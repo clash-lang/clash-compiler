@@ -1,0 +1,2 @@
+module CLaSH.Pretty where
+
