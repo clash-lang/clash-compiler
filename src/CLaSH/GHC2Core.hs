@@ -17,9 +17,9 @@ import Literal    (Literal(..))
 import Name       (Name,nameOccName)
 import OccName    (occNameString)
 import Outputable (showPpr)
-import TyCon      (TyCon,AlgTyConRhs(..),isAlgTyCon,isSynTyCon,isTupleTyCon
+import TyCon      (TyCon,AlgTyConRhs(..),SynTyConRhs(..),isAlgTyCon,isSynTyCon,isTupleTyCon
                   ,isSuperKindTyCon,tyConName,tyConUnique,tyConTyVars,tyConDataCons
-                  ,algTyConRhs,isFunTyCon,isNewTyCon)
+                  ,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,synTyConRhs)
 import Type       (Type,getTyVar_maybe,splitForAllTy_maybe,splitFunTy_maybe
                   ,splitTyConApp_maybe)
 import Unique     (Unique,Uniquable(..),getKey)
@@ -134,20 +134,25 @@ coreToTyCon tc
   | otherwise           = error $ "Can't convert TyCon: " ++ showPpr tc
   where
     tcName = coreToName tyConName tyConUnique tc
+    tcKind = coreToType (tyConKind tc)
 
     algTyCon = C.AlgTyCon
       { C.tyConName   = tcName
+      , C.tyConKind   = tcKind
       , C.tyConTyVars = map coreToTyVar (tyConTyVars tc)
       , C.algTcRhs    = coreToAlgTyConRhs $ algTyConRhs tc
       }
 
     synTyCon = C.SynTyCon
       { C.tyConName   = tcName
+      , C.tyConKind   = tcKind
       , C.tyConTyVars = map coreToTyVar (tyConTyVars tc)
+      , C.synTcRhs    = coreToSynTcRhs $ synTyConRhs tc
       }
 
     tupleTyCon = C.TupleTyCon
       { C.tyConName   = tcName
+      , C.tyConKind   = tcKind
       , C.tyConTyVars = map coreToTyVar (tyConTyVars tc)
       , C.dataCon     = coreToDataCon . head . tyConDataCons $ tc
       }
@@ -164,6 +169,12 @@ coreToAlgTyConRhs algTcRhs = case algTcRhs of
   NewTyCon dc _ _ _ -> C.NewTyCon (coreToDataCon dc)
   AbstractTyCon _   -> error $ "Can't convert AlgTyConRhs: AbstractTyCon"
   DataFamilyTyCon   -> error $ "Can't convert AlgTyConRhs: DataFamilyTyCon"
+
+coreToSynTcRhs ::
+  SynTyConRhs
+  -> C.SynTyConRhs
+coreToSynTcRhs (SynonymTyCon t) = C.SynonymTyCon (coreToType t)
+coreToSynTcRhs SynFamilyTyCon   = error $ "Can't convert SynTyConRhs: SynFamilyTyCon"
 
 coreToTyVar ::
   TyVar

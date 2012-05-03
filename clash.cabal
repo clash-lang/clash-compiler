@@ -19,12 +19,26 @@ Library
   HS-Source-Dirs:      src
 
   extensions:          TemplateHaskell
-  ghc-options:         -O2 -Wall
+  ghc-options:         -O2 -Wall -fwarn-tabs
 
-  -- Exposed-modules:
+  Exposed-modules:     CLaSH.Core
+                       CLaSH.GHC2Core
 
-  -- Build-depends:
+  Build-depends:       base             >= 4.3.1.0 && < 4.6,
+                       unbound          >= 0.4.0.2 && < 0.5
 
-  -- Other-modules:
+  Other-modules:       CLaSH.Core.DataCon
+                       CLaSH.Core.FreeVars
+                       CLaSH.Core.Literal
+                       CLaSH.Core.Prim
+                       CLaSH.Core.Subst
+                       CLaSH.Core.Term
+                       CLaSH.Core.TyCon
+                       CLaSH.Core.Type
+                       CLaSH.Core.TypeRep
+                       CLaSH.Core.TysPrim
+                       CLaSH.Core.Util
+                       CLaSH.Core.Var
+                       CLaSH.Pretty
 
   -- Build-tools:

@@ -10,8 +10,8 @@ module CLaSH.Core.Var where
 import Unbound.LocallyNameless as Unbound
 import Unbound.LocallyNameless.Name (isFree)
 
-import {-# SOURCE #-} CLaSH.Core.Type (Type,Kind)
-import {-# SOURCE #-} CLaSH.Core.Term (Term)
+import {-# SOURCE #-} CLaSH.Core.TypeRep (Type,Kind)
+import {-# SOURCE #-} CLaSH.Core.Term    (Term)
 
 data Var a
   = TyVar

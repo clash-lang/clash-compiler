@@ -29,6 +29,11 @@ instance Alpha Prim
 instance Subst Type Prim
 instance Subst Term Prim
 
+primType ::
+  Prim
+  -> Type
+primType _ = error "primType"
+
 primDicts :: [String]
 primDicts = ["$dPositiveT","$dNaturalT","$dIntegerT"]
 

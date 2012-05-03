@@ -5,47 +5,64 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
-module CLaSH.Core.Type where
+module CLaSH.Core.Type
+  ( Type
+  , Kind
+  , KindOrType
+  , TyName
+  , TyVar
+  , mkFunTy
+  , mkForAllTy
+  , applyTy
+  , splitFunTy_maybe
+  )
+where
 
--- External imports
-import Unbound.LocallyNameless as Unbound
+-- External import
+import Control.Arrow           (first)
+import Unbound.LocallyNameless (bind,runFreshM,unbind)
 
 -- Local imports
-import {-# SOURCE #-} CLaSH.Core.Term  (Term)
-import {-# SOURCE #-} CLaSH.Core.TyCon (TyCon)
-import CLaSH.Core.TysPrim
-import CLaSH.Core.Var                  (TyVar)
+import CLaSH.Core.Subst
+import CLaSH.Core.TyCon
+import CLaSH.Core.TypeRep
+import CLaSH.Core.Var
 
-data Type
-  = TyVarTy  TyName
-  | FunTy    Type  Type
-  | ForAllTy (Bind TyVar Type)
-  | TyConApp TyCon [Type]
-  deriving Show
+mkFunTy :: Type -> Type -> Type
+mkFunTy t1 t2 = FunTy t1 t2
 
-type TyName = Name Type
+mkForAllTy :: TyVar -> Type -> Type
+mkForAllTy tv t = ForAllTy $ bind tv t
 
-type Kind = Type
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys = TyConApp tycon tys
 
-Unbound.derive [''Type]
+mkAppTys :: Type -> [Type] -> Type
+mkAppTys orig_ty1 [] = orig_ty1
+mkAppTys orig_ty1 orig_tys2
+  = mk_app orig_ty1
+  where
+    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
+    mk_app _                 = error $ "mkAppTys: not a TyConApp"
 
-instance Alpha Type
+splitFunTy_maybe ::
+  Type
+  -> Maybe (Type,Type)
+splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
+splitFunTy_maybe (FunTy arg res) = Just (arg,res)
+splitFunTy_maybe _               = Nothing
 
-instance Subst Term Type
-instance Subst Type Type where
-  isvar (TyVarTy v) = Just (SubstName v)
-  isvar _           = Nothing
+coreView :: Type -> Maybe Type
+coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys
+                           = let substEnv = map (first varName) tenv
+                             in Just (mkAppTys (substTys substEnv rhs) tys')
+coreView _                 = Nothing
 
-instance Eq Type where
-  (==) = aeq
-
-intPrimTy :: Type
-intPrimTy = mkTyConTy intPrimTyCon
-
-addrPrimTy :: Type
-addrPrimTy = mkTyConTy addrPrimTyCon
-
-mkTyConTy :: TyCon -> Type
-mkTyConTy tycon = TyConApp tycon []
-
-
+applyTy ::
+  Type
+  -> KindOrType
+  -> Type
+applyTy ty arg | Just ty' <- coreView ty = applyTy ty' arg
+applyTy (ForAllTy b) arg = let (tv,ty) = runFreshM . unbind $ b
+                           in substTy (varName tv) arg ty
+applyTy _ _ = error "applyTy: not a forall type"

@@ -1,12 +1,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-module CLaSH.Core.Type where
+module CLaSH.Core.TypeRep where
 
 import Unbound.LocallyNameless
 
 import {-# SOURCE #-} CLaSH.Core.Term
 
 data Type
-type Kind = Type
+
+type Kind       = Type
+type KindOrType = Type
+type SuperKind  = Type
 
 instance Eq    Type
 instance Rep   Type
