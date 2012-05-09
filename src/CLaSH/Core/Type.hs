@@ -1,32 +1,40 @@
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE UndecidableInstances  #-}
-
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-
 module CLaSH.Core.Type
   ( Type
   , Kind
+  , SuperKind
   , KindOrType
+  , PredType
+  , ThetaType
   , TyName
   , TyVar
+  , Delta
   , mkFunTy
   , mkForAllTy
   , applyTy
   , splitFunTy_maybe
+  , noParenPred
+  , isPredTy
+  , isLiftedTypeKind
   )
 where
 
 -- External import
-import Control.Arrow           (first)
-import Unbound.LocallyNameless (bind,runFreshM,unbind)
+import qualified Data.HashMap.Lazy as HashMap
+import Data.Maybe (fromMaybe)
+import Unbound.LocallyNameless (bind,runFreshM,unbind,name2Integer,unembed)
 
 -- Local imports
 import CLaSH.Core.Subst
 import CLaSH.Core.TyCon
 import CLaSH.Core.TypeRep
+import CLaSH.Core.TysPrim
 import CLaSH.Core.Var
+
+type KindOrType = Type
+type PredType   = Type
+type ThetaType  = [PredType]
+
+type Delta = HashMap.HashMap TyName Kind
 
 mkFunTy :: Type -> Type -> Type
 mkFunTy t1 t2 = FunTy t1 t2
@@ -34,35 +42,74 @@ mkFunTy t1 t2 = FunTy t1 t2
 mkForAllTy :: TyVar -> Type -> Type
 mkForAllTy tv t = ForAllTy $ bind tv t
 
-mkTyConApp :: TyCon -> [Type] -> Type
-mkTyConApp tycon tys = TyConApp tycon tys
-
-mkAppTys :: Type -> [Type] -> Type
-mkAppTys orig_ty1 [] = orig_ty1
-mkAppTys orig_ty1 orig_tys2
-  = mk_app orig_ty1
-  where
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
-    mk_app _                 = error $ "mkAppTys: not a TyConApp"
-
 splitFunTy_maybe ::
   Type
   -> Maybe (Type,Type)
-splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
 splitFunTy_maybe (FunTy arg res) = Just (arg,res)
 splitFunTy_maybe _               = Nothing
-
-coreView :: Type -> Maybe Type
-coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys
-                           = let substEnv = map (first varName) tenv
-                             in Just (mkAppTys (substTys substEnv rhs) tys')
-coreView _                 = Nothing
 
 applyTy ::
   Type
   -> KindOrType
   -> Type
-applyTy ty arg | Just ty' <- coreView ty = applyTy ty' arg
 applyTy (ForAllTy b) arg = let (tv,ty) = runFreshM . unbind $ b
                            in substTy (varName tv) arg ty
 applyTy _ _ = error "applyTy: not a forall type"
+
+noParenPred :: PredType -> Bool
+noParenPred p = isClassPred p || isEqPred p
+
+isClassPred, isEqPred :: PredType -> Bool
+isClassPred ty = case tyConAppTyCon_maybe ty of
+    Just tyCon | isClassTyCon tyCon -> True
+    _                               -> False
+
+isEqPred ty = case tyConAppTyCon_maybe ty of
+    Just tyCon -> (name2Integer $ tyConName tyCon) == eqTyConKey
+    _          -> False
+
+tyConAppTyCon_maybe :: Type -> Maybe TyCon
+tyConAppTyCon_maybe (TyConApp tc _) = Just tc
+tyConAppTyCon_maybe _               = Nothing
+
+isPredTy :: Delta -> Type -> Bool
+isPredTy d ty
+  | isSuperKind ty = False
+  | otherwise      = typeKind d ty == constraintKind
+
+isSuperKind :: Type -> Bool
+isSuperKind (TyConApp skc []) = isSuperKindTyCon skc
+isSuperKind _                 = False
+
+isLiftedTypeKind :: Kind -> Bool
+isLiftedTypeKind (TyConApp tc []) = (name2Integer (tyConName tc)) == liftedTypeKindTyConKey
+isLiftedTypeKind _                = False
+
+typeKind :: Delta -> Type -> Kind
+typeKind _ (TyConApp tc tys) = kindAppResult (tyConKind tc) tys
+typeKind d (ForAllTy b)      = let (tv,ty) = runFreshM $ unbind b
+                                   d'  = HashMap.insert
+                                           (varName tv)
+                                           (unembed $ varKind tv)
+                                           d
+                               in  typeKind d' ty
+typeKind d (TyVarTy tv)      = fromMaybe (error $ "typeKind: " ++ show tv)
+                             $ HashMap.lookup tv d
+typeKind d (FunTy _arg res)
+  | isSuperKind k = k
+  | otherwise     = liftedTypeKind
+  where
+    k = typeKind d res
+
+kindAppResult :: Kind -> [Type] -> Kind
+kindAppResult k []     = k
+kindAppResult k (a:as) = kindAppResult (kindFunResult k a) as
+
+kindFunResult :: Kind -> KindOrType -> Kind
+kindFunResult (FunTy _ res) _  = res
+kindFunResult (ForAllTy b) arg = let (kv,ki) = runFreshM . unbind $ b
+                                 in substKindWith (zip [varName kv] [arg]) ki
+kindFunResult _ _              = error "kindFunResult"
+
+constraintKind :: Kind
+constraintKind = kindTyConType constraintKindTyCon

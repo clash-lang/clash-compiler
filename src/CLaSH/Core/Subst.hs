@@ -2,7 +2,7 @@ module CLaSH.Core.Subst where
 
 import Unbound.LocallyNameless (subst,substs)
 
-import CLaSH.Core.TypeRep (Type,TyName)
+import CLaSH.Core.TypeRep (Type,Kind,TyName,KiName)
 
 substTys ::
   [(TyName,Type)]
@@ -16,3 +16,9 @@ substTy ::
   -> Type
   -> Type
 substTy = subst
+
+substKindWith ::
+  [(KiName,Kind)]
+  -> Kind
+  -> Kind
+substKindWith = substs

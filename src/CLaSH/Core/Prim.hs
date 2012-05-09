@@ -1,6 +1,6 @@
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
@@ -10,15 +10,14 @@ module CLaSH.Core.Prim where
 import Unbound.LocallyNameless as Unbound
 
 import CLaSH.Core.DataCon             (DataCon)
-import {-# SOURCE #-} CLaSH.Core.Term (Term)
+import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.Type                (Type)
-import CLaSH.Core.Var                 (Id)
 
 data Prim
-  = PrimFun  Id
+  = PrimFun  TmName Type
   | PrimCon  DataCon
-  | PrimDict Id
-  | PrimDFun Id
+  | PrimDict TmName Type
+  | PrimDFun TmName Type
   | PrimCo   Type
   deriving Show
 

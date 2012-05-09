@@ -1,6 +1,6 @@
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
@@ -27,7 +27,7 @@ data Term
   | TyLam   (Bind TyVar Term)
   | App     Term Term
   | TyApp   Term Type
-  | Letrec  (Bind (Rec [(Id, Embed Term)]) Term)
+  | Letrec  (Bind (Rec [LetBinding]) Term)
   | Case    Term [Bind Pat Term]
   deriving Show
 

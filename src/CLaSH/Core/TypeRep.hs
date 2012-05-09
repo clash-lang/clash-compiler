@@ -1,21 +1,24 @@
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
 module CLaSH.Core.TypeRep
   ( Type (..)
   , Kind
-  , KindOrType
   , SuperKind
   , TyName
+  , KiName
   , mkTyConTy
   )
 where
 
 -- External imports
+import Data.Hashable (Hashable(..))
 import Unbound.LocallyNameless as Unbound
+import Unbound.LocallyNameless.Name
 
 -- Local imports
 import {-# SOURCE #-} CLaSH.Core.Term
@@ -29,13 +32,17 @@ data Type
   | TyConApp TyCon [Type]
   deriving Show
 
-type TyName = Name Type
-
 type Kind = Type
-type KindOrType = Type
 type SuperKind = Type
 
+type TyName = Name Type
+type KiName = Name Type
+
 Unbound.derive [''Type]
+
+instance Hashable (Name Type) where
+  hash (Nm _ (str, int)) = hashWithSalt (hash int) str
+  hash (Bn _ i0 i1)      = hash i0 `hashWithSalt` i1
 
 instance Alpha Type
 

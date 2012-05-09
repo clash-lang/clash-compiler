@@ -11,7 +11,8 @@ import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type    (Type,Kind,TyName,mkFunTy,mkForAllTy,applyTy,splitFunTy_maybe)
+import CLaSH.Core.Type    (Type,Kind,TyName,mkFunTy,mkForAllTy,applyTy,
+  splitFunTy_maybe)
 import CLaSH.Core.Var     (Id,varName,varType)
 
 instance Hashable (Name a) where
@@ -28,12 +29,13 @@ termType ::
 termType gamma e = case e of
   Var x       -> fromMaybe (error $ "termType: " ++ show x ++ " not found") $
                    HashMap.lookup x gamma
-  Data dc     -> unembed . varType . dcWorkId $ dc
+  Data dc     -> snd . dcWorkId $ dc
   Literal l   -> literalType l
   Prim p      -> primType p
   Lam b       -> let (v,e') = runFreshM $ unbind b
                      ety    = termType
-                                (HashMap.insert (varName v) (unembed $ varType v) gamma)
+                                (HashMap.insert (varName v)
+                                                (unembed $ varType v) gamma)
                                 e'
                  in mkFunTy (unembed $ varType v) ety
   TyLam b     -> let (tv,e') = runFreshM $ unbind b
@@ -68,7 +70,8 @@ collectArgs = go []
 
 applyTypeToArgs :: Type -> [Either Term Type] -> Type
 applyTypeToArgs opTy [] = opTy
-applyTypeToArgs opTy (Right ty:args) = applyTypeToArgs (opTy `applyTy` ty) args
+applyTypeToArgs opTy (Right ty:args) = applyTypeToArgs (opTy `applyTy` ty)
+                                         args
 applyTypeToArgs opTy (Left _:args)   = case splitFunTy_maybe opTy of
   Just (_,resTy) -> applyTypeToArgs resTy args
   Nothing        -> error "applyTypeToArgs splitFunTy: not a funTy"

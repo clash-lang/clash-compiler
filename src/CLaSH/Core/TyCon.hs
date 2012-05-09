@@ -1,6 +1,7 @@
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE PatternGuards         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
@@ -13,37 +14,34 @@ import Unbound.LocallyNameless as Unbound
 -- Internal Imports
 import {-# SOURCE #-} CLaSH.Core.DataCon  (DataCon)
 import {-# SOURCE #-} CLaSH.Core.Term     (Term)
-import {-# SOURCE #-} CLaSH.Core.TypeRep  (Kind,Type)
-import CLaSH.Core.Var                     (TyVar)
+import {-# SOURCE #-} CLaSH.Core.TypeRep  (Kind,Type,TyName)
 
 data TyCon
   = AlgTyCon
   { tyConName   :: TyConName
   , tyConKind   :: Kind
-  , tyConTyVars :: [TyVar]
+  , tyConArity  :: Int
+  , tyConTyVars :: [TyName]
   , algTcRhs    :: AlgTyConRhs
-  }
-
-  | SynTyCon
-  { tyConName   :: TyConName
-  , tyConKind   :: Kind
-  , tyConTyVars :: [TyVar]
-  , synTcRhs    :: SynTyConRhs
+  , algTcParent :: TyConParent
   }
 
   | TupleTyCon
   { tyConName   :: TyConName
   , tyConKind   :: Kind
-  , tyConTyVars :: [TyVar]
+  , tyConArity  :: Int
+  , tyConTyVars :: [TyName]
   , dataCon     :: DataCon
   }
 
   | SuperKindTyCon
   { tyConName   :: TyConName
   }
+
   | PrimTyCon
   { tyConName    :: TyConName
   , tyConKind    :: Kind
+  , tyConArity   :: Int
   , primTyConRep :: PrimRep
   }
   deriving (Eq,Show)
@@ -59,8 +57,9 @@ data AlgTyConRhs
   }
   deriving (Eq,Show)
 
-data SynTyConRhs
-  = SynonymTyCon Type
+data TyConParent
+  = NoParentTyCon
+  | ClassTyCon
   deriving (Eq,Show)
 
 data PrimRep
@@ -69,22 +68,22 @@ data PrimRep
   | VoidRep
   deriving (Eq,Show)
 
-Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''SynTyConRhs]
+Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''TyConParent]
 
 instance Alpha PrimRep
 instance Alpha TyCon
 instance Alpha AlgTyConRhs
-instance Alpha SynTyConRhs
+instance Alpha TyConParent
 
 instance Subst Type TyCon
 instance Subst Type AlgTyConRhs
 instance Subst Type PrimRep
-instance Subst Type SynTyConRhs
+instance Subst Type TyConParent
 
 instance Subst Term TyCon
 instance Subst Term AlgTyConRhs
 instance Subst Term PrimRep
-instance Subst Term SynTyConRhs
+instance Subst Term TyConParent
 
 mkKindTyCon ::
   TyConName
@@ -104,36 +103,34 @@ mkPrimTyCon ::
   -> Int
   -> PrimRep
   -> TyCon
-mkPrimTyCon name kind _ rep
+mkPrimTyCon name kind arity rep
   = PrimTyCon
   { tyConName = name
   , tyConKind = kind
+  , tyConArity = arity
   , primTyConRep = rep
   }
 
-isSynTyCon :: TyCon -> Bool
-isSynTyCon (SynTyCon {}) = True
-isSynTyCon _             = False
+isTupleTyCon :: TyCon -> Bool
+isTupleTyCon (TupleTyCon {}) = True
+isTupleTyCon _               = False
 
-coreExpandTyCon_maybe ::
-  TyCon
-  -> [Type]
-  -> Maybe ([(TyVar,Type)],Type,[Type])
-coreExpandTyCon_maybe (SynTyCon { tyConTyVars = tvs
-                                , synTcRhs = SynonymTyCon rhs }) tys
-    = expand tvs rhs tys
+isClassTyCon :: TyCon -> Bool
+isClassTyCon (AlgTyCon {algTcParent = ClassTyCon}) = True
+isClassTyCon _                                     = False
 
-coreExpandTyCon_maybe _ _ = Nothing
+isSuperKindTyCon :: TyCon -> Bool
+isSuperKindTyCon (SuperKindTyCon {}) = True
+isSuperKindTyCon _                   = False
 
-expand ::
-  [TyVar]
-  -> Type
-  -> [Type]
-  -> Maybe ([(TyVar,Type)], Type, [Type])
-expand tvs rhs tys =
-    case n_tvs `compare` length tys of
-      LT -> Just (tvs `zip` tys, rhs, drop n_tvs tys)
-      EQ -> Just (tvs `zip` tys, rhs, [])
-      Prelude.GT -> Nothing
+isTupleTyConLike :: TyCon -> Bool
+isTupleTyConLike (TupleTyCon {}) = True
+isTupleTyConLike (AlgTyCon {tyConName = nm}) = tupleName (name2String nm)
   where
-    n_tvs = length tvs
+    tupleName nm
+      | '(' <- head nm
+      , ')' <- last nm
+      = all (== ',') (init $ tail nm)
+    tupleName _ = False
+
+isTupleTyConLike _ = False

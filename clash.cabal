@@ -21,15 +21,21 @@ Library
   extensions:          TemplateHaskell
   ghc-options:         -O2 -Wall -fwarn-tabs
 
-  Exposed-modules:     CLaSH.Core
-                       CLaSH.GHC2Core
+  Exposed-modules:     CLaSH.Driver
 
-  Build-depends:       base             >= 4.3.1.0 && < 4.6,
-                       unbound          >= 0.4.0.2 && < 0.5
+  Build-depends:       base                 >= 4.3.1.0 && < 4.6,
+                       ghc                  >= 7.4.1   && < 7.5,
+                       ghc-paths            >= 0.1.0.8 && < 0.2,
+                       hashable             >= 1.1.2.3 && < 1.2,
+                       pretty               >= 1.1.1.0 && < 1.2,
+                       template-haskell     >= 2.7.0.0 && < 2.8,
+                       unbound              >= 0.4.0.2 && < 0.5,
+                       unordered-containers >= 0.2.1.0 && < 0.3
 
   Other-modules:       CLaSH.Core.DataCon
                        CLaSH.Core.FreeVars
                        CLaSH.Core.Literal
+                       CLaSH.Core.Pretty
                        CLaSH.Core.Prim
                        CLaSH.Core.Subst
                        CLaSH.Core.Term
@@ -39,6 +45,10 @@ Library
                        CLaSH.Core.TysPrim
                        CLaSH.Core.Util
                        CLaSH.Core.Var
-                       CLaSH.Pretty
+
+                       CLaSH.GHC.GHC2Core
+                       CLaSH.GHC.LoadModules
+
+                       CLaSH.Util
 
   -- Build-tools:

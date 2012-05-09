@@ -7,9 +7,8 @@ import {-# SOURCE #-} CLaSH.Core.Term
 
 data Type
 
-type Kind       = Type
-type KindOrType = Type
-type SuperKind  = Type
+type Kind = Type
+type TyName = Name Type
 
 instance Eq    Type
 instance Rep   Type

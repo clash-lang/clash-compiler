@@ -1,33 +1,40 @@
-module CLaSH.GHC2Core where
+module CLaSH.GHC.GHC2Core where
 
 -- External Modules
 import Control.Arrow (first,second)
-import Unbound.LocallyNameless (Embed(..),Rep,bind,rec,embed)
+import Unbound.LocallyNameless (Rep,bind,rec,embed)
 import qualified Unbound.LocallyNameless as Unbound
 
 -- GHC API
 import Coercion   (isCoVar,coercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
-import DataCon    (DataCon,dataConTag,dataConUnivTyVars,dataConWorkId
-                  ,dataConRepArgTys,dataConName,dataConTyCon)
+import DataCon    (DataCon,dataConTag,dataConUnivTyVars,dataConWorkId,
+  dataConRepArgTys,dataConName,dataConTyCon)
 import FastString (unpackFS)
 import Id         (isDataConWorkId_maybe)
 import Literal    (Literal(..))
 import Name       (Name,nameOccName)
 import OccName    (occNameString)
 import Outputable (showPpr)
-import TyCon      (TyCon,AlgTyConRhs(..),SynTyConRhs(..),isAlgTyCon,isSynTyCon,isTupleTyCon
-                  ,isSuperKindTyCon,tyConName,tyConUnique,tyConTyVars,tyConDataCons
-                  ,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,synTyConRhs)
-import Type       (Type,getTyVar_maybe,splitForAllTy_maybe,splitFunTy_maybe
-                  ,splitTyConApp_maybe)
+import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
+  isAlgTyCon,isTupleTyCon,isSuperKindTyCon,tyConName,tyConUnique,tyConTyVars,
+  tyConDataCons,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,tyConArity,
+  tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep)
+import Type       (Type,getTyVar_maybe,splitForAllTy_maybe,splitFunTy_maybe,
+  splitTyConApp_maybe)
 import Unique     (Unique,Uniquable(..),getKey)
 import Var        (Var,Id,TyVar,varName,varUnique,varType,isTyVar)
 import VarSet     (isEmptyVarSet)
 
 -- Local imports
-import qualified CLaSH.Core as C
+import qualified CLaSH.Core.DataCon as C
+import qualified CLaSH.Core.Literal as C
+import qualified CLaSH.Core.Prim    as C
+import qualified CLaSH.Core.Term    as C
+import qualified CLaSH.Core.TyCon   as C
+import qualified CLaSH.Core.TypeRep as C
+import qualified CLaSH.Core.Var     as C
 
 coreToDataCon ::
   DataCon
@@ -36,9 +43,10 @@ coreToDataCon dc =
   C.MkData
     { C.dcName       = coreToName dataConName getUnique dc
     , C.dcTag        = dataConTag dc
-    , C.dcRepArgTys  = map coreToType  (dataConRepArgTys  dc)
-    , C.dcUnivTyVars = map coreToTyVar (dataConUnivTyVars dc)
-    , C.dcWorkId     = coreToId $ dataConWorkId dc
+    , C.dcRepArgTys  = map coreToType (dataConRepArgTys  dc)
+    , C.dcUnivTyVars = map coreToVar  (dataConUnivTyVars dc)
+    , C.dcWorkId     = ( coreToVar $ dataConWorkId dc
+                       , coreToType $ varType $ dataConWorkId dc)
     }
 
 coreToLiteral ::
@@ -50,6 +58,7 @@ coreToLiteral l = case l of
   MachInt64  i  -> C.IntegerLiteral i
   MachWord   i  -> C.IntegerLiteral i
   MachWord64 i  -> C.IntegerLiteral i
+  LitInteger i _ -> C.IntegerLiteral i
   _             -> error $ "Can't convert literal: " ++ show l
 
 coreToTerm ::
@@ -66,35 +75,43 @@ coreToTerm = term
     term (Let (NonRec x e1) e2)  = C.Letrec $ bind
                                       (rec [(coreToId x, embed $ term e1)])
                                       (term e2)
-    term (Let (Rec xes) e)       = C.Letrec $ bind
-                                      (rec $ map
-                                         (first coreToId . second (embed . term))
-                                         xes
-                                      ) (term e)
-    term (Case e b _ alts)       = let usesBndr = not $ all (isEmptyVarSet . exprSomeFreeVars (`elem` [b])) $ rhssOfAlts alts
-                                       caseTerm = C.Case (term e) (map alt alts)
-                                   in if usesBndr
-                                     then C.Letrec $ bind
-                                            (rec [(coreToId b, embed $ term e)])
-                                            caseTerm
-                                     else caseTerm
-    term (Cast e _)              = term e
-    term (Tick _ e)              = term e
-    term (Type _)                = error "Type at non-argument position not supported"
-    term (Coercion co)           = C.Prim $ C.PrimCo (coreToType $ coercionType co)
 
-    var x = let xId    = coreToId x
-                xNameS = Unbound.name2String $ C.varName xId
+    term (Let (Rec xes) e) = C.Letrec $ bind
+                                (rec $ map
+                                         ( first coreToId
+                                         . second (embed . term)
+                                         ) xes)
+                                (term e)
+
+    term (Case e b _ alts) = let usesBndr = any ( not
+                                                . isEmptyVarSet
+                                                . exprSomeFreeVars (`elem` [b])
+                                                ) $ rhssOfAlts alts
+                                 caseTerm = C.Case (term e) (map alt alts)
+                             in if usesBndr
+                               then C.Letrec $ bind
+                                      (rec [(coreToId b, embed $ term e)])
+                                      caseTerm
+                               else caseTerm
+
+    term (Cast e _)        = term e
+    term (Tick _ e)        = term e
+    term (Type _)          = error "Type at non-argument position not supported"
+    term (Coercion co)     = C.Prim $ C.PrimCo (coreToType $ coercionType co)
+
+    var x = let xVar   = coreToVar x
+                xType  = coreToType (varType x)
+                xNameS = Unbound.name2String $ xVar
             in case (isDataConWorkId_maybe x) of
               Just dc | isNewTyCon (dataConTyCon dc) -> error "Newtype not supported"
                       | otherwise -> if (xNameS `elem` C.primDataCons)
                           then C.Prim (C.PrimCon (coreToDataCon dc))
                           else C.Data (coreToDataCon dc)
               Nothing
-                | xNameS `elem` C.primDFuns -> C.Prim (C.PrimDFun xId)
-                | xNameS `elem` C.primDicts -> C.Prim (C.PrimDict xId)
-                | xNameS `elem` C.primFuns  -> C.Prim (C.PrimFun xId)
-                | otherwise -> C.Var (C.varName xId)
+                | xNameS `elem` C.primDFuns -> C.Prim (C.PrimDFun xVar xType)
+                | xNameS `elem` C.primDicts -> C.Prim (C.PrimDict xVar xType)
+                | xNameS `elem` C.primFuns  -> C.Prim (C.PrimFun  xVar xType)
+                | otherwise -> C.Var xVar
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat (term e)
     alt (LitAlt l  , _ , e) = bind (C.LitPat $ coreToLiteral l) (term e)
@@ -128,33 +145,38 @@ coreToTyCon ::
   -> C.TyCon
 coreToTyCon tc
   | isAlgTyCon tc       = algTyCon
-  | isSynTyCon tc       = synTyCon
   | isTupleTyCon tc     = tupleTyCon
+  | isSynTyCon tc       = error $ "Can't convert SynTyCon: " ++ showPpr tc
+  | isPrimTyCon tc      = primTyCon
   | isSuperKindTyCon tc = superKindTyCon
   | otherwise           = error $ "Can't convert TyCon: " ++ showPpr tc
   where
-    tcName = coreToName tyConName tyConUnique tc
-    tcKind = coreToType (tyConKind tc)
+    tcName  = coreToName tyConName tyConUnique tc
+    tcKind  = coreToType (tyConKind tc)
+    tcArity = tyConArity tc
 
     algTyCon = C.AlgTyCon
       { C.tyConName   = tcName
       , C.tyConKind   = tcKind
-      , C.tyConTyVars = map coreToTyVar (tyConTyVars tc)
+      , C.tyConArity  = tcArity
+      , C.tyConTyVars = map coreToVar (tyConTyVars tc)
       , C.algTcRhs    = coreToAlgTyConRhs $ algTyConRhs tc
-      }
-
-    synTyCon = C.SynTyCon
-      { C.tyConName   = tcName
-      , C.tyConKind   = tcKind
-      , C.tyConTyVars = map coreToTyVar (tyConTyVars tc)
-      , C.synTcRhs    = coreToSynTcRhs $ synTyConRhs tc
+      , C.algTcParent = coreToAltTcParent $ tyConParent tc
       }
 
     tupleTyCon = C.TupleTyCon
       { C.tyConName   = tcName
       , C.tyConKind   = tcKind
-      , C.tyConTyVars = map coreToTyVar (tyConTyVars tc)
+      , C.tyConArity  = tcArity
+      , C.tyConTyVars = map coreToVar (tyConTyVars tc)
       , C.dataCon     = coreToDataCon . head . tyConDataCons $ tc
+      }
+
+    primTyCon = C.PrimTyCon
+      { C.tyConName    = tcName
+      , C.tyConKind    = tcKind
+      , C.tyConArity   = tcArity
+      , C.primTyConRep = coreToPrimRep (tyConPrimRep tc)
       }
 
     superKindTyCon = C.SuperKindTyCon
@@ -170,11 +192,22 @@ coreToAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon _   -> error $ "Can't convert AlgTyConRhs: AbstractTyCon"
   DataFamilyTyCon   -> error $ "Can't convert AlgTyConRhs: DataFamilyTyCon"
 
-coreToSynTcRhs ::
-  SynTyConRhs
-  -> C.SynTyConRhs
-coreToSynTcRhs (SynonymTyCon t) = C.SynonymTyCon (coreToType t)
-coreToSynTcRhs SynFamilyTyCon   = error $ "Can't convert SynTyConRhs: SynFamilyTyCon"
+coreToAltTcParent ::
+  TyConParent
+  -> C.TyConParent
+coreToAltTcParent algTcParent = case algTcParent of
+  NoParentTyCon -> C.NoParentTyCon
+  ClassTyCon _  -> C.ClassTyCon
+  _             -> error $ "Can't convert algTcParent: " ++ showPpr algTcParent
+
+coreToPrimRep ::
+  PrimRep
+  -> C.PrimRep
+coreToPrimRep p = case p of
+  VoidRep -> C.VoidRep
+  IntRep  -> C.IntRep
+  AddrRep -> C.AddrRep
+  _ -> error $ "Can't convert PrimRep: " ++ showPpr p
 
 coreToTyVar ::
   TyVar
@@ -182,7 +215,7 @@ coreToTyVar ::
 coreToTyVar tv =
   C.TyVar
     { C.varName = coreToVar tv
-    , C.varKind = Embed $ coreToType (varType tv)
+    , C.varKind = embed $ coreToType (varType tv)
     }
 
 coreToId ::
@@ -191,7 +224,7 @@ coreToId ::
 coreToId i =
   C.Id
     { C.varName = coreToVar i
-    , C.varType = Embed $ coreToType (varType i)
+    , C.varType = embed $ coreToType (varType i)
     }
 
 coreToVar ::

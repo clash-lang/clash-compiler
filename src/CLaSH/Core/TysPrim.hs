@@ -4,20 +4,35 @@ module CLaSH.Core.TysPrim where
 import Unbound.LocallyNameless         (makeName)
 
 -- GHC API
-import PrelNames (intPrimTyConKey,addrPrimTyConKey,unliftedTypeKindTyConKey
-                 ,tySuperKindTyConKey)
+import qualified PrelNames
 import Unique    (getKey)
 
 import CLaSH.Core.TyCon
 import CLaSH.Core.TypeRep
 
-intPrimTyConName, addrPrimTyConName :: TyConName
-intPrimTyConName  = makeName "#Int"  (toInteger . getKey $ intPrimTyConKey)
-addrPrimTyConName = makeName "#Addr" (toInteger . getKey $ addrPrimTyConKey)
+intPrimTyConKey, addrPrimTyConKey, eqTyConKey, listTyConKey :: Integer
+tySuperKindTyConKey, unliftedTypeKindTyConKey, liftedTypeKindTyConKey, constraintKindTyConKey :: Integer
 
-tySuperKindTyConName, unliftedTypeKindTyConName :: TyConName
-tySuperKindTyConName      = makeName "BOX" (toInteger . getKey $ tySuperKindTyConKey)
-unliftedTypeKindTyConName = makeName "#" (toInteger . getKey $ unliftedTypeKindTyConKey)
+intPrimTyConKey          = toInteger . getKey $ PrelNames.intPrimTyConKey
+addrPrimTyConKey         = toInteger . getKey $ PrelNames.addrPrimTyConKey
+eqTyConKey               = toInteger . getKey $ PrelNames.eqTyConKey
+listTyConKey             = toInteger . getKey $ PrelNames.listTyConKey
+
+tySuperKindTyConKey      = toInteger . getKey $ PrelNames.tySuperKindTyConKey
+unliftedTypeKindTyConKey = toInteger . getKey $ PrelNames.unliftedTypeKindTyConKey
+liftedTypeKindTyConKey   = toInteger . getKey $ PrelNames.liftedTypeKindTyConKey
+constraintKindTyConKey   = toInteger . getKey $ PrelNames.constraintKindTyConKey
+
+
+intPrimTyConName, addrPrimTyConName :: TyConName
+intPrimTyConName  = makeName "#Int"  intPrimTyConKey
+addrPrimTyConName = makeName "#Addr" addrPrimTyConKey
+
+tySuperKindTyConName, liftedTypeKindTyConName, unliftedTypeKindTyConName, constraintKindTyConName :: TyConName
+tySuperKindTyConName      = makeName "BOX"        tySuperKindTyConKey
+liftedTypeKindTyConName   = makeName "*"          liftedTypeKindTyConKey
+unliftedTypeKindTyConName = makeName "#"          unliftedTypeKindTyConKey
+constraintKindTyConName   = makeName "Constraint" constraintKindTyConKey
 
 intPrimTyCon :: TyCon
 intPrimTyCon  = pcPrimTyCon0 intPrimTyConName IntRep
@@ -25,17 +40,18 @@ intPrimTyCon  = pcPrimTyCon0 intPrimTyConName IntRep
 addrPrimTyCon :: TyCon
 addrPrimTyCon = pcPrimTyCon0 addrPrimTyConName AddrRep
 
-unliftedTypeKindTyCon :: TyCon
-unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName tySuperKind
-
-unliftedTypeKind :: Kind
+liftedTypeKind, unliftedTypeKind :: Kind
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
+liftedTypeKind   = kindTyConType liftedTypeKindTyCon
 
 tySuperKind :: SuperKind
 tySuperKind = kindTyConType tySuperKindTyCon
 
-tySuperKindTyCon :: TyCon
-tySuperKindTyCon = mkSuperKindTyCon tySuperKindTyConName
+tySuperKindTyCon, constraintKindTyCon, liftedTypeKindTyCon, unliftedTypeKindTyCon  :: TyCon
+tySuperKindTyCon      = mkSuperKindTyCon tySuperKindTyConName
+unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName tySuperKind
+liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName tySuperKind
+constraintKindTyCon   = mkKindTyCon constraintKindTyConName tySuperKind
 
 pcPrimTyCon0 ::
   TyConName
