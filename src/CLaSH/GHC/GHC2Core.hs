@@ -118,7 +118,7 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
 
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
-    term (Type _)          = error "Type at non-argument position not supported"
+    term (Type _)          = error $ $(curLoc) ++ "Type at non-argument position not supported"
     term (Coercion co)     = C.Prim <$> C.PrimCo <$> (coreToType $ coercionType co)
 
     var x = let xVar   = coreToVar x
@@ -126,7 +126,7 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
             in do
               xType <- coreToType (varType x)
               case (isDataConWorkId_maybe x) of
-                Just dc | isNewTyCon (dataConTyCon dc) -> error "Newtype not supported"
+                Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
                         | otherwise -> if (xNameS `elem` C.primDataCons)
                             then C.Prim <$> C.PrimCon <$> (coreToDataCon dc)
                             else C.Data <$> (coreToDataCon dc)
@@ -143,7 +143,7 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
                                                       (coreToDataCon dc) <*>
                                                       (mapM coreToId zs)) <*>
                                                 (term e)
-                                _ -> error "Patterns binding coercions or type variables are not supported"
+                                _ -> error $ $(curLoc) ++ "Patterns binding coercions or type variables are not supported"
       where
         (as,ys) = span isTyVar xs
         (cs,zs) = span isCoVar ys
@@ -191,7 +191,7 @@ coreToLiteral l = case l of
   MachWord   i   -> C.IntegerLiteral i
   MachWord64 i   -> C.IntegerLiteral i
   LitInteger i _ -> C.IntegerLiteral i
-  _              -> error $ "Can't convert literal: " ++ show l
+  _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ show l
 
 coreToType ::
   Type
@@ -206,7 +206,7 @@ coreToType ty = case getTyVar_maybe ty of
       Just (t1,t2) -> C.FunTy <$> (coreToType t1) <*> (coreToType t2)
       Nothing -> case (splitForAllTy_maybe ty) of
         Just (tv,ty') -> C.ForAllTy <$> (bind <$> (coreToTyVar tv) <*> (coreToType ty'))
-        Nothing -> error $ "Type application of type variables not supported"
+        Nothing -> error $ $(curLoc) ++ "Type application of type variables not supported"
 
 coreToTyCon ::
   TyCon
@@ -216,10 +216,10 @@ coreToTyCon tc = makeCached tc tyConMap tycon
     tycon
       | isAlgTyCon tc       = algTyCon
       | isTupleTyCon tc     = tupleTyCon
-      | isSynTyCon tc       = error $ "Can't convert SynTyCon: " ++ showPpr tc
+      | isSynTyCon tc       = error $ $(curLoc) ++ "Can't convert SynTyCon: " ++ showPpr tc
       | isPrimTyCon tc      = primTyCon
       | isSuperKindTyCon tc = return superKindTyCon
-      | otherwise           = error $ "Can't convert TyCon: " ++ showPpr tc
+      | otherwise           = error $ $(curLoc) ++ "Can't convert TyCon: " ++ showPpr tc
       where
         tcName  = coreToName tyConName tyConUnique tc
         tcArity = tyConArity tc
@@ -269,8 +269,8 @@ coreToAlgTyConRhs ::
 coreToAlgTyConRhs algTcRhs = case algTcRhs of
   DataTyCon dcs _   -> C.DataTyCon <$> (mapM coreToDataCon_noWorkId dcs)
   NewTyCon dc _ _ _ -> C.NewTyCon <$> (coreToDataCon_noWorkId dc)
-  AbstractTyCon _   -> error $ "Can't convert AlgTyConRhs: AbstractTyCon"
-  DataFamilyTyCon   -> error $ "Can't convert AlgTyConRhs: DataFamilyTyCon"
+  AbstractTyCon _   -> error $ $(curLoc) ++ "Can't convert AlgTyConRhs: AbstractTyCon"
+  DataFamilyTyCon   -> error $ $(curLoc) ++ "Can't convert AlgTyConRhs: DataFamilyTyCon"
 
 coreToAltTcParent ::
   TyConParent
@@ -278,7 +278,7 @@ coreToAltTcParent ::
 coreToAltTcParent algTcParent = case algTcParent of
   NoParentTyCon -> C.NoParentTyCon
   ClassTyCon _  -> C.ClassTyCon
-  _             -> error $ "Can't convert algTcParent: " ++ showPpr algTcParent
+  _             -> error $ $(curLoc) ++ "Can't convert algTcParent: " ++ showPpr algTcParent
 
 coreToPrimRep ::
   PrimRep
@@ -287,7 +287,7 @@ coreToPrimRep p = case p of
   VoidRep -> C.VoidRep
   IntRep  -> C.IntRep
   AddrRep -> C.AddrRep
-  _ -> error $ "Can't convert PrimRep: " ++ showPpr p
+  _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p
 
 coreToTyVar ::
   TyVar

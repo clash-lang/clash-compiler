@@ -6,6 +6,7 @@ import qualified Data.HashMap.Lazy as HashMap
 import CLaSH.GHC.GHC2Core
 import CLaSH.GHC.LoadModules
 import CLaSH.Core.Pretty
+import CLaSH.Core.Util
 
 generateVHDL ::
   String

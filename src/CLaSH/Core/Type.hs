@@ -29,6 +29,7 @@ import CLaSH.Core.TyCon
 import CLaSH.Core.TypeRep
 import CLaSH.Core.TysPrim
 import CLaSH.Core.Var
+import CLaSH.Util
 
 type KindOrType = Type
 type PredType   = Type
@@ -54,7 +55,7 @@ applyTy ::
   -> Type
 applyTy (ForAllTy b) arg = let (tv,ty) = runFreshM . unbind $ b
                            in substTy (varName tv) arg ty
-applyTy _ _ = error "applyTy: not a forall type"
+applyTy _ _ = error $ $(curLoc) ++ "applyTy: not a forall type"
 
 noParenPred :: PredType -> Bool
 noParenPred p = isClassPred p || isEqPred p
@@ -93,7 +94,7 @@ typeKind d (ForAllTy b)      = let (tv,ty) = runFreshM $ unbind b
                                            (unembed $ varKind tv)
                                            d
                                in  typeKind d' ty
-typeKind d (TyVarTy tv)      = fromMaybe (error $ "typeKind: " ++ show tv)
+typeKind d (TyVarTy tv)      = fromMaybe (error $ $(curLoc) ++ "typeKind: " ++ show tv)
                              $ HashMap.lookup tv d
 typeKind d (FunTy _arg res)
   | isSuperKind k = k
@@ -109,7 +110,7 @@ kindFunResult :: Kind -> KindOrType -> Kind
 kindFunResult (FunTy _ res) _  = res
 kindFunResult (ForAllTy b) arg = let (kv,ki) = runFreshM . unbind $ b
                                  in substKindWith (zip [varName kv] [arg]) ki
-kindFunResult _ _              = error "kindFunResult"
+kindFunResult _ _              = error $ $(curLoc) ++ "kindFunResult"
 
 constraintKind :: Kind
 constraintKind = kindTyConType constraintKindTyCon

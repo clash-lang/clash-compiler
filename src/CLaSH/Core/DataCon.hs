@@ -11,6 +11,7 @@ import Unbound.LocallyNameless as Unbound
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.Type                (Type,TyName)
+import CLaSH.Util
 
 data DataCon
   = MkData
@@ -33,3 +34,11 @@ instance Alpha DataCon where
 
 instance Subst Type DataCon
 instance Subst Term DataCon
+
+dataConWorkId ::
+  DataCon
+  -> (TmName, Type)
+dataConWorkId (MkData { dcWorkId = dcIdM }) =
+  case dcIdM of
+    Nothing   -> error $ $(curLoc) ++ "No WorkerID for DataCon"
+    Just dcId -> dcId

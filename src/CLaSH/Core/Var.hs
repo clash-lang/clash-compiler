@@ -12,6 +12,7 @@ import Unbound.LocallyNameless.Name (isFree)
 
 import {-# SOURCE #-} CLaSH.Core.TypeRep (Type,Kind)
 import {-# SOURCE #-} CLaSH.Core.Term    (Term)
+import CLaSH.Util
 
 data Var a
   = TyVar
@@ -37,4 +38,4 @@ instance Subst Term TyVar
 instance Subst Type TyVar
 instance Subst Type Id where
   subst tvN u (Id idN ty) | isFree tvN = Id idN (subst tvN u ty)
-  subst m _ _ = error $ "Cannot substitute for bound variable: " ++ show m
+  subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m

@@ -7,13 +7,14 @@ import qualified Data.HashMap.Lazy as HashMap
 import Unbound.LocallyNameless        (runFreshM,unbind,unembed,unrec)
 import Unbound.LocallyNameless.Name   (Name(..))
 
-import CLaSH.Core.DataCon (dcWorkId)
+import CLaSH.Core.DataCon (dataConWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
 import CLaSH.Core.Type    (Type,Kind,TyName,mkFunTy,mkForAllTy,applyTy,
   splitFunTy_maybe)
 import CLaSH.Core.Var     (Id,varName,varType)
+import CLaSH.Util
 
 instance Hashable (Name a) where
   hash (Nm _ (str,int)) = hashWithSalt (hash int) str
@@ -27,9 +28,9 @@ termType ::
   -> Term
   -> Type
 termType gamma e = case e of
-  Var x       -> fromMaybe (error $ "termType: " ++ show x ++ " not found") $
+  Var x       -> fromMaybe (error $ $(curLoc) ++ "termType: " ++ show x ++ " not found") $
                    HashMap.lookup x gamma
-  Data dc     -> snd . fromMaybe (error "no work id") . dcWorkId $ dc
+  Data dc     -> snd . dataConWorkId $ dc
   Literal l   -> literalType l
   Prim p      -> primType p
   Lam b       -> let (v,e') = runFreshM $ unbind b
@@ -74,7 +75,7 @@ applyTypeToArgs opTy (Right ty:args) = applyTypeToArgs (opTy `applyTy` ty)
                                          args
 applyTypeToArgs opTy (Left _:args)   = case splitFunTy_maybe opTy of
   Just (_,resTy) -> applyTypeToArgs resTy args
-  Nothing        -> error "applyTypeToArgs splitFunTy: not a funTy"
+  Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy"
 
 patIds :: Pat -> [Id]
 patIds (DataPat _ ids) = ids

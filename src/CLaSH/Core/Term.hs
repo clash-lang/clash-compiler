@@ -17,6 +17,7 @@ import CLaSH.Core.Literal (Literal)
 import CLaSH.Core.Prim    (Prim)
 import CLaSH.Core.Type    (Type)
 import CLaSH.Core.Var     (Id,TyVar)
+import CLaSH.Util
 
 data Term
   = Var     TmName
@@ -60,4 +61,4 @@ instance Subst Type Term where
     Letrec b       -> Letrec (subst tvN u b  )
     Case   e   a   -> Case   (subst tvN u e  ) (subst tvN u a  )
     e              -> e
-  subst m _ _ = error $ "Cannot substitute for bound variable: " ++ show m
+  subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
