@@ -11,6 +11,7 @@ type Kind = Type
 type TyName = Name Type
 
 instance Eq    Type
+instance Ord   Type
 instance Rep   Type
 instance Show  Type
 instance Alpha Type

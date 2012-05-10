@@ -10,7 +10,7 @@ module CLaSH.Core.DataCon where
 import Unbound.LocallyNameless as Unbound
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.Type                (Type,TyName)
+import CLaSH.Core.TypeRep                (Type,TyName)
 import CLaSH.Util
 
 data DataCon
@@ -21,7 +21,7 @@ data DataCon
   , dcUnivTyVars :: [TyName]
   , dcWorkId     :: Maybe (TmName, Type)
   }
-  deriving (Eq,Show)
+  deriving (Eq,Ord,Show)
 
 type ConTag = Int
 type DcName = Name DataCon

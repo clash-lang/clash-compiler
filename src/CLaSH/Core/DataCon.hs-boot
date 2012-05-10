@@ -9,6 +9,7 @@ import {-# SOURCE #-} CLaSH.Core.TypeRep (Type)
 data DataCon
 
 instance Eq    DataCon
+instance Ord   DataCon
 instance Rep   DataCon
 instance Show  DataCon
 instance Alpha DataCon

@@ -1,11 +1,8 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module CLaSH.Core.Util where
 
 import Data.Maybe                     (fromMaybe)
-import Data.Hashable                  (Hashable(..))
 import qualified Data.HashMap.Lazy as HashMap
-import Unbound.LocallyNameless        (runFreshM,unbind,unembed,unrec)
-import Unbound.LocallyNameless.Name   (Name(..))
+import Unbound.LocallyNameless        (bind,embed,runFreshM,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon (dataConWorkId)
 import CLaSH.Core.Literal (literalType)
@@ -13,12 +10,8 @@ import CLaSH.Core.Prim    (primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
 import CLaSH.Core.Type    (Type,Kind,TyName,mkFunTy,mkForAllTy,applyTy,
   splitFunTy_maybe)
-import CLaSH.Core.Var     (Id,varName,varType)
+import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
-
-instance Hashable (Name a) where
-  hash (Nm _ (str,int)) = hashWithSalt (hash int) str
-  hash (Bn _ i0 i1)     = hash i0 `hashWithSalt` i1
 
 type Delta = HashMap.HashMap TyName Kind
 type Gamma = HashMap.HashMap TmName Type
@@ -80,3 +73,46 @@ applyTypeToArgs opTy (Left _:args)   = case splitFunTy_maybe opTy of
 patIds :: Pat -> [Id]
 patIds (DataPat _ ids) = ids
 patIds _               = []
+
+mkTyVar ::
+  Delta
+  -> TyName
+  -> TyVar
+mkTyVar delta tyName = TyVar tyName (embed tyKind)
+  where
+    tyKind = fromMaybe (error $ $(curLoc) ++ "mkTyVar: " ++ show tyName ++ " not found in: " ++ show delta) $
+               HashMap.lookup tyName delta
+
+mkId ::
+  Gamma
+  -> TmName
+  -> Id
+mkId gamma tmName = Id tmName (embed tmType)
+  where
+    tmType = fromMaybe (error $ $(curLoc) ++ "mkId: " ++ show tmName ++ " not found in: " ++ show gamma) $
+               HashMap.lookup tmName gamma
+
+mkTyLams ::
+  Term
+  -> [TyVar]
+  -> Term
+mkTyLams = foldr (TyLam `dot` bind)
+
+mkLams ::
+  Term
+  -> [Id]
+  -> Term
+mkLams = foldr (Lam `dot` bind)
+
+mkApps ::
+  Term
+  -> [Term]
+  -> Term
+mkApps = foldl App
+
+mkTyApps ::
+  Term
+  -> [Type]
+  -> Term
+mkTyApps = foldl TyApp
+

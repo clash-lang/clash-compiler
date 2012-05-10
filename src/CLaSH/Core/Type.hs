@@ -10,11 +10,13 @@ module CLaSH.Core.Type
   , Delta
   , mkFunTy
   , mkForAllTy
+  , mkTyVarTy
   , applyTy
   , splitFunTy_maybe
   , noParenPred
   , isPredTy
   , isLiftedTypeKind
+  , isPoly
   )
 where
 
@@ -114,3 +116,13 @@ kindFunResult _ _              = error $ $(curLoc) ++ "kindFunResult"
 
 constraintKind :: Kind
 constraintKind = kindTyConType constraintKindTyCon
+
+isPoly :: Type -> Bool
+isPoly (ForAllTy _)  = True
+isPoly (FunTy _ res) = isPoly res
+isPoly _             = False
+
+mkTyVarTy ::
+  TyName
+  -> Type
+mkTyVarTy = TyVarTy

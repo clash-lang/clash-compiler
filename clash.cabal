@@ -24,6 +24,7 @@ Library
   Exposed-modules:     CLaSH.Driver
 
   Build-depends:       base                 >= 4.3.1.0 && < 4.6,
+                       concurrent-supply    >= 0.1.1   && < 0.2,
                        fclabels             >= 1.1.1.1 && < 1.2,
                        ghc                  >= 7.4.1   && < 7.5,
                        ghc-paths            >= 0.1.0.8 && < 0.2,

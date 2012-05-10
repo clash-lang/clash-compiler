@@ -44,7 +44,7 @@ data TyCon
   , tyConArity   :: Int
   , primTyConRep :: PrimRep
   }
-  deriving (Eq,Show)
+  deriving (Eq,Ord,Show)
 
 type TyConName = Name TyCon
 
@@ -55,18 +55,18 @@ data AlgTyConRhs
   | NewTyCon
   { data_con :: DataCon
   }
-  deriving (Eq,Show)
+  deriving (Eq,Ord,Show)
 
 data TyConParent
   = NoParentTyCon
   | ClassTyCon
-  deriving (Eq,Show)
+  deriving (Eq,Ord,Show)
 
 data PrimRep
   = AddrRep
   | IntRep
   | VoidRep
-  deriving (Eq,Show)
+  deriving (Eq,Ord,Show)
 
 Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''TyConParent]
 

@@ -15,7 +15,7 @@ import Unbound.LocallyNameless.Name (isFree)
 import CLaSH.Core.DataCon (DataCon)
 import CLaSH.Core.Literal (Literal)
 import CLaSH.Core.Prim    (Prim)
-import CLaSH.Core.Type    (Type)
+import CLaSH.Core.TypeRep    (Type)
 import CLaSH.Core.Var     (Id,TyVar)
 import CLaSH.Util
 

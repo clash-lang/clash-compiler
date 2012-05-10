@@ -10,7 +10,7 @@ module CLaSH.Core.Literal where
 import Unbound.LocallyNameless as Unbound
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term)
-import CLaSH.Core.Type                (Type)
+import CLaSH.Core.TypeRep             (Type)
 import CLaSH.Core.TysPrim             (intPrimTy,addrPrimTy)
 
 data Literal

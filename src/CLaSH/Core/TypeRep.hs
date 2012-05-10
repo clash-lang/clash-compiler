@@ -16,9 +16,7 @@ module CLaSH.Core.TypeRep
 where
 
 -- External imports
-import Data.Hashable (Hashable(..))
 import Unbound.LocallyNameless as Unbound
-import Unbound.LocallyNameless.Name
 
 -- Local imports
 import {-# SOURCE #-} CLaSH.Core.Term
@@ -40,9 +38,8 @@ type KiName = Name Type
 
 Unbound.derive [''Type]
 
-instance Hashable (Name Type) where
-  hash (Nm _ (str, int)) = hashWithSalt (hash int) str
-  hash (Bn _ i0 i1)      = hash i0 `hashWithSalt` i1
+instance Ord Type where
+  compare = compareR1 rep1
 
 instance Alpha Type
 

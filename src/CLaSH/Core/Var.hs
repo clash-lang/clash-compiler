@@ -23,7 +23,7 @@ data Var a
   { varName :: Name a
   , varType :: Embed Type
   }
-  deriving (Eq,Show)
+  deriving (Eq,Ord,Show)
 
 type Id    = Var Term
 type TyVar = Var Type
