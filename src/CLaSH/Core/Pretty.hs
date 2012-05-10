@@ -58,7 +58,7 @@ pprTopLevelBndr d (bndr,expr) = do
   bndr' <- ppr d bndr
   bndrName <- ppr d (varName bndr)
   expr' <- ppr d expr
-  return $ bndr' $$ bndrName <+> equals <+> expr' <> text "\n\n"
+  return $ bndr' $$ bndrName <+> equals <+> expr' <> text "\n"
 
 dcolon :: Doc
 dcolon = text "::"

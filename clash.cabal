@@ -24,9 +24,11 @@ Library
   Exposed-modules:     CLaSH.Driver
 
   Build-depends:       base                 >= 4.3.1.0 && < 4.6,
+                       fclabels             >= 1.1.1.1 && < 1.2,
                        ghc                  >= 7.4.1   && < 7.5,
                        ghc-paths            >= 0.1.0.8 && < 0.2,
                        hashable             >= 1.1.2.3 && < 1.2,
+                       mtl                  >= 2.0.1.0 && < 2.1,
                        pretty               >= 1.1.1.0 && < 1.2,
                        template-haskell     >= 2.7.0.0 && < 2.8,
                        unbound              >= 0.4.0.2 && < 0.5,

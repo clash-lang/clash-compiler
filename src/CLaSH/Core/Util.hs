@@ -29,7 +29,7 @@ termType ::
 termType gamma e = case e of
   Var x       -> fromMaybe (error $ "termType: " ++ show x ++ " not found") $
                    HashMap.lookup x gamma
-  Data dc     -> snd . dcWorkId $ dc
+  Data dc     -> snd . fromMaybe (error "no work id") . dcWorkId $ dc
   Literal l   -> literalType l
   Prim p      -> primType p
   Lam b       -> let (v,e') = runFreshM $ unbind b

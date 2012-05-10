@@ -8,6 +8,7 @@ where
 import qualified GHC.Paths
 
 -- GHC API
+import qualified CoreSyn
 import qualified DynFlags
 import qualified GHC
 import qualified HscTypes
@@ -16,8 +17,8 @@ import qualified Panic
 -- Internal Modules
 import CLaSH.Util (curLoc)
 
-loadModules :: String -> IO [HscTypes.ModGuts]
-loadModules modName =
+loadModules :: String -> IO [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]
+loadModules modName = fmap (concatMap (CoreSyn.flattenBinds . HscTypes.mg_binds)) $
   GHC.defaultErrorHandler DynFlags.defaultLogAction $
     GHC.runGhc (Just GHC.Paths.libdir) $ do
       dflags <- GHC.getSessionDynFlags

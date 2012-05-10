@@ -18,7 +18,7 @@ data DataCon
   , dcTag        :: ConTag
   , dcRepArgTys  :: [Type]
   , dcUnivTyVars :: [TyName]
-  , dcWorkId     :: (TmName, Type)
+  , dcWorkId     :: Maybe (TmName, Type)
   }
   deriving (Eq,Show)
 
@@ -27,6 +27,9 @@ type DcName = Name DataCon
 
 Unbound.derive [''DataCon]
 
-instance Alpha DataCon
+instance Alpha DataCon where
+  fv' _ _        = emptyC
+  aeq' _ dc1 dc2 = aeq (dcName dc1) (dcName dc2)
+
 instance Subst Type DataCon
 instance Subst Term DataCon

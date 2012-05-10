@@ -71,7 +71,10 @@ data PrimRep
 Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''TyConParent]
 
 instance Alpha PrimRep
-instance Alpha TyCon
+instance Alpha TyCon where
+  fv' _ _        = emptyC
+  aeq' _ tc1 tc2 = aeq (tyConName tc1) (tyConName tc2)
+
 instance Alpha AlgTyConRhs
 instance Alpha TyConParent
 
