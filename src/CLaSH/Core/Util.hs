@@ -6,10 +6,10 @@ import Unbound.LocallyNameless        (bind,embed,runFreshM,unbind,unembed,unrec
 
 import CLaSH.Core.DataCon (dataConWorkId)
 import CLaSH.Core.Literal (literalType)
-import CLaSH.Core.Prim    (primType)
+import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
 import CLaSH.Core.Type    (Type,Kind,TyName,mkFunTy,mkForAllTy,applyTy,
-  splitFunTy_maybe)
+  splitFunTy,isFunTy)
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
 
@@ -66,7 +66,7 @@ applyTypeToArgs :: Type -> [Either Term Type] -> Type
 applyTypeToArgs opTy [] = opTy
 applyTypeToArgs opTy (Right ty:args) = applyTypeToArgs (opTy `applyTy` ty)
                                          args
-applyTypeToArgs opTy (Left _:args)   = case splitFunTy_maybe opTy of
+applyTypeToArgs opTy (Left _:args)   = case splitFunTy opTy of
   Just (_,resTy) -> applyTypeToArgs resTy args
   Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy"
 
@@ -116,3 +116,38 @@ mkTyApps ::
   -> Term
 mkTyApps = foldl TyApp
 
+isFun ::
+  Gamma
+  -> Term
+  -> Bool
+isFun g = isFunTy . termType g
+
+isLam ::
+  Term
+  -> Bool
+isLam (Lam _) = True
+isLam _       = False
+
+isVar ::
+  Term
+  -> Bool
+isVar (Var _) = True
+isVar _       = False
+
+isCon ::
+  Term
+  -> Bool
+isCon (Data _) = True
+isCon _        = False
+
+isPrimCon ::
+  Term
+  -> Bool
+isPrimCon (Prim (PrimCon _)) = True
+isPrimCon _                  = False
+
+isPrimFun ::
+  Term
+  -> Bool
+isPrimFun (Prim (PrimFun _ _)) = True
+isPrimFun _                    = False

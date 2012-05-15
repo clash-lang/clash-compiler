@@ -6,17 +6,19 @@ import Data.Map          (Map)
 
 import CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.Type (Type)
-import CLaSH.Rewrite.Types (Rewrite)
+import CLaSH.Rewrite.Types (Rewrite,RewriteSession)
 import CLaSH.Util
 
 data NormalizeState
-  = RewriteState
+  = NormalizeState
   { _normalized          :: HashMap TmName Term
-  , _typeSpecializations :: Map (TmName,Type) TmName
+  , _typeSpecializations :: Map (TmName,Int,Type) TmName
   }
 
 mkLabels [''NormalizeState]
 
 type NormalizeMonad = State NormalizeState
+
+type NormalizeSession = RewriteSession NormalizeMonad
 
 type NormRewrite = Rewrite NormalizeMonad

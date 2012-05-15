@@ -2,13 +2,17 @@ module CLaSH.Rewrite.Util where
 
 import qualified Control.Monad        as Monad
 import Control.Monad.Trans.Class         (lift)
+import qualified Control.Monad.Reader as Reader
+import qualified Control.Monad.State  as State
 import qualified Control.Monad.Writer as Writer
 import qualified Data.HashMap.Lazy    as HashMap
 import qualified Data.Label.PureM     as LabelM
 import qualified Data.Monoid          as Monoid
+import qualified Unbound.LocallyNameless as Unbound
 import Unbound.LocallyNameless           (bind,embed,makeName,name2String,rec,unbind,unrec,unembed)
 
 import CLaSH.Core.FreeVars (termFreeVars)
+import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
 import CLaSH.Core.Term (Term(..),TmName,LetBinding)
 import CLaSH.Core.Type (Type,TyName,mkTyVarTy)
@@ -25,15 +29,29 @@ apply name rewrite ctx expr = R $ do
   (expr', anyChanged) <- Writer.listen $ runR $ rewrite ctx expr
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged $ LabelM.modify transformCounter (+1)
+  let (_,delta) = contextEnv ctx
+  let before = showDoc delta expr
+  let after  = showDoc delta expr'
   lvl <- LabelM.asks dbgLevel
-  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name) $
-    traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name) $
+  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
+    traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr'
 
 runRewrite :: Monad m => String -> Rewrite m -> Term -> RewriteSession m Term
 runRewrite name rewrite expr = do
   (expr',_) <- Writer.runWriterT . runR $ apply name rewrite [] expr
   return expr'
+
+runRewriteSession ::
+  Monad m
+  => DebugLevel
+  -> RewriteState
+  -> RewriteSession m a
+  -> m a
+runRewriteSession lvl st
+  = Unbound.runFreshMT
+  . (flip State.evalStateT st)
+  . (flip Reader.runReaderT (RE lvl))
 
 setChanged :: Monad m => RewriteMonad m ()
 setChanged = Writer.tell (Monoid.Any True)
@@ -92,12 +110,20 @@ mkBinderFor ::
   => [CoreContext]
   -> String
   -> Term
-  -> RewriteMonad m (TmName,Id)
+  -> RewriteMonad m (Id,Term)
 mkBinderFor ctx name term = do
   gamma  <- mkGamma ctx
   let ty = termType gamma term
-  name'  <- fmap (makeName name . toInteger) getUniqueM
-  return (name',Id name' (embed ty))
+  mkInternalVar name ty
+
+mkInternalVar ::
+  (Functor m, Monad m)
+  => String
+  -> Type
+  -> RewriteMonad m (Id,Term)
+mkInternalVar name ty = do
+  name' <- fmap (makeName name . toInteger) getUniqueM
+  return (Id name' (embed ty),Var name')
 
 inlineBinders ::
   Monad m
@@ -109,21 +135,32 @@ inlineBinders condition _ expr@(Letrec b) = R $ do
   case replace of
     [] -> return expr
     _  -> do
-      let newExpr = case others of [] -> res; _ -> Letrec (bind (rec others) res)
-      changed $ substituteBinders replace newExpr
+      let (others',res') = substituteBinders replace others res
+      let newExpr = case others of
+                          [] -> res'
+                          _  -> Letrec (bind (rec others') res')
+      changed newExpr
 
 inlineBinders _ _ e = return e
 
 substituteBinders ::
   [LetBinding]
+  -> [LetBinding]
   -> Term
-  -> Term
-substituteBinders [] e = e
-substituteBinders ((bndr,valE):rest) e
+  -> ([LetBinding],Term)
+substituteBinders [] others res = (others,res)
+substituteBinders ((bndr,valE):rest) others res
   = let val   = unembed valE
-        e'    = substTm (varName bndr) val e
-        rest' = map (second (embed . substTm (varName bndr) val . unembed)) rest
-    in substituteBinders rest' e'
+        res'  = substTm (varName bndr) val res
+        rest' = map (second ( embed
+                            . substTm (varName bndr) val
+                            . unembed)
+                    ) rest
+        others' = map (second ( embed
+                            . substTm (varName bndr) val
+                            . unembed)
+                    ) others
+    in substituteBinders rest' others' res'
 
 localFreeVars ::
   (Functor m, Monad m)
@@ -144,10 +181,13 @@ liftBinders condition ctx expr@(Letrec b) = R $ do
   case replace of
     [] -> return expr
     _  -> do
-      let newExpr = case others of [] -> res; _ -> Letrec (bind (rec others) res)
       let (gamma,delta) = contextEnv ctx
       replace' <- mapM (liftBinding gamma delta) replace
-      changed $ substituteBinders replace' newExpr
+      let (others',res') = substituteBinders replace' others res
+      let newExpr = case others of
+                          [] -> res'
+                          _  -> Letrec (bind (rec others') res')
+      changed newExpr
 
 liftBinders _ _ e = return e
 
@@ -204,3 +244,20 @@ cloneVar ::
   => TmName
   -> RewriteMonad m TmName
 cloneVar name = fmap (makeName (name2String name) . toInteger) getUniqueM
+
+isLocalVar ::
+  (Functor m, Monad m)
+  => Term
+  -> RewriteMonad m Bool
+isLocalVar (Var name)
+  = fmap (not . HashMap.member name)
+  $ LabelM.gets bindings
+isLocalVar _ = return False
+
+isUntranslatable ::
+  (Functor m, Monad m)
+  => Term
+  -> RewriteMonad m Bool
+isUntranslatable _
+  = traceIf True ($(curLoc) ++ "isUntranslatable undefined")
+  $ return False

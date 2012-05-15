@@ -12,17 +12,18 @@ module CLaSH.Core.Type
   , mkForAllTy
   , mkTyVarTy
   , applyTy
-  , splitFunTy_maybe
+  , splitFunTy
   , noParenPred
   , isPredTy
   , isLiftedTypeKind
-  , isPoly
+  , isPolyTy
+  , isFunTy
   )
 where
 
 -- External import
 import qualified Data.HashMap.Lazy as HashMap
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe,isJust)
 import Unbound.LocallyNameless (bind,runFreshM,unbind,name2Integer,unembed)
 
 -- Local imports
@@ -44,12 +45,6 @@ mkFunTy t1 t2 = FunTy t1 t2
 
 mkForAllTy :: TyVar -> Type -> Type
 mkForAllTy tv t = ForAllTy $ bind tv t
-
-splitFunTy_maybe ::
-  Type
-  -> Maybe (Type,Type)
-splitFunTy_maybe (FunTy arg res) = Just (arg,res)
-splitFunTy_maybe _               = Nothing
 
 applyTy ::
   Type
@@ -117,12 +112,23 @@ kindFunResult _ _              = error $ $(curLoc) ++ "kindFunResult"
 constraintKind :: Kind
 constraintKind = kindTyConType constraintKindTyCon
 
-isPoly :: Type -> Bool
-isPoly (ForAllTy _)  = True
-isPoly (FunTy _ res) = isPoly res
-isPoly _             = False
+isPolyTy :: Type -> Bool
+isPolyTy (ForAllTy _)  = True
+isPolyTy (FunTy _ res) = isPolyTy res
+isPolyTy _             = False
 
 mkTyVarTy ::
   TyName
   -> Type
 mkTyVarTy = TyVarTy
+
+splitFunTy ::
+  Type
+  -> Maybe (Type, Type)
+splitFunTy (FunTy arg res) = Just (arg,res)
+splitFunTy _               = Nothing
+
+isFunTy ::
+  Type
+  -> Bool
+isFunTy = isJust . splitFunTy

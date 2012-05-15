@@ -13,6 +13,7 @@ where
 
 import Control.Arrow                    (first,second)
 import Control.Monad.State              (MonadState)
+import Control.Monad.Trans.Class        (MonadTrans,lift)
 import Data.Hashable                    (Hashable(..))
 import Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy   as HashMap
@@ -58,6 +59,24 @@ makeCached key lens create = do
     Nothing -> do
       value <- create
       LabelM.modify lens (HashMap.insert key value)
+      return value
+
+makeCachedT3 ::
+  ( MonadTrans t2, MonadTrans t1, MonadTrans t
+  , Eq k, Hashable k
+  , MonadState s m
+  , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m))))
+  => k
+  -> s :-> (HashMap k v)
+  -> (t (t1 (t2 m))) v
+  -> (t (t1 (t2 m))) v
+makeCachedT3 key lens create = do
+  cache <- (lift . lift . lift) $ LabelM.gets lens
+  case HashMap.lookup key cache of
+    Just value -> return value
+    Nothing -> do
+      value <- create
+      (lift . lift . lift) $ LabelM.modify lens (HashMap.insert key value)
       return value
 
 secondM ::
