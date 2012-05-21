@@ -43,7 +43,7 @@ prettyParen False = id
 prettyParen True  = parens
 
 instance Pretty (Name a) where
-  pprPrec _ _ = return . text . name2String
+  pprPrec _ _ = return . text . show
 
 instance Pretty a => Pretty [a] where
   pprPrec prec d xs = do
@@ -58,7 +58,7 @@ pprTopLevelBndr d (bndr,expr) = do
   bndr' <- ppr d bndr
   bndrName <- ppr d (varName bndr)
   expr' <- ppr d expr
-  return $ bndr' $$ bndrName <+> equals <+> expr' <> text "\n"
+  return $ bndr' $$ hang (bndrName <+> equals) 2 expr' <> text "\n"
 
 dcolon :: Doc
 dcolon = text "::"
@@ -79,7 +79,7 @@ instance Pretty (Var Type) where
   pprPrec _ d v = ppr d $ varName v
 
 instance Pretty TyCon where
-  pprPrec _ d tc = ppr d (tyConName tc)
+  pprPrec _ _ tc = return . text . name2String $ tyConName tc
 
 instance Pretty Term where
   pprPrec prec d e = case e of
@@ -113,7 +113,7 @@ instance Pretty (Var Term) where
     return $ v' <+> dcolon <+> ty'
 
 instance Pretty DataCon where
-  pprPrec _ d dc = ppr d (dcName dc)
+  pprPrec _ _ dc = return . text . name2String $ dcName dc
 
 instance Pretty Literal where
   pprPrec _ _ l = case l of
