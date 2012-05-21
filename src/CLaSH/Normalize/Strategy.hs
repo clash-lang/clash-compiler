@@ -6,7 +6,7 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = monomorphization >-> simplification
+normalization = monomorphization >-> defunctionalization >-> simplification
 
 monomorphization :: NormRewrite
 monomorphization = monomorphization' >-> typeSpecialization
@@ -25,6 +25,17 @@ monomorphization = monomorphization' >-> typeSpecialization
             , ("liftPoly"  , liftPoly  )
             ]
 
+defunctionalization :: NormRewrite
+defunctionalization = repeatTopdown steps
+  where
+    steps = [ ("lamApp"   , lamApp    )
+            , ("letApp"   , letApp    )
+            , ("caseApp"  , caseApp   )
+            , ("caseLet"  , caseLet   )
+            , ("caseCon"  , caseCon   )
+            ]
+
+
 simplification :: NormRewrite
 simplification = repeatTopdown steps
   where
@@ -34,6 +45,7 @@ simplification = repeatTopdown steps
             , ("deadcode" , deadCode  )
             , ("etaExpand", etaExpand )
             , ("appSimpl" , appSimpl  )
+            , ("retLet"   , retLet    )
             , ("letFlat"  , letFlat   )
             , ("inlineVar", inlineVar )
             ]

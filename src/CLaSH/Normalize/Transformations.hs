@@ -132,6 +132,49 @@ typeSpec ctx e@(TyApp e1 ty)
 
 typeSpec _ e = return e
 
+-- Defunctionalization Rewrite rules
+caseLet :: NormRewrite
+caseLet _ (Case (Letrec b) ty alts) = R $ do
+  (xes,e) <- unbind b
+  changed . Letrec $ bind xes (Case e ty alts)
+
+caseLet _ e = return e
+
+caseCon :: NormRewrite
+caseCon _ (Case scrut ty alts)
+  | (Data dc, args) <- collectArgs scrut
+  = R $ do
+    alts' <- mapM unbind alts
+    let dcAltM = List.find (equalCon dc . fst) alts'
+    case dcAltM of
+      Just (DataPat _ xs, e) -> do
+        let fvs = termFreeIds e
+        let (binds,_) = List.partition ((`elem` fvs) . varName . fst)
+                      $ zip xs (Either.lefts args)
+        case binds of
+          [] -> changed e
+          _  -> changed . Letrec $ bind (rec $ map (second embed) binds) e
+      Nothing -> do
+        let defAltM = List.find (isDefPat . fst) alts'
+        case defAltM of
+          Just (DefaultPat, e) -> do
+            changed e
+          Nothing -> error $ $(curLoc) ++ "Non-exhaustive case-statement"
+          Just _ -> error $ $(curLoc) ++ "Report as bug: caseCon error"
+      Just _ -> error $ $(curLoc) ++ "Report as bug: caseCon error"
+  where
+    equalCon dc (DataPat dc' _) = dcTag dc == dcTag dc'
+    equalCon _  _               = False
+
+    isDefPat DefaultPat = True
+    isDefPat _          = False
+
+caseCon _ e = return e
+
+--caseCase :: NormRewrite
+--caseCase _ (Case (Case scrut alts1) alts2)
+--  | isBox (hea)
+
 -- Simplification Rewrite Rules
 deadCode :: NormRewrite
 deadCode _ e@(Letrec binds) = R $ do
@@ -213,3 +256,16 @@ letFlat _ e = return e
 
 inlineVar :: NormRewrite
 inlineVar = inlineBinders (isLocalVar . unembed . snd)
+
+retLet :: NormRewrite
+retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
+  (xes,body) <- fmap (first unrec) $ unbind b
+  lv <- isLocalVar body
+  unTran <- isUntranslatable body
+  case lv || unTran of
+    False -> do
+      (resId,resVar) <- mkBinderFor ctx "retLet" body
+      changed . Letrec $ bind (rec $ (resId,embed body):xes) resVar
+    True -> return expr
+
+retLet _ e = return e

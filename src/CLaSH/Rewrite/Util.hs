@@ -261,3 +261,9 @@ isUntranslatable ::
 isUntranslatable _
   = traceIf True ($(curLoc) ++ "isUntranslatable undefined")
   $ return False
+
+isLambdaBodyCtx ::
+  CoreContext
+  -> Bool
+isLambdaBodyCtx (LamBody _) = True
+isLambdaBodyCtx _           = False
