@@ -18,6 +18,7 @@ module CLaSH.Core.Type
   , isLiftedTypeKind
   , isPolyTy
   , isFunTy
+  , applyFunTy
   )
 where
 
@@ -132,3 +133,10 @@ isFunTy ::
   Type
   -> Bool
 isFunTy = isJust . splitFunTy
+
+applyFunTy ::
+  Type
+  -> Type
+  -> Type
+applyFunTy (FunTy _ resTy) _ = resTy
+applyFunTy _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"

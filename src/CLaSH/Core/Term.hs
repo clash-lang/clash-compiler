@@ -29,7 +29,7 @@ data Term
   | App     Term Term
   | TyApp   Term Type
   | Letrec  (Bind (Rec [LetBinding]) Term)
-  | Case    Term [Bind Pat Term]
+  | Case    Term Type [Bind Pat Term]
   deriving Show
 
 type TmName     = Name Term
@@ -59,6 +59,8 @@ instance Subst Type Term where
     App    fun arg -> App    (subst tvN u fun) (subst tvN u arg)
     TyApp  e   ty  -> TyApp  (subst tvN u e  ) (subst tvN u ty )
     Letrec b       -> Letrec (subst tvN u b  )
-    Case   e   a   -> Case   (subst tvN u e  ) (subst tvN u a  )
+    Case   e ty  a -> Case   (subst tvN u e  )
+                             (subst tvN u ty )
+                             (subst tvN u a  )
     e              -> e
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m

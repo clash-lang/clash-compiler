@@ -1,5 +1,6 @@
 module CLaSH.Normalize.Transformations where
 
+import Control.Applicative            ((<$>),(<*>),pure)
 import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.Label.PureM  as LabelM
@@ -8,10 +9,11 @@ import qualified Data.Map          as Map
 import qualified Data.Maybe        as Maybe
 import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,runFreshM,unbind,unembed,unrec)
 
+import CLaSH.Core.DataCon    (dcTag)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
 import CLaSH.Core.Subst      (substTyInTm)
-import CLaSH.Core.Term       (Term(..),LetBinding)
-import CLaSH.Core.Type       (isPolyTy,splitFunTy)
+import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
+import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,applyTy)
 import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun)
 import CLaSH.Core.Var        (Var(..))
 import CLaSH.Normalize.Types
@@ -35,14 +37,16 @@ letApp _ (App (Letrec b) arg) = R $ do
 letApp _ e = return e
 
 caseApp :: NormRewrite
-caseApp ctx (App (Case scrut alts) arg) = R $ do
+caseApp ctx (App (Case scrut ty alts) arg) = R $ do
   (boundArg,argVar) <- mkBinderFor ctx "caseApp" arg
   let alts' = map ( uncurry bind
                   . second (`App` argVar)
                   . runFreshM
                   . unbind
                   ) alts
-  changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut alts')
+  argTy <- termType <$> mkGamma ctx <*> pure arg
+  let ty' = applyFunTy ty argTy
+  changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
 
 caseApp _ e = return e
 
@@ -62,13 +66,14 @@ letTyApp _ (TyApp (Letrec b) t) = R $ do
 letTyApp _ e = return e
 
 caseTyApp :: NormRewrite
-caseTyApp _ (TyApp (Case scrut alts) ty) = R $ do
+caseTyApp _ (TyApp (Case scrut ty' alts) ty) = R $ do
   let alts' = map ( uncurry bind
                   . second (`TyApp` ty)
                   . runFreshM
                   . unbind
                   ) alts
-  changed $ Case scrut alts'
+  let ty'' = applyTy ty' ty
+  changed $ Case scrut ty'' alts'
 
 caseTyApp _ e = return e
 

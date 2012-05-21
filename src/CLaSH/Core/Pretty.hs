@@ -98,7 +98,8 @@ instance Pretty Term where
     Letrec b     -> do
                       lunbind b $ \(xes,e') ->
                         pprPrecLetrec prec d (unrec xes) e'
-    Case e' alts -> mapM (flip lunbind return) alts >>= pprPrecCase prec d e'
+    Case e' _ alts -> mapM (flip lunbind return) alts >>=
+                        pprPrecCase prec d e'
 
 data BindingSite
   = LambdaBind

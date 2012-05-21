@@ -45,13 +45,7 @@ termType gamma e = case e of
                                           (unembed $ varType v) g
                                      ) gamma (map fst $ unrec xes)
                  in termType gamma' e'
-  Case _ alts -> let (p,e') = runFreshM $ unbind (head alts)
-                     gamma' = foldl (\g v ->
-                                      HashMap.insert
-                                        (varName v)
-                                        (unembed $ varType v) g
-                                    ) gamma (patIds p)
-                 in termType gamma' e'
+  Case _ ty _ -> ty
 
 collectArgs ::
   Term

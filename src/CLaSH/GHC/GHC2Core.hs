@@ -101,7 +101,7 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
                                   (rec xes')
                                   e'
 
-    term (Case e b _ alts) = do
+    term (Case e b ty alts) = do
                                let usesBndr =
                                       any ( not
                                           . isEmptyVarSet
@@ -109,7 +109,9 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
                                           ) $ rhssOfAlts alts
                                b'       <- coreToId b
                                e'       <- term e
-                               caseTerm <- C.Case e' <$> mapM alt alts
+                               caseTerm <- C.Case e'
+                                              <$> coreToType ty
+                                              <*> mapM alt alts
                                if usesBndr
                                 then return $ C.Letrec $ bind
                                         (rec [(b',embed e')])
