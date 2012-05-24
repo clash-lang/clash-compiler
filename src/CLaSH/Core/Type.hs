@@ -11,7 +11,6 @@ module CLaSH.Core.Type
   , mkFunTy
   , mkForAllTy
   , mkTyVarTy
-  , applyTy
   , splitFunTy
   , noParenPred
   , isPredTy
@@ -19,13 +18,14 @@ module CLaSH.Core.Type
   , isPolyTy
   , isFunTy
   , applyFunTy
+  , applyTy
   )
 where
 
 -- External import
 import qualified Data.HashMap.Lazy as HashMap
 import Data.Maybe (fromMaybe,isJust)
-import Unbound.LocallyNameless (bind,runFreshM,unbind,name2Integer,unembed)
+import Unbound.LocallyNameless (Fresh,bind,runFreshM,unbind,name2Integer,unembed)
 
 -- Local imports
 import CLaSH.Core.Subst
@@ -46,14 +46,6 @@ mkFunTy t1 t2 = FunTy t1 t2
 
 mkForAllTy :: TyVar -> Type -> Type
 mkForAllTy tv t = ForAllTy $ bind tv t
-
-applyTy ::
-  Type
-  -> KindOrType
-  -> Type
-applyTy (ForAllTy b) arg = let (tv,ty) = runFreshM . unbind $ b
-                           in substTy (varName tv) arg ty
-applyTy _ _ = error $ $(curLoc) ++ "applyTy: not a forall type"
 
 noParenPred :: PredType -> Bool
 noParenPred p = isClassPred p || isEqPred p
@@ -140,3 +132,13 @@ applyFunTy ::
   -> Type
 applyFunTy (FunTy _ resTy) _ = resTy
 applyFunTy _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
+
+applyTy ::
+  Fresh m
+  => Type
+  -> KindOrType
+  -> m Type
+applyTy (ForAllTy b) arg = do
+  (tv,ty) <- unbind b
+  return $ substTy (varName tv) arg ty
+applyTy _ _ = error $ $(curLoc) ++ "applyTy: not a forall type"

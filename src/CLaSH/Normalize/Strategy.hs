@@ -2,6 +2,7 @@ module CLaSH.Normalize.Strategy where
 
 import CLaSH.Normalize.Transformations
 import CLaSH.Normalize.Types
+import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
@@ -11,10 +12,13 @@ normalization = monomorphization >-> defunctionalization >-> simplification
 monomorphization :: NormRewrite
 monomorphization = monomorphization' >-> typeSpecialization
   where
+    monomorphization' :: NormRewrite
     monomorphization' = repeatTopdown steps
 
-    typeSpecialization = bottomupR (apply "typeSpec" typeSpec)
+    typeSpecialization :: NormRewrite
+    typeSpecialization = repeatR $ bottomupR (apply "typeSpec" typeSpec)
 
+    steps :: [(String,NormRewrite)]
     steps = [ ("lamApp"    , lamApp    )
             , ("letApp"    , letApp    )
             , ("caseApp"   , caseApp   )
@@ -26,15 +30,31 @@ monomorphization = monomorphization' >-> typeSpecialization
             ]
 
 defunctionalization :: NormRewrite
-defunctionalization = repeatTopdown steps
+defunctionalization = defunctionalization' >-> functionSpecialization
   where
+    defunctionalization' :: NormRewrite
+    defunctionalization'
+      = repeatR
+      $ foldl1 (>->)
+      $ (doInlineBox:(map (topdownR . uncurry apply) steps))
+
+    steps :: [(String,NormRewrite)]
     steps = [ ("lamApp"   , lamApp    )
             , ("letApp"   , letApp    )
             , ("caseApp"  , caseApp   )
             , ("caseLet"  , caseLet   )
             , ("caseCon"  , caseCon   )
+            , ("caseCase" , caseCase  )
+            , ("bindFun"  , bindFun   )
+            , ("liftFun"  , liftFun   )
             ]
 
+    doInlineBox :: NormRewrite
+    doInlineBox = bottomupR (apply "inlineBox" inlineBox) >->
+                  commitNewInlined
+
+    functionSpecialization :: NormRewrite
+    functionSpecialization = repeatR $ bottomupR (apply "funSpec" funSpec)
 
 simplification :: NormRewrite
 simplification = repeatTopdown steps

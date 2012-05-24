@@ -16,7 +16,7 @@ import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
 import CLaSH.Core.Term (Term(..),TmName,LetBinding)
 import CLaSH.Core.Type (Type,TyName,mkTyVarTy)
-import CLaSH.Core.Util (Gamma,Delta,termType,mkId,mkTyVar,mkTyLams,mkLams,mkApps,mkTyApps)
+import CLaSH.Core.Util (Gamma,Delta,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps)
 import CLaSH.Core.Var  (Var(..),Id)
 import CLaSH.Rewrite.Types
 import CLaSH.Util
@@ -24,7 +24,10 @@ import CLaSH.Util
 liftR :: Monad m => m a -> RewriteMonad m a
 liftR m = lift . lift . lift . lift $ m
 
-apply :: Monad m => String -> Rewrite m -> Rewrite m
+liftRS :: Monad m => m a -> RewriteSession m a
+liftRS m = lift . lift . lift $ m
+
+apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
 apply name rewrite ctx expr = R $ do
   (expr', anyChanged) <- Writer.listen $ runR $ rewrite ctx expr
   let hasChanged = Monoid.getAny anyChanged
@@ -37,7 +40,7 @@ apply name rewrite ctx expr = R $ do
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr'
 
-runRewrite :: Monad m => String -> Rewrite m -> Term -> RewriteSession m Term
+runRewrite :: (Monad m, Functor m) => String -> Rewrite m -> Term -> RewriteSession m Term
 runRewrite name rewrite expr = do
   (expr',_) <- Writer.runWriterT . runR $ apply name rewrite [] expr
   return expr'
@@ -113,7 +116,7 @@ mkBinderFor ::
   -> RewriteMonad m (Id,Term)
 mkBinderFor ctx name term = do
   gamma  <- mkGamma ctx
-  let ty = termType gamma term
+  ty <- termType gamma term
   mkInternalVar name ty
 
 mkInternalVar ::
@@ -181,7 +184,8 @@ liftBinders condition ctx expr@(Letrec b) = R $ do
   case replace of
     [] -> return expr
     _  -> do
-      let (gamma,delta) = contextEnv ctx
+      let (_,delta) = contextEnv ctx
+      gamma <- mkGamma ctx
       replace' <- mapM (liftBinding gamma delta) replace
       let (others',res') = substituteBinders replace' others res
       let newExpr = case others of
@@ -208,10 +212,10 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   let boundFVs  = map (mkId gamma) localFVs'
   let newBody   = mkTyLams (mkLams e boundFVs) boundFTVs
   -- Make a new global ID
-  let newBodyTy = termType gamma newBody
+  newBodyTy <- termType gamma newBody
   newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
   -- Make a new expression, consisting of the te lifted function applied to it's free variables
-  let newExpr   = mkApps (mkTyApps (Var newBodyId) $ map mkTyVarTy localFTVs) $ map Var localFVs'
+  let newExpr   = mkTmApps (mkTyApps (Var newBodyId) $ map mkTyVarTy localFTVs) $ map Var localFVs'
   let newBody'  = substTm idName newExpr newBody
   LabelM.modify bindings (HashMap.insert newBodyId (newBodyTy,newBody'))
   return (Id idName (embed ty), embed newExpr)
@@ -225,8 +229,7 @@ mkFunction ::
   -> Term
   -> RewriteMonad m TmName
 mkFunction ctx bndr body = do
-  gamma <- mkGamma ctx
-  let bodyTy = termType gamma body
+  bodyTy <- mkGamma ctx >>= (`termType` body)
   bodyId <- cloneVar bndr
   addGlobalBind bodyId bodyTy body
   return bodyId

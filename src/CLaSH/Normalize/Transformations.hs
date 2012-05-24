@@ -1,22 +1,26 @@
+{-# LANGUAGE PatternGuards #-}
 module CLaSH.Normalize.Transformations where
 
-import Control.Applicative            ((<$>),(<*>),pure)
+import Control.Monad                  ((<=<))
+import Control.Monad.Trans.Class      (lift)
 import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.Label.PureM  as LabelM
 import qualified Data.List         as List
 import qualified Data.Map          as Map
 import qualified Data.Maybe        as Maybe
-import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,runFreshM,unbind,unembed,unrec)
+import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon    (dcTag)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
 import CLaSH.Core.Subst      (substTyInTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
-import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,applyTy)
-import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun)
+import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
+import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,mkTmApps)
 import CLaSH.Core.Var        (Var(..))
+import {-# SOURCE #-} CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
+import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Types
 import CLaSH.Rewrite.Util
 import CLaSH.Util
@@ -39,12 +43,12 @@ letApp _ e = return e
 caseApp :: NormRewrite
 caseApp ctx (App (Case scrut ty alts) arg) = R $ do
   (boundArg,argVar) <- mkBinderFor ctx "caseApp" arg
-  let alts' = map ( uncurry bind
-                  . second (`App` argVar)
-                  . runFreshM
-                  . unbind
-                  ) alts
-  argTy <- termType <$> mkGamma ctx <*> pure arg
+  alts' <- mapM ( return
+                . uncurry bind
+                . second (`App` argVar)
+                <=< unbind
+                ) alts
+  argTy <- mkGamma ctx >>= (`termType` arg)
   let ty' = applyFunTy ty argTy
   changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
 
@@ -67,12 +71,12 @@ letTyApp _ e = return e
 
 caseTyApp :: NormRewrite
 caseTyApp _ (TyApp (Case scrut ty' alts) ty) = R $ do
-  let alts' = map ( uncurry bind
-                  . second (`TyApp` ty)
-                  . runFreshM
-                  . unbind
-                  ) alts
-  let ty'' = applyTy ty' ty
+  alts' <- mapM ( return
+                . uncurry bind
+                . second (`TyApp` ty)
+                <=< unbind
+                ) alts
+  ty'' <- applyTy ty' ty
   changed $ Case scrut ty'' alts'
 
 caseTyApp _ e = return e
@@ -109,7 +113,7 @@ typeSpec ctx e@(TyApp e1 ty)
                LabelM.gets typeSpecializations
     case specM of
       -- Use previously specialized function
-      Just fname -> changed $ mkApps (Var fname) eArgs
+      Just fname -> changed $ mkTmApps (Var fname) eArgs
       -- Create new specialized function
       Nothing -> do
         bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
@@ -119,14 +123,14 @@ typeSpec ctx e@(TyApp e1 ty)
             (boundArgs,argVars) <- fmap unzip $
                                      mapM (mkBinderFor ctx "pTS") eArgs
             -- Create specialized functions
-            let newBody = mkLams (TyApp (mkApps bodyTm argVars) ty)
+            let newBody = mkLams (TyApp (mkTmApps bodyTm argVars) ty)
                             boundArgs
             newf <- mkFunction ctx f newBody
             -- Remember specialization
             liftR $ LabelM.modify typeSpecializations
                       (Map.insert (f,argLen,ty) newf)
             -- Use specialized function
-            let newExpr = mkApps (Var newf) eArgs
+            let newExpr = mkTmApps (Var newf) eArgs
             changed newExpr
           Nothing -> return e
 
@@ -163,7 +167,7 @@ caseCon _ (Case scrut ty alts)
           Just _ -> error $ $(curLoc) ++ "Report as bug: caseCon error"
       Just _ -> error $ $(curLoc) ++ "Report as bug: caseCon error"
   where
-    equalCon dc (DataPat dc' _) = dcTag dc == dcTag dc'
+    equalCon dc (DataPat dc' _) = dcTag dc == dcTag (unembed dc')
     equalCon _  _               = False
 
     isDefPat DefaultPat = True
@@ -171,9 +175,100 @@ caseCon _ (Case scrut ty alts)
 
 caseCon _ e = return e
 
---caseCase :: NormRewrite
---caseCase _ (Case (Case scrut alts1) alts2)
---  | isBox (hea)
+caseCase :: NormRewrite
+caseCase _ (Case (Case scrut ty1 alts1) ty2 alts2)
+  | isBoxTy ty1
+  = R $ do
+    newAlts  <- mapM ( return
+                     . uncurry bind
+                     . second (\altE -> Case altE ty2 alts2)
+                     <=< unbind
+                     ) alts1
+    changed $ Case scrut ty2 newAlts
+
+caseCase _ e = return e
+
+inlineBox :: NormRewrite
+inlineBox ctx e@(Case scrut ty alts)
+  | (Var f, args) <- collectArgs scrut
+  = R $ do
+    isInlined <- liftR $ alreadyInlined f
+    case isInlined of
+      True -> do
+        cf <- liftR $ LabelM.gets curFun
+        error $ $(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf
+      False -> do
+        scrutTy <- mkGamma ctx >>= (`termType` scrut)
+        bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+        case (isBoxTy scrutTy, bodyMaybe) of
+          (True,Just (_, scrutBody)) -> do
+            scrutBody' <- lift $ runRewrite "monomorphization" monomorphization scrutBody
+            changed $ Case (mkApps scrutBody' args) ty alts
+          _ -> return e
+
+inlineBox _ e = return e
+
+bindFun :: NormRewrite
+bindFun = inlineBinders bindFunTest
+  where
+    bindFunTest (Id idName tyE, exprE)
+      | isFunTy (unembed tyE) || isBoxTy (unembed tyE) = do
+          (_,localFVs) <- localFreeVars (unembed exprE)
+          return $ (idName `notElem` localFVs)
+      | otherwise = return False
+    bindFunTest _ = return False
+
+liftFun :: NormRewrite
+liftFun = liftBinders liftFunTest
+  where
+    liftFunTest (Id idName tyE, exprE)
+      | isFunTy (unembed tyE) || isBoxTy (unembed tyE) = do
+          (_,localFVs) <- localFreeVars (unembed exprE)
+          return $ (idName `elem` localFVs)
+      | otherwise = return False
+    liftFunTest _ = return False
+
+funSpec :: NormRewrite
+funSpec ctx e@(App e1 e2)
+  | (Var f, args) <- collectArgs e1
+  , (eArgs, []) <- Either.partitionEithers args
+  = R $ do
+    gamma <- mkGamma ctx
+    e2Ty <- termType gamma e2
+    case isFunTy e2Ty || isBoxTy e2Ty of
+      True -> do
+        let argLen = length eArgs
+        e2FVs <- fmap snd $ localFreeVars e2
+        -- Determine if 'f' has already been specialized on 'e2'
+        specM <- liftR $ fmap (Map.lookup (f,argLen,e2)) $
+                   LabelM.gets funSpecializations
+        case specM of
+          -- Use previously specialized function
+          Just fname -> changed $ mkTmApps (Var fname) (eArgs ++ (map Var e2FVs))
+          -- Create new specialized function
+          Nothing -> do
+            bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+            case bodyMaybe of
+              Just (_,bodyTm) -> do
+                -- Make new binders for existing arguments
+                (boundArgs,argVars) <- fmap unzip $
+                                         mapM (mkBinderFor ctx "pFS") eArgs
+                -- Make binders for the free variables in e2
+                let e2BVs = fvs2bvs gamma e2FVs
+                -- Create specialized functions
+                let newBody = mkLams (App (mkTmApps bodyTm argVars) e2)
+                                (boundArgs ++ e2BVs)
+                newf <- mkFunction ctx f newBody
+                -- Remember specialization
+                liftR $ LabelM.modify funSpecializations
+                          (Map.insert (f,argLen,e2) newf)
+                -- Use specialized function
+                let newExpr = mkTmApps (Var newf) (eArgs ++ (map Var e2FVs))
+                changed newExpr
+              Nothing -> return e
+      False -> return e
+
+funSpec _ e = return e
 
 -- Simplification Rewrite Rules
 deadCode :: NormRewrite
@@ -209,13 +304,15 @@ etaExpand ctx e
   | not (isLam e)
   = R $ do
     gamma <- mkGamma ctx
-    case (isFun gamma e) of
+    isF <- isFun gamma e
+    case isF of
       True -> do
-        let argTy = ( fst
-                    . Maybe.fromMaybe (error "etaExpand splitFunTy")
-                    . splitFunTy
-                    . termType gamma
-                    ) e
+        argTy <- ( return
+                 . fst
+                 . Maybe.fromMaybe (error "etaExpand splitFunTy")
+                 . splitFunTy
+                 <=< termType gamma
+                 ) e
         (newIdB,newIdV) <- mkInternalVar "eta" argTy
         changed . Lam $ bind newIdB (App e newIdV)
       False -> return e

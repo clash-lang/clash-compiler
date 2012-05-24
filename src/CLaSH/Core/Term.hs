@@ -15,7 +15,7 @@ import Unbound.LocallyNameless.Name (isFree)
 import CLaSH.Core.DataCon (DataCon)
 import CLaSH.Core.Literal (Literal)
 import CLaSH.Core.Prim    (Prim)
-import CLaSH.Core.TypeRep    (Type)
+import CLaSH.Core.TypeRep (Type)
 import CLaSH.Core.Var     (Id,TyVar)
 import CLaSH.Util
 
@@ -36,12 +36,18 @@ type TmName     = Name Term
 type LetBinding = (Id, Embed Term)
 
 data Pat
-  = DataPat DataCon [Id]
-  | LitPat  Literal
+  = DataPat (Embed DataCon) [Id]
+  | LitPat  (Embed Literal)
   | DefaultPat
-  deriving Show
+  deriving (Eq,Ord,Show)
 
 Unbound.derive [''Term,''Pat]
+
+instance Eq Term where
+  e1 == e2 = aeq e1 e2
+
+instance Ord Term where
+  compare = compareR1 rep1
 
 instance Alpha Term
 instance Alpha Pat

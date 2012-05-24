@@ -25,6 +25,7 @@ Library
 
   Build-depends:       base                 >= 4.3.1.0 && < 4.6,
                        concurrent-supply    >= 0.1.1   && < 0.2,
+                       containers           >= 0.4.2.1 && < 0.5,
                        fclabels             >= 1.1.1.1 && < 1.2,
                        ghc                  >= 7.4.1   && < 7.5,
                        ghc-paths            >= 0.1.0.8 && < 0.2,
@@ -32,6 +33,7 @@ Library
                        mtl                  >= 2.0.1.0 && < 2.1,
                        pretty               >= 1.1.1.0 && < 1.2,
                        template-haskell     >= 2.7.0.0 && < 2.8,
+                       transformers         >= 0.2.2.0 && < 0.3,
                        unbound              >= 0.4.0.2 && < 0.5,
                        unordered-containers >= 0.2.1.0 && < 0.3
 

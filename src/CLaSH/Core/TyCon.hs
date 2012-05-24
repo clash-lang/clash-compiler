@@ -137,3 +137,9 @@ isTupleTyConLike (AlgTyCon {tyConName = nm}) = tupleName (name2String nm)
     tupleName _ = False
 
 isTupleTyConLike _ = False
+
+tyConDataCons :: TyCon -> [DataCon]
+tyConDataCons (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons}}) = cons
+tyConDataCons (AlgTyCon {algTcRhs = NewTyCon  { data_con  = con }}) = [con]
+tyConDataCons (TupleTyCon {dataCon = con})                          = [con]
+tyConDataCons _                                                     = []

@@ -13,6 +13,10 @@ data NormalizeState
   = NormalizeState
   { _normalized          :: HashMap TmName Term
   , _typeSpecializations :: Map (TmName,Int,Type) TmName
+  , _funSpecializations  :: Map (TmName,Int,Term) TmName
+  , _inlined             :: HashMap TmName [TmName]
+  , _newInlined          :: [TmName]
+  , _curFun              :: TmName
   }
 
 mkLabels [''NormalizeState]

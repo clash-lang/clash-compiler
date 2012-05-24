@@ -19,7 +19,7 @@ data Prim
   | PrimDict TmName Type
   | PrimDFun TmName Type
   | PrimCo   Type
-  deriving Show
+  deriving (Eq,Ord,Show)
 
 Unbound.derive [''Prim]
 

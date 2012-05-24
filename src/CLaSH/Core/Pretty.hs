@@ -10,7 +10,7 @@ import qualified Data.HashMap.Lazy as HashMap
 import GHC.Show (showMultiLineString)
 import Text.PrettyPrint (Doc,(<+>),(<>),($+$),($$),render,parens,text,sep,
   punctuate,comma,hang,char,brackets,empty,fsep,hsep,equals,vcat,integer)
-import Unbound.LocallyNameless (Embed(..),LFresh,Name,runLFreshM,unembed,
+import Unbound.LocallyNameless (Embed(..),Name,LFresh,runLFreshM,unembed,
   name2String,name2Integer,lunbind,unrec)
 
 import CLaSH.Core.DataCon (DataCon(..))
@@ -133,10 +133,10 @@ instance Pretty Prim where
 instance Pretty Pat where
   pprPrec prec d pat = case pat of
     DataPat dc xs -> do
-      dc' <- ppr d dc
+      dc' <- ppr d (unembed dc)
       xs' <- mapM (pprBndr d CaseBind) xs
       return $ prettyParen (prec >= appPrec) $ dc' <+> hsep xs'
-    LitPat l   -> ppr d l
+    LitPat l   -> ppr d (unembed l)
     DefaultPat -> return $ char '_'
 
 pprPrecLam :: LFresh m => Rational -> Delta -> [Id] -> Term -> m Doc

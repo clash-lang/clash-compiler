@@ -6,11 +6,13 @@
 
 module CLaSH.Util
   ( module CLaSH.Util
+  , module Control.Applicative
   , module Control.Arrow
   , mkLabels
   )
 where
 
+import Control.Applicative              ((<$>),(<*>),pure)
 import Control.Arrow                    (first,second)
 import Control.Monad.State              (MonadState)
 import Control.Monad.Trans.Class        (MonadTrans,lift)
@@ -21,7 +23,7 @@ import Data.Label                       ((:->),mkLabels)
 import qualified Data.Label.PureM    as LabelM
 import Debug.Trace                      (trace)
 import qualified Language.Haskell.TH as TH
-import Unbound.LocallyNameless          (Rep,Bind,Embed,compareR1,eqR1,rep1)
+import Unbound.LocallyNameless          (Rep,Bind,Embed,Rec,compareR1,eqR1,rep1)
 import Unbound.LocallyNameless.Name     (Name(..))
 
 class MonadUnique m where
@@ -38,6 +40,12 @@ instance (Rep p, Rep t, Eq p, Eq t) => Eq (Bind p t) where
   (==) = eqR1 rep1
 
 instance (Rep p, Rep t, Ord p, Ord t) => Ord (Bind p t) where
+  compare = compareR1 rep1
+
+instance (Rep a, Eq a) => Eq (Rec a) where
+  (==) = eqR1 rep1
+
+instance (Rep a, Ord a) => Ord (Rec a) where
   compare = compareR1 rep1
 
 curLoc ::

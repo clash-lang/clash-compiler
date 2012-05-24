@@ -16,7 +16,7 @@ import CLaSH.Core.TysPrim             (intPrimTy,addrPrimTy)
 data Literal
   = IntegerLiteral Integer
   | StringLiteral  String
-  deriving Show
+  deriving (Eq,Ord,Show)
 
 Unbound.derive [''Literal]
 

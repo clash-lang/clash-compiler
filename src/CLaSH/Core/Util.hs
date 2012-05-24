@@ -2,14 +2,15 @@ module CLaSH.Core.Util where
 
 import Data.Maybe                     (fromMaybe)
 import qualified Data.HashMap.Lazy as HashMap
-import Unbound.LocallyNameless        (bind,embed,runFreshM,unbind,unembed,unrec)
+import Unbound.LocallyNameless        (Fresh,bind,embed,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon (dataConWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type    (Type,Kind,TyName,mkFunTy,mkForAllTy,applyTy,
-  splitFunTy,isFunTy)
+import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,
+  splitFunTy,isFunTy,applyTy)
+import CLaSH.Core.TypeRep (Type(..))
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
 
@@ -17,35 +18,37 @@ type Delta = HashMap.HashMap TyName Kind
 type Gamma = HashMap.HashMap TmName Type
 
 termType ::
-  Gamma
+  Fresh m
+  => Gamma
   -> Term
-  -> Type
+  -> m Type
 termType gamma e = case e of
-  Var x       -> fromMaybe (error $ $(curLoc) ++ "termType: " ++ show x ++ " not found") $
+  Var x       -> return $ fromMaybe (error $ $(curLoc) ++ "termType: " ++ show x ++ " not found: " ++ show (HashMap.keys gamma)) $
                    HashMap.lookup x gamma
-  Data dc     -> snd . dataConWorkId $ dc
-  Literal l   -> literalType l
-  Prim p      -> primType p
-  Lam b       -> let (v,e') = runFreshM $ unbind b
-                     ety    = termType
+  Data dc     -> return . snd . dataConWorkId $ dc
+  Literal l   -> return $ literalType l
+  Prim p      -> return $ primType p
+  Lam b       -> do (v,e') <- unbind b
+                    eTy    <- termType
                                 (HashMap.insert (varName v)
                                                 (unembed $ varType v) gamma)
                                 e'
-                 in mkFunTy (unembed $ varType v) ety
-  TyLam b     -> let (tv,e') = runFreshM $ unbind b
-                     ety     = termType gamma e'
-                 in mkForAllTy tv ety
+                    return $ mkFunTy (unembed $ varType v) eTy
+  TyLam b     -> do (tv,e') <- unbind b
+                    eTy     <- termType gamma e'
+                    return $ mkForAllTy tv eTy
   App _ _     -> case collectArgs e of
-                   (fun, args) -> applyTypeToArgs (termType gamma fun) args
-  TyApp e' ty -> termType gamma e' `applyTy` ty
-  Letrec b    -> let (xes,e') = runFreshM $ unbind b
-                     gamma'   = foldl (\g v ->
-                                        HashMap.insert
-                                          (varName v)
-                                          (unembed $ varType v) g
-                                     ) gamma (map fst $ unrec xes)
-                 in termType gamma' e'
-  Case _ ty _ -> ty
+                   (fun, args) -> (termType gamma fun) >>=
+                                  (`applyTypeToArgs` args)
+  TyApp e' ty -> (termType gamma e') >>= (`applyTy` ty)
+  Letrec b    -> do (xes,e') <- unbind b
+                    let gamma' = foldl (\g v ->
+                                         HashMap.insert
+                                           (varName v)
+                                           (unembed $ varType v) g)
+                                       gamma (map fst $ unrec xes)
+                    termType gamma' e'
+  Case _ ty _ -> return ty
 
 collectArgs ::
   Term
@@ -56,13 +59,13 @@ collectArgs = go []
     go args (TyApp e t) = go (Right t:args) e
     go args e           = (e, args)
 
-applyTypeToArgs :: Type -> [Either Term Type] -> Type
-applyTypeToArgs opTy [] = opTy
-applyTypeToArgs opTy (Right ty:args) = applyTypeToArgs (opTy `applyTy` ty)
-                                         args
-applyTypeToArgs opTy (Left _:args)   = case splitFunTy opTy of
+applyTypeToArgs :: Fresh m => Type -> [Either Term Type] -> m Type
+applyTypeToArgs opTy []              = return opTy
+applyTypeToArgs opTy (Right ty:args) = applyTy opTy ty >>=
+                                       (`applyTypeToArgs` args)
+applyTypeToArgs opTy (Left e:args)   = case splitFunTy opTy of
   Just (_,resTy) -> applyTypeToArgs resTy args
-  Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy"
+  Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy: " ++ show (opTy,e,args)
 
 patIds :: Pat -> [Id]
 patIds (DataPat _ ids) = ids
@@ -98,11 +101,11 @@ mkLams ::
   -> Term
 mkLams = foldr (Lam `dot` bind)
 
-mkApps ::
+mkTmApps ::
   Term
   -> [Term]
   -> Term
-mkApps = foldl App
+mkTmApps = foldl App
 
 mkTyApps ::
   Term
@@ -110,11 +113,18 @@ mkTyApps ::
   -> Term
 mkTyApps = foldl TyApp
 
-isFun ::
-  Gamma
+mkApps ::
+  Term
+  -> [Either Term Type]
   -> Term
-  -> Bool
-isFun g = isFunTy . termType g
+mkApps = foldl (\e a -> either (App e) (TyApp e) a)
+
+isFun ::
+  (Functor m, Fresh m)
+  => Gamma
+  -> Term
+  -> m Bool
+isFun g t = fmap isFunTy $ termType g t
 
 isLam ::
   Term

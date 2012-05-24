@@ -15,7 +15,7 @@ import CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
 import CLaSH.Rewrite.Types      (DebugLevel(..),RewriteState(..),dbgLevel,
   bindings)
-import CLaSH.Rewrite.Util       (runRewrite,runRewriteSession)
+import CLaSH.Rewrite.Util       (liftRS,runRewrite,runRewriteSession)
 import CLaSH.Util
 
 runNormalization ::
@@ -29,7 +29,13 @@ runNormalization lvl supply globals
   . runRewriteSession lvl rwState
   where
     rwState   = RewriteState 0 globals supply
-    normState = NormalizeState HashMap.empty Map.empty
+    normState = NormalizeState
+                  HashMap.empty
+                  Map.empty
+                  Map.empty
+                  HashMap.empty
+                  []
+                  (error "Report as bug: no curFun")
 
 normalize ::
   [TmName]
@@ -39,11 +45,15 @@ normalize (bndr:bndrs) = do
   exprM <- fmap (HashMap.lookup bndr) $ LabelM.gets bindings
   case exprM of
     Just (ty,expr) -> do
+      liftRS $ LabelM.puts curFun bndr
       normalizedExpr <- makeCachedT3 bndr normalized $
                          normalizeExpr bndrS expr
       let usedBndrs = termFreeIds normalizedExpr
-      normalizedOthers <- normalize (usedBndrs ++ bndrs)
-      return ((bndr,(ty,normalizedExpr)):normalizedOthers)
+      case (bndr `elem` usedBndrs) of
+        True -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
+        False -> do
+          normalizedOthers <- normalize (usedBndrs ++ bndrs)
+          return ((bndr,(ty,normalizedExpr)):normalizedOthers)
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " not found"
 
 normalize [] = return []
@@ -59,7 +69,7 @@ normalizeExpr bndrS expr = do
   let expr' = traceIf (lvl >= DebugFinal)
                 (bndrS ++ " before normalization:\n\n" ++ before ++ "\n")
                 expr
-  rewritten <- runRewrite "monomorphization" normalization expr'
+  rewritten <- runRewrite "normalization" normalization expr'
   let after = showDoc emptyHM rewritten
   traceIf (lvl >= DebugFinal)
     (bndrS ++ " after normalization:\n\n" ++ after ++ "\n") $

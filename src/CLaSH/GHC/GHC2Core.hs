@@ -9,7 +9,6 @@ module CLaSH.GHC.GHC2Core
 where
 
 -- External Modules
-import Control.Applicative                  ((<$>),(<*>))
 import Control.Monad                        ((<=<))
 import Control.Monad.State                  (State)
 import qualified Control.Monad.State     as State
@@ -124,7 +123,7 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
     term (Coercion co)     = C.Prim <$> C.PrimCo <$> (coreToType $ coercionType co)
 
     var x = let xVar   = coreToVar x
-                xNameS = Unbound.name2String $ xVar
+                xNameS = Unbound.name2String xVar
             in do
               xType <- coreToType (varType x)
               case (isDataConWorkId_maybe x) of
@@ -139,9 +138,9 @@ coreToTerm coreExpr = State.evalState (term coreExpr) (GHC2CoreState HashMap.emp
                   | otherwise -> return $ C.Var xVar
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)
-    alt (LitAlt l  , _ , e) = bind (C.LitPat $ coreToLiteral l) <$> (term e)
+    alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
     alt (DataAlt dc, xs, e) = case (as,cs) of
-                                ([],[]) -> bind <$> (C.DataPat <$>
+                                ([],[]) -> bind <$> (C.DataPat . embed <$>
                                                       (coreToDataCon dc) <*>
                                                       (mapM coreToId zs)) <*>
                                                 (term e)
@@ -163,7 +162,7 @@ coreToDataCon dc = makeCached dc dataConMap dataCon
           { C.dcName       = coreToName dataConName getUnique dc
           , C.dcTag        = dataConTag dc
           , C.dcRepArgTys  = repTys
-          , C.dcUnivTyVars = map coreToVar  (dataConUnivTyVars dc)
+          , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
           , C.dcWorkId     = Just $ ( coreToVar $ dataConWorkId dc
                                     , workIdTy)
           }
@@ -178,7 +177,7 @@ coreToDataCon_noWorkId dc = do
       { C.dcName       = coreToName dataConName getUnique dc
       , C.dcTag        = dataConTag dc
       , C.dcRepArgTys  = repTys
-      , C.dcUnivTyVars = map coreToVar  (dataConUnivTyVars dc)
+      , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
       , C.dcWorkId     = Nothing
       }
 

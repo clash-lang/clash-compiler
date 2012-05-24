@@ -10,7 +10,7 @@ module CLaSH.Core.DataCon where
 import Unbound.LocallyNameless as Unbound
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.TypeRep                (Type,TyName)
+import CLaSH.Core.TypeRep             (Type,TyName)
 import CLaSH.Util
 
 data DataCon
@@ -42,3 +42,14 @@ dataConWorkId (MkData { dcWorkId = dcIdM }) =
   case dcIdM of
     Nothing   -> error $ $(curLoc) ++ "No WorkerID for DataCon"
     Just dcId -> dcId
+
+dataConInstArgTys :: DataCon -> [Type] -> [Type]
+dataConInstArgTys (MkData { dcRepArgTys  = rep_arg_tys
+                          , dcUnivTyVars = univ_tvs
+                          })
+                  inst_tys
+  | length univ_tvs == length inst_tys
+  = map (substs (zip univ_tvs inst_tys)) rep_arg_tys
+
+  | otherwise
+  = error $ $(curLoc) ++ "dataConInstArgTys: number of tyVars and Types differ"
