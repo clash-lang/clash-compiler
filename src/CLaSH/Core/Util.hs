@@ -4,12 +4,12 @@ import Data.Maybe                     (fromMaybe)
 import qualified Data.HashMap.Lazy as HashMap
 import Unbound.LocallyNameless        (Fresh,bind,embed,unbind,unembed,unrec)
 
-import CLaSH.Core.DataCon (dataConWorkId)
+import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,
-  splitFunTy,isFunTy,applyTy)
+import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
+  applyTy)
 import CLaSH.Core.TypeRep (Type(..))
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
@@ -25,7 +25,7 @@ termType ::
 termType gamma e = case e of
   Var x       -> return $ fromMaybe (error $ $(curLoc) ++ "termType: " ++ show x ++ " not found: " ++ show (HashMap.keys gamma)) $
                    HashMap.lookup x gamma
-  Data dc     -> return . snd . dataConWorkId $ dc
+  Data dc     -> return . snd . dcWorkId $ dc
   Literal l   -> return $ literalType l
   Prim p      -> return $ primType p
   Lam b       -> do (v,e') <- unbind b

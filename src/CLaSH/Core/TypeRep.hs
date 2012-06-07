@@ -38,9 +38,6 @@ type KiName = Name Type
 
 Unbound.derive [''Type]
 
-instance Ord Type where
-  compare = compareR1 rep1
-
 instance Alpha Type
 
 instance Subst Term Type
@@ -50,6 +47,9 @@ instance Subst Type Type where
 
 instance Eq Type where
   (==) = aeq
+
+instance Ord Type where
+  compare = acompare
 
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []

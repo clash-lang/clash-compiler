@@ -44,7 +44,15 @@ data TyCon
   , tyConArity   :: Int
   , primTyConRep :: PrimRep
   }
-  deriving (Eq,Ord,Show)
+
+instance Show TyCon where
+  show tc = show (tyConName tc)
+
+instance Eq TyCon where
+  tc1 == tc2 = (tyConName tc1) == (tyConName tc2)
+
+instance Ord TyCon where
+  compare tc1 tc2 = compare (tyConName tc1) (tyConName tc2)
 
 type TyConName = Name TyCon
 
@@ -55,25 +63,37 @@ data AlgTyConRhs
   | NewTyCon
   { data_con :: DataCon
   }
-  deriving (Eq,Ord,Show)
+  deriving Show
 
 data TyConParent
   = NoParentTyCon
   | ClassTyCon
-  deriving (Eq,Ord,Show)
+  deriving Show
 
 data PrimRep
   = AddrRep
   | IntRep
   | VoidRep
-  deriving (Eq,Ord,Show)
+  | PtrRep
+  deriving Show
 
 Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''TyConParent]
 
 instance Alpha PrimRep
 instance Alpha TyCon where
-  fv' _ _        = emptyC
-  aeq' _ tc1 tc2 = aeq (tyConName tc1) (tyConName tc2)
+  swaps' _ _ d    = d
+  fv' _ _         = emptyC
+  lfreshen' _ a f = f a empty
+  freshen' _ a    = return (a,empty)
+  aeq' _ tc1 tc2  = aeq (tyConName tc1) (tyConName tc2)
+  acompare' _ tc1 tc2 = acompare (tyConName tc1) (tyConName tc2)
+  open _ _ d      = d
+  close _ _ d     = d
+  isPat _         = error "isPat TyCon"
+  isTerm _        = error "isTerm TyCon"
+  isEmbed _       = error "isEmbed TyCon"
+  nthpatrec _     = error "nthpatrec TyCon"
+  findpatrec _ _  = error "findpatrec TyCon"
 
 instance Alpha AlgTyConRhs
 instance Alpha TyConParent

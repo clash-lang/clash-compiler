@@ -9,7 +9,7 @@ module CLaSH.Core.Prim where
 
 import Unbound.LocallyNameless as Unbound
 
-import CLaSH.Core.DataCon             (DataCon,dataConWorkId)
+import CLaSH.Core.DataCon             (DataCon,dcWorkId)
 import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.TypeRep             (Type)
 
@@ -33,7 +33,7 @@ primType ::
   -> Type
 primType p = case p of
   PrimFun _ t  -> t
-  PrimCon dc   -> snd $ dataConWorkId dc
+  PrimCon dc   -> snd $ dcWorkId dc
   PrimDict _ t -> t
   PrimDFun _ t -> t
   PrimCo t     -> t

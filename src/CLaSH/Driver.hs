@@ -7,7 +7,7 @@ import Unbound.LocallyNameless (embed,name2String,unembed)
 
 import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Var (Id,Var(..),varName,varType)
-import CLaSH.GHC.GHC2Core (coreToBndr,coreToTerm)
+import CLaSH.GHC.GHC2Core (makeAllTyDataCons,coreToBndr,coreToTerm)
 import CLaSH.GHC.LoadModules (loadModules)
 import CLaSH.Normalize (runNormalization, normalize)
 import CLaSH.Rewrite.Types (DebugLevel(..))
@@ -17,9 +17,12 @@ generateVHDL ::
   String
   -> IO ()
 generateVHDL modName = do
-  allBindings <- loadModules modName
-  let convertedBindings = map (\(x,e) -> (coreToBndr x,coreToTerm e))
-                              allBindings
+  (allBindings,tcs) <- loadModules modName
+  let tcsMap = makeAllTyDataCons tcs
+
+  let convertedBindings = map (\(x,e) -> (coreToBndr tcsMap x
+                                         ,coreToTerm tcsMap e)
+                              ) allBindings
   let topEntities = filter (isTopEntity . fst) convertedBindings
   case topEntities of
     [topEntity] -> do
@@ -34,7 +37,7 @@ generateVHDL modName = do
             $ runNormalization DebugApplied supply bindingsMap
             $ normalize [varName $ fst topEntity]
 
-      let printedBindings   = showDoc HashMap.empty transformedBindings
+      let printedBindings = showDoc HashMap.empty transformedBindings
       putStrLn printedBindings
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"

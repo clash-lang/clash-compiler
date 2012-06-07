@@ -47,7 +47,7 @@ instance Eq Term where
   e1 == e2 = aeq e1 e2
 
 instance Ord Term where
-  compare = compareR1 rep1
+  compare e1 e2 = acompare e1 e2
 
 instance Alpha Term
 instance Alpha Pat
