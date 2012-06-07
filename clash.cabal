@@ -52,7 +52,18 @@ Library
                        CLaSH.Core.Var
 
                        CLaSH.GHC.GHC2Core
+                       CLaSH.GHC.LoadInterfaceFiles
                        CLaSH.GHC.LoadModules
+
+                       CLaSH.Normalize
+                       CLaSH.Normalize.Strategy
+                       CLaSH.Normalize.Transformations
+                       CLaSH.Normalize.Types
+                       CLaSH.Normalize.Util
+
+                       CLaSH.Rewrite.Combinators
+                       CLaSH.Rewrite.Types
+                       CLaSH.Rewrite.Util
 
                        CLaSH.Util
 
