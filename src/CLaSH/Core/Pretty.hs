@@ -287,42 +287,43 @@ pprThetaArrowTy d preds = do
 
 pprTcApp :: LFresh m => TypePrec -> Delta -> (TypePrec -> Type -> m Doc)
   -> TyCon -> [Type] -> m Doc
-pprTcApp _ d _  tc []    = ppr d tc
+pprTcApp _ d _  tc []
+  = ppr d tc
 pprTcApp _ _ pp tc [ty]
   | (name2Integer $ tyConName tc) == listTyConKey
   = pp TopPrec ty >>= (return . brackets)
 
-pprTcApp p d pp tc tys
+pprTcApp p _ pp tc tys
   | isTupleTyConLike tc && tyConArity tc == length tys
   = do
     tys' <- mapM (pp TopPrec) tys
     return $ parens $ sep $ punctuate comma tys'
   | (name2Integer $ tyConName tc) == eqTyConKey
   , [_,ty1,ty2] <- tys
-  = pprInfixApp p d pp (tyConName tc) ty1 ty2
+  = pprInfixApp p pp (tyConName tc) ty1 ty2
   | otherwise
-  = pprTypeNameApp p d pp (tyConName tc) tys
+  = pprTypeNameApp p pp (tyConName tc) tys
 
-pprTypeNameApp :: LFresh m => TypePrec -> Delta
-  -> (TypePrec -> Type -> m Doc) -> Name a -> [Type] -> m Doc
-pprTypeNameApp p d pp name tys
+pprTypeNameApp :: LFresh m => TypePrec -> (TypePrec -> Type -> m Doc)
+  -> Name a -> [Type] -> m Doc
+pprTypeNameApp p pp name tys
   | isSym
   , [ty1,ty2] <- tys
-  = pprInfixApp p d pp name ty1 ty2
+  = pprInfixApp p pp name ty1 ty2
   | otherwise
   = do
     tys' <- mapM (pp TyConPrec) tys
-    name' <- ppr d name
+    let name' = text $ name2String name
     return $ pprPrefixApp p (pprPrefixVar isSym name') tys'
   where
     isSym = isSymName name
 
-pprInfixApp :: LFresh m => TypePrec -> Delta -> (TypePrec -> Type -> m Doc)
+pprInfixApp :: LFresh m => TypePrec -> (TypePrec -> Type -> m Doc)
   -> Name a -> Type -> Type -> m Doc
-pprInfixApp p d pp name ty1 ty2 = do
+pprInfixApp p pp name ty1 ty2 = do
   ty1'  <- pp FunPrec ty1
   ty2'  <- pp FunPrec ty2
-  name' <- ppr d name
+  let name' = text $ name2String name
   return $ maybeParen p FunPrec $ sep [ty1', pprInfixVar True name' <+> ty2']
 
 pprPrefixApp :: TypePrec -> Doc -> [Doc] -> Doc
