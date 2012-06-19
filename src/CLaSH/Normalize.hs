@@ -22,13 +22,14 @@ runNormalization ::
   DebugLevel
   -> Supply
   -> HashMap TmName (Type,Term)
+  -> HashMap TmName (Type,[Term])
   -> NormalizeSession a
   -> a
-runNormalization lvl supply globals
+runNormalization lvl supply globals dfunMap
   = flip State.evalState normState
   . runRewriteSession lvl rwState
   where
-    rwState   = RewriteState 0 globals supply
+    rwState   = RewriteState 0 globals dfunMap supply
     normState = NormalizeState
                   HashMap.empty
                   Map.empty

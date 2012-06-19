@@ -22,11 +22,11 @@ import qualified TysWiredIn
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.Util (curLoc,mapAccumLM,second)
+import           CLaSH.Util (traceIf,curLoc,mapAccumLM)
 
 loadModules ::
   String
-  -> IO ([(CoreSyn.CoreBndr, CoreSyn.CoreExpr)],[GHC.TyCon])
+  -> IO ([(CoreSyn.CoreBndr, CoreSyn.CoreExpr)],[(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])],[GHC.TyCon])
 loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
   GHC.runGhc (Just GHC.Paths.libdir) $ do
     dflags <- GHC.getSessionDynFlags
@@ -56,9 +56,10 @@ loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
         desugardMods <- mapM (\m -> parseModule m >>=
                               GHC.typecheckModule >>=
                               GHC.desugarModule) modGraph'
-        let flattened = flattenModules
+        let (binders,tyCons) = flattenModules
                       $ map flattenDesugaredModule desugardMods
-        return (second (++ allExtTyCons) flattened)
+        (externalBndrs,dfuns,unlocatable) <- loadExternalExprs (map snd binders) (map fst binders)
+        traceIf True ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

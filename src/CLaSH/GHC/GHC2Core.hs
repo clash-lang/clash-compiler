@@ -92,7 +92,7 @@ makeAllTyDataCons tyCons =
                   tyCons
     tupleTyCons = concat [ map (`tupleTyCon` x)
                             [BoxedTuple,UnboxedTuple,ConstraintTuple]
-                         | x <- [1..7]
+                         | x <- [2..62]
                          ]
 
 makeTyCon ::

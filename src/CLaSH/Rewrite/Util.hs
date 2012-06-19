@@ -105,7 +105,8 @@ mkGamma ::
 mkGamma ctx = do
   let (gamma,_) = contextEnv ctx
   tsMap         <- fmap (HashMap.map fst) $ LabelM.gets bindings
-  let gamma'    = tsMap `HashMap.union` gamma
+  dfunTsMap     <- fmap (HashMap.map fst) $ LabelM.gets dfuns
+  let gamma'    = tsMap `HashMap.union` dfunTsMap `HashMap.union` gamma
   return gamma'
 
 mkBinderFor ::
@@ -171,8 +172,9 @@ localFreeVars ::
   -> RewriteMonad m ([TyName],[TmName])
 localFreeVars term = do
   globalBndrs <- fmap (HashMap.keys) $ LabelM.gets bindings
+  globalDFuns <- fmap (HashMap.keys) $ LabelM.gets dfuns
   let (tyFVs,tmFVs) = termFreeVars term
-  return (tyFVs,filter (`notElem` globalBndrs) tmFVs)
+  return (tyFVs,filter (`notElem` (globalBndrs ++ globalDFuns)) tmFVs)
 
 liftBinders ::
   (Functor m, Monad m)

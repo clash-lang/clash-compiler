@@ -42,20 +42,6 @@ curLoc = do
   (TH.Loc _ _ modName (startPosL,_) _) <- TH.location
   TH.litE (TH.StringL $ modName ++ "(" ++ show startPosL ++ "): ")
 
-makeCachedM ::
-  (MonadState s m, Hashable k, Eq k)
-  => k
-  -> s :-> (HashMap k (m v))
-  -> m v
-  -> m v
-makeCachedM key lens create = do
-  cache <- LabelM.gets lens
-  case HashMap.lookup key cache of
-    Just create' -> create'
-    Nothing -> do
-      LabelM.modify lens (HashMap.insert key create)
-      create
-
 makeCached ::
   (MonadState s m, Hashable k, Eq k)
   => k
