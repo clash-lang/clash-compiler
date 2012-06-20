@@ -220,14 +220,20 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   -- Abstract expression over its local FVs
   let boundFTVs = map (mkTyVar delta) localFTVs
   let boundFVs  = map (mkId gamma) localFVs'
-  let newBody   = mkTyLams (mkLams e boundFVs) boundFTVs
   -- Make a new global ID
-  newBodyTy <- termType gamma newBody
   newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
-  -- Make a new expression, consisting of the te lifted function applied to it's free variables
-  let newExpr   = mkTmApps (mkTyApps (Var newBodyId) $ map mkTyVarTy localFTVs) $ map Var localFVs'
-  let newBody'  = substTm idName newExpr newBody
-  LabelM.modify bindings (HashMap.insert newBodyId (newBodyTy,newBody'))
+  -- Make a new expression, consisting of the te lifted function applied to
+  -- its free variables
+  let newExpr = mkTmApps (mkTyApps (Var newBodyId) $ map mkTyVarTy localFTVs)
+              $ map Var localFVs'
+  -- Substitute the recursive calls by the new expression
+  let e' = substTm idName newExpr e
+  -- Create a new body that abstracts over the free variables
+  let newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
+  -- Add the created function to the list of global bindings
+  newBodyTy <- termType gamma newBody
+  LabelM.modify bindings (HashMap.insert newBodyId (newBodyTy,newBody))
+  -- Return the new binder
   return (Id idName (embed ty), embed newExpr)
 
 liftBinding _ _ _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
