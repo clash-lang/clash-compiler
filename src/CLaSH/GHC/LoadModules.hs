@@ -29,6 +29,7 @@ loadModules ::
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
         , [(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])]  -- Dictionary Functions
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
+        , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , [GHC.TyCon]                              -- Type Constructors
         )
 loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
@@ -65,7 +66,7 @@ loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
         (externalBndrs,dfuns,clsOps,unlocatable) <- loadExternalExprs
                                                 (map snd binders)
                                                 (map fst binders)
-        traceIf True ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,tyCons ++ allExtTyCons)
+        traceIf True ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

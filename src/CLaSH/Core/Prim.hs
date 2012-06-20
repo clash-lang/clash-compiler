@@ -56,4 +56,4 @@ primFuns = concat
   [ numFuns
   ]
   where
-    numFuns = ["plusInteger","*","-","negate","abs","signum","fromInteger"]
+    numFuns = []

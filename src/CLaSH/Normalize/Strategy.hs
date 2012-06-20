@@ -7,9 +7,10 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = representable >->
-                (repeatR $ bottomupR (apply "classOpResolution" classOpResolution) !-> representable) >->
+normalization = (repeatR $ clsOpRes >-> representable) >->
                 simplification
+  where
+    clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
 
 representable :: NormRewrite
 representable = monomorphization >-> defunctionalization

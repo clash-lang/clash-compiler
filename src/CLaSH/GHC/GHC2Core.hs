@@ -6,11 +6,11 @@ module CLaSH.GHC.GHC2Core
   ( makeAllTyDataCons
   , coreToTerm
   , coreToBndr
+  , unlocatable
   )
 where
 
 -- External Modules
-import Control.Category
 import Control.Monad                        ((<=<))
 import Control.Monad.Reader                 (Reader)
 import qualified Control.Monad.Reader     as Reader
@@ -21,7 +21,6 @@ import Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import Data.Label.PureM                  as LabelM
 import Data.Maybe                           (fromMaybe)
-import Prelude hiding                       ((.),id)
 import Unbound.LocallyNameless              (Rep,bind,rec,embed)
 import qualified Unbound.LocallyNameless as Unbound
 
@@ -67,8 +66,9 @@ type SR a = StateT GHC2CoreState R a
 
 data GHC2CoreState
   = GHC2CoreState
-  { _tyConMap   :: HashMap TyCon   C.TyCon
-  , _dataConMap :: HashMap DataCon C.DataCon
+  { _tyConMap    :: HashMap TyCon   C.TyCon
+  , _dataConMap  :: HashMap DataCon C.DataCon
+  , _unlocatable :: [Var]
   }
 
 mkLabels [''GHC2CoreState]
@@ -87,7 +87,7 @@ makeAllTyDataCons tyCons =
                            s
   in  s
   where
-    emptyState = GHC2CoreState HashMap.empty HashMap.empty
+    emptyState = GHC2CoreState HashMap.empty HashMap.empty []
     tyCons'    = filter (\tc -> not (isSynTyCon tc || isAbstractTyCon tc))
                   tyCons
     tupleTyCons = concat [ map (`tupleTyCon` x)
@@ -222,14 +222,16 @@ coreToTerm s coreExpr = Reader.runReader (term coreExpr) s
                                           ) $ rhssOfAlts alts
                                b'       <- coreToId b
                                e'       <- term e
-                               caseTerm <- C.Case e'
-                                              <$> coreToType ty
-                                              <*> mapM alt alts
+                               let caseTerm v = C.Case v
+                                                <$> coreToType ty
+                                                <*> mapM alt alts
                                if usesBndr
-                                then return $ C.Letrec $ bind
+                                then do
+                                  ct <- caseTerm (C.Var $ C.varName b')
+                                  return $ C.Letrec $ bind
                                         (rec [(b',embed e')])
-                                        caseTerm
-                                else return caseTerm
+                                        ct
+                                else caseTerm e'
 
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
@@ -239,6 +241,7 @@ coreToTerm s coreExpr = Reader.runReader (term coreExpr) s
     var x = let xVar   = coreToVar x
                 xNameS = Unbound.name2String xVar
             in do
+              unlocs <- LabelM.asks unlocatable
               xType <- coreToType (varType x)
               case (isDataConWorkId_maybe x) of
                 Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
@@ -249,6 +252,7 @@ coreToTerm s coreExpr = Reader.runReader (term coreExpr) s
                   | xNameS `elem` C.primDFuns -> return $ C.Prim (C.PrimDFun xVar xType)
                   | xNameS `elem` C.primDicts -> return $ C.Prim (C.PrimDict xVar xType)
                   | xNameS `elem` C.primFuns  -> return $ C.Prim (C.PrimFun  xVar xType)
+                  | x `elem` unlocs -> return $ C.Prim (C.PrimFun xVar xType)
                   | otherwise -> return $ C.Var xVar
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)

@@ -137,28 +137,20 @@ loadExprFromIface ::
             (CoreSyn.CoreBndr,CoreSyn.CoreExpr))
           CoreSyn.CoreBndr)
 loadExprFromIface bndr = do
-    nameModM <- GHC.gcatch
-                  ( fmap Just
-                  $ GHC.findModule
-                      (GHC.moduleName . GHC.nameModule $ Var.varName bndr)
-                      Nothing
-                  ) (\(_::Exception.SomeException) -> return Nothing)
-
-    case nameModM of
-      Just nameMod -> runIfl nameMod $ do
-        ifaceM <- loadIface nameMod
-        case ifaceM of
-          Nothing    -> return $ Right bndr
-          Just iface -> do
-            let decls = map snd (GHC.mi_decls iface)
-            let nameFun = GHC.getOccName $ Var.varName bndr
-            let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
-            case declM of
-              [namedDecl] -> do
-                tyThing <- loadDecl namedDecl
-                return $ loadExprFromTyThing bndr tyThing
-              _ -> return $ Right bndr
-      Nothing -> return $ Right bndr
+  let nameMod = GHC.nameModule $ Var.varName bndr
+  runIfl nameMod $ do
+    ifaceM <- loadIface nameMod
+    case ifaceM of
+      Nothing    -> return $ Right bndr
+      Just iface -> do
+        let decls = map snd (GHC.mi_decls iface)
+        let nameFun = GHC.getOccName $ Var.varName bndr
+        let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
+        case declM of
+          [namedDecl] -> do
+            tyThing <- loadDecl namedDecl
+            return $ loadExprFromTyThing bndr tyThing
+          _ -> return $ Right bndr
 
 loadExprFromTyThing ::
   CoreSyn.CoreBndr
