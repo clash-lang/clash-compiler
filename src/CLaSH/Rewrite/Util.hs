@@ -105,8 +105,10 @@ mkGamma ::
 mkGamma ctx = do
   let (gamma,_) = contextEnv ctx
   tsMap         <- fmap (HashMap.map fst) $ LabelM.gets bindings
-  dfunTsMap     <- fmap (HashMap.map fst) $ LabelM.gets dfuns
-  let gamma'    = tsMap `HashMap.union` dfunTsMap `HashMap.union` gamma
+  dfuns         <- fmap (HashMap.map fst) $ LabelM.gets dictFuns
+  clsOps        <- fmap (HashMap.map fst) $ LabelM.gets classOps
+  let gamma'    = tsMap `HashMap.union` dfuns `HashMap.union` clsOps
+                  `HashMap.union` gamma
   return gamma'
 
 mkBinderFor ::
@@ -171,10 +173,16 @@ localFreeVars ::
   => Term
   -> RewriteMonad m ([TyName],[TmName])
 localFreeVars term = do
-  globalBndrs <- fmap (HashMap.keys) $ LabelM.gets bindings
-  globalDFuns <- fmap (HashMap.keys) $ LabelM.gets dfuns
+  globalBndrs <- LabelM.gets bindings
+  dfuns       <- LabelM.gets dictFuns
+  clsOps      <- LabelM.gets classOps
   let (tyFVs,tmFVs) = termFreeVars term
-  return (tyFVs,filter (`notElem` (globalBndrs ++ globalDFuns)) tmFVs)
+  return ( tyFVs
+         , filter (\v -> not ( v `HashMap.member` globalBndrs ||
+                               v `HashMap.member` dfuns       ||
+                               v `HashMap.member` clsOps )
+                  ) tmFVs
+         )
 
 liftBinders ::
   (Functor m, Monad m)

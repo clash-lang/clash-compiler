@@ -23,7 +23,8 @@ data Prim
 
 Unbound.derive [''Prim]
 
-instance Alpha Prim
+instance Alpha Prim where
+  fv' _ _ = emptyC
 
 instance Subst Type Prim
 instance Subst Term Prim
@@ -55,4 +56,4 @@ primFuns = concat
   [ numFuns
   ]
   where
-    numFuns = ["+","*","-","negate","abs","signum","fromInteger"]
+    numFuns = ["plusInteger","*","-","negate","abs","signum","fromInteger"]

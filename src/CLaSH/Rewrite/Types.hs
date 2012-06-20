@@ -31,7 +31,8 @@ data RewriteState
   = RewriteState
   { _transformCounter :: Int
   , _bindings         :: HashMap TmName (Type,Term)
-  , _dfuns            :: HashMap TmName (Type,[Term])
+  , _dictFuns         :: HashMap TmName (Type,[Term])
+  , _classOps         :: HashMap TmName (Type,Int)
   , _uniqSupply       :: Supply
   }
 

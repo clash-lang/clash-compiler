@@ -23,13 +23,14 @@ runNormalization ::
   -> Supply
   -> HashMap TmName (Type,Term)
   -> HashMap TmName (Type,[Term])
+  -> HashMap TmName (Type,Int)
   -> NormalizeSession a
   -> a
-runNormalization lvl supply globals dfunMap
+runNormalization lvl supply globals dfunMap clsOpMap
   = flip State.evalState normState
   . runRewriteSession lvl rwState
   where
-    rwState   = RewriteState 0 globals dfunMap supply
+    rwState   = RewriteState 0 globals dfunMap clsOpMap supply
     normState = NormalizeState
                   HashMap.empty
                   Map.empty

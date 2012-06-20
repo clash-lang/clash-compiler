@@ -62,6 +62,13 @@ allR trans c (Case scrut ty alts) = R $ do
 (>->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
 (>->) r1 r2 c = (r1 c) >=> (r2 c)
 
+(!->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
+(!->) r1 r2 c expr = R $ do
+  (expr',changed) <- runR $ Writer.listen $ r1 c expr
+  if Monoid.getAny changed
+    then runR $ r2 c expr'
+    else return expr
+
 topdownR :: (Functor m, Monad m) => Rewrite m -> Rewrite m
 topdownR r = r >-> allR (topdownR r)
 

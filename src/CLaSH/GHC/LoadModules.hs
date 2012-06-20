@@ -26,7 +26,11 @@ import           CLaSH.Util (traceIf,curLoc,mapAccumLM)
 
 loadModules ::
   String
-  -> IO ([(CoreSyn.CoreBndr, CoreSyn.CoreExpr)],[(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])],[GHC.TyCon])
+  -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
+        , [(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])]  -- Dictionary Functions
+        , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
+        , [GHC.TyCon]                              -- Type Constructors
+        )
 loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
   GHC.runGhc (Just GHC.Paths.libdir) $ do
     dflags <- GHC.getSessionDynFlags
@@ -58,8 +62,10 @@ loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
                               GHC.desugarModule) modGraph'
         let (binders,tyCons) = flattenModules
                       $ map flattenDesugaredModule desugardMods
-        (externalBndrs,dfuns,unlocatable) <- loadExternalExprs (map snd binders) (map fst binders)
-        traceIf True ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,tyCons ++ allExtTyCons)
+        (externalBndrs,dfuns,clsOps,unlocatable) <- loadExternalExprs
+                                                (map snd binders)
+                                                (map fst binders)
+        traceIf True ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

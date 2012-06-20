@@ -366,3 +366,15 @@ retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
     True -> return expr
 
 retLet _ e = return e
+
+-- Class Operator Resolution
+classOpResolution :: NormRewrite
+classOpResolution _ e@(App (TyApp (Var sel) _) (Var dfun)) = R $ do
+  classSelM <- fmap (fmap snd . HashMap.lookup sel) $ LabelM.gets classOps
+  dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets dictFuns
+  case (classSelM,dfunOpsM) of
+    (Just classSel,Just dfunOps)
+      | classSel < length dfunOps -> changed (dfunOps !! classSel)
+    _ -> return e
+
+classOpResolution _ e = return e
