@@ -339,7 +339,7 @@ letFlat _ e@(Letrec binds) = R $ do
     (xes, body) <- fmap (first unrec) $ unbind binds
     (binds',updated) <- fmap unzip $ mapM flatBind xes
     case (or updated) of
-      True  -> return . Letrec $ bind (rec (concat binds')) body
+      True  -> changed . Letrec $ bind (rec (concat binds')) body
       False -> return e
   where
     flatBind :: Monad m => LetBinding -> RewriteMonad m ([LetBinding],Bool)
