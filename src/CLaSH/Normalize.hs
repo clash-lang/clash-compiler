@@ -54,7 +54,9 @@ normalize (bndr:bndrs) = do
       case (bndr `elem` usedBndrs) of
         True -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
         False -> do
-          normalizedOthers <- normalize (usedBndrs ++ bndrs)
+          prevNorm <- fmap (HashMap.keys) $ liftRS $ LabelM.gets normalized
+          let toNormalize = filter (`notElem` prevNorm) usedBndrs
+          normalizedOthers <- normalize (toNormalize ++ bndrs)
           return ((bndr,(ty,normalizedExpr)):normalizedOthers)
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " not found"
 
