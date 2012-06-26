@@ -52,21 +52,27 @@ loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
                                               )
                                         . GHC.ms_textual_imps
                                         ) modGraph
+
         externalTyCons <- fmap snd $
                             mapAccumLM getExternalTyCons [] externalImports
+
         let allExtTyCons = concat externalTyCons ++
                                   TysWiredIn.wiredInTyCons ++
                                   TysPrim.primTyCons
+
         let modGraph' = map disableOptimizationsFlags modGraph
         desugardMods <- mapM (\m -> parseModule m >>=
                               GHC.typecheckModule >>=
                               GHC.desugarModule) modGraph'
+
         let (binders,tyCons) = flattenModules
                       $ map flattenDesugaredModule desugardMods
+
         (externalBndrs,dfuns,clsOps,unlocatable) <- loadExternalExprs
                                                 (map snd binders)
                                                 (map fst binders)
-        traceIf True ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
+
+        traceIf (not $ null unlocatable) ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

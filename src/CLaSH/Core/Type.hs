@@ -12,6 +12,7 @@ module CLaSH.Core.Type
   , mkForAllTy
   , mkTyVarTy
   , splitFunTy
+  , splitTyConAppM
   , noParenPred
   , isPredTy
   , isLiftedTypeKind
@@ -142,3 +143,9 @@ applyTy (ForAllTy b) arg = do
   (tv,ty) <- unbind b
   return $ substTy (varName tv) arg ty
 applyTy _ _ = error $ $(curLoc) ++ "applyTy: not a forall type"
+
+splitTyConAppM ::
+  Type
+  -> Maybe (TyCon,[Type])
+splitTyConAppM (TyConApp tc args) = Just (tc,args)
+splitTyConAppM _                  = Nothing

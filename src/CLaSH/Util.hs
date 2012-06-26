@@ -8,12 +8,14 @@ module CLaSH.Util
   ( module CLaSH.Util
   , module Control.Applicative
   , module Control.Arrow
+  , module Control.Monad
   , mkLabels
   )
 where
 
-import Control.Applicative              ((<$>),(<*>),pure)
+import Control.Applicative              (Applicative,(<$>),(<*>),pure)
 import Control.Arrow                    (first,second)
+import Control.Monad                    ((<=<))
 import Control.Monad.State              (MonadState)
 import Control.Monad.Trans.Class        (MonadTrans,lift)
 import Data.Hashable                    (Hashable(..))

@@ -5,7 +5,7 @@ module CLaSH.GHC.LoadInterfaceFiles where
 -- External Modules
 import           Data.Either (partitionEithers)
 import           Data.List   (elemIndex,partition)
-import           Data.Maybe  (fromMaybe,isJust,mapMaybe)
+import           Data.Maybe  (fromMaybe,isJust,isNothing,mapMaybe)
 
 -- GHC API
 import qualified Class
@@ -94,6 +94,7 @@ loadExternalExprs [] _ = return ([],[],[],[])
 loadExternalExprs (expr:exprs) visited = do
   let fvs = VarSet.varSetElems $ CoreFVs.exprSomeFreeVars
               (\v -> Var.isId v &&
+                     isNothing (Id.isDataConId_maybe v) &&
                      v `notElem` visited
               ) expr
 

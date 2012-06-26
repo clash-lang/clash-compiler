@@ -59,6 +59,20 @@ collectArgs = go []
     go args (TyApp e t) = go (Right t:args) e
     go args e           = (e, args)
 
+collectBndrs ::
+  Fresh m
+  => Term
+  -> m ([Either Id TyVar], Term)
+collectBndrs e = go [] e
+  where
+    go bs (Lam b) = do
+      (v,e') <- unbind b
+      go (Left v:bs) e'
+    go bs (TyLam b) = do
+      (tv,e') <- unbind b
+      go (Right tv:bs) e'
+    go bs e' = return (bs,e')
+
 applyTypeToArgs :: Fresh m => Type -> [Either Term Type] -> m Type
 applyTypeToArgs opTy []              = return opTy
 applyTypeToArgs opTy (Right ty:args) = applyTy opTy ty >>=
@@ -131,6 +145,12 @@ isLam ::
   -> Bool
 isLam (Lam _) = True
 isLam _       = False
+
+isLet ::
+  Term
+  -> Bool
+isLet (Letrec _) = True
+isLet _          = False
 
 isVar ::
   Term

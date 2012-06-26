@@ -63,7 +63,7 @@ defunctionalization = defunctionalization' >-> functionSpecialization
     functionSpecialization = repeatR $ bottomupR (apply "funSpec" funSpec)
 
 simplification :: NormRewrite
-simplification = repeatTopdown steps
+simplification = repeatTopdown steps >-> retVarStep
   where
     steps = [ ("lamApp"   , lamApp    )
             , ("letApp"   , letApp    )
@@ -72,9 +72,14 @@ simplification = repeatTopdown steps
             , ("etaExpand", etaExpand )
             , ("appSimpl" , appSimpl  )
             , ("retLet"   , retLet    )
+            , ("retLam"   , retLam    )
             , ("letFlat"  , letFlat   )
             , ("inlineVar", inlineVar )
             ]
+
+    retVarStep = topdownR (apply "retVar" retVar)
+
+
 
 repeatTopdown :: [(String,NormRewrite)] -> NormRewrite
 repeatTopdown

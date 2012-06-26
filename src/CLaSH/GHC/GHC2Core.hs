@@ -11,7 +11,6 @@ module CLaSH.GHC.GHC2Core
 where
 
 -- External Modules
-import Control.Monad                        ((<=<))
 import Control.Monad.Reader                 (Reader)
 import qualified Control.Monad.Reader     as Reader
 import Control.Monad.State                  (StateT,lift)

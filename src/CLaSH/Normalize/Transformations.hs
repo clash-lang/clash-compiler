@@ -1,7 +1,6 @@
 {-# LANGUAGE PatternGuards #-}
 module CLaSH.Normalize.Transformations where
 
-import Control.Monad                  ((<=<))
 import Control.Monad.Trans.Class      (lift)
 import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
@@ -16,7 +15,7 @@ import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
 import CLaSH.Core.Subst      (substTyInTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
-import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,mkTmApps)
+import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,mkTmApps,isLet)
 import CLaSH.Core.Var        (Var(..))
 import {-# SOURCE #-} CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
@@ -366,6 +365,36 @@ retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
     True -> return expr
 
 retLet _ e = return e
+
+retLam :: NormRewrite
+retLam ctx e
+  | all isLambdaBodyCtx ctx && not (isLam e) && not (isLet e)
+  = R $ do
+    lv     <- isLocalVar e
+    unTran <- isUntranslatable e
+    case lv || unTran of
+      False -> do
+        (resId,resVar) <- mkBinderFor ctx "retLam" e
+        changed . Letrec $ bind (rec $ [(resId,embed e)]) resVar
+      True -> return e
+
+retLam _ e = return e
+
+retVar :: NormRewrite
+retVar [] e@(Lam b) = R $ do
+    (bndr, v) <- unbind b
+    case v of
+      Var bndr' | varName bndr == bndr' -> do
+        (boundArg,argVar) <- mkInternalVar "retVar" (unembed $ varType bndr)
+        changed . Lam $ bind
+                        bndr
+                        (Letrec $ bind
+                                  (rec $ [(boundArg, Embed $ Var bndr')])
+                                  argVar
+                        )
+      _ -> return e
+
+retVar _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
