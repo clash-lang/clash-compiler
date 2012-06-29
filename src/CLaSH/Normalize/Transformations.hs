@@ -12,6 +12,8 @@ import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,u
 
 import CLaSH.Core.DataCon    (dcTag)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
+import CLaSH.Core.Pretty     (showDoc)
+import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
@@ -324,7 +326,7 @@ appSimpl ctx e@(App appf arg)
   , isVar f || isCon f || isPrimCon f || isPrimFun f
   = R $ do
     localVar <- isLocalVar arg
-    untranslatable <- isUntranslatable arg
+    untranslatable <- isUntranslatable ctx arg
     case localVar || untranslatable of
       True -> return e
       False -> do
@@ -357,10 +359,10 @@ retLet :: NormRewrite
 retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
   (xes,body) <- fmap (first unrec) $ unbind b
   lv <- isLocalVar body
-  unTran <- isUntranslatable body
+  unTran <- isUntranslatable ctx body
   case lv || unTran of
     False -> do
-      (resId,resVar) <- mkBinderFor ctx "retLet" body
+      (resId,resVar) <- mkBinderFor ctx "result" body
       changed . Letrec $ bind (rec $ (resId,embed body):xes) resVar
     True -> return expr
 
@@ -371,10 +373,10 @@ retLam ctx e
   | all isLambdaBodyCtx ctx && not (isLam e) && not (isLet e)
   = R $ do
     lv     <- isLocalVar e
-    unTran <- isUntranslatable e
+    unTran <- isUntranslatable ctx e
     case lv || unTran of
       False -> do
-        (resId,resVar) <- mkBinderFor ctx "retLam" e
+        (resId,resVar) <- mkBinderFor ctx "result" e
         changed . Letrec $ bind (rec $ [(resId,embed e)]) resVar
       True -> return e
 
@@ -385,7 +387,7 @@ retVar [] e@(Lam b) = R $ do
     (bndr, v) <- unbind b
     case v of
       Var bndr' | varName bndr == bndr' -> do
-        (boundArg,argVar) <- mkInternalVar "retVar" (unembed $ varType bndr)
+        (boundArg,argVar) <- mkInternalVar "result" (unembed $ varType bndr)
         changed . Lam $ bind
                         bndr
                         (Letrec $ bind
@@ -398,12 +400,17 @@ retVar _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
-classOpResolution _ e@(App (TyApp (Var sel) _) (Var dfun)) = R $ do
-  classSelM <- fmap (fmap snd . HashMap.lookup sel) $ LabelM.gets classOps
+classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) (Var dfun)) = R $ do
+  classSelM <- fmap (fmap snd . HashMap.lookup sel)  $ LabelM.gets classOps
   dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets dictFuns
-  case (classSelM,dfunOpsM) of
-    (Just classSel,Just dfunOps)
+  bindingsM <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets bindings
+  case (classSelM,dfunOpsM,bindingsM) of
+    (Just classSel,Just dfunOps,Nothing)
       | classSel < length dfunOps -> changed (dfunOps !! classSel)
+    (Just classSel,Nothing, Just binding) -> do
+      error $ show classSel ++ showDoc (snd $ contextEnv ctx) binding
+    (Just classSel,Nothing,Nothing) -> do
+      error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ show e
     _ -> return e
 
 classOpResolution _ e = return e

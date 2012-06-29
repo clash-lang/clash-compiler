@@ -118,5 +118,24 @@ mapAccumLM f acc (x:xs) = do
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
 
+getAndModify ::
+  MonadState s m
+  => (s :-> a)
+  -> (a -> a)
+  -> m a
+getAndModify lens modify = do
+  a <- LabelM.gets lens
+  LabelM.modify lens modify
+  return a
+
 dot :: (b -> c) -> (a0 -> a1 -> b) -> a0 -> a1 -> c
 dot = (.) . (.)
+
+ifThenElse ::
+  (a -> Bool)
+  -> (a -> b)
+  -> (a -> b)
+  -> a
+  -> b
+ifThenElse t f g a = if t a then f a else g a
+

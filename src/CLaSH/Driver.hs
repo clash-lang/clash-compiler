@@ -1,47 +1,69 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module CLaSH.Driver where
 
-import qualified Control.Concurrent.Supply as Supply
-import qualified Data.HashMap.Lazy         as HashMap
-import           Unbound.LocallyNameless      (embed,name2String)
-import           Text.PrettyPrint.Leijen.Text (putDoc)
+import qualified Data.ByteString.Lazy         as LZ
+import           Data.Maybe                   (fromMaybe)
+import qualified Control.Concurrent.Supply    as Supply
+import qualified Data.HashMap.Lazy            as HashMap
+import           Data.List                    (isSuffixOf)
+import qualified System.Directory             as Directory
+import qualified System.FilePath              as FilePath
+import qualified System.IO                    as IO
+import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc)
+import           Unbound.LocallyNameless      (name2String)
 
-import           CLaSH.Core.Pretty            (showDoc)
 import           CLaSH.Core.Term              (TmName)
-import           CLaSH.Core.Var               (Var(..))
 import           CLaSH.Driver.PrepareBinding
-import           CLaSH.Netlist                (runNetlistMonad,genComponent)
+import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL)
 import           CLaSH.Normalize              (runNormalization, normalize)
+import           CLaSH.Primitives.Types
+import           CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
 import           CLaSH.Util
+
+import           Paths_clash
 
 generateVHDL ::
   String
   -> IO ()
 generateVHDL modName = do
-  (bindingsMap,dfunMap,clsOpMap) <- prepareBinding modName
+  primitiveDir   <- getDataFileName "primitives"
+  primitiveFiles <- fmap (filter (isSuffixOf ".json")) $
+                      Directory.getDirectoryContents primitiveDir
+
+  let primitiveFiles' = map (FilePath.combine primitiveDir) primitiveFiles
+
+  primitives <- fmap concat $ mapM
+                  ( return
+                  . fromMaybe []
+                  . decodeAndReport
+                  <=< LZ.readFile
+                  ) primitiveFiles'
+
+  let primMap = HashMap.fromList $ zip (map name primitives) primitives
+
+  (bindingsMap,dfunMap,clsOpMap) <- prepareBinding primMap modName
 
   let topEntities = HashMap.toList
                   $ HashMap.filterWithKey isTopEntity bindingsMap
 
   case topEntities of
     [topEntity] -> do
+      let bindingsMap' = HashMap.map snd bindingsMap
       supply <- Supply.newSupply
       let transformedBindings
-            = runNormalization DebugFinal supply bindingsMap dfunMap clsOpMap
+            = runNormalization DebugFinal supply bindingsMap' dfunMap clsOpMap
             $ normalize [fst topEntity]
 
-      let transformedTopEntity = head transformedBindings
-      let netlist = runNetlistMonad (HashMap.fromList $ transformedBindings)
-                  $ genComponent (fst transformedTopEntity)
-                                 (snd $ snd transformedTopEntity)
+      netlist <- genNetlist (HashMap.fromList $ transformedBindings)
+                            primMap
+                            (fst topEntity)
 
-      putDoc $ snd (genVHDL netlist)
-      -- let printedBindings = showDoc HashMap.empty
-      --                     $ map (\(v,(t,e)) -> (Id v (embed t),e))
-      --                         transformedBindings
-      -- putStrLn printedBindings
+      let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
+      prepareDir dir
+      mapM_ (writeVHDL dir . genVHDL) netlist
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
@@ -51,3 +73,27 @@ isTopEntity ::
   -> a
   -> Bool
 isTopEntity var _ = name2String var == "topEntity"
+
+-- | Prepares the directory for writing VHDL files. This means creating the
+--   dir if it does not exist and removing all existing .vhdl files from it.
+prepareDir :: String -> IO ()
+prepareDir dir = do
+  -- Create the dir if needed
+  Directory.createDirectoryIfMissing True dir
+  -- Find all .vhdl files in the directory
+  files <- Directory.getDirectoryContents dir
+  let to_remove = filter ((==".vhdl") . FilePath.takeExtension) files
+  -- Prepend the dirname to the filenames
+  let abs_to_remove = map (FilePath.combine dir) to_remove
+  -- Remove the files
+  mapM_ Directory.removeFile abs_to_remove
+
+writeVHDL :: FilePath -> (String, Doc) -> IO ()
+writeVHDL dir (cname, vhdl) = do
+  -- Find the filename
+  let fname = dir ++ cname ++ ".vhdl"
+  -- Write the file
+  handle <- IO.openFile fname IO.WriteMode
+  IO.hPutStrLn handle "-- Automatically generated VHDL"
+  hPutDoc handle vhdl
+  IO.hClose handle

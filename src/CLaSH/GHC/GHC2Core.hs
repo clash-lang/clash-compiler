@@ -6,22 +6,24 @@ module CLaSH.GHC.GHC2Core
   ( makeAllTyDataCons
   , coreToTerm
   , coreToBndr
+  , coreToPrimBndr
   , unlocatable
   )
 where
 
 -- External Modules
-import Control.Monad.Reader                 (Reader)
+import Control.Monad.Reader               (Reader)
 import qualified Control.Monad.Reader     as Reader
-import Control.Monad.State                  (StateT,lift)
+import Control.Monad.State                (StateT,lift)
 import qualified Control.Monad.State.Lazy as State
-import Data.Hashable                        (Hashable(..))
-import Data.HashMap.Lazy                    (HashMap)
-import qualified Data.HashMap.Lazy       as HashMap
-import Data.Label.PureM                  as LabelM
-import Data.Maybe                           (fromMaybe)
-import Unbound.LocallyNameless              (Rep,bind,rec,embed)
-import qualified Unbound.LocallyNameless as Unbound
+import Data.ByteString.Lazy.Char8         (pack)
+import Data.Hashable                      (Hashable(..))
+import Data.HashMap.Lazy                  (HashMap)
+import qualified Data.HashMap.Lazy        as HashMap
+import Data.Label.PureM                   as LabelM
+import Data.Maybe                         (fromMaybe)
+import Unbound.LocallyNameless            (Rep,bind,rec,embed)
+import qualified Unbound.LocallyNameless  as Unbound
 
 -- GHC API
 import BasicTypes (TupleSort (..))
@@ -33,7 +35,8 @@ import DataCon    (DataCon,dataConTag,dataConUnivTyVars,dataConWorkId,
 import FastString (unpackFS)
 import Id         (isDataConWorkId_maybe)
 import Literal    (Literal(..))
-import Name       (Name,nameOccName)
+import Module     (moduleName,moduleNameString)
+import Name       (Name,nameOccName,nameModule_maybe)
 import OccName    (occNameString)
 import Outputable (showPpr)
 import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
@@ -55,6 +58,7 @@ import qualified CLaSH.Core.Term    as C
 import qualified CLaSH.Core.TyCon   as C
 import qualified CLaSH.Core.TypeRep as C
 import qualified CLaSH.Core.Var     as C
+import CLaSH.Primitives.Types
 import CLaSH.Util
 
 instance Show TyCon where
@@ -111,7 +115,7 @@ makeTyCon tc = do
       | otherwise           = error $ $(curLoc) ++ "Can't convert TyCon: "
                                                 ++ showPpr tc
       where
-        tcName  = coreToName tyConName tyConUnique tc
+        tcName  = coreToName tyConName tyConUnique qualfiedNameString tc
         tcArity = tyConArity tc
 
         mkAlgTyCon = do
@@ -171,7 +175,7 @@ makeDataCon dc = do
   workIdTy <- lift $ coreToType (varType $ dataConWorkId dc)
   let dataCon =
         C.MkData
-          { C.dcName       = coreToName dataConName getUnique dc
+          { C.dcName       = coreToName dataConName getUnique nameString dc
           , C.dcTag        = dataConTag dc
           , C.dcRepArgTys  = repTys
           , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
@@ -182,10 +186,11 @@ makeDataCon dc = do
   return dataCon
 
 coreToTerm ::
-  GHC2CoreState
+  PrimMap
+  -> GHC2CoreState
   -> CoreExpr
   -> C.Term
-coreToTerm s coreExpr = Reader.runReader (term coreExpr) s
+coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
   where
     term (Var x)                 = var x
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
@@ -194,74 +199,75 @@ coreToTerm s coreExpr = Reader.runReader (term coreExpr) s
     term (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> (coreToTyVar x) <*> (term e))
                    | otherwise   = C.Lam <$> (bind <$> (coreToId x) <*> (term e))
     term (Let (NonRec x e1) e2)  = do
-                                    x' <- coreToId x
-                                    e1' <- term e1
-                                    e2' <- term e2
-                                    return $
-                                      C.Letrec $ bind
-                                          (rec [(x', embed e1')])
-                                          e2'
+      x' <- coreToId x
+      e1' <- term e1
+      e2' <- term e2
+      return $ C.Letrec $ bind (rec [(x', embed e1')]) e2'
 
     term (Let (Rec xes) e) = do
-                              xes' <- mapM
-                                        ( firstM  coreToId <=<
-                                          secondM ((return . embed) <=< term)
-                                        ) xes
-                              e' <- term e
-                              return $
-                                C.Letrec $ bind
-                                  (rec xes')
-                                  e'
+      xes' <- mapM
+                ( firstM  coreToId <=<
+                  secondM ((return . embed) <=< term)
+                ) xes
+      e' <- term e
+      return $ C.Letrec $ bind (rec xes') e'
 
     term (Case e b ty alts) = do
-                               let usesBndr =
-                                      any ( not
-                                          . isEmptyVarSet
-                                          . exprSomeFreeVars (`elem` [b])
-                                          ) $ rhssOfAlts alts
-                               b'       <- coreToId b
-                               e'       <- term e
-                               let caseTerm v = C.Case v
-                                                <$> coreToType ty
-                                                <*> mapM alt alts
-                               if usesBndr
-                                then do
-                                  ct <- caseTerm (C.Var $ C.varName b')
-                                  return $ C.Letrec $ bind
-                                        (rec [(b',embed e')])
-                                        ct
-                                else caseTerm e'
+     let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
+                  $ rhssOfAlts alts
+     b' <- coreToId b
+     e' <- term e
+     let caseTerm v = C.Case v <$> coreToType ty <*> mapM alt alts
+     if usesBndr
+      then do
+        ct <- caseTerm (C.Var $ C.varName b')
+        return $ C.Letrec $ bind (rec [(b',embed e')]) ct
+      else caseTerm e'
 
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
     term (Type _)          = error $ $(curLoc) ++ "Type at non-argument position not supported"
     term (Coercion co)     = C.Prim <$> C.PrimCo <$> (coreToType $ coercionType co)
 
-    var x = let xVar   = coreToVar x
-                xNameS = Unbound.name2String xVar
-            in do
-              unlocs <- LabelM.asks unlocatable
-              xType <- coreToType (varType x)
-              case (isDataConWorkId_maybe x) of
-                Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
-                        | otherwise -> if (xNameS `elem` C.primDataCons)
-                            then C.Prim <$> C.PrimCon <$> (coreToDataCon dc)
-                            else C.Data <$> (coreToDataCon dc)
-                Nothing
-                  | xNameS `elem` C.primDFuns -> return $ C.Prim (C.PrimDFun xVar xType)
-                  | xNameS `elem` C.primDicts -> return $ C.Prim (C.PrimDict xVar xType)
-                  | xNameS `elem` C.primFuns  -> return $ C.Prim (C.PrimFun  xVar xType)
-                  | x `elem` unlocs -> return $ C.Prim (C.PrimFun xVar xType)
-                  | otherwise -> return $ C.Var xVar
+    var x =
+      let xVar   = coreToVar x
+          xPrim  = coreToPrimVar x
+          xNameS = pack $ Unbound.name2String xPrim
+      in do
+        unlocs <- LabelM.asks unlocatable
+        xType <- coreToType (varType x)
+        case (isDataConWorkId_maybe x) of
+          Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
+                  | otherwise ->  case (HashMap.lookup xNameS primMap) of
+                      Just (Primitive _ Constructor) ->
+                        C.Prim <$> C.PrimCon <$> (coreToDataCon dc)
+                      Just (BlackBox {}) ->
+                        return $ C.Prim (C.PrimFun xPrim xType)
+                      _ ->
+                        C.Data <$> (coreToDataCon dc)
+          Nothing -> case HashMap.lookup xNameS primMap of
+            Just (Primitive _ DFun) ->
+              return $ C.Prim (C.PrimDFun xPrim xType)
+            Just (Primitive _ Dictionary) ->
+              return $ C.Prim (C.PrimDict xPrim xType)
+            Just (Primitive _ Function) ->
+              return $ C.Prim (C.PrimFun  xPrim xType)
+            Just (Primitive _ Constructor) ->
+              error $ $(curLoc) ++ "Primitive DataCon not a identified as DataCon"
+            Just (BlackBox {}) ->
+              return $ C.Prim (C.PrimFun xPrim xType)
+            Nothing
+              | x `elem` unlocs -> return $ C.Prim (C.PrimFun  xPrim xType)
+              | otherwise -> return $ C.Var xVar
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
     alt (DataAlt dc, xs, e) = case (as,cs) of
-                                ([],[]) -> bind <$> (C.DataPat . embed <$>
-                                                      (coreToDataCon dc) <*>
-                                                      (mapM coreToId zs)) <*>
-                                                (term e)
-                                _ -> error $ $(curLoc) ++ "Patterns binding coercions or type variables are not supported"
+      ([],[]) -> bind <$> (C.DataPat . embed <$>
+                            (coreToDataCon dc) <*>
+                            (mapM coreToId zs)) <*>
+                      (term e)
+      _ -> error $ $(curLoc) ++ "Patterns binding coercions or type variables are not supported"
       where
         (as,ys) = span isTyVar xs
         (cs,zs) = span isCoVar ys
@@ -342,6 +348,18 @@ coreToBndr ::
   -> C.Id
 coreToBndr s bndr = Reader.runReader (coreToId bndr) s
 
+coreToPrimBndr ::
+  GHC2CoreState
+  -> Id
+  -> C.Id
+coreToPrimBndr s bndr = Reader.runReader (coreToPrimId bndr) s
+
+coreToPrimId ::
+  Id
+  -> R C.Id
+coreToPrimId i =
+  C.Id (coreToPrimVar i) <$> (embed <$> coreToType (varType i))
+
 coreToId ::
   Id
   -> R C.Id
@@ -352,20 +370,39 @@ coreToVar ::
   Rep a
   => Var
   -> Unbound.Name a
-coreToVar = coreToName varName varUnique
+coreToVar = coreToName varName varUnique nameString
+
+coreToPrimVar ::
+  Rep a
+  => Var
+  -> Unbound.Name a
+coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
 coreToName ::
   Rep a
   => (b -> Name)
   -> (b -> Unique)
+  -> (Name -> String)
   -> b
   -> Unbound.Name a
-coreToName toName toUnique v =
+coreToName toName toUnique toString v =
   Unbound.makeName
-    (nameString $ toName v)
+    (toString $ toName v)
     (toInteger . getKey . toUnique $ v)
 
 nameString ::
   Name
   -> String
 nameString = occNameString . nameOccName
+
+qualfiedNameString ::
+  Name
+  -> String
+qualfiedNameString n = fromMaybe "_INTERNAL_" modName ++ ('.':occName)
+  where
+    modName = do
+      module_ <- nameModule_maybe n
+      let moduleNm = moduleName module_
+      return (moduleNameString moduleNm)
+
+    occName = occNameString $ nameOccName n

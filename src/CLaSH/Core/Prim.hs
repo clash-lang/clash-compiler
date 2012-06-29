@@ -38,22 +38,3 @@ primType p = case p of
   PrimDict _ t -> t
   PrimDFun _ t -> t
   PrimCo t     -> t
-
-primDicts :: [String]
-primDicts = ["$dPositiveT","$dNaturalT","$dIntegerT"]
-
-primDFuns :: [String]
-primDFuns = ["$fShowUnsigned","$fEqInteger","$fPositiveTx"
-            ,"$fNaturalTx","$fArrowComponent","$fArrowLoopComponent"
-            ,"$fShowSigned","$fNumInt"
-            ]
-
-primDataCons :: [String]
-primDataCons = ["I#","Int#","Signed","Unsigned"]
-
-primFuns :: [String]
-primFuns = concat
-  [ numFuns
-  ]
-  where
-    numFuns = []

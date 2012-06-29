@@ -39,3 +39,10 @@ instance Subst Type TyVar
 instance Subst Type Id where
   subst tvN u (Id idN ty) | isFree tvN = Id idN (subst tvN u ty)
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
+
+modifyVarName ::
+  (Name a -> Name a)
+  -> Var a
+  -> Var a
+modifyVarName f (TyVar n k) = TyVar (f n) k
+modifyVarName f (Id n t)    = Id (f n) t

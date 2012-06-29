@@ -124,10 +124,10 @@ instance Pretty Literal where
 
 instance Pretty Prim where
   pprPrec prec d p = case p of
-    PrimFun f _   -> pprPrec prec d f
+    PrimFun f _   -> return . text $ name2String f
     PrimCon dc    -> pprPrec prec d dc
-    PrimDict di _ -> pprPrec prec d di
-    PrimDFun df _ -> pprPrec prec d df
+    PrimDict di _ -> return . text $ name2String di
+    PrimDFun df _ -> return . text $ name2String df
     PrimCo _      -> return $ text "co"
 
 instance Pretty Pat where

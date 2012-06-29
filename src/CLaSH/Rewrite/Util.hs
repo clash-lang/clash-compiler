@@ -18,6 +18,7 @@ import CLaSH.Core.Term (Term(..),TmName,LetBinding)
 import CLaSH.Core.Type (Type,TyName,mkTyVarTy)
 import CLaSH.Core.Util (Gamma,Delta,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps)
 import CLaSH.Core.Var  (Var(..),Id)
+import CLaSH.Netlist.Util (representableType)
 import CLaSH.Rewrite.Types
 import CLaSH.Util
 
@@ -275,11 +276,12 @@ isLocalVar _ = return False
 
 isUntranslatable ::
   (Functor m, Monad m)
-  => Term
+  => [CoreContext]
+  -> Term
   -> RewriteMonad m Bool
-isUntranslatable _
-  = traceIf True ($(curLoc) ++ "isUntranslatable undefined")
-  $ return False
+isUntranslatable ctx tm = do
+  gamma <- mkGamma ctx
+  fmap (not . representableType) $ termType gamma tm
 
 isLambdaBodyCtx ::
   CoreContext

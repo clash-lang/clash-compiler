@@ -14,7 +14,7 @@ import CLaSH.Core.Type          (Type)
 import CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
 import CLaSH.Rewrite.Types      (DebugLevel(..),RewriteState(..),dbgLevel,
-  bindings)
+  bindings,classOps,dictFuns)
 import CLaSH.Rewrite.Util       (liftRS,runRewrite,runRewriteSession)
 import CLaSH.Util
 
@@ -50,7 +50,7 @@ normalize (bndr:bndrs) = do
       liftRS $ LabelM.puts curFun bndr
       normalizedExpr <- makeCachedT3 bndr normalized $
                          normalizeExpr bndrS expr
-      let usedBndrs = termFreeIds normalizedExpr
+      usedBndrs <- usedGlobalBndrs normalizedExpr
       case (bndr `elem` usedBndrs) of
         True -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
         False -> do
@@ -78,3 +78,11 @@ normalizeExpr bndrS expr = do
   traceIf (lvl >= DebugFinal)
     (bndrS ++ " after normalization:\n\n" ++ after ++ "\n") $
     return rewritten
+
+usedGlobalBndrs ::
+  Term
+  -> NormalizeSession [TmName]
+usedGlobalBndrs tm = do
+  clsOps <- fmap (HashMap.keys) $ LabelM.gets classOps
+  dfuns  <- fmap (HashMap.keys) $ LabelM.gets dictFuns
+  return . filter (`notElem` (clsOps ++ dfuns)) $ termFreeIds tm

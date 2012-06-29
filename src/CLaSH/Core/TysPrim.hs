@@ -25,8 +25,8 @@ constraintKindTyConKey   = toInteger . getKey $ PrelNames.constraintKindTyConKey
 
 
 intPrimTyConName, addrPrimTyConName :: TyConName
-intPrimTyConName  = makeName "#Int"  intPrimTyConKey
-addrPrimTyConName = makeName "#Addr" addrPrimTyConKey
+intPrimTyConName  = makeName "GHC.Prim.Int#"  intPrimTyConKey
+addrPrimTyConName = makeName "GHC.Prim.Addr#" addrPrimTyConKey
 
 tySuperKindTyConName, liftedTypeKindTyConName, unliftedTypeKindTyConName, constraintKindTyConName :: TyConName
 tySuperKindTyConName      = makeName "BOX"        tySuperKindTyConKey
