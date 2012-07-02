@@ -106,6 +106,8 @@ typeSize Integer = 32
 typeSize (SP _ cons) =
   (ceiling . logBase (2 :: Float) . fromIntegral $ length cons) +
   (maximum $ map (sum . map typeSize . snd) cons)
+typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
+typeSize (Product _ tys) = sum $ map typeSize tys
 typeSize _ = error "typeSize"
 
 typeLength ::

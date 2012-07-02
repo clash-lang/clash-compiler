@@ -362,7 +362,7 @@ retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
   unTran <- isUntranslatable ctx body
   case lv || unTran of
     False -> do
-      (resId,resVar) <- mkBinderFor ctx "result" body
+      (resId,resVar) <- mkBinderFor ctx "retLet" body
       changed . Letrec $ bind (rec $ (resId,embed body):xes) resVar
     True -> return expr
 
@@ -376,25 +376,20 @@ retLam ctx e
     unTran <- isUntranslatable ctx e
     case lv || unTran of
       False -> do
-        (resId,resVar) <- mkBinderFor ctx "result" e
+        (resId,resVar) <- mkBinderFor ctx "retLam" e
         changed . Letrec $ bind (rec $ [(resId,embed e)]) resVar
       True -> return e
 
 retLam _ e = return e
 
 retVar :: NormRewrite
-retVar [] e@(Lam b) = R $ do
-    (bndr, v) <- unbind b
-    case v of
-      Var bndr' | varName bndr == bndr' -> do
-        (boundArg,argVar) <- mkInternalVar "result" (unembed $ varType bndr)
-        changed . Lam $ bind
-                        bndr
-                        (Letrec $ bind
-                                  (rec $ [(boundArg, Embed $ Var bndr')])
-                                  argVar
-                        )
-      _ -> return e
+retVar ctx e@(Var v)
+  | all isLambdaBodyCtx ctx
+  = R $ case (HashMap.lookup v . fst $ contextEnv ctx) of
+    Just ty -> do
+      (boundArg,argVar) <- mkInternalVar "retVar" ty
+      changed . Letrec $ bind (rec [(boundArg, Embed $ Var v)]) argVar
+    Nothing -> return e
 
 retVar _ e = return e
 

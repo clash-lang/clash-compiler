@@ -14,9 +14,9 @@ import CLaSH.Core.Term (Term(..),TmName)
 import CLaSH.Core.Type (Type)
 import CLaSH.Core.Var  as V (Id,Var(..))
 import CLaSH.Netlist.BlackBox.Types as B
+import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types as HW
 import CLaSH.Netlist.Util
-import CLaSH.Netlist.VHDL
 import CLaSH.Primitives.Types as P
 import CLaSH.Util
 
@@ -61,7 +61,7 @@ mkVarInput ::
   -> Type
   -> (Maybe VarInput)
 mkVarInput nm ty = do
-  let nmT = pack . mkVHDLBasicId $ name2String nm
+  let nmT = mkBasicId . pack $ name2String nm
   case typeToHWType ty of
     Left errMsg -> traceIf True errMsg Nothing
     Right hwTy  -> Just (VarInput nmT (typeSize hwTy) (typeLength hwTy))

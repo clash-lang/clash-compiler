@@ -1,14 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CLaSH.Netlist.VHDL where
 
-import Data.Char (isDigit,ord)
-import qualified Data.List as List
 import Data.Maybe (catMaybes)
 import Data.Text.Lazy (unpack)
 import Data.Text.Lazy.Encoding (decodeUtf8)
-import Numeric (showHex)
 import Text.PrettyPrint.Leijen.Text
 
+import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.Util
 
@@ -50,7 +48,11 @@ vhdlType Integer    = text "integer"
 vhdlType t@(SP _ _) = text "std_logic_vector" <>
                       parens ( int (typeSize t - 1) <+>
                                text "downto 0" )
-vhdlType _          = error "vhdlType"
+vhdlType t@(Sum _ _) = text "std_logic_vector" <>
+                        parens ( int (typeSize t -1) <+>
+                                 text "downto 0")
+vhdlType (Product p _) = text (mkBasicId p)
+vhdlType t          = error $ "vhdlType: " ++ show t
 
 decls :: [Declaration] -> Doc
 decls [] = empty
@@ -69,28 +71,33 @@ decl _ = Nothing
 
 insts :: [Declaration] -> Doc
 insts [] = empty
-insts is =
-    case catMaybes $ zipWith inst gensyms is of
-      []  -> empty
-      is' -> (vcat $ punctuate semi is') <> semi
+insts is = vcat . catMaybes $ zipWith inst gensyms is
+--    case catMaybes $ zipWith inst gensyms is of
+--      []  -> empty
+--      is' -> (vcat $ punctuate semi is') <> semi
   where
     gensyms = [text "proc" <> int i | i <- [0..]]
 
 inst :: Doc -> Declaration -> Maybe Doc
 inst _ (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = Just $
-    text id_ <+> text "<=" <+> assignExpr
+    text id_ <+> larrow <+> assignExpr <> semi
   where
     argTys     = snd $ args !! i
     dcExpr     = expr (dcToExpr ty i)
     argExprs   = zipWith toSLV argTys $ map expr es
     assignExpr = hcat $ punctuate (text " & ") (dcExpr:argExprs)
 
-inst _ (Assignment id_ Nothing Integer [e]) = Just $
-  text id_ <+> text "<=" <+> expr e
+inst _ (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = Just $
+    text id_ <+> larrow <+> assignExpr <> semi
+  where
+    assignExpr = expr (dcToExpr ty i)
+
+inst _ (Assignment id_ Nothing _ [e]) = Just $
+  text id_ <+> larrow <+> expr e <> semi
 
 inst _ (InstDecl nm lbl pms) = Just $
-    nest 2 $ text lbl <> text "comp_inst" <+> colon <+> text "entity"
-              <+> text nm <$$> pms'
+    nest 2 $ text lbl <> text "_comp_inst" <+> colon <+> text "entity"
+              <+> text nm <$$> pms' <> semi
   where
     pms' = nest 2 $ text "port map" <$$>
             tupled [text i <+> text "=>" <+> expr e | (i,e) <- pms]
@@ -107,6 +114,7 @@ expr _                      = empty
 exprLit :: Maybe Size -> Literal -> Doc
 exprLit Nothing   (NumLit i) = int i
 exprLit (Just sz) (NumLit i) = bits $ (toBits sz i)
+exprLit _         (BoolLit t) = if t then text "true" else text "false"
 exprLit _         _          = error "exprLit"
 
 toBits :: Integral a => Int -> a -> [Bit]
@@ -134,69 +142,11 @@ dcToExpr :: HWType -> Int -> Expr
 dcToExpr (SP _ args) i = Literal (Just conSize) (NumLit i)
   where
     conSize = ceiling . logBase (2 :: Float) . fromIntegral $ length args
+dcToExpr (Sum _ dcs) i = Literal (Just conSize) (NumLit i)
+  where
+    conSize = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
 
 dcToExpr _ _ = error "dcExpr"
 
-mkVHDLBasicId ::
-  String
-  -> String
-mkVHDLBasicId = stripMultiscore . stripLeading . zEncode
-  where
-    stripLeading = dropWhile (`elem` ['0'..'9'])
-    stripMultiscore = concatMap (\cs -> case cs of ('_':_) -> "_"; _ -> cs)
-                    . List.group
-
-type UserString    = String -- As the user typed it
-type EncodedString = String -- Encoded form
-
-zEncode :: UserString -> EncodedString
-zEncode cs = go cs
-  where
-    go []       = []
-    go (c:cs')  = encode_digit_ch c ++ go' cs'
-    go' []      = []
-    go' (c:cs') = encode_ch c ++ go' cs'
-
-encode_digit_ch :: Char -> EncodedString
-encode_digit_ch c | c >= '0' && c <= '9' = encode_as_unicode_char c
-encode_digit_ch c | otherwise            = encode_ch c
-
-encode_ch :: Char -> EncodedString
-encode_ch c | unencodedChar c = [c]     -- Common case first
-
--- Constructors
-encode_ch '['  = "ZM"
-encode_ch ']'  = "ZN"
-encode_ch ':'  = "ZC"
-
--- Variables
-encode_ch '&'  = "za"
-encode_ch '|'  = "zb"
-encode_ch '^'  = "zc"
-encode_ch '$'  = "zd"
-encode_ch '='  = "ze"
-encode_ch '>'  = "zg"
-encode_ch '#'  = "zh"
-encode_ch '.'  = "zi"
-encode_ch '<'  = "zl"
-encode_ch '-'  = "zm"
-encode_ch '!'  = "zn"
-encode_ch '+'  = "zp"
-encode_ch '\'' = "zq"
-encode_ch '\\' = "zr"
-encode_ch '/'  = "zs"
-encode_ch '*'  = "zt"
-encode_ch '%'  = "zv"
-encode_ch c    = encode_as_unicode_char c
-
-encode_as_unicode_char :: Char -> EncodedString
-encode_as_unicode_char c = 'z' : if isDigit (head hex_str) then hex_str
-                                                           else '0':hex_str
-  where hex_str = showHex (ord c) "U"
-
-unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
-unencodedChar c   =  c >= 'a' && c <= 'z'
-                  || c >= 'A' && c <= 'Z'
-                  || c >= '0' && c <= '9'
-                  || c == '_' || c == '('
-                  || c == ')'
+larrow :: Doc
+larrow = text "<="
