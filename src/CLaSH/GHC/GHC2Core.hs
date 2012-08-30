@@ -373,9 +373,8 @@ coreToVar ::
 coreToVar = coreToName varName varUnique nameString
 
 coreToPrimVar ::
-  Rep a
-  => Var
-  -> Unbound.Name a
+  Var
+  -> Unbound.Name C.Term
 coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
 coreToName ::
