@@ -23,7 +23,8 @@ Library
   HS-Source-Dirs:      src
 
   extensions:          TemplateHaskell
-  ghc-options:         -O2 -Wall -fwarn-tabs
+  ghc-options:         -Wall -fwarn-tabs
+  Cpp-options:         -DCABAL
 
   Exposed-modules:     CLaSH.Driver
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 module CLaSH.Driver where
 
 import qualified Data.ByteString.Lazy         as LZ
@@ -23,7 +24,12 @@ import           CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
 import           CLaSH.Util
 
+#ifdef CABAL
 import           Paths_clash
+#else
+getDataFileName :: FilePath -> IO FilePath
+getDataFileName = return . ("../" ++)
+#endif
 
 generateVHDL ::
   String
