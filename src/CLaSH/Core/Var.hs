@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
