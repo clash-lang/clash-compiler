@@ -208,5 +208,6 @@ mkDcApplication dst dc args = do
       let dc' = case (name2String $ dcName dc) of
                  "True"  -> [HW.Literal Nothing (BoolLit True)]
                  "False" -> [HW.Literal Nothing (BoolLit False)]
+                 _ -> error $ "unknown bool literal: " ++ show dc
       return [Assignment dstId Nothing dstHType dc']
     _ -> error $ "mkDcApplication undefined: " ++ show dstHType

@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections       #-}
 module CLaSH.GHC.LoadInterfaceFiles where
 
 -- External Modules
@@ -10,6 +10,7 @@ import           Data.Maybe  (fromMaybe,isJust,isNothing,mapMaybe)
 -- GHC API
 import qualified Class
 import qualified CoreSyn
+import           CLaSH.GHC.Compat.CoreSyn (dfunArgExprs)
 import qualified CoreFVs
 import qualified Exception
 import qualified GHC
@@ -20,7 +21,8 @@ import qualified IfaceSyn
 import qualified LoadIface
 import qualified Maybes
 import qualified MonadUtils
-import           Outputable (showPpr,text)
+import           CLaSH.GHC.Compat.Outputable (showPpr)
+import           Outputable (text)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -168,6 +170,6 @@ loadExprFromTyThing bndr tyThing = case tyThing of
       (CoreSyn.CoreUnfolding {}) ->
         Left $ Right (bndr, CoreSyn.unfoldingTemplate unfolding)
       (CoreSyn.DFunUnfolding _ _ es) ->
-        Left $ Left (bndr, es)
-      _ -> traceIf True ("Unwanted unfolding for " ++ show bndr ++ ": " ++ showPpr unfolding) $ Right bndr
-  _ -> traceIf True ("Unwanted tyThing for " ++ show bndr ++ ": " ++ showPpr tyThing) $ Right bndr
+        Left $ Left (bndr, dfunArgExprs es)
+      _ -> traceIf True ("Unwanted unfolding for " ++ showPpr bndr ++ ": " ++ showPpr unfolding) $ Right bndr
+  _ -> traceIf True ("Unwanted tyThing for " ++ showPpr bndr ++ ": " ++ showPpr tyThing) $ Right bndr

@@ -12,8 +12,10 @@ import qualified GHC.Paths
 import qualified CoreSyn
 import qualified DynFlags
 import qualified GHC
+import           CLaSH.GHC.Compat.GHC (defaultErrorHandler)
 import qualified HscTypes
 import qualified HsImpExp
+import           CLaSH.GHC.Compat.Outputable (showPpr)
 import qualified Panic
 import qualified SrcLoc
 import qualified TcRnTypes
@@ -32,7 +34,7 @@ loadModules ::
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , [GHC.TyCon]                              -- Type Constructors
         )
-loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
+loadModules modName = defaultErrorHandler $
   GHC.runGhc (Just GHC.Paths.libdir) $ do
     dflags <- GHC.getSessionDynFlags
     let dflags' = foldl DynFlags.xopt_set
@@ -72,7 +74,7 @@ loadModules modName = GHC.defaultErrorHandler DynFlags.defaultLogAction $
                                                 (map snd binders)
                                                 (map fst binders)
 
-        traceIf (not $ null unlocatable) ("No exprs found for: " ++ show unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
+        traceIf (not $ null unlocatable) ("No exprs found for: " ++ showPpr unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

@@ -5,6 +5,7 @@ import Unbound.LocallyNameless         (makeName)
 
 -- GHC API
 import qualified PrelNames
+import qualified CLaSH.GHC.Compat.PrelNames as CPrelNames (tySuperKindTyConKey)
 import Unique    (getKey)
 
 import CLaSH.Core.TyCon
@@ -18,7 +19,7 @@ addrPrimTyConKey         = toInteger . getKey $ PrelNames.addrPrimTyConKey
 eqTyConKey               = toInteger . getKey $ PrelNames.eqTyConKey
 listTyConKey             = toInteger . getKey $ PrelNames.listTyConKey
 
-tySuperKindTyConKey      = toInteger . getKey $ PrelNames.tySuperKindTyConKey
+tySuperKindTyConKey      = toInteger . getKey $ CPrelNames.tySuperKindTyConKey
 unliftedTypeKindTyConKey = toInteger . getKey $ PrelNames.unliftedTypeKindTyConKey
 liftedTypeKindTyConKey   = toInteger . getKey $ PrelNames.liftedTypeKindTyConKey
 constraintKindTyConKey   = toInteger . getKey $ PrelNames.constraintKindTyConKey

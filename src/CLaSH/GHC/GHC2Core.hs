@@ -32,17 +32,18 @@ import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
 import DataCon    (DataCon,dataConTag,dataConUnivTyVars,dataConWorkId,
   dataConRepArgTys,dataConName,dataConTyCon)
-import FastString (unpackFS)
+import CLaSH.GHC.Compat.FastString (unpackFS)
 import Id         (isDataConWorkId_maybe)
 import Literal    (Literal(..))
 import Module     (moduleName,moduleNameString)
 import Name       (Name,nameOccName,nameModule_maybe)
 import OccName    (occNameString)
-import Outputable (showPpr)
+import CLaSH.GHC.Compat.Outputable (showPpr)
 import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
-  isAlgTyCon,isTupleTyCon,isSuperKindTyCon,tyConName,tyConUnique,tyConTyVars,
+  isAlgTyCon,isTupleTyCon,tyConName,tyConUnique,tyConTyVars,
   tyConDataCons,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,tyConArity,
   tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep,isAbstractTyCon)
+import CLaSH.GHC.Compat.TyCon (isSuperKindTyCon)
 import Type       (Type,getTyVar_maybe,splitForAllTy_maybe,splitFunTy_maybe,
   splitTyConApp_maybe,tcView)
 import TysWiredIn (tupleTyCon)
@@ -289,7 +290,7 @@ coreToLiteral l = case l of
   MachWord   i   -> C.IntegerLiteral i
   MachWord64 i   -> C.IntegerLiteral i
   LitInteger i _ -> C.IntegerLiteral i
-  _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ show l
+  _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ showPpr l
 
 coreToType ::
   Type
