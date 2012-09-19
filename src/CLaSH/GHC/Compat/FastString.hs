@@ -6,7 +6,7 @@ where
 
 import qualified FastString
 
-#if __GLASGOW_HASKELL__ >= 706
+#if __GLASGOW_HASKELL__ >= 707
 unpackFS :: FastString.FastBytes -> String
 unpackFS = FastString.unpackFS
          . FastString.mkFastStringByteList
