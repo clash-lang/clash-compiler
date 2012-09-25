@@ -20,13 +20,14 @@ Data-files:          primitives/ghc.base.json,
 Cabal-version:       >=1.2
 
 Library
-  HS-Source-Dirs:      src
+  HS-Source-Dirs:      src src-prelude
 
   extensions:          TemplateHaskell
   ghc-options:         -Wall -fwarn-tabs
   Cpp-options:         -DCABAL
 
   Exposed-modules:     CLaSH.Driver
+                       CLaSH.Sized.Vector
 
   Build-depends:       aeson                >= 0.6.0.2,
                        attoparsec           >= 0.10.2.0,
