@@ -10,16 +10,17 @@ module CLaSH.Sized.VectorZ
   ( Vec(..), (<:)
   , vhead, vtail, vlast, vinit
   , (+>>), (<<+), (<++>), vconcat
-  , vmap, vzipWith, vfoldl, vfoldr
+  , vsplit, vsplitI, vunconcat, vunconcatI
+  , vreverse, vmap, vzipWith, vfoldl, vfoldr, vzip, vunzip
   , vindex, vindexM, unsafeIndex
-  , vsplit, vsplitI
-  , vtake, vtakeI, vdrop, vdropI, vexact
-  , vreplicate, vreplicateI
+  , vreplace, vreplaceM, unsafeReplace
+  , vtake, vtakeI, vdrop, vdropI, vexact, vselect
+  , vreplicate, vreplicateI, viterate, viterateI, vgenerate, vgenerateI
   )
 where
 
 import GHC.TypeLits
-import Unsafe.Coerce(unsafeCoerce)
+import Unsafe.Coerce (unsafeCoerce)
 
 import CLaSH.Sized.Index
 import CLaSH.Sized.Unsigned
@@ -78,21 +79,35 @@ infixr 5 <++>
 (<++>) :: Vec n a -> Vec m a -> Vec (n + m) a
 xs <++> ys = vappend xs ys
 
--- CLaSH/Sized/VectorZ.hs:86:21:
---     Could not deduce ((m + (n1 * m)) ~ (n * m))
---     from the context (n ~ (n1 + 1))
---       bound by a pattern with constructor
---                  :> :: forall a (n :: Nat). a -> Vec n a -> Vec (n + 1) a,
---                in an equation for `vconcat'
---       at CLaSH/Sized/VectorZ.hs:86:10-16
---     Expected type: Vec (n * m) a
---       Actual type: Vec (m + (n1 * m)) a
---     In the expression: x <++> vconcat xs
---     In an equation for `vconcat': vconcat (x :> xs) = x <++> vconcat xs
--- Failed, modules loaded: CLaSH.Sized.Index, CLaSH.Sized.Unsigned.
+vsplit :: Sing m -> Vec (m + n) a -> (Vec m a, Vec n a)
+vsplit n xs = vsplit' (isZero n) xs
+  where
+    vsplit' :: IsZero m -> Vec (m + n) a -> (Vec m a, Vec n a)
+    vsplit' IsZero     ys        = (Nil,ys)
+    vsplit' (IsSucc s) (y :> ys) = let (as,bs) = vsplit' (isZero s) (unsafeCoerce ys)
+                                   in  (y :> as, bs)
+
+vsplitI :: SingI m => Vec (m + n) a -> (Vec m a, Vec n a)
+vsplitI = withSing vsplit
+
 vconcat :: Vec n (Vec m a) -> Vec (n * m) a
 vconcat Nil       = Nil
 vconcat (x :> xs) = unsafeCoerce $ x <++> vconcat xs
+
+vunconcat :: Sing n -> Sing m -> Vec (n * m) a -> Vec n (Vec m a)
+vunconcat n m xs = vunconcat' (isZero n) m xs
+  where
+    vunconcat' :: IsZero n -> Sing m -> Vec (n * m) a -> Vec n (Vec m a)
+    vunconcat' IsZero      _ _  = Nil
+    vunconcat' (IsSucc n') m xs = let (as,bs) = vsplit m (unsafeCoerce xs)
+                                  in  as :> vunconcat' (isZero n') m bs
+
+vunconcatI :: (SingI n, SingI m) => Vec (n * m) a -> Vec n (Vec m a)
+vunconcatI = (withSing . withSing) vunconcat
+
+vreverse :: Vec n a -> Vec n a
+vreverse Nil        = Nil
+vreverse (x :> xs)  = vreverse xs <: x
 
 vmap :: (a -> b) -> Vec n a -> Vec n b
 vmap f Nil       = Nil
@@ -133,38 +148,21 @@ unsafeIndex xs i = case vindexM xs i of
   Just a  -> a
   Nothing -> error "index out of bounds"
 
--- CLaSH/Sized/VectorZ.hs:142:69:
---     Could not deduce (n3 ~ (n2 + n1))
---     from the context (m1 ~ (n2 + 1))
---       bound by a pattern with constructor
---                  IsSucc :: forall (n :: Nat). Sing Nat n -> IsZero (n + 1),
---                in an equation for vsplit'
---       at CLaSH/Sized/VectorZ.hs:142:14-21
---     or from ((m1 + n1) ~ (n3 + 1))
---       bound by a pattern with constructor
---                  :> :: forall a (n :: Nat). a -> Vec n a -> Vec (n + 1) a,
---                in an equation for vsplit'
---       at CLaSH/Sized/VectorZ.hs:142:25-31
---       `n3' is a rigid type variable bound by
---            a pattern with constructor
---              :> :: forall a (n :: Nat). a -> Vec n a -> Vec (n + 1) a,
---            in an equation for vsplit'
---            at CLaSH/Sized/VectorZ.hs:142:25
---     Expected type: Vec (n2 + n1) a1
---       Actual type: Vec n3 a1
---     In the second argument of vsplit', namely `ys'
---     In the expression: vsplit' (isZero s) ys
---     In a pattern binding: (as, bs) = vsplit' (isZero s) ys
-vsplit :: Sing m -> Vec (m + n) a -> (Vec m a, Vec n a)
-vsplit n xs = vsplit' (isZero n) xs
-  where
-    vsplit' :: IsZero m -> Vec (m + n) a -> (Vec m a, Vec n a)
-    vsplit' IsZero     ys        = (Nil,ys)
-    vsplit' (IsSucc s) (y :> ys) = let (as,bs) = vsplit' (isZero s) (unsafeCoerce ys)
-                                   in  (y :> as, bs)
+vreplace :: Vec n a -> Index n -> a -> Vec n a
+vreplace (_ :> xs) O     y = y :> xs
+vreplace (x :> xs) (S k) y = x :> vreplace xs k y
 
-vsplitI :: SingI m => Vec (m + n) a -> (Vec m a, Vec n a)
-vsplitI = withSing vsplit
+vreplaceM :: Vec n a -> Unsigned s -> a -> Maybe (Vec n a)
+vreplaceM Nil _ _           = Nothing
+vreplaceM (_ :> xs) (U 0) y = Just (y :> xs)
+vreplaceM (x :> xs) (U n) y = case vreplaceM xs (U (n-1)) y of
+                                Just xs' -> Just (x :> xs')
+                                Nothing  -> Nothing
+
+unsafeReplace :: Vec n a -> Unsigned s -> a -> Vec n a
+unsafeReplace xs i a = case vreplaceM xs i a of
+  Just ys -> ys
+  Nothing -> error "index out of bounds"
 
 vtake :: Sing m -> Vec (m + n) a -> Vec m a
 vtake n = fst . vsplit n
@@ -181,6 +179,19 @@ vdropI = withSing vdrop
 vexact :: Sing m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n xs
 
+vselect ::
+  Sing f
+  -> Sing (s + 1)
+  -> Sing n
+  -> Vec (f + ((s * n) + i)) a
+  -> Vec n a
+vselect f s n xs = vselect' (isZero n) $ vdrop f xs
+  where
+    vselect' :: IsZero n -> Vec m a -> Vec n a
+    vselect' IsZero      _          = Nil
+    vselect' (IsSucc n') l@(a :> _) = a :> vselect' (isZero n')
+                                                    (vdrop s (unsafeCoerce l))
+
 vreplicate :: Sing n -> a -> Vec n a
 vreplicate n a = vreplicate' (isZero n) a
   where
@@ -191,15 +202,18 @@ vreplicate n a = vreplicate' (isZero n) a
 vreplicateI :: SingI n => a -> Vec n a
 vreplicateI = withSing vreplicate
 
--- Test vectors
-v1 :: Vec 1 Double
-v1 = 1.0 :> Nil
+viterate :: Sing n -> (a -> a) -> a -> Vec n a
+viterate n f a = viterate' (isZero n) f a
+  where
+    viterate' :: IsZero n -> (a -> a) -> a -> Vec n a
+    viterate' IsZero     _ _ = Nil
+    viterate' (IsSucc s) f a = a :> viterate' (isZero s) f (f a)
 
-v2 :: Vec 2 Double
-v2 = 1.0 :> 2.0 :> Nil
+viterateI :: SingI n => (a -> a) -> a -> Vec n a
+viterateI = withSing viterate
 
-v3 :: Vec 3 Double
-v3 = 1.0 :> 2.0 :> 3.0 :> Nil
+vgenerate :: Sing n -> (a -> a) -> a -> Vec n a
+vgenerate n f a = viterate n f (f a)
 
-v4 :: Vec 2 (Vec 2 Double)
-v4 = v2 :> v2 :> Nil
+vgenerateI :: SingI n => (a -> a) -> a -> Vec n a
+vgenerateI = withSing vgenerate
