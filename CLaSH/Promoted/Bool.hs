@@ -4,8 +4,6 @@
 {-# LANGUAGE PolyKinds      #-}
 module CLaSH.Promoted.Bool where
 
-import GHC.TypeLits
-
 type family If (x :: Bool) (y :: k) (z :: k) :: k
 
 type instance If True  y z = y

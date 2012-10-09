@@ -1,11 +1,14 @@
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE ExplicitForAll        #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE Rank2Types            #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE ExplicitForAll   #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE KindSignatures   #-}
+{-# LANGUAGE Rank2Types       #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators    #-}
+
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+
 module CLaSH.Sized.VectorZ
   ( Vec(..), (<:)
   , vhead, vtail, vlast, vinit
@@ -36,10 +39,10 @@ instance Show a => Show (Vec n a) where
   show (x :> xs) = show x ++ " " ++ show xs
 
 vhead :: Vec (n + 1) a -> a
-vhead (x :> xs) = x
+vhead (x :> _) = x
 
 vtail :: Vec (n + 1) a -> Vec n a
-vtail (x :> xs) = xs
+vtail (_ :> xs) = xs
 
 vlast :: Vec (n + 1) a -> a
 vlast (x :> Nil)     = x
@@ -99,8 +102,8 @@ vunconcat n m xs = vunconcat' (isZero n) m xs
   where
     vunconcat' :: IsZero n -> Sing m -> Vec (n * m) a -> Vec n (Vec m a)
     vunconcat' IsZero      _ _  = Nil
-    vunconcat' (IsSucc n') m xs = let (as,bs) = vsplit m (unsafeCoerce xs)
-                                  in  as :> vunconcat' (isZero n') m bs
+    vunconcat' (IsSucc n') m' ys = let (as,bs) = vsplit m' (unsafeCoerce ys)
+                                   in  as :> vunconcat' (isZero n') m' bs
 
 vunconcatI :: (SingI n, SingI m) => Vec (n * m) a -> Vec n (Vec m a)
 vunconcatI = (withSing . withSing) vunconcat
@@ -110,19 +113,19 @@ vreverse Nil        = Nil
 vreverse (x :> xs)  = vreverse xs <: x
 
 vmap :: (a -> b) -> Vec n a -> Vec n b
-vmap f Nil       = Nil
+vmap _ Nil       = Nil
 vmap f (x :> xs) = f x :> vmap f xs
 
 vzipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
-vzipWith f Nil       Nil       = Nil
+vzipWith _ Nil       Nil       = Nil
 vzipWith f (x :> xs) (y :> ys) = f x y :> vzipWith f xs ys
 
 vfoldr :: (a -> b -> b) -> b -> Vec n a -> b
-vfoldr f z Nil       = z
+vfoldr _ z Nil       = z
 vfoldr f z (x :> xs) = f x (vfoldr f z xs)
 
 vfoldl :: (a -> b -> a) -> a -> Vec n b -> a
-vfoldl f z Nil       = z
+vfoldl _ z Nil       = z
 vfoldl f z (x :> xs) = vfoldl f (f z x) xs
 
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
@@ -135,8 +138,8 @@ vunzip ((a,b) :> xs) = let (as,bs) = vunzip xs
                        in  (a :> as, b :> bs)
 
 vindex :: Vec n a -> Index n -> a
-vindex (x :> xs) O     = x
-vindex (x :> xs) (S k) = vindex xs k
+vindex (x :> _)  O     = x
+vindex (_ :> xs) (S k) = vindex xs k
 
 vindexM :: Vec n a -> Unsigned s -> Maybe a
 vindexM Nil       _     = Nothing
@@ -207,7 +210,7 @@ viterate n f a = viterate' (isZero n) f a
   where
     viterate' :: IsZero n -> (a -> a) -> a -> Vec n a
     viterate' IsZero     _ _ = Nil
-    viterate' (IsSucc s) f a = a :> viterate' (isZero s) f (f a)
+    viterate' (IsSucc s) g x = x :> viterate' (isZero s) g (g x)
 
 viterateI :: SingI n => (a -> a) -> a -> Vec n a
 viterateI = withSing viterate

@@ -1,43 +1,83 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE ExplicitForAll        #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
-module CLaSH.Sized.Unsigned where
+module CLaSH.Sized.Unsigned
+  ( Unsigned
+  , resize
+  )
+where
 
-import CLaSH.Class.Num
-import CLaSH.Promoted.Ord
-
-import qualified Prelude
-import Prelude (Integer,undefined,Show,(.))
+import Data.Bits
 import GHC.TypeLits
 
-newtype Unsigned (n :: Nat) = U Integer deriving Show
+newtype Unsigned (n :: Nat) = U Integer
 
-instance Add (Unsigned n) where
-  type AResult (Unsigned n) = Unsigned (n + 1)
-  (U a) + (U b) = U (a Prelude.+ b)
-  (U a) - (U b) = U (a Prelude.- b)
+instance Show (Unsigned n) where
+  show (U n) = show n
 
-instance Mult (Unsigned n) where
-  type MResult (Unsigned n) = Unsigned (n + n)
-  (U a) * (U b) = U (a Prelude.* b)
+instance Eq (Unsigned n) where
+  (U n) == (U m) = n == m
 
-resize :: Unsigned n -> Unsigned m
-resize (U n) = (U n)
+instance Ord (Unsigned n) where
+  compare (U n) (U m) = compare n m
 
-dot = (.).(.)
+instance SingI n => Bounded (Unsigned n) where
+  minBound = U 0
+  maxBound = U $ (2 ^ fromSing (sing :: Sing n)) - 1
 
-u1 :: Unsigned 4
-u1 = (U 2)
+fromIntegerU :: forall n . SingI n => Integer -> Unsigned (n :: Nat)
+fromIntegerU i = U $ i `mod` (2 ^ fromSing (sing :: Sing n))
 
-u2 :: Unsigned 4
-u2 = (U 4)
+plusU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+plusU (U a) (U b) = fromIntegerU $ a + b
 
-u3 :: Unsigned 5
-u3 = u1 + u2
+minU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+minU a b = a `plusU` (complement b) `plusU` 1
+
+timesU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+timesU (U a) (U b) = fromIntegerU $ a * b
+
+signumU :: Unsigned n -> Unsigned n
+signumU (U 0) = (U 0)
+signumU (U _) = (U 1)
+
+absU :: Unsigned n -> Unsigned n
+absU = id
+
+instance SingI n => Num (Unsigned n) where
+  (+)         = plusU
+  (-)         = minU
+  (*)         = timesU
+  negate      = error "'negate' undefined for Unsigned"
+  abs         = absU
+  signum      = signumU
+  fromInteger = fromIntegerU
+
+instance SingI n => Bits (Unsigned n) where
+  (U a) .&. (U b)     = U (a .&. b)
+  (U a) .|. (U b)     = U (a .|. b)
+  xor (U a) (U b)     = U (xor a b)
+  complement (U n)    = U (complement n)
+  bit i               = fromIntegerU (bit i)
+  testBit (U n) i     = testBit n i
+  bitSizeMaybe _      = Just $ fromInteger (fromSing (sing :: Sing n))
+  isSigned _          = False
+  shiftL _ b | b < 0  = error "'shiftL'{Unsigned} undefined for negative numbers"
+  shiftL (U n) b      = fromIntegerU $ shiftL n b
+  shiftR _ b | b < 0  = error "'shiftR'{Unsigned} undefined for negative numbers"
+  shiftR (U n) b      = fromIntegerU $ shiftR n b
+  rotateL _ b | b < 0 = error "'shiftL'{Unsigned} undefined for negative numbers"
+  rotateL n b         = let b' = b `mod` finiteBitSize n
+                        in shiftL n b' .|. shiftR n (finiteBitSize n - b')
+  rotateR _ b | b < 0 = error "'shiftR'{Unsigned} undefined for negative numbers"
+  rotateR n b         = let b' = b `mod` finiteBitSize n
+                        in shiftR n b' .|. shiftL n (finiteBitSize n - b')
+  popCount (U n)      = popCount n
+
+instance SingI n => FiniteBits (Unsigned n) where
+  finiteBitSize _ = fromInteger $ fromSing (sing :: Sing n)
+
+resize :: SingI m => Unsigned n -> Unsigned m
+resize (U n) = fromIntegerU n
