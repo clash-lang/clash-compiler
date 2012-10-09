@@ -18,7 +18,7 @@ import Unsafe.Coerce(unsafeCoerce)
 import GHC.TypeLits
 
 import CLaSH.Sized.Index
-import CLaSH.Sized.Unsigned
+import CLaSH.Sized.Number
 
 -- Would like to write:
 -- data Vector :: Nat -> * -> * where
@@ -163,13 +163,13 @@ vindex (One x)   O     = x
 vindex (x :> xs) O     = x
 vindex (x :> xs) (S k) = vindex xs k
 
-vindexM :: Vec n a -> Unsigned s -> Maybe a
-vindexM (One x)   (U 0) = Just x
-vindexM (One _)   (U _) = Nothing
-vindexM (x :> _)  (U 0) = Just x
-vindexM (_ :> xs) (U n) = vindexM xs (U (n-1))
+vindexM :: Vec n a -> Number s -> Maybe a
+vindexM (One x)   (N 0) = Just x
+vindexM (One _)   (N _) = Nothing
+vindexM (x :> _)  (N 0) = Just x
+vindexM (_ :> xs) (N n) = vindexM xs (U (n-1))
 
-unsafeIndex :: Vec n a -> Unsigned s -> a
+unsafeIndex :: Vec n a -> Number s -> a
 unsafeIndex xs i = case vindexM xs i of
   Just a  -> a
   Nothing -> error "index out of bounds"
