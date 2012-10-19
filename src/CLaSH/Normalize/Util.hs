@@ -49,7 +49,10 @@ commitNewInlined :: NormRewrite
 commitNewInlined _ e = R $ liftR $ do
   cf <- LabelM.gets curFun
   nI <- LabelM.gets newInlined
-  LabelM.modify inlined (HashMap.adjust (`List.union` nI) cf)
+  inlinedHM <- LabelM.gets inlined
+  case HashMap.lookup cf inlinedHM of
+    Nothing -> LabelM.modify inlined (HashMap.insert cf nI)
+    Just hm -> LabelM.modify inlined (HashMap.adjust (`List.union` nI) cf)
   LabelM.puts newInlined []
   return e
 
