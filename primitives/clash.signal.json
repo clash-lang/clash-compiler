@@ -1,0 +1,23 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Signal.register",
+      "varInputs" : 2,
+      "litInputs" : 0,
+      "template"  :
+"process(defaultClockReset,defaultClock) is
+  begin
+    if defaultClockReset = '0' then
+      {{result.varName}} <= {{varInputs.0.varName}};
+    elsif rising_edge(defaultClock) then
+      {{result.varName}} <= {{varInputs.1.varName}};
+    end if;
+end process;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.sync",
+      "varInputs" : 1,
+      "litInputs" : 0,
+      "template"  : "{{result.varName}} <= {{varInputs.0.varName}};"
+    }
+  }
+]

@@ -7,6 +7,7 @@
 
 module CLaSH.Core.TypeRep
   ( Type (..)
+  , TyLit (..)
   , Kind
   , SuperKind
   , TyName
@@ -28,6 +29,12 @@ data Type
   | FunTy    Type  Type
   | ForAllTy (Bind TyVar Type)
   | TyConApp TyCon [Type]
+  | LitTy    TyLit
+  deriving Show
+
+data TyLit
+  = NumTyLit Integer
+  | StrTyLit String
   deriving Show
 
 type Kind = Type
@@ -36,10 +43,13 @@ type SuperKind = Type
 type TyName = Name Type
 type KiName = Name Type
 
-Unbound.derive [''Type]
+Unbound.derive [''Type,''TyLit]
 
 instance Alpha Type
+instance Alpha TyLit
 
+instance Subst Type TyLit
+instance Subst Term TyLit
 instance Subst Term Type
 instance Subst Type Type where
   isvar (TyVarTy v) = Just (SubstName v)

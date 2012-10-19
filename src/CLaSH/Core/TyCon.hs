@@ -63,6 +63,7 @@ data AlgTyConRhs
   | NewTyCon
   { data_con :: DataCon
   }
+  | DataFamilyTyCon
   deriving Show
 
 data TyConParent

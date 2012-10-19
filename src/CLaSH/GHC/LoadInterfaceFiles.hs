@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
 module CLaSH.GHC.LoadInterfaceFiles where
@@ -45,7 +46,8 @@ getExternalTyCons visited modName = (`Exception.gcatch` expCatch) $ do
             case ifaceM of
               Nothing -> return ([],[])
               Just iface -> do
-                let used  = map fst $ HscTypes.dep_mods $ GHC.mi_deps iface
+                -- let used  = map fst $ HscTypes.dep_mods $ GHC.mi_deps iface
+                let used  = mapMaybe usageModuleName $ GHC.mi_usages iface
                 let decls = map snd (GHC.mi_decls iface)
                 tcs <- fmap (mapMaybe tyThingIsTyCon) $ mapM loadDecl decls
                 return (tcs,used)
@@ -63,6 +65,11 @@ getExternalTyCons visited modName = (`Exception.gcatch` expCatch) $ do
     tyThingIsTyCon :: GHC.TyThing -> Maybe GHC.TyCon
     tyThingIsTyCon (GHC.ATyCon tc) = Just tc
     tyThingIsTyCon _               = Nothing
+
+    usageModuleName :: HscTypes.Usage -> Maybe GHC.ModuleName
+    usageModuleName (HscTypes.UsagePackageModule {..}) = Just $ GHC.moduleName usg_mod
+    usageModuleName (HscTypes.UsageHomeModule {..})    = Just usg_mod_name
+    usageModuleName _                                  = Nothing
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do

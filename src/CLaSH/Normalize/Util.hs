@@ -6,11 +6,11 @@ import qualified Data.List as      List
 import Unbound.LocallyNameless     (aeq,embed)
 
 import CLaSH.Core.DataCon (dataConInstArgTys)
-import CLaSH.Core.Term    (TmName)
+import CLaSH.Core.Term    (Term(..),TmName)
 import CLaSH.Core.TyCon   (TyCon(..),tyConDataCons)
 import CLaSH.Core.Type    (isFunTy)
 import CLaSH.Core.TypeRep (Type(..))
-import CLaSH.Core.Util    (Gamma)
+import CLaSH.Core.Util    (Gamma,collectArgs)
 import CLaSH.Core.Var     (Var(..),Id)
 import CLaSH.Normalize.Types
 import CLaSH.Rewrite.Types
@@ -38,13 +38,11 @@ alreadyInlined f = do
   inlinedHM <- LabelM.gets inlined
   case HashMap.lookup cf inlinedHM of
     Nothing -> do
-      LabelM.modify inlined (HashMap.insert cf [f])
       return False
     Just inlined' -> do
       if (f `elem` inlined')
         then return True
         else do
-          LabelM.modify newInlined (f:)
           return False
 
 commitNewInlined :: NormRewrite
@@ -60,3 +58,13 @@ fvs2bvs ::
   -> [TmName]
   -> [Id]
 fvs2bvs gamma = map (\n -> Id n (embed $ gamma HashMap.! n))
+
+isSimple ::
+  Term
+  -> Bool
+isSimple (Var _)     = True
+isSimple (Literal _) = True
+isSimple (Data _)    = True
+isSimple e@(App _ _)
+  | (Data _, args) <- collectArgs e = all (either isSimple (const True)) args
+isSimple _ = False

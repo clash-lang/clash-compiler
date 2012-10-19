@@ -12,7 +12,7 @@ import CLaSH.Core.TyCon
 import CLaSH.Core.TypeRep
 
 intPrimTyConKey, addrPrimTyConKey, eqTyConKey, listTyConKey :: Integer
-tySuperKindTyConKey, unliftedTypeKindTyConKey, liftedTypeKindTyConKey, constraintKindTyConKey :: Integer
+tySuperKindTyConKey, unliftedTypeKindTyConKey, liftedTypeKindTyConKey, constraintKindTyConKey, typeNatKindConNameKey, typeStringKindConNameKey :: Integer
 
 intPrimTyConKey          = toInteger . getKey $ PrelNames.intPrimTyConKey
 addrPrimTyConKey         = toInteger . getKey $ PrelNames.addrPrimTyConKey
@@ -23,17 +23,21 @@ tySuperKindTyConKey      = toInteger . getKey $ CPrelNames.tySuperKindTyConKey
 unliftedTypeKindTyConKey = toInteger . getKey $ PrelNames.unliftedTypeKindTyConKey
 liftedTypeKindTyConKey   = toInteger . getKey $ PrelNames.liftedTypeKindTyConKey
 constraintKindTyConKey   = toInteger . getKey $ PrelNames.constraintKindTyConKey
+typeNatKindConNameKey    = toInteger . getKey $ PrelNames.typeNatKindConNameKey
+typeStringKindConNameKey = toInteger . getKey $ PrelNames.typeStringKindConNameKey
 
 
 intPrimTyConName, addrPrimTyConName :: TyConName
 intPrimTyConName  = makeName "GHC.Prim.Int#"  intPrimTyConKey
 addrPrimTyConName = makeName "GHC.Prim.Addr#" addrPrimTyConKey
 
-tySuperKindTyConName, liftedTypeKindTyConName, unliftedTypeKindTyConName, constraintKindTyConName :: TyConName
+tySuperKindTyConName, liftedTypeKindTyConName, unliftedTypeKindTyConName, constraintKindTyConName, typeNatKindTyCon, typeStringKindTyCon :: TyConName
 tySuperKindTyConName      = makeName "BOX"        tySuperKindTyConKey
 liftedTypeKindTyConName   = makeName "*"          liftedTypeKindTyConKey
 unliftedTypeKindTyConName = makeName "#"          unliftedTypeKindTyConKey
 constraintKindTyConName   = makeName "Constraint" constraintKindTyConKey
+typeNatKindTyCon          = makeName "Nat"        typeNatKindConNameKey
+typeStringKindTyCon       = makeName "Symbol"     typeStringKindConNameKey
 
 intPrimTyCon :: TyCon
 intPrimTyCon  = pcPrimTyCon0 intPrimTyConName IntRep
@@ -53,6 +57,11 @@ tySuperKindTyCon      = mkSuperKindTyCon tySuperKindTyConName
 unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName tySuperKind
 liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName tySuperKind
 constraintKindTyCon   = mkKindTyCon constraintKindTyConName tySuperKind
+
+typeNatKind, typeStringKind :: Kind
+typeNatKind    = kindTyConType (mkKindTyCon typeNatKindTyCon tySuperKind)
+typeStringKind = kindTyConType (mkKindTyCon typeStringKindTyCon tySuperKind)
+
 
 pcPrimTyCon0 ::
   TyConName

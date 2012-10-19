@@ -12,7 +12,8 @@ import CLaSH.Core.FreeVars     (typeFreeVars)
 import CLaSH.Core.Subst        (substTys)
 import CLaSH.Core.Term         (LetBinding,Term(..),TmName)
 import CLaSH.Core.TyCon        (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type         (Type,splitTyConAppM)
+import CLaSH.Core.Type         (splitTyConAppM)
+import CLaSH.Core.TypeRep      (Type(..),TyLit(..))
 import CLaSH.Core.Util         (collectBndrs,termType)
 import CLaSH.Core.Var          (Var(..),Id,modifyVarName)
 import CLaSH.Netlist.Types
@@ -51,15 +52,34 @@ typeToHWType ty
           "GHC.Prim.Int#" -> return Integer
           "GHC.Prim.ByteArray#" -> return Integer
           "GHC.Types.Bool" -> return Bool
+          "GHC.TypeLits.Sing" -> singletonToHWType (head args)
+          "CLaSH.Signal.Sync" -> typeToHWType (head args)
+          "CLaSH.Sized.Signed.Signed" -> return $ Signed (tyNatSize $ head args)
           _      -> mkADT tyCon args
       Nothing -> Left "Can't translate type"
+
+singletonToHWType ::
+  Type
+  -> Either String HWType
+singletonToHWType ty = case splitTyConAppM ty of
+  Just (tyCon,[]) -> do
+    case (name2String $ tyConName tyCon) of
+      "GHC.TypeLits.Nat" -> return Integer
+      _ -> Left "Can't translate type"
+  _ -> Left "Can't translate type"
+
+tyNatSize ::
+  Type
+  -> Int
+tyNatSize (LitTy (NumTyLit i)) = fromInteger i
+tyNatSize t = error $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
 
 mkADT ::
   TyCon
   -> [Type]
   -> Either String HWType
 mkADT tc args = case tyConDataCons tc of
-  []  -> Left $ "There are no DataCons for the type: " ++ (show (tc,args))
+  []  -> Left $ $(curLoc) ++ "There are no DataCons for the type: " ++ (show (tc,args))
   dcs -> do
     let argTyss = map dcRepArgTys dcs
     let sumTy   = Sum tcName $ map (pack . show . dcName) dcs
@@ -103,6 +123,7 @@ typeSize ::
   -> Int
 typeSize Bool = 1
 typeSize Integer = 32
+typeSize (Signed i) = i
 typeSize (SP _ cons) =
   (ceiling . logBase (2 :: Float) . fromIntegral $ length cons) +
   (maximum $ map (sum . map typeSize . snd) cons)

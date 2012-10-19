@@ -11,11 +11,14 @@ import qualified Data.Monoid          as Monoid
 import qualified Unbound.LocallyNameless as Unbound
 import Unbound.LocallyNameless           (bind,embed,makeName,name2String,rec,unbind,unrec,unembed)
 
+import CLaSH.Core.DataCon (dataConInstArgTys)
 import CLaSH.Core.FreeVars (termFreeVars)
 import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
-import CLaSH.Core.Term (Term(..),TmName,LetBinding)
-import CLaSH.Core.Type (Type,TyName,mkTyVarTy)
+import CLaSH.Core.Term (Pat(..),Term(..),TmName,LetBinding)
+import CLaSH.Core.TyCon (tyConDataCons)
+import CLaSH.Core.Type (TyName,mkTyVarTy)
+import CLaSH.Core.TypeRep (Type(..))
 import CLaSH.Core.Util (Gamma,Delta,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps)
 import CLaSH.Core.Var  (Var(..),Id)
 import CLaSH.Netlist.Util (representableType)
@@ -288,3 +291,39 @@ isLambdaBodyCtx ::
   -> Bool
 isLambdaBodyCtx (LamBody _) = True
 isLambdaBodyCtx _           = False
+
+mkWildValBinder ::
+  (Functor m, Monad m)
+  => Type
+  -> RewriteMonad m (Id,Term)
+mkWildValBinder ty = mkInternalVar "wild" ty
+
+mkSelectorCase ::
+  (Functor m, Monad m)
+  => [CoreContext]
+  -> Term
+  -> Int -- n'th DataCon
+  -> Int -- n'th field
+  -> RewriteMonad m Term
+mkSelectorCase ctx scrut dcI fieldI = do
+  scrutTy <- mkGamma ctx >>= (`termType` scrut)
+  let delta = snd $ contextEnv ctx
+  let cantCreate x = error $ x ++ "Can't create selector for: " ++ showDoc delta scrutTy
+  case scrutTy of
+    TyConApp tc args -> do
+      case (tyConDataCons tc) of
+        [] -> cantCreate $(curLoc)
+        dcs | dcI >= length dcs -> cantCreate $(curLoc)
+            | otherwise -> do
+          let dc = dcs!!dcI
+          let fieldTys = dataConInstArgTys dc args
+          if fieldI >= length fieldTys
+            then cantCreate $(curLoc)
+            else do
+              wildBndrs <- mapM mkWildValBinder fieldTys
+              selBndr <- mkInternalVar "sel" (fieldTys!!fieldI)
+              let bndrs = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
+              let pat    = DataPat (embed dc) (map fst bndrs)
+              let retVal = Case scrut (fieldTys!!fieldI) [ bind pat (snd selBndr) ]
+              return retVal
+    _ -> cantCreate $(curLoc)

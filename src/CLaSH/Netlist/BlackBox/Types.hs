@@ -9,13 +9,17 @@ data BlackBoxContext
   = Context
   { result    :: VarInput
   , varInputs :: [VarInput]
-  , litInputs :: [Integer]
-  } deriving (Data,Typeable)
+  , litInputs :: [LitInput]
+  } deriving (Show,Data,Typeable)
 
 data VarInput
   = VarInput
   { varName   :: Identifier
   , varSize   :: Int
   , varLength :: Int
-  } deriving (Data,Typeable)
+  } deriving (Show,Data,Typeable)
 
+data LitInput
+  = LitInput
+  { lit :: Integer
+  } deriving (Show,Data,Typeable)

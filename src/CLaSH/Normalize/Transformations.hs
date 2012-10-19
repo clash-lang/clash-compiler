@@ -12,7 +12,7 @@ import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,u
 
 import CLaSH.Core.DataCon    (dcTag)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
-import CLaSH.Core.Pretty     (showDoc)
+import CLaSH.Core.Pretty
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
@@ -197,13 +197,14 @@ inlineBox ctx e@(Case scrut ty alts)
     case isInlined of
       True -> do
         cf <- liftR $ LabelM.gets curFun
-        error $ $(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf
+        traceIf True ($(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
       False -> do
         scrutTy <- mkGamma ctx >>= (`termType` scrut)
         bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
         case (isBoxTy scrutTy, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
             scrutBody' <- lift $ runRewrite "monomorphization" monomorphization scrutBody
+            liftR $ LabelM.modify newInlined (f:)
             changed $ Case (mkApps scrutBody' args) ty alts
           _ -> return e
 
@@ -271,6 +272,24 @@ funSpec ctx e@(App e1 e2)
 
 funSpec _ e = return e
 
+funInline :: NormRewrite
+funInline ctx e@(App e1 e2)
+  | (Var f, args) <- collectArgs e1
+  = R $ do
+    gamma <- mkGamma ctx
+    e2Ty <- termType gamma e2
+    case isFunTy e2Ty || isBoxTy e2Ty of
+      True -> do
+        bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+        case bodyMaybe of
+          Just (_,bodyTm) -> do
+            let newE = mkApps bodyTm args
+            changed (App newE e2)
+          Nothing -> return e
+      False -> return e
+
+funInline _ e = return e
+
 -- Simplification Rewrite Rules
 deadCode :: NormRewrite
 deadCode _ e@(Letrec binds) = R $ do
@@ -327,7 +346,7 @@ appSimpl ctx e@(App appf arg)
   = R $ do
     localVar <- isLocalVar arg
     untranslatable <- isUntranslatable ctx arg
-    case localVar || untranslatable of
+    case localVar || untranslatable || isSimple arg of
       True -> return e
       False -> do
         (argId,argVar) <- mkBinderFor ctx "appSimpl" arg
@@ -393,6 +412,16 @@ retVar ctx e@(Var v)
 
 retVar _ e = return e
 
+inlineSimple :: NormRewrite
+inlineSimple _ e@(Var f) = R $ do
+  bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+  case bodyMaybe of
+    Just (_,body) | isSimple body -> changed body
+    _ -> return e
+
+inlineSimple _ e = return e
+
+
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
 classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) (Var dfun)) = R $ do
@@ -402,10 +431,29 @@ classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) (Var dfun)) = R $ 
   case (classSelM,dfunOpsM,bindingsM) of
     (Just classSel,Just dfunOps,Nothing)
       | classSel < length dfunOps -> changed (dfunOps !! classSel)
-    (Just classSel,Nothing, Just binding) -> do
-      error $ show classSel ++ showDoc (snd $ contextEnv ctx) binding
+    (Just classSel,Nothing, Just binding) -> chaseDfun classSel ctx binding
     (Just classSel,Nothing,Nothing) -> do
       error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ show e
     _ -> return e
 
 classOpResolution _ e = return e
+
+chaseDfun ::
+  (Monad m, Functor m)
+  => Int
+  -> [CoreContext]
+  -> Term
+  -> RewriteMonad m Term
+chaseDfun classSel ctx e
+  | (Var f, args) <- collectArgs e
+  = do
+    dfunOpsM  <- fmap (fmap snd . HashMap.lookup f) $ LabelM.gets dictFuns
+    case dfunOpsM of
+      Just dfunOps | classSel < length dfunOps -> do
+        let dfunOp = dfunOps !! classSel
+        changed $ mkApps dfunOp args
+      _ -> error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ show e
+  | otherwise
+  = do
+    selCase <- mkSelectorCase ctx e 0 classSel
+    changed selCase

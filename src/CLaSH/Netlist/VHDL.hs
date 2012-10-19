@@ -13,8 +13,18 @@ import CLaSH.Netlist.Util
 genVHDL :: Component -> (String,Doc)
 genVHDL c = (unpack $ componentName c, vhdl)
   where
-    vhdl = entity c <$$>
+    vhdl = tyImports [] <$$>
+           entity c <$$>
            architecture c
+
+tyImports :: [String] -> Doc
+tyImports _ = vcat $ map (<> semi)
+  [ text "library IEEE"
+  , text "use IEEE.STD_LOGIC_1164.ALL"
+  , text "use IEEE.NUMERIC_STD.ALL"
+  , text "use work.all"
+  ]
+
 
 entity :: Component -> Doc
 entity c =
@@ -45,6 +55,8 @@ architecture c =
 vhdlType :: HWType -> Doc
 vhdlType Bool       = text "boolean"
 vhdlType Integer    = text "integer"
+vhdlType (Signed n) = text "signed" <>
+                      parens ( int (n-1) <+> text "downto 0")
 vhdlType t@(SP _ _) = text "std_logic_vector" <>
                       parens ( int (typeSize t - 1) <+>
                                text "downto 0" )

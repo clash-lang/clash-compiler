@@ -19,7 +19,7 @@ import CLaSH.Core.Prim    (Prim(..))
 import CLaSH.Core.Term    (Term(..),Pat(..))
 import CLaSH.Core.Type    (Kind,ThetaType,Delta,noParenPred,isPredTy,
   isLiftedTypeKind)
-import CLaSH.Core.TypeRep (Type(..))
+import CLaSH.Core.TypeRep (Type(..),TyLit(..))
 import CLaSH.Core.TysPrim (eqTyConKey,listTyConKey)
 import CLaSH.Core.TyCon   (TyCon(..),isTupleTyConLike)
 import CLaSH.Core.Var     (Var,TyVar,Id,varName,varType,varKind)
@@ -80,6 +80,10 @@ instance Pretty (Var Type) where
 
 instance Pretty TyCon where
   pprPrec _ _ tc = return . text . name2String $ tyConName tc
+
+instance Pretty TyLit where
+  pprPrec _ _ (NumTyLit i) = return $ integer i
+  pprPrec _ _ (StrTyLit s) = return $ text s
 
 instance Pretty Term where
   pprPrec prec d e = case e of
@@ -217,6 +221,7 @@ pprType :: LFresh m => Delta -> Type -> m Doc
 pprType = go TopPrec
   where
     go _ d (TyVarTy tv)      = ppr d tv
+    go _ d (LitTy tyLit)     = ppr d tyLit
     go p d (TyConApp tc tys) = pprTcApp p d ((flip go) d) tc tys
     go p d ty@(ForAllTy _)   = pprForAllType p d ty
     go p d funTy@(FunTy ty1 ty2)

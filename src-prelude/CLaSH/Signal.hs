@@ -1,14 +1,11 @@
--- {-# LANGUAGE FlexibleContexts #-}
--- {-# LANGUAGE FlexibleInstances #-}
--- {-# LANGUAGE FunctionalDependencies #-}
--- {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
--- {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies    #-}
 module CLaSH.Signal
   ( Sync (..), sync
   , sample
   , register
-  , Split(..)
+  , Pack(..)
+  , registerP
   , (<^>)
   , (<^), (^>)
   , Comp
@@ -21,16 +18,15 @@ import Data.List
 import Control.Applicative
 import Control.Arrow
 import Control.Category
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax(Lift(..))
 import Prelude hiding (id,(.))
 
+import CLaSH.Class.Default
 import CLaSH.Sized.VectorZ
-import Debug.Trace
 
 infixr 5 :-
 data Sync a = a :- Sync a
-
-toList :: Sync a -> [a]
-toList (x :- xs) = x : toList xs
 
 fromList :: [a] -> Sync a
 fromList []     = error "finite list"
@@ -38,6 +34,12 @@ fromList (x:xs) = x :- fromList xs
 
 instance Show a => Show (Sync a) where
   show (x :- xs) = show x ++ " " ++ show xs
+
+instance Lift a => Lift (Sync a) where
+  lift ~(x :- xs) = [| sync x |]
+
+instance Default a => Default (Sync a) where
+  def = sync def
 
 sample :: Integer -> Sync a -> [a]
 sample 0 _         = []
@@ -69,27 +71,30 @@ instance Monad Sync where
 register :: a -> Sync a -> Sync a
 register i s = i :- s
 
-class Split a where
-  type SplitSync a
-  combine :: SplitSync a -> Sync a
-  split   :: Sync a -> SplitSync a
+class Pack a where
+  type Packed a
+  combine :: Packed a -> Sync a
+  split   :: Sync a -> Packed a
 
-instance Split (a,b) where
-  type SplitSync (a,b) = (Sync a, Sync b)
+registerP :: Pack a => a -> Packed a -> Packed a
+registerP i = split . register i . combine
+
+instance Pack (a,b) where
+  type Packed (a,b) = (Sync a, Sync b)
   combine  = uncurry (liftA2 (,))
   split ab = (fmap fst ab, fmap snd ab)
 
-instance Split (Vec n a) where
-  type SplitSync (Vec n a) = Vec n (Sync a)
+instance Pack (Vec n a) where
+  type Packed (Vec n a) = Vec n (Sync a)
   combine vs                = vmap unSync vs :- combine (vmap next vs)
   split (Nil :- _)          = Nil
   split vs@((_ :> _) :- _)  = fmap vhead vs :> (split (fmap vtail vs))
 
 (<^>) ::
-  Split i => Split o
+  (Pack i, Pack o)
   => (s -> i -> (s,o))
   -> s
-  -> (SplitSync i -> SplitSync o)
+  -> (Packed i -> Packed o)
 f <^> iS = \i -> let (s',o) = split $ f <$> s <*> (combine i)
                      s      = register iS s'
                  in split o
@@ -127,18 +132,6 @@ f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i
 
 registerC :: a -> Comp a a
 registerC = C . register
-
--- class Idiomatic f g | g -> f where
---   idiomatic :: Sync f -> g
---
--- instance Idiomatic a (Sync a) where
---   idiomatic = id
---
--- instance Idiomatic f g => Idiomatic (s -> f) (Sync s -> g) where
---   idiomatic sfi si = idiomatic (sfi <*> si)
---
--- lift :: Idiomatic f g => f -> g
--- lift f = idiomatic (pure f)
 
 instance Num a => Num (Sync a) where
   (+)         = liftA2 (+)

@@ -1,6 +1,6 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP                 #-}
 module CLaSH.Driver where
 
 import qualified Data.ByteString.Lazy         as LZ
@@ -60,7 +60,7 @@ generateVHDL modName = do
       let bindingsMap' = HashMap.map snd bindingsMap
       supply <- Supply.newSupply
       let transformedBindings
-            = runNormalization DebugFinal supply bindingsMap' dfunMap clsOpMap
+            = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
             $ normalize [fst topEntity]
 
       netlist <- genNetlist (HashMap.fromList $ transformedBindings)

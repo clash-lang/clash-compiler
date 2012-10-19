@@ -93,6 +93,9 @@ typeKind d (FunTy _arg res)
   where
     k = typeKind d res
 
+typeKind _ (LitTy (NumTyLit _)) = typeNatKind
+typeKind _ (LitTy (StrTyLit _)) = typeStringKind
+
 kindAppResult :: Kind -> [Type] -> Kind
 kindAppResult k []     = k
 kindAppResult k (a:as) = kindAppResult (kindFunResult k a) as

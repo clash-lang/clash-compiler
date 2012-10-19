@@ -1,0 +1,8 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.TypeLits.Sing",
+      "varInputs" : 0,
+      "litInputs" : 0,
+      "template"  : ""
+    }
+  }
+]

@@ -3,11 +3,12 @@ Version:             0.2
 Synopsis:            CAES Language for Synchronous Hardware
 -- Description:
 Homepage:            http://clash.ewi.utwente.nl/
+bug-reports:         http://github.com/christiaanb/clash2/issues
 License:             BSD3
 License-file:        LICENSE
 Author:              Christiaan Baaij
 Maintainer:          Christiaan Baaij <christiaan.baaij@gmail.com>
-Copyright:           (c)2012, University of Twente
+Copyright:           Copyright (C) 2012 University of Twente
 Category:            Hardware
 Build-type:          Simple
 
@@ -17,7 +18,11 @@ Data-files:          primitives/ghc.base.json,
                      primitives/ghc.integer.type.json,
                      primitives/ghc.types.json
 
-Cabal-version:       >=1.2
+Cabal-version:       >=1.10
+
+source-repository head
+  type: git
+  location: git://github.com/christiaanb/clash2.git
 
 Library
   HS-Source-Dirs:      src src-prelude
@@ -26,8 +31,15 @@ Library
   ghc-options:         -Wall -fwarn-tabs
   Cpp-options:         -DCABAL
 
-  Exposed-modules:     CLaSH.Driver
-                       CLaSH.Sized.Vector
+  Exposed-modules:     CLaSH.Bit
+                       CLaSH.Class.Default
+                       CLaSH.Driver
+                       CLaSH.Prelude
+                       CLaSH.Signal
+                       CLaSH.Sized.Index
+                       CLaSH.Sized.Signed
+                       CLaSH.Sized.Unsigned
+                       CLaSH.Sized.VectorZ
 
   Build-depends:       aeson                >= 0.6.0.2,
                        attoparsec           >= 0.10.2.0,
@@ -38,7 +50,7 @@ Library
                        directory            >= 1.1.0.2,
                        fclabels             >= 1.1.1.1,
                        filepath             >= 1.3.0.0,
-                       ghc                  >= 7.4.1     && < 7.9,
+                       ghc                  >= 7.4.1 && < 7.9,
                        ghc-paths            >= 0.1.0.8,
                        hashable             >= 1.1.2.3,
                        hastache             >= 0.4.1,

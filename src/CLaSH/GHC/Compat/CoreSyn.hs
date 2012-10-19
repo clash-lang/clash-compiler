@@ -9,7 +9,7 @@ import qualified CoreSyn
 dfunArgExprs :: [CoreSyn.DFunArg e] -> [e]
 dfunArgExprs [] = []
 dfunArgExprs (CoreSyn.DFunPolyArg e:es) = e : dfunArgExprs es
-dfunArgExprs (CoreSyn.DFunLamArg _:es)  = undefined : dfunArgExprs es
+dfunArgExprs (CoreSyn.DFunLamArg _:es)  = error "DFunLamArg" : dfunArgExprs es
 #else
 dfunArgExprs :: [e] -> [e]
 dfunArgExprs = id

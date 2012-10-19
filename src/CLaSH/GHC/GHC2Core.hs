@@ -32,7 +32,7 @@ import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
 import DataCon    (DataCon,dataConTag,dataConUnivTyVars,dataConWorkId,
   dataConRepArgTys,dataConName,dataConTyCon)
-import CLaSH.GHC.Compat.FastString (unpackFS)
+import CLaSH.GHC.Compat.FastString (unpackFS,unpackFB)
 import Id         (isDataConWorkId_maybe)
 import Literal    (Literal(..))
 import Module     (moduleName,moduleNameString)
@@ -44,8 +44,8 @@ import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
   tyConDataCons,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,tyConArity,
   tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep,isAbstractTyCon)
 import CLaSH.GHC.Compat.TyCon (isSuperKindTyCon)
-import Type       (Type,getTyVar_maybe,splitForAllTy_maybe,splitFunTy_maybe,
-  splitTyConApp_maybe,tcView)
+import Type       (tcView)
+import TypeRep    (Type(..),TyLit(..))
 import TysWiredIn (tupleTyCon)
 import Unique     (Unique,Uniquable(..),getKey)
 import Var        (Var,Id,TyVar,varName,varUnique,varType,isTyVar)
@@ -166,7 +166,7 @@ makeAlgTyConRhs tc algTcRhs = case algTcRhs of
   DataTyCon dcs _   -> C.DataTyCon <$> (mapM makeDataCon dcs)
   NewTyCon dc _ _ _ -> C.NewTyCon <$> (makeDataCon dc)
   AbstractTyCon _   -> error $ $(curLoc) ++ "Can't convert AlgTyConRhs: AbstractTyCon of: " ++ showPpr tc
-  DataFamilyTyCon   -> error $ $(curLoc) ++ "Can't convert AlgTyConRhs: DataFamilyTyCon: " ++ showPpr tc
+  DataFamilyTyCon   -> return C.DataFamilyTyCon -- error $ $(curLoc) ++ "Can't convert AlgTyConRhs: DataFamilyTyCon: " ++ showPpr tc
 
 makeDataCon ::
   DataCon
@@ -284,7 +284,7 @@ coreToLiteral ::
   Literal
   -> C.Literal
 coreToLiteral l = case l of
-  MachStr    fs  -> C.StringLiteral (unpackFS fs)
+  MachStr    fs  -> C.StringLiteral (unpackFB fs)
   MachInt    i   -> C.IntegerLiteral i
   MachInt64  i   -> C.IntegerLiteral i
   MachWord   i   -> C.IntegerLiteral i
@@ -300,17 +300,21 @@ coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
 coreToType' ::
   Type
   -> R C.Type
-coreToType' ty = case getTyVar_maybe ty of
-  Just tv -> return $ C.TyVarTy (coreToVar tv)
-  Nothing -> case splitTyConApp_maybe ty of
-    Just (tc,args)
-      | isFunTyCon tc -> (foldl1 C.FunTy) <$> (mapM coreToType args)
-      | otherwise     -> C.TyConApp <$> (coreToTyCon tc) <*> (mapM coreToType args)
-    Nothing -> case (splitFunTy_maybe ty) of
-      Just (t1,t2) -> C.FunTy <$> (coreToType t1) <*> (coreToType t2)
-      Nothing -> case (splitForAllTy_maybe ty) of
-        Just (tv,ty') -> C.ForAllTy <$> (bind <$> (coreToTyVar tv) <*> (coreToType ty'))
-        Nothing -> error $ $(curLoc) ++ "Type application of type variables not supported"
+coreToType' (TyVarTy tv) = return $ C.TyVarTy (coreToVar tv)
+coreToType' (TyConApp tc args)
+  | isFunTyCon tc = foldl1 C.FunTy <$> (mapM coreToType args)
+  | otherwise     = C.TyConApp <$> coreToTyCon tc <*> mapM coreToType args
+coreToType' (FunTy ty1 ty2)  = C.FunTy <$> coreToType ty1 <*> coreToType ty2
+coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
+                               (bind <$> coreToTyVar tv <*> coreToType ty)
+coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
+coreToType' ty@(AppTy _ _)   = error $ $(curLoc) ++ "Type application of type variables not supported" ++ showPpr ty
+
+coreToTyLit ::
+  TyLit
+  -> C.TyLit
+coreToTyLit (NumTyLit i) = C.NumTyLit i
+coreToTyLit (StrTyLit s) = C.StrTyLit (unpackFS s)
 
 coreToTyCon ::
   TyCon

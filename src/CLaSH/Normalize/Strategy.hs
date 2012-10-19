@@ -56,8 +56,7 @@ defunctionalization = defunctionalization' >-> functionSpecialization
             ]
 
     doInlineBox :: NormRewrite
-    doInlineBox = bottomupR (apply "inlineBox" inlineBox) >->
-                  commitNewInlined
+    doInlineBox = bottomupR (apply "inlineBox" inlineBox) >-> commitNewInlined
 
     functionSpecialization :: NormRewrite
     functionSpecialization = repeatR $ bottomupR (apply "funSpec" funSpec)
@@ -78,8 +77,6 @@ simplification = repeatTopdown steps >-> retVarStep
             ]
 
     retVarStep = topdownR (apply "retVar" retVar)
-
-
 
 repeatTopdown :: [(String,NormRewrite)] -> NormRewrite
 repeatTopdown
