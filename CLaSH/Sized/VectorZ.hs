@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs            #-}
 {-# LANGUAGE KindSignatures   #-}
-{-# LANGUAGE Rank2Types       #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE TypeOperators    #-}
 
@@ -14,19 +14,24 @@ module CLaSH.Sized.VectorZ
   , vhead, vtail, vlast, vinit
   , (+>>), (<<+), (<++>), vconcat
   , vsplit, vsplitI, vunconcat, vunconcatI
-  , vreverse, vmap, vzipWith, vfoldl, vfoldr, vzip, vunzip
+  , vreverse, vmap, vzipWith
+  , vfoldl, vfoldr, vfoldl1
+  , vzip, vunzip
   , vindex, vindexM, unsafeIndex
   , vreplace, vreplaceM, unsafeReplace
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect
-  , vreplicate, vreplicateI, viterate, viterateI, vgenerate, vgenerateI
+  , vcopyE, vcopy, viterateE, viterate, vgenerateE, vgenerate
+  , toList, v
   )
 where
 
 import GHC.TypeLits
+import Language.Haskell.TH (ExpQ)
+import Language.Haskell.TH.Syntax (Lift(..))
 import Unsafe.Coerce (unsafeCoerce)
 
+import CLaSH.Class.Default
 import CLaSH.Sized.Index
-import CLaSH.Sized.Unsigned
 
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
@@ -35,8 +40,15 @@ data Vec :: Nat -> * -> * where
 infixr 5 :>
 
 instance Show a => Show (Vec n a) where
-  show Nil       = ""
-  show (x :> xs) = show x ++ " " ++ show xs
+  show v = "<" ++ punc v ++ ">"
+    where
+      punc :: Show a => Vec n a -> String
+      punc Nil        = ""
+      punc (x :> Nil) = show x
+      punc (x :> xs)  = show x ++ "," ++ punc xs
+
+instance (SingI n, Default a )=> Default (Vec n a) where
+  def = vcopy def
 
 vhead :: Vec (n + 1) a -> a
 vhead (x :> _) = x
@@ -52,11 +64,12 @@ vinit :: Vec (n + 1) a -> Vec n a
 vinit (_ :> Nil)     = Nil
 vinit (x :> y :> ys) = x :> vinit (y :> ys)
 
-shiftIntoL :: a -> Vec (n + 1) a -> Vec (n + 1) a
-shiftIntoL s xs = s :> (vinit xs)
+shiftIntoL :: a -> Vec n a -> Vec n a
+shiftIntoL s Nil       = Nil
+shiftIntoL s (x :> xs) = s :> (vinit (x:>xs))
 
 infixr 4 +>>
-(+>>) :: a -> Vec (n + 1) a -> Vec (n + 1) a
+(+>>) :: a -> Vec n a -> Vec n a
 s +>> xs = shiftIntoL s xs
 
 snoc :: a -> Vec n a -> Vec (n + 1) a
@@ -67,11 +80,12 @@ infixl 5 <:
 (<:) :: Vec n a -> a -> Vec (n + 1) a
 xs <: s = snoc s xs
 
-shiftIntoR :: a -> Vec (n + 1) a -> Vec (n + 1) a
-shiftIntoR s xs = snoc s (vtail xs)
+shiftIntoR :: a -> Vec n a -> Vec n a
+shiftIntoR s Nil     = Nil
+shiftIntoR s (x:>xs) = snoc s (vtail (x:>xs))
 
 infixl 4 <<+
-(<<+) :: Vec (n + 1) a -> a -> Vec (n + 1) a
+(<<+) :: Vec n a -> a -> Vec n a
 xs <<+ s = shiftIntoR s xs
 
 vappend :: Vec n a -> Vec m a -> Vec (n + m) a
@@ -124,9 +138,12 @@ vfoldr :: (a -> b -> b) -> b -> Vec n a -> b
 vfoldr _ z Nil       = z
 vfoldr f z (x :> xs) = f x (vfoldr f z xs)
 
-vfoldl :: (a -> b -> a) -> a -> Vec n b -> a
+vfoldl :: (b -> a -> b) -> b -> Vec n a -> b
 vfoldl _ z Nil       = z
 vfoldl f z (x :> xs) = vfoldl f (f z x) xs
+
+vfoldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
+vfoldl1 f (x :> xs) = vfoldl f x xs
 
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
 vzip Nil       Nil       = Nil
@@ -141,12 +158,12 @@ vindex :: Vec n a -> Index n -> a
 vindex (x :> _)  O     = x
 vindex (_ :> xs) (S k) = vindex xs k
 
-vindexM :: Vec n a -> Unsigned s -> Maybe a
-vindexM Nil       _     = Nothing
-vindexM (x :> _)  (U 0) = Just x
-vindexM (_ :> xs) (U n) = vindexM xs (U (n-1))
+vindexM :: (Num i, Eq i) => Vec n a -> i -> Maybe a
+vindexM Nil       _ = Nothing
+vindexM (x :> _)  0 = Just x
+vindexM (_ :> xs) n = vindexM xs (n-1)
 
-unsafeIndex :: Vec n a -> Unsigned s -> a
+unsafeIndex :: (Num i, Eq i) => Vec n a -> i -> a
 unsafeIndex xs i = case vindexM xs i of
   Just a  -> a
   Nothing -> error "index out of bounds"
@@ -155,14 +172,14 @@ vreplace :: Vec n a -> Index n -> a -> Vec n a
 vreplace (_ :> xs) O     y = y :> xs
 vreplace (x :> xs) (S k) y = x :> vreplace xs k y
 
-vreplaceM :: Vec n a -> Unsigned s -> a -> Maybe (Vec n a)
-vreplaceM Nil _ _           = Nothing
-vreplaceM (_ :> xs) (U 0) y = Just (y :> xs)
-vreplaceM (x :> xs) (U n) y = case vreplaceM xs (U (n-1)) y of
+vreplaceM :: (Num i, Eq i) => Vec n a -> i -> a -> Maybe (Vec n a)
+vreplaceM Nil       _ _ = Nothing
+vreplaceM (_ :> xs) 0 y = Just (y :> xs)
+vreplaceM (x :> xs) n y = case vreplaceM xs (n-1) y of
                                 Just xs' -> Just (x :> xs')
                                 Nothing  -> Nothing
 
-unsafeReplace :: Vec n a -> Unsigned s -> a -> Vec n a
+unsafeReplace :: (Num i, Eq i) => Vec n a -> i -> a -> Vec n a
 unsafeReplace xs i a = case vreplaceM xs i a of
   Just ys -> ys
   Nothing -> error "index out of bounds"
@@ -195,28 +212,35 @@ vselect f s n xs = vselect' (isZero n) $ vdrop f xs
     vselect' (IsSucc n') l@(a :> _) = a :> vselect' (isZero n')
                                                     (vdrop s (unsafeCoerce l))
 
-vreplicate :: Sing n -> a -> Vec n a
-vreplicate n a = vreplicate' (isZero n) a
+vcopyE :: Sing n -> a -> Vec n a
+vcopyE n a = vreplicate' (isZero n) a
   where
     vreplicate' :: IsZero n -> a -> Vec n a
     vreplicate' IsZero     _ = Nil
     vreplicate' (IsSucc s) x = x :> vreplicate' (isZero s) x
 
-vreplicateI :: SingI n => a -> Vec n a
-vreplicateI = withSing vreplicate
+vcopy :: SingI n => a -> Vec n a
+vcopy = withSing vcopyE
 
-viterate :: Sing n -> (a -> a) -> a -> Vec n a
-viterate n f a = viterate' (isZero n) f a
+viterateE :: Sing n -> (a -> a) -> a -> Vec n a
+viterateE n f a = viterate' (isZero n) f a
   where
     viterate' :: IsZero n -> (a -> a) -> a -> Vec n a
     viterate' IsZero     _ _ = Nil
     viterate' (IsSucc s) g x = x :> viterate' (isZero s) g (g x)
 
-viterateI :: SingI n => (a -> a) -> a -> Vec n a
-viterateI = withSing viterate
+viterate :: SingI n => (a -> a) -> a -> Vec n a
+viterate = withSing viterateE
 
-vgenerate :: Sing n -> (a -> a) -> a -> Vec n a
-vgenerate n f a = viterate n f (f a)
+vgenerateE :: Sing n -> (a -> a) -> a -> Vec n a
+vgenerateE n f a = viterateE n f (f a)
 
-vgenerateI :: SingI n => (a -> a) -> a -> Vec n a
-vgenerateI = withSing vgenerate
+vgenerate :: SingI n => (a -> a) -> a -> Vec n a
+vgenerate = withSing vgenerateE
+
+toList :: Vec n a -> [a]
+toList = vfoldr (:) []
+
+v :: Lift a => [a] -> ExpQ
+v []     = [| Nil |]
+v (x:xs) = [| x :> $(v xs) |]
