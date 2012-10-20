@@ -7,8 +7,9 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = (repeatR $ clsOpRes >-> representable) >->
-                simplification
+normalization = (apply "inlinleWrapper" inlineWrapper)
+                >-> (repeatR $ clsOpRes >-> representable)
+                >-> simplification
   where
     clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
 
@@ -36,13 +37,13 @@ monomorphization = monomorphization' >-> typeSpecialization
             ]
 
 defunctionalization :: NormRewrite
-defunctionalization = defunctionalization' >-> functionSpecialization
+defunctionalization = defunctionalization' -- >-> functionSpecialization
   where
     defunctionalization' :: NormRewrite
     defunctionalization'
       = repeatR
       $ foldl1 (>->)
-      $ (doInlineBox:(map (topdownR . uncurry apply) steps))
+      $ (doInlineBox:(map (topdownR . uncurry apply) steps) ++ [functionSpecialization])
 
     steps :: [(String,NormRewrite)]
     steps = [ ("lamApp"   , lamApp    )
@@ -51,7 +52,6 @@ defunctionalization = defunctionalization' >-> functionSpecialization
             , ("caseLet"  , caseLet   )
             , ("caseCon"  , caseCon   )
             , ("caseCase" , caseCase  )
-            , ("bindFun"  , bindFun   )
             , ("liftFun"  , liftFun   )
             ]
 
@@ -59,12 +59,13 @@ defunctionalization = defunctionalization' >-> functionSpecialization
     doInlineBox = bottomupR (apply "inlineBox" inlineBox) >-> commitNewInlined
 
     functionSpecialization :: NormRewrite
-    functionSpecialization = repeatR $ bottomupR (apply "funSpec" funSpec)
+    functionSpecialization = bottomupR (apply "funInline" funInline) >-> commitNewInlined
 
 simplification :: NormRewrite
 simplification = repeatTopdown steps >-> retVarStep
   where
-    steps = [ ("lamApp"   , lamApp    )
+    steps = [ ("inlineSimple", inlineSimple)
+            , ("lamApp"   , lamApp    )
             , ("letApp"   , letApp    )
             , ("caseApp"  , caseApp   )
             , ("deadcode" , deadCode  )

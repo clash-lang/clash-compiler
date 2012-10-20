@@ -12,7 +12,6 @@ import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,u
 
 import CLaSH.Core.DataCon    (dcTag)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
-import CLaSH.Core.Pretty
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
@@ -223,11 +222,8 @@ bindFun = inlineBinders bindFunTest
 liftFun :: NormRewrite
 liftFun = liftBinders liftFunTest
   where
-    liftFunTest (Id idName tyE, exprE)
-      | isFunTy (unembed tyE) || isBoxTy (unembed tyE) = do
-          (_,localFVs) <- localFreeVars (unembed exprE)
-          return $ (idName `elem` localFVs)
-      | otherwise = return False
+    liftFunTest (Id _ tyE, _) = return $
+      isFunTy (unembed tyE) || isBoxTy (unembed tyE)
     liftFunTest _ = return False
 
 funSpec :: NormRewrite
@@ -280,12 +276,19 @@ funInline ctx e@(App e1 e2)
     e2Ty <- termType gamma e2
     case isFunTy e2Ty || isBoxTy e2Ty of
       True -> do
-        bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
-        case bodyMaybe of
-          Just (_,bodyTm) -> do
-            let newE = mkApps bodyTm args
-            changed (App newE e2)
-          Nothing -> return e
+        isInlined <- liftR $ alreadyInlined f
+        case isInlined of
+          True -> do
+            cf <- liftR $ LabelM.gets curFun
+            traceIf True ($(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
+          False -> do
+            bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+            case bodyMaybe of
+              Just (_,bodyTm) -> do
+                bodyTm' <- lift $ runRewrite "monomorphization" monomorphization bodyTm
+                let newE = mkApps bodyTm' args
+                changed (App newE e2)
+              Nothing -> return e
       False -> return e
 
 funInline _ e = return e
@@ -421,6 +424,14 @@ inlineSimple _ e@(Var f) = R $ do
 
 inlineSimple _ e = return e
 
+inlineWrapper :: NormRewrite
+inlineWrapper [] e@(Var f) = R $ do
+  bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+  case bodyMaybe of
+    Just (_,body) -> changed body
+    Nothing -> return e
+
+inlineWrapper _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite

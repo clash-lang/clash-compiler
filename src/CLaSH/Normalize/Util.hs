@@ -52,7 +52,7 @@ commitNewInlined _ e = R $ liftR $ do
   inlinedHM <- LabelM.gets inlined
   case HashMap.lookup cf inlinedHM of
     Nothing -> LabelM.modify inlined (HashMap.insert cf nI)
-    Just hm -> LabelM.modify inlined (HashMap.adjust (`List.union` nI) cf)
+    Just _  -> LabelM.modify inlined (HashMap.adjust (`List.union` nI) cf)
   LabelM.puts newInlined []
   return e
 
