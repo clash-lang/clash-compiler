@@ -1,8 +1,8 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Types.I#",
-      "varInputs" : 1,
+      "inputs"    : 1,
       "litInputs" : 0,
-      "template"  : "{{result.varName}} <= {{varInputs.0.varName}};"
+      "template"  : "{{result.val}} <= {{inputs.0.val}};"
     }
   }
 ]

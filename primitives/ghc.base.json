@@ -1,15 +1,15 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Base.plusInt",
-      "varInputs" : 2,
+      "inputs"    : 2,
       "litInputs" : 0,
-      "template"  : "{{result.varName}} <= {{varInputs.0.varName}} + {{varInputs.1.varName}};"
+      "template"  : "{{result.val}} <= {{inputs.0.val}} + {{inputs.1.val}};"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Base.timesInt",
-      "varInputs" : 2,
+      "inputs"    : 2,
       "litInputs" : 0,
-      "template"  : "{{result.varName}} <= {{varInputs.0.varName}} * {{varInputs.1.varName}};"
+      "template"  : "{{result.val}} <= {{inputs.0.val}} * {{inputs.1.val}};"
     }
   }
 ]

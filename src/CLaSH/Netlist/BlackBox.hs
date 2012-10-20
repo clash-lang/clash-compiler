@@ -14,6 +14,7 @@ import           Unbound.LocallyNameless (name2String,unembed)
 import CLaSH.Core.Literal as L (Literal(..))
 import CLaSH.Core.Term as C (Term(..),TmName)
 import CLaSH.Core.Type (Type)
+import CLaSH.Core.Util (Gamma)
 import CLaSH.Core.Var  as V (Id,Var(..))
 import CLaSH.Normalize.Util (isSimple)
 import CLaSH.Netlist.BlackBox.Types as B
@@ -28,10 +29,10 @@ mkBlackBoxContext ::
   -> [Term]
   -> NetlistMonad BlackBoxContext
 mkBlackBoxContext resId args = do
-  let (varArgs,otherArgs) = partitionEithers $ map unVar args
-  let (litArgs,_) = partition isSimple otherArgs
+  let (_,otherArgs) = partitionEithers $ map unVar args
+  let (litArgs,_)   = partition isSimple otherArgs
   gamma <- LabelM.gets varEnv
-  let varInps = zipWith mkVarInput varArgs (map (gamma HashMap.!) varArgs)
+  let varInps = map (mkInput gamma) args
   let litInps = map mkLitInput litArgs
   case mkVarInput (V.varName resId) (unembed $ varType resId) of
     Nothing  -> error "can't make blackbox"
@@ -46,8 +47,8 @@ verifyBlackBoxContext ::
   -> BlackBoxContext
   -> Bool
 verifyBlackBoxContext p bbCtx =
-  (length (B.varInputs bbCtx) == P.varInputs p) &&
-  (length (B.litInputs bbCtx) == P.litInputs p)
+  (length (B.inputs bbCtx)    == P.inputs p) &&
+  (length (B.litInputs bbCtx) >= P.litInputs p)
 
 mkBlackBoxDecl ::
   Primitive
@@ -61,19 +62,31 @@ mkBlackBoxDecl p bbCtx = case (verifyBlackBoxContext p bbCtx) of
     return [HW.BlackBox tmpl]
   False -> error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show p
 
+mkInput ::
+  Gamma
+  -> Term
+  -> Maybe VarInput
+mkInput g (Var v) = mkVarInput v (g HashMap.! v)
+mkInput _ e       = mkVarLitInput e
+
 mkVarInput ::
   TmName
   -> Type
-  -> (Maybe VarInput)
+  -> Maybe VarInput
 mkVarInput nm ty = do
   let nmT = mkBasicId . pack $ name2String nm
   case typeToHWType ty of
     Left errMsg -> traceIf True errMsg Nothing
     Right hwTy  -> Just (VarInput nmT (typeSize hwTy) (typeLength hwTy))
 
+mkVarLitInput ::
+  Term
+  -> Maybe VarInput
+mkVarLitInput (C.Literal (IntegerLiteral i)) = Just (VarInput (pack $ show i) 0 0)
+mkVarLitInput _ = Nothing
+
 mkLitInput ::
   Term
-  -> (Maybe LitInput)
+  -> Maybe LitInput
 mkLitInput (C.Literal (IntegerLiteral i)) = Just (LitInput i)
 mkLitInput _ = Nothing
-

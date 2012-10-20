@@ -1,22 +1,22 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.plusS",
-      "varInputs" : 2,
+      "inputs"    : 3,
       "litInputs" : 1,
-      "template"  : "{{result.varName}} <= {{varInputs.0.varName}} + {{varInputs.1.varName}};"
+      "template"  : "{{result.val}} <= {{inputs.1.val}} + {{inputs.2.val}};"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.timesS",
-      "varInputs" : 2,
+      "inputs"    : 3,
       "litInputs" : 1,
-      "template"  : "{{result.varName}} <= resize({{varInputs.0.varName}} * {{varInputs.1.varName}}, {{litInputs.0.lit}});"
+      "template"  : "{{result.val}} <= resize({{inputs.1.val}} * {{inputs.2.val}}, {{litInputs.0.lit}});"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.fromIntegerS",
-      "varInputs" : 0,
-      "litInputs" : 2,
-      "template"  : "{{result.varName}} <= to_signed({{litInputs.1.lit}}, {{litInputs.0.lit}});"
+      "inputs"    : 2,
+      "litInputs" : 1,
+      "template"  : "{{result.val}} <= to_signed({{inputs.1.val}}, {{litInputs.0.lit}});"
     }
   }
 ]

@@ -10,7 +10,7 @@ type PrimMap = HashMap LB.ByteString Primitive
 data Primitive
   = BlackBox
   { name      :: LB.ByteString
-  , varInputs :: Int
+  , inputs    :: Int
   , litInputs :: Int
   , template  :: SB.ByteString
   }

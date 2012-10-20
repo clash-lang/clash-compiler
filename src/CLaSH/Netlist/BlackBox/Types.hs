@@ -8,13 +8,13 @@ import CLaSH.Netlist.Types
 data BlackBoxContext
   = Context
   { result    :: VarInput
-  , varInputs :: [VarInput]
+  , inputs    :: [VarInput]
   , litInputs :: [LitInput]
   } deriving (Show,Data,Typeable)
 
 data VarInput
   = VarInput
-  { varName   :: Identifier
+  { val       :: Identifier
   , varSize   :: Int
   , varLength :: Int
   } deriving (Show,Data,Typeable)
