@@ -48,12 +48,18 @@ sample n ~(x :- xs) = x : (sample (n-1) xs)
 sync :: a -> Sync a
 sync a = a :- sync a
 
+mapSync :: (a -> b) -> Sync a -> Sync b
+mapSync f (a :- as) = f a :- mapSync f as
+
+appSync :: Sync (a -> b) -> Sync a -> Sync b
+appSync (f :- fs) (a :- as) = f a :- appSync fs as
+
 instance Functor Sync where
-  fmap f (a :- as)  = f a :- fmap f as
+  fmap = mapSync
 
 instance Applicative Sync where
-  pure                     = sync
-  (f :- fs) <*> (a :- as)  = f a :- (fs <*> as)
+  pure  = sync
+  (<*>) = appSync
 
 unSync :: Sync a -> a
 unSync (a :- _) = a

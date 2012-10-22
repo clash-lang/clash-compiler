@@ -4,6 +4,7 @@ module CLaSH.Netlist.Util where
 import qualified Control.Monad as Monad
 import Data.Text.Lazy (pack)
 import Data.Either             (partitionEithers)
+import Data.Maybe              (catMaybes)
 import qualified Data.Label.PureM as LabelM
 import Unbound.LocallyNameless (bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
@@ -56,7 +57,17 @@ typeToHWType ty
           "CLaSH.Signal.Sync" -> typeToHWType (head args)
           "CLaSH.Sized.Signed.Signed" -> return $ Signed (tyNatSize $ head args)
           _      -> mkADT tyCon args
-      Nothing -> Left "Can't translate type"
+      Nothing -> Left $ "Can't translate type: " ++ show ty
+
+isRecursiveTy :: TyCon -> [Type] -> Bool
+isRecursiveTy tc args = case tyConDataCons tc of
+    []  -> False
+    dcs -> let argTyss      = map dcRepArgTys dcs
+               tvs          = tyConTyVars tc
+               tvsArgsMap   = zip tvs args
+               substArgTyss = (map . map) (substTys tvsArgsMap) argTyss
+               argTcs       = map fst . catMaybes . map splitTyConAppM $ concat substArgTyss
+           in tc `elem` argTcs
 
 singletonToHWType ::
   Type
@@ -78,7 +89,9 @@ mkADT ::
   TyCon
   -> [Type]
   -> Either String HWType
-mkADT tc args = case tyConDataCons tc of
+mkADT tc args
+  | isRecursiveTy tc args = Left "Can't translate custom recursive type"
+  | otherwise = case tyConDataCons tc of
   []  -> Left $ $(curLoc) ++ "There are no DataCons for the type: " ++ (show (tc,args))
   dcs -> do
     let argTyss = map dcRepArgTys dcs
@@ -98,7 +111,7 @@ mkADT tc args = case tyConDataCons tc of
                                                   )
                                                 ) dcs elemHTys
   where
-    tcName       = pack . show $ tyConName tc
+    tcName     = pack . show $ tyConName tc
     tvs        = tyConTyVars tc
     tvsArgsMap = zip tvs args
 

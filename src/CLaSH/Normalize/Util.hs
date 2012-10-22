@@ -3,7 +3,7 @@ module CLaSH.Normalize.Util where
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.Label.PureM as LabelM
 import qualified Data.List as      List
-import Unbound.LocallyNameless     (aeq,embed)
+import Unbound.LocallyNameless     (Fresh, aeq,embed,unbind)
 
 import CLaSH.Core.DataCon (dataConInstArgTys)
 import CLaSH.Core.Term    (Term(..),TmName)
@@ -19,8 +19,26 @@ import CLaSH.Rewrite.Util
 isBoxTy ::
   Type
   -> Bool
-isBoxTy (TyConApp tc tys) = any (\t -> isBoxTy t || isFunTy t) (conArgs tc tys)
-isBoxTy _                 = False
+isBoxTy = isBoxTy' []
+
+isBoxTy' ::
+  [Type]
+  -> Type
+  -> Bool
+isBoxTy' ts ty@(TyConApp tc tys)
+  | ty `notElem` ts = any (\t -> isBoxTy' (ty:ts) t || isFunTy t)
+                          (conArgs tc tys)
+  | otherwise       = False
+isBoxTy' _ _        = False
+
+isPolyFunTy ::
+  Fresh m
+  => Type
+  -> m Bool
+isPolyFunTy (FunTy _ _)    = return True
+isPolyFunTy (ForAllTy tvT) = unbind tvT >>= (isPolyFunTy . snd)
+isPolyFunTy _              = return False
+
 
 conArgs :: TyCon -> [Type] -> [Type]
 conArgs tc tys = bigUnionTys $ map (flip dataConInstArgTys tys)
@@ -69,5 +87,6 @@ isSimple (Var _)     = True
 isSimple (Literal _) = True
 isSimple (Data _)    = True
 isSimple e@(App _ _)
-  | (Data _, args) <- collectArgs e = all (either isSimple (const True)) args
+  | (Data _, args) <- collectArgs e
+  = all (either isSimple (const True)) args
 isSimple _ = False

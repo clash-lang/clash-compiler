@@ -8,8 +8,8 @@ import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
 normalization = (apply "inlinleWrapper" inlineWrapper)
-                >-> (repeatR $ clsOpRes >-> representable)
-                >-> simplification
+                >-> (repeatR $ clsOpRes >-> representable >-> simplification)
+                >-> retVarStep
   where
     clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
 
@@ -37,14 +37,12 @@ monomorphization = monomorphization' >-> typeSpecialization
             ]
 
 defunctionalization :: NormRewrite
-defunctionalization = defunctionalization' -- >-> functionSpecialization
+defunctionalization = repeatR . foldl1 (>->) $ concat
+    [ [doInline "inlineBox" inlineBox]
+    , map (topdownR . uncurry apply) steps
+    , [doInline "inlineHO" inlineHO]
+    ]
   where
-    defunctionalization' :: NormRewrite
-    defunctionalization'
-      = repeatR
-      $ foldl1 (>->)
-      $ (doInlineBox:(map (topdownR . uncurry apply) steps) ++ [functionSpecialization])
-
     steps :: [(String,NormRewrite)]
     steps = [ ("lamApp"   , lamApp    )
             , ("letApp"   , letApp    )
@@ -52,17 +50,12 @@ defunctionalization = defunctionalization' -- >-> functionSpecialization
             , ("caseLet"  , caseLet   )
             , ("caseCon"  , caseCon   )
             , ("caseCase" , caseCase  )
+            , ("bindBox"  , bindBox   )
             , ("liftFun"  , liftFun   )
             ]
 
-    doInlineBox :: NormRewrite
-    doInlineBox = bottomupR (apply "inlineBox" inlineBox) >-> commitNewInlined
-
-    functionSpecialization :: NormRewrite
-    functionSpecialization = bottomupR (apply "funInline" funInline) >-> commitNewInlined
-
 simplification :: NormRewrite
-simplification = repeatTopdown steps >-> retVarStep
+simplification = repeatTopdown steps
   where
     steps = [ ("inlineSimple", inlineSimple)
             , ("lamApp"   , lamApp    )
@@ -77,7 +70,11 @@ simplification = repeatTopdown steps >-> retVarStep
             , ("inlineVar", inlineVar )
             ]
 
-    retVarStep = topdownR (apply "retVar" retVar)
+retVarStep :: NormRewrite
+retVarStep = topdownR (apply "retVar" retVar)
+
+doInline :: String -> NormRewrite -> NormRewrite
+doInline n t = bottomupR (apply n t) >-> commitNewInlined
 
 repeatTopdown :: [(String,NormRewrite)] -> NormRewrite
 repeatTopdown

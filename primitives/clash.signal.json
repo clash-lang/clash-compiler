@@ -19,4 +19,18 @@ end process;"
       "template"  : "{{result.val}} <= {{varInputs.0.val}};"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.mapSync",
+      "inputs"    : 2,
+      "litInputs" : 0,
+      "template"  : "MAPSYNC"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.appSync",
+      "inputs"    : 2,
+      "litInputs" : 0,
+      "template"  : "APPSYNC"
+    }
+  }
 ]

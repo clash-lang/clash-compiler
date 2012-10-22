@@ -33,13 +33,13 @@ liftRS m = lift . lift . lift $ m
 
 apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
 apply name rewrite ctx expr = R $ do
-  (expr', anyChanged) <- Writer.listen $ runR $ rewrite ctx expr
-  let hasChanged = Monoid.getAny anyChanged
-  Monad.when hasChanged $ LabelM.modify transformCounter (+1)
+  lvl <- LabelM.asks dbgLevel
   let (_,delta) = contextEnv ctx
   let before = showDoc delta expr
+  (expr', anyChanged) <- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ Writer.listen $ runR $ rewrite ctx expr
+  let hasChanged = Monoid.getAny anyChanged
+  Monad.when hasChanged $ LabelM.modify transformCounter (+1)
   let after  = showDoc delta expr'
-  lvl <- LabelM.asks dbgLevel
   traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr'
@@ -284,7 +284,8 @@ isUntranslatable ::
   -> RewriteMonad m Bool
 isUntranslatable ctx tm = do
   gamma <- mkGamma ctx
-  fmap (not . representableType) $ termType gamma tm
+  ty <- termType gamma tm
+  return . not . representableType $ ty
 
 isLambdaBodyCtx ::
   CoreContext

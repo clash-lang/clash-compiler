@@ -12,6 +12,7 @@ import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,u
 
 import CLaSH.Core.DataCon    (dcTag)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
+import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
@@ -87,7 +88,8 @@ bindPoly = inlineBinders bindPolyTest
     bindPolyTest (Id idName tyE, exprE)
       | isPolyTy (unembed tyE) && null (typeFreeVars (unembed tyE)) = do
           (_,localFVs) <- localFreeVars (unembed exprE)
-          return $ (idName `notElem` localFVs)
+          polyFunTy <- isPolyFunTy (unembed tyE)
+          return $ (not polyFunTy) && (idName `notElem` localFVs)
       | otherwise = return False
     bindPolyTest _ = return False
 
@@ -97,7 +99,8 @@ liftPoly = liftBinders liftPolyTest
     liftPolyTest (Id idName tyE, exprE)
       | isPolyTy (unembed tyE) && null (typeFreeVars (unembed tyE)) = do
           (_,localFVs) <- localFreeVars (unembed exprE)
-          return $ (idName `elem` localFVs)
+          polyFunTy <- isPolyFunTy (unembed tyE)
+          return $ polyFunTy || (idName `elem` localFVs)
       | otherwise = return False
     liftPolyTest _ = return False
 
@@ -209,67 +212,30 @@ inlineBox ctx e@(Case scrut ty alts)
 
 inlineBox _ e = return e
 
-bindFun :: NormRewrite
-bindFun = inlineBinders bindFunTest
-  where
-    bindFunTest (Id idName tyE, exprE)
-      | isFunTy (unembed tyE) || isBoxTy (unembed tyE) = do
-          (_,localFVs) <- localFreeVars (unembed exprE)
-          return $ (idName `notElem` localFVs)
-      | otherwise = return False
-    bindFunTest _ = return False
-
 liftFun :: NormRewrite
 liftFun = liftBinders liftFunTest
   where
-    liftFunTest (Id _ tyE, _) = return $
-      isFunTy (unembed tyE) || isBoxTy (unembed tyE)
+    liftFunTest (Id idName tyE, exprE) = do
+      let ty = unembed tyE
+      let hasFreeTyVars = not . null $ typeFreeVars ty
+      (_,localFVs) <-  localFreeVars (unembed exprE)
+      return $ not hasFreeTyVars && (isFunTy ty ||
+                                    ((isBoxTy ty) && idName `elem` localFVs))
     liftFunTest _ = return False
 
-funSpec :: NormRewrite
-funSpec ctx e@(App e1 e2)
-  | (Var f, args) <- collectArgs e1
-  , (eArgs, []) <- Either.partitionEithers args
-  = R $ do
-    gamma <- mkGamma ctx
-    e2Ty <- termType gamma e2
-    case isFunTy e2Ty || isBoxTy e2Ty of
-      True -> do
-        let argLen = length eArgs
-        e2FVs <- fmap snd $ localFreeVars e2
-        -- Determine if 'f' has already been specialized on 'e2'
-        specM <- liftR $ fmap (Map.lookup (f,argLen,e2)) $
-                   LabelM.gets funSpecializations
-        case specM of
-          -- Use previously specialized function
-          Just fname -> changed $ mkTmApps (Var fname) (eArgs ++ (map Var e2FVs))
-          -- Create new specialized function
-          Nothing -> do
-            bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
-            case bodyMaybe of
-              Just (_,bodyTm) -> do
-                -- Make new binders for existing arguments
-                (boundArgs,argVars) <- fmap unzip $
-                                         mapM (mkBinderFor ctx "pFS") eArgs
-                -- Make binders for the free variables in e2
-                let e2BVs = fvs2bvs gamma e2FVs
-                -- Create specialized functions
-                let newBody = mkLams (App (mkTmApps bodyTm argVars) e2)
-                                (boundArgs ++ e2BVs)
-                newf <- mkFunction ctx f newBody
-                -- Remember specialization
-                liftR $ LabelM.modify funSpecializations
-                          (Map.insert (f,argLen,e2) newf)
-                -- Use specialized function
-                let newExpr = mkTmApps (Var newf) (eArgs ++ (map Var e2FVs))
-                changed newExpr
-              Nothing -> return e
-      False -> return e
+bindBox :: NormRewrite
+bindBox = inlineBinders bindBoxTest
+  where
+    bindBoxTest (Id idName tyE, exprE) = do
+      let ty = unembed tyE
+      let hasFreeTyVars = not . null $ typeFreeVars ty
+      (_,localFVs) <- localFreeVars (unembed exprE)
+      return $ not hasFreeTyVars &&
+               ((isBoxTy ty) && (idName `notElem` localFVs))
+    bindBoxTest _ = return False
 
-funSpec _ e = return e
-
-funInline :: NormRewrite
-funInline ctx e@(App e1 e2)
+inlineHO :: NormRewrite
+inlineHO ctx e@(App e1 e2)
   | (Var f, args) <- collectArgs e1
   = R $ do
     gamma <- mkGamma ctx
@@ -287,11 +253,12 @@ funInline ctx e@(App e1 e2)
               Just (_,bodyTm) -> do
                 bodyTm' <- lift $ runRewrite "monomorphization" monomorphization bodyTm
                 let newE = mkApps bodyTm' args
+                liftR $ LabelM.modify newInlined (f:)
                 changed (App newE e2)
               Nothing -> return e
       False -> return e
 
-funInline _ e = return e
+inlineHO _ e = return e
 
 -- Simplification Rewrite Rules
 deadCode :: NormRewrite
@@ -347,10 +314,11 @@ appSimpl ctx e@(App appf arg)
   | (f, _) <- collectArgs e
   , isVar f || isCon f || isPrimCon f || isPrimFun f
   = R $ do
-    localVar <- isLocalVar arg
+    localVar       <- isLocalVar arg
     untranslatable <- isUntranslatable ctx arg
-    case localVar || untranslatable || isSimple arg of
-      True -> return e
+    let simple     = isSimple arg
+    case localVar || untranslatable || simple of
+      True  -> return e
       False -> do
         (argId,argVar) <- mkBinderFor ctx "appSimpl" arg
         changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
@@ -444,7 +412,8 @@ classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) (Var dfun)) = R $ 
       | classSel < length dfunOps -> changed (dfunOps !! classSel)
     (Just classSel,Nothing, Just binding) -> chaseDfun classSel ctx binding
     (Just classSel,Nothing,Nothing) -> do
-      error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ show e
+
+      error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ showDoc (snd $ contextEnv ctx) e
     _ -> return e
 
 classOpResolution _ e = return e

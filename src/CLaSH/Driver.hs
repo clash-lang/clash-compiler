@@ -60,7 +60,7 @@ generateVHDL modName = do
       let bindingsMap' = HashMap.map snd bindingsMap
       supply <- Supply.newSupply
       let transformedBindings
-            = runNormalization DebugNone supply bindingsMap' dfunMap clsOpMap
+            = runNormalization DebugFinal supply bindingsMap' dfunMap clsOpMap
             $ normalize [fst topEntity]
 
       netlist <- genNetlist (HashMap.fromList $ transformedBindings)
