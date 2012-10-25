@@ -37,12 +37,19 @@ monomorphization = monomorphization' >-> typeSpecialization
             ]
 
 defunctionalization :: NormRewrite
-defunctionalization = repeatR . foldl1 (>->) $ concat
-    [ [doInline "inlineBox" inlineBox]
-    , map (topdownR . uncurry apply) steps
-    , [doInline "inlineHO" inlineHO]
-    ]
+defunctionalization = defunctionalization' >-> boxSpecialization
   where
+    defunctionalization' :: NormRewrite
+    defunctionalization' =
+      repeatR . foldl1 (>->) $ concat
+        [ [doInline "inlineBox" inlineBox]
+        , map (topdownR . uncurry apply) steps
+        , [doInline "inlineHO" inlineHO]
+        ]
+
+    boxSpecialization :: NormRewrite
+    boxSpecialization = repeatR $ bottomupR (apply "boxSpec" boxSpec)
+
     steps :: [(String,NormRewrite)]
     steps = [ ("lamApp"   , lamApp    )
             , ("letApp"   , letApp    )

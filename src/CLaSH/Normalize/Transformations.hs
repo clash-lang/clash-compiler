@@ -26,6 +26,41 @@ import CLaSH.Rewrite.Types
 import CLaSH.Rewrite.Util
 import CLaSH.Util
 
+----------------------------------------------------------
+-- = Definitions =
+--
+-- FUN (a -> b) = True
+-- FUN _        = False
+--
+-- BOX (T ts) = any (\t -> BOX t || FUN t) (CONARGS T ts)
+-- BOX _      = False
+--
+-- POLY (∀a.t)   = True
+-- POLY (a -> b) = POLY b
+-- POLY _        = False
+--
+-- POLYFUN (∀a.t)   = POLYFUN t
+-- POLYFUN (a -> b) = True
+-- POLYFUN _        = False
+--
+-- = Inline, Lift, or Specialize =
+--
+-- Function Application:
+-- Has FUN arguments?   => Inline
+-- Has BOXed arguments? => Specialize
+-- Has Type arguments?  => Specialize
+-- Others               => Do Nothing
+--
+-- Let-binding:
+-- Has POLYFUNction type?              => Lift
+-- Takes Type arguments, non-recursive => Inline
+-- Takes Type arguments, recursive     => Lift
+-- Has BOX type, non-recursive?        => Inline
+-- Has BOX type, recursive?            => Lift
+-- Others                              => Do Nothing
+--
+-----------------------------------------------------------
+
 -- Shared Rewrite Rules
 lamApp :: NormRewrite
 lamApp _ (App (Lam b) arg) = R $ do
@@ -82,6 +117,14 @@ caseTyApp _ (TyApp (Case scrut ty' alts) ty) = R $ do
 
 caseTyApp _ e = return e
 
+-- = Inline, Lift, or Specialize =
+--
+-- Let-binding:
+-- Has POLYFUNction type?              => Lift
+-- Takes Type arguments, non-recursive => Inline
+-- Takes Type arguments, recursive     => Lift
+-- Others                              => Do Nothing
+--
 bindPoly :: NormRewrite
 bindPoly = inlineBinders bindPolyTest
   where
@@ -90,7 +133,6 @@ bindPoly = inlineBinders bindPolyTest
           (_,localFVs) <- localFreeVars (unembed exprE)
           polyFunTy <- isPolyFunTy (unembed tyE)
           return $ (not polyFunTy) && (idName `notElem` localFVs)
-      | otherwise = return False
     bindPolyTest _ = return False
 
 liftPoly :: NormRewrite
@@ -101,9 +143,14 @@ liftPoly = liftBinders liftPolyTest
           (_,localFVs) <- localFreeVars (unembed exprE)
           polyFunTy <- isPolyFunTy (unembed tyE)
           return $ polyFunTy || (idName `elem` localFVs)
-      | otherwise = return False
     liftPolyTest _ = return False
 
+-- = Inline, Lift, or Specialize =
+--
+-- Function Application:
+-- Has Type arguments?  => Specialize
+-- Others               => Do Nothing
+--
 typeSpec :: NormRewrite
 typeSpec ctx e@(TyApp e1 ty)
   | (Var f, args) <- collectArgs e1
@@ -212,35 +259,48 @@ inlineBox ctx e@(Case scrut ty alts)
 
 inlineBox _ e = return e
 
+-- = Inline, Lift, or Specialize =
+--
+-- Let-binding:
+-- Has POLYFUNction type?              => Lift
+-- Has BOX type, non-recursive?        => Inline
+-- Has BOX type, recursive?            => Lift
+-- Others                              => Do Nothing
+--
 liftFun :: NormRewrite
 liftFun = liftBinders liftFunTest
   where
-    liftFunTest (Id idName tyE, exprE) = do
-      let ty = unembed tyE
-      let hasFreeTyVars = not . null $ typeFreeVars ty
-      (_,localFVs) <-  localFreeVars (unembed exprE)
-      return $ not hasFreeTyVars && (isFunTy ty ||
-                                    ((isBoxTy ty) && idName `elem` localFVs))
+    liftFunTest (Id idName tyE, exprE)
+      | null (typeFreeVars (unembed tyE)) = do
+          let ty = unembed tyE
+          (_,localFVs) <-  localFreeVars (unembed exprE)
+          return $ isFunTy ty || isBoxTy ty && idName `elem` localFVs
     liftFunTest _ = return False
 
 bindBox :: NormRewrite
 bindBox = inlineBinders bindBoxTest
   where
-    bindBoxTest (Id idName tyE, exprE) = do
-      let ty = unembed tyE
-      let hasFreeTyVars = not . null $ typeFreeVars ty
-      (_,localFVs) <- localFreeVars (unembed exprE)
-      return $ not hasFreeTyVars &&
-               ((isBoxTy ty) && (idName `notElem` localFVs))
+    bindBoxTest (Id idName tyE, exprE)
+      | null (typeFreeVars (unembed tyE)) = do
+          let ty = unembed tyE
+          (_,localFVs) <-  localFreeVars (unembed exprE)
+          return $ isBoxTy ty && idName `notElem` localFVs
     bindBoxTest _ = return False
 
+-- = Inline, Lift, or Specialize =
+--
+-- Function Application:
+-- Has FUN arguments?   => Inline
+-- Has BOXed arguments? => Specialize
+-- Others               => Do Nothing
+--
 inlineHO :: NormRewrite
 inlineHO ctx e@(App e1 e2)
   | (Var f, args) <- collectArgs e1
   = R $ do
     gamma <- mkGamma ctx
     e2Ty <- termType gamma e2
-    case isFunTy e2Ty || isBoxTy e2Ty of
+    case isFunTy e2Ty of
       True -> do
         isInlined <- liftR $ alreadyInlined f
         case isInlined of
@@ -259,6 +319,49 @@ inlineHO ctx e@(App e1 e2)
       False -> return e
 
 inlineHO _ e = return e
+
+boxSpec :: NormRewrite
+boxSpec ctx e@(App e1 e2)
+  | (Var f, args) <- collectArgs e1
+  , (eArgs, []) <- Either.partitionEithers args
+  = R $ do
+    gamma <- mkGamma ctx
+    e2Ty <- termType gamma e2
+    case isBoxTy e2Ty of
+      True -> do
+        let argLen = length eArgs
+        e2FVs <- fmap snd $ localFreeVars e2
+        -- Determine if 'f' has already been specialized on 'e2'
+        specM <- liftR $ fmap (Map.lookup (f,argLen,e2)) $
+                   LabelM.gets funSpecializations
+        case specM of
+          -- Use previously specialized function
+          Just fname -> changed $ mkTmApps (Var fname) (eArgs ++ (map Var e2FVs))
+          -- Create new specialized function
+          Nothing -> do
+            bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+            case bodyMaybe of
+              Just (_,bodyTm) -> do
+                -- Make new binders for existing arguments
+                (boundArgs,argVars) <- fmap unzip $
+                                         mapM (mkBinderFor ctx "pFS") eArgs
+                -- Make binders for the free variables in e2
+                let e2BVs = fvs2bvs gamma e2FVs
+                -- Create specialized functions
+                let newBody = mkLams (App (mkTmApps bodyTm argVars) e2)
+                                (boundArgs ++ e2BVs)
+                newf <- mkFunction ctx f newBody
+                -- Remember specialization
+                liftR $ LabelM.modify funSpecializations
+                          (Map.insert (f,argLen,e2) newf)
+                -- Use specialized function
+                let newExpr = mkTmApps (Var newf) (eArgs ++ (map Var e2FVs))
+                changed newExpr
+              Nothing -> return e
+      False -> return e
+
+boxSpec _ e = return e
+
 
 -- Simplification Rewrite Rules
 deadCode :: NormRewrite
