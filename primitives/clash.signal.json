@@ -12,25 +12,19 @@
 end process;"
     }
   }
-, { "BlackBox" :
+, { "Primitive" :
     { "name"      : "CLaSH.Signal.sync",
-      "inputs"    : 1,
-      "litInputs" : 0,
-      "template"  : "{{result.val}} <= {{varInputs.0.val}};"
+      "primType"  : { "Function" : [] }
     }
   }
-, { "BlackBox" :
+, { "Primitive" :
     { "name"      : "CLaSH.Signal.mapSync",
-      "inputs"    : 2,
-      "litInputs" : 0,
-      "template"  : "MAPSYNC"
+      "primType"  : { "Function" : [] }
     }
   }
-, { "BlackBox" :
+, { "Primitive" :
     { "name"      : "CLaSH.Signal.appSync",
-      "inputs"    : 2,
-      "litInputs" : 0,
-      "template"  : "APPSYNC"
+      "primType"  : { "Function" : [] }
     }
   }
 ]

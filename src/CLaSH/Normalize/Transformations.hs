@@ -403,18 +403,22 @@ inlineWrapper _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
-classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) (Var dfun)) = R $ do
-  classSelM <- fmap (fmap snd . HashMap.lookup sel)  $ LabelM.gets classOps
-  dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets dictFuns
-  bindingsM <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets bindings
-  case (classSelM,dfunOpsM,bindingsM) of
-    (Just classSel,Just dfunOps,Nothing)
-      | classSel < length dfunOps -> changed (dfunOps !! classSel)
-    (Just classSel,Nothing, Just binding) -> chaseDfun classSel ctx binding
-    (Just classSel,Nothing,Nothing) -> do
-
-      error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ showDoc (snd $ contextEnv ctx) e
-    _ -> return e
+classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dfunE)
+  | (Var dfun, dfunArgs) <- collectArgs dfunE = R $ do
+    classSelM <- fmap (fmap snd . HashMap.lookup sel)  $ LabelM.gets classOps
+    dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets dictFuns
+    bindingsM <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets bindings
+    case (classSelM,dfunOpsM,bindingsM) of
+      (Just classSel,Just dfunOps,Nothing)
+        | classSel < length dfunOps -> do
+          let clsExpr = dfunOps !! classSel
+          changed (mkApps clsExpr dfunArgs)
+      (Just classSel,Nothing, Just binding) -> do
+        clsExpr <- chaseDfun classSel ctx binding
+        changed (mkApps clsExpr dfunArgs)
+      (Just classSel,Nothing,Nothing) -> do
+        traceIf True ($(curLoc) ++ "No binding or dfun for classOP?: " ++ showDoc (snd $ contextEnv ctx) e) $ return e
+      _ -> return e
 
 classOpResolution _ e = return e
 
@@ -431,9 +435,9 @@ chaseDfun classSel ctx e
     case dfunOpsM of
       Just dfunOps | classSel < length dfunOps -> do
         let dfunOp = dfunOps !! classSel
-        changed $ mkApps dfunOp args
+        return $ mkApps dfunOp args
       _ -> error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ show e
   | otherwise
   = do
     selCase <- mkSelectorCase ctx e 0 classSel
-    changed selCase
+    return selCase

@@ -2,7 +2,7 @@ module CLaSH.Core.Util where
 
 import Data.Maybe                     (fromMaybe)
 import qualified Data.HashMap.Lazy as HashMap
-import Unbound.LocallyNameless        (Fresh,bind,embed,unbind,unembed,unrec)
+import Unbound.LocallyNameless        (Fresh,bind,embed,unbind,unembed,unrec,string2Name)
 
 import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
@@ -11,6 +11,7 @@ import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
 import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
   applyTy)
 import CLaSH.Core.TypeRep (Type(..))
+import CLaSH.Core.TysPrim (liftedTypeKind)
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
 
@@ -175,3 +176,24 @@ isPrimFun ::
   -> Bool
 isPrimFun (Prim (PrimFun _ _)) = True
 isPrimFun _                    = False
+
+mapSyncTerm :: Term
+mapSyncTerm
+  = let aTV = TyVar (string2Name "a") (embed liftedTypeKind)
+        bTV = TyVar (string2Name "b") (embed liftedTypeKind)
+        fId = Id (string2Name "f") (embed $ FunTy (TyVarTy (varName aTV))
+                                                  (TyVarTy (varName bTV)))
+        xId = Id (string2Name "x") (embed $ TyVarTy (varName aTV))
+  in TyLam $ bind aTV $
+     TyLam $ bind bTV $
+     Lam   $ bind fId $
+     Lam   $ bind xId $
+     App (Var $ varName fId) (Var $ varName xId)
+
+syncTerm :: Term
+syncTerm
+  = let aTV = TyVar (string2Name "a") (embed liftedTypeKind)
+        xId = Id (string2Name "x") (embed $ TyVarTy (varName aTV))
+  in TyLam $ bind aTV $
+     Lam   $ bind xId $
+     (Var $ varName xId)

@@ -19,4 +19,11 @@
       "template"  : "{{result.val}} <= to_signed({{inputs.1.val}}, {{litInputs.0.lit}});"
     }
   }
+  , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.negateS",
+      "inputs"    : 2,
+      "litInputs" : 0,
+      "template"  : "{{result.val}} <= 0 - {{inputs.1.val}};"
+    }
+  }
 ]

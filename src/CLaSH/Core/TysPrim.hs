@@ -62,7 +62,6 @@ typeNatKind, typeStringKind :: Kind
 typeNatKind    = kindTyConType (mkKindTyCon typeNatKindTyCon tySuperKind)
 typeStringKind = kindTyConType (mkKindTyCon typeStringKindTyCon tySuperKind)
 
-
 pcPrimTyCon0 ::
   TyConName
   -> PrimRep

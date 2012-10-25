@@ -58,6 +58,7 @@ import qualified CLaSH.Core.Prim    as C
 import qualified CLaSH.Core.Term    as C
 import qualified CLaSH.Core.TyCon   as C
 import qualified CLaSH.Core.TypeRep as C
+import qualified CLaSH.Core.Util    as C
 import qualified CLaSH.Core.Var     as C
 import CLaSH.Primitives.Types
 import CLaSH.Util
@@ -237,6 +238,7 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
       in do
         unlocs <- LabelM.asks unlocatable
         xType <- coreToType (varType x)
+        let mapSyncName = pack
         case (isDataConWorkId_maybe x) of
           Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
                   | otherwise ->  case (HashMap.lookup xNameS primMap) of
@@ -251,6 +253,10 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
               return $ C.Prim (C.PrimDFun xPrim xType)
             Just (Primitive _ Dictionary) ->
               return $ C.Prim (C.PrimDict xPrim xType)
+            Just (Primitive f Function)
+              | f == pack "CLaSH.Signal.mapSync" -> return C.mapSyncTerm
+              | f == pack "CLaSH.Signal.appSync" -> return C.mapSyncTerm
+              -- | f == pack "CLaSH.Signal.sync"    -> error "sync"
             Just (Primitive _ Function) ->
               return $ C.Prim (C.PrimFun  xPrim xType)
             Just (Primitive _ Constructor) ->
