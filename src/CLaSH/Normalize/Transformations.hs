@@ -486,6 +486,15 @@ retVar ctx e@(Var v)
 
 retVar _ e = return e
 
+bindSimple :: NormRewrite
+bindSimple = inlineBinders bindSimpleTest
+  where
+    bindSimpleTest (Id idName tyE, exprE)
+      | null (typeFreeVars (unembed tyE)) = do
+          (_,localFVs) <- localFreeVars (unembed exprE)
+          return $ isSimple (unembed exprE) && idName `notElem` localFVs
+    bindSimpleTest _ = return False
+
 inlineSimple :: NormRewrite
 inlineSimple _ e@(Var f) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
@@ -496,13 +505,58 @@ inlineSimple _ e@(Var f) = R $ do
 inlineSimple _ e = return e
 
 inlineWrapper :: NormRewrite
-inlineWrapper [] e@(Var f) = R $ do
+inlineWrapper ctx e
+  | (Var f, args) <- collectArgs e
+  , all (either isVar (const True)) args
+  , all isLambdaBodyCtx ctx
+  = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
   case bodyMaybe of
-    Just (_,body) -> changed body
+    Just (_,body) -> changed (mkApps body args)
     Nothing -> return e
 
 inlineWrapper _ e = return e
+
+simpleSpec :: NormRewrite
+simpleSpec ctx e@(App e1 e2)
+  | (Var f, args) <- collectArgs e1
+  , (eArgs, []) <- Either.partitionEithers args
+  = R $ do
+    gamma <- mkGamma ctx
+    case isSimple e2 of
+      True -> do
+        let argLen = length eArgs
+        e2FVs <- fmap snd $ localFreeVars e2
+        -- Determine if 'f' has already been specialized on 'e2'
+        specM <- liftR $ fmap (Map.lookup (f,argLen,e2)) $
+                   LabelM.gets funSpecializations
+        case specM of
+          -- Use previously specialized function
+          Just fname -> changed $ mkTmApps (Var fname) (eArgs ++ (map Var e2FVs))
+          -- Create new specialized function
+          Nothing -> do
+            bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+            case bodyMaybe of
+              Just (_,bodyTm) -> do
+                -- Make new binders for existing arguments
+                (boundArgs,argVars) <- fmap unzip $
+                                         mapM (mkBinderFor ctx "pFS") eArgs
+                -- Make binders for the free variables in e2
+                let e2BVs = fvs2bvs gamma e2FVs
+                -- Create specialized functions
+                let newBody = mkLams (App (mkTmApps bodyTm argVars) e2)
+                                (boundArgs ++ e2BVs)
+                newf <- mkFunction ctx f newBody
+                -- Remember specialization
+                liftR $ LabelM.modify funSpecializations
+                          (Map.insert (f,argLen,e2) newf)
+                -- Use specialized function
+                let newExpr = mkTmApps (Var newf) (eArgs ++ (map Var e2FVs))
+                changed newExpr
+              Nothing -> return e
+      False -> return e
+
+simpleSpec _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite

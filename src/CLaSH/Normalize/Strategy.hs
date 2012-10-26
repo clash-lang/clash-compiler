@@ -62,7 +62,8 @@ defunctionalization = defunctionalization' >-> boxSpecialization
             ]
 
 simplification :: NormRewrite
-simplification = repeatTopdown steps
+simplification = (repeatTopdown steps) >->
+                 simpleSpecialization
   where
     steps = [ ("inlineSimple", inlineSimple)
             , ("lamApp"   , lamApp    )
@@ -71,14 +72,19 @@ simplification = repeatTopdown steps
             , ("deadcode" , deadCode  )
             , ("etaExpand", etaExpand )
             , ("appSimpl" , appSimpl  )
-            , ("retLet"   , retLet    )
-            , ("retLam"   , retLam    )
-            , ("letFlat"  , letFlat   )
+            , ("bindSimple", bindSimple)
             , ("inlineVar", inlineVar )
+            , ("inlineWrapper", inlineWrapper)
             ]
 
+    simpleSpecialization = repeatR $ bottomupR (apply "simpleSpec" simpleSpec)
+
 retVarStep :: NormRewrite
-retVarStep = topdownR (apply "retVar" retVar)
+retVarStep = repeatTopdown [ ("retLet" , retLet  )
+                           , ("retLam" , retLam  )
+                           , ("retVar" , retVar  )
+                           , ("letFlat", letFlat )
+                           ]
 
 doInline :: String -> NormRewrite -> NormRewrite
 doInline n t = bottomupR (apply n t) >-> commitNewInlined

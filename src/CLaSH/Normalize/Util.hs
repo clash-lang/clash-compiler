@@ -83,7 +83,6 @@ fvs2bvs gamma = map (\n -> Id n (embed $ gamma HashMap.! n))
 isSimple ::
   Term
   -> Bool
-isSimple (Var _)     = True
 isSimple (Literal _) = True
 isSimple (Data _)    = True
 isSimple e@(App _ _)
