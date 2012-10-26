@@ -92,7 +92,7 @@ genComponent' compName componentExpr mStart = do
   let argTypes = map (\(Id _ (Embed t)) -> typeToHWType_fail t) arguments
 
   let netDecls = map (\(id_,_) ->
-                        NetDecl (Text.pack . name2String $ varName id_)
+                        NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
                                 (typeToHWType_fail . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders

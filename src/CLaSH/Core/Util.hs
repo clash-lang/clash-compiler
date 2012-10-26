@@ -72,7 +72,7 @@ collectBndrs e = go [] e
     go bs (TyLam b) = do
       (tv,e') <- unbind b
       go (Right tv:bs) e'
-    go bs e' = return (bs,e')
+    go bs e' = return (reverse bs,e')
 
 applyTypeToArgs :: Fresh m => Type -> [Either Term Type] -> m Type
 applyTypeToArgs opTy []              = return opTy
