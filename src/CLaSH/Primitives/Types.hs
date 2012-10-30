@@ -13,6 +13,7 @@ data Primitive
   , inputs    :: Int
   , litInputs :: Int
   , template  :: SB.ByteString
+  , templateI :: SB.ByteString
   }
   | Primitive
   { name     :: LB.ByteString

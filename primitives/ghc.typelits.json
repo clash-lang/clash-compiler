@@ -2,7 +2,8 @@
     { "name"      : "GHC.TypeLits.Sing",
       "inputs"    : 0,
       "litInputs" : 0,
-      "template"  : ""
+      "template"  : "",
+      "templateI" : ""
     }
   }
 ]

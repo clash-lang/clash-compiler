@@ -53,6 +53,7 @@ architecture c =
   text "end architecture structural" <> semi
 
 vhdlType :: HWType -> Doc
+vhdlType Bit        = text "std_logic"
 vhdlType Bool       = text "boolean"
 vhdlType Integer    = text "integer"
 vhdlType (Signed n) = text "signed" <>
@@ -127,6 +128,7 @@ exprLit :: Maybe Size -> Literal -> Doc
 exprLit Nothing   (NumLit i) = int i
 exprLit (Just sz) (NumLit i) = bits $ (toBits sz i)
 exprLit _         (BoolLit t) = if t then text "true" else text "false"
+exprLit _         (BitLit b) = squotes $ bit_char b
 exprLit _         _          = error "exprLit"
 
 toBits :: Integral a => Int -> a -> [Bit]

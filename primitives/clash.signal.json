@@ -9,7 +9,8 @@
     elsif rising_edge(defaultClock) then
       {{result.val}} <= {{inputs.1.val}};
     end if;
-end process;"
+end process;",
+      "templateI" : ""
     }
   }
 , { "Primitive" :

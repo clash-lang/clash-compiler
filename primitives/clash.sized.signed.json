@@ -2,28 +2,32 @@
     { "name"      : "CLaSH.Sized.Signed.plusS",
       "inputs"    : 3,
       "litInputs" : 1,
-      "template"  : "{{result.val}} <= {{inputs.1.val}} + {{inputs.2.val}};"
+      "template"  : "{{result.val}} <= {{inputs.1.val}} + {{inputs.2.val}};",
+      "templateI" : "{{inputs.1.val}} + {{inputs.2.val}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.timesS",
       "inputs"    : 3,
       "litInputs" : 1,
-      "template"  : "{{result.val}} <= resize({{inputs.1.val}} * {{inputs.2.val}}, {{litInputs.0.lit}});"
+      "template"  : "{{result.val}} <= resize({{inputs.1.val}} * {{inputs.2.val}}, {{litInputs.0.lit}});",
+      "templateI" : "resize({{inputs.1.val}} * {{inputs.2.val}}, {{litInputs.0.lit}})"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.fromIntegerS",
       "inputs"    : 2,
       "litInputs" : 1,
-      "template"  : "{{result.val}} <= to_signed({{inputs.1.val}}, {{litInputs.0.lit}});"
+      "template"  : "{{result.val}} <= to_signed({{inputs.1.val}}, {{litInputs.0.lit}});",
+      "templateI" : "to_signed({{inputs.1.val}}, {{litInputs.0.lit}})"
     }
   }
   , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.negateS",
       "inputs"    : 2,
       "litInputs" : 0,
-      "template"  : "{{result.val}} <= 0 - {{inputs.1.val}};"
+      "template"  : "{{result.val}} <= 0 - {{inputs.1.val}};",
+      "templateI" : "0 - {{inputs.1.val}}"
     }
   }
 ]

@@ -54,6 +54,7 @@ typeToHWType ty
           "GHC.Prim.ByteArray#" -> return Integer
           "GHC.Types.Bool" -> return Bool
           "GHC.TypeLits.Sing" -> singletonToHWType (head args)
+          "CLaSH.Bit.Bit"     -> return Bit
           "CLaSH.Signal.Sync" -> typeToHWType (head args)
           "CLaSH.Sized.Signed.Signed" -> return $ Signed (tyNatSize $ head args)
           _      -> mkADT tyCon args
