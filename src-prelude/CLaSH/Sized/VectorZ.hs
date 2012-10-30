@@ -19,7 +19,7 @@ module CLaSH.Sized.VectorZ
   , vzip, vunzip
   , vindex, vindexM, unsafeIndex
   , vreplace, vreplaceM, unsafeReplace
-  , vtake, vtakeI, vdrop, vdropI, vexact, vselect
+  , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopyE, vcopy, viterateE, viterate, vgenerateE, vgenerate
   , toList, v
   )
@@ -40,7 +40,7 @@ data Vec :: Nat -> * -> * where
 infixr 5 :>
 
 instance Show a => Show (Vec n a) where
-  show v = "<" ++ punc v ++ ">"
+  show vs = "<" ++ punc vs ++ ">"
     where
       punc :: Show a => Vec n a -> String
       punc Nil        = ""
@@ -65,7 +65,7 @@ vinit (_ :> Nil)     = Nil
 vinit (x :> y :> ys) = x :> vinit (y :> ys)
 
 shiftIntoL :: a -> Vec n a -> Vec n a
-shiftIntoL s Nil       = Nil
+shiftIntoL _ Nil       = Nil
 shiftIntoL s (x :> xs) = s :> (vinit (x:>xs))
 
 infixr 4 +>>
@@ -81,7 +81,7 @@ infixl 5 <:
 xs <: s = snoc s xs
 
 shiftIntoR :: a -> Vec n a -> Vec n a
-shiftIntoR s Nil     = Nil
+shiftIntoR _ Nil     = Nil
 shiftIntoR s (x:>xs) = snoc s (vtail (x:>xs))
 
 infixl 4 <<+
@@ -200,17 +200,25 @@ vexact :: Sing m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n xs
 
 vselect ::
-  Sing f
-  -> Sing (s + 1)
-  -> Sing n
-  -> Vec (f + ((s * n) + i)) a
-  -> Vec n a
-vselect f s n xs = vselect' (isZero n) $ vdrop f xs
+  ((f + (s * n)) <= i)
+  => Sing f
+  -> Sing s
+  -> Sing (n + 1)
+  -> Vec i a
+  -> Vec (n + 1) a
+vselect f s n xs = vselect' (isZero n) $ vdrop f (unsafeCoerce xs)
   where
     vselect' :: IsZero n -> Vec m a -> Vec n a
-    vselect' IsZero      _          = Nil
-    vselect' (IsSucc n') l@(a :> _) = a :> vselect' (isZero n')
-                                                    (vdrop s (unsafeCoerce l))
+    vselect' IsZero      _           = Nil
+    vselect' (IsSucc n') vs@(x :> _) = x :> vselect' (isZero n') (vdrop s (unsafeCoerce vs))
+
+vselectI ::
+  ((f + (s * n)) <= i, SingI (n + 1))
+  => Sing f
+  -> Sing s
+  -> Vec i a
+  -> Vec (n + 1) a
+vselectI f s xs = withSing (\n -> vselect f s n xs)
 
 vcopyE :: Sing n -> a -> Vec n a
 vcopyE n a = vreplicate' (isZero n) a

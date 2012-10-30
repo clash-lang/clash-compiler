@@ -23,7 +23,20 @@ import CLaSH.Bit
 import CLaSH.Signal
 import GHC.TypeLits
 
+rememberN ::
+  (SingI (n + 1), Default a)
+  => Sync a
+  -> Vec ((n + 1) + 1) (Sync a)
 rememberN x = x :> prev
   where
     prev = registerP (vcopy def) next
     next = x :> vinit prev
+
+rememberN1 ::
+  (SingI (n + 1), Default a)
+  => Sync a
+  -> Vec (n + 1) (Sync a)
+rememberN1 x = prev
+  where
+    prev = registerP (vcopy def) next
+    next = x +>> prev

@@ -5,7 +5,6 @@
 {-# LANGUAGE TypeOperators         #-}
 module CLaSH.Sized.Index where
 
-import Unsafe.Coerce(unsafeCoerce)
 import GHC.TypeLits
 
 data Index :: Nat -> * where
