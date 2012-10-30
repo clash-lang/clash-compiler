@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies    #-}
 module CLaSH.Signal
-  ( Sync (..), sync
+  ( Sync (..), fromList, sync
   , sample
   , register
   , Pack(..)
   , registerP
   , (<^>)
   , (<^), (^>)
-  , Comp
+  , Comp(..)
   , (^^^)
   , registerC
   )
@@ -18,12 +18,11 @@ import Data.List
 import Control.Applicative
 import Control.Arrow
 import Control.Category
-import Language.Haskell.TH
 import Language.Haskell.TH.Syntax(Lift(..))
 import Prelude hiding (id,(.))
 
 import CLaSH.Class.Default
-import CLaSH.Sized.VectorZ
+import CLaSH.Sized.VectorZ (Vec(..), vmap, vhead, vtail)
 
 infixr 5 :-
 data Sync a = a :- Sync a
@@ -36,7 +35,7 @@ instance Show a => Show (Sync a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
 instance Lift a => Lift (Sync a) where
-  lift ~(x :- xs) = [| sync x |]
+  lift ~(x :- _) = [| sync x |]
 
 instance Default a => Default (Sync a) where
   def = sync def
@@ -111,7 +110,7 @@ v <^ f = liftA2 f v
 (^>) :: Applicative f => (f a -> f b) -> f a -> f b
 f ^> v = f v
 
-newtype Comp a b = C (Sync a -> Sync b)
+newtype Comp a b = C { asFunction :: Sync a -> Sync b }
 
 instance Category Comp where
   id            = C id

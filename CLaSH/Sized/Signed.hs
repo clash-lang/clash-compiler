@@ -10,6 +10,8 @@
 module CLaSH.Sized.Signed
   ( Signed
   , resizeS
+  , toBitVector
+  , fromBitVector
   )
 where
 
@@ -36,8 +38,8 @@ instance Show (Signed n) where
 instance Eq (Signed n) where
   (S n) == (S m) = n == m
 
-instance Default (Signed n) where
-  def = S 0
+instance SingI n => Default (Signed n) where
+  def = fromIntegerS 0
 
 instance Ord (Signed n) where
   compare (S n) (S m) = compare n m
@@ -60,12 +62,12 @@ instance SingI n => Integral (Signed n) where
 
 
 fromIntegerS :: forall n . SingI n => Integer -> Signed (n :: Nat)
-fromIntegerS v = res
+fromIntegerS i = res
   where
     sz' = 2 ^ (fromSing (sing :: Sing n) - 1)
-    res = case divMod v sz' of
-            (s,v') | even s    -> S v'
-                   | otherwise -> S (v' - sz')
+    res = case divMod i sz' of
+            (s,i') | even s    -> S i'
+                   | otherwise -> S (i' - sz')
 
 plusS :: SingI n => Signed n -> Signed n -> Signed n
 plusS (S a) (S b) = fromIntegerS $ a + b
