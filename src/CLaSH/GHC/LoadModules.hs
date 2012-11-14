@@ -11,6 +11,7 @@ import qualified GHC.Paths
 -- GHC API
 import qualified CoreSyn
 import qualified DynFlags
+import           CLaSH.GHC.Compat.DynFlags (dopt_unset)
 import qualified GHC
 import           CLaSH.GHC.Compat.GHC (defaultErrorHandler)
 import qualified HscTypes
@@ -89,7 +90,7 @@ disableOptimizationsFlags :: GHC.ModSummary -> GHC.ModSummary
 disableOptimizationsFlags ms@(GHC.ModSummary {..})
   = ms {GHC.ms_hspp_opts = dflags}
   where
-    dflags = DynFlags.dopt_unset (ms_hspp_opts
+    dflags = dopt_unset (ms_hspp_opts
               {DynFlags.optLevel = 0, DynFlags.ctxtStkDepth = 1000})
               DynFlags.Opt_EnableRewriteRules
 
