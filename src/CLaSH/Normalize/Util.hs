@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 module CLaSH.Normalize.Util where
 
 import qualified Data.HashMap.Lazy as HashMap
@@ -88,6 +89,6 @@ isSimple (Data _)    = True
 isSimple e@(App _ _)
   | (Data _, args) <- collectArgs e
   = all (either isSimple (const True)) args
-  | (Prim p, args) <- collectArgs e
+  | (Prim _, args) <- collectArgs e
   = all (either isSimple (const True)) args
 isSimple _ = False

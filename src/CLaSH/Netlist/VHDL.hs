@@ -58,6 +58,7 @@ vhdlType Bool       = text "boolean"
 vhdlType Integer    = text "integer"
 vhdlType (Signed n) = text "signed" <>
                       parens ( int (n-1) <+> text "downto 0")
+vhdlType (Vector n elTy) = text "array_of_" <> vhdlType elTy <> parens ( int (n-1) <+> text "downto 0")
 vhdlType t@(SP _ _) = text "std_logic_vector" <>
                       parens ( int (typeSize t - 1) <+>
                                text "downto 0" )

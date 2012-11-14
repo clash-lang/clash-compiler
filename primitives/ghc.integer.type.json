@@ -2,16 +2,18 @@
     { "name"      : "GHC.Integer.Type.plusInteger",
       "inputs"    : 2,
       "litInputs" : 0,
-      "template"  : "{{result.val}} <= {{inputs.0.val}} + {{inputs.1.val}};",
-      "templateI" : "{{inputs.0.val}} + {{inputs.1.val}}"
+      "funInputs" : 0,
+      "template"  : "{{result}} <= {{inputs.0}} + {{inputs.1}};",
+      "templateI" : "{{inputs.0}} + {{inputs.1}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.timesInteger",
       "inputs"    : 2,
       "litInputs" : 0,
-      "template"  : "{{result.val}} <= {{inputs.0.val}} * {{inputs.1.val}};",
-      "templateI" : "{{inputs.0.val}} * {{inputs.1.val}}"
+      "funInputs" : 0,
+      "template"  : "{{result}} <= {{inputs.0}} * {{inputs.1}};",
+      "templateI" : "{{inputs.0}} * {{inputs.1}}"
     }
   }
 ]

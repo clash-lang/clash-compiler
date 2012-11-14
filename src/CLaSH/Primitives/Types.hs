@@ -12,6 +12,7 @@ data Primitive
   { name      :: LB.ByteString
   , inputs    :: Int
   , litInputs :: Int
+  , funInputs :: Int
   , template  :: SB.ByteString
   , templateI :: SB.ByteString
   }

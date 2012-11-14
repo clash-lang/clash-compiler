@@ -57,6 +57,11 @@ typeToHWType ty
           "CLaSH.Bit.Bit"     -> return Bit
           "CLaSH.Signal.Sync" -> typeToHWType (head args)
           "CLaSH.Sized.Signed.Signed" -> return $ Signed (tyNatSize $ head args)
+          "CLaSH.Sized.VectorZ.Vec" -> do
+            let [szTy,elTy] = args
+            let sz = tyNatSize szTy
+            elHWTy <- typeToHWType elTy
+            return $ Vector sz elHWTy
           _      -> mkADT tyCon args
       Nothing -> Left $ "Can't translate type: " ++ show ty
 
@@ -91,7 +96,7 @@ mkADT ::
   -> [Type]
   -> Either String HWType
 mkADT tc args
-  | isRecursiveTy tc args = Left "Can't translate custom recursive type"
+  | isRecursiveTy tc args = Left $ $(curLoc) ++ "Can't translate custom recursive type: " ++ (show (tc,args))
   | otherwise = case tyConDataCons tc of
   []  -> Left $ $(curLoc) ++ "There are no DataCons for the type: " ++ (show (tc,args))
   dcs -> do
@@ -138,12 +143,13 @@ typeSize ::
 typeSize Bool = 1
 typeSize Integer = 32
 typeSize (Signed i) = i
+typeSize (Vector n el) = n * (typeSize el)
 typeSize (SP _ cons) =
   (ceiling . logBase (2 :: Float) . fromIntegral $ length cons) +
   (maximum $ map (sum . map typeSize . snd) cons)
 typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
-typeSize _ = error "typeSize"
+typeSize _ = 0
 
 typeLength ::
   HWType

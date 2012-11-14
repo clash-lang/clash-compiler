@@ -2,26 +2,21 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 module CLaSH.Prelude
-  ( module CLaSH.Class.Default
-  , module CLaSH.Sized.Index
-  , module CLaSH.Sized.Signed
-  , module CLaSH.Sized.Unsigned
-  , module CLaSH.Sized.VectorZ
-  , module CLaSH.Bit
-  , module CLaSH.Signal
-  , module GHC.TypeLits
+  ( module Exported
   , module CLaSH.Prelude
   )
 where
 
-import CLaSH.Class.Default
-import CLaSH.Sized.Index
-import CLaSH.Sized.Signed
-import CLaSH.Sized.Unsigned
-import CLaSH.Sized.VectorZ
-import CLaSH.Bit
-import CLaSH.Signal
-import GHC.TypeLits
+import CLaSH.Class.Default  as Exported
+import CLaSH.Promoted.Bool  as Exported
+import CLaSH.Promoted.Ord   as Exported
+import CLaSH.Sized.Index    as Exported
+import CLaSH.Sized.Signed   as Exported
+import CLaSH.Sized.Unsigned as Exported
+import CLaSH.Sized.VectorZ  as Exported
+import CLaSH.Bit            as Exported
+import CLaSH.Signal         as Exported
+import GHC.TypeLits         as Exported
 
 rememberN ::
   (SingI (n + 1), Default a)

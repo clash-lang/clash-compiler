@@ -2,12 +2,13 @@
     { "name"      : "CLaSH.Signal.register",
       "inputs"    : 2,
       "litInputs" : 0,
+      "funInputs" : 0,
       "template"  : "process(defaultClockReset,defaultClock) is
   begin
     if defaultClockReset = '0' then
-      {{result.val}} <= {{inputs.0.val}};
+      {{result}} <= {{inputs.0}};
     elsif rising_edge(defaultClock) then
-      {{result.val}} <= {{inputs.1.val}};
+      {{result}} <= {{inputs.1}};
     end if;
 end process;",
       "templateI" : ""

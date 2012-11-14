@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 module CLaSH.Netlist.BlackBox where
 
 import           Control.Monad.IO.Class (liftIO)
@@ -32,10 +33,9 @@ mkBlackBoxContext ::
   -> [Term]
   -> NetlistMonad BlackBoxContext
 mkBlackBoxContext resId args = do
-  varInps   <- mapM (mkInput resId) args
-  case mkVarInput (V.varName resId) (unembed $ varType resId) of
-    Nothing  -> error "can't make blackbox"
-    Just res -> return $ Context res (catMaybes varInps) (catMaybes litInps)
+  let res = mkBasicId . pack $ name2String (V.varName resId)
+  varInps <- mapM (mkInput resId) args
+  return $ Context res (catMaybes varInps) (catMaybes litInps) []
   where
     (_,otherArgs) = partitionEithers $ map unVar args
     (litArgs,_)   = partition isSimple otherArgs
@@ -51,7 +51,8 @@ verifyBlackBoxContext ::
   -> Bool
 verifyBlackBoxContext p bbCtx =
   (length (B.inputs bbCtx)    == P.inputs p) &&
-  (length (B.litInputs bbCtx) >= P.litInputs p)
+  (length (B.litInputs bbCtx) >= P.litInputs p) &&
+  (length (B.funInputs bbCtx) >= P.funInputs p)
 
 mkBlackBoxDecl ::
   Primitive
@@ -80,10 +81,10 @@ mkBlackBoxI p bbCtx = case (verifyBlackBoxContext p bbCtx) of
 mkInput ::
   Id
   -> Term
-  -> NetlistMonad (Maybe VarInput)
+  -> NetlistMonad (Maybe Identifier)
 mkInput _ (Var v) = do
-  gamma     <- LabelM.gets varEnv
-  return $! mkVarInput v (gamma HashMap.! v)
+  let vT = mkBasicId . pack $ name2String v
+  return $! Just vT
 
 mkInput resId e@(App _ _)
   | (Prim (PrimFun nm _), args) <- collectArgs e
@@ -93,28 +94,12 @@ mkInput resId e@(App _ _)
       Just p@(P.BlackBox {}) -> do
         bbCtx <- mkBlackBoxContext resId (lefts args)
         bb <- mkBlackBoxI p bbCtx
-        return $! (Just (VarInput (decodeUtf8 bb) 0 0))
+        return $! Just (decodeUtf8 bb)
       _ -> error $ "No blackbox found: " ++ show bbM
-mkInput _ e       = return $! mkVarLitInput e
-
-mkVarInput ::
-  TmName
-  -> Type
-  -> Maybe VarInput
-mkVarInput nm ty = do
-  let nmT = mkBasicId . pack $ name2String nm
-  case typeToHWType ty of
-    Left errMsg -> traceIf True errMsg Nothing
-    Right hwTy  -> Just (VarInput nmT (typeSize hwTy) (typeLength hwTy))
-
-mkVarLitInput ::
-  Term
-  -> Maybe VarInput
-mkVarLitInput (C.Literal (IntegerLiteral i)) = Just (VarInput (pack $ show i) 0 0)
-mkVarLitInput _ = Nothing
+mkInput _ e       = return $! mkLitInput e
 
 mkLitInput ::
   Term
-  -> Maybe LitInput
-mkLitInput (C.Literal (IntegerLiteral i)) = Just (LitInput i)
+  -> Maybe Identifier
+mkLitInput (C.Literal (IntegerLiteral i)) = Just (pack $ show i)
 mkLitInput _ = Nothing
