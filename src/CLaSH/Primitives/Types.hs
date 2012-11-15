@@ -1,8 +1,10 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module CLaSH.Primitives.Types where
 
 import Data.Aeson.TH        (deriveJSON)
 import Data.ByteString.Lazy as LB (ByteString)
 import Data.ByteString      as SB (ByteString)
+import Data.Data
 import Data.HashMap.Lazy    (HashMap)
 
 type PrimMap = HashMap LB.ByteString Primitive
@@ -19,9 +21,9 @@ data Primitive
   | Primitive
   { name     :: LB.ByteString
   , primType :: PrimType
-  } deriving Show
+  } deriving (Typeable, Data, Show)
 
 data PrimType = Function | Constructor | Dictionary | DFun
-  deriving Show
+  deriving (Typeable, Data, Show)
 
 $(fmap concat $ mapM (deriveJSON id) [''PrimType,''Primitive])

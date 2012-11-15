@@ -19,10 +19,10 @@ newtype NetlistMonad a =
 
 data NetlistState
   = NetlistState
-  { _bindings  :: HashMap TmName (Type,Term)
-  , _varEnv    :: Gamma
-  , _varCount  :: Integer
-  , _cmpCount  :: Integer
+  { _bindings   :: HashMap TmName (Type,Term)
+  , _varEnv     :: Gamma
+  , _varCount   :: Integer
+  , _cmpCount   :: Integer
   , _components :: HashMap TmName Component
   , _primitives :: HashMap ByteString Primitive
   }

@@ -1,6 +1,7 @@
 {-# LANGUAGE PatternGuards #-}
 module CLaSH.Netlist.BlackBox where
 
+import           Control.Monad.State (evalStateT)
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as LZ
 import           Data.Either       (partitionEithers,lefts)
@@ -18,10 +19,11 @@ import CLaSH.Core.Literal as L (Literal(..))
 import CLaSH.Core.Prim (Prim (..))
 import CLaSH.Core.Term as C (Term(..),TmName)
 import CLaSH.Core.Type (Type)
-import CLaSH.Core.Util (collectArgs)
+import CLaSH.Core.Util (collectArgs, isFun)
 import CLaSH.Core.Var  as V (Id,Var(..))
 import CLaSH.Normalize.Util (isSimple)
 import CLaSH.Netlist.BlackBox.Types as B
+import CLaSH.Netlist.BlackBox.Util as B
 import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types as HW
 import CLaSH.Netlist.Util
@@ -34,16 +36,20 @@ mkBlackBoxContext ::
   -> NetlistMonad BlackBoxContext
 mkBlackBoxContext resId args = do
   let res = mkBasicId . pack $ name2String (V.varName resId)
-  varInps <- mapM (mkInput resId) args
-  return $ Context res (catMaybes varInps) (catMaybes litInps) []
-  where
-    (_,otherArgs) = partitionEithers $ map unVar args
-    (litArgs,_)   = partition isSimple otherArgs
-    litInps       = map mkLitInput litArgs
+  gamma     <- LabelM.gets varEnv
+  isFunArgs <- mapM (isFun gamma) args
+  let args' = zip args isFunArgs
+  varInps   <- mapM (mkInput resId) args'
+  let (_,otherArgs)     = partitionEithers $ map unVar args'
+  let (litArgs,funArgs) = partition (\(t,b) -> not b && isSimple t) otherArgs
+  let litInps           = map (mkLitInput . fst) litArgs
+  let funInps           = map (mkFunInput . fst) funArgs
+  return $ Context res (catMaybes varInps) (catMaybes litInps) (catMaybes funInps) addContext addInput addOutput renderFun
 
-unVar :: Term -> Either TmName Term
-unVar (Var v) = Left v
-unVar t       = Right t
+
+unVar :: (Term, Bool) -> Either TmName (Term, Bool)
+unVar (Var v, False) = Left v
+unVar t              = Right t
 
 verifyBlackBoxContext ::
   Primitive
@@ -59,10 +65,9 @@ mkBlackBoxDecl ::
   -> BlackBoxContext
   -> NetlistMonad [Declaration]
 mkBlackBoxDecl p bbCtx = case (verifyBlackBoxContext p bbCtx) of
-  True -> liftIO $ do
-    let hastacheCtx = Hastache.mkGenericContext bbCtx
-    tmpl <- Hastache.hastacheStr (Hastache.defaultConfig)
-              (template p) hastacheCtx
+  True -> do
+    prims <- LabelM.gets primitives
+    tmpl <- liftIO $ evalStateT (renderBlackBox p bbCtx) (BBState prims bbCtx Nothing)
     return [HW.BlackBox tmpl]
   False -> error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show p
 
@@ -71,22 +76,20 @@ mkBlackBoxI ::
   -> BlackBoxContext
   -> NetlistMonad LZ.ByteString
 mkBlackBoxI p bbCtx = case (verifyBlackBoxContext p bbCtx) of
-  True -> liftIO $ do
-    let hastacheCtx = Hastache.mkGenericContext bbCtx
-    tmplI <- Hastache.hastacheStr (Hastache.defaultConfig)
-              (templateI p) hastacheCtx
-    return tmplI
+  True -> do
+    prims <- LabelM.gets primitives
+    liftIO $ evalStateT (renderBlackBox p bbCtx) (BBState prims bbCtx Nothing)
   False -> error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show p
 
 mkInput ::
   Id
-  -> Term
+  -> (Term, Bool)
   -> NetlistMonad (Maybe Identifier)
-mkInput _ (Var v) = do
+mkInput _ ((Var v), _) = do
   let vT = mkBasicId . pack $ name2String v
   return $! Just vT
 
-mkInput resId e@(App _ _)
+mkInput resId (e@(App _ _), False)
   | (Prim (PrimFun nm _), args) <- collectArgs e
   = do
     bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ LabelM.gets primitives
@@ -96,10 +99,26 @@ mkInput resId e@(App _ _)
         bb <- mkBlackBoxI p bbCtx
         return $! Just (decodeUtf8 bb)
       _ -> error $ "No blackbox found: " ++ show bbM
-mkInput _ e       = return $! mkLitInput e
+
+mkInput resId (e@(App _ _), True)
+  | (Prim (PrimFun nm _), _) <- collectArgs e
+  = let nmT = pack $ name2String nm
+    in return $! Just nmT
+
+mkInput _ (e, _) = return $! mkLitInput e
 
 mkLitInput ::
   Term
   -> Maybe Identifier
 mkLitInput (C.Literal (IntegerLiteral i)) = Just (pack $ show i)
 mkLitInput _ = Nothing
+
+mkFunInput ::
+  Term
+  -> Maybe Identifier
+mkFunInput e@(App _ _)
+  | (Prim (PrimFun nm _), _) <- collectArgs e
+  = let nmT = pack $ name2String nm
+    in Just nmT
+
+mkFunInput _ = Nothing

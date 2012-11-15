@@ -1,10 +1,11 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vmap",
       "inputs"    : 2,
-      "litInputs" : 1,
+      "litInputs" : 0,
       "funInputs" : 1,
-      "template"  : "for n in ({{result}}'length - 1) downto 0 generate
-begin {{#start}}{{funInputs.0}}{{/start}} {{#addI}}{{inputs.1}}(n){{/addI}} {{#addO}}{{result}}(n){{/addO}}
+      "template"  :
+"for n in ({{result}}'length - 1) downto 0 generate
+begin {{#start}}{{funInputs.0}}{{/start}}{{#addI}}{{inputs.1}}(n){{/addI}}{{#addO}}{{result}}(n){{/addO}}
   {{#render}}{{funInputs.0}}{{/render}}
 end generate;",
       "templateI" : ""
