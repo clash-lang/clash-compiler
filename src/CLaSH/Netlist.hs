@@ -2,12 +2,13 @@ module CLaSH.Netlist where
 
 import qualified Control.Monad           as Monad
 import           Control.Monad.State     (runStateT)
+import           Control.Monad.Writer    (runWriterT,listen,tell)
 import qualified Data.ByteString.Lazy.Char8 as LZ
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.Label.PureM        as LabelM
-import           Data.List               (elemIndex)
+import           Data.List               (elemIndex,nub)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Text.Lazy          as Text
 import           Unbound.LocallyNameless (Embed(..),name2String,runFreshMT,unembed)
@@ -44,6 +45,7 @@ runNetlistMonad ::
 runNetlistMonad s p
   = runFreshMT
   . (flip runStateT) s'
+  . (fmap fst . runWriterT)
   . runNetlist
   where
     s' = NetlistState s HashMap.empty 0 0 HashMap.empty p
@@ -96,12 +98,11 @@ genComponent' compName componentExpr mStart = do
                                 (typeToHWType_fail . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders
-  decls <- concat <$> mapM (uncurry mkConcSm . second unembed) binders
+  (decls,clks) <- listen $ concat <$> mapM (uncurry mkConcSm . second unembed) binders
 
   let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
   let compOutp       = (Text.pack $ name2String result, resType)
-  let component      = Component componentName' compInps compOutp (netDecls ++ decls)
-
+  let component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
   return component
 
 mkConcSm ::
@@ -128,7 +129,7 @@ mkConcSm bndr app@(App _ _) = do
       case bbM of
         Just p@(P.BlackBox {}) -> do
           bbCtx <- mkBlackBoxContext bndr args
-          mkBlackBoxDecl p bbCtx
+          mkBlackBoxDecl (template p) bbCtx
         _ -> error $ "No blackbox found: " ++ show bbM
     _ -> error $ "Not in normal form: application of a Let/Lam/Case" ++ show app
 
@@ -155,16 +156,17 @@ mkApplication dst fun args = do
     Just _ -> do
       vCnt <- LabelM.gets varCount
       vEnv <- LabelM.gets varEnv
-      (Component compName compInps compOutp _) <- genComponent fun Nothing
+      (Component compName hidden compInps compOutp _) <- genComponent fun Nothing
       LabelM.puts varCount vCnt
       LabelM.puts varEnv vEnv
       case length args == length compInps of
         True  -> do
           let dstId = mkBasicId . Text.pack . name2String $ varName dst
           let args' = map varToExpr args
+          let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
           let inpAssigns = zip (map fst compInps) args'
           let outpAssign = (fst compOutp,Identifier dstId Nothing)
-          let instDecl = InstDecl compName dstId (outpAssign:inpAssigns)
+          let instDecl = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
           return [instDecl]
         False -> error "under-applied normalized function"
     Nothing -> case args of

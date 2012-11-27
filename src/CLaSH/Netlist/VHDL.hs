@@ -39,6 +39,8 @@ entity c =
   where
     ports = [ text i <+> colon <+> text "in" <+> vhdlType ty
             | (i,ty) <- inputs c ] ++
+            [ text i <+> colon <+> text "in" <+> vhdlType ty
+            | (i,ty) <- hidden c ] ++
             [ text (fst $ output c) <+> colon <+> text "out" <+> vhdlType (snd $ output c)
             ]
 
@@ -116,7 +118,7 @@ inst _ (InstDecl nm lbl pms) = Just $
     pms' = nest 2 $ text "port map" <$$>
             tupled [text i <+> text "=>" <+> expr e | (i,e) <- pms]
 
-inst _ (BlackBox bs) = Just $ string $ decodeUtf8 bs
+inst _ (BlackBox bs) = Just $ text bs
 
 inst _ _ = Nothing
 

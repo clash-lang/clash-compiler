@@ -256,7 +256,7 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
             Just (Primitive f Function)
               | f == pack "CLaSH.Signal.mapSync" -> return C.mapSyncTerm
               | f == pack "CLaSH.Signal.appSync" -> return C.mapSyncTerm
-              -- | f == pack "CLaSH.Signal.sync"    -> error "sync"
+              | f == pack "CLaSH.Signal.sync"    -> return C.syncTerm
             Just (Primitive _ Function) ->
               return $ C.Prim (C.PrimFun  xPrim xType)
             Just (Primitive _ Constructor) ->
@@ -319,7 +319,7 @@ coreToType' ty@(AppTy _ _)   = error $ $(curLoc) ++ "Type application of type va
 coreToTyLit ::
   TyLit
   -> C.TyLit
-coreToTyLit (NumTyLit i) = C.NumTyLit i
+coreToTyLit (NumTyLit i) = C.NumTyLit (fromInteger i)
 coreToTyLit (StrTyLit s) = C.StrTyLit (unpackFS s)
 
 coreToTyCon ::

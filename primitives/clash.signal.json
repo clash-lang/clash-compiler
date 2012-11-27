@@ -1,16 +1,14 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Signal.register",
-      "inputs"    : 2,
-      "litInputs" : 0,
-      "funInputs" : 0,
-      "template"  : "process(defaultClockReset,defaultClock) is
+      "template"  :
+"process(~CLK[1],~RST[1]) is
   begin
-    if defaultClockReset = '0' then
-      {{result}} <= {{inputs.0}};
-    elsif rising_edge(defaultClock) then
-      {{result}} <= {{inputs.1}};
+    if ~RST[1] = '0' then
+      ~RESULT <= ~ARG[0];
+    elsif rising_edge(~CLK[1]) then
+      ~RESULT <= ~ARG[1];
     end if;
-end process;",
+  end process;",
       "templateI" : ""
     }
   }

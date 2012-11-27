@@ -2,6 +2,7 @@
 module CLaSH.Netlist.Types where
 
 import Control.Monad.State     (MonadIO,MonadState,StateT)
+import Control.Monad.Writer    (MonadWriter,WriterT)
 import Data.ByteString.Lazy    (ByteString)
 import Data.Text.Lazy          (Text)
 import Data.HashMap.Lazy       (HashMap)
@@ -14,8 +15,8 @@ import CLaSH.Primitives.Types (Primitive)
 import CLaSH.Util
 
 newtype NetlistMonad a =
-    NetlistMonad { runNetlist :: StateT NetlistState (FreshMT IO) a }
-  deriving (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
+    NetlistMonad { runNetlist :: WriterT [(Identifier,HWType)] (StateT NetlistState (FreshMT IO)) a }
+  deriving (Functor, Monad, Applicative, MonadState NetlistState, MonadWriter [(Identifier,HWType)], Fresh, MonadIO)
 
 data NetlistState
   = NetlistState
@@ -33,6 +34,7 @@ type Label      = Identifier
 data Component
   = Component
   { componentName :: Identifier
+  , hidden        :: [(Identifier,HWType)]
   , inputs        :: [(Identifier,HWType)]
   , output        :: (Identifier,HWType)
   , declarations  :: [Declaration]
@@ -51,12 +53,12 @@ data HWType
   | Sum      Identifier [Identifier]
   | Product  Identifier [HWType]
   | SP       Identifier [(Identifier,[HWType])]
-  deriving Show
+  deriving (Eq,Show)
 
 data Declaration
   = Assignment Identifier (Maybe Modifier) HWType [Expr]
   | InstDecl Identifier Identifier [(Identifier,Expr)]
-  | BlackBox ByteString
+  | BlackBox Text
   | NetDecl Identifier HWType (Maybe Expr)
   deriving Show
 

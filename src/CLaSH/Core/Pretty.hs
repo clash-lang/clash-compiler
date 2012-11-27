@@ -9,7 +9,7 @@ import Data.Char (isUpper,ord,isSymbol)
 import qualified Data.HashMap.Lazy as HashMap
 import GHC.Show (showMultiLineString)
 import Text.PrettyPrint (Doc,(<+>),(<>),($+$),($$),render,parens,text,sep,
-  punctuate,comma,hang,char,brackets,empty,fsep,hsep,equals,vcat,integer)
+  punctuate,comma,hang,char,brackets,empty,fsep,hsep,equals,vcat,integer,int)
 import Unbound.LocallyNameless (Embed(..),Name,LFresh,runLFreshM,unembed,
   name2String,name2Integer,lunbind,unrec)
 
@@ -82,7 +82,7 @@ instance Pretty TyCon where
   pprPrec _ _ tc = return . text . name2String $ tyConName tc
 
 instance Pretty TyLit where
-  pprPrec _ _ (NumTyLit i) = return $ integer i
+  pprPrec _ _ (NumTyLit i) = return $ int i
   pprPrec _ _ (StrTyLit s) = return $ text s
 
 instance Pretty Term where

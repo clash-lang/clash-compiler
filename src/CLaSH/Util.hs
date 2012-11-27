@@ -128,8 +128,11 @@ getAndModify lens modify = do
   LabelM.modify lens modify
   return a
 
-dot :: (b -> c) -> (a0 -> a1 -> b) -> a0 -> a1 -> c
+dot :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 dot = (.) . (.)
+
+(><) :: (a -> b) -> (c -> d) -> (a,c) -> (b,d)
+(f >< g) (a,b) = (f a, g b)
 
 ifThenElse ::
   (a -> Bool)

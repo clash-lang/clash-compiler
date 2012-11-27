@@ -1,79 +1,50 @@
 module CLaSH.Netlist.BlackBox.Util where
 
-import Control.Monad.State
-import qualified Data.ByteString       as BS
-import qualified Data.ByteString.Char8 as BS8
-import qualified Data.ByteString.Lazy  as BSL
-import qualified Data.HashMap.Lazy     as HashMap
-import qualified Data.Label.PureM      as LabelM
-import qualified Data.Text.Lazy        as Text
-import Data.Text.Lazy.Encoding (decodeUtf8)
-import qualified Text.Hastache         as Hastache
-import qualified Text.Hastache.Context as Hastache
+import Control.Monad.Writer (Writer,tell,runWriter)
+import qualified Data.List as List
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as Text
 
-import CLaSH.Netlist.BlackBox.Types as BB
-import CLaSH.Primitives.Types as P
+import CLaSH.Netlist.BlackBox.Types
+import CLaSH.Netlist.Types (Identifier,HWType(..))
+import CLaSH.Util
+
+countArgs :: Line -> Int
+countArgs [] = -1
+countArgs l  = maximum $ map (\e -> case e of { I n -> n; _ -> (-1) }) l
+
+countLits :: Line -> Int
+countLits [] = -1
+countLits l  = maximum $ map (\e -> case e of { L n -> n; _ -> (-1) }) l
+
+countFuns :: Line -> Int
+countFuns [] = -1
+countFuns l  = maximum $ map (\e -> case e of { D (Decl n _) -> n; _ -> (-1) }) l
+
+idSyncId :: SyncIdentifier -> Identifier
+idSyncId (Left i) = i
+idSyncId (Right (i,_)) = i
+
+clkSyncId :: SyncIdentifier -> Identifier
+clkSyncId (Right (_,clk)) = clk
+clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 
 renderBlackBox ::
-  Primitive
+  Line
   -> BlackBoxContext
-  -> BlackBoxMonad BSL.ByteString
-renderBlackBox p bbCtx = do
-  let hastacheCtx = Hastache.mkGenericContext bbCtx
-  tmpl <- Hastache.hastacheStr (Hastache.defaultConfig)
-            (template p) hastacheCtx
-  return tmpl
+  -> (Text, [(Identifier,HWType)])
+renderBlackBox l bbCtx = (Text.concat >< List.nub) $ runWriter $ mapM (renderElem bbCtx) l
 
-addContext ::
-  BS.ByteString
-  -> BlackBoxMonad BS.ByteString
-addContext f = do
-  tLvlCtx <- fmap Hastache.mkGenericContext $ LabelM.gets topLevelCtx
-  res <- Hastache.hastacheStr Hastache.defaultConfig f tLvlCtx
-  bbM <- fmap (HashMap.lookup res) $ LabelM.gets prims
-  case bbM of
-    Just p@(P.BlackBox {}) -> do
-      let newC = Context (Text.pack "BB_OUT") [] [] [] addContext addInput addOutput renderFun
-      LabelM.puts renderContext (Just (p,newC))
-      return BS.empty
-    _ -> error $ "No blackbox found: " ++ show bbM
-
-addInput ::
-  BS.ByteString
-  -> BlackBoxMonad BS.ByteString
-addInput i = do
-  tLvlCtx <- fmap Hastache.mkGenericContext $ LabelM.gets topLevelCtx
-  res <- Hastache.hastacheStr Hastache.defaultConfig i tLvlCtx
-  LabelM.modify renderContext
-    (\x -> case x of
-      Just (p,c) -> let c' = c {BB.inputs = BB.inputs c ++ [decodeUtf8 res] }
-                    in Just (p,c')
-      Nothing    -> Nothing
-    )
-  return BS.empty
-
-addOutput ::
-  BS.ByteString
-  -> BlackBoxMonad BS.ByteString
-addOutput o = do
-  tLvlCtx <- fmap Hastache.mkGenericContext $ LabelM.gets topLevelCtx
-  res <- Hastache.hastacheStr Hastache.defaultConfig o tLvlCtx
-  LabelM.modify renderContext
-    (\x -> case x of
-      Just (p,c) -> let c' = c {BB.result = decodeUtf8 res }
-                    in Just (p,c')
-      Nothing    -> Nothing
-    )
-  return BS.empty
-
-renderFun ::
-  BS.ByteString
-  -> BlackBoxMonad BS.ByteString
-renderFun f = do
-  rctx <- LabelM.gets renderContext
-  case rctx of
-    Just (p,ctx) -> do
-      let ctx' = Hastache.mkGenericContext ctx
-      res <- Hastache.hastacheStr Hastache.defaultConfig (template p) ctx'
-      return (BSL.toStrict res)
-    Nothing -> error "No render context set"
+renderElem :: BlackBoxContext -> Element -> Writer [(Identifier,HWType)] Text
+renderElem _ (C t)          = return t
+renderElem b O              = return $! idSyncId $ result b
+renderElem b (I n)          = return $! idSyncId $ (inputs b)!!n
+renderElem b (L n)          = return $! (litInputs b)!!n
+renderElem b (Clk Nothing)  = let t = clkSyncId $ result b
+                              in tell [(t,Bit)] >> return t
+renderElem b (Clk (Just n)) = let t = clkSyncId $ (inputs b)!!n
+                              in tell [(t,Bit)] >> return t
+renderElem b (Rst Nothing)  = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ result b
+                              in tell [(t,Bit)] >> return t
+renderElem b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ (inputs b)!!n
+                              in tell [(t,Bit)] >> return t

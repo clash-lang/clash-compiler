@@ -8,10 +8,11 @@ import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
+import CLaSH.Core.TyCon   (PrimRep(..),mkPrimTyCon)
 import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
   applyTy)
 import CLaSH.Core.TypeRep (Type(..))
-import CLaSH.Core.TysPrim (liftedTypeKind)
+import CLaSH.Core.TysPrim (liftedTypeKind,syncPrimTyCon)
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
 
@@ -181,9 +182,10 @@ mapSyncTerm :: Term
 mapSyncTerm
   = let aTV = TyVar (string2Name "a") (embed liftedTypeKind)
         bTV = TyVar (string2Name "b") (embed liftedTypeKind)
-        fId = Id (string2Name "f") (embed $ FunTy (TyVarTy (varName aTV))
-                                                  (TyVarTy (varName bTV)))
-        xId = Id (string2Name "x") (embed $ TyVarTy (varName aTV))
+        aTy = TyConApp syncPrimTyCon [TyVarTy (varName aTV)]
+        bTy = TyConApp syncPrimTyCon [TyVarTy (varName bTV)]
+        fId = Id (string2Name "f") (embed $ FunTy aTy bTy)
+        xId = Id (string2Name "x") (embed $ aTy)
   in TyLam $ bind aTV $
      TyLam $ bind bTV $
      Lam   $ bind fId $
@@ -193,7 +195,8 @@ mapSyncTerm
 syncTerm :: Term
 syncTerm
   = let aTV = TyVar (string2Name "a") (embed liftedTypeKind)
-        xId = Id (string2Name "x") (embed $ TyVarTy (varName aTV))
+        aTy = TyConApp syncPrimTyCon [TyVarTy (varName aTV)]
+        xId = Id (string2Name "x") (embed aTy)
   in TyLam $ bind aTV $
      Lam   $ bind xId $
      (Var $ varName xId)

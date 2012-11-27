@@ -33,7 +33,7 @@ data Type
   deriving Show
 
 data TyLit
-  = NumTyLit Integer
+  = NumTyLit Int
   | StrTyLit String
   deriving Show
 

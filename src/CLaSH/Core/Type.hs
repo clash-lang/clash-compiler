@@ -104,7 +104,7 @@ kindFunResult :: Kind -> KindOrType -> Kind
 kindFunResult (FunTy _ res) _  = res
 kindFunResult (ForAllTy b) arg = let (kv,ki) = runFreshM . unbind $ b
                                  in substKindWith (zip [varName kv] [arg]) ki
-kindFunResult _ _              = error $ $(curLoc) ++ "kindFunResult"
+kindFunResult k tys            = error $ $(curLoc) ++ ("kindFunResult: ") ++ show (k,tys)
 
 constraintKind :: Kind
 constraintKind = kindTyConType constraintKindTyCon
@@ -123,6 +123,8 @@ splitFunTy ::
   Type
   -> Maybe (Type, Type)
 splitFunTy (FunTy arg res) = Just (arg,res)
+splitFunTy (TyConApp tc [(FunTy arg res)])
+  | tc == syncPrimTyCon    = Just (arg, TyConApp tc [res])
 splitFunTy _               = Nothing
 
 isFunTy ::

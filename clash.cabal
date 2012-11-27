@@ -97,7 +97,9 @@ Library
 
                        CLaSH.Netlist
                        CLaSH.Netlist.BlackBox
+                       CLaSH.Netlist.BlackBox.Parser
                        CLaSH.Netlist.BlackBox.Types
+                       CLaSH.NetList.BlackBox.Util
                        CLaSH.Netlist.Id
                        CLaSH.Netlist.Types
                        CLaSH.Netlist.Util

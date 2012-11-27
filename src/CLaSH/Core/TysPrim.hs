@@ -1,7 +1,7 @@
 module CLaSH.Core.TysPrim where
 
 -- External Modules
-import Unbound.LocallyNameless         (makeName)
+import Unbound.LocallyNameless         (makeName,string2Name)
 
 -- GHC API
 import qualified PrelNames
@@ -44,6 +44,9 @@ intPrimTyCon  = pcPrimTyCon0 intPrimTyConName IntRep
 
 addrPrimTyCon :: TyCon
 addrPrimTyCon = pcPrimTyCon0 addrPrimTyConName AddrRep
+
+syncPrimTyCon :: TyCon
+syncPrimTyCon = mkPrimTyCon (string2Name "CLaSH.Signal.Sync") (FunTy liftedTypeKind liftedTypeKind) 1 VoidRep
 
 liftedTypeKind, unliftedTypeKind :: Kind
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon

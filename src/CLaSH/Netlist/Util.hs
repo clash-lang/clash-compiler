@@ -40,6 +40,17 @@ typeToHWType_fail ::
   -> HWType
 typeToHWType_fail = either error id . typeToHWType
 
+synchronizedClk ::
+  Type
+  -> Maybe Identifier
+synchronizedClk ty
+  | not . null . typeFreeVars $ ty = Nothing
+  | Just (tyCon,args) <- splitTyConAppM ty
+  , (name2String $ tyConName tyCon) == "CLaSH.Signal.Sync"
+  = Just (pack "clk")
+  | otherwise
+  = Nothing
+
 typeToHWType ::
   Type
   -> Either String HWType
@@ -88,7 +99,7 @@ singletonToHWType ty = case splitTyConAppM ty of
 tyNatSize ::
   Type
   -> Int
-tyNatSize (LitTy (NumTyLit i)) = fromInteger i
+tyNatSize (LitTy (NumTyLit i)) =  i
 tyNatSize t = error $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
 
 mkADT ::

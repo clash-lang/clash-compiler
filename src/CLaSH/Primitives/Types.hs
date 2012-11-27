@@ -2,24 +2,21 @@
 module CLaSH.Primitives.Types where
 
 import Data.Aeson.TH        (deriveJSON)
-import Data.ByteString.Lazy as LB (ByteString)
-import Data.ByteString      as SB (ByteString)
+import Data.ByteString.Lazy (ByteString)
+import Data.Text.Lazy       (Text)
 import Data.Data
 import Data.HashMap.Lazy    (HashMap)
 
-type PrimMap = HashMap LB.ByteString Primitive
+type PrimMap = HashMap ByteString Primitive
 
 data Primitive
   = BlackBox
-  { name      :: LB.ByteString
-  , inputs    :: Int
-  , litInputs :: Int
-  , funInputs :: Int
-  , template  :: SB.ByteString
-  , templateI :: SB.ByteString
+  { name      :: ByteString
+  , template  :: Text
+  , templateI :: Text
   }
   | Primitive
-  { name     :: LB.ByteString
+  { name     :: ByteString
   , primType :: PrimType
   } deriving (Typeable, Data, Show)
 
