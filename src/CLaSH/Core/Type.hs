@@ -26,7 +26,7 @@ where
 -- External import
 import qualified Data.HashMap.Lazy as HashMap
 import Data.Maybe (fromMaybe,isJust)
-import Unbound.LocallyNameless (Fresh,bind,runFreshM,unbind,name2Integer,unembed)
+import Unbound.LocallyNameless (Fresh,bind,name2Integer,name2String,runFreshM,unbind,unembed)
 
 -- Local imports
 import CLaSH.Core.Subst
@@ -124,7 +124,8 @@ splitFunTy ::
   -> Maybe (Type, Type)
 splitFunTy (FunTy arg res) = Just (arg,res)
 splitFunTy (TyConApp tc [(FunTy arg res)])
-  | tc == syncPrimTyCon    = Just (arg, TyConApp tc [res])
+  | name2String (tyConName tc) == "CLaSH.Signal.Sync"
+  = Just (arg, TyConApp tc [res])
 splitFunTy _               = Nothing
 
 isFunTy ::

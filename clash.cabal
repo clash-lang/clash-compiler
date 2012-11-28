@@ -58,7 +58,6 @@ Library
                        ghc                  >= 7.4.1 && < 7.9,
                        ghc-paths            >= 0.1.0.8,
                        hashable             >= 1.1.2.3,
-                       hastache             >= 0.4.1,
                        mtl                  >= 2.0.1.0,
                        pretty               >= 1.1.1.0,
                        template-haskell     >= 2.7.0.0,

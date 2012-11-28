@@ -42,8 +42,8 @@ mkBlackBoxContext resId args = do
   varInps               <- mapM (runMaybeT . mkInput resId) args'
   let (_,otherArgs)     = partitionEithers $ map unVar args'
   let (litArgs,funArgs) = partition (\(t,b) -> not b && isSimple t) otherArgs
-  litInps               <- mapM (runMaybeT. mkLitInput . fst) litArgs
-  let funInps           = map (mkFunInput . fst) funArgs
+  litInps               <- mapM (runMaybeT . mkLitInput . fst) litArgs
+  funInps               <- mapM (runMaybeT . mkFunInput resId . fst) funArgs
   return $ Context res (catMaybes varInps)
                        (catMaybes litInps)
                        (catMaybes funInps)
@@ -51,15 +51,6 @@ mkBlackBoxContext resId args = do
 unVar :: (Term, Bool) -> Either TmName (Term, Bool)
 unVar (Var v, False) = Left v
 unVar t              = Right t
-
-verifyBlackBoxContext ::
-  Line
-  -> BlackBoxContext
-  -> Bool
-verifyBlackBoxContext tmpl bbCtx =
-  ((length (B.inputs bbCtx) - 1)    == B.countArgs tmpl) &&
-  ((length (B.litInputs bbCtx) - 1) >= B.countLits tmpl) &&
-  ((length (B.funInputs bbCtx) - 1) >= B.countFuns tmpl)
 
 mkBlackBoxDecl ::
   Text
@@ -69,6 +60,7 @@ mkBlackBoxDecl templ bbCtx = do
   let (l,err) = runParse templ
   case (null err && verifyBlackBoxContext l bbCtx) of
     True -> do
+      i <- LabelM.gets varCount
       let (tmpl,clks) = renderBlackBox l bbCtx
       tell clks
       return [N.BlackBox tmpl]
@@ -99,6 +91,8 @@ mkInput resId (e@(App _ _), False)
             return (Left bb)
       _ -> error $ "No blackbox found: " ++ show bbM
 
+mkInput _ (_, True) = Left <$> (pure $ pack "__FUN__")
+
 mkInput _ (e, _) = Left <$> mkLitInput e
 
 mkLitInput ::
@@ -109,11 +103,22 @@ mkLitInput (C.Literal (IntegerLiteral i)) = return (pack $ show i)
 mkLitInput _                              = mzero
 
 mkFunInput ::
-  Term
-  -> Maybe Identifier
-mkFunInput e@(App _ _)
-  | (Prim (PrimFun nm _), _) <- collectArgs e
-  = let nmT = pack $ name2String nm
-    in Just nmT
+  Id
+  -> Term
+  -> MaybeT NetlistMonad (Line,BlackBoxContext)
+mkFunInput resId e@(App _ _)
+  | (Prim (PrimFun nm _), args) <- collectArgs e
+  = do
+    bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ LabelM.gets primitives
+    case bbM of
+      Just p@(P.BlackBox {}) -> do
+        bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
+        let (l,err) = runParse (template p)
+        if null err
+          then do
+            i <- getAndModify varCount (+1)
+            return (setSym (fromInteger i) l,bbCtx)
+          else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
+      _ -> error $ "No blackbox found: " ++ show bbM
 
-mkFunInput _ = Nothing
+mkFunInput _ _ = mzero

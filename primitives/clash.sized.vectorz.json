@@ -1,11 +1,25 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vmap",
       "template"  :
-"for n in (~RESULT'length - 1) downto 0 generate
+"~SYM_generate : for ~SYM in (~RESULT'length - 1) downto 0 generate
 begin
   ~INST 0
-    ~OUTPUT => ~RESULT(n)~
-    ~INPUT  => ~ARG[1](n)~
+    ~OUTPUT <= ~RESULT(~SYM)~
+    ~INPUT  <= ~ARG[1](~SYM)~
+  ~INST
+end generate;",
+      "templateI" : ""
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vzipWith",
+      "template"  :
+"~SYM_generate : for ~SYM in (~RESULT'length - 1) downto 0 generate
+begin
+  ~INST 0
+    ~OUTPUT <= ~RESULT(~SYM)~
+    ~INPUT  <= ~ARG[1](~SYM)~
+    ~INPUT  <= ~ARG[2](~SYM)~
   ~INST
 end generate;",
       "templateI" : ""

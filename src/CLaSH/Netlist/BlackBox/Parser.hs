@@ -33,7 +33,7 @@ pTag =  D <$> pDecl
 
 pDecl :: Parser Decl
 pDecl = Decl <$> (pKeyWS "~INST" *> pNatural) <*>
-        ((:) <$> pOutput <*> pList pInput) <* pKeyWS "~INST"
+        ((:) <$> pOutput <*> pList pInput) <* pKey "~INST"
 
 pOutput :: Parser Line
 pOutput = pKeyWS "~OUTPUT" *> pKeyWS "<=" *> pLine' <* pKeyWS "~"
@@ -49,6 +49,7 @@ pTag' =  O             <$  pKey "~RESULT"
      <|> (Clk Nothing) <$  pKey "~CLKO"
      <|> (Rst . Just)  <$> ((pKey "~RST") *> pBrackets pNatural)
      <|> (Rst Nothing) <$  pKey "~RSTO"
+     <|> (Sym 0)       <$ pKey "~SYM"
 
 pBrackets :: Parser a -> Parser a
 pBrackets p = pSym '[' *> p <* pSym ']'

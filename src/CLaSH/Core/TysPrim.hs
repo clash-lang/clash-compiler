@@ -45,9 +45,6 @@ intPrimTyCon  = pcPrimTyCon0 intPrimTyConName IntRep
 addrPrimTyCon :: TyCon
 addrPrimTyCon = pcPrimTyCon0 addrPrimTyConName AddrRep
 
-syncPrimTyCon :: TyCon
-syncPrimTyCon = mkPrimTyCon (string2Name "CLaSH.Signal.Sync") (FunTy liftedTypeKind liftedTypeKind) 1 VoidRep
-
 liftedTypeKind, unliftedTypeKind :: Kind
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
 liftedTypeKind   = kindTyConType liftedTypeKindTyCon

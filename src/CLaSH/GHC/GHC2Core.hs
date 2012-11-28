@@ -254,9 +254,9 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
             Just (Primitive _ Dictionary) ->
               return $ C.Prim (C.PrimDict xPrim xType)
             Just (Primitive f Function)
-              | f == pack "CLaSH.Signal.mapSync" -> return C.mapSyncTerm
-              | f == pack "CLaSH.Signal.appSync" -> return C.mapSyncTerm
-              | f == pack "CLaSH.Signal.sync"    -> return C.syncTerm
+              | f == pack "CLaSH.Signal.mapSync" -> return (C.mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.appSync" -> return (C.mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.sync"    -> return (C.syncTerm xType)
             Just (Primitive _ Function) ->
               return $ C.Prim (C.PrimFun  xPrim xType)
             Just (Primitive _ Constructor) ->

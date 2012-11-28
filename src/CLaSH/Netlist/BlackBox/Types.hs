@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveDataTypeable  #-}
-{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module CLaSH.Netlist.BlackBox.Types where
 
+import Control.Monad.Writer (MonadWriter,Writer)
 import Data.Text.Lazy (Text)
+
 import CLaSH.Netlist.Types
 
 data BlackBoxContext
@@ -10,7 +11,7 @@ data BlackBoxContext
   { result    :: SyncIdentifier
   , inputs    :: [SyncIdentifier]
   , litInputs :: [Identifier]
-  , funInputs :: [Identifier]
+  , funInputs :: [(Line,BlackBoxContext)]
   }
   deriving Show
 
@@ -23,7 +24,13 @@ data Element = C  Text
              | O
              | I   Int
              | L   Int
+             | Sym Int
              | Clk (Maybe Int)
              | Rst (Maybe Int)
+  deriving Show
 
 data Decl = Decl Int [Line]
+  deriving Show
+
+newtype BlackBoxMonad a = B { runB :: Writer [(Identifier,HWType)] a }
+  deriving (Functor, Monad, MonadWriter [(Identifier,HWType)])

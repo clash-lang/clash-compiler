@@ -2,7 +2,7 @@ module CLaSH.Core.Util where
 
 import Data.Maybe                     (fromMaybe)
 import qualified Data.HashMap.Lazy as HashMap
-import Unbound.LocallyNameless        (Fresh,bind,embed,unbind,unembed,unrec,string2Name)
+import Unbound.LocallyNameless        (Fresh,bind,embed,runFreshM,unbind,unembed,unrec,string2Name)
 
 import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
@@ -12,7 +12,7 @@ import CLaSH.Core.TyCon   (PrimRep(..),mkPrimTyCon)
 import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
   applyTy)
 import CLaSH.Core.TypeRep (Type(..))
-import CLaSH.Core.TysPrim (liftedTypeKind,syncPrimTyCon)
+import CLaSH.Core.TysPrim (liftedTypeKind)
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
 
@@ -178,25 +178,32 @@ isPrimFun ::
 isPrimFun (Prim (PrimFun _ _)) = True
 isPrimFun _                    = False
 
-mapSyncTerm :: Term
-mapSyncTerm
-  = let aTV = TyVar (string2Name "a") (embed liftedTypeKind)
-        bTV = TyVar (string2Name "b") (embed liftedTypeKind)
-        aTy = TyConApp syncPrimTyCon [TyVarTy (varName aTV)]
-        bTy = TyConApp syncPrimTyCon [TyVarTy (varName bTV)]
-        fId = Id (string2Name "f") (embed $ FunTy aTy bTy)
-        xId = Id (string2Name "x") (embed $ aTy)
+mapSyncTerm ::
+  Type
+  -> Term
+mapSyncTerm (ForAllTy tvATy) =
+  let (aTV,bTV,FunTy _ (FunTy aTy bTy)) = runFreshM $ do
+                { (aTV,ForAllTy tvBTy) <- unbind tvATy
+                ; (bTV,funTy)          <- unbind tvBTy
+                ; return (aTV,bTV,funTy) }
+      fId = Id (string2Name "f") (embed $ FunTy aTy bTy)
+      xId = Id (string2Name "x") (embed aTy)
   in TyLam $ bind aTV $
      TyLam $ bind bTV $
      Lam   $ bind fId $
      Lam   $ bind xId $
      App (Var $ varName fId) (Var $ varName xId)
 
-syncTerm :: Term
-syncTerm
-  = let aTV = TyVar (string2Name "a") (embed liftedTypeKind)
-        aTy = TyConApp syncPrimTyCon [TyVarTy (varName aTV)]
-        xId = Id (string2Name "x") (embed aTy)
+mapSyncTerm ty = error $ $(curLoc) ++ show ty
+
+syncTerm ::
+  Type
+  -> Term
+syncTerm (ForAllTy tvTy) =
+  let (aTV,FunTy varTy aTy) = runFreshM $ unbind tvTy
+      xId = Id (string2Name "x") (embed aTy)
   in TyLam $ bind aTV $
      Lam   $ bind xId $
-     (Var $ varName xId)
+     Var   $ varName xId
+
+syncTerm ty = error $ $(curLoc) ++ show ty
