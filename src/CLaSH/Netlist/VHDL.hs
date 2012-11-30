@@ -114,15 +114,10 @@ decl _ = Nothing
 
 insts :: [Declaration] -> Doc
 insts [] = empty
-insts is = vcat . catMaybes $ zipWith inst gensyms is
---    case catMaybes $ zipWith inst gensyms is of
---      []  -> empty
---      is' -> (vcat $ punctuate semi is') <> semi
-  where
-    gensyms = ["proc" <> int i | i <- [0..]]
+insts is = vcat . catMaybes $ map inst is
 
-inst :: Doc -> Declaration -> Maybe Doc
-inst _ (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = Just $
+inst :: Declaration -> Maybe Doc
+inst (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = Just $
     text id_ <+> larrow <+> assignExpr <> semi
   where
     argTys     = snd $ args !! i
@@ -130,24 +125,24 @@ inst _ (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = Just $
     argExprs   = zipWith toSLV argTys $ map expr es
     assignExpr = hcat $ punctuate (" & ") (dcExpr:argExprs)
 
-inst _ (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = Just $
+inst (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = Just $
     text id_ <+> larrow <+> assignExpr <> semi
   where
     assignExpr = expr (dcToExpr ty i)
 
-inst _ (Assignment id_ Nothing _ [e]) = Just $
+inst (Assignment id_ Nothing _ [e]) = Just $
   text id_ <+> larrow <+> expr e <> semi
 
-inst _ (InstDecl nm lbl pms) = Just $
+inst (InstDecl nm lbl pms) = Just $
     nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"
               <+> text nm <$$> pms' <> semi
   where
     pms' = nest 2 $ "port map" <$$>
             tupled [text i <+> "=>" <+> expr e | (i,e) <- pms]
 
-inst _ (BlackBox bs) = Just $ text bs
+inst (BlackBox bs) = Just $ text bs
 
-inst _ _ = Nothing
+inst _ = Nothing
 
 expr :: Expr -> Doc
 expr (Literal sizeM lit)    = exprLit sizeM lit

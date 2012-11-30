@@ -10,9 +10,10 @@ import           Data.Either       (lefts,partitionEithers)
 import qualified Data.HashMap.Lazy as HashMap
 import           Data.List         (partition)
 import qualified Data.Label.PureM  as LabelM
-import           Data.Maybe        (catMaybes)
+import           Data.Maybe        (catMaybes,fromJust)
 import           Data.Text.Lazy    (Text,pack)
 import qualified Data.Text.Lazy    as Text
+import Text.PrettyPrint.Leijen.Text ()
 import           Unbound.LocallyNameless (name2String)
 
 import CLaSH.Core.Literal            as L (Literal(..))
@@ -21,12 +22,14 @@ import CLaSH.Core.Term               as C (Term(..),TmName)
 import CLaSH.Core.Util               (collectArgs,isFun)
 import CLaSH.Core.Var                as V (Id,Var(..))
 import CLaSH.Normalize.Util          (isSimple)
+import {-# SOURCE #-} CLaSH.Netlist  (genComponent)
 import CLaSH.Netlist.BlackBox.Parser as B
 import CLaSH.Netlist.BlackBox.Types  as B
 import CLaSH.Netlist.BlackBox.Util   as B
 import CLaSH.Netlist.Id              as N
 import CLaSH.Netlist.Types           as N
 import CLaSH.Netlist.Util            as N
+import CLaSH.Netlist.VHDL            as N
 import CLaSH.Primitives.Types        as P
 import CLaSH.Util
 
@@ -106,9 +109,8 @@ mkFunInput ::
   Id
   -> Term
   -> MaybeT NetlistMonad (Line,BlackBoxContext)
-mkFunInput resId e@(App _ _)
-  | (Prim (PrimFun nm _), args) <- collectArgs e
-  = do
+mkFunInput resId e = case (collectArgs e) of
+  (Prim (PrimFun nm _), args) -> do
     bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ LabelM.gets primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do
@@ -120,5 +122,23 @@ mkFunInput resId e@(App _ _)
             return (setSym (fromInteger i) l,bbCtx)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ show bbM
-
-mkFunInput _ _ = mzero
+  (Var fun, args) -> do
+    bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
+    (Component compName hidden compInps compOutp _) <- lift $
+      do vCnt <- LabelM.gets varCount
+         vEnv <- LabelM.gets varEnv
+         comp <- genComponent fun Nothing
+         LabelM.puts varCount vCnt
+         LabelM.puts varEnv vEnv
+         return comp
+    let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
+        inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [0..] ]
+        outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
+    i <- getAndModify varCount (+1)
+    let decl          = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
+        templ         = pack . show . fromJust $ inst decl
+        (line,err)    = runParse templ
+    if (null err)
+      then return (line,bbCtx)
+      else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
+  _ -> error (show e)
