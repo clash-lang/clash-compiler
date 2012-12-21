@@ -58,6 +58,7 @@ Library
                        ghc                  >= 7.4.1 && < 7.9,
                        ghc-paths            >= 0.1.0.8,
                        hashable             >= 1.1.2.3,
+                       listlike-instances   >= 0.2.3.1,
                        mtl                  >= 2.0.1.0,
                        pretty               >= 1.1.1.0,
                        template-haskell     >= 2.7.0.0,
@@ -65,6 +66,7 @@ Library
                        transformers         >= 0.2.2.0,
                        unbound              >= 0.4.0.2,
                        unordered-containers >= 0.2.1.0,
+                       uu-parsinglib        >= 2.7.4,
                        wl-pprint-text       >= 1.0.0.0
 
   Other-modules:       CLaSH.Core.DataCon
@@ -98,7 +100,7 @@ Library
                        CLaSH.Netlist.BlackBox
                        CLaSH.Netlist.BlackBox.Parser
                        CLaSH.Netlist.BlackBox.Types
-                       CLaSH.NetList.BlackBox.Util
+                       CLaSH.Netlist.BlackBox.Util
                        CLaSH.Netlist.Id
                        CLaSH.Netlist.Types
                        CLaSH.Netlist.Util
