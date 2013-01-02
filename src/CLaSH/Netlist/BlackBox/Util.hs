@@ -89,7 +89,7 @@ mkSyncIdentifier _ (C t)          = return $ Left t
 mkSyncIdentifier b O              = return $ result b
 mkSyncIdentifier b (I n)          = return $ (inputs b)!!n
 mkSyncIdentifier b (L n)          = return $ Left $ (litInputs b)!!n
-mkSyncIdentifier b (Sym n)        = return $ Left $ Text.pack ("n_" ++ show n)
+mkSyncIdentifier _ (Sym n)        = return $ Left $ Text.pack ("n_" ++ show n)
 mkSyncIdentifier b (Clk Nothing)  = let t = clkSyncId $ result b
                                     in tell [(t,Bit)] >> return (Left t)
 mkSyncIdentifier b (Clk (Just n)) = let t = clkSyncId $ (inputs b)!!n
@@ -98,4 +98,4 @@ mkSyncIdentifier b (Rst Nothing)  = let t = (`Text.append` (Text.pack "_rst")) .
                                     in tell [(t,Bit)] >> return (Left t)
 mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ (inputs b)!!n
                                     in tell [(t,Bit)] >> return (Left t)
-
+mkSyncIdentifier b (D _)          = error $ $(curLoc) ++ "Unexpected component declaration"

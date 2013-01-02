@@ -34,7 +34,7 @@ type Label      = Identifier
 data Component
   = Component
   { componentName :: Identifier
-  , hidden        :: [(Identifier,HWType)]
+  , hiddenPorts   :: [(Identifier,HWType)]
   , inputs        :: [(Identifier,HWType)]
   , output        :: (Identifier,HWType)
   , declarations  :: [Declaration]

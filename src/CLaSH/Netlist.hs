@@ -2,7 +2,7 @@ module CLaSH.Netlist where
 
 import qualified Control.Monad           as Monad
 import           Control.Monad.State     (runStateT)
-import           Control.Monad.Writer    (runWriterT,listen,tell)
+import           Control.Monad.Writer    (runWriterT,listen)
 import qualified Data.ByteString.Lazy.Char8 as LZ
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Lazy       (HashMap)

@@ -1,7 +1,7 @@
 module CLaSH.Core.TysPrim where
 
 -- External Modules
-import Unbound.LocallyNameless         (makeName,string2Name)
+import Unbound.LocallyNameless         (makeName)
 
 -- GHC API
 import qualified PrelNames

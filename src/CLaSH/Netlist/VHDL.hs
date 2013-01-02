@@ -32,16 +32,17 @@ tyPackage cName tys = imports <$> linebreak <>
                 ]
 
 needsTyDec :: HWType -> [HWType]
-needsTyDec ty@(Vector n elTy) = needsTyDec elTy ++ [ty]
+needsTyDec ty@(Vector _ elTy) = needsTyDec elTy ++ [ty]
 needsTyDec _                  = []
 
 tyDec :: HWType -> Doc
-tyDec (Vector n elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
+tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
+tyDec _               = empty
 
 tyName :: HWType -> Doc
 tyName (Vector n elTy) = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)      = "signed_" <> int n
-tyName _ = empty
+tyName _               = empty
 
 tyImports :: Text -> Doc
 tyImports compName = vcat $ map (<> semi)
@@ -67,7 +68,7 @@ entity c =
     ports = [ text i <+> colon <+> "in" <+> vhdlType ty
             | (i,ty) <- inputs c ] ++
             [ text i <+> colon <+> "in" <+> vhdlType ty
-            | (i,ty) <- hidden c ] ++
+            | (i,ty) <- hiddenPorts c ] ++
             [ text (fst $ output c) <+> colon <+> "out" <+> vhdlType (snd $ output c)
             ]
 

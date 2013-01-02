@@ -3,7 +3,7 @@ module CLaSH.Netlist.BlackBox.Parser
 where
 
 import Data.Text.Lazy (Text,pack)
-import Data.ListLike.Text.TextLazy
+import Data.ListLike.Text.TextLazy ()
 import Text.ParserCombinators.UU
 import qualified Text.ParserCombinators.UU.Core as PCC (parse)
 import Text.ParserCombinators.UU.BasicInstances hiding (Parser)

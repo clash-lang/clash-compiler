@@ -8,11 +8,9 @@ import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.TyCon   (PrimRep(..),mkPrimTyCon)
 import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
   applyTy)
 import CLaSH.Core.TypeRep (Type(..))
-import CLaSH.Core.TysPrim (liftedTypeKind)
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
 import CLaSH.Util
 
@@ -183,9 +181,9 @@ mapSyncTerm ::
   -> Term
 mapSyncTerm (ForAllTy tvATy) =
   let (aTV,bTV,FunTy _ (FunTy aTy bTy)) = runFreshM $ do
-                { (aTV,ForAllTy tvBTy) <- unbind tvATy
-                ; (bTV,funTy)          <- unbind tvBTy
-                ; return (aTV,bTV,funTy) }
+                { (aTV',ForAllTy tvBTy) <- unbind tvATy
+                ; (bTV',funTy)          <- unbind tvBTy
+                ; return (aTV',bTV',funTy) }
       fId = Id (string2Name "f") (embed $ FunTy aTy bTy)
       xId = Id (string2Name "x") (embed aTy)
   in TyLam $ bind aTV $
@@ -200,7 +198,7 @@ syncTerm ::
   Type
   -> Term
 syncTerm (ForAllTy tvTy) =
-  let (aTV,FunTy varTy aTy) = runFreshM $ unbind tvTy
+  let (aTV,FunTy _ aTy) = runFreshM $ unbind tvTy
       xId = Id (string2Name "x") (embed aTy)
   in TyLam $ bind aTV $
      Lam   $ bind xId $

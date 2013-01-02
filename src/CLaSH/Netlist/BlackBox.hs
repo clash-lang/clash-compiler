@@ -63,7 +63,6 @@ mkBlackBoxDecl templ bbCtx = do
   let (l,err) = runParse templ
   case (null err && verifyBlackBoxContext l bbCtx) of
     True -> do
-      i <- LabelM.gets varCount
       let (tmpl,clks) = renderBlackBox l bbCtx
       tell clks
       return [N.BlackBox tmpl]
@@ -132,11 +131,11 @@ mkFunInput resId e = case (collectArgs e) of
          LabelM.puts varEnv vEnv
          return comp
     let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-        inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [0..] ]
+        inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
         outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
     i <- getAndModify varCount (+1)
-    let decl          = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
-        templ         = pack . show . fromJust $ inst decl
+    let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
+        templ         = pack . show . fromJust $ inst instDecl
         (line,err)    = runParse templ
     if (null err)
       then return (line,bbCtx)
