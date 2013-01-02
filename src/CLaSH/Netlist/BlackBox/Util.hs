@@ -1,9 +1,12 @@
 module CLaSH.Netlist.BlackBox.Util where
 
-import Control.Monad.Writer (tell,runWriter)
-import Data.Foldable (foldrM)
-import qualified Data.List as List
-import Data.Text.Lazy (Text)
+import Control.Monad.State      (State,runState)
+import Control.Monad.Writer     (tell,runWriter)
+import Control.Lens             (_1,_2,use,(%=),(+=),at)
+import Data.Foldable            (foldrM)
+import qualified Data.IntMap    as IntMap
+import qualified Data.List      as List
+import Data.Text.Lazy           (Text)
 import qualified Data.Text.Lazy as Text
 
 import CLaSH.Netlist.BlackBox.Types
@@ -41,12 +44,24 @@ countFuns :: Line -> Int
 countFuns [] = -1
 countFuns l  = maximum $ map (\e -> case e of { D (Decl n _) -> n; _ -> (-1) }) l
 
-setSym :: Int -> Line -> Line
-setSym i = map (\e -> case e of
-                      Sym _ -> Sym i
-                      D (Decl n l) -> D (Decl n $ map (setSym i) l)
-                      _ -> e
-               )
+setSym :: Int -> Line -> (Line,Int)
+setSym i l
+  = second fst
+  $ runState (setSym' l) (i,IntMap.empty)
+  where
+    setSym' :: Line -> State (Int,IntMap.IntMap Int) Line
+    setSym' = mapM (\e -> case e of
+                      Sym i'        -> do symM <- use (_2 . at i')
+                                          case symM of
+                                            Nothing -> do k <- use _1
+                                                          _1 += 1
+                                                          _2 %= (IntMap.insert i' k)
+                                                          return (Sym k)
+                                            Just k  -> return (Sym k)
+                      D (Decl n l') -> D <$> (Decl n <$> mapM setSym' l')
+                      _             -> pure e
+              )
+
 
 clkSyncId :: SyncIdentifier -> Identifier
 clkSyncId (Right (_,clk)) = clk

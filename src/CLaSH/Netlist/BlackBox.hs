@@ -117,8 +117,10 @@ mkFunInput resId e = case (collectArgs e) of
         let (l,err) = runParse (template p)
         if null err
           then do
-            i <- getAndModify varCount (+1)
-            return (setSym (fromInteger i) l,bbCtx)
+            i <- LabelM.gets varCount
+            let (l',i') = setSym (fromInteger i) l
+            LabelM.puts varCount (toInteger i')
+            return (l',bbCtx)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ show bbM
   (Var fun, args) -> do

@@ -58,6 +58,7 @@ Library
                        ghc                  >= 7.4.1 && < 7.9,
                        ghc-paths            >= 0.1.0.8,
                        hashable             >= 1.1.2.3,
+                       lens                 >= 3.7.1,
                        listlike-instances   >= 0.2.3.1,
                        mtl                  >= 2.0.1.0,
                        pretty               >= 1.1.1.0,
