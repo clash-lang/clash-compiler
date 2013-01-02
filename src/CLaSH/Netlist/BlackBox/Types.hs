@@ -32,5 +32,5 @@ data Element = C  Text
 data Decl = Decl Int [Line]
   deriving Show
 
-newtype BlackBoxMonad a = B { runB :: Writer [(Identifier,HWType)] a }
+newtype BlackBoxMonad a = B { runBlackBoxM :: Writer [(Identifier,HWType)] a }
   deriving (Functor, Monad, MonadWriter [(Identifier,HWType)])

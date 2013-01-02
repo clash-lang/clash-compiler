@@ -74,7 +74,7 @@ renderBlackBox ::
 renderBlackBox l bbCtx
   = (Text.concat >< List.nub)
   $ runWriter
-  $ runB
+  $ runBlackBoxM
   $ mapM (renderElem bbCtx) l
 
 renderElem :: BlackBoxContext -> Element -> BlackBoxMonad Text
