@@ -1,7 +1,6 @@
-[ { "BlackBox" :
+[ { "Primitive" :
     { "name"      : "GHC.TypeLits.Sing",
-      "template"  : "",
-      "templateI" : ""
+      "primType"  : { "Dictionary" : [] }
     }
   }
 ]

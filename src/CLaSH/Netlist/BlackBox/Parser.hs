@@ -43,13 +43,13 @@ pInput = pKeyWS "~INPUT" *> pKeyWS "<=" *> pLine' <* pKeyWS "~"
 
 pTag' :: Parser Element
 pTag' =  O             <$  pKey "~RESULT"
-     <|> I             <$> ((pKey "~ARG") *> pBrackets pNatural)
-     <|> I             <$> ((pKey "~LIT") *> pBrackets pNatural)
-     <|> (Clk . Just)  <$> ((pKey "~CLK") *> pBrackets pNatural)
+     <|> I             <$> (pKey "~ARG" *> pBrackets pNatural)
+     <|> I             <$> (pKey "~LIT" *> pBrackets pNatural)
+     <|> (Clk . Just)  <$> (pKey "~CLK" *> pBrackets pNatural)
      <|> (Clk Nothing) <$  pKey "~CLKO"
-     <|> (Rst . Just)  <$> ((pKey "~RST") *> pBrackets pNatural)
+     <|> (Rst . Just)  <$> (pKey "~RST" *> pBrackets pNatural)
      <|> (Rst Nothing) <$  pKey "~RSTO"
-     <|> (Sym 0)       <$ pKey "~SYM"
+     <|> Sym           <$> (pKey "~SYM" *> pBrackets pNatural)
 
 pBrackets :: Parser a -> Parser a
 pBrackets p = pSym '[' *> p <* pSym ']'
