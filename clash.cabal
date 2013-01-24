@@ -40,6 +40,8 @@ Library
                        CLaSH.Class.Default
                        CLaSH.Driver
                        CLaSH.Prelude
+                       CLaSH.Promoted.Bool
+                       CLaSH.Promoted.Ord
                        CLaSH.Signal
                        CLaSH.Sized.Index
                        CLaSH.Sized.Signed

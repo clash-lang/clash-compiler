@@ -14,7 +14,7 @@ import           Data.Maybe        (catMaybes,fromJust)
 import           Data.Text.Lazy    (Text,pack)
 import qualified Data.Text.Lazy    as Text
 import Text.PrettyPrint.Leijen.Text ()
-import           Unbound.LocallyNameless (name2String)
+import           Unbound.LocallyNameless (name2String,unembed)
 
 import CLaSH.Core.Literal            as L (Literal(..))
 import CLaSH.Core.Prim               (Prim (..))
@@ -39,6 +39,7 @@ mkBlackBoxContext ::
   -> NetlistMonad BlackBoxContext
 mkBlackBoxContext resId args = do
   let res               = Left . mkBasicId . pack $ name2String (V.varName resId)
+  let resTy             = N.typeToHWType_fail $ unembed $ V.varType resId
   gamma                 <- LabelM.gets varEnv
   isFunArgs             <- mapM (isFun gamma) args
   let args'             = zip args isFunArgs
@@ -47,9 +48,9 @@ mkBlackBoxContext resId args = do
   let (litArgs,funArgs) = partition (\(t,b) -> not b && isSimple t) otherArgs
   litInps               <- mapM (runMaybeT . mkLitInput . fst) litArgs
   funInps               <- mapM (runMaybeT . mkFunInput resId . fst) funArgs
-  return $ Context res (catMaybes varInps)
-                       (catMaybes litInps)
-                       (catMaybes funInps)
+  return $ Context (res,resTy) (catMaybes varInps)
+                               (catMaybes litInps)
+                               (catMaybes funInps)
 
 unVar :: (Term, Bool) -> Either TmName (Term, Bool)
 unVar (Var v, False) = Left v
@@ -63,7 +64,10 @@ mkBlackBoxDecl templ bbCtx = do
   let (l,err) = runParse templ
   case (null err && verifyBlackBoxContext l bbCtx) of
     True -> do
-      let (tmpl,clks) = renderBlackBox l bbCtx
+      i <- LabelM.gets varCount
+      let (l',i') = setSym (fromInteger i) l
+      LabelM.puts varCount (toInteger i')
+      let (tmpl,clks) = renderBlackBox l' bbCtx
       tell clks
       return [N.BlackBox tmpl]
     False -> error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show templ ++ "\ngiven errors:\n" ++ show err
@@ -71,13 +75,14 @@ mkBlackBoxDecl templ bbCtx = do
 mkInput ::
   Id
   -> (Term, Bool)
-  -> MaybeT NetlistMonad SyncIdentifier
+  -> MaybeT NetlistMonad (SyncIdentifier,HWType)
 mkInput _ ((Var v), False) = do
   let vT = mkBasicId . pack $ name2String v
   ty <- fmap (HashMap.! v) $ LabelM.gets varEnv
+  let hwTy = N.typeToHWType_fail ty
   case synchronizedClk ty of
-    Just clk -> return (Right (vT,clk))
-    Nothing  -> return (Left vT)
+    Just clk -> return ((Right (vT,clk)), hwTy)
+    Nothing  -> return ((Left vT), hwTy)
 
 mkInput resId (e@(App _ _), False)
   | (Prim (PrimFun nm _), args) <- collectArgs e
@@ -90,12 +95,14 @@ mkInput resId (e@(App _ _), False)
           True -> error $ $(curLoc) ++ "Can't create inlined blackbox: " ++ show p
           False -> do
             (N.BlackBox bb:_) <- lift $ mkBlackBoxDecl (templateI p) bbCtx
-            return (Left bb)
+            let hwTy = error $ $(curLoc) ++ "No Type"
+            return (Left bb, hwTy)
       _ -> error $ "No blackbox found: " ++ show bbM
 
-mkInput _ (_, True) = Left <$> (pure $ pack "__FUN__")
+mkInput _ (_, True) = return (Left $ pack "__FUN__", error $ $(curLoc) ++ "No Type")
 
-mkInput _ (e, _) = Left <$> mkLitInput e
+mkInput _ (e, _)    = do e' <- mkLitInput e
+                         return (Left e', error $ $(curLoc) ++ "No Type")
 
 mkLitInput ::
   Monad m

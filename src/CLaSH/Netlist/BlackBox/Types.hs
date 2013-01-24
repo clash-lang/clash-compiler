@@ -8,8 +8,8 @@ import CLaSH.Netlist.Types
 
 data BlackBoxContext
   = Context
-  { result    :: SyncIdentifier
-  , inputs    :: [SyncIdentifier]
+  { result    :: (SyncIdentifier,HWType)
+  , inputs    :: [(SyncIdentifier,HWType)]
   , litInputs :: [Identifier]
   , funInputs :: [(Line,BlackBoxContext)]
   }
@@ -27,6 +27,7 @@ data Element = C  Text
              | Sym Int
              | Clk (Maybe Int)
              | Rst (Maybe Int)
+             | Typ (Maybe Int)
   deriving Show
 
 data Decl = Decl Int [Line]
