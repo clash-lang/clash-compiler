@@ -17,8 +17,8 @@ module CLaSH.Sized.VectorZ
   , vreverse, vmap, vzipWith
   , vfoldl, vfoldr, vfoldl1
   , vzip, vunzip
-  , vindex, vindexM, unsafeIndex
-  , vreplace, vreplaceM, unsafeReplace
+  , vindex, vindexM
+  , vreplace, vreplaceM
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopyE, vcopy, viterateE, viterate, vgenerateE, vgenerate
   , toList, v
@@ -31,7 +31,6 @@ import Language.Haskell.TH.Syntax (Lift(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 import CLaSH.Class.Default
-import CLaSH.Sized.Index
 
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
@@ -154,23 +153,15 @@ vunzip Nil = (Nil,Nil)
 vunzip ((a,b) :> xs) = let (as,bs) = vunzip xs
                        in  (a :> as, b :> bs)
 
-vindex :: Vec n a -> Index n -> a
-vindex (x :> _)  O     = x
-vindex (_ :> xs) (S k) = vindex xs k
-
 vindexM :: (Num i, Eq i) => Vec n a -> i -> Maybe a
 vindexM Nil       _ = Nothing
 vindexM (x :> _)  0 = Just x
 vindexM (_ :> xs) n = vindexM xs (n-1)
 
-unsafeIndex :: (Num i, Eq i) => Vec n a -> i -> a
-unsafeIndex xs i = case vindexM xs i of
+vindex :: (Num i, Eq i) => Vec n a -> i -> a
+vindex xs i = case vindexM xs i of
   Just a  -> a
   Nothing -> error "index out of bounds"
-
-vreplace :: Vec n a -> Index n -> a -> Vec n a
-vreplace (_ :> xs) O     y = y :> xs
-vreplace (x :> xs) (S k) y = x :> vreplace xs k y
 
 vreplaceM :: (Num i, Eq i) => Vec n a -> i -> a -> Maybe (Vec n a)
 vreplaceM Nil       _ _ = Nothing
@@ -179,8 +170,8 @@ vreplaceM (x :> xs) n y = case vreplaceM xs (n-1) y of
                                 Just xs' -> Just (x :> xs')
                                 Nothing  -> Nothing
 
-unsafeReplace :: (Num i, Eq i) => Vec n a -> i -> a -> Vec n a
-unsafeReplace xs i a = case vreplaceM xs i a of
+vreplace :: (Num i, Eq i) => Vec n a -> i -> a -> Vec n a
+vreplace xs i a = case vreplaceM xs i a of
   Just ys -> ys
   Nothing -> error "index out of bounds"
 
