@@ -25,4 +25,35 @@ end generate;",
       "templateI" : ""
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vfoldl",
+      "template"  :
+"
+~SYM[0]_block : block
+  signal ~SYM[1] : ~TYP[2];
+begin
+  ~SYM[1](~SYM[1]'high) <= ~ARG[1];
+
+  ~SYM[2]_generate : for ~SYM[3] in (~RESULT'length - 1) downto 0 generate
+  begin
+    ~SYM[4]_generate : if ~SYM[3] /= 0 generate
+      ~INST 0
+        ~OUTPUT <= ~SYM[1](~SYM[3]-1)~
+        ~INPUT  <= ~SYM[1](~SYM[3])~
+        ~INPUT  <= ~ARG[2](~SYM[3])~
+      ~INST
+    end generate;
+
+    ~SYM[5]_generate : if ~SYM[3] = 0 generate
+      ~INST 0
+        ~OUTPUT <= ~RESULT~
+        ~INPUT  <= ~SYM[1](~SYM[3])~
+        ~INPUT  <= ~ARG[2](~SYM[3])~
+      ~INST
+    end generate;
+  end generate;
+end block;",
+      "templateI" : ""
+    }
+  }
 ]

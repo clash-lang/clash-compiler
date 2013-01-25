@@ -115,7 +115,7 @@ decl _ = Nothing
 
 insts :: [Declaration] -> Doc
 insts [] = empty
-insts is = vcat . catMaybes $ map inst is
+insts is = vcat . map (<> linebreak) . catMaybes $ map inst is
 
 inst :: Declaration -> Maybe Doc
 inst (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = Just $
@@ -141,7 +141,7 @@ inst (InstDecl nm lbl pms) = Just $
     pms' = nest 2 $ "port map" <$$>
             tupled [text i <+> "=>" <+> expr e | (i,e) <- pms]
 
-inst (BlackBox bs) = Just $ text bs
+inst (BlackBox bs) = Just $ string bs
 
 inst _ = Nothing
 

@@ -50,6 +50,8 @@ pTag' =  O             <$  pKey "~RESULT"
      <|> (Rst . Just)  <$> (pKey "~RST" *> pBrackets pNatural)
      <|> (Rst Nothing) <$  pKey "~RSTO"
      <|> Sym           <$> (pKey "~SYM" *> pBrackets pNatural)
+     <|> (Typ Nothing) <$  pKey "~TYPO"
+     <|> (Typ . Just)  <$> (pKey "~TYP" *> pBrackets pNatural)
 
 pBrackets :: Parser a -> Parser a
 pBrackets p = pSym '[' *> p <* pSym ']'

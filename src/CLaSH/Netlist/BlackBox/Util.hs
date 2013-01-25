@@ -8,9 +8,11 @@ import qualified Data.IntMap    as IntMap
 import qualified Data.List      as List
 import Data.Text.Lazy           (Text)
 import qualified Data.Text.Lazy as Text
+import Text.PrettyPrint.Leijen.Text (renderOneLine,displayT)
 
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Netlist.Types (Identifier,HWType(..))
+import CLaSH.Netlist.VHDL  (vhdlType)
 import CLaSH.Util
 
 verifyBlackBoxContext ::
@@ -89,28 +91,32 @@ renderElem b (D (Decl n (l:ls))) = do
 
 renderElem b e = fmap (either id fst) $ mkSyncIdentifier b e
 
-lineToIdentifier :: BlackBoxContext -> Line -> BlackBoxMonad SyncIdentifier
-lineToIdentifier b = foldrM (\e a -> do
+lineToIdentifier :: BlackBoxContext -> Line -> BlackBoxMonad (SyncIdentifier,HWType)
+lineToIdentifier b = foldrM (\e (a,_) -> do
                               e' <- mkSyncIdentifier  b e
                               case (e', a) of
-                                (Left t, Left t')             -> return $ Left  (t `Text.append` t')
-                                (Left t, Right (t',clk))      -> return $ Right (t `Text.append` t',clk)
-                                (Right (t,clk), Left t')      -> return $ Right (t `Text.append` t',clk)
-                                (Right (t,clk), Right (t',_)) -> return $ Right (t `Text.append` t',clk)
-                   ) (Left Text.empty)
+                                (Left t, Left t')             -> return $ (Left  (t `Text.append` t'), ty)
+                                (Left t, Right (t',clk))      -> return $ (Right (t `Text.append` t',clk), ty)
+                                (Right (t,clk), Left t')      -> return $ (Right (t `Text.append` t',clk), ty)
+                                (Right (t,clk), Right (t',_)) -> return $ (Right (t `Text.append` t',clk), ty)
+                   ) (Left Text.empty,ty)
+  where
+    ty = error $ $(curLoc) ++ "No Type"
 
 mkSyncIdentifier :: BlackBoxContext -> Element -> BlackBoxMonad SyncIdentifier
 mkSyncIdentifier _ (C t)          = return $ Left t
-mkSyncIdentifier b O              = return $ result b
-mkSyncIdentifier b (I n)          = return $ (inputs b)!!n
+mkSyncIdentifier b O              = return $ fst $ result b
+mkSyncIdentifier b (I n)          = return $ fst $ (inputs b)!!n
 mkSyncIdentifier b (L n)          = return $ Left $ (litInputs b)!!n
 mkSyncIdentifier _ (Sym n)        = return $ Left $ Text.pack ("n_" ++ show n)
-mkSyncIdentifier b (Clk Nothing)  = let t = clkSyncId $ result b
+mkSyncIdentifier b (Clk Nothing)  = let t = clkSyncId $ fst $ result b
                                     in tell [(t,Bit)] >> return (Left t)
-mkSyncIdentifier b (Clk (Just n)) = let t = clkSyncId $ (inputs b)!!n
+mkSyncIdentifier b (Clk (Just n)) = let t = clkSyncId $ fst $ (inputs b)!!n
                                     in tell [(t,Bit)] >> return (Left t)
-mkSyncIdentifier b (Rst Nothing)  = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ result b
+mkSyncIdentifier b (Rst Nothing)  = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ fst $ result b
                                     in tell [(t,Bit)] >> return (Left t)
-mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ (inputs b)!!n
+mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ fst $ (inputs b)!!n
                                     in tell [(t,Bit)] >> return (Left t)
+mkSyncIdentifier b (Typ Nothing)  = return $ Left $ displayT $ renderOneLine $ vhdlType $ snd $ result b
+mkSyncIdentifier b (Typ (Just n)) = return $ Left $ displayT $ renderOneLine $ vhdlType $ snd $ (inputs b)!!n
 mkSyncIdentifier b (D _)          = error $ $(curLoc) ++ "Unexpected component declaration"
