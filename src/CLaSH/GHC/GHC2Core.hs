@@ -17,7 +17,7 @@ import qualified Control.Monad.Reader     as Reader
 import Control.Monad.State                (StateT,lift)
 import qualified Control.Monad.State.Lazy as State
 import Data.ByteString.Lazy.Char8         (pack)
-import Data.Hashable                      (Hashable(..))
+import Data.Hashable                      (Hashable(..),hash)
 import Data.HashMap.Lazy                  (HashMap)
 import qualified Data.HashMap.Lazy        as HashMap
 import Data.Label.PureM                   as LabelM
@@ -79,10 +79,10 @@ data GHC2CoreState
 mkLabels [''GHC2CoreState]
 
 instance Hashable TyCon where
-  hash = hash . getKey . getUnique
+  hashWithSalt s = hashWithSalt s . getKey . getUnique
 
 instance Hashable DataCon where
-  hash dc = (dataConTag dc) `hashWithSalt` (hash $ dataConTyCon dc)
+  hashWithSalt s dc = hashWithSalt s ((dataConTag dc) `hashWithSalt` (hash $ dataConTyCon dc))
 
 makeAllTyDataCons :: [TyCon] -> GHC2CoreState
 makeAllTyDataCons tyCons =

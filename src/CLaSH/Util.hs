@@ -18,7 +18,7 @@ import Control.Arrow                    (first,second)
 import Control.Monad                    ((<=<))
 import Control.Monad.State              (MonadState)
 import Control.Monad.Trans.Class        (MonadTrans,lift)
-import Data.Hashable                    (Hashable(..))
+import Data.Hashable                    (Hashable(..),hash)
 import Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy   as HashMap
 import Data.Label                       ((:->),mkLabels)
@@ -32,8 +32,8 @@ class MonadUnique m where
   getUniqueM :: m Int
 
 instance Hashable (Name a) where
-  hash (Nm _ (str,int)) = hashWithSalt (hash int) str
-  hash (Bn _ i0 i1)     = hash i0 `hashWithSalt` i1
+  hashWithSalt salt (Nm _ (str,int)) = hashWithSalt salt (hashWithSalt (hash int) str)
+  hashWithSalt salt (Bn _ i0 i1)     = hashWithSalt salt (hash i0 `hashWithSalt` i1)
 
 instance (Ord a) => Ord (Embed a) where
   compare (Embed a) (Embed b) = compare a b

@@ -7,17 +7,21 @@ where
 
 import qualified FastString
 
+#if __GLASGOW_HASKELL__ >= 707
+import Data.ByteString
+#endif
+
 #if __GLASGOW_HASKELL__ == 706
 unpackFS :: FastString.FastBytes -> String
 unpackFS = FastString.unpackFS
          . FastString.mkFastStringByteList
          . FastString.bytesFB
-#else
+#endif
+
+#if __GLASGOW_HASKELL__ >= 707
 unpackFS :: FastString.FastString -> String
 unpackFS = FastString.unpackFS
 
-unpackFB :: FastString.FastBytes -> String
-unpackFB = FastString.unpackFS
-         . FastString.mkFastStringByteList
-         . FastString.bytesFB
+unpackFB :: ByteString -> String
+unpackFB = undefined
 #endif
