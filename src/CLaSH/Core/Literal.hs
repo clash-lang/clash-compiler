@@ -8,6 +8,7 @@
 module CLaSH.Core.Literal where
 
 import Unbound.LocallyNameless as Unbound
+import Unbound.LocallyNameless.Alpha
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term)
 import {-# SOURCE #-} CLaSH.Core.Type (Type)
@@ -20,7 +21,9 @@ data Literal
 
 Unbound.derive [''Literal]
 
-instance Alpha Literal
+instance Alpha Literal where
+  acompare' c (IntegerLiteral i) (IntegerLiteral j) = compare i j
+  acompare' c l1 l2 = acompareR1 rep1 c l1 l2
 
 instance Subst Type Literal
 instance Subst Term Literal
