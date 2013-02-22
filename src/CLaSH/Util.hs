@@ -142,3 +142,10 @@ ifThenElse ::
   -> b
 ifThenElse t f g a = if t a then f a else g a
 
+infixr 5 <:>
+(<:>) :: Applicative f
+      => f a
+      -> f [a]
+      -> f [a]
+x <:> xs = (:) <$> x <*> xs
+

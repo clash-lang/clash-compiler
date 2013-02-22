@@ -1,53 +1,40 @@
+{-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Core.Util where
 
-import Data.Maybe                     (fromMaybe)
-import qualified Data.HashMap.Lazy as HashMap
-import Unbound.LocallyNameless        (Fresh,bind,embed,runFreshM,unbind,unembed,unrec,string2Name)
+import Data.HashMap.Lazy (HashMap)
+import Unbound.LocallyNameless (Fresh,bind,embed,runFreshM,unbind,unembed,string2Name)
 
 import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type    (Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
+import CLaSH.Core.Type    (Type(..),Kind,TyName,TypeView(..),tyView,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
   applyTy)
-import CLaSH.Core.TypeRep (Type(..))
-import CLaSH.Core.Var     (Var(..),TyVar,Id,varName,varType)
+import CLaSH.Core.Var     (Var(..),TyVar,Id,varType)
 import CLaSH.Util
 
-type Delta = HashMap.HashMap TyName Kind
-type Gamma = HashMap.HashMap TmName Type
+type Gamma = HashMap TmName Type
+type Delta = HashMap TyName Kind
 
 termType ::
-  Fresh m
-  => Gamma
-  -> Term
+  (Functor m, Fresh m)
+  => Term
   -> m Type
-termType gamma e = case e of
-  Var x       -> return $ fromMaybe (error $ $(curLoc) ++ "termType: " ++ show x ++ " not found: " ++ show (HashMap.keys gamma)) $
-                   HashMap.lookup x gamma
+termType e = case e of
+  Var t _     -> return t
   Data dc     -> return . snd . dcWorkId $ dc
   Literal l   -> return $ literalType l
   Prim p      -> return $ primType p
   Lam b       -> do (v,e') <- unbind b
-                    eTy    <- termType
-                                (HashMap.insert (varName v)
-                                                (unembed $ varType v) gamma)
-                                e'
-                    return $ mkFunTy (unembed $ varType v) eTy
+                    mkFunTy (unembed $ varType v) <$> termType e'
   TyLam b     -> do (tv,e') <- unbind b
-                    eTy     <- termType gamma e'
-                    return $ mkForAllTy tv eTy
+                    mkForAllTy tv <$> termType e'
   App _ _     -> case collectArgs e of
-                   (fun, args) -> (termType gamma fun) >>=
+                   (fun, args) -> (termType fun) >>=
                                   (`applyTypeToArgs` args)
-  TyApp e' ty -> (termType gamma e') >>= (`applyTy` ty)
-  Letrec b    -> do (xes,e') <- unbind b
-                    let gamma' = foldl (\g v ->
-                                         HashMap.insert
-                                           (varName v)
-                                           (unembed $ varType v) g)
-                                       gamma (map fst $ unrec xes)
-                    termType gamma' e'
+  TyApp e' ty -> (termType e') >>= (`applyTy` ty)
+  Letrec b    -> do (_,e') <- unbind b
+                    termType e'
   Case _ ty _ -> return ty
 
 collectArgs ::
@@ -82,26 +69,20 @@ applyTypeToArgs opTy (Left e:args)   = case splitFunTy opTy of
   Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy: " ++ show (opTy,e,args)
 
 patIds :: Pat -> [Id]
-patIds (DataPat _ ids) = ids
-patIds _               = []
+patIds (DataPat _ _ ids) = ids
+patIds _                 = []
 
 mkTyVar ::
-  Delta
+  Kind
   -> TyName
   -> TyVar
-mkTyVar delta tyName = TyVar tyName (embed tyKind)
-  where
-    tyKind = fromMaybe (error $ $(curLoc) ++ "mkTyVar: " ++ show tyName ++ " not found in: " ++ show delta) $
-               HashMap.lookup tyName delta
+mkTyVar tyKind tyName = TyVar tyName (embed tyKind)
 
 mkId ::
-  Gamma
+  Type
   -> TmName
   -> Id
-mkId gamma tmName = Id tmName (embed tmType)
-  where
-    tmType = fromMaybe (error $ $(curLoc) ++ "mkId: " ++ show tmName ++ " not found in: " ++ show gamma) $
-               HashMap.lookup tmName gamma
+mkId tmType tmName = Id tmName (embed tmType)
 
 mkTyLams ::
   Term
@@ -135,10 +116,9 @@ mkApps = foldl (\e a -> either (App e) (TyApp e) a)
 
 isFun ::
   (Functor m, Fresh m)
-  => Gamma
-  -> Term
+  => Term
   -> m Bool
-isFun g t = fmap isFunTy $ termType g t
+isFun t = fmap isFunTy $ termType t
 
 isLam ::
   Term
@@ -155,8 +135,8 @@ isLet _          = False
 isVar ::
   Term
   -> Bool
-isVar (Var _) = True
-isVar _       = False
+isVar (Var _ _) = True
+isVar _         = False
 
 isCon ::
   Term
@@ -180,17 +160,20 @@ mapSyncTerm ::
   Type
   -> Term
 mapSyncTerm (ForAllTy tvATy) =
-  let (aTV,bTV,FunTy _ (FunTy aTy bTy)) = runFreshM $ do
+  let (aTV,bTV,tyView -> FunTy _ (tyView -> FunTy aTy bTy)) = runFreshM $ do
                 { (aTV',ForAllTy tvBTy) <- unbind tvATy
                 ; (bTV',funTy)          <- unbind tvBTy
                 ; return (aTV',bTV',funTy) }
-      fId = Id (string2Name "f") (embed $ FunTy aTy bTy)
-      xId = Id (string2Name "x") (embed aTy)
+      fName = string2Name "f"
+      xName = string2Name "x"
+      fTy = mkFunTy aTy bTy
+      fId = Id fName (embed fTy)
+      xId = Id xName (embed aTy)
   in TyLam $ bind aTV $
      TyLam $ bind bTV $
      Lam   $ bind fId $
      Lam   $ bind xId $
-     App (Var $ varName fId) (Var $ varName xId)
+     App (Var fTy fName) (Var aTy xName)
 
 mapSyncTerm ty = error $ $(curLoc) ++ show ty
 
@@ -198,10 +181,11 @@ syncTerm ::
   Type
   -> Term
 syncTerm (ForAllTy tvTy) =
-  let (aTV,FunTy _ aTy) = runFreshM $ unbind tvTy
-      xId = Id (string2Name "x") (embed aTy)
+  let (aTV,tyView -> FunTy _ aTy) = runFreshM $ unbind tvTy
+      xName = string2Name "x"
+      xId = Id xName (embed aTy)
   in TyLam $ bind aTV $
      Lam   $ bind xId $
-     Var   $ varName xId
+     Var   aTy xName
 
 syncTerm ty = error $ $(curLoc) ++ show ty

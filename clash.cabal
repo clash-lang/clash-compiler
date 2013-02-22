@@ -81,7 +81,6 @@ Library
                        CLaSH.Core.Term
                        CLaSH.Core.TyCon
                        CLaSH.Core.Type
-                       CLaSH.Core.TypeRep
                        CLaSH.Core.TysPrim
                        CLaSH.Core.Util
                        CLaSH.Core.Var

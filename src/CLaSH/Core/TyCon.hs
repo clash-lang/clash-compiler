@@ -14,7 +14,7 @@ import Unbound.LocallyNameless as Unbound
 -- Internal Imports
 import {-# SOURCE #-} CLaSH.Core.DataCon  (DataCon)
 import {-# SOURCE #-} CLaSH.Core.Term     (Term)
-import {-# SOURCE #-} CLaSH.Core.TypeRep  (Kind,Type,TyName)
+import {-# SOURCE #-} CLaSH.Core.Type     (Kind,Type,TyName)
 
 data TyCon
   = AlgTyCon

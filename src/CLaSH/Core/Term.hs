@@ -12,15 +12,15 @@ import Unbound.LocallyNameless as Unbound hiding (Data)
 import Unbound.LocallyNameless.Name (isFree)
 
 -- Internal Modules
-import CLaSH.Core.DataCon (DataCon)
-import CLaSH.Core.Literal (Literal)
-import CLaSH.Core.Prim    (Prim)
-import CLaSH.Core.TypeRep (Type)
-import CLaSH.Core.Var     (Id,TyVar)
+import CLaSH.Core.DataCon              (DataCon)
+import CLaSH.Core.Literal              (Literal)
+import CLaSH.Core.Prim                 (Prim)
+import {-# SOURCE #-} CLaSH.Core.Type  (Type)
+import CLaSH.Core.Var                  (Id,TyVar)
 import CLaSH.Util
 
 data Term
-  = Var     TmName
+  = Var     Type TmName
   | Data    DataCon
   | Literal Literal
   | Prim    Prim
@@ -36,7 +36,7 @@ type TmName     = Name Term
 type LetBinding = (Id, Embed Term)
 
 data Pat
-  = DataPat (Embed DataCon) [Id]
+  = DataPat (Embed DataCon) [TyVar] [Id]
   | LitPat  (Embed Literal)
   | DefaultPat
   deriving (Eq,Ord,Show)
@@ -54,8 +54,8 @@ instance Alpha Pat
 
 instance Subst Term Pat
 instance Subst Term Term where
-  isvar (Var x) = Just (SubstName x)
-  isvar _       = Nothing
+  isvar (Var _ x) = Just (SubstName x)
+  isvar _         = Nothing
 
 instance Subst Type Pat
 instance Subst Type Term where
@@ -68,5 +68,6 @@ instance Subst Type Term where
     Case   e ty  a -> Case   (subst tvN u e  )
                              (subst tvN u ty )
                              (subst tvN u a  )
+    Var ty nm      -> Var    (subst tvN u ty ) nm
     e              -> e
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m

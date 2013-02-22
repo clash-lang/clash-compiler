@@ -40,8 +40,7 @@ mkBlackBoxContext ::
 mkBlackBoxContext resId args = do
   let res               = Left . mkBasicId . pack $ name2String (V.varName resId)
   let resTy             = N.typeToHWType_fail $ unembed $ V.varType resId
-  gamma                 <- LabelM.gets varEnv
-  isFunArgs             <- mapM (isFun gamma) args
+  isFunArgs             <- mapM isFun args
   let args'             = zip args isFunArgs
   varInps               <- mapM (runMaybeT . mkInput resId) args'
   let (_,otherArgs)     = partitionEithers $ map unVar args'
@@ -53,8 +52,8 @@ mkBlackBoxContext resId args = do
                                (catMaybes funInps)
 
 unVar :: (Term, Bool) -> Either TmName (Term, Bool)
-unVar (Var v, False) = Left v
-unVar t              = Right t
+unVar (Var _ v, False) = Left v
+unVar t                = Right t
 
 mkBlackBoxDecl ::
   Text
@@ -76,9 +75,8 @@ mkInput ::
   Id
   -> (Term, Bool)
   -> MaybeT NetlistMonad (SyncIdentifier,HWType)
-mkInput _ ((Var v), False) = do
+mkInput _ ((Var ty v), False) = do
   let vT = mkBasicId . pack $ name2String v
-  ty <- fmap (HashMap.! v) $ LabelM.gets varEnv
   let hwTy = N.typeToHWType_fail ty
   case synchronizedClk ty of
     Just clk -> return ((Right (vT,clk)), hwTy)
@@ -130,7 +128,7 @@ mkFunInput resId e = case (collectArgs e) of
             return (l',bbCtx)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ show bbM
-  (Var fun, args) -> do
+  (Var _ fun, args) -> do
     bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
     (Component compName hidden compInps compOutp _) <- lift $
       do vCnt <- LabelM.gets varCount

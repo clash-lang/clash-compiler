@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module CLaSH.Rewrite.Util where
 
 import qualified Control.Monad        as Monad
@@ -17,8 +18,7 @@ import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
 import CLaSH.Core.Term (Pat(..),Term(..),TmName,LetBinding)
 import CLaSH.Core.TyCon (tyConDataCons)
-import CLaSH.Core.Type (TyName,mkTyVarTy)
-import CLaSH.Core.TypeRep (Type(..))
+import CLaSH.Core.Type (Type(..),TyName,TypeView(..),tyView,mkTyVarTy)
 import CLaSH.Core.Util (Gamma,Delta,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps)
 import CLaSH.Core.Var  (Var(..),Id)
 import CLaSH.Netlist.Util (representableType)
@@ -34,12 +34,11 @@ liftRS m = lift . lift . lift $ m
 apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
 apply name rewrite ctx expr = R $ do
   lvl <- LabelM.asks dbgLevel
-  let (_,delta) = contextEnv ctx
-  let before = showDoc delta expr
+  let before = showDoc expr
   (expr', anyChanged) <- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ Writer.listen $ runR $ rewrite ctx expr
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged $ LabelM.modify transformCounter (+1)
-  let after  = showDoc delta expr'
+  let after  = showDoc expr'
   traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr'
@@ -117,14 +116,11 @@ mkGamma ctx = do
 
 mkBinderFor ::
   (Functor m, Monad m)
-  => [CoreContext]
-  -> String
+  => String
   -> Term
   -> RewriteMonad m (Id,Term)
-mkBinderFor ctx name term = do
-  gamma  <- mkGamma ctx
-  ty <- termType gamma term
-  mkInternalVar name ty
+mkBinderFor name term =
+  mkInternalVar name =<< termType term
 
 mkInternalVar ::
   (Functor m, Monad m)
@@ -133,7 +129,7 @@ mkInternalVar ::
   -> RewriteMonad m (Id,Term)
 mkInternalVar name ty = do
   name' <- fmap (makeName name . toInteger) getUniqueM
-  return (Id name' (embed ty),Var name')
+  return (Id name' (embed ty),Var ty name')
 
 inlineBinders ::
   Monad m
@@ -220,22 +216,26 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   let e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
   (localFTVs,localFVs) <- localFreeVars e
-  let localFVs' = filter (/= idName) localFVs
+  let localFTVkinds = map (delta HashMap.!) localFTVs
+  let localFVs'     = filter (/= idName) localFVs
+  let localFVtys'   = map (gamma HashMap.!) localFVs'
   -- Abstract expression over its local FVs
-  let boundFTVs = map (mkTyVar delta) localFTVs
-  let boundFVs  = map (mkId gamma) localFVs'
+  let boundFTVs = zipWith mkTyVar localFTVkinds localFTVs
+  let boundFVs  = zipWith mkId localFVtys' localFVs'
   -- Make a new global ID
+  newBodyTy <- termType $ mkTyLams (mkLams e boundFVs) boundFTVs
   newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
   -- Make a new expression, consisting of the te lifted function applied to
   -- its free variables
-  let newExpr = mkTmApps (mkTyApps (Var newBodyId) $ map mkTyVarTy localFTVs)
-              $ map Var localFVs'
+  let newExpr = mkTmApps
+                  (mkTyApps (Var newBodyTy newBodyId)
+                            (zipWith mkTyVarTy localFTVkinds localFTVs))
+                  (zipWith Var localFVtys' localFVs')
   -- Substitute the recursive calls by the new expression
   let e' = substTm idName newExpr e
   -- Create a new body that abstracts over the free variables
   let newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
   -- Add the created function to the list of global bindings
-  newBodyTy <- termType gamma newBody
   LabelM.modify bindings (HashMap.insert newBodyId (newBodyTy,newBody))
   -- Return the new binder
   return (Id idName (embed ty), embed newExpr)
@@ -244,15 +244,14 @@ liftBinding _ _ _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound 
 
 mkFunction ::
   (Functor m, Monad m)
-  => [CoreContext]
-  -> TmName
+  => TmName
   -> Term
-  -> RewriteMonad m TmName
-mkFunction ctx bndr body = do
-  bodyTy <- mkGamma ctx >>= (`termType` body)
+  -> RewriteMonad m (TmName,Type)
+mkFunction bndr body = do
+  bodyTy <- termType body
   bodyId <- cloneVar bndr
   addGlobalBind bodyId bodyTy body
-  return bodyId
+  return (bodyId,bodyTy)
 
 addGlobalBind ::
   (Functor m, Monad m)
@@ -272,20 +271,16 @@ isLocalVar ::
   (Functor m, Monad m)
   => Term
   -> RewriteMonad m Bool
-isLocalVar (Var name)
+isLocalVar (Var _ name)
   = fmap (not . HashMap.member name)
   $ LabelM.gets bindings
 isLocalVar _ = return False
 
 isUntranslatable ::
   (Functor m, Monad m)
-  => [CoreContext]
-  -> Term
+  => Term
   -> RewriteMonad m Bool
-isUntranslatable ctx tm = do
-  gamma <- mkGamma ctx
-  ty <- termType gamma tm
-  return . not . representableType $ ty
+isUntranslatable tm = not . representableType <$> termType tm
 
 isLambdaBodyCtx ::
   CoreContext
@@ -307,11 +302,11 @@ mkSelectorCase ::
   -> Int -- n'th field
   -> RewriteMonad m Term
 mkSelectorCase ctx scrut dcI fieldI = do
-  scrutTy <- mkGamma ctx >>= (`termType` scrut)
+  scrutTy <- termType scrut
   let delta = snd $ contextEnv ctx
-  let cantCreate x = error $ x ++ "Can't create selector for: " ++ showDoc delta scrutTy
+  let cantCreate x = error $ x ++ "Can't create selector for: " ++ showDoc scrutTy
   case scrutTy of
-    TyConApp tc args -> do
+    (tyView -> TyConApp tc args) -> do
       case (tyConDataCons tc) of
         [] -> cantCreate $(curLoc)
         dcs | dcI >= length dcs -> cantCreate $(curLoc)
@@ -323,8 +318,8 @@ mkSelectorCase ctx scrut dcI fieldI = do
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
               selBndr <- mkInternalVar "sel" (fieldTys!!fieldI)
-              let bndrs = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
-              let pat    = DataPat (embed dc) (map fst bndrs)
+              let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
+              let pat    = DataPat (embed dc) [] (map fst bndrs)
               let retVal = Case scrut (fieldTys!!fieldI) [ bind pat (snd selBndr) ]
               return retVal
     _ -> cantCreate $(curLoc)

@@ -43,7 +43,7 @@ normalize ::
   [TmName]
   -> NormalizeSession [(TmName,(Type,Term))]
 normalize (bndr:bndrs) = do
-  let bndrS = showDoc HashMap.empty bndr
+  let bndrS = showDoc bndr
   exprM <- fmap (HashMap.lookup bndr) $ LabelM.gets bindings
   case exprM of
     Just (ty,expr) -> do
@@ -67,14 +67,13 @@ normalizeExpr ::
   -> Term
   -> NormalizeSession Term
 normalizeExpr bndrS expr = do
-  let emptyHM = HashMap.empty
   lvl <- LabelM.asks dbgLevel
-  let before = showDoc emptyHM expr
+  let before = showDoc expr
   let expr' = traceIf (lvl >= DebugFinal)
                 (bndrS ++ " before normalization:\n\n" ++ before ++ "\n")
                 expr
   rewritten <- runRewrite "normalization" normalization expr'
-  let after = showDoc emptyHM rewritten
+  let after = showDoc rewritten
   traceIf (lvl >= DebugFinal)
     (bndrS ++ " after normalization:\n\n" ++ after ++ "\n") $
     return rewritten

@@ -5,7 +5,6 @@ import qualified Control.Monad as Monad
 import Data.Text.Lazy (pack)
 import Data.Either             (partitionEithers)
 import Data.Maybe              (catMaybes)
-import qualified Data.Label.PureM as LabelM
 import Unbound.LocallyNameless (bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon      (DataCon(..),dcRepArgTys)
@@ -13,8 +12,7 @@ import CLaSH.Core.FreeVars     (typeFreeVars)
 import CLaSH.Core.Subst        (substTys)
 import CLaSH.Core.Term         (LetBinding,Term(..),TmName)
 import CLaSH.Core.TyCon        (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type         (splitTyConAppM)
-import CLaSH.Core.TypeRep      (Type(..),TyLit(..))
+import CLaSH.Core.Type         (Type(..),LitTy(..),splitTyConAppM)
 import CLaSH.Core.Util         (collectBndrs,termType)
 import CLaSH.Core.Var          (Var(..),Id,modifyVarName)
 import CLaSH.Netlist.Types
@@ -30,7 +28,7 @@ splitNormalized expr = do
       | (tmArgs,[]) <- args -> do
           (xes,e) <- unbind b
           case e of
-            Var v -> return (tmArgs,unrec xes,v)
+            Var _ v -> return (tmArgs,unrec xes,v)
             _ -> error "Not in normal form: res not simple var"
       | otherwise -> error "Not in normal form: tyArgs"
     _ -> error "Not in normal from: no Letrec"
@@ -101,7 +99,7 @@ singletonToHWType ty = case splitTyConAppM ty of
 tyNatSize ::
   Type
   -> Int
-tyNatSize (LitTy (NumTyLit i)) =  i
+tyNatSize (LitTy (NumTy i)) =  i
 tyNatSize t = error $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
 
 mkADT ::
@@ -173,15 +171,13 @@ typeLength _            = 0
 termHWType ::
   Term
   -> NetlistMonad HWType
-termHWType e = do
-  eType <- (`termType` e) =<< (LabelM.gets varEnv)
-  return $ typeToHWType_fail eType
+termHWType e = typeToHWType_fail <$> termType e
 
 varToExpr ::
   Term
   -> Expr
-varToExpr (Var var) = Identifier (pack $ name2String var) Nothing
-varToExpr _         = error "not a var"
+varToExpr (Var _ var) = Identifier (pack $ name2String var) Nothing
+varToExpr _           = error "not a var"
 
 mkUniqueNormalized ::
   ([Id],[LetBinding],TmName)
@@ -211,16 +207,16 @@ mkUniqueNormalized (args,binds,res) = do
 
     subsBndr :: Id -> Id -> Term -> NetlistMonad Term
     subsBndr f r e = case e of
-      Var v | v == (varName f) -> return . Var $ varName r
-      App e1 e2                -> App <$> subsBndr f r e1
-                                      <*> subsBndr f r e2
-      Case scrut ty alts       -> Case <$> (subsBndr f r scrut)
-                                       <*> pure ty
-                                       <*> mapM ( return
-                                                . uncurry bind
-                                                <=< secondM (subsBndr f r)
-                                                <=< unbind
-                                                ) alts
+      Var t v | v == (varName f) -> return . Var t $ varName r
+      App e1 e2                  -> App <$> subsBndr f r e1
+                                        <*> subsBndr f r e2
+      Case scrut ty alts         -> Case <$> (subsBndr f r scrut)
+                                         <*> pure ty
+                                         <*> mapM ( return
+                                                  . uncurry bind
+                                                  <=< secondM (subsBndr f r)
+                                                  <=< unbind
+                                                  ) alts
       _ -> return e
 
 appendToName ::

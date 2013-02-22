@@ -10,7 +10,7 @@ module CLaSH.Core.DataCon where
 import Unbound.LocallyNameless as Unbound
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.TypeRep             (Type,TyName)
+import {-# SOURCE #-} CLaSH.Core.Type (Type,TyName)
 import CLaSH.Util
 
 data DataCon

@@ -11,7 +11,7 @@ import Unbound.LocallyNameless as Unbound
 
 import CLaSH.Core.DataCon             (DataCon,dcWorkId)
 import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.TypeRep             (Type)
+import {-# SOURCE #-} CLaSH.Core.Type (Type)
 
 data Prim
   = PrimFun  TmName Type

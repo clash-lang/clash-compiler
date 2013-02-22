@@ -4,7 +4,7 @@
 module CLaSH.Rewrite.Types where
 
 import Control.Concurrent.Supply (Supply,freshId)
-import Control.Monad.Reader      (MonadTrans,MonadReader,ReaderT,lift)
+import Control.Monad.Reader      (MonadReader,ReaderT,lift)
 import Control.Monad.State       (MonadState,StateT)
 import Control.Monad.Writer      (MonadWriter,WriterT)
 import Data.HashMap.Lazy         (HashMap)

@@ -109,16 +109,15 @@ mkConcSm ::
   Id
   -> Term
   -> NetlistMonad [Declaration]
-mkConcSm bndr (Var v) = mkApplication bndr v []
+mkConcSm bndr (Var _ v) = mkApplication bndr v []
 
 mkConcSm bndr (Data dc) = mkDcApplication bndr dc []
 
 mkConcSm bndr app@(App _ _) = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  gamma <- LabelM.gets varEnv
-  args' <- Monad.filterM (fmap representableType . termType gamma) args
+  args' <- Monad.filterM (fmap representableType . termType) args
   case appF of
-    Var f
+    Var _ f
       | all isVar args' && null tyArgs -> mkApplication bndr f args'
       | otherwise                      -> error "Not in normal form: Var-application with non-Var arguments"
     Data dc

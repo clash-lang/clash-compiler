@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Normalize.Util where
 
 import qualified Data.HashMap.Lazy as HashMap
@@ -9,8 +10,7 @@ import Unbound.LocallyNameless     (Fresh, aeq,embed,unbind)
 import CLaSH.Core.DataCon (dataConInstArgTys)
 import CLaSH.Core.Term    (Term(..),TmName)
 import CLaSH.Core.TyCon   (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type    (isFunTy)
-import CLaSH.Core.TypeRep (Type(..))
+import CLaSH.Core.Type    (Type(..),TypeView(..),tyView,isFunTy)
 import CLaSH.Core.Util    (Gamma,collectArgs)
 import CLaSH.Core.Var     (Var(..),Id)
 import CLaSH.Normalize.Types
@@ -26,7 +26,7 @@ isBoxTy' ::
   [Type]
   -> Type
   -> Bool
-isBoxTy' ts ty@(TyConApp tc tys)
+isBoxTy' ts ty@(tyView -> TyConApp tc tys)
   | ty `notElem` ts = any (\t -> isBoxTy' (ty:ts) t || isFunTy t)
                           (conArgs tc tys)
   | otherwise       = False
@@ -36,10 +36,9 @@ isPolyFunTy ::
   Fresh m
   => Type
   -> m Bool
-isPolyFunTy (FunTy _ _)    = return True
-isPolyFunTy (ForAllTy tvT) = unbind tvT >>= (isPolyFunTy . snd)
-isPolyFunTy _              = return False
-
+isPolyFunTy (tyView -> FunTy _ _) = return True
+isPolyFunTy (ForAllTy tvT)        = unbind tvT >>= (isPolyFunTy . snd)
+isPolyFunTy _                     = return False
 
 conArgs :: TyCon -> [Type] -> [Type]
 conArgs tc tys = bigUnionTys $ map (flip dataConInstArgTys tys)

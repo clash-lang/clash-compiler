@@ -22,7 +22,7 @@ import Data.HashMap.Lazy                  (HashMap)
 import qualified Data.HashMap.Lazy        as HashMap
 import Data.Label.PureM                   as LabelM
 import Data.Maybe                         (fromMaybe)
-import Unbound.LocallyNameless            (Rep,bind,rec,embed)
+import Unbound.LocallyNameless            (Rep,bind,rec,embed,unembed)
 import qualified Unbound.LocallyNameless  as Unbound
 
 -- GHC API
@@ -57,7 +57,7 @@ import qualified CLaSH.Core.Literal as C
 import qualified CLaSH.Core.Prim    as C
 import qualified CLaSH.Core.Term    as C
 import qualified CLaSH.Core.TyCon   as C
-import qualified CLaSH.Core.TypeRep as C
+import qualified CLaSH.Core.Type    as C
 import qualified CLaSH.Core.Util    as C
 import qualified CLaSH.Core.Var     as C
 import CLaSH.Primitives.Types
@@ -222,7 +222,7 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
      let caseTerm v = C.Case v <$> coreToType ty <*> mapM alt alts
      if usesBndr
       then do
-        ct <- caseTerm (C.Var $ C.varName b')
+        ct <- caseTerm (C.Var (unembed $ C.varType b') (C.varName b'))
         return $ C.Letrec $ bind (rec [(b',embed e')]) ct
       else caseTerm e'
 
@@ -265,13 +265,14 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
               return $ C.Prim (C.PrimFun xPrim xType)
             Nothing
               | x `elem` unlocs -> return $ C.Prim (C.PrimFun  xPrim xType)
-              | otherwise -> return $ C.Var xVar
+              | otherwise -> return $ C.Var xType xVar
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
     alt (DataAlt dc, xs, e) = case (as,cs) of
       ([],[]) -> bind <$> (C.DataPat . embed <$>
                             (coreToDataCon dc) <*>
+                            (pure []) <*>
                             (mapM coreToId zs)) <*>
                       (term e)
       _ -> error $ $(curLoc) ++ "Patterns binding coercions or type variables are not supported"
@@ -306,11 +307,11 @@ coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
 coreToType' ::
   Type
   -> R C.Type
-coreToType' (TyVarTy tv) = return $ C.TyVarTy (coreToVar tv)
+coreToType' (TyVarTy tv) = C.VarTy <$> (coreToType $ varType tv) <*> (pure $ coreToVar tv)
 coreToType' (TyConApp tc args)
-  | isFunTyCon tc = foldl1 C.FunTy <$> (mapM coreToType args)
-  | otherwise     = C.TyConApp <$> coreToTyCon tc <*> mapM coreToType args
-coreToType' (FunTy ty1 ty2)  = C.FunTy <$> coreToType ty1 <*> coreToType ty2
+  | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> (mapM coreToType args)
+  | otherwise     = C.mkTyConApp <$> coreToTyCon tc <*> mapM coreToType args
+coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
                                (bind <$> coreToTyVar tv <*> coreToType ty)
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
@@ -318,9 +319,9 @@ coreToType' ty@(AppTy _ _)   = error $ $(curLoc) ++ "Type application of type va
 
 coreToTyLit ::
   TyLit
-  -> C.TyLit
-coreToTyLit (NumTyLit i) = C.NumTyLit (fromInteger i)
-coreToTyLit (StrTyLit s) = C.StrTyLit (unpackFS s)
+  -> C.LitTy
+coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
+coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 
 coreToTyCon ::
   TyCon

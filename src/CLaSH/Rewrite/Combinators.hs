@@ -12,7 +12,7 @@ import CLaSH.Core.Var      (Id)
 import CLaSH.Rewrite.Types
 
 allR :: forall m . (Functor m, Monad m) => Rewrite m -> Rewrite m
-allR _ _ (Var x)     = return (Var x)
+allR _ _ (Var t x)   = return (Var t x)
 allR _ _ (Data dc)   = return (Data dc)
 allR _ _ (Literal l) = return (Literal l)
 allR _ _ (Prim p)    = return (Prim p)

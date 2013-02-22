@@ -4,15 +4,15 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-duplicate-constraints #-}
 
 module CLaSH.Core.Var where
 
 import Unbound.LocallyNameless as Unbound
 import Unbound.LocallyNameless.Name (isFree)
 
-import {-# SOURCE #-} CLaSH.Core.TypeRep (Type,Kind)
-import {-# SOURCE #-} CLaSH.Core.Term    (Term)
+import {-# SOURCE #-} CLaSH.Core.Type (Type,Kind)
+import {-# SOURCE #-} CLaSH.Core.Term (Term)
 import CLaSH.Util
 
 data Var a
