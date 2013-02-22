@@ -34,7 +34,7 @@ end generate;",
 begin
   ~SYM[1](~SYM[1]'high) <= ~ARG[1];
 
-  ~SYM[2]_generate : for ~SYM[3] in (~RESULT'length - 1) downto 0 generate
+  ~SYM[2]_generate : for ~SYM[3] in (~ARG[2]'length - 1) downto 0 generate
   begin
     ~SYM[4]_generate : if ~SYM[3] /= 0 generate
       ~INST 0
