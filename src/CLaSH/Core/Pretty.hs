@@ -161,7 +161,7 @@ pprPrecApp prec e1 e2 = do
 pprPrecTyApp :: (Applicative m, LFresh m) => Rational -> Term -> Type -> m Doc
 pprPrecTyApp prec e ty = do
   e' <- pprPrec opPrec e
-  ty' <- pprPrec appPrec ty
+  ty' <- pprParendType ty
   return $ prettyParen (prec >= appPrec) $ e' <+> char '@' <> ty'
 
 pprPrecLetrec :: (Applicative m, LFresh m) => Rational -> [(Id, Embed Term)] -> Term
@@ -209,22 +209,27 @@ maybeParen :: TypePrec -> TypePrec -> Doc -> Doc
 maybeParen ctxt_prec inner_prec = prettyParen (ctxt_prec >= inner_prec)
 
 pprType :: (Applicative m, LFresh m) => Type -> m Doc
-pprType = go TopPrec
-  where
-    go _ (VarTy _ tv)                 = ppr tv
-    go _ (LitTy tyLit)                = ppr tyLit
-    go p ty@(ForAllTy _)              = pprForAllType p ty
-    go p (ConstTy (TyCon tc))         = pprTcApp p go tc []
-    go p (tyView -> TyConApp tc args) = pprTcApp p go tc args
-    go p fun_ty@(tyView -> FunTy ty1 ty2)
-        | isPredTy ty1                = pprForAllType p fun_ty
-        | otherwise                   = pprArrowChain p <$> go FunPrec ty1 <:> pprFunTail ty2
-    go p (AppTy ty1 ty2)              = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1 <*> go TyConPrec ty2)
-    go p ty = error $ $(curLoc) ++ "Can't pretty print type: " ++ show ty
+pprType = ppr_type TopPrec
 
-    pprFunTail (tyView -> FunTy ty1 ty2)
-      | not (isPredTy ty1) = go FunPrec ty1 <:> pprFunTail ty2
-    pprFunTail otherTy     = go TopPrec otherTy <:> pure []
+pprParendType :: (Applicative m, LFresh m) => Type -> m Doc
+pprParendType = ppr_type TyConPrec
+
+ppr_type :: (Applicative m, LFresh m) => TypePrec -> Type -> m Doc
+ppr_type _ (VarTy _ tv)                 = ppr tv
+ppr_type _ (LitTy tyLit)                = ppr tyLit
+ppr_type p ty@(ForAllTy _)              = pprForAllType p ty
+ppr_type p (ConstTy (TyCon tc))         = pprTcApp p ppr_type tc []
+ppr_type p (tyView -> TyConApp tc args) = pprTcApp p ppr_type tc args
+ppr_type p fun_ty@(tyView -> FunTy ty1 ty2)
+  | isPredTy ty1                = pprForAllType p fun_ty
+  | otherwise                   = pprArrowChain p <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
+  where
+    pprFunTail (tyView -> FunTy ty1' ty2')
+      | not (isPredTy ty1) = ppr_type FunPrec ty1' <:> pprFunTail ty2'
+    pprFunTail otherTy     = ppr_type TopPrec otherTy <:> pure []
+
+ppr_type p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1 <*> ppr_type TyConPrec ty2)
+ppr_type p ty = error $ $(curLoc) ++ "Can't pretty print type: " ++ show ty
 
 pprForAllType :: (Applicative m, LFresh m) => TypePrec -> Type -> m Doc
 pprForAllType p ty = maybeParen p FunPrec <$> pprSigmaType True ty
