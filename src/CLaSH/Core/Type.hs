@@ -164,6 +164,7 @@ typeKind (tyView -> FunTy _arg res)
 typeKind (tyView -> TyConApp tc args) = kindAppResult (tyConKind tc) args
 
 typeKind (AppTy fun arg)      = kindFunResult (typeKind fun) arg
+typeKind (ConstTy ct)         = error $ $(curLoc) ++ "typeKind: naked ConstTy: " ++ show ct
 
 kindAppResult :: Kind -> [Type] -> Kind
 kindAppResult k []     = k

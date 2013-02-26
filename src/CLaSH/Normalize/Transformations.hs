@@ -5,7 +5,6 @@ import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.Label.PureM  as LabelM
 import qualified Data.List         as List
-import qualified Data.Map          as Map
 import qualified Data.Maybe        as Maybe
 import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
 
@@ -16,7 +15,7 @@ import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm,substTysinTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
-import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,mkTmApps,isLet)
+import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,isLet)
 import CLaSH.Core.Var        (Var(..))
 import CLaSH.Normalize.Types
 import CLaSH.Normalize.Util
@@ -133,17 +132,17 @@ liftNonRep = liftBinders nonRepTest
 
 typeSpec :: NormRewrite
 typeSpec ctx e@(TyApp e1 ty)
-  | (Var _ f,  args) <- collectArgs e1
+  | (Var _ _,  args) <- collectArgs e1
   , null $ typeFreeVars ty
-  , (eArgs, []) <- Either.partitionEithers args
+  , (_, []) <- Either.partitionEithers args
   = specialise specialisations ctx e
 
 typeSpec _ e = return e
 
 nonRepSpec :: NormRewrite
 nonRepSpec ctx e@(App e1 e2)
-  | (Var _ f, args) <- collectArgs e1
-  , (eArgs, [])     <- Either.partitionEithers args
+  | (Var _ _, args) <- collectArgs e1
+  , (_, [])     <- Either.partitionEithers args
   , null $ termFreeTyVars e2
   = do e2Ty <- termType e2
        if nonRep e2Ty
@@ -504,12 +503,12 @@ inlineWrapper _ e = return e
 
 simpleSpec :: NormRewrite
 simpleSpec ctx e@(App e1 e2)
-  | (Var _ f, args) <- collectArgs e1
-  , (eArgs, []) <- Either.partitionEithers args
+  | (Var _ _, args) <- collectArgs e1
+  , (_, []) <- Either.partitionEithers args
   , isSimple e2
   = specialise specialisations ctx e
 
-simpleSpec _ e = return e 
+simpleSpec _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite

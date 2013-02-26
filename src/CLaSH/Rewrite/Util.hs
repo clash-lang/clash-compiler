@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Rewrite.Util where
 
@@ -8,6 +9,7 @@ import qualified Control.Monad.Reader    as Reader
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.Writer    as Writer
 import qualified Data.HashMap.Lazy       as HashMap
+import           Data.Label.Pure         ((:->))
 import qualified Data.Label.PureM        as LabelM
 import qualified Data.Map                as Map
 import qualified Data.Monoid             as Monoid
@@ -120,6 +122,11 @@ mkEnv ctx = do
                   `HashMap.union` gamma
   return (gamma',delta)
 
+mkTmBinderFor ::
+  (Functor m, Fresh m, MonadUnique m)
+  => String
+  -> Term
+  -> m (Id, Term)
 mkTmBinderFor name e = do
   (Left r) <- mkBinderFor name (Left e)
   return r
@@ -342,11 +349,22 @@ mkSelectorCase ctx scrut dcI fieldI = do
               return retVal
     _ -> cantCreate $(curLoc)
 
-
+specialise ::
+  (Functor m, State.MonadState s m)
+  => (s :-> Map.Map (TmName, Int, Either Term Type) (TmName,Type))
+  -> Rewrite m
 specialise specMapLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl ctx e (collectArgs e1) (Right ty)
 specialise specMapLbl ctx e@(App   e1 e2) = specialise' specMapLbl ctx e (collectArgs e1) (Left  e2)
 specialise _          _   e               = return e
 
+specialise' ::
+  (Functor m, State.MonadState s m)
+  => (s :-> Map.Map (TmName, Int, Either Term Type) (TmName,Type))
+  -> [CoreContext]
+  -> Term
+  -> (Term, [Either Term Type])
+  -> Either Term Type
+  -> R m Term
 specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
   -- Create binders and variable references for free variables in 'specArg'
   (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $
