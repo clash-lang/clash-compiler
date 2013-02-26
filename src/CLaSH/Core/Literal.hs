@@ -22,7 +22,7 @@ data Literal
 Unbound.derive [''Literal]
 
 instance Alpha Literal where
-  acompare' c (IntegerLiteral i) (IntegerLiteral j) = compare i j
+  acompare' _ (IntegerLiteral i) (IntegerLiteral j) = compare i j
   acompare' c l1 l2 = acompareR1 rep1 c l1 l2
 
 instance Subst Type Literal
