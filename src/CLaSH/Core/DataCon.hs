@@ -42,8 +42,8 @@ instance Alpha DataCon where
   fv' _ _         = emptyC
   lfreshen' _ a f = f a empty
   freshen' _ a    = return (a,empty)
-  aeq' _ dc1 dc2  = aeq (dcName dc1) (dcName dc2)
-  acompare' _ _ _ = error "acompare' DataCon"
+  aeq' c dc1 dc2  = aeq' c (dcName dc1) (dcName dc2)
+  acompare' c dc1 dc2 = acompare' c (dcName dc1) (dcName dc2)
   open _ _ d      = d
   close _ _ d     = d
   isPat _         = error "isPat DataCon"
