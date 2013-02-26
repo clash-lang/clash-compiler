@@ -152,13 +152,22 @@ isLiftedTypeKind _                     = False
 
 typeKind :: Type -> Kind
 typeKind (VarTy k _)          = k
-typeKind (ConstTy Arrow)      = mkFunTy liftedTypeKind liftedTypeKind
-typeKind (ConstTy (TyCon tc)) = tyConKind tc
 typeKind (ForAllTy b)         = let (_,ty) = runFreshM $ unbind b
                                 in typeKind ty
-typeKind (AppTy fun arg)      = kindFunResult (typeKind fun) arg
 typeKind (LitTy (NumTy _))    = typeNatKind
 typeKind (LitTy (SymTy _))    = typeSymbolKind
+typeKind (tyView -> FunTy _arg res)
+  | isSuperKind k = k
+  | otherwise     = liftedTypeKind
+  where k = typeKind res
+
+typeKind (tyView -> TyConApp tc args) = kindAppResult (tyConKind tc) args
+
+typeKind (AppTy fun arg)      = kindFunResult (typeKind fun) arg
+
+kindAppResult :: Kind -> [Type] -> Kind
+kindAppResult k []     = k
+kindAppResult k (a:as) = kindAppResult (kindFunResult k a) as
 
 kindFunResult :: Kind -> KindOrType -> Kind
 kindFunResult (tyView -> FunTy _ res) _ = res
