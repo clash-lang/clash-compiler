@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Netlist.Util where
 
 import qualified Control.Monad as Monad
@@ -9,10 +10,11 @@ import Unbound.LocallyNameless (bind,embed,makeName,name2String,name2Integer,unb
 
 import CLaSH.Core.DataCon      (DataCon(..))
 import CLaSH.Core.FreeVars     (typeFreeVars)
+import CLaSH.Core.Pretty       (showDoc)
 import CLaSH.Core.Subst        (substTys)
 import CLaSH.Core.Term         (LetBinding,Term(..),TmName)
 import CLaSH.Core.TyCon        (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type         (Type(..),LitTy(..),splitTyConAppM)
+import CLaSH.Core.Type         (Type(..),TypeView(..),LitTy(..),tyView,splitTyConAppM)
 import CLaSH.Core.Util         (collectBndrs,termType)
 import CLaSH.Core.Var          (Var(..),Id,modifyVarName)
 import CLaSH.Netlist.Types
@@ -33,10 +35,10 @@ splitNormalized expr = do
       | otherwise -> error "Not in normal form: tyArgs"
     _ -> error "Not in normal from: no Letrec"
 
-typeToHWType_fail ::
+coreTypeToHWType_fail ::
   Type
   -> HWType
-typeToHWType_fail = either error id . typeToHWType
+coreTypeToHWType_fail = either error id . coreTypeToHWType
 
 synchronizedClk ::
   Type
@@ -51,106 +53,100 @@ synchronizedClk ty
   | otherwise
   = Nothing
 
-typeToHWType ::
+coreTypeToHWType ::
   Type
   -> Either String HWType
-typeToHWType ty
-  | (_:_) <- typeFreeVars ty = Left "Can't translate types with free type variables"
-  | otherwise = do
-    case splitTyConAppM ty of
-      Just (tyCon, args) -> do
-        case (name2String $ tyConName tyCon) of
-          "GHC.Integer.Type.Integer" -> return Integer
-          "GHC.Prim.Int#" -> return Integer
-          "GHC.Prim.ByteArray#" -> return Integer
-          "GHC.Types.Bool" -> return Bool
-          "GHC.TypeLits.Sing" -> singletonToHWType (head args)
-          "CLaSH.Bit.Bit"     -> return Bit
-          "CLaSH.Signal.Sync" -> typeToHWType (head args)
-          "CLaSH.Sized.Signed.Signed" -> return $ Signed (tyNatSize $ head args)
-          "CLaSH.Sized.VectorZ.Vec" -> do
-            let [szTy,elTy] = args
-            let sz = tyNatSize szTy
-            elHWTy <- typeToHWType elTy
-            return $ Vector sz elHWTy
-          _      -> mkADT tyCon args
-      Nothing -> Left $ "Can't translate type: " ++ show ty
+coreTypeToHWType ty@(tyView -> TyConApp tc args) =
+  case (name2String $ tyConName tc) of
+    "GHC.Integer.Type.Integer"  -> return Integer
+    "GHC.Prim.Int#"             -> return Integer
+    "GHC.Prim.ByteArray#"       -> return Integer
+    "GHC.Types.Bool"            -> return Bool
+    "GHC.TypeLits.Sing"         -> singletonToHWType (head args)
+    "CLaSH.Bit.Bit"             -> return Bit
+    "CLaSH.Signal.Sync"         -> coreTypeToHWType (head args)
+    "CLaSH.Sized.Signed.Signed" -> Signed <$> (tyNatSize $ head args)
+    "CLaSH.Sized.VectorZ.Vec"   -> do
+      let [szTy,elTy] = args
+      sz     <- tyNatSize szTy
+      elHWTy <- coreTypeToHWType elTy
+      return $ Vector sz elHWTy
+    _ -> mkADT (showDoc ty) tc args
+
+coreTypeToHWType ty = Left $ "Can't translate type: " ++ showDoc ty
+
+singletonToHWType ::
+  Type
+  -> Either String HWType
+singletonToHWType (tyView -> TyConApp tc [])
+  | (name2String $ tyConName tc) == "GHC.TypeLits.Nat"
+  = return Integer
+
+singletonToHWType ty = Left $ "Can't translate singleton type: " ++ showDoc ty
+
+mkADT ::
+  String
+  -> TyCon
+  -> [Type]
+  -> Either String HWType
+mkADT tyString tc args
+  | isRecursiveTy tc args
+  = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
+
+mkADT _ tc args = case tyConDataCons tc of
+  []  -> return Void
+  dcs -> do
+    let argTyss      = map dcArgTys dcs
+    let substArgTyss = (map . map) (substTys tvsArgsMap) argTyss
+    argHTyss         <- mapM (mapM coreTypeToHWType) substArgTyss
+    let nonEmptyArgs = map (filter (not . isEmptyType)) argHTyss
+    case (dcs,nonEmptyArgs) of
+      ([_],[[elemTy]])   -> return elemTy
+      ([_],[elemTys])    -> return $ Product tcName elemTys
+      (_  ,concat -> []) -> return $ Sum tcName $ map (pack . show . dcName) dcs
+      (_  ,elemHTys)     -> return $ SP tcName
+                                   $ zipWith (\dc tys ->
+                                               ( pack . show $ dcName dc
+                                               , tys
+                                               )
+                                             ) dcs elemHTys
+  where
+    tcName     = pack . show $ tyConName tc
+    tvs        = tyConTyVars tc
+    tvsArgsMap = zip tvs args
 
 isRecursiveTy :: TyCon -> [Type] -> Bool
 isRecursiveTy tc args = case tyConDataCons tc of
     []  -> False
-    dcs -> let argTyss      = map dcRepArgTys dcs
+    dcs -> let argTyss      = map dcArgTys dcs
                tvs          = tyConTyVars tc
                tvsArgsMap   = zip tvs args
                substArgTyss = (map . map) (substTys tvsArgsMap) argTyss
                argTcs       = map fst . catMaybes . map splitTyConAppM $ concat substArgTyss
            in tc `elem` argTcs
 
-singletonToHWType ::
-  Type
-  -> Either String HWType
-singletonToHWType ty = case splitTyConAppM ty of
-  Just (tyCon,[]) -> do
-    case (name2String $ tyConName tyCon) of
-      "GHC.TypeLits.Nat" -> return Integer
-      _ -> Left "Can't translate type"
-  _ -> Left "Can't translate type"
-
 tyNatSize ::
   Type
-  -> Int
-tyNatSize (LitTy (NumTy i)) =  i
-tyNatSize t = error $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
-
-mkADT ::
-  TyCon
-  -> [Type]
-  -> Either String HWType
-mkADT tc args
-  | isRecursiveTy tc args = Left $ $(curLoc) ++ "Can't translate custom recursive type: " ++ (show (tc,args))
-  | otherwise = case tyConDataCons tc of
-  []  -> Left $ $(curLoc) ++ "There are no DataCons for the type: " ++ (show (tc,args))
-  dcs -> do
-    let argTyss = map dcRepArgTys dcs
-    let sumTy   = Sum tcName $ map (pack . show . dcName) dcs
-    case (concat argTyss) of
-      [] -> return sumTy
-      _  -> do
-        let substArgTyss = (map . map) (substTys tvsArgsMap) argTyss
-        argHTyss <- mapM (mapM typeToHWType) substArgTyss
-        case (dcs, map (filter (not . isEmptyType)) argHTyss) of
-          ([_],[[elemTy]]) -> return elemTy
-          ([_],[elemTys])  -> return $ Product tcName elemTys
-          (_  ,elemHTys)    -> return $ SP tcName
-                                      $ zipWith (\dc tys ->
-                                                  ( pack . show $ dcName dc
-                                                  , tys
-                                                  )
-                                                ) dcs elemHTys
-  where
-    tcName     = pack . show $ tyConName tc
-    tvs        = tyConTyVars tc
-    tvsArgsMap = zip tvs args
-
-translatableType ::
-  Type
-  -> Bool
-translatableType = (either (\s -> traceIf True s False) (const True)) . typeToHWType
+  -> Either String Int
+tyNatSize (LitTy (NumTy i)) = return i
+tyNatSize t                 = Left $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
 
 representableType ::
   Type
   -> Bool
-representableType = translatableType
+representableType = (either (\s -> traceIf True s False) (const True)) . coreTypeToHWType
 
 isEmptyType ::
   HWType
   -> Bool
+isEmptyType Void           = True
 isEmptyType (Sum _ (_:[])) = True
 isEmptyType _              = False
 
 typeSize ::
   HWType
   -> Int
+typeSize Void = 0
 typeSize Bool = 1
 typeSize Integer = 32
 typeSize (Signed i) = i
@@ -171,7 +167,7 @@ typeLength _            = 0
 termHWType ::
   Term
   -> NetlistMonad HWType
-termHWType e = typeToHWType_fail <$> termType e
+termHWType e = coreTypeToHWType_fail <$> termType e
 
 varToExpr ::
   Term

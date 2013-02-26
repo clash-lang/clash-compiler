@@ -84,6 +84,12 @@ mkId ::
   -> Id
 mkId tmType tmName = Id tmName (embed tmType)
 
+mkAbstraction ::
+  Term
+  -> [Either Id TyVar]
+  -> Term
+mkAbstraction = foldr (either (Lam `dot` bind) (TyLam `dot` bind))
+
 mkTyLams ::
   Term
   -> [TyVar]

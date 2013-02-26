@@ -34,7 +34,6 @@ runNormalization lvl supply globals dfunMap clsOpMap
     normState = NormalizeState
                   HashMap.empty
                   Map.empty
-                  Map.empty
                   HashMap.empty
                   []
                   (error "Report as bug: no curFun")

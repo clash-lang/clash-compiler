@@ -1,26 +1,30 @@
 module CLaSH.Core.FreeVars where
 
-import Unbound.LocallyNameless (fv)
+import Unbound.LocallyNameless (fv,Collection)
 
 import CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.Type (Type,TyName)
 
 typeFreeVars ::
-  Type
-  -> [TyName]
+  Collection c
+  => Type
+  -> c TyName
 typeFreeVars = fv
 
 termFreeVars ::
-  Term
-  -> ([TyName],[TmName])
+  Collection c
+  => Term
+  -> (c TyName, c TmName)
 termFreeVars tm = (termFreeTyVars tm, termFreeIds tm)
 
 termFreeIds ::
-  Term
-  -> [TmName]
+  Collection c
+  => Term
+  -> c TmName
 termFreeIds = fv
 
 termFreeTyVars ::
-  Term
-  -> [TyName]
+  Collection c
+  => Term
+  -> c TyName
 termFreeTyVars = fv

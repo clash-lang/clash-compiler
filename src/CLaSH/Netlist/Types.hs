@@ -44,7 +44,8 @@ data Component
 type Size = Int
 
 data HWType
-  = Bit
+  = Void
+  | Bit
   | Bool
   | Integer
   | Signed   Size

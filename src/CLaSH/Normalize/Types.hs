@@ -11,12 +11,11 @@ import CLaSH.Util
 
 data NormalizeState
   = NormalizeState
-  { _normalized          :: HashMap TmName Term
-  , _typeSpecializations :: Map (TmName,Int,Type) (TmName,Type)
-  , _funSpecializations  :: Map (TmName,Int,Term) (TmName,Type)
-  , _inlined             :: HashMap TmName [TmName]
-  , _newInlined          :: [TmName]
-  , _curFun              :: TmName
+  { _normalized      :: HashMap TmName Term
+  , _specialisations :: Map (TmName,Int,Either Term Type) (TmName,Type)
+  , _inlined         :: HashMap TmName [TmName]
+  , _newInlined      :: [TmName]
+  , _curFun          :: TmName
   }
 
 mkLabels [''NormalizeState]

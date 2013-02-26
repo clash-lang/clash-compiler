@@ -9,6 +9,7 @@ module CLaSH.Core.Term where
 
 -- External Modules
 import Unbound.LocallyNameless as Unbound hiding (Data)
+import Unbound.LocallyNameless.Alpha (fvR1,aeqR1)
 import Unbound.LocallyNameless.Name (isFree)
 
 -- Internal Modules
@@ -49,7 +50,13 @@ instance Eq Term where
 instance Ord Term where
   compare e1 e2 = acompare e1 e2
 
-instance Alpha Term
+instance Alpha Term where
+  fv' c (Var _ n) = fv' c n
+  fv' c t         = fvR1 rep1 c t
+
+  aeq' c (Var _ n) (Var _ m) = aeq' c n m
+  aeq' c t1        t2        = aeqR1 rep1 c t1 t2
+
 instance Alpha Pat
 
 instance Subst Term Pat

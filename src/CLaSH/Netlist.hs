@@ -90,12 +90,12 @@ genComponent' compName componentExpr mStart = do
 
   LabelM.puts varEnv gamma
 
-  let resType  = typeToHWType_fail $ ids HashMap.! result
-  let argTypes = map (\(Id _ (Embed t)) -> typeToHWType_fail t) arguments
+  let resType  = coreTypeToHWType_fail $ ids HashMap.! result
+  let argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_fail t) arguments
 
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
-                                (typeToHWType_fail . unembed $ varType id_)
+                                (coreTypeToHWType_fail . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkConcSm . second unembed) binders
@@ -134,7 +134,7 @@ mkConcSm bndr app@(App _ _) = do
 
 mkConcSm bndr (Core.Literal lit) = do
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  let bndrHWType = typeToHWType_fail . unembed $ varType bndr
+  let bndrHWType = coreTypeToHWType_fail . unembed $ varType bndr
   let i = case lit of
             (IntegerLiteral i') -> i'
             _ -> error "not an integer literal"
@@ -171,7 +171,7 @@ mkApplication dst fun args = do
     Nothing -> case args of
       [] -> do
         let dstId     = mkBasicId . Text.pack . name2String $ varName dst
-        let dstHWType = typeToHWType_fail . unembed $ varType dst
+        let dstHWType = coreTypeToHWType_fail . unembed $ varType dst
         return [Assignment dstId Nothing dstHWType [Identifier (mkBasicId . Text.pack $ name2String fun) Nothing]]
       _ -> error "Unknown function"
 
@@ -181,7 +181,7 @@ mkDcApplication ::
   -> [Term]
   -> NetlistMonad [Declaration]
 mkDcApplication dst dc args = do
-  let dstHType = typeToHWType_fail . unembed $ varType dst
+  let dstHType = coreTypeToHWType_fail . unembed $ varType dst
   let dstId    = mkBasicId . Text.pack . name2String $ varName dst
   case dstHType of
     SP _ dcArgPairs -> do

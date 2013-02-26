@@ -17,6 +17,7 @@ module CLaSH.Core.Type
   , TyVar
   , ThetaType
   , tyView
+  , typeKind
   , mkTyConTy
   , isPredTy
   , noParenPred

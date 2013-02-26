@@ -7,59 +7,32 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = (apply "inlinleWrapper" inlineWrapper)
-                >-> (repeatR $ clsOpRes >-> representable >-> simplification)
+normalization = (repeatR $ clsOpRes >-> representable >-> simplification)
                 >-> retVarStep
   where
     clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
 
 representable :: NormRewrite
-representable = monomorphization >-> defunctionalization
-
-monomorphization :: NormRewrite
-monomorphization = monomorphization' >-> typeSpecialization
+representable = propagagition >-> specialisation
   where
-    monomorphization' :: NormRewrite
-    monomorphization' = repeatTopdown steps
+    propagagition = repeatR ( repeatTopdown [ ("lamApp"       ,lamApp      )
+                                            , ("letApp"       ,letApp      )
+                                            , ("caseApp"      ,caseApp     )
+                                            , ("tauReduction" ,tauReduction)
+                                            , ("letTyApp"     ,letTyApp    )
+                                            , ("caseTyApp"    ,caseTyApp   )
+                                            , ("bindNonRep"   ,bindNonRep  )
+                                            , ("liftNonRep"   ,liftNonRep  )
+                                            , ("caseLet"      , caseLet    )
+                                            , ("caseCon"      , caseCon    )
+                                            , ("caseCase"     , caseCase   )
+                                            ]
+                              >->
+                              doInline "inlineNonRep" inlineNonRep
+                            )
+    specialisation = repeatR (bottomupR (apply "typeSpec" typeSpec)) >->
+                     repeatR (bottomupR (apply "nonRepSpec" nonRepSpec))
 
-    typeSpecialization :: NormRewrite
-    typeSpecialization = repeatR $ bottomupR (apply "typeSpec" typeSpec)
-
-    steps :: [(String,NormRewrite)]
-    steps = [ ("lamApp"    , lamApp    )
-            , ("letApp"    , letApp    )
-            , ("caseApp"   , caseApp   )
-            , ("iotaReduce", iotaReduce)
-            , ("letTyApp"  , letTyApp  )
-            , ("caseTyApp" , caseTyApp )
-            , ("bindPoly"  , bindPoly  )
-            , ("liftPoly"  , liftPoly  )
-            ]
-
-defunctionalization :: NormRewrite
-defunctionalization = defunctionalization' >-> boxSpecialization
-  where
-    defunctionalization' :: NormRewrite
-    defunctionalization' =
-      repeatR . foldl1 (>->) $ concat
-        [ [doInline "inlineBox" inlineBox]
-        , map (topdownR . uncurry apply) steps
-        , [doInline "inlineHO" inlineHO]
-        ]
-
-    boxSpecialization :: NormRewrite
-    boxSpecialization = repeatR $ bottomupR (apply "boxSpec" boxSpec)
-
-    steps :: [(String,NormRewrite)]
-    steps = [ ("lamApp"   , lamApp    )
-            , ("letApp"   , letApp    )
-            , ("caseApp"  , caseApp   )
-            , ("caseLet"  , caseLet   )
-            , ("caseCon"  , caseCon   )
-            , ("caseCase" , caseCase  )
-            , ("bindBox"  , bindBox   )
-            , ("liftFun"  , liftFun   )
-            ]
 
 simplification :: NormRewrite
 simplification = (repeatTopdown steps) >->
@@ -74,7 +47,7 @@ simplification = (repeatTopdown steps) >->
             , ("appSimpl" , appSimpl  )
             , ("bindSimple", bindSimple)
             , ("inlineVar", inlineVar )
-            , ("inlineWrapper", inlineWrapper)
+            -- , ("inlineWrapper", inlineWrapper)
             ]
 
     simpleSpecialization = repeatR $ bottomupR (apply "simpleSpec" simpleSpec)
@@ -93,4 +66,4 @@ repeatTopdown :: [(String,NormRewrite)] -> NormRewrite
 repeatTopdown
   = repeatR
   . foldl1 (>->)
-  . map (topdownR . uncurry apply)
+  . map (repeatR . topdownR . uncurry apply)

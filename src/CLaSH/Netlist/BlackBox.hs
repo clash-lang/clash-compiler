@@ -39,7 +39,7 @@ mkBlackBoxContext ::
   -> NetlistMonad BlackBoxContext
 mkBlackBoxContext resId args = do
   let res               = Left . mkBasicId . pack $ name2String (V.varName resId)
-  let resTy             = N.typeToHWType_fail $ unembed $ V.varType resId
+  let resTy             = N.coreTypeToHWType_fail $ unembed $ V.varType resId
   isFunArgs             <- mapM isFun args
   let args'             = zip args isFunArgs
   varInps               <- mapM (runMaybeT . mkInput resId) args'
@@ -77,7 +77,7 @@ mkInput ::
   -> MaybeT NetlistMonad (SyncIdentifier,HWType)
 mkInput _ ((Var ty v), False) = do
   let vT = mkBasicId . pack $ name2String v
-  let hwTy = N.typeToHWType_fail ty
+  let hwTy = N.coreTypeToHWType_fail ty
   case synchronizedClk ty of
     Just clk -> return ((Right (vT,clk)), hwTy)
     Nothing  -> return ((Left vT), hwTy)

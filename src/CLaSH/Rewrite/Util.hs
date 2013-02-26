@@ -1,26 +1,30 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Rewrite.Util where
 
-import qualified Control.Monad        as Monad
-import Control.Monad.Trans.Class         (lift)
-import qualified Control.Monad.Reader as Reader
-import qualified Control.Monad.State  as State
-import qualified Control.Monad.Writer as Writer
-import qualified Data.HashMap.Lazy    as HashMap
-import qualified Data.Label.PureM     as LabelM
-import qualified Data.Monoid          as Monoid
+import qualified Control.Monad           as Monad
+import Control.Monad.Trans.Class            (lift)
+import qualified Control.Monad.Reader    as Reader
+import qualified Control.Monad.State     as State
+import qualified Control.Monad.Writer    as Writer
+import qualified Data.HashMap.Lazy       as HashMap
+import qualified Data.Label.PureM        as LabelM
+import qualified Data.Map                as Map
+import qualified Data.Monoid             as Monoid
+import qualified Data.Set                as Set
 import qualified Unbound.LocallyNameless as Unbound
-import Unbound.LocallyNameless           (bind,embed,makeName,name2String,rec,unbind,unrec,unembed)
+import Unbound.LocallyNameless           (Fresh,Collection(..),bind,embed,makeName,name2String,rebind,rec,unbind,unrec,unembed)
+import Unbound.Util                      (filterC)
 
 import CLaSH.Core.DataCon (dataConInstArgTys)
-import CLaSH.Core.FreeVars (termFreeVars)
+import CLaSH.Core.FreeVars (termFreeVars,typeFreeVars)
 import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
 import CLaSH.Core.Term (Pat(..),Term(..),TmName,LetBinding)
 import CLaSH.Core.TyCon (tyConDataCons)
-import CLaSH.Core.Type (Type(..),TyName,TypeView(..),tyView,mkTyVarTy)
-import CLaSH.Core.Util (Gamma,Delta,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps)
-import CLaSH.Core.Var  (Var(..),Id)
+import CLaSH.Core.Type (Type(..),TyName,TypeView(..),typeKind,tyView,mkTyVarTy)
+import CLaSH.Core.Util (Gamma,Delta,collectArgs,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps,mkApps,mkAbstraction)
+import CLaSH.Core.Var  (Var(..),Id,TyVar)
 import CLaSH.Netlist.Util (representableType)
 import CLaSH.Rewrite.Types
 import CLaSH.Util
@@ -35,11 +39,13 @@ apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
 apply name rewrite ctx expr = R $ do
   lvl <- LabelM.asks dbgLevel
   let before = showDoc expr
+  beforeType <- fmap showDoc $ termType expr
   (expr', anyChanged) <- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ Writer.listen $ runR $ rewrite ctx expr
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged $ LabelM.modify transformCounter (+1)
   let after  = showDoc expr'
-  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
+  afterType <- fmap showDoc $ termType expr'
+  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nType:" ++ beforeType ++ "\nResult:\n" ++ after ++ "\nType:" ++ afterType ++ "\n") $
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr'
 
@@ -101,32 +107,41 @@ contextEnv = go HashMap.empty HashMap.empty
     addToDelta delta (TyVar tvName ki) = HashMap.insert tvName (unembed ki) delta
     addToDelta delta _                 = error $ $(curLoc) ++ "Adding Id to Delta"
 
-mkGamma ::
+mkEnv ::
   (Functor m, Monad m)
   => [CoreContext]
-  -> RewriteMonad m Gamma
-mkGamma ctx = do
-  let (gamma,_) = contextEnv ctx
+  -> RewriteMonad m (Gamma, Delta)
+mkEnv ctx = do
+  let (gamma,delta) = contextEnv ctx
   tsMap         <- fmap (HashMap.map fst) $ LabelM.gets bindings
   dfuns         <- fmap (HashMap.map fst) $ LabelM.gets dictFuns
   clsOps        <- fmap (HashMap.map fst) $ LabelM.gets classOps
   let gamma'    = tsMap `HashMap.union` dfuns `HashMap.union` clsOps
                   `HashMap.union` gamma
-  return gamma'
+  return (gamma',delta)
+
+mkTmBinderFor name e = do
+  (Left r) <- mkBinderFor name (Left e)
+  return r
 
 mkBinderFor ::
-  (Functor m, Monad m)
+  (Functor m, Monad m, MonadUnique m, Fresh m)
   => String
-  -> Term
-  -> RewriteMonad m (Id,Term)
-mkBinderFor name term =
-  mkInternalVar name =<< termType term
+  -> (Either Term Type)
+  -> m (Either (Id,Term) (TyVar,Type))
+mkBinderFor name (Left term) =
+  Left <$> (mkInternalVar name =<< termType term)
+
+mkBinderFor name (Right ty) = do
+  name'     <- fmap (makeName name . toInteger) getUniqueM
+  let kind  = typeKind ty
+  return $ Right (TyVar name' (embed kind), VarTy kind name')
 
 mkInternalVar ::
-  (Functor m, Monad m)
+  (Functor m, Monad m, MonadUnique m)
   => String
   -> Type
-  -> RewriteMonad m (Id,Term)
+  -> m (Id,Term)
 mkInternalVar name ty = do
   name' <- fmap (makeName name . toInteger) getUniqueM
   return (Id name' (embed ty),Var ty name')
@@ -169,19 +184,23 @@ substituteBinders ((bndr,valE):rest) others res
     in substituteBinders rest' others' res'
 
 localFreeVars ::
-  (Functor m, Monad m)
+  (Functor m, Monad m, Collection c)
   => Term
-  -> RewriteMonad m ([TyName],[TmName])
+  -> RewriteMonad m (c TyName,c TmName)
 localFreeVars term = do
   globalBndrs <- LabelM.gets bindings
   dfuns       <- LabelM.gets dictFuns
   clsOps      <- LabelM.gets classOps
   let (tyFVs,tmFVs) = termFreeVars term
   return ( tyFVs
-         , filter (\v -> not ( v `HashMap.member` globalBndrs ||
-                               v `HashMap.member` dfuns       ||
-                               v `HashMap.member` clsOps )
-                  ) tmFVs
+         , filterC
+         $ cmap (\v -> if ( v `HashMap.member` globalBndrs ||
+                            v `HashMap.member` dfuns       ||
+                            v `HashMap.member` clsOps
+                          )
+                       then Nothing
+                       else Just v
+                ) tmFVs
          )
 
 liftBinders ::
@@ -194,8 +213,7 @@ liftBinders condition ctx expr@(Letrec b) = R $ do
   case replace of
     [] -> return expr
     _  -> do
-      let (_,delta) = contextEnv ctx
-      gamma <- mkGamma ctx
+      (gamma,delta) <- mkEnv ctx
       replace' <- mapM (liftBinding gamma delta) replace
       let (others',res') = substituteBinders replace' others res
       let newExpr = case others of
@@ -215,7 +233,7 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   let ty = unembed tyE
   let e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  (localFTVs,localFVs) <- localFreeVars e
+  (localFTVs,localFVs) <- fmap (Set.toList >< Set.toList) $ localFreeVars e
   let localFTVkinds = map (delta HashMap.!) localFTVs
   let localFVs'     = filter (/= idName) localFVs
   let localFVtys'   = map (gamma HashMap.!) localFVs'
@@ -319,7 +337,51 @@ mkSelectorCase ctx scrut dcI fieldI = do
               wildBndrs <- mapM mkWildValBinder fieldTys
               selBndr <- mkInternalVar "sel" (fieldTys!!fieldI)
               let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
-              let pat    = DataPat (embed dc) [] (map fst bndrs)
+              let pat    = DataPat (embed dc) (rebind [] (map fst bndrs))
               let retVal = Case scrut (fieldTys!!fieldI) [ bind pat (snd selBndr) ]
               return retVal
     _ -> cantCreate $(curLoc)
+
+
+specialise specMapLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl ctx e (collectArgs e1) (Right ty)
+specialise specMapLbl ctx e@(App   e1 e2) = specialise' specMapLbl ctx e (collectArgs e1) (Left  e2)
+specialise _          _   e               = return e
+
+specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
+  -- Create binders and variable references for free variables in 'specArg'
+  (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $
+                        either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
+  (gamma,delta) <- mkEnv ctx
+  let (specTyBndrs,specTyVars) = unzip
+                 $  map (\tv -> let ki = delta HashMap.! tv
+                               in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
+  let (specTmBndrs,specTmVars) = unzip
+                 $ map (\tm -> let ty = gamma HashMap.! tm
+                               in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
+  let argLen = length args
+  -- Determine if 'f' has already been specialized on 'specArg'
+  specM <- liftR $ fmap (Map.lookup (f,argLen,specArg))
+                 $ LabelM.gets specMapLbl
+  case specM of
+    -- Use previously specialized function
+    Just (fname,fty) -> changed $ mkApps (Var fty fname) (args ++ specTyVars ++ specTmVars)
+    -- Create new specialized function
+    Nothing -> do
+      bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+      case bodyMaybe of
+        Just (_,bodyTm) -> do
+          -- Make new binders for existing arguments
+          (boundArgs,argVars) <- fmap unzip $ fmap (map (either (Left >< Left) (Right >< Right))) $
+                                 mapM (mkBinderFor "pTS") args
+          -- Create specialized functions
+          let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specTyBndrs ++ specTmBndrs)
+          newf <- mkFunction f newBody
+          -- Remember specialization
+          liftR $ LabelM.modify specMapLbl
+                    (Map.insert (f,argLen,specArg) newf)
+          -- use specialized function
+          let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specTyVars ++ specTmVars)
+          changed newExpr
+        Nothing -> return e
+
+specialise' _ _ e _ _ = return e
