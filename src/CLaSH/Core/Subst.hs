@@ -31,6 +31,12 @@ substTyInTm ::
   -> Term
 substTyInTm = subst
 
+substTysinTm ::
+  [(TyName,Type)]
+  -> Term
+  -> Term
+substTysinTm = substs
+
 substTm ::
   TmName
   -> Term

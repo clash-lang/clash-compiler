@@ -8,13 +8,13 @@ import qualified Data.Label.PureM  as LabelM
 import qualified Data.List         as List
 import qualified Data.Map          as Map
 import qualified Data.Maybe        as Maybe
-import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,unrec)
+import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
 
-import CLaSH.Core.DataCon    (dcTag)
-import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds)
+import CLaSH.Core.DataCon    (dcTag,dcUnivTyVars)
+import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars)
 import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
-import CLaSH.Core.Subst      (substTyInTm)
+import CLaSH.Core.Subst      (substTyInTm,substTysinTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
 import CLaSH.Core.Util       (collectArgs,mkLams,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,mkTmApps,isLet)
@@ -201,13 +201,17 @@ caseCon _ (Case scrut ty alts)
     alts' <- mapM unbind alts
     let dcAltM = List.find (equalCon dc . fst) alts'
     case dcAltM of
-      Just (DataPat _ _ xs, e) -> do
+      Just (DataPat _ pxs, e) -> do
+        let (tvs,xs) = unrebind pxs
         let fvs = termFreeIds e
         let (binds,_) = List.partition ((`elem` fvs) . varName . fst)
                       $ zip xs (Either.lefts args)
-        case binds of
-          [] -> changed e
-          _  -> changed . Letrec $ bind (rec $ map (second embed) binds) e
+        let e' = case binds of
+                  [] -> e
+                  _  -> Letrec $ bind (rec $ map (second embed) binds) e
+        let substTyMap = zip (map varName tvs) (drop (length $ dcUnivTyVars dc) (Either.rights args))
+
+        traceIf True ("substTyMap:" ++ show substTyMap) $ changed (substTysinTm substTyMap e')
       Nothing -> do
         let defAltM = List.find (isDefPat . fst) alts'
         case defAltM of

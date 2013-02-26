@@ -17,8 +17,9 @@ data DataCon
   = MkData
   { dcName       :: DcName
   , dcTag        :: ConTag
-  , dcRepArgTys  :: [Type]
   , dcUnivTyVars :: [TyName]
+  , dcExtTyVars  :: [TyName]
+  , dcArgTys     :: [Type]
   , dcWorkId     :: (TmName, Type)
   }
 
@@ -55,12 +56,16 @@ instance Subst Type DataCon
 instance Subst Term DataCon
 
 dataConInstArgTys :: DataCon -> [Type] -> [Type]
-dataConInstArgTys (MkData { dcRepArgTys  = rep_arg_tys
+dataConInstArgTys (MkData { dcArgTys     = arg_tys
                           , dcUnivTyVars = univ_tvs
+                          , dcExtTyVars  = ex_tvs
                           })
                   inst_tys
-  | length univ_tvs == length inst_tys
-  = map (substs (zip univ_tvs inst_tys)) rep_arg_tys
+  | length tyvars == length inst_tys
+  = map (substs (zip tyvars inst_tys)) arg_tys
 
   | otherwise
   = error $ $(curLoc) ++ "dataConInstArgTys: number of tyVars and Types differ"
+
+  where
+    tyvars = univ_tvs ++ ex_tvs

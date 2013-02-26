@@ -2,7 +2,7 @@
 module CLaSH.Core.Util where
 
 import Data.HashMap.Lazy (HashMap)
-import Unbound.LocallyNameless (Fresh,bind,embed,runFreshM,unbind,unembed,string2Name)
+import Unbound.LocallyNameless (Fresh,bind,embed,runFreshM,unbind,unembed,string2Name,unrebind)
 
 import CLaSH.Core.DataCon (dcWorkId)
 import CLaSH.Core.Literal (literalType)
@@ -69,8 +69,8 @@ applyTypeToArgs opTy (Left e:args)   = case splitFunTy opTy of
   Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy: " ++ show (opTy,e,args)
 
 patIds :: Pat -> [Id]
-patIds (DataPat _ _ ids) = ids
-patIds _                 = []
+patIds (DataPat _ ids) = snd $ unrebind ids
+patIds _               = []
 
 mkTyVar ::
   Kind

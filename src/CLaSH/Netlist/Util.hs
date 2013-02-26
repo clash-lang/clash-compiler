@@ -7,7 +7,7 @@ import Data.Either             (partitionEithers)
 import Data.Maybe              (catMaybes)
 import Unbound.LocallyNameless (bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
-import CLaSH.Core.DataCon      (DataCon(..),dcRepArgTys)
+import CLaSH.Core.DataCon      (DataCon(..))
 import CLaSH.Core.FreeVars     (typeFreeVars)
 import CLaSH.Core.Subst        (substTys)
 import CLaSH.Core.Term         (LetBinding,Term(..),TmName)

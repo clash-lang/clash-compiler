@@ -12,7 +12,7 @@ import GHC.Show (showMultiLineString)
 import Text.PrettyPrint (Doc,(<+>),(<>),($+$),($$),render,parens,text,sep,
   punctuate,comma,hang,char,brackets,empty,fsep,hsep,equals,vcat,integer,int)
 import Unbound.LocallyNameless (Embed(..),Name,LFresh,runLFreshM,unembed,
-  name2String,name2Integer,lunbind,unrec)
+  name2String,name2Integer,lunbind,unrec,unrebind)
 
 import CLaSH.Core.DataCon (DataCon(..))
 import CLaSH.Core.Literal (Literal(..))
@@ -129,9 +129,10 @@ instance Pretty Prim where
 
 instance Pretty Pat where
   pprPrec prec pat = case pat of
-    DataPat dc txs xs -> do
+    DataPat dc pxs -> do
+      let (txs,xs) = unrebind pxs
       dc'  <- ppr (unembed dc)
-      txs' <- mapM (pprBndr CaseBind) txs
+      txs' <- mapM (pprBndr LetBind) txs
       xs'  <- mapM (pprBndr CaseBind) xs
       return $ prettyParen (prec >= appPrec) $ dc' <+> hsep txs' <+> hsep xs'
     LitPat l   -> ppr (unembed l)

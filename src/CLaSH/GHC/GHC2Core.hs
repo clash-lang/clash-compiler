@@ -22,7 +22,7 @@ import Data.HashMap.Lazy                  (HashMap)
 import qualified Data.HashMap.Lazy        as HashMap
 import Data.Label.PureM                   as LabelM
 import Data.Maybe                         (fromMaybe)
-import Unbound.LocallyNameless            (Rep,bind,rec,embed,unembed)
+import Unbound.LocallyNameless            (Rep,bind,rec,embed,rebind,unembed)
 import qualified Unbound.LocallyNameless  as Unbound
 
 -- GHC API
@@ -30,7 +30,7 @@ import BasicTypes (TupleSort (..))
 import Coercion   (isCoVar,coercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
-import DataCon    (DataCon,dataConTag,dataConUnivTyVars,dataConWorkId,
+import DataCon    (DataCon,dataConTag,dataConExTyVars,dataConUnivTyVars,dataConWorkId,
   dataConRepArgTys,dataConName,dataConTyCon)
 import CLaSH.GHC.Compat.FastString (unpackFS,unpackFB)
 import Id         (isDataConWorkId_maybe)
@@ -179,8 +179,9 @@ makeDataCon dc = do
         C.MkData
           { C.dcName       = coreToName dataConName getUnique nameString dc
           , C.dcTag        = dataConTag dc
-          , C.dcRepArgTys  = repTys
+          , C.dcArgTys     = repTys
           , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
+          , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
           , C.dcWorkId     = ( coreToVar $ dataConWorkId dc
                              , workIdTy)
           }
@@ -270,12 +271,13 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
     alt (DataAlt dc, xs, e) = case (as,cs) of
-      ([],[]) -> bind <$> (C.DataPat . embed <$>
+      (tvs,[]) -> bind <$> (C.DataPat . embed <$>
                             (coreToDataCon dc) <*>
-                            (pure []) <*>
-                            (mapM coreToId zs)) <*>
+                            (rebind <$>
+                              (mapM coreToTyVar tvs) <*>
+                              (mapM coreToId zs))) <*>
                       (term e)
-      _ -> error $ $(curLoc) ++ "Patterns binding coercions or type variables are not supported"
+      _ -> error $ $(curLoc) ++ "Patterns binding coercions are not supported: " ++ showPpr coreExpr
       where
         (as,ys) = span isTyVar xs
         (cs,zs) = span isCoVar ys

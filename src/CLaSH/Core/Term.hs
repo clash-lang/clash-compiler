@@ -36,10 +36,10 @@ type TmName     = Name Term
 type LetBinding = (Id, Embed Term)
 
 data Pat
-  = DataPat (Embed DataCon) [TyVar] [Id]
+  = DataPat (Embed DataCon) (Rebind [TyVar] [Id])
   | LitPat  (Embed Literal)
   | DefaultPat
-  deriving (Eq,Ord,Show)
+  deriving (Show)
 
 Unbound.derive [''Term,''Pat]
 
