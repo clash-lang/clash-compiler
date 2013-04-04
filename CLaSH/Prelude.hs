@@ -7,6 +7,7 @@ module CLaSH.Prelude
   )
 where
 
+import Data.Bits            as Exported
 import CLaSH.Class.Default  as Exported
 import CLaSH.Promoted.Bool  as Exported
 import CLaSH.Promoted.Ord   as Exported
