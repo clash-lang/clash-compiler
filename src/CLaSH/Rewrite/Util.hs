@@ -15,7 +15,7 @@ import qualified Data.Map                as Map
 import qualified Data.Monoid             as Monoid
 import qualified Data.Set                as Set
 import qualified Unbound.LocallyNameless as Unbound
-import Unbound.LocallyNameless           (Fresh,Collection(..),bind,embed,makeName,name2String,rebind,rec,unbind,unrec,unembed)
+import Unbound.LocallyNameless           (Fresh,Collection(..),bind,embed,makeName,name2String,rebind,rec,string2Name,unbind,unrec,unembed)
 import Unbound.Util                      (filterC)
 
 import CLaSH.Core.DataCon (dataConInstArgTys)
@@ -401,5 +401,24 @@ specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
           let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specTyVars ++ specTmVars)
           changed newExpr
         Nothing -> return e
+
+specialise' _ ctx _ (appE,args) (Left specArg) = R $ do
+  -- Create binders and variable references for free variables in 'specArg'
+  (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $ localFreeVars specArg
+  (gamma,delta) <- mkEnv ctx
+  let (specTyBndrs,specTyVars) = unzip
+                               $ map (\tv -> let ki = delta HashMap.! tv
+                                             in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
+  let (specTmBndrs,specTmVars) = unzip
+                               $ map (\tm -> let ty = gamma HashMap.! tm
+                                             in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
+  -- Create specialized function
+  let newBody = mkAbstraction specArg (specTyBndrs ++ specTmBndrs)
+  newf <- mkFunction (string2Name "specF") newBody
+  -- Create specialized argument
+  let newArg  = Left $ mkApps ((uncurry . flip) Var newf) (specTyVars ++ specTmVars)
+  -- Use specialized argument
+  let newExpr = mkApps appE (args ++ [newArg])
+  changed newExpr
 
 specialise' _ _ e _ _ = return e

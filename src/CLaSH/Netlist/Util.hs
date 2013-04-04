@@ -33,7 +33,7 @@ splitNormalized expr = do
             Var _ v -> return (tmArgs,unrec xes,v)
             _ -> error "Not in normal form: res not simple var"
       | otherwise -> error "Not in normal form: tyArgs"
-    _ -> error "Not in normal from: no Letrec"
+    _ -> error ("Not in normal from: no Letrec: " ++ showDoc expr)
 
 coreTypeToHWType_fail ::
   Type

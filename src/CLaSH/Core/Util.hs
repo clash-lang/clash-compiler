@@ -150,6 +150,12 @@ isCon ::
 isCon (Data _) = True
 isCon _        = False
 
+isPrim ::
+  Term
+  -> Bool
+isPrim (Prim _) = True
+isPrim _        = False
+
 isPrimCon ::
   Term
   -> Bool

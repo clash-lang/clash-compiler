@@ -15,7 +15,7 @@ import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm,substTysinTm)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
-import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,isLet)
+import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,isLet,isPrim)
 import CLaSH.Core.Var        (Var(..))
 import CLaSH.Normalize.Types
 import CLaSH.Normalize.Util
@@ -228,7 +228,7 @@ caseCon _ e = return e
 
 funANF :: NormRewrite
 funANF _ e@(App appf arg)
-  | (Var f, _) <- collectArgs e
+  | (Var _ _, _) <- collectArgs e
   = R $ do
     localVar <- isLocalVar arg
     case localVar of
@@ -237,6 +237,100 @@ funANF _ e@(App appf arg)
                   changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
 
 funANF _ e = return e
+
+conPrimANF :: NormRewrite
+conPrimANF ctx e@(App appConPrim arg)
+  | (conPrim, _) <- collectArgs e
+  , isCon conPrim || isPrim conPrim
+  = R $ do
+    localVar       <- isLocalVar arg
+    untranslatable <- isUntranslatable arg
+    case (localVar,untranslatable,arg) of
+      (False,False,_)  -> do (argId,argVar) <- mkTmBinderFor "conPrimANF" arg
+                             changed . Letrec $ bind (rec [(argId,embed arg)]) (App appConPrim argVar)
+      (_,_,Letrec b)   -> do (binds,body) <- unbind b
+                             changed . Letrec $ bind binds (App appConPrim body)
+      (_,_,Case _ _ _) -> runR $ specialise specialisations ctx e
+      (_,_,Lam _)      -> runR $ specialise specialisations ctx e
+      _                -> return e
+
+conPrimANF _ e = return e
+
+subjLet :: NormRewrite
+subjLet _ e@(Case subj ty alts) = R $ do
+  localVar       <- isLocalVar subj
+  untranslatable <- isUntranslatable subj
+  case localVar || untranslatable of
+    True  -> return e
+    False -> do (argId,argVar) <- mkTmBinderFor "subjLet" subj
+                changed . Letrec $ bind (rec [(argId,embed subj)]) (Case argVar ty alts)
+
+subjLet _ e = return e
+
+altLet :: NormRewrite
+altLet = undefined
+
+bodyVar :: NormRewrite
+bodyVar _ e@(Letrec b) = R $ do
+  (binds,body)   <- unbind b
+  localVar       <- isLocalVar body
+  untranslatable <- isUntranslatable body
+  case localVar || untranslatable of
+    True  -> return e
+    False -> do (argId,argVar) <- mkTmBinderFor "bodyVar" body
+                changed . Letrec $ bind (rec $ unrec binds ++ [(argId,embed body)]) argVar
+
+bodyVar _ e = return e
+
+letFlat :: NormRewrite
+letFlat _ e@(Letrec binds) = R $ do
+    (xes, body) <- fmap (first unrec) $ unbind binds
+    (binds',updated) <- fmap unzip $ mapM flatBind xes
+    case (or updated) of
+      True  -> changed . Letrec $ bind (rec (concat binds')) body
+      False -> return e
+  where
+    flatBind :: Monad m => LetBinding -> RewriteMonad m ([LetBinding],Bool)
+    flatBind (bndr, Embed (Letrec binds')) = do
+      (r,body) <- unbind binds'
+      let r' = unrec r
+      return ((bndr, Embed body):r', True)
+    flatBind b = return ([b],False)
+
+letFlat _ e = return e
+
+topLet :: NormRewrite
+topLet ctx e
+  | all isLambdaBodyCtx ctx && not (isLet e)
+  = R $ do
+  untranslatable <- isUntranslatable e
+  case untranslatable of
+    True  -> return e
+    False -> do (argId,argVar) <- mkTmBinderFor "topLet" e
+                changed . Letrec $ bind (rec [(argId,embed e)]) argVar
+
+topLet _ e = return e
+
+etaExpansion :: NormRewrite
+etaExpansion (AppFirst:_)  e = return e
+etaExpansion (AppSecond:_) e = return e
+etaExpansion _ e
+  | not (isLam e)
+  = R $ do
+    isF <- isFun e
+    case isF of
+      True -> do
+        argTy <- ( return
+                 . fst
+                 . Maybe.fromMaybe (error "etaExpansion splitFunTy")
+                 . splitFunTy
+                 <=< termType
+                 ) e
+        (newIdB,newIdV) <- mkInternalVar "eta" argTy
+        changed . Lam $ bind newIdB (App e newIdV)
+      False -> return e
+
+etaExpansion _ e = return e
 
 -- = Inline, Lift, or Specialize =
 --
@@ -424,38 +518,21 @@ appSimpl _ e@(App appf arg)
 
 appSimpl _ e = return e
 
-letFlat :: NormRewrite
-letFlat _ e@(Letrec binds) = R $ do
-    (xes, body) <- fmap (first unrec) $ unbind binds
-    (binds',updated) <- fmap unzip $ mapM flatBind xes
-    case (or updated) of
-      True  -> changed . Letrec $ bind (rec (concat binds')) body
-      False -> return e
-  where
-    flatBind :: Monad m => LetBinding -> RewriteMonad m ([LetBinding],Bool)
-    flatBind (bndr, Embed (Letrec binds')) = do
-      (r,body) <- unbind binds'
-      let r' = unrec r
-      return ((bndr, Embed body):r', True)
-    flatBind b = return ([b],False)
-
-letFlat _ e = return e
-
 inlineVar :: NormRewrite
 inlineVar = inlineBinders (isLocalVar . unembed . snd)
 
-retLet :: NormRewrite
-retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
-  (xes,body) <- fmap (first unrec) $ unbind b
-  lv <- isLocalVar body
-  unTran <- isUntranslatable body
-  case lv || unTran of
-    False -> do
-      (resId,resVar) <- mkTmBinderFor "retLet" body
-      changed . Letrec $ bind (rec $ (resId,embed body):xes) resVar
-    True -> return expr
+-- retLet :: NormRewrite
+-- retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
+--   (xes,body) <- fmap (first unrec) $ unbind b
+--   lv <- isLocalVar body
+--   unTran <- isUntranslatable body
+--   case lv || unTran of
+--     False -> do
+--       (resId,resVar) <- mkTmBinderFor "retLet" body
+--       changed . Letrec $ bind (rec $ (resId,embed body):xes) resVar
+--     True -> return expr
 
-retLet _ e = return e
+-- retLet _ e = return e
 
 retLam :: NormRewrite
 retLam ctx e
