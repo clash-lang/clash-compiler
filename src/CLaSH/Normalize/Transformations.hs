@@ -226,6 +226,18 @@ caseCon _ (Case scrut ty alts)
 
 caseCon _ e = return e
 
+funANF :: NormRewrite
+funANF _ e@(App appf arg)
+  | (Var f, _) <- collectArgs e
+  = R $ do
+    localVar <- isLocalVar arg
+    case localVar of
+      True  -> return e
+      False -> do (argId,argVar) <- mkTmBinderFor "funANF" arg
+                  changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
+
+funANF _ e = return e
+
 -- = Inline, Lift, or Specialize =
 --
 -- Let-binding:
