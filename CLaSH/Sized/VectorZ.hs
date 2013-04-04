@@ -1,11 +1,12 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE ExplicitForAll   #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE KindSignatures   #-}
-{-# LANGUAGE TemplateHaskell  #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
@@ -41,7 +42,7 @@ infixr 5 :>
 instance Show a => Show (Vec n a) where
   show vs = "<" ++ punc vs ++ ">"
     where
-      punc :: Show a => Vec n a -> String
+      punc :: Show a => Vec m a -> String
       punc Nil        = ""
       punc (x :> Nil) = show x
       punc (x :> xs)  = show x ++ "," ++ punc xs
@@ -158,10 +159,13 @@ vindexM Nil       _ = Nothing
 vindexM (x :> _)  0 = Just x
 vindexM (_ :> xs) n = vindexM xs (n-1)
 
-vindex :: (Num i, Eq i) => Vec n a -> i -> a
-vindex xs i = case vindexM xs i of
-  Just a  -> a
-  Nothing -> error "index out of bounds"
+vindex :: (SingI n, Num i, Eq i) => Vec n a -> i -> a
+vindex xs i = case vindexM xs (maxIndex xs - i) of
+    Just a  -> a
+    Nothing -> error "index out of bounds"
+
+maxIndex :: forall i n a . SingRep n => Num i => Vec n a -> i
+maxIndex _ = fromInteger (fromSing (sing :: Sing n) - 1)
 
 vreplaceM :: (Num i, Eq i) => Vec n a -> i -> a -> Maybe (Vec n a)
 vreplaceM Nil       _ _ = Nothing
@@ -170,8 +174,8 @@ vreplaceM (x :> xs) n y = case vreplaceM xs (n-1) y of
                                 Just xs' -> Just (x :> xs')
                                 Nothing  -> Nothing
 
-vreplace :: (Num i, Eq i) => Vec n a -> i -> a -> Vec n a
-vreplace xs i a = case vreplaceM xs i a of
+vreplace :: (SingI n, Num i, Eq i) => Vec n a -> i -> a -> Vec n a
+vreplace xs i a = case vreplaceM xs (maxIndex xs - i) a of
   Just ys -> ys
   Nothing -> error "index out of bounds"
 
