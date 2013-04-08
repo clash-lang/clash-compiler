@@ -15,7 +15,7 @@ where
 
 import Control.Applicative              (Applicative,(<$>),(<*>),pure)
 import Control.Arrow                    (first,second)
-import Control.Monad                    ((<=<))
+import Control.Monad                    ((<=<),(>=>))
 import Control.Monad.State              (MonadState)
 import Control.Monad.Trans.Class        (MonadTrans,lift)
 import Data.Hashable                    (Hashable(..),hash)

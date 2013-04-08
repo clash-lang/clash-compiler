@@ -8,7 +8,6 @@ import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
 normalization = repeatR $ clsOpRes >-> representable >-> simplification
-                -- >-> retVarStep
   where
     clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
 
@@ -40,40 +39,15 @@ simplification = repeatTopdown steps
             , ("lamApp"      , lamApp )
             , ("letApp"      , letApp )
             , ("caseApp"     , caseApp )
-            , ("funANF"      , funANF )
-            , ("conPrimANF"  , conPrimANF )
+            , ("repANF"      , repANF )
+            , ("nonRepANF"   , nonRepANF )
             , ("subjLet"     , subjLet)
-            -- , ("altLet"      , altLet)
+            , ("altLet"      , altLet)
             , ("bodyVar"     , bodyVar)
             , ("letFlat"     , letFlat)
             , ("topLet"      , topLet)
             , ("etaExpansion", etaExpansion)
             ]
-
--- simplification :: NormRewrite
--- simplification = (repeatTopdown steps) >->
---                  simpleSpecialization
---   where
---     steps = [ ("inlineSimple", inlineSimple)
---             , ("lamApp"   , lamApp    )
---             , ("letApp"   , letApp    )
---             , ("caseApp"  , caseApp   )
---             , ("deadcode" , deadCode  )
---             , ("etaExpand", etaExpand )
---             , ("appSimpl" , appSimpl  )
---             , ("bindSimple", bindSimple)
---             , ("inlineVar", inlineVar )
---             -- , ("inlineWrapper", inlineWrapper)
---             ]
---
---     simpleSpecialization = repeatR $ bottomupR (apply "simpleSpec" simpleSpec)
---
--- retVarStep :: NormRewrite
--- retVarStep = repeatTopdown [ ("retLet" , retLet  )
---                            , ("retLam" , retLam  )
---                            , ("retVar" , retVar  )
---                            , ("letFlat", letFlat )
---                            ]
 
 doInline :: String -> NormRewrite -> NormRewrite
 doInline n t = bottomupR (apply n t) >-> commitNewInlined

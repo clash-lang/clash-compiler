@@ -1,22 +1,24 @@
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Normalize.Transformations where
 
+import qualified Control.Monad     as Monad
 import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.Label.PureM  as LabelM
 import qualified Data.List         as List
 import qualified Data.Maybe        as Maybe
-import Unbound.LocallyNameless        (Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
+import Unbound.LocallyNameless        (Bind,Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
 
-import CLaSH.Core.DataCon    (dcTag,dcUnivTyVars)
+import CLaSH.Core.DataCon    (DataCon,dcTag,dcUnivTyVars)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars)
 import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm,substTysinTm)
-import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
-import CLaSH.Core.Type       (isPolyTy,splitFunTy,applyFunTy,isFunTy,applyTy)
-import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isPrimCon,isPrimFun,isLet,isPrim)
-import CLaSH.Core.Var        (Var(..))
+import CLaSH.Core.Term       (Term(..),TmName,LetBinding,Pat(..))
+import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy)
+import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isLet,isPrim)
+import CLaSH.Core.Var        (Var(..),Id)
 import CLaSH.Normalize.Types
 import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Types
@@ -226,35 +228,35 @@ caseCon _ (Case scrut ty alts)
 
 caseCon _ e = return e
 
-funANF :: NormRewrite
-funANF _ e@(App appf arg)
-  | (Var _ _, _) <- collectArgs e
+repANF :: NormRewrite
+repANF _ e@(App appf arg)
+  | (conVarPrim, _) <- collectArgs e
+  , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = R $ do
-    localVar <- isLocalVar arg
-    case localVar of
+    localVar       <- isLocalVar arg
+    untranslatable <- isUntranslatable arg
+    case localVar || untranslatable of
       True  -> return e
-      False -> do (argId,argVar) <- mkTmBinderFor "funANF" arg
+      False -> do (argId,argVar) <- mkTmBinderFor "repANF" arg
                   changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
 
-funANF _ e = return e
+repANF _ e = return e
 
-conPrimANF :: NormRewrite
-conPrimANF ctx e@(App appConPrim arg)
+nonRepANF :: NormRewrite
+nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
   = R $ do
     localVar       <- isLocalVar arg
     untranslatable <- isUntranslatable arg
-    case (localVar,untranslatable,arg) of
-      (False,False,_)  -> do (argId,argVar) <- mkTmBinderFor "conPrimANF" arg
-                             changed . Letrec $ bind (rec [(argId,embed arg)]) (App appConPrim argVar)
-      (_,_,Letrec b)   -> do (binds,body) <- unbind b
-                             changed . Letrec $ bind binds (App appConPrim body)
-      (_,_,Case _ _ _) -> runR $ specialise specialisations ctx e
-      (_,_,Lam _)      -> runR $ specialise specialisations ctx e
-      _                -> return e
+    case (localVar || not untranslatable,arg) of
+      (False,Letrec b)   -> do (binds,body) <- unbind b
+                               changed . Letrec $ bind binds (App appConPrim body)
+      (False,Case _ _ _) -> runR $ specialise specialisations ctx e
+      (False,Lam _)      -> runR $ specialise specialisations ctx e
+      _                  -> return e
 
-conPrimANF _ e = return e
+nonRepANF _ e = return e
 
 subjLet :: NormRewrite
 subjLet _ e@(Case subj ty alts) = R $ do
@@ -268,7 +270,43 @@ subjLet _ e@(Case subj ty alts) = R $ do
 subjLet _ e = return e
 
 altLet :: NormRewrite
-altLet = undefined
+altLet ctx e@(Case subj ty alts) = R $ do
+    untranslatable <- isUntranslatable e
+    case untranslatable of
+      True  -> return e
+      False -> do (bndrs,alts') <- fmap (first concat . unzip) $ mapM doAlt alts
+                  case bndrs of
+                    [] -> return e
+                    _  -> changed . Letrec $ bind (rec bndrs) (Case subj ty alts')
+  where
+    doAlt :: Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
+    doAlt = fmap (second (uncurry bind)) . doAlt' <=< unbind
+
+    doAlt' :: (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
+    doAlt' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
+      lv <- isLocalVar altExpr
+      case lv of
+        True  -> return ([],alt)
+        False -> do let fvs = termFreeIds e
+                    patSels <- fmap Maybe.catMaybes $ Monad.zipWithM (doPatBndr fvs (unembed dc)) xs [0..]
+                    (altId,altVar) <- mkTmBinderFor "altLet" altExpr
+                    return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
+    doAlt' alt@(DataPat _ _, _) = return ([],alt)
+    doAlt' alt@(pat,altExpr) = do
+      lv <- isLocalVar altExpr
+      case lv of
+        True  -> return ([],alt)
+        False -> do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
+                    return ([(altId,embed altExpr)],(pat,altVar))
+
+    doPatBndr :: [TmName] -> DataCon -> Id -> Int -> RewriteMonad NormalizeMonad (Maybe LetBinding)
+    doPatBndr fvs dc pId i
+      | (varName pId) `notElem` fvs = return Nothing
+      | otherwise
+      = do patExpr <- mkSelectorCase ctx subj (dcTag dc) i
+           return (Just (pId,embed patExpr))
+
+altLet _ e = return e
 
 bodyVar :: NormRewrite
 bodyVar _ e@(Letrec b) = R $ do
@@ -332,129 +370,7 @@ etaExpansion _ e
 
 etaExpansion _ e = return e
 
--- = Inline, Lift, or Specialize =
---
--- Let-binding:
--- Has POLYFUNction type?              => Lift
--- Takes Type arguments, non-recursive => Inline
--- Takes Type arguments, recursive     => Lift
--- Others                              => Do Nothing
---
-bindPoly :: NormRewrite
-bindPoly = inlineBinders bindPolyTest
-  where
-    bindPolyTest (Id idName tyE, exprE)
-      | isPolyTy (unembed tyE) && null (typeFreeVars (unembed tyE)) = do
-          (_,localFVs) <- localFreeVars (unembed exprE)
-          polyFunTy <- isPolyFunTy (unembed tyE)
-          return $ (not polyFunTy) && (idName `notElem` localFVs)
-    bindPolyTest _ = return False
-
-liftPoly :: NormRewrite
-liftPoly = liftBinders liftPolyTest
-  where
-    liftPolyTest (Id idName tyE, exprE)
-      | isPolyTy (unembed tyE) && null (typeFreeVars (unembed tyE)) = do
-          (_,localFVs) <- localFreeVars (unembed exprE)
-          polyFunTy <- isPolyFunTy (unembed tyE)
-          return $ polyFunTy || (idName `elem` localFVs)
-    liftPolyTest _ = return False
-
--- = Inline, Lift, or Specialize =
---
--- Function Application:
--- Has Type arguments?  => Specialize
--- Others               => Do Nothing
---
-
-
--- Defunctionalization Rewrite rules
--- inlineBox :: NormRewrite
--- inlineBox ctx e@(Case scrut ty alts)
---   | (Var _ f, args) <- collectArgs scrut
---   = R $ do
---     isInlined <- liftR $ alreadyInlined f
---     case isInlined of
---       True -> do
---         cf <- liftR $ LabelM.gets curFun
---         traceIf True ($(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
---       False -> do
---         scrutTy <- termType scrut
---         bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
---         case (isBoxTy scrutTy, bodyMaybe) of
---           (True,Just (_, scrutBody)) -> do
---             scrutBody' <- lift $ runRewrite "monomorphization" monomorphization scrutBody
---             liftR $ LabelM.modify newInlined (f:)
---             changed $ Case (mkApps scrutBody' args) ty alts
---           _ -> return e
---
--- inlineBox _ e = return e
-
--- = Inline, Lift, or Specialize =
---
--- Let-binding:
--- Has POLYFUNction type?              => Lift
--- Has BOX type, non-recursive?        => Inline
--- Has BOX type, recursive?            => Lift
--- Others                              => Do Nothing
---
-liftFun :: NormRewrite
-liftFun = liftBinders liftFunTest
-  where
-    liftFunTest (Id idName tyE, exprE)
-      | null (typeFreeVars (unembed tyE)) = do
-          let ty = unembed tyE
-          (_,localFVs) <-  localFreeVars (unembed exprE)
-          return $ isFunTy ty || isBoxTy ty && idName `elem` localFVs
-    liftFunTest _ = return False
-
-bindBox :: NormRewrite
-bindBox = inlineBinders bindBoxTest
-  where
-    bindBoxTest (Id idName tyE, exprE)
-      | null (typeFreeVars (unembed tyE)) = do
-          let ty = unembed tyE
-          (_,localFVs) <-  localFreeVars (unembed exprE)
-          return $ isBoxTy ty && idName `notElem` localFVs
-    bindBoxTest _ = return False
-
--- = Inline, Lift, or Specialize =
---
--- Function Application:
--- Has FUN arguments?   => Inline
--- Has BOXed arguments? => Specialize
--- Others               => Do Nothing
---
--- inlineHO :: NormRewrite
--- inlineHO ctx e@(App e1 e2)
---   | (Var _ f, args) <- collectArgs e1
---   = R $ do
---     gamma <- mkGamma ctx
---     e2Ty <- termType e2
---     case isFunTy e2Ty of
---       True -> do
---         isInlined <- liftR $ alreadyInlined f
---         case isInlined of
---           True -> do
---             cf <- liftR $ LabelM.gets curFun
---             traceIf True ($(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
---           False -> do
---             bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
---             case bodyMaybe of
---               Just (_,bodyTm) -> do
---                 bodyTm' <- lift $ runRewrite "monomorphization" monomorphization bodyTm
---                 let newE = mkApps bodyTm' args
---                 liftR $ LabelM.modify newInlined (f:)
---                 changed (App newE e2)
---               Nothing -> return e
---       False -> return e
---
--- inlineHO _ e = return e
-
-
-
-
--- Simplification Rewrite Rules
+-- Misc rewrites
 deadCode :: NormRewrite
 deadCode _ e@(Letrec binds) = R $ do
     (xes, body) <- fmap (first unrec) $ unbind binds
@@ -480,124 +396,6 @@ deadCode _ e@(Letrec binds) = R $ do
       in findUsedBndrs (used ++ explore) explore' other'
 
 deadCode _ e = return e
-
-etaExpand :: NormRewrite
-etaExpand (AppFirst:_)  e = return e
-etaExpand (AppSecond:_) e = return e
-etaExpand _ e
-  | not (isLam e)
-  = R $ do
-    isF <- isFun e
-    case isF of
-      True -> do
-        argTy <- ( return
-                 . fst
-                 . Maybe.fromMaybe (error "etaExpand splitFunTy")
-                 . splitFunTy
-                 <=< termType
-                 ) e
-        (newIdB,newIdV) <- mkInternalVar "eta" argTy
-        changed . Lam $ bind newIdB (App e newIdV)
-      False -> return e
-
-etaExpand _ e = return e
-
-appSimpl :: NormRewrite
-appSimpl _ e@(App appf arg)
-  | (f, _) <- collectArgs e
-  , isVar f || isCon f || isPrimCon f || isPrimFun f
-  = R $ do
-    localVar       <- isLocalVar arg
-    untranslatable <- isUntranslatable arg
-    let simple     = isSimple arg
-    case localVar || untranslatable || simple of
-      True  -> return e
-      False -> do
-        (argId,argVar) <- mkTmBinderFor "appSimpl" arg
-        changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
-
-appSimpl _ e = return e
-
-inlineVar :: NormRewrite
-inlineVar = inlineBinders (isLocalVar . unembed . snd)
-
--- retLet :: NormRewrite
--- retLet ctx expr@(Letrec b) | all isLambdaBodyCtx ctx = R $ do
---   (xes,body) <- fmap (first unrec) $ unbind b
---   lv <- isLocalVar body
---   unTran <- isUntranslatable body
---   case lv || unTran of
---     False -> do
---       (resId,resVar) <- mkTmBinderFor "retLet" body
---       changed . Letrec $ bind (rec $ (resId,embed body):xes) resVar
---     True -> return expr
-
--- retLet _ e = return e
-
-retLam :: NormRewrite
-retLam ctx e
-  | all isLambdaBodyCtx ctx && not (isLam e) && not (isLet e)
-  = R $ do
-    lv     <- isLocalVar e
-    unTran <- isUntranslatable e
-    case lv || unTran of
-      False -> do
-        (resId,resVar) <- mkTmBinderFor "retLam" e
-        changed . Letrec $ bind (rec $ [(resId,embed e)]) resVar
-      True -> return e
-
-retLam _ e = return e
-
-retVar :: NormRewrite
-retVar ctx e@(Var t v)
-  | all isLambdaBodyCtx ctx
-  = R $ case (HashMap.lookup v . fst $ contextEnv ctx) of
-    Just ty -> do
-      (boundArg,argVar) <- mkInternalVar "retVar" ty
-      changed . Letrec $ bind (rec [(boundArg, Embed $ Var t v)]) argVar
-    Nothing -> return e
-
-retVar _ e = return e
-
-bindSimple :: NormRewrite
-bindSimple = inlineBinders bindSimpleTest
-  where
-    bindSimpleTest (Id idName tyE, exprE)
-      | null (typeFreeVars (unembed tyE)) = do
-          (_,localFVs) <- localFreeVars (unembed exprE)
-          return $ isSimple (unembed exprE) && idName `notElem` localFVs
-    bindSimpleTest _ = return False
-
-inlineSimple :: NormRewrite
-inlineSimple _ e@(Var _ f) = R $ do
-  bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
-  case bodyMaybe of
-    Just (_,body) | isSimple body -> changed body
-    _ -> return e
-
-inlineSimple _ e = return e
-
-inlineWrapper :: NormRewrite
-inlineWrapper ctx e
-  | (Var _ f, args) <- collectArgs e
-  , all (either isVar (const True)) args
-  , all isLambdaBodyCtx ctx
-  = R $ do
-  bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
-  case bodyMaybe of
-    Just (_,body) -> changed (mkApps body args)
-    Nothing -> return e
-
-inlineWrapper _ e = return e
-
-simpleSpec :: NormRewrite
-simpleSpec ctx e@(App e1 e2)
-  | (Var _ _, args) <- collectArgs e1
-  , (_, []) <- Either.partitionEithers args
-  , isSimple e2
-  = specialise specialisations ctx e
-
-simpleSpec _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
