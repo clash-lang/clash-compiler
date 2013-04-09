@@ -63,13 +63,13 @@ generateVHDL modName = do
             = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
             $ normalize [fst topEntity]
 
-      netlist <- genNetlist (HashMap.fromList $ transformedBindings)
-                            primMap
-                            (fst topEntity)
+      (netlist,vhdlState) <- genNetlist (HashMap.fromList $ transformedBindings)
+                              primMap
+                              (fst topEntity)
 
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
-      mapM_ (writeVHDL dir . genVHDL) netlist
+      mapM_ (writeVHDL dir . genVHDL vhdlState) netlist
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"

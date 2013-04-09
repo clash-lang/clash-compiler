@@ -2,6 +2,7 @@
 module CLaSH.Netlist.BlackBox where
 
 import           Control.Monad (mzero)
+import           Control.Monad.State (state)
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Writer (tell)
 import           Control.Monad.Trans.Maybe (MaybeT(..))
@@ -13,7 +14,6 @@ import qualified Data.Label.PureM  as LabelM
 import           Data.Maybe        (catMaybes,fromJust)
 import           Data.Text.Lazy    (Text,pack)
 import qualified Data.Text.Lazy    as Text
-import Text.PrettyPrint.Leijen.Text ()
 import           Unbound.LocallyNameless (name2String,unembed)
 
 import CLaSH.Core.Literal            as L (Literal(..))
@@ -66,7 +66,7 @@ mkBlackBoxDecl templ bbCtx = do
       i <- LabelM.gets varCount
       let (l',i') = setSym (fromInteger i) l
       LabelM.puts varCount (toInteger i')
-      let (tmpl,clks) = renderBlackBox l' bbCtx
+      (tmpl,clks) <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
       tell clks
       return [N.BlackBox tmpl]
     False -> error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show templ ++ "\ngiven errors:\n" ++ show err
@@ -142,8 +142,8 @@ mkFunInput resId e = case (collectArgs e) of
         outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
     i <- getAndModify varCount (+1)
     let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
-        templ         = pack . show . fromJust $ inst instDecl
-        (line,err)    = runParse templ
+    templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
+    let (line,err)    = runParse templ
     if (null err)
       then return (line,bbCtx)
       else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err

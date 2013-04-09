@@ -1,14 +1,15 @@
 module CLaSH.Netlist.BlackBox.Util where
 
-import Control.Monad.State      (State,runState)
-import Control.Monad.Writer     (tell,runWriter)
+import Control.Monad.State      (State,runState,lift)
+import Control.Monad.Writer     (tell,runWriterT)
 import Control.Lens             (_1,_2,use,(%=),(+=),at)
 import Data.Foldable            (foldrM)
+import Data.HashMap.Lazy        (HashMap)
 import qualified Data.IntMap    as IntMap
 import qualified Data.List      as List
 import Data.Text.Lazy           (Text)
 import qualified Data.Text.Lazy as Text
-import Text.PrettyPrint.Leijen.Text (renderOneLine,displayT)
+import Text.PrettyPrint.Leijen.Text.Monadic (renderOneLine,displayT,Doc)
 
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Netlist.Types (Identifier,HWType(..))
@@ -72,10 +73,12 @@ clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 renderBlackBox ::
   Line
   -> BlackBoxContext
-  -> (Text, [(Identifier,HWType)])
-renderBlackBox l bbCtx
-  = (Text.concat >< List.nub)
-  $ runWriter
+  -> (Int, HashMap HWType Doc)
+  -> ((Text, [(Identifier,HWType)]),(Int, HashMap HWType Doc))
+renderBlackBox l bbCtx s
+  = first (Text.concat >< List.nub)
+  $ flip runState s
+  $ runWriterT
   $ runBlackBoxM
   $ mapM (renderElem bbCtx) l
 
@@ -117,6 +120,6 @@ mkSyncIdentifier b (Rst Nothing)  = let t = (`Text.append` (Text.pack "_rst")) .
                                     in tell [(t,Bit)] >> return (Left t)
 mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ fst $ (inputs b)!!n
                                     in tell [(t,Bit)] >> return (Left t)
-mkSyncIdentifier b (Typ Nothing)  = return $ Left $ displayT $ renderOneLine $ vhdlType $ snd $ result b
-mkSyncIdentifier b (Typ (Just n)) = return $ Left $ displayT $ renderOneLine $ vhdlType $ snd $ (inputs b)!!n
+mkSyncIdentifier b (Typ Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
+mkSyncIdentifier b (Typ (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ (inputs b)!!n
 mkSyncIdentifier b (D _)          = error $ $(curLoc) ++ "Unexpected component declaration"

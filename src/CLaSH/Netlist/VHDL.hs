@@ -1,17 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CLaSH.Netlist.VHDL where
 
+import Control.Monad.State
+import Data.HashMap.Lazy  (HashMap,(!))
+import Data.Label.PureM as LabelM
 import Data.List (nub)
 import Data.Maybe (catMaybes)
 import Data.Text.Lazy (Text,unpack)
-import Text.PrettyPrint.Leijen.Text
+import Text.PrettyPrint.Leijen.Text.Monadic
 
-import CLaSH.Netlist.Id
+-- import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.Util
+import CLaSH.Util (makeCached,getAndModify,__1,__2)
 
-genVHDL :: Component -> (String,Doc)
-genVHDL c = (unpack $ cName, vhdl)
+type VHDLM a = State (Int,HashMap HWType Doc) a
+
+genVHDL :: (Int,HashMap HWType Doc) -> Component -> (String,Doc)
+genVHDL s c = (unpack $ cName, flip evalState s vhdl)
   where
     cName = componentName c
     vhdl = tyPackage cName ((snd $ output c) : map snd (inputs c)) <$$> linebreak <>
@@ -19,13 +25,13 @@ genVHDL c = (unpack $ cName, vhdl)
            entity c <$$> linebreak <>
            architecture c
 
-tyPackage :: Text -> [HWType] -> Doc
+tyPackage :: Text -> [HWType] -> VHDLM Doc
 tyPackage cName tys = imports <$> linebreak <>
   "package" <+> text cName <> "_types" <+> "is" <$>
-  indent 2 (vcat $ map tyDec $ nub $ concatMap needsTyDec tys) <$>
+  indent 2 (vcat $ mapM tyDec $ nub $ concatMap needsTyDec tys) <$>
   "end package" <+> text cName <> "_types" <> semi
   where
-    imports = vcat $ map (<> semi)
+    imports = punctuate' semi $ sequence
                 [ "library IEEE"
                 , "use IEEE.STD_LOGIC_1164.ALL"
                 , "use IEEE.NUMERIC_STD.ALL"
@@ -37,11 +43,11 @@ needsTyDec ty@(Product _ tys) = ty:(concatMap needsTyDec tys)
 needsTyDec (SP _ tys)         = concatMap (concatMap needsTyDec . snd) tys
 needsTyDec _                  = []
 
-tyDec :: HWType -> Doc
+tyDec :: HWType -> VHDLM Doc
 tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
 tyDec ty@(Product _ tys) = "type" <+> tName <+> "is record" <$>
-                           indent 2 (vcat $ zipWith (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
-                           "end record" <+> tName <> semi
+                              indent 2 (vcat $ sequence $ zipWith (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
+                           "end record" <> semi
 
 
   where tName    = tyName ty
@@ -49,14 +55,14 @@ tyDec ty@(Product _ tys) = "type" <+> tName <+> "is record" <$>
         selTys   = map vhdlType tys
 tyDec _          = empty
 
-tyName :: HWType -> Doc
-tyName (Vector n elTy) = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (Signed n)      = "signed_" <> int n
-tyName (Product p tys) = text (mkBasicId p)
-tyName _               = empty
+tyName :: HWType -> VHDLM Doc
+tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (Signed n)        = "signed_" <> int n
+tyName t@(Product _ _)   = makeCached t __2 (do {k <- getAndModify __1 (+1); "product" <> int k })
+tyName _                 = empty
 
-tyImports :: Text -> Doc
-tyImports compName = vcat $ map (<> semi)
+tyImports :: Text -> VHDLM Doc
+tyImports compName = punctuate' semi $ sequence
   [ "library IEEE"
   , "use IEEE.STD_LOGIC_1164.ALL"
   , "use IEEE.NUMERIC_STD.ALL"
@@ -64,11 +70,11 @@ tyImports compName = vcat $ map (<> semi)
   , "use work.all"
   ]
 
-
-entity :: Component -> Doc
-entity c =
+entity :: Component -> VHDLM Doc
+entity c = do
+    p <- ports
     "entity" <+> text (componentName c) <+> "is" <$>
-      (case ports of
+      (case p of
          [] -> empty
          _  -> indent 2 ("port" <>
                          parens (align $ vcat $ punctuate semi ports) <>
@@ -76,14 +82,15 @@ entity c =
       ) <$>
       "end entity" <+> text (componentName c) <> semi
   where
-    ports = [ text i <+> colon <+> "in" <+> vhdlType ty
+    ports = sequence
+          $ [ text i <+> colon <+> "in" <+> vhdlType ty
             | (i,ty) <- inputs c ] ++
             [ text i <+> colon <+> "in" <+> vhdlType ty
             | (i,ty) <- hiddenPorts c ] ++
             [ text (fst $ output c) <+> colon <+> "out" <+> vhdlType (snd $ output c)
             ]
 
-architecture :: Component -> Doc
+architecture :: Component -> VHDLM Doc
 architecture c =
   nest 2
     ("architecture structural of" <+> text (componentName c) <+> "is" <$$>
@@ -93,7 +100,7 @@ architecture c =
      (insts $ declarations c)) <$$>
   "end architecture structural" <> semi
 
-vhdlType :: HWType -> Doc
+vhdlType :: HWType -> VHDLM Doc
 vhdlType Bit        = "std_logic"
 vhdlType Bool       = "boolean"
 vhdlType Integer    = "integer"
@@ -106,67 +113,68 @@ vhdlType t@(SP _ _) = "std_logic_vector" <>
 vhdlType t@(Sum _ _) = "std_logic_vector" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
-vhdlType (Product p _) = text (mkBasicId p)
+vhdlType t@(Product _ _) = fmap (! t) $ LabelM.gets __2
 vhdlType t          = error $ "vhdlType: " ++ show t
 
-decls :: [Declaration] -> Doc
+decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
-decls ds =
-    case dsDoc of
+decls ds = do
+    d <- dsDoc
+    case d of
       [] -> empty
       _  -> vcat (punctuate semi dsDoc) <> semi
   where
-    dsDoc = catMaybes $ map decl ds
+    dsDoc = fmap catMaybes $ mapM decl ds
 
-decl :: Declaration -> Maybe Doc
-decl (NetDecl id_ ty Nothing) = Just $
+decl :: Declaration -> VHDLM (Maybe Doc)
+decl (NetDecl id_ ty Nothing) = fmap Just $
   "signal" <+> text id_ <+> colon <+> vhdlType ty
 
-decl _ = Nothing
+decl _ = return Nothing
 
-insts :: [Declaration] -> Doc
+insts :: [Declaration] -> VHDLM Doc
 insts [] = empty
-insts is = vcat . map (<> linebreak) . catMaybes $ map inst is
+insts is = vcat . punctuate linebreak . fmap catMaybes $ mapM inst is
 
-inst :: Declaration -> Maybe Doc
-inst (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = Just $
+inst :: Declaration -> VHDLM (Maybe Doc)
+inst (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = fmap Just $
     text id_ <+> larrow <+> assignExpr <> semi
   where
     argTys     = snd $ args !! i
     dcExpr     = expr (dcToExpr ty i)
     argExprs   = zipWith toSLV argTys $ map expr es
-    assignExpr = hcat $ punctuate (" & ") (dcExpr:argExprs)
+    assignExpr = hcat $ punctuate (" & ") $ sequence (dcExpr:argExprs)
 
-inst (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = Just $
+inst (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = fmap Just $
     text id_ <+> larrow <+> assignExpr <> semi
   where
     assignExpr = expr (dcToExpr ty i)
 
-inst (Assignment id_ _ ty@(Product _ _) es) = Just $
-    vcat $ zipWith (\i e -> text id_ <> dot <> tName <> "_sel" <> int i <+> larrow <+> expr e) [0..] es
+inst (Assignment id_ (Just (DC 0)) ty@(Product _ _) es) = fmap Just $
+    vcat $ sequence $ zipWith (\i e -> text id_ <> dot <> tName <> "_sel" <> int i <+> larrow <+> expr e <> semi) [0..] es
   where
     tName = tyName ty
 
-inst (Assignment id_ Nothing _ [e]) = Just $
+inst (Assignment id_ Nothing _ [e]) = fmap Just $
   text id_ <+> larrow <+> expr e <> semi
 
-inst (InstDecl nm lbl pms) = Just $
+inst (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"
               <+> text nm <$$> pms' <> semi
   where
     pms' = nest 2 $ "port map" <$$>
-            tupled [text i <+> "=>" <+> expr e | (i,e) <- pms]
+            tupled (sequence [text i <+> "=>" <+> expr e | (i,e) <- pms])
 
-inst (BlackBox bs) = Just $ string bs
+inst (BlackBox bs) = fmap Just $ string bs
 
-inst _ = Nothing
+inst _ = return Nothing
 
-expr :: Expr -> Doc
+expr :: Expr -> VHDLM Doc
 expr (Literal sizeM lit)    = exprLit sizeM lit
 expr (Identifier n Nothing) = text n
 expr _                      = empty
 
-exprLit :: Maybe Size -> Literal -> Doc
+exprLit :: Maybe Size -> Literal -> VHDLM Doc
 exprLit Nothing   (NumLit i) = int i
 exprLit (Just sz) (NumLit i) = bits $ (toBits sz i)
 exprLit _         (BoolLit t) = if t then "true" else "false"
@@ -180,16 +188,16 @@ toBits size val = map (\x -> if odd x then H else L)
                 $ map (`mod` 2)
                 $ iterate (`div` 2) val
 
-bits :: [Bit] -> Doc
-bits = dquotes . hcat . map bit_char
+bits :: [Bit] -> VHDLM Doc
+bits = dquotes . hcat . sequence . map bit_char
 
-bit_char :: Bit -> Doc
+bit_char :: Bit -> VHDLM Doc
 bit_char H = char '1'
 bit_char L = char '0'
 bit_char U = char 'U'
 bit_char Z = char 'Z'
 
-toSLV :: HWType -> Doc -> Doc
+toSLV :: HWType -> VHDLM Doc -> VHDLM Doc
 toSLV Bit  d = d
 toSLV Bool d = "toSLV" <> parens d
 toSLV _    _ = error "toSLV"
@@ -204,5 +212,9 @@ dcToExpr (Sum _ dcs) i = Literal (Just conSize) (NumLit i)
 
 dcToExpr _ _ = error "dcExpr"
 
-larrow :: Doc
+larrow :: VHDLM Doc
 larrow = "<="
+
+punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
+punctuate' s d = (vcat $ punctuate s d) <> s
+

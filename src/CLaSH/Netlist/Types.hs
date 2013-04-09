@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module CLaSH.Netlist.Types where
 
@@ -5,7 +6,10 @@ import Control.Monad.State     (MonadIO,MonadState,StateT)
 import Control.Monad.Writer    (MonadWriter,WriterT)
 import Data.ByteString.Lazy    (ByteString)
 import Data.Text.Lazy          (Text)
+import Data.Hashable
 import Data.HashMap.Lazy       (HashMap)
+import GHC.Generics            (Generic)
+import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 import Unbound.LocallyNameless (Fresh,FreshMT)
 
 import CLaSH.Core.Term (Term,TmName)
@@ -26,6 +30,7 @@ data NetlistState
   , _cmpCount   :: Integer
   , _components :: HashMap TmName Component
   , _primitives :: HashMap ByteString Primitive
+  , _vhdlMState :: (Int,HashMap HWType Doc)
   }
 
 type Identifier = Text
@@ -54,7 +59,9 @@ data HWType
   | Sum      Identifier [Identifier]
   | Product  Identifier [HWType]
   | SP       Identifier [(Identifier,[HWType])]
-  deriving (Eq,Show)
+  deriving (Eq,Show,Generic)
+
+instance Hashable HWType
 
 data Declaration
   = Assignment Identifier (Maybe Modifier) HWType [Expr]

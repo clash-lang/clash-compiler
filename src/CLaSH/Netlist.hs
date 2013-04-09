@@ -11,6 +11,7 @@ import qualified Data.Label.PureM        as LabelM
 import           Data.List               (elemIndex,nub)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Text.Lazy          as Text
+import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 import           Unbound.LocallyNameless (Embed(..),name2String,runFreshMT,unembed)
 
 import CLaSH.Core.DataCon   (DataCon(..))
@@ -32,10 +33,10 @@ genNetlist ::
   HashMap TmName (Type,Term)
   -> PrimMap
   -> TmName
-  -> IO [Component]
+  -> IO ([Component],(Int, HashMap HWType Doc))
 genNetlist globals primMap topEntity = do
   (_,s) <- runNetlistMonad globals primMap $ genComponent topEntity Nothing
-  return $ HashMap.elems $ _components s
+  return $ (HashMap.elems $ _components s, _vhdlMState s)
 
 runNetlistMonad ::
   HashMap TmName (Type,Term)
@@ -48,7 +49,7 @@ runNetlistMonad s p
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (0,HashMap.empty)
 
 genComponent ::
   TmName
@@ -198,7 +199,7 @@ mkDcApplication dst dc args = do
       nonEmptyArgs <- fmap (map varToExpr) $ Monad.filterM
                         (return . not . isEmptyType <=< termHWType) args
       case (compare (length dcArgs) (length nonEmptyArgs)) of
-        EQ -> return [Assignment dstId Nothing dstHType nonEmptyArgs]
+        EQ -> return [Assignment dstId (Just $ DC 0) dstHType nonEmptyArgs]
         LT -> error "Over-applied constructor"
         GT -> error "Under-applied constructor"
     Sum _ dcs -> do

@@ -16,12 +16,13 @@ where
 import Control.Applicative              (Applicative,(<$>),(<*>),pure)
 import Control.Arrow                    (first,second)
 import Control.Monad                    ((<=<),(>=>))
-import Control.Monad.State              (MonadState)
+import Control.Monad.State              (MonadState,State,runState)
 import Control.Monad.Trans.Class        (MonadTrans,lift)
 import Data.Hashable                    (Hashable(..),hash)
 import Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy   as HashMap
 import Data.Label                       ((:->),mkLabels)
+import qualified Data.Label          as Label
 import qualified Data.Label.PureM    as LabelM
 import Debug.Trace                      (trace)
 import qualified Language.Haskell.TH as TH
@@ -76,6 +77,16 @@ makeCachedT3 key lens create = do
       value <- create
       (lift . lift . lift) $ LabelM.modify lens (HashMap.insert key value)
       return value
+
+liftState :: (MonadState s m)
+          => (s :-> s')
+          -> State s' a
+          -> m a
+liftState lens m = do
+  s <- LabelM.gets lens
+  let (a,s') = runState m s
+  LabelM.puts lens s'
+  return a
 
 secondM ::
   Functor f
@@ -148,4 +159,10 @@ infixr 5 <:>
       -> f [a]
       -> f [a]
 x <:> xs = (:) <$> x <*> xs
+
+__1 :: ((a,b) :-> a)
+__1 = Label.lens fst (\x (_,y) -> (x,y))
+
+__2 :: ((a,b) :-> b)
+__2 = Label.lens snd (\y (x,_) -> (x,y))
 
