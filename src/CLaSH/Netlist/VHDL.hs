@@ -32,16 +32,27 @@ tyPackage cName tys = imports <$> linebreak <>
                 ]
 
 needsTyDec :: HWType -> [HWType]
-needsTyDec ty@(Vector _ elTy) = needsTyDec elTy ++ [ty]
+needsTyDec ty@(Vector _ elTy) = ty:(needsTyDec elTy)
+needsTyDec ty@(Product _ tys) = ty:(concatMap needsTyDec tys)
+needsTyDec (SP _ tys)         = concatMap (concatMap needsTyDec . snd) tys
 needsTyDec _                  = []
 
 tyDec :: HWType -> Doc
 tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
-tyDec _               = empty
+tyDec ty@(Product _ tys) = "type" <+> tName <+> "is record" <$>
+                           indent 2 (vcat $ zipWith (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
+                           "end record" <+> tName <> semi
+
+
+  where tName    = tyName ty
+        selNames = map (\i -> tName <> "_sel" <> int i) [0..]
+        selTys   = map vhdlType tys
+tyDec _          = empty
 
 tyName :: HWType -> Doc
 tyName (Vector n elTy) = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)      = "signed_" <> int n
+tyName (Product p tys) = text (mkBasicId p)
 tyName _               = empty
 
 tyImports :: Text -> Doc
@@ -130,6 +141,11 @@ inst (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = Just $
     text id_ <+> larrow <+> assignExpr <> semi
   where
     assignExpr = expr (dcToExpr ty i)
+
+inst (Assignment id_ _ ty@(Product _ _) es) = Just $
+    vcat $ zipWith (\i e -> text id_ <> dot <> tName <> "_sel" <> int i <+> larrow <+> expr e) [0..] es
+  where
+    tName = tyName ty
 
 inst (Assignment id_ Nothing _ [e]) = Just $
   text id_ <+> larrow <+> expr e <> semi

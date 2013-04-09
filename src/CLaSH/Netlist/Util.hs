@@ -103,15 +103,15 @@ mkADT _ tc args = case tyConDataCons tc of
     case (dcs,nonEmptyArgs) of
       ([_],[[elemTy]])   -> return elemTy
       ([_],[elemTys])    -> return $ Product tcName elemTys
-      (_  ,concat -> []) -> return $ Sum tcName $ map (pack . show . dcName) dcs
+      (_  ,concat -> []) -> return $ Sum tcName $ map (pack . name2String . dcName) dcs
       (_  ,elemHTys)     -> return $ SP tcName
                                    $ zipWith (\dc tys ->
-                                               ( pack . show $ dcName dc
+                                               ( pack . name2String $ dcName dc
                                                , tys
                                                )
                                              ) dcs elemHTys
   where
-    tcName     = pack . show $ tyConName tc
+    tcName     = pack . name2String $ tyConName tc
     tvs        = tyConTyVars tc
     tvsArgsMap = zip tvs args
 
