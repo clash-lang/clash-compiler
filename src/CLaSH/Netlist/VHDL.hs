@@ -257,9 +257,11 @@ bit_char U = char 'U'
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> VHDLM Doc -> VHDLM Doc
-toSLV Bit  d = d
-toSLV Bool d = "toSLV" <> parens d
-toSLV _    _ = error "toSLV"
+toSLV Bit        d = d
+toSLV Bool       d = "toSLV" <> parens d
+toSLV Integer    d = toSLV (Signed 32) ("to_signed" <> (tupled $ sequence [d,int 32]))
+toSLV (Signed _) d = "std_logic_vector" <> parens d
+toSLV _          _ = error "toSLV"
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr (SP _ args) i = Literal (Just conSize) (NumLit i)
