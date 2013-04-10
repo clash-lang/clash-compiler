@@ -1,10 +1,11 @@
 module CLaSH.Normalize where
 
 import Control.Concurrent.Supply        (Supply)
+import           Control.Lens           ((.=))
+import qualified Control.Lens        as Lens
 import qualified Control.Monad.State as State
 import Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy   as HashMap
-import qualified Data.Label.PureM    as LabelM
 import qualified Data.Map            as Map
 
 import CLaSH.Core.FreeVars      (termFreeIds)
@@ -43,17 +44,17 @@ normalize ::
   -> NormalizeSession [(TmName,(Type,Term))]
 normalize (bndr:bndrs) = do
   let bndrS = showDoc bndr
-  exprM <- fmap (HashMap.lookup bndr) $ LabelM.gets bindings
+  exprM <- fmap (HashMap.lookup bndr) $ Lens.use bindings
   case exprM of
     Just (ty,expr) -> do
-      liftRS $ LabelM.puts curFun bndr
+      liftRS $ curFun .= bndr
       normalizedExpr <- makeCachedT3 bndr normalized $
                          normalizeExpr bndrS expr
       usedBndrs <- usedGlobalBndrs normalizedExpr
       case (bndr `elem` usedBndrs) of
         True -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
         False -> do
-          prevNorm <- fmap (HashMap.keys) $ liftRS $ LabelM.gets normalized
+          prevNorm <- fmap (HashMap.keys) $ liftRS $ Lens.use normalized
           let toNormalize = filter (`notElem` prevNorm) usedBndrs
           normalizedOthers <- normalize (toNormalize ++ bndrs)
           return ((bndr,(ty,normalizedExpr)):normalizedOthers)
@@ -66,7 +67,7 @@ normalizeExpr ::
   -> Term
   -> NormalizeSession Term
 normalizeExpr bndrS expr = do
-  lvl <- LabelM.asks dbgLevel
+  lvl <- Lens.view dbgLevel
   let before = showDoc expr
   let expr' = traceIf (lvl >= DebugFinal)
                 (bndrS ++ " before normalization:\n\n" ++ before ++ "\n")
@@ -81,6 +82,6 @@ usedGlobalBndrs ::
   Term
   -> NormalizeSession [TmName]
 usedGlobalBndrs tm = do
-  clsOps <- fmap (HashMap.keys) $ LabelM.gets classOps
-  dfuns  <- fmap (HashMap.keys) $ LabelM.gets dictFuns
+  clsOps <- fmap (HashMap.keys) $ Lens.use classOps
+  dfuns  <- fmap (HashMap.keys) $ Lens.use dictFuns
   return . filter (`notElem` (clsOps ++ dfuns)) $ termFreeIds tm

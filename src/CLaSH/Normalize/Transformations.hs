@@ -2,10 +2,11 @@
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Normalize.Transformations where
 
+import           Control.Lens            ((%=))
+import qualified Control.Lens            as Lens
 import qualified Control.Monad     as Monad
 import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
-import qualified Data.Label.PureM  as LabelM
 import qualified Data.List         as List
 import qualified Data.Maybe        as Maybe
 import Unbound.LocallyNameless        (Bind,Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
@@ -180,14 +181,14 @@ inlineNonRep ctx e@(Case scrut ty alts)
     isInlined <- liftR $ alreadyInlined f
     case isInlined of
       True -> do
-        cf <- liftR $ LabelM.gets curFun
+        cf <- liftR $ Lens.use curFun
         traceIf True ($(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
       False -> do
         scrutTy   <- termType scrut
-        bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+        bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
         case (nonRep scrutTy, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
-            liftR $ LabelM.modify newInlined (f:)
+            liftR $ newInlined %= (f:)
             changed $ Case (mkApps scrutBody args) ty alts
           _ -> return e
 
@@ -401,9 +402,9 @@ deadCode _ e = return e
 classOpResolution :: NormRewrite
 classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dfunE)
   | (Var _ dfun, dfunArgs) <- collectArgs dfunE = R $ do
-    classSelM <- fmap (fmap snd . HashMap.lookup sel)  $ LabelM.gets classOps
-    dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets dictFuns
-    bindingsM <- fmap (fmap snd . HashMap.lookup dfun) $ LabelM.gets bindings
+    classSelM <- fmap (fmap snd . HashMap.lookup sel)  $ Lens.use classOps
+    dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
+    bindingsM <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use bindings
     case (classSelM,dfunOpsM,bindingsM) of
       (Just classSel,Just dfunOps,Nothing)
         | classSel < length dfunOps -> do
@@ -427,7 +428,7 @@ chaseDfun ::
 chaseDfun classSel ctx e
   | (Var _ f, args) <- collectArgs e
   = do
-    dfunOpsM  <- fmap (fmap snd . HashMap.lookup f) $ LabelM.gets dictFuns
+    dfunOpsM  <- fmap (fmap snd . HashMap.lookup f) $ Lens.use dictFuns
     case dfunOpsM of
       Just dfunOps | classSel < length dfunOps -> do
         let dfunOp = dfunOps !! classSel

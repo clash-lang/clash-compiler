@@ -194,7 +194,7 @@ mkUniqueNormalized (args,binds,res) = do
     mkUnique (find,repl) v = case (find == varName v) of
       True  -> return $ modifyVarName (const repl) v
       False -> do
-        varCnt <- getAndModify varCount (+1)
+        varCnt <- varCount <%= (+1)
         let v' = modifyVarName (`appendToName` ("_" ++ show varCnt)) v
         return v'
 

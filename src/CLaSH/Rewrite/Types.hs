@@ -4,11 +4,11 @@
 module CLaSH.Rewrite.Types where
 
 import Control.Concurrent.Supply (Supply,freshId)
+import Control.Lens              (use,(.=))
 import Control.Monad.Reader      (MonadReader,ReaderT,lift)
 import Control.Monad.State       (MonadState,StateT)
 import Control.Monad.Writer      (MonadWriter,WriterT)
 import Data.HashMap.Lazy         (HashMap)
-import Data.Label.PureM          (gets,puts)
 import Data.Monoid               (Any)
 import Unbound.LocallyNameless   (Fresh,FreshMT)
 
@@ -36,7 +36,7 @@ data RewriteState
   , _uniqSupply       :: Supply
   }
 
-mkLabels [''RewriteState]
+makeLenses ''RewriteState
 
 data DebugLevel
   = DebugNone
@@ -47,7 +47,7 @@ data DebugLevel
 
 newtype RewriteEnv = RE { _dbgLevel :: DebugLevel }
 
-mkLabels [''RewriteEnv]
+makeLenses ''RewriteEnv
 
 type RewriteSession m = ReaderT RewriteEnv (StateT RewriteState (FreshMT m))
 
@@ -55,9 +55,9 @@ type RewriteMonad m = WriterT Any (RewriteSession m)
 
 instance Monad m => MonadUnique (RewriteMonad m) where
   getUniqueM = do
-    sup <- lift . lift $ gets uniqSupply
+    sup <- lift . lift $ use uniqSupply
     let (a,sup') = freshId sup
-    lift . lift $ puts uniqSupply sup'
+    lift . lift $ uniqSupply .= sup'
     return a
 
 newtype R m a = R { runR :: RewriteMonad m a }

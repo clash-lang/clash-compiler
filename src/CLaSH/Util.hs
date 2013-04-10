@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
@@ -9,7 +10,7 @@ module CLaSH.Util
   , module Control.Applicative
   , module Control.Arrow
   , module Control.Monad
-  , mkLabels
+  , makeLenses
   )
 where
 
@@ -21,9 +22,7 @@ import Control.Monad.Trans.Class        (MonadTrans,lift)
 import Data.Hashable                    (Hashable(..),hash)
 import Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy   as HashMap
-import Data.Label                       ((:->),mkLabels)
-import qualified Data.Label          as Label
-import qualified Data.Label.PureM    as LabelM
+import Control.Lens
 import Debug.Trace                      (trace)
 import qualified Language.Haskell.TH as TH
 import Unbound.LocallyNameless          (Embed(..))
@@ -48,16 +47,16 @@ curLoc = do
 makeCached ::
   (MonadState s m, Hashable k, Eq k)
   => k
-  -> s :-> (HashMap k v)
+  -> Lens' s (HashMap k v)
   -> m v
   -> m v
-makeCached key lens create = do
-  cache <- LabelM.gets lens
+makeCached key l create = do
+  cache <- use l
   case HashMap.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      LabelM.modify lens (HashMap.insert key value)
+      l %= (HashMap.insert key value)
       return value
 
 makeCachedT3 ::
@@ -66,26 +65,26 @@ makeCachedT3 ::
   , MonadState s m
   , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m))))
   => k
-  -> s :-> (HashMap k v)
+  -> Lens' s (HashMap k v)
   -> (t (t1 (t2 m))) v
   -> (t (t1 (t2 m))) v
-makeCachedT3 key lens create = do
-  cache <- (lift . lift . lift) $ LabelM.gets lens
+makeCachedT3 key l create = do
+  cache <- (lift . lift . lift) $ use l
   case HashMap.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      (lift . lift . lift) $ LabelM.modify lens (HashMap.insert key value)
+      (lift . lift . lift) $ l %= (HashMap.insert key value)
       return value
 
 liftState :: (MonadState s m)
-          => (s :-> s')
+          => Lens' s s'
           -> State s' a
           -> m a
-liftState lens m = do
-  s <- LabelM.gets lens
+liftState l m = do
+  s <- use l
   let (a,s') = runState m s
-  LabelM.puts lens s'
+  l .= s'
   return a
 
 secondM ::
@@ -129,14 +128,14 @@ mapAccumLM f acc (x:xs) = do
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
 
-getAndModify ::
+(<%=) ::
   MonadState s m
-  => (s :-> a)
+  => Lens' s a
   -> (a -> a)
   -> m a
-getAndModify lens modify = do
-  a <- LabelM.gets lens
-  LabelM.modify lens modify
+(<%=) l modify = do
+  a <- use l
+  l %= modify
   return a
 
 dot :: (c -> d) -> (a -> b -> c) -> a -> b -> d
@@ -159,10 +158,3 @@ infixr 5 <:>
       -> f [a]
       -> f [a]
 x <:> xs = (:) <$> x <*> xs
-
-__1 :: ((a,b) :-> a)
-__1 = Label.lens fst (\x (_,y) -> (x,y))
-
-__2 :: ((a,b) :-> b)
-__2 = Label.lens snd (\y (x,_) -> (x,y))
-

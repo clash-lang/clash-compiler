@@ -1,6 +1,8 @@
 {-# LANGUAGE PatternGuards #-}
 module CLaSH.Netlist.BlackBox where
 
+import           Control.Lens ((.=),_2)
+import qualified Control.Lens as Lens
 import           Control.Monad (mzero)
 import           Control.Monad.State (state)
 import           Control.Monad.Trans.Class (lift)
@@ -10,7 +12,6 @@ import qualified Data.ByteString.Lazy.Char8 as BSL
 import           Data.Either       (lefts,partitionEithers)
 import qualified Data.HashMap.Lazy as HashMap
 import           Data.List         (partition)
-import qualified Data.Label.PureM  as LabelM
 import           Data.Maybe        (catMaybes,fromJust)
 import           Data.Text.Lazy    (Text,pack)
 import qualified Data.Text.Lazy    as Text
@@ -63,9 +64,9 @@ mkBlackBoxDecl templ bbCtx = do
   let (l,err) = runParse templ
   case (null err && verifyBlackBoxContext l bbCtx) of
     True -> do
-      i <- LabelM.gets varCount
+      i <- Lens.use varCount
       let (l',i') = setSym (fromInteger i) l
-      LabelM.puts varCount (toInteger i')
+      varCount .= (toInteger i')
       (tmpl,clks) <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
       tell clks
       return [N.BlackBox tmpl]
@@ -85,7 +86,7 @@ mkInput _ ((Var ty v), False) = do
 mkInput resId (e@(App _ _), False)
   | (Prim (PrimFun nm _), args) <- collectArgs e
   = do
-    bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ LabelM.gets primitives
+    bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do
         bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
@@ -115,32 +116,32 @@ mkFunInput ::
   -> MaybeT NetlistMonad (Line,BlackBoxContext)
 mkFunInput resId e = case (collectArgs e) of
   (Prim (PrimFun nm _), args) -> do
-    bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ LabelM.gets primitives
+    bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do
         bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
         let (l,err) = runParse (template p)
         if null err
           then do
-            i <- LabelM.gets varCount
+            i <- Lens.use varCount
             let (l',i') = setSym (fromInteger i) l
-            LabelM.puts varCount (toInteger i')
+            varCount .= (toInteger i')
             return (l',bbCtx)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ show bbM
   (Var _ fun, args) -> do
     bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
     (Component compName hidden compInps compOutp _) <- lift $
-      do vCnt <- LabelM.gets varCount
-         vEnv <- LabelM.gets varEnv
+      do vCnt <- Lens.use varCount
+         vEnv <- Lens.use varEnv
          comp <- genComponent fun Nothing
-         LabelM.puts varCount vCnt
-         LabelM.puts varEnv vEnv
+         varCount .= vCnt
+         varEnv .= vEnv
          return comp
     let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
         inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
         outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
-    i <- getAndModify varCount (+1)
+    i <- varCount <%= (+1)
     let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
     templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
     let (line,err)    = runParse templ

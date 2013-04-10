@@ -1,8 +1,8 @@
 module CLaSH.Driver.PrepareBinding where
 
+import           Control.Lens            (set)
 import qualified Data.HashMap.Lazy       as HashMap
 import           Data.HashMap.Lazy       (HashMap)
-import qualified Data.Label              as Label
 import           Data.Maybe              (fromMaybe)
 import           Unbound.LocallyNameless (unembed)
 
@@ -27,7 +27,7 @@ prepareBinding ::
   -> IO (BindingMap,DFunMap,ClassOpMap)
 prepareBinding primMap modName = do
   (bindings,dfuns,clsOps,unlocs,tcs) <- loadModules modName
-  let tcsMap = Label.set unlocatable (unlocs++(map fst clsOps)) (makeAllTyDataCons tcs)
+  let tcsMap = set unlocatable (unlocs++(map fst clsOps)) (makeAllTyDataCons tcs)
 
   let bindingsMap = HashMap.fromList
                   $ map (\(v,e) ->

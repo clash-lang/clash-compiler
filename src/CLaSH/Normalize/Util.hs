@@ -2,8 +2,9 @@
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Normalize.Util where
 
+import Control.Lens                ((.=),(%=))
+import qualified Control.Lens      as Lens
 import qualified Data.HashMap.Lazy as HashMap
-import qualified Data.Label.PureM as LabelM
 import qualified Data.List as      List
 import Unbound.LocallyNameless     (Fresh, aeq,embed,unbind)
 
@@ -58,8 +59,8 @@ alreadyInlined ::
   TmName
   -> NormalizeMonad Bool
 alreadyInlined f = do
-  cf <- LabelM.gets curFun
-  inlinedHM <- LabelM.gets inlined
+  cf <- Lens.use curFun
+  inlinedHM <- Lens.use inlined
   case HashMap.lookup cf inlinedHM of
     Nothing -> do
       return False
@@ -71,13 +72,13 @@ alreadyInlined f = do
 
 commitNewInlined :: NormRewrite
 commitNewInlined _ e = R $ liftR $ do
-  cf <- LabelM.gets curFun
-  nI <- LabelM.gets newInlined
-  inlinedHM <- LabelM.gets inlined
+  cf <- Lens.use curFun
+  nI <- Lens.use newInlined
+  inlinedHM <- Lens.use inlined
   case HashMap.lookup cf inlinedHM of
-    Nothing -> LabelM.modify inlined (HashMap.insert cf nI)
-    Just _  -> LabelM.modify inlined (HashMap.adjust (`List.union` nI) cf)
-  LabelM.puts newInlined []
+    Nothing -> inlined %= (HashMap.insert cf nI)
+    Just _  -> inlined %= (HashMap.adjust (`List.union` nI) cf)
+  newInlined .= []
   return e
 
 fvs2bvs ::

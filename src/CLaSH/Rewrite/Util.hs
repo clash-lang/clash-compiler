@@ -1,16 +1,17 @@
+{-# LANGUAGE Rank2Types    #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Rewrite.Util where
 
+import Control.Lens                      (Lens',(%=),(+=))
+import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
 import Control.Monad.Trans.Class            (lift)
 import qualified Control.Monad.Reader    as Reader
 import qualified Control.Monad.State     as State
 import qualified Control.Monad.Writer    as Writer
 import qualified Data.HashMap.Lazy       as HashMap
-import           Data.Label.Pure         ((:->))
-import qualified Data.Label.PureM        as LabelM
 import qualified Data.Map                as Map
 import qualified Data.Monoid             as Monoid
 import qualified Data.Set                as Set
@@ -39,12 +40,12 @@ liftRS m = lift . lift . lift $ m
 
 apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
 apply name rewrite ctx expr = R $ do
-  lvl <- LabelM.asks dbgLevel
+  lvl <- Lens.view dbgLevel
   let before = showDoc expr
   beforeType <- fmap showDoc $ termType expr
   (expr', anyChanged) <- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ Writer.listen $ runR $ rewrite ctx expr
   let hasChanged = Monoid.getAny anyChanged
-  Monad.when hasChanged $ LabelM.modify transformCounter (+1)
+  Monad.when hasChanged $ transformCounter += 1
   let after  = showDoc expr'
   afterType <- fmap showDoc $ termType expr'
   traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nType:" ++ beforeType ++ "\nResult:\n" ++ after ++ "\nType:" ++ afterType ++ "\n") $
@@ -115,9 +116,9 @@ mkEnv ::
   -> RewriteMonad m (Gamma, Delta)
 mkEnv ctx = do
   let (gamma,delta) = contextEnv ctx
-  tsMap         <- fmap (HashMap.map fst) $ LabelM.gets bindings
-  dfuns         <- fmap (HashMap.map fst) $ LabelM.gets dictFuns
-  clsOps        <- fmap (HashMap.map fst) $ LabelM.gets classOps
+  tsMap         <- fmap (HashMap.map fst) $ Lens.use bindings
+  dfuns         <- fmap (HashMap.map fst) $ Lens.use dictFuns
+  clsOps        <- fmap (HashMap.map fst) $ Lens.use classOps
   let gamma'    = tsMap `HashMap.union` dfuns `HashMap.union` clsOps
                   `HashMap.union` gamma
   return (gamma',delta)
@@ -195,9 +196,9 @@ localFreeVars ::
   => Term
   -> RewriteMonad m (c TyName,c TmName)
 localFreeVars term = do
-  globalBndrs <- LabelM.gets bindings
-  dfuns       <- LabelM.gets dictFuns
-  clsOps      <- LabelM.gets classOps
+  globalBndrs <- Lens.use bindings
+  dfuns       <- Lens.use dictFuns
+  clsOps      <- Lens.use classOps
   let (tyFVs,tmFVs) = termFreeVars term
   return ( tyFVs
          , filterC
@@ -261,7 +262,7 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   -- Create a new body that abstracts over the free variables
   let newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
   -- Add the created function to the list of global bindings
-  LabelM.modify bindings (HashMap.insert newBodyId (newBodyTy,newBody))
+  bindings %= (HashMap.insert newBodyId (newBodyTy,newBody))
   -- Return the new binder
   return (Id idName (embed ty), embed newExpr)
 
@@ -284,7 +285,7 @@ addGlobalBind ::
   -> Type
   -> Term
   -> RewriteMonad m ()
-addGlobalBind vId ty body = LabelM.modify bindings (HashMap.insert vId (ty,body))
+addGlobalBind vId ty body = bindings %= (HashMap.insert vId (ty,body))
 
 cloneVar ::
   (Functor m, Monad m)
@@ -298,7 +299,7 @@ isLocalVar ::
   -> RewriteMonad m Bool
 isLocalVar (Var _ name)
   = fmap (not . HashMap.member name)
-  $ LabelM.gets bindings
+  $ Lens.use bindings
 isLocalVar _ = return False
 
 isUntranslatable ::
@@ -351,7 +352,7 @@ mkSelectorCase ctx scrut dcI fieldI = do
 
 specialise ::
   (Functor m, State.MonadState s m)
-  => (s :-> Map.Map (TmName, Int, Either Term Type) (TmName,Type))
+  => (Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)))
   -> Rewrite m
 specialise specMapLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl ctx e (collectArgs e1) (Right ty)
 specialise specMapLbl ctx e@(App   e1 e2) = specialise' specMapLbl ctx e (collectArgs e1) (Left  e2)
@@ -359,7 +360,7 @@ specialise _          _   e               = return e
 
 specialise' ::
   (Functor m, State.MonadState s m)
-  => (s :-> Map.Map (TmName, Int, Either Term Type) (TmName,Type))
+  => (Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)))
   -> [CoreContext]
   -> Term
   -> (Term, [Either Term Type])
@@ -379,13 +380,13 @@ specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
   let argLen = length args
   -- Determine if 'f' has already been specialized on 'specArg'
   specM <- liftR $ fmap (Map.lookup (f,argLen,specArg))
-                 $ LabelM.gets specMapLbl
+                 $ Lens.use specMapLbl
   case specM of
     -- Use previously specialized function
     Just (fname,fty) -> changed $ mkApps (Var fty fname) (args ++ specTyVars ++ specTmVars)
     -- Create new specialized function
     Nothing -> do
-      bodyMaybe <- fmap (HashMap.lookup f) $ LabelM.gets bindings
+      bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
       case bodyMaybe of
         Just (_,bodyTm) -> do
           -- Make new binders for existing arguments
@@ -395,8 +396,7 @@ specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
           let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specTyBndrs ++ specTmBndrs)
           newf <- mkFunction f newBody
           -- Remember specialization
-          liftR $ LabelM.modify specMapLbl
-                    (Map.insert (f,argLen,specArg) newf)
+          liftR $ specMapLbl %= (Map.insert (f,argLen,specArg) newf)
           -- use specialized function
           let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specTyVars ++ specTmVars)
           changed newExpr

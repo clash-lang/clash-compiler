@@ -18,7 +18,7 @@ data NormalizeState
   , _curFun          :: TmName
   }
 
-mkLabels [''NormalizeState]
+makeLenses ''NormalizeState
 
 type NormalizeMonad = State NormalizeState
 

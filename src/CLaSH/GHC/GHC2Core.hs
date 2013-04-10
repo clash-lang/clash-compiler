@@ -12,6 +12,7 @@ module CLaSH.GHC.GHC2Core
 where
 
 -- External Modules
+import Control.Lens                       (view,(%=))
 import Control.Monad.Reader               (Reader)
 import qualified Control.Monad.Reader     as Reader
 import Control.Monad.State                (StateT,lift)
@@ -20,7 +21,6 @@ import Data.ByteString.Lazy.Char8         (pack)
 import Data.Hashable                      (Hashable(..),hash)
 import Data.HashMap.Lazy                  (HashMap)
 import qualified Data.HashMap.Lazy        as HashMap
-import Data.Label.PureM                   as LabelM
 import Data.Maybe                         (fromMaybe)
 import Unbound.LocallyNameless            (Rep,bind,rec,embed,rebind,unembed)
 import qualified Unbound.LocallyNameless  as Unbound
@@ -76,7 +76,7 @@ data GHC2CoreState
   , _unlocatable :: [Var]
   }
 
-mkLabels [''GHC2CoreState]
+makeLenses ''GHC2CoreState
 
 instance Hashable TyCon where
   hashWithSalt s = hashWithSalt s . getKey . getUnique
@@ -105,7 +105,7 @@ makeTyCon ::
   -> SR ()
 makeTyCon tc = do
     tycon' <- tycon
-    LabelM.modify tyConMap (HashMap.insert tc tycon')
+    tyConMap %= (HashMap.insert tc tycon')
   where
     tycon
       | isAlgTyCon tc       = mkAlgTyCon
@@ -185,7 +185,7 @@ makeDataCon dc = do
           , C.dcWorkId     = ( coreToVar $ dataConWorkId dc
                              , workIdTy)
           }
-  LabelM.modify dataConMap (HashMap.insert dc dataCon)
+  dataConMap %= (HashMap.insert dc dataCon)
   return dataCon
 
 coreToTerm ::
@@ -237,7 +237,7 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
           xPrim  = coreToPrimVar x
           xNameS = pack $ Unbound.name2String xPrim
       in do
-        unlocs <- LabelM.asks unlocatable
+        unlocs <- view unlocatable
         xType <- coreToType (varType x)
         let mapSyncName = pack
         case (isDataConWorkId_maybe x) of
@@ -287,7 +287,7 @@ coreToDataCon ::
   -> R C.DataCon
 coreToDataCon dc = fmap ( fromMaybe (error $ "DataCon: " ++ showPpr dc ++ " not found")
                         . HashMap.lookup dc
-                        ) $ LabelM.asks dataConMap
+                        ) $ view dataConMap
 
 coreToLiteral ::
   Literal
@@ -330,7 +330,7 @@ coreToTyCon ::
   -> R C.TyCon
 coreToTyCon tc = fmap ( fromMaybe (error $ "TyCon: " ++ showPpr tc ++ " not found")
                       . HashMap.lookup tc
-                      ) $ LabelM.asks tyConMap
+                      ) $ view tyConMap
 
 coreToAltTcParent ::
   TyConParent

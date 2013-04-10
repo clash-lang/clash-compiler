@@ -1,5 +1,7 @@
 module CLaSH.Netlist where
 
+import           Control.Lens            ((.=),_2)
+import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
 import           Control.Monad.State     (runStateT)
 import           Control.Monad.Writer    (runWriterT,listen)
@@ -7,11 +9,9 @@ import qualified Data.ByteString.Lazy.Char8 as LZ
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
-import qualified Data.Label.PureM        as LabelM
 import           Data.List               (elemIndex,nub)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Text.Lazy          as Text
-import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 import           Unbound.LocallyNameless (Embed(..),name2String,runFreshMT,unembed)
 
 import CLaSH.Core.DataCon   (DataCon(..))
@@ -49,14 +49,14 @@ runNetlistMonad s p
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (0,HashMap.empty)
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (0,Text.empty,HashMap.empty)
 
 genComponent ::
   TmName
   -> Maybe Integer
   -> NetlistMonad Component
 genComponent compName mStart = do
-  compExprM <- fmap (HashMap.lookup compName) $ LabelM.gets bindings
+  compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
     Nothing -> error "no normalized expression found"
     Just (_,expr) -> makeCached compName components $
@@ -68,8 +68,8 @@ genComponent' ::
   -> Maybe Integer
   -> NetlistMonad Component
 genComponent' compName componentExpr mStart = do
-  LabelM.puts varCount $ fromMaybe 0 mStart
-  componentNumber <- getAndModify cmpCount (+1)
+  varCount .= fromMaybe 0 mStart
+  componentNumber <- cmpCount <%= (+1)
 
   let componentName' = (`Text.append` (Text.pack $ show componentNumber))
                      . ifThenElse Text.null
@@ -87,9 +87,9 @@ genComponent' compName componentExpr mStart = do
           $ arguments ++ (map fst binders)
 
   gamma <- (ids `HashMap.union`) . (HashMap.map fst)
-           <$> LabelM.gets bindings
+           <$> Lens.use bindings
 
-  LabelM.puts varEnv gamma
+  varEnv .= gamma
 
   let resType  = coreTypeToHWType_fail $ ids HashMap.! result
   let argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_fail t) arguments
@@ -125,7 +125,7 @@ mkConcSm bndr app@(App _ _) = do
       | all isVar args' -> mkDcApplication bndr dc args'
       | otherwise       -> error "Not in normal form: DataCon-application with non-Var arguments"
     Prim (PrimFun nm _) -> do
-      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ LabelM.gets primitives
+      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) -> do
           bbCtx <- mkBlackBoxContext bndr args
@@ -151,14 +151,14 @@ mkApplication ::
   -> [Term]
   -> NetlistMonad [Declaration]
 mkApplication dst fun args = do
-  normalized <- LabelM.gets bindings
+  normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
     Just _ -> do
-      vCnt <- LabelM.gets varCount
-      vEnv <- LabelM.gets varEnv
+      vCnt <- Lens.use varCount
+      vEnv <- Lens.use varEnv
       (Component compName hidden compInps compOutp _) <- genComponent fun Nothing
-      LabelM.puts varCount vCnt
-      LabelM.puts varEnv vEnv
+      varCount .= vCnt
+      varEnv .= vEnv
       case length args == length compInps of
         True  -> do
           let dstId = mkBasicId . Text.pack . name2String $ varName dst

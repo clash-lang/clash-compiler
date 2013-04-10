@@ -91,4 +91,4 @@ data Literal
 data Bit = H | L | U | Z
   deriving Show
 
-mkLabels [''NetlistState]
+makeLenses ''NetlistState
