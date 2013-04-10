@@ -10,10 +10,8 @@ import Data.Maybe (catMaybes)
 import Data.Text.Lazy (Text,unpack)
 import Text.PrettyPrint.Leijen.Text.Monadic
 
--- import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.Util
-import CLaSH.Util (traceIf)
 
 type VHDLM a = State VHDLState a
 
@@ -40,13 +38,19 @@ tyPackage cName tys = do prevDec <- use _3
                              otherDec = map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
                          case (newDec ++ useDec) of
                             []   -> empty
-                            cDec -> traceIf True (show (cN,otherDec,cDec)) $ packageDec otherDec cDec
+                            cDec -> packageDec otherDec cDec <$$> linebreak <>
+                                    packageBodyDec cDec
   where
     packageDec ptys ntys =
       imports ptys <$> linebreak <>
       "package" <+> text cName <> "_types" <+> "is" <$>
         indent 2 (vcat $ mapM tyDec ntys) <$>
-      "end package" <+> text cName <> "_types" <> semi
+      "end" <> semi
+
+    packageBodyDec ntys =
+      "package" <+> "body" <+> text cName <> "_types" <+> "is" <$>
+        indent 2 (vcat $ mapM funDec ntys) <$>
+      "end" <> semi
 
     imports ptys = punctuate' semi $ sequence $
                 [ "library IEEE"
@@ -58,9 +62,17 @@ needsTyDec :: HWType -> [HWType]
 needsTyDec ty@(Vector _ elTy) = ty:(needsTyDec elTy)
 needsTyDec ty@(Product _ tys) = ty:(concatMap needsTyDec tys)
 needsTyDec (SP _ tys)         = concatMap (concatMap needsTyDec . snd) tys
+needsTyDec Bool               = [Bool]
 needsTyDec _                  = []
 
 tyDec :: HWType -> VHDLM Doc
+tyDec Bool = do prevDec <- use _3
+                case (HashMap.lookup Bool prevDec) of
+                   Nothing -> toSLVDec
+                   Just _  -> empty
+  where
+    toSLVDec = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi
+
 tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
 tyDec ty@(Product _ tys) = "type" <+> tName <+> "is record" <$>
                               indent 2 (vcat $ sequence $ zipWith (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
@@ -71,6 +83,25 @@ tyDec ty@(Product _ tys) = "type" <+> tName <+> "is record" <$>
         selNames = map (\i -> tName <> "_sel" <> int i) [0..]
         selTys   = map vhdlType tys
 tyDec _          = empty
+
+funDec :: HWType -> VHDLM Doc
+funDec Bool = do prevDec <- use _3
+                 cN      <- use _2
+                 case (HashMap.lookup Bool prevDec) of
+                    Nothing -> do _3 %= HashMap.insert Bool (cN,"boolean")
+                                  toSLVDec
+                    Just _  -> empty
+  where
+    toSLVDec = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+               "begin" <$>
+                 indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
+                                           ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
+                                           ,"else"
+                                           ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
+                                           ,"end" <+> "if" <> semi
+                                           ]) <$>
+               "end" <> semi
+funDec _ = empty
 
 tyName :: HWType -> VHDLM Doc
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
@@ -108,7 +139,7 @@ entity c = do
                          parens (align $ vcat $ punctuate semi ports) <>
                          semi)
       ) <$>
-      "end entity" <+> text (componentName c) <> semi
+      "end" <> semi
   where
     ports = sequence
           $ [ text i <+> colon <+> "in" <+> vhdlType ty
@@ -126,7 +157,7 @@ architecture c =
   nest 2
     ("begin" <$$>
      (insts $ declarations c)) <$$>
-  "end architecture structural" <> semi
+    "end" <> semi
 
 vhdlType :: HWType -> VHDLM Doc
 vhdlType Bit        = "std_logic"

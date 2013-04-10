@@ -190,8 +190,8 @@ mkDcApplication dst dc args = do
   let dstId    = mkBasicId . Text.pack . name2String $ varName dst
   case dstHType of
     SP _ dcArgPairs -> do
-      let dcNameBS = Text.pack . show $ dcName dc
-      let dcI      = fromMaybe (error "dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
+      let dcNameBS = Text.pack . name2String $ dcName dc
+      let dcI      = fromMaybe (error "SP: dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
       let argTys   = snd $ dcArgPairs !! dcI
       nonEmptyArgs <- fmap (map varToExpr) $ Monad.filterM
                         (return . not . isEmptyType <=< termHWType) args
@@ -207,8 +207,8 @@ mkDcApplication dst dc args = do
         LT -> error "Over-applied constructor"
         GT -> error "Under-applied constructor"
     Sum _ dcs -> do
-      let dcNameBS = Text.pack . show $ dcName dc
-      let dcI = fromMaybe (error "dc not found") $ elemIndex dcNameBS dcs
+      let dcNameBS = Text.pack . name2String $ dcName dc
+      let dcI = fromMaybe (error "Sum: dc not found") $ elemIndex dcNameBS dcs
       return [Assignment dstId (Just $ DC dcI) dstHType []]
     Bool -> do
       let dc' = case (name2String $ dcName dc) of
