@@ -4,15 +4,14 @@ import Control.Monad.State      (State,runState,lift)
 import Control.Monad.Writer     (tell,runWriterT)
 import Control.Lens             (_1,_2,use,(%=),(+=),at)
 import Data.Foldable            (foldrM)
-import Data.HashMap.Lazy        (HashMap)
 import qualified Data.IntMap    as IntMap
 import qualified Data.List      as List
 import Data.Text.Lazy           (Text)
 import qualified Data.Text.Lazy as Text
-import Text.PrettyPrint.Leijen.Text.Monadic (renderOneLine,displayT,Doc)
+import Text.PrettyPrint.Leijen.Text.Monadic (renderOneLine,displayT)
 
 import CLaSH.Netlist.BlackBox.Types
-import CLaSH.Netlist.Types (Identifier,HWType(..))
+import CLaSH.Netlist.Types (Identifier,HWType(..),VHDLState)
 import CLaSH.Netlist.VHDL  (vhdlType)
 import CLaSH.Util
 
@@ -73,8 +72,8 @@ clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 renderBlackBox ::
   Line
   -> BlackBoxContext
-  -> (Int, HashMap HWType Doc)
-  -> ((Text, [(Identifier,HWType)]),(Int, HashMap HWType Doc))
+  -> VHDLState
+  -> ((Text, [(Identifier,HWType)]),VHDLState)
 renderBlackBox l bbCtx s
   = first (Text.concat >< List.nub)
   $ flip runState s

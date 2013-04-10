@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP                 #-}
 module CLaSH.Driver where
 
+import           Control.Monad.State          (evalState)
 import qualified Data.ByteString.Lazy         as LZ
 import           Data.Maybe                   (fromMaybe)
 import qualified Control.Concurrent.Supply    as Supply
@@ -69,7 +70,7 @@ generateVHDL modName = do
 
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
-      mapM_ (writeVHDL dir . genVHDL vhdlState) netlist
+      mapM_ (writeVHDL dir) $ evalState (mapM genVHDL netlist) vhdlState
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"

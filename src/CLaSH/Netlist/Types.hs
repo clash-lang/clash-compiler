@@ -22,6 +22,8 @@ newtype NetlistMonad a =
     NetlistMonad { runNetlist :: WriterT [(Identifier,HWType)] (StateT NetlistState (FreshMT IO)) a }
   deriving (Functor, Monad, Applicative, MonadState NetlistState, MonadWriter [(Identifier,HWType)], Fresh, MonadIO)
 
+type VHDLState = (Int,Text,HashMap HWType (Text,Doc))
+
 data NetlistState
   = NetlistState
   { _bindings   :: HashMap TmName (Type,Term)
@@ -30,7 +32,7 @@ data NetlistState
   , _cmpCount   :: Integer
   , _components :: HashMap TmName Component
   , _primitives :: HashMap ByteString Primitive
-  , _vhdlMState :: (Int,HashMap HWType Doc)
+  , _vhdlMState :: VHDLState
   }
 
 type Identifier = Text

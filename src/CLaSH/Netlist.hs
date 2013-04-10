@@ -33,7 +33,7 @@ genNetlist ::
   HashMap TmName (Type,Term)
   -> PrimMap
   -> TmName
-  -> IO ([Component],(Int, HashMap HWType Doc))
+  -> IO ([Component],VHDLState)
 genNetlist globals primMap topEntity = do
   (_,s) <- runNetlistMonad globals primMap $ genComponent topEntity Nothing
   return $ (HashMap.elems $ _components s, _vhdlMState s)
@@ -78,6 +78,8 @@ genComponent' compName componentExpr mStart = do
                      . mkBasicId
                      . Text.pack
                      $ name2String compName
+
+  (vhdlMState . _2) .= componentName'
 
   (arguments,binders,result) <- splitNormalized componentExpr >>=
                                 mkUniqueNormalized
@@ -156,9 +158,11 @@ mkApplication dst fun args = do
     Just _ -> do
       vCnt <- Lens.use varCount
       vEnv <- Lens.use varEnv
+      cN   <- Lens.use (vhdlMState . _2)
       (Component compName hidden compInps compOutp _) <- genComponent fun Nothing
       varCount .= vCnt
       varEnv .= vEnv
+      (vhdlMState . _2) .= cN
       case length args == length compInps of
         True  -> do
           let dstId = mkBasicId . Text.pack . name2String $ varName dst

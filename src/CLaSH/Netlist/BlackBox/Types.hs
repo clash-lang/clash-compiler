@@ -3,9 +3,7 @@ module CLaSH.Netlist.BlackBox.Types where
 
 import Control.Monad.State (MonadState, State)
 import Control.Monad.Writer (MonadWriter,WriterT)
-import Data.HashMap.Lazy (HashMap)
 import Data.Text.Lazy (Text)
-import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 
 import CLaSH.Netlist.Types
 
@@ -36,5 +34,5 @@ data Element = C  Text
 data Decl = Decl Int [Line]
   deriving Show
 
-newtype BlackBoxMonad a = B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State (Int,HashMap HWType Doc)) a }
-  deriving (Functor, Monad, MonadWriter [(Identifier,HWType)], MonadState (Int,HashMap HWType Doc))
+newtype BlackBoxMonad a = B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State VHDLState) a }
+  deriving (Functor, Monad, MonadWriter [(Identifier,HWType)], MonadState VHDLState)

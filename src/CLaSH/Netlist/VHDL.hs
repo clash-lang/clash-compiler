@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 module CLaSH.Netlist.VHDL where
 
+import Control.Lens
 import Control.Monad.State
-import Data.HashMap.Lazy  (HashMap,(!))
-import Data.Label.PureM as LabelM
+import qualified Data.HashMap.Lazy as HashMap
 import Data.List (nub)
 import Data.Maybe (catMaybes)
 import Data.Text.Lazy (Text,unpack)
@@ -12,30 +13,46 @@ import Text.PrettyPrint.Leijen.Text.Monadic
 -- import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.Util
-import CLaSH.Util (makeCached,getAndModify,__1,__2)
+import CLaSH.Util (traceIf)
 
-type VHDLM a = State (Int,HashMap HWType Doc) a
+type VHDLM a = State VHDLState a
 
-genVHDL :: (Int,HashMap HWType Doc) -> Component -> (String,Doc)
-genVHDL s c = (unpack $ cName, flip evalState s vhdl)
+genVHDL :: Component -> VHDLM (String,Doc)
+genVHDL c = do
+    _2 .= cName
+    fmap (unpack $ cName,) vhdl
   where
     cName = componentName c
-    vhdl = tyPackage cName ((snd $ output c) : map snd (inputs c)) <$$> linebreak <>
-           tyImports cName <$$> linebreak <>
+    vhdl = tyPackage cName tys <$$> linebreak <>
+           tyImports tys <$$> linebreak <>
            entity c <$$> linebreak <>
            architecture c
+    tys = (snd $ output c)
+        : map snd (inputs c)
+        ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
 
 tyPackage :: Text -> [HWType] -> VHDLM Doc
-tyPackage cName tys = imports <$> linebreak <>
-  "package" <+> text cName <> "_types" <+> "is" <$>
-  indent 2 (vcat $ mapM tyDec $ nub $ concatMap needsTyDec tys) <$>
-  "end package" <+> text cName <> "_types" <> semi
+tyPackage cName tys = do prevDec <- use _3
+                         cN      <- use _2
+                         let needsDec = nub $ concatMap needsTyDec tys
+                             newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
+                             useDec   = HashMap.keys $ HashMap.filter ((== cN) . fst) prevDec
+                             otherDec = map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
+                         case (newDec ++ useDec) of
+                            []   -> empty
+                            cDec -> traceIf True (show (cN,otherDec,cDec)) $ packageDec otherDec cDec
   where
-    imports = punctuate' semi $ sequence
+    packageDec ptys ntys =
+      imports ptys <$> linebreak <>
+      "package" <+> text cName <> "_types" <+> "is" <$>
+        indent 2 (vcat $ mapM tyDec ntys) <$>
+      "end package" <+> text cName <> "_types" <> semi
+
+    imports ptys = punctuate' semi $ sequence $
                 [ "library IEEE"
                 , "use IEEE.STD_LOGIC_1164.ALL"
                 , "use IEEE.NUMERIC_STD.ALL"
-                ]
+                ] ++ map (\x -> "use work." <> text x <> "_types.all") ptys
 
 needsTyDec :: HWType -> [HWType]
 needsTyDec ty@(Vector _ elTy) = ty:(needsTyDec elTy)
@@ -58,17 +75,28 @@ tyDec _          = empty
 tyName :: HWType -> VHDLM Doc
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)        = "signed_" <> int n
-tyName t@(Product _ _)   = makeCached t __2 (do {k <- getAndModify __1 (+1); "product" <> int k })
+tyName t@(Product _ _)   = do tMap <- use _3
+                              case HashMap.lookup t tMap of
+                                Nothing -> do i <- use _1
+                                              c <- use _2
+                                              _1 += 1
+                                              newName <- "product" <> int i
+                                              _3 %= HashMap.insert t (c,newName)
+                                              return newName
+                                Just (_,n) -> return n
+
+
 tyName _                 = empty
 
-tyImports :: Text -> VHDLM Doc
-tyImports compName = punctuate' semi $ sequence
-  [ "library IEEE"
-  , "use IEEE.STD_LOGIC_1164.ALL"
-  , "use IEEE.NUMERIC_STD.ALL"
-  , "use work." <> text compName <> "_types.ALL"
-  , "use work.all"
-  ]
+tyImports :: [HWType] -> VHDLM Doc
+tyImports tys = do prevDec <- use _3
+                   let needsDec = nub $ concatMap needsTyDec tys
+                       usePacks = map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
+                   punctuate' semi $ sequence $ [ "library IEEE"
+                                                , "use IEEE.STD_LOGIC_1164.ALL"
+                                                , "use IEEE.NUMERIC_STD.ALL"
+                                                , "use work.all"
+                                                ] ++ map (\x -> "use work." <> text x <> "_types.all") usePacks
 
 entity :: Component -> VHDLM Doc
 entity c = do
@@ -113,7 +141,7 @@ vhdlType t@(SP _ _) = "std_logic_vector" <>
 vhdlType t@(Sum _ _) = "std_logic_vector" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
-vhdlType t@(Product _ _) = fmap (! t) $ LabelM.gets __2
+vhdlType t@(Product _ _) = tyName t
 vhdlType t          = error $ "vhdlType: " ++ show t
 
 decls :: [Declaration] -> VHDLM Doc
@@ -217,4 +245,3 @@ larrow = "<="
 
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = (vcat $ punctuate s d) <> s
-

@@ -134,9 +134,11 @@ mkFunInput resId e = case (collectArgs e) of
     (Component compName hidden compInps compOutp _) <- lift $
       do vCnt <- Lens.use varCount
          vEnv <- Lens.use varEnv
+         cN   <- Lens.use (vhdlMState . _2)
          comp <- genComponent fun Nothing
          varCount .= vCnt
          varEnv .= vEnv
+         (vhdlMState . _2) .= cN
          return comp
     let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
         inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
