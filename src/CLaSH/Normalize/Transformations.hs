@@ -227,6 +227,12 @@ caseCon _ (Case scrut ty alts)
     isDefPat DefaultPat = True
     isDefPat _          = False
 
+caseCon _ (Case _ _ [alt]) = R $ do
+  (pat,e) <- unbind alt
+  case pat of
+    DefaultPat -> changed e
+    _          -> return e
+
 caseCon _ e = return e
 
 repANF :: NormRewrite
