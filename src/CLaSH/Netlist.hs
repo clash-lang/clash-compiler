@@ -218,6 +218,11 @@ mkDcApplication dst dc args = do
                  "L" -> [HW.Literal Nothing (BitLit L)]
                  _ -> error $ "unknown bit literal: " ++ show dc
       return [Assignment dstId Nothing dstHType dc']
+    Integer -> do
+      let dc' = case (name2String $ dcName dc) of
+                  "S#" -> Nothing
+                  _    -> error $ $(curLoc) ++ "not a simple integer: " ++ show dc
+      return [Assignment dstId dc' dstHType (map varToExpr args)]
     Vector 0 _ -> return []
     Vector 1 _ -> return [Assignment dstId (Just VecAppend) dstHType [varToExpr $ head args]]
     Vector _ _ -> return [Assignment dstId (Just VecAppend) dstHType (map varToExpr args)]
