@@ -129,6 +129,10 @@ tyNatSize ::
   Type
   -> Either String Int
 tyNatSize (LitTy (NumTy i)) = return i
+tyNatSize ((tyView -> TyConApp tc [ty1,ty2]))
+                            = case (name2String $ tyConName tc) of
+                                "GHC.TypeLits.+" -> (+) <$> tyNatSize ty1 <*> tyNatSize ty2
+                                _ -> Left $ $(curLoc) ++ "Can't convert tyNatOp: " ++ show tc
 tyNatSize t                 = Left $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
 
 representableType ::
@@ -141,6 +145,7 @@ isEmptyType ::
   -> Bool
 isEmptyType Void           = True
 isEmptyType (Sum _ (_:[])) = True
+isEmptyType (Vector 0 _)   = True
 isEmptyType _              = False
 
 typeSize ::

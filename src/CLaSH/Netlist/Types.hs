@@ -76,6 +76,7 @@ data Modifier
   = Indexed  Int
   | Selected Label
   | DC Int
+  | VecAppend
   deriving Show
 
 data Expr

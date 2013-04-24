@@ -36,7 +36,7 @@ tyPackage cName tys = do prevDec <- use _3
                              newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
                              useDec   = HashMap.keys $ HashMap.filter ((== cN) . fst) prevDec
                              otherDec = map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
-                         case (newDec ++ useDec) of
+                         case (nub $ newDec ++ useDec) of
                             []   -> empty
                             cDec -> packageDec otherDec cDec <$$> linebreak <>
                                     packageBodyDec cDec
@@ -59,7 +59,7 @@ tyPackage cName tys = do prevDec <- use _3
                 ] ++ map (\x -> "use work." <> text x <> "_types.all") ptys
 
 needsTyDec :: HWType -> [HWType]
-needsTyDec ty@(Vector _ elTy) = ty:(needsTyDec elTy)
+needsTyDec (Vector _ elTy)    = (Vector 0 elTy):(needsTyDec elTy)
 needsTyDec ty@(Product _ tys) = ty:(concatMap needsTyDec tys)
 needsTyDec (SP _ tys)         = concatMap (concatMap needsTyDec . snd) tys
 needsTyDec Bool               = [Bool]
@@ -186,6 +186,7 @@ decls ds = do
     dsDoc = fmap catMaybes $ mapM decl ds
 
 decl :: Declaration -> VHDLM (Maybe Doc)
+decl (NetDecl _ ty _) | isEmptyType ty = return Nothing
 decl (NetDecl id_ ty Nothing) = fmap Just $
   "signal" <+> text id_ <+> colon <+> vhdlType ty
 
@@ -213,6 +214,12 @@ inst (Assignment id_ (Just (DC 0)) ty@(Product _ _) es) = fmap Just $
     vcat $ sequence $ zipWith (\i e -> text id_ <> dot <> tName <> "_sel" <> int i <+> larrow <+> expr e <> semi) [0..] es
   where
     tName = tyName ty
+
+inst (Assignment id_ (Just VecAppend) (Vector 1 _) [e]) = fmap Just $
+  text id_ <+> larrow <+> parens ("others" <+> rarrow <+> expr e) <> semi
+
+inst (Assignment id_ (Just VecAppend) (Vector _ _) [e1,e2]) = fmap Just $
+  text id_ <+> larrow <+> expr e1 <+> "&" <+> expr e2 <> semi
 
 inst (Assignment id_ Nothing _ [e]) = fmap Just $
   text id_ <+> larrow <+> expr e <> semi
@@ -275,6 +282,9 @@ dcToExpr _ _ = error "dcExpr"
 
 larrow :: VHDLM Doc
 larrow = "<="
+
+rarrow :: VHDLM Doc
+rarrow = "=>"
 
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = (vcat $ punctuate s d) <> s

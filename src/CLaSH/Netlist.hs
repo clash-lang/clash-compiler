@@ -218,4 +218,8 @@ mkDcApplication dst dc args = do
                  "L" -> [HW.Literal Nothing (BitLit L)]
                  _ -> error $ "unknown bit literal: " ++ show dc
       return [Assignment dstId Nothing dstHType dc']
+    Vector 0 _ -> return []
+    Vector 1 _ -> return [Assignment dstId (Just VecAppend) dstHType [varToExpr $ head args]]
+    Vector _ _ -> return [Assignment dstId (Just VecAppend) dstHType (map varToExpr args)]
+
     _ -> error $ "mkDcApplication undefined: " ++ show dstHType

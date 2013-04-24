@@ -47,7 +47,7 @@ import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
 import CLaSH.GHC.Compat.TyCon (isSuperKindTyCon)
 import Type       (tcView)
 import TypeRep    (Type(..),TyLit(..))
-import TysWiredIn (tupleTyCon)
+import TysWiredIn (tupleTyCon,typeNatAddTyCon)
 import Unique     (Unique,Uniquable(..),getKey)
 import Var        (Var,Id,TyVar,varName,varUnique,varType,isTyVar)
 import VarSet     (isEmptyVarSet)
@@ -88,7 +88,10 @@ instance Hashable DataCon where
 makeAllTyDataCons :: [TyCon] -> GHC2CoreState
 makeAllTyDataCons tyCons =
   let s = Reader.runReader (State.execStateT
-                              (mapM makeTyCon (tyCons' ++ tupleTyCons))
+                              (do { mapM_ mkTyNatTyCon [typeNatAddTyCon]
+                                  ; mapM_ makeTyCon (tyCons' ++ tupleTyCons)
+                                  }
+                              )
                               emptyState)
                            s
   in  s
@@ -100,6 +103,16 @@ makeAllTyDataCons tyCons =
                             [BoxedTuple,UnboxedTuple,ConstraintTuple]
                          | x <- [2..62]
                          ]
+
+mkTyNatTyCon ::
+  TyCon
+  -> SR ()
+mkTyNatTyCon tc = do
+  tcKind <- lift $ coreToType (tyConKind tc)
+  let tcName  = coreToName tyConName tyConUnique qualfiedNameString tc
+      tcArity = tyConArity tc
+      tycon   = C.mkPrimTyCon tcName tcKind tcArity C.VoidRep
+  tyConMap %= (HashMap.insert tc tycon)
 
 makeTyCon ::
   TyCon
