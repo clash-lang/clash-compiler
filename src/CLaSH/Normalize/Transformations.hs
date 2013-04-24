@@ -294,7 +294,7 @@ altLet ctx e@(Case subj ty alts) = R $ do
       lv <- isLocalVar altExpr
       case lv of
         True  -> return ([],alt)
-        False -> do let fvs = termFreeIds e
+        False -> do let fvs = termFreeIds altExpr
                     patSels <- fmap Maybe.catMaybes $ Monad.zipWithM (doPatBndr fvs (unembed dc)) xs [0..]
                     (altId,altVar) <- mkTmBinderFor "altLet" altExpr
                     return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
