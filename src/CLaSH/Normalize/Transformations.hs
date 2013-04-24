@@ -398,6 +398,20 @@ deadCode _ e@(Letrec binds) = R $ do
 
 deadCode _ e = return e
 
+inlineVar :: NormRewrite
+inlineVar ctx = inlineBinders lvarTest ctx
+  where
+    lvarTest (_, (Embed e@(Var _ nm)))
+      = do lv <- isLocalVar e
+           case lv of
+             True  -> return $! (null $ filter (isLamBound nm) ctx)
+             False -> return False
+
+    lvarTest _ = return False
+
+    isLamBound varN (LamBody id1) = varName id1 == varN
+    isLamBound _             _    = False
+
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
 classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dfunE)

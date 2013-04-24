@@ -47,6 +47,7 @@ simplification = repeatTopdown steps
             , ("letFlat"     , letFlat)
             , ("topLet"      , topLet)
             , ("etaExpansion", etaExpansion)
+            , ("inlineVar"   , inlineVar)
             ]
 
 doInline :: String -> NormRewrite -> NormRewrite
