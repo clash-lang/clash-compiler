@@ -56,4 +56,10 @@ end block;",
       "templateI" : ""
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.+>>",
+      "template"  : "~RESULT <= ~ARG[0] & ~ARG[1]((~ARG[1]'length - 2) downto 0);",
+      "templateI" : "~ARG[0] & ~ARG[1]((~ARG[1]'length - 2) downto 0)"
+    }
+  }
 ]
