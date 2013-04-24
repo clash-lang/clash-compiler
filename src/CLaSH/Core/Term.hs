@@ -22,7 +22,7 @@ import CLaSH.Util
 
 data Term
   = Var     Type TmName
-  | Data    DataCon
+  | Data    Bool DataCon
   | Literal Literal
   | Prim    Prim
   | Lam     (Bind Id Term)

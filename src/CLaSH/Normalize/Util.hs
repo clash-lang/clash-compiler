@@ -91,9 +91,9 @@ isSimple ::
   Term
   -> Bool
 isSimple (Literal _) = True
-isSimple (Data _)    = True
+isSimple (Data _ _)  = True
 isSimple e@(App _ _)
-  | (Data _, args) <- collectArgs e
+  | (Data _ _, args) <- collectArgs e
   = all (either isSimple (const True)) args
   | (Prim _, args) <- collectArgs e
   = all (either isSimple (const True)) args

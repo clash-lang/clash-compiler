@@ -21,6 +21,7 @@ data DataCon
   , dcExtTyVars  :: [TyName]
   , dcArgTys     :: [Type]
   , dcWorkId     :: (TmName, Type)
+  , dcWrapIdM    :: Maybe (TmName,Type)
   }
 
 instance Show DataCon where

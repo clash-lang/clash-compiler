@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections    #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -31,9 +32,9 @@ import Coercion   (isCoVar,coercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
 import DataCon    (DataCon,dataConTag,dataConExTyVars,dataConUnivTyVars,dataConWorkId,
-  dataConRepArgTys,dataConName,dataConTyCon)
+  dataConRepArgTys,dataConName,dataConTyCon,dataConWrapId,dataConWrapId_maybe)
 import CLaSH.GHC.Compat.FastString (unpackFS,unpackFB)
-import Id         (isDataConWorkId_maybe)
+import Id         (isDataConWorkId,isDataConId_maybe)
 import Literal    (Literal(..))
 import Module     (moduleName,moduleNameString)
 import Name       (Name,nameOccName,nameModule_maybe)
@@ -175,6 +176,7 @@ makeDataCon ::
 makeDataCon dc = do
   repTys   <- lift $ mapM coreToType (dataConRepArgTys  dc)
   workIdTy <- lift $ coreToType (varType $ dataConWorkId dc)
+  wrapIdTyM <- maybe (return Nothing) (fmap Just . lift . coreToType . varType) (dataConWrapId_maybe dc)
   let dataCon =
         C.MkData
           { C.dcName       = coreToName dataConName getUnique nameString dc
@@ -184,6 +186,7 @@ makeDataCon dc = do
           , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
           , C.dcWorkId     = ( coreToVar $ dataConWorkId dc
                              , workIdTy)
+          , C.dcWrapIdM    = maybe Nothing (Just . (coreToVar $ dataConWrapId dc,)) wrapIdTyM
           }
   dataConMap %= (HashMap.insert dc dataCon)
   return dataCon
@@ -240,15 +243,15 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
         unlocs <- view unlocatable
         xType <- coreToType (varType x)
         let mapSyncName = pack
-        case (isDataConWorkId_maybe x) of
+        case (isDataConId_maybe x) of
           Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
                   | otherwise ->  case (HashMap.lookup xNameS primMap) of
                       Just (Primitive _ Constructor) ->
                         C.Prim <$> C.PrimCon <$> (coreToDataCon dc)
                       Just (BlackBox {}) ->
                         return $ C.Prim (C.PrimFun xPrim xType)
-                      _ ->
-                        C.Data <$> (coreToDataCon dc)
+                      _ | isDataConWorkId x -> C.Data False <$> (coreToDataCon dc)
+                        | otherwise         -> C.Data True  <$> (coreToDataCon dc)
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive _ DFun) ->
               return $ C.Prim (C.PrimDFun xPrim xType)

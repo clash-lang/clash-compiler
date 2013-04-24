@@ -114,27 +114,6 @@ mkConcSm ::
   -> NetlistMonad [Declaration]
 mkConcSm bndr (Var _ v) = mkApplication bndr v []
 
-mkConcSm bndr (Data dc) = mkDcApplication bndr dc []
-
-mkConcSm bndr app@(App _ _) = do
-  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  args' <- Monad.filterM (fmap representableType . termType) args
-  case appF of
-    Var _ f
-      | all isVar args' && null tyArgs -> mkApplication bndr f args'
-      | otherwise                      -> error "Not in normal form: Var-application with non-Var arguments"
-    Data dc
-      | all isVar args' -> mkDcApplication bndr dc args'
-      | otherwise       -> error "Not in normal form: DataCon-application with non-Var arguments"
-    Prim (PrimFun nm _) -> do
-      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
-      case bbM of
-        Just p@(P.BlackBox {}) -> do
-          bbCtx <- mkBlackBoxContext bndr args
-          mkBlackBoxDecl (template p) bbCtx
-        _ -> error $ "No blackbox found: " ++ show bbM
-    _ -> error $ "Not in normal form: application of a Let/Lam/Case" ++ show app
-
 mkConcSm bndr (Core.Literal lit) = do
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
   let bndrHWType = coreTypeToHWType_fail . unembed $ varType bndr
@@ -145,7 +124,24 @@ mkConcSm bndr (Core.Literal lit) = do
            [HW.Literal Nothing . NumLit $ fromInteger i]
          ]
 
-mkConcSm _ e = error $ "Not in normal form: let-bound expr is a Let or TyApp: " ++ show e
+mkConcSm bndr app = do
+  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
+  args' <- Monad.filterM (fmap representableType . termType) args
+  case appF of
+    Var _ f
+      | all isVar args' && null tyArgs -> mkApplication bndr f args'
+      | otherwise                      -> error "Not in normal form: Var-application with non-Var arguments"
+    Data _ dc
+      | all isVar args' -> mkDcApplication bndr dc args'
+      | otherwise       -> error "Not in normal form: DataCon-application with non-Var arguments"
+    Prim (PrimFun nm _) -> do
+      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
+      case bbM of
+        Just p@(P.BlackBox {}) -> do
+          bbCtx <- mkBlackBoxContext bndr args
+          mkBlackBoxDecl (template p) bbCtx
+        _ -> error $ "No blackbox found: " ++ show bbM
+    _ -> error $ "Not in normal form: application of a Let/Lam/Case" ++ show app
 
 mkApplication ::
   Id
