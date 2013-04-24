@@ -63,6 +63,7 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
     "GHC.Prim.ByteArray#"       -> return Integer
     "GHC.Types.Bool"            -> return Bool
     "GHC.TypeLits.Sing"         -> singletonToHWType (head args)
+    "GHC.Prim.~#"               -> Left $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Bit.Bit"             -> return Bit
     "CLaSH.Signal.Sync"         -> coreTypeToHWType (head args)
     "CLaSH.Sized.Signed.Signed" -> Signed <$> (tyNatSize $ head args)
