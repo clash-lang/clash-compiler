@@ -32,7 +32,7 @@ genVHDL c = do
 tyPackage :: Text -> [HWType] -> VHDLM Doc
 tyPackage cName tys = do prevDec <- use _3
                          cN      <- use _2
-                         let needsDec = nub $ concatMap needsTyDec tys
+                         let needsDec = reverse $ nub $ concatMap needsTyDec tys
                              newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
                              useDec   = HashMap.keys $ HashMap.filter ((== cN) . fst) prevDec
                              otherDec = map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
