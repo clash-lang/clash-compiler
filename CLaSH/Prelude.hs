@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
+
 module CLaSH.Prelude
   ( module Exported
   , module CLaSH.Prelude

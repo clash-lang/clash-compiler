@@ -47,7 +47,7 @@ instance Show a => Show (Vec n a) where
       punc (x :> Nil) = show x
       punc (x :> xs)  = show x ++ "," ++ punc xs
 
-instance (SingI n, Default a )=> Default (Vec n a) where
+instance (SingI n, Default a) => Default (Vec n a) where
   def = vcopy def
 
 vhead :: Vec (n + 1) a -> a
@@ -215,6 +215,7 @@ vselectI ::
   -> Vec (n + 1) a
 vselectI f s xs = withSing (\n -> vselect f s n xs)
 
+{-# NOINLINE vcopyE #-}
 vcopyE :: Sing n -> a -> Vec n a
 vcopyE n a = vreplicate' (isZero n) a
   where
@@ -222,9 +223,11 @@ vcopyE n a = vreplicate' (isZero n) a
     vreplicate' IsZero     _ = Nil
     vreplicate' (IsSucc s) x = x :> vreplicate' (isZero s) x
 
+{-# NOINLINE vcopy #-}
 vcopy :: SingI n => a -> Vec n a
 vcopy = withSing vcopyE
 
+{-# NOINLINE viterateE #-}
 viterateE :: Sing n -> (a -> a) -> a -> Vec n a
 viterateE n f a = viterate' (isZero n) f a
   where
