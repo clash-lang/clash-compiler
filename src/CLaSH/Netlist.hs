@@ -59,7 +59,7 @@ genComponent ::
 genComponent compName mStart = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
-    Nothing -> error "no normalized expression found"
+    Nothing -> error $ $(curLoc) ++ "No normalized expression found for: " ++ show compName
     Just (_,expr) -> makeCached compName components $
                       genComponent' compName expr mStart
 
@@ -130,7 +130,7 @@ mkConcSm bndr app = do
   case appF of
     Var _ f
       | all isVar args' && null tyArgs -> mkApplication bndr f args'
-      | otherwise                      -> error "Not in normal form: Var-application with non-Var arguments"
+      | otherwise                      -> error $ $(curLoc) ++ "Not in normal form: Var-application with non-Var arguments"
     Data _ dc
       | all (\e -> isConstant e || isVar e) args' -> let dstId = mkBasicId . Text.pack . name2String $ varName bndr
                                                          hwTy  = coreTypeToHWType_fail . unembed $ varType bndr
@@ -142,8 +142,8 @@ mkConcSm bndr app = do
         Just p@(P.BlackBox {}) -> do
           bbCtx <- mkBlackBoxContext bndr args
           mkBlackBoxDecl (template p) bbCtx
-        _ -> error $ "No blackbox found: " ++ show bbM
-    _ -> error $ "Not in normal form: application of a Let/Lam/Case" ++ show app
+        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
+    _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case" ++ show app
 
 mkApplication ::
   Id
@@ -170,7 +170,7 @@ mkApplication dst fun args = do
           let outpAssign = (fst compOutp,Identifier dstId Nothing)
           let instDecl = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
           return [instDecl]
-        False -> error "under-applied normalized function"
+        False -> error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of
       [] -> do
         let dstId     = mkBasicId . Text.pack . name2String $ varName dst
@@ -232,4 +232,4 @@ mkDcApplication dstHType dc args = do
     Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [(head argExprs)])
     Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
 
-    _ -> error $ "mkDcApplication undefined: " ++ show dstHType
+    _ -> error $ $(curLoc) ++ "mkDcApplication undefined: " ++ show dstHType
