@@ -80,6 +80,7 @@ loadModules modName = defaultErrorHandler $
                                      ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env dsMod
                                      ; let tycons     = HscTypes.cg_tycons tidy_guts
                                      ; let pgm        = HscTypes.cg_binds tidy_guts
+                                     -- ; let pgm = HscTypes.mg_binds dsMod
                                      -- ; let dataTyCons = filter TyCon.isDataTyCon tycons
                                      -- ; dflags'' <- GHC.getSessionDynFlags
                                      -- ; prepBinders <- MonadUtils.liftIO $ CorePrep.corePrepPgm dflags'' hsc_env pgm dataTyCons
