@@ -20,6 +20,7 @@ import CLaSH.Core.Term       (Term(..),TmName,LetBinding,Pat(..))
 import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy)
 import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isLet,isPrim)
 import CLaSH.Core.Var        (Var(..),Id)
+import CLaSH.Netlist.Util    (splitNormalized)
 import CLaSH.Normalize.Types
 import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Types
@@ -405,18 +406,40 @@ deadCode _ e@(Letrec binds) = R $ do
 deadCode _ e = return e
 
 inlineVar :: NormRewrite
-inlineVar ctx = inlineBinders lvarTest ctx
+inlineVar ctx e@(Letrec bnd) = do
+  (bndrs,_) <- unbind bnd
+  if length (unrec bndrs) > 1
+    then inlineBinders (isLocalVar . unembed . snd) ctx e
+    else return e
+
+inlineVar _ e = return e
+
+
+inlineWrapper :: NormRewrite
+inlineWrapper [] e = R $ do
+  (_,lbs,_) <- splitNormalized e
+  case lbs of
+    [(_,bExpr)] -> case collectArgs (unembed bExpr) of
+      (Var _ fn,args) -> do allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
+                            bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
+                            case (bodyMaybe,allLocal) of
+                              (Just (_,body),True) -> changed body
+                              _                    -> return e
+      _               -> return e
+    _ -> return e
+
+inlineWrapper _ e@(Var _ f) = R $ do
+    bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+    case bodyMaybe of
+      Just (_,body) -> do
+        wrappedF_maybe <- getWrappedF body
+        case wrappedF_maybe of
+          Just wrappedF -> changed wrappedF
+          Nothing       -> return e
+      _ -> return e
   where
-    lvarTest (_, (Embed e@(Var _ nm)))
-      = do lv <- isLocalVar e
-           case lv of
-             True  -> return $! (null $ filter (isLamBound nm) ctx)
-             False -> return False
 
-    lvarTest _ = return False
-
-    isLamBound varN (LamBody id1) = varName id1 == varN
-    isLamBound _             _    = False
+inlineWrapper _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite

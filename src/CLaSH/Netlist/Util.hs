@@ -6,7 +6,7 @@ import qualified Control.Monad as Monad
 import Data.Text.Lazy (pack)
 import Data.Either             (partitionEithers)
 import Data.Maybe              (catMaybes)
-import Unbound.LocallyNameless (bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
+import Unbound.LocallyNameless (Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon      (DataCon(..))
 import CLaSH.Core.FreeVars     (typeFreeVars)
@@ -21,8 +21,9 @@ import CLaSH.Netlist.Types
 import CLaSH.Util
 
 splitNormalized ::
-  Term
-  -> NetlistMonad ([Id],[LetBinding],TmName)
+  (Fresh m,Functor m)
+  => Term
+  -> m ([Id],[LetBinding],TmName)
 splitNormalized expr = do
   (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
   case (letExpr) of

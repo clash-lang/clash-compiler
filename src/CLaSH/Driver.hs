@@ -19,7 +19,7 @@ import           CLaSH.Core.Term              (TmName)
 import           CLaSH.Driver.PrepareBinding
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL)
-import           CLaSH.Normalize              (runNormalization, normalize)
+import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
 import           CLaSH.Primitives.Types
 import           CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
@@ -62,7 +62,7 @@ generateVHDL modName = do
       supply <- Supply.newSupply
       let transformedBindings
             = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
-            $ normalize [fst topEntity]
+            $ (normalize [fst topEntity]) >>= cleanupGraph
 
       (netlist,vhdlState) <- genNetlist (HashMap.fromList $ transformedBindings)
                               primMap

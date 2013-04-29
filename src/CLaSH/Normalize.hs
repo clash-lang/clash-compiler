@@ -7,6 +7,7 @@ import qualified Control.Monad.State as State
 import Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy   as HashMap
 import qualified Data.Map            as Map
+import qualified Data.Set            as Set
 
 import CLaSH.Core.FreeVars      (termFreeIds)
 import CLaSH.Core.Pretty        (showDoc)
@@ -49,7 +50,7 @@ normalize (bndr:bndrs) = do
     Just (ty,expr) -> do
       liftRS $ curFun .= bndr
       normalizedExpr <- makeCachedT3 bndr normalized $
-                         normalizeExpr bndrS expr
+                         rewriteExpr ("normalization",normalization) (bndrS,expr)
       usedBndrs <- usedGlobalBndrs normalizedExpr
       case (bndr `elem` usedBndrs) of
         True -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
@@ -62,21 +63,33 @@ normalize (bndr:bndrs) = do
 
 normalize [] = return []
 
-normalizeExpr ::
-  String
-  -> Term
+rewriteExpr ::
+  (String,NormRewrite)
+  -> (String,Term)
   -> NormalizeSession Term
-normalizeExpr bndrS expr = do
+rewriteExpr (nrwS,nrw) (bndrS,expr) = do
   lvl <- Lens.view dbgLevel
   let before = showDoc expr
   let expr' = traceIf (lvl >= DebugFinal)
-                (bndrS ++ " before normalization:\n\n" ++ before ++ "\n")
+                (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
                 expr
-  rewritten <- runRewrite "normalization" normalization expr'
+  rewritten <- runRewrite nrwS nrw expr'
   let after = showDoc rewritten
   traceIf (lvl >= DebugFinal)
-    (bndrS ++ " after normalization:\n\n" ++ after ++ "\n") $
+    (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
+
+cleanupGraph :: [(TmName,(Type,Term))] -> NormalizeSession [(TmName,(Type,Term))]
+cleanupGraph norm = do
+    bindings .= (HashMap.fromList norm)
+    mapM cleanupGraph' norm
+  where
+    cleanupGraph' :: (TmName,(Type,Term)) -> NormalizeSession (TmName,(Type,Term))
+    cleanupGraph' (nm,(ty,expr)) = do
+      let nmS = showDoc nm
+      liftRS $ curFun .= nm
+      cleanedUp <- rewriteExpr ("cleanup",cleanup) (nmS,expr)
+      return  (nm,(ty,cleanedUp))
 
 usedGlobalBndrs ::
   Term
@@ -84,4 +97,4 @@ usedGlobalBndrs ::
 usedGlobalBndrs tm = do
   clsOps <- fmap (HashMap.keys) $ Lens.use classOps
   dfuns  <- fmap (HashMap.keys) $ Lens.use dictFuns
-  return . filter (`notElem` (clsOps ++ dfuns)) $ termFreeIds tm
+  return . filter (`notElem` (clsOps ++ dfuns)) . Set.toList $ termFreeIds tm

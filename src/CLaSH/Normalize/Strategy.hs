@@ -11,6 +11,11 @@ normalization = repeatR $ clsOpRes >-> representable >-> simplification
   where
     clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
 
+cleanup :: NormRewrite
+cleanup = repeatR $ cleanupSteps !-> simplification
+  where
+    cleanupSteps = bottomupR $ apply "inlineWrapper" inlineWrapper
+
 representable :: NormRewrite
 representable = propagagition >-> specialisation
   where
