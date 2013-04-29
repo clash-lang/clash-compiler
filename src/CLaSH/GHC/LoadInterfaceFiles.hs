@@ -46,10 +46,8 @@ getExternalTyCons visited modName = (`Exception.gcatch` expCatch) $ do
             case ifaceM of
               Nothing -> return ([],[])
               Just iface -> do
-                -- let used  = map fst $ HscTypes.dep_mods $ GHC.mi_deps iface
                 let used  = mapMaybe usageModuleName $ GHC.mi_usages iface
-                let decls = map snd (GHC.mi_decls iface)
-                tcs <- fmap (mapMaybe tyThingIsTyCon) $ mapM loadDecl decls
+                tcs <- ifaceTyCons iface
                 return (tcs,used)
 
   let visited' = modName:visited
@@ -61,10 +59,6 @@ getExternalTyCons visited modName = (`Exception.gcatch` expCatch) $ do
     expCatch :: GHC.GhcMonad m
       => HscTypes.SourceError -> m ([GHC.ModuleName],[GHC.TyCon])
     expCatch _ = return (modName:visited,[])
-
-    tyThingIsTyCon :: GHC.TyThing -> Maybe GHC.TyCon
-    tyThingIsTyCon (GHC.ATyCon tc) = Just tc
-    tyThingIsTyCon _               = Nothing
 
     usageModuleName :: HscTypes.Usage -> Maybe GHC.ModuleName
     usageModuleName (HscTypes.UsagePackageModule {..}) = Just $ GHC.moduleName usg_mod
@@ -82,6 +76,9 @@ runIfl modName action = do
 
 loadDecl :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL GHC.TyThing
 loadDecl decl = TcIface.tcIfaceDecl False decl
+
+ifaceTyCons :: HscTypes.ModIface -> TcRnTypes.IfL [GHC.TyCon]
+ifaceTyCons = fmap (HscTypes.typeEnvTyCons . HscTypes.md_types) . TcIface.typecheckIface
 
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
 loadIface foundMod = do
