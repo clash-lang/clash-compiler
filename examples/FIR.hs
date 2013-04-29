@@ -5,10 +5,13 @@ import CLaSH.Prelude
 
 dotp as bs = vfoldl (+) 0 (vzipWith (*) as bs)
 
-fir hs pxs x = (x +>> pxs, dotp pxs hs)
+fir :: Vec 4 (Sync (Signed 16))
+          -> Sync (Signed 16)
+          -> Sync (Signed 16)
+fir hs x = y
+  where
+    y  = dotp hs xs
+    xs = rememberN x
 
-topEntity :: Vec 4 (Signed 16)
-          -> Signed 16
-          -> (Vec 4 (Signed 16),Signed 16)
-topEntity pxs x = fir (2 :> 3 :> (-2) :> 8 :> Nil) pxs x
-
+topEntity :: Sync (Signed 16) -> Sync (Signed 16)
+topEntity = fir (0 :> 1 :> 2 :> 3 :> Nil)
