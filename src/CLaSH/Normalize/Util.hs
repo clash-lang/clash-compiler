@@ -12,7 +12,7 @@ import CLaSH.Core.DataCon (dataConInstArgTys)
 import CLaSH.Core.Term    (Term(..),TmName)
 import CLaSH.Core.TyCon   (TyCon(..),tyConDataCons)
 import CLaSH.Core.Type    (Type(..),TypeView(..),tyView,isFunTy)
-import CLaSH.Core.Util    (Gamma,collectArgs)
+import CLaSH.Core.Util    (Gamma,collectArgs,termType)
 import CLaSH.Core.Var     (Var(..),Id)
 import CLaSH.Netlist.Util (representableType,splitNormalized)
 import CLaSH.Normalize.Types
@@ -86,6 +86,14 @@ fvs2bvs ::
   -> [TmName]
   -> [Id]
 fvs2bvs gamma = map (\n -> Id n (embed $ gamma HashMap.! n))
+
+isClosed ::
+  (Functor m, Fresh m)
+  => Term
+  -> m Bool
+isClosed e = do
+  ty <- termType e
+  fmap not $ isPolyFunTy ty
 
 isConstant :: Term -> Bool
 isConstant e = case collectArgs e of

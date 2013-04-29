@@ -9,7 +9,8 @@ import CLaSH.Rewrite.Util
 normalization :: NormRewrite
 normalization = repeatR $ clsOpRes >-> representable >-> simplification
   where
-    clsOpRes = bottomupR $ apply "classOpResolution" classOpResolution
+    clsOpRes = (bottomupR $ apply "classOpResolution" classOpResolution) >->
+               (bottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
 
 cleanup :: NormRewrite
 cleanup = repeatR $ cleanupSteps !-> simplification
@@ -40,19 +41,22 @@ representable = propagagition >-> specialisation
 simplification :: NormRewrite
 simplification = repeatTopdown steps
   where
-    steps = [ ("deadcode"    , deadCode  )
-            , ("lamApp"      , lamApp )
-            , ("letApp"      , letApp )
-            , ("caseApp"     , caseApp )
-            , ("repANF"      , repANF )
-            , ("nonRepANF"   , nonRepANF )
-            , ("subjLet"     , subjLet)
-            , ("altLet"      , altLet)
-            , ("bodyVar"     , bodyVar)
-            , ("letFlat"     , letFlat)
-            , ("topLet"      , topLet)
-            , ("etaExpansion", etaExpansion)
-            , ("inlineVar"   , inlineVar)
+    steps = [ ("deadcode"        , deadCode  )
+            , ("lamApp"          , lamApp )
+            , ("letApp"          , letApp )
+            , ("caseApp"         , caseApp )
+            , ("repANF"          , repANF )
+            , ("nonRepANF"       , nonRepANF )
+            , ("subjLet"         , subjLet)
+            , ("altLet"          , altLet)
+            , ("bodyVar"         , bodyVar)
+            , ("letFlat"         , letFlat)
+            , ("topLet"          , topLet)
+            , ("etaExpansion"    , etaExpansion)
+            , ("inlineVar"       , inlineVar)
+            , ("inlineClosedTerm", inlineClosedTerm)
+            , ("bindConstant"    , bindConstant)
+            , ("constantSpec"    , constantSpec)
             ]
 
 doInline :: String -> NormRewrite -> NormRewrite

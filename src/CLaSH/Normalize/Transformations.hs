@@ -243,7 +243,7 @@ repANF _ e@(App appf arg)
   = R $ do
     localVar       <- isLocalVar arg
     untranslatable <- isUntranslatable arg
-    case localVar || untranslatable of
+    case localVar || untranslatable || isConstant arg of
       True  -> return e
       False -> do (argId,argVar) <- mkTmBinderFor "repANF" arg
                   changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
@@ -414,6 +414,37 @@ inlineVar ctx e@(Letrec bnd) = do
 
 inlineVar _ e = return e
 
+inlineClosedTerm :: NormRewrite
+inlineClosedTerm _ e@(Var _ f) = R $ do
+  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+  case bodyMaybe of
+    Just (_,body) -> do
+      closed <- isClosed body
+      if closed
+        then changed body
+        else return e
+    _ -> return e
+
+inlineClosedTerm _ e = return e
+
+bindConstant :: NormRewrite
+bindConstant ctx e@(Letrec bnd) = do
+  (bndrs,_) <- unbind bnd
+  if length (unrec bndrs) > 1
+    then inlineBinders (return . isConstant . unembed . snd) ctx e
+    else return e
+
+bindConstant _ e = return e
+
+constantSpec :: NormRewrite
+constantSpec ctx e@(App e1 e2)
+  | (Var _ _, args) <- collectArgs e1
+  , (_, [])     <- Either.partitionEithers args
+  , null $ termFreeTyVars e2
+  , isConstant e2
+  = specialise specialisations ctx e
+
+constantSpec _ e = return e
 
 inlineWrapper :: NormRewrite
 inlineWrapper [] e = R $ do
@@ -481,3 +512,12 @@ chaseDfun classSel ctx e
   = do
     selCase <- mkSelectorCase ctx e 0 classSel
     return selCase
+
+inlineSingularDFun :: NormRewrite
+inlineSingularDFun _ e@(Var _ f) = R $ do
+  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use dictFuns
+  case bodyMaybe of
+    Just (_,[dfunOp]) -> changed dfunOp
+    _ -> return e
+
+inlineSingularDFun _ e = return e
