@@ -104,8 +104,8 @@ genComponent' compName componentExpr mStart = do
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkConcSm . second unembed) binders
 
-  let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
-  let compOutp       = (Text.pack $ name2String result, resType)
+  let compInps       = zip (map (mkBasicId . Text.pack . name2String . varName) arguments) argTypes
+  let compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
   let component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
   return component
 
