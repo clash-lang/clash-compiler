@@ -18,8 +18,8 @@
   }
   , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.negateS",
-      "template"  : "~RESULT <= 0 - ~ARG[1];",
-      "templateI" : "(0 - ~ARG[1])"
+      "template"  : "~RESULT <= -~ARG[1];",
+      "templateI" : "(-~ARG[1])"
     }
   }
 ]
