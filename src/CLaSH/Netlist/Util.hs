@@ -143,7 +143,8 @@ tyNatSize t                 = Left $ $(curLoc) ++ "Can't convert tyNat: " ++ sho
 representableType ::
   Type
   -> Bool
-representableType = (either (\s -> traceIf True s False) (const True)) . coreTypeToHWType
+-- representableType = (either (\s -> traceIf True s False) (const True)) . coreTypeToHWType
+representableType = (either (const False) (const True)) . coreTypeToHWType
 
 isEmptyType ::
   HWType

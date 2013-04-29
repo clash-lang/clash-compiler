@@ -27,40 +27,6 @@ import CLaSH.Rewrite.Types
 import CLaSH.Rewrite.Util
 import CLaSH.Util
 
-----------------------------------------------------------
--- = Definitions =
---
--- FUN (a -> b) = True
--- FUN _        = False
---
--- BOX (T ts) = any (\t -> BOX t || FUN t) (CONARGS T ts)
--- BOX _      = False
---
--- POLY (∀a.t)   = True
--- POLY (a -> b) = POLY b
--- POLY _        = False
---
--- POLYFUN (∀a.t)   = POLYFUN t
--- POLYFUN (a -> b) = True
--- POLYFUN _        = False
---
--- = Inline, Lift, or Specialize =
---
--- Function Application:
--- Has FUN arguments?   => Inline
--- Has BOXed arguments? => Specialize
--- Has Type arguments?  => Specialize
--- Others               => Do Nothing
---
--- Let-binding:
--- Has POLYFUNction type?              => Lift
--- Takes Type arguments, non-recursive => Inline
--- Takes Type arguments, recursive     => Lift
--- Has BOX type, non-recursive?        => Inline
--- Has BOX type, recursive?            => Lift
--- Others                              => Do Nothing
---
------------------------------------------------------------
 tauReduction :: NormRewrite
 tauReduction _ (TyApp (TyLam b) t) = R $ do
   (tv,e) <- unbind b

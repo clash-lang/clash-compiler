@@ -43,9 +43,8 @@ isPolyFunTy ::
   Fresh m
   => Type
   -> m Bool
-isPolyFunTy (tyView -> FunTy _ _) = return True
-isPolyFunTy (ForAllTy tvT)        = unbind tvT >>= (isPolyFunTy . snd)
-isPolyFunTy _                     = return False
+isPolyFunTy (ForAllTy tvT) = unbind tvT >>= (isPolyFunTy . snd)
+isPolyFunTy ty             = return $! isFunTy ty
 
 conArgs :: TyCon -> [Type] -> [Type]
 conArgs tc tys = bigUnionTys $ map (flip dataConInstArgTys tys)
