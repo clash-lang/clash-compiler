@@ -66,7 +66,7 @@ data HWType
 instance Hashable HWType
 
 data Declaration
-  = Assignment Identifier (Maybe Modifier) HWType [Expr]
+  = Assignment Identifier Expr
   | InstDecl Identifier Identifier [(Identifier,Expr)]
   | BlackBox Text
   | NetDecl Identifier HWType (Maybe Expr)
@@ -81,6 +81,7 @@ data Modifier
 
 data Expr
   = Literal    (Maybe Size) Literal
+  | DataCon    HWType       (Maybe Modifier)  [Expr]
   | Identifier Identifier   (Maybe Modifier)
   deriving Show
 

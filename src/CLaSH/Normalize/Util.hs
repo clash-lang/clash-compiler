@@ -87,14 +87,10 @@ fvs2bvs ::
   -> [Id]
 fvs2bvs gamma = map (\n -> Id n (embed $ gamma HashMap.! n))
 
-isSimple ::
-  Term
-  -> Bool
-isSimple (Literal _) = True
-isSimple (Data _ _)  = True
-isSimple e@(App _ _)
-  | (Data _ _, args) <- collectArgs e
-  = all (either isSimple (const True)) args
-  | (Prim _, args) <- collectArgs e
-  = all (either isSimple (const True)) args
-isSimple _ = False
+isConstant :: Term -> Bool
+isConstant e = case collectArgs e of
+  (Data _ _, args) -> all (either isConstant (const True)) args
+  (Prim _, args)   -> all (either isConstant (const True)) args
+  (Literal _,_)    -> True
+  _                -> False
+

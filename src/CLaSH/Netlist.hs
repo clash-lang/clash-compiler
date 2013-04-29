@@ -12,7 +12,7 @@ import qualified Data.HashMap.Lazy       as HashMap
 import           Data.List               (elemIndex,nub)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Text.Lazy          as Text
-import           Unbound.LocallyNameless (Embed(..),name2String,runFreshMT,unembed)
+import           Unbound.LocallyNameless (Embed(..),name2String,string2Name,runFreshMT,unembed)
 
 import CLaSH.Core.DataCon   (DataCon(..))
 import CLaSH.Core.Literal   (Literal(..))
@@ -26,6 +26,7 @@ import CLaSH.Netlist.BlackBox
 import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types as HW
 import CLaSH.Netlist.Util
+import CLaSH.Normalize.Util
 import CLaSH.Primitives.Types as P
 import CLaSH.Util
 
@@ -119,9 +120,8 @@ mkConcSm bndr (Core.Literal lit) = do
   let bndrHWType = coreTypeToHWType_fail . unembed $ varType bndr
   let i = case lit of
             (IntegerLiteral i') -> i'
-            _ -> error "not an integer literal"
-  return [Assignment dstId Nothing bndrHWType
-           [HW.Literal Nothing . NumLit $ fromInteger i]
+            _ -> error $ $(curLoc) ++ "not an integer literal"
+  return [Assignment dstId (HW.Literal Nothing . NumLit $ fromInteger i)
          ]
 
 mkConcSm bndr app = do
@@ -132,8 +132,10 @@ mkConcSm bndr app = do
       | all isVar args' && null tyArgs -> mkApplication bndr f args'
       | otherwise                      -> error "Not in normal form: Var-application with non-Var arguments"
     Data _ dc
-      | all isVar args' -> mkDcApplication bndr dc args'
-      | otherwise       -> error "Not in normal form: DataCon-application with non-Var arguments"
+      | all (\e -> isConstant e || isVar e) args' -> let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+                                                         hwTy  = coreTypeToHWType_fail . unembed $ varType bndr
+                                                     in fmap ((:[]) . Assignment dstId) $ mkDcApplication hwTy dc args'
+      | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
     Prim (PrimFun nm _) -> do
       bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
       case bbM of
@@ -172,59 +174,62 @@ mkApplication dst fun args = do
     Nothing -> case args of
       [] -> do
         let dstId     = mkBasicId . Text.pack . name2String $ varName dst
-        let dstHWType = coreTypeToHWType_fail . unembed $ varType dst
-        return [Assignment dstId Nothing dstHWType [Identifier (mkBasicId . Text.pack $ name2String fun) Nothing]]
-      _ -> error "Unknown function"
+        return [Assignment dstId (Identifier (mkBasicId . Text.pack $ name2String fun) Nothing)]
+      _ -> error $ $(curLoc) ++ "Unknown function"
 
 mkDcApplication ::
-  Id
+  HWType
   -> DataCon
   -> [Term]
-  -> NetlistMonad [Declaration]
-mkDcApplication dst dc args = do
-  let dstHType = coreTypeToHWType_fail . unembed $ varType dst
-  let dstId    = mkBasicId . Text.pack . name2String $ varName dst
+  -> NetlistMonad Expr
+mkDcApplication dstHType dc args = do
+  argTys       <- mapM termType args
+  let args'    = filter (not . isEmptyType . coreTypeToHWType_fail . snd) $ zip args argTys
+  assngs       <- mapM (\(e,t) -> mkConcSm (Id (string2Name "_ERROR_") (Embed t)) e) args'
+  let argExprs = map (\d -> case d of
+                        [Assignment _ e] -> e
+                        [HW.BlackBox t]  -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
+                                            in Identifier t' Nothing
+                        _                -> error $ $(curLoc) ++ "Datacon arguments lead to more than one assignment: " ++ show d
+                     ) assngs
+
   case dstHType of
     SP _ dcArgPairs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
-      let dcI      = fromMaybe (error "SP: dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
-      let argTys   = snd $ dcArgPairs !! dcI
-      nonEmptyArgs <- fmap (map varToExpr) $ Monad.filterM
-                        (return . not . isEmptyType <=< termHWType) args
-      case (compare (length argTys) (length nonEmptyArgs)) of
-        EQ -> return [Assignment dstId (Just $ DC dcI) dstHType nonEmptyArgs]
-        LT -> error "Over-applied constructor"
-        GT -> error "Under-applied constructor"
+      let dcI      = fromMaybe (error $ $(curLoc) ++ "SP: dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
+      let dcArgs   = snd $ dcArgPairs !! dcI
+      case (compare (length dcArgs) (length argExprs)) of
+        EQ -> return (HW.DataCon dstHType (Just $ DC dcI) argExprs)
+        LT -> error $ $(curLoc) ++ "Over-applied constructor"
+        GT -> error $ $(curLoc) ++ "Under-applied constructor"
     Product _ dcArgs -> do
-      nonEmptyArgs <- fmap (map varToExpr) $ Monad.filterM
-                        (return . not . isEmptyType <=< termHWType) args
-      case (compare (length dcArgs) (length nonEmptyArgs)) of
-        EQ -> return [Assignment dstId (Just $ DC 0) dstHType nonEmptyArgs]
-        LT -> error "Over-applied constructor"
-        GT -> error "Under-applied constructor"
+      case (compare (length dcArgs) (length argExprs)) of
+        EQ -> return (HW.DataCon dstHType (Just $ DC 0) argExprs)
+        LT -> error $ $(curLoc) ++ "Over-applied constructor"
+        GT -> error $ $(curLoc) ++ "Under-applied constructor"
     Sum _ dcs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
       let dcI = fromMaybe (error "Sum: dc not found") $ elemIndex dcNameBS dcs
-      return [Assignment dstId (Just $ DC dcI) dstHType []]
+      return (HW.DataCon dstHType (Just $ DC dcI) [])
     Bool -> do
       let dc' = case (name2String $ dcName dc) of
-                 "True"  -> [HW.Literal Nothing (BoolLit True)]
-                 "False" -> [HW.Literal Nothing (BoolLit False)]
-                 _ -> error $ "unknown bool literal: " ++ show dc
-      return [Assignment dstId Nothing dstHType dc']
+                 "True"  -> HW.Literal Nothing (BoolLit True)
+                 "False" -> HW.Literal Nothing (BoolLit False)
+                 _ -> error $ $(curLoc) ++ "unknown bool literal: " ++ show dc
+      return dc'
     Bit -> do
       let dc' = case (name2String $ dcName dc) of
-                 "H" -> [HW.Literal Nothing (BitLit H)]
-                 "L" -> [HW.Literal Nothing (BitLit L)]
-                 _ -> error $ "unknown bit literal: " ++ show dc
-      return [Assignment dstId Nothing dstHType dc']
+                 "H" -> HW.Literal Nothing (BitLit H)
+                 "L" -> HW.Literal Nothing (BitLit L)
+                 _ -> error $ $(curLoc) ++ "unknown bit literal: " ++ show dc
+      return dc'
     Integer -> do
       let dc' = case (name2String $ dcName dc) of
                   "S#" -> Nothing
                   _    -> error $ $(curLoc) ++ "not a simple integer: " ++ show dc
-      return [Assignment dstId dc' dstHType (map varToExpr args)]
-    Vector 0 _ -> return []
-    Vector 1 _ -> return [Assignment dstId (Just VecAppend) dstHType [varToExpr $ head args]]
-    Vector _ _ -> return [Assignment dstId (Just VecAppend) dstHType (map varToExpr args)]
+      return (HW.DataCon dstHType dc' argExprs)
+    Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
+    Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [(head argExprs)])
+    Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
 
     _ -> error $ "mkDcApplication undefined: " ++ show dstHType

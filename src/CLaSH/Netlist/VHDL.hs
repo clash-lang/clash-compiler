@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE ViewPatterns      #-}
 module CLaSH.Netlist.VHDL where
 
+import qualified Control.Applicative as A
 import Control.Lens
 import Control.Monad.State
 import qualified Data.HashMap.Lazy as HashMap
@@ -12,6 +14,7 @@ import Text.PrettyPrint.Leijen.Text.Monadic
 
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.Util
+import CLaSH.Util (makeCached,(<:>))
 
 type VHDLM a = State VHDLState a
 
@@ -66,31 +69,26 @@ needsTyDec Bool               = [Bool]
 needsTyDec _                  = []
 
 tyDec :: HWType -> VHDLM Doc
-tyDec Bool = do prevDec <- use _3
-                case (HashMap.lookup Bool prevDec) of
-                   Nothing -> toSLVDec
-                   Just _  -> empty
+tyDec Bool = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi
+
+tyDec (Vector _ elTy) = fmap snd $ makeCached (Vector 0 elTy) _3 ((,) A.<$> (use _2) A.<*> vecDec)
   where
-    toSLVDec = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi
+    vecDec = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
 
-tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
-tyDec ty@(Product _ tys) = "type" <+> tName <+> "is record" <$>
-                              indent 2 (vcat $ sequence $ zipWith (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
-                           "end record" <> semi
+tyDec ty@(Product _ tys) = prodDec
+  where
+    prodDec = "type" <+> tName <+> "is record" <$>
+                indent 2 (vcat $ sequence $ zipWith (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
+              "end record" <> semi
 
+    tName    = tyName ty
+    selNames = map (\i -> tName <> "_sel" <> int i) [0..]
+    selTys   = map vhdlType tys
 
-  where tName    = tyName ty
-        selNames = map (\i -> tName <> "_sel" <> int i) [0..]
-        selTys   = map vhdlType tys
-tyDec _          = empty
+tyDec _ = empty
 
 funDec :: HWType -> VHDLM Doc
-funDec Bool = do prevDec <- use _3
-                 cN      <- use _2
-                 case (HashMap.lookup Bool prevDec) of
-                    Nothing -> do _3 %= HashMap.insert Bool (cN,"boolean")
-                                  toSLVDec
-                    Just _  -> empty
+funDec Bool = fmap snd $ makeCached Bool _3 ((,) A.<$> (use _2) A.<*> toSLVDec)
   where
     toSLVDec = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
                "begin" <$>
@@ -106,23 +104,18 @@ funDec _ = empty
 tyName :: HWType -> VHDLM Doc
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)        = "signed_" <> int n
-tyName t@(Product _ _)   = do tMap <- use _3
-                              case HashMap.lookup t tMap of
-                                Nothing -> do i <- use _1
-                                              c <- use _2
-                                              _1 += 1
-                                              newName <- "product" <> int i
-                                              _3 %= HashMap.insert t (c,newName)
-                                              return newName
-                                Just (_,n) -> return n
-
+tyName t@(Product _ _)   = fmap snd $ makeCached t _3 ((,) A.<$> (use _2) A.<*> prodName)
+  where
+    prodName = do i <- use _1
+                  _1 += 1
+                  "product" <> int i
 
 tyName _                 = empty
 
 tyImports :: [HWType] -> VHDLM Doc
 tyImports tys = do prevDec <- use _3
                    let needsDec = nub $ concatMap needsTyDec tys
-                       usePacks = map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
+                       usePacks = nub $ map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
                    punctuate' semi $ sequence $ [ "library IEEE"
                                                 , "use IEEE.STD_LOGIC_1164.ALL"
                                                 , "use IEEE.NUMERIC_STD.ALL"
@@ -197,31 +190,33 @@ insts [] = empty
 insts is = vcat . punctuate linebreak . fmap catMaybes $ mapM inst is
 
 inst :: Declaration -> VHDLM (Maybe Doc)
-inst (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = fmap Just $
-    text id_ <+> larrow <+> assignExpr <> semi
-  where
-    argTys     = snd $ args !! i
-    dcExpr     = expr (dcToExpr ty i)
-    argExprs   = zipWith toSLV argTys $ map expr es
-    assignExpr = hcat $ punctuate (" & ") $ sequence (dcExpr:argExprs)
+-- inst (Assignment id_ (Just (DC i)) ty@(SP _ args) es) = fmap Just $
+--     text id_ <+> larrow <+> assignExpr <> semi
+--   where
+--     argTys     = snd $ args !! i
+--     dcExpr     = expr (dcToExpr ty i)
+--     argExprs   = zipWith toSLV argTys $ map expr es
+--     assignExpr = hcat $ punctuate (" & ") $ sequence (dcExpr:argExprs)
 
-inst (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = fmap Just $
-    text id_ <+> larrow <+> assignExpr <> semi
-  where
-    assignExpr = expr (dcToExpr ty i)
+-- inst (Assignment id_ (Just (DC i)) ty@(Sum _ _) []) = fmap Just $
+--     text id_ <+> larrow <+> assignExpr <> semi
+--   where
+--     assignExpr = expr (dcToExpr ty i)
 
-inst (Assignment id_ (Just (DC 0)) ty@(Product _ _) es) = fmap Just $
-    vcat $ sequence $ zipWith (\i e -> text id_ <> dot <> tName <> "_sel" <> int i <+> larrow <+> expr e <> semi) [0..] es
-  where
-    tName = tyName ty
+-- inst (Assignment id_ (Just (DC 0)) ty@(Product _ _) es) = fmap Just $
+--     vcat $ sequence $ zipWith (\i e -> text id_ <> dot <> tName <> "_sel" <> int i <+> larrow <+> expr e <> semi) [0..] es
+--   where
+--     tName = tyName ty
 
-inst (Assignment id_ (Just VecAppend) (Vector 1 _) [e]) = fmap Just $
-  text id_ <+> larrow <+> parens ("others" <+> rarrow <+> expr e) <> semi
+-- inst (Assignment id_ (Just VecAppend) (Vector 1 _) [e]) = fmap Just $
+--   text id_ <+> larrow <+> parens ("others" <+> rarrow <+> expr e) <> semi
 
-inst (Assignment id_ (Just VecAppend) (Vector _ _) [e1,e2]) = fmap Just $
-  text id_ <+> larrow <+> expr e1 <+> "&" <+> expr e2 <> semi
+-- inst (Assignment id_ (Just VecAppend) (Vector _ _) [e1,e2]) = fmap Just $
+--   text id_ <+> larrow <+> expr e1 <+> "&" <+> expr e2 <> semi
 
-inst (Assignment id_ Nothing _ [e]) = fmap Just $
+-- inst (Assignment id_ Nothing _ [e]) = fmap Just $
+--   text id_ <+> larrow <+> expr e <> semi
+inst (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr e <> semi
 
 inst (InstDecl nm lbl pms) = fmap Just $
@@ -236,9 +231,18 @@ inst (BlackBox bs) = fmap Just $ string bs
 inst _ = return Nothing
 
 expr :: Expr -> VHDLM Doc
-expr (Literal sizeM lit)    = exprLit sizeM lit
-expr (Identifier n Nothing) = text n
-expr _                      = empty
+expr (Literal sizeM lit)                     = exprLit sizeM lit
+expr (Identifier n Nothing)                  = text n
+expr (vectorChain -> Just es)                = tupled (mapM expr es)
+expr (DataCon (Vector 1 _) _ [e])            = parens ("others" <+> rarrow <+> expr e)
+expr (DataCon (Vector _ _) (Just _) [e1,e2]) = expr e1 <+> "&" <+> expr e2
+expr _                                       = empty
+
+vectorChain :: Expr -> Maybe [Expr]
+vectorChain (DataCon (Vector _ _) Nothing _)        = Just []
+vectorChain (DataCon (Vector 1 _) (Just _) [e])     = Just [e]
+vectorChain (DataCon (Vector _ _) (Just _) [e1,e2]) = (Just e1) <:> vectorChain e2
+vectorChain _                                       = Nothing
 
 exprLit :: Maybe Size -> Literal -> VHDLM Doc
 exprLit Nothing   (NumLit i) = int i

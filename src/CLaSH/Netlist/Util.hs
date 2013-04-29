@@ -49,6 +49,7 @@ synchronizedClk ty
   = case (name2String $ tyConName tyCon) of
       "CLaSH.Signal.Sync"       -> Just (pack "clk")
       "CLaSH.Sized.VectorZ.Vec" -> synchronizedClk (args!!1)
+      "CLaSH.Signal.Packed"     -> synchronizedClk (head args)
       _                         -> Nothing
   | otherwise
   = Nothing
@@ -58,14 +59,16 @@ coreTypeToHWType ::
   -> Either String HWType
 coreTypeToHWType ty@(tyView -> TyConApp tc args) =
   case (name2String $ tyConName tc) of
-    "GHC.Integer.Type.Integer"  -> return Integer
-    "GHC.Prim.Int#"             -> return Integer
-    "GHC.Prim.ByteArray#"       -> return Integer
+    "GHC.Integer.Type.Integer"  -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
+    "GHC.Prim.Int#"             -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
+    "GHC.Prim.ByteArray#"       -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
     "GHC.Types.Bool"            -> return Bool
-    "GHC.TypeLits.Sing"         -> singletonToHWType (head args)
+    "GHC.TypeLits.Sing"         -> Left $ "Can't translate type: " ++ showDoc ty -- singletonToHWType (head args)
     "GHC.Prim.~#"               -> Left $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Bit.Bit"             -> return Bit
     "CLaSH.Signal.Sync"         -> coreTypeToHWType (head args)
+    "CLaSH.Signal.Packed"       -> coreTypeToHWType (head args)
+    "CLaSH.Signed.Pack"         -> Left $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Sized.Signed.Signed" -> Signed <$> (tyNatSize $ head args)
     "CLaSH.Sized.VectorZ.Vec"   -> do
       let [szTy,elTy] = args
