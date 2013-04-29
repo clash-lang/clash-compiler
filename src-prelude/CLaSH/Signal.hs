@@ -24,6 +24,12 @@ import Prelude hiding (id,(.))
 import CLaSH.Class.Default
 import CLaSH.Sized.VectorZ (Vec(..), vmap, vhead, vtail)
 
+{-# NOINLINE register  #-}
+{-# NOINLINE registerP #-}
+{-# NOINLINE sync      #-}
+{-# NOINLINE mapSync   #-}
+{-# NOINLINE appSync   #-}
+
 infixr 5 :-
 data Sync a = a :- Sync a
 

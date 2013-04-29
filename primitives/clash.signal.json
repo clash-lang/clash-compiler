@@ -18,6 +18,26 @@ end block;",
       "templateI" : ""
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.registerP",
+      "template"  :
+"~SYM[0]_block : block
+  signal ~SYM[1] : ~TYP[1];
+begin
+  process(~CLK[1],~RST[1]) is
+  begin
+    if ~RST[1] = '0' then
+      ~SYM[1] <= ~ARG[0];
+    elsif rising_edge(~CLK[1]) then
+      ~SYM[1] <= ~ARG[1];
+    end if;
+  end process;
+
+  ~RESULT <= ~SYM[1];
+end block;",
+      "templateI" : ""
+    }
+  }
 , { "Primitive" :
     { "name"      : "CLaSH.Signal.sync",
       "primType"  : { "Function" : [] }
@@ -30,6 +50,16 @@ end block;",
   }
 , { "Primitive" :
     { "name"      : "CLaSH.Signal.appSync",
+      "primType"  : { "Function" : [] }
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.combine",
+      "primType"  : { "Function" : [] }
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.split",
       "primType"  : { "Function" : [] }
     }
   }

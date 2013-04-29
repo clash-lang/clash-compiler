@@ -14,14 +14,23 @@ end generate;",
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vzipWith",
       "template"  :
-"~SYM[0]_generate : for ~SYM[1] in (~RESULT'length - 1) downto 0 generate
+"
+~SYM[0]_block : block
+  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
 begin
-  ~INST 0
-    ~OUTPUT <= ~RESULT(~SYM[1])~
-    ~INPUT  <= ~ARG[1](~SYM[1])~
-    ~INPUT  <= ~ARG[2](~SYM[1])~
-  ~INST
-end generate;",
+  ~SYM[1] <= ~ARG[1];
+  ~SYM[2] <= ~ARG[2];
+
+  ~SYM[3]_generate : for ~SYM[4] in (~RESULT'length - 1) downto 0 generate
+  begin
+    ~INST 0
+      ~OUTPUT <= ~RESULT(~SYM[4])~
+      ~INPUT  <= ~SYM[1](~SYM[4])~
+      ~INPUT  <= ~SYM[2](~SYM[4])~
+    ~INST
+  end generate;
+end block;",
       "templateI" : ""
     }
   }
@@ -60,6 +69,24 @@ end block;",
     { "name"      : "CLaSH.Sized.VectorZ.+>>",
       "template"  : "~RESULT <= ~ARG[0] & ~ARG[1]((~ARG[1]'length - 2) downto 0);",
       "templateI" : "~ARG[0] & ~ARG[1]((~ARG[1]'length - 2) downto 0)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vcopy"
+    , "template"  : "~RESULT <= (others => ~ARG[1]);"
+    , "templateI" : "(others => ~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vcopyE"
+    , "template"  : "~RESULT <= (others => ~ARG[1]);"
+    , "templateI" : "(others => ~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vinit"
+    , "template"  : "~RESULT <= ~ARG[0]((~ARG[0]'length - 1) downto 1);"
+    , "templateI" : "(others => ~ARG[0]((~ARG[0]'length - 1) downto 1))"
     }
   }
 ]
