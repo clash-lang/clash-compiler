@@ -122,7 +122,6 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_DoLambdaEtaExpansion -- We need eta-expansion anyway, so the more GHC does, the better
              , Opt_CaseMerge -- We want fewer case-statements
              , Opt_DictsCheap -- Makes dictionaries seem cheap to optimizer: hopefully inline
-             , Opt_IrrefutableTuples -- User might enable, doesn't affect normalization, don't disable
              , Opt_SimpleListLiterals -- Avoids 'build' rule
              , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
              , Opt_ForceRecomp -- Force recompilation: never bad
@@ -149,4 +148,5 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
                , Opt_IgnoreInterfacePragmas -- We need all the unfoldings we can get
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
                , Opt_SimplPreInlining -- Does inlining, which destroys function hierarchy: avoid
+               , Opt_IrrefutableTuples -- Introduce irrefuntPatError: avoid
                ]
