@@ -7,7 +7,7 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = repeatR $ clsOpRes >-> representable >-> simplification
+normalization = repeatR $ clsOpRes >-> (repeatR $ representable >-> clsOpRes) >-> simplification
   where
     clsOpRes = (bottomupR $ apply "classOpResolution" classOpResolution) >->
                (bottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
@@ -42,6 +42,7 @@ simplification :: NormRewrite
 simplification = repeatTopdown steps
   where
     steps = [ ("deadcode"        , deadCode  )
+            , ("caseCon"         , caseCon    )
             , ("lamApp"          , lamApp )
             , ("letApp"          , letApp )
             , ("caseApp"         , caseApp )
