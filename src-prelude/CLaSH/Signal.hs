@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies    #-}
 module CLaSH.Signal
@@ -6,10 +7,8 @@ module CLaSH.Signal
   , register
   , Pack(..)
   , registerP
-  , (<^>)
   , (<^), (^>)
   , Comp(..)
-  , (^^^)
   , registerC
   )
 where
@@ -19,10 +18,13 @@ import Control.Applicative
 import Control.Arrow
 import Control.Category
 import Language.Haskell.TH.Syntax(Lift(..))
+import Unsafe.Coerce
 import Prelude hiding (id,(.))
 
 import CLaSH.Class.Default
-import CLaSH.Sized.VectorZ (Vec(..), vmap, vhead, vtail)
+import CLaSH.Sized.Signed   (Signed)
+import CLaSH.Sized.Unsigned (Unsigned)
+import CLaSH.Sized.VectorZ  (Vec(..), vmap, vhead, vtail)
 
 {-# NOINLINE register  #-}
 {-# NOINLINE registerP #-}
@@ -84,8 +86,19 @@ register i s = i :- s
 
 class Pack a where
   type Packed a
+  type Packed a = Sync a
+  {-# NOINLINE combine #-}
   combine :: Packed a -> Sync a
-  split   :: Sync a -> Packed a
+  combine = unsafeCoerce
+  {-# NOINLINE split #-}
+  split :: Sync a -> Packed a
+  split = unsafeCoerce
+
+instance Pack (Signed n)
+instance Pack (Unsigned n)
+instance Pack Bool
+instance Pack Integer
+instance Pack ()
 
 registerP :: Pack a => a -> Packed a -> Packed a
 registerP i = split . register i . combine
@@ -95,20 +108,28 @@ instance Pack (a,b) where
   combine  = uncurry (liftA2 (,))
   split ab = (fmap fst ab, fmap snd ab)
 
+instance Pack (a,b,c) where
+  type Packed (a,b,c) = (Sync a, Sync b, Sync c)
+  combine (a,b,c) = (,,) <$> a <*> b <*> c
+  split abc       = (fmap (\(x,_,_) -> x) abc
+                    ,fmap (\(_,x,_) -> x) abc
+                    ,fmap (\(_,_,x) -> x) abc
+                    )
+
+instance Pack (a,b,c,d) where
+  type Packed (a,b,c,d) = (Sync a, Sync b, Sync c, Sync d)
+  combine (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
+  split abcd        = (fmap (\(x,_,_,_) -> x) abcd
+                      ,fmap (\(_,x,_,_) -> x) abcd
+                      ,fmap (\(_,_,x,_) -> x) abcd
+                      ,fmap (\(_,_,_,x) -> x) abcd
+                      )
+
 instance Pack (Vec n a) where
   type Packed (Vec n a) = Vec n (Sync a)
   combine vs                = vmap unSync vs :- combine (vmap next vs)
   split (Nil :- _)          = Nil
   split vs@((_ :> _) :- _)  = fmap vhead vs :> (split (fmap vtail vs))
-
-(<^>) ::
-  (Pack i, Pack o)
-  => (s -> i -> (s,o))
-  -> s
-  -> (Packed i -> Packed o)
-f <^> iS = \i -> let (s',o) = split $ f <$> s <*> (combine i)
-                     s      = register iS s'
-                 in split o
 
 (<^) :: Applicative f => f a -> (a -> b -> c) -> f b -> f c
 v <^ f = liftA2 f v
@@ -135,11 +156,6 @@ instance ArrowLoop Comp where
     where
       simpleLoop g b = let ~(c,d) = g (b,d)
                        in c
-
-(^^^) :: (s -> i -> (s,o)) -> s -> Comp i o
-f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i
-                         s      = register sI s'
-                     in  o
 
 registerC :: a -> Comp a a
 registerC = C . register
