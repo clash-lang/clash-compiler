@@ -62,7 +62,7 @@ generateVHDL modName = do
       supply <- Supply.newSupply
       let transformedBindings
             = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
-            $ (normalize [fst topEntity]) >>= cleanupGraph
+            $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
 
       (netlist,vhdlState) <- genNetlist (HashMap.fromList $ transformedBindings)
                               primMap

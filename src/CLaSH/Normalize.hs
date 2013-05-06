@@ -79,17 +79,24 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) = do
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
 
-cleanupGraph :: [(TmName,(Type,Term))] -> NormalizeSession [(TmName,(Type,Term))]
-cleanupGraph norm = do
+cleanupGraph :: [TmName] -> [(TmName,(Type,Term))] -> NormalizeSession [(TmName,(Type,Term))]
+cleanupGraph bndrs norm = do
     bindings .= (HashMap.fromList norm)
-    mapM cleanupGraph' norm
+    cleanupGraph' bndrs
   where
-    cleanupGraph' :: (TmName,(Type,Term)) -> NormalizeSession (TmName,(Type,Term))
-    cleanupGraph' (nm,(ty,expr)) = do
-      let nmS = showDoc nm
-      liftRS $ curFun .= nm
-      cleanedUp <- rewriteExpr ("cleanup",cleanup) (nmS,expr)
-      return  (nm,(ty,cleanedUp))
+    cleanupGraph' :: [TmName] -> NormalizeSession [(TmName,(Type,Term))]
+    cleanupGraph' (bndr:bndrs') = do
+      let bndrS = showDoc bndr
+      exprM <- fmap (HashMap.lookup bndr) $ Lens.use bindings
+      case exprM of
+        Just (ty,expr) -> do
+          liftRS $ curFun .= bndr
+          cleanedUp <- rewriteExpr ("cleanup",cleanup) (bndrS,expr)
+          usedBndrs <- usedGlobalBndrs cleanedUp
+          cleanedOthers <- cleanupGraph' (usedBndrs ++ bndrs')
+          return $! (bndr,(ty,cleanedUp)):cleanedOthers
+        Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " not found"
+    cleanupGraph' [] = return []
 
 usedGlobalBndrs ::
   Term
