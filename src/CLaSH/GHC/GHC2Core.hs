@@ -321,7 +321,7 @@ coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
                                (bind <$> coreToTyVar tv <*> coreToType ty)
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
-coreToType' ty@(AppTy _ _)   = error $ $(curLoc) ++ "Type application of type variables not supported" ++ showPpr ty
+coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2 -- error $ $(curLoc) ++ "Type application of type variables not supported: " ++ showPpr ty
 
 coreToTyLit ::
   TyLit
