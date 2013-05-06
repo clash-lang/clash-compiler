@@ -12,13 +12,14 @@ import qualified Data.HashMap.Lazy       as HashMap
 import           Data.List               (elemIndex,nub)
 import           Data.Maybe              (fromMaybe)
 import qualified Data.Text.Lazy          as Text
-import           Unbound.LocallyNameless (Embed(..),name2String,string2Name,runFreshMT,unembed)
+import           Unbound.LocallyNameless (Embed(..),name2String,string2Name,runFreshMT,unembed,unbind,unrebind)
 
 import CLaSH.Core.DataCon   (DataCon(..))
 import CLaSH.Core.Literal   (Literal(..))
+import CLaSH.Core.Pretty    (showDoc)
 import CLaSH.Core.Prim      (Prim(..))
 import qualified CLaSH.Core.Term as Core
-import CLaSH.Core.Term      (Term(..),TmName)
+import CLaSH.Core.Term      (Pat(..),Term(..),TmName)
 import CLaSH.Core.Type      (Type)
 import CLaSH.Core.Util      (collectArgs,isVar,termType)
 import CLaSH.Core.Var       (Id,Var(..))
@@ -124,6 +125,49 @@ mkConcSm bndr (Core.Literal lit) = do
   return [Assignment dstId (HW.Literal Nothing . NumLit $ fromInteger i)
          ]
 
+mkConcSm bndr (Case (Var scrutTy scrutNm) _ [alt]) = do
+  (pat,Var varTy varTm)  <- unbind alt
+  let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+  let altVarId = mkBasicId . Text.pack $ name2String varTm
+  let selId = mkBasicId . Text.pack $ name2String scrutNm
+  let modifier = case pat of
+                DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
+                                          in case (elemIndex (Id varTm (Embed varTy)) tms) of
+                                               Nothing -> Nothing
+                                               Just fI -> Just (Indexed (coreTypeToHWType_fail scrutTy,dcTag dc - 1,fI))
+  let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+  return [Assignment dstId extractExpr]
+
+mkConcSm bndr (Case scrut@(Var scrutTy scrutNm) _ alts) = do
+  alts' <- mapM unbind alts
+  exprs <- mapM mkCondExpr alts'
+  let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+  return [CondAssignment dstId (reverse exprs)]
+  where
+    mkCondExpr :: (Pat,Term) -> NetlistMonad (Expr,Expr,Expr)
+    mkCondExpr (pat,alt) = do
+      altTy    <- termType alt
+      altAssgn <- mkConcSm (Id (string2Name "_ERROR_") (Embed altTy)) alt
+      let altExpr = case altAssgn of
+                      [Assignment _ e] -> e
+                      [HW.BlackBox t]  -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
+                                          in Identifier t' Nothing
+                      _                -> error $ $(curLoc) ++ "Alt lead to more than one assignment: " ++ show altAssgn
+      case pat of
+        DefaultPat           -> return (Empty,Empty,altExpr)
+        DataPat (Embed dc) _ -> let scrutId  = mkBasicId . Text.pack $ name2String scrutNm
+                                    scrutHTy = coreTypeToHWType_fail scrutTy
+                                in return (Identifier scrutId (Just (DC (scrutHTy,dcTag dc - 1))),dcToLiteral scrutHTy (dcTag dc),altExpr)
+        LitPat  (Embed (IntegerLiteral i)) -> return (varToExpr scrut, HW.Literal Nothing (NumLit $ fromInteger i),altExpr)
+        _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
+
+    dcToLiteral :: HWType -> Int -> Expr
+    dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit True)
+    dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit False)
+    dcToLiteral Bit 1  = HW.Literal Nothing (BitLit H)
+    dcToLiteral Bit 2  = HW.Literal Nothing (BitLit L)
+    dcToLiteral t i    = HW.Literal (Just $ conSize t) (NumLit (i-1))
+
 mkConcSm bndr app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
   args' <- Monad.filterM (fmap representableType . termType) args
@@ -143,7 +187,7 @@ mkConcSm bndr app = do
           bbCtx <- mkBlackBoxContext bndr args
           mkBlackBoxDecl (template p) bbCtx
         _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
-    _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case" ++ show app
+    _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
 
 mkApplication ::
   Id
@@ -196,21 +240,21 @@ mkDcApplication dstHType dc args = do
   case dstHType of
     SP _ dcArgPairs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
-      let dcI      = fromMaybe (error $ $(curLoc) ++ "SP: dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
-      let dcArgs   = snd $ dcArgPairs !! dcI
+      let dcI      = dcTag dc - 1 -- fromMaybe (error $ $(curLoc) ++ "SP: dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
+      let dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
       case (compare (length dcArgs) (length argExprs)) of
-        EQ -> return (HW.DataCon dstHType (Just $ DC dcI) argExprs)
+        EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)
         LT -> error $ $(curLoc) ++ "Over-applied constructor"
         GT -> error $ $(curLoc) ++ "Under-applied constructor"
     Product _ dcArgs -> do
       case (compare (length dcArgs) (length argExprs)) of
-        EQ -> return (HW.DataCon dstHType (Just $ DC 0) argExprs)
+        EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,0)) argExprs)
         LT -> error $ $(curLoc) ++ "Over-applied constructor"
         GT -> error $ $(curLoc) ++ "Under-applied constructor"
     Sum _ dcs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
       let dcI = fromMaybe (error "Sum: dc not found") $ elemIndex dcNameBS dcs
-      return (HW.DataCon dstHType (Just $ DC dcI) [])
+      return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) [])
     Bool -> do
       let dc' = case (name2String $ dcName dc) of
                  "True"  -> HW.Literal Nothing (BoolLit True)

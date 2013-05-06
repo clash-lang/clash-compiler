@@ -67,15 +67,16 @@ instance Hashable HWType
 
 data Declaration
   = Assignment Identifier Expr
+  | CondAssignment Identifier [(Expr,Expr,Expr)]
   | InstDecl Identifier Identifier [(Identifier,Expr)]
   | BlackBox Text
   | NetDecl Identifier HWType (Maybe Expr)
   deriving Show
 
 data Modifier
-  = Indexed  Int
+  = Indexed (HWType,Int,Int)
   | Selected Label
-  | DC Int
+  | DC (HWType,Int)
   | VecAppend
   deriving Show
 
@@ -83,6 +84,7 @@ data Expr
   = Literal    (Maybe Size) Literal
   | DataCon    HWType       (Maybe Modifier)  [Expr]
   | Identifier Identifier   (Maybe Modifier)
+  | Empty
   deriving Show
 
 data Literal

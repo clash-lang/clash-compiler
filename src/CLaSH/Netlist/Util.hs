@@ -5,16 +5,15 @@ module CLaSH.Netlist.Util where
 import qualified Control.Monad as Monad
 import Data.Text.Lazy (pack)
 import Data.Either             (partitionEithers)
-import Data.Maybe              (catMaybes)
 import Unbound.LocallyNameless (Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon      (DataCon(..))
-import CLaSH.Core.FreeVars     (typeFreeVars)
+import CLaSH.Core.FreeVars     (typeFreeVars,termFreeIds)
 import CLaSH.Core.Pretty       (showDoc)
 import CLaSH.Core.Subst        (substTys)
 import CLaSH.Core.Term         (LetBinding,Term(..),TmName)
 import CLaSH.Core.TyCon        (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type         (Type(..),TypeView(..),LitTy(..),tyView,splitTyConAppM)
+import CLaSH.Core.Type         (Type(..),TypeView(..),LitTy(..),mkTyConApp,tyView,splitTyConAppM)
 import CLaSH.Core.Util         (collectBndrs,termType)
 import CLaSH.Core.Var          (Var(..),Id,modifyVarName)
 import CLaSH.Netlist.Types
@@ -23,7 +22,7 @@ import CLaSH.Util
 splitNormalized ::
   (Fresh m,Functor m)
   => Term
-  -> m ([Id],[LetBinding],TmName)
+  -> m ([Id],[LetBinding],Id)
 splitNormalized expr = do
   (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
   case (letExpr) of
@@ -31,7 +30,7 @@ splitNormalized expr = do
       | (tmArgs,[]) <- args -> do
           (xes,e) <- unbind b
           case e of
-            Var _ v -> return (tmArgs,unrec xes,v)
+            Var t v -> return (tmArgs,unrec xes,Id v (embed t))
             _ -> error "Not in normal form: res not simple var"
       | otherwise -> error "Not in normal form: tyArgs"
     _ -> error ("Not in normal from: no Letrec: " ++ showDoc expr)
@@ -60,8 +59,8 @@ coreTypeToHWType ::
   -> Either String HWType
 coreTypeToHWType ty@(tyView -> TyConApp tc args) =
   case (name2String $ tyConName tc) of
-    "GHC.Integer.Type.Integer"  -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
-    "GHC.Prim.Int#"             -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
+    "GHC.Integer.Type.Integer"  -> return Integer -- Left $ "Can't translate type: " ++ showDoc ty
+    "GHC.Prim.Int#"             -> return Integer -- Left $ "Can't translate type: " ++ showDoc ty
     "GHC.Prim.ByteArray#"       -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
     "GHC.Types.Bool"            -> return Bool
     "GHC.TypeLits.Sing"         -> Left $ "Can't translate type: " ++ showDoc ty -- singletonToHWType (head args)
@@ -69,8 +68,9 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
     "CLaSH.Bit.Bit"             -> return Bit
     "CLaSH.Signal.Sync"         -> coreTypeToHWType (head args)
     "CLaSH.Signal.Packed"       -> coreTypeToHWType (head args)
-    "CLaSH.Signed.Pack"         -> Left $ "Can't translate type: " ++ showDoc ty
+    "CLaSH.Signal.Pack"         -> Left $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Sized.Signed.Signed" -> Signed <$> (tyNatSize $ head args)
+    "CLaSH.Sized.Unsigned.Unsigned" -> Unsigned <$> (tyNatSize $ head args)
     "CLaSH.Sized.VectorZ.Vec"   -> do
       let [szTy,elTy] = args
       sz     <- tyNatSize szTy
@@ -78,7 +78,7 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
       return $ Vector sz elHWTy
     _ -> mkADT (showDoc ty) tc args
 
-coreTypeToHWType ty = Left $ "Can't translate type: " ++ showDoc ty
+coreTypeToHWType ty = Left $ "Can't translate non tycon-type: " ++ showDoc ty
 
 singletonToHWType ::
   Type
@@ -102,7 +102,8 @@ mkADT _ tc args = case tyConDataCons tc of
   []  -> return Void
   dcs -> do
     let argTyss      = map dcArgTys dcs
-    let substArgTyss = (map . map) (substTys tvsArgsMap) argTyss
+    let argTVs       = map dcUnivTyVars dcs
+    let substArgTyss = (map . map) (substTys (tvsArgsMap argTVs)) argTyss
     argHTyss         <- mapM (mapM coreTypeToHWType) substArgTyss
     let nonEmptyArgs = map (filter (not . isEmptyType)) argHTyss
     case (dcs,nonEmptyArgs) of
@@ -118,7 +119,7 @@ mkADT _ tc args = case tyConDataCons tc of
   where
     tcName     = pack . name2String $ tyConName tc
     tvs        = tyConTyVars tc
-    tvsArgsMap = zip tvs args
+    tvsArgsMap dcTVs = [ (a,t) | a <- concat dcTVs , (a',t) <- (zip tvs args), name2String a == name2String a' ]
 
 isRecursiveTy :: TyCon -> [Type] -> Bool
 isRecursiveTy tc args = case tyConDataCons tc of
@@ -126,9 +127,9 @@ isRecursiveTy tc args = case tyConDataCons tc of
     dcs -> let argTyss      = map dcArgTys dcs
                tvs          = tyConTyVars tc
                tvsArgsMap   = zip tvs args
-               substArgTyss = (map . map) (substTys tvsArgsMap) argTyss
-               argTcs       = map fst . catMaybes . map splitTyConAppM $ concat substArgTyss
-           in tc `elem` argTcs
+               substArgTyss = (concatMap . map) (substTys tvsArgsMap) argTyss
+               -- argTcs       = map fst . catMaybes . map splitTyConAppM $ concat substArgTyss
+           in (mkTyConApp tc args) `elem` substArgTyss
 
 tyNatSize ::
   Type
@@ -162,12 +163,16 @@ typeSize Bool = 1
 typeSize Integer = 32
 typeSize (Signed i) = i
 typeSize (Vector n el) = n * (typeSize el)
-typeSize (SP _ cons) =
-  (ceiling . logBase (2 :: Float) . fromIntegral $ length cons) +
+typeSize t@(SP _ cons) = conSize t +
   (maximum $ map (sum . map typeSize . snd) cons)
 typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
 typeSize _ = 0
+
+conSize :: HWType
+        -> Int
+conSize (SP _ cons) = ceiling . logBase (2 :: Float) . fromIntegral $ length cons
+conSize t           = typeSize t
 
 typeLength ::
   HWType
@@ -187,18 +192,23 @@ varToExpr (Var _ var) = Identifier (pack $ name2String var) Nothing
 varToExpr _           = error "not a var"
 
 mkUniqueNormalized ::
-  ([Id],[LetBinding],TmName)
+  ([Id],[LetBinding],Id)
   -> NetlistMonad ([Id],[LetBinding],TmName)
 mkUniqueNormalized (args,binds,res) = do
   let args' = zipWith (\n s -> modifyVarName (`appendToName` s) n)
                 args ["_i" ++ show i | i <- [(1::Integer)..]]
-  let res'  = appendToName res "_o"
+  let res'  = appendToName (varName res) "_o"
   let bndrs = map fst binds
   let exprs = map (unembed . snd) binds
-  bndrs' <- mapM (mkUnique (res,res')) bndrs
+  let usesOutput = concatMap (filter (== (varName res)) . termFreeIds) exprs
+  let (res'',extraBndr) = case usesOutput of
+                            [] -> (res',[])
+                            _  -> let res'' = appendToName (varName res) "_o_sig"
+                                  in (res'',[(Id res' (varType res),embed $ Var (unembed $ varType res) res'')])
+  bndrs' <- mapM (mkUnique (varName res,res'')) bndrs
   let repl = (zip args args') ++ (zip bndrs bndrs')
   exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs repl
-  return (args',zip bndrs' exprs',res')
+  return (args',zip bndrs' exprs' ++ extraBndr,res')
 
   where
     mkUnique :: (TmName,TmName) -> Id -> NetlistMonad Id

@@ -102,9 +102,8 @@ mkInput resId (e, False) = case collectArgs e of
             True -> error $ $(curLoc) ++ "Can't create inlined blackbox: " ++ show p
             False -> do
               (N.BlackBox bb:_) <- lift $ mkBlackBoxDecl (templateI p) bbCtx
-              let hwTy = error $ $(curLoc) ++ "No Type"
-              return (Left bb, hwTy)
-        _ -> error $ "No blackbox found: " ++ name2String nm
+              return (Left bb, Void)
+        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
 
 mkLitInput ::
   Term

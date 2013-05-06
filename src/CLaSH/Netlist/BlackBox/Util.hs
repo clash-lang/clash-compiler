@@ -20,7 +20,7 @@ verifyBlackBoxContext ::
   -> BlackBoxContext
   -> Bool
 verifyBlackBoxContext tmpl bbCtx =
-  ((length (inputs bbCtx) - 1)    == countArgs tmpl) &&
+  ((length (inputs bbCtx) - 1)    >= countArgs tmpl) &&
   ((length (litInputs bbCtx) - 1) >= countLits tmpl) &&
   ((length (funInputs bbCtx) - 1) >= countFuns tmpl)
 
@@ -85,7 +85,7 @@ renderElem :: BlackBoxContext -> Element -> BlackBoxMonad Text
 renderElem b (D (Decl n (l:ls))) = do
   o  <- lineToIdentifier b l
   is <- mapM (lineToIdentifier b) ls
-  let (templ,pCtx) = funInputs b !! n
+  let (templ,pCtx) = indexNote ($(curLoc) ++ "No function argument " ++ show n) (funInputs b) n
   let b' = pCtx { result = o, inputs = (inputs pCtx) ++ is }
   if (verifyBlackBoxContext templ b')
     then Text.concat <$> mapM (renderElem b') templ
@@ -103,7 +103,7 @@ lineToIdentifier b = foldrM (\e (a,_) -> do
                                 (Right (t,clk), Right (t',_)) -> return $ (Right (t `Text.append` t',clk), ty)
                    ) (Left Text.empty,ty)
   where
-    ty = error $ $(curLoc) ++ "No Type"
+    ty = Void
 
 mkSyncIdentifier :: BlackBoxContext -> Element -> BlackBoxMonad SyncIdentifier
 mkSyncIdentifier _ (C t)          = return $ Left t
