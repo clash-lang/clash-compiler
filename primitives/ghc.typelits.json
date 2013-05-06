@@ -3,4 +3,9 @@
       "primType"  : { "Dictionary" : [] }
     }
   }
+, { "Primitive" :
+    { "name"      : "GHC.TypeLits.sing",
+      "primType"  : { "Dictionary" : [] }
+    }
+  }
 ]

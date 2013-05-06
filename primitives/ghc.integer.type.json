@@ -10,4 +10,10 @@
       "templateI" : "~ARG[0] * ~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.minusInteger",
+      "template"  : "~RESULT <= ~ARG[0] - ~ARG[1];",
+      "templateI" : "~ARG[0] - ~ARG[1]"
+    }
+  }
 ]

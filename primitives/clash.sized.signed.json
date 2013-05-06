@@ -22,4 +22,10 @@
       "templateI" : "(-~ARG[1])"
     }
   }
+  , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.minS",
+      "template"  : "~RESULT <= ~ARG[1] - ~ARG[2];",
+      "templateI" : "~ARG[1] - ~ARG[2]"
+    }
+  }
 ]
