@@ -1,5 +1,5 @@
 module SimpleConstructor where
 
-data Option = Empty | Value Bool
+data Option = Empty | Value Integer
 
 topEntity = Value
