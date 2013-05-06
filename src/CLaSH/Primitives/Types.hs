@@ -20,7 +20,7 @@ data Primitive
   , primType :: PrimType
   } deriving (Typeable, Data, Show)
 
-data PrimType = Function | Constructor | Dictionary | DFun
+data PrimType = Function | Constructor | Dictionary
   deriving (Typeable, Data, Show)
 
 $(fmap concat $ mapM (deriveJSON id) [''PrimType,''Primitive])

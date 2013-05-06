@@ -47,10 +47,12 @@ apply name rewrite ctx expr = R $ do
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged $ transformCounter += 1
   let after  = showDoc expr'
+  let expr'' = if hasChanged then expr' else expr
   afterType <- fmap showDoc $ termType expr'
-  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nType:" ++ beforeType ++ "\nResult:\n" ++ after ++ "\nType:" ++ afterType ++ "\n") $
+  -- traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nType:" ++ beforeType ++ "\nResult:\n" ++ after ++ "\nType:" ++ afterType ++ "\n") $
+  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
-      return expr'
+      return expr''
 
 runRewrite :: (Monad m, Functor m) => String -> Rewrite m -> Term -> RewriteSession m Term
 runRewrite name rewrite expr = do
@@ -322,31 +324,32 @@ mkWildValBinder ty = mkInternalVar "wild" ty
 
 mkSelectorCase ::
   (Functor m, Monad m)
-  => [CoreContext]
+  => String
+  -> [CoreContext]
   -> Term
   -> Int -- n'th DataCon
   -> Int -- n'th field
   -> RewriteMonad m Term
-mkSelectorCase ctx scrut dcI fieldI = do
+mkSelectorCase caller ctx scrut dcI fieldI = do
   scrutTy <- termType scrut
   let delta = snd $ contextEnv ctx
-  let cantCreate x = error $ x ++ "Can't create selector for: " ++ showDoc scrutTy
+  let cantCreate x = error $ x ++ "Can't create selector" ++ (show (caller,dcI,fieldI)) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
   case scrutTy of
     (tyView -> TyConApp tc args) -> do
       case (tyConDataCons tc) of
         [] -> cantCreate $(curLoc)
-        dcs | dcI >= length dcs -> cantCreate $(curLoc)
+        dcs | dcI > length dcs -> cantCreate $(curLoc)
             | otherwise -> do
-          let dc = dcs!!dcI
+          let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
           let fieldTys = dataConInstArgTys dc args
           if fieldI >= length fieldTys
             then cantCreate $(curLoc)
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
-              selBndr <- mkInternalVar "sel" (fieldTys!!fieldI)
+              selBndr <- mkInternalVar "sel" (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI)
               let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
               let pat    = DataPat (embed dc) (rebind [] (map fst bndrs))
-              let retVal = Case scrut (fieldTys!!fieldI) [ bind pat (snd selBndr) ]
+              let retVal = Case scrut (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI) [ bind pat (snd selBndr) ]
               return retVal
     _ -> cantCreate $(curLoc)
 

@@ -12,7 +12,7 @@ import qualified Data.Maybe        as Maybe
 import Unbound.LocallyNameless        (Bind,Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
 
 import CLaSH.Core.DataCon    (DataCon,dcTag,dcUnivTyVars)
-import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars)
+import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars,termFreeVars)
 import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTyInTm,substTysinTm)
@@ -114,10 +114,11 @@ nonRepSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ termFreeTyVars e2
-  = do e2Ty <- termType e2
-       if nonRep e2Ty
-         then specialise specialisations ctx e
-         else return e
+  = R $ do e2Ty <- termType e2
+           localVar <- isLocalVar e2
+           if (nonRep e2Ty && (not localVar))
+             then runR $ specialise specialisations ctx e
+             else return e
 
 nonRepSpec _ e = return e
 
@@ -194,11 +195,18 @@ caseCon _ (Case scrut ty alts)
     isDefPat DefaultPat = True
     isDefPat _          = False
 
-caseCon _ (Case _ _ [alt]) = R $ do
-  (pat,e) <- unbind alt
+caseCon _ e@(Case _ _ [alt]) = R $ do
+  (pat,altE) <- unbind alt
   case pat of
-    DefaultPat -> changed e
-    _          -> return e
+    DefaultPat    -> changed altE
+    DataPat _ pxs -> do let (tvs,xs)   = unrebind pxs
+                            (ftvs,fvs) = termFreeVars altE
+                            usedTvs    = filter ((`elem` ftvs) . varName) tvs
+                            usedXs     = filter ((`elem` fvs) . varName) xs
+                        case (usedTvs,usedXs) of
+                          ([],[]) -> changed altE
+                          _       -> return e  
+    _             -> return e
 
 caseCon _ e = return e
 
@@ -236,7 +244,7 @@ subjLet :: NormRewrite
 subjLet _ e@(Case subj ty alts) = R $ do
   localVar       <- isLocalVar subj
   untranslatable <- isUntranslatable subj
-  case localVar || untranslatable of
+  case localVar || untranslatable || isConstant subj of
     True  -> return e
     False -> do (argId,argVar) <- mkTmBinderFor "subjLet" subj
                 changed . Letrec $ bind (rec [(argId,embed subj)]) (Case argVar ty alts)
@@ -259,7 +267,7 @@ altLet ctx e@(Case subj ty alts) = R $ do
     doAlt' :: (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
     doAlt' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
       lv <- isLocalVar altExpr
-      case lv of
+      case (lv || isConstant altExpr) of
         True  -> return ([],alt)
         False -> do let fvs = termFreeIds altExpr
                     patSels <- fmap Maybe.catMaybes $ Monad.zipWithM (doPatBndr fvs (unembed dc)) xs [0..]
@@ -268,7 +276,7 @@ altLet ctx e@(Case subj ty alts) = R $ do
     doAlt' alt@(DataPat _ _, _) = return ([],alt)
     doAlt' alt@(pat,altExpr) = do
       lv <- isLocalVar altExpr
-      case lv of
+      case (lv || isConstant altExpr) of
         True  -> return ([],alt)
         False -> do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
                     return ([(altId,embed altExpr)],(pat,altVar))
@@ -277,7 +285,7 @@ altLet ctx e@(Case subj ty alts) = R $ do
     doPatBndr fvs dc pId i
       | (varName pId) `notElem` fvs = return Nothing
       | otherwise
-      = do patExpr <- mkSelectorCase ctx subj (dcTag dc) i
+      = do patExpr <- mkSelectorCase "doPatBndr" ctx subj (dcTag dc) i
            return (Just (pId,embed patExpr))
 
 altLet _ e = return e
@@ -440,22 +448,46 @@ inlineWrapper _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
-classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dfunE)
-  | (Var _ dfun, dfunArgs) <- collectArgs dfunE = R $ do
-    classSelM <- fmap (fmap snd . HashMap.lookup sel)  $ Lens.use classOps
-    dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
-    bindingsM <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use bindings
-    case (classSelM,dfunOpsM,bindingsM) of
-      (Just classSel,Just dfunOps,Nothing)
-        | classSel < length dfunOps -> do
-          let clsExpr = dfunOps !! classSel
-          changed (mkApps clsExpr dfunArgs)
-      (Just classSel,Nothing, Just binding) -> do
-        clsExpr <- chaseDfun classSel ctx binding
-        changed (mkApps clsExpr dfunArgs)
-      (Just classSel,Nothing,Nothing) -> do
-        traceIf True ($(curLoc) ++ "No binding or dfun for classOP?: " ++ showDoc e) $ return e
+classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dict) = R $ do
+  classSelM <- fmap (fmap snd . HashMap.lookup sel) $ Lens.use classOps
+  case classSelM of
+    Just classSel -> case collectArgs dict of
+      (Prim (PrimDFun dfun _),dfunArgs) -> do
+        dfunOpsM <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
+        case dfunOpsM of
+          Just dfunOps | classSel < length dfunOps -> changed $ mkApps (dfunOps !! classSel) dfunArgs
+          Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
+          _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e
+      (Var _ fdict,dfunArgs) -> do
+        dictBindingM <- fmap (fmap snd . HashMap.lookup fdict) $ Lens.use bindings
+        case dictBindingM of
+          Just dictBinding -> do
+            clsExpr <- chaseDfun classSel ctx dictBinding
+            changed $ mkApps clsExpr dfunArgs
+          Nothing -> return e
       _ -> return e
+    Nothing -> return e
+
+classOpResolution ctx e@(Case scrut ty [alt]) = R $ do
+  case (collectArgs scrut) of
+    (Prim (PrimDFun df t), args) -> do
+      (pat,altExpr) <- unbind alt
+      dfunOpsM <- fmap (fmap snd . HashMap.lookup df) $ Lens.use dictFuns
+      case (dfunOpsM,pat) of
+        (Just dfunOps, DataPat _ pxs) -> do --error $ $(curLoc) ++ "DFunExprs: " ++ showDoc dfunOps
+          let dfunOps' = map (`mkApps` args) dfunOps
+          let (_,xs)   = unrebind pxs
+          let fvs      = termFreeIds altExpr
+          let (binds,_) = List.partition ((`elem` fvs) . varName . fst) $ zip xs dfunOps'
+          let altExpr' = case binds of
+                            [] -> altExpr
+                            _  -> Letrec $ bind (rec $ map (second embed) binds) altExpr
+          changed altExpr'
+        (Nothing,_)  -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
+        _            -> error $ $(curLoc) ++ "No DataPat: " ++ showDoc e
+    (Prim (PrimFun df t), args)  -> error $ "FUN: " ++ showDoc scrut
+    (Prim (PrimDict df t), args) -> error $ "DICT: " ++ showDoc scrut
+    k -> return e
 
 classOpResolution _ e = return e
 
@@ -465,22 +497,19 @@ chaseDfun ::
   -> [CoreContext]
   -> Term
   -> RewriteMonad m Term
-chaseDfun classSel ctx e
-  | (Var _ f, args) <- collectArgs e
-  = do
-    dfunOpsM  <- fmap (fmap snd . HashMap.lookup f) $ Lens.use dictFuns
+chaseDfun classSel ctx e = case (collectArgs e) of
+  (Prim (PrimDFun dfun _), args) -> do
+    dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
     case dfunOpsM of
       Just dfunOps | classSel < length dfunOps -> do
         let dfunOp = dfunOps !! classSel
         return $ mkApps dfunOp args
-      _ -> error $ $(curLoc) ++ "No binding or dfun for classOP?: " ++ show e
-  | otherwise
-  = do
-    selCase <- mkSelectorCase ctx e 0 classSel
-    return selCase
+      Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
+      _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e
+  _ -> mkSelectorCase "chaseDfun" ctx e 1 classSel
 
 inlineSingularDFun :: NormRewrite
-inlineSingularDFun _ e@(Var _ f) = R $ do
+inlineSingularDFun _ e@(Prim (PrimDFun f _)) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use dictFuns
   case bodyMaybe of
     Just (_,[dfunOp]) -> changed dfunOp
