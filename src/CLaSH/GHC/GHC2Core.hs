@@ -27,7 +27,7 @@ import qualified Unbound.LocallyNameless  as Unbound
 
 -- GHC API
 import BasicTypes (TupleSort (..))
-import Coercion   (isCoVar,coercionType)
+import Coercion   (coercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
 import DataCon    (DataCon,dataConTag,dataConExTyVars,dataConUnivTyVars,dataConWorkId,
@@ -278,17 +278,13 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
-    alt (DataAlt dc, xs, e) = case (as,cs) of
-      (tvs,[]) -> bind <$> (C.DataPat . embed <$>
-                            (coreToDataCon dc) <*>
-                            (rebind <$>
-                              (mapM coreToTyVar tvs) <*>
-                              (mapM coreToId zs))) <*>
-                      (term e)
-      _ -> error $ $(curLoc) ++ "Patterns binding coercions are not supported: " ++ showPpr coreExpr
-      where
-        (as,ys) = span isTyVar xs
-        (cs,zs) = span isCoVar ys
+    alt (DataAlt dc, xs, e) = case span isTyVar xs of
+      (tyvs,tmvs) -> bind <$> (C.DataPat . embed <$>
+                                (coreToDataCon dc) <*>
+                                (rebind <$>
+                                  (mapM coreToTyVar tyvs) <*>
+                                  (mapM coreToId tmvs))) <*>
+                              (term e)
 
 coreToDataCon ::
   DataCon
