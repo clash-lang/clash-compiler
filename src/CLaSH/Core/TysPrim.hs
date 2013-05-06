@@ -1,7 +1,7 @@
 module CLaSH.Core.TysPrim where
 
 -- External Modules
-import Unbound.LocallyNameless         (makeName)
+import Unbound.LocallyNameless         (makeName,string2Name)
 
 -- GHC API
 import qualified PrelNames
@@ -11,11 +11,10 @@ import Unique    (getKey)
 import CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
 
-intPrimTyConKey, addrPrimTyConKey, eqTyConKey, listTyConKey :: Integer
+intPrimTyConKey, eqTyConKey, listTyConKey :: Integer
 tySuperKindTyConKey, unliftedTypeKindTyConKey, liftedTypeKindTyConKey, constraintKindTyConKey, typeNatKindConNameKey, typeSymbolKindConNameKey :: Integer
 
 intPrimTyConKey          = toInteger . getKey $ PrelNames.intPrimTyConKey
-addrPrimTyConKey         = toInteger . getKey $ PrelNames.addrPrimTyConKey
 eqTyConKey               = toInteger . getKey $ PrelNames.eqTyConKey
 listTyConKey             = toInteger . getKey $ PrelNames.listTyConKey
 
@@ -27,9 +26,9 @@ typeNatKindConNameKey    = toInteger . getKey $ PrelNames.typeNatKindConNameKey
 typeSymbolKindConNameKey = toInteger . getKey $ PrelNames.typeSymbolKindConNameKey
 
 
-intPrimTyConName, addrPrimTyConName :: TyConName
+intPrimTyConName, voidPrimTyConName:: TyConName
 intPrimTyConName  = makeName "GHC.Prim.Int#"  intPrimTyConKey
-addrPrimTyConName = makeName "GHC.Prim.Addr#" addrPrimTyConKey
+voidPrimTyConName = string2Name "__VOID__"
 
 tySuperKindTyConName, liftedTypeKindTyConName, unliftedTypeKindTyConName, constraintKindTyConName, typeNatKindTyCon, typeSymbolKindTyCon :: TyConName
 tySuperKindTyConName      = makeName "BOX"        tySuperKindTyConKey
@@ -39,11 +38,9 @@ constraintKindTyConName   = makeName "Constraint" constraintKindTyConKey
 typeNatKindTyCon          = makeName "Nat"        typeNatKindConNameKey
 typeSymbolKindTyCon       = makeName "Symbol"     typeSymbolKindConNameKey
 
-intPrimTyCon :: TyCon
+intPrimTyCon, voidPrimTyCon :: TyCon
 intPrimTyCon  = pcPrimTyCon0 intPrimTyConName IntRep
-
-addrPrimTyCon :: TyCon
-addrPrimTyCon = pcPrimTyCon0 addrPrimTyConName AddrRep
+voidPrimTyCon = pcPrimTyCon0 voidPrimTyConName VoidRep
 
 liftedTypeKind, unliftedTypeKind :: Kind
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
@@ -71,11 +68,9 @@ pcPrimTyCon0 name rep
   where
     result_kind = unliftedTypeKind
 
-intPrimTy :: Type
-intPrimTy = mkTyConTy intPrimTyCon
-
-addrPrimTy :: Type
-addrPrimTy = mkTyConTy addrPrimTyCon
+intPrimTy, voidPrimTy :: Type
+intPrimTy  = mkTyConTy intPrimTyCon
+voidPrimTy = mkTyConTy voidPrimTyCon
 
 kindTyConType :: TyCon -> Type
 kindTyConType = mkTyConTy

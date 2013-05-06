@@ -122,16 +122,19 @@ makeTyCon tc = do
 
         mkAlgTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
-          tcRhs  <- makeAlgTyConRhs tc $ algTyConRhs tc
-          return $
-            C.AlgTyCon
-            { C.tyConName   = tcName
-            , C.tyConKind   = tcKind
-            , C.tyConArity  = tcArity
-            , C.tyConTyVars = map coreToVar (tyConTyVars tc)
-            , C.algTcRhs    = tcRhs
-            , C.algTcParent = coreToAltTcParent $ tyConParent tc
-            }
+          tcRhsM  <- makeAlgTyConRhs $ algTyConRhs tc
+          case tcRhsM of
+            Just tcRhs ->
+              return $
+                C.AlgTyCon
+                { C.tyConName   = tcName
+                , C.tyConKind   = tcKind
+                , C.tyConArity  = tcArity
+                , C.tyConTyVars = map coreToVar (tyConTyVars tc)
+                , C.algTcRhs    = tcRhs
+                , C.algTcParent = coreToAltTcParent $ tyConParent tc
+                }
+            Nothing -> return $! C.mkPrimTyCon tcName tcKind tcArity C.VoidRep
 
         mkTupleTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
@@ -352,8 +355,8 @@ coreToPrimRep ::
 coreToPrimRep p = case p of
   VoidRep -> C.VoidRep
   IntRep  -> C.IntRep
-  AddrRep -> C.AddrRep
-  PtrRep  -> C.PtrRep
+  AddrRep -> C.VoidRep
+  PtrRep  -> C.VoidRep
   _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p
 
 coreToTyVar ::

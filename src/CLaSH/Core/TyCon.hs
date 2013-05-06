@@ -63,7 +63,6 @@ data AlgTyConRhs
   | NewTyCon
   { data_con :: DataCon
   }
-  | DataFamilyTyCon
   deriving Show
 
 data TyConParent
@@ -72,10 +71,8 @@ data TyConParent
   deriving Show
 
 data PrimRep
-  = AddrRep
-  | IntRep
+  = IntRep
   | VoidRep
-  | PtrRep
   deriving Show
 
 Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''TyConParent]

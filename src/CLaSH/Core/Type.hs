@@ -236,5 +236,3 @@ splitTyAppM ty = fmap (second reverse) $ splitTyAppM' [] ty
                                           Nothing             -> Just (ty1,ty2:args)
                                           Just (ty1',ty1args) -> Just (ty1',ty2:ty1args )
     splitTyAppM' _ _                  = Nothing
-
-

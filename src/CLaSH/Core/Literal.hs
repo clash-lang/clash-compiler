@@ -12,7 +12,7 @@ import Unbound.LocallyNameless.Alpha
 
 import {-# SOURCE #-} CLaSH.Core.Term (Term)
 import {-# SOURCE #-} CLaSH.Core.Type (Type)
-import CLaSH.Core.TysPrim             (intPrimTy,addrPrimTy)
+import CLaSH.Core.TysPrim             (intPrimTy,voidPrimTy)
 
 data Literal
   = IntegerLiteral Integer
@@ -32,4 +32,4 @@ literalType ::
   Literal
   -> Type
 literalType (IntegerLiteral _) = intPrimTy
-literalType (StringLiteral  _) = addrPrimTy
+literalType (StringLiteral  _) = voidPrimTy
