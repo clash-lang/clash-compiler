@@ -204,3 +204,23 @@ syncTerm (ForAllTy tvTy) =
      Var   aTy xName
 
 syncTerm ty = error $ $(curLoc) ++ show ty
+
+splitCombineTerm ::
+  Bool
+  -> Type
+  -> Term
+splitCombineTerm b (ForAllTy tvTy) =
+  let (aTV,tyView -> FunTy dictTy (tyView -> FunTy inpTy outpTy)) = runFreshM $ unbind tvTy
+      dictName = string2Name "splitCombineDict"
+      xName    = string2Name "x"
+      nTy      = if b then inpTy else outpTy
+      dId      = Id dictName (embed dictTy)
+      xId      = Id xName    (embed nTy)
+      newExpr  = TyLam $ bind aTV $
+                 Lam   $ bind dId $
+                 Lam   $ bind xId $
+                 Var nTy xName
+  in newExpr
+
+splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
+

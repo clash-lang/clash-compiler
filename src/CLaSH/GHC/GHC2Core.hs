@@ -263,6 +263,8 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
               | f == pack "CLaSH.Signal.mapSync" -> return (C.mapSyncTerm xType)
               | f == pack "CLaSH.Signal.appSync" -> return (C.mapSyncTerm xType)
               | f == pack "CLaSH.Signal.sync"    -> return (C.syncTerm xType)
+              | f == pack "CLaSH.Signal.combine" -> return (C.splitCombineTerm False xType)
+              | f == pack "CLaSH.Signal.split"   -> return (C.splitCombineTerm True xType)
             Just (Primitive _ Function) ->
               return $ C.Prim (C.PrimFun  xPrim xType)
             Just (Primitive _ Constructor) ->
