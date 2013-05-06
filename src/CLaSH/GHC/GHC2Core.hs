@@ -8,7 +8,6 @@ module CLaSH.GHC.GHC2Core
   , coreToTerm
   , coreToBndr
   , coreToPrimBndr
-  , unlocatable
   )
 where
 
@@ -74,7 +73,6 @@ data GHC2CoreState
   = GHC2CoreState
   { _tyConMap    :: HashMap TyCon   C.TyCon
   , _dataConMap  :: HashMap DataCon C.DataCon
-  , _unlocatable :: [Var]
   }
 
 makeLenses ''GHC2CoreState
@@ -93,7 +91,7 @@ makeAllTyDataCons tyCons =
                            s
   in  s
   where
-    emptyState = GHC2CoreState HashMap.empty HashMap.empty []
+    emptyState = GHC2CoreState HashMap.empty HashMap.empty
     tupleTyCons = concat [ map (`tupleTyCon` x)
                             [BoxedTuple,UnboxedTuple,ConstraintTuple]
                          | x <- [2..62]
@@ -179,7 +177,7 @@ makeDataCon ::
   DataCon
   -> SR C.DataCon
 makeDataCon dc = do
-  repTys   <- lift $ mapM coreToType (dataConRepArgTys  dc)
+  repTys   <- lift $ mapM coreToType (dataConRepArgTys dc)
   workIdTy <- lift $ coreToType (varType $ dataConWorkId dc)
   wrapIdTyM <- maybe (return Nothing) (fmap Just . lift . coreToType . varType) (dataConWrapId_maybe dc)
   let dataCon =
@@ -198,10 +196,12 @@ makeDataCon dc = do
 
 coreToTerm ::
   PrimMap
+  -> [Var]
+  -> [Var]
   -> GHC2CoreState
   -> CoreExpr
   -> C.Term
-coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
+coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr) s
   where
     term (Var x)                 = var x
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
@@ -245,7 +245,6 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
           xPrim  = coreToPrimVar x
           xNameS = pack $ Unbound.name2String xPrim
       in do
-        unlocs <- view unlocatable
         xType <- coreToType (varType x)
         let mapSyncName = pack
         case (isDataConId_maybe x) of
@@ -258,8 +257,6 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
                       _ | isDataConWorkId x -> C.Data False <$> (coreToDataCon dc)
                         | otherwise         -> C.Data True  <$> (coreToDataCon dc)
           Nothing -> case HashMap.lookup xNameS primMap of
-            Just (Primitive _ DFun) ->
-              return $ C.Prim (C.PrimDFun xPrim xType)
             Just (Primitive _ Dictionary) ->
               return $ C.Prim (C.PrimDict xPrim xType)
             Just (Primitive f Function)
@@ -274,6 +271,7 @@ coreToTerm primMap s coreExpr = Reader.runReader (term coreExpr) s
               return $ C.Prim (C.PrimFun xPrim xType)
             Nothing
               | x `elem` unlocs -> return $ C.Prim (C.PrimFun xPrim xType)
+              | x `elem` dfunvars -> return $ C.Prim (C.PrimDFun xVar xType)
               | otherwise -> return $ C.Var xType xVar
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)

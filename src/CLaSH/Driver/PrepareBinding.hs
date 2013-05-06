@@ -1,6 +1,5 @@
 module CLaSH.Driver.PrepareBinding where
 
-import           Control.Lens            (set)
 import qualified Data.HashMap.Lazy       as HashMap
 import           Data.HashMap.Lazy       (HashMap)
 import           Data.Maybe              (fromMaybe)
@@ -13,7 +12,7 @@ import qualified Var
 import           CLaSH.Core.Term         (TmName,Term)
 import           CLaSH.Core.Type         (Type)
 import           CLaSH.Core.Var          (Var(..))
-import           CLaSH.GHC.GHC2Core      (makeAllTyDataCons,coreToBndr,coreToPrimBndr,coreToTerm,unlocatable)
+import           CLaSH.GHC.GHC2Core      (makeAllTyDataCons,coreToBndr,coreToPrimBndr,coreToTerm)
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Primitives.Types
 
@@ -27,7 +26,10 @@ prepareBinding ::
   -> IO (BindingMap,DFunMap,ClassOpMap)
 prepareBinding primMap modName = do
   (bindings,dfuns,clsOps,unlocs,tcs) <- loadModules modName
-  let tcsMap = set unlocatable (unlocs++(map fst clsOps)) (makeAllTyDataCons tcs)
+  -- let tcsMap = set unlocatable (unlocs++(map fst clsOps)) (makeAllTyDataCons tcs)
+  let unlocatable = unlocs ++ (map fst clsOps)
+  let dfunvars = map fst dfuns
+  let tcsMap = makeAllTyDataCons tcs
 
   let bindingsMap = HashMap.fromList
                   $ map (\(v,e) ->
@@ -35,7 +37,7 @@ prepareBinding primMap modName = do
                           in ( varName v'
                              , ( moduleName $ Var.varName v
                                , ( unembed $ varType v'
-                                 , coreToTerm primMap tcsMap e
+                                 , coreToTerm primMap unlocatable dfunvars tcsMap e
                                  )
                                )
                              )
@@ -46,7 +48,7 @@ prepareBinding primMap modName = do
                       let v' = coreToBndr tcsMap v
                       in ( varName v'
                          , ( unembed $ varType v'
-                             , map (coreToTerm primMap tcsMap) es
+                             , map (coreToTerm primMap unlocatable dfunvars tcsMap) es
                              )
                          )
                     ) dfuns
