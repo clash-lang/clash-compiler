@@ -167,14 +167,13 @@ makeTyCon tc = do
           return $! C.mkPrimTyCon tcName tcKind tcArity C.VoidRep
 
 makeAlgTyConRhs ::
-  TyCon
-  -> AlgTyConRhs
-  -> SR C.AlgTyConRhs
-makeAlgTyConRhs tc algTcRhs = case algTcRhs of
-  DataTyCon dcs _   -> C.DataTyCon <$> (mapM makeDataCon dcs)
-  NewTyCon dc _ _ _ -> C.NewTyCon <$> (makeDataCon dc)
-  AbstractTyCon _   -> error $ $(curLoc) ++ "Can't convert AlgTyConRhs: AbstractTyCon of: " ++ showPpr tc
-  DataFamilyTyCon   -> return C.DataFamilyTyCon -- error $ $(curLoc) ++ "Can't convert AlgTyConRhs: DataFamilyTyCon: " ++ showPpr tc
+  AlgTyConRhs
+  -> SR (Maybe C.AlgTyConRhs)
+makeAlgTyConRhs algTcRhs = case algTcRhs of
+  DataTyCon dcs _   -> Just <$> C.DataTyCon <$> (mapM makeDataCon dcs)
+  NewTyCon dc _ _ _ -> Just <$> C.NewTyCon <$> (makeDataCon dc)
+  AbstractTyCon _   -> return Nothing -- error $ $(curLoc) ++ "Can't convert AlgTyConRhs: AbstractTyCon of: " ++ showPpr tc
+  DataFamilyTyCon   -> return Nothing -- error $ $(curLoc) ++ "Can't convert AlgTyConRhs: DataFamilyTyCon: " ++ showPpr tc
 
 makeDataCon ::
   DataCon
