@@ -22,7 +22,7 @@ import CLaSH.Util
 splitNormalized ::
   (Fresh m,Functor m)
   => Term
-  -> m ([Id],[LetBinding],Id)
+  -> m (Either String ([Id],[LetBinding],Id))
 splitNormalized expr = do
   (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
   case (letExpr) of
@@ -30,10 +30,10 @@ splitNormalized expr = do
       | (tmArgs,[]) <- args -> do
           (xes,e) <- unbind b
           case e of
-            Var t v -> return (tmArgs,unrec xes,Id v (embed t))
-            _ -> error "Not in normal form: res not simple var"
-      | otherwise -> error "Not in normal form: tyArgs"
-    _ -> error ("Not in normal from: no Letrec: " ++ showDoc expr)
+            Var t v -> return $! Right (tmArgs,unrec xes,Id v (embed t))
+            _ -> return $! Left ($(curLoc) ++ "Not in normal form: res not simple var")
+      | otherwise -> return $! Left ($(curLoc) ++ "Not in normal form: tyArgs")
+    _ -> return $! Left ($(curLoc) ++ "Not in normal from: no Letrec: " ++ showDoc expr)
 
 coreTypeToHWType_fail ::
   Type

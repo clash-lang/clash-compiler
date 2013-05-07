@@ -422,9 +422,9 @@ constantSpec _ e = return e
 
 inlineWrapper :: NormRewrite
 inlineWrapper [] e = R $ do
-  (_,lbs,_) <- splitNormalized e
-  case lbs of
-    [(_,bExpr)] -> case collectArgs (unembed bExpr) of
+  normalizedM <- splitNormalized e
+  case normalizedM of
+    Right ((funArgs,[(_,bExpr)],_)) -> case collectArgs (unembed bExpr) of
       (Var _ fn,args) -> do allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
                             bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
                             case (bodyMaybe,allLocal) of
@@ -434,15 +434,14 @@ inlineWrapper [] e = R $ do
     _ -> return e
 
 inlineWrapper _ e@(Var _ f) = R $ do
-    bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-    case bodyMaybe of
-      Just (_,body) -> do
-        wrappedF_maybe <- getWrappedF body
-        case wrappedF_maybe of
-          Just wrappedF -> changed wrappedF
-          Nothing       -> return e
-      _ -> return e
-  where
+  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+  case bodyMaybe of
+    Just (_,body) -> do
+      wrappedF_maybe <- getWrappedF body
+      case wrappedF_maybe of
+        Just wrappedF -> changed wrappedF
+        Nothing       -> return e
+    _ -> return e
 
 inlineWrapper _ e = return e
 

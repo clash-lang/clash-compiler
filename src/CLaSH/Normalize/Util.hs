@@ -103,10 +103,10 @@ isConstant e = case collectArgs e of
 
 getWrappedF :: (Fresh m,Functor m) => Term -> m (Maybe Term)
 getWrappedF body = do
-      (funArgs,lbs,_) <- splitNormalized body
-      case lbs of
-        [(_,bExpr)] -> return $! uncurry (reduceArgs funArgs) (collectArgs $ unembed bExpr)
-        _           -> return Nothing
+  normalizedM <- splitNormalized body
+  case normalizedM of
+    Right ((funArgs,[(_,bExpr)],_)) -> return $! uncurry (reduceArgs funArgs) (collectArgs $ unembed bExpr)
+    _                               -> return Nothing
 
 reduceArgs :: [Id] -> Term -> [Either Term Type] -> Maybe Term
 reduceArgs []  appE []                            = Just appE

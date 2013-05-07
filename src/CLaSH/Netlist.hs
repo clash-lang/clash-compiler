@@ -83,8 +83,11 @@ genComponent' compName componentExpr mStart = do
 
   (vhdlMState . _2) .= componentName'
 
-  (arguments,binders,result) <- splitNormalized componentExpr >>=
-                                mkUniqueNormalized
+  (arguments,binders,result) <- do { normalizedM <- splitNormalized componentExpr
+                                   ; case normalizedM of
+                                       Right normalized -> mkUniqueNormalized normalized
+                                       Left err         -> error err
+                                   }
 
   let ids = HashMap.fromList
           $ map (\(Id v (Embed t)) -> (v,t))
