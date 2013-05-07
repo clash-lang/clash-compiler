@@ -6,7 +6,6 @@ module CLaSH.Signal
   , sample
   , register
   , Pack(..)
-  , registerP
   , (<^), (^>)
   , Comp(..)
   , registerC
@@ -27,7 +26,6 @@ import CLaSH.Sized.Unsigned (Unsigned)
 import CLaSH.Sized.VectorZ  (Vec(..), vmap, vhead, vtail)
 
 {-# NOINLINE register  #-}
-{-# NOINLINE registerP #-}
 {-# NOINLINE sync      #-}
 {-# NOINLINE mapSync   #-}
 {-# NOINLINE appSync   #-}
@@ -99,9 +97,6 @@ instance Pack (Unsigned n)
 instance Pack Bool
 instance Pack Integer
 instance Pack ()
-
-registerP :: Pack a => a -> Packed a -> Packed a
-registerP i = split . register i . combine
 
 instance Pack (a,b) where
   type Packed (a,b) = (Sync a, Sync b)

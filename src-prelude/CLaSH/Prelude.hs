@@ -62,6 +62,10 @@ f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i
                          s      = register sI s'
                      in  o
 
+{-# INLINABLE registerP #-}
+registerP :: Pack a => a -> Packed a -> Packed a
+registerP i = split . register i . combine
+
 {-# NOINLINE blockRam #-}
 blockRam :: forall n m a . (SingI n, SingI m, Pack a)
          => Sing (n :: Nat)
