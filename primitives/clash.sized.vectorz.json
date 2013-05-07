@@ -49,7 +49,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vmap",
       "template"  :
-"~SYM[0]_generate : for ~SYM[1] in (~RESULT'length - 1) downto 0 generate
+"~SYM[0]_generate : for ~SYM[1] in (~RESULT'high) downto 0 generate
 begin
   ~INST 0
     ~OUTPUT <= ~RESULT(~SYM[1])~
@@ -69,7 +69,7 @@ begin
   ~SYM[1] <= ~ARG[1];
   ~SYM[2] <= ~ARG[2];
 
-  ~SYM[3]_generate : for ~SYM[4] in (~RESULT'length - 1) downto 0 generate
+  ~SYM[3]_generate : for ~SYM[4] in (~RESULT'high) downto 0 generate
   begin
     ~INST 0
       ~OUTPUT <= ~RESULT(~SYM[4])~
@@ -82,20 +82,54 @@ end block;",
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vfoldr",
+      "template"  :
+"~SYM[0]_block : block
+  signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[6] : ~TYP[2];
+begin
+  ~SYM[1](0) <= ~ARG[1];
+  ~SYM[6] <= ~ARG[2];
+
+  ~SYM[2]_generate : for ~SYM[3] in 0 to (~SYM[6]'high) generate
+  begin
+    ~SYM[4]_generate : if ~SYM[3] /= (~SYM[6]'high) generate
+      ~INST 0
+        ~OUTPUT <= ~SYM[1](~SYM[3]+1)~
+        ~INPUT  <= ~SYM[6](~SYM[3])~
+        ~INPUT  <= ~SYM[1](~SYM[3])~
+      ~INST
+    end generate;
+
+    ~SYM[5]_generate : if ~SYM[3] = (~SYM[6]'high) generate
+      ~INST 0
+        ~OUTPUT <= ~RESULT~
+        ~INPUT  <= ~SYM[6](~SYM[3])~
+        ~INPUT  <= ~SYM[1](~SYM[3])~
+      ~INST
+    end generate;
+  end generate;
+end block;",
+      "templateI" : ""
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vfoldl",
       "template"  :
 "~SYM[0]_block : block
   signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[6] : ~TYP[2];
 begin
   ~SYM[1](~SYM[1]'high) <= ~ARG[1];
+  ~SYM[6] <= ~ARG[2];
 
-  ~SYM[2]_generate : for ~SYM[3] in (~ARG[2]'length - 1) downto 0 generate
+  ~SYM[2]_generate : for ~SYM[3] in (~SYM[6]'high) downto 0 generate
   begin
     ~SYM[4]_generate : if ~SYM[3] /= 0 generate
       ~INST 0
         ~OUTPUT <= ~SYM[1](~SYM[3]-1)~
         ~INPUT  <= ~SYM[1](~SYM[3])~
-        ~INPUT  <= ~ARG[2](~SYM[3])~
+        ~INPUT  <= ~SYM[6](~SYM[3])~
       ~INST
     end generate;
 
@@ -103,7 +137,7 @@ begin
       ~INST 0
         ~OUTPUT <= ~RESULT~
         ~INPUT  <= ~SYM[1](~SYM[3])~
-        ~INPUT  <= ~ARG[2](~SYM[3])~
+        ~INPUT  <= ~SYM[6](~SYM[3])~
       ~INST
     end generate;
   end generate;
@@ -131,7 +165,7 @@ end block;",
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vreplace"
-    , "template"  : 
+    , "template"  :
 "process(~ARG[1],~ARG[2],~ARG[3]) is
   variable ~SYM[0] : ~TYP[1];
 begin
