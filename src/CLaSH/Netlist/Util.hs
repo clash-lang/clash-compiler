@@ -49,7 +49,7 @@ synchronizedClk ty
   = case (name2String $ tyConName tyCon) of
       "CLaSH.Signal.Sync"       -> Just (pack "clk")
       "CLaSH.Sized.VectorZ.Vec" -> synchronizedClk (args!!1)
-      "CLaSH.Signal.Packed"     -> synchronizedClk (head args)
+      "CLaSH.Signal.Packed"     -> Just (pack "clk")
       _                         -> Nothing
   | otherwise
   = Nothing
@@ -61,6 +61,7 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
   case (name2String $ tyConName tc) of
     "GHC.Integer.Type.Integer"  -> return Integer -- Left $ "Can't translate type: " ++ showDoc ty
     "GHC.Prim.Int#"             -> return Integer -- Left $ "Can't translate type: " ++ showDoc ty
+    "GHC.Prim.Int"              -> return Integer
     "GHC.Prim.ByteArray#"       -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
     "GHC.Types.Bool"            -> return Bool
     "GHC.TypeLits.Sing"         -> Left $ "Can't translate type: " ++ showDoc ty -- singletonToHWType (head args)
