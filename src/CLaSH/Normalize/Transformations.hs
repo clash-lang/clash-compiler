@@ -15,7 +15,7 @@ import CLaSH.Core.DataCon    (DataCon,dcTag,dcUnivTyVars)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars,termFreeVars)
 import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
-import CLaSH.Core.Subst      (substTyInTm,substTysinTm)
+import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm)
 import CLaSH.Core.Term       (Term(..),TmName,LetBinding,Pat(..))
 import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy)
 import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isLet,isPrim)
@@ -56,7 +56,9 @@ caseTyApp _ e = return e
 lamApp :: NormRewrite
 lamApp _ (App (Lam b) arg) = R $ do
   (v,e) <- unbind b
-  changed . Letrec $ bind (rec [(v,embed arg)]) e
+  case (isConstant arg || isVar arg) of
+    True  -> changed $ substTm (varName v) arg e
+    False -> changed . Letrec $ bind (rec [(v,embed arg)]) e
 
 lamApp _ e = return e
 
@@ -69,15 +71,26 @@ letApp _ e = return e
 
 caseApp :: NormRewrite
 caseApp _ (App (Case scrut ty alts) arg) = R $ do
-  (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
-  alts' <- mapM ( return
-                . uncurry bind
-                . second (`App` argVar)
-                <=< unbind
-                ) alts
   argTy <- termType arg
   let ty' = applyFunTy ty argTy
-  changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
+  case (isConstant arg || isVar arg) of
+    True  -> do
+      alts' <- mapM ( return
+                    . uncurry bind
+                    . second (`App` arg)
+                    <=< unbind
+                    ) alts
+
+      let ty' = applyFunTy ty argTy
+      changed $ Case scrut ty' alts'
+    False -> do
+      (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
+      alts' <- mapM ( return
+                    . uncurry bind
+                    . second (`App` argVar)
+                    <=< unbind
+                    ) alts
+      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
 
 caseApp _ e = return e
 
@@ -205,7 +218,7 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
                             usedXs     = filter ((`elem` fvs) . varName) xs
                         case (usedTvs,usedXs) of
                           ([],[]) -> changed altE
-                          _       -> return e  
+                          _       -> return e
     _             -> return e
 
 caseCon _ e = return e
@@ -382,9 +395,9 @@ deadCode _ e = return e
 inlineVar :: NormRewrite
 inlineVar ctx e@(Letrec bnd) = do
   (bndrs,_) <- unbind bnd
-  if length (unrec bndrs) > 1
-    then inlineBinders (isLocalVar . unembed . snd) ctx e
-    else return e
+  if ((all isLambdaBodyCtx ctx) && (length (unrec bndrs) < 2))
+    then return e
+    else inlineBinders (isLocalVar . unembed . snd) ctx e
 
 inlineVar _ e = return e
 
@@ -394,7 +407,8 @@ inlineClosedTerm _ e@(Var _ f) = R $ do
   case bodyMaybe of
     Just (_,body) -> do
       closed <- isClosed body
-      if closed
+      untranslatable <- isUntranslatable body
+      if (closed && not untranslatable)
         then changed body
         else return e
     _ -> return e
@@ -404,9 +418,9 @@ inlineClosedTerm _ e = return e
 bindConstant :: NormRewrite
 bindConstant ctx e@(Letrec bnd) = do
   (bndrs,_) <- unbind bnd
-  if length (unrec bndrs) > 1
-    then inlineBinders (return . isConstant . unembed . snd) ctx e
-    else return e
+  if ((all isLambdaBodyCtx ctx) && (length (unrec bndrs) < 2))
+    then return e
+    else inlineBinders (return . isConstant . unembed . snd) ctx e
 
 bindConstant _ e = return e
 
