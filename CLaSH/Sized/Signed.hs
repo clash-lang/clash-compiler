@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}
@@ -10,8 +11,6 @@
 module CLaSH.Sized.Signed
   ( Signed
   , resizeS
-  , toBitVector
-  , fromBitVector
   )
 where
 
@@ -21,6 +20,7 @@ import Language.Haskell.TH.Syntax(Lift(..))
 import GHC.TypeLits
 
 import CLaSH.Bit
+import CLaSH.Class.BitVector
 import CLaSH.Class.Default
 import CLaSH.Sized.VectorZ
 
@@ -36,7 +36,11 @@ instance Show (Signed n) where
   show (S n) = show n
 
 instance Eq (Signed n) where
-  (S n) == (S m) = n == m
+  (==) = eqS
+
+{-# NOINLINE eqS #-}
+eqS :: (Signed n) -> (Signed n) -> Bool
+(S n) `eqS` (S m) = n == m
 
 instance SingI n => Default (Signed n) where
   def = fromIntegerS 0
@@ -60,7 +64,7 @@ instance SingI n => Integral (Signed n) where
                           in (fromIntegerS a', fromIntegerS b')
   toInteger (S n)       = n
 
-
+{-# NOINLINE fromIntegerS #-}
 fromIntegerS :: forall n . SingI n => Integer -> Signed (n :: Nat)
 fromIntegerS i = res
   where
@@ -69,21 +73,27 @@ fromIntegerS i = res
             (s,i') | even s    -> S i'
                    | otherwise -> S (i' - sz')
 
+{-# NOINLINE plusS #-}
 plusS :: SingI n => Signed n -> Signed n -> Signed n
 plusS (S a) (S b) = fromIntegerS $ a + b
 
+{-# NOINLINE minS #-}
 minS :: SingI n => Signed n -> Signed n -> Signed n
 minS (S a) (S b) = fromIntegerS $ a - b
 
+{-# NOINLINE timesS #-}
 timesS :: SingI n => Signed n -> Signed n -> Signed n
 timesS (S a) (S b) = fromIntegerS $ a * b
 
+{-# NOINLINE negateS #-}
 negateS :: SingI n => Signed n -> Signed n
 negateS (S n) = fromIntegerS (0 - n)
 
+{-# NOINLINE absS #-}
 absS :: SingI n => Signed n -> Signed n
 absS (S n) = fromIntegerS (abs n)
 
+{-# NOINLINE signumS #-}
 signumS :: SingI n => Signed n -> Signed n
 signumS (S n) = fromIntegerS (signum n)
 
@@ -120,6 +130,7 @@ instance SingI n => Bits (Signed n) where
 instance SingI n => FiniteBits (Signed n) where
   finiteBitSize _ = fromInteger $ fromSing (sing :: Sing n)
 
+{-# NOINLINE resizeS #-}
 resizeS :: forall n m . (SingI n, SingI m) => Signed n -> Signed m
 resizeS s@(S n) | n' <= m'  = fromIntegerS n
                 | otherwise = fromBitList $ (take (m' - 1) l) ++ [last l]
@@ -128,11 +139,18 @@ resizeS s@(S n) | n' <= m'  = fromIntegerS n
     m' = fromInteger $ fromSing (sing :: Sing m) :: Int
     l  = toList $ toBitVector s
 
+{-# NOINLINE toBitVector #-}
 toBitVector :: SingI n => Signed n -> Vec n Bit
-toBitVector (S m) = vmap (\x -> if odd x then H else L) $ viterate (`div` 2) m
+toBitVector (S m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterate (`div` 2) m
 
+{-# NOINLINE fromBitVector #-}
 fromBitVector :: SingI n => Vec n Bit -> Signed n
-fromBitVector = fromBitList . toList
+fromBitVector = fromBitList . reverse . toList
+
+instance BitVector (Signed n) where
+  type BitSize (Signed n) = n
+  toBV   = toBitVector
+  fromBV = fromBitVector
 
 fromBitList :: SingI n => [Bit] -> Signed n
 fromBitList l = fromIntegerS
