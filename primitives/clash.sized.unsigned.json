@@ -1,53 +1,53 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.plusS",
+    { "name"      : "CLaSH.Sized.Unsigned.plusU",
       "template"  : "~RESULT <= ~ARG[1] + ~ARG[2];",
       "templateI" : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.timesS",
+    { "name"      : "CLaSH.Sized.Unsigned.timesU",
       "template"  : "~RESULT <= resize(~ARG[1] * ~ARG[2], ~LIT[0]);",
       "templateI" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.fromIntegerS",
+    { "name"      : "CLaSH.Sized.Unsigned.fromIntegerU",
       "template"  : "~RESULT <= to_signed(~ARG[1], ~LIT[0]);",
       "templateI" : "to_signed(~ARG[1], ~LIT[0])"
     }
   }
   , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.negateS",
+    { "name"      : "CLaSH.Sized.Unsigned.negateU",
       "template"  : "~RESULT <= -~ARG[1];",
       "templateI" : "(-~ARG[1])"
     }
   }
   , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.minS",
+    { "name"      : "CLaSH.Sized.Unsigned.minU",
       "template"  : "~RESULT <= ~ARG[1] - ~ARG[2];",
       "templateI" : "~ARG[1] - ~ARG[2]"
     }
   }
   , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.toBitVector",
+    { "name"      : "CLaSH.Sized.Unsigned.toBitVector",
       "template"  : "~RESULT <= std_logic_vector(~ARG[1]);",
       "templateI" : "std_logic_vector(~ARG[1])"
     }
   }
   , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.fromBitVector",
-      "template"  : "~RESULT <= signed(~ARG[1]);",
-      "templateI" : "signed(~ARG[1])"
+    { "name"      : "CLaSH.Sized.Unsigned.fromBitVector",
+      "template"  : "~RESULT <= unsigned(~ARG[1]);",
+      "templateI" : "unsigned(~ARG[1])"
     }
   }
   , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.resizeS",
-      "template"  : "~RESULT <= resize(~ARG[2],~LIT[1]);",
-      "templateI" : "resize(~ARG[2],~LIT[1])"
+    { "name"      : "CLaSH.Sized.Unsigned.resizeU",
+      "template"  : "~RESULT <= resize(~ARG[1],~LIT[0]);",
+      "templateI" : "resize(~ARG[1],~LIT[0])"
     }
   }
   , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.eqS",
+    { "name"      : "CLaSH.Sized.Unsigned.eqU",
       "template"  : "~RESULT <= ~ARG[0] = ~ARG[1]);",
       "templateI" : "~ARG[0] = ~ARG[1]"
     }

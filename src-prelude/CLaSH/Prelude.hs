@@ -13,17 +13,18 @@ module CLaSH.Prelude
 where
 
 import Control.Applicative
-import Data.Bits            as Exported
-import CLaSH.Class.Default  as Exported
-import CLaSH.Promoted.Bool  as Exported
-import CLaSH.Promoted.Ord   as Exported
-import CLaSH.Sized.Index    as Exported
-import CLaSH.Sized.Signed   as Exported
-import CLaSH.Sized.Unsigned as Exported
-import CLaSH.Sized.VectorZ  as Exported
-import CLaSH.Bit            as Exported
-import CLaSH.Signal         as Exported
-import GHC.TypeLits         as Exported
+import Data.Bits             as Exported
+import CLaSH.Class.BitVector as Exported
+import CLaSH.Class.Default   as Exported
+import CLaSH.Promoted.Bool   as Exported
+import CLaSH.Promoted.Ord    as Exported
+import CLaSH.Sized.Index     as Exported
+import CLaSH.Sized.Signed    as Exported
+import CLaSH.Sized.Unsigned  as Exported
+import CLaSH.Sized.VectorZ   as Exported
+import CLaSH.Bit             as Exported
+import CLaSH.Signal          as Exported
+import GHC.TypeLits          as Exported
 
 {-# INLINABLE window #-}
 window ::

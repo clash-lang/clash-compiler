@@ -37,6 +37,7 @@ Library
   Cpp-options:         -DCABAL
 
   Exposed-modules:     CLaSH.Bit
+                       CLaSH.Class.BitVector
                        CLaSH.Class.Default
                        CLaSH.Driver
                        CLaSH.Prelude
