@@ -18,7 +18,7 @@ module CLaSH.Sized.VectorZ
   , vreverse, vmap, vzipWith
   , vfoldl, vfoldr, vfoldl1
   , vzip, vunzip
-  , vindex, vindexM
+  , (!), vindex, vindexM
   , vreplace, vreplaceM
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopyE, vcopy, viterateE, viterate, vgenerateE, vgenerate
@@ -49,6 +49,9 @@ instance Show a => Show (Vec n a) where
 
 instance (SingI n, Default a) => Default (Vec n a) where
   def = vcopy def
+
+instance Eq a => Eq (Vec n a) where
+  v1 == v2 = vfoldr (&&) True (vzipWith (==) v1 v2)
 
 {-# NOINLINE vhead #-}
 vhead :: Vec (n + 1) a -> a
@@ -190,6 +193,10 @@ vindex :: (SingI n, Num i, Eq i) => Vec n a -> i -> a
 vindex xs i = case vindexM xs (maxIndex xs - i) of
     Just a  -> a
     Nothing -> error "index out of bounds"
+
+{-# INLINE (!) #-}
+(!) :: (SingI n, Num i, Eq i) => Vec n a -> i -> a
+(!) = vindex
 
 {-# NOINLINE maxIndex #-}
 maxIndex :: forall i n a . SingRep n => Num i => Vec n a -> i
