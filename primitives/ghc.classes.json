@@ -1,0 +1,7 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Classes.not",
+      "template"  : "~RESULT <= not ~ARG[0];",
+      "templateI" : "not ~ARG[0]"
+    }
+  }
+]
