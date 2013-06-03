@@ -128,7 +128,7 @@ mkConcSm bndr (Core.Literal lit) = do
   return [Assignment dstId (HW.Literal Nothing . NumLit $ fromInteger i)
          ]
 
-mkConcSm bndr (Case (Var scrutTy scrutNm) _ [alt]) = do
+mkConcSm bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
   (pat,Var varTy varTm)  <- unbind alt
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
   let altVarId = mkBasicId . Text.pack $ name2String varTm
@@ -138,6 +138,7 @@ mkConcSm bndr (Case (Var scrutTy scrutNm) _ [alt]) = do
                                           in case (elemIndex (Id varTm (Embed varTy)) tms) of
                                                Nothing -> Nothing
                                                Just fI -> Just (Indexed (coreTypeToHWType_fail scrutTy,dcTag dc - 1,fI))
+                _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
   let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
 
