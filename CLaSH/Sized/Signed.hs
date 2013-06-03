@@ -35,15 +35,15 @@ decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 instance Show (Signed n) where
   show (S n) = show n
 
+instance SingI n => Default (Signed n) where
+  def = fromIntegerS 0
+
 instance Eq (Signed n) where
   (==) = eqS
 
 {-# NOINLINE eqS #-}
 eqS :: (Signed n) -> (Signed n) -> Bool
 (S n) `eqS` (S m) = n == m
-
-instance SingI n => Default (Signed n) where
-  def = fromIntegerS 0
 
 instance Ord (Signed n) where
   compare (S n) (S m) = compare n m

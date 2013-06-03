@@ -26,8 +26,8 @@ import CLaSH.Sized.VectorZ
 
 newtype Unsigned (n :: Nat) = U Integer
 
-instance SingI n => Lift (Unsigned n) where
-  lift (U i) = sigE [| U i |] (decUnsigned $ fromSing (sing :: (Sing n)))
+instance forall n . SingI n => Lift (Unsigned n) where
+  lift (U i) = sigE [| fromInteger i |] (decUnsigned $ fromSing (sing :: (Sing n)))
 
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
@@ -35,8 +35,8 @@ decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 instance Show (Unsigned n) where
   show (U n) = show n
 
-instance Default (Unsigned n) where
-  def = U 0
+instance SingI n => Default (Unsigned n) where
+  def = fromIntegerU 0
 
 instance Eq (Unsigned n) where
   (==) = eqU
