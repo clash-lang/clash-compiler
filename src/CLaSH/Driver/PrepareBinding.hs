@@ -26,7 +26,6 @@ prepareBinding ::
   -> IO (BindingMap,DFunMap,ClassOpMap)
 prepareBinding primMap modName = do
   (bindings,dfuns,clsOps,unlocs,tcs) <- loadModules modName
-  -- let tcsMap = set unlocatable (unlocs++(map fst clsOps)) (makeAllTyDataCons tcs)
   let unlocatable = unlocs ++ (map fst clsOps)
   let dfunvars = map fst dfuns
   let tcsMap = makeAllTyDataCons tcs
