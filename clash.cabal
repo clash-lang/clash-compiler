@@ -71,6 +71,7 @@ Library
                        pretty               >= 1.1.1.0,
                        template-haskell     >= 2.7.0.0,
                        text                 >= 0.11.1.13,
+                       time                 >= 1.4.0.2,
                        transformers         >= 0.2.2.0,
                        unbound              >= 0.4.0.2,
                        unordered-containers >= 0.2.1.0,

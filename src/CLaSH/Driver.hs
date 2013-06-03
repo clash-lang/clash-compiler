@@ -25,6 +25,8 @@ import           CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
 import           CLaSH.Util
 
+import qualified Data.Time.Clock as Clock
+
 #ifdef CABAL
 import           Paths_clash
 #else
@@ -36,6 +38,8 @@ generateVHDL ::
   String
   -> IO ()
 generateVHDL modName = do
+  start <- Clock.getCurrentTime
+
   primitiveDir   <- getDataFileName "primitives"
   primitiveFiles <- fmap (filter (isSuffixOf ".json")) $
                       Directory.getDirectoryContents primitiveDir
@@ -63,14 +67,19 @@ generateVHDL modName = do
       let transformedBindings
             = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
-
+      let tBindings = length transformedBindings
+      mid <- Clock.getCurrentTime
+      traceIf True ("\nNormalisation of " ++ show tBindings ++ " took " ++ show (Clock.diffUTCTime mid start)) $ return ()
       (netlist,vhdlState) <- genNetlist (HashMap.fromList $ transformedBindings)
                               primMap
                               (fst topEntity)
-
+      mid' <- Clock.getCurrentTime
+      traceIf True ("\nNetlist generation took " ++ show (Clock.diffUTCTime mid' mid)) $ return ()
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
       mapM_ (writeVHDL dir) $ evalState (mapM genVHDL netlist) vhdlState
+      end <- Clock.getCurrentTime
+      traceIf True ("\nTotal compilation took " ++ show (Clock.diffUTCTime end start)) $ return ()
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
