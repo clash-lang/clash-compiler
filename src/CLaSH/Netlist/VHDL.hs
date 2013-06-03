@@ -311,6 +311,8 @@ fromSLV Bool d         = "fromSLV" <> parens d
 fromSLV Integer d      = "to_integer" <> parens (fromSLV (Signed 32) d)
 fromSLV (Signed _) d   = "signed" <> parens d
 fromSLV (Unsigned _) d = "unsigned" <> parens d
+fromSLV (SP _ _) d     = d
+fromSLV (Sum _ _) d    = d
 fromSLV hty _          = error $ "fromSLV: " ++ show hty
 
 dcToExpr :: HWType -> Int -> Expr

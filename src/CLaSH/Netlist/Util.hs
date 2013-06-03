@@ -163,6 +163,7 @@ typeSize Void = 0
 typeSize Bool = 1
 typeSize Integer = 32
 typeSize (Signed i) = i
+typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * (typeSize el)
 typeSize t@(SP _ cons) = conSize t +
   (maximum $ map (sum . map typeSize . snd) cons)
@@ -198,18 +199,18 @@ mkUniqueNormalized ::
 mkUniqueNormalized (args,binds,res) = do
   let args' = zipWith (\n s -> modifyVarName (`appendToName` s) n)
                 args ["_i" ++ show i | i <- [(1::Integer)..]]
-  let res'  = appendToName (varName res) "_o"
+  let res1  = appendToName (varName res) "_o"
   let bndrs = map fst binds
   let exprs = map (unembed . snd) binds
   let usesOutput = concatMap (filter (== (varName res)) . termFreeIds) exprs
-  let (res'',extraBndr) = case usesOutput of
-                            [] -> (res',[])
-                            _  -> let res'' = appendToName (varName res) "_o_sig"
-                                  in (res'',[(Id res' (varType res),embed $ Var (unembed $ varType res) res'')])
-  bndrs' <- mapM (mkUnique (varName res,res'')) bndrs
+  let (res2,extraBndr) = case usesOutput of
+                            [] -> (res1,[])
+                            _  -> let res3 = appendToName (varName res) "_o_sig"
+                                  in (res3,[(Id res1 (varType res),embed $ Var (unembed $ varType res) res3)])
+  bndrs' <- mapM (mkUnique (varName res,res2)) bndrs
   let repl = (zip args args') ++ (zip bndrs bndrs')
   exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs repl
-  return (args',zip bndrs' exprs' ++ extraBndr,res')
+  return (args',zip bndrs' exprs' ++ extraBndr,res1)
 
   where
     mkUnique :: (TmName,TmName) -> Id -> NetlistMonad Id
