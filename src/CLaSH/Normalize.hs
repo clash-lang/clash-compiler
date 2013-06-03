@@ -82,9 +82,7 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) = do
 cleanupGraph :: [TmName] -> [(TmName,(Type,Term))] -> NormalizeSession [(TmName,(Type,Term))]
 cleanupGraph bndrs norm = do
     bindings .= (HashMap.fromList norm)
-    es <- cleanupGraph' ("cleanupTD",cleanupTD) bndrs
-    bindings .= (HashMap.fromList es)
-    cleanupGraph' ("cleanupBU",cleanupBU) bndrs
+    cleanupGraph' ("cleanup",cleanup) bndrs
   where
     cleanupGraph' :: (String,NormRewrite) -> [TmName] -> NormalizeSession [(TmName,(Type,Term))]
     cleanupGraph' rw (bndr:bndrs') = do

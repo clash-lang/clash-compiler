@@ -9,33 +9,27 @@ import CLaSH.Rewrite.Util
 normalization :: NormRewrite
 normalization = (repeatR $ clsOpRes >-> representable) >-> simplification
   where
-    clsOpRes = (bottomupR $ apply "classOpResolution" classOpResolution) >->
-               (bottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
+    clsOpRes = (unsafeBottomupR $ apply "classOpResolution" classOpResolution) >->
+               (unsafeBottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
 
-cleanupTD :: NormRewrite
-cleanupTD = repeatBottomup steps
+cleanup :: NormRewrite
+cleanup = repeatR $ closedTerms >-> wrappers >-> propConstants
   where
-    steps = [ ("inlineClosedTerm", inlineClosedTerm)
-            , ("lamApp"          , lamApp )
-            , ("repANF"          , repANF )
-            , ("letFlat"         , letFlat)
-            , ("bindConstant"    , bindConstant)
-            , ("inlineVar"       , inlineVar)
-            , ("constantSpec"    , constantSpec)
-            ]
+    wrappers      = unsafeTopdownR $ (apply "inlineWrapper" inlineWrapper) !-> propConstants
 
-cleanupBU :: NormRewrite
-cleanupBU = repeatR $ topdownR (apply "inlineWrapper" inlineWrapper)
+    closedTerms   = unsafeTopdownR $ (apply "inlineClosedTerm" inlineClosedTerm) !-> propConstants
+
+    propConstants = repeatTopdown steps
+    steps         = [ ("propagation"     , appProp)
+                    , ("bindConstantVar" , bindConstantVar)
+                    , ("constantSpec"    , constantSpec)
+                    , ("caseCon"      , caseCon    )
+                    ]
 
 representable :: NormRewrite
 representable = propagagition >-> specialisation
   where
-    propagagition = repeatR ( repeatBottomup [ ("lamApp"       ,lamApp      )
-                                             , ("letApp"       ,letApp      )
-                                             , ("caseApp"      ,caseApp     )
-                                             , ("tauReduction" ,tauReduction)
-                                             , ("letTyApp"     ,letTyApp    )
-                                             , ("caseTyApp"    ,caseTyApp   )
+    propagagition = repeatR ( repeatBottomup [ ("propagation"  ,appProp     )
                                              , ("bindNonRep"   ,bindNonRep  )
                                              , ("liftNonRep"   ,liftNonRep  )
                                              , ("caseLet"      , caseLet    )
@@ -45,32 +39,32 @@ representable = propagagition >-> specialisation
                               >->
                               doInline "inlineNonRep" inlineNonRep
                             )
-    specialisation = repeatR (bottomupR (apply "typeSpec" typeSpec)) >->
-                     repeatR (bottomupR (apply "nonRepSpec" nonRepSpec))
+    specialisation = repeatR (unsafeBottomupR (apply "typeSpec" typeSpec)) >->
+                     repeatR (unsafeBottomupR (apply "nonRepSpec" nonRepSpec))
 
 simplification :: NormRewrite
-simplification = repeatBottomup steps
+simplification = (apply "etaTL" etaExpansionTL) >->
+                 (repeatR $ unsafeTopdownR $ apply "propagation" appProp) >->
+                 (apply "ANF" makeANF) >->
+                 repeatBottomup steps
   where
-    steps = [ ("deadcode"        , deadCode  )
-            , ("caseCon"         , caseCon    )
-            , ("lamApp"          , lamApp )
-            , ("letApp"          , letApp )
-            , ("caseApp"         , caseApp )
-            , ("repANF"          , repANF )
-            , ("nonRepANF"       , nonRepANF )
-            , ("subjLet"         , subjLet)
-            , ("altLet"          , altLet)
-            , ("bodyVar"         , bodyVar)
-            , ("letFlat"         , letFlat)
-            , ("topLet"          , topLet)
-            , ("etaExpansion"    , etaExpansion)
+    steps = [ ("nonRepANF", nonRepANF)
+            , ("topLet"   , topLet)
+            , ("bodyVar"  , bodyVar)
+            , ("deadcode" , deadCode)
             ]
 
 doInline :: String -> NormRewrite -> NormRewrite
-doInline n t = bottomupR (apply n t) >-> commitNewInlined
+doInline n t = unsafeBottomupR (apply n t) >-> commitNewInlined
 
 repeatBottomup :: [(String,NormRewrite)] -> NormRewrite
 repeatBottomup
   = repeatR
   . foldl1 (>->)
-  . map (bottomupR . uncurry apply)
+  . map (unsafeBottomupR . uncurry apply)
+
+repeatTopdown :: [(String,NormRewrite)] -> NormRewrite
+repeatTopdown
+  = repeatR
+  . foldl1 (>->)
+  . map (unsafeTopdownR . uncurry apply)

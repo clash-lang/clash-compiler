@@ -25,7 +25,7 @@ import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
 import CLaSH.Core.Term (Pat(..),Term(..),TmName,LetBinding)
 import CLaSH.Core.TyCon (tyConDataCons)
-import CLaSH.Core.Type (Type(..),TyName,TypeView(..),typeKind,tyView,tyViewP,mkTyVarTy)
+import CLaSH.Core.Type (Type(..),TyName,TypeView(..),typeKind,tyViewP,mkTyVarTy)
 import CLaSH.Core.Util (Gamma,Delta,collectArgs,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps,mkApps,mkAbstraction)
 import CLaSH.Core.Var  (Var(..),Id,TyVar)
 import CLaSH.Netlist.Util (representableType)
@@ -42,14 +42,11 @@ apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
 apply name rewrite ctx expr = R $ do
   lvl <- Lens.view dbgLevel
   let before = showDoc expr
-  beforeType <- fmap showDoc $ termType expr
   (expr', anyChanged) <- traceIf (lvl >= DebugAll) ("Trying: " ++ name ++ " on:\n" ++ before) $ Writer.listen $ runR $ rewrite ctx expr
   let hasChanged = Monoid.getAny anyChanged
   Monad.when hasChanged $ transformCounter += 1
   let after  = showDoc expr'
   let expr'' = if hasChanged then expr' else expr
-  afterType <- fmap showDoc $ termType expr'
-  -- traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nType:" ++ beforeType ++ "\nResult:\n" ++ after ++ "\nType:" ++ afterType ++ "\n") $
   traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr''

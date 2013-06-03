@@ -5,11 +5,13 @@ module CLaSH.Normalize.Transformations where
 import           Control.Lens            ((%=))
 import qualified Control.Lens            as Lens
 import qualified Control.Monad     as Monad
+import Control.Monad.Writer        (WriterT(..),lift,tell)
 import qualified Data.Either       as Either
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.List         as List
 import qualified Data.Maybe        as Maybe
 import Unbound.LocallyNameless        (Bind,Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
+import Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import CLaSH.Core.DataCon    (DataCon,dcTag,dcUnivTyVars)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars,termFreeVars)
@@ -23,6 +25,7 @@ import CLaSH.Core.Var        (Var(..),Id)
 import CLaSH.Netlist.Util    (splitNormalized)
 import CLaSH.Normalize.Types
 import CLaSH.Normalize.Util
+import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Types
 import CLaSH.Rewrite.Util
 import CLaSH.Util
@@ -80,8 +83,6 @@ caseApp _ (App (Case scrut ty alts) arg) = R $ do
                     . second (`App` arg)
                     <=< unbind
                     ) alts
-
-      let ty' = applyFunTy ty argTy
       changed $ Case scrut ty' alts'
     False -> do
       (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
@@ -192,7 +193,7 @@ caseCon _ (Case scrut ty alts)
                   _  -> Letrec $ bind (rec $ map (second embed) binds) e
         let substTyMap = zip (map varName tvs) (drop (length $ dcUnivTyVars dc) (Either.rights args))
 
-        traceIf True ("substTyMap:" ++ show substTyMap) $ changed (substTysinTm substTyMap e')
+        changed (substTysinTm substTyMap e')
       Nothing -> do
         let defAltM = List.find (isDefPat . fst) alts'
         case defAltM of
@@ -392,14 +393,16 @@ deadCode _ e@(Letrec binds) = R $ do
 
 deadCode _ e = return e
 
-inlineVar :: NormRewrite
-inlineVar ctx e@(Letrec bnd) = do
+bindConstantVar :: NormRewrite
+bindConstantVar ctx e@(Letrec bnd) = do
   (bndrs,_) <- unbind bnd
+  let test (_,Embed e') = (||) <$> isLocalVar e' <*> (pure $ isConstant e')
   if ((all isLambdaBodyCtx ctx) && (length (unrec bndrs) < 2))
     then return e
-    else inlineBinders (isLocalVar . unembed . snd) ctx e
+    else inlineBinders test ctx e
 
-inlineVar _ e = return e
+
+bindConstantVar _ e = return e
 
 inlineClosedTerm :: NormRewrite
 inlineClosedTerm _ e@(Var _ f) = R $ do
@@ -415,14 +418,19 @@ inlineClosedTerm _ e@(Var _ f) = R $ do
 
 inlineClosedTerm _ e = return e
 
-bindConstant :: NormRewrite
-bindConstant ctx e@(Letrec bnd) = do
-  (bndrs,_) <- unbind bnd
-  if ((all isLambdaBodyCtx ctx) && (length (unrec bndrs) < 2))
-    then return e
-    else inlineBinders (return . isConstant . unembed . snd) ctx e
+forceToplet :: NormRewrite
+forceToplet _ (Letrec b) = R $ do
+  case unsafeUnbind b of
+    (unrec -> [(_,Embed e)],v@(Var _ _)) -> do
+      lv <- isLocalVar v
+      case lv of
+        True  -> changed e
+        False -> error $ $(curLoc) ++ "forceTopLet called on let-binding where body is not a local variable: " ++ showDoc (Letrec b)
+    _ -> error $ $(curLoc) ++ "forceTopLet called on let-binding with more than one binding: " ++ showDoc (Letrec b)
 
-bindConstant _ e = return e
+forceToplet _ e
+  | isConstant e = R $ changed e
+  | otherwise    = error $ $(curLoc) ++ "forceTopLet not called on a let-binding: " ++ showDoc e
 
 constantSpec :: NormRewrite
 constantSpec ctx e@(App e1 e2)
@@ -438,7 +446,7 @@ inlineWrapper :: NormRewrite
 inlineWrapper [] e = R $ do
   normalizedM <- splitNormalized e
   case normalizedM of
-    Right ((funArgs,[(_,bExpr)],_)) -> case collectArgs (unembed bExpr) of
+    Right ((_,[(_,bExpr)],_)) -> case collectArgs (unembed bExpr) of
       (Var _ fn,args) -> do allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
                             bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
                             case (bodyMaybe,allLocal) of
@@ -487,7 +495,7 @@ classOpResolution ctx e@(Case scrut ty [alt]) = R $ do
       (pat,altExpr) <- unbind alt
       dfunOpsM <- fmap (fmap snd . HashMap.lookup df) $ Lens.use dictFuns
       case (dfunOpsM,pat) of
-        (Just dfunOps, DataPat _ pxs) -> do --error $ $(curLoc) ++ "DFunExprs: " ++ showDoc dfunOps
+        (Just dfunOps, DataPat _ pxs) -> do
           let dfunOps' = map (`mkApps` args) dfunOps
           let (_,xs)   = unrebind pxs
           let fvs      = termFreeIds altExpr
@@ -498,9 +506,9 @@ classOpResolution ctx e@(Case scrut ty [alt]) = R $ do
           changed altExpr'
         (Nothing,_)  -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
         _            -> error $ $(curLoc) ++ "No DataPat: " ++ showDoc e
-    (Prim (PrimFun df t), args)  -> error $ "FUN: " ++ showDoc scrut
-    (Prim (PrimDict df t), args) -> error $ "DICT: " ++ showDoc scrut
-    k -> return e
+    (Prim (PrimFun _ _), _)  -> error $ "FUN: " ++ showDoc scrut
+    (Prim (PrimDict _ _), _) -> error $ "DICT: " ++ showDoc scrut
+    _ -> return e
 
 classOpResolution _ e = return e
 
@@ -529,3 +537,170 @@ inlineSingularDFun _ e@(Prim (PrimDFun f _)) = R $ do
     _ -> return e
 
 inlineSingularDFun _ e = return e
+
+-- Experimental
+appProp :: NormRewrite
+appProp _ (App (Lam b) arg) = R $ do
+  (v,e) <- unbind b
+  case (isConstant arg || isVar arg) of
+    True  -> changed $ substTm (varName v) arg e
+    False -> changed . Letrec $ bind (rec [(v,embed arg)]) e
+
+appProp _ (App (Letrec b) arg) = R $ do
+  (v,e) <- unbind b
+  changed . Letrec $ bind v (App e arg)
+
+appProp _ (App (Case scrut ty alts) arg) = R $ do
+  argTy <- termType arg
+  let ty' = applyFunTy ty argTy
+  case (isConstant arg || isVar arg) of
+    True  -> do
+      alts' <- mapM ( return
+                    . uncurry bind
+                    . second (`App` arg)
+                    <=< unbind
+                    ) alts
+      changed $ Case scrut ty' alts'
+    False -> do
+      (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
+      alts' <- mapM ( return
+                    . uncurry bind
+                    . second (`App` argVar)
+                    <=< unbind
+                    ) alts
+      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
+
+appProp _ (TyApp (TyLam b) t) = R $ do
+  (tv,e) <- unbind b
+  changed $ substTyInTm (varName tv) t e
+
+appProp _ (TyApp (Letrec b) t) = R $ do
+  (v,e) <- unbind b
+  changed . Letrec $ bind v (TyApp e t)
+
+appProp _ (TyApp (Case scrut ty' alts) ty) = R $ do
+  alts' <- mapM ( return
+                . uncurry bind
+                . second (`TyApp` ty)
+                <=< unbind
+                ) alts
+  ty'' <- applyTy ty' ty
+  changed $ Case scrut ty'' alts'
+
+appProp _ e = return e
+
+type NormRewriteW = Transform (WriterT [LetBinding] (R NormalizeMonad))
+
+liftNormR :: RewriteMonad NormalizeMonad a
+          -> WriterT [LetBinding] (R NormalizeMonad) a
+liftNormR = lift . R
+
+-- NOTE [unsafeUnbind]: Use unsafeUnbind (which doesn't freshen pattern
+-- variables). Reason: previously collected expression still reference
+-- the 'old' variable names created by the traversal!
+makeANF :: NormRewrite
+makeANF ctx (Lam b) = do
+  -- See NOTE [unsafeUnbind]
+  let (bndr,e) = unsafeUnbind b
+  e' <- makeANF (LamBody bndr:ctx) e
+  return $ Lam (bind bndr e')
+
+makeANF ctx e
+  = R $ do
+    (e',bndrs) <- runR $ runWriterT $ bottomupR collectANF ctx e
+    case bndrs of
+      [] -> return e
+      _  -> changed . Letrec $ bind (rec bndrs) e'
+
+collectANF :: NormRewriteW
+collectANF _ e@(App appf arg)
+  | (conVarPrim, _) <- collectArgs e
+  , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
+  = do
+    localVar       <- liftNormR $ isLocalVar arg
+    untranslatable <- liftNormR $ isUntranslatable arg
+    case (untranslatable,localVar || isConstant arg,arg) of
+      (False,False,_) -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "repANF" arg
+                            tell [(argId,embed arg)]
+                            return (App appf argVar)
+      (True,False,Letrec b) -> do (binds,body) <- unbind b
+                                  tell (unrec binds)
+                                  return (App appf body)
+      _ -> return e
+
+collectANF _ (Letrec b) = do
+  -- See NOTE [unsafeUnbind]
+  let (binds,body) = unsafeUnbind b
+  localVar       <- liftNormR $ isLocalVar body
+  untranslatable <- liftNormR $ isUntranslatable body
+  tell (unrec binds)
+  case localVar || untranslatable of
+    True  -> return body
+    False -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "bodyVar" body
+                tell [(argId,embed body)]
+                return argVar
+
+collectANF ctx e@(Case subj ty alts) = do
+    localVar           <- liftNormR $ isLocalVar subj
+    untranslatableSubj <- liftNormR $ isUntranslatable subj
+    (bndr,subj') <- case localVar || untranslatableSubj || isConstant subj of
+      True  -> return ([],subj)
+      False -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "subjLet" subj
+                  return ([(argId,embed subj)],argVar)
+
+    untranslatableE <- liftNormR $ isUntranslatable e
+    (binds,alts') <- case untranslatableE of
+      True  -> return ([],alts)
+      False -> fmap (first concat . unzip) $ liftNormR $ mapM doAlt alts
+
+    tell (bndr ++ binds)
+    return (Case subj' ty alts')
+  where
+    doAlt :: Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
+    -- See NOTE [unsafeUnbind]
+    doAlt = fmap (second (uncurry bind)) . doAlt' . unsafeUnbind
+
+    doAlt' :: (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
+    doAlt' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
+      lv      <- isLocalVar altExpr
+      patSels <- Monad.zipWithM (doPatBndr (unembed dc)) xs [0..]
+      case (lv || isConstant altExpr) of
+        True  -> return (patSels,alt)
+        False -> do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
+                    return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
+    doAlt' alt@(DataPat _ _, _) = return ([],alt)
+    doAlt' alt@(pat,altExpr) = do
+      lv <- isLocalVar altExpr
+      case (lv || isConstant altExpr) of
+        True  -> return ([],alt)
+        False -> do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
+                    return ([(altId,embed altExpr)],(pat,altVar))
+
+    doPatBndr :: DataCon -> Id -> Int -> RewriteMonad NormalizeMonad LetBinding
+    doPatBndr dc pId i
+      = do patExpr <- mkSelectorCase "doPatBndr" ctx subj (dcTag dc) i
+           return (pId,embed patExpr)
+
+collectANF _ e = return e
+
+etaExpansionTL :: NormRewrite
+etaExpansionTL ctx (Lam b) = do
+  (bndr,e) <- unbind b
+  e' <- etaExpansionTL (LamBody bndr:ctx) e
+  return $ Lam (bind bndr e')
+
+etaExpansionTL ctx e
+  = R $ do
+    isF <- isFun e
+    case isF of
+      True -> do
+        argTy <- ( return
+                 . fst
+                 . Maybe.fromMaybe (error "etaExpansion splitFunTy")
+                 . splitFunTy
+                 <=< termType
+                 ) e
+        (newIdB,newIdV) <- mkInternalVar "eta" argTy
+        e' <- runR $ etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
+        changed . Lam $ bind newIdB e'
+      False -> return e

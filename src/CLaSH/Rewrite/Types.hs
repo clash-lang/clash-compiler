@@ -26,6 +26,7 @@ data CoreContext = AppFirst
                  | TyLamBody  TyVar
                  | CaseAlt    [Id]
                  | CaseScrut
+                 deriving Show
 
 data RewriteState
   = RewriteState
@@ -70,4 +71,5 @@ newtype R m a = R { runR :: RewriteMonad m a }
            , Fresh
            )
 
-type Rewrite m = [CoreContext] -> Term -> R m Term
+type Transform m = [CoreContext] -> Term -> m Term
+type Rewrite m   = Transform (R m)
