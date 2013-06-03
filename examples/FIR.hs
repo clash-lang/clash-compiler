@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, TemplateHaskell #-}
 module FIR where
 
 import CLaSH.Prelude
@@ -11,4 +11,4 @@ fir coeffs x_t = y_t
     xs  = window x_t
 
 topEntity :: Sync (Signed 16) -> Sync (Signed 16)
-topEntity = fir (0 :> 1 :> 2 :> 3 :> Nil)
+topEntity = fir $(v [0::Sync (Signed 16),1,2,3])

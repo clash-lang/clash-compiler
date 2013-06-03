@@ -26,6 +26,6 @@ datamem mem (addr,Just val) = (vreplace mem addr val,vindex mem addr)
 topEntity :: Sync (OPC Word) -> Sync (Maybe Word)
 topEntity i = val
   where
-    (addr,val) = (pu alu <^> (0,0,0)) (mem,i)
+    (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
     initMem    = vcopyE (sing :: Sing 8) 0
