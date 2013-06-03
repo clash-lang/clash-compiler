@@ -31,8 +31,6 @@ import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-import CLaSH.Class.Default
-
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   (:>) :: a -> Vec n a -> Vec (n + 1) a
@@ -46,9 +44,6 @@ instance Show a => Show (Vec n a) where
       punc Nil        = ""
       punc (x :> Nil) = show x
       punc (x :> xs)  = show x ++ "," ++ punc xs
-
-instance (SingI n, Default a) => Default (Vec n a) where
-  def = vcopy def
 
 instance Eq a => Eq (Vec n a) where
   v1 == v2 = vfoldr (&&) True (vzipWith (==) v1 v2)
@@ -127,7 +122,7 @@ vsplitI = withSing vsplit
 {-# NOINLINE vconcat #-}
 vconcat :: Vec n (Vec m a) -> Vec (n * m) a
 vconcat Nil       = Nil
-vconcat (x :> xs) = unsafeCoerce $ x <++> vconcat xs
+vconcat (x :> xs) = unsafeCoerce $ vappend x (vconcat xs)
 
 {-# NOINLINE vunconcat #-}
 vunconcat :: Sing n -> Sing m -> Vec (n * m) a -> Vec n (Vec m a)

@@ -27,7 +27,7 @@ import CLaSH.Sized.VectorZ
 newtype Signed (n :: Nat) = S Integer
 
 instance SingI n => Lift (Signed n) where
-  lift (S i) = sigE [| S i |] (decSigned $ fromSing (sing :: (Sing n)))
+  lift (S i) = sigE [| fromInteger i |] (decSigned $ fromSing (sing :: (Sing n)))
 
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
@@ -47,6 +47,23 @@ instance SingI n => Default (Signed n) where
 
 instance Ord (Signed n) where
   compare (S n) (S m) = compare n m
+  (<)  = ltS
+  (>=) = geS
+  (>)  = gtS
+  (<=) = leS
+
+{-# NOINLINE ltS #-}
+ltS :: Signed n -> Signed n -> Bool
+ltS (S n) (S m) = n < m
+{-# NOINLINE geS #-}
+geS :: Signed n -> Signed n -> Bool
+geS (S n) (S m) = n >= m
+{-# NOINLINE gtS #-}
+gtS :: Signed n -> Signed n -> Bool
+gtS (S n) (S m) = n > m
+{-# NOINLINE leS #-}
+leS :: Signed n -> Signed n -> Bool
+leS (S n) (S m) = n <= m
 
 instance SingI n => Bounded (Signed n) where
   minBound = S $ negate $ 2 ^ (fromSing (sing :: Sing n) -1)
