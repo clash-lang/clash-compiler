@@ -1,6 +1,9 @@
 {-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies    #-}
+
+{-# OPTIONS_GHC -fno-expose-all-unfoldings #-}
+
 module CLaSH.Signal
   ( Sync (..), fromList, sync
   , sample
