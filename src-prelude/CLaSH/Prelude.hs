@@ -4,7 +4,7 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE TypeOperators       #-}
 
-{-# OPTIONS_GHC -O0 -fno-omit-interface-pragmas #-}
+{-# OPTIONS_GHC -O0 -fno-omit-interface-pragmas -fno-expose-all-unfoldings #-}
 
 module CLaSH.Prelude
   ( module Exported
