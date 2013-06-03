@@ -14,13 +14,18 @@ Build-type:          Simple
 
 Extra-source-files:  README.md
 
-Data-files:          primitives/clash.signal.json,
+Data-files:          primitives/clash.bit.json,
+                     primitives/clash.prelude.json,
+                     primitives/clash.signal.json,
                      primitives/clash.sized.signed.json,
+                     primitives/clash.sized.unsigned.json,
                      primitives/clash.sized.vectorz.json,
                      primitives/ghc.base.json,
+                     primitives/ghc.classes.json,
                      primitives/ghc.integer.type.json,
-                     primitives/ghc.typelits.json
-                     primitives/ghc.types.json
+                     primitives/ghc.typelits.json,
+                     primitives/ghc.types.json,
+                     primitives/unsafe.coerce.json
 
 Cabal-version:       >=1.10
 
