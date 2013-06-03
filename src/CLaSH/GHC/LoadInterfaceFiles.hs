@@ -22,17 +22,19 @@ import qualified IfaceSyn
 import qualified LoadIface
 import qualified Maybes
 import qualified MonadUtils
+import qualified Name
 import           CLaSH.GHC.Compat.Outputable (showPpr)
 import           Outputable (text)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
+import UniqSupply (UniqSupply)
 import qualified Var
 import qualified VarSet
 
 -- Internal Modules
-import           CLaSH.Util (curLoc,mapAccumLM,traceIf)
+import           CLaSH.Util (curLoc,mapAccumLM,second,traceIf)
 
 getExternalTyCons ::
   GHC.GhcMonad m
@@ -42,13 +44,13 @@ getExternalTyCons ::
 getExternalTyCons visited modName = (`Exception.gcatch` expCatch) $ do
   foundMod   <- GHC.findModule modName Nothing
   (tcs,used) <- runIfl foundMod $ do
-            ifaceM <- loadIface foundMod
-            case ifaceM of
-              Nothing -> return ([],[])
-              Just iface -> do
-                let used  = mapMaybe usageModuleName $ GHC.mi_usages iface
-                tcs <- ifaceTyCons iface
-                return (tcs,used)
+                  ifaceM <- loadIface foundMod
+                  case ifaceM of
+                    Nothing -> return ([],[])
+                    Just iface -> do
+                      let used  = mapMaybe usageModuleName $ GHC.mi_usages iface
+                      tcs <- ifaceTyCons iface
+                      return (tcs,used)
 
   let visited' = modName:visited
   let used'    = filter (`notElem` visited') used
@@ -89,15 +91,16 @@ loadIface foundMod = do
 
 loadExternalExprs ::
   GHC.GhcMonad m
-  => [CoreSyn.CoreExpr]
+  => UniqSupply
+  -> [CoreSyn.CoreExpr]
   -> [CoreSyn.CoreBndr]
   -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)]    -- Binders
        , [(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])]  -- Dictionary functions
        , [(CoreSyn.CoreBndr,Int)]                 -- Class Ops
        , [CoreSyn.CoreBndr]                       -- Unlocatable
        )
-loadExternalExprs [] _ = return ([],[],[],[])
-loadExternalExprs (expr:exprs) visited = do
+loadExternalExprs _ [] _ = return ([],[],[],[])
+loadExternalExprs us (expr:exprs) visited = do
   let fvs = VarSet.varSetElems $ CoreFVs.exprSomeFreeVars
               (\v -> Var.isId v &&
                      isNothing (Id.isDataConId_maybe v) &&
@@ -106,8 +109,8 @@ loadExternalExprs (expr:exprs) visited = do
 
   let (clsOps,fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
 
-  (located,unlocated) <- fmap partitionEithers
-                       $ mapM loadExprFromIface fvs'
+  (us',(located,unlocated)) <- fmap (second partitionEithers)
+                                  $ mapAccumLM loadExprFromIface us fvs'
 
   let (locatedDFuns,locatedExprs) = partitionEithers located
   let visited' = map fst locatedExprs ++ map fst locatedDFuns
@@ -115,6 +118,7 @@ loadExternalExprs (expr:exprs) visited = do
 
   (locatedExprs', locatedDFuns', clsOps', unlocated') <-
     loadExternalExprs
+      us'
       ( exprs ++
         map snd locatedExprs ++
         concatMap snd locatedDFuns
@@ -137,43 +141,53 @@ loadExternalExprs (expr:exprs) visited = do
 
 loadExprFromIface ::
   GHC.GhcMonad m
-  => CoreSyn.CoreBndr
-  -> m (Either
+  => UniqSupply
+  -> CoreSyn.CoreBndr
+  -> m (UniqSupply
+       ,Either
           (Either
             (CoreSyn.CoreBndr,[CoreSyn.CoreExpr])
             (CoreSyn.CoreBndr,CoreSyn.CoreExpr))
-          CoreSyn.CoreBndr)
-loadExprFromIface bndr = do
-  let nameMod = GHC.nameModule $ Var.varName bndr
-  runIfl nameMod $ do
-    ifaceM <- loadIface nameMod
-    case ifaceM of
-      Nothing    -> return $ Right bndr
-      Just iface -> do
-        let decls = map snd (GHC.mi_decls iface)
-        let nameFun = GHC.getOccName $ Var.varName bndr
-        let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
-        case declM of
-          [namedDecl] -> do
-            tyThing <- loadDecl namedDecl
-            return $ loadExprFromTyThing bndr tyThing
-          _ -> return $ Right bndr
+          CoreSyn.CoreBndr
+       )
+loadExprFromIface us bndr = do
+  let moduleM = Name.nameModule_maybe $ Var.varName bndr
+  case moduleM of
+    Just nameMod -> runIfl nameMod $ do
+      ifaceM <- loadIface nameMod
+      case ifaceM of
+        Nothing    -> return $! (us,Right bndr)
+        Just iface -> do
+          let decls = map snd (GHC.mi_decls iface)
+          let nameFun = GHC.getOccName $ Var.varName bndr
+          let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
+          case declM of
+            [namedDecl] -> do
+              tyThing <- loadDecl namedDecl
+              return $ loadExprFromTyThing us bndr tyThing
+            _ -> return $! (us,Right bndr)
+    Nothing -> return $! (us,Right bndr)
 
 loadExprFromTyThing ::
-  CoreSyn.CoreBndr
+  UniqSupply
+  -> CoreSyn.CoreBndr
   -> GHC.TyThing
-  -> Either
-      (Either
-        (CoreSyn.CoreBndr,[CoreSyn.CoreExpr]) -- Lcated DFun
-        (CoreSyn.CoreBndr,CoreSyn.CoreExpr))  -- Located Binder
-      CoreSyn.CoreBndr                        -- Unlocated Var
-loadExprFromTyThing bndr tyThing = case tyThing of
+  -> (UniqSupply
+     ,Either
+       (Either
+         (CoreSyn.CoreBndr,[CoreSyn.CoreExpr]) -- Located DFun
+         (CoreSyn.CoreBndr,CoreSyn.CoreExpr))  -- Located Binder
+       CoreSyn.CoreBndr                        -- unlocatable Var
+     )
+loadExprFromTyThing us bndr tyThing = case tyThing of
   GHC.AnId _id | Var.isId _id -> do
     let unfolding = IdInfo.unfoldingInfo $ Var.idInfo _id
+    let dfunTy    = Id.idType _id
     case unfolding of
       (CoreSyn.CoreUnfolding {}) ->
-        Left $ Right (bndr, CoreSyn.unfoldingTemplate unfolding)
+        (us,Left $! (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
       (CoreSyn.DFunUnfolding _ _ es) ->
-        Left $ Left (bndr, dfunArgExprs es)
-      _ -> traceIf True ("Unwanted unfolding for " ++ showPpr bndr ++ ": " ++ showPpr unfolding) $ Right bndr
-  _ -> traceIf True ("Unwanted tyThing for " ++ showPpr bndr ++ ": " ++ showPpr tyThing) $ Right bndr
+        let (exprs,us') = dfunArgExprs us dfunTy es
+        in (us',Left $! Left (bndr, exprs))
+      _ -> (us,Right bndr)
+  _ -> (us,Right bndr)

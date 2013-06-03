@@ -20,17 +20,17 @@ import           CLaSH.GHC.Compat.GHC (defaultErrorHandler)
 import qualified HscTypes
 import qualified HsImpExp
 import qualified MonadUtils
-import           CLaSH.GHC.Compat.Outputable (showPpr)
 import qualified Panic
 import qualified SrcLoc
 import qualified TidyPgm
 -- import qualified TyCon
 import qualified TysPrim
 import qualified TysWiredIn
+import           UniqSupply (mkSplitUniqSupply)
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.Util (traceIf,curLoc,mapAccumLM,(><))
+import           CLaSH.Util (curLoc,mapAccumLM,(><))
 
 loadModules ::
   String
@@ -40,7 +40,14 @@ loadModules ::
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , [GHC.TyCon]                              -- Type Constructors
         )
-loadModules modName = defaultErrorHandler $
+loadModules modName = defaultErrorHandler $ do
+  -- Generate a UniqSupply
+  -- Running
+  --    egrep -r "(initTcRnIf|mkSplitUniqSupply)" .
+  -- on the compiler dir of ghc suggests that 'z' is not used to generate
+  -- a unique supply anywhere.
+  uniqSupply <- mkSplitUniqSupply 'z'
+
   GHC.runGhc (Just GHC.Paths.libdir) $ do
     dflags <- GHC.getSessionDynFlags
     let dflags1 = foldl DynFlags.xopt_set
@@ -91,10 +98,11 @@ loadModules modName = defaultErrorHandler $
         let (binders,tyCons) = (concat >< concat) (unzip tidiedMods)
 
         (externalBndrs,dfuns,clsOps,unlocatable) <- loadExternalExprs
-                                                (map snd binders)
-                                                (map fst binders)
+                                                      uniqSupply
+                                                      (map snd binders)
+                                                      (map fst binders)
 
-        traceIf (not $ null unlocatable) ("No exprs found for: " ++ showPpr unlocatable) $ return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
+        return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
