@@ -25,7 +25,7 @@ import CLaSH.Core.Pretty (showDoc)
 import CLaSH.Core.Subst (substTm)
 import CLaSH.Core.Term (Pat(..),Term(..),TmName,LetBinding)
 import CLaSH.Core.TyCon (tyConDataCons)
-import CLaSH.Core.Type (Type(..),TyName,TypeView(..),typeKind,tyView,mkTyVarTy)
+import CLaSH.Core.Type (Type(..),TyName,TypeView(..),typeKind,tyView,tyViewP,mkTyVarTy)
 import CLaSH.Core.Util (Gamma,Delta,collectArgs,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps,mkApps,mkAbstraction)
 import CLaSH.Core.Var  (Var(..),Id,TyVar)
 import CLaSH.Netlist.Util (representableType)
@@ -333,9 +333,9 @@ mkSelectorCase ::
 mkSelectorCase caller ctx scrut dcI fieldI = do
   scrutTy <- termType scrut
   let delta = snd $ contextEnv ctx
-  let cantCreate x = error $ x ++ "Can't create selector" ++ (show (caller,dcI,fieldI)) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
+  let cantCreate x = error $ x ++ "Can't create selector " ++ (show (caller,dcI,fieldI)) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
   case scrutTy of
-    (tyView -> TyConApp tc args) -> do
+    (tyViewP -> TyConApp tc args) -> do
       case (tyConDataCons tc) of
         [] -> cantCreate $(curLoc)
         dcs | dcI > length dcs -> cantCreate $(curLoc)

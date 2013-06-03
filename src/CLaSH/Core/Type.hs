@@ -17,6 +17,7 @@ module CLaSH.Core.Type
   , TyVar
   , ThetaType
   , tyView
+  , tyViewP
   , typeKind
   , mkTyConTy
   , isPredTy
@@ -104,6 +105,16 @@ tyView ty@(AppTy _ _) = case splitTyAppM ty of
   _ -> OtherType
 tyView (ConstTy (TyCon tc)) = TyConApp tc []
 tyView _ = OtherType
+
+tyViewP :: Type -> TypeView
+tyViewP ty =
+  let tView = tyView ty
+  in case tyView ty of
+       TyConApp tc args
+         | (name2String $ tyConName tc) == "CLaSH.Signal.Sync" -> tyViewP (head args)
+         | (name2String $ tyConName tc) == "CLaSH.Signal.Packed" -> tyViewP (head args)
+       _ -> tView
+
 
 mkFunTy :: Type -> Type -> Type
 mkFunTy t1 t2 = AppTy (AppTy (ConstTy Arrow) t1) t2
