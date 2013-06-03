@@ -52,4 +52,28 @@
       "templateI" : "~ARG[0] = ~ARG[1]"
     }
   }
+  , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.gtS",
+      "template"  : "~RESULT <= ~ARG[0] > ~ARG[1]);",
+      "templateI" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+  , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.ltS",
+      "template"  : "~RESULT <= ~ARG[0] < ~ARG[1]);",
+      "templateI" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+  , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.geS",
+      "template"  : "~RESULT <= ~ARG[0] >= ~ARG[1]);",
+      "templateI" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+  , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.leS",
+      "template"  : "~RESULT <= ~ARG[0] <= ~ARG[1]);",
+      "templateI" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
 ]

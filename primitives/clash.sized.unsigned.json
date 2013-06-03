@@ -12,8 +12,8 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.fromIntegerU",
-      "template"  : "~RESULT <= to_signed(~ARG[1], ~LIT[0]);",
-      "templateI" : "to_signed(~ARG[1], ~LIT[0])"
+      "template"  : "~RESULT <= to_unsigned(~ARG[1], ~LIT[0]);",
+      "templateI" : "to_unsigned(~ARG[1], ~LIT[0])"
     }
   }
   , { "BlackBox" :
