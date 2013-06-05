@@ -4,4 +4,16 @@
       "templateI" : "not ~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.&&",
+      "template"  : "~RESULT <= ~ARG[0] and ~ARG[1];",
+      "templateI" : "~ARG[0] and ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.||",
+      "template"  : "~RESULT <= ~ARG[0] or ~ARG[1];",
+      "templateI" : "~ARG[0] or ~ARG[1]"
+    }
+  }
 ]
