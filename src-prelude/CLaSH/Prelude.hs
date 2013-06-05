@@ -85,7 +85,7 @@ blockRam n wr rd en din = combine $ (bram' <^> binit) (wr,rd,en,din)
       where
         ram' | e         = vreplace ram w d
              | otherwise = ram
-        o'               = vindex ram r
+        o'               = ram ! r
 
 {-# INLINABLE blockRamPow2 #-}
 blockRamPow2 :: (SingI n, SingI (2^n), Pack a)
