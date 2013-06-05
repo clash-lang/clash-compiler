@@ -16,12 +16,12 @@ module CLaSH.Sized.VectorZ
   , (+>>), (<<+), (<++>), vconcat
   , vsplit, vsplitI, vunconcat, vunconcatI
   , vreverse, vmap, vzipWith
-  , vfoldl, vfoldr, vfoldl1
+  , vfoldr, vfoldl, vfoldr1, vfoldl1
   , vzip, vunzip
-  , (!), vindex, vindexM
+  , (!), vindexM
   , vreplace, vreplaceM
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
-  , vcopyE, vcopy, viterateE, viterate, vgenerateE, vgenerate
+  , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
   , toList, v
   )
 where
@@ -162,9 +162,13 @@ vfoldl :: (b -> a -> b) -> b -> Vec n a -> b
 vfoldl _ z Nil       = z
 vfoldl f z (x :> xs) = vfoldl f (f z x) xs
 
-{-# NOINLINE vfoldl1 #-}
+{-# NOINLINE vfoldr1 #-}
+vfoldr1 :: (a -> a -> a) -> Vec (n + 1) a -> a
+vfoldr1 _ (x :> Nil)       = x
+vfoldr1 f (x :> (y :> ys)) = f x (vfoldr1 f (y :> ys))
+
 vfoldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
-vfoldl1 f (x :> xs) = vfoldl f x xs
+vfoldl1 f xs = vfoldl f (vhead xs) (vtail xs)
 
 {-# NOINLINE vzip #-}
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
@@ -177,39 +181,51 @@ vunzip Nil = (Nil,Nil)
 vunzip ((a,b) :> xs) = let (as,bs) = vunzip xs
                        in  (a :> as, b :> bs)
 
-{-# NOINLINE vindexM #-}
-vindexM :: (Num i, Eq i) => Vec n a -> i -> Maybe a
-vindexM Nil       _ = Nothing
-vindexM (x :> _)  0 = Just x
-vindexM (_ :> xs) n = vindexM xs (n-1)
+{-# NOINLINE vindexM_integer #-}
+vindexM_integer :: Vec n a -> Integer -> Maybe a
+vindexM_integer Nil       _ = Nothing
+vindexM_integer (x :> _)  0 = Just x
+vindexM_integer (_ :> xs) n = vindexM_integer xs (n-1)
 
-{-# NOINLINE vindex #-}
-vindex :: (SingI n, Num i, Eq i) => Vec n a -> i -> a
-vindex xs i = case vindexM xs (maxIndex xs - i) of
+{-# INLINE vindexM #-}
+vindexM :: (SingI n, Integral i) => Vec n a -> i -> Maybe a
+vindexM xs i = vindexM_integer xs (toInteger i)
+
+{-# NOINLINE vindex_integer #-}
+vindex_integer :: SingI n => Vec n a -> Integer -> a
+vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
     Just a  -> a
     Nothing -> error "index out of bounds"
 
 {-# INLINE (!) #-}
-(!) :: (SingI n, Num i, Eq i) => Vec n a -> i -> a
-(!) = vindex
+(!) :: (SingI n, Integral i) => Vec n a -> i -> a
+xs ! i = vindex_integer xs (toInteger i)
 
 {-# NOINLINE maxIndex #-}
-maxIndex :: forall i n a . SingRep n => Num i => Vec n a -> i
-maxIndex _ = fromInteger (fromSing (sing :: Sing n) - 1)
+maxIndex :: forall n a . SingRep n => Vec n a -> Integer
+maxIndex _ = fromSing (sing :: Sing n) - 1
 
-{-# NOINLINE vreplaceM #-}
-vreplaceM :: (Num i, Eq i) => Vec n a -> i -> a -> Maybe (Vec n a)
-vreplaceM Nil       _ _ = Nothing
-vreplaceM (_ :> xs) 0 y = Just (y :> xs)
-vreplaceM (x :> xs) n y = case vreplaceM xs (n-1) y of
-                                Just xs' -> Just (x :> xs')
-                                Nothing  -> Nothing
+{-# NOINLINE vreplaceM_integer #-}
+vreplaceM_integer :: Vec n a -> Integer -> a -> Maybe (Vec n a)
+vreplaceM_integer Nil       _ _ = Nothing
+vreplaceM_integer (_ :> xs) 0 y = Just (y :> xs)
+vreplaceM_integer (x :> xs) n y = case vreplaceM_integer xs (n-1) y of
+                                    Just xs' -> Just (x :> xs')
+                                    Nothing  -> Nothing
 
-{-# NOINLINE vreplace #-}
-vreplace :: (SingI n, Num i, Eq i) => Vec n a -> i -> a -> Vec n a
-vreplace xs i a = case vreplaceM xs (maxIndex xs - i) a of
+{-# INLINE vreplaceM #-}
+vreplaceM :: (SingI n, Integral i) => Vec n a -> i -> a -> Maybe (Vec n a)
+vreplaceM xs i y = vreplaceM_integer xs (toInteger i) y
+
+{-# NOINLINE vreplace_integer #-}
+vreplace_integer :: SingI n => Vec n a -> Integer -> a -> Vec n a
+vreplace_integer xs i a = case vreplaceM xs (maxIndex xs - i) a of
   Just ys -> ys
   Nothing -> error "index out of bounds"
+
+{-# INLINE vreplace #-}
+vreplace :: (SingI n, Integral i) => Vec n a -> i -> a -> Vec n a
+vreplace xs i y = vreplace_integer xs (toInteger i) y
 
 {-# NOINLINE vtake #-}
 vtake :: Sing m -> Vec (m + n) a -> Vec m a
@@ -254,38 +270,39 @@ vselectI ::
   -> Vec (n + 1) a
 vselectI f s xs = withSing (\n -> vselect f s n xs)
 
-{-# NOINLINE vcopyE #-}
-vcopyE :: Sing n -> a -> Vec n a
-vcopyE n a = vreplicate' (isZero n) a
+{-# NOINLINE vcopy #-}
+vcopy :: Sing n -> a -> Vec n a
+vcopy n a = vreplicate' (isZero n) a
   where
     vreplicate' :: IsZero n -> a -> Vec n a
     vreplicate' IsZero     _ = Nil
     vreplicate' (IsSucc s) x = x :> vreplicate' (isZero s) x
 
-{-# NOINLINE vcopy #-}
-vcopy :: SingI n => a -> Vec n a
-vcopy = withSing vcopyE
+{-# NOINLINE vcopyI #-}
+vcopyI :: SingI n => a -> Vec n a
+vcopyI = withSing vcopy
 
-{-# NOINLINE viterateE #-}
-viterateE :: Sing n -> (a -> a) -> a -> Vec n a
-viterateE n f a = viterate' (isZero n) f a
+{-# NOINLINE viterate #-}
+viterate :: Sing n -> (a -> a) -> a -> Vec n a
+viterate n f a = viterate' (isZero n) f a
   where
     viterate' :: IsZero n -> (a -> a) -> a -> Vec n a
     viterate' IsZero     _ _ = Nil
     viterate' (IsSucc s) g x = x :> viterate' (isZero s) g (g x)
 
-{-# NOINLINE viterate #-}
-viterate :: SingI n => (a -> a) -> a -> Vec n a
-viterate = withSing viterateE
-
-{-# NOINLINE vgenerateE #-}
-vgenerateE :: Sing n -> (a -> a) -> a -> Vec n a
-vgenerateE n f a = viterateE n f (f a)
+{-# NOINLINE viterateI #-}
+viterateI :: SingI n => (a -> a) -> a -> Vec n a
+viterateI = withSing viterate
 
 {-# NOINLINE vgenerate #-}
-vgenerate :: SingI n => (a -> a) -> a -> Vec n a
-vgenerate = withSing vgenerateE
+vgenerate :: Sing n -> (a -> a) -> a -> Vec n a
+vgenerate n f a = viterate n f (f a)
 
+{-# NOINLINE vgenerateI #-}
+vgenerateI :: SingI n => (a -> a) -> a -> Vec n a
+vgenerateI = withSing vgenerate
+
+{-# NOINLINE toList #-}
 toList :: Vec n a -> [a]
 toList = vfoldr (:) []
 
