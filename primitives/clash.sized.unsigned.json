@@ -1,7 +1,49 @@
 [ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.eqU",
+      "template"  : "~RESULT <= ~ARG[0] = ~ARG[1];",
+      "templateI" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.gtU",
+      "template"  : "~RESULT <= ~ARG[0] > ~ARG[1];",
+      "templateI" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.ltU",
+      "template"  : "~RESULT <= ~ARG[0] < ~ARG[1];",
+      "templateI" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.geU",
+      "template"  : "~RESULT <= ~ARG[0] >= ~ARG[1];",
+      "templateI" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.leU",
+      "template"  : "~RESULT <= ~ARG[0] <= ~ARG[1];",
+      "templateI" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.maxBoundU",
+      "template"  : "~RESULT <= (others => '1');",
+      "templateI" : "(others => '1')"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.plusU",
       "template"  : "~RESULT <= ~ARG[1] + ~ARG[2];",
       "templateI" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.minU",
+      "template"  : "~RESULT <= ~ARG[1] - ~ARG[2];",
+      "templateI" : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
@@ -16,40 +58,119 @@
       "templateI" : "to_unsigned(~ARG[1], ~LIT[0])"
     }
   }
-  , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Unsigned.negateU",
-      "template"  : "~RESULT <= -~ARG[1];",
-      "templateI" : "(-~ARG[1])"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.quotU",
+      "template"  : "~RESULT <= ~ARG[1] / ~ARG[2];",
+      "templateI" : "~ARG[1] / ~ARG[2]"
     }
   }
-  , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Unsigned.minU",
-      "template"  : "~RESULT <= ~ARG[1] - ~ARG[2];",
-      "templateI" : "~ARG[1] - ~ARG[2]"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.remU",
+      "template"  : "~RESULT <= ~ARG[1] rem ~ARG[2];",
+      "templateI" : "~ARG[1] rem ~ARG[2]"
     }
   }
-  , { "BlackBox" :
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.modU",
+      "template"  : "~RESULT <= ~ARG[1] mod ~ARG[2];",
+      "templateI" : "~ARG[1] mod ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.toIntegerU",
+      "template"  : "~RESULT <= to_integer(~ARG[0]);",
+      "templateI" : "to_integer(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.andU",
+      "template"  : "~RESULT <= ~ARG[1] and ~ARG[2];",
+      "templateI" : "~ARG[1] and ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.orU",
+      "template"  : "~RESULT <= ~ARG[1] or ~ARG[2];",
+      "templateI" : "~ARG[1] or ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.xorU",
+      "template"  : "~RESULT <= ~ARG[1] xor ~ARG[2];",
+      "templateI" : "~ARG[1] xor ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.complementU",
+      "template"  : "~RESULT <= not ~ARG[1];",
+      "templateI" : "not ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.bitU",
+      "template"  :
+"process(~ARG[1]) is
+  variable ~SYM[0] : ~TYPO;
+begin
+  ~SYM[0] := (others => '0');
+  ~SYM[0](~ARG[1]) := '1';
+  ~RESULT <= ~SYM[0];
+end process;",
+      "templateI" : ""
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.testBitU",
+      "template"  : "~RESULT <= ~ARG[0](~ARG[1]) = '1';",
+      "templateI" : "~ARG[0](~ARG[1]) = '1'"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.shiftLU",
+      "template"  : "~RESULT <= shift_left(~ARG[1],~ARG[2]);",
+      "templateI" : "shift_left(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.shiftRU",
+      "template"  : "~RESULT <= shift_right(~ARG[1],~ARG[2]);",
+      "templateI" : "shift_right(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.rotateLU",
+      "template"  : "~RESULT <= rotate_left(~ARG[1],~ARG[2]);",
+      "templateI" : "rotate_left(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.rotateRU",
+      "template"  : "~RESULT <= rotate_right(~ARG[1],~ARG[2]);",
+      "templateI" : "rotate_right(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.finiteBitSizeU",
+      "template"  : "~RESULT <= ~LIT[0];",
+      "templateI" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.toBitVector",
       "template"  : "~RESULT <= std_logic_vector(~ARG[1]);",
       "templateI" : "std_logic_vector(~ARG[1])"
     }
   }
-  , { "BlackBox" :
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.fromBitVector",
       "template"  : "~RESULT <= unsigned(~ARG[1]);",
       "templateI" : "unsigned(~ARG[1])"
     }
   }
-  , { "BlackBox" :
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.resizeU",
-      "template"  : "~RESULT <= resize(~ARG[1],~LIT[0]);",
-      "templateI" : "resize(~ARG[1],~LIT[0])"
-    }
-  }
-  , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Unsigned.eqU",
-      "template"  : "~RESULT <= ~ARG[0] = ~ARG[1]);",
-      "templateI" : "~ARG[0] = ~ARG[1]"
+      "template"  : "~RESULT <= resize(~ARG[2],~LIT[1]);",
+      "templateI" : "resize(~ARG[2],~LIT[1])"
     }
   }
 ]

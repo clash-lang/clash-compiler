@@ -26,8 +26,174 @@ import CLaSH.Sized.VectorZ
 
 newtype Unsigned (n :: Nat) = U Integer
 
+instance Eq (Unsigned n) where
+  (==) = eqU
+
+{-# NOINLINE eqU #-}
+eqU :: (Unsigned n) -> (Unsigned n) -> Bool
+(U n) `eqU` (U m) = n == m
+
+instance Ord (Unsigned n) where
+  compare n m =
+    if geU n m
+      then if gtU n m then GT else EQ
+      else LT
+  (<)  = ltU
+  (>=) = geU
+  (>)  = gtU
+  (<=) = leU
+
+ltU,geU,gtU,leU :: Unsigned n -> Unsigned n -> Bool
+{-# NOINLINE ltU #-}
+ltU (U n) (U m) = n < m
+{-# NOINLINE geU #-}
+geU (U n) (U m) = n >= m
+{-# NOINLINE gtU #-}
+gtU (U n) (U m) = n > m
+{-# NOINLINE leU #-}
+leU (U n) (U m) = n <= m
+
+instance SingI n => Enum (Unsigned n) where
+  succ           = plusU (fromIntegerU 1)
+  pred           = minU (fromIntegerU 1)
+  toEnum         = fromIntegerU . toInteger
+  fromEnum       = fromEnum . toIntegerU
+
+instance SingI n => Bounded (Unsigned n) where
+  minBound = fromIntegerU 0
+  maxBound = maxBoundU
+
+{-# NOINLINE maxBoundU #-}
+maxBoundU :: forall n . SingI n => Unsigned n
+maxBoundU = U $ (2 ^ fromSing (sing :: Sing n)) - 1
+
+instance SingI n => Num (Unsigned n) where
+  (+)         = plusU
+  (-)         = minU
+  (*)         = timesU
+  negate      = id
+  abs         = id
+  signum      = signumU
+  fromInteger = fromIntegerU
+
+plusU,minU,timesU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+{-# NOINLINE plusU #-}
+plusU (U a) (U b) = fromIntegerU_inlineable $ a + b
+
+{-# NOINLINE minU #-}
+minU (U a) (U b) = fromIntegerU_inlineable $ a - b
+
+{-# NOINLINE timesU #-}
+timesU (U a) (U b) = fromIntegerU_inlineable $ a * b
+
+{-# NOINLINE signumU #-}
+signumU :: Unsigned n -> Unsigned n
+signumU (U 0) = (U 0)
+signumU (U _) = (U 1)
+
+fromIntegerU,fromIntegerU_inlineable :: forall n . SingI n => Integer -> Unsigned (n :: Nat)
+{-# NOINLINE fromIntegerU #-}
+fromIntegerU = fromIntegerU_inlineable
+{-# INLINABLE fromIntegerU_inlineable #-}
+fromIntegerU_inlineable i = U $ i `mod` (2 ^ fromSing (sing :: Sing n))
+
+instance SingI n => Real (Unsigned n) where
+  toRational = toRational . toIntegerU
+
+instance SingI n => Integral (Unsigned n) where
+  quot      = quotU
+  rem       = remU
+  div       = quotU
+  mod       = modU
+  quotRem   = quotRemU
+  divMod    = divModU
+  toInteger = toIntegerU
+
+quotU,remU,modU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+{-# NOINLINE quotU #-}
+quotU = (fst.) . quotRemU_inlineable
+{-# NOINLINE remU #-}
+remU = (snd.) . quotRemU_inlineable
+{-# NOINLINE modU #-}
+(U a) `modU` (U b) = fromIntegerU_inlineable (a `mod` b)
+
+quotRemU,divModU :: SingI n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
+quotRemU n d = (n `quotU` d,n `remU` d)
+divModU n d  = (n `quotU` d,n `modU` d)
+
+{-# INLINEABLE quotRemU_inlineable #-}
+quotRemU_inlineable :: SingI n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
+(U a) `quotRemU_inlineable` (U b) = let (a',b') = a `quotRem` b
+                                    in (fromIntegerU_inlineable a', fromIntegerU_inlineable b')
+
+{-# NOINLINE toIntegerU #-}
+toIntegerU :: Unsigned n -> Integer
+toIntegerU (U n) = n
+
+instance SingI n => Bits (Unsigned n) where
+  (.&.)          = andU
+  (.|.)          = orU
+  xor            = xorU
+  complement     = complementU
+  bit            = bitU
+  testBit        = testBitU
+  bitSizeMaybe   = Just . finiteBitSizeU
+  isSigned       = const False
+  shiftL         = shiftLU
+  shiftR         = shiftRU
+  rotateL        = rotateLU
+  rotateR        = rotateRU
+  popCount       = popCountU
+
+andU,orU,xorU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+{-# NOINLINE andU #-}
+(U a) `andU` (U b) = fromIntegerU_inlineable (a .&. b)
+{-# NOINLINE orU #-}
+(U a) `orU` (U b)  = fromIntegerU_inlineable (a .|. b)
+{-# NOINLINE xorU #-}
+(U a) `xorU` (U b) = fromIntegerU_inlineable (xor a b)
+
+{-# NOINLINE complementU #-}
+complementU :: SingI n => Unsigned n -> Unsigned n
+complementU = fromBitVector . vmap complement . toBitVector
+
+{-# NOINLINE bitU #-}
+bitU :: SingI n => Int -> Unsigned n
+bitU = fromIntegerU_inlineable . bit
+
+{-# NOINLINE testBitU #-}
+testBitU :: Unsigned n -> Int -> Bool
+testBitU (U n) i = testBit n i
+
+shiftLU,shiftRU,rotateLU,rotateRU :: SingI n => Unsigned n -> Int -> Unsigned n
+{-# NOINLINE shiftLU #-}
+shiftLU _ b | b < 0  = error "'shiftL'{Unsigned} undefined for negative numbers"
+shiftLU (U n) b      = fromIntegerU_inlineable (shiftL n b)
+{-# NOINLINE shiftRU #-}
+shiftRU _ b | b < 0  = error "'shiftR'{Unsigned} undefined for negative numbers"
+shiftRU (U n) b      = fromIntegerU_inlineable (shiftR n b)
+{-# NOINLINE rotateLU #-}
+rotateLU _ b | b < 0 = error "'shiftL'{Unsigned} undefined for negative numbers"
+rotateLU n b         = let b' = b `mod` finiteBitSizeU n
+                       in shiftL n b' .|. shiftR n (finiteBitSizeU n - b')
+{-# NOINLINE rotateRU #-}
+rotateRU _ b | b < 0 = error "'shiftR'{Unsigned} undefined for negative numbers"
+rotateRU n b         = let b' = b `mod` finiteBitSizeU n
+                       in shiftR n b' .|. shiftL n (finiteBitSizeU n - b')
+
+{-# NOINLINE popCountU #-}
+popCountU :: Unsigned n -> Int
+popCountU (U n) = popCount n
+
+instance SingI n => FiniteBits (Unsigned n) where
+  finiteBitSize  = finiteBitSizeU
+
+{-# NOINLINE finiteBitSizeU #-}
+finiteBitSizeU :: forall n . SingI n => Unsigned n -> Int
+finiteBitSizeU _ = fromInteger $ fromSing (sing :: Sing n)
+
 instance forall n . SingI n => Lift (Unsigned n) where
-  lift (U i) = sigE [| fromInteger i |] (decUnsigned $ fromSing (sing :: (Sing n)))
+  lift (U i) = sigE [| fromIntegerU i |] (decUnsigned $ fromSing (sing :: (Sing n)))
 
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
@@ -38,80 +204,10 @@ instance Show (Unsigned n) where
 instance SingI n => Default (Unsigned n) where
   def = fromIntegerU 0
 
-instance Eq (Unsigned n) where
-  (==) = eqU
-
-{-# NOINLINE eqU #-}
-eqU :: (Unsigned n) -> (Unsigned n) -> Bool
-(U n) `eqU` (U m) = n == m
-
-instance Ord (Unsigned n) where
-  compare (U n) (U m) = compare n m
-
-instance SingI n => Bounded (Unsigned n) where
-  minBound = U 0
-  maxBound = U $ (2 ^ fromSing (sing :: Sing n)) - 1
-
-{-# NOINLINE fromIntegerU #-}
-fromIntegerU :: forall n . SingI n => Integer -> Unsigned (n :: Nat)
-fromIntegerU i = U $ i `mod` (2 ^ fromSing (sing :: Sing n))
-
-{-# NOINLINE plusU #-}
-plusU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
-plusU (U a) (U b) = fromIntegerU $ a + b
-
-{-# NOINLINE minU #-}
-minU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
-minU (U a) (U b) = fromIntegerU $ a - b
-
-{-# NOINLINE timesU #-}
-timesU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
-timesU (U a) (U b) = fromIntegerU $ a * b
-
-{-# NOINLINE negateU #-}
-negateU :: Unsigned n -> Unsigned n
-negateU (U a) = (U a)
-
-{-# NOINLINE signumU #-}
-signumU :: Unsigned n -> Unsigned n
-signumU (U 0) = (U 0)
-signumU (U _) = (U 1)
-
-instance SingI n => Num (Unsigned n) where
-  (+)         = plusU
-  (-)         = minU
-  (*)         = timesU
-  negate      = negateU
-  abs         = error "'abs' undefined for Unsigned"
-  signum      = signumU
-  fromInteger = fromIntegerU
-
-instance SingI n => Bits (Unsigned n) where
-  (U a) .&. (U b)     = fromIntegerU (a .&. b)
-  (U a) .|. (U b)     = fromIntegerU (a .|. b)
-  xor (U a) (U b)     = fromIntegerU (xor a b)
-  complement (U n)    = fromIntegerU (complement n)
-  bit i               = fromIntegerU (bit i)
-  testBit (U n) i     = testBit n i
-  bitSizeMaybe _      = Just $ fromInteger (fromSing (sing :: Sing n))
-  isSigned _          = False
-  shiftL _ b | b < 0  = error "'shiftL'{Unsigned} undefined for negative numbers"
-  shiftL (U n) b      = fromIntegerU (shiftL n b)
-  shiftR _ b | b < 0  = error "'shiftR'{Unsigned} undefined for negative numbers"
-  shiftR (U n) b      = fromIntegerU (shiftR n b)
-  rotateL _ b | b < 0 = error "'shiftL'{Unsigned} undefined for negative numbers"
-  rotateL n b         = let b' = b `mod` finiteBitSize n
-                        in shiftL n b' .|. shiftR n (finiteBitSize n - b')
-  rotateR _ b | b < 0 = error "'shiftR'{Unsigned} undefined for negative numbers"
-  rotateR n b         = let b' = b `mod` finiteBitSize n
-                        in shiftR n b' .|. shiftL n (finiteBitSize n - b')
-  popCount (U n)      = popCount n
-
-instance SingI n => FiniteBits (Unsigned n) where
-  finiteBitSize _ = fromInteger $ fromSing (sing :: Sing n)
-
-resizeU :: SingI m => Unsigned n -> Unsigned m
-resizeU (U n) = fromIntegerU n
+instance BitVector (Unsigned n) where
+  type BitSize (Unsigned n) = n
+  toBV   = toBitVector
+  fromBV = fromBitVector
 
 {-# NOINLINE toBitVector #-}
 toBitVector :: SingI n => Unsigned n -> Vec n Bit
@@ -121,14 +217,14 @@ toBitVector (U m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterate (`
 fromBitVector :: SingI n => Vec n Bit -> Unsigned n
 fromBitVector = fromBitList . reverse . toList
 
-instance BitVector (Unsigned n) where
-  type BitSize (Unsigned n) = n
-  toBV   = toBitVector
-  fromBV = fromBitVector
-
+{-# INLINABLE fromBitList #-}
 fromBitList :: SingI n => [Bit] -> Unsigned n
-fromBitList l = fromIntegerU
+fromBitList l = fromIntegerU_inlineable
               $ sum [ n
                     | (n,b) <- zip (iterate (*2) 1) l
                     , b == H
                     ]
+
+{-# NOINLINE resizeU #-}
+resizeU :: SingI m => Unsigned n -> Unsigned m
+resizeU (U n) = fromIntegerU_inlineable n
