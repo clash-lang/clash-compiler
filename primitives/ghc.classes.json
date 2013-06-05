@@ -1,7 +1,37 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Classes.not",
-      "template"  : "~RESULT <= not ~ARG[0];",
-      "templateI" : "not ~ARG[0]"
+    { "name"      : "GHC.Classes.eqInt",
+      "template"  : "~RESULT <= ~ARG[0] = ~ARG[1];",
+      "templateI" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.neInt",
+      "template"  : "~RESULT <= ~ARG[0] /= ~ARG[1];",
+      "templateI" : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.gtInt",
+      "template"  : "~RESULT <= ~ARG[0] > ~ARG[1];",
+      "templateI" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.geInt",
+      "template"  : "~RESULT <= ~ARG[0] >= ~ARG[1];",
+      "templateI" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.ltInt",
+      "template"  : "~RESULT <= ~ARG[0] < ~ARG[1];",
+      "templateI" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.leInt",
+      "template"  : "~RESULT <= ~ARG[0] <= ~ARG[1];",
+      "templateI" : "~ARG[0] <= ~ARG[1]"
     }
   }
 , { "BlackBox" :
@@ -14,6 +44,12 @@
     { "name"      : "GHC.Classes.||",
       "template"  : "~RESULT <= ~ARG[0] or ~ARG[1];",
       "templateI" : "~ARG[0] or ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.not",
+      "template"  : "~RESULT <= not ~ARG[0];",
+      "templateI" : "not ~ARG[0]"
     }
   }
 ]

@@ -1,19 +1,79 @@
 [ { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.remInteger",
+      "template"  : "~RESULT <= ~ARG[0] rem ~ARG[1];",
+      "templateI" : "~ARG[0] rem ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.quotInteger",
+      "template"  : "~RESULT <= ~ARG[0] div ~ARG[1];",
+      "templateI" : "~ARG[0] div ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger",
+      "template"  : "~RESULT <= ~ARG[0] = ~ARG[1];",
+      "templateI" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger",
+      "template"  : "~RESULT <= ~ARG[0] /= ~ARG[1];",
+      "templateI" : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger",
+      "template"  : "~RESULT <= ~ARG[0] <= ~ARG[1];",
+      "templateI" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger",
+      "template"  : "~RESULT <= ~ARG[0] > ~ARG[1];",
+      "templateI" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger",
+      "template"  : "~RESULT <= ~ARG[0] < ~ARG[1];",
+      "templateI" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger",
+      "template"  : "~RESULT <= ~ARG[0] >= ~ARG[1];",
+      "templateI" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.absInteger",
+      "template"  : "~RESULT <= abs ~ARG[0];",
+      "templateI" : "abs ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.plusInteger",
       "template"  : "~RESULT <= ~ARG[0] + ~ARG[1];",
       "templateI" : "~ARG[0] + ~ARG[1]"
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.minusInteger",
+      "template"  : "~RESULT <= ~ARG[0] - ~ARG[1];",
+      "templateI" : "~ARG[0] - ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.timesInteger",
-      "template"  : "~RESULT <= ~ARG[0] + ~ARG[1];",
+      "template"  : "~RESULT <= ~ARG[0] * ~ARG[1];",
       "templateI" : "~ARG[0] * ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.minusInteger",
-      "template"  : "~RESULT <= ~ARG[0] - ~ARG[1];",
-      "templateI" : "~ARG[0] - ~ARG[1]"
+    { "name"      : "GHC.Integer.Type.negateInteger",
+      "template"  : "~RESULT <= -~ARG[0];",
+      "templateI" : "-~ARG[0]"
     }
   }
 ]
