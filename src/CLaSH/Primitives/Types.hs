@@ -1,26 +1,39 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 module CLaSH.Primitives.Types where
 
-import Data.Aeson.TH        (deriveJSON)
-import Data.ByteString.Lazy (ByteString)
-import Data.Text.Lazy       (Text)
-import Data.Data
-import Data.HashMap.Lazy    (HashMap)
+import           Data.Aeson           ((.:), FromJSON(..), Value(..))
+import           Data.ByteString.Lazy (ByteString)
+import           Data.Text.Lazy       (Text)
+import           Data.HashMap.Lazy    (HashMap)
+import qualified Data.HashMap.Strict  as H
+import           Control.Applicative  ((<$>),(<*>),(<|>),pure)
 
 type PrimMap = HashMap ByteString Primitive
 
 data Primitive
   = BlackBox
   { name      :: ByteString
-  , template  :: Text
-  , templateI :: Text
+  , template  :: Either Text Text
   }
   | Primitive
   { name     :: ByteString
   , primType :: PrimType
-  } deriving (Typeable, Data, Show)
+  }
 
 data PrimType = Function | Constructor | Dictionary
-  deriving (Typeable, Data, Show)
 
-$(fmap concat $ mapM (deriveJSON id) [''PrimType,''Primitive])
+
+instance FromJSON PrimType where
+  parseJSON = \case "Function"    -> pure Function
+                    "Constructor" -> pure Constructor
+                    "Dictionary"  -> pure Dictionary
+                    _             -> error "PrimType, expected: Function, Constructor, or Dictionary"
+
+instance FromJSON Primitive where
+  parseJSON (Object v) = case H.toList v of
+    [(conKey,Object conVal)] -> case conKey of
+      "BlackBox"  -> BlackBox <$> conVal .: "name" <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
+      "Primitive" -> Primitive <$> conVal .: "name" <*> conVal .: "primType"
+      _ -> error "Expected: BlackBox or Primitive object"
+    _ -> error "Expected: BlackBox or Primitive object"
+  parseJSON _ = error "Expected: BlackBox or Primitive object"

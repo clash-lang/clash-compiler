@@ -218,7 +218,7 @@ inst (InstDecl nm lbl pms) = fmap Just $
     pms' = nest 2 $ "port map" <$$>
             tupled (sequence [text i <+> "=>" <+> expr e | (i,e) <- pms])
 
-inst (BlackBox bs) = fmap Just $ string bs
+inst (BlackBoxD bs) = fmap Just $ string bs
 
 inst _ = return Nothing
 
@@ -260,6 +260,8 @@ expr (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = expr (dcToExpr ty i)
 expr (DataCon ty@(Product _ _) _ es)         = tupled $ sequence $ zipWith (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr e) [0..] es
   where
     tName = tyName ty
+
+expr (BlackBoxE bs) = string bs
 
 expr _                                       = empty
 

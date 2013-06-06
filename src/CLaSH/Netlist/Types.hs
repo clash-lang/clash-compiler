@@ -69,7 +69,7 @@ data Declaration
   = Assignment Identifier Expr
   | CondAssignment Identifier [(Expr,Expr,Expr)]
   | InstDecl Identifier Identifier [(Identifier,Expr)]
-  | BlackBox Text
+  | BlackBoxD Text
   | NetDecl Identifier HWType (Maybe Expr)
   deriving Show
 
@@ -84,6 +84,7 @@ data Expr
   = Literal    (Maybe Size) Literal
   | DataCon    HWType       (Maybe Modifier)  [Expr]
   | Identifier Identifier   (Maybe Modifier)
+  | BlackBoxE Text
   | Empty
   deriving Show
 

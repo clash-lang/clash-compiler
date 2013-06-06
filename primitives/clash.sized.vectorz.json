@@ -1,121 +1,106 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vhead",
-      "template"  : "~RESULT <= ~ARG[0](~ARG[0]'high);",
-      "templateI" : "~ARG[0](~ARG[0]'high)"
+    { "name"      : "CLaSH.Sized.VectorZ.vhead"
+    , "templateE" : "~ARG[0](~ARG[0]'high)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vtail",
-      "template"  : "~RESULT <= ~ARG[0]((~ARG[0]'high)-1 downto 0);",
-      "templateI" : "~ARG[0]((~ARG[0]'high)-1 downto 0)"
+    { "name"      : "CLaSH.Sized.VectorZ.vtail"
+    , "templateE" : "~ARG[0]((~ARG[0]'high)-1 downto 0)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vlast",
-      "template"  : "~RESULT <= ~ARG[0](0);",
-      "templateI" : "~ARG[0](0)"
+    { "name"      : "CLaSH.Sized.VectorZ.vlast"
+    , "templateE" : "~ARG[0](0)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vinit",
-      "template"  : "~RESULT <= ~ARG[0](~ARG[0]'high downto 1);",
-      "templateI" : "~ARG[0](~ARG[0]'high downto 1)"
+    { "name"      : "CLaSH.Sized.VectorZ.vinit"
+    , "templateE" : "~ARG[0](~ARG[0]'high downto 1)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.shiftIntoL",
-      "template"  : "~RESULT <= ~ARG[0] & ~ARG[1](~ARG[1]'high downto 1);",
-      "templateI" : "(~ARG[0] & ~ARG[1](~ARG[1]'high downto 1))"
+    { "name"      : "CLaSH.Sized.VectorZ.shiftIntoL"
+    , "templateE" : "~ARG[0] & ~ARG[1](~ARG[1]'high downto 1)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.snoc",
-      "template"  : "~RESULT <= ~ARG[1] & ~ARG[0];",
-      "templateI" : "(~ARG[1] & ~ARG[0])"
+    { "name"      : "CLaSH.Sized.VectorZ.snoc"
+    , "templateE" : "~ARG[1] & ~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.shiftIntoR",
-      "template"  : "~RESULT <= ~ARG[1]((~ARG[1]'high)-1 downto 0) & ~ARG[0];",
-      "templateI" : "(~ARG[1]((~ARG[1]'high)-1 downto 0) & ~ARG[0])"
+    { "name"      : "CLaSH.Sized.VectorZ.shiftIntoR"
+    , "templateE" : "~ARG[1]((~ARG[1]'high)-1 downto 0) & ~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vappend",
-      "template"  : "~RESULT <= ~ARG[0] & ~ARG[1];",
-      "templateI" : "(~ARG[0] & ~ARG[1])"
+    { "name"      : "CLaSH.Sized.VectorZ.vappend"
+    , "templateE" : "~ARG[0] & ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vsplit",
-      "template"  : "~RESULT <= (~ARG[1](~ARG[1]'high downto ~LIT[0]),~ARG[1](~LIT[0]-1 downto 0));",
-      "templateI" : "(~ARG[1](~ARG[1]'high downto ~LIT[0]),~ARG[1](~LIT[0]-1 downto 0))"
+    { "name"      : "CLaSH.Sized.VectorZ.vsplit"
+    , "templateE" : "(~ARG[1](~ARG[1]'high downto ~LIT[0]),~ARG[1](~LIT[0]-1 downto 0))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vsplitI",
-      "template"  : "~RESULT <= (~ARG[1](~ARG[1]'high downto ~LIT[0]),~ARG[1](~LIT[0]-1 downto 0));",
-      "templateI" : "(~ARG[1](~ARG[1]'high downto ~LIT[0]),~ARG[1](~LIT[0]-1 downto 0))"
+    { "name"      : "CLaSH.Sized.VectorZ.vsplitI"
+    , "templateE" : "(~ARG[1](~ARG[1]'high downto ~LIT[0]),~ARG[1](~LIT[0]-1 downto 0))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vconcat",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vconcat"
+    , "templateD"  :
 "~SYM[0]_vconcat : for ~SYM[1] in (~ARG[0]'high downto 0) generate
 begin
   ~RESULT((~SYM[1] * ~ARG[0](0)'length) + ARG[0](0)'high) downto (~SYM[1] * ~ARG[0](0)'length)) <= ~ARG[0](~SYM[1]);
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vunconcat",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vunconcat"
+    , "templateD"  :
 "~SYM[0]_vconcat : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~RESULT(~SYM[1]) <= ~ARG[2]((~SYM[1] * ~RESULT(0)'length) + ~RESULT(0)'high) downto (~SYM[1] * ~RESULT(0)'length));
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vunconcatI",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vunconcatI"
+    , "templateD"  :
 "~SYM[0]_vconcat : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~RESULT(~SYM[1]) <= ~ARG[2]((~SYM[1] * ~RESULT(0)'length) + ~RESULT(0)'high) downto (~SYM[1] * ~RESULT(0)'length));
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vreverse"
-    , "template"  :
+    , "templateD"  :
 "process(~ARG[0])
 begin
   for ~SYM[0] in ~ARG[0]'range loop
     ~RESULT(~ARG[0]'high - ~SYM[0]) <= ~ARG[0](~SYM[0]);
   end loop;
 end process;"
-    , "templateI" : ""
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vmap",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vmap"
+    , "templateD"  :
 "~SYM[0]_vmap : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~INST 0
     ~OUTPUT <= ~RESULT(~SYM[1])~
     ~INPUT  <= ~ARG[1](~SYM[1])~
   ~INST
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vzipWith",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vzipWith"
+    , "templateD"  :
 "~SYM[0]_vzipWith : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
@@ -131,13 +116,12 @@ begin
       ~INPUT  <= ~SYM[2](~SYM[4])~
     ~INST
   end generate;
-end block;",
-      "templateI" : ""
+end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vfoldr",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vfoldr"
+    , "templateD"  :
 "~SYM[0]_vfoldr : block
   signal ~SYM[1] : ~TYP[2];
   signal ~SYM[6] : ~TYP[2];
@@ -163,13 +147,12 @@ begin
       ~INST
     end generate;
   end generate;
-end block;",
-      "templateI" : ""
+end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vfoldl",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vfoldl"
+    , "templateD"  :
 "~SYM[0]_vfoldl : block
   signal ~SYM[1] : ~TYP[2];
   signal ~SYM[6] : ~TYP[2];
@@ -195,14 +178,13 @@ begin
       ~INST
     end generate;
   end generate;
-end block;",
-      "templateI" : ""
+end block;"
     }
   }
 
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vfoldr1",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vfoldr1"
+    , "templateD"  :
 "~SYM[0]_vfoldr1 : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[1];
@@ -220,46 +202,41 @@ begin
   end generate;
 
   ~RESULT <= ~SYM[2](~SYM[2]'high);
-end block;",
-      "templateI" : ""
+end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vzip",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vzip"
+    , "templateD"  :
 "~SYM[0]_vzip : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~RESULT(~SYM[1]) <= (~ARG[0](~SYM[1]),~ARG[1](~SYM[1]));
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vunzip",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vunzip"
+    , "templateD"  :
 "~SYM[0]_vunzip : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~RESULT.~TYPO_sel0(~SYM[1]) <= ~ARG[0](~SYM[1]).~TYP[0]_sel0;
   ~RESULT.~TYPO_sel1(~SYM[1]) <= ~ARG[0](~SYM[1]).~TYP[0]_sel1;
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vindex_integer"
-    , "template"  : "~RESULT <= ~ARG[1](~ARG[2]);"
-    , "templateI" : "~ARG[1](~ARG[2])"
+    , "templateE" : "~ARG[1](~ARG[2])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.maxIndex"
-    , "template"  : "~RESULT <= ~ARG[1]'high;"
-    , "templateI" : "~ARG[1]'high"
+    , "templateE" : "~ARG[1]'high"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vreplace_integer"
-    , "template"  :
+    , "templateD"  :
 "process(~ARG[1],~ARG[2],~ARG[3]) is
   variable ~SYM[0] : ~TYP[1];
 begin
@@ -267,74 +244,64 @@ begin
   ~SYM[0](~ARG[2]) := ~ARG[3];
   ~RESULT <= ~SYM[0];
 end process;"
-    , "templateI" : ""
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vake"
-    , "template"  : "~RESULT <= ~ARG[1](~ARG[1]'high downto ~LIT[0]);"
-    , "templateI" : "~ARG[1](~ARG[1]'high downto ~LIT[0])"
+    , "templateE" : "~ARG[1](~ARG[1]'high downto ~LIT[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vakeI"
-    , "template"  : "~RESULT <= ~ARG[1](~ARG[1]'high downto ~LIT[0]);"
-    , "templateI" : "~ARG[1](~ARG[1]'high downto ~LIT[0])"
+    , "templateE" : "~ARG[1](~ARG[1]'high downto ~LIT[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.drop"
-    , "template"  : "~RESULT <= ~ARG[1](~RESULT'high downto 0);"
-    , "templateI" : "~ARG[1](~RESULT'high downto 0)"
+    , "templateE" : "~ARG[1](~RESULT'high downto 0)"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.dropI"
-    , "template"  : "~RESULT <= ~ARG[1](~RESULT'high downto 0);"
-    , "templateI" : "~ARG[1](~RESULT'high downto 0)"
+    , "templateE" : "~ARG[1](~RESULT'high downto 0)"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vexact"
-    , "template"  : "~RESULT <= ~ARG[1](~LIT[0]);"
-    , "templateI" : "~ARG[1](~LIT[0])"
+    , "templateE" : "~ARG[1](~LIT[0])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vselect",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vselect"
+    , "templateD"  :
 "~SYM[0]_vselect : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~RESULT <= ~ARG[4](~LIT[0]+~LIT[1]*~SYM[1]);
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vselectI",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vselectI"
+    , "templateD"  :
 "~SYM[0]_vselectI : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~RESULT <= ~ARG[4](~LIT[1]+~LIT[2]*~SYM[1]);
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vcopy"
-    , "template"  : "~RESULT <= (others => ~ARG[0]);"
-    , "templateI" : "(others => ~ARG[0])"
+    , "templateE" : "(others => ~ARG[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vcopyI"
-    , "template"  : "~RESULT <= (others => ~ARG[1]);"
-    , "templateI" : "(others => ~ARG[1])"
+    , "templateE" : "(others => ~ARG[1])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.viterate",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.viterate"
+    , "templateD"  :
 "~SYM[0]_viterate : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~SYM[2]_generate : if ~SYM[1] = (~RESULT'high) generate
@@ -347,13 +314,12 @@ begin
       ~INPUT  <= ~RESULT(~SYM[1]+1)~
     ~INST
   end generate;
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.viterateI",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.viterateI"
+    , "templateD"  :
 "~SYM[0]_viterateI : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~SYM[2]_generate : if ~SYM[1] = (~RESULT'high) generate
@@ -366,13 +332,12 @@ begin
       ~INPUT  <= ~RESULT(~SYM[1]+1)~
     ~INST
   end generate;
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vgenerate",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vgenerate"
+    , "templateD"  :
 "~SYM[0]_vgenerate : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~SYM[2]_generate : if ~SYM[1] = (~RESULT'high) generate
@@ -388,13 +353,12 @@ begin
       ~INPUT  <= ~RESULT(~SYM[1]+1)~
     ~INST
   end generate;
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.VectorZ.vgenerateI",
-      "template"  :
+    { "name"      : "CLaSH.Sized.VectorZ.vgenerateI"
+    , "templateD"  :
 "~SYM[0]_vgenerateI : for ~SYM[1] in (~RESULT'high downto 0) generate
 begin
   ~SYM[2]_generate : if ~SYM[1] = (~RESULT'high) generate
@@ -410,8 +374,7 @@ begin
       ~INPUT  <= ~RESULT(~SYM[1]+1)~
     ~INST
   end generate;
-end generate;",
-      "templateI" : ""
+end generate;"
     }
   }
 ]

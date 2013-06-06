@@ -154,7 +154,7 @@ mkConcSm bndr (Case scrut@(Var scrutTy scrutNm) _ alts) = do
       altAssgn <- mkConcSm (Id (string2Name "_ERROR_") (Embed altTy)) alt
       let altExpr = case altAssgn of
                       [Assignment _ e] -> e
-                      [HW.BlackBox t]  -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
+                      [HW.BlackBoxD t] -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
                                           in Identifier t' Nothing
                       _                -> error $ $(curLoc) ++ "Alt lead to more than one assignment: " ++ show altAssgn
       case pat of
@@ -188,8 +188,15 @@ mkConcSm bndr app = do
       bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) -> do
-          bbCtx <- mkBlackBoxContext bndr args
-          mkBlackBoxDecl (template p) bbCtx
+          (bbCtx,ctxDcls) <- mkBlackBoxContext bndr args
+          case template p of
+            Left templD -> do
+              bb <- fmap BlackBoxD $! mkBlackBox templD bbCtx
+              return (ctxDcls ++ [bb])
+            Right templE -> do
+              bb <- fmap BlackBoxE $! mkBlackBox templE bbCtx
+              let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+              return (ctxDcls ++ [Assignment dstId bb])
         _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
     _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
 
@@ -236,15 +243,15 @@ mkDcApplication dstHType dc args = do
   assngs       <- mapM (\(e,t) -> mkConcSm (Id (string2Name "_ERROR_") (Embed t)) e) args'
   let argExprs = map (\d -> case d of
                         [Assignment _ e] -> e
-                        [HW.BlackBox t]  -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
-                                            in Identifier t' Nothing
+                        [HW.BlackBoxD t]  -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
+                                             in Identifier t' Nothing
                         _                -> error $ $(curLoc) ++ "Datacon arguments lead to more than one assignment: " ++ show d
                      ) assngs
 
   case dstHType of
     SP _ dcArgPairs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
-      let dcI      = dcTag dc - 1 -- fromMaybe (error $ $(curLoc) ++ "SP: dc not found") $ elemIndex dcNameBS $ map fst dcArgPairs
+      let dcI      = dcTag dc - 1
       let dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
       case (compare (length dcArgs) (length argExprs)) of
         EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)

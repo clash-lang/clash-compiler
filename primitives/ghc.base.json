@@ -1,13 +1,11 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Base.plusInt",
-      "template"  : "~RESULT <= ~ARG[0] + ~ARG[1];",
-      "templateI" : "~ARG[0] + ~ARG[1]"
+    { "name"      : "GHC.Base.plusInt"
+    , "templateE" : "~ARG[0] + ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Base.timesInt",
-      "template"  : "~RESULT <= ~ARG[0] + ~ARG[1];",
-      "templateI" : "~ARG[0] * ~ARG[1]"
+    { "name"      : "GHC.Base.timesInt"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
     }
   }
 ]

@@ -1,6 +1,6 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Signal.register",
-      "template"  :
+    { "name"      : "CLaSH.Signal.register"
+    , "templateD" :
 "~SYM[0]_block : block
   signal ~SYM[1] : ~TYP[1];
 begin
@@ -14,33 +14,32 @@ begin
   end process;
 
   ~RESULT <= ~SYM[1];
-end block;",
-      "templateI" : ""
+end block;"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.sync",
-      "primType"  : { "Function" : [] }
+    { "name"      : "CLaSH.Signal.sync"
+    , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.mapSync",
-      "primType"  : { "Function" : [] }
+    { "name"      : "CLaSH.Signal.mapSync"
+    , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.appSync",
-      "primType"  : { "Function" : [] }
+    { "name"      : "CLaSH.Signal.appSync"
+    , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.combine",
-      "primType"  : { "Function" : [] }
+    { "name"      : "CLaSH.Signal.combine"
+    , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.split",
-      "primType"  : { "Function" : [] }
+    { "name"      : "CLaSH.Signal.split"
+    , "primType"  : "Function"
     }
   }
 ]

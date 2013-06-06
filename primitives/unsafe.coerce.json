@@ -1,7 +1,6 @@
 [ { "BlackBox" :
-    { "name"      : "Unsafe.Coerce.unsafeCoerce",
-      "template"  : "~RESULT <= ~ARG[0];",
-      "templateI" : "~ARG[0]"
+    { "name"      : "Unsafe.Coerce.unsafeCoerce"
+    , "templateE" : "~ARG[0]"
     }
   }
 ]

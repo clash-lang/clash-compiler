@@ -1,11 +1,11 @@
 [ { "Primitive" :
-    { "name"      : "GHC.TypeLits.Sing",
-      "primType"  : { "Dictionary" : [] }
+    { "name"      : "GHC.TypeLits.Sing"
+    , "primType"  : "Dictionary"
     }
   }
 , { "Primitive" :
-    { "name"      : "GHC.TypeLits.sing",
-      "primType"  : { "Dictionary" : [] }
+    { "name"      : "GHC.TypeLits.sing"
+    , "primType"  : "Dictionary"
     }
   }
 ]

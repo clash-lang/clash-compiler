@@ -1,7 +1,6 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Types.I#",
-      "template"  : "~RESULT <= ~ARG[0];",
-      "templateI" : "~ARG[0]"
+    { "name"      : "GHC.Types.I#"
+    , "templateE" : "~ARG[0]"
     }
   }
 ]

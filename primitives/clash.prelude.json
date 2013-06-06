@@ -1,6 +1,6 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Prelude.blockRam",
-      "template"  :
+    { "name"      : "CLaSH.Prelude.blockRam"
+    , "templateD" :
 "~SYM[0]_block : block
   type ram_array is array (natural range <>) of ~TYP[5];
   signal ~SYM[1] : ram_array((~ARG[0]-1) downto 0); -- ram
@@ -20,8 +20,7 @@ begin
   end process;
 
   ~RESULT <= ~SYM[3];
-end block;",
-      "templateI" : ""
+end block;"
     }
   }
 ]

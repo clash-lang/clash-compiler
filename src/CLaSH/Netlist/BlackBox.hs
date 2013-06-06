@@ -1,22 +1,22 @@
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Netlist.BlackBox where
 
-import           Control.Lens ((.=),_2)
-import qualified Control.Lens as Lens
-import           Control.Monad (filterM,mzero)
-import           Control.Monad.State (state)
-import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Writer (tell)
-import           Control.Monad.Trans.Maybe (MaybeT(..))
+import           Control.Lens               ((.=),_2)
+import qualified Control.Lens               as Lens
+import           Control.Monad              (filterM,mzero)
+import           Control.Monad.State        (state)
+import           Control.Monad.Trans.Class  (lift)
+import           Control.Monad.Writer       (tell)
+import           Control.Monad.Trans.Maybe  (MaybeT(..))
 import qualified Data.ByteString.Lazy.Char8 as BSL
-import           Data.Either       (lefts,partitionEithers)
-import qualified Data.HashMap.Lazy as HashMap
-import           Data.List         (partition)
-import           Data.Maybe        (catMaybes,fromJust)
-import           Data.Text.Lazy    (Text,pack)
-import qualified Data.Text.Lazy    as Text
-import           Unbound.LocallyNameless (name2String,unembed)
+import           Data.Either                (lefts,partitionEithers)
+import qualified Data.HashMap.Lazy          as HashMap
+import           Data.List                  (partition)
+import           Data.Maybe                 (catMaybes,fromJust)
+import           Data.Text.Lazy             (Text,pack)
+import           Unbound.LocallyNameless    (name2String,unembed)
 
 import CLaSH.Core.DataCon            (dcName)
 import CLaSH.Core.Literal            as L (Literal(..))
@@ -40,69 +40,79 @@ import CLaSH.Util
 mkBlackBoxContext ::
   Id
   -> [Term]
-  -> NetlistMonad BlackBoxContext
+  -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
-  let res               = Left . mkBasicId . pack $ name2String (V.varName resId)
-  let resTy             = N.coreTypeToHWType_fail $ unembed $ V.varType resId
-  isFunArgs             <- mapM isFun args
-  let args'             = zip args isFunArgs
-  varInps               <- mapM (runMaybeT . mkInput resId) args'
+  -- Make context inputs
+  args'                 <- fmap (zip args) $ mapM isFun args
+  (varInps,declssV)     <- fmap (unzip . catMaybes)  $ mapM (runMaybeT . mkInput resId) args'
   let (_,otherArgs)     = partitionEithers $ map unVar args'
-  let (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
-  litInps               <- mapM (runMaybeT . fmap fst . mkLitInput . fst) litArgs
-  funInps               <- mapM (runMaybeT . mkFunInput resId . fst) funArgs
-  return $ Context (res,resTy) (catMaybes varInps)
-                               (catMaybes litInps)
-                               (catMaybes funInps)
+      (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
+  litInps               <- fmap catMaybes $ mapM (runMaybeT . fmap fst . mkLitInput . fst) litArgs
+  (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
+
+  -- Make context result
+  let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
+      resTy = N.coreTypeToHWType_fail $ unembed $ V.varType resId
+
+  return ((Context (res,resTy) varInps litInps funInps),concat declssV ++ concat declssF)
 
 unVar :: (Term, Bool) -> Either TmName (Term, Bool)
 unVar (Var _ v, False) = Left v
 unVar t                = Right t
 
-mkBlackBoxDecl ::
+mkBlackBox ::
   Text
   -> BlackBoxContext
-  -> NetlistMonad [Declaration]
-mkBlackBoxDecl templ bbCtx = do
+  -> NetlistMonad Text
+mkBlackBox templ bbCtx = do
   let (l,err) = runParse templ
   case (null err && verifyBlackBoxContext l bbCtx) of
     True -> do
-      i <- Lens.use varCount
-      let (l',i') = setSym (fromInteger i) l
-      varCount .= (toInteger i')
-      (tmpl,clks) <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
+      i           <- Lens.use varCount
+      let (l',i') =  setSym (fromInteger i) l
+      varCount    .= (toInteger i')
+      (bb,clks)   <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
       tell clks
-      return [N.BlackBox tmpl]
+      return $! bb
     False -> error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show templ ++ "\ngiven errors:\n" ++ show err
 
 mkInput ::
   Id
   -> (Term, Bool)
-  -> MaybeT NetlistMonad (SyncIdentifier,HWType)
-mkInput _ (_, True) = return (Left $ pack "__FUN__", Void)
+  -> MaybeT NetlistMonad ((SyncIdentifier,HWType),[Declaration])
+mkInput _ (_, True) = return ((Left $ pack "__FUN__", Void),[])
 
 mkInput _ ((Var ty v), False) = do
-  let vT = mkBasicId . pack $ name2String v
-  let hwTy = N.coreTypeToHWType_fail ty
+  let vT   = mkBasicId . pack $ name2String v
+      hwTy = N.coreTypeToHWType_fail ty
   case synchronizedClk ty of
-    Just clk -> return ((Right (vT,clk)), hwTy)
-    Nothing  -> return ((Left vT), hwTy)
+    Just clk -> return (((Right (vT,clk)), hwTy),[])
+    Nothing  -> return (((Left vT), hwTy),[])
 
 mkInput resId (e, False) = case collectArgs e of
   (Prim (PrimCon dc), args)  -> mkInput' (dcName dc) args
   (Prim (PrimFun f _), args) -> mkInput' f args
-  _                          -> fmap (first Left) $ mkLitInput e
+  _                          -> fmap ((,[]) . first Left) $ mkLitInput e
   where
     mkInput' nm args = do
       bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) -> do
-          bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
-          case (Text.null $ templateI p) of
-            True -> error $ $(curLoc) ++ "Can't create inlined blackbox: " ++ show p
-            False -> do
-              (N.BlackBox bb:_) <- lift $ mkBlackBoxDecl (templateI p) bbCtx
-              return (Left bb, Void)
+          (bbCtx,ctxDecls) <- lift $ mkBlackBoxContext resId (lefts args)
+          let hwTy = snd $ result bbCtx
+          case (template p) of
+            (Left tempD)  -> do
+              i           <- lift $ varCount <%= (+1)
+              let dstId   = pack ("bb_sig_" ++ show i)
+                  netDecl = N.NetDecl dstId hwTy Nothing
+                  bbCtx'  = bbCtx { result = first (either (Left . const dstId)
+                                                           (Right . first (const dstId)))
+                                                           (result bbCtx) }
+              bbDecl      <- fmap N.BlackBoxD $ lift $ mkBlackBox tempD bbCtx'
+              return ((Left dstId, hwTy),ctxDecls ++ [netDecl,bbDecl])
+            (Right tempE) -> do
+              bb   <- lift $ mkBlackBox tempE bbCtx
+              return ((Left bb, hwTy),ctxDecls)
         _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
 
 mkLitInput ::
@@ -120,27 +130,27 @@ mkLitInput _                                    = mzero
 mkFunInput ::
   Id
   -> Term
-  -> MaybeT NetlistMonad (Line,BlackBoxContext)
+  -> MaybeT NetlistMonad ((Line,BlackBoxContext),[Declaration])
 mkFunInput resId e = case (collectArgs e) of
   (Prim (PrimFun nm _), args) -> do
     bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do
-        bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
-        let (l,err) = runParse (template p)
+        (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
+        let (l,err) = either runParse runParse (template p)
         if null err
           then do
             i <- Lens.use varCount
             let (l',i') = setSym (fromInteger i) l
             varCount .= (toInteger i')
-            return (l',bbCtx)
+            return ((l',bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ name2String nm
   (Var ty fun, args) -> do
     normalized <- Lens.use bindings
     case HashMap.lookup fun normalized of
       Just _ -> do
-        bbCtx <- lift $ mkBlackBoxContext resId (lefts args)
+        (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
         (Component compName hidden compInps compOutp _) <- lift $
           do vCnt <- Lens.use varCount
              vEnv <- Lens.use varEnv
@@ -158,7 +168,7 @@ mkFunInput resId e = case (collectArgs e) of
         templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
         let (line,err)    = runParse templ
         if (null err)
-          then return (line,bbCtx)
+          then return ((line,bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
       Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
