@@ -9,6 +9,7 @@ import           Data.List   (elemIndex,partition)
 import           Data.Maybe  (fromMaybe,isJust,isNothing,mapMaybe)
 
 -- GHC API
+import qualified BasicTypes
 import qualified Class
 import qualified CoreSyn
 import           CLaSH.GHC.Compat.CoreSyn (dfunArgExprs)
@@ -180,12 +181,15 @@ loadExprFromTyThing ::
        CoreSyn.CoreBndr                        -- unlocatable Var
      )
 loadExprFromTyThing us bndr tyThing = case tyThing of
-  GHC.AnId _id | Var.isId _id -> do
-    let unfolding = IdInfo.unfoldingInfo $ Var.idInfo _id
-    let dfunTy    = Id.idType _id
-    case unfolding of
+  GHC.AnId _id | Var.isId _id ->
+    let unfolding  = IdInfo.unfoldingInfo $ Var.idInfo _id
+        inlineInfo = IdInfo.inlinePragInfo $ Var.idInfo _id
+        dfunTy     = Id.idType _id
+    in case unfolding of
       (CoreSyn.CoreUnfolding {}) ->
-        (us,Left $! (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
+        case BasicTypes.inl_inline inlineInfo of
+          BasicTypes.NoInline -> (us,Right bndr)
+          _ -> (us,Left $! (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
       (CoreSyn.DFunUnfolding _ _ es) ->
         let (exprs,us') = dfunArgExprs us dfunTy es
         in (us',Left $! Left (bndr, exprs))
