@@ -34,10 +34,6 @@ eqU :: (Unsigned n) -> (Unsigned n) -> Bool
 (U n) `eqU` (U m) = n == m
 
 instance Ord (Unsigned n) where
-  compare n m =
-    if geU n m
-      then if gtU n m then GT else EQ
-      else LT
   (<)  = ltU
   (>=) = geU
   (>)  = gtU
@@ -211,7 +207,7 @@ instance BitVector (Unsigned n) where
 
 {-# NOINLINE toBitVector #-}
 toBitVector :: SingI n => Unsigned n -> Vec n Bit
-toBitVector (U m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterate (`div` 2) m
+toBitVector (U m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterateI (`div` 2) m
 
 {-# NOINLINE fromBitVector #-}
 fromBitVector :: SingI n => Vec n Bit -> Unsigned n

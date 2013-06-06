@@ -34,10 +34,6 @@ eqS :: (Signed n) -> (Signed n) -> Bool
 (S n) `eqS` (S m) = n == m
 
 instance Ord (Signed n) where
-  compare n m =
-    if geS n m
-      then if gtS n m then GT else EQ
-      else LT
   (<)  = ltS
   (>=) = geS
   (>)  = gtS
@@ -228,7 +224,7 @@ instance BitVector (Signed n) where
 
 {-# NOINLINE toBitVector #-}
 toBitVector :: SingI n => Signed n -> Vec n Bit
-toBitVector (S m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterate (`div` 2) m
+toBitVector (S m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterateI (`div` 2) m
 
 {-# NOINLINE fromBitVector #-}
 fromBitVector :: SingI n => Vec n Bit -> Signed n

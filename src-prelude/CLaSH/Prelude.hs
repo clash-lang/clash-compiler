@@ -33,7 +33,7 @@ window ::
   -> Vec ((n + 1) + 1) (Sync a)
 window x = x :> prev
   where
-    prev = registerP (vcopy def) next
+    prev = registerP (vcopyI def) next
     next = x +>> prev
 
 {-# INLINABLE windowP #-}
@@ -43,7 +43,7 @@ windowP ::
   -> Vec (n + 1) (Sync a)
 windowP x = prev
   where
-    prev = registerP (vcopy def) next
+    prev = registerP (vcopyI def) next
     next = x +>> prev
 
 {-# INLINABLE (<^>) #-}
@@ -77,7 +77,7 @@ blockRam :: forall n m a . (SingI n, SingI m, Pack a)
 blockRam n wr rd en din = combine $ (bram' <^> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
-    binit = (vcopyE n (error "uninitialized ram"),error "uninitialized ram")
+    binit = (vcopy n (error "uninitialized ram"),error "uninitialized ram")
 
     bram' :: (Vec n a,a) -> (Unsigned m, Unsigned m, Bool, a)
           -> (((Vec n a),a),a)
