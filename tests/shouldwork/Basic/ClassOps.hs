@@ -1,4 +1,4 @@
 module ClassOps where
 
-topEntity :: Integer
-topEntity = (1 +) $ 2
+topEntity :: Integer -> Integer
+topEntity = (`div` 3)
