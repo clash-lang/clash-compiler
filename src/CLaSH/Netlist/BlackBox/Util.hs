@@ -12,7 +12,7 @@ import Text.PrettyPrint.Leijen.Text.Monadic (renderOneLine,displayT)
 
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Netlist.Types (Identifier,HWType(..),VHDLState)
-import CLaSH.Netlist.VHDL  (vhdlType)
+import CLaSH.Netlist.VHDL  (vhdlType,vhdlTypeDefault)
 import CLaSH.Util
 
 verifyBlackBoxContext ::
@@ -121,4 +121,6 @@ mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) .
                                     in tell [(t,Bit)] >> return (Left t)
 mkSyncIdentifier b (Typ Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
 mkSyncIdentifier b (Typ (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ (inputs b)!!n
+mkSyncIdentifier b (Def Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b
+mkSyncIdentifier b (Def (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ (inputs b)!!n
 mkSyncIdentifier b (D _)          = error $ $(curLoc) ++ "Unexpected component declaration"

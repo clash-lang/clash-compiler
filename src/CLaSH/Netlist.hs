@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module CLaSH.Netlist where
 
 import           Control.Lens            ((.=),_2)
@@ -99,7 +100,7 @@ genComponent' compName componentExpr mStart = do
   varEnv .= gamma
 
   let resType  = coreTypeToHWType_fail $ ids HashMap.! result
-  let argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_fail t) arguments
+      argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_fail t) arguments
 
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
@@ -109,65 +110,57 @@ genComponent' compName componentExpr mStart = do
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkConcSm . second unembed) binders
 
   let compInps       = zip (map (mkBasicId . Text.pack . name2String . varName) arguments) argTypes
-  let compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
-  let component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
+      compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
+      component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
   return component
 
 mkConcSm ::
   Id
   -> Term
   -> NetlistMonad [Declaration]
-mkConcSm bndr (Var _ v) = mkApplication bndr v []
-
-mkConcSm bndr (Core.Literal lit) = do
-  let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  let bndrHWType = coreTypeToHWType_fail . unembed $ varType bndr
-  let i = case lit of
-            (IntegerLiteral i') -> i'
-            _ -> error $ $(curLoc) ++ "not an integer literal"
-  return [Assignment dstId (HW.Literal Nothing . NumLit $ fromInteger i)
-         ]
+mkConcSm bndr (Var _ v) = mkFunApp bndr v []
 
 mkConcSm bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
   (pat,Var varTy varTm)  <- unbind alt
-  let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  let altVarId = mkBasicId . Text.pack $ name2String varTm
-  let selId = mkBasicId . Text.pack $ name2String scrutNm
-  let modifier = case pat of
-                DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
-                                          in case (elemIndex (Id varTm (Embed varTy)) tms) of
-                                               Nothing -> Nothing
-                                               Just fI -> Just (Indexed (coreTypeToHWType_fail scrutTy,dcTag dc - 1,fI))
-                _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
-  let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+  let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
+      altVarId = mkBasicId . Text.pack $ name2String varTm
+      selId    = mkBasicId . Text.pack $ name2String scrutNm
+      modifier = case pat of
+        DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
+                                  in case (elemIndex (Id varTm (Embed varTy)) tms) of
+                                       Nothing -> Nothing
+                                       Just fI -> Just (Indexed (coreTypeToHWType_fail scrutTy,dcTag dc - 1,fI))
+        _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
+      extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
 
-mkConcSm bndr (Case scrut@(Var scrutTy scrutNm) _ alts) = do
-  alts' <- mapM unbind alts
-  exprs <- mapM mkCondExpr alts'
+mkConcSm bndr (Case scrut ty alts) = do
+  alts'   <- mapM unbind alts
+  scrutTy <- termType scrut
+  (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
+  let scrutHTy = coreTypeToHWType_fail scrutTy
+  (exprs,altsDecls)      <- fmap (second concat . unzip) $ mapM (mkCondExpr (scrutExpr,scrutHTy)) alts'
+
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  return [CondAssignment dstId (reverse exprs)]
+  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId (reverse exprs)]
   where
-    mkCondExpr :: (Pat,Term) -> NetlistMonad (Expr,Expr,Expr)
-    mkCondExpr (pat,alt) = do
-      altTy    <- termType alt
-      altAssgn <- mkConcSm (Id (string2Name "_ERROR_") (Embed altTy)) alt
-      let altExpr = case altAssgn of
-                      [Assignment _ e] -> e
-                      [HW.BlackBoxD t] -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
-                                          in Identifier t' Nothing
-                      _                -> error $ $(curLoc) ++ "Alt lead to more than one assignment: " ++ show altAssgn
-      case pat of
+    mkCondExpr :: (Expr,HWType) -> (Pat,Term) -> NetlistMonad ((Expr,Expr,Expr),[Declaration])
+    mkCondExpr (scrutE,scrutHTy) (pat,alt) = do
+      (altExpr,altDecls) <- mkExpr ty alt
+      fmap (,altDecls) $! case pat of
         DefaultPat           -> return (Empty,Empty,altExpr)
-        DataPat (Embed dc) _ -> let scrutId  = mkBasicId . Text.pack $ name2String scrutNm
-                                    scrutHTy = coreTypeToHWType_fail scrutTy
-                                in return (Identifier scrutId (Just (DC (scrutHTy,dcTag dc - 1))),dcToLiteral scrutHTy (dcTag dc),altExpr)
-        LitPat  (Embed (IntegerLiteral i)) -> return (varToExpr scrut, HW.Literal Nothing (NumLit $ fromInteger i),altExpr)
+        DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
+                                    scrutSel = case scrutE of
+                                      Identifier scrutId Nothing -> Identifier scrutId modifier
+                                      BlackBoxE bbE Nothing      -> BlackBoxE bbE modifier
+                                      _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
+                                in return (scrutSel,dcToLiteral scrutHTy (dcTag dc),altExpr)
+        LitPat  (Embed (IntegerLiteral i)) -> return (scrutE, HW.Literal Nothing (NumLit $ fromInteger i),altExpr)
         _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
 
     dcToLiteral :: HWType -> Int -> Expr
-    dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit True)
-    dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit False)
+    dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
+    dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit True)
     dcToLiteral Bit 1  = HW.Literal Nothing (BitLit H)
     dcToLiteral Bit 2  = HW.Literal Nothing (BitLit L)
     dcToLiteral t i    = HW.Literal (Just $ conSize t) (NumLit (i-1))
@@ -177,78 +170,92 @@ mkConcSm bndr app = do
   args' <- Monad.filterM (fmap representableType . termType) args
   case appF of
     Var _ f
-      | all isVar args' && null tyArgs -> mkApplication bndr f args'
+      | all isVar args' && null tyArgs -> mkFunApp bndr f args'
       | otherwise                      -> error $ $(curLoc) ++ "Not in normal form: Var-application with non-Var arguments"
-    Data _ dc
-      | all (\e -> isConstant e || isVar e) args' -> let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-                                                         hwTy  = coreTypeToHWType_fail . unembed $ varType bndr
-                                                     in fmap ((:[]) . Assignment dstId) $ mkDcApplication hwTy dc args'
-      | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim (PrimFun nm _) -> do
-      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
-      case bbM of
-        Just p@(P.BlackBox {}) -> do
-          (bbCtx,ctxDcls) <- mkBlackBoxContext bndr args
-          case template p of
-            Left templD -> do
-              bb <- fmap BlackBoxD $! mkBlackBox templD bbCtx
-              return (ctxDcls ++ [bb])
-            Right templE -> do
-              bb <- fmap BlackBoxE $! mkBlackBox templE bbCtx
-              let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-              return (ctxDcls ++ [Assignment dstId bb])
-        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
-    _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
+    _ -> do
+      (exprApp,declsApp) <- mkExpr (unembed $ varType bndr) app
+      let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+      return (declsApp ++ [Assignment dstId exprApp])
 
-mkApplication ::
+mkFunApp ::
   Id
   -> TmName
   -> [Term]
   -> NetlistMonad [Declaration]
-mkApplication dst fun args = do
+mkFunApp dst fun args = do
   normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
     Just _ -> do
-      vCnt <- Lens.use varCount
-      vEnv <- Lens.use varEnv
-      cN   <- Lens.use (vhdlMState . _2)
-      (Component compName hidden compInps compOutp _) <- genComponent fun Nothing
-      varCount .= vCnt
-      varEnv .= vEnv
-      (vhdlMState . _2) .= cN
+      (Component compName hidden compInps compOutp _) <- preserveVHDLState $ genComponent fun Nothing
       case length args == length compInps of
-        True  -> do
-          let dstId = mkBasicId . Text.pack . name2String $ varName dst
-          let args' = map varToExpr args
-          let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-          let inpAssigns = zip (map fst compInps) args'
-          let outpAssign = (fst compOutp,Identifier dstId Nothing)
-          let instDecl = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
-          return [instDecl]
+        True  ->
+          let dstId         = mkBasicId . Text.pack . name2String $ varName dst
+              args'         = map varToExpr args
+              hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
+              inpAssigns    = zip (map fst compInps) args'
+              outpAssign    = (fst compOutp,Identifier dstId Nothing)
+              instDecl      = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
+          in return [instDecl]
         False -> error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of
       [] -> do
-        let dstId     = mkBasicId . Text.pack . name2String $ varName dst
+        let dstId = mkBasicId . Text.pack . name2String $ varName dst
         return [Assignment dstId (Identifier (mkBasicId . Text.pack $ name2String fun) Nothing)]
       _ -> error $ $(curLoc) ++ "Unknown function"
+
+mkExpr ::
+  Type
+  -> Term
+  -> NetlistMonad (Expr,[Declaration])
+mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
+  where
+    i = case lit of
+          (IntegerLiteral i') -> i'
+          _ -> error $ $(curLoc) ++ "not an integer literal"
+
+mkExpr ty app = do
+  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
+      hwTy                 = coreTypeToHWType_fail ty
+  args' <- Monad.filterM (fmap representableType . termType) args
+  case appF of
+    Data _ dc
+      | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
+      | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
+    Prim (PrimFun nm _) -> do
+      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
+      case bbM of
+        Just p@(P.BlackBox {}) ->
+          case template p of
+            Left templD -> do
+              i <- varCount <%= (+1)
+              let tmpNm   = "tmp_" ++ show i
+                  tmpId   = Id (string2Name tmpNm) (Embed ty)
+                  tmpS    = Text.pack tmpNm
+                  netDecl = NetDecl tmpS hwTy Nothing
+              (bbCtx,ctxDcls) <- mkBlackBoxContext tmpId args
+              bb <- fmap BlackBoxD $! mkBlackBox templD bbCtx
+              return (Identifier tmpS Nothing, ctxDcls ++ [netDecl,bb])
+            Right templE -> do
+              (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
+              bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox templE bbCtx
+              return (bb,ctxDcls)
+        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
+    Var _ f
+      | null args -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
+      | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
+    _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
 
 mkDcApplication ::
   HWType
   -> DataCon
   -> [Term]
-  -> NetlistMonad Expr
+  -> NetlistMonad (Expr,[Declaration])
 mkDcApplication dstHType dc args = do
-  argTys       <- mapM termType args
-  let args'    = filter (not . isEmptyType . coreTypeToHWType_fail . snd) $ zip args argTys
-  assngs       <- mapM (\(e,t) -> mkConcSm (Id (string2Name "_ERROR_") (Embed t)) e) args'
-  let argExprs = map (\d -> case d of
-                        [Assignment _ e] -> e
-                        [HW.BlackBoxD t]  -> let t' = Text.init . snd . Text.breakOnEnd (Text.pack " <= ") $ t
-                                             in Identifier t' Nothing
-                        _                -> error $ $(curLoc) ++ "Datacon arguments lead to more than one assignment: " ++ show d
-                     ) assngs
+  argTys              <- mapM termType args
+  let args'           = filter (not . isEmptyType . coreTypeToHWType_fail . snd) $ zip args argTys
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) args'
 
-  case dstHType of
+  fmap (,argDecls) $! case dstHType of
     SP _ dcArgPairs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
       let dcI      = dcTag dc - 1
@@ -287,4 +294,4 @@ mkDcApplication dstHType dc args = do
     Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [(head argExprs)])
     Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
 
-    _ -> error $ $(curLoc) ++ "mkDcApplication undefined: " ++ show dstHType
+    _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show dstHType

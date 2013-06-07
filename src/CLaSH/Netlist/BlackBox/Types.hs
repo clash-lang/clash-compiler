@@ -29,6 +29,7 @@ data Element = C  Text
              | Clk (Maybe Int)
              | Rst (Maybe Int)
              | Typ (Maybe Int)
+             | Def (Maybe Int)
   deriving Show
 
 data Decl = Decl Int [Line]

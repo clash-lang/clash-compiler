@@ -2,8 +2,10 @@
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Netlist.Util where
 
+import           Control.Lens  ((.=),_2)
+import qualified Control.Lens  as Lens
 import qualified Control.Monad as Monad
-import Data.Text.Lazy (pack)
+import Data.Text.Lazy          (pack)
 import Data.Either             (partitionEithers)
 import Unbound.LocallyNameless (Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
@@ -243,3 +245,16 @@ appendToName ::
   -> String
   -> TmName
 appendToName n s = makeName (name2String n ++ s) (name2Integer n)
+
+preserveVHDLState ::
+  NetlistMonad a
+  -> NetlistMonad a
+preserveVHDLState action = do
+  vCnt <- Lens.use varCount
+  vEnv <- Lens.use varEnv
+  cN   <- Lens.use (vhdlMState . _2)
+  val  <- action
+  varCount          .= vCnt
+  varEnv            .= vEnv
+  (vhdlMState . _2) .= cN
+  return val

@@ -1,9 +1,8 @@
 {-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Netlist.BlackBox where
 
-import           Control.Lens               ((.=),_2)
+import           Control.Lens               ((.=))
 import qualified Control.Lens               as Lens
 import           Control.Monad              (filterM,mzero)
 import           Control.Monad.State        (state)
@@ -15,6 +14,7 @@ import           Data.Either                (lefts,partitionEithers)
 import qualified Data.HashMap.Lazy          as HashMap
 import           Data.List                  (partition)
 import           Data.Maybe                 (catMaybes,fromJust)
+import           Data.Monoid                (mconcat)
 import           Data.Text.Lazy             (Text,pack)
 import           Unbound.LocallyNameless    (name2String,unembed)
 
@@ -47,14 +47,14 @@ mkBlackBoxContext resId args = do
   (varInps,declssV)     <- fmap (unzip . catMaybes)  $ mapM (runMaybeT . mkInput resId) args'
   let (_,otherArgs)     = partitionEithers $ map unVar args'
       (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
-  litInps               <- fmap catMaybes $ mapM (runMaybeT . fmap fst . mkLitInput . fst) litArgs
+  (litInps,declssL)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkLitInput . fst) litArgs
   (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
 
   -- Make context result
   let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
       resTy = N.coreTypeToHWType_fail $ unembed $ V.varType resId
 
-  return ((Context (res,resTy) varInps litInps funInps),concat declssV ++ concat declssF)
+  return ((Context (res,resTy) varInps (map fst litInps) funInps),concat declssV ++ concat declssL ++ concat declssF)
 
 unVar :: (Term, Bool) -> Either TmName (Term, Bool)
 unVar (Var _ v, False) = Left v
@@ -92,7 +92,7 @@ mkInput _ ((Var ty v), False) = do
 mkInput resId (e, False) = case collectArgs e of
   (Prim (PrimCon dc), args)  -> mkInput' (dcName dc) args
   (Prim (PrimFun f _), args) -> mkInput' f args
-  _                          -> fmap ((,[]) . first Left) $ mkLitInput e
+  _                          -> fmap (first (first Left)) $ mkLitInput e
   where
     mkInput' nm args = do
       bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
@@ -112,20 +112,21 @@ mkInput resId (e, False) = case collectArgs e of
               return ((Left dstId, hwTy),ctxDecls ++ [netDecl,bbDecl])
             (Right tempE) -> do
               bb   <- lift $ mkBlackBox tempE bbCtx
-              return ((Left bb, hwTy),ctxDecls)
+              let bb' = mconcat [pack "(",bb,pack ")"]
+              return ((Left bb', hwTy),ctxDecls)
         _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
 
 mkLitInput ::
   Term
-  -> MaybeT NetlistMonad (Identifier,HWType)
-mkLitInput (C.Literal (IntegerLiteral i))       = return (pack $ show i,Integer)
+  -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
+mkLitInput (C.Literal (IntegerLiteral i))       = return ((pack $ show i,Integer),[])
 mkLitInput e@(collectArgs -> (Data _ dc, args)) = lift $ do
   args' <- filterM (fmap representableType . termType) (lefts args)
   hwTy  <- N.termHWType e
-  exprN <- mkDcApplication hwTy dc args'
-  exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr exprN
-  return (exprV,hwTy)
-mkLitInput _                                    = mzero
+  (exprN,dcDecls) <- mkDcApplication hwTy dc args'
+  exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN
+  return ((exprV,hwTy),dcDecls)
+mkLitInput _ = mzero
 
 mkFunInput ::
   Id
@@ -151,15 +152,7 @@ mkFunInput resId e = case (collectArgs e) of
     case HashMap.lookup fun normalized of
       Just _ -> do
         (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
-        (Component compName hidden compInps compOutp _) <- lift $
-          do vCnt <- Lens.use varCount
-             vEnv <- Lens.use varEnv
-             cN   <- Lens.use (vhdlMState . _2)
-             comp <- genComponent fun Nothing
-             varCount .= vCnt
-             varEnv .= vEnv
-             (vhdlMState . _2) .= cN
-             return comp
+        (Component compName hidden compInps compOutp _) <- lift $ preserveVHDLState $ genComponent fun Nothing
         let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
             inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
             outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)

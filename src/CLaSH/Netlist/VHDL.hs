@@ -178,6 +178,18 @@ vhdlType t@(Sum _ _) = "std_logic_vector" <>
 vhdlType t@(Product _ _) = tyName t
 vhdlType t          = error $ "vhdlType: " ++ show t
 
+vhdlTypeDefault :: HWType -> VHDLM Doc
+vhdlTypeDefault Bit                 = "'-'"
+vhdlTypeDefault Bool                = "false"
+vhdlTypeDefault Integer             = "0"
+vhdlTypeDefault (Signed _)          = "(others => '-')"
+vhdlTypeDefault (Unsigned _)        = "(others => '-')"
+vhdlTypeDefault (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeDefault elTy)
+vhdlTypeDefault (SP _ _)            = "(others => '-')"
+vhdlTypeDefault (Sum _ _)           = "(others => '-')"
+vhdlTypeDefault (Product _ elTys)   = tupled $ mapM vhdlTypeDefault elTys
+vhdlTypeDefault t                   = error $ "vhdlTypeDefault: " ++ show t
+
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
 decls ds = do
@@ -201,31 +213,31 @@ insts is = vcat . punctuate linebreak . fmap catMaybes $ mapM inst is
 
 inst :: Declaration -> VHDLM (Maybe Doc)
 inst (Assignment id_ e) = fmap Just $
-  text id_ <+> larrow <+> expr e <> semi
+  text id_ <+> larrow <+> expr False e <> semi
 
 inst (CondAssignment id_ es) = fmap Just $
   text id_ <+> larrow <+> align (vcat (conds es)) <> semi
     where
       conds :: [(Expr,Expr,Expr)]-> VHDLM [Doc]
       conds []            = return []
-      conds [(_,_,e)]     = expr e <:> (return [])
-      conds ((l,r,e):es') = (expr e <+> "when" <+> parens (expr l <+> "=" <+> expr r) <+> "else") <:> conds es'
+      conds [(_,_,e)]     = expr False e <:> (return [])
+      conds ((l,r,e):es') = (expr False e <+> "when" <+> parens (expr True l <+> "=" <+> expr True r) <+> "else") <:> conds es'
 
 inst (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"
               <+> text nm <$$> pms' <> semi
   where
     pms' = nest 2 $ "port map" <$$>
-            tupled (sequence [text i <+> "=>" <+> expr e | (i,e) <- pms])
+            tupled (sequence [text i <+> "=>" <+> expr False e | (i,e) <- pms])
 
 inst (BlackBoxD bs) = fmap Just $ string bs
 
 inst _ = return Nothing
 
-expr :: Expr -> VHDLM Doc
-expr (Literal sizeM lit)                           = exprLit sizeM lit
-expr (Identifier id_ Nothing)                      = text id_
-expr (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy selected
+expr :: Bool -> Expr -> VHDLM Doc
+expr _ (Literal sizeM lit)                           = exprLit sizeM lit
+expr _ (Identifier id_ Nothing)                      = text id_
+expr _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy selected
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -235,35 +247,39 @@ expr (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy s
     end      = start - argSize + 1
     selected = text id_ <> parens (int start <+> "downto" <+> int end)
 
-expr (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> tyName ty <> "_sel" <> int fI
-expr (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
+expr _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> tyName ty <> "_sel" <> int fI
+expr _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-expr (Identifier id_ (Just _)) = text id_
-expr (vectorChain -> Just es)                  = tupled (mapM expr es)
-expr (DataCon (Vector 1 _) _ [e])              = parens ("others" <+> rarrow <+> expr e)
-expr (DataCon (Vector _ _) _ [e1,e2])          = expr e1 <+> "&" <+> expr e2
-expr (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
+expr _ (Identifier id_ (Just _)) = text id_
+expr _ (vectorChain -> Just es)                  = tupled (mapM (expr False) es)
+expr _ (DataCon (Vector 1 _) _ [e])              = parens ("others" <+> rarrow <+> (expr False) e)
+expr _ (DataCon (Vector _ _) _ [e1,e2])          = expr False e1 <+> "&" <+> expr False e2
+expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
   where
     argTys     = snd $ args !! i
     dcSize     = (conSize ty) + sum (map typeSize argTys)
-    dcExpr     = expr (dcToExpr ty i)
-    argExprs   = zipWith toSLV argTys $ map expr es
+    dcExpr     = expr False (dcToExpr ty i)
+    argExprs   = zipWith toSLV argTys $ map (expr False) es
     extraArg   = case (typeSize ty - dcSize) of
                    0 -> []
                    n -> [exprLit (Just n) (NumLit 0)]
     assignExpr = hcat $ punctuate (" & ") $ sequence (dcExpr:argExprs ++ extraArg)
 
-expr (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = expr (dcToExpr ty i)
-expr (DataCon ty@(Product _ _) _ es)         = tupled $ sequence $ zipWith (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr e) [0..] es
+expr _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = expr False (dcToExpr ty i)
+expr _ (DataCon ty@(Product _ _) _ es)             = tupled $ sequence $ zipWith (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr False e) [0..] es
   where
     tName = tyName ty
 
-expr (BlackBoxE bs) = string bs
+expr b (BlackBoxE bs (Just (DC (ty@(SP _ _),_)))) = parenIf b $ parens (string bs) <> parens (int start <+> "downto" <+> int end)
+  where
+    start = typeSize ty - 1
+    end   = typeSize ty - conSize ty
+expr b (BlackBoxE bs _) = parenIf b $ string bs
 
-expr _                                       = empty
+expr _ _ = empty
 
 otherSize :: [HWType] -> Int -> Int
 otherSize _ n | n < 0 = 0
@@ -325,6 +341,10 @@ larrow = "<="
 
 rarrow :: VHDLM Doc
 rarrow = "=>"
+
+parenIf :: Monad m => Bool -> m Doc -> m Doc
+parenIf True  = parens
+parenIf False = id
 
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = (vcat $ punctuate s d) <> s

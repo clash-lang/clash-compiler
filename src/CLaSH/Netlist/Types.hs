@@ -84,7 +84,7 @@ data Expr
   = Literal    (Maybe Size) Literal
   | DataCon    HWType       (Maybe Modifier)  [Expr]
   | Identifier Identifier   (Maybe Modifier)
-  | BlackBoxE Text
+  | BlackBoxE Text (Maybe Modifier)
   | Empty
   deriving Show
 
