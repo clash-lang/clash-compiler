@@ -13,7 +13,9 @@ normalization = (repeatR $ clsOpRes >-> representable) >-> simplification
                (unsafeBottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
 
 cleanup :: NormRewrite
-cleanup = repeatR $ closedTerms >-> wrappers >-> propConstants
+cleanup = (repeatR $ closedTerms >-> wrappers >-> propConstants) >->
+          (unsafeBottomupR (apply "letFlat" letFlat)) >->
+          (apply "bindConstantVar" bindConstantVar)
   where
     wrappers      = unsafeTopdownR $ (apply "inlineWrapper" inlineWrapper) !-> propConstants
 
@@ -23,15 +25,15 @@ cleanup = repeatR $ closedTerms >-> wrappers >-> propConstants
     steps         = [ ("propagation"     , appProp)
                     , ("bindConstantVar" , bindConstantVar)
                     , ("constantSpec"    , constantSpec)
-                    , ("caseCon"      , caseCon    )
+                    , ("caseCon"         , caseCon    )
                     ]
 
 representable :: NormRewrite
 representable = propagagition >-> specialisation
   where
-    propagagition = repeatR ( repeatBottomup [ ("propagation"  ,appProp     )
-                                             , ("bindNonRep"   ,bindNonRep  )
-                                             , ("liftNonRep"   ,liftNonRep  )
+    propagagition = repeatR ( repeatBottomup [ ("propagation"  , appProp    )
+                                             , ("bindNonRep"   , bindNonRep )
+                                             , ("liftNonRep"   , liftNonRep )
                                              , ("caseLet"      , caseLet    )
                                              , ("caseCon"      , caseCon    )
                                              , ("caseCase"     , caseCase   )
