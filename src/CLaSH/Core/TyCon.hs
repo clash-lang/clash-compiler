@@ -61,7 +61,8 @@ data AlgTyConRhs
   { data_cons :: [DataCon]
   }
   | NewTyCon
-  { data_con :: DataCon
+  { data_con    :: DataCon
+  , nt_etad_rhs :: ([TyName],Type)
   }
   deriving Show
 

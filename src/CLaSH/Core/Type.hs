@@ -17,7 +17,7 @@ module CLaSH.Core.Type
   , TyVar
   , ThetaType
   , tyView
-  , tyViewP
+  , coreView
   , typeKind
   , mkTyConTy
   , isPredTy
@@ -60,7 +60,8 @@ data Type
 data TypeView
   = FunTy    Type  Type
   | TyConApp TyCon [Type]
-  | OtherType
+  | OtherType Type
+  deriving Show
 
 data ConstTy
   = TyCon TyCon
@@ -102,19 +103,24 @@ tyView :: Type -> TypeView
 tyView ty@(AppTy _ _) = case splitTyAppM ty of
   Just (ConstTy Arrow, [ty1,ty2]) -> FunTy ty1 ty2
   Just (ConstTy (TyCon tc), args) -> TyConApp tc args
-  _ -> OtherType
+  _ -> OtherType ty
 tyView (ConstTy (TyCon tc)) = TyConApp tc []
-tyView _ = OtherType
+tyView t = OtherType t
 
-tyViewP :: Type -> TypeView
-tyViewP ty =
+coreView :: Type -> TypeView
+coreView ty =
   let tView = tyView ty
-  in case tyView ty of
-       TyConApp tc args
-         | (name2String $ tyConName tc) == "CLaSH.Signal.Sync" -> tyViewP (head args)
-         | (name2String $ tyConName tc) == "CLaSH.Signal.Packed" -> tyViewP (head args)
-       _ -> tView
+  in  case tyView ty of
+        TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args     -> coreView (newTyConInstRhs nt args)
+        TyConApp tc args
+          | (name2String $ tyConName tc) == "CLaSH.Signal.Sync"   -> coreView (head args)
+          | (name2String $ tyConName tc) == "CLaSH.Signal.Packed" -> coreView (head args)
+        _ -> tView
 
+newTyConInstRhs :: ([TyName],Type) -> [Type] -> Type
+newTyConInstRhs (tvs,ty) tys = foldl AppTy (substTys (zip tvs tys1) ty) tys2
+  where
+    (tys1, tys2) = splitAtList tvs tys
 
 mkFunTy :: Type -> Type -> Type
 mkFunTy t1 t2 = AppTy (AppTy (ConstTy Arrow) t1) t2
@@ -204,11 +210,8 @@ mkTyVarTy = VarTy
 splitFunTy ::
   Type
   -> Maybe (Type, Type)
-splitFunTy (tyView -> FunTy arg res) = Just (arg,res)
-splitFunTy (tyView -> TyConApp tc [tyView -> FunTy arg res])
-  | name2String (tyConName tc) == "CLaSH.Signal.Sync"
-  = Just (arg, mkTyConApp tc [res])
-splitFunTy _               = Nothing
+splitFunTy (coreView -> FunTy arg res) = Just (arg,res)
+splitFunTy _                          = Nothing
 
 isFunTy ::
   Type
@@ -219,7 +222,7 @@ applyFunTy ::
   Type
   -> Type
   -> Type
-applyFunTy (tyView -> FunTy _ resTy) _ = resTy
+applyFunTy (coreView -> FunTy _ resTy) _ = resTy
 applyFunTy _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 applyTy ::

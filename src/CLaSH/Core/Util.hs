@@ -223,4 +223,3 @@ splitCombineTerm b (ForAllTy tvTy) =
   in newExpr
 
 splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
-

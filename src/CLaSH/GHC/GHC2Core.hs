@@ -168,10 +168,12 @@ makeAlgTyConRhs ::
   AlgTyConRhs
   -> SR (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
-  DataTyCon dcs _   -> Just <$> C.DataTyCon <$> (mapM makeDataCon dcs)
-  NewTyCon dc _ _ _ -> Just <$> C.NewTyCon <$> (makeDataCon dc)
-  AbstractTyCon _   -> return Nothing -- error $ $(curLoc) ++ "Can't convert AlgTyConRhs: AbstractTyCon of: " ++ showPpr tc
-  DataFamilyTyCon   -> return Nothing -- error $ $(curLoc) ++ "Can't convert AlgTyConRhs: DataFamilyTyCon: " ++ showPpr tc
+  DataTyCon dcs _ -> Just <$> C.DataTyCon <$> (mapM makeDataCon dcs)
+  NewTyCon dc _ (rhsTvs,rhsEtad) _ -> do Just <$> (C.NewTyCon <$> (makeDataCon dc)
+                                                              <*> ((,) (map coreToVar rhsTvs) <$>
+                                                                   (lift $ coreToType rhsEtad)))
+  AbstractTyCon _ -> return Nothing
+  DataFamilyTyCon -> return Nothing
 
 makeDataCon ::
   DataCon

@@ -172,3 +172,10 @@ indexNote :: String
           -> Int
           -> a
 indexNote note = fromMaybe (error note) `dot` indexMaybe
+
+splitAtList :: [b] -> [a] -> ([a], [a])
+splitAtList [] xs     = ([], xs)
+splitAtList _ xs@[]   = (xs, xs)
+splitAtList (_:xs) (y:ys) = (y:ys', ys'')
+    where
+      (ys', ys'') = splitAtList xs ys
