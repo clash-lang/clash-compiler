@@ -12,7 +12,9 @@ module CLaSH.Prelude
   )
 where
 
+import Control.Arrow
 import Control.Applicative
+import Control.Category      as Category
 import Data.Bits             as Exported
 import CLaSH.Class.BitVector as Exported
 import CLaSH.Class.Default   as Exported
@@ -56,15 +58,9 @@ f <^> iS = \i -> let (s',o) = split $ f <$> s <*> (combine i)
                      s      = register iS s'
                  in split o
 
-{-# INLINABLE (^^^) #-}
-(^^^) :: (s -> i -> (s,o)) -> s -> Comp i o
-f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i
-                         s      = register sI s'
-                     in  o
-
 {-# INLINABLE registerP #-}
 registerP :: Pack a => a -> Packed a -> Packed a
-registerP i = split . register i . combine
+registerP i = split Prelude.. register i Prelude.. combine
 
 {-# NOINLINE blockRam #-}
 blockRam :: forall n m a . (SingI n, SingI m, Pack a)
@@ -96,3 +92,32 @@ blockRamPow2 :: (SingI n, SingI (2^n), Pack a)
              -> Sync a
              -> Sync a
 blockRamPow2 = blockRam
+
+newtype Comp a b = C { asFunction :: Sync a -> Sync b }
+
+instance Category Comp where
+  id            = C Prelude.id
+  (C f) . (C g) = C (f Prelude.. g)
+
+infixr 8 ><
+(><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
+(f >< g) (x,y) = (f x,g y)
+
+instance Arrow Comp where
+  arr         = C Prelude.. fmap
+  first (C f) = C $ combine Prelude.. (f >< Prelude.id) Prelude.. split
+
+instance ArrowLoop Comp where
+  loop (C f) = C $ simpleLoop (split Prelude.. f Prelude.. combine)
+    where
+      simpleLoop g b = let ~(c,d) = g (b,d)
+                       in c
+
+registerC :: a -> Comp a a
+registerC = C Prelude.. register
+
+{-# INLINABLE (^^^) #-}
+(^^^) :: (s -> i -> (s,o)) -> s -> Comp i o
+f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i
+                         s      = register sI s'
+                     in  o
