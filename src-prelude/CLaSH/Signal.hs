@@ -10,18 +10,13 @@ module CLaSH.Signal
   , register
   , Pack(..)
   , (<^), (^>)
-  , Comp(..)
-  , registerC
   )
 where
 
 import Data.List
 import Control.Applicative
-import Control.Arrow
-import Control.Category
 import Language.Haskell.TH.Syntax(Lift(..))
 import Unsafe.Coerce
-import Prelude hiding (id,(.))
 
 import CLaSH.Class.Default
 import CLaSH.Sized.Signed   (Signed)
@@ -134,29 +129,6 @@ v <^ f = liftA2 f v
 
 (^>) :: Applicative f => (f a -> f b) -> f a -> f b
 f ^> v = f v
-
-newtype Comp a b = C { asFunction :: Sync a -> Sync b }
-
-instance Category Comp where
-  id            = C id
-  (C f) . (C g) = C (f . g)
-
-infixr 8 ><
-(><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
-(f >< g) (x,y) = (f x,g y)
-
-instance Arrow Comp where
-  arr         = C . fmap
-  first (C f) = C $ combine . (f >< id) . split
-
-instance ArrowLoop Comp where
-  loop (C f) = C $ simpleLoop (split . f . combine)
-    where
-      simpleLoop g b = let ~(c,d) = g (b,d)
-                       in c
-
-registerC :: a -> Comp a a
-registerC = C . register
 
 instance Num a => Num (Sync a) where
   (+)         = liftA2 (+)
