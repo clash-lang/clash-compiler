@@ -61,20 +61,20 @@ coreTypeToHWType ::
   -> Either String HWType
 coreTypeToHWType ty@(tyView -> TyConApp tc args) =
   case (name2String $ tyConName tc) of
-    "GHC.Integer.Type.Integer"  -> return Integer -- Left $ "Can't translate type: " ++ showDoc ty
-    "GHC.Prim.Int#"             -> return Integer -- Left $ "Can't translate type: " ++ showDoc ty
-    "GHC.Prim.Int"              -> return Integer
-    "GHC.Prim.ByteArray#"       -> Left $ "Can't translate type: " ++ showDoc ty -- return Integer
-    "GHC.Types.Bool"            -> return Bool
-    "GHC.TypeLits.Sing"         -> Left $ "Can't translate type: " ++ showDoc ty -- singletonToHWType (head args)
-    "GHC.Prim.~#"               -> Left $ "Can't translate type: " ++ showDoc ty
-    "CLaSH.Bit.Bit"             -> return Bit
-    "CLaSH.Signal.Sync"         -> coreTypeToHWType (head args)
-    "CLaSH.Signal.Packed"       -> coreTypeToHWType (head args)
-    "CLaSH.Signal.Pack"         -> Left $ "Can't translate type: " ++ showDoc ty
-    "CLaSH.Sized.Signed.Signed" -> Signed <$> (tyNatSize $ head args)
+    "GHC.Integer.Type.Integer"      -> return Integer
+    "GHC.Prim.Int#"                 -> return Integer
+    "GHC.Prim.Int"                  -> return Integer
+    "GHC.Prim.ByteArray#"           -> Left $ "Can't translate type: " ++ showDoc ty
+    "GHC.Types.Bool"                -> return Bool
+    "GHC.TypeLits.Sing"             -> Left $ "Can't translate type: " ++ showDoc ty
+    "GHC.Prim.~#"                   -> Left $ "Can't translate type: " ++ showDoc ty
+    "CLaSH.Bit.Bit"                 -> return Bit
+    "CLaSH.Signal.Pack"             -> Left $ "Can't translate type: " ++ showDoc ty
+    "CLaSH.Signal.Sync"             -> coreTypeToHWType (head args)
+    "CLaSH.Signal.Packed"           -> coreTypeToHWType (head args)
+    "CLaSH.Sized.Signed.Signed"     -> Signed <$> (tyNatSize $ head args)
     "CLaSH.Sized.Unsigned.Unsigned" -> Unsigned <$> (tyNatSize $ head args)
-    "CLaSH.Sized.VectorZ.Vec"   -> do
+    "CLaSH.Sized.VectorZ.Vec"       -> do
       let [szTy,elTy] = args
       sz     <- tyNatSize szTy
       elHWTy <- coreTypeToHWType elTy
@@ -129,7 +129,6 @@ isRecursiveTy tc args = case tyConDataCons tc of
                tvs          = tyConTyVars tc
                tvsArgsMap   = zip tvs args
                substArgTyss = (concatMap . map) (substTys tvsArgsMap) argTyss
-               -- argTcs       = map fst . catMaybes . map splitTyConAppM $ concat substArgTyss
            in (mkTyConApp tc args) `elem` substArgTyss
 
 tyNatSize ::

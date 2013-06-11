@@ -164,7 +164,7 @@ inlineNonRep ctx e@(Case scrut ty alts)
     case isInlined of
       True -> do
         cf <- liftR $ Lens.use curFun
-        traceIf True ($(curLoc) ++ "InlineBox: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
+        traceIf True ($(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
       False -> do
         scrutTy   <- termType scrut
         bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
