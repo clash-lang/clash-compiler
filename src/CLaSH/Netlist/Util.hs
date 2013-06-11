@@ -108,17 +108,15 @@ mkADT _ tc args = case tyConDataCons tc of
     let argTVs       = map dcUnivTyVars dcs
     let substArgTyss = (map . map) (substTys (tvsArgsMap argTVs)) argTyss
     argHTyss         <- mapM (mapM coreTypeToHWType) substArgTyss
-    let nonEmptyArgs = map (filter (not . isEmptyType)) argHTyss
-    case (dcs,nonEmptyArgs) of
-      ([_],[[elemTy]])   -> return elemTy
-      ([_],[elemTys])    -> return $ Product tcName elemTys
-      (_  ,concat -> []) -> return $ Sum tcName $ map (pack . name2String . dcName) dcs
-      (_  ,elemHTys)     -> return $ SP tcName
-                                   $ zipWith (\dc tys ->
-                                               ( pack . name2String $ dcName dc
-                                               , tys
-                                               )
-                                             ) dcs elemHTys
+    case (dcs,argHTyss) of
+      (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
+      (_   ,concat -> [])    -> return $ Sum tcName $ map (pack . name2String . dcName) dcs
+      (_   ,elemHTys)        -> return $ SP tcName
+                                      $ zipWith (\dc tys ->
+                                                  ( pack . name2String $ dcName dc
+                                                  , tys
+                                                  )
+                                                ) dcs elemHTys
   where
     tcName     = pack . name2String $ tyConName tc
     tvs        = tyConTyVars tc
@@ -147,16 +145,7 @@ tyNatSize t                 = Left $ $(curLoc) ++ "Can't convert tyNat: " ++ sho
 representableType ::
   Type
   -> Bool
--- representableType = (either (\s -> traceIf True s False) (const True)) . coreTypeToHWType
 representableType = (either (const False) (const True)) . coreTypeToHWType
-
-isEmptyType ::
-  HWType
-  -> Bool
-isEmptyType Void           = True
-isEmptyType (Sum _ (_:[])) = True
-isEmptyType (Vector 0 _)   = True
-isEmptyType _              = False
 
 typeSize ::
   HWType

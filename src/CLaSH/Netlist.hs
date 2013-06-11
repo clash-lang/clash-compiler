@@ -252,8 +252,7 @@ mkDcApplication ::
   -> NetlistMonad (Expr,[Declaration])
 mkDcApplication dstHType dc args = do
   argTys              <- mapM termType args
-  let args'           = filter (not . isEmptyType . coreTypeToHWType_fail . snd) $ zip args argTys
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) args'
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
 
   fmap (,argDecls) $! case dstHType of
     SP _ dcArgPairs -> do

@@ -201,7 +201,6 @@ decls ds = do
     dsDoc = fmap catMaybes $ mapM decl ds
 
 decl :: Declaration -> VHDLM (Maybe Doc)
-decl (NetDecl _ ty _) | isEmptyType ty = return Nothing
 decl (NetDecl id_ ty Nothing) = fmap Just $
   "signal" <+> text id_ <+> colon <+> vhdlType ty
 
