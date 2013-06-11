@@ -108,8 +108,8 @@ makeTyCon tc = do
                   tyConMap %= (HashMap.insert tc tycon')
   where
     tycon
-      | isAlgTyCon tc       = mkAlgTyCon
       | isTupleTyCon tc     = mkTupleTyCon
+      | isAlgTyCon tc       = mkAlgTyCon
       | isSynTyCon tc       = mkVoidTyCon
       | isPrimTyCon tc      = mkPrimTyCon
       | isSuperKindTyCon tc = return mkSuperKindTyCon
