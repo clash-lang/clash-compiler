@@ -110,8 +110,11 @@ funDec Integer = fmap snd $ makeCached Integer _3 ((,) A.<$> (use _2) A.<*> toIn
 funDec _ = empty
 
 tyName :: HWType -> VHDLM Doc
+tyName Integer           = "integer"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)        = "signed_" <> int n
+tyName (Unsigned n)      = "unsigned_" <> int n
+tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
 tyName t@(Product _ _)   = fmap snd $ makeCached t _3 ((,) A.<$> (use _2) A.<*> prodName)
   where
     prodName = do i <- use _1
@@ -172,7 +175,7 @@ vhdlType (Vector n elTy) = "array_of_" <> tyName elTy <> parens ( int (n-1) <+> 
 vhdlType t@(SP _ _) = "std_logic_vector" <>
                       parens ( int (typeSize t - 1) <+>
                                "downto 0" )
-vhdlType t@(Sum _ _) = "std_logic_vector" <>
+vhdlType t@(Sum _ _) = "unsigned" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
 vhdlType t@(Product _ _) = tyName t
@@ -267,7 +270,7 @@ expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
                    n -> [exprLit (Just n) (NumLit 0)]
     assignExpr = hcat $ punctuate (" & ") $ sequence (dcExpr:argExprs ++ extraArg)
 
-expr _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = expr False (dcToExpr ty i)
+expr _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = "to_unsigned" <> (tupled $ sequence [int i,int (typeSize ty)])
 expr _ (DataCon ty@(Product _ _) _ es)             = tupled $ sequence $ zipWith (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr False e) [0..] es
   where
     tName = tyName ty
@@ -320,6 +323,7 @@ toSLV Bool       d   = "toSLV" <> parens d
 toSLV Integer    d   = toSLV (Signed 32) ("to_signed" <> (tupled $ sequence [d,int 32]))
 toSLV (Signed _) d   = "std_logic_vector" <> parens d
 toSLV (Unsigned _) d = "std_logic_vector" <> parens d
+toSLV (Sum _ _) d    = "std_logic_vector" <> parens d
 toSLV hty          _ = error $ "toSLV: " ++ show hty
 
 fromSLV :: HWType -> VHDLM Doc -> VHDLM Doc
@@ -329,7 +333,7 @@ fromSLV Integer d      = "to_integer" <> parens (fromSLV (Signed 32) d)
 fromSLV (Signed _) d   = "signed" <> parens d
 fromSLV (Unsigned _) d = "unsigned" <> parens d
 fromSLV (SP _ _) d     = d
-fromSLV (Sum _ _) d    = d
+fromSLV (Sum _ _) d    = "unsigned" <> parens d
 fromSLV hty _          = error $ "fromSLV: " ++ show hty
 
 dcToExpr :: HWType -> Int -> Expr
