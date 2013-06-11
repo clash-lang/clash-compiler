@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fno-expose-all-unfoldings #-}
 
 module CLaSH.Signal
-  ( Sync (..), fromList, sync
+  ( Sync, fromList, sync
   , sample
   , register
   , Pack(..)
@@ -13,7 +13,6 @@ module CLaSH.Signal
   )
 where
 
-import Data.List
 import Control.Applicative
 import Language.Haskell.TH.Syntax(Lift(..))
 import Unsafe.Coerce
