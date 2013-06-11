@@ -17,6 +17,7 @@ import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Term              (TmName)
 import           CLaSH.Driver.PrepareBinding
+import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL)
 import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
@@ -67,10 +68,9 @@ generateVHDL modName = do
       let transformedBindings
             = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
-      let tBindings = length transformedBindings
       mid <- Clock.getCurrentTime
-      traceIf True ("\nNormalisation of " ++ show tBindings ++ " took " ++ show (Clock.diffUTCTime mid start)) $ return ()
-      (netlist,vhdlState) <- genNetlist (HashMap.fromList $ transformedBindings)
+      traceIf True ("\nNormalisation took " ++ show (Clock.diffUTCTime mid start)) $ return ()
+      (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList $ transformedBindings)
                               primMap
                               (fst topEntity)
       mid' <- Clock.getCurrentTime

@@ -33,26 +33,28 @@ import CLaSH.Primitives.Types as P
 import CLaSH.Util
 
 genNetlist ::
-  HashMap TmName (Type,Term)
+  Maybe VHDLState
+  -> HashMap TmName (Type,Term)
   -> PrimMap
   -> TmName
   -> IO ([Component],VHDLState)
-genNetlist globals primMap topEntity = do
-  (_,s) <- runNetlistMonad globals primMap $ genComponent topEntity Nothing
+genNetlist vhdlStateM globals primMap topEntity = do
+  (_,s) <- runNetlistMonad vhdlStateM globals primMap $ genComponent topEntity Nothing
   return $ (HashMap.elems $ _components s, _vhdlMState s)
 
 runNetlistMonad ::
-  HashMap TmName (Type,Term)
+  Maybe VHDLState
+  -> HashMap TmName (Type,Term)
   -> PrimMap
   -> NetlistMonad a
   -> IO (a,NetlistState)
-runNetlistMonad s p
+runNetlistMonad vhdlStateM s p
   = runFreshMT
   . (flip runStateT) s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (0,Text.empty,HashMap.empty)
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (maybe (0,Text.empty,HashMap.empty) id vhdlStateM)
 
 genComponent ::
   TmName
