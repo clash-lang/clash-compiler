@@ -114,5 +114,6 @@ reduceArgs (_:_) _  []                            = Nothing
 reduceArgs ids appE (Right ty:args)               = reduceArgs ids (TyApp appE ty) args
 reduceArgs (id1:ids) appE (Left (Var _ nm):args)  | varName id1 == nm = reduceArgs ids appE args
                                                   | otherwise         = Nothing
-reduceArgs ids appE (Left arg:args)               | isConstant arg    = reduceArgs ids (App appE arg) args
-                                                  | otherwise         = Nothing
+reduceArgs _ _ _                                  = Nothing
+--reduceArgs ids appE (Left arg:args)               | isConstant arg    = reduceArgs ids (App appE arg) args
+--                                                  | otherwise         = Nothing
