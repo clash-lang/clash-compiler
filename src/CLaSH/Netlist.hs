@@ -36,10 +36,11 @@ genNetlist ::
   Maybe VHDLState
   -> HashMap TmName (Type,Term)
   -> PrimMap
+  -> Maybe Int
   -> TmName
   -> IO ([Component],VHDLState)
-genNetlist vhdlStateM globals primMap topEntity = do
-  (_,s) <- runNetlistMonad vhdlStateM globals primMap $ genComponent topEntity Nothing
+genNetlist vhdlStateM globals primMap mStart topEntity = do
+  (_,s) <- runNetlistMonad vhdlStateM globals primMap $ genComponent topEntity mStart
   return $ (HashMap.elems $ _components s, _vhdlMState s)
 
 runNetlistMonad ::
@@ -58,7 +59,7 @@ runNetlistMonad vhdlStateM s p
 
 genComponent ::
   TmName
-  -> Maybe Integer
+  -> Maybe Int
   -> NetlistMonad Component
 genComponent compName mStart = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
@@ -70,7 +71,7 @@ genComponent compName mStart = do
 genComponent' ::
   TmName
   -> Term
-  -> Maybe Integer
+  -> Maybe Int
   -> NetlistMonad Component
 genComponent' compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart

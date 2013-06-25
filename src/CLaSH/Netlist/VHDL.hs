@@ -166,6 +166,8 @@ architecture c =
 vhdlType :: HWType -> VHDLM Doc
 vhdlType Bit        = "std_logic"
 vhdlType Bool       = "boolean"
+vhdlType (Clock _)  = "std_logic"
+vhdlType (Reset _)  = "std_logic"
 vhdlType Integer    = "integer"
 vhdlType (Signed n) = "signed" <>
                       parens ( int (n-1) <+> "downto 0")
@@ -204,8 +206,8 @@ decls ds = do
     dsDoc = fmap catMaybes $ mapM decl ds
 
 decl :: Declaration -> VHDLM (Maybe Doc)
-decl (NetDecl id_ ty Nothing) = fmap Just $
-  "signal" <+> text id_ <+> colon <+> vhdlType ty
+decl (NetDecl id_ ty netInit) = fmap Just $
+  "signal" <+> text id_ <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr False e) netInit)
 
 decl _ = return Nothing
 

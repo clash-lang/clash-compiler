@@ -69,8 +69,8 @@ mkBlackBox templ bbCtx = do
   case (null err && verifyBlackBoxContext l bbCtx) of
     True -> do
       i           <- Lens.use varCount
-      let (l',i') =  setSym (fromInteger i) l
-      varCount    .= (toInteger i')
+      let (l',i') =  setSym i l
+      varCount    .= i'
       (bb,clks)   <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
       tell clks
       return $! bb
@@ -142,8 +142,8 @@ mkFunInput resId e = case (collectArgs e) of
         if null err
           then do
             i <- Lens.use varCount
-            let (l',i') = setSym (fromInteger i) l
-            varCount .= (toInteger i')
+            let (l',i') = setSym i l
+            varCount .= i'
             return ((l',bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ name2String nm

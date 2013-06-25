@@ -5,10 +5,11 @@ module CLaSH.Driver where
 
 import           Control.Monad.State          (evalState)
 import qualified Data.ByteString.Lazy         as LZ
-import           Data.Maybe                   (fromMaybe)
+import           Data.Maybe                   (fromMaybe,listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
 import qualified Data.HashMap.Lazy            as HashMap
 import           Data.List                    (isSuffixOf)
+import           Data.Text.Lazy               (pack)
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
 import qualified System.IO                    as IO
@@ -20,6 +21,7 @@ import           CLaSH.Driver.PrepareBinding
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL)
+import           CLaSH.Netlist.Types          (Component(..))
 import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
 import           CLaSH.Primitives.Types
 import           CLaSH.Primitives.Util
@@ -61,23 +63,36 @@ generateVHDL modName = do
   let topEntities = HashMap.toList
                   $ HashMap.filterWithKey isTopEntity bindingsMap
 
+      testInputs  = HashMap.toList
+                  $ HashMap.filterWithKey isTestInput bindingsMap
+
+      expectedOutputs = HashMap.toList
+                      $ HashMap.filterWithKey isExpectedOutput bindingsMap
+
   case topEntities of
     [topEntity] -> do
       let bindingsMap' = HashMap.map snd bindingsMap
-      supply <- Supply.newSupply
+      (supplyN,supplyTB) <- fmap Supply.splitSupply Supply.newSupply
       let transformedBindings
-            = runNormalization DebugApplied supply bindingsMap' dfunMap clsOpMap
+            = runNormalization DebugFinal supplyN bindingsMap' dfunMap clsOpMap
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
-      mid <- Clock.getCurrentTime
-      traceIf True ("\nNormalisation took " ++ show (Clock.diffUTCTime mid start)) $ return ()
+      normTime <- Clock.getCurrentTime
+      traceIf True ("\nNormalisation took " ++ show (Clock.diffUTCTime normTime start)) $ return ()
       (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList $ transformedBindings)
                               primMap
+                              Nothing
                               (fst topEntity)
-      mid' <- Clock.getCurrentTime
-      traceIf True ("\nNetlist generation took " ++ show (Clock.diffUTCTime mid' mid)) $ return ()
+      netlistTime <- Clock.getCurrentTime
+      traceIf True ("\nNetlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
+
+      (testBench,vhdlState') <- genTestBench DebugFinal supplyTB dfunMap clsOpMap primMap vhdlState
+                                  bindingsMap'
+                                  (listToMaybe $ map fst testInputs)
+                                  (listToMaybe $ map fst expectedOutputs)
+                                  (head $ filter (\(Component cName _ _ _ _) -> cName == (pack "topEntity_0")) netlist)
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
-      mapM_ (writeVHDL dir) $ evalState (mapM genVHDL netlist) vhdlState
+      mapM_ (writeVHDL dir) $ evalState (mapM genVHDL (netlist ++ testBench)) vhdlState'
       end <- Clock.getCurrentTime
       traceIf True ("\nTotal compilation took " ++ show (Clock.diffUTCTime end start)) $ return ()
 
@@ -89,6 +104,18 @@ isTopEntity ::
   -> a
   -> Bool
 isTopEntity var _ = name2String var == "topEntity"
+
+isTestInput ::
+  TmName
+  -> a
+  -> Bool
+isTestInput var _ = name2String var == "testInput"
+
+isExpectedOutput ::
+  TmName
+  -> a
+  -> Bool
+isExpectedOutput var _ = name2String var == "expectedOutput"
 
 -- | Prepares the directory for writing VHDL files. This means creating the
 --   dir if it does not exist and removing all existing .vhdl files from it.

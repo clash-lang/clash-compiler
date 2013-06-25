@@ -6,7 +6,7 @@ import CLaSH.Netlist.Types  (Expr,HWType,NetlistMonad,Component,Declaration)
 
 genComponent ::
   TmName
-  -> Maybe Integer
+  -> Maybe Int
   -> NetlistMonad Component
 
 mkDcApplication ::

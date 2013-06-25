@@ -112,13 +112,13 @@ mkSyncIdentifier b (I n)          = return $ fst $ (inputs b)!!n
 mkSyncIdentifier b (L n)          = return $ Left $ (litInputs b)!!n
 mkSyncIdentifier _ (Sym n)        = return $ Left $ Text.pack ("n_" ++ show n)
 mkSyncIdentifier b (Clk Nothing)  = let t = clkSyncId $ fst $ result b
-                                    in tell [(t,Bit)] >> return (Left t)
+                                    in tell [(t,Clock 10)] >> return (Left t)
 mkSyncIdentifier b (Clk (Just n)) = let t = clkSyncId $ fst $ (inputs b)!!n
-                                    in tell [(t,Bit)] >> return (Left t)
+                                    in tell [(t,Clock 10)] >> return (Left t)
 mkSyncIdentifier b (Rst Nothing)  = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ fst $ result b
-                                    in tell [(t,Bit)] >> return (Left t)
+                                    in tell [(t,Reset 10)] >> return (Left t)
 mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` (Text.pack "_rst")) . clkSyncId $ fst $ (inputs b)!!n
-                                    in tell [(t,Bit)] >> return (Left t)
+                                    in tell [(t,Reset 10)] >> return (Left t)
 mkSyncIdentifier b (Typ Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
 mkSyncIdentifier b (Typ (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ (inputs b)!!n
 mkSyncIdentifier b (Def Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b

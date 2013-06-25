@@ -151,6 +151,8 @@ typeSize ::
   -> Int
 typeSize Void = 0
 typeSize Bool = 1
+typeSize (Clock _) = 1
+typeSize (Reset _) = 1
 typeSize Integer = 32
 typeSize (Signed i) = i
 typeSize (Unsigned i) = i
