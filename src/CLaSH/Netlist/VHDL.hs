@@ -146,11 +146,11 @@ entity c = do
       "end" <> semi
   where
     ports = sequence
-          $ [ text i <+> colon <+> "in" <+> vhdlType ty
+          $ [ text i <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty
             | (i,ty) <- inputs c ] ++
-            [ text i <+> colon <+> "in" <+> vhdlType ty
+            [ text i <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty
             | (i,ty) <- hiddenPorts c ] ++
-            [ text (fst $ output c) <+> colon <+> "out" <+> vhdlType (snd $ output c)
+            [ text (fst $ output c) <+> colon <+> "out" <+> vhdlType (snd $ output c) <+> ":=" <+> vhdlTypeDefault (snd $ output c)
             ]
 
 architecture :: Component -> VHDLM Doc
@@ -184,15 +184,17 @@ vhdlType t@(Product _ _) = tyName t
 vhdlType t          = error $ "vhdlType: " ++ show t
 
 vhdlTypeDefault :: HWType -> VHDLM Doc
-vhdlTypeDefault Bit                 = "'-'"
+vhdlTypeDefault Bit                 = "'0'"
 vhdlTypeDefault Bool                = "false"
 vhdlTypeDefault Integer             = "0"
-vhdlTypeDefault (Signed _)          = "(others => '-')"
-vhdlTypeDefault (Unsigned _)        = "(others => '-')"
+vhdlTypeDefault (Signed _)          = "(others => '0')"
+vhdlTypeDefault (Unsigned _)        = "(others => '0')"
 vhdlTypeDefault (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeDefault elTy)
-vhdlTypeDefault (SP _ _)            = "(others => '-')"
-vhdlTypeDefault (Sum _ _)           = "(others => '-')"
+vhdlTypeDefault (SP _ _)            = "(others => '0')"
+vhdlTypeDefault (Sum _ _)           = "(others => '0')"
 vhdlTypeDefault (Product _ elTys)   = tupled $ mapM vhdlTypeDefault elTys
+vhdlTypeDefault (Reset _)           = "'0'"
+vhdlTypeDefault (Clock _)           = "'0'"
 vhdlTypeDefault t                   = error $ "vhdlTypeDefault: " ++ show t
 
 decls :: [Declaration] -> VHDLM Doc
@@ -207,7 +209,7 @@ decls ds = do
 
 decl :: Declaration -> VHDLM (Maybe Doc)
 decl (NetDecl id_ ty netInit) = fmap Just $
-  "signal" <+> text id_ <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr False e) netInit)
+  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <+> ":=" <+> maybe (vhdlTypeDefault ty) (expr False) netInit
 
 decl _ = return Nothing
 
