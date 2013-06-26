@@ -26,6 +26,9 @@ module CLaSH.Sized.VectorZ
   )
 where
 
+import Control.Applicative
+import Data.Traversable
+import Data.Foldable hiding (toList)
 import GHC.TypeLits
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -47,6 +50,20 @@ instance Show a => Show (Vec n a) where
 
 instance Eq a => Eq (Vec n a) where
   v1 == v2 = vfoldr (&&) True (vzipWith (==) v1 v2)
+
+instance SingI n => Applicative (Vec n) where
+  pure  = vcopyI
+  (<*>) = vzipWith ($)
+
+instance Traversable (Vec n) where
+  traverse f Nil       = pure Nil
+  traverse f (x :> xs) = (:>) <$> f x <*> traverse f xs
+
+instance Foldable (Vec n) where
+  foldMap = foldMapDefault
+
+instance Functor (Vec n) where
+  fmap = fmapDefault
 
 {-# NOINLINE vhead #-}
 vhead :: Vec (n + 1) a -> a
