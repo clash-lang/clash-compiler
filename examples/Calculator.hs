@@ -29,3 +29,9 @@ topEntity i = val
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
     initMem    = vcopy (sing :: Sing 8) 0
+
+testInput :: [OPC Word]
+testInput = [Imm 1,Push,Imm 2,Push,Pop,Pop,Pop,ADD]
+
+expectedOutput :: [Maybe Word]
+expectedOutput = [Just 1,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3]
