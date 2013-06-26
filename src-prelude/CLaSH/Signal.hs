@@ -54,7 +54,7 @@ mapSync :: (a -> b) -> Sync a -> Sync b
 mapSync f (a :- as) = f a :- mapSync f as
 
 appSync :: Sync (a -> b) -> Sync a -> Sync b
-appSync (f :- fs) (a :- as) = f a :- appSync fs as
+appSync (f :- fs) ~(a :- as) = f a :- appSync fs as
 
 instance Functor Sync where
   fmap = mapSync
