@@ -135,12 +135,10 @@ genAssert compO expV = PP.hsep
   [ PP.text "assert"
   , PP.parens $ PP.hsep [ PP.text compO
                         , PP.equals
-                        -- , (PP.text . Text.pack . name2String . varName) expV
                         , PP.text expV
                         ]
   , PP.text "report"
   , PP.parens (PP.hsep [ "\"expected: \" &"
-                       -- , "to_string" <+> PP.parens (PP.text . Text.pack . name2String $ varName expV)
                        , "to_string" <+> PP.parens (PP.text expV)
                        , "& \", actual: \" &"
                        , "to_string" <+> PP.parens (PP.text compO)
