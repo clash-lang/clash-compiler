@@ -233,8 +233,9 @@ inst (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"
               <+> text nm <$$> pms' <> semi
   where
-    pms' = nest 2 $ "port map" <$$>
-            tupled (sequence [text i <+> "=>" <+> expr False e | (i,e) <- pms])
+    pms' = do
+      rec (p,ls) <- fmap unzip $ sequence [ (,fromIntegral (T.length i)) A.<$> fill (maximum ls) (text i) <+> "=>" <+> expr False e | (i,e) <- pms]
+      nest 2 $ "port map" <$$> tupled (A.pure p)
 
 inst (BlackBoxD bs) = fmap Just $ string bs
 
