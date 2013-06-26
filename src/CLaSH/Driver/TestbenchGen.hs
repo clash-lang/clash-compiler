@@ -125,7 +125,7 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap vhdlState globals stimuliNmM
     normalizeSignal glbls bndr =
       runNormalization dbgLvl supply glbls dfunMap clsOpMap (normalize [bndr] >>= cleanupGraph [bndr])
 
-genTestBench _ _ _ _ _ v _ _ _ c = error $ "Can't make testbench for: " ++ show c
+genTestBench _ _ _ _ _ _ _ _ _ c = error $ "Can't make testbench for: " ++ show c
 
 renderFloat2Dec :: Float -> PP.Doc
 renderFloat2Dec = PP.text . Builder.toLazyText . (Builder.formatRealFloat Builder.Fixed (Just 2))

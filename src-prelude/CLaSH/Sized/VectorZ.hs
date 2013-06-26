@@ -56,7 +56,7 @@ instance SingI n => Applicative (Vec n) where
   (<*>) = vzipWith ($)
 
 instance Traversable (Vec n) where
-  traverse f Nil       = pure Nil
+  traverse _ Nil       = pure Nil
   traverse f (x :> xs) = (:>) <$> f x <*> traverse f xs
 
 instance Foldable (Vec n) where
