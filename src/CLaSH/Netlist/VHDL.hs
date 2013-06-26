@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE RecursiveDo       #-}
 module CLaSH.Netlist.VHDL where
 
 import qualified Control.Applicative as A
@@ -10,6 +11,7 @@ import qualified Data.HashMap.Lazy as HashMap
 import Data.List (nub)
 import Data.Maybe (catMaybes)
 import Data.Text.Lazy (Text,unpack)
+import qualified Data.Text.Lazy as T
 import Text.PrettyPrint.Leijen.Text.Monadic
 
 import CLaSH.Netlist.Types
@@ -200,18 +202,16 @@ vhdlTypeDefault t                   = error $ "vhdlTypeDefault: " ++ show t
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
 decls ds = do
-    d <- dsDoc
-    case d of
+    rec (dsDoc,ls) <- fmap (unzip . catMaybes) $ mapM (decl (maximum ls)) ds
+    case dsDoc of
       [] -> empty
-      _  -> vcat (punctuate semi dsDoc) <> semi
-  where
-    dsDoc = fmap catMaybes $ mapM decl ds
+      _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
 
-decl :: Declaration -> VHDLM (Maybe Doc)
-decl (NetDecl id_ ty netInit) = fmap Just $
+decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
+decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
   "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <+> ":=" <+> maybe (vhdlTypeDefault ty) (expr False) netInit
 
-decl _ = return Nothing
+decl _ _ = return Nothing
 
 insts :: [Declaration] -> VHDLM Doc
 insts [] = empty
