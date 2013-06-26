@@ -137,23 +137,23 @@ tyImports tys = do prevDec <- use _3
 
 entity :: Component -> VHDLM Doc
 entity c = do
-    p <- ports
+    rec (p,ls) <- fmap unzip (ports (maximum ls))
     "entity" <+> text (componentName c) <+> "is" <$>
       (case p of
          [] -> empty
          _  -> indent 2 ("port" <>
-                         parens (align $ vcat $ punctuate semi ports) <>
+                         parens (align $ vcat $ punctuate semi (A.pure p)) <>
                          semi)
       ) <$>
       "end" <> semi
   where
-    ports = sequence
-          $ [ text i <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty
-            | (i,ty) <- inputs c ] ++
-            [ text i <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty
-            | (i,ty) <- hiddenPorts c ] ++
-            [ text (fst $ output c) <+> colon <+> "out" <+> vhdlType (snd $ output c) <+> ":=" <+> vhdlTypeDefault (snd $ output c)
-            ]
+    ports l = sequence
+            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty)
+              | (i,ty) <- inputs c ] ++
+              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty)
+              | (i,ty) <- hiddenPorts c ] ++
+              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c) <+> ":=" <+> vhdlTypeDefault (snd $ output c))
+              ]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
