@@ -113,6 +113,7 @@ funDec _ = empty
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
+tyName Bit               = "std_logic"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
