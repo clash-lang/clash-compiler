@@ -85,7 +85,7 @@ generateVHDL modName = do
       netlistTime <- Clock.getCurrentTime
       traceIf True ("\nNetlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
 
-      (testBench,vhdlState') <- genTestBench DebugFinal supplyTB dfunMap clsOpMap primMap vhdlState
+      (testBench,vhdlState') <- genTestBench DebugNone supplyTB dfunMap clsOpMap primMap vhdlState
                                   bindingsMap'
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)

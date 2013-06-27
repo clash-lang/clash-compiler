@@ -8,9 +8,9 @@
 module CLaSH.Core.Term where
 
 -- External Modules
-import Unbound.LocallyNameless as Unbound hiding (Data)
+import Unbound.LocallyNameless       as Unbound hiding (Data)
 import Unbound.LocallyNameless.Alpha (fvR1,aeqR1)
-import Unbound.LocallyNameless.Name (isFree)
+import Unbound.LocallyNameless.Name  (isFree)
 
 -- Internal Modules
 import CLaSH.Core.DataCon              (DataCon)
