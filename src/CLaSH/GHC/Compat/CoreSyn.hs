@@ -3,7 +3,7 @@ module CLaSH.GHC.Compat.CoreSyn
   (dfunArgExprs)
 where
 
-#if __GLASGOW_HASKELL__ >= 706
+#if __GLASGOW_HASKELL__ < 707
 import Data.List (mapAccumL)
 
 import CoreSyn    (CoreExpr,DFunArg(..),Expr(Var))
@@ -15,10 +15,11 @@ import TcType     (tcSplitForAllTys,tcView)
 import TypeRep    (Type(FunTy))
 import UniqSupply (UniqSupply,takeUniqFromSupply)
 #else
-import Type (Type)
+import Type       (Type)
+import UniqSupply (UniqSupply)
 #endif
 
-#if __GLASGOW_HASKELL__ >= 706
+#if __GLASGOW_HASKELL__ < 707
 dfunArgExprs :: UniqSupply -> Type -> [DFunArg CoreExpr] -> ([CoreExpr],UniqSupply)
 dfunArgExprs uniqSupply dfunty es = (map dfunArgToE es,uniqSupply')
   where

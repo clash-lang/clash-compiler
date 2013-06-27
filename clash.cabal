@@ -95,6 +95,7 @@ Library
 
                        CLaSH.Driver.PrepareBinding
                        CLaSH.Driver.TestbenchGen
+                       CLaSH.Driver.Types
 
                        CLaSH.GHC.Compat.CoreSyn
                        CLaSH.GHC.Compat.DynFlags
@@ -106,6 +107,7 @@ Library
                        CLaSH.GHC.GHC2Core
                        CLaSH.GHC.LoadInterfaceFiles
                        CLaSH.GHC.LoadModules
+                       CLaSH.GHC.Types
 
                        CLaSH.Netlist
                        CLaSH.Netlist.BlackBox

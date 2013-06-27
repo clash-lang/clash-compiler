@@ -8,6 +8,7 @@ module CLaSH.GHC.GHC2Core
   , coreToTerm
   , coreToBndr
   , coreToPrimBndr
+  , coreToVar
   )
 where
 

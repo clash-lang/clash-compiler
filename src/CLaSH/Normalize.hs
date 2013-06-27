@@ -13,6 +13,7 @@ import CLaSH.Core.FreeVars      (termFreeIds)
 import CLaSH.Core.Pretty        (showDoc)
 import CLaSH.Core.Term          (TmName,Term)
 import CLaSH.Core.Type          (Type)
+import CLaSH.Driver.Types
 import CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
 import CLaSH.Rewrite.Types      (DebugLevel(..),RewriteState(..),dbgLevel,
@@ -24,8 +25,8 @@ runNormalization ::
   DebugLevel
   -> Supply
   -> HashMap TmName (Type,Term)
-  -> HashMap TmName (Type,[Term])
-  -> HashMap TmName (Type,Int)
+  -> DFunMap
+  -> ClassOpMap
   -> NormalizeSession a
   -> a
 runNormalization lvl supply globals dfunMap clsOpMap

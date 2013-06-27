@@ -17,7 +17,7 @@ import CLaSH.Core.DataCon    (DataCon,dcTag,dcUnivTyVars)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars,termFreeVars)
 import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
-import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm)
+import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm,substTms)
 import CLaSH.Core.Term       (Term(..),TmName,LetBinding,Pat(..))
 import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy)
 import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isLet,isPrim)
@@ -476,9 +476,16 @@ classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dict) = R $ do
       (Prim (PrimDFun dfun _),dfunArgs) -> do
         dfunOpsM <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
         case dfunOpsM of
-          Just dfunOps | classSel < length dfunOps -> changed $ mkApps (dfunOps !! classSel) dfunArgs
+          Just ((dfunTyBndrs,dfunTmBndrs),dfunOps)
+            | classSel < length dfunOps
+            , (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs
+            -> let (dfunTms,dfunTys) = Either.partitionEithers dfunArgs
+                   tySubst = zip dfunTyBndrs dfunTys
+                   tmSubst = zip dfunTmBndrs dfunTms
+               in changed $! substTms tmSubst $ substTysinTm tySubst (dfunOps !! classSel)
+               -- in error $ show (tySubst,tmSubst) ++ unlines (map showDoc $ tail dfunOps)
           Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
-          _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e
+          _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e ++ show dfunOpsM
       (Var _ fdict,dfunArgs) -> do
         dictBindingM <- fmap (fmap snd . HashMap.lookup fdict) $ Lens.use bindings
         case dictBindingM of
@@ -491,19 +498,23 @@ classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dict) = R $ do
 
 classOpResolution ctx e@(Case scrut ty [alt]) = R $ do
   case (collectArgs scrut) of
-    (Prim (PrimDFun df t), args) -> do
+    (Prim (PrimDFun df t), dfunArgs) -> do
       (pat,altExpr) <- unbind alt
       dfunOpsM <- fmap (fmap snd . HashMap.lookup df) $ Lens.use dictFuns
       case (dfunOpsM,pat) of
-        (Just dfunOps, DataPat _ pxs) -> do
-          let dfunOps' = map (`mkApps` args) dfunOps
-          let (_,xs)   = unrebind pxs
-          let fvs      = termFreeIds altExpr
-          let (binds,_) = List.partition ((`elem` fvs) . varName . fst) $ zip xs dfunOps'
-          let altExpr' = case binds of
-                            [] -> altExpr
-                            _  -> Letrec $ bind (rec $ map (second embed) binds) altExpr
-          changed altExpr'
+        (Just ((dfunTyBndrs,dfunTmBndrs),dfunOps), DataPat _ pxs)
+          | (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs ->
+            let (dfunTms,dfunTys) = Either.partitionEithers dfunArgs
+                tySubst   = zip dfunTyBndrs dfunTys
+                tmSubst   = zip dfunTmBndrs dfunTms
+                dfunOps'  = map (substTms tmSubst . substTysinTm tySubst) dfunOps
+                (_,xs)    = unrebind pxs
+                fvs       = termFreeIds altExpr
+                (binds,_) = List.partition ((`elem` fvs) . varName . fst) $ zip xs dfunOps'
+                altExpr'  = case binds of
+                               [] -> altExpr
+                               _  -> Letrec $ bind (rec $ map (second embed) binds) altExpr
+            in changed altExpr'
         (Nothing,_)  -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
         _            -> error $ $(curLoc) ++ "No DataPat: " ++ showDoc e
     (Prim (PrimFun _ _), _)  -> error $ "FUN: " ++ showDoc scrut
@@ -519,21 +530,33 @@ chaseDfun ::
   -> Term
   -> RewriteMonad m Term
 chaseDfun classSel ctx e = case (collectArgs e) of
-  (Prim (PrimDFun dfun _), args) -> do
+  (Prim (PrimDFun dfun _), dfunArgs) -> do
     dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
     case dfunOpsM of
-      Just dfunOps | classSel < length dfunOps -> do
-        let dfunOp = dfunOps !! classSel
-        return $ mkApps dfunOp args
+      Just ((dfunTyBndrs,dfunTmBndrs),dfunOps)
+        | classSel < length dfunOps
+        , (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs
+        -> let (dfunTms,dfunTys) = Either.partitionEithers dfunArgs
+               tySubst = zip dfunTyBndrs dfunTys
+               tmSubst = zip dfunTmBndrs dfunTms
+               dfunOp  = substTms tmSubst $ substTysinTm tySubst (dfunOps !! classSel)
+           in return $! dfunOp
       Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
       _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e
   _ -> mkSelectorCase "chaseDfun" ctx e 1 classSel
 
 inlineSingularDFun :: NormRewrite
-inlineSingularDFun _ e@(Prim (PrimDFun f _)) = R $ do
-  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use dictFuns
+inlineSingularDFun _ e@(collectArgs -> (Prim (PrimDFun dfun _),dfunArgs)) = R $ do
+  bodyMaybe <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
   case bodyMaybe of
-    Just (_,[dfunOp]) -> changed dfunOp
+    Just ((dfunTyBndrs,dfunTmBndrs),[dfunOp])
+      | (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs
+      -> let (dfunTms,dfunTys) = Either.partitionEithers dfunArgs
+             tySubst = zip dfunTyBndrs dfunTys
+             tmSubst = zip dfunTmBndrs dfunTms
+             dfunOp' = substTms tmSubst $ substTysinTm tySubst dfunOp
+         in return $! dfunOp'
+      | otherwise -> return e
     _ -> return e
 
 inlineSingularDFun _ e = return e

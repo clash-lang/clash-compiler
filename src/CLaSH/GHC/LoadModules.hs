@@ -30,12 +30,13 @@ import           UniqSupply (mkSplitUniqSupply)
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
+import           CLaSH.GHC.Types
 import           CLaSH.Util (curLoc,mapAccumLM,(><))
 
 loadModules ::
   String
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
-        , [(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])]  -- Dictionary Functions
+        , [CoreDFUN]                               -- Dictionary Functions
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , [GHC.TyCon]                              -- Type Constructors

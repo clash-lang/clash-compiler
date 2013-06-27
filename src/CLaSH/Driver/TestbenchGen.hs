@@ -24,6 +24,7 @@ import CLaSH.Core.TyCon
 import CLaSH.Core.Type
 import CLaSH.Core.Util
 
+import CLaSH.Driver.Types
 import CLaSH.Netlist
 import CLaSH.Netlist.Types as N
 import CLaSH.Normalize (runNormalization,normalize,cleanupGraph)
@@ -34,8 +35,8 @@ import CLaSH.Util
 
 genTestBench :: DebugLevel
              -> Supply
-             -> HashMap TmName (Type,[Term]) -- ^ Dictionary Functions
-             -> HashMap TmName (Type,Int)    -- ^ Class operators
+             -> DFunMap                      -- ^ Dictionary Functions
+             -> ClassOpMap                   -- ^ Class operators
              -> PrimMap                      -- ^ Primitives
              -> VHDLState
              -> HashMap TmName (Type,Term)   -- ^ Global binders

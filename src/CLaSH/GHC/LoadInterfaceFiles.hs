@@ -6,7 +6,7 @@ module CLaSH.GHC.LoadInterfaceFiles where
 -- External Modules
 import           Data.Either (partitionEithers)
 import           Data.List   (elemIndex,partition)
-import           Data.Maybe  (fromMaybe,isJust,isNothing,mapMaybe)
+import           Data.Maybe  (isJust,isNothing,mapMaybe)
 
 -- GHC API
 import qualified BasicTypes
@@ -35,7 +35,8 @@ import qualified Var
 import qualified VarSet
 
 -- Internal Modules
-import           CLaSH.Util (curLoc,mapAccumLM,second,traceIf)
+import           CLaSH.GHC.Types
+import           CLaSH.Util (curLoc,mapAccumLM,maybe',second,traceIf)
 
 getExternalTyCons ::
   GHC.GhcMonad m
@@ -96,7 +97,7 @@ loadExternalExprs ::
   -> [CoreSyn.CoreExpr]
   -> [CoreSyn.CoreBndr]
   -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)]    -- Binders
-       , [(CoreSyn.CoreBndr,[CoreSyn.CoreExpr])]  -- Dictionary functions
+       , [CoreDFUN]  -- Dictionary functions
        , [(CoreSyn.CoreBndr,Int)]                 -- Class Ops
        , [CoreSyn.CoreBndr]                       -- Unlocatable
        )
@@ -114,25 +115,34 @@ loadExternalExprs us (expr:exprs) visited = do
                                   $ mapAccumLM loadExprFromIface us fvs'
 
   let (locatedDFuns,locatedExprs) = partitionEithers located
-  let visited' = map fst locatedExprs ++ map fst locatedDFuns
-                  ++ unlocated ++ clsOps ++ visited
+  let visited' = concat [ map fst locatedExprs
+                        , map fst locatedDFuns
+                        , concatMap (snd . fst . snd) locatedDFuns
+                        , unlocated
+                        , clsOps
+                        , visited
+                        ]
 
   (locatedExprs', locatedDFuns', clsOps', unlocated') <-
     loadExternalExprs
       us'
       ( exprs ++
         map snd locatedExprs ++
-        concatMap snd locatedDFuns
+        concatMap (snd . snd) locatedDFuns
       ) visited'
 
-  let clsOps'' = map ( \v ->
-                          (v,)
-                          . fromMaybe (error $ $(curLoc) ++ "Index not found")
-                          . elemIndex v
-                          . Class.classAllSelIds
-                          . fromMaybe (error $ $(curLoc) ++ "Not a class op")
-                          $ Id.isClassOpId_maybe v
-                     ) clsOps
+  let clsOps'' = map
+       ( \v -> maybe' (error $ $(curLoc) ++ "Not a class op") (Id.isClassOpId_maybe v) $ \c ->
+           let clsIds = Class.classAllSelIds c
+               l      = Class.classArity c
+           in maybe' (error $ $(curLoc) ++ "Index not found") (elemIndex v clsIds) ((v,) . (+l))
+   --         (v,)
+   --         . fromMaybe (error $ $(curLoc) ++ "Index not found")
+   --         . elemIndex v
+   --         . Class.classAllSelIds
+   --         . fromMaybe (error $ $(curLoc) ++ "Not a class op")
+   --         $ Id.isClassOpId_maybe v
+       ) clsOps
 
   return ( locatedExprs ++ locatedExprs'
          , locatedDFuns ++ locatedDFuns'
@@ -147,7 +157,7 @@ loadExprFromIface ::
   -> m (UniqSupply
        ,Either
           (Either
-            (CoreSyn.CoreBndr,[CoreSyn.CoreExpr])
+            CoreDFUN
             (CoreSyn.CoreBndr,CoreSyn.CoreExpr))
           CoreSyn.CoreBndr
        )
@@ -176,7 +186,7 @@ loadExprFromTyThing ::
   -> (UniqSupply
      ,Either
        (Either
-         (CoreSyn.CoreBndr,[CoreSyn.CoreExpr]) -- Located DFun
+         CoreDFUN                              -- Located DFun
          (CoreSyn.CoreBndr,CoreSyn.CoreExpr))  -- Located Binder
        CoreSyn.CoreBndr                        -- unlocatable Var
      )
@@ -190,8 +200,8 @@ loadExprFromTyThing us bndr tyThing = case tyThing of
         case BasicTypes.inl_inline inlineInfo of
           BasicTypes.NoInline -> (us,Right bndr)
           _ -> (us,Left $! (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
-      (CoreSyn.DFunUnfolding _ _ es) ->
+      (CoreSyn.DFunUnfolding dfbndrs _ es) ->
         let (exprs,us') = dfunArgExprs us dfunTy es
-        in (us',Left $! Left (bndr, exprs))
+        in (us',Left $! Left (bndr, (partition Var.isTyVar dfbndrs,exprs)))
       _ -> (us,Right bndr)
   _ -> (us,Right bndr)

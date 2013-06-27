@@ -43,3 +43,9 @@ substTm ::
   -> Term
   -> Term
 substTm = subst
+
+substTms ::
+  [(TmName,Term)]
+  -> Term
+  -> Term
+substTms = substs

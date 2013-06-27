@@ -1,7 +1,6 @@
 module CLaSH.Driver.PrepareBinding where
 
 import qualified Data.HashMap.Lazy       as HashMap
-import           Data.HashMap.Lazy       (HashMap)
 import           Data.Maybe              (fromMaybe)
 import           Unbound.LocallyNameless (unembed)
 
@@ -9,16 +8,11 @@ import qualified Module
 import qualified Name
 import qualified Var
 
-import           CLaSH.Core.Term         (TmName,Term)
-import           CLaSH.Core.Type         (Type)
 import           CLaSH.Core.Var          (Var(..))
-import           CLaSH.GHC.GHC2Core      (makeAllTyDataCons,coreToBndr,coreToPrimBndr,coreToTerm)
+import           CLaSH.Driver.Types
+import           CLaSH.GHC.GHC2Core      (makeAllTyDataCons,coreToBndr,coreToPrimBndr,coreToTerm,coreToVar)
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Primitives.Types
-
-type DFunMap    = HashMap TmName (Type,[Term])
-type ClassOpMap = HashMap TmName (Type,Int)
-type BindingMap = HashMap TmName (String,(Type,Term))
 
 prepareBinding ::
   PrimMap
@@ -43,11 +37,15 @@ prepareBinding primMap modName = do
                         ) bindings
 
   let dfunMap = HashMap.fromList
-              $ map (\(v,es) ->
+              $ map (\(v,((tyVs,tmVs),es)) ->
                       let v' = coreToBndr tcsMap v
                       in ( varName v'
                          , ( unembed $ varType v'
-                             , map (coreToTerm primMap unlocatable dfunvars tcsMap) es
+                             , ( ( map coreToVar tyVs
+                                 , map coreToVar tmVs
+                                 )
+                               , map (coreToTerm primMap unlocatable dfunvars tcsMap) es
+                               )
                              )
                          )
                     ) dfuns

@@ -15,6 +15,7 @@ import Unbound.LocallyNameless   (Fresh,FreshMT)
 import CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.Type (Type)
 import CLaSH.Core.Var  (Id,TyVar)
+import CLaSH.Driver.Types
 import CLaSH.Util
 
 data CoreContext = AppFirst
@@ -32,8 +33,8 @@ data RewriteState
   = RewriteState
   { _transformCounter :: Int
   , _bindings         :: HashMap TmName (Type,Term)
-  , _dictFuns         :: HashMap TmName (Type,[Term])
-  , _classOps         :: HashMap TmName (Type,Int)
+  , _dictFuns         :: DFunMap
+  , _classOps         :: ClassOpMap
   , _uniqSupply       :: Supply
   }
 
