@@ -642,7 +642,8 @@ collectANF _ e@(App appf arg)
   = do
     localVar       <- liftNormR $ isLocalVar arg
     untranslatable <- liftNormR $ isUntranslatable arg
-    case (untranslatable,localVar || isConstant arg,arg) of
+    closed         <- liftNormR $ isClosed arg
+    case (untranslatable,localVar || closed || isConstant arg,arg) of
       (False,False,_) -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "repANF" arg
                             tell [(argId,embed arg)]
                             return (App appf argVar)
