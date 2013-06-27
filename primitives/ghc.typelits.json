@@ -3,9 +3,9 @@
     , "primType"  : "Dictionary"
     }
   }
-, { "Primitive" :
+, { "BlackBox" :
     { "name"      : "GHC.TypeLits.sing"
-    , "primType"  : "Dictionary"
+    , "templateE" : "~LIT[0]"
     }
   }
 ]

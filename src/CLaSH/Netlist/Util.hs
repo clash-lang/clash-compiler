@@ -66,7 +66,7 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
     "GHC.Prim.Int"                  -> return Integer
     "GHC.Prim.ByteArray#"           -> Left $ "Can't translate type: " ++ showDoc ty
     "GHC.Types.Bool"                -> return Bool
-    "GHC.TypeLits.Sing"             -> Left $ "Can't translate type: " ++ showDoc ty
+    "GHC.TypeLits.Sing"             -> singletonToHWType (head args) -- Left $ "Can't translate type: " ++ showDoc ty
     "GHC.Prim.~#"                   -> Left $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Bit.Bit"                 -> return Bit
     "CLaSH.Signal.Pack"             -> Left $ "Can't translate type: " ++ showDoc ty
