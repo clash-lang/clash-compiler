@@ -47,6 +47,7 @@ representable = propagagition >-> specialisation
 simplification :: NormRewrite
 simplification = (apply "etaTL" etaExpansionTL) >->
                  (repeatR $ unsafeTopdownR $ apply "propagation" appProp) >->
+                 (bottomupR (apply "nonRepANF" nonRepANF)) >->
                  (apply "ANF" makeANF) >->
                  repeatBottomup steps
   where
