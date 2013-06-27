@@ -15,6 +15,7 @@ import qualified CoreSyn
 import           CLaSH.GHC.Compat.CoreSyn (dfunArgExprs)
 import qualified CoreFVs
 import qualified Exception
+import qualified FamInstEnv
 import qualified GHC
 import qualified HscTypes
 import qualified Id
@@ -24,7 +25,7 @@ import qualified LoadIface
 import qualified Maybes
 import qualified MonadUtils
 import qualified Name
-import           CLaSH.GHC.Compat.Outputable (showPpr)
+import           CLaSH.GHC.Compat.Outputable (showPpr,showSDoc)
 import           Outputable (text)
 import qualified TcIface
 import qualified TcRnMonad
@@ -82,14 +83,16 @@ loadDecl :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL GHC.TyThing
 loadDecl decl = TcIface.tcIfaceDecl False decl
 
 ifaceTyCons :: HscTypes.ModIface -> TcRnTypes.IfL [GHC.TyCon]
-ifaceTyCons = fmap (HscTypes.typeEnvTyCons . HscTypes.md_types) . TcIface.typecheckIface
+ifaceTyCons = fmap (\md -> (HscTypes.typeEnvTyCons . HscTypes.md_types) md ++
+                           (FamInstEnv.famInstsRepTyCons . HscTypes.md_fam_insts) md
+                   ) . TcIface.typecheckIface
 
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
 loadIface foundMod = do
   ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface") foundMod False
   case ifaceFailM of
     Maybes.Succeeded (modInfo,_) -> return (Just modInfo)
-    Maybes.Failed _ -> traceIf True ("failed to load interface for module: " ++ showPpr foundMod) $ return Nothing
+    Maybes.Failed msg -> traceIf True ($(curLoc) ++ "Failed to load interface for module: " ++ showPpr foundMod ++ "\nReason: " ++ showSDoc msg) $ return Nothing
 
 loadExternalExprs ::
   GHC.GhcMonad m

@@ -43,11 +43,11 @@ import CLaSH.GHC.Compat.Outputable (showPpr)
 import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
   isAlgTyCon,isTupleTyCon,tyConName,tyConUnique,tyConTyVars,
   tyConDataCons,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,tyConArity,
-  tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep)
+  tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep,isPromotedDataCon)
 import CLaSH.GHC.Compat.TyCon (isSuperKindTyCon)
 import Type       (tcView)
 import TypeRep    (Type(..),TyLit(..))
-import TysWiredIn (tupleTyCon)
+import TysWiredIn (tupleTyCon,boolKindCon,trueTyCon,falseTyCon)
 import Unique     (Unique,Uniquable(..),getKey)
 import Var        (Var,Id,TyVar,varName,varUnique,varType,isTyVar)
 import VarSet     (isEmptyVarSet)
@@ -87,16 +87,19 @@ instance Hashable DataCon where
 makeAllTyDataCons :: [TyCon] -> GHC2CoreState
 makeAllTyDataCons tyCons =
   let s = Reader.runReader (State.execStateT
-                              (mapM_ makeTyCon (tyCons ++ tupleTyCons))
+                              (mapM_ makeTyCon toConvert)
                               emptyState)
                            s
   in  s
   where
-    emptyState = GHC2CoreState HashMap.empty HashMap.empty
-    tupleTyCons = concat [ map (`tupleTyCon` x)
-                            [BoxedTuple,UnboxedTuple,ConstraintTuple]
-                         | x <- [2..62]
-                         ]
+    emptyState     = GHC2CoreState HashMap.empty HashMap.empty
+    tupleTyCons    = concat [ map (`tupleTyCon` x)
+                               [BoxedTuple,UnboxedTuple,ConstraintTuple]
+                            | x <- [2..62]
+                            ]
+    promotedTyCons = [boolKindCon,trueTyCon,falseTyCon]
+    toConvert      = concat [tyCons,tupleTyCons,promotedTyCons]
+
 
 makeTyCon ::
   TyCon
@@ -335,7 +338,7 @@ coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 coreToTyCon ::
   TyCon
   -> R C.TyCon
-coreToTyCon tc = fmap ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc ++ " not found")
+coreToTyCon tc = fmap ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc ++ " not found " ++ show (TyCon.isPromotedDataCon tc) )
                       . HashMap.lookup tc
                       ) $ view tyConMap
 
