@@ -1,0 +1,6 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Real.divZeroError"
+    , "templateE" : "~DEFAULTO"
+    }
+  }
+]
