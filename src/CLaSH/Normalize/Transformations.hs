@@ -621,6 +621,14 @@ liftNormR = lift . R
 -- NOTE [unsafeUnbind]: Use unsafeUnbind (which doesn't freshen pattern
 -- variables). Reason: previously collected expression still reference
 -- the 'old' variable names created by the traversal!
+
+-- NOTE [NoTouchVar] Local variable references should be left alone.
+-- Global variable reference will trigger inlined later because:
+-- See also NOTE [VarClosed]
+
+-- NOTE [VarClosed]: All variables are expected to refer to closed
+-- expressions. Meaning that this transformation only behaves as
+-- desired when the program is in first-order form.
 makeANF :: NormRewrite
 makeANF ctx (Lam b) = do
   -- See NOTE [unsafeUnbind]
@@ -640,10 +648,9 @@ collectANF _ e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
-    localVar       <- liftNormR $ isLocalVar arg
     untranslatable <- liftNormR $ isUntranslatable arg
-    closed         <- liftNormR $ isClosed arg
-    case (untranslatable,localVar || closed || isConstant arg,arg) of
+    -- See NOTE [NoTouchVar]
+    case (untranslatable,isVar arg || isConstant arg,arg) of
       (False,False,_) -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "repANF" arg
                             tell [(argId,embed arg)]
                             return (App appf argVar)
@@ -655,19 +662,19 @@ collectANF _ e@(App appf arg)
 collectANF _ (Letrec b) = do
   -- See NOTE [unsafeUnbind]
   let (binds,body) = unsafeUnbind b
-  localVar       <- liftNormR $ isLocalVar body
-  untranslatable <- liftNormR $ isUntranslatable body
   tell (unrec binds)
-  case localVar || untranslatable of
+  untranslatable <- liftNormR $ isUntranslatable body
+  -- See NOTE [NoTouchVar]
+  case isVar body || untranslatable of
     True  -> return body
     False -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "bodyVar" body
                 tell [(argId,embed body)]
                 return argVar
 
 collectANF ctx e@(Case subj ty alts) = do
-    localVar           <- liftNormR $ isLocalVar subj
     untranslatableSubj <- liftNormR $ isUntranslatable subj
-    (bndr,subj') <- case localVar || untranslatableSubj || isConstant subj of
+    -- See NOTE [NoTouchVar]
+    (bndr,subj') <- case isVar subj || untranslatableSubj || isConstant subj of
       True  -> return ([],subj)
       False -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "subjLet" subj
                   return ([(argId,embed subj)],argVar)
