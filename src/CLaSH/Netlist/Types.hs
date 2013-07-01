@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module CLaSH.Netlist.Types where
 
 import Control.Monad.State     (MonadIO,MonadState,StateT)

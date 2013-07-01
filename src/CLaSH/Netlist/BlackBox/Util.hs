@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module CLaSH.Netlist.BlackBox.Util where
 
 import Control.Monad.State      (State,runState,lift)

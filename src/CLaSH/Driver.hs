@@ -1,6 +1,7 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE TemplateHaskell     #-}
 module CLaSH.Driver where
 
 import           Control.Monad.State          (evalState)

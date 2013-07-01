@@ -1,7 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
 module CLaSH.Normalize.Types where
 
 import Control.Monad.State (State)
-import Data.HashMap.Lazy (HashMap)
+import Data.HashMap.Strict (HashMap)
 import Data.Map          (Map)
 
 import CLaSH.Core.Term (Term,TmName)

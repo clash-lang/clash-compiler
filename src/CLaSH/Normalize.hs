@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 module CLaSH.Normalize where
 
 import Control.Concurrent.Supply        (Supply)

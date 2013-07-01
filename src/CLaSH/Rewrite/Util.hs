@@ -1,7 +1,8 @@
-{-# LANGUAGE Rank2Types    #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ViewPatterns  #-}
+{-# LANGUAGE Rank2Types      #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections   #-}
+{-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Rewrite.Util where
 
 import Control.Lens                      (Lens',(%=),(+=))

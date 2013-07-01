@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TupleSections    #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}

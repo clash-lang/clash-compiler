@@ -1,5 +1,6 @@
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE ViewPatterns  #-}
+{-# LANGUAGE PatternGuards   #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Netlist.BlackBox where
 
 import           Control.Lens               ((.=))

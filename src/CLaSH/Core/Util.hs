@@ -1,4 +1,5 @@
-{-# LANGUAGE ViewPatterns  #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Core.Util where
 
 import Data.Maybe (fromMaybe)
