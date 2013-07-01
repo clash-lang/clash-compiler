@@ -61,6 +61,7 @@ allR rf trans c (Case scrut ty alts) = do
       e' <- trans (CaseAlt (patIds p):c) e
       return (p,e')
 
+infixr 6 >->
 (>->) :: (Monad m) => Transform m -> Transform m -> Transform m
 (>->) r1 r2 c = (r1 c) >=> (r2 c)
 
@@ -76,6 +77,10 @@ bottomupR r = allR True (bottomupR r) >-> r
 unsafeBottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 
+unsafeUpDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
+unsafeUpDownR r = unsafeBottomupR (r !-> unsafeTopdownR r)
+
+infixr 5 !->
 (!->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
 (!->) r1 r2 c expr = R $ do
   (expr',changed) <- runR $ Writer.listen $ r1 c expr
@@ -85,15 +90,3 @@ unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 
 repeatR :: Monad m => Rewrite m -> Rewrite m
 repeatR r = r !-> (repeatR r)
-
-bottomupProp :: (Fresh m, Functor m, Monad m) => Rewrite m -> Rewrite m
-bottomupProp r = bottomupR (r !-> allR True (topdownR r))
-
-unsafeBottomupProp :: (Fresh m, Functor m, Monad m) => Rewrite m -> Rewrite m
-unsafeBottomupProp r = unsafeBottomupR (r !-> allR False (unsafeTopdownR r))
-
--- repeatR r c expr = R $ do
---   (expr',changed) <- runR $ Writer.listen $ r c expr
---   if Monoid.getAny changed
---     then runR $ repeatR r c expr'
---     else return expr

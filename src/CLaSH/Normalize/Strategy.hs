@@ -7,36 +7,24 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = (repeatR $ clsOpRes >-> representable) >-> simplification
-  where
-    clsOpRes = (unsafeBottomupR $ apply "classOpResolution" classOpResolution) >->
-               (unsafeBottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
+normalization = representable >-> simplification
 
 cleanup :: NormRewrite
-cleanup = (repeatR $ closedTerms >-> wrappers >-> propConstants) >->
-          (unsafeBottomupR (apply "letFlat" letFlat)) >->
-          (apply "bindConstantVar" bindConstantVar)
-  where
-    wrappers      = unsafeTopdownR $ (apply "inlineWrapper" inlineWrapper) !-> propConstants
-
-    closedTerms   = unsafeTopdownR $ (apply "inlineClosedTerm" inlineClosedTerm) !-> propConstants
-
-    propConstants = repeatTopdown steps
-    steps         = [ ("propagation"     , appProp)
-                    , ("bindConstantVar" , bindConstantVar)
-                    , ("constantSpec"    , constantSpec)
-                    , ("caseCon"         , caseCon    )
-                    ]
+cleanup = repeatR $ unsafeTopdownR (apply "inlineWrapper" inlineWrapper)
 
 representable :: NormRewrite
-representable = propagagition >-> specialisation
+representable = (clsOpRes >-> propagagition >-> specialisation) !->
+                repeatR (clsOpRes !-> (propagagition >-> specialisation))
   where
-    propagagition = repeatR ( repeatBottomup [ ("propagation"  , appProp    )
-                                             , ("bindNonRep"   , bindNonRep )
+    clsOpRes = (unsafeBottomupR $ apply "classOpResolution"  classOpResolution) >->
+               (unsafeBottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
+
+    propagagition = repeatR ( unsafeUpDownR  (apply "propagation" appProp) >->
+                              repeatBottomup [ ("bindNonRep"   , bindNonRep )
                                              , ("liftNonRep"   , liftNonRep )
                                              , ("caseLet"      , caseLet    )
-                                             , ("caseCon"      , caseCon    )
                                              , ("caseCase"     , caseCase   )
+                                             , ("caseCon"      , caseCon    )
                                              ]
                               >->
                               doInline "inlineNonRep" inlineNonRep
@@ -45,17 +33,25 @@ representable = propagagition >-> specialisation
                      repeatR (unsafeBottomupR (apply "nonRepSpec" nonRepSpec))
 
 simplification :: NormRewrite
-simplification = (apply "etaTL" etaExpansionTL) >->
-                 (repeatR $ unsafeTopdownR $ apply "propagation" appProp) >->
-                 (bottomupR (apply "nonRepANF" nonRepANF)) >->
-                 (apply "ANF" makeANF) >->
-                 repeatBottomup steps
+simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
+
   where
-    steps = [ ("nonRepANF", nonRepANF)
-            , ("topLet"   , topLet)
-            , ("bodyVar"  , bodyVar)
-            , ("deadcode" , deadCode)
-            ]
+    etaTL           = apply "etaTL" etaExpansionTL
+
+    constSimpl      = repeatR ( unsafeUpDownR   (apply "propagation" appProp) >->
+                                unsafeBottomupR (apply "inlineClosedTerm" (inlineClosedTerm !-> representable)) >->
+                                repeatBottomup  [ ("nonRepANF"       , nonRepANF       )
+                                                , ("bindConstantVar" , bindConstantVar )
+                                                , ("constantSpec"    , constantSpec    )
+                                                , ("caseCon"         , caseCon         )
+                                                ]
+                              )
+
+    anf             = apply "ANF" makeANF
+
+    deadCodeRemoval = unsafeBottomupR (apply "deadcode" deadCode)
+
+    letTL           = unsafeBottomupR (apply "topLet" topLet)
 
 doInline :: String -> NormRewrite -> NormRewrite
 doInline n t = unsafeBottomupR (apply n t) >-> commitNewInlined

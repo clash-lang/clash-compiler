@@ -1,6 +1,28 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ViewPatterns  #-}
-module CLaSH.Normalize.Transformations where
+module CLaSH.Normalize.Transformations
+  ( appProp
+  , bindNonRep
+  , liftNonRep
+  , caseLet
+  , caseCon
+  , caseCase
+  , inlineNonRep
+  , typeSpec
+  , nonRepSpec
+  , etaExpansionTL
+  , inlineClosedTerm
+  , nonRepANF
+  , bindConstantVar
+  , constantSpec
+  , makeANF
+  , deadCode
+  , topLet
+  , inlineWrapper
+  , classOpResolution
+  , inlineSingularDFun
+  )
+where
 
 import           Control.Lens            ((%=))
 import qualified Control.Lens            as Lens
@@ -18,9 +40,9 @@ import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars,termFreeVa
 import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm,substTms)
-import CLaSH.Core.Term       (Term(..),TmName,LetBinding,Pat(..))
+import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy)
-import CLaSH.Core.Util       (collectArgs,mkApps,isFun,isLam,termType,isVar,isCon,isLet,isPrim)
+import CLaSH.Core.Util       (collectArgs,mkApps,isFun,termType,isVar,isCon,isLet,isPrim)
 import CLaSH.Core.Var        (Var(..),Id)
 import CLaSH.Netlist.Util    (splitNormalized)
 import CLaSH.Normalize.Types
@@ -29,71 +51,6 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Types
 import CLaSH.Rewrite.Util
 import CLaSH.Util
-
-tauReduction :: NormRewrite
-tauReduction _ (TyApp (TyLam b) t) = R $ do
-  (tv,e) <- unbind b
-  changed $ substTyInTm (varName tv) t e
-
-tauReduction _ e = return e
-
-letTyApp :: NormRewrite
-letTyApp _ (TyApp (Letrec b) t) = R $ do
-  (v,e) <- unbind b
-  changed . Letrec $ bind v (TyApp e t)
-
-letTyApp _ e = return e
-
-caseTyApp :: NormRewrite
-caseTyApp _ (TyApp (Case scrut ty' alts) ty) = R $ do
-  alts' <- mapM ( return
-                . uncurry bind
-                . second (`TyApp` ty)
-                <=< unbind
-                ) alts
-  ty'' <- applyTy ty' ty
-  changed $ Case scrut ty'' alts'
-
-caseTyApp _ e = return e
-
-lamApp :: NormRewrite
-lamApp _ (App (Lam b) arg) = R $ do
-  (v,e) <- unbind b
-  case (isConstant arg || isVar arg) of
-    True  -> changed $ substTm (varName v) arg e
-    False -> changed . Letrec $ bind (rec [(v,embed arg)]) e
-
-lamApp _ e = return e
-
-letApp :: NormRewrite
-letApp _ (App (Letrec b) arg) = R $ do
-  (v,e) <- unbind b
-  changed . Letrec $ bind v (App e arg)
-
-letApp _ e = return e
-
-caseApp :: NormRewrite
-caseApp _ (App (Case scrut ty alts) arg) = R $ do
-  argTy <- termType arg
-  let ty' = applyFunTy ty argTy
-  case (isConstant arg || isVar arg) of
-    True  -> do
-      alts' <- mapM ( return
-                    . uncurry bind
-                    . second (`App` arg)
-                    <=< unbind
-                    ) alts
-      changed $ Case scrut ty' alts'
-    False -> do
-      (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
-      alts' <- mapM ( return
-                    . uncurry bind
-                    . second (`App` argVar)
-                    <=< unbind
-                    ) alts
-      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
-
-caseApp _ e = return e
 
 bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
@@ -224,20 +181,6 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
 
 caseCon _ e = return e
 
-repANF :: NormRewrite
-repANF _ e@(App appf arg)
-  | (conVarPrim, _) <- collectArgs e
-  , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
-  = R $ do
-    localVar       <- isLocalVar arg
-    untranslatable <- isUntranslatable arg
-    case localVar || untranslatable || isConstant arg of
-      True  -> return e
-      False -> do (argId,argVar) <- mkTmBinderFor "repANF" arg
-                  changed . Letrec $ bind (rec [(argId,embed arg)]) (App appf argVar)
-
-repANF _ e = return e
-
 nonRepANF :: NormRewrite
 nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
@@ -254,84 +197,22 @@ nonRepANF ctx e@(App appConPrim arg)
 
 nonRepANF _ e = return e
 
-subjLet :: NormRewrite
-subjLet _ e@(Case subj ty alts) = R $ do
-  localVar       <- isLocalVar subj
-  untranslatable <- isUntranslatable subj
-  case localVar || untranslatable || isConstant subj of
-    True  -> return e
-    False -> do (argId,argVar) <- mkTmBinderFor "subjLet" subj
-                changed . Letrec $ bind (rec [(argId,embed subj)]) (Case argVar ty alts)
+-- letFlat :: NormRewrite
+-- letFlat _ e@(Letrec binds) = R $ do
+--     (xes, body) <- fmap (first unrec) $ unbind binds
+--     (binds',updated) <- fmap unzip $ mapM flatBind xes
+--     case (or updated) of
+--       True  -> changed . Letrec $ bind (rec (concat binds')) body
+--       False -> return e
+--   where
+--     flatBind :: Monad m => LetBinding -> RewriteMonad m ([LetBinding],Bool)
+--     flatBind (bndr, Embed (Letrec binds')) = do
+--       (r,body) <- unbind binds'
+--       let r' = unrec r
+--       return ((bndr, Embed body):r', True)
+--     flatBind b = return ([b],False)
 
-subjLet _ e = return e
-
-altLet :: NormRewrite
-altLet ctx e@(Case subj ty alts) = R $ do
-    untranslatable <- isUntranslatable e
-    case untranslatable of
-      True  -> return e
-      False -> do (bndrs,alts') <- fmap (first concat . unzip) $ mapM doAlt alts
-                  case bndrs of
-                    [] -> return e
-                    _  -> changed . Letrec $ bind (rec bndrs) (Case subj ty alts')
-  where
-    doAlt :: Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
-    doAlt = fmap (second (uncurry bind)) . doAlt' <=< unbind
-
-    doAlt' :: (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
-    doAlt' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
-      lv <- isLocalVar altExpr
-      case (lv || isConstant altExpr) of
-        True  -> return ([],alt)
-        False -> do let fvs = termFreeIds altExpr
-                    patSels <- fmap Maybe.catMaybes $ Monad.zipWithM (doPatBndr fvs (unembed dc)) xs [0..]
-                    (altId,altVar) <- mkTmBinderFor "altLet" altExpr
-                    return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
-    doAlt' alt@(DataPat _ _, _) = return ([],alt)
-    doAlt' alt@(pat,altExpr) = do
-      lv <- isLocalVar altExpr
-      case (lv || isConstant altExpr) of
-        True  -> return ([],alt)
-        False -> do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
-                    return ([(altId,embed altExpr)],(pat,altVar))
-
-    doPatBndr :: [TmName] -> DataCon -> Id -> Int -> RewriteMonad NormalizeMonad (Maybe LetBinding)
-    doPatBndr fvs dc pId i
-      | (varName pId) `notElem` fvs = return Nothing
-      | otherwise
-      = do patExpr <- mkSelectorCase "doPatBndr" ctx subj (dcTag dc) i
-           return (Just (pId,embed patExpr))
-
-altLet _ e = return e
-
-bodyVar :: NormRewrite
-bodyVar _ e@(Letrec b) = R $ do
-  (binds,body)   <- unbind b
-  localVar       <- isLocalVar body
-  untranslatable <- isUntranslatable body
-  case localVar || untranslatable of
-    True  -> return e
-    False -> do (argId,argVar) <- mkTmBinderFor "bodyVar" body
-                changed . Letrec $ bind (rec $ unrec binds ++ [(argId,embed body)]) argVar
-
-bodyVar _ e = return e
-
-letFlat :: NormRewrite
-letFlat _ e@(Letrec binds) = R $ do
-    (xes, body) <- fmap (first unrec) $ unbind binds
-    (binds',updated) <- fmap unzip $ mapM flatBind xes
-    case (or updated) of
-      True  -> changed . Letrec $ bind (rec (concat binds')) body
-      False -> return e
-  where
-    flatBind :: Monad m => LetBinding -> RewriteMonad m ([LetBinding],Bool)
-    flatBind (bndr, Embed (Letrec binds')) = do
-      (r,body) <- unbind binds'
-      let r' = unrec r
-      return ((bndr, Embed body):r', True)
-    flatBind b = return ([b],False)
-
-letFlat _ e = return e
+-- letFlat _ e = return e
 
 topLet :: NormRewrite
 topLet ctx e
@@ -343,28 +224,18 @@ topLet ctx e
     False -> do (argId,argVar) <- mkTmBinderFor "topLet" e
                 changed . Letrec $ bind (rec [(argId,embed e)]) argVar
 
-topLet _ e = return e
-
-etaExpansion :: NormRewrite
-etaExpansion (AppFirst:_)  e = return e
-etaExpansion (AppSecond:_) e = return e
-etaExpansion _ e
-  | not (isLam e)
+topLet ctx e@(Letrec b)
+  | all isLambdaBodyCtx ctx
   = R $ do
-    isF <- isFun e
-    case isF of
-      True -> do
-        argTy <- ( return
-                 . fst
-                 . Maybe.fromMaybe (error "etaExpansion splitFunTy")
-                 . splitFunTy
-                 <=< termType
-                 ) e
-        (newIdB,newIdV) <- mkInternalVar "eta" argTy
-        changed . Lam $ bind newIdB (App e newIdV)
-      False -> return e
+    (binds,body)   <- unbind b
+    localVar       <- isLocalVar body
+    untranslatable <- isUntranslatable body
+    case localVar || untranslatable of
+      True  -> return e
+      False -> do (argId,argVar) <- mkTmBinderFor "topLet" body
+                  changed . Letrec $ bind (rec $ unrec binds ++ [(argId,embed body)]) argVar
 
-etaExpansion _ e = return e
+topLet _ e = return e
 
 -- Misc rewrites
 deadCode :: NormRewrite
@@ -394,15 +265,9 @@ deadCode _ e@(Letrec binds) = R $ do
 deadCode _ e = return e
 
 bindConstantVar :: NormRewrite
-bindConstantVar ctx e@(Letrec bnd) = do
-  (bndrs,_) <- unbind bnd
-  let test (_,Embed e') = (||) <$> isLocalVar e' <*> (pure $ isConstant e')
-  if ((all isLambdaBodyCtx ctx) && (length (unrec bndrs) < 2))
-    then return e
-    else inlineBinders test ctx e
-
-
-bindConstantVar _ e = return e
+bindConstantVar = inlineBinders test
+  where
+    test (_,Embed e) = (||) <$> isLocalVar e <*> (pure $ isConstant e)
 
 inlineClosedTerm :: NormRewrite
 inlineClosedTerm _ e@(Var _ f) = R $ do
@@ -417,20 +282,6 @@ inlineClosedTerm _ e@(Var _ f) = R $ do
     _ -> return e
 
 inlineClosedTerm _ e = return e
-
-forceToplet :: NormRewrite
-forceToplet _ (Letrec b) = R $ do
-  case unsafeUnbind b of
-    (unrec -> [(_,Embed e)],v@(Var _ _)) -> do
-      lv <- isLocalVar v
-      case lv of
-        True  -> changed e
-        False -> error $ $(curLoc) ++ "forceTopLet called on let-binding where body is not a local variable: " ++ showDoc (Letrec b)
-    _ -> error $ $(curLoc) ++ "forceTopLet called on let-binding with more than one binding: " ++ showDoc (Letrec b)
-
-forceToplet _ e
-  | isConstant e = R $ changed e
-  | otherwise    = error $ $(curLoc) ++ "forceTopLet not called on a let-binding: " ++ showDoc e
 
 constantSpec :: NormRewrite
 constantSpec ctx e@(App e1 e2)
@@ -483,7 +334,6 @@ classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dict) = R $ do
                    tySubst = zip dfunTyBndrs dfunTys
                    tmSubst = zip dfunTmBndrs dfunTms
                in changed $! substTms tmSubst $ substTysinTm tySubst (dfunOps !! classSel)
-               -- in error $ show (tySubst,tmSubst) ++ unlines (map showDoc $ tail dfunOps)
           Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
           _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e ++ show dfunOpsM
       (Var _ fdict,dfunArgs) -> do
@@ -621,14 +471,6 @@ liftNormR = lift . R
 -- NOTE [unsafeUnbind]: Use unsafeUnbind (which doesn't freshen pattern
 -- variables). Reason: previously collected expression still reference
 -- the 'old' variable names created by the traversal!
-
--- NOTE [NoTouchVar] Local variable references should be left alone.
--- Global variable reference will trigger inlined later because:
--- See also NOTE [VarClosed]
-
--- NOTE [VarClosed]: All variables are expected to refer to closed
--- expressions. Meaning that this transformation only behaves as
--- desired when the program is in first-order form.
 makeANF :: NormRewrite
 makeANF ctx (Lam b) = do
   -- See NOTE [unsafeUnbind]
@@ -649,8 +491,8 @@ collectANF _ e@(App appf arg)
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
     untranslatable <- liftNormR $ isUntranslatable arg
-    -- See NOTE [NoTouchVar]
-    case (untranslatable,isVar arg || isConstant arg,arg) of
+    localVar       <- liftNormR $ isLocalVar arg
+    case (untranslatable,localVar || isConstant arg,arg) of
       (False,False,_) -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "repANF" arg
                             tell [(argId,embed arg)]
                             return (App appf argVar)
@@ -664,8 +506,8 @@ collectANF _ (Letrec b) = do
   let (binds,body) = unsafeUnbind b
   tell (unrec binds)
   untranslatable <- liftNormR $ isUntranslatable body
-  -- See NOTE [NoTouchVar]
-  case isVar body || untranslatable of
+  localVar       <- liftNormR $ isLocalVar body
+  case localVar || untranslatable of
     True  -> return body
     False -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "bodyVar" body
                 tell [(argId,embed body)]
@@ -673,8 +515,8 @@ collectANF _ (Letrec b) = do
 
 collectANF ctx e@(Case subj ty alts) = do
     untranslatableSubj <- liftNormR $ isUntranslatable subj
-    -- See NOTE [NoTouchVar]
-    (bndr,subj') <- case isVar subj || untranslatableSubj || isConstant subj of
+    localVar           <- liftNormR $ isLocalVar subj
+    (bndr,subj') <- case localVar || untranslatableSubj || isConstant subj of
       True  -> return ([],subj)
       False -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "subjLet" subj
                   return ([(argId,embed subj)],argVar)

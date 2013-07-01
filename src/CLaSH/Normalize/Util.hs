@@ -105,15 +105,14 @@ getWrappedF :: (Fresh m,Functor m) => Term -> m (Maybe Term)
 getWrappedF body = do
   normalizedM <- splitNormalized body
   case normalizedM of
-    Right ((funArgs,[(_,bExpr)],_)) -> return $! uncurry (reduceArgs funArgs) (collectArgs $ unembed bExpr)
+    Right ((funArgs,[(_,bExpr)],_)) -> return $! uncurry (reduceArgs True funArgs) (collectArgs $ unembed bExpr)
     _                               -> return Nothing
 
-reduceArgs :: [Id] -> Term -> [Either Term Type] -> Maybe Term
-reduceArgs []  appE []                            = Just appE
-reduceArgs (_:_) _  []                            = Nothing
-reduceArgs ids appE (Right ty:args)               = reduceArgs ids (TyApp appE ty) args
-reduceArgs (id1:ids) appE (Left (Var _ nm):args)  | varName id1 == nm = reduceArgs ids appE args
-                                                  | otherwise         = Nothing
-reduceArgs _ _ _                                  = Nothing
---reduceArgs ids appE (Left arg:args)               | isConstant arg    = reduceArgs ids (App appE arg) args
---                                                  | otherwise         = Nothing
+reduceArgs :: Bool -> [Id] -> Term -> [Either Term Type] -> Maybe Term
+reduceArgs _    []    appE []                         = Just appE
+reduceArgs _    (_:_) _ []                            = Nothing
+reduceArgs b    ids       appE (Right ty:args)        = reduceArgs b ids (TyApp appE ty) args
+reduceArgs _    (id1:ids) appE (Left (Var _ nm):args) | varName id1 == nm = reduceArgs False ids appE args
+reduceArgs True ids@(_:_) appE (Left arg:args)        = reduceArgs True ids (App appE arg) args
+reduceArgs _ _ _ _                                    = Nothing
+
