@@ -14,20 +14,21 @@ module CLaSH.Util
   )
 where
 
-import Control.Applicative              (Applicative,(<$>),(<*>),pure)
-import Control.Arrow                    (first,second)
-import Control.Monad                    ((<=<),(>=>))
-import Control.Monad.State              (MonadState,State,runState)
-import Control.Monad.Trans.Class        (MonadTrans,lift)
-import Data.Hashable                    (Hashable(..),hash)
-import Data.HashMap.Lazy                (HashMap)
-import qualified Data.HashMap.Lazy   as HashMap
-import Data.Maybe                       (fromMaybe)
+import Control.Applicative            (Applicative,(<$>),(<*>),pure)
+import Control.Arrow                  (first,second)
+import Control.Monad                  ((<=<),(>=>))
+import Control.Monad.State            (MonadState,State,runState)
+import Control.Monad.Trans.Class      (MonadTrans,lift)
+import Data.Hashable                  (Hashable(..),hash)
+import Data.HashMap.Lazy              (HashMap)
+import qualified Data.HashMap.Lazy    as HashMapL
+import qualified Data.HashMap.Strict  as HashMapS
+import Data.Maybe                     (fromMaybe)
 import Control.Lens
-import Debug.Trace                      (trace)
-import qualified Language.Haskell.TH as TH
-import Unbound.LocallyNameless          (Embed(..))
-import Unbound.LocallyNameless.Name     (Name(..))
+import Debug.Trace                    (trace)
+import qualified Language.Haskell.TH  as TH
+import Unbound.LocallyNameless        (Embed(..))
+import Unbound.LocallyNameless.Name   (Name(..))
 
 class MonadUnique m where
   getUniqueM :: m Int
@@ -53,11 +54,11 @@ makeCached ::
   -> m v
 makeCached key l create = do
   cache <- use l
-  case HashMap.lookup key cache of
+  case HashMapL.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      l %= (HashMap.insert key value)
+      l %= (HashMapL.insert key value)
       return value
 
 makeCachedT3 ::
@@ -71,11 +72,29 @@ makeCachedT3 ::
   -> (t (t1 (t2 m))) v
 makeCachedT3 key l create = do
   cache <- (lift . lift . lift) $ use l
-  case HashMap.lookup key cache of
+  case HashMapL.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      (lift . lift . lift) $ l %= (HashMap.insert key value)
+      (lift . lift . lift) $ l %= (HashMapL.insert key value)
+      return value
+
+makeCachedT3_strict ::
+  ( MonadTrans t2, MonadTrans t1, MonadTrans t
+  , Eq k, Hashable k
+  , MonadState s m
+  , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m))))
+  => k
+  -> Lens' s (HashMap k v)
+  -> (t (t1 (t2 m))) v
+  -> (t (t1 (t2 m))) v
+makeCachedT3_strict key l create = do
+  cache <- (lift . lift . lift) $ use l
+  case HashMapS.lookup key cache of
+    Just value -> return value
+    Nothing -> do
+      value <- create
+      (lift . lift . lift) $ l %= (HashMapS.insert key value)
       return value
 
 liftState :: (MonadState s m)

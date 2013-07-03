@@ -51,7 +51,7 @@ normalize (bndr:bndrs) = do
   case exprM of
     Just (ty,expr) -> do
       liftRS $ curFun .= bndr
-      normalizedExpr <- makeCachedT3 bndr normalized $
+      normalizedExpr <- makeCachedT3_strict bndr normalized $
                          rewriteExpr ("normalization",normalization) (bndrS,expr)
       usedBndrs <- usedGlobalBndrs normalizedExpr
       case (bndr `elem` usedBndrs) of
