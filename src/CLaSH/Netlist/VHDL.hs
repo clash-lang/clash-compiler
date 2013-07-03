@@ -186,6 +186,21 @@ vhdlType t@(Sum _ _) = "unsigned" <>
 vhdlType t@(Product _ _) = tyName t
 vhdlType t          = error $ "vhdlType: " ++ show t
 
+vhdlTypeMark :: HWType -> VHDLM Doc
+vhdlTypeMark Bit             = "std_logic"
+vhdlTypeMark Bool            = "boolean"
+vhdlTypeMark (Clock _)       = "std_logic"
+vhdlTypeMark (Reset _)       = "std_logic"
+vhdlTypeMark Integer         = "integer"
+vhdlTypeMark (Signed _)      = "signed"
+vhdlTypeMark (Unsigned _)    = "unsigned"
+vhdlTypeMark (Vector _ Bit)  = "std_logic_vector"
+vhdlTypeMark (Vector _ elTy) = "array_of_" <> tyName elTy
+vhdlTypeMark (SP _ _)        = "std_logic_vector"
+vhdlTypeMark (Sum _ _)       = "unsigned"
+vhdlTypeMark t@(Product _ _) = tyName t
+vhdlTypeMark t               = error $ "vhdlTypeMark: " ++ show t
+
 vhdlTypeDefault :: HWType -> VHDLM Doc
 vhdlTypeDefault Bit                 = "'0'"
 vhdlTypeDefault Bool                = "false"

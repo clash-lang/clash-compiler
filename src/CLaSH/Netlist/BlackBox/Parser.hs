@@ -52,6 +52,8 @@ pTag' =  O             <$  pKey "~RESULT"
      <|> Sym           <$> (pKey "~SYM" *> pBrackets pNatural)
      <|> (Typ Nothing) <$  pKey "~TYPO"
      <|> (Typ . Just)  <$> (pKey "~TYP" *> pBrackets pNatural)
+     <|> (TypM Nothing) <$  pKey "~TYPMO"
+     <|> (TypM . Just) <$> (pKey "~TYPM" *> pBrackets pNatural)
      <|> (Def Nothing) <$  (pKey "~DEFAULTO")
      <|> (Def . Just)  <$> (pKey "~DEFAULT" *> pBrackets pNatural)
 
