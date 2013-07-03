@@ -14,7 +14,7 @@ module CLaSH.Sized.VectorZ
   ( Vec(..), (<:)
   , vhead, vtail, vlast, vinit
   , (+>>), (<<+), (<++>), vconcat
-  , vsplit, vsplitI, vunconcat, vunconcatI
+  , vsplit, vsplitI, vunconcat, vunconcatI, vmerge
   , vreverse, vmap, vzipWith
   , vfoldr, vfoldl, vfoldr1, vfoldl1
   , vzip, vunzip
@@ -153,6 +153,11 @@ vunconcat n m xs = vunconcat' (isZero n) m xs
 {-# NOINLINE vunconcatI #-}
 vunconcatI :: (SingI n, SingI m) => Vec (n * m) a -> Vec n (Vec m a)
 vunconcatI = (withSing . withSing) vunconcat
+
+{-# NOINLINE vmerge #-}
+vmerge :: Vec n a -> Vec n a -> Vec (2 * n) a
+vmerge Nil Nil             = Nil
+vmerge (x :> xs) (y :> ys) = unsafeCoerce (x :> y :> vmerge xs ys)
 
 {-# NOINLINE vreverse #-}
 vreverse :: Vec n a -> Vec n a
