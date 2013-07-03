@@ -2,20 +2,20 @@
     { "name"      : "CLaSH.Prelude.blockRam"
     , "templateD" :
 "~SYM[0]_block : block
-  type ram_array is array (natural range <>) of ~TYP[5];
+  type ram_array is array (natural range <>) of ~TYP[6];
   signal ~SYM[1] : ram_array((~ARG[0]-1) downto 0); -- ram
-  signal ~SYM[2] : ~TYP[5]; -- inp
-  signal ~SYM[3] : ~TYP[5]; -- outp
+  signal ~SYM[2] : ~TYP[6]; -- inp
+  signal ~SYM[3] : ~TYP[6]; -- outp
 begin
-  ~SYM[2] <= ~ARG[5];
+  ~SYM[2] <= ~ARG[6];
 
-  process(~CLK[5]) is
+  process(~CLK[6]) is
   begin
-    if rising_edge(~CLK[5]) then
-      if ~ARG[4] then
-        ~SYM[1](to_integer(~ARG[2])) <= ~SYM[2];
+    if rising_edge(~CLK[6]) then
+      if ~ARG[5] then
+        ~SYM[1](to_integer(~ARG[3])) <= ~SYM[2];
       end if;
-      ~SYM[3] <= ~SYM[1](to_integer(~ARG[3]));
+      ~SYM[3] <= ~SYM[1](to_integer(~ARG[4]));
     end if;
   end process;
 
