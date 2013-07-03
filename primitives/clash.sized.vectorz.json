@@ -76,6 +76,24 @@ end generate;"
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.VectorZ.vmerge"
+    , "templateD" :
+"~SYM[0]_vmerge : block
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~SYM[2] <= ~ARG[1];
+
+  ~SYM[3]_vmerge : for ~SYM[4] in ~SYM[1]'high downto 0 generate
+  begin
+    ~RESULT(2*~SYM[4]+1) <= ~SYM[1](~SYM[4]);
+    ~RESULT(2*~SYM[4])   <= ~SYM[2](~SYM[4]);
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.VectorZ.vreverse"
     , "templateD"  :
 "~SYM[0]_vreverse : block
