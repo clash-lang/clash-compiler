@@ -63,6 +63,7 @@ tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst
                 ] ++ map (\x -> "use work." <> text x <> "_types.all") ptys
 
 needsTyDec :: HWType -> [HWType]
+needsTyDec (Vector _ Bit)     = []
 needsTyDec (Vector _ elTy)    = (needsTyDec elTy) ++ [Vector 0 elTy]
 needsTyDec ty@(Product _ tys) = (concatMap needsTyDec tys) ++ [ty]
 needsTyDec (SP _ tys)         = concatMap (concatMap needsTyDec . snd) tys
@@ -114,6 +115,7 @@ funDec _ = empty
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
 tyName Bit               = "std_logic"
+tyName (Vector n Bit)    = "std_logic_vector_" <> int n
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
@@ -176,6 +178,7 @@ vhdlType (Signed n) = "signed" <>
                       parens ( int (n-1) <+> "downto 0")
 vhdlType (Unsigned n) = "unsigned" <>
                         parens ( int (n-1) <+> "downto 0")
+vhdlType (Vector n Bit) = "std_logic_vector" <> parens ( int (n-1) <+> "downto 0")
 vhdlType (Vector n elTy) = "array_of_" <> tyName elTy <> parens ( int (n-1) <+> "downto 0")
 vhdlType t@(SP _ _) = "std_logic_vector" <>
                       parens ( int (typeSize t - 1) <+>
