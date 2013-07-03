@@ -74,28 +74,40 @@ generateVHDL modName = do
     [topEntity] -> do
       let bindingsMap' = HashMap.map snd bindingsMap
       (supplyN,supplyTB) <- fmap Supply.splitSupply Supply.newSupply
+
+      prepTime <- dfunMap `seq` Clock.getCurrentTime
+      traceIf True ("Loading dependencies took " ++ show (Clock.diffUTCTime prepTime start)) $ return ()
+
       let transformedBindings
-            = runNormalization DebugFinal supplyN bindingsMap' dfunMap clsOpMap
+            = runNormalization DebugNone supplyN bindingsMap' dfunMap clsOpMap
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
-      normTime <- Clock.getCurrentTime
-      traceIf True ("\nNormalisation took " ++ show (Clock.diffUTCTime normTime start)) $ return ()
+
+      normTime <- transformedBindings `seq` Clock.getCurrentTime
+      traceIf True ("Normalisation took " ++ show (Clock.diffUTCTime normTime prepTime)) $ return ()
+
       (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList $ transformedBindings)
                               primMap
                               Nothing
                               (fst topEntity)
-      netlistTime <- Clock.getCurrentTime
-      traceIf True ("\nNetlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
+
+      netlistTime <- netlist `seq` Clock.getCurrentTime
+      traceIf True ("Netlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
 
       (testBench,vhdlState') <- genTestBench DebugNone supplyTB dfunMap clsOpMap primMap vhdlState
                                   bindingsMap'
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
                                   (head $ filter (\(Component cName _ _ _ _) -> cName == (pack "topEntity_0")) netlist)
+
+      testBenchTime <- testBench `seq` Clock.getCurrentTime
+      traceIf True ("Testbench generation took " ++ show (Clock.diffUTCTime testBenchTime netlistTime)) $ return ()
+
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
       mapM_ (writeVHDL dir) $ evalState (mapM genVHDL (netlist ++ testBench)) vhdlState'
+
       end <- Clock.getCurrentTime
-      traceIf True ("\nTotal compilation took " ++ show (Clock.diffUTCTime end start)) $ return ()
+      traceIf True ("Total compilation took " ++ show (Clock.diffUTCTime end start)) $ return ()
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
