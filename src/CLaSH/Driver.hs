@@ -144,12 +144,14 @@ prepareDir dir = do
   -- Remove the files
   mapM_ Directory.removeFile abs_to_remove
 
-writeVHDL :: FilePath -> (String, Doc) -> IO ()
-writeVHDL dir (cname, vhdl) = do
-  -- Find the filename
-  let fname = dir ++ cname ++ ".vhdl"
-  -- Write the file
-  handle <- IO.openFile fname IO.WriteMode
-  IO.hPutStrLn handle "-- Automatically generated VHDL"
-  hPutDoc handle vhdl
-  IO.hClose handle
+writeVHDL :: FilePath -> (String, Maybe Doc, Doc) -> IO ()
+writeVHDL dir (cname, vhdlTysM, vhdl) = do
+    maybe (return ()) (write (dir ++ cname ++ "_types.vhdl")) vhdlTysM
+    write (dir ++ cname ++ ".vhdl") vhdl
+  where
+    write fname val = do
+      handle <- IO.openFile fname IO.WriteMode
+      IO.hPutStrLn handle "-- Automatically generated VHDL"
+      hPutDoc handle val
+      IO.hPutStr handle "\n"
+      IO.hClose handle

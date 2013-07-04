@@ -20,30 +20,32 @@ import CLaSH.Util (makeCached,(<:>))
 
 type VHDLM a = State VHDLState a
 
-genVHDL :: Component -> VHDLM (String,Doc)
+genVHDL :: Component -> VHDLM (String,Maybe Doc,Doc)
 genVHDL c = do
     _2 .= cName
-    fmap (unpack $ cName,) vhdl
+    (unpack $ cName,,) A.<$> vhdlTys A.<*> vhdl
   where
-    cName = componentName c
-    vhdl = tyPackage cName tys <$$> linebreak <>
-           tyImports tys <$$> linebreak <>
-           entity c <$$> linebreak <>
-           architecture c
-    tys = (snd $ output c)
-        : map snd (inputs c)
-        ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
+    cName   = componentName c
+    vhdlTys = tyPackage cName tys
+    vhdl    = tyImports tys <$$> linebreak <>
+              entity c      <$$> linebreak <>
+              architecture c
 
-tyPackage :: Text -> [HWType] -> VHDLM Doc
+    tys     =  (snd $ output c)
+            :  map snd (inputs c)
+            ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
+
+tyPackage :: Text -> [HWType] -> VHDLM (Maybe Doc)
 tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst)) $ use _3
                          let needsDec = nub $ concatMap needsTyDec tys
                              newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
                              newDecNeeds = nub $ concatMap needsTyDec newDec
                              otherDec = nub $ map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` newDecNeeds) prevDec
                          case newDec of
-                            [] -> empty
-                            _  -> packageDec otherDec newDec <$$> linebreak <>
-                                  packageBodyDec newDec
+                            [] -> return Nothing
+                            _  -> Just A.<$> ( packageDec otherDec newDec <$$> linebreak <>
+                                               packageBodyDec newDec
+                                             )
   where
     packageDec ptys ntys =
       imports ptys <$> linebreak <>
