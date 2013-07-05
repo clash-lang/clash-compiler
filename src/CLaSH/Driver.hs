@@ -32,10 +32,27 @@ import           CLaSH.Util
 import qualified Data.Time.Clock as Clock
 
 #ifdef CABAL
+
 import           Paths_clash
+getDefPrimDir :: IO FilePath
+getDefPrimDir = getDataFileName "primitives"
+
+#elif STANDALONE
+
+import qualified Control.Exception as Exception
+import System.Environment (getEnv)
+
+getDefPrimDir :: IO FilePath
+getDefPrimDir = catchIO (getEnv "clash_primdir") (error "Environment variable \"clash_primdir\" undefined")
+
+catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
+catchIO = Exception.catch
+
 #else
-getDataFileName :: FilePath -> IO FilePath
-getDataFileName = return . ("../" ++)
+
+getDefPrimDir :: FilePath -> IO FilePath
+getDefPrimDir = return "../primitives"
+
 #endif
 
 generateVHDL ::
@@ -44,7 +61,7 @@ generateVHDL ::
 generateVHDL modName = do
   start <- Clock.getCurrentTime
 
-  primitiveDir   <- getDataFileName "primitives"
+  primitiveDir   <- getDefPrimDir
   primitiveFiles <- fmap (filter (isSuffixOf ".json")) $
                       Directory.getDirectoryContents primitiveDir
 

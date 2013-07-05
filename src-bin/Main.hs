@@ -64,8 +64,23 @@ import Data.List
 import Data.Maybe
 
 -- clash additions
+#ifdef STANDALONE
+import qualified Control.Exception as Exception
+#else
 import qualified GHC.Paths
+#endif
 import qualified CLaSH.Driver
+
+#ifdef STANDALONE
+ghcLibDir :: IO FilePath
+ghcLibDir = catchIO (getEnv "ghc_libdir") (error "Environment variable \"ghc_libdir\" undefined")
+
+catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
+catchIO = Exception.catch
+#else
+ghcLibDir :: IO FilePath
+ghcLibDir = return GHC.Paths.libdir
+#endif
 
 -----------------------------------------------------------------------------
 -- ToDo:
@@ -83,6 +98,7 @@ main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
    hSetBuffering stderr NoBuffering
+   libDir <- ghcLibDir
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
@@ -116,7 +132,7 @@ main = do
                    ShowOptions             -> showOptions
         Right postStartupMode ->
             -- start our GHC session
-            GHC.runGhc (Just GHC.Paths.libdir) $ do
+            GHC.runGhc (Just libDir) $ do
 
             dflags <- GHC.getSessionDynFlags
 

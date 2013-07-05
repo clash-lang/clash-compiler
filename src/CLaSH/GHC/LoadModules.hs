@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -7,7 +8,12 @@ module CLaSH.GHC.LoadModules
 where
 
 -- External Modules
+#ifdef STANDALONE
+import qualified Control.Exception as Exception
+import System.Environment (getEnv)
+#else
 import qualified GHC.Paths
+#endif
 
 -- GHC API
 -- import qualified CorePrep
@@ -34,6 +40,17 @@ import           CLaSH.GHC.LoadInterfaceFiles
 import           CLaSH.GHC.Types
 import           CLaSH.Util (curLoc,mapAccumLM,(><))
 
+#ifdef STANDALONE
+ghcLibDir :: IO FilePath
+ghcLibDir = catchIO (getEnv "ghc_libdir") (error "Environment variable \"ghc_libdir\" undefined")
+
+catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
+catchIO = Exception.catch
+#else
+ghcLibDir :: IO FilePath
+ghcLibDir = return GHC.Paths.libdir
+#endif
+
 loadModules ::
   String
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
@@ -49,8 +66,9 @@ loadModules modName = defaultErrorHandler $ do
   -- on the compiler dir of ghc suggests that 'z' is not used to generate
   -- a unique supply anywhere.
   uniqSupply <- mkSplitUniqSupply 'z'
+  libDir     <- MonadUtils.liftIO $ ghcLibDir
 
-  GHC.runGhc (Just GHC.Paths.libdir) $ do
+  GHC.runGhc (Just libDir) $ do
     dflags <- GHC.getSessionDynFlags
     let dflags1 = foldl DynFlags.xopt_set
                     (dflags
