@@ -66,7 +66,11 @@ generateVHDL modName = do
   primitiveFiles <- fmap (filter (isSuffixOf ".json")) $
                       Directory.getDirectoryContents primitiveDir
 
-  let primitiveFiles' = map (FilePath.combine primitiveDir) primitiveFiles
+  localPrimitives <- fmap (filter (isSuffixOf ".json")) $
+                      Directory.getDirectoryContents "."
+
+  let primitiveFiles' = map (FilePath.combine primitiveDir) primitiveFiles ++
+                        localPrimitives
 
   primitives <- fmap concat $ mapM
                   ( return
