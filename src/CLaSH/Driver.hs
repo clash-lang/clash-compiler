@@ -4,9 +4,10 @@
 {-# LANGUAGE TemplateHaskell     #-}
 module CLaSH.Driver where
 
+import           Control.Monad                (unless)
 import           Control.Monad.State          (evalState)
 import qualified Data.ByteString.Lazy         as LZ
-import           Data.Maybe                   (fromMaybe,listToMaybe)
+import           Data.Maybe                   (catMaybes,fromMaybe,listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
 import qualified Data.HashMap.Lazy            as HashMap
 import           Data.List                    (isSuffixOf)
@@ -14,7 +15,7 @@ import           Data.Text.Lazy               (pack)
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
 import qualified System.IO                    as IO
-import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc)
+import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc,linebreak,punctuate,vcat)
 import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Term              (TmName)
@@ -121,7 +122,11 @@ generateVHDL modName = do
 
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
-      mapM_ (writeVHDL dir) $ evalState (mapM genVHDL (netlist ++ testBench)) vhdlState'
+      let (vhdlNms,typeDocsM,vhdlDocs) = unzip3 $ evalState (mapM genVHDL (netlist ++ testBench)) vhdlState'
+      let typeDocs = catMaybes typeDocsM
+
+      unless (null typeDocs) $ writeVHDL dir ("types", vcat $ punctuate linebreak typeDocs)
+      mapM_ (writeVHDL dir) (zip vhdlNms vhdlDocs)
 
       end <- Clock.getCurrentTime
       traceIf True ("Total compilation took " ++ show (Clock.diffUTCTime end start)) $ return ()
@@ -161,14 +166,10 @@ prepareDir dir = do
   -- Remove the files
   mapM_ Directory.removeFile abs_to_remove
 
-writeVHDL :: FilePath -> (String, Maybe Doc, Doc) -> IO ()
-writeVHDL dir (cname, vhdlTysM, vhdl) = do
-    maybe (return ()) (write (dir ++ cname ++ "_types.vhdl")) vhdlTysM
-    write (dir ++ cname ++ ".vhdl") vhdl
-  where
-    write fname val = do
-      handle <- IO.openFile fname IO.WriteMode
-      IO.hPutStrLn handle "-- Automatically generated VHDL"
-      hPutDoc handle val
-      IO.hPutStr handle "\n"
-      IO.hClose handle
+writeVHDL :: FilePath -> (String, Doc) -> IO ()
+writeVHDL dir (cname, vhdl) = do
+  handle <- IO.openFile (dir ++ cname ++ ".vhdl") IO.WriteMode
+  IO.hPutStrLn handle "-- Automatically generated VHDL"
+  hPutDoc handle vhdl
+  IO.hPutStr handle "\n"
+  IO.hClose handle

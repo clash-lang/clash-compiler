@@ -43,9 +43,12 @@ tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst
                              otherDec = nub $ map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` newDecNeeds) prevDec
                          case newDec of
                             [] -> return Nothing
-                            _  -> Just A.<$> ( packageDec otherDec newDec <$$> linebreak <>
-                                               packageBodyDec newDec
-                                             )
+                            _  -> do newDecFun <- fmap catMaybes $ mapM funDec newDec
+                                     Just A.<$> ( packageDec otherDec newDec <$$>
+                                                    case newDecFun of
+                                                      [] -> empty
+                                                      _  -> linebreak <> packageBodyDec (return newDecFun)
+                                                )
   where
     packageDec ptys ntys =
       imports ptys <$> linebreak <>
@@ -55,7 +58,7 @@ tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst
 
     packageBodyDec ntys =
       "package" <+> "body" <+> text cName <> "_types" <+> "is" <$>
-        indent 2 (vcat $ mapM funDec ntys) <$>
+        indent 2 (vcat ntys) <$>
       "end" <> semi
 
     imports ptys = punctuate' semi $ sequence $
@@ -93,8 +96,8 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
-funDec :: HWType -> VHDLM Doc
-funDec Bool = fmap snd $ makeCached Bool _3 ((,) A.<$> (use _2) A.<*> toSLVDec)
+funDec :: HWType -> VHDLM (Maybe Doc)
+funDec Bool = fmap (Just . snd) $ makeCached Bool _3 ((,) A.<$> (use _2) A.<*> toSLVDec)
   where
     toSLVDec = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
                "begin" <$>
@@ -105,14 +108,14 @@ funDec Bool = fmap snd $ makeCached Bool _3 ((,) A.<$> (use _2) A.<*> toSLVDec)
                                            ,"end" <+> "if" <> semi
                                            ]) <$>
                "end" <> semi
-funDec Integer = fmap snd $ makeCached Integer _3 ((,) A.<$> (use _2) A.<*> toIntegerDec)
+funDec Integer = fmap (Just . snd) $ makeCached Integer _3 ((,) A.<$> (use _2) A.<*> toIntegerDec)
   where
     toIntegerDec = "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
                    "begin" <$>
                      indent 2 ("return" <+> "i" <> semi) <$>
                    "end" <> semi
 
-funDec _ = empty
+funDec _ = return Nothing
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
