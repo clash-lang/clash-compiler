@@ -8,7 +8,7 @@ import qualified Control.Lens  as Lens
 import qualified Control.Monad as Monad
 import Data.Text.Lazy          (pack)
 import Data.Either             (partitionEithers)
-import Unbound.LocallyNameless (Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
+import Unbound.LocallyNameless (Embed,Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
 
 import CLaSH.Core.DataCon      (DataCon(..))
 import CLaSH.Core.FreeVars     (typeFreeVars,termFreeIds)
@@ -198,7 +198,7 @@ mkUniqueNormalized (args,binds,res) = do
   let exprs = map (unembed . snd) binds
   let usesOutput = concatMap (filter (== (varName res)) . termFreeIds) exprs
   let (res2,extraBndr) = case usesOutput of
-                            [] -> (res1,[])
+                            [] -> (res1,[] :: [(Id, Embed Term)])
                             _  -> let res3 = appendToName (varName res) "_o_sig"
                                   in (res3,[(Id res1 (varType res),embed $ Var (unembed $ varType res) res3)])
   bndrs' <- mapM (mkUnique (varName res,res2)) bndrs
