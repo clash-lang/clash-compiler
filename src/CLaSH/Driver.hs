@@ -51,7 +51,7 @@ catchIO = Exception.catch
 
 #else
 
-getDefPrimDir :: FilePath -> IO FilePath
+getDefPrimDir :: IO FilePath
 getDefPrimDir = return "../primitives"
 
 #endif
