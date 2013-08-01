@@ -2,13 +2,13 @@ Name:                 clash
 Version:              0.2
 Synopsis:             CAES Language for Synchronous Hardware
 -- Description:
-Homepage:             http://clash.ewi.utwente.nl/
+Homepage:             http://christiaanb.github.com/clash2
 bug-reports:          http://github.com/christiaanb/clash2/issues
 License:              BSD3
 License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
-Copyright:            Copyright (C) 2012 University of Twente
+Copyright:            Copyright (C) 2013 University of Twente
 Category:             Hardware
 Build-type:           Simple
 
