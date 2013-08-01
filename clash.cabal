@@ -47,8 +47,6 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fwarn-tabs
 
-  Exposed-modules:    CLaSH.Driver
-
   Build-depends:      aeson                >= 0.6.0.2,
                       attoparsec           >= 0.10.2.0,
                       base                 >= 4.3.1.0,
@@ -73,13 +71,7 @@ Library
                       uu-parsinglib        >= 2.7.4,
                       wl-pprint-text       >= 1.0.0.0
 
-  if flag(standalone)
-    CPP-options:      -DSTANDALONE
-  else
-    CPP-options:      -DCABAL
-    Build-depends:    ghc-paths            >= 0.1.0.8
-
-  Other-modules:      CLaSH.Core.DataCon
+  Exposed-modules:    CLaSH.Core.DataCon
                       CLaSH.Core.FreeVars
                       CLaSH.Core.Literal
                       CLaSH.Core.Pretty
@@ -92,6 +84,7 @@ Library
                       CLaSH.Core.Util
                       CLaSH.Core.Var
 
+                      CLaSH.Driver
                       CLaSH.Driver.PrepareBinding
                       CLaSH.Driver.TestbenchGen
                       CLaSH.Driver.Types
@@ -133,7 +126,13 @@ Library
 
                       CLaSH.Util
 
-                      Paths_clash
+  if flag(standalone)
+    CPP-options:      -DSTANDALONE
+  else
+    CPP-options:      -DCABAL
+    Build-depends:    ghc-paths            >= 0.1.0.8
+    Other-modules:    Paths_clash
+
 
 Executable clash
   HS-Source-Dirs:     src-bin
