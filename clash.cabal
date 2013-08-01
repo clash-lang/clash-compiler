@@ -2,7 +2,7 @@ Name:                 clash
 Version:              0.2
 Synopsis:             CAES Language for Synchronous Hardware
 -- Description:
-Homepage:             http://christiaanb.github.com/clash2
+Homepage:             http://christiaanb.github.io/clash2
 bug-reports:          http://github.com/christiaanb/clash2/issues
 License:              BSD3
 License-file:         LICENSE
