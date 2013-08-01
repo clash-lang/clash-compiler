@@ -44,7 +44,7 @@ import qualified Control.Exception as Exception
 import System.Environment (getEnv)
 
 getDefPrimDir :: IO FilePath
-getDefPrimDir = catchIO (getEnv "clash_primdir") (error "Environment variable \"clash_primdir\" undefined")
+getDefPrimDir = catchIO (getEnv "CLASH_PRIMDIR") (error "Environment variable \"CLASH_PRIMDIR\" undefined")
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
 catchIO = Exception.catch

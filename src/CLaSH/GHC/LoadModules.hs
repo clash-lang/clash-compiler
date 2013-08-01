@@ -42,7 +42,7 @@ import           CLaSH.Util (curLoc,mapAccumLM,(><))
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
-ghcLibDir = catchIO (getEnv "ghc_libdir") (error "Environment variable \"ghc_libdir\" undefined")
+ghcLibDir = catchIO (getEnv "GHC_LIBDIR") (error "Environment variable \"GHC_LIBDIR\" undefined")
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
 catchIO = Exception.catch
