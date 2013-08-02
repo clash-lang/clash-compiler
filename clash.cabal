@@ -131,7 +131,7 @@ Library
     CPP-options:      -DSTANDALONE
   else
     CPP-options:      -DCABAL
-    Build-depends:    ghc-paths            >= 0.1.0.8
+    Build-depends:    ghc-paths >= 0.1.0.8
     Other-modules:    Paths_clash
 
 
@@ -150,16 +150,16 @@ Executable clash
                       PatternGuards
                       NondecreasingIndentation
 
-  Build-Depends:      base       >= 3   && < 5,
-                      array      >= 0.1 && < 0.5,
-                      bytestring >= 0.9 && < 0.11,
-                      directory  >= 1   && < 1.3,
-                      process    >= 1   && < 1.3,
-                      filepath   >= 1   && < 1.4,
-                      ghc,
-                      transformers,
-                      haskeline,
-                      clash      >= 0.2
+  Build-Depends:      base          >= 3   && < 5,
+                      array         >= 0.1 && < 0.5,
+                      bytestring    >= 0.9 && < 0.11,
+                      directory     >= 1   && < 1.3,
+                      process       >= 1   && < 1.3,
+                      filepath      >= 1   && < 1.4,
+                      ghc           >= 7.7,
+                      transformers  >= 0.3,
+                      haskeline     >= 0.7.0.3,
+                      clash         >= 0.2
   if os(windows)
     Build-Depends:    Win32
   else
