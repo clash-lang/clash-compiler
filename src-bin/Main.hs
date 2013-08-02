@@ -65,7 +65,7 @@ import Data.Maybe
 
 -- clash additions
 #ifdef STANDALONE
-import qualified Control.Exception as Exception
+import           System.Process (runInteractiveCommand, waitForProcess)
 #else
 import qualified GHC.Paths
 #endif
@@ -73,10 +73,21 @@ import qualified CLaSH.Driver
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
-ghcLibDir = catchIO (getEnv "GHC_LIBDIR") (error "Environment variable \"GHC_LIBDIR\" undefined")
+ghcLibDir = do (libDir,exitCode) <- getProcessOutput "ghc --print-libdir"
+               case exitCode of
+                  ExitSuccess   -> return libDir
+                  ExitFailure i -> error $ "Calling GHC failed with: " ++ show i
 
-catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO = Exception.catch
+getProcessOutput :: String -> IO (String, ExitCode)
+getProcessOutput command =
+     -- Create the process
+  do (_, pOut, _, handle) <- runInteractiveCommand command
+     -- Wait for the process to finish and store its exit code
+     exitCode <- waitForProcess handle
+     -- Get the standard output.
+     output   <- hGetLine pOut
+     -- return both the output and the exit code.
+     return (output, exitCode)
 #else
 ghcLibDir :: IO FilePath
 ghcLibDir = return GHC.Paths.libdir
