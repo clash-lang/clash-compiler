@@ -10,5 +10,5 @@ fir coeffs x_t = y_t
     y_t = dotp coeffs xs
     xs  = window x_t
 
-topEntity :: Sync (Signed 16) -> Sync (Signed 16)
-topEntity = fir $(v [0::Sync (Signed 16),1,2,3])
+topEntity :: Signal (Signed 16) -> Signal (Signed 16)
+topEntity = fir $(v [0::Signal (Signed 16),1,2,3])

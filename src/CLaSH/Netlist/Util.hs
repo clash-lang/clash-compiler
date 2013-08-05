@@ -50,9 +50,9 @@ synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case (name2String $ tyConName tyCon) of
-      "CLaSH.Signal.Sync"       -> Just (pack "clk")
+      "CLaSH.Signal.Signal"     -> Just (pack "clk")
       "CLaSH.Sized.VectorZ.Vec" -> synchronizedClk (args!!1)
-      "CLaSH.Signal.Packed"     -> Just (pack "clk")
+      "CLaSH.Signal.SignalP"    -> Just (pack "clk")
       _                         -> Nothing
   | otherwise
   = Nothing
@@ -71,8 +71,8 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
     "GHC.Prim.~#"                   -> Left $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Bit.Bit"                 -> return Bit
     "CLaSH.Signal.Pack"             -> Left $ "Can't translate type: " ++ showDoc ty
-    "CLaSH.Signal.Sync"             -> coreTypeToHWType (head args)
-    "CLaSH.Signal.Packed"           -> coreTypeToHWType (head args)
+    "CLaSH.Signal.Signal"           -> coreTypeToHWType (head args)
+    "CLaSH.Signal.SignalP"          -> coreTypeToHWType (head args)
     "CLaSH.Sized.Signed.Signed"     -> Signed <$> (tyNatSize $ head args)
     "CLaSH.Sized.Unsigned.Unsigned" -> Unsigned <$> (tyNatSize $ head args)
     "CLaSH.Sized.VectorZ.Vec"       -> do

@@ -23,7 +23,7 @@ pu alu (op1,op2,cnt) (dmem,opc)  = ((op1,op2,cnt)   ,(cnt,alu opc op1 op2))
 datamem mem (addr,Nothing)  = (mem                  ,mem ! addr)
 datamem mem (addr,Just val) = (vreplace mem addr val,mem ! addr)
 
-topEntity :: Sync (OPC Word) -> Sync (Maybe Word)
+topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
 topEntity i = val
   where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)

@@ -18,27 +18,27 @@ end block;"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.sync"
+    { "name"      : "CLaSH.Signal.signal"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.mapSync"
+    { "name"      : "CLaSH.Signal.mapSignal"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.appSync"
+    { "name"      : "CLaSH.Signal.appSignal"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.combine"
+    { "name"      : "CLaSH.Signal.pack"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.split"
+    { "name"      : "CLaSH.Signal.unpack"
     , "primType"  : "Function"
     }
   }
