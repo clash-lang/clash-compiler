@@ -31,8 +31,8 @@ import GHC.TypeLits          as Exported
 {-# INLINABLE window #-}
 window ::
   (SingI (n + 1), Default a)
-  => Sync a
-  -> Vec ((n + 1) + 1) (Sync a)
+  => Signal a
+  -> Vec ((n + 1) + 1) (Signal a)
 window x = x :> prev
   where
     prev = registerP (vcopyI def) next
@@ -41,8 +41,8 @@ window x = x :> prev
 {-# INLINABLE windowP #-}
 windowP ::
   (SingI (n + 1), Default a)
-  => Sync a
-  -> Vec (n + 1) (Sync a)
+  => Signal a
+  -> Vec (n + 1) (Signal a)
 windowP x = prev
   where
     prev = registerP (vcopyI def) next
@@ -65,11 +65,11 @@ registerP i = split Prelude.. register i Prelude.. combine
 {-# NOINLINE blockRam #-}
 blockRam :: forall n m a . (SingI n, SingI m, Pack a)
          => Sing (n :: Nat)
-         -> Sync (Unsigned m)
-         -> Sync (Unsigned m)
-         -> Sync Bool
-         -> Sync a
-         -> Sync a
+         -> Signal (Unsigned m)
+         -> Signal (Unsigned m)
+         -> Signal Bool
+         -> Signal a
+         -> Signal a
 blockRam n wr rd en din = combine $ (bram' <^> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
@@ -86,14 +86,14 @@ blockRam n wr rd en din = combine $ (bram' <^> binit) (wr,rd,en,din)
 {-# INLINABLE blockRamPow2 #-}
 blockRamPow2 :: (SingI n, SingI (2^n), Pack a)
              => (Sing ((2^n) :: Nat))
-             -> Sync (Unsigned n)
-             -> Sync (Unsigned n)
-             -> Sync Bool
-             -> Sync a
-             -> Sync a
+             -> Signal (Unsigned n)
+             -> Signal (Unsigned n)
+             -> Signal Bool
+             -> Signal a
+             -> Signal a
 blockRamPow2 = blockRam
 
-newtype Comp a b = C { asFunction :: Sync a -> Sync b }
+newtype Comp a b = C { asFunction :: Signal a -> Signal b }
 
 instance Category Comp where
   id            = C Prelude.id

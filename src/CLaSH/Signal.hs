@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies    #-}
 
 module CLaSH.Signal
-  ( Sync, fromList, sync
+  ( Signal, fromList, signal
   , sample
   , register
   , Pack(..)
@@ -21,70 +21,70 @@ import CLaSH.Sized.Unsigned (Unsigned)
 import CLaSH.Sized.VectorZ  (Vec(..), vmap, vhead, vtail)
 
 {-# NOINLINE register  #-}
-{-# NOINLINE sync      #-}
-{-# NOINLINE mapSync   #-}
-{-# NOINLINE appSync   #-}
+{-# NOINLINE signal    #-}
+{-# NOINLINE mapSignal #-}
+{-# NOINLINE appSignal #-}
 
 infixr 5 :-
-data Sync a = a :- Sync a
+data Signal a = a :- Signal a
 
-fromList :: [a] -> Sync a
+fromList :: [a] -> Signal a
 fromList []     = error "finite list"
 fromList (x:xs) = x :- fromList xs
 
-instance Show a => Show (Sync a) where
+instance Show a => Show (Signal a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
-instance Lift a => Lift (Sync a) where
-  lift ~(x :- _) = [| sync x |]
+instance Lift a => Lift (Signal a) where
+  lift ~(x :- _) = [| signal x |]
 
-instance Default a => Default (Sync a) where
-  def = sync def
+instance Default a => Default (Signal a) where
+  def = signal def
 
-sample :: Integer -> Sync a -> [a]
+sample :: Integer -> Signal a -> [a]
 sample 0 _         = []
 sample n ~(x :- xs) = x : (sample (n-1) xs)
 
-sync :: a -> Sync a
-sync a = a :- sync a
+signal :: a -> Signal a
+signal a = a :- signal a
 
-mapSync :: (a -> b) -> Sync a -> Sync b
-mapSync f (a :- as) = f a :- mapSync f as
+mapSignal :: (a -> b) -> Signal a -> Signal b
+mapSignal f (a :- as) = f a :- mapSignal f as
 
-appSync :: Sync (a -> b) -> Sync a -> Sync b
-appSync (f :- fs) ~(a :- as) = f a :- appSync fs as
+appSignal :: Signal (a -> b) -> Signal a -> Signal b
+appSignal (f :- fs) ~(a :- as) = f a :- appSignal fs as
 
-instance Functor Sync where
-  fmap = mapSync
+instance Functor Signal where
+  fmap = mapSignal
 
-instance Applicative Sync where
-  pure  = sync
-  (<*>) = appSync
+instance Applicative Signal where
+  pure  = signal
+  (<*>) = appSignal
 
-unSync :: Sync a -> a
-unSync (a :- _) = a
+unSignal :: Signal a -> a
+unSignal (a :- _) = a
 
-next :: Sync a -> Sync a
+next :: Signal a -> Signal a
 next (_ :- as) = as
 
-diag :: Sync (Sync a) -> Sync a
-diag (xs :- xss) = unSync xs :- diag (fmap next xss)
+diag :: Signal (Signal a) -> Signal a
+diag (xs :- xss) = unSignal xs :- diag (fmap next xss)
 
-instance Monad Sync where
-  return    = sync
+instance Monad Signal where
+  return    = signal
   xs >>= f  = diag (fmap f xs)
 
-register :: a -> Sync a -> Sync a
+register :: a -> Signal a -> Signal a
 register i s = i :- s
 
 class Pack a where
   type Packed a
-  type Packed a = Sync a
+  type Packed a = Signal a
   {-# NOINLINE combine #-}
-  combine :: Packed a -> Sync a
+  combine :: Packed a -> Signal a
   combine = unsafeCoerce
   {-# NOINLINE split #-}
-  split :: Sync a -> Packed a
+  split :: Signal a -> Packed a
   split = unsafeCoerce
 
 instance Pack (Signed n)
@@ -94,12 +94,12 @@ instance Pack Integer
 instance Pack ()
 
 instance Pack (a,b) where
-  type Packed (a,b) = (Sync a, Sync b)
+  type Packed (a,b) = (Signal a, Signal b)
   combine  = uncurry (liftA2 (,))
   split ab = (fmap fst ab, fmap snd ab)
 
 instance Pack (a,b,c) where
-  type Packed (a,b,c) = (Sync a, Sync b, Sync c)
+  type Packed (a,b,c) = (Signal a, Signal b, Signal c)
   combine (a,b,c) = (,,) <$> a <*> b <*> c
   split abc       = (fmap (\(x,_,_) -> x) abc
                     ,fmap (\(_,x,_) -> x) abc
@@ -107,7 +107,7 @@ instance Pack (a,b,c) where
                     )
 
 instance Pack (a,b,c,d) where
-  type Packed (a,b,c,d) = (Sync a, Sync b, Sync c, Sync d)
+  type Packed (a,b,c,d) = (Signal a, Signal b, Signal c, Signal d)
   combine (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
   split abcd        = (fmap (\(x,_,_,_) -> x) abcd
                       ,fmap (\(_,x,_,_) -> x) abcd
@@ -116,8 +116,8 @@ instance Pack (a,b,c,d) where
                       )
 
 instance Pack (Vec n a) where
-  type Packed (Vec n a) = Vec n (Sync a)
-  combine vs                = vmap unSync vs :- combine (vmap next vs)
+  type Packed (Vec n a) = Vec n (Signal a)
+  combine vs                = vmap unSignal vs :- combine (vmap next vs)
   split (Nil :- _)          = Nil
   split vs@((_ :> _) :- _)  = fmap vhead vs :> (split (fmap vtail vs))
 
@@ -127,11 +127,11 @@ v <^ f = liftA2 f v
 (^>) :: Applicative f => (f a -> f b) -> f a -> f b
 f ^> v = f v
 
-instance Num a => Num (Sync a) where
+instance Num a => Num (Signal a) where
   (+)         = liftA2 (+)
   (-)         = liftA2 (-)
   (*)         = liftA2 (*)
   negate      = fmap negate
   abs         = fmap abs
   signum      = fmap signum
-  fromInteger = sync . fromInteger
+  fromInteger = signal . fromInteger
