@@ -36,7 +36,7 @@ Library
                       CLaSH.Sized.Index
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
-                      CLaSH.Sized.VectorZ
+                      CLaSH.Sized.Vector
 
   Build-depends:      base                 >= 4.3.1.0,
                       template-haskell     >= 2.9.0.0

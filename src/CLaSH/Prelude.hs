@@ -23,7 +23,7 @@ import CLaSH.Promoted.Ord    as Exported
 import CLaSH.Sized.Index     as Exported
 import CLaSH.Sized.Signed    as Exported
 import CLaSH.Sized.Unsigned  as Exported
-import CLaSH.Sized.VectorZ   as Exported
+import CLaSH.Sized.Vector    as Exported
 import CLaSH.Bit             as Exported
 import CLaSH.Signal          as Exported
 import GHC.TypeLits          as Exported

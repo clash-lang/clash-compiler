@@ -10,7 +10,7 @@
 
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
-module CLaSH.Sized.VectorZ
+module CLaSH.Sized.Vector
   ( Vec(..), (<:)
   , vhead, vtail, vlast, vinit
   , (+>>), (<<+), (<++>), vconcat
