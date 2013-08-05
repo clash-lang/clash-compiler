@@ -13,7 +13,6 @@ where
 
 import Control.Applicative
 import Language.Haskell.TH.Syntax(Lift(..))
-import Unsafe.Coerce
 
 import CLaSH.Class.Default
 import CLaSH.Sized.Signed   (Signed)
@@ -79,19 +78,38 @@ register i s = i :- s
 
 class Pack a where
   type Packed a
-  type Packed a = Signal a
-  {-# NOINLINE combine #-}
   combine :: Packed a -> Signal a
-  combine = unsafeCoerce
-  {-# NOINLINE split #-}
-  split :: Signal a -> Packed a
-  split = unsafeCoerce
+  split   :: Signal a -> Packed a
 
-instance Pack (Signed n)
-instance Pack (Unsigned n)
-instance Pack Bool
-instance Pack Integer
-instance Pack ()
+instance Pack (Signed n) where
+  type Packed (Signed n) = Signal (Signed n)
+  combine = id
+  split   = id
+
+instance Pack (Unsigned n) where
+  type Packed (Unsigned n) = Signal (Unsigned n)
+  combine = id
+  split   = id
+
+instance Pack Bool where
+  type Packed Bool = Signal Bool
+  combine = id
+  split   = id
+
+instance Pack Integer where
+  type Packed Integer = Signal Integer
+  combine = id
+  split   = id
+
+instance Pack Int where
+  type Packed Int = Signal Int
+  combine = id
+  split   = id
+
+instance Pack () where
+  type Packed () = Signal ()
+  combine = id
+  split   = id
 
 instance Pack (a,b) where
   type Packed (a,b) = (Signal a, Signal b)
