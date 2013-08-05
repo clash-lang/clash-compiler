@@ -4,7 +4,7 @@
 module CLaSH.Class.BitVector where
 
 import CLaSH.Bit
-import CLaSH.Sized.VectorZ
+import CLaSH.Sized.Vector
 import GHC.TypeLits
 
 class BitVector a where

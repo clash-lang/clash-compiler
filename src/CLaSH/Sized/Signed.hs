@@ -22,7 +22,7 @@ import GHC.TypeLits
 import CLaSH.Bit
 import CLaSH.Class.BitVector
 import CLaSH.Class.Default
-import CLaSH.Sized.VectorZ
+import CLaSH.Sized.Vector
 
 newtype Signed (n :: Nat) = S Integer
 

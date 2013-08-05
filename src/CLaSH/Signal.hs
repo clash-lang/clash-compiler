@@ -18,7 +18,7 @@ import Unsafe.Coerce
 import CLaSH.Class.Default
 import CLaSH.Sized.Signed   (Signed)
 import CLaSH.Sized.Unsigned (Unsigned)
-import CLaSH.Sized.VectorZ  (Vec(..), vmap, vhead, vtail)
+import CLaSH.Sized.Vector   (Vec(..), vmap, vhead, vtail)
 
 {-# NOINLINE register  #-}
 {-# NOINLINE signal    #-}
