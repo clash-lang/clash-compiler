@@ -116,6 +116,9 @@ instance ArrowLoop Comp where
 registerC :: a -> Comp a a
 registerC = C Prelude.. register
 
+simulateC :: Comp a b -> [a] -> [b]
+simulateC f = simulate (asFunction f)
+
 {-# INLINABLE (^^^) #-}
 (^^^) :: (s -> i -> (s,o)) -> s -> Comp i o
 f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i

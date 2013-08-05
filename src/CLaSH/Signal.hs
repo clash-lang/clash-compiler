@@ -3,10 +3,14 @@
 {-# LANGUAGE TypeFamilies    #-}
 
 module CLaSH.Signal
-  ( Signal, fromList, signal
+  ( Signal
+  , fromList
+  , signal
   , sample
   , register
+  , simulate
   , Pack(..)
+  , simulateP
   , (<^), (^>)
   )
 where
@@ -40,7 +44,7 @@ instance Lift a => Lift (Signal a) where
 instance Default a => Default (Signal a) where
   def = signal def
 
-sample :: Integer -> Signal a -> [a]
+sample :: Int -> Signal a -> [a]
 sample 0 _         = []
 sample n ~(x :- xs) = x : (sample (n-1) xs)
 
@@ -76,10 +80,16 @@ instance Monad Signal where
 register :: a -> Signal a -> Signal a
 register i s = i :- s
 
+simulate :: (Signal a -> Signal b) -> [a] -> [b]
+simulate f as = sample (length as) (f (fromList as))
+
 class Pack a where
   type Packed a
   combine :: Packed a -> Signal a
   split   :: Signal a -> Packed a
+
+simulateP :: (Pack a, Pack b) => (Packed a -> Packed b) -> [a] -> [b]
+simulateP f = simulate (combine . f . split)
 
 instance Pack (Signed n) where
   type Packed (Signed n) = Signal (Signed n)
