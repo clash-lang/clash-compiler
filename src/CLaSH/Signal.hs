@@ -113,25 +113,71 @@ instance Pack () where
 
 instance Pack (a,b) where
   type Packed (a,b) = (Signal a, Signal b)
-  combine  = uncurry (liftA2 (,))
-  split ab = (fmap fst ab, fmap snd ab)
+  combine   = uncurry (liftA2 (,))
+  split tup = (fmap fst tup, fmap snd tup)
 
 instance Pack (a,b,c) where
   type Packed (a,b,c) = (Signal a, Signal b, Signal c)
   combine (a,b,c) = (,,) <$> a <*> b <*> c
-  split abc       = (fmap (\(x,_,_) -> x) abc
-                    ,fmap (\(_,x,_) -> x) abc
-                    ,fmap (\(_,_,x) -> x) abc
+  split tup       = (fmap (\(x,_,_) -> x) tup
+                    ,fmap (\(_,x,_) -> x) tup
+                    ,fmap (\(_,_,x) -> x) tup
                     )
 
 instance Pack (a,b,c,d) where
   type Packed (a,b,c,d) = (Signal a, Signal b, Signal c, Signal d)
   combine (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
-  split abcd        = (fmap (\(x,_,_,_) -> x) abcd
-                      ,fmap (\(_,x,_,_) -> x) abcd
-                      ,fmap (\(_,_,x,_) -> x) abcd
-                      ,fmap (\(_,_,_,x) -> x) abcd
+  split tup         = (fmap (\(x,_,_,_) -> x) tup
+                      ,fmap (\(_,x,_,_) -> x) tup
+                      ,fmap (\(_,_,x,_) -> x) tup
+                      ,fmap (\(_,_,_,x) -> x) tup
                       )
+
+instance Pack (a,b,c,d,e) where
+  type Packed (a,b,c,d,e) = (Signal a, Signal b, Signal c, Signal d, Signal e)
+  combine (a,b,c,d,e) = (,,,,) <$> a <*> b <*> c <*> d <*> e
+  split tup           = (fmap (\(x,_,_,_,_) -> x) tup
+                        ,fmap (\(_,x,_,_,_) -> x) tup
+                        ,fmap (\(_,_,x,_,_) -> x) tup
+                        ,fmap (\(_,_,_,x,_) -> x) tup
+                        ,fmap (\(_,_,_,_,x) -> x) tup
+                        )
+
+instance Pack (a,b,c,d,e,f) where
+  type Packed (a,b,c,d,e,f) = (Signal a, Signal b, Signal c, Signal d, Signal e, Signal f)
+  combine (a,b,c,d,e,f) = (,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
+  split tup             = (fmap (\(x,_,_,_,_,_) -> x) tup
+                          ,fmap (\(_,x,_,_,_,_) -> x) tup
+                          ,fmap (\(_,_,x,_,_,_) -> x) tup
+                          ,fmap (\(_,_,_,x,_,_) -> x) tup
+                          ,fmap (\(_,_,_,_,x,_) -> x) tup
+                          ,fmap (\(_,_,_,_,_,x) -> x) tup
+                          )
+
+instance Pack (a,b,c,d,e,f,g) where
+  type Packed (a,b,c,d,e,f,g) = (Signal a, Signal b, Signal c, Signal d, Signal e, Signal f, Signal g)
+  combine (a,b,c,d,e,f,g) = (,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f <*> g
+  split tup               = (fmap (\(x,_,_,_,_,_,_) -> x) tup
+                            ,fmap (\(_,x,_,_,_,_,_) -> x) tup
+                            ,fmap (\(_,_,x,_,_,_,_) -> x) tup
+                            ,fmap (\(_,_,_,x,_,_,_) -> x) tup
+                            ,fmap (\(_,_,_,_,x,_,_) -> x) tup
+                            ,fmap (\(_,_,_,_,_,x,_) -> x) tup
+                            ,fmap (\(_,_,_,_,_,_,x) -> x) tup
+                            )
+
+instance Pack (a,b,c,d,e,f,g,h) where
+  type Packed (a,b,c,d,e,f,g,h) = (Signal a, Signal b, Signal c, Signal d, Signal e, Signal f, Signal g, Signal h)
+  combine (a,b,c,d,e,f,g,h) = (,,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f <*> g <*> h
+  split tup                 = (fmap (\(x,_,_,_,_,_,_,_) -> x) tup
+                              ,fmap (\(_,x,_,_,_,_,_,_) -> x) tup
+                              ,fmap (\(_,_,x,_,_,_,_,_) -> x) tup
+                              ,fmap (\(_,_,_,x,_,_,_,_) -> x) tup
+                              ,fmap (\(_,_,_,_,x,_,_,_) -> x) tup
+                              ,fmap (\(_,_,_,_,_,x,_,_) -> x) tup
+                              ,fmap (\(_,_,_,_,_,_,x,_) -> x) tup
+                              ,fmap (\(_,_,_,_,_,_,_,x) -> x) tup
+                              )
 
 instance Pack (Vec n a) where
   type Packed (Vec n a) = Vec n (Signal a)
