@@ -53,14 +53,14 @@ windowP x = prev
   (Pack i, Pack o)
   => (s -> i -> (s,o))
   -> s
-  -> (Packed i -> Packed o)
-f <^> iS = \i -> let (s',o) = split $ f <$> s <*> (combine i)
+  -> (SignalP i -> SignalP o)
+f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
                      s      = register iS s'
-                 in split o
+                 in unpack o
 
 {-# INLINABLE registerP #-}
-registerP :: Pack a => a -> Packed a -> Packed a
-registerP i = split Prelude.. register i Prelude.. combine
+registerP :: Pack a => a -> SignalP a -> SignalP a
+registerP i = unpack Prelude.. register i Prelude.. pack
 
 {-# NOINLINE blockRam #-}
 blockRam :: forall n m a . (SingI n, SingI m, Pack a)
@@ -70,7 +70,7 @@ blockRam :: forall n m a . (SingI n, SingI m, Pack a)
          -> Signal Bool
          -> Signal a
          -> Signal a
-blockRam n wr rd en din = combine $ (bram' <^> binit) (wr,rd,en,din)
+blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
     binit = (vcopy n (error "uninitialized ram"),error "uninitialized ram")
@@ -105,10 +105,10 @@ infixr 8 ><
 
 instance Arrow Comp where
   arr         = C Prelude.. fmap
-  first (C f) = C $ combine Prelude.. (f >< Prelude.id) Prelude.. split
+  first (C f) = C $ pack Prelude.. (f >< Prelude.id) Prelude.. unpack
 
 instance ArrowLoop Comp where
-  loop (C f) = C $ simpleLoop (split Prelude.. f Prelude.. combine)
+  loop (C f) = C $ simpleLoop (unpack Prelude.. f Prelude.. pack)
     where
       simpleLoop g b = let ~(c,d) = g (b,d)
                        in c
@@ -121,6 +121,6 @@ simulateC f = simulate (asFunction f)
 
 {-# INLINABLE (^^^) #-}
 (^^^) :: (s -> i -> (s,o)) -> s -> Comp i o
-f ^^^ sI = C $ \i -> let (s',o) = split $ f <$> s <*> i
+f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
                          s      = register sI s'
                      in  o
