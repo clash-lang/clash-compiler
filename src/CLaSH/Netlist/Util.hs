@@ -50,10 +50,10 @@ synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case (name2String $ tyConName tyCon) of
-      "CLaSH.Signal.Signal"     -> Just (pack "clk")
-      "CLaSH.Sized.VectorZ.Vec" -> synchronizedClk (args!!1)
-      "CLaSH.Signal.SignalP"    -> Just (pack "clk")
-      _                         -> Nothing
+      "CLaSH.Signal.Signal"    -> Just (pack "clk")
+      "CLaSH.Sized.Vector.Vec" -> synchronizedClk (args!!1)
+      "CLaSH.Signal.SignalP"   -> Just (pack "clk")
+      _                        -> Nothing
   | otherwise
   = Nothing
 
@@ -75,7 +75,7 @@ coreTypeToHWType ty@(tyView -> TyConApp tc args) =
     "CLaSH.Signal.SignalP"          -> coreTypeToHWType (head args)
     "CLaSH.Sized.Signed.Signed"     -> Signed <$> (tyNatSize $ head args)
     "CLaSH.Sized.Unsigned.Unsigned" -> Unsigned <$> (tyNatSize $ head args)
-    "CLaSH.Sized.VectorZ.Vec"       -> do
+    "CLaSH.Sized.Vector.Vec"        -> do
       let [szTy,elTy] = args
       sz     <- tyNatSize szTy
       elHWTy <- coreTypeToHWType elTy
