@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TupleSections    #-}
+{-# LANGUAGE ViewPatterns     #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -24,7 +25,7 @@ import Data.Hashable                      (Hashable(..),hash)
 import Data.HashMap.Lazy                  (HashMap)
 import qualified Data.HashMap.Lazy        as HashMap
 import Data.Maybe                         (fromMaybe,isJust)
-import Unbound.LocallyNameless            (Rep,bind,rec,embed,rebind,unembed)
+import Unbound.LocallyNameless            (Rep,bind,rec,embed,rebind,runFreshM,string2Name,unbind,unembed)
 import qualified Unbound.LocallyNameless  as Unbound
 
 -- GHC API
@@ -60,7 +61,6 @@ import qualified CLaSH.Core.Prim    as C
 import qualified CLaSH.Core.Term    as C
 import qualified CLaSH.Core.TyCon   as C
 import qualified CLaSH.Core.Type    as C
-import qualified CLaSH.Core.Util    as C
 import qualified CLaSH.Core.Var     as C
 import CLaSH.Primitives.Types
 import CLaSH.Util
@@ -276,11 +276,11 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
             Just (Primitive _ Dictionary) ->
               return $ C.Prim (C.PrimDict xPrim xType)
             Just (Primitive f Function)
-              | f == pack "CLaSH.Signal.mapSignal" -> return (C.mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.appSignal" -> return (C.mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.signal"    -> return (C.syncTerm xType)
-              | f == pack "CLaSH.Signal.pack"      -> return (C.splitCombineTerm False xType)
-              | f == pack "CLaSH.Signal.unpack"    -> return (C.splitCombineTerm True xType)
+              | f == pack "CLaSH.Signal.mapSignal" -> return (mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.appSignal" -> return (mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.signal"    -> return (syncTerm xType)
+              | f == pack "CLaSH.Signal.pack"      -> return (splitCombineTerm False xType)
+              | f == pack "CLaSH.Signal.unpack"    -> return (splitCombineTerm True xType)
             Just (Primitive _ Function) ->
               return $ C.Prim (C.PrimFun  xPrim xType)
             Just (Primitive _ Constructor) ->
@@ -444,3 +444,53 @@ qualfiedNameString n = fromMaybe "_INTERNAL_" modName ++ ('.':occName)
       return (moduleNameString moduleNm)
 
     occName = occNameString $ nameOccName n
+
+mapSyncTerm :: C.Type
+            -> C.Term
+mapSyncTerm (C.ForAllTy tvATy) =
+  let (aTV,bTV,C.tyView -> C.FunTy _ (C.tyView -> C.FunTy aTy bTy)) = runFreshM $ do
+                { (aTV',C.ForAllTy tvBTy) <- unbind tvATy
+                ; (bTV',funTy)            <- unbind tvBTy
+                ; return (aTV',bTV',funTy) }
+      fName = string2Name "f"
+      xName = string2Name "x"
+      fTy = C.mkFunTy aTy bTy
+      fId = C.Id fName (embed fTy)
+      xId = C.Id xName (embed aTy)
+  in C.TyLam $ bind aTV $
+     C.TyLam $ bind bTV $
+     C.Lam   $ bind fId $
+     C.Lam   $ bind xId $
+     C.App (C.Var fTy fName) (C.Var aTy xName)
+
+mapSyncTerm ty = error $ $(curLoc) ++ show ty
+
+syncTerm :: C.Type
+         -> C.Term
+syncTerm (C.ForAllTy tvTy) =
+  let (aTV,C.tyView -> C.FunTy _ aTy) = runFreshM $ unbind tvTy
+      xName = string2Name "x"
+      xId = C.Id xName (embed aTy)
+  in C.TyLam $ bind aTV $
+     C.Lam   $ bind xId $
+     C.Var   aTy xName
+
+syncTerm ty = error $ $(curLoc) ++ show ty
+
+splitCombineTerm :: Bool
+                 -> C.Type
+                 -> C.Term
+splitCombineTerm b (C.ForAllTy tvTy) =
+  let (aTV,C.tyView -> C.FunTy dictTy (C.tyView -> C.FunTy inpTy outpTy)) = runFreshM $ unbind tvTy
+      dictName = string2Name "splitCombineDict"
+      xName    = string2Name "x"
+      nTy      = if b then inpTy else outpTy
+      dId      = C.Id dictName (embed dictTy)
+      xId      = C.Id xName    (embed nTy)
+      newExpr  = C.TyLam $ bind aTV $
+                 C.Lam   $ bind dId $
+                 C.Lam   $ bind xId $
+                 C.Var nTy xName
+  in newExpr
+
+splitCombineTerm _ ty = error $ $(curLoc) ++ show ty

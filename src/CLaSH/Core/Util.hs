@@ -3,14 +3,14 @@
 module CLaSH.Core.Util where
 
 import Data.HashMap.Lazy (HashMap)
-import Unbound.LocallyNameless (Fresh,bind,embed,runFreshM,unbind,unembed,string2Name,unrebind)
+import Unbound.LocallyNameless (Fresh,bind,embed,unbind,unembed,unrebind)
 
 import CLaSH.Core.DataCon (dcType)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Pretty  (showDoc)
 import CLaSH.Core.Prim    (Prim(..),primType)
 import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type    (Type(..),Kind,TyName,TypeView(..),tyView,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
+import CLaSH.Core.Type    (Type(..),Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
   applyTy)
 import CLaSH.Core.Var     (Var(..),TyVar,Id,varType)
 import CLaSH.Util
@@ -169,56 +169,3 @@ isPrimFun ::
   -> Bool
 isPrimFun (Prim (PrimFun _ _)) = True
 isPrimFun _                    = False
-
-mapSyncTerm ::
-  Type
-  -> Term
-mapSyncTerm (ForAllTy tvATy) =
-  let (aTV,bTV,tyView -> FunTy _ (tyView -> FunTy aTy bTy)) = runFreshM $ do
-                { (aTV',ForAllTy tvBTy) <- unbind tvATy
-                ; (bTV',funTy)          <- unbind tvBTy
-                ; return (aTV',bTV',funTy) }
-      fName = string2Name "f"
-      xName = string2Name "x"
-      fTy = mkFunTy aTy bTy
-      fId = Id fName (embed fTy)
-      xId = Id xName (embed aTy)
-  in TyLam $ bind aTV $
-     TyLam $ bind bTV $
-     Lam   $ bind fId $
-     Lam   $ bind xId $
-     App (Var fTy fName) (Var aTy xName)
-
-mapSyncTerm ty = error $ $(curLoc) ++ show ty
-
-syncTerm ::
-  Type
-  -> Term
-syncTerm (ForAllTy tvTy) =
-  let (aTV,tyView -> FunTy _ aTy) = runFreshM $ unbind tvTy
-      xName = string2Name "x"
-      xId = Id xName (embed aTy)
-  in TyLam $ bind aTV $
-     Lam   $ bind xId $
-     Var   aTy xName
-
-syncTerm ty = error $ $(curLoc) ++ show ty
-
-splitCombineTerm ::
-  Bool
-  -> Type
-  -> Term
-splitCombineTerm b (ForAllTy tvTy) =
-  let (aTV,tyView -> FunTy dictTy (tyView -> FunTy inpTy outpTy)) = runFreshM $ unbind tvTy
-      dictName = string2Name "splitCombineDict"
-      xName    = string2Name "x"
-      nTy      = if b then inpTy else outpTy
-      dId      = Id dictName (embed dictTy)
-      xId      = Id xName    (embed nTy)
-      newExpr  = TyLam $ bind aTV $
-                 Lam   $ bind dId $
-                 Lam   $ bind xId $
-                 Var nTy xName
-  in newExpr
-
-splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
