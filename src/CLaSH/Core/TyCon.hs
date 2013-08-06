@@ -59,17 +59,12 @@ data AlgTyConRhs
   }
   deriving Show
 
-data TyConParent
-  = NoParentTyCon
-  | ClassTyCon
-  deriving Show
-
 data PrimRep
   = IntRep
   | VoidRep
   deriving Show
 
-Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep,''TyConParent]
+Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep]
 
 instance Alpha PrimRep
 instance Alpha TyCon where
@@ -88,17 +83,14 @@ instance Alpha TyCon where
   findpatrec _ _  = error "findpatrec TyCon"
 
 instance Alpha AlgTyConRhs
-instance Alpha TyConParent
 
 instance Subst Type TyCon
 instance Subst Type AlgTyConRhs
 instance Subst Type PrimRep
-instance Subst Type TyConParent
 
 instance Subst Term TyCon
 instance Subst Term AlgTyConRhs
 instance Subst Term PrimRep
-instance Subst Term TyConParent
 
 mkKindTyCon ::
   TyConName
