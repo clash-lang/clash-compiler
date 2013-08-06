@@ -27,23 +27,15 @@ data TyCon
   , isDictTyCon :: Bool
   }
 
-  | TupleTyCon
-  { tyConName   :: TyConName
-  , tyConKind   :: Kind
-  , tyConArity  :: Int
-  , tyConTyVars :: [TyName]
-  , dataCon     :: DataCon
-  }
-
-  | SuperKindTyCon
-  { tyConName   :: TyConName
-  }
-
   | PrimTyCon
   { tyConName    :: TyConName
   , tyConKind    :: Kind
   , tyConArity   :: Int
   , primTyConRep :: PrimRep
+  }
+
+  | SuperKindTyCon
+  { tyConName   :: TyConName
   }
 
 instance Show TyCon where
@@ -134,16 +126,11 @@ mkPrimTyCon name kind arity rep
   , primTyConRep = rep
   }
 
-isTupleTyCon :: TyCon -> Bool
-isTupleTyCon (TupleTyCon {}) = True
-isTupleTyCon _               = False
-
 isSuperKindTyCon :: TyCon -> Bool
 isSuperKindTyCon (SuperKindTyCon {}) = True
 isSuperKindTyCon _                   = False
 
 isTupleTyConLike :: TyCon -> Bool
-isTupleTyConLike (TupleTyCon {}) = True
 isTupleTyConLike (AlgTyCon {tyConName = nm}) = tupleName (name2String nm)
   where
     tupleName nm
@@ -157,5 +144,4 @@ isTupleTyConLike _ = False
 tyConDataCons :: TyCon -> [DataCon]
 tyConDataCons (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons}}) = cons
 tyConDataCons (AlgTyCon {algTcRhs = NewTyCon  { data_con  = con }}) = [con]
-tyConDataCons (TupleTyCon {dataCon = con})                          = [con]
 tyConDataCons _                                                     = []

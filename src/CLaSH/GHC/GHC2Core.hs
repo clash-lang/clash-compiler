@@ -142,14 +142,15 @@ makeTyCon tc = do
 
         mkTupleTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
-          tcDc   <- makeDataCon . head . tyConDataCons $ tc
+          tcDc   <- fmap (C.DataTyCon . (:[])) . makeDataCon . head . tyConDataCons $ tc
           return $
-            C.TupleTyCon
+            C.AlgTyCon
             { C.tyConName   = tcName
             , C.tyConKind   = tcKind
             , C.tyConArity  = tcArity
             , C.tyConTyVars = map coreToVar (tyConTyVars tc)
-            , C.dataCon     = tcDc
+            , C.algTcRhs    = tcDc
+            , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
             }
 
         mkPrimTyCon = do
