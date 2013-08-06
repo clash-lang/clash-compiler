@@ -110,7 +110,7 @@ coreView :: Type -> TypeView
 coreView ty =
   let tView = tyView ty
   in  case tyView ty of
-        TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args     -> coreView (newTyConInstRhs nt args)
+        TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args      -> coreView (newTyConInstRhs nt args)
         TyConApp tc args
           | (name2String $ tyConName tc) == "CLaSH.Signal.Signal"  -> coreView (head args)
           | (name2String $ tyConName tc) == "CLaSH.Signal.SignalP" -> coreView (head args)
