@@ -22,6 +22,7 @@ module CLaSH.Core.Type
   , typeKind
   , mkTyConTy
   , isPredTy
+  , isClassPred
   , noParenPred
   , splitTyAppM
   , mkFunTy

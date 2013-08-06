@@ -42,7 +42,7 @@ import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm,substTms)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
-import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy)
+import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy,isClassPred)
 import CLaSH.Core.Util       (collectArgs,mkApps,isFun,termType,isVar,isCon,isLet,isPrim)
 import CLaSH.Core.Var        (Var(..),Id)
 import CLaSH.Netlist.Util    (splitNormalized)
@@ -321,10 +321,11 @@ inlineWrapper _ e = return e
 
 -- Class Operator Resolution
 classOpResolution :: NormRewrite
-classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dict) = R $ do
+classOpResolution ctx e@(App (TyApp (collectArgs -> (Prim (PrimFun sel _),_)) _) dict) = R $ do
   classSelM <- fmap (fmap snd . HashMap.lookup sel) $ Lens.use classOps
+  isDict    <- fmap isClassPred $ termType dict
   case classSelM of
-    Just classSel -> case collectArgs dict of
+    Just classSel | isDict -> case collectArgs dict of
       (Prim (PrimDFun dfun _),dfunArgs) -> do
         dfunOpsM <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
         case dfunOpsM of
@@ -340,12 +341,12 @@ classOpResolution ctx e@(App (TyApp (Prim (PrimFun sel _)) _) dict) = R $ do
       (Var _ fdict,dfunArgs) -> do
         dictBindingM <- fmap (fmap snd . HashMap.lookup fdict) $ Lens.use bindings
         case dictBindingM of
-          Just dictBinding -> do
+          Just dictBinding | isDict -> do
             clsExpr <- chaseDfun classSel ctx dictBinding
             changed $ mkApps clsExpr dfunArgs
-          Nothing -> return e
+          _ -> return e
       _ -> return e
-    Nothing -> return e
+    _ -> return e
 
 classOpResolution ctx e@(Case scrut ty [alt]) = R $ do
   case (collectArgs scrut) of
@@ -394,6 +395,7 @@ chaseDfun classSel ctx e = case (collectArgs e) of
            in return $! dfunOp
       Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
       _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e
+  (Literal _, _) -> return e
   _ -> mkSelectorCase "chaseDfun" ctx e 1 classSel
 
 inlineSingularDFun :: NormRewrite
