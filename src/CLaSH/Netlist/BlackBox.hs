@@ -124,7 +124,7 @@ mkLitInput ::
   Term
   -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
 mkLitInput (C.Literal (IntegerLiteral i))       = return ((pack $ show i,Integer),[])
-mkLitInput e@(collectArgs -> (Data _ dc, args)) = lift $ do
+mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   args' <- filterM (fmap representableType . termType) (lefts args)
   hwTy  <- N.termHWType e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'

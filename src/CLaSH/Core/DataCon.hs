@@ -10,7 +10,7 @@ module CLaSH.Core.DataCon where
 
 import Unbound.LocallyNameless as Unbound
 
-import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
+import {-# SOURCE #-} CLaSH.Core.Term (Term)
 import {-# SOURCE #-} CLaSH.Core.Type (Type,TyName)
 import CLaSH.Util
 
@@ -18,11 +18,10 @@ data DataCon
   = MkData
   { dcName       :: DcName
   , dcTag        :: ConTag
+  , dcType       :: Type
   , dcUnivTyVars :: [TyName]
   , dcExtTyVars  :: [TyName]
   , dcArgTys     :: [Type]
-  , dcWorkId     :: (TmName, Type)
-  , dcWrapIdM    :: Maybe (TmName,Type)
   }
 
 instance Show DataCon where

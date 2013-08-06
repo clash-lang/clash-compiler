@@ -14,7 +14,7 @@ import CLaSH.Rewrite.Types
 
 allR :: forall m . (Functor m, Monad m, Fresh m) => Bool -> Transform m -> Transform m
 allR _ _ _ (Var t x)   = return (Var t x)
-allR _ _ _ (Data w dc) = return (Data w dc)
+allR _ _ _ (Data dc)   = return (Data dc)
 allR _ _ _ (Literal l) = return (Literal l)
 allR _ _ _ (Prim p)    = return (Prim p)
 

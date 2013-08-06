@@ -222,7 +222,7 @@ mkExpr ty app = do
       hwTy                 = coreTypeToHWType_fail ty
   args' <- Monad.filterM (fmap representableType . termType) args
   case appF of
-    Data _ dc
+    Data dc
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
       | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
     Prim (PrimFun nm _) -> do

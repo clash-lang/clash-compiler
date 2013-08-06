@@ -89,7 +89,7 @@ instance Pretty LitTy where
 instance Pretty Term where
   pprPrec prec e = case e of
     Var _ x        -> pprPrec prec x
-    Data _ dc      -> pprPrec prec dc
+    Data dc        -> pprPrec prec dc
     Literal l      -> pprPrec prec l
     Prim p         -> pprPrec prec p
     Lam b          -> lunbind b $ \(v,e')  -> pprPrecLam prec [v] e'

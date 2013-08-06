@@ -96,10 +96,10 @@ isClosed e = do
 
 isConstant :: Term -> Bool
 isConstant e = case collectArgs e of
-  (Data _ _, args) -> all (either isConstant (const True)) args
-  (Prim _, args)   -> all (either isConstant (const True)) args
-  (Literal _,_)    -> True
-  _                -> False
+  (Data _, args) -> all (either isConstant (const True)) args
+  (Prim _, args) -> all (either isConstant (const True)) args
+  (Literal _,_)  -> True
+  _              -> False
 
 getWrappedF :: (Fresh m,Functor m) => Term -> m (Maybe Term)
 getWrappedF body = do

@@ -33,7 +33,7 @@ import Coercion   (coercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
 import DataCon    (DataCon,dataConTag,dataConExTyVars,dataConUnivTyVars,dataConWorkId,
-  dataConRepArgTys,dataConName,dataConTyCon,dataConWrapId,dataConWrapId_maybe)
+  dataConRepArgTys,dataConName,dataConTyCon,dataConWrapId_maybe)
 import CLaSH.GHC.Compat.FastString (unpackFS,unpackFB)
 import Id         (isDataConWorkId,isDataConId_maybe)
 import Literal    (Literal(..))
@@ -73,8 +73,9 @@ type SR a = StateT GHC2CoreState R a
 
 data GHC2CoreState
   = GHC2CoreState
-  { _tyConMap    :: HashMap TyCon   C.TyCon
-  , _dataConMap  :: HashMap DataCon C.DataCon
+  { _tyConMap       :: HashMap TyCon   C.TyCon
+  , _dataConMap     :: HashMap DataCon C.DataCon
+  , _dataConWrapMap :: HashMap DataCon C.DataCon
   }
 
 makeLenses ''GHC2CoreState
@@ -93,7 +94,7 @@ makeAllTyDataCons tyCons =
                            s
   in  s
   where
-    emptyState     = GHC2CoreState HashMap.empty HashMap.empty
+    emptyState     = GHC2CoreState HashMap.empty HashMap.empty HashMap.empty
     tupleTyCons    = concat [ map (`tupleTyCon` x)
                                [BoxedTuple,UnboxedTuple,ConstraintTuple]
                             | x <- [2..62]
@@ -186,19 +187,26 @@ makeDataCon ::
 makeDataCon dc = do
   repTys   <- lift $ mapM coreToType (dataConRepArgTys dc)
   workIdTy <- lift $ coreToType (varType $ dataConWorkId dc)
-  wrapIdTyM <- maybe (return Nothing) (fmap Just . lift . coreToType . varType) (dataConWrapId_maybe dc)
-  let dataCon =
+  let mkDataCon dcty =
         C.MkData
           { C.dcName       = coreToName dataConName getUnique nameString dc
           , C.dcTag        = dataConTag dc
+          , C.dcType       = dcty
           , C.dcArgTys     = repTys
           , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
           , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
-          , C.dcWorkId     = ( coreToVar $ dataConWorkId dc
-                             , workIdTy)
-          , C.dcWrapIdM    = maybe Nothing (Just . (coreToVar $ dataConWrapId dc,)) wrapIdTyM
           }
+
+      dataCon = mkDataCon workIdTy
+
   dataConMap %= (HashMap.insert dc dataCon)
+
+  case dataConWrapId_maybe dc of
+    Just wrapId -> do wrapIdTy <- lift . coreToType $ varType wrapId
+                      let dataConWrap = mkDataCon wrapIdTy
+                      dataConWrapMap %= (HashMap.insert dc dataConWrap)
+    Nothing     -> return ()
+
   return dataCon
 
 coreToTerm ::
@@ -258,11 +266,11 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
           Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
                   | otherwise ->  case (HashMap.lookup xNameS primMap) of
                       Just (Primitive _ Constructor) ->
-                        C.Prim <$> C.PrimCon <$> (coreToDataCon dc)
+                        C.Prim <$> C.PrimCon <$> (coreToDataCon False dc)
                       Just (BlackBox {}) ->
                         return $ C.Prim (C.PrimFun xPrim xType)
-                      _ | isDataConWorkId x -> C.Data False <$> (coreToDataCon dc)
-                        | otherwise         -> C.Data True  <$> (coreToDataCon dc)
+                      _ | isDataConWorkId x -> C.Data <$> (coreToDataCon False dc)
+                        | otherwise         -> C.Data <$> (coreToDataCon True  dc)
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive _ Dictionary) ->
               return $ C.Prim (C.PrimDict xPrim xType)
@@ -287,18 +295,23 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
     alt (DataAlt dc, xs, e) = case span isTyVar xs of
       (tyvs,tmvs) -> bind <$> (C.DataPat . embed <$>
-                                (coreToDataCon dc) <*>
+                                (coreToDataCon False dc) <*>
                                 (rebind <$>
                                   (mapM coreToTyVar tyvs) <*>
                                   (mapM coreToId tmvs))) <*>
                               (term e)
 
 coreToDataCon ::
-  DataCon
+  Bool
+  -> DataCon
   -> R C.DataCon
-coreToDataCon dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon: " ++ showPpr dc ++ " not found")
-                        . HashMap.lookup dc
-                        ) $ view dataConMap
+coreToDataCon False dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon: " ++ showPpr dc ++ " not found")
+                              . HashMap.lookup dc
+                              ) $ view dataConMap
+
+coreToDataCon True dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon: " ++ showPpr dc ++ " not found")
+                              . HashMap.lookup dc
+                              ) $ view dataConWrapMap
 
 coreToLiteral ::
   Literal

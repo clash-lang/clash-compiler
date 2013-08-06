@@ -136,7 +136,7 @@ inlineNonRep _ e = return e
 
 caseCon :: NormRewrite
 caseCon _ (Case scrut ty alts)
-  | (Data _ dc, args) <- collectArgs scrut
+  | (Data dc, args) <- collectArgs scrut
   = R $ do
     alts' <- mapM unbind alts
     let dcAltM = List.find (equalCon dc . fst) alts'

@@ -173,10 +173,10 @@ prepareSignals vhdlState primMap globals normalizeSignal mStart signalNm = do
 
 termToList :: Monad m => Term -> EitherT String m [Term]
 termToList e = case (second lefts $ collectArgs e) of
-  (Data _ dc,[])
+  (Data dc,[])
     | name2String (dcName dc) == "[]" -> pure []
     | otherwise                                 -> errNoConstruct $(curLoc)
-  (Data _ dc,[hdArg,tlArg])
+  (Data dc,[hdArg,tlArg])
     | name2String (dcName dc) == ":"  -> (hdArg:) <$> termToList tlArg
     | otherwise                                 -> errNoConstruct $(curLoc)
   _ -> errNoConstruct $(curLoc)

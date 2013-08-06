@@ -2,11 +2,10 @@
 {-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Core.Util where
 
-import Data.Maybe (fromMaybe)
 import Data.HashMap.Lazy (HashMap)
 import Unbound.LocallyNameless (Fresh,bind,embed,runFreshM,unbind,unembed,string2Name,unrebind)
 
-import CLaSH.Core.DataCon (dcWorkId,dcWrapIdM)
+import CLaSH.Core.DataCon (dcType)
 import CLaSH.Core.Literal (literalType)
 import CLaSH.Core.Pretty  (showDoc)
 import CLaSH.Core.Prim    (Prim(..),primType)
@@ -25,8 +24,7 @@ termType ::
   -> m Type
 termType e = case e of
   Var t _     -> return t
-  Data False dc -> return . snd . dcWorkId $ dc
-  Data True dc  -> return . snd . (fromMaybe (error $ $(curLoc) ++ "No WrapId")) . dcWrapIdM $ dc
+  Data dc     -> return $ dcType dc
   Literal l   -> return $ literalType l
   Prim p      -> return $ primType p
   Lam b       -> do (v,e') <- unbind b
@@ -151,8 +149,8 @@ isVar _         = False
 isCon ::
   Term
   -> Bool
-isCon (Data _ _) = True
-isCon _          = False
+isCon (Data _) = True
+isCon _        = False
 
 isPrim ::
   Term
