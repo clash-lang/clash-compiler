@@ -11,16 +11,15 @@ import Data.Char (isUpper,ord,isSymbol)
 import Data.Traversable (sequenceA)
 import GHC.Show (showMultiLineString)
 import Text.PrettyPrint (Doc,(<+>),(<>),($+$),($$),render,parens,text,sep,
-  punctuate,comma,hang,char,brackets,empty,fsep,hsep,equals,vcat,integer,int)
+  punctuate,comma,hang,char,empty,fsep,hsep,equals,vcat,integer,int)
 import Unbound.LocallyNameless (Embed(..),Name,LFresh,runLFreshM,unembed,
-  name2String,name2Integer,lunbind,unrec,unrebind)
+  name2String,lunbind,unrec,unrebind)
 
 import CLaSH.Core.DataCon (DataCon(..))
 import CLaSH.Core.Literal (Literal(..))
 import CLaSH.Core.Prim    (Prim(..))
 import CLaSH.Core.Term    (Term(..),Pat(..))
-import CLaSH.Core.Type    (Type(..),ConstTy(..),LitTy(..),Kind,TypeView(..),ThetaType,tyView,noParenPred,isPredTy,isLiftedTypeKind)
-import CLaSH.Core.TysPrim (eqTyConKey,listTyConKey)
+import CLaSH.Core.Type    (Type(..),ConstTy(..),LitTy(..),Kind,TypeView(..),ThetaType,tyView)
 import CLaSH.Core.TyCon   (TyCon(..),isTupleTyConLike)
 import CLaSH.Core.Var     (Var,TyVar,Id,varName,varType,varKind)
 import CLaSH.Util
@@ -221,13 +220,10 @@ ppr_type _ (LitTy tyLit)                = ppr tyLit
 ppr_type p ty@(ForAllTy _)              = pprForAllType p ty
 ppr_type p (ConstTy (TyCon tc))         = pprTcApp p ppr_type tc []
 ppr_type p (tyView -> TyConApp tc args) = pprTcApp p ppr_type tc args
-ppr_type p fun_ty@(tyView -> FunTy ty1 ty2)
-  | isPredTy ty1                = pprForAllType p fun_ty
-  | otherwise                   = pprArrowChain p <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
+ppr_type p (tyView -> FunTy ty1 ty2)    = pprArrowChain p <$> ppr_type FunPrec ty1 <:> pprFunTail ty2
   where
-    pprFunTail (tyView -> FunTy ty1' ty2')
-      | not (isPredTy ty1) = ppr_type FunPrec ty1' <:> pprFunTail ty2'
-    pprFunTail otherTy     = ppr_type TopPrec otherTy <:> pure []
+    pprFunTail (tyView -> FunTy ty1' ty2') = ppr_type FunPrec ty1' <:> pprFunTail ty2'
+    pprFunTail otherTy                     = ppr_type TopPrec otherTy <:> pure []
 
 ppr_type p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1 <*> ppr_type TyConPrec ty2)
 ppr_type p ty = error $ $(curLoc) ++ "Can't pretty print type: " ++ show ty
@@ -248,8 +244,7 @@ pprSigmaType showForalls ty = do
       lunbind b $ \(tv,resTy) -> split1 (tv:tvs) resTy
     split1 tvs resTy = return (reverse tvs,resTy)
 
-    split2 ps (tyView -> FunTy ty1 ty2)
-      | isPredTy ty1 = split2 (ty1:ps) ty2
+    split2 ps (tyView -> FunTy ty1 ty2) = split2 (ty1:ps) ty2
     split2 ps resTy  = (reverse ps, resTy)
 
 pprForAll :: (Applicative m, LFresh m) => [TyVar] -> m Doc
@@ -260,8 +255,7 @@ pprForAll tvs = do
 
 pprTvBndr :: (Applicative m, LFresh m) => TyVar -> m Doc
 pprTvBndr tv
-  | isLiftedTypeKind kind = ppr tv
-  | otherwise             = do
+  = do
       tv'   <- ppr tv
       kind' <- pprKind kind
       return $ parens (tv' <+> dcolon <+> kind')
@@ -272,11 +266,7 @@ pprKind :: (Applicative m, LFresh m) => Kind -> m Doc
 pprKind = pprType
 
 pprThetaArrowTy :: (Applicative m, LFresh m) => ThetaType -> m Doc
-pprThetaArrowTy [] = return empty
-pprThetaArrowTy [predTy]
-  | noParenPred predTy
-  = do predType' <- pprType predTy
-       return $ predType' <+> darrow
+pprThetaArrowTy []    = return empty
 pprThetaArrowTy preds = do
   preds' <- mapM pprType preds
   return $ parens (fsep (punctuate comma preds')) <+> darrow
@@ -285,18 +275,13 @@ pprTcApp :: (Applicative m, LFresh m) => TypePrec -> (TypePrec -> Type -> m Doc)
   -> TyCon -> [Type] -> m Doc
 pprTcApp _ _  tc []
   = ppr tc
-pprTcApp _ pp tc [ty]
-  | (name2Integer $ tyConName tc) == listTyConKey
-  = pp TopPrec ty >>= (return . brackets)
 
 pprTcApp p pp tc tys
   | isTupleTyConLike tc && tyConArity tc == length tys
   = do
     tys' <- mapM (pp TopPrec) tys
     return $ parens $ sep $ punctuate comma tys'
-  | (name2Integer $ tyConName tc) == eqTyConKey
-  , [_,ty1,ty2] <- tys
-  = pprInfixApp p pp (tyConName tc) ty1 ty2
+
   | otherwise
   = pprTypeNameApp p pp (tyConName tc) tys
 

@@ -24,7 +24,7 @@ data TyCon
   , tyConArity  :: Int
   , tyConTyVars :: [TyName]
   , algTcRhs    :: AlgTyConRhs
-  , algTcParent :: TyConParent
+  , isDictTyCon :: Bool
   }
 
   | TupleTyCon
@@ -137,10 +137,6 @@ mkPrimTyCon name kind arity rep
 isTupleTyCon :: TyCon -> Bool
 isTupleTyCon (TupleTyCon {}) = True
 isTupleTyCon _               = False
-
-isClassTyCon :: TyCon -> Bool
-isClassTyCon (AlgTyCon {algTcParent = ClassTyCon}) = True
-isClassTyCon _                                     = False
 
 isSuperKindTyCon :: TyCon -> Bool
 isSuperKindTyCon (SuperKindTyCon {}) = True

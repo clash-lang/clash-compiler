@@ -21,9 +21,7 @@ module CLaSH.Core.Type
   , coreView
   , typeKind
   , mkTyConTy
-  , isPredTy
-  , isClassPred
-  , noParenPred
+  , isDictType
   , splitTyAppM
   , mkFunTy
   , mkTyConApp
@@ -31,7 +29,6 @@ module CLaSH.Core.Type
   , mkTyVarTy
   , splitFunTy
   , splitTyConAppM
-  , isLiftedTypeKind
   , isPolyTy
   , isFunTy
   , applyFunTy
@@ -139,35 +136,18 @@ mkForAllTy tv t = ForAllTy $ bind tv t
 type PredType  = Type
 type ThetaType = [PredType]
 
-noParenPred :: PredType -> Bool
-noParenPred p = isClassPred p || isEqPred p
-
-isClassPred :: PredType -> Bool
-isClassPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon | isClassTyCon tyCon -> True
-    _                               -> False
-
-isEqPred :: PredType -> Bool
-isEqPred ty = case tyConAppTyCon_maybe ty of
-    Just tyCon -> (name2Integer $ tyConName tyCon) == eqTyConKey
-    _          -> False
+isDictType :: PredType -> Bool
+isDictType ty = case tyConAppTyCon_maybe ty of
+    Just (AlgTyCon {isDictTyCon = d}) -> d
+    _                                 -> False
 
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe (tyView -> TyConApp tc _) = Just tc
 tyConAppTyCon_maybe _                         = Nothing
 
-isPredTy :: Type -> Bool
-isPredTy ty
-  | isSuperKind ty = False
-  | otherwise      = typeKind ty == constraintKind
-
 isSuperKind :: Type -> Bool
 isSuperKind (ConstTy (TyCon skc)) = isSuperKindTyCon skc
 isSuperKind _                     = False
-
-isLiftedTypeKind :: Kind -> Bool
-isLiftedTypeKind (ConstTy (TyCon ltk)) = (name2Integer (tyConName ltk)) == liftedTypeKindTyConKey
-isLiftedTypeKind _                     = False
 
 typeKind :: Type -> Kind
 typeKind (VarTy k _)          = k
@@ -194,9 +174,6 @@ kindFunResult (tyView -> FunTy _ res) _ = res
 kindFunResult (ForAllTy b) arg          = let (kv,ki) = runFreshM . unbind $ b
                                           in substKindWith (zip [varName kv] [arg]) ki
 kindFunResult k tys                     = error $ $(curLoc) ++ ("kindFunResult: ") ++ show (k,tys)
-
-constraintKind :: Kind
-constraintKind = kindTyConType constraintKindTyCon
 
 isPolyTy :: Type -> Bool
 isPolyTy (ForAllTy _)            = True

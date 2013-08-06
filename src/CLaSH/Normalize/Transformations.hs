@@ -42,7 +42,7 @@ import CLaSH.Core.Pretty     (showDoc)
 import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm,substTms)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
-import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy,isClassPred)
+import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy,isDictType)
 import CLaSH.Core.Util       (collectArgs,mkApps,isFun,termType,isVar,isCon,isLet,isPrim)
 import CLaSH.Core.Var        (Var(..),Id)
 import CLaSH.Netlist.Util    (splitNormalized)
@@ -323,7 +323,7 @@ inlineWrapper _ e = return e
 classOpResolution :: NormRewrite
 classOpResolution ctx e@(App (TyApp (collectArgs -> (Prim (PrimFun sel _),_)) _) dict) = R $ do
   classSelM <- fmap (fmap snd . HashMap.lookup sel) $ Lens.use classOps
-  isDict    <- fmap isClassPred $ termType dict
+  isDict    <- fmap isDictType $ termType dict
   case classSelM of
     Just classSel | isDict -> case collectArgs dict of
       (Prim (PrimDFun dfun _),dfunArgs) -> do

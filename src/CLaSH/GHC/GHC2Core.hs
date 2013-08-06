@@ -136,7 +136,7 @@ makeTyCon tc = do
                 , C.tyConArity  = tcArity
                 , C.tyConTyVars = map coreToVar (tyConTyVars tc)
                 , C.algTcRhs    = tcRhs
-                , C.algTcParent = coreToAltTcParent $ tyConParent tc
+                , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
                 }
             Nothing -> return $! C.mkPrimTyCon tcName tcKind tcArity C.VoidRep
 
@@ -356,12 +356,12 @@ coreToTyCon tc = fmap ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc 
                       . HashMap.lookup tc
                       ) $ view tyConMap
 
-coreToAltTcParent ::
+coreIsDictTyCon ::
   TyConParent
-  -> C.TyConParent
-coreToAltTcParent algTcParent = case algTcParent of
-  NoParentTyCon -> C.NoParentTyCon
-  ClassTyCon _  -> C.ClassTyCon
+  -> Bool
+coreIsDictTyCon algTcParent = case algTcParent of
+  NoParentTyCon -> False
+  ClassTyCon _  -> True
   _             -> error $ $(curLoc) ++ "Can't convert algTcParent: " ++ showPpr algTcParent
 
 coreToPrimRep ::
