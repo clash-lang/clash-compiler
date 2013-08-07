@@ -1,4 +1,7 @@
-module CLaSH.Driver.PrepareBinding where
+module CLaSH.GHC.GenerateBindings
+  (generateBindings)
+where
+
 
 import qualified Data.HashMap.Lazy       as HashMap
 import           Data.Maybe              (fromMaybe)
@@ -14,11 +17,11 @@ import           CLaSH.GHC.GHC2Core      (makeAllTyDataCons,coreToBndr,coreToPri
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Primitives.Types
 
-prepareBinding ::
+generateBindings ::
   PrimMap
   -> String
   -> IO (BindingMap,DFunMap,ClassOpMap)
-prepareBinding primMap modName = do
+generateBindings primMap modName = do
   (bindings,dfuns,clsOps,unlocs,tcs) <- loadModules modName
   let unlocatable = unlocs ++ (map fst clsOps)
   let dfunvars = map fst dfuns

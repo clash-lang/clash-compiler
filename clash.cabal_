@@ -12,34 +12,13 @@ Copyright:            Copyright (C) 2013 University of Twente
 Category:             Hardware
 Build-type:           Simple
 
-Extra-source-files:   README.md,
-                      src-bin/HsVersions.h
-                      src-bin/PosixSource.h
-
-Data-files:           primitives/clash.bit.json,
-                      primitives/clash.prelude.json,
-                      primitives/clash.signal.json,
-                      primitives/clash.sized.signed.json,
-                      primitives/clash.sized.unsigned.json,
-                      primitives/clash.sized.vector.json,
-                      primitives/ghc.base.json,
-                      primitives/ghc.classes.json,
-                      primitives/ghc.err.json,
-                      primitives/ghc.integer.type.json,
-                      primitives/ghc.real.json,
-                      primitives/ghc.typelits.json,
-                      primitives/ghc.types.json,
-                      primitives/unsafe.coerce.json
+Extra-source-files:   README.md
 
 Cabal-version:        >=1.10
 
 source-repository head
   type: git
   location: git://github.com/christiaanb/clash2.git
-
-Flag standalone
-  Description: Build compiler for non-cabal installation
-  Default: False
 
 Library
   HS-Source-Dirs:     src
@@ -56,7 +35,6 @@ Library
                       directory            >= 1.1.0.2,
                       errors               >= 1.4.1,
                       filepath             >= 1.3.0.0,
-                      ghc                  >= 7.7 && < 7.9,
                       hashable             >= 1.1.2.3,
                       lens                 >= 3.7.1,
                       listlike-instances   >= 0.2.3.1,
@@ -86,21 +64,8 @@ Library
                       CLaSH.Core.Var
 
                       CLaSH.Driver
-                      CLaSH.Driver.PrepareBinding
                       CLaSH.Driver.TestbenchGen
                       CLaSH.Driver.Types
-
-                      CLaSH.GHC.Compat.CoreSyn
-                      CLaSH.GHC.Compat.DynFlags
-                      CLaSH.GHC.Compat.FastString
-                      CLaSH.GHC.Compat.GHC
-                      CLaSH.GHC.Compat.Outputable
-                      CLaSH.GHC.Compat.PrelNames
-                      CLaSH.GHC.Compat.TyCon
-                      CLaSH.GHC.GHC2Core
-                      CLaSH.GHC.LoadInterfaceFiles
-                      CLaSH.GHC.LoadModules
-                      CLaSH.GHC.Types
 
                       CLaSH.Netlist
                       CLaSH.Netlist.BlackBox
@@ -126,53 +91,3 @@ Library
                       CLaSH.Rewrite.Util
 
                       CLaSH.Util
-
-  if flag(standalone)
-    CPP-options:      -DSTANDALONE
-  else
-    CPP-options:      -DCABAL
-    Build-depends:    ghc-paths >= 0.1.0.8
-    Other-modules:    Paths_clash
-
-
-Executable clash
-  HS-Source-Dirs:     src-bin
-  Main-Is:            Main.hs
-
-  default-language:   Haskell2010
-  GHC-Options:        -Wall -fno-warn-name-shadowing
-  CPP-Options:        -DGHCI
-  default-extensions: ForeignFunctionInterface
-                      UnboxedTuples
-                      FlexibleInstances
-                      MagicHash
-                      CPP
-                      PatternGuards
-                      NondecreasingIndentation
-
-  Build-Depends:      base          >= 3   && < 5,
-                      array         >= 0.1 && < 0.5,
-                      bytestring    >= 0.9 && < 0.11,
-                      directory     >= 1   && < 1.3,
-                      process       >= 1   && < 1.3,
-                      filepath      >= 1   && < 1.4,
-                      ghc           >= 7.7,
-                      transformers  >= 0.3,
-                      haskeline     >= 0.7.0.3,
-                      clash         >= 0.2
-  if os(windows)
-    Build-Depends:    Win32
-  else
-    Build-Depends:    unix
-
-  if flag(standalone)
-    CPP-Options:      -DSTANDALONE
-  else
-    Build-Depends:    ghc-paths
-
-
-  C-Sources:          src-bin/hschooks.c
-
-  Other-Modules:      InteractiveUI
-                      GhciMonad
-                      GhciTags

@@ -1,0 +1,103 @@
+Name:                 clash-ghc
+Version:              0.2
+Synopsis:             CAES Language for Synchronous Hardware
+-- Description:
+Homepage:             http://christiaanb.github.io/clash2
+bug-reports:          http://github.com/christiaanb/clash2/issues
+License:              BSD3
+License-file:         LICENSE
+Author:               Christiaan Baaij
+Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
+Copyright:            Copyright (C) 2013 University of Twente
+Category:             Hardware
+Build-type:           Simple
+
+Extra-source-files:   README.md,
+                      src-bin/HsVersions.h
+                      src-bin/PosixSource.h
+
+Data-files:           primitives/clash.bit.json,
+                      primitives/clash.prelude.json,
+                      primitives/clash.signal.json,
+                      primitives/clash.sized.signed.json,
+                      primitives/clash.sized.unsigned.json,
+                      primitives/clash.sized.vector.json,
+                      primitives/ghc.base.json,
+                      primitives/ghc.classes.json,
+                      primitives/ghc.err.json,
+                      primitives/ghc.integer.type.json,
+                      primitives/ghc.real.json,
+                      primitives/ghc.typelits.json,
+                      primitives/ghc.types.json,
+                      primitives/unsafe.coerce.json
+
+Cabal-version:        >=1.10
+
+source-repository head
+  type: git
+  location: git://github.com/christiaanb/clash2.git
+
+Flag standalone
+  Description: Build compiler for non-cabal installation
+  Default: False
+
+Executable clash
+  HS-Source-Dirs:     src-ghc src-bin
+  Main-Is:            Main.hs
+
+  default-language:   Haskell2010
+  GHC-Options:        -Wall -fno-warn-name-shadowing
+  CPP-Options:        -DGHCI
+  default-extensions: ForeignFunctionInterface
+                      UnboxedTuples
+                      FlexibleInstances
+                      MagicHash
+                      CPP
+                      PatternGuards
+                      NondecreasingIndentation
+
+  Build-Depends:      array                >= 0.4,
+                      base                 >= 4.3.1.0,
+                      bytestring           >= 0.9,
+                      clash                >= 0.2,
+                      directory            >= 1.2,
+                      filepath             >= 1.3,
+                      ghc                  >= 7.7,
+                      process              >= 1.2,
+                      hashable             >= 1.1.2.3,
+                      haskeline            >= 0.7.0.3,
+                      lens                 >= 3.7.1,
+                      mtl                  >= 2.1.1,
+                      transformers         >= 0.3,
+                      unbound              >= 0.4.2,
+                      unordered-containers >= 0.2.1.0
+
+  if os(windows)
+    Build-Depends:    Win32
+  else
+    Build-Depends:    unix
+
+  C-Sources:          src-bin/hschooks.c
+
+  Other-Modules:      InteractiveUI
+                      GhciMonad
+                      GhciTags
+
+                      CLaSH.GHC.Compat.CoreSyn
+                      CLaSH.GHC.Compat.DynFlags
+                      CLaSH.GHC.Compat.FastString
+                      CLaSH.GHC.Compat.GHC
+                      CLaSH.GHC.Compat.Outputable
+                      CLaSH.GHC.Compat.PrelNames
+                      CLaSH.GHC.Compat.TyCon
+                      CLaSH.GHC.GenerateBindings
+                      CLaSH.GHC.GHC2Core
+                      CLaSH.GHC.LoadInterfaceFiles
+                      CLaSH.GHC.LoadModules
+                      CLaSH.GHC.Types
+
+  if flag(standalone)
+    CPP-Options:      -DSTANDALONE
+  else
+    Build-Depends:    ghc-paths
+    Other-Modules:    Paths_clash_ghc

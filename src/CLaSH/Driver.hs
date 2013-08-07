@@ -6,11 +6,9 @@ module CLaSH.Driver where
 
 import           Control.Monad                (unless)
 import           Control.Monad.State          (evalState)
-import qualified Data.ByteString.Lazy         as LZ
-import           Data.Maybe                   (catMaybes,fromMaybe,listToMaybe)
+import           Data.Maybe                   (catMaybes,listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
 import qualified Data.HashMap.Lazy            as HashMap
-import           Data.List                    (isSuffixOf)
 import           Data.Text.Lazy               (pack)
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
@@ -19,69 +17,25 @@ import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc,linebreak,punctuate,v
 import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Term              (TmName)
-import           CLaSH.Driver.PrepareBinding
 import           CLaSH.Driver.TestbenchGen
+import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL)
 import           CLaSH.Netlist.Types          (Component(..))
 import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
 import           CLaSH.Primitives.Types
-import           CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
 import           CLaSH.Util
 
 import qualified Data.Time.Clock as Clock
 
-#ifdef CABAL
-
-import           Paths_clash
-getDefPrimDir :: IO FilePath
-getDefPrimDir = getDataFileName "primitives"
-
-#elif STANDALONE
-
-import qualified Control.Exception as Exception
-import System.Environment (getEnv)
-
-getDefPrimDir :: IO FilePath
-getDefPrimDir = catchIO (getEnv "CLASH_PRIMDIR") (error "Environment variable \"CLASH_PRIMDIR\" undefined")
-
-catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO = Exception.catch
-
-#else
-
-getDefPrimDir :: IO FilePath
-getDefPrimDir = return "../primitives"
-
-#endif
-
-generateVHDL ::
-  String
-  -> IO ()
-generateVHDL modName = do
+generateVHDL :: BindingMap
+             -> ClassOpMap
+             -> DFunMap
+             -> PrimMap
+             -> IO ()
+generateVHDL bindingsMap clsOpMap dfunMap primMap = do
   start <- Clock.getCurrentTime
-
-  primitiveDir   <- getDefPrimDir
-  primitiveFiles <- fmap (filter (isSuffixOf ".json")) $
-                      Directory.getDirectoryContents primitiveDir
-
-  localPrimitives <- fmap (filter (isSuffixOf ".json")) $
-                      Directory.getDirectoryContents "."
-
-  let primitiveFiles' = map (FilePath.combine primitiveDir) primitiveFiles ++
-                        localPrimitives
-
-  primitives <- fmap concat $ mapM
-                  ( return
-                  . fromMaybe []
-                  . decodeAndReport
-                  <=< LZ.readFile
-                  ) primitiveFiles'
-
-  let primMap = HashMap.fromList $ zip (map name primitives) primitives
-
-  (bindingsMap,dfunMap,clsOpMap) <- prepareBinding primMap modName
 
   let topEntities = HashMap.toList
                   $ HashMap.filterWithKey isTopEntity bindingsMap

@@ -66,10 +66,14 @@ import Data.Maybe
 -- clash additions
 #ifdef STANDALONE
 import           System.Process (runInteractiveCommand, waitForProcess)
+import qualified Control.Exception as Exception
 #else
 import qualified GHC.Paths
+import           Paths_clash_ghc
 #endif
 import qualified CLaSH.Driver
+import           CLaSH.GHC.GenerateBindings
+import qualified CLaSH.Primitives.Util
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
@@ -88,9 +92,18 @@ getProcessOutput command =
      output   <- hGetLine pOut
      -- return both the output and the exit code.
      return (output, exitCode)
+
+getDefPrimDir :: IO FilePath
+getDefPrimDir = catchIO (getEnv "CLASH_PRIMDIR") (error "Environment variable \"CLASH_PRIMDIR\" undefined")
+
+catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
+catchIO = Exception.catch
 #else
 ghcLibDir :: IO FilePath
 ghcLibDir = return GHC.Paths.libdir
+
+getDefPrimDir :: IO FilePath
+getDefPrimDir = getDataFileName "primitives"
 #endif
 
 -----------------------------------------------------------------------------
@@ -852,7 +865,11 @@ abiHash strs = do
 
 doVHDL :: [(String,Maybe Phase)] -> Ghc ()
 doVHDL []   = throwGhcException (CmdLineError "No input files")
-doVHDL srcs = liftIO $ mapM_ (CLaSH.Driver.generateVHDL . fst) srcs
+doVHDL srcs = liftIO $ do primDir <- getDefPrimDir
+                          primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
+                          mapM_ (\(src,_) -> do (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
+                                                CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap
+                                ) srcs
 
 -- -----------------------------------------------------------------------------
 -- Util

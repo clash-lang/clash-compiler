@@ -103,6 +103,26 @@ import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
 import qualified CLaSH.Driver
+import           CLaSH.GHC.GenerateBindings
+import qualified CLaSH.Primitives.Util
+
+#ifdef STANDALONE
+
+import qualified Control.Exception
+
+getDefPrimDir :: IO FilePath
+getDefPrimDir = catchIO_ (getEnv "CLASH_PRIMDIR") (error "Environment variable \"CLASH_PRIMDIR\" undefined")
+
+catchIO_ :: IO a -> (Exception.IOException -> IO a) -> IO a
+catchIO_ = Control.Exception.catch
+
+#else
+
+import           Paths_clash_ghc
+getDefPrimDir :: IO FilePath
+getDefPrimDir = getDataFileName "primitives"
+
+#endif
 
 -----------------------------------------------------------------------------
 
@@ -1421,9 +1441,17 @@ makeVHDL [] = do
   case (reverse sortedGraph) of
     (AcyclicSCC top):_ -> do
       let loc = (GHC.ml_hs_file . GHC.ms_location) top
-      maybe (return ()) (liftIO . CLaSH.Driver.generateVHDL) loc
+      maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
+                                             primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
+                                             (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
+                                             CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap
+                        ) loc
     _ -> return ()
-makeVHDL fs = liftIO $ mapM_ CLaSH.Driver.generateVHDL fs
+makeVHDL srcs = liftIO $ do primDir <- getDefPrimDir
+                            primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
+                            mapM_ (\src -> do (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
+                                              CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap
+                                  ) srcs
 
 -----------------------------------------------------------------------------
 -- :type
