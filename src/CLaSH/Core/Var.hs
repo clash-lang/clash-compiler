@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -5,7 +6,11 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-duplicate-constraints #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
+{-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
+#endif
+
 
 module CLaSH.Core.Var where
 
