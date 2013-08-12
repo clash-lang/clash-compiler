@@ -134,7 +134,6 @@ makeTyCon tc = do
                 { C.tyConName   = tcName
                 , C.tyConKind   = tcKind
                 , C.tyConArity  = tcArity
-                , C.tyConTyVars = map coreToVar (tyConTyVars tc)
                 , C.algTcRhs    = tcRhs
                 , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
                 }
@@ -148,7 +147,6 @@ makeTyCon tc = do
             { C.tyConName   = tcName
             , C.tyConKind   = tcKind
             , C.tyConArity  = tcArity
-            , C.tyConTyVars = map coreToVar (tyConTyVars tc)
             , C.algTcRhs    = tcDc
             , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
             }

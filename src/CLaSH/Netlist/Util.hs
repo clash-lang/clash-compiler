@@ -6,6 +6,7 @@ module CLaSH.Netlist.Util where
 import           Control.Lens  ((.=),_2)
 import qualified Control.Lens  as Lens
 import qualified Control.Monad as Monad
+import Data.Maybe              (catMaybes)
 import Data.Text.Lazy          (pack)
 import Data.Either             (partitionEithers)
 import Unbound.LocallyNameless (Embed,Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
@@ -105,9 +106,11 @@ mkADT tyString tc args
 mkADT _ tc args = case tyConDataCons tc of
   []  -> return Void
   dcs -> do
-    let argTyss      = map dcArgTys dcs
-    let argTVs       = map dcUnivTyVars dcs
-    let substArgTyss = (map . map) (substTys (tvsArgsMap argTVs)) argTyss
+    let tcName       = pack . name2String $ tyConName tc
+        argTyss      = map dcArgTys dcs
+        argTVss      = map dcUnivTyVars dcs
+        argSubts     = map (\tvs -> zip tvs args) argTVss
+        substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
     argHTyss         <- mapM (mapM coreTypeToHWType) substArgTyss
     case (dcs,argHTyss) of
       (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
@@ -118,19 +121,13 @@ mkADT _ tc args = case tyConDataCons tc of
                                                   , tys
                                                   )
                                                 ) dcs elemHTys
-  where
-    tcName     = pack . name2String $ tyConName tc
-    tvs        = tyConTyVars tc
-    tvsArgsMap dcTVs = [ (a,t) | a <- concat dcTVs , (a',t) <- (zip tvs args), name2String a == name2String a' ]
 
 isRecursiveTy :: TyCon -> [Type] -> Bool
 isRecursiveTy tc args = case tyConDataCons tc of
     []  -> False
     dcs -> let argTyss      = map dcArgTys dcs
-               tvs          = tyConTyVars tc
-               tvsArgsMap   = zip tvs args
-               substArgTyss = (concatMap . map) (substTys tvsArgsMap) argTyss
-           in (mkTyConApp tc args) `elem` substArgTyss
+               argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
+           in tc `elem` argTycons
 
 tyNatSize ::
   Type

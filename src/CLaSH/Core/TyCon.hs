@@ -22,7 +22,6 @@ data TyCon
   { tyConName   :: TyConName
   , tyConKind   :: Kind
   , tyConArity  :: Int
-  , tyConTyVars :: [TyName]
   , algTcRhs    :: AlgTyConRhs
   , isDictTyCon :: Bool
   }
