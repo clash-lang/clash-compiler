@@ -17,7 +17,7 @@ import CLaSH.Core.Pretty       (showDoc)
 import CLaSH.Core.Subst        (substTys)
 import CLaSH.Core.Term         (LetBinding,Term(..),TmName)
 import CLaSH.Core.TyCon        (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type         (Type(..),TypeView(..),LitTy(..),mkTyConApp,tyView,splitTyConAppM)
+import CLaSH.Core.Type         (Type(..),TypeView(..),LitTy(..),tyView,splitTyConAppM)
 import CLaSH.Core.Util         (collectBndrs,termType)
 import CLaSH.Core.Var          (Var(..),Id,modifyVarName)
 import CLaSH.Netlist.Types
@@ -100,7 +100,7 @@ mkADT ::
   -> [Type]
   -> Either String HWType
 mkADT tyString tc args
-  | isRecursiveTy tc args
+  | isRecursiveTy tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
 mkADT _ tc args = case tyConDataCons tc of
@@ -122,8 +122,8 @@ mkADT _ tc args = case tyConDataCons tc of
                                                   )
                                                 ) dcs elemHTys
 
-isRecursiveTy :: TyCon -> [Type] -> Bool
-isRecursiveTy tc args = case tyConDataCons tc of
+isRecursiveTy :: TyCon -> Bool
+isRecursiveTy tc = case tyConDataCons tc of
     []  -> False
     dcs -> let argTyss      = map dcArgTys dcs
                argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss

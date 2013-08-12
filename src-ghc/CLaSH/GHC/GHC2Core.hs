@@ -43,7 +43,7 @@ import Name       (Name,nameOccName,nameModule_maybe)
 import OccName    (occNameString)
 import CLaSH.GHC.Compat.Outputable (showPpr)
 import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
-  isAlgTyCon,isTupleTyCon,tyConName,tyConUnique,tyConTyVars,
+  isAlgTyCon,isTupleTyCon,tyConName,tyConUnique,
   tyConDataCons,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,tyConArity,
   tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep,isPromotedDataCon)
 import CLaSH.GHC.Compat.TyCon (isSuperKindTyCon)
