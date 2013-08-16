@@ -51,7 +51,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap dbgLevel = do
   case topEntities of
     [topEntity] -> do
       let bindingsMap' = HashMap.map snd bindingsMap
-      (supplyN,supplyTB) <- fmap Supply.splitSupply Supply.newSupply
+      (supplyN,supplyTB) <- fmap (Supply.splitSupply . snd .  Supply.freshId) Supply.newSupply
 
       prepTime <- dfunMap `seq` Clock.getCurrentTime
       traceIf True ("Loading dependencies took " ++ show (Clock.diffUTCTime prepTime start)) $ return ()
