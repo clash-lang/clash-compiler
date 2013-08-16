@@ -14,15 +14,10 @@ import CLaSH.Core.TyCon   (TyCon(..),tyConDataCons)
 import CLaSH.Core.Type    (Type(..),TypeView(..),tyView,isFunTy)
 import CLaSH.Core.Util    (Gamma,collectArgs,termType)
 import CLaSH.Core.Var     (Var(..),Id)
-import CLaSH.Netlist.Util (representableType,splitNormalized)
+import CLaSH.Netlist.Util (splitNormalized)
 import CLaSH.Normalize.Types
 import CLaSH.Rewrite.Types
 import CLaSH.Rewrite.Util
-
-nonRep ::
-  Type
-  -> Bool
-nonRep = not . representableType
 
 isBoxTy ::
   Type

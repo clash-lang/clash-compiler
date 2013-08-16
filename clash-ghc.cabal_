@@ -95,6 +95,7 @@ Executable clash
                       CLaSH.GHC.GHC2Core
                       CLaSH.GHC.LoadInterfaceFiles
                       CLaSH.GHC.LoadModules
+                      CLaSH.GHC.NetlistTypes
                       CLaSH.GHC.Types
 
   if flag(standalone)

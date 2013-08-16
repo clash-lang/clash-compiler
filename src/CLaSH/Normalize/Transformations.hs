@@ -25,16 +25,16 @@ module CLaSH.Normalize.Transformations
   )
 where
 
-import           Control.Lens            ((%=))
-import qualified Control.Lens            as Lens
-import qualified Control.Monad     as Monad
-import Control.Monad.Writer        (WriterT(..),lift,tell)
-import qualified Data.Either       as Either
-import qualified Data.HashMap.Lazy as HashMap
-import qualified Data.List         as List
-import qualified Data.Maybe        as Maybe
-import Unbound.LocallyNameless        (Bind,Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
-import Unbound.LocallyNameless.Ops (unsafeUnbind)
+import           Control.Lens        ((%=))
+import qualified Control.Lens        as Lens
+import qualified Control.Monad       as Monad
+import Control.Monad.Writer          (WriterT(..),lift,tell)
+import qualified Data.Either         as Either
+import qualified Data.HashMap.Lazy   as HashMap
+import qualified Data.List           as List
+import qualified Data.Maybe          as Maybe
+import Unbound.LocallyNameless       (Bind,Embed(..),bind,embed,rec,unbind,unembed,unrebind,unrec)
+import Unbound.LocallyNameless.Ops   (unsafeUnbind)
 
 import CLaSH.Core.DataCon    (DataCon,dcTag,dcUnivTyVars)
 import CLaSH.Core.FreeVars   (typeFreeVars,termFreeIds,termFreeTyVars,termFreeVars)
@@ -45,7 +45,7 @@ import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy,isDictType)
 import CLaSH.Core.Util       (collectArgs,mkApps,isFun,termType,isVar,isCon,isLet,isPrim)
 import CLaSH.Core.Var        (Var(..),Id)
-import CLaSH.Netlist.Util    (splitNormalized)
+import CLaSH.Netlist.Util    (representableType,splitNormalized)
 import CLaSH.Normalize.Types
 import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Combinators
@@ -57,8 +57,8 @@ bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
-      | nonRep (unembed tyE)
-      = fmap (notElem idName . snd) $ localFreeVars (unembed exprE)
+      = (&&) <$> (not <$> (representableType <$> (Lens.use typeTranslator) <*> pure (unembed tyE)))
+             <*> ((notElem idName . snd) <$> localFreeVars (unembed exprE))
 
     nonRepTest _ = return False
 
@@ -66,8 +66,8 @@ liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
-      | nonRep (unembed tyE)
-      = fmap (elem idName . snd) $ localFreeVars (unembed exprE)
+      = (&&) <$> (not <$> (representableType <$> (Lens.use typeTranslator) <*> pure (unembed tyE)))
+             <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
 
     nonRepTest _ = return False
 
@@ -88,7 +88,8 @@ nonRepSpec ctx e@(App e1 e2)
   , null $ termFreeTyVars e2
   = R $ do e2Ty <- termType e2
            localVar <- isLocalVar e2
-           if (nonRep e2Ty && (not localVar))
+           nonRepE2 <- not <$> (representableType <$> (Lens.use typeTranslator) <*> pure e2Ty)
+           if (nonRepE2 && (not localVar))
              then runR $ specialise specialisations ctx e
              else return e
 
@@ -102,15 +103,17 @@ caseLet _ (Case (Letrec b) ty alts) = R $ do
 caseLet _ e = return e
 
 caseCase :: NormRewrite
-caseCase _ (Case (Case scrut ty1 alts1) ty2 alts2)
-  | nonRep ty1
+caseCase _ e@(Case (Case scrut ty1 alts1) ty2 alts2)
   = R $ do
-    newAlts  <- mapM ( return
-                     . uncurry bind
-                     . second (\altE -> Case altE ty2 alts2)
-                     <=< unbind
-                     ) alts1
-    changed $ Case scrut ty2 newAlts
+    ty1Rep <- representableType <$> (Lens.use typeTranslator) <*> pure ty1
+    case ty1Rep of
+      False -> do newAlts  <- mapM ( return
+                                   . uncurry bind
+                                   . second (\altE -> Case altE ty2 alts2)
+                                   <=< unbind
+                                   ) alts1
+                  changed $ Case scrut ty2 newAlts
+      True  -> return e
 
 caseCase _ e = return e
 
@@ -124,9 +127,10 @@ inlineNonRep ctx e@(Case scrut ty alts)
         cf <- liftR $ Lens.use curFun
         traceIf True ($(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
       False -> do
-        scrutTy   <- termType scrut
-        bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-        case (nonRep scrutTy, bodyMaybe) of
+        scrutTy     <- termType scrut
+        bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
+        nonRepScrut <- not <$> (representableType <$> (Lens.use typeTranslator) <*> pure scrutTy)
+        case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
             liftR $ newInlined %= (f:)
             changed $ Case (mkApps scrutBody args) ty alts

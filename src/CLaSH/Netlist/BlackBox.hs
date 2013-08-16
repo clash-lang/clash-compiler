@@ -54,7 +54,7 @@ mkBlackBoxContext resId args = do
 
   -- Make context result
   let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
-      resTy = N.coreTypeToHWType_fail $ unembed $ V.varType resId
+  resTy <- N.coreTypeToHWTypeM_unsafe (unembed $ V.varType resId)
 
   return ((Context (res,resTy) varInps (map fst litInps) funInps),concat declssV ++ concat declssL ++ concat declssF)
 
@@ -84,8 +84,8 @@ mkInput ::
 mkInput (_, True) = return ((Left $ pack "__FUN__", Void),[])
 
 mkInput ((Var ty v), False) = do
-  let vT   = mkBasicId . pack $ name2String v
-      hwTy = N.coreTypeToHWType_fail ty
+  let vT = mkBasicId . pack $ name2String v
+  hwTy <- lift $ N.coreTypeToHWTypeM_unsafe ty
   case synchronizedClk ty of
     Just clk -> return (((Right (vT,clk)), hwTy),[])
     Nothing  -> return (((Left vT), hwTy),[])
@@ -125,7 +125,8 @@ mkLitInput ::
   -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
 mkLitInput (C.Literal (IntegerLiteral i))       = return ((pack $ show i,Integer),[])
 mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
-  args' <- filterM (fmap representableType . termType) (lefts args)
+  typeTrans <- Lens.use typeTranslator
+  args' <- filterM (fmap (representableType typeTrans) . termType) (lefts args)
   hwTy  <- N.termHWType e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'
   exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN

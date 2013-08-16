@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections   #-}
 module CLaSH.Netlist where
 
+import           Control.Applicative     (liftA2)
 import           Control.Lens            ((.=),_2)
 import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
@@ -33,30 +34,30 @@ import CLaSH.Normalize.Util
 import CLaSH.Primitives.Types as P
 import CLaSH.Util
 
-genNetlist ::
-  Maybe VHDLState
-  -> HashMap TmName (Type,Term)
-  -> PrimMap
-  -> Maybe Int
-  -> TmName
-  -> IO ([Component],VHDLState)
-genNetlist vhdlStateM globals primMap mStart topEntity = do
-  (_,s) <- runNetlistMonad vhdlStateM globals primMap $ genComponent topEntity mStart
+genNetlist :: Maybe VHDLState
+           -> HashMap TmName (Type,Term)
+           -> PrimMap
+           -> (Type -> Maybe (Either String HWType))
+           -> Maybe Int
+           -> TmName
+           -> IO ([Component],VHDLState)
+genNetlist vhdlStateM globals primMap typeTrans mStart topEntity = do
+  (_,s) <- runNetlistMonad vhdlStateM globals primMap typeTrans $ genComponent topEntity mStart
   return $ (HashMap.elems $ _components s, _vhdlMState s)
 
-runNetlistMonad ::
-  Maybe VHDLState
-  -> HashMap TmName (Type,Term)
-  -> PrimMap
-  -> NetlistMonad a
-  -> IO (a,NetlistState)
-runNetlistMonad vhdlStateM s p
+runNetlistMonad :: Maybe VHDLState
+                -> HashMap TmName (Type,Term)
+                -> PrimMap
+                -> (Type -> Maybe (Either String HWType))
+                -> NetlistMonad a
+                -> IO (a,NetlistState)
+runNetlistMonad vhdlStateM s p typeTrans
   = runFreshMT
   . (flip runStateT) s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (maybe (0,Text.empty,HashMap.empty) id vhdlStateM)
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (maybe (0,Text.empty,HashMap.empty) id vhdlStateM) typeTrans
 
 genComponent ::
   TmName
@@ -103,12 +104,13 @@ genComponent' compName componentExpr mStart = do
 
   varEnv .= gamma
 
-  let resType  = coreTypeToHWType_fail $ ids HashMap.! result
-      argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_fail t) arguments
+  typeTrans    <- Lens.use typeTranslator
+  let resType  = coreTypeToHWType_unsafe typeTrans $ ids HashMap.! result
+      argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_unsafe typeTrans t) arguments
 
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
-                                (coreTypeToHWType_fail . unembed $ varType id_)
+                                (coreTypeToHWType_unsafe typeTrans . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkConcSm . second unembed) binders
@@ -126,6 +128,7 @@ mkConcSm bndr (Var _ v) = mkFunApp bndr v []
 
 mkConcSm bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
   (pat,Var varTy varTm)  <- unbind alt
+  typeTrans    <- Lens.use typeTranslator
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
       altVarId = mkBasicId . Text.pack $ name2String varTm
       selId    = mkBasicId . Text.pack $ name2String scrutNm
@@ -133,7 +136,7 @@ mkConcSm bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
         DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
                                   in case (elemIndex (Id varTm (Embed varTy)) tms) of
                                        Nothing -> Nothing
-                                       Just fI -> Just (Indexed (coreTypeToHWType_fail scrutTy,dcTag dc - 1,fI))
+                                       Just fI -> Just (Indexed (coreTypeToHWType_unsafe typeTrans scrutTy,dcTag dc - 1,fI))
         _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
@@ -142,7 +145,7 @@ mkConcSm bndr (Case scrut ty alts) = do
   alts'   <- mapM unbind alts
   scrutTy <- termType scrut
   (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
-  let scrutHTy = coreTypeToHWType_fail scrutTy
+  scrutHTy <- coreTypeToHWTypeM_unsafe scrutTy
   (exprs,altsDecls)      <- fmap (second concat . unzip) $ mapM (mkCondExpr (scrutExpr,scrutHTy)) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
@@ -171,7 +174,7 @@ mkConcSm bndr (Case scrut ty alts) = do
 
 mkConcSm bndr app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  args' <- Monad.filterM (fmap representableType . termType) args
+  args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
   case appF of
     Var _ f
       | all isVar args' && null tyArgs -> mkFunApp bndr f args'
@@ -219,8 +222,8 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
 
 mkExpr ty app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-      hwTy                 = coreTypeToHWType_fail ty
-  args' <- Monad.filterM (fmap representableType . termType) args
+  hwTy <- coreTypeToHWTypeM_unsafe ty
+  args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
   case appF of
     Data dc
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'

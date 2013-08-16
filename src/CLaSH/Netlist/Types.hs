@@ -27,13 +27,14 @@ type VHDLState = (Int,Text,HashMap HWType (Text,Doc))
 
 data NetlistState
   = NetlistState
-  { _bindings   :: HashMap TmName (Type,Term)
-  , _varEnv     :: Gamma
-  , _varCount   :: Int
-  , _cmpCount   :: Int
-  , _components :: HashMap TmName Component
-  , _primitives :: HashMap ByteString Primitive
-  , _vhdlMState :: VHDLState
+  { _bindings       :: HashMap TmName (Type,Term)
+  , _varEnv         :: Gamma
+  , _varCount       :: Int
+  , _cmpCount       :: Int
+  , _components     :: HashMap TmName Component
+  , _primitives     :: HashMap ByteString Primitive
+  , _vhdlMState     :: VHDLState
+  , _typeTranslator :: (Type -> Maybe (Either String HWType))
   }
 
 type Identifier = Text

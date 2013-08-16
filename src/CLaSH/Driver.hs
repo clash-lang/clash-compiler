@@ -18,11 +18,12 @@ import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc,linebreak,punctuate,v
 import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Term              (TmName)
+import           CLaSH.Core.Type              (Type)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL)
-import           CLaSH.Netlist.Types          (Component(..))
+import           CLaSH.Netlist.Types          (Component(..),HWType)
 import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
 import           CLaSH.Primitives.Types
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
@@ -34,9 +35,10 @@ generateVHDL :: BindingMap
              -> ClassOpMap
              -> DFunMap
              -> PrimMap
+             -> (Type -> Maybe (Either String HWType))
              -> DebugLevel
              -> IO ()
-generateVHDL bindingsMap clsOpMap dfunMap primMap dbgLevel = do
+generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
   start <- Clock.getCurrentTime
 
   let topEntities = HashMap.toList
@@ -57,7 +59,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap dbgLevel = do
       traceIf True ("Loading dependencies took " ++ show (Clock.diffUTCTime prepTime start)) $ return ()
 
       let transformedBindings
-            = runNormalization dbgLevel supplyN bindingsMap' dfunMap clsOpMap
+            = runNormalization dbgLevel supplyN bindingsMap' dfunMap clsOpMap typeTrans
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
@@ -65,13 +67,14 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap dbgLevel = do
 
       (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList $ transformedBindings)
                               primMap
+                              typeTrans
                               Nothing
                               (fst topEntity)
 
       netlistTime <- netlist `seq` Clock.getCurrentTime
       traceIf True ("Netlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
 
-      (testBench,vhdlState') <- genTestBench DebugNone supplyTB dfunMap clsOpMap primMap vhdlState
+      (testBench,vhdlState') <- genTestBench DebugNone supplyTB dfunMap clsOpMap primMap typeTrans vhdlState
                                   bindingsMap'
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)

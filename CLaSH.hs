@@ -1,6 +1,7 @@
 import CLaSH.Driver
 import CLaSH.Rewrite.Types
 import CLaSH.GHC.GenerateBindings
+import CLaSH.GHC.NetlistTypes
 import CLaSH.Primitives.Util
 
 genVHDL :: String
@@ -8,4 +9,4 @@ genVHDL :: String
 genVHDL src = do
   primMap <- generatePrimMap ["./primitives"]
   (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-  generateVHDL bindingsMap clsOpMap dfunMap primMap DebugFinal
+  generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugFinal

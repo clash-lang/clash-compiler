@@ -333,7 +333,7 @@ isUntranslatable ::
   (Functor m, Monad m)
   => Term
   -> RewriteMonad m Bool
-isUntranslatable tm = not . representableType <$> termType tm
+isUntranslatable tm = not <$> (representableType <$> Lens.use typeTranslator <*> termType tm)
 
 isLambdaBodyCtx ::
   CoreContext

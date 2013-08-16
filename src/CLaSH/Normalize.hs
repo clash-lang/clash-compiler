@@ -15,6 +15,7 @@ import CLaSH.Core.Pretty        (showDoc)
 import CLaSH.Core.Term          (TmName,Term)
 import CLaSH.Core.Type          (Type)
 import CLaSH.Driver.Types
+import CLaSH.Netlist.Types      (HWType)
 import CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
 import CLaSH.Rewrite.Types      (DebugLevel(..),RewriteState(..),dbgLevel,
@@ -28,13 +29,14 @@ runNormalization ::
   -> HashMap TmName (Type,Term)
   -> DFunMap
   -> ClassOpMap
+  -> (Type -> Maybe (Either String HWType))
   -> NormalizeSession a
   -> a
-runNormalization lvl supply globals dfunMap clsOpMap
+runNormalization lvl supply globals dfunMap clsOpMap typeTrans
   = flip State.evalState normState
   . runRewriteSession lvl rwState
   where
-    rwState   = RewriteState 0 globals dfunMap clsOpMap supply
+    rwState   = RewriteState 0 globals dfunMap clsOpMap supply typeTrans
     normState = NormalizeState
                   HashMap.empty
                   Map.empty

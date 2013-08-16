@@ -17,6 +17,7 @@ import CLaSH.Core.Term (Term,TmName)
 import CLaSH.Core.Type (Type)
 import CLaSH.Core.Var  (Id,TyVar)
 import CLaSH.Driver.Types
+import CLaSH.Netlist.Types (HWType)
 import CLaSH.Util
 
 data CoreContext = AppFirst
@@ -37,6 +38,7 @@ data RewriteState
   , _dictFuns         :: DFunMap
   , _classOps         :: ClassOpMap
   , _uniqSupply       :: Supply
+  , _typeTranslator   :: (Type -> Maybe (Either String HWType))
   }
 
 makeLenses ''RewriteState

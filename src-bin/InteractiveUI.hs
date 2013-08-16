@@ -104,6 +104,7 @@ import GHC.TopHandler ( topHandler )
 
 import qualified CLaSH.Driver
 import           CLaSH.GHC.GenerateBindings
+import           CLaSH.GHC.NetlistTypes
 import qualified CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types (DebugLevel(..))
 
@@ -1445,13 +1446,13 @@ makeVHDL [] = do
       maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
                                              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
                                              (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-                                             CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap DebugNone
+                                             CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugNone
                         ) loc
     _ -> return ()
 makeVHDL srcs = liftIO $ do primDir <- getDefPrimDir
                             primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
                             mapM_ (\src -> do (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-                                              CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap DebugNone
+                                              CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugNone
                                   ) srcs
 
 -----------------------------------------------------------------------------
