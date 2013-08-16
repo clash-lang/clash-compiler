@@ -9,7 +9,8 @@ import           Control.Monad.State          (evalState)
 import           Data.Maybe                   (catMaybes,listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
 import qualified Data.HashMap.Lazy            as HashMap
-import           Data.Text.Lazy               (pack)
+import           Data.List                    (isSuffixOf)
+import qualified Data.Text.Lazy               as Text
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
 import qualified System.IO                    as IO
@@ -74,7 +75,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap dbgLevel = do
                                   bindingsMap'
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
-                                  (head $ filter (\(Component cName _ _ _ _) -> cName == (pack "topEntity_0")) netlist)
+                                  (head $ filter (\(Component cName _ _ _ _) -> Text.isSuffixOf (Text.pack "topEntity_0") cName) netlist)
 
       testBenchTime <- testBench `seq` Clock.getCurrentTime
       traceIf True ("Testbench generation took " ++ show (Clock.diffUTCTime testBenchTime netlistTime)) $ return ()
@@ -97,19 +98,19 @@ isTopEntity ::
   TmName
   -> a
   -> Bool
-isTopEntity var _ = name2String var == "topEntity"
+isTopEntity var _ = isSuffixOf "topEntity" $ name2String var
 
 isTestInput ::
   TmName
   -> a
   -> Bool
-isTestInput var _ = name2String var == "testInput"
+isTestInput var _ = isSuffixOf "testInput" $ name2String var
 
 isExpectedOutput ::
   TmName
   -> a
   -> Bool
-isExpectedOutput var _ = name2String var == "expectedOutput"
+isExpectedOutput var _ = isSuffixOf "expectedOutput" $ name2String var
 
 -- | Prepares the directory for writing VHDL files. This means creating the
 --   dir if it does not exist and removing all existing .vhdl files from it.
