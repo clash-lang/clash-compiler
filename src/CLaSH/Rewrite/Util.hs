@@ -342,22 +342,21 @@ isLambdaBodyCtx (LamBody _) = True
 isLambdaBodyCtx _           = False
 
 mkWildValBinder ::
-  (Functor m, Monad m)
+  (Functor m, Monad m, MonadUnique m)
   => Type
-  -> RewriteMonad m (Id,Term)
+  -> m (Id,Term)
 mkWildValBinder ty = mkInternalVar "wild" ty
 
 mkSelectorCase ::
-  (Functor m, Monad m)
+  (Functor m, Monad m, MonadUnique m, Fresh m)
   => String
   -> [CoreContext]
   -> Term
   -> Int -- n'th DataCon
   -> Int -- n'th field
-  -> RewriteMonad m Term
+  -> m Term
 mkSelectorCase caller ctx scrut dcI fieldI = do
   scrutTy <- termType scrut
-  let delta = snd $ contextEnv ctx
   let cantCreate x = error $ x ++ "Can't create selector " ++ (show (caller,dcI,fieldI)) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
   case scrutTy of
     (coreView -> TyConApp tc args) -> do
