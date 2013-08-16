@@ -49,7 +49,7 @@ apply name rewrite ctx expr = R $ do
   let after  = showDoc expr'
   let expr'' = if hasChanged then expr' else expr
 
-  Monad.when (lvl >= DebugNone && hasChanged) $ do
+  Monad.when (lvl > DebugNone && hasChanged) $ do
     beforeTy             <- termType expr
     (beforeFTV,beforeFV) <- localFreeVars expr
     afterTy              <- termType expr'
