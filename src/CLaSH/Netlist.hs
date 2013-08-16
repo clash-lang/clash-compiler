@@ -205,7 +205,7 @@ mkFunApp dst fun args = do
       [] -> do
         let dstId = mkBasicId . Text.pack . name2String $ varName dst
         return [Assignment dstId (Identifier (mkBasicId . Text.pack $ name2String fun) Nothing)]
-      _ -> error $ $(curLoc) ++ "Unknown function"
+      _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
 
 mkExpr ::
   Type

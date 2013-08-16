@@ -302,8 +302,12 @@ inlineWrapper [] e = R $ do
       (Var _ fn,args) -> do allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
                             bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
                             case (bodyMaybe,allLocal) of
-                              (Just (_,body),True) -> changed body
-                              _                    -> return e
+                              (Just (bodyTy,body),True) -> do
+                                eTy <- termType e
+                                if (eTy == bodyTy)
+                                  then changed body
+                                  else return e
+                              _                     -> return e
       _               -> return e
     _ -> return e
 
