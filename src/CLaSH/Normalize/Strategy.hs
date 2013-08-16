@@ -10,16 +10,16 @@ normalization :: NormRewrite
 normalization = representable >-> simplification
 
 cleanup :: NormRewrite
-cleanup = repeatR $ unsafeTopdownR (apply "inlineWrapper" inlineWrapper)
+cleanup = repeatR $ topdownR (apply "inlineWrapper" inlineWrapper)
 
 representable :: NormRewrite
 representable = (clsOpRes >-> propagagition >-> specialisation) !->
                 repeatR (clsOpRes !-> (propagagition >-> specialisation))
   where
-    clsOpRes = (unsafeBottomupR $ apply "classOpResolution"  classOpResolution) >->
-               (unsafeBottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
+    clsOpRes = (bottomupR $ apply "classOpResolution"  classOpResolution) >->
+               (bottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
 
-    propagagition = repeatR ( unsafeUpDownR  (apply "propagation" appProp) >->
+    propagagition = repeatR ( upDownR  (apply "propagation" appProp) >->
                               repeatBottomup [ ("bindNonRep"   , bindNonRep )
                                              , ("liftNonRep"   , liftNonRep )
                                              , ("caseLet"      , caseLet    )
@@ -29,8 +29,8 @@ representable = (clsOpRes >-> propagagition >-> specialisation) !->
                               >->
                               doInline "inlineNonRep" inlineNonRep
                             )
-    specialisation = repeatR (unsafeBottomupR (apply "typeSpec" typeSpec)) >->
-                     repeatR (unsafeBottomupR (apply "nonRepSpec" nonRepSpec))
+    specialisation = repeatR (bottomupR (apply "typeSpec" typeSpec)) >->
+                     repeatR (bottomupR (apply "nonRepSpec" nonRepSpec))
 
 simplification :: NormRewrite
 simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
@@ -38,8 +38,8 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
   where
     etaTL           = apply "etaTL" etaExpansionTL
 
-    constSimpl      = repeatR ( unsafeUpDownR   (apply "propagation" appProp) >->
-                                unsafeBottomupR (apply "inlineClosedTerm" (inlineClosedTerm !-> representable)) >->
+    constSimpl      = repeatR ( upDownR   (apply "propagation" appProp) >->
+                                bottomupR (apply "inlineClosedTerm" (inlineClosedTerm !-> representable)) >->
                                 repeatBottomup  [ ("nonRepANF"       , nonRepANF       )
                                                 , ("bindConstantVar" , bindConstantVar )
                                                 , ("constantSpec"    , constantSpec    )
@@ -49,21 +49,21 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
 
     anf             = apply "ANF" makeANF
 
-    deadCodeRemoval = unsafeBottomupR (apply "deadcode" deadCode)
+    deadCodeRemoval = bottomupR (apply "deadcode" deadCode)
 
-    letTL           = unsafeBottomupR (apply "topLet" topLet)
+    letTL           = bottomupR (apply "topLet" topLet)
 
 doInline :: String -> NormRewrite -> NormRewrite
-doInline n t = unsafeBottomupR (apply n t) >-> commitNewInlined
+doInline n t = bottomupR (apply n t) >-> commitNewInlined
 
 repeatBottomup :: [(String,NormRewrite)] -> NormRewrite
 repeatBottomup
   = repeatR
   . foldl1 (>->)
-  . map (unsafeBottomupR . uncurry apply)
+  . map (bottomupR . uncurry apply)
 
 repeatTopdown :: [(String,NormRewrite)] -> NormRewrite
 repeatTopdown
   = repeatR
   . foldl1 (>->)
-  . map (unsafeTopdownR . uncurry apply)
+  . map (topdownR . uncurry apply)

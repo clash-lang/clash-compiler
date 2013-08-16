@@ -80,6 +80,9 @@ unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 unsafeUpDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
 unsafeUpDownR r = unsafeBottomupR (r !-> unsafeTopdownR r)
 
+upDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
+upDownR r = bottomupR (r !-> topdownR r)
+
 infixr 5 !->
 (!->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
 (!->) r1 r2 c expr = R $ do
