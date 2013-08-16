@@ -33,8 +33,9 @@ generateVHDL :: BindingMap
              -> ClassOpMap
              -> DFunMap
              -> PrimMap
+             -> DebugLevel
              -> IO ()
-generateVHDL bindingsMap clsOpMap dfunMap primMap = do
+generateVHDL bindingsMap clsOpMap dfunMap primMap dbgLevel = do
   start <- Clock.getCurrentTime
 
   let topEntities = HashMap.toList
@@ -55,7 +56,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap = do
       traceIf True ("Loading dependencies took " ++ show (Clock.diffUTCTime prepTime start)) $ return ()
 
       let transformedBindings
-            = runNormalization DebugNone supplyN bindingsMap' dfunMap clsOpMap
+            = runNormalization dbgLevel supplyN bindingsMap' dfunMap clsOpMap
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
