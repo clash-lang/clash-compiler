@@ -11,7 +11,7 @@ import Data.Char (isUpper,ord,isSymbol)
 import Data.Traversable (sequenceA)
 import GHC.Show (showMultiLineString)
 import Text.PrettyPrint (Doc,(<+>),(<>),($+$),($$),render,parens,text,sep,
-  punctuate,comma,hang,char,empty,fsep,hsep,equals,vcat,integer,int)
+  punctuate,comma,hang,char,empty,hsep,equals,vcat,integer,int)
 import Unbound.LocallyNameless (Embed(..),Name,LFresh,runLFreshM,unembed,
   name2String,lunbind,unrec,unrebind)
 
@@ -19,7 +19,7 @@ import CLaSH.Core.DataCon (DataCon(..))
 import CLaSH.Core.Literal (Literal(..))
 import CLaSH.Core.Prim    (Prim(..))
 import CLaSH.Core.Term    (Term(..),Pat(..))
-import CLaSH.Core.Type    (Type(..),ConstTy(..),LitTy(..),Kind,TypeView(..),ThetaType,tyView)
+import CLaSH.Core.Type    (Type(..),ConstTy(..),LitTy(..),Kind,TypeView(..),tyView)
 import CLaSH.Core.TyCon   (TyCon(..),isTupleTyConLike)
 import CLaSH.Core.Var     (Var,TyVar,Id,varName,varType,varKind)
 import CLaSH.Util
@@ -65,9 +65,6 @@ dcolon = text "::"
 
 period :: Doc
 period = char '.'
-
-darrow :: Doc
-darrow = text "=>"
 
 rarrow :: Doc
 rarrow = text "->"
@@ -234,18 +231,13 @@ pprForAllType p ty = maybeParen p FunPrec <$> pprSigmaType True ty
 pprSigmaType :: (Applicative m, LFresh m) => Bool -> Type -> m Doc
 pprSigmaType showForalls ty = do
     (tvs, rho)     <- split1 [] ty
-    let (ctxt,tau) =  split2 [] rho
     sep <$> sequenceA [ if showForalls then pprForAll tvs else pure empty
-                      , pprThetaArrowTy ctxt
-                      , pprType tau
+                      , pprType rho
                       ]
   where
     split1 tvs (ForAllTy b) = do
       lunbind b $ \(tv,resTy) -> split1 (tv:tvs) resTy
     split1 tvs resTy = return (reverse tvs,resTy)
-
-    split2 ps (tyView -> FunTy ty1 ty2) = split2 (ty1:ps) ty2
-    split2 ps resTy  = (reverse ps, resTy)
 
 pprForAll :: (Applicative m, LFresh m) => [TyVar] -> m Doc
 pprForAll [] = return empty
@@ -264,12 +256,6 @@ pprTvBndr tv
 
 pprKind :: (Applicative m, LFresh m) => Kind -> m Doc
 pprKind = pprType
-
-pprThetaArrowTy :: (Applicative m, LFresh m) => ThetaType -> m Doc
-pprThetaArrowTy []    = return empty
-pprThetaArrowTy preds = do
-  preds' <- mapM pprType preds
-  return $ parens (fsep (punctuate comma preds')) <+> darrow
 
 pprTcApp :: (Applicative m, LFresh m) => TypePrec -> (TypePrec -> Type -> m Doc)
   -> TyCon -> [Type] -> m Doc
