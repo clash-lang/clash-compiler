@@ -68,7 +68,7 @@ applyTypeToArgs opTy (Right ty:args) = applyTy opTy ty >>=
                                        (`applyTypeToArgs` args)
 applyTypeToArgs opTy (Left e:args)   = case splitFunTy opTy of
   Just (_,resTy) -> applyTypeToArgs resTy args
-  Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy:\n" ++ "opTy: " ++ showDoc opTy ++ "\nTerm: " ++ showDoc e ++ "\nOtherArgs: " ++ show args
+  Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy:\n" ++ "opTy: " ++ showDoc opTy ++ "\nTerm: " ++ showDoc e ++ "\nOtherArgs: " ++ unlines (map (either showDoc showDoc) args)
 
 patIds :: Pat -> [Id]
 patIds (DataPat _ ids) = snd $ unrebind ids
