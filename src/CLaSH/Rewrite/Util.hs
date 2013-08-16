@@ -48,6 +48,33 @@ apply name rewrite ctx expr = R $ do
   Monad.when hasChanged $ transformCounter += 1
   let after  = showDoc expr'
   let expr'' = if hasChanged then expr' else expr
+
+  Monad.when (lvl >= DebugNone && hasChanged) $ do
+    beforeTy             <- termType expr
+    (beforeFTV,beforeFV) <- localFreeVars expr
+    afterTy              <- termType expr'
+    (afterFTV,afterFV)   <- localFreeVars expr'
+    let newFV = (Set.size afterFTV) > (Set.size beforeFTV) ||
+                (Set.size afterFV) > (Set.size beforeFV)
+    Monad.when newFV $
+            error ( concat [ $(curLoc)
+                           , "Error when applying rewrite ", name
+                           , " to:\n" , before
+                           , "\nResult:\n" ++ after ++ "\n"
+                           , "Changes free variables from: ", show (beforeFTV,beforeFV)
+                           , "\nto: ", show (afterFTV,afterFV)
+                           ]
+                  )
+    traceIf ( beforeTy /= afterTy)
+            ( concat [ $(curLoc)
+                     , "Error when applying rewrite ", name
+                     , " to:\n" , before
+                     , "\nResult:\n" ++ after ++ "\n"
+                     , "Changes type from:\n", showDoc beforeTy
+                     , "\nto:\n", showDoc afterTy
+                     ]
+            ) (return ())
+
   traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
       return expr''
