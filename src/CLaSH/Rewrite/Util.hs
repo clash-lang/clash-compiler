@@ -394,6 +394,7 @@ specialise' ::
   -> Either Term Type
   -> R m Term
 specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
+  lvl <- Lens.view dbgLevel
   -- Create binders and variable references for free variables in 'specArg'
   (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $
                         either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
@@ -410,7 +411,9 @@ specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
                  $ Lens.use specMapLbl
   case specM of
     -- Use previously specialized function
-    Just (fname,fty) -> changed $ mkApps (Var fty fname) (args ++ specTyVars ++ specTmVars)
+    Just (fname,fty) -> do
+      traceIf (lvl >= DebugApplied) ("Using previous specialization: " ++ showDoc fname) $
+        changed $ mkApps (Var fty fname) (args ++ specTyVars ++ specTmVars)
     -- Create new specialized function
     Nothing -> do
       bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
