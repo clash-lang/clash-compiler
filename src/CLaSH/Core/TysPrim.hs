@@ -26,7 +26,7 @@ typeNatKind    = kindTyConType (mkKindTyCon typeNatKindTyConName tySuperKind)
 typeSymbolKind = kindTyConType (mkKindTyCon typeSymbolKindTyConName tySuperKind)
 
 intPrimTyConName, voidPrimTyConName :: TyConName
-intPrimTyConName  = string2Name "__Int#__"
+intPrimTyConName  = string2Name "__INT__"
 voidPrimTyConName = string2Name "__VOID__"
 
 pcPrimTyCon0 ::
