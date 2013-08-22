@@ -303,7 +303,7 @@ end process;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1](~SYM[1]'high downto (~SYM[1]'length - LIT[0]));
+  ~RESULT <= ~SYM[1](~SYM[1]'high downto (~SYM[1]'length - ~LIT[0]));
 end block;"
     }
   }
@@ -314,7 +314,7 @@ end block;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1](~SYM[1]'high downto (~SYM[1]'length - LIT[0]));
+  ~RESULT <= ~SYM[1](~SYM[1]'high downto (~SYM[1]'length - ~LIT[0]));
 end block;"
     }
   }
