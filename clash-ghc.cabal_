@@ -70,7 +70,7 @@ Executable clash
                       lens                 >= 3.7.1,
                       mtl                  >= 2.1.1,
                       transformers         >= 0.3,
-                      unbound              >= 0.4.2,
+                      unbound              >= 0.4.0.2,
                       unordered-containers >= 0.2.1.0
 
   if os(windows)
