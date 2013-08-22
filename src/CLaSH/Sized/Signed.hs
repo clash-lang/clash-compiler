@@ -98,9 +98,12 @@ fromIntegerS,fromIntegerS_inlineable :: forall n . SingI n => Integer -> Signed 
 {-# NOINLINE fromIntegerS #-}
 fromIntegerS = fromIntegerS_inlineable
 {-# INLINABLE fromIntegerS_inlineable #-}
-fromIntegerS_inlineable i = res
+fromIntegerS_inlineable i
+    | nS == 0   = S 0
+    | otherwise = res
   where
-    sz  = 2 ^ (fromSing (sing :: Sing n) - 1)
+    nS  = fromSing (sing :: Sing n)
+    sz  = 2 ^ (nS - 1)
     res = case divMod i sz of
             (s,i') | even s    -> S i'
                    | otherwise -> S (i' - sz)
