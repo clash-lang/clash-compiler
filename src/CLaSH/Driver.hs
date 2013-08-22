@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell     #-}
 module CLaSH.Driver where
 
-import           Control.Monad                (unless)
 import           Control.Monad.State          (evalState)
 import           Data.Maybe                   (catMaybes,listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
@@ -14,7 +13,7 @@ import qualified Data.Text.Lazy               as Text
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
 import qualified System.IO                    as IO
-import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc,linebreak,punctuate,vcat)
+import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc)
 import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Term              (TmName)
@@ -22,7 +21,7 @@ import           CLaSH.Core.Type              (Type)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
-import           CLaSH.Netlist.VHDL           (genVHDL)
+import           CLaSH.Netlist.VHDL           (genVHDL,mkTyPackage)
 import           CLaSH.Netlist.Types          (Component(..),HWType)
 import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
 import           CLaSH.Primitives.Types
@@ -83,12 +82,18 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
       testBenchTime <- testBench `seq` Clock.getCurrentTime
       traceIf True ("Testbench generation took " ++ show (Clock.diffUTCTime testBenchTime netlistTime)) $ return ()
 
+      let (vhdlNms,vhdlDocs,typesPkgM) = flip evalState vhdlState' $ do
+            { (vhdlNms',typeDocsM,vhdlDocs') <- fmap unzip3 $ mapM genVHDL (netlist ++ testBench)
+            ; let (typeDecDocs,typeBodyDocs) = ((catMaybes >< catMaybes) . unzip) typeDocsM
+            ; typesPkgM'  <- case typeDecDocs of
+                              [] -> return Nothing
+                              _  -> Just <$> mkTyPackage (typeDecDocs,typeBodyDocs)
+            ; return (vhdlNms',vhdlDocs',typesPkgM')
+            }
+
       let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
       prepareDir dir
-      let (vhdlNms,typeDocsM,vhdlDocs) = unzip3 $ evalState (mapM genVHDL (netlist ++ testBench)) vhdlState'
-      let typeDocs = catMaybes typeDocsM
-
-      unless (null typeDocs) $ writeVHDL dir ("types", vcat $ punctuate linebreak typeDocs)
+      maybe (return ()) (\typesPkg -> writeVHDL dir ("types", typesPkg)) typesPkgM
       mapM_ (writeVHDL dir) (zip vhdlNms vhdlDocs)
 
       end <- Clock.getCurrentTime

@@ -20,7 +20,7 @@ import CLaSH.Util (makeCached,(<:>))
 
 type VHDLM a = State VHDLState a
 
-genVHDL :: Component -> VHDLM (String,Maybe Doc,Doc)
+genVHDL :: Component -> VHDLM (String,(Maybe Doc,Maybe Doc),Doc)
 genVHDL c = do
     _2 .= cName
     (unpack $ cName,,) A.<$> vhdlTys A.<*> vhdl
@@ -35,37 +35,35 @@ genVHDL c = do
             :  map snd (inputs c)
             ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
 
-tyPackage :: Text -> [HWType] -> VHDLM (Maybe Doc)
+mkTyPackage :: ([Doc],[Doc])
+            -> VHDLM Doc
+mkTyPackage (pkgDecs,pkgBodyDecs) =
+   "package" <+> "types" <+> "is" <$>
+      vcat (punctuate linebreak (return pkgDecs)) <$>
+   "end" <> packageBodyDec pkgBodyDecs
+  where
+    packageBodyDec []   = semi
+    packageBodyDec decs = linebreak <$>
+      "package" <+> "body" <+> "types" <+> "is" <$>
+        vcat (punctuate linebreak (return decs)) <$>
+      "end" <> semi
+
+tyPackage :: Text -> [HWType] -> VHDLM (Maybe Doc,Maybe Doc)
 tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst)) $ use _3
                          let needsDec = nub $ concatMap needsTyDec tys
                              newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
-                             newDecNeeds = nub $ concatMap needsTyDec newDec
-                             otherDec = nub $ map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` newDecNeeds) prevDec
                          case newDec of
-                            [] -> return Nothing
-                            _  -> do newDecFun <- fmap catMaybes $ mapM funDec newDec
-                                     Just A.<$> ( packageDec otherDec newDec <$$>
-                                                    case newDecFun of
-                                                      [] -> empty
-                                                      _  -> linebreak <> packageBodyDec (return newDecFun)
-                                                )
+                            [] -> return (Nothing,Nothing)
+                            _  -> do pDec      <- Just A.<$> (packageDec newDec)
+                                     newDecFun <- fmap catMaybes $ mapM funDec newDec
+                                     pbDec     <- case newDecFun of
+                                                    [] -> return Nothing
+                                                    _  -> Just A.<$> packageBodyDec (return newDecFun)
+                                     return (pDec,pbDec)
+
   where
-    packageDec ptys ntys =
-      imports ptys <$> linebreak <>
-      "package" <+> text cName <> "_types" <+> "is" <$>
-        indent 2 (vcat $ mapM tyDec ntys) <$>
-      "end" <> semi
-
-    packageBodyDec ntys =
-      "package" <+> "body" <+> text cName <> "_types" <+> "is" <$>
-        indent 2 (vcat ntys) <$>
-      "end" <> semi
-
-    imports ptys = punctuate' semi $ sequence $
-                [ "library IEEE"
-                , "use IEEE.STD_LOGIC_1164.ALL"
-                , "use IEEE.NUMERIC_STD.ALL"
-                ] ++ map (\x -> "use work." <> text x <> "_types.all") ptys
+    packageDec     ntys = indent 2 (vcat $ mapM tyDec ntys)
+    packageBodyDec ntys = indent 2 (vcat ntys)
 
 needsTyDec :: HWType -> [HWType]
 needsTyDec (Vector _ Bit)     = []
@@ -141,7 +139,7 @@ tyImports tys = do prevDec <- use _3
                                                 , "use IEEE.STD_LOGIC_1164.ALL"
                                                 , "use IEEE.NUMERIC_STD.ALL"
                                                 , "use work.all"
-                                                ] ++ map (\x -> "use work." <> text x <> "_types.all") usePacks
+                                                ] ++ (\x -> case x of [] -> [] ; _ -> ["use work.types.all"]) usePacks
 
 entity :: Component -> VHDLM Doc
 entity c = do
