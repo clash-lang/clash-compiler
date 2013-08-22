@@ -244,7 +244,8 @@ fromBitList l = fromIntegerS_inlineable
 {-# NOINLINE resizeS #-}
 resizeS :: forall n m . (SingI n, SingI m) => Signed n -> Signed m
 resizeS s@(S n) | n' <= m'  = fromIntegerS_inlineable n
-                | otherwise = fromBitList $ (take (m' - 1) l) ++ [last l]
+                | otherwise = case l of
+                    (x:xs) -> fromBitList $ reverse $ x : (drop (n' - m') xs)
   where
     n' = fromInteger $ fromSing (sing :: Sing n) :: Int
     m' = fromInteger $ fromSing (sing :: Sing m) :: Int
