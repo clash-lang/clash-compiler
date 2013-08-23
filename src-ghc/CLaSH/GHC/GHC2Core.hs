@@ -407,7 +407,7 @@ coreToVar ::
   Rep a
   => Var
   -> Unbound.Name a
-coreToVar = coreToName varName varUnique nameString
+coreToVar = coreToName varName varUnique qualfiedNameStringM
 
 coreToPrimVar ::
   Var
@@ -437,6 +437,17 @@ qualfiedNameString ::
 qualfiedNameString n = fromMaybe "_INTERNAL_" modName ++ ('.':occName)
   where
     modName = do
+      module_ <- nameModule_maybe n
+      let moduleNm = moduleName module_
+      return (moduleNameString moduleNm)
+
+    occName = occNameString $ nameOccName n
+
+qualfiedNameStringM :: Name
+                    -> String
+qualfiedNameStringM n = maybe (occName) (\modName -> modName ++ ('.':occName)) modNameM
+  where
+    modNameM = do
       module_ <- nameModule_maybe n
       let moduleNm = moduleName module_
       return (moduleNameString moduleNm)

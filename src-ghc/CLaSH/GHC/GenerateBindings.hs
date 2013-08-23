@@ -4,12 +4,7 @@ where
 
 
 import qualified Data.HashMap.Lazy       as HashMap
-import           Data.Maybe              (fromMaybe)
 import           Unbound.LocallyNameless (unembed)
-
-import qualified Module
-import qualified Name
-import qualified Var
 
 import           CLaSH.Core.Var          (Var(..))
 import           CLaSH.Driver.Types
@@ -31,11 +26,10 @@ generateBindings primMap modName = do
                   $ map (\(v,e) ->
                           let v' = coreToBndr tcsMap v
                           in ( varName v'
-                             , ( moduleName $ Var.varName v
-                               , ( unembed $ varType v'
-                                 , coreToTerm primMap unlocatable dfunvars tcsMap e
-                                 )
+                             , ( unembed $ varType v'
+                               , coreToTerm primMap unlocatable dfunvars tcsMap e
                                )
+
                              )
                         ) bindings
 
@@ -62,13 +56,3 @@ generateBindings primMap modName = do
                      ) clsOps
 
   return (bindingsMap,dfunMap,clsOpMap)
-
-moduleName ::
-  Name.Name
-  -> String
-moduleName n = fromMaybe "_INTERNAL_" modName
-  where
-    modName = do
-      module_ <- Name.nameModule_maybe n
-      let moduleNm = Module.moduleName module_
-      return (Module.moduleNameString moduleNm)

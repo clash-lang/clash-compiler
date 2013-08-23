@@ -84,6 +84,8 @@ genComponent' compName componentExpr mStart = do
                           (`Text.append` (Text.pack "Component_"))
                           (`Text.append` (Text.pack "_"))
                      . mkBasicId
+                     . last
+                     . Text.splitOn (Text.pack ".")
                      . Text.pack
                      $ name2String compName
 

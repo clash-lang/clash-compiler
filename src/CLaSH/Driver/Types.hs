@@ -7,4 +7,4 @@ import CLaSH.Core.Type (Type,TyName)
 
 type DFunMap    = HashMap TmName (Type,(([TyName],[TmName]),[Term]))
 type ClassOpMap = HashMap TmName (Type,Int)
-type BindingMap = HashMap TmName (String,(Type,Term))
+type BindingMap = HashMap TmName (Type,Term)

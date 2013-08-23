@@ -51,14 +51,13 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
 
   case topEntities of
     [topEntity] -> do
-      let bindingsMap' = HashMap.map snd bindingsMap
       (supplyN,supplyTB) <- fmap (Supply.splitSupply . snd .  Supply.freshId) Supply.newSupply
 
       prepTime <- dfunMap `seq` Clock.getCurrentTime
       traceIf True ("Loading dependencies took " ++ show (Clock.diffUTCTime prepTime start)) $ return ()
 
       let transformedBindings
-            = runNormalization dbgLevel supplyN bindingsMap' dfunMap clsOpMap typeTrans
+            = runNormalization dbgLevel supplyN bindingsMap dfunMap clsOpMap typeTrans
             $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
@@ -74,7 +73,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
       traceIf True ("Netlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
 
       (testBench,vhdlState') <- genTestBench DebugNone supplyTB dfunMap clsOpMap primMap typeTrans vhdlState
-                                  bindingsMap'
+                                  bindingsMap
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
                                   (head $ filter (\(Component cName _ _ _ _) -> Text.isSuffixOf (Text.pack "topEntity_0") cName) netlist)
@@ -91,7 +90,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
             ; return (vhdlNms',vhdlDocs',typesPkgM')
             }
 
-      let dir = "./vhdl/" ++ (fst $ snd topEntity) ++ "/"
+      let dir = "./vhdl/" ++ (takeWhile (/= '.') $ name2String $ fst $ topEntity) ++ "/"
       prepareDir dir
       maybe (return ()) (\typesPkg -> writeVHDL dir ("types", typesPkg)) typesPkgM
       mapM_ (writeVHDL dir) (zip vhdlNms vhdlDocs)
