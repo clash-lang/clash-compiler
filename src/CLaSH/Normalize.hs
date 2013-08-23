@@ -18,6 +18,7 @@ import CLaSH.Driver.Types
 import CLaSH.Netlist.Types      (HWType)
 import CLaSH.Normalize.Strategy
 import CLaSH.Normalize.Types
+import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Types      (DebugLevel(..),RewriteState(..),dbgLevel,
   bindings,classOps,dictFuns)
 import CLaSH.Rewrite.Util       (liftRS,runRewrite,runRewriteSession)
@@ -109,3 +110,14 @@ usedGlobalBndrs tm = do
   clsOps <- fmap (HashMap.keys) $ Lens.use classOps
   dfuns  <- fmap (HashMap.keys) $ Lens.use dictFuns
   return . filter (`notElem` (clsOps ++ dfuns)) . Set.toList $ termFreeIds tm
+
+checkNonRecursive :: TmName
+                  -> [(TmName,(Type,Term))]
+                  -> NormalizeSession [(TmName,(Type,Term))]
+checkNonRecursive topEntity norm = do
+  clsOps <- fmap (HashMap.keys) $ Lens.use classOps
+  dfuns  <- fmap (HashMap.keys) $ Lens.use dictFuns
+  let cg = callGraph (clsOps ++ dfuns) (HashMap.fromList $ map (second snd) norm) topEntity
+  case recursiveComponents cg of
+    []  -> return norm
+    rcs -> error $ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs

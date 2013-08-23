@@ -23,7 +23,7 @@ import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.VHDL           (genVHDL,mkTyPackage)
 import           CLaSH.Netlist.Types          (Component(..),HWType)
-import           CLaSH.Normalize              (runNormalization, normalize, cleanupGraph)
+import           CLaSH.Normalize              (runNormalization, normalize, checkNonRecursive, cleanupGraph)
 import           CLaSH.Primitives.Types
 import           CLaSH.Rewrite.Types          (DebugLevel(..))
 import           CLaSH.Util
@@ -58,7 +58,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
 
       let transformedBindings
             = runNormalization dbgLevel supplyN bindingsMap dfunMap clsOpMap typeTrans
-            $ (normalize [fst topEntity]) >>= cleanupGraph [fst topEntity]
+            $ (normalize [fst topEntity]) >>= checkNonRecursive (fst topEntity) >>= cleanupGraph [fst topEntity]
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
       traceIf True ("Normalisation took " ++ show (Clock.diffUTCTime normTime prepTime)) $ return ()

@@ -1,14 +1,20 @@
+{-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Normalize.Util where
 
 import Control.Lens                ((.=),(%=))
 import qualified Control.Lens      as Lens
+import Data.HashMap.Lazy (HashMap)
+import qualified Data.Graph as Graph
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.List as      List
+import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import Unbound.LocallyNameless     (Fresh,aeq,embed,unbind,unembed)
 
 import CLaSH.Core.DataCon (dataConInstArgTys)
+import CLaSH.Core.FreeVars (termFreeIds)
 import CLaSH.Core.Term    (Term(..),TmName)
 import CLaSH.Core.TyCon   (TyCon(..),tyConDataCons)
 import CLaSH.Core.Type    (Type(..),TypeView(..),tyView,isFunTy)
@@ -111,3 +117,20 @@ reduceArgs _    (id1:ids) appE (Left (Var _ nm):args) | varName id1 == nm = redu
 reduceArgs True ids@(_:_) appE (Left arg:args)        = reduceArgs True ids (App appE arg) args
 reduceArgs _ _ _ _                                    = Nothing
 
+callGraph :: [TmName]
+          -> HashMap TmName Term
+          -> TmName
+          -> [(TmName,[TmName])]
+callGraph visited bindingMap root = node:other
+  where
+    rootTm = maybe (error $ show root ++ " is not a global binder") id $ HashMap.lookup root bindingMap
+    used   = Set.toList $ termFreeIds rootTm
+    node   = (root,used)
+    other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
+
+recursiveComponents :: [(TmName,[TmName])]
+                    -> [[TmName]]
+recursiveComponents = Maybe.catMaybes
+                    . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
+                    . Graph.stronglyConnComp
+                    . map (\(n,es) -> (n,n,es))
