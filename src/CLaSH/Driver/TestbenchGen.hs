@@ -179,9 +179,11 @@ termToList :: Monad m => Term -> EitherT String m [Term]
 termToList e = case (second lefts $ collectArgs e) of
   (Data dc,[])
     | name2String (dcName dc) == "[]" -> pure []
+    | name2String (dcName dc) == "Prelude.List.Nil" -> pure []
     | otherwise                                 -> errNoConstruct $(curLoc)
   (Data dc,[hdArg,tlArg])
     | name2String (dcName dc) == ":"  -> (hdArg:) <$> termToList tlArg
+    | name2String (dcName dc) == "Prelude.List.::"  -> (hdArg:) <$> termToList tlArg
     | otherwise                                 -> errNoConstruct $(curLoc)
   _ -> errNoConstruct $(curLoc)
   where
@@ -191,6 +193,7 @@ stimuliElemTy ::Monad m => Type -> EitherT String m Type
 stimuliElemTy ty = case splitTyConAppM ty of
   (Just (tc,[arg]))
     | name2String (tyConName tc) == "GHC.Types.[]" -> return arg
+    | name2String (tyConName tc) == "Prelude.List.List" -> return arg
     | otherwise -> left $ $(curLoc) ++ "Not a List TyCon: " ++ showDoc ty
   _ -> left $ $(curLoc) ++ "Not a List TyCon: " ++ showDoc ty
 
