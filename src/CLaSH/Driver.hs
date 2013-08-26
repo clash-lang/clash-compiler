@@ -72,7 +72,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
       netlistTime <- netlist `seq` Clock.getCurrentTime
       traceIf True ("Netlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
 
-      (testBench,vhdlState') <- genTestBench DebugNone supplyTB dfunMap clsOpMap primMap typeTrans vhdlState
+      (testBench,vhdlState') <- genTestBench dbgLevel supplyTB dfunMap clsOpMap primMap typeTrans vhdlState
                                   bindingsMap
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
