@@ -38,11 +38,14 @@ genVHDL c = do
 mkTyPackage :: ([Doc],[Doc])
             -> VHDLM Doc
 mkTyPackage (pkgDecs,pkgBodyDecs) =
+   "library IEEE" <$>
+   "use IEEE.STD_LOGIC_1164.ALL" <$>
+   "use IEEE.NUMERIC_STD.ALL" <$$> linebreak <>
    "package" <+> "types" <+> "is" <$>
       vcat (punctuate linebreak (return pkgDecs)) <$>
-   "end" <> packageBodyDec pkgBodyDecs
+   "end" <> semi <> packageBodyDec pkgBodyDecs
   where
-    packageBodyDec []   = semi
+    packageBodyDec []   = empty
     packageBodyDec decs = linebreak <$>
       "package" <+> "body" <+> "types" <+> "is" <$>
         vcat (punctuate linebreak (return decs)) <$>
