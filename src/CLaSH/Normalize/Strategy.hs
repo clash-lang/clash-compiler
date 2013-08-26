@@ -7,7 +7,7 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = representable >-> simplification
+normalization = representable >-> simplification >-> (apply "recToLetrec" recToLetRec)
 
 cleanup :: NormRewrite
 cleanup = repeatR $ topdownR (apply "inlineWrapper" inlineWrapper)

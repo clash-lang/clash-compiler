@@ -169,3 +169,13 @@ isPrimFun ::
   -> Bool
 isPrimFun (Prim (PrimFun _ _)) = True
 isPrimFun _                    = False
+
+idToVar :: Id
+        -> Term
+idToVar (Id nm tyE) = Var (unembed tyE) nm
+idToVar tv          = error $ $(curLoc) ++ "idToVar: tyVar: " ++ showDoc tv
+
+varToId :: Term
+        -> Id
+varToId (Var ty nm) = Id nm (embed ty)
+varToId e           = error $ $(curLoc) ++ "varToId: not a var: " ++ showDoc e

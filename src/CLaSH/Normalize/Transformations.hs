@@ -22,6 +22,7 @@ module CLaSH.Normalize.Transformations
   , inlineWrapper
   , classOpResolution
   , inlineSingularDFun
+  , recToLetRec
   )
 where
 
@@ -43,7 +44,7 @@ import CLaSH.Core.Prim       (Prim(..))
 import CLaSH.Core.Subst      (substTm,substTyInTm,substTysinTm,substTms)
 import CLaSH.Core.Term       (Term(..),LetBinding,Pat(..))
 import CLaSH.Core.Type       (splitFunTy,applyFunTy,applyTy,isDictType)
-import CLaSH.Core.Util       (collectArgs,mkApps,isFun,termType,isVar,isCon,isLet,isPrim)
+import CLaSH.Core.Util       (collectArgs,mkApps,mkLams,mkTmApps,isFun,termType,isVar,isCon,isLet,isPrim,idToVar)
 import CLaSH.Core.Var        (Var(..),Id)
 import CLaSH.Netlist.Util    (representableType,splitNormalized)
 import CLaSH.Normalize.Types
@@ -588,3 +589,23 @@ etaExpansionTL ctx e
         e' <- runR $ etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
         changed . Lam $ bind newIdB e'
       False -> return e
+
+recToLetRec :: NormRewrite
+recToLetRec [] e = R $ do
+  fn <- liftR $ Lens.use curFun
+  bodyM       <- fmap (HashMap.lookup fn) $ Lens.use bindings
+  normalizedE <- splitNormalized e
+  case (normalizedE,bodyM) of
+    (Right ((args,bndrs,res)), Just (bodyTy,_)) -> do
+      let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)
+          (toInline,others) = List.partition ((==) appF . unembed . snd) bndrs
+          resV              = idToVar res
+      case (toInline,others) of
+        ((_:_),(_:_)) -> do
+          let substsInline = map (\(id_,_) -> (varName id_,resV)) toInline
+              others'      = map (second (embed . substTms substsInline . unembed)) others
+          changed $ mkLams (Letrec $ bind (rec others') resV) args
+        _ -> return e
+    _ -> return e
+
+recToLetRec _ e = return e
