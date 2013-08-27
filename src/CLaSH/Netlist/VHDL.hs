@@ -7,6 +7,7 @@ module CLaSH.Netlist.VHDL where
 import qualified Control.Applicative as A
 import Control.Lens hiding (Indexed)
 import Control.Monad.State
+import Data.Graph.Inductive (Gr,mkGraph,topsort')
 import qualified Data.HashMap.Lazy as HashMap
 import Data.List (nub)
 import Data.Maybe (catMaybes)
@@ -20,7 +21,7 @@ import CLaSH.Util (makeCached,(<:>))
 
 type VHDLM a = State VHDLState a
 
-genVHDL :: Component -> VHDLM (String,(Maybe Doc,Maybe Doc),Doc)
+genVHDL :: Component -> VHDLM (String,[HWType],Doc)
 genVHDL c = do
     _2 .= cName
     (unpack $ cName,,) A.<$> vhdlTys A.<*> vhdl
@@ -35,38 +36,53 @@ genVHDL c = do
             :  map snd (inputs c)
             ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
 
-mkTyPackage :: ([Doc],[Doc])
+mkTyPackage :: [HWType]
             -> VHDLM Doc
-mkTyPackage (pkgDecs,pkgBodyDecs) =
+mkTyPackage hwtys =
    "library IEEE" <$>
    "use IEEE.STD_LOGIC_1164.ALL" <$>
    "use IEEE.NUMERIC_STD.ALL" <$$> linebreak <>
    "package" <+> "types" <+> "is" <$>
-      vcat (punctuate linebreak (return pkgDecs)) <$>
-   "end" <> semi <> packageBodyDec pkgBodyDecs
+      packageDec <$>
+   "end" <> semi <> packageBodyDec
   where
-    packageBodyDec []   = empty
-    packageBodyDec decs = linebreak <$>
-      "package" <+> "body" <+> "types" <+> "is" <$>
-        vcat (punctuate linebreak (return decs)) <$>
-      "end" <> semi
+    hwTysSorted = topSortHWTys hwtys
+    packageDec  = indent 2 (vcat $ mapM tyDec hwTysSorted)
 
-tyPackage :: Text -> [HWType] -> VHDLM (Maybe Doc,Maybe Doc)
+    packageBodyDec = do
+      funDecs <- catMaybes A.<$> mapM funDec hwTysSorted
+      case funDecs of
+        [] -> empty
+        _  -> linebreak <$>
+              "package" <+> "body" <+> "types" <+> "is" <$>
+                indent 2 (vcat $ return funDecs) <$>
+              "end" <> semi
+
+topSortHWTys :: [HWType]
+             -> [HWType]
+topSortHWTys hwtys = sorted
+  where
+    nodes  = zip [0..] hwtys
+    nodesI = HashMap.fromList (zip hwtys [0..])
+    edges  = concatMap edge hwtys
+    graph  = mkGraph nodes edges :: Gr HWType ()
+    sorted = reverse $ topsort' graph
+
+    edge t@(Vector _ elTy) = maybe [] ((:[]) . (nodesI HashMap.! t,,())) (HashMap.lookup elTy nodesI)
+    edge t@(Product _ tys) = let ti = nodesI HashMap.! t
+                             in catMaybes $ map (\ty -> HashMap.lookup ty nodesI >>= (return . (ti,,()))) tys
+    edge t@(SP _ ctys)     = let ti = nodesI HashMap.! t
+                             in concatMap (\(_,tys) -> catMaybes $ map (\ty -> HashMap.lookup ty nodesI >>= (return . (ti,,()))) tys) ctys
+    edge _                 = []
+
+
+tyPackage :: Text -> [HWType] -> VHDLM [HWType]
 tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst)) $ use _3
                          let needsDec = nub $ concatMap needsTyDec tys
                              newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
-                         case newDec of
-                            [] -> return (Nothing,Nothing)
-                            _  -> do pDec      <- Just A.<$> (packageDec newDec)
-                                     newDecFun <- fmap catMaybes $ mapM funDec newDec
-                                     pbDec     <- case newDecFun of
-                                                    [] -> return Nothing
-                                                    _  -> Just A.<$> packageBodyDec (return newDecFun)
-                                     return (pDec,pbDec)
-
-  where
-    packageDec     ntys = indent 2 (vcat $ mapM tyDec ntys)
-    packageBodyDec ntys = indent 2 (vcat ntys)
+                         _ <- mapM tyDec newDec
+                         _ <- mapM funDec newDec
+                         return newDec
 
 needsTyDec :: HWType -> [HWType]
 needsTyDec (Vector _ Bit)     = []

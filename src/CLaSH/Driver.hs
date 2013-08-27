@@ -5,7 +5,7 @@
 module CLaSH.Driver where
 
 import           Control.Monad.State          (evalState)
-import           Data.Maybe                   (catMaybes,listToMaybe)
+import           Data.Maybe                   (listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
 import qualified Data.HashMap.Lazy            as HashMap
 import           Data.List                    (isSuffixOf)
@@ -82,11 +82,11 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
       traceIf True ("Testbench generation took " ++ show (Clock.diffUTCTime testBenchTime netlistTime)) $ return ()
 
       let (vhdlNms,vhdlDocs,typesPkgM) = flip evalState vhdlState' $ do
-            { (vhdlNms',typeDocsM,vhdlDocs') <- fmap unzip3 $ mapM genVHDL (netlist ++ testBench)
-            ; let (typeDecDocs,typeBodyDocs) = ((catMaybes >< catMaybes) . unzip) typeDocsM
-            ; typesPkgM'  <- case typeDecDocs of
+            { (vhdlNms',hwtys,vhdlDocs') <- fmap unzip3 $ mapM genVHDL (netlist ++ testBench)
+            ; let hwtys' = concat hwtys
+            ; typesPkgM'  <- case hwtys' of
                               [] -> return Nothing
-                              _  -> Just <$> mkTyPackage (typeDecDocs,typeBodyDocs)
+                              _  -> Just <$> mkTyPackage hwtys'
             ; return (vhdlNms',vhdlDocs',typesPkgM')
             }
 
