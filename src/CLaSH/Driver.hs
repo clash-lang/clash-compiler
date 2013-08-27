@@ -4,16 +4,16 @@
 {-# LANGUAGE TemplateHaskell     #-}
 module CLaSH.Driver where
 
-import           Control.Monad.State          (evalState)
-import           Data.Maybe                   (listToMaybe)
 import qualified Control.Concurrent.Supply    as Supply
+import           Control.Monad.State          (evalState)
 import qualified Data.HashMap.Lazy            as HashMap
 import           Data.List                    (isSuffixOf)
+import           Data.Maybe                   (listToMaybe)
 import qualified Data.Text.Lazy               as Text
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
 import qualified System.IO                    as IO
-import           Text.PrettyPrint.Leijen.Text (Doc,hPutDoc)
+import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
 import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Term              (TmName)
@@ -21,14 +21,15 @@ import           CLaSH.Core.Type              (Type)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
-import           CLaSH.Netlist.VHDL           (genVHDL,mkTyPackage)
-import           CLaSH.Netlist.Types          (Component(..),HWType)
-import           CLaSH.Normalize              (runNormalization, normalize, checkNonRecursive, cleanupGraph)
+import           CLaSH.Netlist.Types          (Component (..), HWType)
+import           CLaSH.Netlist.VHDL           (genVHDL, mkTyPackage)
+import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
+                                               normalize, runNormalization)
 import           CLaSH.Primitives.Types
-import           CLaSH.Rewrite.Types          (DebugLevel(..))
+import           CLaSH.Rewrite.Types          (DebugLevel (..))
 import           CLaSH.Util
 
-import qualified Data.Time.Clock as Clock
+import qualified Data.Time.Clock              as Clock
 
 generateVHDL :: BindingMap
              -> ClassOpMap
@@ -58,12 +59,12 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
 
       let transformedBindings
             = runNormalization dbgLevel supplyN bindingsMap dfunMap clsOpMap typeTrans
-            $ (normalize [fst topEntity]) >>= checkNonRecursive (fst topEntity) >>= cleanupGraph [fst topEntity]
+            $ normalize [fst topEntity] >>= checkNonRecursive (fst topEntity) >>= cleanupGraph [fst topEntity]
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
       traceIf True ("Normalisation took " ++ show (Clock.diffUTCTime normTime prepTime)) $ return ()
 
-      (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList $ transformedBindings)
+      (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList transformedBindings)
                               primMap
                               typeTrans
                               Nothing
@@ -90,7 +91,7 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
             ; return (vhdlNms',vhdlDocs',typesPkgM')
             }
 
-      let dir = "./vhdl/" ++ (takeWhile (/= '.') $ name2String $ fst $ topEntity) ++ "/"
+      let dir = "./vhdl/" ++ takeWhile (/= '.') (name2String $ fst topEntity) ++ "/"
       prepareDir dir
       maybe (return ()) (\typesPkg -> writeVHDL dir ("types", typesPkg)) typesPkgM
       mapM_ (writeVHDL dir) (zip vhdlNms vhdlDocs)

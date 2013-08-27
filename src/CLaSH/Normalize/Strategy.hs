@@ -7,7 +7,7 @@ import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
 normalization :: NormRewrite
-normalization = representable >-> simplification >-> (apply "recToLetrec" recToLetRec)
+normalization = representable >-> simplification >-> apply "recToLetrec" recToLetRec
 
 cleanup :: NormRewrite
 cleanup = repeatR $ topdownR (apply "inlineWrapper" inlineWrapper)
@@ -16,8 +16,8 @@ representable :: NormRewrite
 representable = (clsOpRes >-> propagagition >-> specialisation) !->
                 repeatR (clsOpRes !-> (propagagition >-> specialisation))
   where
-    clsOpRes = (bottomupR $ apply "classOpResolution"  classOpResolution) >->
-               (bottomupR $ apply "inlineSingularDFun" inlineSingularDFun)
+    clsOpRes = bottomupR (apply "classOpResolution"  classOpResolution) >->
+               bottomupR (apply "inlineSingularDFun" inlineSingularDFun)
 
     propagagition = repeatR ( upDownR  (apply "propagation" appProp) >->
                               repeatBottomup [ ("bindNonRep"   , bindNonRep )

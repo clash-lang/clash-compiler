@@ -1,9 +1,9 @@
 module CLaSH.Core.Subst where
 
-import Unbound.LocallyNameless (subst,substs)
+import                Unbound.LocallyNameless (subst, substs)
 
-import CLaSH.Core.Term (Term,TmName)
-import {-# SOURCE #-} CLaSH.Core.Type (Type,Kind,TyName,KiName)
+import                CLaSH.Core.Term         (Term, TmName)
+import {-# SOURCE #-} CLaSH.Core.Type         (KiName, Kind, TyName, Type)
 
 substTys ::
   [(TyName,Type)]

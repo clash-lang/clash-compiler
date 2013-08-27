@@ -2,37 +2,39 @@
 {-# LANGUAGE TupleSections   #-}
 module CLaSH.Netlist where
 
-import           Control.Applicative     (liftA2)
-import           Control.Lens            ((.=),_2)
-import qualified Control.Lens            as Lens
-import qualified Control.Monad           as Monad
-import           Control.Monad.State     (runStateT)
-import           Control.Monad.Writer    (runWriterT,listen)
+import           Control.Applicative        (liftA2)
+import           Control.Lens               ((.=), _2)
+import qualified Control.Lens               as Lens
+import qualified Control.Monad              as Monad
+import           Control.Monad.State        (runStateT)
+import           Control.Monad.Writer       (listen, runWriterT)
 import qualified Data.ByteString.Lazy.Char8 as LZ
-import           Data.Either             (partitionEithers)
-import           Data.HashMap.Lazy       (HashMap)
-import qualified Data.HashMap.Lazy       as HashMap
-import           Data.List               (elemIndex,nub)
-import           Data.Maybe              (fromMaybe)
-import qualified Data.Text.Lazy          as Text
-import           Unbound.LocallyNameless (Embed(..),name2String,string2Name,runFreshMT,unembed,unbind,unrebind)
+import           Data.Either                (partitionEithers)
+import           Data.HashMap.Lazy          (HashMap)
+import qualified Data.HashMap.Lazy          as HashMap
+import           Data.List                  (elemIndex, nub)
+import           Data.Maybe                 (fromMaybe)
+import qualified Data.Text.Lazy             as Text
+import           Unbound.LocallyNameless    (Embed (..), name2String,
+                                             runFreshMT, string2Name, unbind,
+                                             unembed, unrebind)
 
-import CLaSH.Core.DataCon   (DataCon(..))
-import CLaSH.Core.Literal   (Literal(..))
-import CLaSH.Core.Pretty    (showDoc)
-import CLaSH.Core.Prim      (Prim(..))
-import qualified CLaSH.Core.Term as Core
-import CLaSH.Core.Term      (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type      (Type)
-import CLaSH.Core.Util      (collectArgs,isVar,termType)
-import CLaSH.Core.Var       (Id,Var(..))
-import CLaSH.Netlist.BlackBox
-import CLaSH.Netlist.Id
-import CLaSH.Netlist.Types as HW
-import CLaSH.Netlist.Util
-import CLaSH.Normalize.Util
-import CLaSH.Primitives.Types as P
-import CLaSH.Util
+import           CLaSH.Core.DataCon         (DataCon (..))
+import           CLaSH.Core.Literal         (Literal (..))
+import           CLaSH.Core.Pretty          (showDoc)
+import           CLaSH.Core.Prim            (Prim (..))
+import           CLaSH.Core.Term            (Pat (..), Term (..), TmName)
+import qualified CLaSH.Core.Term            as Core
+import           CLaSH.Core.Type            (Type)
+import           CLaSH.Core.Util            (collectArgs, isVar, termType)
+import           CLaSH.Core.Var             (Id, Var (..))
+import           CLaSH.Netlist.BlackBox
+import           CLaSH.Netlist.Id
+import           CLaSH.Netlist.Types        as HW
+import           CLaSH.Netlist.Util
+import           CLaSH.Normalize.Util
+import           CLaSH.Primitives.Types     as P
+import           CLaSH.Util
 
 genNetlist :: Maybe VHDLState
            -> HashMap TmName (Type,Term)
@@ -43,7 +45,7 @@ genNetlist :: Maybe VHDLState
            -> IO ([Component],VHDLState)
 genNetlist vhdlStateM globals primMap typeTrans mStart topEntity = do
   (_,s) <- runNetlistMonad vhdlStateM globals primMap typeTrans $ genComponent topEntity mStart
-  return $ (HashMap.elems $ _components s, _vhdlMState s)
+  return (HashMap.elems $ _components s, _vhdlMState s)
 
 runNetlistMonad :: Maybe VHDLState
                 -> HashMap TmName (Type,Term)
@@ -53,11 +55,11 @@ runNetlistMonad :: Maybe VHDLState
                 -> IO (a,NetlistState)
 runNetlistMonad vhdlStateM s p typeTrans
   = runFreshMT
-  . (flip runStateT) s'
+  . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (maybe (0,Text.empty,HashMap.empty) id vhdlStateM) typeTrans
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (fromMaybe (0,Text.empty,HashMap.empty) vhdlStateM) typeTrans
 
 genComponent ::
   TmName
@@ -81,8 +83,8 @@ genComponent' compName componentExpr mStart = do
 
   let componentName' = (`Text.append` (Text.pack $ show componentNumber))
                      . ifThenElse Text.null
-                          (`Text.append` (Text.pack "Component_"))
-                          (`Text.append` (Text.pack "_"))
+                          (`Text.append` Text.pack "Component_")
+                          (`Text.append` Text.pack "_")
                      . mkBasicId
                      . last
                      . Text.splitOn (Text.pack ".")
@@ -99,20 +101,20 @@ genComponent' compName componentExpr mStart = do
 
   let ids = HashMap.fromList
           $ map (\(Id v (Embed t)) -> (v,t))
-          $ arguments ++ (map fst binders)
+          $ arguments ++ map fst binders
 
-  gamma <- (ids `HashMap.union`) . (HashMap.map fst)
+  gamma <- (ids `HashMap.union`) . HashMap.map fst
            <$> Lens.use bindings
 
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  let resType  = coreTypeToHWType_unsafe typeTrans $ ids HashMap.! result
-      argTypes = map (\(Id _ (Embed t)) -> coreTypeToHWType_unsafe typeTrans t) arguments
+  let resType  = unsafeCoreTypeToHWType typeTrans $ ids HashMap.! result
+      argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType typeTrans t) arguments
 
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
-                                (coreTypeToHWType_unsafe typeTrans . unembed $ varType id_)
+                                (unsafeCoreTypeToHWType typeTrans . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkConcSm . second unembed) binders
@@ -136,9 +138,9 @@ mkConcSm bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
       selId    = mkBasicId . Text.pack $ name2String scrutNm
       modifier = case pat of
         DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
-                                  in case (elemIndex (Id varTm (Embed varTy)) tms) of
+                                  in case elemIndex (Id varTm (Embed varTy)) tms of
                                        Nothing -> Nothing
-                                       Just fI -> Just (Indexed (coreTypeToHWType_unsafe typeTrans scrutTy,dcTag dc - 1,fI))
+                                       Just fI -> Just (Indexed (unsafeCoreTypeToHWType typeTrans scrutTy,dcTag dc - 1,fI))
         _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
@@ -147,7 +149,7 @@ mkConcSm bndr (Case scrut ty alts) = do
   alts'   <- mapM unbind alts
   scrutTy <- termType scrut
   (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
-  scrutHTy <- coreTypeToHWTypeM_unsafe scrutTy
+  scrutHTy <- unsafeCoreTypeToHWTypeM scrutTy
   (exprs,altsDecls)      <- fmap (second concat . unzip) $ mapM (mkCondExpr (scrutExpr,scrutHTy)) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
@@ -196,16 +198,15 @@ mkFunApp dst fun args = do
   case HashMap.lookup fun normalized of
     Just _ -> do
       (Component compName hidden compInps compOutp _) <- preserveVHDLState $ genComponent fun Nothing
-      case length args == length compInps of
-        True  ->
-          let dstId         = mkBasicId . Text.pack . name2String $ varName dst
-              args'         = map varToExpr args
-              hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-              inpAssigns    = zip (map fst compInps) args'
-              outpAssign    = (fst compOutp,Identifier dstId Nothing)
-              instDecl      = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
-          in return [instDecl]
-        False -> error $ $(curLoc) ++ "under-applied normalized function"
+      if length args == length compInps
+        then let dstId         = mkBasicId . Text.pack . name2String $ varName dst
+                 args'         = map varToExpr args
+                 hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
+                 inpAssigns    = zip (map fst compInps) args'
+                 outpAssign    = (fst compOutp,Identifier dstId Nothing)
+                 instDecl      = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
+             in return [instDecl]
+        else error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of
       [] -> do
         let dstId = mkBasicId . Text.pack . name2String $ varName dst
@@ -224,7 +225,7 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
 
 mkExpr ty app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  hwTy <- coreTypeToHWTypeM_unsafe ty
+  hwTy <- unsafeCoreTypeToHWTypeM ty
   args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
   case appF of
     Data dc
@@ -266,40 +267,40 @@ mkDcApplication dstHType dc args = do
   fmap (,argDecls) $! case dstHType of
     SP _ dcArgPairs -> do
       let dcNameBS = Text.pack . name2String $ dcName dc
-      let dcI      = dcTag dc - 1
-      let dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-      case (compare (length dcArgs) (length argExprs)) of
+          dcI      = dcTag dc - 1
+          dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
+      case compare (length dcArgs) (length argExprs) of
         EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)
         LT -> error $ $(curLoc) ++ "Over-applied constructor"
         GT -> error $ $(curLoc) ++ "Under-applied constructor"
-    Product _ dcArgs -> do
-      case (compare (length dcArgs) (length argExprs)) of
+    Product _ dcArgs ->
+      case compare (length dcArgs) (length argExprs) of
         EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,0)) argExprs)
         LT -> error $ $(curLoc) ++ "Over-applied constructor"
         GT -> error $ $(curLoc) ++ "Under-applied constructor"
-    Sum _ dcs -> do
+    Sum _ dcs ->
       let dcNameBS = Text.pack . name2String $ dcName dc
-      let dcI = fromMaybe (error "Sum: dc not found") $ elemIndex dcNameBS dcs
-      return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) [])
-    Bool -> do
-      let dc' = case (name2String $ dcName dc) of
+          dcI = fromMaybe (error "Sum: dc not found") $ elemIndex dcNameBS dcs
+      in  return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) [])
+    Bool ->
+      let dc' = case name2String $ dcName dc of
                  "True"  -> HW.Literal Nothing (BoolLit True)
                  "False" -> HW.Literal Nothing (BoolLit False)
                  _ -> error $ $(curLoc) ++ "unknown bool literal: " ++ show dc
-      return dc'
-    Bit -> do
-      let dc' = case (name2String $ dcName dc) of
+      in  return dc'
+    Bit ->
+      let dc' = case name2String $ dcName dc of
                  "H" -> HW.Literal Nothing (BitLit H)
                  "L" -> HW.Literal Nothing (BitLit L)
                  _ -> error $ $(curLoc) ++ "unknown bit literal: " ++ show dc
-      return dc'
-    Integer -> do
-      let dc' = case (name2String $ dcName dc) of
+      in return dc'
+    Integer ->
+      let dc' = case name2String $ dcName dc of
                   "S#" -> Nothing
                   _    -> error $ $(curLoc) ++ "not a simple integer: " ++ show dc
-      return (HW.DataCon dstHType dc' argExprs)
+      in return (HW.DataCon dstHType dc' argExprs)
     Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
-    Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [(head argExprs)])
+    Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
     Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
 
     _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show dstHType

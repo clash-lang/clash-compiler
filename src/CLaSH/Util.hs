@@ -7,18 +7,17 @@
 
 module CLaSH.Util
   ( module CLaSH.Util
-  , module Control.Applicative
-  , module Control.Arrow
-  , module Control.Monad
+  , module X
   , makeLenses
   )
 where
 
-import Control.Applicative            (Applicative,(<$>),(<*>),pure)
-import Control.Arrow                  (first,second)
-import Control.Monad                  ((<=<),(>=>))
+import Control.Applicative            as X (Applicative,(<$>),(<*>),pure)
+import Control.Arrow                  as X (first,second)
+import Control.Monad                  as X ((<=<),(>=>))
 import Control.Monad.State            (MonadState,State,runState)
 import Control.Monad.Trans.Class      (MonadTrans,lift)
+import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable(..),hash)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
@@ -58,7 +57,7 @@ makeCached key l create = do
     Just value -> return value
     Nothing -> do
       value <- create
-      l %= (HashMapL.insert key value)
+      l %= HashMapL.insert key value
       return value
 
 makeCachedT3 ::
@@ -76,10 +75,11 @@ makeCachedT3 key l create = do
     Just value -> return value
     Nothing -> do
       value <- create
-      (lift . lift . lift) $ l %= (HashMapL.insert key value)
+      (lift . lift . lift) $ l %= HashMapL.insert key value
       return value
 
-makeCachedT3_strict ::
+-- | Spine-strict cache variant of 'mkCachedT3'
+makeCachedT3' ::
   ( MonadTrans t2, MonadTrans t1, MonadTrans t
   , Eq k, Hashable k
   , MonadState s m
@@ -88,13 +88,13 @@ makeCachedT3_strict ::
   -> Lens' s (HashMap k v)
   -> (t (t1 (t2 m))) v
   -> (t (t1 (t2 m))) v
-makeCachedT3_strict key l create = do
+makeCachedT3' key l create = do
   cache <- (lift . lift . lift) $ use l
   case HashMapS.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      (lift . lift . lift) $ l %= (HashMapS.insert key value)
+      (lift . lift . lift) $ l %= HashMapS.insert key value
       return value
 
 liftState :: (MonadState s m)
@@ -119,7 +119,7 @@ firstM ::
   => (a -> f c)
   -> (a, b)
   -> f (c, b)
-firstM f (x,y) = fmap (flip (,) $ y) (f x)
+firstM f (x,y) = fmap (flip (,) y) (f x)
 
 traceIf :: Bool -> String -> a -> a
 traceIf True  msg = trace msg

@@ -1,10 +1,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module CLaSH.Core.DataCon where
 
-import Unbound.LocallyNameless
+import                Unbound.LocallyNameless
 
-import {-# SOURCE #-} CLaSH.Core.Term (Term)
-import {-# SOURCE #-} CLaSH.Core.Type (Type)
+import {-# SOURCE #-} CLaSH.Core.Term         (Term)
+import {-# SOURCE #-} CLaSH.Core.Type         (Type)
 
 data DataCon
 

@@ -10,12 +10,13 @@
 module CLaSH.Core.TyCon where
 
 -- External Import
-import Unbound.LocallyNameless as Unbound
+import                Unbound.LocallyNameless as Unbound
 
 -- Internal Imports
-import {-# SOURCE #-} CLaSH.Core.DataCon  (DataCon)
-import {-# SOURCE #-} CLaSH.Core.Term     (Term)
-import {-# SOURCE #-} CLaSH.Core.Type     (Kind,Type,TyName)
+import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
+import {-# SOURCE #-} CLaSH.Core.Term         (Term)
+import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
+import                CLaSH.Util
 
 data TyCon
   = AlgTyCon
@@ -34,17 +35,17 @@ data TyCon
   }
 
   | SuperKindTyCon
-  { tyConName   :: TyConName
+  { tyConName :: TyConName
   }
 
 instance Show TyCon where
-  show tc = show (tyConName tc)
+  show = show . tyConName
 
 instance Eq TyCon where
-  tc1 == tc2 = (tyConName tc1) == (tyConName tc2)
+  (==) = (==) `on` tyConName
 
 instance Ord TyCon where
-  compare tc1 tc2 = compare (tyConName tc1) (tyConName tc2)
+  compare = compare `on` tyConName
 
 type TyConName = Name TyCon
 
@@ -101,7 +102,7 @@ mkKindTyCon name kind
 mkSuperKindTyCon ::
   TyConName
   -> TyCon
-mkSuperKindTyCon name = SuperKindTyCon name
+mkSuperKindTyCon = SuperKindTyCon
 
 mkPrimTyCon ::
   TyConName

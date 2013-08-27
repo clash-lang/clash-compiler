@@ -1,38 +1,41 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
 module CLaSH.Driver.TestbenchGen where
 
-import           Control.Concurrent.Supply   (Supply)
-import           Control.Error               (EitherT,eitherT,hoistEither,left,note,right)
-import           Control.Monad.Trans.Class   (lift)
-import           Data.Either                 (lefts)
-import           Data.List                   (intersperse)
-import           Data.HashMap.Lazy           (HashMap)
-import qualified Data.HashMap.Lazy           as HashMap
-import           Data.Maybe                  (catMaybes)
-import qualified Data.Text.Lazy.Builder.RealFloat as Builder
+import           Control.Concurrent.Supply        (Supply)
+import           Control.Error                    (EitherT, eitherT,
+                                                   hoistEither, left, note,
+                                                   right)
+import           Control.Monad.Trans.Class        (lift)
+import           Data.Either                      (lefts)
+import           Data.HashMap.Lazy                (HashMap)
+import qualified Data.HashMap.Lazy                as HashMap
+import           Data.List                        (intersperse)
+import           Data.Maybe                       (mapMaybe)
 import qualified Data.Text.Lazy.Builder           as Builder
+import qualified Data.Text.Lazy.Builder.RealFloat as Builder
+import           Text.PrettyPrint.Leijen.Text     ((<+>), (<>))
 import qualified Text.PrettyPrint.Leijen.Text     as PP
-import           Text.PrettyPrint.Leijen.Text     ((<+>),(<>))
-import           Unbound.LocallyNameless     (bind,makeName,name2String,name2Integer,rec,unrec)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+import           Unbound.LocallyNameless          (bind, makeName, name2Integer,
+                                                   name2String, rec, unrec)
+import           Unbound.LocallyNameless.Ops      (unsafeUnbind)
 
-import CLaSH.Core.DataCon
-import CLaSH.Core.Pretty
-import CLaSH.Core.Term
-import CLaSH.Core.TyCon
-import CLaSH.Core.Type
-import CLaSH.Core.Util
+import           CLaSH.Core.DataCon
+import           CLaSH.Core.Pretty
+import           CLaSH.Core.Term
+import           CLaSH.Core.TyCon
+import           CLaSH.Core.Type
+import           CLaSH.Core.Util
 
-import CLaSH.Driver.Types
-import CLaSH.Netlist
-import CLaSH.Netlist.Types as N
-import CLaSH.Normalize (runNormalization,normalize,cleanupGraph)
-import CLaSH.Primitives.Types
-import CLaSH.Rewrite.Types
+import           CLaSH.Driver.Types
+import           CLaSH.Netlist
+import           CLaSH.Netlist.Types              as N
+import           CLaSH.Normalize                  (cleanupGraph, normalize,
+                                                   runNormalization)
+import           CLaSH.Primitives.Types
+import           CLaSH.Rewrite.Types
 
-import CLaSH.Util
+import           CLaSH.Util
 
 genTestBench :: DebugLevel
              -> Supply
@@ -74,8 +77,8 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState globals 
                    , "begin"
                    , PP.indent 2 ( PP.vsep $
                                    map (<> PP.semi) $
-                                   concat [ ["wait for" <+> (renderFloat2Dec $ rateF * 0.4) <+> "ns" ]
-                                            , intersperse ("wait for" <+> (renderFloat2Dec rateF) <+> "ns") asserts
+                                   concat [ ["wait for" <+> renderFloat2Dec (rateF * 0.4) <+> "ns" ]
+                                            , intersperse ("wait for" <+> renderFloat2Dec rateF <+> "ns") asserts
                                             , ["wait"]
                                             ]
                                  )
@@ -84,13 +87,13 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState globals 
         procDecl' = BlackBoxD (PP.displayT $ PP.renderPretty 0.4 80 procDecl)
     return (procDecl':decls,comps,vhdlState'',length sigVs)
 
-  let finExpr = "'1' after" <+> (renderFloat2Dec (rateF * ((fromIntegral $ max inpCnt expCnt) - 0.5))) <+> "ns"
+  let finExpr = "'1' after" <+> renderFloat2Dec (rateF * (fromIntegral (max inpCnt expCnt) - 0.5)) <+> "ns"
       finDecl = [ NetDecl "finished" Bit (Just (N.Literal Nothing (BitLit L)))
                 , Assignment "finished" (BlackBoxE (PP.displayT $ PP.renderCompact finExpr) Nothing)
                 , Assignment "done" (Identifier "finished" Nothing)
                 ]
 
-      clkExpr = "not" <+> PP.text clkName <+> "after" <+> (renderFloat2Dec $ rateF * 0.5) <+> "ns when finished = '0'"
+      clkExpr = "not" <+> PP.text clkName <+> "after" <+> renderFloat2Dec (rateF * 0.5) <+> "ns when finished = '0'"
       clkDecl = [ NetDecl clkName (Clock rate) (Just (N.Literal Nothing (BitLit L)))
                 , Assignment clkName (BlackBoxE (PP.displayT $ PP.renderCompact clkExpr) Nothing)
                 ]
@@ -102,8 +105,8 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState globals 
       retDecl = [ NetDecl rstName Bit Nothing
                 , Assignment rstName (BlackBoxE (PP.displayT $ PP.renderCompact retExpr) Nothing)
                 ]
-      ioDecl  = [ NetDecl (fst inp) (snd inp) Nothing
-                , NetDecl (fst outp) (snd outp) Nothing
+      ioDecl  = [ uncurry NetDecl inp  Nothing
+                , uncurry NetDecl outp Nothing
                 ]
 
       instDecl = InstDecl cName "totest"
@@ -133,7 +136,7 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState globals 
 genTestBench _ _ _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
 
 renderFloat2Dec :: Float -> PP.Doc
-renderFloat2Dec = PP.text . Builder.toLazyText . (Builder.formatRealFloat Builder.Fixed (Just 2))
+renderFloat2Dec = PP.text . Builder.toLazyText . Builder.formatRealFloat Builder.Fixed (Just 2)
 
 genAssert :: Identifier -> Identifier -> PP.Doc
 genAssert compO expV = PP.hsep
@@ -170,13 +173,14 @@ prepareSignals vhdlState primMap globals typeTrans normalizeSignal mStart signal
   let signalK  = name2Integer signalNm
       elemNms  = map (\i -> makeName (signalS ++ show i) signalK) [(0::Int)..]
       elemBnds = zipWith (\nm e -> (nm,(elemTy,e))) elemNms signalList
-      signalList_normalized = map (normalizeSignal (HashMap.fromList elemBnds `HashMap.union` globals))
-                                  (map fst elemBnds)
+      signalList_normalized = map (normalizeSignal (HashMap.fromList elemBnds `HashMap.union` globals)
+                                  . fst
+                                  ) elemBnds
 
   lift $ createSignal vhdlState primMap typeTrans mStart signalList_normalized
 
 termToList :: Monad m => Term -> EitherT String m [Term]
-termToList e = case (second lefts $ collectArgs e) of
+termToList e = case second lefts $ collectArgs e of
   (Data dc,[])
     | name2String (dcName dc) == "[]" -> pure []
     | name2String (dcName dc) == "Prelude.List.Nil" -> pure []
@@ -210,19 +214,19 @@ createSignal vhdlState primMap typeTrans mStart normalizedSignals = do
       newExpr               = Letrec $ bind (rec $ concat sigEs)
                                             (Var (fst . snd $ head signalHds)
                                                  (fst $ head signalHds))
-      newBndr               = ((fst $ head signalHds), (fst . snd $ head signalHds, newExpr))
+      newBndr               = (fst $ head signalHds, (fst . snd $ head signalHds, newExpr))
 
-  ((Component _ _ _ _ decls):comps,vhdlState') <- genNetlist (Just vhdlState)
+  (Component _ _ _ _ decls:comps,vhdlState') <- genNetlist (Just vhdlState)
                                                              (HashMap.fromList $ newBndr : concat signalTls)
                                                              primMap
                                                              typeTrans
                                                              mStart
                                                              (fst $ head signalHds)
 
-  let sigVs = catMaybes $ map (\d -> case d of
+  let sigVs = mapMaybe (\d -> case d of
                                 NetDecl i _ _ -> Just i
                                 _             -> Nothing
-                              )
-                              decls
+                       )
+                       decls
 
   return (decls,sigVs,comps,vhdlState')

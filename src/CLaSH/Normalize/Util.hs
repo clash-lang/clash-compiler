@@ -1,29 +1,29 @@
 {-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE ViewPatterns  #-}
 module CLaSH.Normalize.Util where
 
-import Control.Lens                ((.=),(%=))
-import qualified Control.Lens      as Lens
-import Data.HashMap.Lazy (HashMap)
-import qualified Data.Graph as Graph
-import qualified Data.HashMap.Lazy as HashMap
-import qualified Data.List as      List
-import qualified Data.Maybe as Maybe
-import qualified Data.Set as Set
-import Unbound.LocallyNameless     (Fresh,aeq,embed,unbind,unembed)
+import           Control.Lens            ((%=), (.=))
+import qualified Control.Lens            as Lens
+import qualified Data.Graph              as Graph
+import           Data.HashMap.Lazy       (HashMap)
+import qualified Data.HashMap.Lazy       as HashMap
+import qualified Data.List               as List
+import qualified Data.Maybe              as Maybe
+import qualified Data.Set                as Set
+import           Unbound.LocallyNameless (Fresh, aeq, embed, unbind, unembed)
 
-import CLaSH.Core.DataCon (dataConInstArgTys)
-import CLaSH.Core.FreeVars (termFreeIds)
-import CLaSH.Core.Term    (Term(..),TmName)
-import CLaSH.Core.TyCon   (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type    (Type(..),TypeView(..),tyView,isFunTy)
-import CLaSH.Core.Util    (Gamma,collectArgs,termType)
-import CLaSH.Core.Var     (Var(..),Id)
-import CLaSH.Netlist.Util (splitNormalized)
-import CLaSH.Normalize.Types
-import CLaSH.Rewrite.Types
-import CLaSH.Rewrite.Util
+import           CLaSH.Core.DataCon      (dataConInstArgTys)
+import           CLaSH.Core.FreeVars     (termFreeIds)
+import           CLaSH.Core.Term         (Term (..), TmName)
+import           CLaSH.Core.TyCon        (TyCon (..), tyConDataCons)
+import           CLaSH.Core.Type         (Type (..), TypeView (..), isFunTy,
+                                          tyView)
+import           CLaSH.Core.Util         (Gamma, collectArgs, termType)
+import           CLaSH.Core.Var          (Id, Var (..))
+import           CLaSH.Netlist.Util      (splitNormalized)
+import           CLaSH.Normalize.Types
+import           CLaSH.Rewrite.Types
+import           CLaSH.Rewrite.Util
 
 isBoxTy ::
   Type
@@ -48,7 +48,7 @@ isPolyFunTy (ForAllTy tvT) = unbind tvT >>= (isPolyFunTy . snd)
 isPolyFunTy ty             = return $! isFunTy ty
 
 conArgs :: TyCon -> [Type] -> [Type]
-conArgs tc tys = bigUnionTys $ map (flip dataConInstArgTys tys)
+conArgs tc tys = bigUnionTys $ map (`dataConInstArgTys` tys)
                $ tyConDataCons tc
   where
     bigUnionTys :: [[Type]] -> [Type]
@@ -62,13 +62,8 @@ alreadyInlined f = do
   cf <- Lens.use curFun
   inlinedHM <- Lens.use inlined
   case HashMap.lookup cf inlinedHM of
-    Nothing -> do
-      return False
-    Just inlined' -> do
-      if (f `elem` inlined')
-        then return True
-        else do
-          return False
+    Nothing       -> return False
+    Just inlined' -> return (f `elem` inlined')
 
 commitNewInlined :: NormRewrite
 commitNewInlined _ e = R $ liftR $ do
@@ -76,8 +71,8 @@ commitNewInlined _ e = R $ liftR $ do
   nI <- Lens.use newInlined
   inlinedHM <- Lens.use inlined
   case HashMap.lookup cf inlinedHM of
-    Nothing -> inlined %= (HashMap.insert cf nI)
-    Just _  -> inlined %= (HashMap.adjust (`List.union` nI) cf)
+    Nothing -> inlined %= HashMap.insert cf nI
+    Just _  -> inlined %= HashMap.adjust (`List.union` nI) cf
   newInlined .= []
   return e
 
@@ -106,8 +101,8 @@ getWrappedF :: (Fresh m,Functor m) => Term -> m (Maybe Term)
 getWrappedF body = do
   normalizedM <- splitNormalized body
   case normalizedM of
-    Right ((funArgs,[(_,bExpr)],_)) -> return $! uncurry (reduceArgs True funArgs) (collectArgs $ unembed bExpr)
-    _                               -> return Nothing
+    Right (funArgs,[(_,bExpr)],_) -> return $! uncurry (reduceArgs True funArgs) (collectArgs $ unembed bExpr)
+    _                             -> return Nothing
 
 reduceArgs :: Bool -> [Id] -> Term -> [Either Term Type] -> Maybe Term
 reduceArgs _    []    appE []                         = Just appE
@@ -123,7 +118,7 @@ callGraph :: [TmName]
           -> [(TmName,[TmName])]
 callGraph visited bindingMap root = node:other
   where
-    rootTm = maybe (error $ show root ++ " is not a global binder") id $ HashMap.lookup root bindingMap
+    rootTm = Maybe.fromMaybe (error $ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
     used   = Set.toList $ termFreeIds rootTm
     node   = (root,used)
     other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)

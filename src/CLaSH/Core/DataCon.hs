@@ -8,11 +8,11 @@
 
 module CLaSH.Core.DataCon where
 
-import Unbound.LocallyNameless as Unbound
+import                Unbound.LocallyNameless as Unbound
 
-import {-# SOURCE #-} CLaSH.Core.Term (Term)
-import {-# SOURCE #-} CLaSH.Core.Type (Type,TyName)
-import CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.Term         (Term)
+import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
+import                CLaSH.Util
 
 data DataCon
   = MkData
@@ -25,13 +25,13 @@ data DataCon
   }
 
 instance Show DataCon where
-  show dc = show (dcName dc)
+  show = show . dcName
 
 instance Eq DataCon where
-  dc1 == dc2 = (dcName dc1) == (dcName dc2)
+  (==) = (==) `on` dcName
 
 instance Ord DataCon where
-  compare dc1 dc2 = compare (dcName dc1) (dcName dc2)
+  compare = compare `on` dcName
 
 type ConTag = Int
 type DcName = Name DataCon

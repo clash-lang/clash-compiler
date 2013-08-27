@@ -1,9 +1,9 @@
 module CLaSH.Core.FreeVars where
 
-import Unbound.LocallyNameless (fv,Collection)
+import           Unbound.LocallyNameless (Collection, fv)
 
-import CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.Type (Type,TyName)
+import           CLaSH.Core.Term         (Term, TmName)
+import           CLaSH.Core.Type         (TyName, Type)
 
 typeFreeVars ::
   Collection c

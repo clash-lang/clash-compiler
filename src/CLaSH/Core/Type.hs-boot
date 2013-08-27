@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module CLaSH.Core.Type where
 
-import Unbound.LocallyNameless
+import                Unbound.LocallyNameless
 
 import {-# SOURCE #-} CLaSH.Core.Term
 import {-# SOURCE #-} CLaSH.Core.TyCon

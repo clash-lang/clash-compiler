@@ -1,19 +1,20 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 module CLaSH.Primitives.Types where
 
-import           Data.Aeson           ((.:), FromJSON(..), Value(..))
+import           Control.Applicative  (pure, (<$>), (<*>), (<|>))
+import           Data.Aeson           (FromJSON (..), Value (..), (.:))
 import           Data.ByteString.Lazy (ByteString)
-import           Data.Text.Lazy       (Text)
 import           Data.HashMap.Lazy    (HashMap)
 import qualified Data.HashMap.Strict  as H
-import           Control.Applicative  ((<$>),(<*>),(<|>),pure)
+import           Data.Text.Lazy       (Text)
 
 type PrimMap = HashMap ByteString Primitive
 
 data Primitive
   = BlackBox
-  { name      :: ByteString
-  , template  :: Either Text Text
+  { name     :: ByteString
+  , template :: Either Text Text
   }
   | Primitive
   { name     :: ByteString
@@ -21,7 +22,6 @@ data Primitive
   }
 
 data PrimType = Function | Constructor | Dictionary
-
 
 instance FromJSON PrimType where
   parseJSON = \case "Function"    -> pure Function

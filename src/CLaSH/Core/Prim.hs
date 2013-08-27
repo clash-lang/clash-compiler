@@ -8,11 +8,11 @@
 
 module CLaSH.Core.Prim where
 
-import Unbound.LocallyNameless as Unbound
+import                Unbound.LocallyNameless as Unbound
 
-import CLaSH.Core.DataCon             (DataCon,dcType)
-import {-# SOURCE #-} CLaSH.Core.Term (Term,TmName)
-import {-# SOURCE #-} CLaSH.Core.Type (Type)
+import                CLaSH.Core.DataCon      (DataCon, dcType)
+import {-# SOURCE #-} CLaSH.Core.Term         (Term, TmName)
+import {-# SOURCE #-} CLaSH.Core.Type         (Type)
 
 data Prim
   = PrimFun  TmName Type

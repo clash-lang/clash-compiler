@@ -4,20 +4,20 @@
 {-# LANGUAGE TypeSynonymInstances       #-}
 module CLaSH.Rewrite.Types where
 
-import Control.Concurrent.Supply (Supply,freshId)
-import Control.Lens              (use,(.=))
-import Control.Monad.Reader      (MonadReader,ReaderT,lift)
-import Control.Monad.State       (MonadState,StateT)
-import Control.Monad.Writer      (MonadWriter,WriterT)
+import Control.Concurrent.Supply (Supply, freshId)
+import Control.Lens              (use, (.=))
+import Control.Monad.Reader      (MonadReader, ReaderT, lift)
+import Control.Monad.State       (MonadState, StateT)
+import Control.Monad.Writer      (MonadWriter, WriterT)
 import Data.HashMap.Lazy         (HashMap)
 import Data.Monoid               (Any)
-import Unbound.LocallyNameless   (Fresh,FreshMT)
+import Unbound.LocallyNameless   (Fresh, FreshMT)
 
-import CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.Type (Type)
-import CLaSH.Core.Var  (Id,TyVar)
+import CLaSH.Core.Term           (Term, TmName)
+import CLaSH.Core.Type           (Type)
+import CLaSH.Core.Var            (Id, TyVar)
 import CLaSH.Driver.Types
-import CLaSH.Netlist.Types (HWType)
+import CLaSH.Netlist.Types       (HWType)
 import CLaSH.Util
 
 data CoreContext = AppFirst
@@ -38,7 +38,7 @@ data RewriteState
   , _dictFuns         :: DFunMap
   , _classOps         :: ClassOpMap
   , _uniqSupply       :: Supply
-  , _typeTranslator   :: (Type -> Maybe (Either String HWType))
+  , _typeTranslator   :: Type -> Maybe (Either String HWType)
   }
 
 makeLenses ''RewriteState

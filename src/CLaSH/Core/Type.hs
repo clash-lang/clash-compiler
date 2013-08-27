@@ -40,16 +40,16 @@ module CLaSH.Core.Type
 where
 
 -- External import
-import Data.Maybe (isJust)
-import Unbound.LocallyNameless as Unbound hiding (Arrow)
+import                Data.Maybe              (isJust)
+import                Unbound.LocallyNameless as Unbound hiding (Arrow)
 
 -- Local imports
-import CLaSH.Core.Subst
+import                CLaSH.Core.Subst
 import {-# SOURCE #-} CLaSH.Core.Term
-import CLaSH.Core.TyCon
-import CLaSH.Core.TysPrim
-import CLaSH.Core.Var
-import CLaSH.Util
+import                CLaSH.Core.TyCon
+import                CLaSH.Core.TysPrim
+import                CLaSH.Core.Var
+import                CLaSH.Util
 
 data Type
   = VarTy    Kind TyName
@@ -113,10 +113,10 @@ coreView :: Type -> TypeView
 coreView ty =
   let tView = tyView ty
   in  case tyView ty of
-        TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args      -> coreView (newTyConInstRhs nt args)
+        TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args    -> coreView (newTyConInstRhs nt args)
         TyConApp tc args
-          | (name2String $ tyConName tc) == "CLaSH.Signal.Signal"  -> coreView (head args)
-          | (name2String $ tyConName tc) == "CLaSH.Signal.SignalP" -> coreView (head args)
+          | name2String (tyConName tc) == "CLaSH.Signal.Signal"  -> coreView (head args)
+          | name2String (tyConName tc) == "CLaSH.Signal.SignalP" -> coreView (head args)
         _ -> tView
 
 newTyConInstRhs :: ([TyName],Type) -> [Type] -> Type
@@ -125,7 +125,7 @@ newTyConInstRhs (tvs,ty) tys = foldl AppTy (substTys (zip tvs tys1) ty) tys2
     (tys1, tys2) = splitAtList tvs tys
 
 mkFunTy :: Type -> Type -> Type
-mkFunTy t1 t2 = AppTy (AppTy (ConstTy Arrow) t1) t2
+mkFunTy t1 = AppTy (AppTy (ConstTy Arrow) t1)
 
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tc = foldl AppTy (ConstTy $ TyCon tc)
@@ -169,14 +169,13 @@ typeKind (AppTy fun arg)      = kindFunResult (typeKind fun) arg
 typeKind (ConstTy ct)         = error $ $(curLoc) ++ "typeKind: naked ConstTy: " ++ show ct
 
 kindAppResult :: Kind -> [Type] -> Kind
-kindAppResult k []     = k
-kindAppResult k (a:as) = kindAppResult (kindFunResult k a) as
+kindAppResult = foldl kindFunResult
 
 kindFunResult :: Kind -> KindOrType -> Kind
 kindFunResult (tyView -> FunTy _ res) _ = res
 kindFunResult (ForAllTy b) arg          = let (kv,ki) = runFreshM . unbind $ b
                                           in substKindWith (zip [varName kv] [arg]) ki
-kindFunResult k tys                     = error $ $(curLoc) ++ ("kindFunResult: ") ++ show (k,tys)
+kindFunResult k tys                     = error $ $(curLoc) ++ "kindFunResult: " ++ show (k,tys)
 
 isPolyTy :: Type -> Bool
 isPolyTy (ForAllTy _)            = True
@@ -193,7 +192,7 @@ splitFunTy ::
   Type
   -> Maybe (Type, Type)
 splitFunTy (coreView -> FunTy arg res) = Just (arg,res)
-splitFunTy _                          = Nothing
+splitFunTy _                           = Nothing
 
 isFunTy ::
   Type

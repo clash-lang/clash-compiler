@@ -2,14 +2,14 @@ module CLaSH.Netlist.BlackBox.Parser
   (runParse)
 where
 
-import Data.Text.Lazy (Text,pack)
-import Data.ListLike.Text.TextLazy ()
-import Text.ParserCombinators.UU
-import qualified Text.ParserCombinators.UU.Core as PCC (parse)
-import Text.ParserCombinators.UU.BasicInstances hiding (Parser)
-import Text.ParserCombinators.UU.Utils hiding (pBrackets)
+import           Data.ListLike.Text.TextLazy              ()
+import           Data.Text.Lazy                           (Text, pack)
+import           Text.ParserCombinators.UU
+import           Text.ParserCombinators.UU.BasicInstances hiding (Parser)
+import qualified Text.ParserCombinators.UU.Core           as PCC (parse)
+import           Text.ParserCombinators.UU.Utils          hiding (pBrackets)
 
-import CLaSH.Netlist.BlackBox.Types
+import           CLaSH.Netlist.BlackBox.Types
 
 type Parser a = P (Str Char Text LineColPos) a
 
@@ -46,22 +46,22 @@ pTag' =  O             <$  pKey "~RESULT"
      <|> I             <$> (pKey "~ARG" *> pBrackets pNatural)
      <|> I             <$> (pKey "~LIT" *> pBrackets pNatural)
      <|> (Clk . Just)  <$> (pKey "~CLK" *> pBrackets pNatural)
-     <|> (Clk Nothing) <$  pKey "~CLKO"
+     <|> Clk Nothing   <$  pKey "~CLKO"
      <|> (Rst . Just)  <$> (pKey "~RST" *> pBrackets pNatural)
-     <|> (Rst Nothing) <$  pKey "~RSTO"
+     <|> Rst Nothing   <$  pKey "~RSTO"
      <|> Sym           <$> (pKey "~SYM" *> pBrackets pNatural)
-     <|> (Typ Nothing) <$  pKey "~TYPO"
+     <|> Typ Nothing   <$  pKey "~TYPO"
      <|> (Typ . Just)  <$> (pKey "~TYP" *> pBrackets pNatural)
-     <|> (TypM Nothing) <$  pKey "~TYPMO"
+     <|> TypM Nothing  <$  pKey "~TYPMO"
      <|> (TypM . Just) <$> (pKey "~TYPM" *> pBrackets pNatural)
-     <|> (Def Nothing) <$  (pKey "~DEFAULTO")
+     <|> Def Nothing   <$  pKey "~DEFAULTO"
      <|> (Def . Just)  <$> (pKey "~DEFAULT" *> pBrackets pNatural)
 
 pBrackets :: Parser a -> Parser a
 pBrackets p = pSym '[' *> p <* pSym ']'
 
 pKey :: String -> Parser String
-pKey keyw = pToken keyw
+pKey = pToken
 
 pKeyWS :: String -> Parser String
 pKeyWS keyw = pToken keyw <* pSpaces

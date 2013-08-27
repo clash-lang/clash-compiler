@@ -1,19 +1,20 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Core.Util where
 
-import Data.HashMap.Lazy (HashMap)
-import Unbound.LocallyNameless (Fresh,bind,embed,unbind,unembed,unrebind)
+import           Data.HashMap.Lazy       (HashMap)
+import           Unbound.LocallyNameless (Fresh, bind, embed, unbind, unembed,
+                                          unrebind)
 
-import CLaSH.Core.DataCon (dcType)
-import CLaSH.Core.Literal (literalType)
-import CLaSH.Core.Pretty  (showDoc)
-import CLaSH.Core.Prim    (Prim(..),primType)
-import CLaSH.Core.Term    (Pat(..),Term(..),TmName)
-import CLaSH.Core.Type    (Type(..),Kind,TyName,mkFunTy,mkForAllTy,splitFunTy,isFunTy,
-  applyTy)
-import CLaSH.Core.Var     (Var(..),TyVar,Id,varType)
-import CLaSH.Util
+import           CLaSH.Core.DataCon      (dcType)
+import           CLaSH.Core.Literal      (literalType)
+import           CLaSH.Core.Pretty       (showDoc)
+import           CLaSH.Core.Prim         (Prim (..), primType)
+import           CLaSH.Core.Term         (Pat (..), Term (..), TmName)
+import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
+                                          isFunTy, mkForAllTy, mkFunTy,
+                                          splitFunTy)
+import           CLaSH.Core.Var          (Id, TyVar, Var (..), varType)
+import           CLaSH.Util
 
 type Gamma = HashMap TmName Type
 type Delta = HashMap TyName Kind
@@ -32,9 +33,9 @@ termType e = case e of
   TyLam b     -> do (tv,e') <- unbind b
                     mkForAllTy tv <$> termType e'
   App _ _     -> case collectArgs e of
-                   (fun, args) -> (termType fun) >>=
+                   (fun, args) -> termType fun >>=
                                   (`applyTypeToArgs` args)
-  TyApp e' ty -> (termType e') >>= (`applyTy` ty)
+  TyApp e' ty -> termType e' >>= (`applyTy` ty)
   Letrec b    -> do (_,e') <- unbind b
                     termType e'
   Case _ ty _ -> return ty
@@ -52,7 +53,7 @@ collectBndrs ::
   Fresh m
   => Term
   -> m ([Either Id TyVar], Term)
-collectBndrs e = go [] e
+collectBndrs = go []
   where
     go bs (Lam b) = do
       (v,e') <- unbind b

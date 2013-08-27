@@ -3,20 +3,21 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module CLaSH.Netlist.Types where
 
-import Control.Monad.State     (MonadIO,MonadState,StateT)
-import Control.Monad.Writer    (MonadWriter,WriterT)
-import Data.ByteString.Lazy    (ByteString)
-import Data.Text.Lazy          (Text)
+import Control.Monad.State                  (MonadIO, MonadState,
+                                             StateT)
+import Control.Monad.Writer                 (MonadWriter, WriterT)
+import Data.ByteString.Lazy                 (ByteString)
 import Data.Hashable
-import Data.HashMap.Lazy       (HashMap)
-import GHC.Generics            (Generic)
+import Data.HashMap.Lazy                    (HashMap)
+import Data.Text.Lazy                       (Text)
+import GHC.Generics                         (Generic)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
-import Unbound.LocallyNameless (Fresh,FreshMT)
+import Unbound.LocallyNameless              (Fresh, FreshMT)
 
-import CLaSH.Core.Term (Term,TmName)
-import CLaSH.Core.Type (Type)
-import CLaSH.Core.Util (Gamma)
-import CLaSH.Primitives.Types (Primitive)
+import CLaSH.Core.Term                      (Term, TmName)
+import CLaSH.Core.Type                      (Type)
+import CLaSH.Core.Util                      (Gamma)
+import CLaSH.Primitives.Types               (Primitive)
 import CLaSH.Util
 
 newtype NetlistMonad a =
@@ -34,7 +35,7 @@ data NetlistState
   , _components     :: HashMap TmName Component
   , _primitives     :: HashMap ByteString Primitive
   , _vhdlMState     :: VHDLState
-  , _typeTranslator :: (Type -> Maybe (Either String HWType))
+  , _typeTranslator :: Type -> Maybe (Either String HWType)
   }
 
 type Identifier = Text

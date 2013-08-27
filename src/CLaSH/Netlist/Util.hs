@@ -3,25 +3,28 @@
 {-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Netlist.Util where
 
-import           Control.Lens  ((.=),_2)
-import qualified Control.Lens  as Lens
-import qualified Control.Monad as Monad
-import Data.Maybe              (catMaybes)
-import Data.Text.Lazy          (pack)
-import Data.Either             (partitionEithers)
-import Unbound.LocallyNameless (Embed,Fresh,bind,embed,makeName,name2String,name2Integer,unbind,unembed,unrec)
+import           Control.Lens            ((.=), _2)
+import qualified Control.Lens            as Lens
+import qualified Control.Monad           as Monad
+import           Data.Either             (partitionEithers)
+import           Data.Maybe              (catMaybes,fromMaybe)
+import           Data.Text.Lazy          (pack)
+import           Unbound.LocallyNameless (Embed, Fresh, bind, embed, makeName,
+                                          name2Integer, name2String, unbind,
+                                          unembed, unrec)
 
-import CLaSH.Core.DataCon      (DataCon(..))
-import CLaSH.Core.FreeVars     (typeFreeVars,termFreeIds)
-import CLaSH.Core.Pretty       (showDoc)
-import CLaSH.Core.Subst        (substTys)
-import CLaSH.Core.Term         (LetBinding,Term(..),TmName)
-import CLaSH.Core.TyCon        (TyCon(..),tyConDataCons)
-import CLaSH.Core.Type         (Type(..),TypeView(..),tyView,splitTyConAppM)
-import CLaSH.Core.Util         (collectBndrs,termType)
-import CLaSH.Core.Var          (Var(..),Id,modifyVarName)
-import CLaSH.Netlist.Types
-import CLaSH.Util
+import           CLaSH.Core.DataCon      (DataCon (..))
+import           CLaSH.Core.FreeVars     (termFreeIds, typeFreeVars)
+import           CLaSH.Core.Pretty       (showDoc)
+import           CLaSH.Core.Subst        (substTys)
+import           CLaSH.Core.Term         (LetBinding, Term (..), TmName)
+import           CLaSH.Core.TyCon        (TyCon (..), tyConDataCons)
+import           CLaSH.Core.Type         (Type (..), TypeView (..),
+                                          splitTyConAppM, tyView)
+import           CLaSH.Core.Util         (collectBndrs, termType)
+import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
+import           CLaSH.Netlist.Types
+import           CLaSH.Util
 
 splitNormalized ::
   (Fresh m,Functor m)
@@ -29,7 +32,7 @@ splitNormalized ::
   -> m (Either String ([Id],[LetBinding],Id))
 splitNormalized expr = do
   (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
-  case (letExpr) of
+  case letExpr of
     Letrec b
       | (tmArgs,[]) <- args -> do
           (xes,e) <- unbind b
@@ -39,14 +42,14 @@ splitNormalized expr = do
       | otherwise -> return $! Left ($(curLoc) ++ "Not in normal form: tyArgs")
     _ -> return $! Left ($(curLoc) ++ "Not in normal from: no Letrec: " ++ showDoc expr)
 
-coreTypeToHWType_unsafe :: (Type -> Maybe (Either String HWType))
-                        -> Type
-                        -> HWType
-coreTypeToHWType_unsafe builtInTranslation = either error id . coreTypeToHWType builtInTranslation
+unsafeCoreTypeToHWType :: (Type -> Maybe (Either String HWType))
+                       -> Type
+                       -> HWType
+unsafeCoreTypeToHWType builtInTranslation = either error id . coreTypeToHWType builtInTranslation
 
-coreTypeToHWTypeM_unsafe :: Type
-                       -> NetlistMonad HWType
-coreTypeToHWTypeM_unsafe ty = coreTypeToHWType_unsafe <$> Lens.use typeTranslator <*> pure ty
+unsafeCoreTypeToHWTypeM :: Type
+                        -> NetlistMonad HWType
+unsafeCoreTypeToHWTypeM ty = unsafeCoreTypeToHWType <$> Lens.use typeTranslator <*> pure ty
 
 synchronizedClk ::
   Type
@@ -54,7 +57,7 @@ synchronizedClk ::
 synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
-  = case (name2String $ tyConName tyCon) of
+  = case name2String (tyConName tyCon) of
       "CLaSH.Signal.Signal"    -> Just (pack "clk")
       "CLaSH.Sized.Vector.Vec" -> synchronizedClk (args!!1)
       "CLaSH.Signal.SignalP"   -> Just (pack "clk")
@@ -66,11 +69,11 @@ coreTypeToHWType :: (Type -> Maybe (Either String HWType))
                  -> Type
                  -> Either String HWType
 coreTypeToHWType builtInTranslation ty =
-  case builtInTranslation ty of
-    Just res -> res
-    Nothing  -> case (tyView ty) of
-                  TyConApp tc args -> mkADT builtInTranslation (showDoc ty) tc args
-                  _                -> Left $ "Can't translate non tycon-type: " ++ showDoc ty
+  fromMaybe
+    (case tyView ty of
+       TyConApp tc args -> mkADT builtInTranslation (showDoc ty) tc args
+       _                -> Left $ "Can't translate non tycon-type: " ++ showDoc ty)
+    (builtInTranslation ty)
 
 mkADT :: (Type -> Maybe (Either String HWType))
       -> String
@@ -87,7 +90,7 @@ mkADT builtInTranslation _ tc args = case tyConDataCons tc of
     let tcName       = pack . name2String $ tyConName tc
         argTyss      = map dcArgTys dcs
         argTVss      = map dcUnivTyVars dcs
-        argSubts     = map (\tvs -> zip tvs args) argTVss
+        argSubts     = map (`zip` args) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
     argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation)) substArgTyss
     case (dcs,argHTyss) of
@@ -110,7 +113,7 @@ isRecursiveTy tc = case tyConDataCons tc of
 representableType :: (Type -> Maybe (Either String HWType))
                   -> Type
                   -> Bool
-representableType builtInTranslation = (either (const False) (const True)) . coreTypeToHWType builtInTranslation
+representableType builtInTranslation = either (const False) (const True) . coreTypeToHWType builtInTranslation
 
 typeSize ::
   HWType
@@ -122,9 +125,9 @@ typeSize (Reset _) = 1
 typeSize Integer = 32
 typeSize (Signed i) = i
 typeSize (Unsigned i) = i
-typeSize (Vector n el) = n * (typeSize el)
+typeSize (Vector n el) = n * typeSize el
 typeSize t@(SP _ cons) = conSize t +
-  (maximum $ map (sum . map typeSize . snd) cons)
+  maximum (map (sum . map typeSize . snd) cons)
 typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
 typeSize _ = 0
@@ -142,7 +145,7 @@ typeLength _            = 0
 
 termHWType :: Term
            -> NetlistMonad HWType
-termHWType e = coreTypeToHWTypeM_unsafe =<< termType e
+termHWType e = unsafeCoreTypeToHWTypeM =<< termType e
 
 varToExpr ::
   Term
@@ -159,23 +162,23 @@ mkUniqueNormalized (args,binds,res) = do
   let res1  = appendToName (varName res) "_o"
   let bndrs = map fst binds
   let exprs = map (unembed . snd) binds
-  let usesOutput = concatMap (filter (== (varName res)) . termFreeIds) exprs
+  let usesOutput = concatMap (filter (== varName res) . termFreeIds) exprs
   let (res2,extraBndr) = case usesOutput of
                             [] -> (res1,[] :: [(Id, Embed Term)])
                             _  -> let res3 = appendToName (varName res) "_o_sig"
                                   in (res3,[(Id res1 (varType res),embed $ Var (unembed $ varType res) res3)])
   bndrs' <- mapM (mkUnique (varName res,res2)) bndrs
-  let repl = (zip args args') ++ (zip bndrs bndrs')
+  let repl = zip args args' ++ zip bndrs bndrs'
   exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs repl
   return (args',zip bndrs' exprs' ++ extraBndr,res1)
 
   where
     mkUnique :: (TmName,TmName) -> Id -> NetlistMonad Id
-    mkUnique (find,repl) v = case (find == varName v) of
-      True  -> return $ modifyVarName (const repl) v
-      False -> do
+    mkUnique (find,repl) v = if (find == varName v)
+      then return $ modifyVarName (const repl) v
+      else do
         varCnt <- varCount <%= (+1)
-        let v' = modifyVarName (`appendToName` ("_" ++ show varCnt)) v
+        let v' = modifyVarName (`appendToName` ('_' : show varCnt)) v
         return v'
 
     subsBndrs :: [Term] -> (Id,Id) -> NetlistMonad [Term]
@@ -183,16 +186,16 @@ mkUniqueNormalized (args,binds,res) = do
 
     subsBndr :: Id -> Id -> Term -> NetlistMonad Term
     subsBndr f r e = case e of
-      Var t v | v == (varName f) -> return . Var t $ varName r
-      App e1 e2                  -> App <$> subsBndr f r e1
-                                        <*> subsBndr f r e2
-      Case scrut ty alts         -> Case <$> (subsBndr f r scrut)
-                                         <*> pure ty
-                                         <*> mapM ( return
-                                                  . uncurry bind
-                                                  <=< secondM (subsBndr f r)
-                                                  <=< unbind
-                                                  ) alts
+      Var t v | v == varName f -> return . Var t $ varName r
+      App e1 e2                -> App <$> subsBndr f r e1
+                                      <*> subsBndr f r e2
+      Case scrut ty alts       -> Case <$> subsBndr f r scrut
+                                       <*> pure ty
+                                       <*> mapM ( return
+                                                . uncurry bind
+                                                <=< secondM (subsBndr f r)
+                                                <=< unbind
+                                                ) alts
       _ -> return e
 
 appendToName ::

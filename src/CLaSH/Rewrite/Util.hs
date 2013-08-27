@@ -5,33 +5,41 @@
 {-# LANGUAGE ViewPatterns    #-}
 module CLaSH.Rewrite.Util where
 
-import Control.Lens                      (Lens',(%=),(+=))
-import qualified Control.Lens            as Lens
-import qualified Control.Monad           as Monad
-import Control.Monad.Trans.Class            (lift)
-import qualified Control.Monad.Reader    as Reader
-import qualified Control.Monad.State     as State
-import qualified Control.Monad.Writer    as Writer
-import qualified Data.HashMap.Lazy       as HashMap
-import qualified Data.Map                as Map
-import qualified Data.Monoid             as Monoid
-import qualified Data.Set                as Set
-import qualified Unbound.LocallyNameless as Unbound
-import Unbound.LocallyNameless           (Fresh,Collection(..),bind,embed,makeName,name2String,rebind,rec,string2Name,unbind,unrec,unembed)
-import Unbound.Util                      (filterC)
+import           Control.Lens              (Lens', (%=), (+=))
+import qualified Control.Lens              as Lens
+import qualified Control.Monad             as Monad
+import qualified Control.Monad.Reader      as Reader
+import qualified Control.Monad.State       as State
+import           Control.Monad.Trans.Class (lift)
+import qualified Control.Monad.Writer      as Writer
+import qualified Data.HashMap.Lazy         as HashMap
+import qualified Data.Map                  as Map
+import qualified Data.Monoid               as Monoid
+import qualified Data.Set                  as Set
+import           Unbound.LocallyNameless   (Collection (..), Fresh, bind, embed,
+                                            makeName, name2String, rebind, rec,
+                                            string2Name, unbind, unembed, unrec)
+import qualified Unbound.LocallyNameless   as Unbound
+import           Unbound.Util              (filterC)
 
-import CLaSH.Core.DataCon (dataConInstArgTys)
-import CLaSH.Core.FreeVars (termFreeVars,typeFreeVars)
-import CLaSH.Core.Pretty (showDoc)
-import CLaSH.Core.Subst (substTm)
-import CLaSH.Core.Term (Pat(..),Term(..),TmName,LetBinding)
-import CLaSH.Core.TyCon (tyConDataCons)
-import CLaSH.Core.Type (Type(..),TyName,TypeView(..),typeKind,coreView,mkTyVarTy)
-import CLaSH.Core.Util (Gamma,Delta,collectArgs,termType,mkId,mkTyVar,mkTyLams,mkLams,mkTyApps,mkTmApps,mkApps,mkAbstraction)
-import CLaSH.Core.Var  (Var(..),Id,TyVar)
-import CLaSH.Netlist.Util (representableType)
-import CLaSH.Rewrite.Types
-import CLaSH.Util
+import           CLaSH.Core.DataCon        (dataConInstArgTys)
+import           CLaSH.Core.FreeVars       (termFreeVars, typeFreeVars)
+import           CLaSH.Core.Pretty         (showDoc)
+import           CLaSH.Core.Subst          (substTm)
+import           CLaSH.Core.Term           (LetBinding, Pat (..), Term (..),
+                                            TmName)
+import           CLaSH.Core.TyCon          (tyConDataCons)
+import           CLaSH.Core.Type           (TyName, Type (..), TypeView (..),
+                                            coreView, mkTyVarTy, typeKind)
+import           CLaSH.Core.Util           (Delta, Gamma, collectArgs,
+                                            mkAbstraction, mkApps, mkId, mkLams,
+                                            mkTmApps, mkTyApps, mkTyLams,
+                                            mkTyVar, termType)
+import           CLaSH.Core.Var            (Id, TyVar, Var (..))
+import           CLaSH.Netlist.Util        (representableType)
+import           CLaSH.Rewrite.Types
+import           CLaSH.Util
+
 
 liftR :: Monad m => m a -> RewriteMonad m a
 liftR m = lift . lift . lift . lift $ m
@@ -54,8 +62,8 @@ apply name rewrite ctx expr = R $ do
     (beforeFTV,beforeFV) <- localFreeVars expr
     afterTy              <- termType expr'
     (afterFTV,afterFV)   <- localFreeVars expr'
-    let newFV = (Set.size afterFTV) > (Set.size beforeFTV) ||
-                (Set.size afterFV) > (Set.size beforeFV)
+    let newFV = Set.size afterFTV > Set.size beforeFTV ||
+                Set.size afterFV > Set.size beforeFV
     Monad.when newFV $
             error ( concat [ $(curLoc)
                            , "Error when applying rewrite ", name
@@ -92,8 +100,8 @@ runRewriteSession ::
   -> m a
 runRewriteSession lvl st
   = Unbound.runFreshMT
-  . (flip State.evalStateT st)
-  . (flip Reader.runReaderT (RE lvl))
+  . (`State.evalStateT` st)
+  . (`Reader.runReaderT` RE lvl)
 
 setChanged :: Monad m => RewriteMonad m ()
 setChanged = Writer.tell (Monoid.Any True)
@@ -162,7 +170,7 @@ mkTmBinderFor name e = do
 mkBinderFor ::
   (Functor m, Monad m, MonadUnique m, Fresh m)
   => String
-  -> (Either Term Type)
+  -> Either Term Type
   -> m (Either (Id,Term) (TyVar,Type))
 mkBinderFor name (Left term) =
   Left <$> (mkInternalVar name =<< termType term)
@@ -229,10 +237,9 @@ localFreeVars term = do
   let (tyFVs,tmFVs) = termFreeVars term
   return ( tyFVs
          , filterC
-         $ cmap (\v -> if ( v `HashMap.member` globalBndrs ||
-                            v `HashMap.member` dfuns       ||
-                            v `HashMap.member` clsOps
-                          )
+         $ cmap (\v -> if v `HashMap.member` globalBndrs ||
+                          v `HashMap.member` dfuns       ||
+                          v `HashMap.member` clsOps
                        then Nothing
                        else Just v
                 ) tmFVs
@@ -289,7 +296,7 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   -- Create a new body that abstracts over the free variables
   let newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
   -- Add the created function to the list of global bindings
-  bindings %= (HashMap.insert newBodyId (newBodyTy,newBody))
+  bindings %= HashMap.insert newBodyId (newBodyTy,newBody)
   -- Return the new binder
   return (Id idName (embed ty), embed newExpr)
 
@@ -312,7 +319,7 @@ addGlobalBind ::
   -> Type
   -> Term
   -> RewriteMonad m ()
-addGlobalBind vId ty body = bindings %= (HashMap.insert vId (ty,body))
+addGlobalBind vId ty body = bindings %= HashMap.insert vId (ty,body)
 
 cloneVar ::
   (Functor m, Monad m)
@@ -345,7 +352,7 @@ mkWildValBinder ::
   (Functor m, Monad m, MonadUnique m)
   => Type
   -> m (Id,Term)
-mkWildValBinder ty = mkInternalVar "wild" ty
+mkWildValBinder = mkInternalVar "wild"
 
 mkSelectorCase ::
   (Functor m, Monad m, MonadUnique m, Fresh m)
@@ -357,10 +364,10 @@ mkSelectorCase ::
   -> m Term
 mkSelectorCase caller ctx scrut dcI fieldI = do
   scrutTy <- termType scrut
-  let cantCreate x = error $ x ++ "Can't create selector " ++ (show (caller,dcI,fieldI)) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
+  let cantCreate x = error $ x ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
   case scrutTy of
-    (coreView -> TyConApp tc args) -> do
-      case (tyConDataCons tc) of
+    (coreView -> TyConApp tc args) ->
+      case tyConDataCons tc of
         [] -> cantCreate $(curLoc)
         dcs | dcI > length dcs -> cantCreate $(curLoc)
             | otherwise -> do
@@ -379,7 +386,7 @@ mkSelectorCase caller ctx scrut dcI fieldI = do
 
 specialise ::
   (Functor m, State.MonadState s m)
-  => (Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)))
+  => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type))
   -> Rewrite m
 specialise specMapLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl ctx e (collectArgs e1) (Right ty)
 specialise specMapLbl ctx e@(App   e1 e2) = specialise' specMapLbl ctx e (collectArgs e1) (Left  e2)
@@ -387,7 +394,7 @@ specialise _          _   e               = return e
 
 specialise' ::
   (Functor m, State.MonadState s m)
-  => (Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)))
+  => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type))
   -> [CoreContext]
   -> Term
   -> (Term, [Either Term Type])
@@ -396,59 +403,61 @@ specialise' ::
 specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
   lvl <- Lens.view dbgLevel
   -- Create binders and variable references for free variables in 'specArg'
-  (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $
-                        either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
-  (gamma,delta) <- mkEnv ctx
-  let (specTyBndrs,specTyVars) = unzip
-                 $  map (\tv -> let ki = delta HashMap.! tv
-                               in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
-  let (specTmBndrs,specTmVars) = unzip
-                 $ map (\tm -> let ty = gamma HashMap.! tm
-                               in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
+  (specBndrs,specVars) <- specArgBndrsAndVars ctx specArg
   let argLen = length args
   -- Determine if 'f' has already been specialized on 'specArg'
   specM <- liftR $ fmap (Map.lookup (f,argLen,specArg))
                  $ Lens.use specMapLbl
   case specM of
     -- Use previously specialized function
-    Just (fname,fty) -> do
+    Just (fname,fty) ->
       traceIf (lvl >= DebugApplied) ("Using previous specialization: " ++ showDoc fname) $
-        changed $ mkApps (Var fty fname) (args ++ specTyVars ++ specTmVars)
+        changed $ mkApps (Var fty fname) (args ++ specVars)
     -- Create new specialized function
     Nothing -> do
       bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
       case bodyMaybe of
         Just (_,bodyTm) -> do
           -- Make new binders for existing arguments
-          (boundArgs,argVars) <- fmap unzip $ fmap (map (either (Left >< Left) (Right >< Right))) $
+          (boundArgs,argVars) <- fmap (unzip . map (either (Left >< Left) (Right >< Right))) $
                                  mapM (mkBinderFor "pTS") args
           -- Create specialized functions
-          let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specTyBndrs ++ specTmBndrs)
+          let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
           newf <- mkFunction f newBody
           -- Remember specialization
-          liftR $ specMapLbl %= (Map.insert (f,argLen,specArg) newf)
+          liftR $ specMapLbl %= Map.insert (f,argLen,specArg) newf
           -- use specialized function
-          let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specTyVars ++ specTmVars)
+          let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specVars)
           changed newExpr
         Nothing -> return e
 
 specialise' _ ctx _ (appE,args) (Left specArg) = R $ do
   -- Create binders and variable references for free variables in 'specArg'
-  (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $ localFreeVars specArg
-  (gamma,delta) <- mkEnv ctx
-  let (specTyBndrs,specTyVars) = unzip
-                               $ map (\tv -> let ki = delta HashMap.! tv
-                                             in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
-  let (specTmBndrs,specTmVars) = unzip
-                               $ map (\tm -> let ty = gamma HashMap.! tm
-                                             in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
+  (specBndrs,specVars) <- specArgBndrsAndVars ctx (Left specArg)
   -- Create specialized function
-  let newBody = mkAbstraction specArg (specTyBndrs ++ specTmBndrs)
+  let newBody = mkAbstraction specArg specBndrs
   newf <- mkFunction (string2Name "specF") newBody
   -- Create specialized argument
-  let newArg  = Left $ mkApps ((uncurry . flip) Var newf) (specTyVars ++ specTmVars)
+  let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars
   -- Use specialized argument
   let newExpr = mkApps appE (args ++ [newArg])
   changed newExpr
 
 specialise' _ _ e _ _ = return e
+
+-- | Create binders and variable references for free variables in 'specArg'
+specArgBndrsAndVars :: (Functor m, Monad m)
+                    => [CoreContext]
+                    -> Either Term Type
+                    -> RewriteMonad m ([Either Id TyVar],[Either Term Type])
+specArgBndrsAndVars ctx specArg = do
+  (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $
+                        either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
+  (gamma,delta) <- mkEnv ctx
+  let (specTyBndrs,specTyVars) = unzip
+                 $ map (\tv -> let ki = delta HashMap.! tv
+                               in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
+      (specTmBndrs,specTmVars) = unzip
+                 $ map (\tm -> let ty = gamma HashMap.! tm
+                               in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
+  return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)

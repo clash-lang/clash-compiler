@@ -7,22 +7,27 @@ module CLaSH.Core.Pretty
   )
 where
 
-import Data.Char (isUpper,ord,isSymbol)
-import Data.Traversable (sequenceA)
-import GHC.Show (showMultiLineString)
-import Text.PrettyPrint (Doc,(<+>),(<>),($+$),($$),render,parens,text,sep,
-  punctuate,comma,hang,char,empty,hsep,equals,vcat,integer,int)
-import Unbound.LocallyNameless (Embed(..),Name,LFresh,runLFreshM,unembed,
-  name2String,lunbind,unrec,unrebind)
+import           Data.Char               (isSymbol, isUpper, ord)
+import           Data.Traversable        (sequenceA)
+import           GHC.Show                (showMultiLineString)
+import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
+                                          hsep, int, integer, parens, punctuate,
+                                          render, sep, text, vcat, ($$), ($+$),
+                                          (<+>), (<>))
+import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
+                                          name2String, runLFreshM, unembed,
+                                          unrebind, unrec)
 
-import CLaSH.Core.DataCon (DataCon(..))
-import CLaSH.Core.Literal (Literal(..))
-import CLaSH.Core.Prim    (Prim(..))
-import CLaSH.Core.Term    (Term(..),Pat(..))
-import CLaSH.Core.Type    (Type(..),ConstTy(..),LitTy(..),Kind,TypeView(..),tyView)
-import CLaSH.Core.TyCon   (TyCon(..),isTupleTyConLike)
-import CLaSH.Core.Var     (Var,TyVar,Id,varName,varType,varKind)
-import CLaSH.Util
+import           CLaSH.Core.DataCon      (DataCon (..))
+import           CLaSH.Core.Literal      (Literal (..))
+import           CLaSH.Core.Prim         (Prim (..))
+import           CLaSH.Core.Term         (Pat (..), Term (..))
+import           CLaSH.Core.TyCon        (TyCon (..), isTupleTyConLike)
+import           CLaSH.Core.Type         (ConstTy (..), Kind, LitTy (..),
+                                          Type (..), TypeView (..), tyView)
+import           CLaSH.Core.Var          (Id, TyVar, Var, varKind, varName,
+                                          varType)
+import           CLaSH.Util
 
 class Pretty p where
   ppr :: (Applicative m, LFresh m) => p -> m Doc
@@ -70,7 +75,7 @@ rarrow :: Doc
 rarrow = text "->"
 
 instance Pretty Type where
-  pprPrec _ ty = pprType ty
+  pprPrec _ = pprType
 
 instance Pretty (Var Type) where
   pprPrec _ v = ppr $ varName v
@@ -93,7 +98,7 @@ instance Pretty Term where
     App fun arg    -> pprPrecApp prec fun arg
     TyApp e' ty    -> pprPrecTyApp prec e' ty
     Letrec b       -> lunbind b $ \(xes,e') -> pprPrecLetrec prec (unrec xes) e'
-    Case e' _ alts -> pprPrecCase prec e' =<< mapM (flip lunbind return) alts
+    Case e' _ alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
 
 data BindingSite
   = LambdaBind
@@ -235,7 +240,7 @@ pprSigmaType showForalls ty = do
                       , pprType rho
                       ]
   where
-    split1 tvs (ForAllTy b) = do
+    split1 tvs (ForAllTy b) =
       lunbind b $ \(tv,resTy) -> split1 (tv:tvs) resTy
     split1 tvs resTy = return (reverse tvs,resTy)
 

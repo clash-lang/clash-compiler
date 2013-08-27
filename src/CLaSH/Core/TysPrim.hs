@@ -8,9 +8,9 @@ module CLaSH.Core.TysPrim
   )
 where
 
-import Unbound.LocallyNameless (string2Name)
+import                Unbound.LocallyNameless (string2Name)
 
-import CLaSH.Core.TyCon
+import                CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
 
 tySuperKindTyConName, liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
@@ -33,7 +33,7 @@ pcPrimTyCon0 ::
   TyConName
   -> PrimRep
   -> TyCon
-pcPrimTyCon0 name rep = mkPrimTyCon name liftedTypeKind 0 rep
+pcPrimTyCon0 name = mkPrimTyCon name liftedTypeKind 0
 
 intPrimTy, voidPrimTy :: Type
 intPrimTy  = mkTyConTy (pcPrimTyCon0 intPrimTyConName  IntRep )

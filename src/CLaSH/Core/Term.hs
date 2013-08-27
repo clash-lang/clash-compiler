@@ -9,17 +9,17 @@
 module CLaSH.Core.Term where
 
 -- External Modules
-import Unbound.LocallyNameless       as Unbound hiding (Data)
-import Unbound.LocallyNameless.Alpha (fvR1,aeqR1)
-import Unbound.LocallyNameless.Name  (isFree)
+import                Unbound.LocallyNameless       as Unbound hiding (Data)
+import                Unbound.LocallyNameless.Alpha (aeqR1, fvR1)
+import                Unbound.LocallyNameless.Name  (isFree)
 
 -- Internal Modules
-import CLaSH.Core.DataCon              (DataCon)
-import CLaSH.Core.Literal              (Literal)
-import CLaSH.Core.Prim                 (Prim)
-import {-# SOURCE #-} CLaSH.Core.Type  (Type)
-import CLaSH.Core.Var                  (Id,TyVar)
-import CLaSH.Util
+import                CLaSH.Core.DataCon            (DataCon)
+import                CLaSH.Core.Literal            (Literal)
+import                CLaSH.Core.Prim               (Prim)
+import {-# SOURCE #-} CLaSH.Core.Type               (Type)
+import                CLaSH.Core.Var                (Id, TyVar)
+import                CLaSH.Util
 
 data Term
   = Var     Type TmName
@@ -46,10 +46,10 @@ data Pat
 Unbound.derive [''Term,''Pat]
 
 instance Eq Term where
-  e1 == e2 = aeq e1 e2
+  (==) = aeq
 
 instance Ord Term where
-  compare e1 e2 = acompare e1 e2
+  compare = acompare
 
 instance Alpha Term where
   fv' c (Var _ n) = fv' c n

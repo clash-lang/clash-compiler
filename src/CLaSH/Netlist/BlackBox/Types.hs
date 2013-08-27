@@ -1,9 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module CLaSH.Netlist.BlackBox.Types where
 
-import Control.Monad.State (MonadState, State)
+import Control.Monad.State  (MonadState, State)
 import Control.Monad.Writer (MonadWriter,WriterT)
-import Data.Text.Lazy (Text)
+import Data.Text.Lazy       (Text)
 
 import CLaSH.Netlist.Types
 

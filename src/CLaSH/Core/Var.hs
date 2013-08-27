@@ -3,23 +3,22 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
 {-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
 #endif
 
-
 module CLaSH.Core.Var where
 
-import Unbound.LocallyNameless as Unbound
-import Unbound.LocallyNameless.Name (isFree)
+import                Unbound.LocallyNameless      as Unbound
+import                Unbound.LocallyNameless.Name (isFree)
 
-import {-# SOURCE #-} CLaSH.Core.Type (Type,Kind)
-import {-# SOURCE #-} CLaSH.Core.Term (Term)
-import CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.Term              (Term)
+import {-# SOURCE #-} CLaSH.Core.Type              (Kind, Type)
+import                CLaSH.Util
 
 data Var a
   = TyVar
