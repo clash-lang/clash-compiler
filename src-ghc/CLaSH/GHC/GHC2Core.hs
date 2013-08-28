@@ -15,58 +15,74 @@ module CLaSH.GHC.GHC2Core
 where
 
 -- External Modules
-import Control.Lens                       (view,(%=),use)
-import Control.Monad.Reader               (Reader)
-import qualified Control.Monad.Reader     as Reader
-import Control.Monad.State                (StateT,lift)
-import qualified Control.Monad.State.Lazy as State
-import Data.ByteString.Lazy.Char8         (pack)
-import Data.Hashable                      (Hashable(..),hash)
-import Data.HashMap.Lazy                  (HashMap)
-import qualified Data.HashMap.Lazy        as HashMap
-import Data.Maybe                         (fromMaybe,isJust)
-import Unbound.LocallyNameless            (Rep,bind,rec,embed,rebind,runFreshM,string2Name,unbind,unembed)
-import qualified Unbound.LocallyNameless  as Unbound
+import           Control.Lens                (use, view, (%=))
+import           Control.Monad               (unless)
+import           Control.Monad.Reader        (Reader)
+import qualified Control.Monad.Reader        as Reader
+import           Control.Monad.State         (StateT, lift)
+import qualified Control.Monad.State.Lazy    as State
+import           Data.ByteString.Lazy.Char8  (pack)
+import           Data.Hashable               (Hashable (..), hash)
+import           Data.HashMap.Lazy           (HashMap)
+import qualified Data.HashMap.Lazy           as HashMap
+import           Data.Maybe                  (fromMaybe, isJust)
+import           Unbound.LocallyNameless     (Rep, bind, embed, rebind, rec,
+                                              runFreshM, string2Name, unbind,
+                                              unembed)
+import qualified Unbound.LocallyNameless     as Unbound
 
 -- GHC API
-import BasicTypes (TupleSort (..))
-import Coercion   (coercionType)
-import CoreFVs    (exprSomeFreeVars)
-import CoreSyn    (CoreExpr,Expr (..),Bind(..),AltCon(..),rhssOfAlts)
-import DataCon    (DataCon,dataConTag,dataConExTyVars,dataConUnivTyVars,dataConWorkId,
-  dataConRepArgTys,dataConName,dataConTyCon,dataConWrapId_maybe)
-import CLaSH.GHC.Compat.FastString (unpackFS,unpackFB)
-import Id         (isDataConWorkId,isDataConId_maybe)
-import Literal    (Literal(..))
-import Module     (moduleName,moduleNameString)
-import Name       (Name,nameOccName,nameModule_maybe)
-import OccName    (occNameString)
-import CLaSH.GHC.Compat.Outputable (showPpr)
-import TyCon      (TyCon,AlgTyConRhs(..),TyConParent(..),PrimRep(..),
-  isAlgTyCon,isTupleTyCon,tyConName,tyConUnique,
-  tyConDataCons,algTyConRhs,isFunTyCon,isNewTyCon,tyConKind,tyConArity,
-  tyConParent,isSynTyCon,isPrimTyCon,tyConPrimRep,isPromotedDataCon)
-import CLaSH.GHC.Compat.TyCon (isSuperKindTyCon)
-import Type       (tcView)
-import TypeRep    (Type(..),TyLit(..))
-import TysWiredIn (tupleTyCon,boolKindCon,trueTyCon,falseTyCon)
-import Unique     (Unique,Uniquable(..),getKey)
-import Var        (Var,Id,TyVar,varName,varUnique,varType,isTyVar)
-import VarSet     (isEmptyVarSet)
+import           BasicTypes                  (TupleSort (..))
+import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)
+import           CLaSH.GHC.Compat.Outputable (showPpr)
+import           CLaSH.GHC.Compat.TyCon      (isSuperKindTyCon)
+import           Coercion                    (coercionType)
+import           CoreFVs                     (exprSomeFreeVars)
+import           CoreSyn                     (AltCon (..), Bind (..), CoreExpr,
+                                              Expr (..), rhssOfAlts)
+import           DataCon                     (DataCon, dataConExTyVars,
+                                              dataConName, dataConRepArgTys,
+                                              dataConTag, dataConTyCon,
+                                              dataConUnivTyVars, dataConWorkId,
+                                              dataConWrapId_maybe)
+import           Id                          (isDataConId_maybe,
+                                              isDataConWorkId)
+import           Literal                     (Literal (..))
+import           Module                      (moduleName, moduleNameString)
+import           Name                        (Name, nameModule_maybe,
+                                              nameOccName)
+import           OccName                     (occNameString)
+import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
+                                              TyCon, TyConParent (..),
+                                              algTyConRhs, isAlgTyCon,
+                                              isFunTyCon, isNewTyCon,
+                                              isPrimTyCon, isPromotedDataCon,
+                                              isSynTyCon, isTupleTyCon,
+                                              tyConArity, tyConDataCons,
+                                              tyConKind, tyConName, tyConParent,
+                                              tyConPrimRep, tyConUnique)
+import           Type                        (tcView)
+import           TypeRep                     (TyLit (..), Type (..))
+import           TysWiredIn                  (boolKindCon, falseTyCon,
+                                              trueTyCon, tupleTyCon)
+import           Unique                      (Uniquable (..), Unique, getKey)
+import           Var                         (Id, TyVar, Var, isTyVar, varName,
+                                              varType, varUnique)
+import           VarSet                      (isEmptyVarSet)
 
 -- Local imports
-import qualified CLaSH.Core.DataCon as C
-import qualified CLaSH.Core.Literal as C
-import qualified CLaSH.Core.Prim    as C
-import qualified CLaSH.Core.Term    as C
-import qualified CLaSH.Core.TyCon   as C
-import qualified CLaSH.Core.Type    as C
-import qualified CLaSH.Core.Var     as C
-import CLaSH.Primitives.Types
-import CLaSH.Util
+import qualified CLaSH.Core.DataCon          as C
+import qualified CLaSH.Core.Literal          as C
+import qualified CLaSH.Core.Prim             as C
+import qualified CLaSH.Core.Term             as C
+import qualified CLaSH.Core.TyCon            as C
+import qualified CLaSH.Core.Type             as C
+import qualified CLaSH.Core.Var              as C
+import           CLaSH.Primitives.Types
+import           CLaSH.Util
 
 instance Show TyCon where
-  show tc = showPpr tc
+  show = showPpr
 
 type R    = Reader GHC2CoreState
 type SR a = StateT GHC2CoreState R a
@@ -84,7 +100,7 @@ instance Hashable TyCon where
   hashWithSalt s = hashWithSalt s . getKey . getUnique
 
 instance Hashable DataCon where
-  hashWithSalt s dc = hashWithSalt s ((dataConTag dc) `hashWithSalt` (hash $ dataConTyCon dc))
+  hashWithSalt s dc = hashWithSalt s (dataConTag dc `hashWithSalt` hash (dataConTyCon dc))
 
 makeAllTyDataCons :: [TyCon] -> GHC2CoreState
 makeAllTyDataCons tyCons =
@@ -108,10 +124,9 @@ makeTyCon ::
   -> SR ()
 makeTyCon tc = do
     alreadyConverted <- fmap (isJust . HashMap.lookup tc) $ use tyConMap
-    case alreadyConverted of
-      True  -> return ()
-      False -> do tycon' <- tycon
-                  tyConMap %= (HashMap.insert tc tycon')
+    unless alreadyConverted $ do
+      tycon' <- tycon
+      tyConMap %= HashMap.insert tc tycon'
   where
     tycon
       | isTupleTyCon tc     = mkTupleTyCon
@@ -129,7 +144,7 @@ makeTyCon tc = do
           tcRhsM  <- makeAlgTyConRhs $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
-              return $
+              return
                 C.AlgTyCon
                 { C.tyConName   = tcName
                 , C.tyConKind   = tcKind
@@ -142,7 +157,7 @@ makeTyCon tc = do
         mkTupleTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
           tcDc   <- fmap (C.DataTyCon . (:[])) . makeDataCon . head . tyConDataCons $ tc
-          return $
+          return
             C.AlgTyCon
             { C.tyConName   = tcName
             , C.tyConKind   = tcKind
@@ -153,7 +168,7 @@ makeTyCon tc = do
 
         mkPrimTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
-          return $
+          return
             C.PrimTyCon
             { C.tyConName    = tcName
             , C.tyConKind    = tcKind
@@ -173,10 +188,10 @@ makeAlgTyConRhs ::
   AlgTyConRhs
   -> SR (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
-  DataTyCon dcs _ -> Just <$> C.DataTyCon <$> (mapM makeDataCon dcs)
-  NewTyCon dc _ (rhsTvs,rhsEtad) _ -> do Just <$> (C.NewTyCon <$> (makeDataCon dc)
-                                                              <*> ((,) (map coreToVar rhsTvs) <$>
-                                                                   (lift $ coreToType rhsEtad)))
+  DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM makeDataCon dcs
+  NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> makeDataCon dc
+                                                           <*> ((,) (map coreToVar rhsTvs) <$>
+                                                                lift (coreToType rhsEtad)))
   AbstractTyCon _ -> return Nothing
   DataFamilyTyCon -> return Nothing
 
@@ -198,12 +213,12 @@ makeDataCon dc = do
 
       dataCon = mkDataCon workIdTy
 
-  dataConMap %= (HashMap.insert dc dataCon)
+  dataConMap %= HashMap.insert dc dataCon
 
   case dataConWrapId_maybe dc of
     Just wrapId -> do wrapIdTy <- lift . coreToType $ varType wrapId
                       let dataConWrap = mkDataCon wrapIdTy
-                      dataConWrapMap %= (HashMap.insert dc dataConWrap)
+                      dataConWrapMap %= HashMap.insert dc dataConWrap
     Nothing     -> return ()
 
   return dataCon
@@ -219,10 +234,10 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
   where
     term (Var x)                 = var x
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
-    term (App eFun (Type tyArg)) = C.TyApp <$> (term eFun) <*> (coreToType tyArg)
-    term (App eFun eArg)         = C.App <$> (term eFun) <*> (term eArg)
-    term (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> (coreToTyVar x) <*> (term e))
-                   | otherwise   = C.Lam <$> (bind <$> (coreToId x) <*> (term e))
+    term (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
+    term (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
+    term (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> coreToTyVar x <*> term e)
+                   | otherwise   = C.Lam   <$> (bind <$> coreToId x    <*> term e)
     term (Let (NonRec x e1) e2)  = do
       x' <- coreToId x
       e1' <- term e1
@@ -252,7 +267,7 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
     term (Type _)          = error $ $(curLoc) ++ "Type at non-argument position not supported"
-    term (Coercion co)     = C.Prim <$> C.PrimCo <$> (coreToType $ coercionType co)
+    term (Coercion co)     = C.Prim <$> C.PrimCo <$> coreToType (coercionType co)
 
     var x =
       let xVar   = coreToVar x
@@ -261,15 +276,15 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
       in do
         xType <- coreToType (varType x)
         let mapSyncName = pack
-        case (isDataConId_maybe x) of
+        case isDataConId_maybe x of
           Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
-                  | otherwise ->  case (HashMap.lookup xNameS primMap) of
+                  | otherwise -> case HashMap.lookup xNameS primMap of
                       Just (Primitive _ Constructor) ->
-                        C.Prim <$> C.PrimCon <$> (coreToDataCon False dc)
+                        C.Prim <$> C.PrimCon <$> coreToDataCon False dc
                       Just (BlackBox {}) ->
                         return $ C.Prim (C.PrimFun xPrim xType)
-                      _ | isDataConWorkId x -> C.Data <$> (coreToDataCon False dc)
-                        | otherwise         -> C.Data <$> (coreToDataCon True  dc)
+                      _ | isDataConWorkId x -> C.Data <$> coreToDataCon False dc
+                        | otherwise         -> C.Data <$> coreToDataCon True  dc
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive _ Dictionary) ->
               return $ C.Prim (C.PrimDict xPrim xType)
@@ -290,15 +305,15 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
               | x `elem` dfunvars -> return $ C.Prim (C.PrimDFun xVar xType)
               | otherwise -> return $ C.Var xType xVar
 
-    alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> (term e)
-    alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> (term e)
+    alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> term e
+    alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> term e
     alt (DataAlt dc, xs, e) = case span isTyVar xs of
       (tyvs,tmvs) -> bind <$> (C.DataPat . embed <$>
-                                (coreToDataCon False dc) <*>
+                                coreToDataCon False dc <*>
                                 (rebind <$>
-                                  (mapM coreToTyVar tyvs) <*>
-                                  (mapM coreToId tmvs))) <*>
-                              (term e)
+                                  mapM coreToTyVar tyvs <*>
+                                  mapM coreToId tmvs)) <*>
+                              term e
 
 coreToDataCon ::
   Bool
@@ -332,9 +347,9 @@ coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
 coreToType' ::
   Type
   -> R C.Type
-coreToType' (TyVarTy tv) = C.VarTy <$> (coreToType $ varType tv) <*> (pure $ coreToVar tv)
+coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> pure (coreToVar tv)
 coreToType' (TyConApp tc args)
-  | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> (mapM coreToType args)
+  | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
   | otherwise     = C.mkTyConApp <$> coreToTyCon tc <*> mapM coreToType args
 coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
@@ -434,25 +449,22 @@ nameString = occNameString . nameOccName
 qualfiedNameString ::
   Name
   -> String
-qualfiedNameString n = fromMaybe "_INTERNAL_" modName ++ ('.':occName)
+qualfiedNameString n = fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName)
   where
-    modName = do
-      module_ <- nameModule_maybe n
-      let moduleNm = moduleName module_
-      return (moduleNameString moduleNm)
-
     occName = occNameString $ nameOccName n
 
 qualfiedNameStringM :: Name
                     -> String
-qualfiedNameStringM n = maybe (occName) (\modName -> modName ++ ('.':occName)) modNameM
+qualfiedNameStringM n = maybe occName (\modName -> modName ++ ('.':occName)) (modNameM n)
   where
-    modNameM = do
+    occName = occNameString $ nameOccName n
+
+modNameM :: Name
+         -> Maybe String
+modNameM n = do
       module_ <- nameModule_maybe n
       let moduleNm = moduleName module_
       return (moduleNameString moduleNm)
-
-    occName = occNameString $ nameOccName n
 
 mapSyncTerm :: C.Type
             -> C.Term

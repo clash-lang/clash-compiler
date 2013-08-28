@@ -9,21 +9,22 @@ where
 
 -- External Modules
 #ifdef STANDALONE
-import           System.IO      (hGetLine)
-import           System.Process (runInteractiveCommand, waitForProcess)
-import           System.Exit    (ExitCode(..))
+import           System.Exit                  (ExitCode (..))
+import           System.IO                    (hGetLine)
+import           System.Process               (runInteractiveCommand,
+                                               waitForProcess)
 #else
 import qualified GHC.Paths
 #endif
 
 -- GHC API
 -- import qualified CorePrep
+import           CLaSH.GHC.Compat.DynFlags    (dopt_set, dopt_unset)
+import           CLaSH.GHC.Compat.GHC         (defaultErrorHandler)
 import qualified CoreSyn
-import           DynFlags (GeneralFlag(..))
+import           DynFlags                     (GeneralFlag (..))
 import qualified DynFlags
-import           CLaSH.GHC.Compat.DynFlags (dopt_unset,dopt_set)
 import qualified GHC
-import           CLaSH.GHC.Compat.GHC (defaultErrorHandler)
 -- import qualified HscMain
 import qualified HscTypes
 import qualified HsImpExp
@@ -34,12 +35,12 @@ import qualified TidyPgm
 -- import qualified TyCon
 import qualified TysPrim
 import qualified TysWiredIn
-import           UniqSupply (mkSplitUniqSupply)
+import           UniqSupply                   (mkSplitUniqSupply)
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
 import           CLaSH.GHC.Types
-import           CLaSH.Util (curLoc,mapAccumLM,(><))
+import           CLaSH.Util                   (curLoc, mapAccumLM, (><))
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
@@ -78,7 +79,7 @@ loadModules modName = defaultErrorHandler $ do
   -- on the compiler dir of ghc suggests that 'z' is not used to generate
   -- a unique supply anywhere.
   uniqSupply <- mkSplitUniqSupply 'z'
-  libDir     <- MonadUtils.liftIO $ ghcLibDir
+  libDir     <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
     dflags <- GHC.getSessionDynFlags

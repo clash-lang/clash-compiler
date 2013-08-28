@@ -6,9 +6,11 @@ where
 import qualified Data.HashMap.Lazy       as HashMap
 import           Unbound.LocallyNameless (unembed)
 
-import           CLaSH.Core.Var          (Var(..))
+import           CLaSH.Core.Var          (Var (..))
 import           CLaSH.Driver.Types
-import           CLaSH.GHC.GHC2Core      (makeAllTyDataCons,coreToBndr,coreToPrimBndr,coreToTerm,coreToVar)
+import           CLaSH.GHC.GHC2Core      (coreToBndr, coreToPrimBndr,
+                                          coreToTerm, coreToVar,
+                                          makeAllTyDataCons)
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Primitives.Types
 
@@ -18,7 +20,7 @@ generateBindings ::
   -> IO (BindingMap,DFunMap,ClassOpMap)
 generateBindings primMap modName = do
   (bindings,dfuns,clsOps,unlocs,tcs) <- loadModules modName
-  let unlocatable = unlocs ++ (map fst clsOps)
+  let unlocatable = unlocs ++ map fst clsOps
   let dfunvars = map fst dfuns
   let tcsMap = makeAllTyDataCons tcs
 

@@ -8,8 +8,8 @@ where
 import qualified FastString
 
 #if __GLASGOW_HASKELL__ >= 707
-import Data.ByteString
-import Data.ByteString.Char8 as Char8 (unpack)
+import           Data.ByteString
+import           Data.ByteString.Char8 as Char8 (unpack)
 #endif
 
 #if __GLASGOW_HASKELL__ == 706

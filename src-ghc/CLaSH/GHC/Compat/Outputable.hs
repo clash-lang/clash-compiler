@@ -4,11 +4,11 @@ module CLaSH.GHC.Compat.Outputable
 where
 
 #if __GLASGOW_HASKELL__ >= 707
-import qualified DynFlags (unsafeGlobalDynFlags)
+import qualified DynFlags   (unsafeGlobalDynFlags)
 #elif __GLASGOW_HASKELL__ >= 706
-import qualified DynFlags (tracingDynFlags)
+import qualified DynFlags   (tracingDynFlags)
 #endif
-import qualified Outputable (Outputable,SDoc,showPpr,showSDoc)
+import qualified Outputable (Outputable, SDoc, showPpr, showSDoc)
 
 showSDoc :: Outputable.SDoc -> String
 #if __GLASGOW_HASKELL__ >= 707

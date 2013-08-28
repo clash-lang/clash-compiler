@@ -5,16 +5,17 @@
 module CLaSH.GHC.LoadInterfaceFiles where
 
 -- External Modules
-import           Data.Either (partitionEithers)
-import           Data.List   (elemIndex,partition)
-import           Data.Maybe  (isJust,isNothing,mapMaybe)
+import           Data.Either                 (partitionEithers)
+import           Data.List                   (elemIndex, partition)
+import           Data.Maybe                  (isJust, isNothing, mapMaybe)
 
 -- GHC API
 import qualified BasicTypes
+import           CLaSH.GHC.Compat.CoreSyn    (dfunArgExprs)
+import           CLaSH.GHC.Compat.Outputable (showPpr, showSDoc)
 import qualified Class
-import qualified CoreSyn
-import           CLaSH.GHC.Compat.CoreSyn (dfunArgExprs)
 import qualified CoreFVs
+import qualified CoreSyn
 import qualified Exception
 import qualified FamInstEnv
 import qualified GHC
@@ -26,19 +27,19 @@ import qualified LoadIface
 import qualified Maybes
 import qualified MonadUtils
 import qualified Name
-import           CLaSH.GHC.Compat.Outputable (showPpr,showSDoc)
-import           Outputable (text)
+import           Outputable                  (text)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
-import UniqSupply (UniqSupply)
+import           UniqSupply                  (UniqSupply)
 import qualified Var
 import qualified VarSet
 
 -- Internal Modules
 import           CLaSH.GHC.Types
-import           CLaSH.Util (curLoc,mapAccumLM,maybe',second,traceIf)
+import           CLaSH.Util                  (curLoc, mapAccumLM, maybe',
+                                              second, traceIf)
 
 getExternalTyCons ::
   GHC.GhcMonad m
@@ -81,7 +82,7 @@ runIfl modName action = do
                         localEnv action
 
 loadDecl :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL GHC.TyThing
-loadDecl decl = TcIface.tcIfaceDecl False decl
+loadDecl = TcIface.tcIfaceDecl False
 
 ifaceTyCons :: HscTypes.ModIface -> TcRnTypes.IfL [GHC.TyCon]
 ifaceTyCons = fmap (\md -> (HscTypes.typeEnvTyCons . HscTypes.md_types) md ++
@@ -171,7 +172,7 @@ loadExprFromIface us bndr = do
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
       case ifaceM of
-        Nothing    -> return $! (us,Right bndr)
+        Nothing    -> return (us,Right bndr)
         Just iface -> do
           let decls = map snd (GHC.mi_decls iface)
           let nameFun = GHC.getOccName $ Var.varName bndr
@@ -180,8 +181,8 @@ loadExprFromIface us bndr = do
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
               return $ loadExprFromTyThing us bndr tyThing
-            _ -> return $! (us,Right bndr)
-    Nothing -> return $! (us,Right bndr)
+            _ -> return (us,Right bndr)
+    Nothing -> return (us,Right bndr)
 
 loadExprFromTyThing ::
   UniqSupply
@@ -203,7 +204,7 @@ loadExprFromTyThing us bndr tyThing = case tyThing of
       (CoreSyn.CoreUnfolding {}) ->
         case BasicTypes.inl_inline inlineInfo of
           BasicTypes.NoInline -> (us,Right bndr)
-          _ -> (us,Left $! (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
+          _ -> (us,Left (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
       (CoreSyn.DFunUnfolding dfbndrs _ es) ->
         let (exprs,us') = dfunArgExprs us dfunTy es
         in (us',Left $! Left (bndr, (partition Var.isTyVar dfbndrs,exprs)))

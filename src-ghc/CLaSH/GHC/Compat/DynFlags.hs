@@ -1,11 +1,10 @@
 {-# LANGUAGE CPP #-}
 module CLaSH.GHC.Compat.DynFlags where
 
-import DynFlags (DynFlags)
 #if __GLASGOW_HASKELL__ >= 707
-import DynFlags (GeneralFlag)
+import           DynFlags (DynFlags,GeneralFlag)
 #else
-import DynFlags (DynFlag)
+import           DynFlags (DynFlags,DynFlag)
 #endif
 import qualified DynFlags
 
