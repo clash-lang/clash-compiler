@@ -21,7 +21,8 @@ import           CLaSH.Core.Type              (Type)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
-import           CLaSH.Netlist.Types          (Component (..), HWType)
+import           CLaSH.Netlist.Types          (Component (..), HWType,
+                                               VHDLState)
 import           CLaSH.Netlist.VHDL           (genVHDL, mkTyPackage)
 import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
                                                normalize, runNormalization)
@@ -52,52 +53,65 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
 
   case topEntities of
     [topEntity] -> do
-      (supplyN,supplyTB) <- fmap (Supply.splitSupply . snd .  Supply.freshId) Supply.newSupply
+      -- Create unique supplies for normalisation and TB generation
+      (supplyN,supplyTB) <- ( Supply.splitSupply
+                            . snd
+                            . Supply.freshId)
+                           <$> Supply.newSupply
 
-      prepTime <- dfunMap `seq` Clock.getCurrentTime
-      traceIf True ("Loading dependencies took " ++ show (Clock.diffUTCTime prepTime start)) $ return ()
+      prepTime <- bindingsMap `seq` dfunMap `seq` Clock.getCurrentTime
+      let prepStartDiff = Clock.diffUTCTime prepTime start
+      putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
-      let transformedBindings
-            = runNormalization dbgLevel supplyN bindingsMap dfunMap clsOpMap typeTrans
-            $ normalize [fst topEntity] >>= checkNonRecursive (fst topEntity) >>= cleanupGraph [fst topEntity]
+      let doNorm = do norm <- normalize [fst topEntity]
+                      normChecked <- checkNonRecursive (fst topEntity) norm
+                      cleanupGraph [fst topEntity] normChecked
+
+          transformedBindings =
+            runNormalization dbgLevel supplyN bindingsMap dfunMap clsOpMap
+                             typeTrans doNorm
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
-      traceIf True ("Normalisation took " ++ show (Clock.diffUTCTime normTime prepTime)) $ return ()
+      let prepNormDiff = Clock.diffUTCTime normTime prepTime
+      putStrLn $ "Normalisation took " ++ show prepNormDiff
 
-      (netlist,vhdlState) <- genNetlist Nothing (HashMap.fromList transformedBindings)
-                              primMap
-                              typeTrans
-                              Nothing
-                              (fst topEntity)
+      (netlist,vhdlState) <- genNetlist Nothing
+                               (HashMap.fromList transformedBindings)
+                               primMap typeTrans Nothing (fst topEntity)
 
       netlistTime <- netlist `seq` Clock.getCurrentTime
-      traceIf True ("Netlist generation took " ++ show (Clock.diffUTCTime netlistTime normTime)) $ return ()
+      let normNetDiff = Clock.diffUTCTime netlistTime normTime
+      putStrLn $ "Netlist generation took " ++ show normNetDiff
 
-      (testBench,vhdlState') <- genTestBench dbgLevel supplyTB dfunMap clsOpMap primMap typeTrans vhdlState
+      let topComponent = head
+                       $ filter (\(Component cName _ _ _ _) ->
+                                    Text.isSuffixOf (Text.pack "topEntity_0")
+                                      cName)
+                                netlist
+
+      (testBench,vhdlState') <- genTestBench dbgLevel supplyTB dfunMap
+                                  clsOpMap primMap typeTrans vhdlState
                                   bindingsMap
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
-                                  (head $ filter (\(Component cName _ _ _ _) -> Text.isSuffixOf (Text.pack "topEntity_0") cName) netlist)
+                                  topComponent
+
 
       testBenchTime <- testBench `seq` Clock.getCurrentTime
-      traceIf True ("Testbench generation took " ++ show (Clock.diffUTCTime testBenchTime netlistTime)) $ return ()
+      let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
+      putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-      let (vhdlNms,vhdlDocs,typesPkgM) = flip evalState vhdlState' $ do
-            { (vhdlNms',hwtys,vhdlDocs') <- fmap unzip3 $ mapM genVHDL (netlist ++ testBench)
-            ; let hwtys' = concat hwtys
-            ; typesPkgM'  <- case hwtys' of
-                              [] -> return Nothing
-                              _  -> Just <$> mkTyPackage hwtys'
-            ; return (vhdlNms',vhdlDocs',typesPkgM')
-            }
-
-      let dir = "./vhdl/" ++ takeWhile (/= '.') (name2String $ fst topEntity) ++ "/"
+      let vhdlDocs = createVHDL vhdlState' (netlist ++ testBench)
+          dir = concat [ "./vhdl/"
+                       , takeWhile (/= '.') (name2String $ fst topEntity)
+                       , "/"
+                       ]
       prepareDir dir
-      maybe (return ()) (\typesPkg -> writeVHDL dir ("types", typesPkg)) typesPkgM
-      mapM_ (writeVHDL dir) (zip vhdlNms vhdlDocs)
+      mapM_ (writeVHDL dir) vhdlDocs
 
-      end <- Clock.getCurrentTime
-      traceIf True ("Total compilation took " ++ show (Clock.diffUTCTime end start)) $ return ()
+      end <- vhdlDocs `seq` Clock.getCurrentTime
+      let startEndDiff = Clock.diffUTCTime end start
+      putStrLn $ "Total compilation took " ++ show startEndDiff
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
@@ -119,6 +133,19 @@ isExpectedOutput ::
   -> a
   -> Bool
 isExpectedOutput var _ = isSuffixOf "expectedOutput" $ name2String var
+
+createVHDL :: VHDLState
+           -> [Component]
+           -> [(String,Doc)]
+createVHDL vhdlState components = flip evalState vhdlState $ do
+  (vhdlNms,hwtyss,vhdlDocs) <- unzip3 <$> mapM genVHDL components
+  let hwtys      = concat hwtyss
+      vhdlNmDocs = zip vhdlNms vhdlDocs
+  typesPkgM <- case hwtys of
+                 [] -> return Nothing
+                 _  -> Just <$> mkTyPackage hwtys
+
+  return $ maybe vhdlNmDocs (\t -> ("types",t):vhdlNmDocs) typesPkgM
 
 -- | Prepares the directory for writing VHDL files. This means creating the
 --   dir if it does not exist and removing all existing .vhdl files from it.
