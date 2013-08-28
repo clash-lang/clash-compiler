@@ -6,7 +6,11 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
-module CLaSH.Core.Prim where
+module CLaSH.Core.Prim
+  ( Prim (..)
+  , primType
+  )
+where
 
 import                Unbound.LocallyNameless as Unbound
 
@@ -15,11 +19,11 @@ import {-# SOURCE #-} CLaSH.Core.Term         (Term, TmName)
 import {-# SOURCE #-} CLaSH.Core.Type         (Type)
 
 data Prim
-  = PrimFun  TmName Type
-  | PrimCon  DataCon
-  | PrimDict TmName Type
-  | PrimDFun TmName Type
-  | PrimCo   Type
+  = PrimFun  TmName Type -- ^ Primitive Function
+  | PrimCon  DataCon     -- ^ Primitive DataConstructor
+  | PrimDict TmName Type -- ^ Primitive Dictionary
+  | PrimDFun TmName Type -- ^ Primitive Dictionary Function
+  | PrimCo   Type        -- ^ Mainly there to deal with GHC/SystemFC coercions
   deriving (Eq,Ord,Show)
 
 Unbound.derive [''Prim]
@@ -30,6 +34,7 @@ instance Alpha Prim where
 instance Subst Type Prim
 instance Subst Term Prim
 
+-- | Determines the Type of a Literal
 primType ::
   Prim
   -> Type

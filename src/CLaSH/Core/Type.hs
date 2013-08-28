@@ -19,7 +19,6 @@ module CLaSH.Core.Type
   , KiName
   , TyName
   , TyVar
-  , ThetaType
   , tyView
   , coreView
   , typeKind
@@ -28,8 +27,6 @@ module CLaSH.Core.Type
   , splitTyAppM
   , mkFunTy
   , mkTyConApp
-  , mkForAllTy
-  , mkTyVarTy
   , splitFunTy
   , splitTyConAppM
   , isPolyTy
@@ -52,22 +49,22 @@ import                CLaSH.Core.Var
 import                CLaSH.Util
 
 data Type
-  = VarTy    Kind TyName
-  | ConstTy  ConstTy
-  | ForAllTy (Bind TyVar Type)
-  | AppTy    Type Type
-  | LitTy    LitTy
+  = VarTy    Kind TyName       -- ^ Type variable
+  | ConstTy  ConstTy           -- ^ Type constant
+  | ForAllTy (Bind TyVar Type) -- ^ Polymorphic Type
+  | AppTy    Type Type         -- ^ Type Application
+  | LitTy    LitTy             -- ^ Type literal
   deriving Show
 
 data TypeView
-  = FunTy    Type  Type
-  | TyConApp TyCon [Type]
-  | OtherType Type
+  = FunTy    Type  Type   -- ^ Function type
+  | TyConApp TyCon [Type] -- ^ Applied TyCon
+  | OtherType Type        -- ^ Neither of the above
   deriving Show
 
 data ConstTy
-  = TyCon TyCon
-  | Arrow
+  = TyCon TyCon -- ^ TyCon type
+  | Arrow       -- ^ Function type
   deriving Show
 
 data LitTy
@@ -101,6 +98,7 @@ instance Eq Type where
 instance Ord Type where
   compare = acompare
 
+-- | An easier view on types
 tyView :: Type -> TypeView
 tyView ty@(AppTy _ _) = case splitTyAppM ty of
   Just (ConstTy Arrow, [ty1,ty2]) -> FunTy ty1 ty2
@@ -109,49 +107,61 @@ tyView ty@(AppTy _ _) = case splitTyAppM ty of
 tyView (ConstTy (TyCon tc)) = TyConApp tc []
 tyView t = OtherType t
 
+-- | A view on types in which 'Signal' types and newtypes are transparent
 coreView :: Type -> TypeView
 coreView ty =
   let tView = tyView ty
-  in  case tyView ty of
-        TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args    -> coreView (newTyConInstRhs nt args)
-        TyConApp tc args
-          | name2String (tyConName tc) == "CLaSH.Signal.Signal"  -> coreView (head args)
-          | name2String (tyConName tc) == "CLaSH.Signal.SignalP" -> coreView (head args)
-        _ -> tView
+  in case tyView ty of
+       TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args ->
+         coreView (newTyConInstRhs nt args)
+       TyConApp tc args
+         | name2String (tyConName tc) == "CLaSH.Signal.Signal"  ->
+             coreView (head args)
+         | name2String (tyConName tc) == "CLaSH.Signal.SignalP" ->
+             coreView (head args)
+       _ -> tView
 
+-- | Instantiate and Apply the RHS/Original of a NewType with the given
+-- list of argument types
 newTyConInstRhs :: ([TyName],Type) -> [Type] -> Type
 newTyConInstRhs (tvs,ty) tys = foldl AppTy (substTys (zip tvs tys1) ty) tys2
   where
     (tys1, tys2) = splitAtList tvs tys
 
+-- | Make a function type of an argument and result type
 mkFunTy :: Type -> Type -> Type
 mkFunTy t1 = AppTy (AppTy (ConstTy Arrow) t1)
 
+-- | Make a TyCon Application out of a TyCon and a list of argument types
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tc = foldl AppTy (ConstTy $ TyCon tc)
 
+-- | Make a Type out of a TyCon
 mkTyConTy :: TyCon -> Type
 mkTyConTy ty = ConstTy $ TyCon ty
 
-mkForAllTy :: TyVar -> Type -> Type
-mkForAllTy tv t = ForAllTy $ bind tv t
-
-type PredType  = Type
-type ThetaType = [PredType]
-
-isDictType :: PredType -> Bool
-isDictType ty = case tyConAppTyCon_maybe ty of
+-- | Is a type a Dictionary type?
+isDictType :: Type -> Bool
+isDictType ty = case tyConAppTyConM ty of
     Just (AlgTyCon {isDictTyCon = d}) -> d
     _                                 -> False
 
-tyConAppTyCon_maybe :: Type -> Maybe TyCon
-tyConAppTyCon_maybe (tyView -> TyConApp tc _) = Just tc
-tyConAppTyCon_maybe _                         = Nothing
+-- | Split a TyCon Application in a TyCon and its arguments
+splitTyConAppM :: Type
+               -> Maybe (TyCon,[Type])
+splitTyConAppM (tyView -> TyConApp tc args) = Just (tc,args)
+splitTyConAppM _                            = Nothing
 
+-- | Get the TyCon out of TyCon application
+tyConAppTyConM :: Type -> Maybe TyCon
+tyConAppTyConM = fmap fst . splitTyConAppM
+
+-- | Is a type a Superkind?
 isSuperKind :: Type -> Bool
-isSuperKind (ConstTy (TyCon skc)) = isSuperKindTyCon skc
-isSuperKind _                     = False
+isSuperKind (ConstTy (TyCon (SuperKindTyCon {}))) = True
+isSuperKind _                                     = False
 
+-- | Determine the kind of a type
 typeKind :: Type -> Kind
 typeKind (VarTy k _)          = k
 typeKind (ForAllTy b)         = let (_,ty) = runFreshM $ unbind b
@@ -163,71 +173,62 @@ typeKind (tyView -> FunTy _arg res)
   | otherwise     = liftedTypeKind
   where k = typeKind res
 
-typeKind (tyView -> TyConApp tc args) = kindAppResult (tyConKind tc) args
+typeKind (tyView -> TyConApp tc args) = foldl kindFunResult (tyConKind tc) args
 
 typeKind (AppTy fun arg)      = kindFunResult (typeKind fun) arg
 typeKind (ConstTy ct)         = error $ $(curLoc) ++ "typeKind: naked ConstTy: " ++ show ct
 
-kindAppResult :: Kind -> [Type] -> Kind
-kindAppResult = foldl kindFunResult
-
 kindFunResult :: Kind -> KindOrType -> Kind
 kindFunResult (tyView -> FunTy _ res) _ = res
-kindFunResult (ForAllTy b) arg          = let (kv,ki) = runFreshM . unbind $ b
-                                          in substKindWith (zip [varName kv] [arg]) ki
-kindFunResult k tys                     = error $ $(curLoc) ++ "kindFunResult: " ++ show (k,tys)
 
+kindFunResult (ForAllTy b) arg =
+  let (kv,ki) = runFreshM . unbind $ b
+  in  substKindWith (zip [varName kv] [arg]) ki
+
+kindFunResult k tys =
+  error $ $(curLoc) ++ "kindFunResult: " ++ show (k,tys)
+
+-- | Is a type polymorphic?
 isPolyTy :: Type -> Bool
 isPolyTy (ForAllTy _)            = True
 isPolyTy (tyView -> FunTy _ res) = isPolyTy res
 isPolyTy _                       = False
 
-mkTyVarTy ::
-  Kind
-  -> TyName
-  -> Type
-mkTyVarTy = VarTy
-
-splitFunTy ::
-  Type
-  -> Maybe (Type, Type)
+-- | Split a function type in an argument and result type
+splitFunTy :: Type
+           -> Maybe (Type, Type)
 splitFunTy (coreView -> FunTy arg res) = Just (arg,res)
 splitFunTy _                           = Nothing
 
-isFunTy ::
-  Type
-  -> Bool
+-- | Is a type a function type?
+isFunTy :: Type
+        -> Bool
 isFunTy = isJust . splitFunTy
 
-applyFunTy ::
-  Type
-  -> Type
-  -> Type
+-- | Apply a function type to an argument type and get the result type
+applyFunTy :: Type
+           -> Type
+           -> Type
 applyFunTy (coreView -> FunTy _ resTy) _ = resTy
 applyFunTy _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
-applyTy ::
-  Fresh m
-  => Type
-  -> KindOrType
-  -> m Type
+-- | Substitute the type variable of a type ('ForAllTy') with another type
+applyTy :: Fresh m
+        => Type
+        -> KindOrType
+        -> m Type
 applyTy (ForAllTy b) arg = do
   (tv,ty) <- unbind b
   return $ substTy (varName tv) arg ty
 applyTy _ _ = error $ $(curLoc) ++ "applyTy: not a forall type"
 
-splitTyConAppM ::
-  Type
-  -> Maybe (TyCon,[Type])
-splitTyConAppM (tyView -> TyConApp tc args) = Just (tc,args)
-splitTyConAppM _                            = Nothing
-
-splitTyAppM ::
-  Type
-  -> Maybe (Type, [Type])
-splitTyAppM ty = fmap (second reverse) $ splitTyAppM' [] ty
+-- | Split a type application in the applied type and the argument types
+splitTyAppM :: Type
+            -> Maybe (Type, [Type])
+splitTyAppM = fmap (second reverse) . go []
   where
-    splitTyAppM' args (AppTy ty1 ty2) = case splitTyAppM' args ty1 of
-                                          Nothing             -> Just (ty1,ty2:args)
-                                          Just (ty1',ty1args) -> Just (ty1',ty2:ty1args )
-    splitTyAppM' _ _                  = Nothing
+    go args (AppTy ty1 ty2) =
+      case go args ty1 of
+        Nothing             -> Just (ty1,ty2:args)
+        Just (ty1',ty1args) -> Just (ty1',ty2:ty1args )
+    go _ _ = Nothing

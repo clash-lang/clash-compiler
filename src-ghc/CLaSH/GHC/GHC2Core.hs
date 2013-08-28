@@ -152,7 +152,7 @@ makeTyCon tc = do
                 , C.algTcRhs    = tcRhs
                 , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
                 }
-            Nothing -> return $! C.mkPrimTyCon tcName tcKind tcArity C.VoidRep
+            Nothing -> return $! C.PrimTyCon tcName tcKind tcArity C.VoidRep
 
         mkTupleTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
@@ -182,7 +182,7 @@ makeTyCon tc = do
 
         mkVoidTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
-          return $! C.mkPrimTyCon tcName tcKind tcArity C.VoidRep
+          return $! C.PrimTyCon tcName tcKind tcArity C.VoidRep
 
 makeAlgTyConRhs ::
   AlgTyConRhs

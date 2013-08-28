@@ -5,47 +5,47 @@ import                Unbound.LocallyNameless (subst, substs)
 import                CLaSH.Core.Term         (Term, TmName)
 import {-# SOURCE #-} CLaSH.Core.Type         (KiName, Kind, TyName, Type)
 
-substTys ::
-  [(TyName,Type)]
-  -> Type
-  -> Type
+-- | Substitutes types in a type
+substTys :: [(TyName,Type)]
+         -> Type
+         -> Type
 substTys = substs
 
-substTy ::
-  TyName
-  -> Type
-  -> Type
-  -> Type
+-- | Substitutes a type in a type
+substTy :: TyName
+        -> Type
+        -> Type
+        -> Type
 substTy = subst
 
-substKindWith ::
-  [(KiName,Kind)]
-  -> Kind
-  -> Kind
+-- | Substitutes kinds in a kind
+substKindWith :: [(KiName,Kind)]
+              -> Kind
+              -> Kind
 substKindWith = substs
 
-substTyInTm ::
-  TyName
-  -> Type
-  -> Term
-  -> Term
+-- | Substitutes a type in a term
+substTyInTm :: TyName
+            -> Type
+            -> Term
+            -> Term
 substTyInTm = subst
 
-substTysinTm ::
-  [(TyName,Type)]
-  -> Term
-  -> Term
+-- | Substitutes types in a term
+substTysinTm :: [(TyName,Type)]
+             -> Term
+             -> Term
 substTysinTm = substs
 
-substTm ::
-  TmName
-  -> Term
-  -> Term
-  -> Term
+-- | Substitutes a term in a term
+substTm :: TmName
+        -> Term
+        -> Term
+        -> Term
 substTm = subst
 
-substTms ::
-  [(TmName,Term)]
-  -> Term
-  -> Term
+-- | Substitutes terms in a term
+substTms :: [(TmName,Term)]
+         -> Term
+         -> Term
 substTms = substs

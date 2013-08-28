@@ -38,10 +38,15 @@ import           CLaSH.Util
 
 genNetlist :: Maybe VHDLState
            -> HashMap TmName (Type,Term)
+           -- ^ Global binders
            -> PrimMap
+           -- ^ Primitive definitions
            -> (Type -> Maybe (Either String HWType))
+           -- ^ Hardcoded Type -> HWType translator
            -> Maybe Int
+           -- ^ Symbol count
            -> TmName
+           -- ^ Name of the topEntity
            -> IO ([Component],VHDLState)
 genNetlist vhdlStateM globals primMap typeTrans mStart topEntity = do
   (_,s) <- runNetlistMonad vhdlStateM globals primMap typeTrans $ genComponent topEntity mStart

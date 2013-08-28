@@ -3,8 +3,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 module CLaSH.Core.Pretty
-  ( showDoc
-  )
+  ( showDoc )
 where
 
 import           Data.Char               (isSymbol, isUpper, ord)

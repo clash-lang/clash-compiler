@@ -54,10 +54,10 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
   case topEntities of
     [topEntity] -> do
       -- Create unique supplies for normalisation and TB generation
-      (supplyN,supplyTB) <- ( Supply.splitSupply
-                            . snd
-                            . Supply.freshId)
-                           <$> Supply.newSupply
+      (supplyN,supplyTB) <- Supply.splitSupply
+                          . snd
+                          . Supply.freshId
+                         <$> Supply.newSupply
 
       prepTime <- bindingsMap `seq` dfunMap `seq` Clock.getCurrentTime
       let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -134,6 +134,7 @@ isExpectedOutput ::
   -> Bool
 isExpectedOutput var _ = isSuffixOf "expectedOutput" $ name2String var
 
+-- | Pretty print Components to VHDL Documents
 createVHDL :: VHDLState
            -> [Component]
            -> [(String,Doc)]
@@ -161,6 +162,7 @@ prepareDir dir = do
   -- Remove the files
   mapM_ Directory.removeFile abs_to_remove
 
+-- | Writes a VHDL file to the given directory
 writeVHDL :: FilePath -> (String, Doc) -> IO ()
 writeVHDL dir (cname, vhdl) = do
   handle <- IO.openFile (dir ++ cname ++ ".vhdl") IO.WriteMode

@@ -11,7 +11,13 @@
 {-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
 #endif
 
-module CLaSH.Core.Var where
+module CLaSH.Core.Var
+  ( Var (..)
+  , Id
+  , TyVar
+  , modifyVarName
+  )
+where
 
 import                Unbound.LocallyNameless      as Unbound
 import                Unbound.LocallyNameless.Name (isFree)
@@ -46,6 +52,7 @@ instance Subst Type Id where
   subst tvN u (Id idN ty) | isFree tvN = Id idN (subst tvN u ty)
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
 
+-- | Change the name of a variable
 modifyVarName ::
   (Name a -> Name a)
   -> Var a

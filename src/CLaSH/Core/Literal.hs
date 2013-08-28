@@ -6,7 +6,11 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
-module CLaSH.Core.Literal where
+module CLaSH.Core.Literal
+  ( Literal (..)
+  , literalType
+  )
+where
 
 import                Unbound.LocallyNameless       as Unbound
 import                Unbound.LocallyNameless.Alpha
@@ -29,8 +33,8 @@ instance Alpha Literal where
 instance Subst Type Literal
 instance Subst Term Literal
 
-literalType ::
-  Literal
-  -> Type
+-- | Determines the Type of a Literal
+literalType :: Literal
+            -> Type
 literalType (IntegerLiteral _) = intPrimTy
 literalType (StringLiteral  _) = voidPrimTy

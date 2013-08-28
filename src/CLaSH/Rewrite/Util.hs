@@ -30,7 +30,7 @@ import           CLaSH.Core.Term           (LetBinding, Pat (..), Term (..),
                                             TmName)
 import           CLaSH.Core.TyCon          (tyConDataCons)
 import           CLaSH.Core.Type           (TyName, Type (..), TypeView (..),
-                                            coreView, mkTyVarTy, typeKind)
+                                            coreView, typeKind)
 import           CLaSH.Core.Util           (Delta, Gamma, collectArgs,
                                             mkAbstraction, mkApps, mkId, mkLams,
                                             mkTmApps, mkTyApps, mkTyLams,
@@ -289,7 +289,7 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   -- its free variables
   let newExpr = mkTmApps
                   (mkTyApps (Var newBodyTy newBodyId)
-                            (zipWith mkTyVarTy localFTVkinds localFTVs))
+                            (zipWith VarTy localFTVkinds localFTVs))
                   (zipWith Var localFVtys' localFVs')
   -- Substitute the recursive calls by the new expression
   let e' = substTm idName newExpr e

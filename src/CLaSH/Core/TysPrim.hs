@@ -21,7 +21,7 @@ typeSymbolKindTyConName   = string2Name "__Symbol__"
 
 liftedTypeKind, tySuperKind, typeNatKind, typeSymbolKind :: Kind
 liftedTypeKind = kindTyConType (mkKindTyCon liftedTypeKindTyConName tySuperKind)
-tySuperKind    = kindTyConType (mkSuperKindTyCon tySuperKindTyConName)
+tySuperKind    = kindTyConType (SuperKindTyCon tySuperKindTyConName)
 typeNatKind    = kindTyConType (mkKindTyCon typeNatKindTyConName tySuperKind)
 typeSymbolKind = kindTyConType (mkKindTyCon typeSymbolKindTyConName tySuperKind)
 
@@ -33,7 +33,7 @@ pcPrimTyCon0 ::
   TyConName
   -> PrimRep
   -> TyCon
-pcPrimTyCon0 name = mkPrimTyCon name liftedTypeKind 0
+pcPrimTyCon0 name = PrimTyCon name liftedTypeKind 0
 
 intPrimTy, voidPrimTy :: Type
 intPrimTy  = mkTyConTy (pcPrimTyCon0 intPrimTyConName  IntRep )

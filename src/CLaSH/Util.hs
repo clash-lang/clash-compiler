@@ -198,7 +198,3 @@ splitAtList _ xs@[]   = (xs, xs)
 splitAtList (_:xs) (y:ys) = (y:ys', ys'')
     where
       (ys', ys'') = splitAtList xs ys
-
-maybe' :: b -> Maybe a -> (a -> b) -> b
-maybe' b Nothing  _ = b
-maybe' _ (Just a) f = f a

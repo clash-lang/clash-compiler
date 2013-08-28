@@ -11,18 +11,17 @@ import           CLaSH.Core.Pretty       (showDoc)
 import           CLaSH.Core.Prim         (Prim (..), primType)
 import           CLaSH.Core.Term         (Pat (..), Term (..), TmName)
 import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
-                                          isFunTy, mkForAllTy, mkFunTy,
-                                          splitFunTy)
+                                          isFunTy, mkFunTy, splitFunTy)
 import           CLaSH.Core.Var          (Id, TyVar, Var (..), varType)
 import           CLaSH.Util
 
 type Gamma = HashMap TmName Type
 type Delta = HashMap TyName Kind
 
-termType ::
-  (Functor m, Fresh m)
-  => Term
-  -> m Type
+-- | Determine the type of a term
+termType :: (Functor m, Fresh m)
+         => Term
+         -> m Type
 termType e = case e of
   Var t _     -> return t
   Data dc     -> return $ dcType dc
@@ -31,7 +30,7 @@ termType e = case e of
   Lam b       -> do (v,e') <- unbind b
                     mkFunTy (unembed $ varType v) <$> termType e'
   TyLam b     -> do (tv,e') <- unbind b
-                    mkForAllTy tv <$> termType e'
+                    ForAllTy <$> bind tv <$> termType e'
   App _ _     -> case collectArgs e of
                    (fun, args) -> termType fun >>=
                                   (`applyTypeToArgs` args)
@@ -40,19 +39,19 @@ termType e = case e of
                     termType e'
   Case _ ty _ -> return ty
 
-collectArgs ::
-  Term
-  -> (Term, [Either Term Type])
+-- | Split a (Type)Application in the applied term and it arguments
+collectArgs :: Term
+            -> (Term, [Either Term Type])
 collectArgs = go []
   where
     go args (App e1 e2) = go (Left e2:args) e1
     go args (TyApp e t) = go (Right t:args) e
     go args e           = (e, args)
 
-collectBndrs ::
-  Fresh m
-  => Term
-  -> m ([Either Id TyVar], Term)
+-- | Split a (Type)Abstraction in the bound variables and the abstracted term
+collectBndrs :: Fresh m
+             => Term
+             -> m ([Either Id TyVar], Term)
 collectBndrs = go []
   where
     go bs (Lam b) = do
@@ -63,119 +62,132 @@ collectBndrs = go []
       go (Right tv:bs) e'
     go bs e' = return (reverse bs,e')
 
+-- | Get the result type of a polymorphic function given a list of arguments
 applyTypeToArgs :: Fresh m => Type -> [Either Term Type] -> m Type
 applyTypeToArgs opTy []              = return opTy
 applyTypeToArgs opTy (Right ty:args) = applyTy opTy ty >>=
                                        (`applyTypeToArgs` args)
 applyTypeToArgs opTy (Left e:args)   = case splitFunTy opTy of
   Just (_,resTy) -> applyTypeToArgs resTy args
-  Nothing        -> error $ $(curLoc) ++ "applyTypeToArgs splitFunTy: not a funTy:\n" ++ "opTy: " ++ showDoc opTy ++ "\nTerm: " ++ showDoc e ++ "\nOtherArgs: " ++ unlines (map (either showDoc showDoc) args)
+  Nothing        -> error $
+                    concat [ $(curLoc)
+                           , "applyTypeToArgs splitFunTy: not a funTy:\n"
+                           , "opTy: "
+                           , showDoc opTy
+                           , "\nTerm: "
+                           , showDoc e
+                           , "\nOtherArgs: "
+                           , unlines (map (either showDoc showDoc) args)
+                           ]
 
+-- | Get the list of term-binders out of a DataType pattern
 patIds :: Pat -> [Id]
 patIds (DataPat _ ids) = snd $ unrebind ids
 patIds _               = []
 
-mkTyVar ::
-  Kind
-  -> TyName
-  -> TyVar
+-- | Make a type variable
+mkTyVar :: Kind
+        -> TyName
+        -> TyVar
 mkTyVar tyKind tyName = TyVar tyName (embed tyKind)
 
-mkId ::
-  Type
-  -> TmName
-  -> Id
+-- | Make a term variable
+mkId :: Type
+     -> TmName
+     -> Id
 mkId tmType tmName = Id tmName (embed tmType)
 
-mkAbstraction ::
-  Term
-  -> [Either Id TyVar]
-  -> Term
+-- | Abstract a term over a list of term and type variables
+mkAbstraction :: Term
+              -> [Either Id TyVar]
+              -> Term
 mkAbstraction = foldr (either (Lam `dot` bind) (TyLam `dot` bind))
 
-mkTyLams ::
-  Term
-  -> [TyVar]
-  -> Term
-mkTyLams = foldr (TyLam `dot` bind)
+-- | Abstract a term over a list of term variables
+mkTyLams :: Term
+         -> [TyVar]
+         -> Term
+mkTyLams tm = mkAbstraction tm . map Right
 
-mkLams ::
-  Term
-  -> [Id]
-  -> Term
-mkLams = foldr (Lam `dot` bind)
+-- | Abstract a term over a list of type variables
+mkLams :: Term
+       -> [Id]
+       -> Term
+mkLams tm = mkAbstraction tm . map Left
 
-mkTmApps ::
-  Term
-  -> [Term]
-  -> Term
-mkTmApps = foldl App
-
-mkTyApps ::
-  Term
-  -> [Type]
-  -> Term
-mkTyApps = foldl TyApp
-
-mkApps ::
-  Term
-  -> [Either Term Type]
-  -> Term
+-- | Apply a list of types and terms to a term
+mkApps :: Term
+       -> [Either Term Type]
+       -> Term
 mkApps = foldl (\e a -> either (App e) (TyApp e) a)
 
-isFun ::
-  (Functor m, Fresh m)
-  => Term
-  -> m Bool
+-- | Apply a list of terms to a term
+mkTmApps :: Term
+         -> [Term]
+         -> Term
+mkTmApps = foldl App
+
+-- | Apply a list of types to a term
+mkTyApps :: Term
+         -> [Type]
+         -> Term
+mkTyApps = foldl TyApp
+
+-- | Does a term have a function type?
+isFun :: (Functor m, Fresh m)
+      => Term
+      -> m Bool
 isFun t = fmap isFunTy $ termType t
 
-isLam ::
-  Term
-  -> Bool
+-- | Is a term a term-abstraction?
+isLam :: Term
+      -> Bool
 isLam (Lam _) = True
 isLam _       = False
 
-isLet ::
-  Term
-  -> Bool
+-- | Is a term a recursive let-binding?
+isLet :: Term
+      -> Bool
 isLet (Letrec _) = True
 isLet _          = False
 
-isVar ::
-  Term
-  -> Bool
+-- | Is a term a variable reference?
+isVar :: Term
+      -> Bool
 isVar (Var _ _) = True
 isVar _         = False
 
-isCon ::
-  Term
-  -> Bool
+-- | Is a term a datatype constructor?
+isCon :: Term
+      -> Bool
 isCon (Data _) = True
 isCon _        = False
 
-isPrim ::
-  Term
-  -> Bool
+-- | Is a term a primitive?
+isPrim :: Term
+       -> Bool
 isPrim (Prim _) = True
 isPrim _        = False
 
-isPrimCon ::
-  Term
-  -> Bool
+-- | Is a term a primitive datatype constructor?
+isPrimCon :: Term
+          -> Bool
 isPrimCon (Prim (PrimCon _)) = True
 isPrimCon _                  = False
 
-isPrimFun ::
-  Term
-  -> Bool
+-- | Is a term a primitive functions?
+isPrimFun :: Term
+          -> Bool
 isPrimFun (Prim (PrimFun _ _)) = True
 isPrimFun _                    = False
 
+-- | Make variable reference out of term variable
 idToVar :: Id
         -> Term
 idToVar (Id nm tyE) = Var (unembed tyE) nm
 idToVar tv          = error $ $(curLoc) ++ "idToVar: tyVar: " ++ showDoc tv
 
+-- | Make a term variable out of a variable reference
 varToId :: Term
         -> Id
 varToId (Var ty nm) = Id nm (embed ty)

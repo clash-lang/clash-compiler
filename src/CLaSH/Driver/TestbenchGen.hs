@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-module CLaSH.Driver.TestbenchGen where
+module CLaSH.Driver.TestbenchGen
+  ( genTestBench )
+where
 
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Error                    (EitherT, eitherT,
@@ -12,6 +14,7 @@ import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (intersperse)
 import           Data.Maybe                       (mapMaybe)
+import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy.Builder           as Builder
 import qualified Data.Text.Lazy.Builder.RealFloat as Builder
 import           Text.PrettyPrint.Leijen.Text     ((<+>), (<>))
@@ -37,6 +40,9 @@ import           CLaSH.Rewrite.Types
 
 import           CLaSH.Util
 
+
+-- | Generate a VHDL testbench for a component given a set of stimuli and a
+-- set of matching expected outputs
 genTestBench :: DebugLevel
              -> Supply
              -> DFunMap                      -- ^ Dictionary Functions
@@ -49,27 +55,28 @@ genTestBench :: DebugLevel
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],VHDLState)
-genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState globals stimuliNmM expectedNmM
-  (Component cName [(clkName,Clock rate),(rstName,Reset reset)] [inp] outp _) = eitherT error return $ do
+genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState
+  globals stimuliNmM expectedNmM
+  (Component cName [(clkName,Clock rate),(rstName,Reset reset)] [inp] outp _)
+  = eitherT error return $ do
   let rateF  = fromIntegral rate :: Float
       resetF = fromIntegral reset :: Float
-  (inpDecls,inpComps,vhdlState',inpCnt) <- maybe' (right ([],[],vhdlState,0)) stimuliNmM $ \stimuliNm -> do
-    (decls,sigVs,comps,vhdlState') <- prepareSignals vhdlState primMap globals typeTrans normalizeSignal Nothing stimuliNm
-    let sigAs     = zipWith (\s t -> PP.hsep
-                                     -- [ (PP.text . Text.pack . name2String . varName) s
-                                     [ PP.text s
-                                     , "after"
-                                     , (PP.text . Builder.toLazyText . Builder.formatRealFloat Builder.Fixed (Just 2)) t
-                                     , "ns"
-                                     ]
-                            )
-                      sigVs
+      emptyStimuli = right ([],[],vhdlState,0)
+  (inpDecls,inpComps,vhdlState',inpCnt) <- flip (maybe emptyStimuli) stimuliNmM $ \stimuliNm -> do
+    (decls,sigVs,comps,vhdlState') <- prepareSignals vhdlState primMap globals
+                                        typeTrans normalizeSignal Nothing
+                                        stimuliNm
+
+    let sigAs     = zipWith delayedSignal sigVs
                       (0.0:iterate (+rateF) (0.6 * rateF))
-        sigAs'    = BlackBoxE (PP.displayT . PP.renderPretty 0.4 80 . PP.vsep $ PP.punctuate PP.comma sigAs) Nothing
+        sigAs'    = BlackBoxE ( PP.displayT . PP.renderPretty 0.4 80 . PP.vsep
+                              $ PP.punctuate PP.comma sigAs ) Nothing
         inpAssign = Assignment (fst inp) sigAs'
+
     return (inpAssign:decls,comps,vhdlState',length sigVs)
 
-  (expDecls,expComps,vhdlState'',expCnt) <- maybe' (right ([],[],vhdlState',0)) expectedNmM $ \expectedNm -> do
+  let emptyExpected = right ([],[],vhdlState',0)
+  (expDecls,expComps,vhdlState'',expCnt) <- flip (maybe emptyExpected) expectedNmM $ \expectedNm -> do
     (decls,sigVs,comps,vhdlState'') <- prepareSignals vhdlState' primMap globals typeTrans normalizeSignal (Just inpCnt) expectedNm
     let asserts  = map (genAssert (fst outp)) sigVs
         procDecl = PP.vsep
@@ -135,6 +142,17 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState globals 
 
 genTestBench _ _ _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
 
+delayedSignal :: Text
+              -> Float
+              -> PP.Doc
+delayedSignal s t =
+  PP.hsep
+    [ PP.text s
+    , "after"
+    , renderFloat2Dec t
+    , "ns"
+    ]
+
 renderFloat2Dec :: Float -> PP.Doc
 renderFloat2Dec = PP.text . Builder.toLazyText . Builder.formatRealFloat Builder.Fixed (Just 2)
 
@@ -154,15 +172,17 @@ genAssert compO expV = PP.hsep
   , PP.text "severity error"
   ]
 
-prepareSignals ::
-  VHDLState
-  -> PrimMap
-  -> HashMap TmName (Type,Term)
-  -> (Type -> Maybe (Either String HWType))
-  -> (HashMap TmName (Type,Term) -> TmName -> [(TmName,(Type,Term))])
-  -> Maybe Int
-  -> TmName
-  -> EitherT String IO ([Declaration],[Identifier],[Component],VHDLState)
+prepareSignals :: VHDLState
+               -> PrimMap
+               -> HashMap TmName (Type,Term)
+               -> (Type -> Maybe (Either String HWType))
+               -> ( HashMap TmName (Type,Term)
+                    -> TmName
+                    -> [(TmName,(Type,Term))])
+               -> Maybe Int
+               -> TmName
+               -> EitherT String IO
+                    ([Declaration],[Identifier],[Component],VHDLState)
 prepareSignals vhdlState primMap globals typeTrans normalizeSignal mStart signalNm = do
   let signalS = name2String signalNm
   (signalTy,signalTm) <- hoistEither $ note ($(curLoc) ++ "Unable to find: " ++ signalS)
@@ -193,7 +213,7 @@ termToList e = case second lefts $ collectArgs e of
   where
     errNoConstruct l = left $ l ++ "Can't deconstruct list literal: " ++ show (second lefts $ collectArgs e)
 
-stimuliElemTy ::Monad m => Type -> EitherT String m Type
+stimuliElemTy :: Monad m => Type -> EitherT String m Type
 stimuliElemTy ty = case splitTyConAppM ty of
   (Just (tc,[arg]))
     | name2String (tyConName tc) == "GHC.Types.[]" -> return arg

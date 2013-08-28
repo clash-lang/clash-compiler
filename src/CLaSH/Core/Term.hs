@@ -6,7 +6,13 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
-module CLaSH.Core.Term where
+module CLaSH.Core.Term
+  ( Term (..)
+  , TmName
+  , LetBinding
+  , Pat (..)
+  )
+where
 
 -- External Modules
 import                Unbound.LocallyNameless       as Unbound hiding (Data)
@@ -22,16 +28,17 @@ import                CLaSH.Core.Var                (Id, TyVar)
 import                CLaSH.Util
 
 data Term
-  = Var     Type TmName
-  | Data    DataCon
-  | Literal Literal
-  | Prim    Prim
-  | Lam     (Bind Id Term)
-  | TyLam   (Bind TyVar Term)
-  | App     Term Term
-  | TyApp   Term Type
-  | Letrec  (Bind (Rec [LetBinding]) Term)
-  | Case    Term Type [Bind Pat Term]
+  = Var     Type TmName -- ^ Variable reference
+  | Data    DataCon -- ^ Datatype constructor
+  | Literal Literal -- ^ Literal
+  | Prim    Prim -- ^ Primitive
+  | Lam     (Bind Id Term) -- ^ Term-abstraction
+  | TyLam   (Bind TyVar Term) -- ^ Type-abstraction
+  | App     Term Term -- ^ Application
+  | TyApp   Term Type -- ^ Type-application
+  | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
+  | Case    Term Type [Bind Pat Term] -- ^ Case-expression: subject, type of
+                                      -- alternatives, list of alternatives
   deriving Show
 
 type TmName     = Name Term
@@ -39,8 +46,12 @@ type LetBinding = (Id, Embed Term)
 
 data Pat
   = DataPat (Embed DataCon) (Rebind [TyVar] [Id])
+  -- ^ Datatype pattern, '[TyVar]' bind existentially-quantified
+  -- type-variables of a DataCon
   | LitPat  (Embed Literal)
+  -- ^ Literal pattern
   | DefaultPat
+  -- ^ Default pattern
   deriving (Show)
 
 Unbound.derive [''Term,''Pat]

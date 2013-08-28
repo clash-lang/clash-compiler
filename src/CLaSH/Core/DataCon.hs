@@ -6,7 +6,13 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
-module CLaSH.Core.DataCon where
+module CLaSH.Core.DataCon
+  ( DataCon (..)
+  , DcName
+  , ConTag
+  , dataConInstArgTys
+  )
+where
 
 import                Unbound.LocallyNameless as Unbound
 
@@ -16,12 +22,16 @@ import                CLaSH.Util
 
 data DataCon
   = MkData
-  { dcName       :: DcName
-  , dcTag        :: ConTag
-  , dcType       :: Type
-  , dcUnivTyVars :: [TyName]
-  , dcExtTyVars  :: [TyName]
-  , dcArgTys     :: [Type]
+  { dcName       :: DcName   -- ^ Name of the DataCon
+  , dcTag        :: ConTag   -- ^ Syntactical position in the type definition
+  , dcType       :: Type     -- ^ Type of the 'DataCon
+  , dcUnivTyVars :: [TyName] -- ^ Universally quantified type-variables,
+                             -- these type variables are also part of the
+                             -- result type of the DataCon
+  , dcExtTyVars  :: [TyName] -- ^ Existentially quantified type-variables,
+                             -- these type variables are not part of the result
+                             -- of the DataCon, but only of the arguments.
+  , dcArgTys     :: [Type]   -- ^ Argument types
   }
 
 instance Show DataCon where
@@ -56,6 +66,11 @@ instance Alpha DataCon where
 instance Subst Type DataCon
 instance Subst Term DataCon
 
+-- | Given a DataCon and a list of types, the type variables of the DataCon
+-- type are substituted for the list of types. The argument types are returned.
+--
+-- The list of types should be equal to the number of type variables, otherwise
+-- an error is reported.
 dataConInstArgTys :: DataCon -> [Type] -> [Type]
 dataConInstArgTys (MkData { dcArgTys     = arg_tys
                           , dcUnivTyVars = univ_tvs

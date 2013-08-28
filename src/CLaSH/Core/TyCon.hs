@@ -7,7 +7,16 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
-module CLaSH.Core.TyCon where
+module CLaSH.Core.TyCon
+  ( TyCon (..)
+  , TyConName
+  , AlgTyConRhs (..)
+  , PrimRep (..)
+  , mkKindTyCon
+  , isTupleTyConLike
+  , tyConDataCons
+  )
+where
 
 -- External Import
 import                Unbound.LocallyNameless as Unbound
@@ -19,23 +28,24 @@ import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import                CLaSH.Util
 
 data TyCon
+  -- | Algorithmic DataCons
   = AlgTyCon
-  { tyConName   :: TyConName
-  , tyConKind   :: Kind
-  , tyConArity  :: Int
-  , algTcRhs    :: AlgTyConRhs
-  , isDictTyCon :: Bool
+  { tyConName   :: TyConName   -- ^ Name of the TyCon
+  , tyConKind   :: Kind        -- ^ Kind of the TyCon
+  , tyConArity  :: Int         -- ^ Number of type arguments
+  , algTcRhs    :: AlgTyConRhs -- ^ DataCon definitions
+  , isDictTyCon :: Bool        -- ^ Is a dictionary TyCon
   }
-
+  -- | Primitive TyCons
   | PrimTyCon
-  { tyConName    :: TyConName
-  , tyConKind    :: Kind
-  , tyConArity   :: Int
-  , primTyConRep :: PrimRep
+  { tyConName    :: TyConName  -- ^ Name of the TyCon
+  , tyConKind    :: Kind       -- ^ Kind of the TyCon
+  , tyConArity   :: Int        -- ^ Number of type arguments
+  , primTyConRep :: PrimRep    -- ^ Representation
   }
-
+  -- | To close the loop on the type hierarchy
   | SuperKindTyCon
-  { tyConName :: TyConName
+  { tyConName :: TyConName     -- ^ Name of the TyCon
   }
 
 instance Show TyCon where
@@ -51,11 +61,15 @@ type TyConName = Name TyCon
 
 data AlgTyConRhs
   = DataTyCon
-  { data_cons :: [DataCon]
+  { dataCons :: [DataCon]        -- ^ The DataCons of a TyCon
   }
   | NewTyCon
-  { data_con    :: DataCon
-  , nt_etad_rhs :: ([TyName],Type)
+  { dataCon   :: DataCon         -- ^ The newtype DataCon
+  , ntEtadRhs :: ([TyName],Type) -- ^ The argument type of the newtype
+                                 -- DataCon in eta-reduced form, which is
+                                 -- just the representation of the TyCon.
+                                 -- The TyName's are the type-variables from
+                                 -- the corresponding TyCon.
   }
   deriving Show
 
@@ -92,36 +106,14 @@ instance Subst Term TyCon
 instance Subst Term AlgTyConRhs
 instance Subst Term PrimRep
 
-mkKindTyCon ::
-  TyConName
-  -> Kind
-  -> TyCon
+-- | Create a Kind out of a TyConName
+mkKindTyCon :: TyConName
+            -> Kind
+            -> TyCon
 mkKindTyCon name kind
-  = mkPrimTyCon name kind 0 VoidRep
+  = PrimTyCon name kind 0 VoidRep
 
-mkSuperKindTyCon ::
-  TyConName
-  -> TyCon
-mkSuperKindTyCon = SuperKindTyCon
-
-mkPrimTyCon ::
-  TyConName
-  -> Kind
-  -> Int
-  -> PrimRep
-  -> TyCon
-mkPrimTyCon name kind arity rep
-  = PrimTyCon
-  { tyConName = name
-  , tyConKind = kind
-  , tyConArity = arity
-  , primTyConRep = rep
-  }
-
-isSuperKindTyCon :: TyCon -> Bool
-isSuperKindTyCon (SuperKindTyCon {}) = True
-isSuperKindTyCon _                   = False
-
+-- | Does the TyCon look like a tuple TyCon
 isTupleTyConLike :: TyCon -> Bool
 isTupleTyConLike (AlgTyCon {tyConName = nm}) = tupleName (name2String nm)
   where
@@ -133,7 +125,8 @@ isTupleTyConLike (AlgTyCon {tyConName = nm}) = tupleName (name2String nm)
 
 isTupleTyConLike _ = False
 
+-- | Get the DataCons belonging to a TyCon
 tyConDataCons :: TyCon -> [DataCon]
-tyConDataCons (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons}}) = cons
-tyConDataCons (AlgTyCon {algTcRhs = NewTyCon  { data_con  = con }}) = [con]
-tyConDataCons _                                                     = []
+tyConDataCons (AlgTyCon {algTcRhs = DataTyCon { dataCons = cons}}) = cons
+tyConDataCons (AlgTyCon {algTcRhs = NewTyCon  { dataCon  = con }}) = [con]
+tyConDataCons _                                                    = []
