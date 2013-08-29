@@ -21,10 +21,10 @@ termFreeVars tm = (termFreeTyVars tm, termFreeIds tm)
 termFreeIds :: Collection c
             => Term
             -> c TmName
-termFreeIds = snd . termFreeVars
+termFreeIds = fv
 
 -- | Gives the free type-variables of a Term
 termFreeTyVars :: Collection c
                => Term
                -> c TyName
-termFreeTyVars = fst . termFreeVars
+termFreeTyVars = fv
