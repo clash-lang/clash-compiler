@@ -48,7 +48,9 @@ data TyCon
   }
 
 instance Show TyCon where
-  show = show . tyConName
+  show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
+  show (PrimTyCon      {tyConName = n}) = "PrimTyCon: " ++ show n
+  show (SuperKindTyCon {tyConName = n}) = "SuperKindTyCon: " ++ show n
 
 instance Eq TyCon where
   (==) = (==) `on` tyConName
