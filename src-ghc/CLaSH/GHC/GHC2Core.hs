@@ -36,6 +36,7 @@ import           BasicTypes                  (TupleSort (..))
 import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)
 import           CLaSH.GHC.Compat.Outputable (showPpr)
 import           CLaSH.GHC.Compat.TyCon      (isSuperKindTyCon)
+-- import           Coercion                    (coercionKind, coercionType)
 import           Coercion                    (coercionType)
 import           CoreFVs                     (exprSomeFreeVars)
 import           CoreSyn                     (AltCon (..), Bind (..), CoreExpr,
@@ -52,6 +53,7 @@ import           Module                      (moduleName, moduleNameString)
 import           Name                        (Name, nameModule_maybe,
                                               nameOccName)
 import           OccName                     (occNameString)
+-- import           Pair                        (Pair (..))
 import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
                                               TyCon, algTyConRhs, isAlgTyCon,
                                               isFunTyCon, isNewTyCon,
@@ -259,6 +261,14 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
         return $ C.Letrec $ bind (rec [(b',embed e')]) ct
       else caseTerm e'
 
+    -- term j@(Cast e co)     = traceIf True ("CAST: " ++ showPpr j) $ case coercionKind co of
+    --                            Pair ty1 ty2 -> do
+    --                              ty1C <- coreToType ty1
+    --                              ty2C <- coreToType ty2
+    --                              eC   <- term e
+    --                              let caTy = C.mkFunTy ty1C ty2C
+    --                                  ca   = C.Prim (string2Name "_CAST_") caTy
+    --                              return (C.App ca eC)
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
     term (Type t)          = C.Prim (string2Name "_TY_") <$> coreToType t
