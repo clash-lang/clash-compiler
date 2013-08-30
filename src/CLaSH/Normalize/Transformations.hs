@@ -20,13 +20,11 @@ module CLaSH.Normalize.Transformations
   , deadCode
   , topLet
   , inlineWrapper
-  , classOpResolution
-  , inlineSingularDFun
   , recToLetRec
   )
 where
 
-import           Control.Lens                ((%=))
+import           Control.Lens                ((.=),(%=))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
@@ -42,14 +40,10 @@ import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 import           CLaSH.Core.DataCon          (DataCon, dcTag, dcUnivTyVars)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               termFreeVars, typeFreeVars)
-import           CLaSH.Core.Pretty           (showDoc)
-import           CLaSH.Core.Prim             (Prim (..))
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
-import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
-                                              TmName)
-import           CLaSH.Core.Type             (TyName, Type, applyFunTy, applyTy,
-                                              isDictType, splitFunTy)
+import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
+import           CLaSH.Core.Type             (applyFunTy, applyTy, splitFunTy)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPrim, isVar,
                                               mkApps, mkLams, mkTmApps,
@@ -266,19 +260,27 @@ bindConstantVar = inlineBinders test
   where
     test (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
 
-inlineClosedTerm :: NormRewrite
-inlineClosedTerm _ e@(Var _ f) = R $ do
+inlineClosedTerm :: String -> NormRewrite -> NormRewrite
+inlineClosedTerm rwS rw _ e@(Var _ f) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+  normMaybe <- fmap (HashMap.lookup f) $ liftR $ Lens.use normalized
   case bodyMaybe of
     Just (_,body) -> do
       closed <- isClosed body
       untranslatable <- isUntranslatable body
       if closed && not untranslatable
-        then changed body
+        then case normMaybe of
+               Just norm -> changed norm
+               Nothing   -> do cf <- liftR $ Lens.use curFun
+                               liftR $ curFun .= f
+                               newNorm <- lift $ runRewrite rwS rw body
+                               liftR $ curFun .= cf
+                               liftR $ normalized %= HashMap.insert f newNorm
+                               changed newNorm
         else return e
     _ -> return e
 
-inlineClosedTerm _ e = return e
+inlineClosedTerm _ _ _ e = return e
 
 constantSpec :: NormRewrite
 constantSpec ctx e@(App e1 e2)
@@ -318,103 +320,6 @@ inlineWrapper _ e@(Var _ f) = R $ do
     _ -> return e
 
 inlineWrapper _ e = return e
-
--- Class Operator Resolution
-classOpResolution :: NormRewrite
-classOpResolution ctx e@(App (TyApp (collectArgs -> (Prim (PrimFun sel _),_)) _) dict) = R $ do
-  classSelM <- fmap (fmap snd . HashMap.lookup sel) $ Lens.use classOps
-  isDict    <- fmap isDictType $ termType dict
-  case classSelM of
-    Just classSel | isDict -> case collectArgs dict of
-      (Prim (PrimDFun dfun _),dfunArgs) -> do
-        dfunOpsM <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
-        case dfunOpsM of
-          Just ((dfunTyBndrs,dfunTmBndrs),dfunOps)
-            | classSel < length dfunOps
-            , (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs
-            -> let (tySubst,tmSubst) = dfunSubst dfunTyBndrs dfunTmBndrs dfunArgs
-               in  changed $! substTms tmSubst $ substTysinTm tySubst (dfunOps !! classSel)
-          Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
-          _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e ++ show dfunOpsM
-      (Var _ fdict,dfunArgs) -> do
-        dictBindingM <- fmap (fmap snd . HashMap.lookup fdict) $ Lens.use bindings
-        case dictBindingM of
-          Just dictBinding | isDict -> do
-            clsExpr <- chaseDfun classSel ctx dictBinding
-            changed $ mkApps clsExpr dfunArgs
-          _ -> return e
-      _ -> return e
-    _ -> return e
-
-classOpResolution ctx e@(Case scrut ty [alt]) = R $
-  case collectArgs scrut of
-    (Prim (PrimDFun df t), dfunArgs) -> do
-      (pat,altExpr) <- unbind alt
-      dfunOpsM <- fmap (fmap snd . HashMap.lookup df) $ Lens.use dictFuns
-      case (dfunOpsM,pat) of
-        (Just ((dfunTyBndrs,dfunTmBndrs),dfunOps), DataPat _ pxs)
-          | (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs ->
-            let (tySubst,tmSubst) = dfunSubst dfunTyBndrs dfunTmBndrs dfunArgs
-                dfunOps'  = map (substTms tmSubst . substTysinTm tySubst) dfunOps
-                (_,xs)    = unrebind pxs
-                fvs       = termFreeIds altExpr
-                (binds,_) = List.partition ((`elem` fvs) . varName . fst) $ zip xs dfunOps'
-                altExpr'  = case binds of
-                               [] -> altExpr
-                               _  -> Letrec $ bind (rec $ map (second embed) binds) altExpr
-            in changed altExpr'
-        (Nothing,_)  -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
-        _            -> error $ $(curLoc) ++ "No DataPat: " ++ showDoc e
-    (Prim (PrimFun _ _), _)  -> error $ "FUN: " ++ showDoc scrut
-    (Prim (PrimDict _ _), _) -> error $ "DICT: " ++ showDoc scrut
-    _ -> return e
-
-classOpResolution _ e = return e
-
-chaseDfun ::
-  (Monad m, Functor m)
-  => Int
-  -> [CoreContext]
-  -> Term
-  -> RewriteMonad m Term
-chaseDfun classSel ctx e = case collectArgs e of
-  (Prim (PrimDFun dfun _), dfunArgs) -> do
-    dfunOpsM  <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
-    case dfunOpsM of
-      Just ((dfunTyBndrs,dfunTmBndrs),dfunOps)
-        | classSel < length dfunOps
-        , (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs
-        -> let (tySubst,tmSubst) = dfunSubst dfunTyBndrs dfunTmBndrs dfunArgs
-               dfunOp  = substTms tmSubst $ substTysinTm tySubst (dfunOps !! classSel)
-           in return $! dfunOp
-      Nothing -> error $ $(curLoc) ++ "No DFun for: " ++ showDoc e
-      _ -> error $ $(curLoc) ++ "Class selector larger than number of expressions in Dfun: " ++ showDoc e
-  (Literal _, _) -> return e
-  _ -> mkSelectorCase "chaseDfun" ctx e 1 classSel
-
-inlineSingularDFun :: NormRewrite
-inlineSingularDFun _ e@(collectArgs -> (Prim (PrimDFun dfun _),dfunArgs)) = R $ do
-  bodyMaybe <- fmap (fmap snd . HashMap.lookup dfun) $ Lens.use dictFuns
-  case bodyMaybe of
-    Just ((dfunTyBndrs,dfunTmBndrs),[dfunOp])
-      | (length dfunTyBndrs + length dfunTmBndrs) == length dfunArgs
-      -> let (tySubst,tmSubst) = dfunSubst dfunTyBndrs dfunTmBndrs dfunArgs
-             dfunOp' = substTms tmSubst $ substTysinTm tySubst dfunOp
-         in return $! dfunOp'
-      | otherwise -> return e
-    _ -> return e
-
-inlineSingularDFun _ e = return e
-
-dfunSubst :: [TyName]
-          -> [TmName]
-          -> [Either Term Type]
-          -> ([(TyName,Type)],[(TmName,Term)])
-dfunSubst dfunTyBndrs dfunTmBndrs dfunArgs = (tySubst,tmSubst)
-  where
-    (dfunTms,dfunTys) = Either.partitionEithers dfunArgs
-    tySubst           = zip dfunTyBndrs dfunTys
-    tmSubst           = zip dfunTmBndrs dfunTms
 
 -- Experimental
 appProp :: NormRewrite
@@ -586,7 +491,7 @@ etaExpansionTL ctx e
 
 recToLetRec :: NormRewrite
 recToLetRec [] e = R $ do
-  fn <- liftR $ Lens.use curFun
+  fn          <- liftR $ Lens.use curFun
   bodyM       <- fmap (HashMap.lookup fn) $ Lens.use bindings
   normalizedE <- splitNormalized e
   case (normalizedE,bodyM) of

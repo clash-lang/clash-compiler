@@ -17,7 +17,7 @@ allR :: forall m . (Functor m, Monad m, Fresh m) => Bool -> Transform m -> Trans
 allR _ _ _ (Var t x)   = return (Var t x)
 allR _ _ _ (Data dc)   = return (Data dc)
 allR _ _ _ (Literal l) = return (Literal l)
-allR _ _ _ (Prim p)    = return (Prim p)
+allR _ _ _ (Prim nm t) = return (Prim nm t)
 
 allR rf trans c (Lam b) = do
   (v,e) <- if rf then unbind b else return (unsafeUnbind b)

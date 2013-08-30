@@ -53,13 +53,12 @@ import           Name                        (Name, nameModule_maybe,
                                               nameOccName)
 import           OccName                     (occNameString)
 import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
-                                              TyCon, TyConParent (..),
-                                              algTyConRhs, isAlgTyCon,
+                                              TyCon, algTyConRhs, isAlgTyCon,
                                               isFunTyCon, isNewTyCon,
                                               isPrimTyCon, isPromotedDataCon,
                                               isSynTyCon, isTupleTyCon,
                                               tyConArity, tyConDataCons,
-                                              tyConKind, tyConName, tyConParent,
+                                              tyConKind, tyConName,
                                               tyConPrimRep, tyConUnique)
 import           Type                        (tcView)
 import           TypeRep                     (TyLit (..), Type (..))
@@ -73,7 +72,6 @@ import           VarSet                      (isEmptyVarSet)
 -- Local imports
 import qualified CLaSH.Core.DataCon          as C
 import qualified CLaSH.Core.Literal          as C
-import qualified CLaSH.Core.Prim             as C
 import qualified CLaSH.Core.Term             as C
 import qualified CLaSH.Core.TyCon            as C
 import qualified CLaSH.Core.Type             as C
@@ -141,7 +139,7 @@ makeTyCon tc = do
 
         mkAlgTyCon = do
           tcKind <- lift $ coreToType (tyConKind tc)
-          tcRhsM  <- makeAlgTyConRhs $ algTyConRhs tc
+          tcRhsM <- makeAlgTyConRhs $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
               return
@@ -150,7 +148,6 @@ makeTyCon tc = do
                 , C.tyConKind   = tcKind
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcRhs
-                , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
                 }
             Nothing -> return $! C.PrimTyCon tcName tcKind tcArity C.VoidRep
 
@@ -163,7 +160,6 @@ makeTyCon tc = do
             , C.tyConKind   = tcKind
             , C.tyConArity  = tcArity
             , C.algTcRhs    = tcDc
-            , C.isDictTyCon = coreIsDictTyCon $ tyConParent tc
             }
 
         mkPrimTyCon = do
@@ -226,11 +222,10 @@ makeDataCon dc = do
 coreToTerm ::
   PrimMap
   -> [Var]
-  -> [Var]
   -> GHC2CoreState
   -> CoreExpr
   -> C.Term
-coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr) s
+coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
   where
     term (Var x)                 = var x
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
@@ -266,8 +261,8 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
 
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
-    term (Type _)          = error $ $(curLoc) ++ "Type at non-argument position not supported"
-    term (Coercion co)     = C.Prim <$> C.PrimCo <$> coreToType (coercionType co)
+    term (Type t)          = C.Prim (string2Name "_TY_") <$> coreToType t
+    term (Coercion co)     = C.Prim (string2Name "_CO_") <$> coreToType (coercionType co)
 
     var x =
       let xVar   = coreToVar x
@@ -279,31 +274,23 @@ coreToTerm primMap unlocs dfunvars s coreExpr = Reader.runReader (term coreExpr)
         case isDataConId_maybe x of
           Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
                   | otherwise -> case HashMap.lookup xNameS primMap of
-                      Just (Primitive _ Constructor) ->
-                        C.Prim <$> C.PrimCon <$> coreToDataCon False dc
-                      Just (BlackBox {}) ->
-                        return $ C.Prim (C.PrimFun xPrim xType)
-                      _ | isDataConWorkId x -> C.Data <$> coreToDataCon False dc
+                      Just _ -> return $ C.Prim xPrim xType
+                      Nothing
+                        | isDataConWorkId x -> C.Data <$> coreToDataCon False dc
                         | otherwise         -> C.Data <$> coreToDataCon True  dc
           Nothing -> case HashMap.lookup xNameS primMap of
-            Just (Primitive _ Dictionary) ->
-              return $ C.Prim (C.PrimDict xPrim xType)
-            Just (Primitive f Function)
+            Just (Primitive f _)
               | f == pack "CLaSH.Signal.mapSignal" -> return (mapSyncTerm xType)
               | f == pack "CLaSH.Signal.appSignal" -> return (mapSyncTerm xType)
               | f == pack "CLaSH.Signal.signal"    -> return (syncTerm xType)
               | f == pack "CLaSH.Signal.pack"      -> return (splitCombineTerm False xType)
               | f == pack "CLaSH.Signal.unpack"    -> return (splitCombineTerm True xType)
-            Just (Primitive _ Function) ->
-              return $ C.Prim (C.PrimFun  xPrim xType)
-            Just (Primitive _ Constructor) ->
-              error $ $(curLoc) ++ "Primitive DataCon not a identified as DataCon"
+              | otherwise                          -> return (C.Prim xPrim xType)
             Just (BlackBox {}) ->
-              return $ C.Prim (C.PrimFun xPrim xType)
+              return (C.Prim xPrim xType)
             Nothing
-              | x `elem` unlocs -> return $ C.Prim (C.PrimFun xPrim xType)
-              | x `elem` dfunvars -> return $ C.Prim (C.PrimDFun xVar xType)
-              | otherwise -> return $ C.Var xType xVar
+              | x `elem` unlocs -> return (C.Prim xPrim xType)
+              | otherwise -> return  (C.Var xType xVar)
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> term e
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> term e
@@ -369,14 +356,6 @@ coreToTyCon ::
 coreToTyCon tc = fmap ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc ++ " not found " ++ show (TyCon.isPromotedDataCon tc) )
                       . HashMap.lookup tc
                       ) $ view tyConMap
-
-coreIsDictTyCon ::
-  TyConParent
-  -> Bool
-coreIsDictTyCon algTcParent = case algTcParent of
-  NoParentTyCon -> False
-  ClassTyCon _  -> True
-  _             -> error $ $(curLoc) ++ "Can't convert algTcParent: " ++ showPpr algTcParent
 
 coreToPrimRep ::
   PrimRep

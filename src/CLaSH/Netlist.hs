@@ -22,7 +22,6 @@ import           Unbound.LocallyNameless    (Embed (..), name2String,
 import           CLaSH.Core.DataCon         (DataCon (..))
 import           CLaSH.Core.Literal         (Literal (..))
 import           CLaSH.Core.Pretty          (showDoc)
-import           CLaSH.Core.Prim            (Prim (..))
 import           CLaSH.Core.Term            (Pat (..), Term (..), TmName)
 import qualified CLaSH.Core.Term            as Core
 import           CLaSH.Core.Type            (Type)
@@ -236,7 +235,7 @@ mkExpr ty app = do
     Data dc
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
       | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim (PrimFun nm _) -> do
+    Prim nm _ -> do
       bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) ->

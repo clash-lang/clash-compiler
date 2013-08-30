@@ -15,7 +15,8 @@ where
 import Control.Applicative            as X (Applicative,(<$>),(<*>),pure)
 import Control.Arrow                  as X (first,second)
 import Control.Monad                  as X ((<=<),(>=>))
-import Control.Monad.State            (MonadState,State,runState)
+import Control.Monad.State            (MonadState,State,StateT,runState)
+import qualified Control.Monad.State  as State
 import Control.Monad.Trans.Class      (MonadTrans,lift)
 import Data.Function                  as X (on)
 import Data.Hashable                  (Hashable(..),hash)
@@ -31,6 +32,12 @@ import Unbound.LocallyNameless.Name   (Name(..))
 
 class MonadUnique m where
   getUniqueM :: m Int
+
+instance Monad m => MonadUnique (StateT Int m) where
+  getUniqueM = do
+    supply <- State.get
+    State.modify (+1)
+    return supply
 
 instance Hashable (Name a) where
   hashWithSalt salt (Nm _ (str,int)) = hashWithSalt salt (hashWithSalt (hash int) str)

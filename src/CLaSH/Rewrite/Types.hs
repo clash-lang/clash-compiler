@@ -16,7 +16,6 @@ import Unbound.LocallyNameless   (Fresh, FreshMT)
 import CLaSH.Core.Term           (Term, TmName)
 import CLaSH.Core.Type           (Type)
 import CLaSH.Core.Var            (Id, TyVar)
-import CLaSH.Driver.Types
 import CLaSH.Netlist.Types       (HWType)
 import CLaSH.Util
 
@@ -35,8 +34,6 @@ data RewriteState
   = RewriteState
   { _transformCounter :: Int
   , _bindings         :: HashMap TmName (Type,Term)
-  , _dictFuns         :: DFunMap
-  , _classOps         :: ClassOpMap
   , _uniqSupply       :: Supply
   , _typeTranslator   :: Type -> Maybe (Either String HWType)
   }

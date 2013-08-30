@@ -33,13 +33,11 @@ import           CLaSH.Util
 import qualified Data.Time.Clock              as Clock
 
 generateVHDL :: BindingMap
-             -> ClassOpMap
-             -> DFunMap
              -> PrimMap
              -> (Type -> Maybe (Either String HWType))
              -> DebugLevel
              -> IO ()
-generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
+generateVHDL bindingsMap primMap typeTrans dbgLevel = do
   start <- Clock.getCurrentTime
 
   let topEntities = HashMap.toList
@@ -59,17 +57,16 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
                           . Supply.freshId
                          <$> Supply.newSupply
 
-      prepTime <- bindingsMap `seq` dfunMap `seq` Clock.getCurrentTime
+      prepTime <- bindingsMap `seq` Clock.getCurrentTime
       let prepStartDiff = Clock.diffUTCTime prepTime start
       putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
       let doNorm = do norm <- normalize [fst topEntity]
-                      normChecked <- checkNonRecursive (fst topEntity) norm
+                      let normChecked = checkNonRecursive (fst topEntity) norm
                       cleanupGraph [fst topEntity] normChecked
 
           transformedBindings =
-            runNormalization dbgLevel supplyN bindingsMap dfunMap clsOpMap
-                             typeTrans doNorm
+            runNormalization dbgLevel supplyN bindingsMap typeTrans doNorm
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -89,9 +86,8 @@ generateVHDL bindingsMap clsOpMap dfunMap primMap typeTrans dbgLevel = do
                                       cName)
                                 netlist
 
-      (testBench,vhdlState') <- genTestBench dbgLevel supplyTB dfunMap
-                                  clsOpMap primMap typeTrans vhdlState
-                                  bindingsMap
+      (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
+                                  typeTrans vhdlState bindingsMap
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
                                   topComponent

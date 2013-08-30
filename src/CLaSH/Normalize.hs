@@ -14,14 +14,12 @@ import           CLaSH.Core.FreeVars       (termFreeIds)
 import           CLaSH.Core.Pretty         (showDoc)
 import           CLaSH.Core.Term           (Term, TmName)
 import           CLaSH.Core.Type           (Type)
-import           CLaSH.Driver.Types
 import           CLaSH.Netlist.Types       (HWType)
 import           CLaSH.Normalize.Strategy
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Rewrite.Types       (DebugLevel (..), RewriteState (..),
-                                            bindings, classOps, dbgLevel,
-                                            dictFuns)
+                                            bindings, dbgLevel)
 import           CLaSH.Rewrite.Util        (liftRS, runRewrite,
                                             runRewriteSession)
 import           CLaSH.Util
@@ -30,16 +28,14 @@ runNormalization ::
   DebugLevel
   -> Supply
   -> HashMap TmName (Type,Term)
-  -> DFunMap
-  -> ClassOpMap
   -> (Type -> Maybe (Either String HWType))
   -> NormalizeSession a
   -> a
-runNormalization lvl supply globals dfunMap clsOpMap typeTrans
+runNormalization lvl supply globals typeTrans
   = flip State.evalState normState
   . runRewriteSession lvl rwState
   where
-    rwState   = RewriteState 0 globals dfunMap clsOpMap supply typeTrans
+    rwState   = RewriteState 0 globals supply typeTrans
     normState = NormalizeState
                   HashMap.empty
                   Map.empty
@@ -58,7 +54,7 @@ normalize (bndr:bndrs) = do
       liftRS $ curFun .= bndr
       normalizedExpr <- makeCachedT3' bndr normalized $
                          rewriteExpr ("normalization",normalization) (bndrS,expr)
-      usedBndrs <- usedGlobalBndrs normalizedExpr
+      let usedBndrs = Set.toList $ termFreeIds normalizedExpr
       if bndr `elem` usedBndrs
         then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
         else do
@@ -99,27 +95,17 @@ cleanupGraph bndrs norm = do
         Just (ty,expr) -> do
           liftRS $ curFun .= bndr
           cleaned <- rewriteExpr rw (bndrS,expr)
-          usedBndrs <- usedGlobalBndrs cleaned
+          let usedBndrs = Set.toList $ termFreeIds cleaned
           cleanedOthers <- cleanupGraph' rw (usedBndrs ++ bndrs')
           return $! (bndr,(ty,cleaned)):cleanedOthers
         Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " not found"
     cleanupGraph' _ [] = return []
 
-usedGlobalBndrs ::
-  Term
-  -> NormalizeSession [TmName]
-usedGlobalBndrs tm = do
-  clsOps <- fmap HashMap.keys $ Lens.use classOps
-  dfuns  <- fmap HashMap.keys $ Lens.use dictFuns
-  return . filter (`notElem` (clsOps ++ dfuns)) . Set.toList $ termFreeIds tm
-
 checkNonRecursive :: TmName
                   -> [(TmName,(Type,Term))]
-                  -> NormalizeSession [(TmName,(Type,Term))]
-checkNonRecursive topEntity norm = do
-  clsOps <- fmap HashMap.keys $ Lens.use classOps
-  dfuns  <- fmap HashMap.keys $ Lens.use dictFuns
-  let cg = callGraph (clsOps ++ dfuns) (HashMap.fromList $ map (second snd) norm) topEntity
-  case recursiveComponents cg of
-    []  -> return norm
-    rcs -> error $ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs
+                  -> [(TmName,(Type,Term))]
+checkNonRecursive topEntity norm =
+  let cg = callGraph [] (HashMap.fromList $ map (second snd) norm) topEntity
+  in  case recursiveComponents cg of
+       []  -> norm
+       rcs -> error $ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs

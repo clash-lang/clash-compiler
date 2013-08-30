@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module CLaSH.Primitives.Types where
 
-import           Control.Applicative  (pure, (<$>), (<*>), (<|>))
+import           Control.Applicative  ((<$>), (<*>), (<|>))
 import           Data.Aeson           (FromJSON (..), Value (..), (.:))
 import           Data.ByteString.Lazy (ByteString)
 import           Data.HashMap.Lazy    (HashMap)
@@ -18,16 +18,8 @@ data Primitive
   }
   | Primitive
   { name     :: ByteString
-  , primType :: PrimType
+  , primType :: Text
   }
-
-data PrimType = Function | Constructor | Dictionary
-
-instance FromJSON PrimType where
-  parseJSON = \case "Function"    -> pure Function
-                    "Constructor" -> pure Constructor
-                    "Dictionary"  -> pure Dictionary
-                    _             -> error "PrimType, expected: Function, Constructor, or Dictionary"
 
 instance FromJSON Primitive where
   parseJSON (Object v) = case H.toList v of

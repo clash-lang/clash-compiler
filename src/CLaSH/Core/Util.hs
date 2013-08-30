@@ -8,7 +8,6 @@ import           Unbound.LocallyNameless (Fresh, bind, embed, unbind, unembed,
 import           CLaSH.Core.DataCon      (dcType)
 import           CLaSH.Core.Literal      (literalType)
 import           CLaSH.Core.Pretty       (showDoc)
-import           CLaSH.Core.Prim         (Prim (..), primType)
 import           CLaSH.Core.Term         (Pat (..), Term (..), TmName)
 import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
                                           isFunTy, mkFunTy, splitFunTy)
@@ -26,7 +25,7 @@ termType e = case e of
   Var t _     -> return t
   Data dc     -> return $ dcType dc
   Literal l   -> return $ literalType l
-  Prim p      -> return $ primType p
+  Prim _ t    -> return t
   Lam b       -> do (v,e') <- unbind b
                     mkFunTy (unembed $ varType v) <$> termType e'
   TyLam b     -> do (tv,e') <- unbind b
@@ -166,20 +165,8 @@ isCon _        = False
 -- | Is a term a primitive?
 isPrim :: Term
        -> Bool
-isPrim (Prim _) = True
-isPrim _        = False
-
--- | Is a term a primitive datatype constructor?
-isPrimCon :: Term
-          -> Bool
-isPrimCon (Prim (PrimCon _)) = True
-isPrimCon _                  = False
-
--- | Is a term a primitive functions?
-isPrimFun :: Term
-          -> Bool
-isPrimFun (Prim (PrimFun _ _)) = True
-isPrimFun _                    = False
+isPrim (Prim _ _) = True
+isPrim _          = False
 
 -- | Make variable reference out of term variable
 idToVar :: Id

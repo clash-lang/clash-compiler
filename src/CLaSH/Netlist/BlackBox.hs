@@ -21,10 +21,8 @@ import           Data.Text.Lazy                (Text, pack)
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
-import           CLaSH.Core.DataCon            (dcName)
 import           CLaSH.Core.Literal            as L (Literal (..))
 import           CLaSH.Core.Pretty             (showDoc)
-import           CLaSH.Core.Prim               (Prim (..))
 import           CLaSH.Core.Term               as C (Term (..), TmName)
 import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
@@ -92,9 +90,8 @@ mkInput (Var ty v, False) = do
     Nothing  -> return ((Left vT, hwTy),[])
 
 mkInput (e, False) = case collectArgs e of
-  (Prim (PrimCon dc), args)  -> mkInput' (dcName dc) args
-  (Prim (PrimFun f _), args) -> mkInput' f args
-  _                          -> fmap (first (first Left)) $ mkLitInput e
+  (Prim f _, args) -> mkInput' f args
+  _                -> fmap (first (first Left)) $ mkLitInput e
   where
     mkInput' nm args = do
       bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
@@ -139,7 +136,7 @@ mkFunInput ::
   -> Term
   -> MaybeT NetlistMonad ((Line,BlackBoxContext),[Declaration])
 mkFunInput resId e = case collectArgs e of
-  (Prim (PrimFun nm _), args) -> do
+  (Prim nm _, args) -> do
     bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do

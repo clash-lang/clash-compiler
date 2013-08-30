@@ -13,12 +13,8 @@ cleanup :: NormRewrite
 cleanup = repeatR $ topdownR (apply "inlineWrapper" inlineWrapper)
 
 representable :: NormRewrite
-representable = (clsOpRes >-> propagagition >-> specialisation) !->
-                repeatR (clsOpRes !-> (propagagition >-> specialisation))
+representable = propagagition >-> specialisation
   where
-    clsOpRes = bottomupR (apply "classOpResolution"  classOpResolution) >->
-               bottomupR (apply "inlineSingularDFun" inlineSingularDFun)
-
     propagagition = repeatR ( upDownR  (apply "propagation" appProp) >->
                               repeatBottomup [ ("bindNonRep"   , bindNonRep )
                                              , ("liftNonRep"   , liftNonRep )
@@ -38,8 +34,8 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
   where
     etaTL           = apply "etaTL" etaExpansionTL
 
-    constSimpl      = repeatR ( upDownR   (apply "propagation" appProp) >->
-                                bottomupR (apply "inlineClosedTerm" (inlineClosedTerm !-> representable)) >->
+    constSimpl      = repeatR ( upDownR (apply "propagation" appProp) >->
+                                bottomupR inlineClosed >->
                                 repeatBottomup  [ ("nonRepANF"       , nonRepANF       )
                                                 , ("bindConstantVar" , bindConstantVar )
                                                 , ("constantSpec"    , constantSpec    )
@@ -52,6 +48,11 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
     deadCodeRemoval = bottomupR (apply "deadcode" deadCode)
 
     letTL           = bottomupR (apply "topLet" topLet)
+
+    inlineClosed    = apply "inlineClosedTerm" (inlineClosedTerm
+                                                  "normalization"
+                                                  normalization
+                                               )
 
 doInline :: String -> NormRewrite -> NormRewrite
 doInline n t = bottomupR (apply n t) >-> commitNewInlined

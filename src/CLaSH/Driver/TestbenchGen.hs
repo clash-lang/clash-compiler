@@ -30,7 +30,6 @@ import           CLaSH.Core.TyCon
 import           CLaSH.Core.Type
 import           CLaSH.Core.Util
 
-import           CLaSH.Driver.Types
 import           CLaSH.Netlist
 import           CLaSH.Netlist.Types              as N
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
@@ -45,8 +44,6 @@ import           CLaSH.Util
 -- set of matching expected outputs
 genTestBench :: DebugLevel
              -> Supply
-             -> DFunMap                      -- ^ Dictionary Functions
-             -> ClassOpMap                   -- ^ Class operators
              -> PrimMap                      -- ^ Primitives
              -> (Type -> Maybe (Either String HWType))
              -> VHDLState
@@ -55,8 +52,7 @@ genTestBench :: DebugLevel
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],VHDLState)
-genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState
-  globals stimuliNmM expectedNmM
+genTestBench dbgLvl supply primMap typeTrans vhdlState globals stimuliNmM expectedNmM
   (Component cName [(clkName,Clock rate),(rstName,Reset reset)] [inp] outp _)
   = eitherT error return $ do
   let rateF  = fromIntegral rate :: Float
@@ -138,9 +134,9 @@ genTestBench dbgLvl supply dfunMap clsOpMap primMap typeTrans vhdlState
                     -> TmName
                     -> [(TmName,(Type,Term))])
     normalizeSignal glbls bndr =
-      runNormalization dbgLvl supply glbls dfunMap clsOpMap typeTrans (normalize [bndr] >>= cleanupGraph [bndr])
+      runNormalization dbgLvl supply glbls typeTrans (normalize [bndr] >>= cleanupGraph [bndr])
 
-genTestBench _ _ _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
+genTestBench _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
 
 delayedSignal :: Text
               -> Float

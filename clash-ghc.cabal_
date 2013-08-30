@@ -84,7 +84,6 @@ Executable clash
                       GhciMonad
                       GhciTags
 
-                      CLaSH.GHC.Compat.CoreSyn
                       CLaSH.GHC.Compat.DynFlags
                       CLaSH.GHC.Compat.FastString
                       CLaSH.GHC.Compat.GHC
@@ -96,7 +95,6 @@ Executable clash
                       CLaSH.GHC.LoadInterfaceFiles
                       CLaSH.GHC.LoadModules
                       CLaSH.GHC.NetlistTypes
-                      CLaSH.GHC.Types
 
   if flag(standalone)
     CPP-Options:      -DSTANDALONE

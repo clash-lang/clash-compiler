@@ -11,7 +11,6 @@ import           Data.Maybe                  (isJust, isNothing, mapMaybe)
 
 -- GHC API
 import qualified BasicTypes
-import           CLaSH.GHC.Compat.CoreSyn    (dfunArgExprs)
 import           CLaSH.GHC.Compat.Outputable (showPpr, showSDoc)
 import qualified Class
 import qualified CoreFVs
@@ -25,6 +24,7 @@ import qualified IdInfo
 import qualified IfaceSyn
 import qualified LoadIface
 import qualified Maybes
+import qualified MkCore
 import qualified MonadUtils
 import qualified Name
 import           Outputable                  (text)
@@ -32,14 +32,11 @@ import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
-import           UniqSupply                  (UniqSupply)
 import qualified Var
 import qualified VarSet
 
 -- Internal Modules
-import           CLaSH.GHC.Types
-import           CLaSH.Util                  (curLoc, mapAccumLM, maybe',
-                                              second, traceIf)
+import           CLaSH.Util                  (curLoc, mapAccumLM, traceIf)
 
 getExternalTyCons ::
   GHC.GhcMonad m
@@ -98,16 +95,14 @@ loadIface foundMod = do
 
 loadExternalExprs ::
   GHC.GhcMonad m
-  => UniqSupply
-  -> [CoreSyn.CoreExpr]
+  => [CoreSyn.CoreExpr]
   -> [CoreSyn.CoreBndr]
-  -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)]    -- Binders
-       , [CoreDFUN]  -- Dictionary functions
-       , [(CoreSyn.CoreBndr,Int)]                 -- Class Ops
-       , [CoreSyn.CoreBndr]                       -- Unlocatable
+  -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
+       , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
+       , [CoreSyn.CoreBndr]                    -- Unlocatable
        )
-loadExternalExprs _ [] _ = return ([],[],[],[])
-loadExternalExprs us (expr:exprs) visited = do
+loadExternalExprs []           _       = return ([],[],[])
+loadExternalExprs (expr:exprs) visited = do
   let fvs = VarSet.varSetElems $ CoreFVs.exprSomeFreeVars
               (\v -> Var.isId v &&
                      isNothing (Id.isDataConId_maybe v) &&
@@ -116,63 +111,47 @@ loadExternalExprs us (expr:exprs) visited = do
 
   let (clsOps,fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
 
-  (us',(located,unlocated)) <- fmap (second partitionEithers)
-                                  $ mapAccumLM loadExprFromIface us fvs'
+  (locatedExprs,unlocated) <- fmap partitionEithers
+                                $ mapM loadExprFromIface fvs'
 
-  let (locatedDFuns,locatedExprs) = partitionEithers located
   let visited' = concat [ map fst locatedExprs
-                        , map fst locatedDFuns
-                        , concatMap (snd . fst . snd) locatedDFuns
                         , unlocated
                         , clsOps
                         , visited
                         ]
 
-  (locatedExprs', locatedDFuns', clsOps', unlocated') <-
+  (locatedExprs', clsOps', unlocated') <-
     loadExternalExprs
-      us'
-      ( exprs ++
-        map snd locatedExprs ++
-        concatMap (snd . snd) locatedDFuns
-      ) visited'
+      (exprs ++ map snd locatedExprs)
+      visited'
 
   let clsOps'' = map
-       ( \v -> maybe' (error $ $(curLoc) ++ "Not a class op") (Id.isClassOpId_maybe v) $ \c ->
+       ( \v -> flip (maybe (error $ $(curLoc) ++ "Not a class op")) (Id.isClassOpId_maybe v) $ \c ->
            let clsIds = Class.classAllSelIds c
-               l      = Class.classArity c
-           in maybe' (error $ $(curLoc) ++ "Index not found") (elemIndex v clsIds) ((v,) . (+l))
-   --         (v,)
-   --         . fromMaybe (error $ $(curLoc) ++ "Index not found")
-   --         . elemIndex v
-   --         . Class.classAllSelIds
-   --         . fromMaybe (error $ $(curLoc) ++ "Not a class op")
-   --         $ Id.isClassOpId_maybe v
+           in  maybe (error $ $(curLoc) ++ "Index not found")
+                     (v,)
+                     (elemIndex v clsIds)
        ) clsOps
 
   return ( locatedExprs ++ locatedExprs'
-         , locatedDFuns ++ locatedDFuns'
          , clsOps''     ++ clsOps'
          , unlocated    ++ unlocated'
          )
 
 loadExprFromIface ::
   GHC.GhcMonad m
-  => UniqSupply
-  -> CoreSyn.CoreBndr
-  -> m (UniqSupply
-       ,Either
-          (Either
-            CoreDFUN
-            (CoreSyn.CoreBndr,CoreSyn.CoreExpr))
+  => CoreSyn.CoreBndr
+  -> m (Either
+          (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
           CoreSyn.CoreBndr
        )
-loadExprFromIface us bndr = do
+loadExprFromIface bndr = do
   let moduleM = Name.nameModule_maybe $ Var.varName bndr
   case moduleM of
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
       case ifaceM of
-        Nothing    -> return (us,Right bndr)
+        Nothing    -> return (Right bndr)
         Just iface -> do
           let decls = map snd (GHC.mi_decls iface)
           let nameFun = GHC.getOccName $ Var.varName bndr
@@ -180,33 +159,27 @@ loadExprFromIface us bndr = do
           case declM of
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
-              return $ loadExprFromTyThing us bndr tyThing
-            _ -> return (us,Right bndr)
-    Nothing -> return (us,Right bndr)
+              return $ loadExprFromTyThing bndr tyThing
+            _ -> return (Right bndr)
+    Nothing -> return (Right bndr)
 
-loadExprFromTyThing ::
-  UniqSupply
-  -> CoreSyn.CoreBndr
-  -> GHC.TyThing
-  -> (UniqSupply
-     ,Either
-       (Either
-         CoreDFUN                              -- Located DFun
-         (CoreSyn.CoreBndr,CoreSyn.CoreExpr))  -- Located Binder
-       CoreSyn.CoreBndr                        -- unlocatable Var
-     )
-loadExprFromTyThing us bndr tyThing = case tyThing of
+loadExprFromTyThing :: CoreSyn.CoreBndr
+                    -> GHC.TyThing
+                    -> Either
+                         (CoreSyn.CoreBndr,CoreSyn.CoreExpr)  -- Located Binder
+                         CoreSyn.CoreBndr                     -- unlocatable Var
+loadExprFromTyThing bndr tyThing = case tyThing of
   GHC.AnId _id | Var.isId _id ->
     let unfolding  = IdInfo.unfoldingInfo $ Var.idInfo _id
         inlineInfo = IdInfo.inlinePragInfo $ Var.idInfo _id
-        dfunTy     = Id.idType _id
     in case unfolding of
       (CoreSyn.CoreUnfolding {}) ->
         case BasicTypes.inl_inline inlineInfo of
-          BasicTypes.NoInline -> (us,Right bndr)
-          _ -> (us,Left (Right (bndr, CoreSyn.unfoldingTemplate unfolding)))
-      (CoreSyn.DFunUnfolding dfbndrs _ es) ->
-        let (exprs,us') = dfunArgExprs us dfunTy es
-        in (us',Left $! Left (bndr, (partition Var.isTyVar dfbndrs,exprs)))
-      _ -> (us,Right bndr)
-  _ -> (us,Right bndr)
+          BasicTypes.NoInline -> Right bndr
+          _ -> Left (bndr, CoreSyn.unfoldingTemplate unfolding)
+      (CoreSyn.DFunUnfolding dfbndrs dc es) ->
+        let dcApp  = MkCore.mkCoreConApps dc es
+            dfExpr = MkCore.mkCoreLams dfbndrs dcApp
+        in Left (bndr,dfExpr)
+      _ -> Right bndr
+  _ -> Right bndr

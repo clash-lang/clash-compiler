@@ -30,7 +30,7 @@ import           CLaSH.Core.Term           (LetBinding, Pat (..), Term (..),
                                             TmName)
 import           CLaSH.Core.TyCon          (tyConDataCons)
 import           CLaSH.Core.Type           (TyName, Type (..), TypeView (..),
-                                            coreView, typeKind)
+                                            transparentTy, typeKind, tyView)
 import           CLaSH.Core.Util           (Delta, Gamma, collectArgs,
                                             mkAbstraction, mkApps, mkId, mkLams,
                                             mkTmApps, mkTyApps, mkTyLams,
@@ -58,11 +58,11 @@ apply name rewrite ctx expr = R $ do
   let expr'' = if hasChanged then expr' else expr
 
   Monad.when (lvl > DebugNone && hasChanged) $ do
-    beforeTy             <- termType expr
+    beforeTy             <- fmap transparentTy $ termType expr
     (beforeFTV,beforeFV) <- localFreeVars expr
-    afterTy              <- termType expr'
+    afterTy              <- fmap transparentTy $ termType expr'
     (afterFTV,afterFV)   <- localFreeVars expr'
-    let newFV = Set.size afterFTV > Set.size beforeFTV ||
+    let newFV = -- Set.size afterFTV > Set.size beforeFTV ||
                 Set.size afterFV > Set.size beforeFV
     Monad.when newFV $
             error ( concat [ $(curLoc)
@@ -83,8 +83,11 @@ apply name rewrite ctx expr = R $ do
                      ]
             ) (return ())
 
+  Monad.when (lvl >= DebugApplied && not hasChanged && expr /= expr') $
+    error $ "Expression changed without notice(" ++ name ++  "): before" ++ before ++ "\nafter:\n" ++ after
+
   traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
-    traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\n") $
+    traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n") $
       return expr''
 
 runRewrite :: (Monad m, Functor m) => String -> Rewrite m -> Term -> RewriteSession m Term
@@ -151,11 +154,8 @@ mkEnv ::
   -> RewriteMonad m (Gamma, Delta)
 mkEnv ctx = do
   let (gamma,delta) = contextEnv ctx
-  tsMap         <- fmap (HashMap.map fst) $ Lens.use bindings
-  dfuns         <- fmap (HashMap.map fst) $ Lens.use dictFuns
-  clsOps        <- fmap (HashMap.map fst) $ Lens.use classOps
-  let gamma'    = tsMap `HashMap.union` dfuns `HashMap.union` clsOps
-                  `HashMap.union` gamma
+  tsMap             <- fmap (HashMap.map fst) $ Lens.use bindings
+  let gamma'        = tsMap `HashMap.union` gamma
   return (gamma',delta)
 
 mkTmBinderFor ::
@@ -232,14 +232,10 @@ localFreeVars ::
   -> RewriteMonad m (c TyName,c TmName)
 localFreeVars term = do
   globalBndrs <- Lens.use bindings
-  dfuns       <- Lens.use dictFuns
-  clsOps      <- Lens.use classOps
   let (tyFVs,tmFVs) = termFreeVars term
   return ( tyFVs
          , filterC
-         $ cmap (\v -> if v `HashMap.member` globalBndrs ||
-                          v `HashMap.member` dfuns       ||
-                          v `HashMap.member` clsOps
+         $ cmap (\v -> if v `HashMap.member` globalBndrs
                        then Nothing
                        else Just v
                 ) tmFVs
@@ -364,17 +360,17 @@ mkSelectorCase ::
   -> m Term
 mkSelectorCase caller ctx scrut dcI fieldI = do
   scrutTy <- termType scrut
-  let cantCreate x = error $ x ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: " ++ showDoc scrutTy ++ showDoc scrut
-  case scrutTy of
-    (coreView -> TyConApp tc args) ->
+  let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
+  case transparentTy scrutTy of
+    (tyView -> TyConApp tc args) ->
       case tyConDataCons tc of
-        [] -> cantCreate $(curLoc)
-        dcs | dcI > length dcs -> cantCreate $(curLoc)
+        [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc)
+        dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max"
             | otherwise -> do
           let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
           let fieldTys = dataConInstArgTys dc args
           if fieldI >= length fieldTys
-            then cantCreate $(curLoc)
+            then cantCreate $(curLoc) "Field index exceed max"
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
               selBndr <- mkInternalVar "sel" (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI)
@@ -382,7 +378,7 @@ mkSelectorCase caller ctx scrut dcI fieldI = do
               let pat    = DataPat (embed dc) (rebind [] (map fst bndrs))
               let retVal = Case scrut (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI) [ bind pat (snd selBndr) ]
               return retVal
-    _ -> cantCreate $(curLoc)
+    _ -> cantCreate $(curLoc) "Type of subject is not a datatype"
 
 specialise ::
   (Functor m, State.MonadState s m)

@@ -35,11 +35,9 @@ import qualified TidyPgm
 -- import qualified TyCon
 import qualified TysPrim
 import qualified TysWiredIn
-import           UniqSupply                   (mkSplitUniqSupply)
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.GHC.Types
 import           CLaSH.Util                   (curLoc, mapAccumLM, (><))
 
 #ifdef STANDALONE
@@ -67,18 +65,11 @@ ghcLibDir = return GHC.Paths.libdir
 loadModules ::
   String
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
-        , [CoreDFUN]                               -- Dictionary Functions
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , [GHC.TyCon]                              -- Type Constructors
         )
 loadModules modName = defaultErrorHandler $ do
-  -- Generate a UniqSupply
-  -- Running
-  --    egrep -r "(initTcRnIf|mkSplitUniqSupply)" .
-  -- on the compiler dir of ghc suggests that 'z' is not used to generate
-  -- a unique supply anywhere.
-  uniqSupply <- mkSplitUniqSupply 'z'
   libDir     <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -130,12 +121,11 @@ loadModules modName = defaultErrorHandler $ do
 
         let (binders,tyCons) = (concat >< concat) (unzip tidiedMods)
 
-        (externalBndrs,dfuns,clsOps,unlocatable) <- loadExternalExprs
-                                                      uniqSupply
-                                                      (map snd binders)
-                                                      (map fst binders)
+        (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
+                                                (map snd binders)
+                                                (map fst binders)
 
-        return (binders ++ externalBndrs,dfuns,clsOps,unlocatable,tyCons ++ allExtTyCons)
+        return (binders ++ externalBndrs,clsOps,unlocatable,tyCons ++ allExtTyCons)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

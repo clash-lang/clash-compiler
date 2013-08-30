@@ -34,7 +34,6 @@ data TyCon
   , tyConKind   :: Kind        -- ^ Kind of the TyCon
   , tyConArity  :: Int         -- ^ Number of type arguments
   , algTcRhs    :: AlgTyConRhs -- ^ DataCon definitions
-  , isDictTyCon :: Bool        -- ^ Is a dictionary TyCon
   }
   -- | Primitive TyCons
   | PrimTyCon

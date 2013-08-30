@@ -19,7 +19,6 @@ import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
 
 import           CLaSH.Core.DataCon      (DataCon (..))
 import           CLaSH.Core.Literal      (Literal (..))
-import           CLaSH.Core.Prim         (Prim (..))
 import           CLaSH.Core.Term         (Pat (..), Term (..))
 import           CLaSH.Core.TyCon        (TyCon (..), isTupleTyConLike)
 import           CLaSH.Core.Type         (ConstTy (..), Kind, LitTy (..),
@@ -91,7 +90,7 @@ instance Pretty Term where
     Var _ x        -> pprPrec prec x
     Data dc        -> pprPrec prec dc
     Literal l      -> pprPrec prec l
-    Prim p         -> pprPrec prec p
+    Prim nm _      -> return . text $ name2String nm
     Lam b          -> lunbind b $ \(v,e')  -> pprPrecLam prec [v] e'
     TyLam b        -> lunbind b $ \(tv,e') -> pprPrecTyLam prec [tv] e'
     App fun arg    -> pprPrecApp prec fun arg
@@ -119,14 +118,6 @@ instance Pretty Literal where
       | i < 0       -> return $ parens (integer i)
       | otherwise   -> return $ integer i
     StringLiteral s -> return $ vcat $ map text $ showMultiLineString s
-
-instance Pretty Prim where
-  pprPrec prec p = case p of
-    PrimFun f _   -> return . text $ name2String f
-    PrimCon dc    -> pprPrec prec dc
-    PrimDict di _ -> return . text $ name2String di
-    PrimDFun df _ -> return . text $ name2String df
-    PrimCo _      -> return $ text "co"
 
 instance Pretty Pat where
   pprPrec prec pat = case pat of

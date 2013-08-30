@@ -21,13 +21,14 @@ module CLaSH.Core.Type
   , TyVar
   , tyView
   , coreView
+  , transparentTy
   , typeKind
   , mkTyConTy
-  , isDictType
   , splitTyAppM
   , mkFunTy
   , mkTyConApp
   , splitFunTy
+  , splitFunForallTy
   , splitTyConAppM
   , isPolyTy
   , isFunTy
@@ -37,8 +38,9 @@ module CLaSH.Core.Type
 where
 
 -- External import
-import                Data.Maybe              (isJust)
-import                Unbound.LocallyNameless as Unbound hiding (Arrow)
+import                Data.Maybe                  (isJust)
+import                Unbound.LocallyNameless     as Unbound hiding (Arrow)
+import                Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 -- Local imports
 import                CLaSH.Core.Subst
@@ -107,18 +109,29 @@ tyView ty@(AppTy _ _) = case splitTyAppM ty of
 tyView (ConstTy (TyCon tc)) = TyConApp tc []
 tyView t = OtherType t
 
+-- | A transformation that renders 'Signal' types transparent
+transparentTy :: Type -> Type
+transparentTy (AppTy (ConstTy (TyCon tc)) ty)
+  = case name2String (tyConName tc) of
+      "CLaSH.Signal.Signal"  -> transparentTy ty
+      "CLaSH.Signal.SignalP" -> transparentTy ty
+      _ -> AppTy (ConstTy (TyCon tc)) (transparentTy ty)
+transparentTy (AppTy ty1 ty2) = AppTy (transparentTy ty1) (transparentTy ty2)
+transparentTy (ForAllTy b)    = ForAllTy (uncurry bind $ second transparentTy $ unsafeUnbind b)
+transparentTy ty              = ty
+
 -- | A view on types in which 'Signal' types and newtypes are transparent
 coreView :: Type -> TypeView
 coreView ty =
   let tView = tyView ty
-  in case tyView ty of
-       TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args ->
-         coreView (newTyConInstRhs nt args)
-       TyConApp tc args
-         | name2String (tyConName tc) == "CLaSH.Signal.Signal"  ->
-             coreView (head args)
-         | name2String (tyConName tc) == "CLaSH.Signal.SignalP" ->
-             coreView (head args)
+  in case tView of
+       TyConApp (AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args
+         | length (fst nt) == length args -> coreView (newTyConInstRhs nt args)
+         | otherwise  -> tView
+       TyConApp tc args -> case name2String (tyConName tc) of
+         "CLaSH.Signal.Signal"  -> coreView (head args)
+         "CLaSH.Signal.SignalP" -> coreView (head args)
+         _ -> tView
        _ -> tView
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given
@@ -140,21 +153,11 @@ mkTyConApp tc = foldl AppTy (ConstTy $ TyCon tc)
 mkTyConTy :: TyCon -> Type
 mkTyConTy ty = ConstTy $ TyCon ty
 
--- | Is a type a Dictionary type?
-isDictType :: Type -> Bool
-isDictType ty = case tyConAppTyConM ty of
-    Just (AlgTyCon {isDictTyCon = d}) -> d
-    _                                 -> False
-
 -- | Split a TyCon Application in a TyCon and its arguments
 splitTyConAppM :: Type
                -> Maybe (TyCon,[Type])
 splitTyConAppM (tyView -> TyConApp tc args) = Just (tc,args)
 splitTyConAppM _                            = Nothing
-
--- | Get the TyCon out of TyCon application
-tyConAppTyConM :: Type -> Maybe TyCon
-tyConAppTyConM = fmap fst . splitTyConAppM
 
 -- | Is a type a Superkind?
 isSuperKind :: Type -> Bool
@@ -199,6 +202,15 @@ splitFunTy :: Type
            -> Maybe (Type, Type)
 splitFunTy (coreView -> FunTy arg res) = Just (arg,res)
 splitFunTy _                           = Nothing
+
+splitFunForallTy :: Type
+                 -> ([Either TyVar Type],Type)
+splitFunForallTy = go []
+  where
+    go args (ForAllTy b) = let (tv,ty) = runFreshM $ unbind b
+                           in  go (Left tv:args) ty
+    go args (tyView -> FunTy arg res) = go (Right arg:args) res
+    go args ty                        = (reverse args,ty)
 
 -- | Is a type a function type?
 isFunTy :: Type

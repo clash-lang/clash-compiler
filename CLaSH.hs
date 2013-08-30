@@ -8,5 +8,5 @@ genVHDL :: String
         -> IO ()
 genVHDL src = do
   primMap <- generatePrimMap ["./primitives"]
-  (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-  generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugFinal
+  bindingsMap <- generateBindings primMap src
+  generateVHDL bindingsMap primMap ghcTypeToHWType DebugFinal
