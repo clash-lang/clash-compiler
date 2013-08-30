@@ -1,2 +1,1 @@
-= WARNING =
-Only works with (patched) type-nats (https://github.com/ghc/ghc/tree/type-nats) branch of GHC-HEAD!
+http://christiaanb.github.io/clash2/
