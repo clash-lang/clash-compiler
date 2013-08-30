@@ -38,9 +38,10 @@ module CLaSH.Core.Type
 where
 
 -- External import
-import                Data.Maybe                  (isJust)
-import                Unbound.LocallyNameless     as Unbound hiding (Arrow)
-import                Unbound.LocallyNameless.Ops (unsafeUnbind)
+import                Data.Maybe                    (isJust)
+import                Unbound.LocallyNameless       as Unbound hiding (Arrow)
+import                Unbound.LocallyNameless.Alpha (aeqR1,fvR1)
+import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
 
 -- Local imports
 import                CLaSH.Core.Subst
@@ -81,7 +82,13 @@ type KiName     = Name Kind
 
 Unbound.derive [''Type,''LitTy,''ConstTy]
 
-instance Alpha Type
+instance Alpha Type where
+  fv' c (VarTy _ n) = fv' c n
+  fv' c t           = fvR1 rep1 c t
+
+  aeq' c (VarTy _ n) (VarTy _ m) = aeq' c n m
+  aeq' c t1          t2          = aeqR1 rep1 c t1 t2
+
 instance Alpha ConstTy
 instance Alpha LitTy
 

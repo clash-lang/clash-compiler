@@ -62,7 +62,7 @@ apply name rewrite ctx expr = R $ do
     (beforeFTV,beforeFV) <- localFreeVars expr
     afterTy              <- fmap transparentTy $ termType expr'
     (afterFTV,afterFV)   <- localFreeVars expr'
-    let newFV = -- Set.size afterFTV > Set.size beforeFTV ||
+    let newFV = Set.size afterFTV > Set.size beforeFTV ||
                 Set.size afterFV > Set.size beforeFV
     Monad.when newFV $
             error ( concat [ $(curLoc)

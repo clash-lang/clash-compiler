@@ -27,6 +27,8 @@ data Literal
 Unbound.derive [''Literal]
 
 instance Alpha Literal where
+  fv' _ _ = emptyC
+
   acompare' _ (IntegerLiteral i) (IntegerLiteral j) = compare i j
   acompare' c l1                 l2                 = acompareR1 rep1 c l1 l2
 
