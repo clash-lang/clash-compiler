@@ -55,7 +55,6 @@ Library
                       CLaSH.Core.FreeVars
                       CLaSH.Core.Literal
                       CLaSH.Core.Pretty
-                      CLaSH.Core.Prim
                       CLaSH.Core.Subst
                       CLaSH.Core.Term
                       CLaSH.Core.TyCon
