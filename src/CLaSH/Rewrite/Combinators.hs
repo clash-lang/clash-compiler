@@ -13,7 +13,11 @@ import           CLaSH.Core.Util             (patIds)
 import           CLaSH.Core.Var              (Id)
 import           CLaSH.Rewrite.Types
 
-allR :: forall m . (Functor m, Monad m, Fresh m) => Bool -> Transform m -> Transform m
+-- | Apply a transformation on the subtrees of an term
+allR :: forall m . (Functor m, Monad m, Fresh m)
+     => Bool -- ^ Freshen variable references in abstracted terms
+     -> Transform m -- ^ The transformation to apply to the subtrees
+     -> Transform m
 allR _ _ _ (Var t x)   = return (Var t x)
 allR _ _ _ (Data dc)   = return (Data dc)
 allR _ _ _ (Literal l) = return (Literal l)
@@ -63,28 +67,42 @@ allR rf trans c (Case scrut ty alts) = do
       return (p,e')
 
 infixr 6 >->
+-- | Apply two transformations in succession
 (>->) :: (Monad m) => Transform m -> Transform m -> Transform m
 (>->) r1 r2 c = r1 c >=> r2 c
 
+-- | Apply a transformation in a topdown traversal
 topdownR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 topdownR r = r >-> allR True (topdownR r)
 
+-- | Apply a transformation in a topdown traversal. Doesn't freshen bound
+-- variables
 unsafeTopdownR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 unsafeTopdownR r = r >-> allR False (unsafeTopdownR r)
 
+-- Apply a transformation in a bottomup traversal
 bottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 bottomupR r = allR True (bottomupR r) >-> r
 
+-- | Apply a transformation in a bottomup traversal. Doesn't freshen bound
+-- variables
 unsafeBottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 
-unsafeUpDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
-unsafeUpDownR r = unsafeBottomupR (r !-> unsafeTopdownR r)
-
+-- | Apply a transformation in a bottomup traversal, when a transformation
+-- succeeds in a certain node, apply the transformation further in a topdown
+-- traversal starting at that node.
 upDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
 upDownR r = bottomupR (r !-> topdownR r)
 
+-- | Apply a transformation in a bottomup traversal, when a transformation
+-- succeeds in a certain node, apply the transformation further in a topdown
+-- traversal starting at that node. Doesn't freshen bound variables
+unsafeUpDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
+unsafeUpDownR r = unsafeBottomupR (r !-> unsafeTopdownR r)
+
 infixr 5 !->
+-- | Only apply the second transformation if the first one succeeds.
 (!->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
 (!->) r1 r2 c expr = R $ do
   (expr',changed) <- runR $ Writer.listen $ r1 c expr
@@ -92,5 +110,6 @@ infixr 5 !->
     then runR $ r2 c expr'
     else return expr
 
+-- | Keep applying a transformation until it fails.
 repeatR :: Monad m => Rewrite m -> Rewrite m
 repeatR r = r !-> repeatR r

@@ -26,10 +26,12 @@ import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
 import           CLaSH.Netlist.Types
 import           CLaSH.Util
 
-splitNormalized ::
-  (Fresh m,Functor m)
-  => Term
-  -> m (Either String ([Id],[LetBinding],Id))
+-- | Split a normalized term into: a list of arguments, a list of let-bindings,
+-- and a variable reference that is the body of the let-binding. Returns a
+-- String containing the error is the term was not in a normalized form.
+splitNormalized :: (Fresh m,Functor m)
+                => Term
+                -> m (Either String ([Id],[LetBinding],Id))
 splitNormalized expr = do
   (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
   case letExpr of
@@ -42,18 +44,21 @@ splitNormalized expr = do
       | otherwise -> return $! Left ($(curLoc) ++ "Not in normal form: tyArgs")
     _ -> return $! Left ($(curLoc) ++ "Not in normal from: no Letrec: " ++ showDoc expr)
 
+-- | Converts a Core type to a HWType given a function that translates certain
+-- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType :: (Type -> Maybe (Either String HWType))
                        -> Type
                        -> HWType
 unsafeCoreTypeToHWType builtInTranslation = either error id . coreTypeToHWType builtInTranslation
 
+-- | Converts a Core type to a HWType within the NetlistMonad
 unsafeCoreTypeToHWTypeM :: Type
                         -> NetlistMonad HWType
 unsafeCoreTypeToHWTypeM ty = unsafeCoreTypeToHWType <$> Lens.use typeTranslator <*> pure ty
 
-synchronizedClk ::
-  Type
-  -> Maybe Identifier
+-- | Returns the name of the clock corresponding to a type
+synchronizedClk :: Type
+                -> Maybe Identifier
 synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
@@ -65,6 +70,9 @@ synchronizedClk ty
   | otherwise
   = Nothing
 
+-- | Converts a Core type to a HWType given a function that translates certain
+-- builtin types. Returns a string containing the error message when the Core
+-- type is not translatable.
 coreTypeToHWType :: (Type -> Maybe (Either String HWType))
                  -> Type
                  -> Either String HWType
@@ -103,6 +111,7 @@ mkADT builtInTranslation _ tc args = case tyConDataCons tc of
                                                   )
                                                 ) dcs elemHTys
 
+-- | Simple check if a TyCon is recursively defined.
 isRecursiveTy :: TyCon -> Bool
 isRecursiveTy tc = case tyConDataCons tc of
     []  -> False
@@ -110,14 +119,16 @@ isRecursiveTy tc = case tyConDataCons tc of
                argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
            in tc `elem` argTycons
 
+-- | Determines if a Core type is translatable to a HWType given a function that
+-- translates certain builtin types.
 representableType :: (Type -> Maybe (Either String HWType))
                   -> Type
                   -> Bool
 representableType builtInTranslation = either (const False) (const True) . coreTypeToHWType builtInTranslation
 
-typeSize ::
-  HWType
-  -> Int
+-- | Determines the bitsize of a type
+typeSize :: HWType
+         -> Int
 typeSize Void = 0
 typeSize Bool = 1
 typeSize (Clock _) = 1
@@ -132,30 +143,35 @@ typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dc
 typeSize (Product _ tys) = sum $ map typeSize tys
 typeSize _ = 0
 
+-- | Determines the bitsize of the constructor of a type
 conSize :: HWType
         -> Int
 conSize (SP _ cons) = ceiling . logBase (2 :: Float) . fromIntegral $ length cons
 conSize t           = typeSize t
 
-typeLength ::
-  HWType
-  -> Int
+-- | Gives the length of length-indexed types
+typeLength :: HWType
+           -> Int
 typeLength (Vector n _) = n
 typeLength _            = 0
 
+-- | Gives the HWType corresponding to a term. Returns an error if the term has
+-- a Core type that is not translatable to a HWType.
 termHWType :: Term
            -> NetlistMonad HWType
 termHWType e = unsafeCoreTypeToHWTypeM =<< termType e
 
-varToExpr ::
-  Term
-  -> Expr
+-- | Turns a Core variable reference to a Netlist expression. Errors if the term
+-- is not a variable.
+varToExpr :: Term
+          -> Expr
 varToExpr (Var _ var) = Identifier (pack $ name2String var) Nothing
 varToExpr _           = error "not a var"
 
-mkUniqueNormalized ::
-  ([Id],[LetBinding],Id)
-  -> NetlistMonad ([Id],[LetBinding],TmName)
+-- | Uniquely rename all the variables and their references in a normalized
+-- term
+mkUniqueNormalized :: ([Id],[LetBinding],Id)
+                   -> NetlistMonad ([Id],[LetBinding],TmName)
 mkUniqueNormalized (args,binds,res) = do
   let args' = zipWith (\n s -> modifyVarName (`appendToName` s) n)
                 args ["_i" ++ show i | i <- [(1::Integer)..]]
@@ -198,15 +214,15 @@ mkUniqueNormalized (args,binds,res) = do
                                                 ) alts
       _ -> return e
 
-appendToName ::
-  TmName
-  -> String
-  -> TmName
+-- | Append a string to a name
+appendToName :: TmName
+             -> String
+             -> TmName
 appendToName n s = makeName (name2String n ++ s) (name2Integer n)
 
-preserveVHDLState ::
-  NetlistMonad a
-  -> NetlistMonad a
+-- | Preserve the VHDL substate when executing the monadic action
+preserveVHDLState :: NetlistMonad a
+                  -> NetlistMonad a
 preserveVHDLState action = do
   vCnt <- Lens.use varCount
   vEnv <- Lens.use varEnv

@@ -20,10 +20,12 @@ import           CLaSH.Netlist.VHDL                   (vhdlType,
                                                        vhdlTypeMark)
 import           CLaSH.Util
 
-verifyBlackBoxContext ::
-  Line
-  -> BlackBoxContext
-  -> Bool
+-- | Determine if the number of normal/literal/function inputs of a blackbox
+-- context at least matches the number of argument that is expected by the
+-- template.
+verifyBlackBoxContext :: Line -- ^ Template to check against
+                      -> BlackBoxContext -- ^ Blackbox to verify
+                      -> Bool
 verifyBlackBoxContext tmpl bbCtx =
   ((length (inputs bbCtx) - 1)    >= countArgs tmpl) &&
   ((length (litInputs bbCtx) - 1) >= countLits tmpl) &&
@@ -51,6 +53,8 @@ countFuns :: Line -> Int
 countFuns [] = -1
 countFuns l  = maximum $ map (\e -> case e of { D (Decl n _) -> n; _ -> -1 }) l
 
+-- | Update all the symbol references in a template, and increment the symbol
+-- counter for every newly encountered symbol.
 setSym :: Int -> Line -> (Line,Int)
 setSym i l
   = second fst
@@ -69,16 +73,17 @@ setSym i l
                       _             -> pure e
               )
 
-
+-- | Get the name of the clock of an identifier
 clkSyncId :: SyncIdentifier -> Identifier
 clkSyncId (Right (_,clk)) = clk
 clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 
-renderBlackBox ::
-  Line
-  -> BlackBoxContext
-  -> VHDLState
-  -> ((Text, [(Identifier,HWType)]),VHDLState)
+-- | Render a blackbox given a certain context. Returns a filled out template
+-- and a list of 'hidden' inputs that must be added to the encompassing component.
+renderBlackBox :: Line -- ^ Blackbox template
+               -> BlackBoxContext -- ^ Context used to fill in the hole
+               -> VHDLState
+               -> ((Text, [(Identifier,HWType)]),VHDLState)
 renderBlackBox l bbCtx s
   = first (Text.concat >< List.nub)
   $ flip runState s
@@ -86,7 +91,10 @@ renderBlackBox l bbCtx s
   $ runBlackBoxM
   $ mapM (renderElem bbCtx) l
 
-renderElem :: BlackBoxContext -> Element -> BlackBoxMonad Text
+-- | Render a single template element
+renderElem :: BlackBoxContext
+           -> Element
+           -> BlackBoxMonad Text
 renderElem b (D (Decl n (l:ls))) = do
   o  <- lineToIdentifier b l
   is <- mapM (lineToIdentifier b) ls
@@ -96,9 +104,14 @@ renderElem b (D (Decl n (l:ls))) = do
     then Text.concat <$> mapM (renderElem b') templ
     else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ
 
-renderElem b e = fmap (either id fst) $ mkSyncIdentifier b e
+renderElem b e = either id fst <$> mkSyncIdentifier b e
 
-lineToIdentifier :: BlackBoxContext -> Line -> BlackBoxMonad (SyncIdentifier,HWType)
+-- | Fill out the template corresponding to an output/input assignment of a
+-- component instantiation, and turn it into a single identifier so it can
+-- be used for a new blackbox context.
+lineToIdentifier :: BlackBoxContext
+                 -> Line
+                 -> BlackBoxMonad (SyncIdentifier,HWType)
 lineToIdentifier b = foldrM (\e (a,_) -> do
                               e' <- mkSyncIdentifier  b e
                               case (e', a) of
@@ -110,24 +123,28 @@ lineToIdentifier b = foldrM (\e (a,_) -> do
   where
     ty = Void
 
-mkSyncIdentifier :: BlackBoxContext -> Element -> BlackBoxMonad SyncIdentifier
-mkSyncIdentifier _ (C t)          = return $ Left t
-mkSyncIdentifier b O              = return $ fst $ result b
-mkSyncIdentifier b (I n)          = return $ fst $ inputs b !! n
-mkSyncIdentifier b (L n)          = return $ Left $ litInputs b !! n
-mkSyncIdentifier _ (Sym n)        = return $ Left $ Text.pack ("n_" ++ show n)
-mkSyncIdentifier b (Clk Nothing)  = let t = clkSyncId $ fst $ result b
-                                    in tell [(t,Clock 10)] >> return (Left t)
-mkSyncIdentifier b (Clk (Just n)) = let t = clkSyncId $ fst $ inputs b !! n
-                                    in tell [(t,Clock 10)] >> return (Left t)
-mkSyncIdentifier b (Rst Nothing)  = let t = (`Text.append` Text.pack "_rst") . clkSyncId $ fst $ result b
-                                    in tell [(t,Reset 10)] >> return (Left t)
-mkSyncIdentifier b (Rst (Just n)) = let t = (`Text.append` Text.pack "_rst") . clkSyncId $ fst $ inputs b !! n
-                                    in tell [(t,Reset 10)] >> return (Left t)
-mkSyncIdentifier b (Typ Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
-mkSyncIdentifier b (Typ (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ inputs b !! n
+-- | Give a context and a tagged hole (of a template), returns part of the
+-- context that matches the tag of the hole.
+mkSyncIdentifier :: BlackBoxContext
+                 -> Element
+                 -> BlackBoxMonad SyncIdentifier
+mkSyncIdentifier _ (C t)           = return $ Left t
+mkSyncIdentifier b O               = return $ fst $ result b
+mkSyncIdentifier b (I n)           = return $ fst $ inputs b !! n
+mkSyncIdentifier b (L n)           = return $ Left $ litInputs b !! n
+mkSyncIdentifier _ (Sym n)         = return $ Left $ Text.pack ("n_" ++ show n)
+mkSyncIdentifier b (Clk Nothing)   = let t = clkSyncId $ fst $ result b
+                                     in tell [(t,Clock 10)] >> return (Left t)
+mkSyncIdentifier b (Clk (Just n))  = let t = clkSyncId $ fst $ inputs b !! n
+                                     in tell [(t,Clock 10)] >> return (Left t)
+mkSyncIdentifier b (Rst Nothing)   = let t = (`Text.append` Text.pack "_rst") . clkSyncId $ fst $ result b
+                                     in tell [(t,Reset 10)] >> return (Left t)
+mkSyncIdentifier b (Rst (Just n))  = let t = (`Text.append` Text.pack "_rst") . clkSyncId $ fst $ inputs b !! n
+                                     in tell [(t,Reset 10)] >> return (Left t)
+mkSyncIdentifier b (Typ Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
+mkSyncIdentifier b (Typ (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ inputs b !! n
 mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ result b
 mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ inputs b !! n
-mkSyncIdentifier b (Def Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b
-mkSyncIdentifier b (Def (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ inputs b !! n
-mkSyncIdentifier b (D _)          = error $ $(curLoc) ++ "Unexpected component declaration"
+mkSyncIdentifier b (Def Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b
+mkSyncIdentifier b (Def (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ inputs b !! n
+mkSyncIdentifier b (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"

@@ -16,23 +16,31 @@ data BlackBoxContext
   }
   deriving Show
 
+-- | Either the name of the identifier, or a tuple of the identifier and the
+-- corresponding clock
 type SyncIdentifier = Either Identifier (Identifier,Identifier)
 
 type Line = [Element]
 
-data Element = C  Text
-             | D Decl
-             | O
-             | I   Int
-             | L   Int
-             | Sym Int
-             | Clk (Maybe Int)
-             | Rst (Maybe Int)
-             | Typ (Maybe Int)
-             | TypM (Maybe Int)
-             | Def (Maybe Int)
+-- | Elements of a blackbox context
+data Element = C   Text          -- ^ Constant
+             | D   Decl          -- ^ Component instantiation hole
+             | O                 -- ^ Output hole
+             | I   Int           -- ^ Input hole
+             | L   Int           -- ^ Literal hole
+             | Sym Int           -- ^ Symbol hole
+             | Clk (Maybe Int)   -- ^ Clock hole (Maybe clk corresponding to
+                                 -- input, clk corresponding to output if Nothing)
+             | Rst (Maybe Int)   -- ^ Reset hole
+             | Typ (Maybe Int)   -- ^ Type declaration hole
+             | TypM (Maybe Int)  -- ^ Type root hole
+             | Def (Maybe Int)   -- ^ Default value hole
   deriving Show
 
+-- | Component instantiation hole. First argument indicates which function argument
+-- to instantiate. Second argument corresponds to output and input assignments,
+-- where the first element is the output assignment, and the subsequent elements
+-- are the consecutive input assignments.
 data Decl = Decl Int [Line]
   deriving Show
 

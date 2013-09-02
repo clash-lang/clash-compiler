@@ -7,9 +7,9 @@ import Data.Char      (isAsciiLower,isAsciiUpper,isDigit,ord)
 import Data.Text.Lazy as Text
 import Numeric        (showHex)
 
-mkBasicId ::
-  Text
-  -> Text
+-- | Transform/format a text so that it is acceptable as a VHDL identifier
+mkBasicId :: Text
+          -> Text
 mkBasicId = stripMultiscore . stripLeading . zEncode
   where
     stripLeading    = Text.dropWhile (`elem` ['0'..'9'])

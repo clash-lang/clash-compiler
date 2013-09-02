@@ -38,10 +38,10 @@ import           CLaSH.Normalize.Util          (isConstant)
 import           CLaSH.Primitives.Types        as P
 import           CLaSH.Util
 
-mkBlackBoxContext ::
-  Id
-  -> [Term]
-  -> NetlistMonad (BlackBoxContext,[Declaration])
+-- | Generate the context for a BlackBox instantiation.
+mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox application
+                  -> [Term] -- ^ Arguments of the primitive/blackbox application
+                  -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
   -- Make context inputs
   args'                 <- fmap (zip args) $ mapM isFun args
@@ -63,10 +63,10 @@ unVar :: (Term, Bool) -> Either TmName (Term, Bool)
 unVar (Var _ v, False) = Left v
 unVar t                = Right t
 
-mkBlackBox ::
-  Text
-  -> BlackBoxContext
-  -> NetlistMonad Text
+-- | Instantiate a BlackBox template according to the given context
+mkBlackBox :: Text -- ^ Template to instantiate
+           -> BlackBoxContext -- ^ Context to instantiate template with
+           -> NetlistMonad Text
 mkBlackBox templ bbCtx =
   let (l,err) = runParse templ
   in if null err && verifyBlackBoxContext l bbCtx
@@ -77,9 +77,9 @@ mkBlackBox templ bbCtx =
       return $! bb
     else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show templ ++ "\ngiven errors:\n" ++ show err
 
-mkInput ::
-  (Term, Bool)
-  -> MaybeT NetlistMonad ((SyncIdentifier,HWType),[Declaration])
+-- | Create an template instantiation text for an argument term
+mkInput :: (Term, Bool)
+        -> MaybeT NetlistMonad ((SyncIdentifier,HWType),[Declaration])
 mkInput (_, True) = return ((Left $ pack "__FUN__", Void),[])
 
 mkInput (Var ty v, False) = do
@@ -118,9 +118,10 @@ mkInput (e, False) = case collectArgs e of
               return ((Left bb', hwTy),ctxDecls)
         _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
 
-mkLitInput ::
-  Term
-  -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
+-- | Create an template instantiation text for an argument term, given that
+-- the term is a literal. Returns 'Nothing' if the term is not a literal.
+mkLitInput :: Term -- ^ The literal argument term
+           -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
 mkLitInput (C.Literal (IntegerLiteral i))       = return ((pack $ show i,Integer),[])
 mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   typeTrans <- Lens.use typeTranslator
@@ -131,10 +132,12 @@ mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   return ((exprV,hwTy),dcDecls)
 mkLitInput _ = mzero
 
-mkFunInput ::
-  Id
-  -> Term
-  -> MaybeT NetlistMonad ((Line,BlackBoxContext),[Declaration])
+-- | Create an template instantiation text and a partial blackbox content for an
+-- argument term, given that the term is a function. Errors if the term is not
+-- a function
+mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox application
+           -> Term -- ^ The function argument term
+           -> MaybeT NetlistMonad ((Line,BlackBoxContext),[Declaration])
 mkFunInput resId e = case collectArgs e of
   (Prim nm _, args) -> do
     bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
@@ -167,6 +170,7 @@ mkFunInput resId e = case collectArgs e of
       Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
 
+-- | Instantiate symbols references with a new symbol and increment symbol counter
 instantiateSym :: Line
                -> NetlistMonad Line
 instantiateSym l = do
