@@ -40,9 +40,9 @@ genVHDL c = do
 mkTyPackage :: [HWType]
             -> VHDLM Doc
 mkTyPackage hwtys =
-   "library IEEE" <$>
-   "use IEEE.STD_LOGIC_1164.ALL" <$>
-   "use IEEE.NUMERIC_STD.ALL" <$$> linebreak <>
+   "library IEEE;" <$>
+   "use IEEE.STD_LOGIC_1164.ALL;" <$>
+   "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>
    "package" <+> "types" <+> "is" <$>
       packageDec <$>
    "end" <> semi <> packageBodyDec
