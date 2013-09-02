@@ -1445,14 +1445,14 @@ makeVHDL [] = do
       let loc = (GHC.ml_hs_file . GHC.ms_location) top
       maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
                                              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                                             (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-                                             CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugNone
+                                             bindingsMap <- generateBindings primMap src
+                                             CLaSH.Driver.generateVHDL bindingsMap primMap ghcTypeToHWType DebugNone
                         ) loc
     _ -> return ()
 makeVHDL srcs = liftIO $ do primDir <- getDefPrimDir
                             primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                            mapM_ (\src -> do (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-                                              CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugNone
+                            mapM_ (\src -> do bindingsMap <- generateBindings primMap src
+                                              CLaSH.Driver.generateVHDL bindingsMap primMap ghcTypeToHWType DebugNone
                                   ) srcs
 
 -----------------------------------------------------------------------------

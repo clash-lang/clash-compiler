@@ -869,8 +869,8 @@ doVHDL :: [(String,Maybe Phase)] -> Ghc ()
 doVHDL []   = throwGhcException (CmdLineError "No input files")
 doVHDL srcs = liftIO $ do primDir <- getDefPrimDir
                           primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                          mapM_ (\(src,_) -> do (bindingsMap,dfunMap,clsOpMap) <- generateBindings primMap src
-                                                CLaSH.Driver.generateVHDL bindingsMap clsOpMap dfunMap primMap ghcTypeToHWType DebugNone
+                          mapM_ (\(src,_) -> do bindingsMap <- generateBindings primMap src
+                                                CLaSH.Driver.generateVHDL bindingsMap primMap ghcTypeToHWType DebugNone
                                 ) srcs
 
 -- -----------------------------------------------------------------------------
