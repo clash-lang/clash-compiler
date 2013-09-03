@@ -19,6 +19,7 @@ import {-# SOURCE #-} CLaSH.Core.Term               (Term)
 import {-# SOURCE #-} CLaSH.Core.Type               (Type)
 import                CLaSH.Core.TysPrim            (intPrimTy, voidPrimTy)
 
+-- | Term Literal
 data Literal
   = IntegerLiteral Integer
   | StringLiteral  String

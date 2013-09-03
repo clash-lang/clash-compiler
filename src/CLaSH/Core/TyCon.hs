@@ -27,6 +27,7 @@ import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import                CLaSH.Util
 
+-- | Type Constructor
 data TyCon
   -- | Algorithmic DataCons
   = AlgTyCon
@@ -58,8 +59,10 @@ instance Eq TyCon where
 instance Ord TyCon where
   compare = compare `on` tyConName
 
+-- | TyCon reference
 type TyConName = Name TyCon
 
+-- | The RHS of an Algebraic Datatype
 data AlgTyConRhs
   = DataTyCon
   { dataCons :: [DataCon]        -- ^ The DataCons of a TyCon
@@ -74,6 +77,7 @@ data AlgTyConRhs
   }
   deriving Show
 
+-- | Representations for primitive types
 data PrimRep
   = IntRep
   | VoidRep

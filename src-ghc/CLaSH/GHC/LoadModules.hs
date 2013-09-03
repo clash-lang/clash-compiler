@@ -38,7 +38,7 @@ import qualified TysWiredIn
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.Util                   (curLoc, mapAccumLM, (><))
+import           CLaSH.Util                   ((***) ,curLoc, mapAccumLM)
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
@@ -119,7 +119,7 @@ loadModules modName = defaultErrorHandler $ do
                                      }
                              ) modGraph'
 
-        let (binders,tyCons) = (concat >< concat) (unzip tidiedMods)
+        let (binders,tyCons) = (concat *** concat) (unzip tidiedMods)
 
         (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
                                                 (map snd binders)

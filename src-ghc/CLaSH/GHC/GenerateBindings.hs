@@ -17,7 +17,7 @@ import           CLaSH.GHC.GHC2Core      (coreToBndr, coreToTerm,
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Primitives.Types  (PrimMap)
 import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
-import           CLaSH.Util              ((><),first)
+import           CLaSH.Util              ((***),first)
 
 generateBindings ::
   PrimMap
@@ -56,7 +56,7 @@ mkClassSelector :: Type
                 -> Term
 mkClassSelector ty sel = newExpr
   where
-    ((tvs,dictTy:_),_) = first (lefts >< rights)
+    ((tvs,dictTy:_),_) = first (lefts *** rights)
                        $ first (span (\l -> case l of Left _ -> True
                                                       _      -> False))
                        $ splitFunForallTy ty

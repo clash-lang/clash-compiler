@@ -34,8 +34,8 @@ allR rf trans c (TyLam b) = do
   return . TyLam $ bind tv e'
 
 allR _ trans c (App e1 e2) = do
-  e1' <- trans (AppFirst:c) e1
-  e2' <- trans (AppSecond:c) e2
+  e1' <- trans (AppFun:c) e1
+  e2' <- trans (AppArg:c) e2
   return $ App e1' e2'
 
 allR _ trans c (TyApp e ty) = do

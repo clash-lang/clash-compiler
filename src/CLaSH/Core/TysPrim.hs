@@ -4,7 +4,6 @@ module CLaSH.Core.TysPrim
   , typeSymbolKind
   , intPrimTy
   , voidPrimTy
-  , kindTyConType
   )
 where
 
@@ -13,31 +12,31 @@ import                Unbound.LocallyNameless (string2Name)
 import                CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
 
+-- | Builtin Name
 tySuperKindTyConName, liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
 tySuperKindTyConName      = string2Name "__BOX__"
 liftedTypeKindTyConName   = string2Name "__*__"
 typeNatKindTyConName      = string2Name "__Nat__"
 typeSymbolKindTyConName   = string2Name "__Symbol__"
 
+-- | Builtin Kind
 liftedTypeKind, tySuperKind, typeNatKind, typeSymbolKind :: Kind
-liftedTypeKind = kindTyConType (mkKindTyCon liftedTypeKindTyConName tySuperKind)
-tySuperKind    = kindTyConType (SuperKindTyCon tySuperKindTyConName)
-typeNatKind    = kindTyConType (mkKindTyCon typeNatKindTyConName tySuperKind)
-typeSymbolKind = kindTyConType (mkKindTyCon typeSymbolKindTyConName tySuperKind)
+tySuperKind    = mkTyConTy (SuperKindTyCon tySuperKindTyConName)
+liftedTypeKind = mkTyConTy (mkKindTyCon liftedTypeKindTyConName tySuperKind)
+typeNatKind    = mkTyConTy (mkKindTyCon typeNatKindTyConName tySuperKind)
+typeSymbolKind = mkTyConTy (mkKindTyCon typeSymbolKindTyConName tySuperKind)
 
 intPrimTyConName, voidPrimTyConName :: TyConName
 intPrimTyConName  = string2Name "__INT__"
 voidPrimTyConName = string2Name "__VOID__"
 
-pcPrimTyCon0 ::
+liftedPrimTC ::
   TyConName
   -> PrimRep
   -> TyCon
-pcPrimTyCon0 name = PrimTyCon name liftedTypeKind 0
+liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
+-- | Builtin Type
 intPrimTy, voidPrimTy :: Type
-intPrimTy  = mkTyConTy (pcPrimTyCon0 intPrimTyConName  IntRep )
-voidPrimTy = mkTyConTy (pcPrimTyCon0 voidPrimTyConName VoidRep)
-
-kindTyConType :: TyCon -> Type
-kindTyConType = mkTyConTy
+intPrimTy  = mkTyConTy (liftedPrimTC intPrimTyConName  IntRep )
+voidPrimTy = mkTyConTy (liftedPrimTC voidPrimTyConName VoidRep)

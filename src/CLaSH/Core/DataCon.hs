@@ -20,6 +20,7 @@ import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
 import                CLaSH.Util
 
+-- | Data Constructor
 data DataCon
   = MkData
   { dcName       :: DcName   -- ^ Name of the DataCon
@@ -43,7 +44,9 @@ instance Eq DataCon where
 instance Ord DataCon where
   compare = compare `on` dcName
 
+-- | Syntactical position of the DataCon in the type definition
 type ConTag = Int
+-- | DataCon reference
 type DcName = Name DataCon
 
 Unbound.derive [''DataCon]

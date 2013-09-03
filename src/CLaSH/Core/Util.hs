@@ -14,7 +14,9 @@ import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
 import           CLaSH.Core.Var          (Id, TyVar, Var (..), varType)
 import           CLaSH.Util
 
+-- | Type environment/context
 type Gamma = HashMap TmName Type
+-- | Kind environment/context
 type Delta = HashMap TyName Kind
 
 -- | Determine the type of a term

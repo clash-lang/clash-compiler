@@ -24,13 +24,18 @@ import           CLaSH.Rewrite.Util        (liftRS, runRewrite,
                                             runRewriteSession)
 import           CLaSH.Util
 
-runNormalization ::
-  DebugLevel
-  -> Supply
-  -> HashMap TmName (Type,Term)
-  -> (Type -> Maybe (Either String HWType))
-  -> NormalizeSession a
-  -> a
+-- | Run a NormalizeSession in a given environment
+runNormalization :: DebugLevel
+                 -- ^ Level of debug messages to print
+                 -> Supply
+                 -- ^ UniqueSupply
+                 -> HashMap TmName (Type,Term)
+                 -- ^ Global Binders
+                 -> (Type -> Maybe (Either String HWType))
+                 -- ^ Hardcoded Type -> HWType translator
+                 -> NormalizeSession a
+                 -- ^ NormalizeSession to run
+                 -> a
 runNormalization lvl supply globals typeTrans
   = flip State.evalState normState
   . runRewriteSession lvl rwState
@@ -43,9 +48,9 @@ runNormalization lvl supply globals typeTrans
                   []
                   (error "Report as bug: no curFun")
 
-normalize ::
-  [TmName]
-  -> NormalizeSession [(TmName,(Type,Term))]
+-- | Normalize a list of global binders
+normalize :: [TmName]
+          -> NormalizeSession [(TmName,(Type,Term))]
 normalize (bndr:bndrs) = do
   let bndrS = showDoc bndr
   exprM <- fmap (HashMap.lookup bndr) $ Lens.use bindings
@@ -66,10 +71,10 @@ normalize (bndr:bndrs) = do
 
 normalize [] = return []
 
-rewriteExpr ::
-  (String,NormRewrite)
-  -> (String,Term)
-  -> NormalizeSession Term
+-- | Rewrite a term according to the provided transformation
+rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
+            -> (String,Term) -- ^ Term to transform
+            -> NormalizeSession Term
 rewriteExpr (nrwS,nrw) (bndrS,expr) = do
   lvl <- Lens.view dbgLevel
   let before = showDoc expr
@@ -82,7 +87,15 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) = do
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
 
-cleanupGraph :: [TmName] -> [(TmName,(Type,Term))] -> NormalizeSession [(TmName,(Type,Term))]
+-- | Perform general \"clean up\" of the normalized (non-recursive) function
+-- hierarchy. This includes:
+--
+--   * Inlining functions that simply \"wrap\" another function
+cleanupGraph :: [TmName]
+             -- ^ Names of the functions to clean up
+             -> [(TmName,(Type,Term))]
+             -- ^ Global binders
+             -> NormalizeSession [(TmName,(Type,Term))]
 cleanupGraph bndrs norm = do
     bindings .= HashMap.fromList norm
     cleanupGraph' ("cleanup",cleanup) bndrs
@@ -101,8 +114,11 @@ cleanupGraph bndrs norm = do
         Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " not found"
     cleanupGraph' _ [] = return []
 
-checkNonRecursive :: TmName
-                  -> [(TmName,(Type,Term))]
+-- | Check if the call graph (second argument), starting at the @topEnity@
+-- (first argument) is non-recursive. Returns the list of normalized terms if
+-- call graph is indeed non-recursive, errors otherwise.
+checkNonRecursive :: TmName -- ^ @topEntity@
+                  -> [(TmName,(Type,Term))] -- ^ List of normalized binders
                   -> [(TmName,(Type,Term))]
 checkNonRecursive topEntity norm =
   let cg = callGraph [] (HashMap.fromList $ map (second snd) norm) topEntity

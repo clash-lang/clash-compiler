@@ -26,18 +26,23 @@ import {-# SOURCE #-} CLaSH.Core.Term              (Term)
 import {-# SOURCE #-} CLaSH.Core.Type              (Kind, Type)
 import                CLaSH.Util
 
+-- | Variables in CoreHW
 data Var a
+  -- | Constructor for type variables
   = TyVar
   { varName :: Name a
   , varKind :: Embed Kind
   }
+  -- | Constructor for term variables
   | Id
   { varName :: Name a
   , varType :: Embed Type
   }
   deriving (Eq,Ord,Show)
 
+-- | Term variable
 type Id    = Var Term
+-- | Type variable
 type TyVar = Var Type
 
 Unbound.derive [''Var]

@@ -19,23 +19,25 @@ import CLaSH.Core.Var            (Id, TyVar)
 import CLaSH.Netlist.Types       (HWType)
 import CLaSH.Util
 
-data CoreContext = AppFirst
-                 | AppSecond
-                 | TyAppC
-                 | LetBinding [Id]
-                 | LetBody    [Id]
-                 | LamBody    Id
-                 | TyLamBody  TyVar
-                 | CaseAlt    [Id]
-                 | CaseScrut
+-- | Context in which a term appears
+data CoreContext = AppFun -- ^ Function position of an application
+                 | AppArg -- ^ Argument position of an application
+                 | TyAppC -- ^ Function position of a type application
+                 | LetBinding [Id] -- ^ RHS of a Let-binder with the sibling LHS'
+                 | LetBody    [Id] -- ^ Body of a Let-binding with the bound LHS'
+                 | LamBody    Id   -- ^ Body of a lambda-term with the abstracted variable
+                 | TyLamBody  TyVar -- ^ Body of a TyLambda-term with the abstracted type-variable
+                 | CaseAlt    [Id] -- ^ RHS of a case-alternative with the variables bound by the pattern on the LHS
+                 | CaseScrut -- ^ Subject of a case-decomposition
                  deriving Show
 
+-- | State of a rewriting session
 data RewriteState
   = RewriteState
-  { _transformCounter :: Int
-  , _bindings         :: HashMap TmName (Type,Term)
-  , _uniqSupply       :: Supply
-  , _typeTranslator   :: Type -> Maybe (Either String HWType)
+  { _transformCounter :: Int -- ^ Number of applied transformations
+  , _bindings         :: HashMap TmName (Type,Term) -- ^ Global binders
+  , _uniqSupply       :: Supply -- ^ Supply of unique numbers
+  , _typeTranslator   :: Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
   }
 
 makeLenses ''RewriteState

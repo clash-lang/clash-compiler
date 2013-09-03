@@ -51,6 +51,7 @@ import                CLaSH.Core.TysPrim
 import                CLaSH.Core.Var
 import                CLaSH.Util
 
+-- | Types in CoreHW: function and polymorphic types
 data Type
   = VarTy    Kind TyName       -- ^ Type variable
   | ConstTy  ConstTy           -- ^ Type constant
@@ -59,25 +60,33 @@ data Type
   | LitTy    LitTy             -- ^ Type literal
   deriving Show
 
+-- | An easier view on types
 data TypeView
   = FunTy    Type  Type   -- ^ Function type
   | TyConApp TyCon [Type] -- ^ Applied TyCon
   | OtherType Type        -- ^ Neither of the above
   deriving Show
 
+-- | Type Constants
 data ConstTy
   = TyCon TyCon -- ^ TyCon type
   | Arrow       -- ^ Function type
   deriving Show
 
+-- | Literal Types
 data LitTy
   = NumTy Int
   | SymTy String
   deriving Show
 
+-- | The level above types
 type Kind       = Type
+-- | Either a Kind or a Type
 type KindOrType = Type
+
+-- | Reference to a Type
 type TyName     = Name Type
+-- | Reference to a Kind
 type KiName     = Name Kind
 
 Unbound.derive [''Type,''LitTy,''ConstTy]
@@ -210,6 +219,8 @@ splitFunTy :: Type
 splitFunTy (coreView -> FunTy arg res) = Just (arg,res)
 splitFunTy _                           = Nothing
 
+-- | Split a poly-function type in a: list of type-binders and argument types,
+-- and the result type
 splitFunForallTy :: Type
                  -> ([Either TyVar Type],Type)
 splitFunForallTy = go []

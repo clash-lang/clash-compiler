@@ -271,7 +271,7 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   let ty = unembed tyE
   let e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  (localFTVs,localFVs) <- fmap (Set.toList >< Set.toList) $ localFreeVars e
+  (localFTVs,localFVs) <- fmap (Set.toList *** Set.toList) $ localFreeVars e
   let localFTVkinds = map (delta HashMap.!) localFTVs
   let localFVs'     = filter (/= idName) localFVs
   let localFVtys'   = map (gamma HashMap.!) localFVs'
@@ -415,7 +415,7 @@ specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
       case bodyMaybe of
         Just (_,bodyTm) -> do
           -- Make new binders for existing arguments
-          (boundArgs,argVars) <- fmap (unzip . map (either (Left >< Left) (Right >< Right))) $
+          (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
                                  mapM (mkBinderFor "pTS") args
           -- Create specialized functions
           let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
@@ -447,7 +447,7 @@ specArgBndrsAndVars :: (Functor m, Monad m)
                     -> Either Term Type
                     -> RewriteMonad m ([Either Id TyVar],[Either Term Type])
 specArgBndrsAndVars ctx specArg = do
-  (specFTVs,specFVs) <- fmap (Set.toList >< Set.toList) $
+  (specFTVs,specFVs) <- fmap (Set.toList *** Set.toList) $
                         either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
   (gamma,delta) <- mkEnv ctx
   let (specTyBndrs,specTyVars) = unzip

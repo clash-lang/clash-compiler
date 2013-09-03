@@ -26,6 +26,7 @@ import {-# SOURCE #-} CLaSH.Core.Type               (Type)
 import                CLaSH.Core.Var                (Id, TyVar)
 import                CLaSH.Util
 
+-- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
   = Var     Type TmName -- ^ Variable reference
   | Data    DataCon -- ^ Datatype constructor
@@ -40,9 +41,12 @@ data Term
                                       -- alternatives, list of alternatives
   deriving Show
 
+-- | Term reference
 type TmName     = Name Term
+-- | Binding in a LetRec construct
 type LetBinding = (Id, Embed Term)
 
+-- | Patterns in the LHS of a case-decomposition
 data Pat
   = DataPat (Embed DataCon) (Rebind [TyVar] [Id])
   -- ^ Datatype pattern, '[TyVar]' bind existentially-quantified

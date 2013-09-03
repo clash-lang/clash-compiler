@@ -3,8 +3,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module CLaSH.Netlist.Types where
 
-import Control.Monad.State                  (MonadIO, MonadState,
-                                             StateT)
+import Control.Monad.State                  (MonadIO, MonadState, StateT)
 import Control.Monad.Writer                 (MonadWriter, WriterT)
 import Data.ByteString.Lazy                 (ByteString)
 import Data.Hashable
@@ -20,56 +19,62 @@ import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Primitives.Types               (Primitive)
 import CLaSH.Util
 
+-- | Monad that caches generated components (StateT) and remembers hidden inputs
+-- of components that are being generated (WriterT)
 newtype NetlistMonad a =
     NetlistMonad { runNetlist :: WriterT [(Identifier,HWType)] (StateT NetlistState (FreshMT IO)) a }
   deriving (Functor, Monad, Applicative, MonadState NetlistState, MonadWriter [(Identifier,HWType)], Fresh, MonadIO)
 
 type VHDLState = (Int,Text,HashMap HWType (Text,Doc))
 
+-- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: HashMap TmName (Type,Term)
-  , _varEnv         :: Gamma
-  , _varCount       :: Int
-  , _cmpCount       :: Int
-  , _components     :: HashMap TmName Component
-  , _primitives     :: HashMap ByteString Primitive
-  , _vhdlMState     :: VHDLState
-  , _typeTranslator :: Type -> Maybe (Either String HWType)
+  { _bindings       :: HashMap TmName (Type,Term) -- ^ Global binders
+  , _varEnv         :: Gamma -- ^ Type environment/context
+  , _varCount       :: Int -- ^ Number of signal declarations
+  , _cmpCount       :: Int -- ^ Number of create components
+  , _components     :: HashMap TmName Component -- ^ Cached components
+  , _primitives     :: HashMap ByteString Primitive -- ^ Primitive Definitions
+  , _vhdlMState     :: VHDLState -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+  , _typeTranslator :: Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
   }
 
+-- | Signal reference
 type Identifier = Text
-type Label      = Identifier
 
+-- | Component: base unit of a Netlist
 data Component
   = Component
-  { componentName :: Identifier
-  , hiddenPorts   :: [(Identifier,HWType)]
-  , inputs        :: [(Identifier,HWType)]
-  , output        :: (Identifier,HWType)
-  , declarations  :: [Declaration]
+  { componentName :: Identifier -- ^ Name of the component
+  , hiddenPorts   :: [(Identifier,HWType)] -- ^ Ports that have no correspondence the original function definition
+  , inputs        :: [(Identifier,HWType)] -- ^ Input ports
+  , output        :: (Identifier,HWType) -- ^ Output port
+  , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving Show
 
 type Size = Int
 
+-- | Representable hardware types
 data HWType
-  = Void
-  | Bit
-  | Bool
-  | Integer
-  | Signed   Size
-  | Unsigned Size
-  | Vector   Size       HWType
-  | Sum      Identifier [Identifier]
-  | Product  Identifier [HWType]
-  | SP       Identifier [(Identifier,[HWType])]
-  | Clock    Int
-  | Reset    Int
+  = Void -- ^ Empty type
+  | Bit -- ^ Bit type
+  | Bool -- ^ Boolean type
+  | Integer -- ^ Integer type
+  | Signed   Size -- ^ Signed integer of a specified size
+  | Unsigned Size -- ^ Unsigned integer of a specified size
+  | Vector   Size       HWType -- ^ Vector type
+  | Sum      Identifier [Identifier] -- ^ Sum type: Name and Constructor names
+  | Product  Identifier [HWType] -- ^ Product type: Name and field types
+  | SP       Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
+  | Clock    Int -- ^ Clock type with specified period
+  | Reset    Int -- ^ Reset type corresponding to clock with a specified period
   deriving (Eq,Show,Generic)
 
 instance Hashable HWType
 
+-- | Internals of a Component
 data Declaration
   = Assignment Identifier Expr
   -- ^ Signal assignment:
@@ -90,13 +95,14 @@ data Declaration
   | NetDecl Identifier HWType (Maybe Expr) -- ^ Signal declaration
   deriving Show
 
+-- Expression Modifier
 data Modifier
-  = Indexed (HWType,Int,Int)
-  | Selected Label
-  | DC (HWType,Int)
-  | VecAppend
+  = Indexed (HWType,Int,Int) -- ^ Index the expression: (Type of expression,DataCon tag,Field Tag)
+  | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
+  | VecAppend -- ^ See the expression in the context of a Vector append operation
   deriving Show
 
+-- | Expression used in RHS of a declaration
 data Expr
   = Literal    (Maybe Size) Literal -- ^ Literal expression
   | DataCon    HWType       (Maybe Modifier)  [Expr] -- ^ DataCon application
@@ -104,14 +110,20 @@ data Expr
   | BlackBoxE Text (Maybe Modifier) -- ^ Instantiation of a BlackBox expression
   deriving Show
 
+-- | Literals used in an expression
 data Literal
-  = NumLit  Int
-  | BitLit  Bit
-  | BoolLit Bool
-  | VecLit  [Literal]
+  = NumLit  Int -- ^ Number literal
+  | BitLit  Bit -- ^ Bit literal
+  | BoolLit Bool -- ^ Boolean literal
+  | VecLit  [Literal] -- ^ Vector literal
   deriving Show
 
-data Bit = H | L | U | Z
+-- | Bit literal
+data Bit
+  = H -- ^ High
+  | L -- ^ Low
+  | U -- ^ Undefined
+  | Z -- ^ High-impedance
   deriving Show
 
 makeLenses ''NetlistState

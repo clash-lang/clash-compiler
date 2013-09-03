@@ -85,7 +85,7 @@ renderBlackBox :: Line -- ^ Blackbox template
                -> VHDLState
                -> ((Text, [(Identifier,HWType)]),VHDLState)
 renderBlackBox l bbCtx s
-  = first (Text.concat >< List.nub)
+  = first (Text.concat *** List.nub)
   $ flip runState s
   $ runWriterT
   $ runBlackBoxM

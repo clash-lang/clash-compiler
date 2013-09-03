@@ -13,7 +13,10 @@ import qualified System.FilePath        as FilePath
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
 
-generatePrimMap :: [FilePath] -> IO PrimMap
+-- | Generate a set of primitives that are found in the primitive definition
+-- files in the given directories.
+generatePrimMap :: [FilePath] -- ^ Directories to search for primitive definitions
+                -> IO PrimMap
 generatePrimMap filePaths = do
   primitiveFiles <- fmap concat $ mapM
                       (\filePath ->
@@ -33,10 +36,11 @@ generatePrimMap filePaths = do
 
   return primMap
 
-decodeAndReport ::
-  (FromJSON a)
-  => ByteString
-  -> Maybe a
+-- | Parse a ByteString according to the given JSON template. Prints failures
+-- on @stdout@, and returns 'Nothing' if parsing fails.
+decodeAndReport :: (FromJSON a)
+                => ByteString -- ^ Bytestring to parse
+                -> Maybe a
 decodeAndReport s =
   case L.parse json s of
     L.Done _ v -> case fromJSON v of

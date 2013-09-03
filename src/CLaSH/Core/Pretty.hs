@@ -3,7 +3,9 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 module CLaSH.Core.Pretty
-  ( showDoc )
+  ( Pretty (..)
+  , showDoc
+  )
 where
 
 import           Data.Char               (isSymbol, isUpper, ord)
@@ -27,6 +29,7 @@ import           CLaSH.Core.Var          (Id, TyVar, Var, varKind, varName,
                                           varType)
 import           CLaSH.Util
 
+-- | Pretty printing Show-like typeclass
 class Pretty p where
   ppr :: (Applicative m, LFresh m) => p -> m Doc
   ppr = pprPrec 0
@@ -38,6 +41,7 @@ noPrec = 0
 opPrec = 1
 appPrec = 2
 
+-- | Print a Pretty thing to a String
 showDoc :: Pretty p => p -> String
 showDoc = render . runLFreshM . ppr
 
