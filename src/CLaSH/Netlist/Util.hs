@@ -190,7 +190,7 @@ mkUniqueNormalized (args,binds,res) = do
 
   where
     mkUnique :: (TmName,TmName) -> Id -> NetlistMonad Id
-    mkUnique (find,repl) v = if (find == varName v)
+    mkUnique (find,repl) v = if find == varName v
       then return $ modifyVarName (const repl) v
       else do
         varCnt <- varCount <%= (+1)
