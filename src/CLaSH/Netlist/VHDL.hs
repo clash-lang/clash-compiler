@@ -263,13 +263,12 @@ inst :: Declaration -> VHDLM (Maybe Doc)
 inst (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr False e <> semi
 
-inst (CondAssignment id_ es) = fmap Just $
-  text id_ <+> larrow <+> align (vcat (conds es)) <> semi
+inst (CondAssignment id_ scrut es) = fmap Just $
+  text id_ <+> larrow <+> align (vcat (mapM cond es)) <> semi
     where
-      conds :: [(Expr,Expr,Expr)]-> VHDLM [Doc]
-      conds []            = return []
-      conds [(_,_,e)]     = expr False e <:> return []
-      conds ((l,r,e):es') = (expr False e <+> "when" <+> parens (expr True l <+> "=" <+> expr True r) <+> "else") <:> conds es'
+      cond :: (Maybe Expr,Expr) -> VHDLM Doc
+      cond (Nothing,e) = expr False e
+      cond (Just c ,e) = expr False e <+> "when" <+> parens (expr True scrut <+> "=" <+> expr True c) <+> "else"
 
 inst (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"

@@ -72,10 +72,22 @@ instance Hashable HWType
 
 data Declaration
   = Assignment Identifier Expr
-  | CondAssignment Identifier [(Expr,Expr,Expr)]
-  | InstDecl Identifier Identifier [(Identifier,Expr)]
-  | BlackBoxD Text
-  | NetDecl Identifier HWType (Maybe Expr)
+  -- ^ Signal assignment:
+  --
+  -- * Signal to assign
+  --
+  -- * Assigned expression
+  | CondAssignment Identifier Expr [(Maybe Expr,Expr)]
+  -- ^ Conditional signal assignment:
+  --
+  -- * Signal to assign
+  --
+  -- * Scrutinized expression
+  --
+  -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
+  | InstDecl Identifier Identifier [(Identifier,Expr)] -- ^ Instantiation of another component
+  | BlackBoxD Text -- ^ Instantiation of blackbox declaration
+  | NetDecl Identifier HWType (Maybe Expr) -- ^ Signal declaration
   deriving Show
 
 data Modifier
@@ -86,11 +98,10 @@ data Modifier
   deriving Show
 
 data Expr
-  = Literal    (Maybe Size) Literal
-  | DataCon    HWType       (Maybe Modifier)  [Expr]
-  | Identifier Identifier   (Maybe Modifier)
-  | BlackBoxE Text (Maybe Modifier)
-  | Empty
+  = Literal    (Maybe Size) Literal -- ^ Literal expression
+  | DataCon    HWType       (Maybe Modifier)  [Expr] -- ^ DataCon application
+  | Identifier Identifier   (Maybe Modifier) -- ^ Signal reference
+  | BlackBoxE Text (Maybe Modifier) -- ^ Instantiation of a BlackBox expression
   deriving Show
 
 data Literal

@@ -150,28 +150,32 @@ mkConcSm bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
   return [Assignment dstId extractExpr]
 
 mkConcSm bndr (Case scrut ty alts) = do
-  alts'   <- mapM unbind alts
-  scrutTy <- termType scrut
-  (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
-  scrutHTy <- unsafeCoreTypeToHWTypeM scrutTy
-  (exprs,altsDecls)      <- fmap (second concat . unzip) $ mapM (mkCondExpr (scrutExpr,scrutHTy)) alts'
+  alts'                  <- mapM unbind alts
+  scrutTy                <- termType scrut
+  scrutHTy               <- unsafeCoreTypeToHWTypeM scrutTy
+  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr scrutTy scrut
+  (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId (reverse exprs)]
+  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId scrutExpr (reverse exprs)]
   where
-    mkCondExpr :: (Expr,HWType) -> (Pat,Term) -> NetlistMonad ((Expr,Expr,Expr),[Declaration])
-    mkCondExpr (scrutE,scrutHTy) (pat,alt) = do
+    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
+    mkCondExpr scrutHTy (pat,alt) = do
       (altExpr,altDecls) <- mkExpr ty alt
-      fmap (,altDecls) $! case pat of
-        DefaultPat           -> return (Empty,Empty,altExpr)
-        DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
-                                    scrutSel = case scrutE of
-                                      Identifier scrutId Nothing -> Identifier scrutId modifier
-                                      BlackBoxE bbE Nothing      -> BlackBoxE bbE modifier
-                                      _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
-                                in return (scrutSel,dcToLiteral scrutHTy (dcTag dc),altExpr)
-        LitPat  (Embed (IntegerLiteral i)) -> return (scrutE, HW.Literal Nothing (NumLit $ fromInteger i),altExpr)
+      (,altDecls) <$> case pat of
+        DefaultPat           -> return (Nothing,altExpr)
+        DataPat (Embed dc) _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
+        LitPat  (Embed (IntegerLiteral i)) -> return (Just (HW.Literal Nothing (NumLit $ fromInteger i)),altExpr)
         _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
+
+    mkScrutExpr :: HWType -> Pat -> Expr -> Expr
+    mkScrutExpr scrutHTy pat scrutE = case pat of
+      DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
+                              in case scrutE of
+                                  Identifier scrutId _ -> Identifier scrutId modifier
+                                  BlackBoxE bbE _      -> BlackBoxE bbE modifier
+                                  _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
+      _ -> scrutE
 
     dcToLiteral :: HWType -> Int -> Expr
     dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
