@@ -190,6 +190,7 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
   (pat,altE) <- unbind alt
   case pat of
     DefaultPat    -> changed altE
+    LitPat _      -> changed altE
     DataPat _ pxs -> let (tvs,xs)   = unrebind pxs
                          (ftvs,fvs) = termFreeVars altE
                          usedTvs    = filter ((`elem` ftvs) . varName) tvs
@@ -197,7 +198,6 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
                      in  case (usedTvs,usedXs) of
                            ([],[]) -> changed altE
                            _       -> return e
-    _             -> return e
 
 caseCon _ e = return e
 
