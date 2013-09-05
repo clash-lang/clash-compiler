@@ -208,14 +208,13 @@ nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
   = R $ do
-    localVar       <- isLocalVar arg
     untranslatable <- isUntranslatable arg
-    case (localVar || not untranslatable,arg) of
-      (False,Letrec b) -> do (binds,body) <- unbind b
-                             changed . Letrec $ bind binds (App appConPrim body)
-      (False,Case {})  -> runR $ specialise specialisations ctx e
-      (False,Lam _)    -> runR $ specialise specialisations ctx e
-      _                -> return e
+    case (untranslatable,arg) of
+      (True,Letrec b) -> do (binds,body) <- unbind b
+                            changed . Letrec $ bind binds (App appConPrim body)
+      (True,Case {})  -> runR $ specialise specialisations ctx e
+      (True,Lam _)    -> runR $ specialise specialisations ctx e
+      _               -> return e
 
 nonRepANF _ e = return e
 
