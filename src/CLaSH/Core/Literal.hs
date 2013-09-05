@@ -6,6 +6,7 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
+-- | Term Literal
 module CLaSH.Core.Literal
   ( Literal (..)
   , literalType

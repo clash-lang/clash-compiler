@@ -7,6 +7,7 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
+-- | Type Constructors in CoreHW
 module CLaSH.Core.TyCon
   ( TyCon (..)
   , TyConName

@@ -1,3 +1,4 @@
+-- | Capture-free substitution function for CoreHW
 module CLaSH.Core.Subst where
 
 import                Unbound.LocallyNameless (subst, substs)

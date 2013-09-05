@@ -43,25 +43,25 @@ mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox applicati
                   -> [Term] -- ^ Arguments of the primitive/blackbox application
                   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
-  -- Make context inputs
-  args'                 <- fmap (zip args) $ mapM isFun args
-  (varInps,declssV)     <- fmap (unzip . catMaybes)  $ mapM (runMaybeT . mkInput) args'
-  let (_,otherArgs)     = partitionEithers $ map unVar args'
-      (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
-  (litInps,declssL)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkLitInput . fst) litArgs
-  (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
+    -- Make context inputs
+    args'                 <- fmap (zip args) $ mapM isFun args
+    (varInps,declssV)     <- fmap (unzip . catMaybes)  $ mapM (runMaybeT . mkInput) args'
+    let (_,otherArgs)     = partitionEithers $ map unVar args'
+        (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
+    (litInps,declssL)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkLitInput . fst) litArgs
+    (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
 
-  -- Make context result
-  let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
-  resTy <- N.unsafeCoreTypeToHWTypeM (unembed $ V.varType resId)
+    -- Make context result
+    let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
+    resTy <- N.unsafeCoreTypeToHWTypeM (unembed $ V.varType resId)
 
-  return ( Context (res,resTy) varInps (map fst litInps) funInps
-         , concat declssV ++ concat declssL ++ concat declssF
-         )
-
-unVar :: (Term, Bool) -> Either TmName (Term, Bool)
-unVar (Var _ v, False) = Left v
-unVar t                = Right t
+    return ( Context (res,resTy) varInps (map fst litInps) funInps
+           , concat declssV ++ concat declssL ++ concat declssF
+           )
+  where
+    unVar :: (Term, Bool) -> Either TmName (Term, Bool)
+    unVar (Var _ v, False) = Left v
+    unVar t                = Right t
 
 -- | Instantiate a BlackBox template according to the given context
 mkBlackBox :: Text -- ^ Template to instantiate
@@ -137,7 +137,7 @@ mkLitInput _ = mzero
 -- a function
 mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
-           -> MaybeT NetlistMonad ((Line,BlackBoxContext),[Declaration])
+           -> MaybeT NetlistMonad ((BlackBoxTemplate,BlackBoxContext),[Declaration])
 mkFunInput resId e = case collectArgs e of
   (Prim nm _, args) -> do
     bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
@@ -171,8 +171,8 @@ mkFunInput resId e = case collectArgs e of
   _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
-instantiateSym :: Line
-               -> NetlistMonad Line
+instantiateSym :: BlackBoxTemplate
+               -> NetlistMonad BlackBoxTemplate
 instantiateSym l = do
   i <- Lens.use varCount
   let (l',i') = setSym i l

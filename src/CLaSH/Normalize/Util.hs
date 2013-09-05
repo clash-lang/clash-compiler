@@ -1,63 +1,33 @@
 {-# LANGUAGE LambdaCase    #-}
 {-# LANGUAGE ViewPatterns  #-}
+
+-- | Utility functions used by the normalisation transformations
 module CLaSH.Normalize.Util where
 
 import           Control.Lens            ((%=), (.=))
 import qualified Control.Lens            as Lens
+import qualified Data.Either             as Either
 import qualified Data.Graph              as Graph
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.List               as List
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
-import           Unbound.LocallyNameless (Fresh, aeq, embed, unbind, unembed)
+import           Unbound.LocallyNameless (Fresh, unembed)
 
-import           CLaSH.Core.DataCon      (dataConInstArgTys)
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
-import           CLaSH.Core.TyCon        (TyCon (..), tyConDataCons)
-import           CLaSH.Core.Type         (Type (..), TypeView (..), isFunTy,
-                                          tyView)
-import           CLaSH.Core.Util         (Gamma, collectArgs, termType)
+import           CLaSH.Core.Type         (Type (..), splitFunForallTy)
+import           CLaSH.Core.Util         (collectArgs, termType)
 import           CLaSH.Core.Var          (Id, Var (..))
 import           CLaSH.Netlist.Util      (splitNormalized)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
 
-isBoxTy ::
-  Type
-  -> Bool
-isBoxTy = isBoxTy' []
-
-isBoxTy' ::
-  [Type]
-  -> Type
-  -> Bool
-isBoxTy' ts ty@(tyView -> TyConApp tc tys)
-  | ty `notElem` ts = any (\t -> isBoxTy' (ty:ts) t || isFunTy t)
-                          (conArgs tc tys)
-  | otherwise       = False
-isBoxTy' _ _        = False
-
-isPolyFunTy ::
-  Fresh m
-  => Type
-  -> m Bool
-isPolyFunTy (ForAllTy tvT) = unbind tvT >>= (isPolyFunTy . snd)
-isPolyFunTy ty             = return $! isFunTy ty
-
-conArgs :: TyCon -> [Type] -> [Type]
-conArgs tc tys = bigUnionTys $ map (`dataConInstArgTys` tys)
-               $ tyConDataCons tc
-  where
-    bigUnionTys :: [[Type]] -> [Type]
-    bigUnionTys []   = []
-    bigUnionTys tyss = foldl1 (List.unionBy aeq) tyss
-
-alreadyInlined ::
-  TmName
-  -> NormalizeMonad Bool
+-- | Determine if a function is already inlined in the context of the 'NetlistMonad'
+alreadyInlined :: TmName
+               -> NormalizeMonad Bool
 alreadyInlined f = do
   cf <- Lens.use curFun
   inlinedHM <- Lens.use inlined
@@ -65,6 +35,8 @@ alreadyInlined f = do
     Nothing       -> return False
     Just inlined' -> return (f `elem` inlined')
 
+-- | Move the names of inlined functions collected during a traversal into the
+-- permanent inlined function cache
 commitNewInlined :: NormRewrite
 commitNewInlined _ e = R $ liftR $ do
   cf <- Lens.use curFun
@@ -76,20 +48,16 @@ commitNewInlined _ e = R $ liftR $ do
   newInlined .= []
   return e
 
-fvs2bvs ::
-  Gamma
-  -> [TmName]
-  -> [Id]
-fvs2bvs gamma = map (\n -> Id n (embed $ gamma HashMap.! n))
+-- | Determine if a term is closed
+isClosed :: (Functor m, Fresh m)
+         => Term
+         -> m Bool
+isClosed = fmap (not . isPolyFunTy) . termType
+  where
+    -- Is a type a (polymorphic) function type?
+    isPolyFunTy = not . null . Either.lefts . fst . splitFunForallTy
 
-isClosed ::
-  (Functor m, Fresh m)
-  => Term
-  -> m Bool
-isClosed e = do
-  ty <- termType e
-  fmap not $ isPolyFunTy ty
-
+-- | Determine if a term represents a constant
 isConstant :: Term -> Bool
 isConstant e = case collectArgs e of
   (Data _, args)   -> all (either isConstant (const True)) args
@@ -97,24 +65,27 @@ isConstant e = case collectArgs e of
   (Literal _,_)    -> True
   _                -> False
 
+-- | Get the \"Wrapped\" function out of a normalized Term. Returns 'Nothing' if
+-- the normalized term is not actually a wrapper.
 getWrappedF :: (Fresh m,Functor m) => Term -> m (Maybe Term)
 getWrappedF body = do
-  normalizedM <- splitNormalized body
-  case normalizedM of
-    Right (funArgs,[(_,bExpr)],_) -> return $! uncurry (reduceArgs True funArgs) (collectArgs $ unembed bExpr)
-    _                             -> return Nothing
+    normalizedM <- splitNormalized body
+    case normalizedM of
+      Right (funArgs,[(_,bExpr)],_) -> return $! uncurry (reduceArgs True funArgs) (collectArgs $ unembed bExpr)
+      _                             -> return Nothing
+  where
+    reduceArgs :: Bool -> [Id] -> Term -> [Either Term Type] -> Maybe Term
+    reduceArgs _    []    appE []                         = Just appE
+    reduceArgs _    (_:_) _ []                            = Nothing
+    reduceArgs b    ids       appE (Right ty:args)        = reduceArgs b ids (TyApp appE ty) args
+    reduceArgs _    (id1:ids) appE (Left (Var _ nm):args) | varName id1 == nm = reduceArgs False ids appE args
+    reduceArgs True ids@(_:_) appE (Left arg:args)        = reduceArgs True ids (App appE arg) args
+    reduceArgs _ _ _ _                                    = Nothing
 
-reduceArgs :: Bool -> [Id] -> Term -> [Either Term Type] -> Maybe Term
-reduceArgs _    []    appE []                         = Just appE
-reduceArgs _    (_:_) _ []                            = Nothing
-reduceArgs b    ids       appE (Right ty:args)        = reduceArgs b ids (TyApp appE ty) args
-reduceArgs _    (id1:ids) appE (Left (Var _ nm):args) | varName id1 == nm = reduceArgs False ids appE args
-reduceArgs True ids@(_:_) appE (Left arg:args)        = reduceArgs True ids (App appE arg) args
-reduceArgs _ _ _ _                                    = Nothing
-
-callGraph :: [TmName]
-          -> HashMap TmName Term
-          -> TmName
+-- | Create a call graph for a set of global binders, given a root
+callGraph :: [TmName] -- ^ List of functions that should not be inspected
+          -> HashMap TmName Term -- ^ Global binders
+          -> TmName -- ^ Root of the call graph
           -> [(TmName,[TmName])]
 callGraph visited bindingMap root = node:other
   where
@@ -123,7 +94,8 @@ callGraph visited bindingMap root = node:other
     node   = (root,used)
     other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
 
-recursiveComponents :: [(TmName,[TmName])]
+-- | Determine the sets of recursive components given the edges of a callgraph
+recursiveComponents :: [(TmName,[TmName])] -- ^ [(calling function,[called function])]
                     -> [[TmName]]
 recursiveComponents = Maybe.catMaybes
                     . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})

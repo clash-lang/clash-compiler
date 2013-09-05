@@ -1,6 +1,8 @@
 {-# LANGUAGE PatternGuards   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
+
+-- | Transformations of the Normalization process
 module CLaSH.Normalize.Transformations
   ( appProp
   , bindNonRep
@@ -58,6 +60,7 @@ import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
 import           CLaSH.Util
 
+-- | Inline non-recursive, non-representable let-bindings
 bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
@@ -67,6 +70,7 @@ bindNonRep = inlineBinders nonRepTest
 
     nonRepTest _ = return False
 
+-- | Lift recursive, non-representable let-bindings
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
@@ -76,7 +80,7 @@ liftNonRep = liftBinders nonRepTest
 
     nonRepTest _ = return False
 
-
+-- | Specialize functions on their type
 typeSpec :: NormRewrite
 typeSpec ctx e@(TyApp e1 ty)
   | (Var _ _,  args) <- collectArgs e1
@@ -86,6 +90,7 @@ typeSpec ctx e@(TyApp e1 ty)
 
 typeSpec _ e = return e
 
+-- | Specialize functions on their non-representable argument
 nonRepSpec :: NormRewrite
 nonRepSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
@@ -100,6 +105,7 @@ nonRepSpec ctx e@(App e1 e2)
 
 nonRepSpec _ e = return e
 
+-- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: NormRewrite
 caseLet _ (Case (Letrec b) ty alts) = R $ do
   (xes,e) <- unbind b
@@ -107,6 +113,7 @@ caseLet _ (Case (Letrec b) ty alts) = R $ do
 
 caseLet _ e = return e
 
+-- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut ty1 alts1) ty2 alts2)
   = R $ do
@@ -122,6 +129,8 @@ caseCase _ e@(Case (Case scrut ty1 alts1) ty2 alts2)
 
 caseCase _ e = return e
 
+-- | Inline function with a non-representable result if it's the subject
+-- of a Case-decomposition
 inlineNonRep :: NormRewrite
 inlineNonRep ctx e@(Case scrut ty alts)
   | (Var _ f, args) <- collectArgs scrut
@@ -143,6 +152,9 @@ inlineNonRep ctx e@(Case scrut ty alts)
 
 inlineNonRep _ e = return e
 
+-- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
+-- the subject is (an application of) a DataCon; or if there is only a single
+-- alternative that doesn't reference variables bound by the pattern.
 caseCon :: NormRewrite
 caseCon _ (Case scrut ty alts)
   | (Data dc, args) <- collectArgs scrut
@@ -189,6 +201,8 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
 
 caseCon _ e = return e
 
+-- | Bring an application of a DataCon or Primitive in ANF, when the argument is
+-- is considered non-representable
 nonRepANF :: NormRewrite
 nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
@@ -205,6 +219,8 @@ nonRepANF ctx e@(App appConPrim arg)
 
 nonRepANF _ e = return e
 
+-- | Ensure that top-level lambda's eventually bind a let-expression of which
+-- the body is a variable-reference.
 topLet :: NormRewrite
 topLet ctx e
   | all isLambdaBodyCtx ctx && not (isLet e)
@@ -229,6 +245,8 @@ topLet ctx e@(Letrec b)
 topLet _ e = return e
 
 -- Misc rewrites
+
+-- | Remove unused let-bindings
 deadCode :: NormRewrite
 deadCode _ e@(Letrec binds) = R $ do
     (xes, body) <- fmap (first unrec) $ unbind binds
@@ -255,11 +273,14 @@ deadCode _ e@(Letrec binds) = R $ do
 
 deadCode _ e = return e
 
+-- | Inline let-bindings when the RHS is either a local variable reference or
+-- is constant
 bindConstantVar :: NormRewrite
 bindConstantVar = inlineBinders test
   where
     test (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
 
+-- | Inline nullary/closed functions
 inlineClosedTerm :: String -> NormRewrite -> NormRewrite
 inlineClosedTerm rwS rw _ e@(Var _ f) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
@@ -282,6 +303,7 @@ inlineClosedTerm rwS rw _ e@(Var _ f) = R $ do
 
 inlineClosedTerm _ _ _ e = return e
 
+-- | Specialise functions on arguments which are constant
 constantSpec :: NormRewrite
 constantSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
@@ -292,6 +314,7 @@ constantSpec ctx e@(App e1 e2)
 
 constantSpec _ e = return e
 
+-- | Inline functions which simply \"wrap\" another function
 inlineWrapper :: NormRewrite
 inlineWrapper [] e = R $ do
   normalizedM <- splitNormalized e
@@ -322,6 +345,9 @@ inlineWrapper _ e@(Var _ f) = R $ do
 inlineWrapper _ e = return e
 
 -- Experimental
+
+-- | Propagate arguments of application inwards; except for 'Lam' where the
+-- argument becomes let-bound.
 appProp :: NormRewrite
 appProp _ (App (Lam b) arg) = R $ do
   (v,e) <- unbind b
@@ -381,6 +407,9 @@ liftNormR = lift . R
 -- NOTE [unsafeUnbind]: Use unsafeUnbind (which doesn't freshen pattern
 -- variables). Reason: previously collected expression still reference
 -- the 'old' variable names created by the traversal!
+
+-- | Turn an expression into a modified ANF-form. As opposed to standard ANF,
+-- constants do not become let-bound.
 makeANF :: NormRewrite
 makeANF ctx (Lam b) = do
   -- See NOTE [unsafeUnbind]
@@ -467,6 +496,7 @@ collectANF ctx e@(Case subj ty alts) = do
 
 collectANF _ e = return e
 
+-- | Eta-expand top-level lambda's (DON'T use in a traversal!)
 etaExpansionTL :: NormRewrite
 etaExpansionTL ctx (Lam b) = do
   (bndr,e) <- unbind b
@@ -489,6 +519,10 @@ etaExpansionTL ctx e
         changed . Lam $ bind newIdB e'
       else return e
 
+-- | Turn a  normalized recursive function, where the recursive calls only pass
+-- along the unchanged original arguments, into let-recursive function. This
+-- means that all recursive calls are replaced by the same variable reference as
+-- found in the body of the top-level let-expression.
 recToLetRec :: NormRewrite
 recToLetRec [] e = R $ do
   fn          <- liftR $ Lens.use curFun

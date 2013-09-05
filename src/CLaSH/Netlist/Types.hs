@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
+
+-- | Type and instance definitions for Netlist modules
 module CLaSH.Netlist.Types where
 
 import Control.Monad.State                  (MonadIO, MonadState, StateT)
@@ -37,7 +39,7 @@ data NetlistState
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: HashMap ByteString Primitive -- ^ Primitive Definitions
   , _vhdlMState     :: VHDLState -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
-  , _typeTranslator :: Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
+  , _typeTranslator :: Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   }
 
 -- | Signal reference
@@ -54,6 +56,7 @@ data Component
   }
   deriving Show
 
+-- | Size indication of a type (e.g. bit-size or number of elements)
 type Size = Int
 
 -- | Representable hardware types
@@ -95,7 +98,7 @@ data Declaration
   | NetDecl Identifier HWType (Maybe Expr) -- ^ Signal declaration
   deriving Show
 
--- Expression Modifier
+-- | Expression Modifier
 data Modifier
   = Indexed (HWType,Int,Int) -- ^ Index the expression: (Type of expression,DataCon tag,Field Tag)
   | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)

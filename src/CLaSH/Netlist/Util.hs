@@ -83,10 +83,11 @@ coreTypeToHWType builtInTranslation ty =
        _                -> Left $ "Can't translate non tycon-type: " ++ showDoc ty)
     (builtInTranslation ty)
 
-mkADT :: (Type -> Maybe (Either String HWType))
-      -> String
-      -> TyCon
-      -> [Type]
+-- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
+mkADT :: (Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
+      -> String -- ^ String representation of the Core type for error messages
+      -> TyCon -- ^ The TyCon
+      -> [Type] -- ^ Its applied arguments
       -> Either String HWType
 mkADT _ tyString tc args
   | isRecursiveTy tc

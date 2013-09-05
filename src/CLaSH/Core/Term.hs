@@ -6,6 +6,7 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
+-- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
   ( Term (..)
   , TmName

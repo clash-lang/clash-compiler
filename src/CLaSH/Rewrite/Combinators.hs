@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+-- | Rewriting combinators and traversals
 module CLaSH.Rewrite.Combinators where
 
 import           Control.Monad               ((<=<), (>=>))
@@ -80,7 +81,7 @@ topdownR r = r >-> allR True (topdownR r)
 unsafeTopdownR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 unsafeTopdownR r = r >-> allR False (unsafeTopdownR r)
 
--- Apply a transformation in a bottomup traversal
+-- | Apply a transformation in a bottomup traversal
 bottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 bottomupR r = allR True (bottomupR r) >-> r
 

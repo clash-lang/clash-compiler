@@ -1,3 +1,4 @@
+-- | Type definitions used by the Driver module
 module CLaSH.Driver.Types where
 
 import Data.HashMap.Lazy (HashMap)

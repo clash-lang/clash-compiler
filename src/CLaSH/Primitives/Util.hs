@@ -1,3 +1,4 @@
+-- | Utility functions to generate Primitives
 module CLaSH.Primitives.Util where
 
 import           Data.Aeson             (FromJSON, Result (..), fromJSON, json)

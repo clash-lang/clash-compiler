@@ -6,6 +6,7 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+-- | Assortment of utility function used in the CLaSH library
 module CLaSH.Util
   ( module CLaSH.Util
   , module X

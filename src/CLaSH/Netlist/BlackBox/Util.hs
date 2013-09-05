@@ -1,4 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
+
+-- | Utilties to verify blackbox contexts against templates and rendering
+-- filled in templates
 module CLaSH.Netlist.BlackBox.Util where
 
 import           Control.Lens                         (at, use, (%=), (+=), _1,
@@ -23,7 +26,7 @@ import           CLaSH.Util
 -- | Determine if the number of normal/literal/function inputs of a blackbox
 -- context at least matches the number of argument that is expected by the
 -- template.
-verifyBlackBoxContext :: Line -- ^ Template to check against
+verifyBlackBoxContext :: BlackBoxTemplate -- ^ Template to check against
                       -> BlackBoxContext -- ^ Blackbox to verify
                       -> Bool
 verifyBlackBoxContext tmpl bbCtx =
@@ -31,7 +34,8 @@ verifyBlackBoxContext tmpl bbCtx =
   ((length (litInputs bbCtx) - 1) >= countLits tmpl) &&
   ((length (funInputs bbCtx) - 1) >= countFuns tmpl)
 
-countArgs :: Line -> Int
+-- | Count the number of argument tags/holes in a blackbox template
+countArgs :: BlackBoxTemplate -> Int
 countArgs [] = -1
 countArgs l  = maximum
              $ map (\e -> case e of
@@ -40,7 +44,8 @@ countArgs l  = maximum
                             _ -> -1
                    ) l
 
-countLits :: Line -> Int
+-- | Counter the number of literal tags/holes in a blackbox template
+countLits :: BlackBoxTemplate -> Int
 countLits [] = -1
 countLits l  = maximum
              $ map (\e -> case e of
@@ -49,18 +54,19 @@ countLits l  = maximum
                             _ -> -1
                    ) l
 
-countFuns :: Line -> Int
+-- | Count the number of function instantiations in a blackbox template
+countFuns :: BlackBoxTemplate -> Int
 countFuns [] = -1
 countFuns l  = maximum $ map (\e -> case e of { D (Decl n _) -> n; _ -> -1 }) l
 
 -- | Update all the symbol references in a template, and increment the symbol
 -- counter for every newly encountered symbol.
-setSym :: Int -> Line -> (Line,Int)
+setSym :: Int -> BlackBoxTemplate -> (BlackBoxTemplate,Int)
 setSym i l
   = second fst
   $ runState (setSym' l) (i,IntMap.empty)
   where
-    setSym' :: Line -> State (Int,IntMap.IntMap Int) Line
+    setSym' :: BlackBoxTemplate -> State (Int,IntMap.IntMap Int) BlackBoxTemplate
     setSym' = mapM (\e -> case e of
                       Sym i'        -> do symM <- use (_2 . at i')
                                           case symM of
@@ -80,7 +86,7 @@ clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
-renderBlackBox :: Line -- ^ Blackbox template
+renderBlackBox :: BlackBoxTemplate -- ^ Blackbox template
                -> BlackBoxContext -- ^ Context used to fill in the hole
                -> VHDLState
                -> ((Text, [(Identifier,HWType)]),VHDLState)
@@ -110,7 +116,7 @@ renderElem b e = either id fst <$> mkSyncIdentifier b e
 -- component instantiation, and turn it into a single identifier so it can
 -- be used for a new blackbox context.
 lineToIdentifier :: BlackBoxContext
-                 -> Line
+                 -> BlackBoxTemplate
                  -> BlackBoxMonad (SyncIdentifier,HWType)
 lineToIdentifier b = foldrM (\e (a,_) -> do
                               e' <- mkSyncIdentifier  b e

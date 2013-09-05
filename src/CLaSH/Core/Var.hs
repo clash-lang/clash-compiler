@@ -11,6 +11,7 @@
 {-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
 #endif
 
+-- | Variables in CoreHW
 module CLaSH.Core.Var
   ( Var (..)
   , Id

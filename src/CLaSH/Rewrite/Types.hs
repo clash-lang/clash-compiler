@@ -2,6 +2,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
+
+-- | Type and instance definitions for Rewrite modules
 module CLaSH.Rewrite.Types where
 
 import Control.Concurrent.Supply (Supply, freshId)
@@ -42,19 +44,25 @@ data RewriteState
 
 makeLenses ''RewriteState
 
+-- | Debug Message Verbosity
 data DebugLevel
-  = DebugNone
-  | DebugFinal
-  | DebugApplied
-  | DebugAll
+  = DebugNone -- ^ Don't show debug messages
+  | DebugFinal -- ^ Show completely normalized expressions
+  | DebugApplied -- ^ Show sub-expressions after a successful rewrite
+  | DebugAll -- ^ Show all sub-expressions on which a rewrite is attempted
   deriving (Eq,Ord)
 
+-- | Read-only environment of a rewriting session
 newtype RewriteEnv = RE { _dbgLevel :: DebugLevel }
 
 makeLenses ''RewriteEnv
 
+-- | Monad that keeps track how many transformations have been applied and can
+-- generate fresh variables and unique identifiers
 type RewriteSession m = ReaderT RewriteEnv (StateT RewriteState (FreshMT m))
 
+-- | Monad that can do the same as 'RewriteSession' and in addition keeps track
+-- if a transformation/rewrite has been successfully applied.
 type RewriteMonad m = WriterT Any (RewriteSession m)
 
 instance Monad m => MonadUnique (RewriteMonad m) where
@@ -64,6 +72,7 @@ instance Monad m => MonadUnique (RewriteMonad m) where
     lift . lift $ uniqSupply .= sup'
     return a
 
+-- | MTL convenience wrapper around 'RewriteMonad'
 newtype R m a = R { runR :: RewriteMonad m a }
   deriving ( Monad
            , Functor
@@ -74,5 +83,8 @@ newtype R m a = R { runR :: RewriteMonad m a }
            , Fresh
            )
 
+-- | Monadic action that transforms a term given a certain context
 type Transform m = [CoreContext] -> Term -> m Term
+
+-- | A 'Transform' action in the context of the 'RewriteMonad'
 type Rewrite m   = Transform (R m)

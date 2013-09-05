@@ -6,6 +6,7 @@
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
+-- | Data Constructors in CoreHW
 module CLaSH.Core.DataCon
   ( DataCon (..)
   , DcName

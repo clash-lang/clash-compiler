@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+-- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
 import           Data.HashMap.Lazy       (HashMap)

@@ -1,3 +1,4 @@
+-- | Builtin Type and Kind definitions
 module CLaSH.Core.TysPrim
   ( liftedTypeKind
   , typeNatKind

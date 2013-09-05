@@ -16,7 +16,6 @@ import qualified System.IO                    as IO
 import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
 import           Unbound.LocallyNameless      (name2String)
 
-import           CLaSH.Core.Term              (TmName)
 import           CLaSH.Core.Type              (Type)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
@@ -32,22 +31,29 @@ import           CLaSH.Util
 
 import qualified Data.Time.Clock              as Clock
 
-generateVHDL :: BindingMap
-             -> PrimMap
-             -> (Type -> Maybe (Either String HWType))
-             -> DebugLevel
+-- | Create a set of .VHDL files for a set of functions
+generateVHDL :: BindingMap -- ^ Set of functions
+             -> PrimMap -- ^ Primitive / BlackBox Definitions
+             -> (Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
+             -> DebugLevel -- ^ Debug information level for the normalization process
              -> IO ()
 generateVHDL bindingsMap primMap typeTrans dbgLevel = do
   start <- Clock.getCurrentTime
 
   let topEntities = HashMap.toList
-                  $ HashMap.filterWithKey isTopEntity bindingsMap
+                  $ HashMap.filterWithKey
+                      (\var _ -> isSuffixOf "topEntity" $ name2String var)
+                      bindingsMap
 
       testInputs  = HashMap.toList
-                  $ HashMap.filterWithKey isTestInput bindingsMap
+                  $ HashMap.filterWithKey
+                      (\var _ -> isSuffixOf "testInput" $ name2String var)
+                      bindingsMap
 
       expectedOutputs = HashMap.toList
-                      $ HashMap.filterWithKey isExpectedOutput bindingsMap
+                      $ HashMap.filterWithKey
+                          (\var _ -> isSuffixOf "expectedOutput" $ name2String var)
+                          bindingsMap
 
   case topEntities of
     [topEntity] -> do
@@ -111,24 +117,6 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
-
-isTopEntity ::
-  TmName
-  -> a
-  -> Bool
-isTopEntity var _ = isSuffixOf "topEntity" $ name2String var
-
-isTestInput ::
-  TmName
-  -> a
-  -> Bool
-isTestInput var _ = isSuffixOf "testInput" $ name2String var
-
-isExpectedOutput ::
-  TmName
-  -> a
-  -> Bool
-isExpectedOutput var _ = isSuffixOf "expectedOutput" $ name2String var
 
 -- | Pretty print Components to VHDL Documents
 createVHDL :: VHDLState

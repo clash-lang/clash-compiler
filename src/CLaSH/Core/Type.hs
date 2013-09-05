@@ -10,12 +10,14 @@
 {-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
 #endif
 
+-- | Types in CoreHW
 module CLaSH.Core.Type
   ( Type (..)
   , TypeView (..)
   , ConstTy (..)
   , LitTy (..)
   , Kind
+  , KindOrType
   , KiName
   , TyName
   , TyVar
@@ -24,7 +26,6 @@ module CLaSH.Core.Type
   , transparentTy
   , typeKind
   , mkTyConTy
-  , splitTyAppM
   , mkFunTy
   , mkTyConApp
   , splitFunTy

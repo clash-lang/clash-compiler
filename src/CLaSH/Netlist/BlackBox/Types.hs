@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+-- | Types used in BlackBox modules
 module CLaSH.Netlist.BlackBox.Types where
 
 import Control.Monad.State  (MonadState, State)
@@ -7,12 +8,16 @@ import Data.Text.Lazy       (Text)
 
 import CLaSH.Netlist.Types
 
+-- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
   = Context
-  { result    :: (SyncIdentifier,HWType)
-  , inputs    :: [(SyncIdentifier,HWType)]
-  , litInputs :: [Identifier]
-  , funInputs :: [(Line,BlackBoxContext)]
+  { result    :: (SyncIdentifier,HWType) -- ^ Result name and type
+  , inputs    :: [(SyncIdentifier,HWType)] -- ^ Argument names and types
+  , litInputs :: [Identifier] -- ^ Literal arguments (subset of inputs)
+  , funInputs :: [(BlackBoxTemplate,BlackBoxContext)]
+  -- ^ Function arguments (subset of inputs):
+  --
+  -- * (Blackbox Template,Partial Blackbox Concext)
   }
   deriving Show
 
@@ -20,7 +25,8 @@ data BlackBoxContext
 -- corresponding clock
 type SyncIdentifier = Either Identifier (Identifier,Identifier)
 
-type Line = [Element]
+-- | A BlackBox Template is a List of Elements
+type BlackBoxTemplate = [Element]
 
 -- | Elements of a blackbox context
 data Element = C   Text          -- ^ Constant
@@ -41,8 +47,10 @@ data Element = C   Text          -- ^ Constant
 -- to instantiate. Second argument corresponds to output and input assignments,
 -- where the first element is the output assignment, and the subsequent elements
 -- are the consecutive input assignments.
-data Decl = Decl Int [Line]
+data Decl = Decl Int [BlackBoxTemplate]
   deriving Show
 
+-- | Monad that caches VHDL information and remembers hidden inputs of
+-- black boxes that are being generated (WriterT)
 newtype BlackBoxMonad a = B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State VHDLState) a }
   deriving (Functor, Monad, MonadWriter [(Identifier,HWType)], MonadState VHDLState)

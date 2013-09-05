@@ -1,3 +1,4 @@
+-- | Parser definitions for BlackBox templates
 module CLaSH.Netlist.BlackBox.Parser
   (runParse)
 where
@@ -13,62 +14,74 @@ import           CLaSH.Netlist.BlackBox.Types
 
 type Parser a = P (Str Char Text LineColPos) a
 
-runParse :: Text -> (Line, [Error LineColPos])
-runParse = PCC.parse ((,) <$> pLine <*> pEnd)
+
+-- | Parse a text as a BlackBoxTemplate, returns a list of errors in case
+-- parsing fails
+runParse :: Text -> (BlackBoxTemplate, [Error LineColPos])
+runParse = PCC.parse ((,) <$> pBlackBoxD <*> pEnd)
          . createStr (LineColPos 0 0 0)
 
-pLine :: Parser Line
-pLine = pSome pElement
+-- | Parse a BlackBoxTemplate (Declarations and Expressions)
+pBlackBoxD :: Parser BlackBoxTemplate
+pBlackBoxD = pSome pElement
 
+-- | Parse a single Template Element
 pElement :: Parser Element
-pElement  =  pTag
+pElement  =  pTagD
          <|> C <$> pText
 
+-- | Parse the Text part of a Template
 pText :: Parser Text
 pText = pack <$> pList1 (pRange ('\000','\125'))
 
-pTag :: Parser Element
-pTag =  D <$> pDecl
-    <|> pTag'
+-- | Parse a Declaration or Expression element
+pTagD :: Parser Element
+pTagD =  D <$> pDecl
+     <|> pTagE
 
+-- | Parse a Declaration
 pDecl :: Parser Decl
-pDecl = Decl <$> (pKeyWS "~INST" *> pNatural) <*>
-        ((:) <$> pOutput <*> pList pInput) <* pKey "~INST"
+pDecl = Decl <$> (pTokenWS "~INST" *> pNatural) <*>
+        ((:) <$> pOutput <*> pList pInput) <* pToken "~INST"
 
-pOutput :: Parser Line
-pOutput = pKeyWS "~OUTPUT" *> pKeyWS "<=" *> pLine' <* pKeyWS "~"
+-- | Parse the output tag of Declaration
+pOutput :: Parser BlackBoxTemplate
+pOutput = pTokenWS "~OUTPUT" *> pTokenWS "<=" *> pBlackBoxE <* pTokenWS "~"
 
-pInput :: Parser Line
-pInput = pKeyWS "~INPUT" *> pKeyWS "<=" *> pLine' <* pKeyWS "~"
+-- | Parse the input tag of Declaration
+pInput :: Parser BlackBoxTemplate
+pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> pBlackBoxE <* pTokenWS "~"
 
-pTag' :: Parser Element
-pTag' =  O             <$  pKey "~RESULT"
-     <|> I             <$> (pKey "~ARG" *> pBrackets pNatural)
-     <|> I             <$> (pKey "~LIT" *> pBrackets pNatural)
-     <|> (Clk . Just)  <$> (pKey "~CLK" *> pBrackets pNatural)
-     <|> Clk Nothing   <$  pKey "~CLKO"
-     <|> (Rst . Just)  <$> (pKey "~RST" *> pBrackets pNatural)
-     <|> Rst Nothing   <$  pKey "~RSTO"
-     <|> Sym           <$> (pKey "~SYM" *> pBrackets pNatural)
-     <|> Typ Nothing   <$  pKey "~TYPO"
-     <|> (Typ . Just)  <$> (pKey "~TYP" *> pBrackets pNatural)
-     <|> TypM Nothing  <$  pKey "~TYPMO"
-     <|> (TypM . Just) <$> (pKey "~TYPM" *> pBrackets pNatural)
-     <|> Def Nothing   <$  pKey "~DEFAULTO"
-     <|> (Def . Just)  <$> (pKey "~DEFAULT" *> pBrackets pNatural)
+-- | Parse an Expression element
+pTagE :: Parser Element
+pTagE =  O             <$  pToken "~RESULT"
+     <|> I             <$> (pToken "~ARG" *> pBrackets pNatural)
+     <|> I             <$> (pToken "~LIT" *> pBrackets pNatural)
+     <|> (Clk . Just)  <$> (pToken "~CLK" *> pBrackets pNatural)
+     <|> Clk Nothing   <$  pToken "~CLKO"
+     <|> (Rst . Just)  <$> (pToken "~RST" *> pBrackets pNatural)
+     <|> Rst Nothing   <$  pToken "~RSTO"
+     <|> Sym           <$> (pToken "~SYM" *> pBrackets pNatural)
+     <|> Typ Nothing   <$  pToken "~TYPO"
+     <|> (Typ . Just)  <$> (pToken "~TYP" *> pBrackets pNatural)
+     <|> TypM Nothing  <$  pToken "~TYPMO"
+     <|> (TypM . Just) <$> (pToken "~TYPM" *> pBrackets pNatural)
+     <|> Def Nothing   <$  pToken "~DEFAULTO"
+     <|> (Def . Just)  <$> (pToken "~DEFAULT" *> pBrackets pNatural)
 
+-- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a
 pBrackets p = pSym '[' *> p <* pSym ']'
 
-pKey :: String -> Parser String
-pKey = pToken
+-- | Parse a token and eat trailing whitespace
+pTokenWS :: String -> Parser String
+pTokenWS keyw = pToken keyw <* pSpaces
 
-pKeyWS :: String -> Parser String
-pKeyWS keyw = pToken keyw <* pSpaces
+-- | Parse the expression part of Blackbox Templates
+pBlackBoxE :: Parser BlackBoxTemplate
+pBlackBoxE = pSome pElemE
 
-pLine' :: Parser Line
-pLine' = pSome pElem'
-
-pElem' :: Parser Element
-pElem' = pTag'
+-- | Parse an Expression or Text
+pElemE :: Parser Element
+pElemE = pTagE
       <|> C <$> pText

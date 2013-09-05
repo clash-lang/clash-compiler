@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+-- | Type and instance definitions for Primitive
 module CLaSH.Primitives.Types where
 
 import           Control.Applicative  ((<$>), (<*>), (<|>))

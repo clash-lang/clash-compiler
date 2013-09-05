@@ -3,6 +3,8 @@
 {-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE ViewPatterns    #-}
+
+-- | Utilities for rewriting: e.g. inlining, specialisation, etc.
 module CLaSH.Rewrite.Util where
 
 import           Control.Lens              (Lens', (%=), (+=))
@@ -29,8 +31,9 @@ import           CLaSH.Core.Subst          (substTm)
 import           CLaSH.Core.Term           (LetBinding, Pat (..), Term (..),
                                             TmName)
 import           CLaSH.Core.TyCon          (tyConDataCons)
-import           CLaSH.Core.Type           (TyName, Type (..), TypeView (..),
-                                            transparentTy, typeKind, tyView)
+import           CLaSH.Core.Type           (KindOrType, TyName, Type (..),
+                                            TypeView (..), transparentTy,
+                                            typeKind, tyView)
 import           CLaSH.Core.Util           (Delta, Gamma, collectArgs,
                                             mkAbstraction, mkApps, mkId, mkLams,
                                             mkTmApps, mkTyApps, mkTyLams,
@@ -40,14 +43,19 @@ import           CLaSH.Netlist.Util        (representableType)
 import           CLaSH.Rewrite.Types
 import           CLaSH.Util
 
-
+-- | Lift an action working in the inner monad to the 'RewriteMonad'
 liftR :: Monad m => m a -> RewriteMonad m a
 liftR m = lift . lift . lift . lift $ m
 
+-- | Lift an action working in the inner monad to the 'RewriteSession'
 liftRS :: Monad m => m a -> RewriteSession m a
 liftRS m = lift . lift . lift $ m
 
-apply :: (Monad m, Functor m) => String -> Rewrite m -> Rewrite m
+-- | Record if a transformation is succesfully applied
+apply :: (Monad m, Functor m)
+      => String -- ^ Name of the transformation
+      -> Rewrite m -- ^ Transformation to be applied
+      -> Rewrite m
 apply name rewrite ctx expr = R $ do
   lvl <- Lens.view dbgLevel
   let before = showDoc expr
@@ -90,33 +98,41 @@ apply name rewrite ctx expr = R $ do
     traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n") $
       return expr''
 
-runRewrite :: (Monad m, Functor m) => String -> Rewrite m -> Term -> RewriteSession m Term
+-- | Perform a transformation on a Term
+runRewrite :: (Monad m, Functor m)
+           => String -- ^ Name of the transformation
+           -> Rewrite m -- ^ Transformation to perform
+           -> Term  -- ^ Term to transform
+           -> RewriteSession m Term
 runRewrite name rewrite expr = do
   (expr',_) <- Writer.runWriterT . runR $ apply name rewrite [] expr
   return expr'
 
-runRewriteSession ::
-  Monad m
-  => DebugLevel
-  -> RewriteState
-  -> RewriteSession m a
-  -> m a
+-- | Evaluate a RewriteSession to its inner monad
+runRewriteSession :: Monad m
+                  => DebugLevel
+                  -> RewriteState
+                  -> RewriteSession m a
+                  -> m a
 runRewriteSession lvl st
   = Unbound.runFreshMT
   . (`State.evalStateT` st)
   . (`Reader.runReaderT` RE lvl)
 
+-- | Notify that a transformation has changed the expression
 setChanged :: Monad m => RewriteMonad m ()
 setChanged = Writer.tell (Monoid.Any True)
 
+-- | Identity function that additionally notifies that a transformation has
+-- changed the expression
 changed :: Monad m => a -> RewriteMonad m a
 changed val = do
   Writer.tell (Monoid.Any True)
   return val
 
-contextEnv ::
-  [CoreContext]
-  -> (Gamma, Delta)
+-- | Create a type and kind context out of a transformation context
+contextEnv :: [CoreContext]
+           -> (Gamma, Delta)
 contextEnv = go HashMap.empty HashMap.empty
   where
     go gamma delta []                   = (gamma,delta)
@@ -148,30 +164,31 @@ contextEnv = go HashMap.empty HashMap.empty
     addToDelta delta (TyVar tvName ki) = HashMap.insert tvName (unembed ki) delta
     addToDelta delta _                 = error $ $(curLoc) ++ "Adding Id to Delta"
 
-mkEnv ::
-  (Functor m, Monad m)
-  => [CoreContext]
-  -> RewriteMonad m (Gamma, Delta)
+-- | Create a complete type and kind context out of the global binders and the
+-- transformation context
+mkEnv :: (Functor m, Monad m)
+      => [CoreContext]
+      -> RewriteMonad m (Gamma, Delta)
 mkEnv ctx = do
   let (gamma,delta) = contextEnv ctx
   tsMap             <- fmap (HashMap.map fst) $ Lens.use bindings
   let gamma'        = tsMap `HashMap.union` gamma
   return (gamma',delta)
 
-mkTmBinderFor ::
-  (Functor m, Fresh m, MonadUnique m)
-  => String
-  -> Term
-  -> m (Id, Term)
+-- | Make a new binder and variable reference for a term
+mkTmBinderFor :: (Functor m, Fresh m, MonadUnique m)
+              => String -- ^ Name of the new binder
+              -> Term -- ^ Term to bind
+              -> m (Id, Term)
 mkTmBinderFor name e = do
   (Left r) <- mkBinderFor name (Left e)
   return r
 
-mkBinderFor ::
-  (Functor m, Monad m, MonadUnique m, Fresh m)
-  => String
-  -> Either Term Type
-  -> m (Either (Id,Term) (TyVar,Type))
+-- | Make a new binder and variable reference for either a term or a type
+mkBinderFor :: (Functor m, Monad m, MonadUnique m, Fresh m)
+            => String -- ^ Name of the new binder
+            -> Either Term Type -- ^ Type or Term to bind
+            -> m (Either (Id,Term) (TyVar,Type))
 mkBinderFor name (Left term) =
   Left <$> (mkInternalVar name =<< termType term)
 
@@ -180,19 +197,19 @@ mkBinderFor name (Right ty) = do
   let kind  = typeKind ty
   return $ Right (TyVar name' (embed kind), VarTy kind name')
 
-mkInternalVar ::
-  (Functor m, Monad m, MonadUnique m)
-  => String
-  -> Type
-  -> m (Id,Term)
+-- | Make a new, unique, identifier and corresponding variable reference
+mkInternalVar :: (Functor m, Monad m, MonadUnique m)
+              => String -- ^ Name of the identifier
+              -> KindOrType
+              -> m (Id,Term)
 mkInternalVar name ty = do
   name' <- fmap (makeName name . toInteger) getUniqueM
   return (Id name' (embed ty),Var ty name')
 
-inlineBinders ::
-  Monad m
-  => (LetBinding -> RewriteMonad m Bool)
-  -> Rewrite m
+-- | Inline the binders in a let-binding that have a certain property
+inlineBinders :: Monad m
+              => (LetBinding -> RewriteMonad m Bool) -- ^ Property test
+              -> Rewrite m
 inlineBinders condition _ expr@(Letrec b) = R $ do
   (xes,res)        <- unbind b
   (replace,others) <- partitionM condition (unrec xes)
@@ -200,18 +217,20 @@ inlineBinders condition _ expr@(Letrec b) = R $ do
     [] -> return expr
     _  -> do
       let (others',res') = substituteBinders replace others res
-      let newExpr = case others of
+          newExpr = case others of
                           [] -> res'
                           _  -> Letrec (bind (rec others') res')
       changed newExpr
 
 inlineBinders _ _ e = return e
 
-substituteBinders ::
-  [LetBinding]
-  -> [LetBinding]
-  -> Term
-  -> ([LetBinding],Term)
+-- | Substitute the RHS of the first set of Let-binders for references to the
+-- first set of Let-binders in: the second set of Let-binders and the additional
+-- term
+substituteBinders :: [LetBinding] -- ^ Let-binders to substitute
+                  -> [LetBinding] -- ^ Let-binders where substitution takes place
+                  -> Term -- ^ Expression where substitution takes place
+                  -> ([LetBinding],Term)
 substituteBinders [] others res = (others,res)
 substituteBinders ((bndr,valE):rest) others res
   = let val   = unembed valE
@@ -226,10 +245,11 @@ substituteBinders ((bndr,valE):rest) others res
                     ) others
     in substituteBinders rest' others' res'
 
-localFreeVars ::
-  (Functor m, Monad m, Collection c)
-  => Term
-  -> RewriteMonad m (c TyName,c TmName)
+-- | Calculate the /local/ free variable of an expression: the free variables
+-- that are not bound in the global environment.
+localFreeVars :: (Functor m, Monad m, Collection c)
+              => Term
+              -> RewriteMonad m (c TyName,c TmName)
 localFreeVars term = do
   globalBndrs <- Lens.use bindings
   let (tyFVs,tmFVs) = termFreeVars term
@@ -241,10 +261,11 @@ localFreeVars term = do
                 ) tmFVs
          )
 
-liftBinders ::
-  (Functor m, Monad m)
-  => (LetBinding -> RewriteMonad m Bool)
-  -> Rewrite m
+-- | Lift the binders in a let-binding to a global function that have a certain
+-- property
+liftBinders :: (Functor m, Monad m)
+            => (LetBinding -> RewriteMonad m Bool) -- ^ Property test
+            -> Rewrite m
 liftBinders condition ctx expr@(Letrec b) = R $ do
   (xes,res)        <- unbind b
   (replace,others) <- partitionM condition (unrec xes)
@@ -254,30 +275,32 @@ liftBinders condition ctx expr@(Letrec b) = R $ do
       (gamma,delta) <- mkEnv ctx
       replace' <- mapM (liftBinding gamma delta) replace
       let (others',res') = substituteBinders replace' others res
-      let newExpr = case others of
+          newExpr = case others of
                           [] -> res'
                           _  -> Letrec (bind (rec others') res')
       changed newExpr
 
 liftBinders _ _ e = return e
 
-liftBinding ::
-  (Functor m, Monad m)
-  => Gamma
-  -> Delta
-  -> LetBinding
-  -> RewriteMonad m LetBinding
+-- | Create a global function for a Let-binding and return a Let-binding where
+-- the RHS is a reference to the new global function applied to the free
+-- variables of the original RHS
+liftBinding :: (Functor m, Monad m)
+            => Gamma
+            -> Delta
+            -> LetBinding
+            -> RewriteMonad m LetBinding
 liftBinding gamma delta (Id idName tyE,eE) = do
   let ty = unembed tyE
-  let e  = unembed eE
+      e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
   (localFTVs,localFVs) <- fmap (Set.toList *** Set.toList) $ localFreeVars e
   let localFTVkinds = map (delta HashMap.!) localFTVs
-  let localFVs'     = filter (/= idName) localFVs
-  let localFVtys'   = map (gamma HashMap.!) localFVs'
+      localFVs'     = filter (/= idName) localFVs
+      localFVtys'   = map (gamma HashMap.!) localFVs'
   -- Abstract expression over its local FVs
-  let boundFTVs = zipWith mkTyVar localFTVkinds localFTVs
-  let boundFVs  = zipWith mkId localFVtys' localFVs'
+      boundFTVs = zipWith mkTyVar localFTVkinds localFTVs
+      boundFVs  = zipWith mkId localFVtys' localFVs'
   -- Make a new global ID
   newBodyTy <- termType $ mkTyLams (mkLams e boundFVs) boundFTVs
   newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
@@ -288,9 +311,9 @@ liftBinding gamma delta (Id idName tyE,eE) = do
                             (zipWith VarTy localFTVkinds localFTVs))
                   (zipWith Var localFVtys' localFVs')
   -- Substitute the recursive calls by the new expression
-  let e' = substTm idName newExpr e
+      e' = substTm idName newExpr e
   -- Create a new body that abstracts over the free variables
-  let newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
+      newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
   -- Add the created function to the list of global bindings
   bindings %= HashMap.insert newBodyId (newBodyTy,newBody)
   -- Return the new binder
@@ -298,66 +321,67 @@ liftBinding gamma delta (Id idName tyE,eE) = do
 
 liftBinding _ _ _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
-mkFunction ::
-  (Functor m, Monad m)
-  => TmName
-  -> Term
-  -> RewriteMonad m (TmName,Type)
+-- | Make a global function for a name-term tuple
+mkFunction :: (Functor m, Monad m)
+           => TmName -- ^ Name of the function
+           -> Term -- ^ Term bound to the function
+           -> RewriteMonad m (TmName,Type) -- ^ Name with a proper unique and the type of the function
 mkFunction bndr body = do
   bodyTy <- termType body
   bodyId <- cloneVar bndr
   addGlobalBind bodyId bodyTy body
   return (bodyId,bodyTy)
 
-addGlobalBind ::
-  (Functor m, Monad m)
-  => TmName
-  -> Type
-  -> Term
-  -> RewriteMonad m ()
+-- | Add a function to the set of global binders
+addGlobalBind :: (Functor m, Monad m)
+              => TmName
+              -> Type
+              -> Term
+              -> RewriteMonad m ()
 addGlobalBind vId ty body = bindings %= HashMap.insert vId (ty,body)
 
-cloneVar ::
-  (Functor m, Monad m)
-  => TmName
-  -> RewriteMonad m TmName
+-- | Create a new name out of the given name, but with another unique
+cloneVar :: (Functor m, Monad m)
+         => TmName
+         -> RewriteMonad m TmName
 cloneVar name = fmap (makeName (name2String name) . toInteger) getUniqueM
 
-isLocalVar ::
-  (Functor m, Monad m)
-  => Term
-  -> RewriteMonad m Bool
+
+-- | Test whether a term is a variable reference to a local binder
+isLocalVar :: (Functor m, Monad m)
+           => Term
+           -> RewriteMonad m Bool
 isLocalVar (Var _ name)
   = fmap (not . HashMap.member name)
   $ Lens.use bindings
 isLocalVar _ = return False
 
-isUntranslatable ::
-  (Functor m, Monad m)
-  => Term
-  -> RewriteMonad m Bool
+-- | Determine if a term cannot be represented in hardware
+isUntranslatable :: (Functor m, Monad m)
+                 => Term
+                 -> RewriteMonad m Bool
 isUntranslatable tm = not <$> (representableType <$> Lens.use typeTranslator <*> termType tm)
 
-isLambdaBodyCtx ::
-  CoreContext
-  -> Bool
+-- | Is the Context a Lambda/Term-abstraction context?
+isLambdaBodyCtx :: CoreContext
+                -> Bool
 isLambdaBodyCtx (LamBody _) = True
 isLambdaBodyCtx _           = False
 
-mkWildValBinder ::
-  (Functor m, Monad m, MonadUnique m)
-  => Type
-  -> m (Id,Term)
-mkWildValBinder = mkInternalVar "wild"
+-- | Make a binder that should not be referenced
+mkWildValBinder :: (Functor m, Monad m, MonadUnique m)
+                => Type
+                -> m Id
+mkWildValBinder = fmap fst . mkInternalVar "wild"
 
-mkSelectorCase ::
-  (Functor m, Monad m, MonadUnique m, Fresh m)
-  => String
-  -> [CoreContext]
-  -> Term
-  -> Int -- n'th DataCon
-  -> Int -- n'th field
-  -> m Term
+-- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
+mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
+               => String -- ^ Name of the caller of this function
+               -> [CoreContext] -- ^ Transformation Context in which this function is called
+               -> Term -- ^ Subject of the case-composition
+               -> Int -- n'th DataCon
+               -> Int -- n'th field
+               -> m Term
 mkSelectorCase caller ctx scrut dcI fieldI = do
   scrutTy <- termType scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
@@ -374,28 +398,28 @@ mkSelectorCase caller ctx scrut dcI fieldI = do
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
               selBndr <- mkInternalVar "sel" (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI)
-              let bndrs  = take fieldI wildBndrs ++ [selBndr] ++ drop (fieldI+1) wildBndrs
-              let pat    = DataPat (embed dc) (rebind [] (map fst bndrs))
+              let bndrs  = take fieldI wildBndrs ++ [fst selBndr] ++ drop (fieldI+1) wildBndrs
+              let pat    = DataPat (embed dc) (rebind [] bndrs)
               let retVal = Case scrut (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI) [ bind pat (snd selBndr) ]
               return retVal
     _ -> cantCreate $(curLoc) "Type of subject is not a datatype"
 
-specialise ::
-  (Functor m, State.MonadState s m)
-  => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type))
-  -> Rewrite m
+-- | Specialise an application on its argument
+specialise :: (Functor m, State.MonadState s m)
+           => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type))
+           -> Rewrite m
 specialise specMapLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl ctx e (collectArgs e1) (Right ty)
 specialise specMapLbl ctx e@(App   e1 e2) = specialise' specMapLbl ctx e (collectArgs e1) (Left  e2)
 specialise _          _   e               = return e
 
-specialise' ::
-  (Functor m, State.MonadState s m)
-  => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type))
-  -> [CoreContext]
-  -> Term
-  -> (Term, [Either Term Type])
-  -> Either Term Type
-  -> R m Term
+-- | Specialise an application on its argument
+specialise' :: (Functor m, State.MonadState s m)
+            => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
+            -> [CoreContext] -- Transformation context
+            -> Term -- ^ Original term
+            -> (Term, [Either Term Type]) -- ^ Function part of the term, split into root and applied arguments
+            -> Either Term Type -- ^ Argument to specialize on
+            -> R m Term
 specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
   lvl <- Lens.view dbgLevel
   -- Create binders and variable references for free variables in 'specArg'

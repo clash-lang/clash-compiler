@@ -1,3 +1,4 @@
+-- | Free variable calculations
 module CLaSH.Core.FreeVars where
 
 import Unbound.LocallyNameless (Collection, fv)

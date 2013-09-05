@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+-- | Transform/format a Netlist Identifier so that it is acceptable as a VHDL identifier
 module CLaSH.Netlist.Id
   (mkBasicId)
 where

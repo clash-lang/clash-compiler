@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+
+-- | Turn CoreHW terms into normalized CoreHW Terms
 module CLaSH.Normalize where
 
 import           Control.Concurrent.Supply (Supply)
