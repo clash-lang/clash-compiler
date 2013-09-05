@@ -1,14 +1,17 @@
 Name:                 clash-ghc
 Version:              0.2
 Synopsis:             CAES Language for Synchronous Hardware
-Description:          CλaSH (pronounced ‘clash’) is a functional hardware
-                      description language that borrows both its syntax and
-                      semantics from the functional programming language
-                      Haskell. The merits of using a functional language to
-                      describe hardware comes from the fact that combinational
-                      circuits can be directly modeled as mathematical functions
-                      and that functional languages lend themselves very well at
-                      describing and (de-)composing mathematical functions.
+Description:
+  CλaSH (pronounced ‘clash’) is a functional hardware description language that
+  borrows both its syntax and semantics from the functional programming language
+  Haskell. The merits of using a functional language to describe hardware comes
+  from the fact that combinational circuits can be directly modeled as
+  mathematical functions and that functional languages lend themselves very well
+  at describing and (de-)composing mathematical functions.
+  .
+  This package provides:
+  .
+  * CλaSH Compiler binary using GHC/Haskell as a frontend
 Homepage:             http://christiaanb.github.io/clash2
 bug-reports:          http://github.com/christiaanb/clash2/issues
 License:              OtherLicense
@@ -42,7 +45,7 @@ Cabal-version:        >=1.10
 
 source-repository head
   type: git
-  location: git://github.com/christiaanb/clash2.git
+  location: git@github.com:christiaanb/clash2.git
 
 Flag standalone
   Description: Build compiler for non-cabal installation
