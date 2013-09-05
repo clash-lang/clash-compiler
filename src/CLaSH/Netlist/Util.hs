@@ -1,9 +1,11 @@
 {-# LANGUAGE PatternGuards   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
+
+-- | Utilities for converting Core Type/Term to Netlist datatypes
 module CLaSH.Netlist.Util where
 
-import           Control.Lens            ((.=), _2)
+import           Control.Lens            ((.=),(<<%=))
 import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
 import           Data.Either             (partitionEithers)
@@ -194,7 +196,7 @@ mkUniqueNormalized (args,binds,res) = do
     mkUnique (find,repl) v = if find == varName v
       then return $ modifyVarName (const repl) v
       else do
-        varCnt <- varCount <%= (+1)
+        varCnt <- varCount <<%= (+1)
         let v' = modifyVarName (`appendToName` ('_' : show varCnt)) v
         return v'
 

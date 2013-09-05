@@ -2,9 +2,11 @@
 {-# LANGUAGE PatternGuards     #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
+
+-- | Functions to create BlackBox Contexts and fill in BlackBox templates
 module CLaSH.Netlist.BlackBox where
 
-import           Control.Lens                  ((.=))
+import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (filterM, mzero)
 import           Control.Monad.State           (state)
@@ -97,7 +99,7 @@ mkInput (e, False) = case collectArgs e of
       bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) -> do
-          i           <- lift $ varCount <%= (+1)
+          i           <- lift $ varCount <<%= (+1)
           ty          <- termType e
           let dstNm   = "bb_sig_" ++ show i
               dstId   = pack dstNm
@@ -160,7 +162,7 @@ mkFunInput resId e = case collectArgs e of
         let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
             inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
             outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
-        i <- varCount <%= (+1)
+        i <- varCount <<%= (+1)
         let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
         templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
         let (line,err)    = runParse templ

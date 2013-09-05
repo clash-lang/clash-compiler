@@ -1,9 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
+
+-- | Create Netlists out of normalized CoreHW Terms
 module CLaSH.Netlist where
 
 import           Control.Applicative        (liftA2)
-import           Control.Lens               ((.=), _2)
+import           Control.Lens               ((.=), (<<%=))
 import qualified Control.Lens               as Lens
 import qualified Control.Monad              as Monad
 import           Control.Monad.State        (runStateT)
@@ -93,7 +95,7 @@ genComponentT :: TmName -- ^ Name of the function
               -> NetlistMonad Component
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
-  componentNumber <- cmpCount <%= (+1)
+  componentNumber <- cmpCount <<%= (+1)
 
   let componentName' = (`Text.append` (Text.pack $ show componentNumber))
                      . ifThenElse Text.null
@@ -256,7 +258,7 @@ mkExpr ty app = do
         Just p@(P.BlackBox {}) ->
           case template p of
             Left templD -> do
-              i <- varCount <%= (+1)
+              i <- varCount <<%= (+1)
               let tmpNm   = "tmp_" ++ show i
                   tmpId   = Id (string2Name tmpNm) (Embed ty)
                   tmpS    = Text.pack tmpNm

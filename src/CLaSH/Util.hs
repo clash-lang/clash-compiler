@@ -161,16 +161,6 @@ mapAccumLM f acc (x:xs) = do
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
 
--- | Get the state as seen through the Lens, and modify afterwards
-(<%=) :: MonadState s m
-      => Lens' s a
-      -> (a -> a)
-      -> m a
-(<%=) l modify = do
-  a <- use l
-  l %= modify
-  return a
-
 -- | Composition of a unary function with a binary function
 dot :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 dot = (.) . (.)
