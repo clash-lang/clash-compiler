@@ -221,15 +221,13 @@ appendToName :: TmName
              -> TmName
 appendToName n s = makeName (name2String n ++ s) (name2Integer n)
 
--- | Preserve the VHDL substate when executing the monadic action
-preserveVHDLState :: NetlistMonad a
+-- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
+preserveVarEnv :: NetlistMonad a
                   -> NetlistMonad a
-preserveVHDLState action = do
+preserveVarEnv action = do
   vCnt <- Lens.use varCount
   vEnv <- Lens.use varEnv
-  cN   <- Lens.use (vhdlMState . _2)
   val  <- action
-  varCount          .= vCnt
-  varEnv            .= vEnv
-  (vhdlMState . _2) .= cN
+  varCount .= vCnt
+  varEnv   .= vEnv
   return val

@@ -2,11 +2,15 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+
+-- | Module that connects all the parts of the CLaSH compiler library
 module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.Monad.State          (evalState)
+import           Control.Lens                 (_1, use)
 import qualified Data.HashMap.Lazy            as HashMap
+import qualified Data.HashSet                 as HashSet
 import           Data.List                    (isSuffixOf)
 import           Data.Maybe                   (listToMaybe)
 import qualified Data.Text.Lazy               as Text
@@ -123,9 +127,9 @@ createVHDL :: VHDLState
            -> [Component]
            -> [(String,Doc)]
 createVHDL vhdlState components = flip evalState vhdlState $ do
-  (vhdlNms,hwtyss,vhdlDocs) <- unzip3 <$> mapM genVHDL components
-  let hwtys      = concat hwtyss
-      vhdlNmDocs = zip vhdlNms vhdlDocs
+  (vhdlNms,vhdlDocs) <- unzip <$> mapM genVHDL components
+  let vhdlNmDocs = zip vhdlNms vhdlDocs
+  hwtys <- HashSet.toList <$> use _1
   typesPkgM <- case hwtys of
                  [] -> return Nothing
                  _  -> Just <$> mkTyPackage hwtys

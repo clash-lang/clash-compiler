@@ -10,6 +10,7 @@ import Control.Monad.Writer                 (MonadWriter, WriterT)
 import Data.ByteString.Lazy                 (ByteString)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
+import Data.HashSet                         (HashSet)
 import Data.Text.Lazy                       (Text)
 import GHC.Generics                         (Generic)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
@@ -27,7 +28,14 @@ newtype NetlistMonad a =
     NetlistMonad { runNetlist :: WriterT [(Identifier,HWType)] (StateT NetlistState (FreshMT IO)) a }
   deriving (Functor, Monad, Applicative, MonadState NetlistState, MonadWriter [(Identifier,HWType)], Fresh, MonadIO)
 
-type VHDLState = (Int,Text,HashMap HWType (Text,Doc))
+-- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
+--
+-- * Previously encountered HWTypes
+--
+-- * Product type counter
+--
+-- * Cache for previously generated product type names
+type VHDLState = (HashSet HWType,Int,HashMap HWType Doc)
 
 -- | State of the NetlistMonad
 data NetlistState

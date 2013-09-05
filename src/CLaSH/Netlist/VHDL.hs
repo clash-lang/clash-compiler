@@ -2,7 +2,18 @@
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
-module CLaSH.Netlist.VHDL where
+
+-- | Generate VHDL for assorted Netlist datatypes
+module CLaSH.Netlist.VHDL
+  ( genVHDL
+  , mkTyPackage
+  , vhdlType
+  , vhdlTypeDefault
+  , vhdlTypeMark
+  , inst
+  , expr
+  )
+where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
@@ -10,9 +21,10 @@ import           Control.Monad                        (liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import qualified Data.HashMap.Lazy                    as HashMap
+import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nub)
 import           Data.Maybe                           (catMaybes,mapMaybe)
-import           Data.Text.Lazy                       (Text, unpack)
+import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -22,21 +34,23 @@ import           CLaSH.Util                           (makeCached, (<:>))
 
 type VHDLM a = State VHDLState a
 
-genVHDL :: Component -> VHDLM (String,[HWType],Doc)
+-- | Generate VHDL for a Netlist component
+genVHDL :: Component -> VHDLM (String,Doc)
 genVHDL c = do
-    _2 .= cName
-    (unpack cName,,) A.<$> vhdlTys A.<*> vhdl
+    _1 %= (\s -> foldr HashSet.insert s needsDec)
+    (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdlTys = tyPackage cName tys
-    vhdl    = tyImports tys <$$> linebreak <>
-              entity c      <$$> linebreak <>
+    vhdl    = tyImports (not $ null needsDec) <$$> linebreak <>
+              entity c <$$> linebreak <>
               architecture c
 
     tys     =  snd (output c)
             :  map snd (inputs c)
             ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
+    needsDec = nub $ concatMap needsTyDec tys
 
+-- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage :: [HWType]
             -> VHDLM Doc
 mkTyPackage hwtys =
@@ -76,15 +90,6 @@ topSortHWTys hwtys = sorted
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
-
-tyPackage :: Text -> [HWType] -> VHDLM [HWType]
-tyPackage cName tys = do prevDec <- fmap (HashMap.filter (not . (== cName) . fst)) $ use _3
-                         let needsDec = nub $ concatMap needsTyDec tys
-                             newDec   = filter (not . (`HashMap.member` prevDec)) needsDec
-                         _ <- mapM tyDec newDec
-                         _ <- mapM funDec newDec
-                         return newDec
-
 needsTyDec :: HWType -> [HWType]
 needsTyDec (Vector _ Bit)     = []
 needsTyDec (Vector _ elTy)    = needsTyDec elTy ++ [Vector 0 elTy]
@@ -98,9 +103,7 @@ tyDec :: HWType -> VHDLM Doc
 tyDec Bool = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi
 tyDec Integer = "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi
 
-tyDec (Vector _ elTy) = fmap snd $ makeCached (Vector 0 elTy) _3 ((,) A.<$> use _2 A.<*> vecDec)
-  where
-    vecDec = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
+tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
 
 tyDec ty@(Product _ tys) = prodDec
   where
@@ -115,23 +118,22 @@ tyDec ty@(Product _ tys) = prodDec
 tyDec _ = empty
 
 funDec :: HWType -> VHDLM (Maybe Doc)
-funDec Bool = fmap (Just . snd) $ makeCached Bool _3 ((,) A.<$> use _2 A.<*> toSLVDec)
-  where
-    toSLVDec = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
-               "begin" <$>
-                 indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                           ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
-                                           ,"else"
-                                           ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
-                                           ,"end" <+> "if" <> semi
-                                           ]) <$>
-               "end" <> semi
-funDec Integer = fmap (Just . snd) $ makeCached Integer _3 ((,) A.<$> use _2 A.<*> toIntegerDec)
-  where
-    toIntegerDec = "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
-                   "begin" <$>
-                     indent 2 ("return" <+> "i" <> semi) <$>
-                   "end" <> semi
+funDec Bool = fmap Just $
+  "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+  "begin" <$>
+    indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
+                              ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
+                              ,"else"
+                              ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
+                              ,"end" <+> "if" <> semi
+                              ]) <$>
+  "end" <> semi
+
+funDec Integer = fmap Just $
+  "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
+  "begin" <$>
+    indent 2 ("return" <+> "i" <> semi) <$>
+  "end" <> semi
 
 funDec _ = return Nothing
 
@@ -143,23 +145,23 @@ tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
 tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
-tyName t@(Product _ _)   = fmap snd $ makeCached t _3 ((,) A.<$> use _2 A.<*> prodName)
+tyName t@(Product _ _)   = makeCached t _3 prodName
   where
-    prodName = do i <- use _1
-                  _1 += 1
+    prodName = do i <- _2 <<%= (+1)
                   "product" <> int i
 
-tyName _                 = empty
+tyName _ = empty
 
-tyImports :: [HWType] -> VHDLM Doc
-tyImports tys = do prevDec <- use _3
-                   let needsDec = nub $ concatMap needsTyDec tys
-                       usePacks = nub $ map fst $ HashMap.elems $ HashMap.filterWithKey (\k _ -> k `elem` needsDec) prevDec
-                   punctuate' semi $ sequence $ [ "library IEEE"
-                                                , "use IEEE.STD_LOGIC_1164.ALL"
-                                                , "use IEEE.NUMERIC_STD.ALL"
-                                                , "use work.all"
-                                                ] ++ (\x -> case x of [] -> [] ; _ -> ["use work.types.all"]) usePacks
+tyImports :: Bool -> VHDLM Doc
+tyImports needsDec =
+  punctuate' semi $ sequence $ concat
+    [ [ "library IEEE"
+      , "use IEEE.STD_LOGIC_1164.ALL"
+      , "use IEEE.NUMERIC_STD.ALL"
+      , "use work.all" ]
+    , if needsDec then ["use work.types.all"] else []
+    ]
+
 
 entity :: Component -> VHDLM Doc
 entity c = do
@@ -191,6 +193,7 @@ architecture c =
      insts (declarations c)) <$$>
     "end" <> semi
 
+-- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
 vhdlType Bit        = "std_logic"
 vhdlType Bool       = "boolean"
@@ -212,6 +215,7 @@ vhdlType t@(Sum _ _) = "unsigned" <>
 vhdlType t@(Product _ _) = tyName t
 vhdlType t          = error $ "vhdlType: " ++ show t
 
+-- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
 vhdlTypeMark Bit             = "std_logic"
 vhdlTypeMark Bool            = "boolean"
@@ -227,6 +231,7 @@ vhdlTypeMark (Sum _ _)       = "unsigned"
 vhdlTypeMark t@(Product _ _) = tyName t
 vhdlTypeMark t               = error $ "vhdlTypeMark: " ++ show t
 
+-- | Convert a Netlist HWType to a default VHDL value for that type
 vhdlTypeDefault :: HWType -> VHDLM Doc
 vhdlTypeDefault Bit                 = "'0'"
 vhdlTypeDefault Bool                = "false"
@@ -259,6 +264,7 @@ insts :: [Declaration] -> VHDLM Doc
 insts [] = empty
 insts is = vcat . punctuate linebreak . fmap catMaybes $ mapM inst is
 
+-- | Turn a Netlist Declaration to a VHDL concurrent block
 inst :: Declaration -> VHDLM (Maybe Doc)
 inst (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr False e <> semi
@@ -282,7 +288,10 @@ inst (BlackBoxD bs) = fmap Just $ string bs
 
 inst _ = return Nothing
 
-expr :: Bool -> Expr -> VHDLM Doc
+-- | Turn a Netlist expression into a VHDL expression
+expr :: Bool -- ^ Enclose in parenthesis?
+     -> Expr -- ^ Expr to convert
+     -> VHDLM Doc
 expr _ (Literal sizeM lit)                           = exprLit sizeM lit
 expr _ (Identifier id_ Nothing)                      = text id_
 expr _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy selected

@@ -12,6 +12,7 @@ import qualified Data.ByteString.Lazy.Char8 as LZ
 import           Data.Either                (partitionEithers)
 import           Data.HashMap.Lazy          (HashMap)
 import qualified Data.HashMap.Lazy          as HashMap
+import qualified Data.HashSet               as HashSet
 import           Data.List                  (elemIndex, nub)
 import           Data.Maybe                 (fromMaybe)
 import qualified Data.Text.Lazy             as Text
@@ -72,7 +73,7 @@ runNetlistMonad vhdlStateM s p typeTrans
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (fromMaybe (0,Text.empty,HashMap.empty) vhdlStateM) typeTrans
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (fromMaybe (HashSet.empty,0,HashMap.empty) vhdlStateM) typeTrans
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -103,8 +104,6 @@ genComponentT compName componentExpr mStart = do
                      . Text.splitOn (Text.pack ".")
                      . Text.pack
                      $ name2String compName
-
-  (vhdlMState . _2) .= componentName'
 
   (arguments,binders,result) <- do { normalizedM <- splitNormalized componentExpr
                                    ; case normalizedM of
@@ -217,7 +216,7 @@ mkFunApp dst fun args = do
   normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
     Just _ -> do
-      (Component compName hidden compInps compOutp _) <- preserveVHDLState $ genComponent fun Nothing
+      (Component compName hidden compInps compOutp _) <- preserveVarEnv $ genComponent fun Nothing
       if length args == length compInps
         then let dstId         = mkBasicId . Text.pack . name2String $ varName dst
                  args'         = map varToExpr args
