@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
 module CLaSH.Bit
@@ -5,6 +7,7 @@ module CLaSH.Bit
 where
 
 import Data.Bits
+import Language.Haskell.TH.Lift
 
 import CLaSH.Class.Default
 
@@ -25,6 +28,8 @@ instance Show Bit where
 
 instance Default Bit where
   def = L
+
+deriveLift ''Bit
 
 {-# NOINLINE bAnd #-}
 bAnd :: Bit -> Bit -> Bit
