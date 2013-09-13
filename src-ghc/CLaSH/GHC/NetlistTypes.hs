@@ -63,10 +63,5 @@ tyNatSize (tyView -> TyConApp tc [ty1,ty2])
 -- The current problem is that type-functions are not reduced by the GHC -> Core
 -- transformation process, and so end up here. Once a fix has been found for
 -- this problem remove this dirty hack.
-tyNatSize (tyView -> TyConApp tc [ty1])
-                            = case name2String (tyConName tc) of
-                                "CLaSH.Class.BitVector.BitSize" -> tyNatSize ty1
-                                "CLaSH.Sized.Unsigned.Unsigned" -> tyNatSize ty1
-                                "CLaSH.Sized.Signed.Signed"     -> tyNatSize ty1
-                                _ -> fail $ $(curLoc) ++ "Can't convert tyNat Wrapper: " ++ show tc
-tyNatSize t                 = fail $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
+tyNatSize (tyView -> TyConApp _ [ty1]) = tyNatSize ty1
+tyNatSize t = fail $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
