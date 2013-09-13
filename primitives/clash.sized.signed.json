@@ -169,7 +169,7 @@ end process;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.resizeS"
-    , "templateE" : "resize(~ARG[2],~LIT[1])"
+    , "templateE" : "resize(~ARG[1],~LIT[0])"
     }
   }
 ]
