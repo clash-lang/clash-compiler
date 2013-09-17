@@ -108,10 +108,6 @@ listModuleTags m = do
     tyThing2TagKind (ATyCon _)   = 't'
     tyThing2TagKind (ACoAxiom _) = 'x'
 
-    -- XXX: What is this for?
-    tyThing2TagKind (ACoAxiomRule _) = 'r'
-
-
 data TagInfo = TagInfo
   { tagExported :: Bool -- is tag exported
   , tagKind :: Char   -- tag kind

@@ -64,8 +64,7 @@ import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
                                               tyConPrimRep, tyConUnique)
 import           Type                        (tcView)
 import           TypeRep                     (TyLit (..), Type (..))
-import           TysWiredIn                  (boolKindCon, falseTyCon,
-                                              trueTyCon, tupleTyCon)
+import           TysWiredIn                  (tupleTyCon)
 import           Unique                      (Uniquable (..), Unique, getKey)
 import           Var                         (Id, TyVar, Var, isTyVar, varName,
                                               varType, varUnique)
@@ -115,8 +114,7 @@ makeAllTyDataCons tyCons =
                                [BoxedTuple,UnboxedTuple,ConstraintTuple]
                             | x <- [2..62]
                             ]
-    promotedTyCons = [boolKindCon,trueTyCon,falseTyCon]
-    toConvert      = concat [tyCons,tupleTyCons,promotedTyCons]
+    toConvert      = concat [tyCons,tupleTyCons]
 
 
 makeTyCon ::

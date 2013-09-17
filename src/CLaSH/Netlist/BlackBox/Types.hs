@@ -2,6 +2,7 @@
 -- | Types used in BlackBox modules
 module CLaSH.Netlist.BlackBox.Types where
 
+import Control.Applicative  (Applicative)
 import Control.Monad.State  (MonadState, State)
 import Control.Monad.Writer (MonadWriter,WriterT)
 import Data.Text.Lazy       (Text)
@@ -53,4 +54,4 @@ data Decl = Decl Int [BlackBoxTemplate]
 -- | Monad that caches VHDL information and remembers hidden inputs of
 -- black boxes that are being generated (WriterT)
 newtype BlackBoxMonad a = B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State VHDLState) a }
-  deriving (Functor, Monad, MonadWriter [(Identifier,HWType)], MonadState VHDLState)
+  deriving (Functor, Applicative, Monad, MonadWriter [(Identifier,HWType)], MonadState VHDLState)

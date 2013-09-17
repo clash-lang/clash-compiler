@@ -74,8 +74,9 @@ instance Monad m => MonadUnique (RewriteMonad m) where
 
 -- | MTL convenience wrapper around 'RewriteMonad'
 newtype R m a = R { runR :: RewriteMonad m a }
-  deriving ( Monad
-           , Functor
+  deriving ( Functor
+           , Applicative
+           , Monad
            , MonadReader RewriteEnv
            , MonadState  RewriteState
            , MonadWriter Any
