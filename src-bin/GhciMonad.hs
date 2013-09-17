@@ -46,6 +46,7 @@ import Data.IORef
 import System.CPUTime
 import System.Environment
 import System.IO
+import Control.Applicative (Applicative (..))
 import Control.Monad
 import GHC.Exts
 
@@ -173,7 +174,11 @@ instance Monad GHCi where
   return a  = GHCi $ \_ -> return a
 
 instance Functor GHCi where
-    fmap f m = m >>= return . f
+    fmap = liftM
+
+instance Applicative GHCi where
+    pure  = return
+    (<*>) = ap
 
 getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> liftIO $ readIORef r
