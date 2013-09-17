@@ -58,7 +58,7 @@ ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
 ghciCreateTagsFile kind file = do
   createTagsFile kind file
 
--- ToDo: 
+-- ToDo:
 --      - remove restriction that all modules must be interpreted
 --        (problem: we don't know source locations for entities unless
 --        we compiled the module.
