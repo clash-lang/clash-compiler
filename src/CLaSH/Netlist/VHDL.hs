@@ -270,11 +270,13 @@ inst (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr False e <> semi
 
 inst (CondAssignment id_ scrut es) = fmap Just $
-  text id_ <+> larrow <+> align (vcat (mapM cond es)) <> semi
+  text id_ <+> larrow <+> align (vcat (conds es)) <> semi
     where
-      cond :: (Maybe Expr,Expr) -> VHDLM Doc
-      cond (Nothing,e) = expr False e
-      cond (Just c ,e) = expr False e <+> "when" <+> parens (expr True scrut <+> "=" <+> expr True c) <+> "else"
+      conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
+      conds []                = return []
+      conds [(_,e)]           = expr False e <:> return []
+      conds ((Nothing,e):_)   = expr False e <:> return []
+      conds ((Just c ,e):es') = (expr False e <+> "when" <+> parens (expr True scrut <+> "=" <+> expr True c) <+> "else") <:> conds es'
 
 inst (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"
