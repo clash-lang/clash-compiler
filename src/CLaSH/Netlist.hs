@@ -299,10 +299,8 @@ mkDcApplication dstHType dc args = do
         EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,0)) argExprs)
         LT -> error $ $(curLoc) ++ "Over-applied constructor"
         GT -> error $ $(curLoc) ++ "Under-applied constructor"
-    Sum _ dcs ->
-      let dcNameBS = Text.pack . name2String $ dcName dc
-          dcI = fromMaybe (error "Sum: dc not found") $ elemIndex dcNameBS dcs
-      in  return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) [])
+    Sum _ _ ->
+      return (HW.DataCon dstHType (Just $ DC (dstHType,dcTag dc - 1)) [])
     Bool ->
       let dc' = case name2String $ dcName dc of
                  "True"  -> HW.Literal Nothing (BoolLit True)
