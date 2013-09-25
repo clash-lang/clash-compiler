@@ -19,6 +19,7 @@ import Control.Applicative
 import Language.Haskell.TH.Syntax(Lift(..))
 
 import CLaSH.Class.Default
+import CLaSH.Bit            (Bit)
 import CLaSH.Sized.Signed   (Signed)
 import CLaSH.Sized.Unsigned (Unsigned)
 import CLaSH.Sized.Vector   (Vec(..), vmap, vhead, vtail)
@@ -90,6 +91,11 @@ class Pack a where
 
 simulateP :: (Pack a, Pack b) => (SignalP a -> SignalP b) -> [a] -> [b]
 simulateP f = simulate (pack . f . unpack)
+
+instance Pack Bit where
+  type SignalP Bit = Signal Bit
+  pack   = id
+  unpack = id
 
 instance Pack (Signed n) where
   type SignalP (Signed n) = Signal (Signed n)
