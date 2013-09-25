@@ -25,6 +25,7 @@ import           CLaSH.Core.Type         (Type (..), TypeView (..),
                                           splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
+import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types
 import           CLaSH.Util
 
@@ -168,7 +169,7 @@ termHWType e = unsafeCoreTypeToHWTypeM =<< termType e
 -- is not a variable.
 varToExpr :: Term
           -> Expr
-varToExpr (Var _ var) = Identifier (pack $ name2String var) Nothing
+varToExpr (Var _ var) = Identifier (mkBasicId . pack $ name2String var) Nothing
 varToExpr _           = error "not a var"
 
 -- | Uniquely rename all the variables and their references in a normalized
