@@ -21,11 +21,11 @@ import           Control.Monad.Reader        (Reader)
 import qualified Control.Monad.Reader        as Reader
 import           Control.Monad.State         (StateT, lift)
 import qualified Control.Monad.State.Lazy    as State
-import           Data.ByteString.Lazy.Char8  (pack)
 import           Data.Hashable               (Hashable (..), hash)
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
 import           Data.Maybe                  (fromMaybe, isJust)
+import           Data.Text.Lazy              (pack)
 import           Unbound.LocallyNameless     (Rep, bind, embed, rebind, rec,
                                               runFreshM, string2Name, unbind,
                                               unembed)

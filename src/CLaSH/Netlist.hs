@@ -10,7 +10,6 @@ import qualified Control.Lens               as Lens
 import qualified Control.Monad              as Monad
 import           Control.Monad.State        (runStateT)
 import           Control.Monad.Writer       (listen, runWriterT)
-import qualified Data.ByteString.Lazy.Char8 as LZ
 import           Data.Either                (partitionEithers)
 import           Data.HashMap.Lazy          (HashMap)
 import qualified Data.HashMap.Lazy          as HashMap
@@ -253,7 +252,7 @@ mkExpr ty app = do
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
       | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
     Prim nm _ -> do
-      bbM <- fmap (HashMap.lookup . LZ.pack $ name2String nm) $ Lens.use primitives
+      bbM <- fmap (HashMap.lookup . Text.pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) ->
           case template p of

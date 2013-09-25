@@ -13,7 +13,6 @@ import           Control.Monad.State           (state)
 import           Control.Monad.Trans.Class     (lift)
 import           Control.Monad.Trans.Maybe     (MaybeT (..))
 import           Control.Monad.Writer          (tell)
-import qualified Data.ByteString.Lazy.Char8    as BSL
 import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
 import           Data.List                     (partition)
@@ -96,7 +95,7 @@ mkInput (e, False) = case collectArgs e of
   _                -> fmap (first (first Left)) $ mkLitInput e
   where
     mkInput' nm args = do
-      bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
+      bbM <- fmap (HashMap.lookup . pack $ name2String nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) -> do
           i           <- lift $ varCount <<%= (+1)
@@ -142,7 +141,7 @@ mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox app
            -> MaybeT NetlistMonad ((BlackBoxTemplate,BlackBoxContext),[Declaration])
 mkFunInput resId e = case collectArgs e of
   (Prim nm _, args) -> do
-    bbM <- fmap (HashMap.lookup . BSL.pack $ name2String nm) $ Lens.use primitives
+    bbM <- fmap (HashMap.lookup . pack $ name2String nm) $ Lens.use primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do
         (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
