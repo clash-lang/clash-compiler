@@ -271,7 +271,14 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.vindex_integer"
-    , "templateE" : "~ARG[1](~ARG[2])"
+    , "templateD" : "
+~SYM[0]_vindex_integer : block
+  type ~TYPM[1] is array (natural range <>) of ~TYPO;
+  signal ~SYM[1] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~RESULT <= ~SYM[1](~ARG[2]);
+end block;"
     }
   }
 , { "BlackBox" :
