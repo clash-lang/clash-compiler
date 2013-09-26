@@ -273,7 +273,6 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vindex_integer"
     , "templateD" : "
 ~SYM[0]_vindex_integer : block
-  type ~TYPM[1] is array (natural range <>) of ~TYPO;
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
