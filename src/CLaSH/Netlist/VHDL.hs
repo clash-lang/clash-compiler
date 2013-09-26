@@ -38,14 +38,9 @@ genVHDL :: Component -> VHDLM (String,Doc)
 genVHDL c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdl    = tyImports needsDec <$$> linebreak <>
+    vhdl    = tyImports <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c
-
-    tys     =  snd (output c)
-            :  map snd (inputs c)
-            ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
-    needsDec = any needsTyDec tys
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage :: [HWType]
@@ -134,14 +129,14 @@ funDec Integer = fmap Just $
 
 funDec _ = return Nothing
 
-tyImports :: Bool -> VHDLM Doc
-tyImports needsDec =
-  punctuate' semi $ sequence $ concat
-    [ [ "library IEEE"
-      , "use IEEE.STD_LOGIC_1164.ALL"
-      , "use IEEE.NUMERIC_STD.ALL"
-      , "use work.all" ]
-    , if needsDec then ["use work.types.all"] else []
+tyImports :: VHDLM Doc
+tyImports =
+  punctuate' semi $ sequence
+    [ "library IEEE"
+    , "use IEEE.STD_LOGIC_1164.ALL"
+    , "use IEEE.NUMERIC_STD.ALL"
+    , "use work.all"
+    , "use work.types.all"
     ]
 
 
