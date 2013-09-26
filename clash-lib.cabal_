@@ -62,7 +62,7 @@ Library
                       filepath             >= 1.3.0.0,
                       hashable             >= 1.1.2.3,
                       lens                 >= 3.7.1,
-                      listlike-instances   >= 0.2.3.1,
+                      ListLike             >= 4.0.0,
                       mtl                  >= 2.0.1.0,
                       pretty               >= 1.1.1.0,
                       process              >= 1.1.0.2,
