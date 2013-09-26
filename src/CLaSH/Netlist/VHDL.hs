@@ -17,12 +17,11 @@ where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (liftM,zipWithM)
+import           Control.Monad                        (liftM,when,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (nub)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
@@ -36,19 +35,17 @@ type VHDLM a = State VHDLState a
 
 -- | Generate VHDL for a Netlist component
 genVHDL :: Component -> VHDLM (String,Doc)
-genVHDL c = do
-    _1 %= (\s -> foldr HashSet.insert s needsDec)
-    (unpack cName,) A.<$> vhdl
+genVHDL c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdl    = tyImports (not $ null needsDec) <$$> linebreak <>
+    vhdl    = tyImports needsDec <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c
 
     tys     =  snd (output c)
             :  map snd (inputs c)
             ++ concatMap (\d -> case d of {(NetDecl _ ty _) -> [ty]; _ -> []}) (declarations c)
-    needsDec = nub $ concatMap needsTyDec tys
+    needsDec = any needsTyDec tys
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage :: [HWType]
@@ -90,14 +87,14 @@ topSortHWTys hwtys = sorted
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
-needsTyDec :: HWType -> [HWType]
-needsTyDec (Vector _ Bit)     = []
-needsTyDec (Vector _ elTy)    = needsTyDec elTy ++ [Vector 0 elTy]
-needsTyDec ty@(Product _ tys) = concatMap needsTyDec tys ++ [ty]
-needsTyDec (SP _ tys)         = concatMap (concatMap needsTyDec . snd) tys
-needsTyDec Bool               = [Bool]
-needsTyDec Integer            = [Integer]
-needsTyDec _                  = []
+needsTyDec :: HWType -> Bool
+needsTyDec (Vector _ Bit) = False
+needsTyDec (Vector _ _)   = True
+needsTyDec (Product _ _)  = True
+needsTyDec (SP _ _)       = True
+needsTyDec Bool           = True
+needsTyDec Integer        = True
+needsTyDec _              = False
 
 tyDec :: HWType -> VHDLM Doc
 tyDec Bool = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi
@@ -136,22 +133,6 @@ funDec Integer = fmap Just $
   "end" <> semi
 
 funDec _ = return Nothing
-
-tyName :: HWType -> VHDLM Doc
-tyName Integer           = "integer"
-tyName Bit               = "std_logic"
-tyName Bool              = "boolean"
-tyName (Vector n Bit)    = "std_logic_vector_" <> int n
-tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (Signed n)        = "signed_" <> int n
-tyName (Unsigned n)      = "unsigned_" <> int n
-tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
-tyName t@(Product _ _)   = makeCached t _3 prodName
-  where
-    prodName = do i <- _2 <<%= (+1)
-                  "product" <> int i
-
-tyName _ = empty
 
 tyImports :: Bool -> VHDLM Doc
 tyImports needsDec =
@@ -196,25 +177,30 @@ architecture c =
 
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
-vhdlType Bit        = "std_logic"
-vhdlType Bool       = "boolean"
-vhdlType (Clock _)  = "std_logic"
-vhdlType (Reset _)  = "std_logic"
-vhdlType Integer    = "integer"
-vhdlType (Signed n) = "signed" <>
+vhdlType hwty = do
+  when (needsTyDec hwty) (_1 %= HashSet.insert hwty)
+  vhdlType' hwty
+
+vhdlType' :: HWType -> VHDLM Doc
+vhdlType' Bit        = "std_logic"
+vhdlType' Bool       = "boolean"
+vhdlType' (Clock _)  = "std_logic"
+vhdlType' (Reset _)  = "std_logic"
+vhdlType' Integer    = "integer"
+vhdlType' (Signed n) = "signed" <>
                       parens ( int (n-1) <+> "downto 0")
-vhdlType (Unsigned n) = "unsigned" <>
+vhdlType' (Unsigned n) = "unsigned" <>
                         parens ( int (n-1) <+> "downto 0")
-vhdlType (Vector n Bit) = "std_logic_vector" <> parens ( int (n-1) <+> "downto 0")
-vhdlType (Vector n elTy) = "array_of_" <> tyName elTy <> parens ( int (n-1) <+> "downto 0")
-vhdlType t@(SP _ _) = "std_logic_vector" <>
+vhdlType' (Vector n Bit) = "std_logic_vector" <> parens ( int (n-1) <+> "downto 0")
+vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ( int (n-1) <+> "downto 0")
+vhdlType' t@(SP _ _) = "std_logic_vector" <>
                       parens ( int (typeSize t - 1) <+>
                                "downto 0" )
-vhdlType t@(Sum _ _) = "unsigned" <>
+vhdlType' t@(Sum _ _) = "unsigned" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
-vhdlType t@(Product _ _) = tyName t
-vhdlType t          = error $ "vhdlType: " ++ show t
+vhdlType' t@(Product _ _) = tyName t
+vhdlType' t          = error $ "vhdlType: " ++ show t
 
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
@@ -231,6 +217,22 @@ vhdlTypeMark (SP _ _)        = "std_logic_vector"
 vhdlTypeMark (Sum _ _)       = "unsigned"
 vhdlTypeMark t@(Product _ _) = tyName t
 vhdlTypeMark t               = error $ "vhdlTypeMark: " ++ show t
+
+tyName :: HWType -> VHDLM Doc
+tyName Integer           = "integer"
+tyName Bit               = "std_logic"
+tyName Bool              = "boolean"
+tyName (Vector n Bit)    = "std_logic_vector_" <> int n
+tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (Signed n)        = "signed_" <> int n
+tyName (Unsigned n)      = "unsigned_" <> int n
+tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
+tyName t@(Product _ _)   = makeCached t _3 prodName
+  where
+    prodName = do i <- _2 <<%= (+1)
+                  "product" <> int i
+
+tyName _ = empty
 
 -- | Convert a Netlist HWType to a default VHDL value for that type
 vhdlTypeDefault :: HWType -> VHDLM Doc
