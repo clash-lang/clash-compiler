@@ -1,6 +1,3 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
 -- | Module that connects all the parts of the CLaSH compiler library
