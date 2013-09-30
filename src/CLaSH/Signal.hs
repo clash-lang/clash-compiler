@@ -122,6 +122,16 @@ instance Pack Int where
   pack   = id
   unpack = id
 
+instance Pack Float where
+  type SignalP Float = Signal Float
+  pack   = id
+  unpack = id
+
+instance Pack Double where
+  type SignalP Double = Signal Double
+  pack   = id
+  unpack = id
+
 instance Pack () where
   type SignalP () = Signal ()
   pack   = id
