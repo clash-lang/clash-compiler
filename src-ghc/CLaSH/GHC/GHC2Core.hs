@@ -46,8 +46,8 @@ import           DataCon                     (DataCon, dataConExTyVars,
                                               dataConTag, dataConTyCon,
                                               dataConUnivTyVars, dataConWorkId,
                                               dataConWrapId_maybe)
-import           Id                          (isDataConId_maybe,
-                                              isDataConWorkId)
+import           Id                          (isDataConId_maybe)
+import           IdInfo                      (IdDetails (..))
 import           Literal                     (Literal (..))
 import           Module                      (moduleName, moduleNameString)
 import           Name                        (Name, nameModule_maybe,
@@ -65,9 +65,11 @@ import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
 import           Type                        (tcView)
 import           TypeRep                     (TyLit (..), Type (..))
 import           TysWiredIn                  (tupleTyCon)
+import           TcTypeNats                  (typeNatTyCons)
 import           Unique                      (Uniquable (..), Unique, getKey)
-import           Var                         (Id, TyVar, Var, isTyVar, varName,
-                                              varType, varUnique)
+import           Var                         (Id, TyVar, Var, idDetails,
+                                              isTyVar, varName, varType,
+                                              varUnique)
 import           VarSet                      (isEmptyVarSet)
 
 -- Local imports
@@ -278,14 +280,10 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
           xNameS = pack $ Unbound.name2String xPrim
       in do
         xType <- coreToType (varType x)
-        let mapSyncName = pack
         case isDataConId_maybe x of
-          Just dc | isNewTyCon (dataConTyCon dc) -> error $ $(curLoc) ++ "Newtype not supported"
-                  | otherwise -> case HashMap.lookup xNameS primMap of
-                      Just _ -> return $ C.Prim xPrim xType
-                      Nothing
-                        | isDataConWorkId x -> C.Data <$> coreToDataCon False dc
-                        | otherwise         -> C.Data <$> coreToDataCon True  dc
+          Just dc -> case HashMap.lookup xNameS primMap of
+                      Just _  -> return $ C.Prim xPrim xType
+                      Nothing -> C.Data <$> coreToDataCon (isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))) dc
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive f _)
               | f == pack "CLaSH.Signal.mapSignal" -> return (mapSyncTerm xType)
@@ -318,7 +316,7 @@ coreToDataCon False dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon: " ++ s
                               . HashMap.lookup dc
                               ) $ view dataConMap
 
-coreToDataCon True dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon: " ++ showPpr dc ++ " not found")
+coreToDataCon True dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon Wrapper: " ++ showPpr dc ++ " not found")
                               . HashMap.lookup dc
                               ) $ view dataConWrapMap
 
@@ -502,3 +500,8 @@ splitCombineTerm b (C.ForAllTy tvTy) =
   in newExpr
 
 splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
+
+isDataConWrapId :: Id -> Bool
+isDataConWrapId v = case idDetails v of
+                      DataConWrapId {} -> True
+                      _                -> False
