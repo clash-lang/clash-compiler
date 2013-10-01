@@ -1,5 +1,5 @@
 Name:                 clash-lib
-Version:              0.2
+Version:              0.2.0.1
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -42,7 +42,7 @@ Cabal-version:        >=1.10
 
 source-repository head
   type: git
-  location: git@github.com:christiaanb/clash2.git
+  location: https://github.com/christiaanb/clash2.git
 
 Library
   HS-Source-Dirs:     src
@@ -50,30 +50,30 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fwarn-tabs
 
-  Build-depends:      aeson                >= 0.6.0.2,
-                      attoparsec           >= 0.10.2.0,
-                      base                 >= 4.3.1.0 && < 5,
-                      bytestring           >= 0.9.2.1,
-                      concurrent-supply    >= 0.1.3,
-                      containers           >= 0.4.2.1,
-                      directory            >= 1.1.0.2,
-                      errors               >= 1.4.1,
+  Build-depends:      aeson                >= 0.6.2.0,
+                      attoparsec           >= 0.10.4.0,
+                      base                 >= 4.6.0.1 && < 5,
+                      bytestring           >= 0.10.0.2,
+                      concurrent-supply    >= 0.1.7,
+                      containers           >= 0.5.0.0,
+                      directory            >= 1.2.0.1,
+                      errors               >= 1.4.2,
                       fgl                  >= 5.4.2.4,
-                      filepath             >= 1.3.0.0,
-                      hashable             >= 1.1.2.3,
-                      lens                 >= 3.7.1,
+                      filepath             >= 1.3.0.1,
+                      hashable             >= 1.2.1.0,
+                      lens                 >= 3.9.2,
                       ListLike             >= 4.0.0,
-                      mtl                  >= 2.0.1.0,
+                      mtl                  >= 2.1.2,
                       pretty               >= 1.1.1.0,
                       process              >= 1.1.0.2,
-                      template-haskell     >= 2.7.0.0,
-                      text                 >= 0.11.1.13,
+                      template-haskell     >= 2.8.0.0,
+                      text                 >= 0.11.3.1,
                       time                 >= 1.4.0.1,
-                      transformers         >= 0.2.2.0,
-                      unbound              >= 0.4.0.2,
-                      unordered-containers >= 0.2.1.0,
-                      uu-parsinglib        >= 2.7.4,
-                      wl-pprint-text       >= 1.0.0.0
+                      transformers         >= 0.3.0.0,
+                      unbound              >= 0.4.2,
+                      unordered-containers >= 0.2.3.3,
+                      uu-parsinglib        >= 2.8.1,
+                      wl-pprint-text       >= 1.1.0.0
 
   Exposed-modules:    CLaSH.Core.DataCon
                       CLaSH.Core.FreeVars
