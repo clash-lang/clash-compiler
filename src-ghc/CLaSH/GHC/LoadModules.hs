@@ -16,6 +16,7 @@ import           System.Process               (runInteractiveCommand,
 #else
 import qualified GHC.Paths
 #endif
+import           Data.List                    ((\\), nub)
 
 -- GHC API
 -- import qualified CorePrep
@@ -78,6 +79,8 @@ loadModules modName = defaultErrorHandler $ do
                     (dflags
                       { DynFlags.ctxtStkDepth = 1000
                       , DynFlags.optLevel = 2
+                      , DynFlags.ghcMode  = GHC.CompManager
+                      , DynFlags.ghcLink  = GHC.LinkInMemory
                       } )
                     [DynFlags.Opt_TemplateHaskell,DynFlags.Opt_Arrows]
     let dflags2 = wantedOptimizationFlags dflags1
@@ -95,8 +98,9 @@ loadModules modName = defaultErrorHandler $ do
                                         . GHC.ms_textual_imps
                                         ) modGraph
 
+        let internalMods = map GHC.ms_mod_name modGraph
         externalTyCons <- fmap snd $
-                            mapAccumLM getExternalTyCons [] externalImports
+                            mapAccumLM getExternalTyCons internalMods (nub externalImports \\ internalMods)
 
         let allExtTyCons = concat externalTyCons ++
                                   TysWiredIn.wiredInTyCons ++
@@ -156,6 +160,7 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_SimpleListLiterals -- Avoids 'build' rule
              , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
              , Opt_ForceRecomp -- Force recompilation: never bad
+             -- , Opt_BuildDynamicToo
              ]
 
     unwanted = [ Opt_FloatIn -- Moves let-bindings inwards: defeats the normal-form with a single top-level let-binding
