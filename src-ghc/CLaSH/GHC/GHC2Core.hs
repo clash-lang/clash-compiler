@@ -116,7 +116,7 @@ makeAllTyDataCons tyCons =
                                [BoxedTuple,UnboxedTuple,ConstraintTuple]
                             | x <- [2..62]
                             ]
-    toConvert      = concat [tyCons,tupleTyCons]
+    toConvert      = concat [tyCons,tupleTyCons,typeNatTyCons]
 
 
 makeTyCon ::
