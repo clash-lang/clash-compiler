@@ -1,5 +1,5 @@
-{-# LANGUAGE LambdaCase    #-}
-{-# LANGUAGE ViewPatterns  #-}
+{-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Utility functions used by the normalisation transformations
 module CLaSH.Normalize.Util where

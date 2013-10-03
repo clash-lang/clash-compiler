@@ -3,6 +3,7 @@
 module CLaSH.Normalize.Types where
 
 import Control.Monad.State (State)
+import Control.Termination (TestResult)
 import Data.HashMap.Strict (HashMap)
 import Data.Map            (Map)
 
@@ -21,6 +22,7 @@ data NormalizeState
   -- * Key: (name of the original function, argument position, specialised term/type)
   --
   -- * Elem: (name of specialised function,type of specialised function)
+  , _specHist        :: HashMap TmName (TestResult Term)
   , _inlined         :: HashMap TmName [TmName]
   -- ^ Cache of function where inlining took place:
   --

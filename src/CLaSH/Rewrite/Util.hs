@@ -1,45 +1,59 @@
-{-# LANGUAGE Rank2Types      #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections   #-}
-{-# LANGUAGE TypeOperators   #-}
-{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE Rank2Types        #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 -- | Utilities for rewriting: e.g. inlining, specialisation, etc.
 module CLaSH.Rewrite.Util where
 
-import           Control.Lens              (Lens', (%=), (+=))
-import qualified Control.Lens              as Lens
-import qualified Control.Monad             as Monad
-import qualified Control.Monad.Reader      as Reader
-import qualified Control.Monad.State       as State
-import           Control.Monad.Trans.Class (lift)
-import qualified Control.Monad.Writer      as Writer
-import qualified Data.HashMap.Lazy         as HashMap
-import qualified Data.Map                  as Map
-import qualified Data.Monoid               as Monoid
-import qualified Data.Set                  as Set
-import           Unbound.LocallyNameless   (Collection (..), Fresh, bind, embed,
-                                            makeName, name2String, rebind, rec,
-                                            string2Name, unbind, unembed, unrec)
-import qualified Unbound.LocallyNameless   as Unbound
-import           Unbound.Util              (filterC)
+import           Control.Lens                (Lens', (%=), (+=))
+import qualified Control.Lens                as Lens
+import qualified Control.Monad               as Monad
+import qualified Control.Monad.Reader        as Reader
+import qualified Control.Monad.State         as State
+import           Control.Monad.Trans.Class   (lift)
+import qualified Control.Monad.Writer        as Writer
+import           Control.Termination         (Finite, Fix (..), TestResult (..),
+                                              TTest, alwaysT, eitherT, finiteT,
+                                              gfixT, initHistory, test, pairT)
+import           Data.Foldable               (Foldable)
+import           Data.Functor.Contravariant  (contramap)
+import           Data.HashMap.Lazy           (HashMap)
+import qualified Data.HashMap.Lazy           as HashMap
+import qualified Data.Map                    as Map
+import qualified Data.Monoid                 as Monoid
+import qualified Data.Set                    as Set
+import           Data.Text.Lazy              (Text)
+import           Data.Traversable            (Traversable)
+import           Unbound.LocallyNameless     (Collection (..), Fresh, bind,
+                                              embed, makeName, name2String,
+                                              rebind, rec, string2Name, unbind,
+                                              unembed, unrec)
+import qualified Unbound.LocallyNameless     as Unbound
+import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+import           Unbound.Util                (filterC)
 
-import           CLaSH.Core.DataCon        (dataConInstArgTys)
-import           CLaSH.Core.FreeVars       (termFreeVars, typeFreeVars)
-import           CLaSH.Core.Pretty         (showDoc)
-import           CLaSH.Core.Subst          (substTm)
-import           CLaSH.Core.Term           (LetBinding, Pat (..), Term (..),
-                                            TmName)
-import           CLaSH.Core.TyCon          (tyConDataCons)
-import           CLaSH.Core.Type           (KindOrType, TyName, Type (..),
-                                            TypeView (..), transparentTy,
-                                            typeKind, tyView)
-import           CLaSH.Core.Util           (Delta, Gamma, collectArgs,
-                                            mkAbstraction, mkApps, mkId, mkLams,
-                                            mkTmApps, mkTyApps, mkTyLams,
-                                            mkTyVar, termType)
-import           CLaSH.Core.Var            (Id, TyVar, Var (..))
-import           CLaSH.Netlist.Util        (representableType)
+import           CLaSH.Core.DataCon          (DataCon,dataConInstArgTys)
+import           CLaSH.Core.FreeVars         (termFreeVars, typeFreeVars)
+import           CLaSH.Core.Literal          (Literal)
+import           CLaSH.Core.Pretty           (showDoc)
+import           CLaSH.Core.Subst            (substTm)
+import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
+                                              TmName)
+import           CLaSH.Core.TyCon            (tyConDataCons)
+import           CLaSH.Core.Type             (KindOrType, TyName, Type (..),
+                                              TypeView (..), transparentTy,
+                                              typeKind, tyView)
+import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
+                                              mkAbstraction, mkApps, mkId,
+                                              mkLams, mkTmApps, mkTyApps,
+                                              mkTyLams, mkTyVar, termType)
+import           CLaSH.Core.Var              (Id, TyVar, Var (..))
+import           CLaSH.Netlist.Util          (representableType)
 import           CLaSH.Rewrite.Types
 import           CLaSH.Util
 
@@ -406,27 +420,30 @@ mkSelectorCase caller ctx scrut dcI fieldI = do
 
 -- | Specialise an application on its argument
 specialise :: (Functor m, State.MonadState s m)
-           => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type))
+           => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
+           -> Lens' s (HashMap.HashMap TmName (TestResult Term)) -- ^ Lens into specialisation history
            -> Rewrite m
-specialise specMapLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl ctx e (collectArgs e1) (Right ty)
-specialise specMapLbl ctx e@(App   e1 e2) = specialise' specMapLbl ctx e (collectArgs e1) (Left  e2)
-specialise _          _   e               = return e
+specialise specMapLbl specHistLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl specHistLbl ctx e (collectArgs e1) (Right ty)
+specialise specMapLbl specHistLbl ctx e@(App   e1 e2) = specialise' specMapLbl specHistLbl ctx e (collectArgs e1) (Left  e2)
+specialise _          _           _   e               = return e
 
 -- | Specialise an application on its argument
 specialise' :: (Functor m, State.MonadState s m)
             => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
+            -> Lens' s (HashMap.HashMap TmName (TestResult Term)) -- ^ Lens into specialisation history
             -> [CoreContext] -- Transformation context
             -> Term -- ^ Original term
             -> (Term, [Either Term Type]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> R m Term
-specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
+specialise' specMapLbl specHistLbl ctx e (Var _ f, args) specArg = R $ do
   lvl <- Lens.view dbgLevel
   -- Create binders and variable references for free variables in 'specArg'
   (specBndrs,specVars) <- specArgBndrsAndVars ctx specArg
-  let argLen = length args
+  let argLen  = length args
+      specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on 'specArg'
-  specM <- liftR $ fmap (Map.lookup (f,argLen,specArg))
+  specM <- liftR $ fmap (Map.lookup (f,argLen,specAbs))
                  $ Lens.use specMapLbl
   case specM of
     -- Use previously specialized function
@@ -435,23 +452,34 @@ specialise' specMapLbl ctx e (Var _ f, args) specArg = R $ do
         changed $ mkApps (Var fty fname) (args ++ specVars)
     -- Create new specialized function
     Nothing -> do
+      -- Determine if we can specialize f
       bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
       case bodyMaybe of
         Just (_,bodyTm) -> do
-          -- Make new binders for existing arguments
-          (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
-                                 mapM (mkBinderFor "pTS") args
-          -- Create specialized functions
-          let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
-          newf <- mkFunction f newBody
-          -- Remember specialization
-          liftR $ specMapLbl %= Map.insert (f,argLen,specArg) newf
-          -- use specialized function
-          let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specVars)
-          changed newExpr
+          -- Determine if we see a sequence of specialisations on a growing argument
+          specHistM <- liftR $ fmap (HashMap.lookup f) (Lens.use specHistLbl)
+          case specHistM of
+            (Just Stop) -> fail $ unlines [ "Hit specialisation limit on function `" ++ showDoc f ++ "'.\n"
+                                          , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
+                                          , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
+                                          , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showDoc showDoc) specArg
+                                          ]
+            _ -> do
+              -- Make new binders for existing arguments
+              (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
+                                     mapM (mkBinderFor "pTS") args
+              -- Create specialized functions
+              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
+              newf <- mkFunction f newBody
+              -- Remember specialization
+              updateSpecHist specHistLbl f specArg
+              liftR $ specMapLbl %= Map.insert (f,argLen,specAbs) newf
+              -- use specialized function
+              let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specVars)
+              changed newExpr
         Nothing -> return e
 
-specialise' _ ctx _ (appE,args) (Left specArg) = R $ do
+specialise' _ _ ctx _ (appE,args) (Left specArg) = R $ do
   -- Create binders and variable references for free variables in 'specArg'
   (specBndrs,specVars) <- specArgBndrsAndVars ctx (Left specArg)
   -- Create specialized function
@@ -463,7 +491,7 @@ specialise' _ ctx _ (appE,args) (Left specArg) = R $ do
   let newExpr = mkApps appE (args ++ [newArg])
   changed newExpr
 
-specialise' _ _ e _ _ = return e
+specialise' _ _ _ e _ _ = return e
 
 -- | Create binders and variable references for free variables in 'specArg'
 specArgBndrsAndVars :: (Functor m, Monad m)
@@ -481,3 +509,85 @@ specArgBndrsAndVars ctx specArg = do
                  $ map (\tm -> let ty = gamma HashMap.! tm
                                in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
   return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
+
+-- | Update specialisation history for a given top-level function 'f'.
+--
+-- The specialisation history is used by the termination checker to determine
+-- if we keep specialising a function on a growing argument, e.g. a sequence
+-- of specialisations of 'f' on [2,2*2,2*(2*2),...]. If we see such a sequence
+-- of specialisations, we must stop, as it is an indicator of an infinite number
+-- of specialisations on the recursive function 'f'.
+updateSpecHist :: (Functor m, State.MonadState s m)
+               => Lens' s (HashMap.HashMap TmName (TestResult Term))
+               -> TmName
+               -> Either Term Type
+               -> RewriteMonad m ()
+updateSpecHist specHistLbl f (Left e) = do
+  bndrs <- Lens.use bindings
+  let ih = initHistory (termT bndrs)
+  liftR $ specHistLbl %= HashMap.insertWith updateHist f (ih `test` e)
+  where
+    updateHist _ Stop         = Stop
+    updateHist _ (Continue h) = h `test` e
+
+updateSpecHist _ _ (Right _) = return ()
+
+-- BEGIN Copy of http://www.cl.cam.ac.uk/~mb566/papers/termination-combinators-hs11.pdf
+data ListF a rec = NilF | ConsF a rec
+  deriving (Functor,Foldable,Traversable)
+
+listT :: TTest a -> TTest [a]
+listT wqoElt = contramap fromList (gfixT wqoFix)
+  where
+    wqoFix wqoTail = contramap inject (eitherT alwaysT (wqoElt `pairT` wqoTail))
+    inject NilF         = Left ()
+    inject (ConsF y ys) = Right (y,ys)
+
+fromList :: [a] -> Fix (ListF a)
+fromList []     = Roll NilF
+fromList (x:xs) = Roll (ConsF x (fromList xs))
+
+type Tree a      = Fix (TreeF a)
+data TreeF a rec = NodeF a [rec]
+  deriving (Functor,Foldable,Traversable)
+
+mkNode :: a -> [Tree a] -> Tree a
+mkNode x ys = Roll (NodeF x ys)
+
+treeT :: TTest a -> TTest (Tree a)
+treeT wqoElt = gfixT wqoFix
+  where
+    wqoFix wqoSubtree   = contramap inject (pairT wqoElt (listT wqoSubtree))
+    inject (NodeF x ts) = (x,ts)
+
+-- Adaptation of 'Node' datatype on page 10
+data TermNode = FnVarN TmName
+              | DataN DataCon
+              | LiteralN Literal
+              | PrimN Text
+              | VarN | AppN | TyAppN | LamN | TyLamN | LetN | CaseN
+              deriving (Eq)
+
+instance Finite TermNode
+
+-- Adaptation of 'test1' on page 10
+termT :: HashMap TmName (Type,Term) -> TTest Term
+termT nms = contramap inject (treeT finiteT)
+  where
+    inject (Var _ nm) | HashMap.member nm nms = mkNode (FnVarN nm) []
+                      | otherwise             = mkNode VarN []
+    inject (Data dc)     = mkNode (DataN dc) []
+    inject (Literal l)   = mkNode (LiteralN l) []
+    inject (Prim t _)    = mkNode (PrimN t) []
+    inject (Lam b)       = let (_,e) = unsafeUnbind b
+                           in mkNode LamN [inject e]
+    inject (TyLam b)     = let (_,e) = unsafeUnbind b
+                           in mkNode TyLamN [inject e]
+    inject (App e1 e2)   = mkNode AppN [inject e1, inject e2]
+    inject (TyApp e _)   = mkNode TyAppN [inject e]
+    inject (Letrec b)    = let (es,e) = unsafeUnbind b
+                               es'    = map (unembed . snd) $ unrec es
+                           in mkNode LetN (map inject (e:es'))
+    inject (Case e _ bs) = let es = map (snd . unsafeUnbind) bs
+                           in mkNode CaseN (map inject (e:es))
+-- END Copy of http://www.cl.cam.ac.uk/~mb566/papers/termination-combinators-hs11.pdf
