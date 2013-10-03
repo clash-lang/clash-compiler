@@ -56,7 +56,7 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
                           (\var _ -> isSuffixOf "expectedOutput" $ name2String var)
                           bindingsMap
 
-  case topEntities of
+  start `seq` case topEntities of
     [topEntity] -> do
       -- Create unique supplies for normalisation and TB generation
       (supplyN,supplyTB) <- Supply.splitSupply
