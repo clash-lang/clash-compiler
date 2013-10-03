@@ -54,7 +54,7 @@ mkBlackBoxContext resId args = do
 
     -- Make context result
     let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
-    resTy <- N.unsafeCoreTypeToHWTypeM (unembed $ V.varType resId)
+    resTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) varInps (map fst litInps) funInps
            , concat declssV ++ concat declssL ++ concat declssF
@@ -85,7 +85,7 @@ mkInput (_, True) = return ((Left $ pack "__FUN__", Void),[])
 
 mkInput (Var ty v, False) = do
   let vT = mkBasicId . pack $ name2String v
-  hwTy <- lift $ N.unsafeCoreTypeToHWTypeM ty
+  hwTy <- lift $ N.unsafeCoreTypeToHWTypeM $(curLoc) ty
   case synchronizedClk ty of
     Just clk -> return ((Right (vT,clk), hwTy),[])
     Nothing  -> return ((Left vT, hwTy),[])
@@ -123,11 +123,11 @@ mkInput (e, False) = case collectArgs e of
 -- the term is a literal. Returns 'Nothing' if the term is not a literal.
 mkLitInput :: Term -- ^ The literal argument term
            -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
-mkLitInput (C.Literal (IntegerLiteral i))       = return ((pack $ show i,Integer),[])
+mkLitInput (C.Literal (IntegerLiteral i))     = return ((pack $ show i,Integer),[])
 mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   typeTrans <- Lens.use typeTranslator
   args' <- filterM (fmap (representableType typeTrans) . termType) (lefts args)
-  hwTy  <- N.termHWType e
+  hwTy  <- N.termHWType $(curLoc) e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'
   exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN
   return ((exprV,hwTy),dcDecls)

@@ -122,12 +122,12 @@ genComponentT compName componentExpr mStart = do
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  let resType  = unsafeCoreTypeToHWType typeTrans $ ids HashMap.! result
-      argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType typeTrans t) arguments
+  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans $ ids HashMap.! result
+      argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans t) arguments
 
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
-                                (unsafeCoreTypeToHWType typeTrans . unembed $ varType id_)
+                                (unsafeCoreTypeToHWType $(curLoc) typeTrans . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkDeclarations . second unembed) binders
@@ -156,7 +156,7 @@ mkDeclarations bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
         DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
                                   in case elemIndex (Id varTm (Embed varTy)) tms of
                                        Nothing -> Nothing
-                                       Just fI -> Just (Indexed (unsafeCoreTypeToHWType typeTrans scrutTy,dcTag dc - 1,fI))
+                                       Just fI -> Just (Indexed (unsafeCoreTypeToHWType $(curLoc) typeTrans scrutTy,dcTag dc - 1,fI))
         _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
@@ -164,7 +164,7 @@ mkDeclarations bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
 mkDeclarations bndr (Case scrut ty alts) = do
   alts'                  <- mapM unbind alts
   scrutTy                <- termType scrut
-  scrutHTy               <- unsafeCoreTypeToHWTypeM scrutTy
+  scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
@@ -245,7 +245,7 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
 
 mkExpr ty app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  hwTy <- unsafeCoreTypeToHWTypeM ty
+  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
   case appF of
     Data dc

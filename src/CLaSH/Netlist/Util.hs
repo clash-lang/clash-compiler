@@ -49,15 +49,17 @@ splitNormalized expr = do
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
-unsafeCoreTypeToHWType :: (Type -> Maybe (Either String HWType))
+unsafeCoreTypeToHWType :: String
+                       -> (Type -> Maybe (Either String HWType))
                        -> Type
                        -> HWType
-unsafeCoreTypeToHWType builtInTranslation = either error id . coreTypeToHWType builtInTranslation
+unsafeCoreTypeToHWType loc builtInTranslation = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation
 
 -- | Converts a Core type to a HWType within the NetlistMonad
-unsafeCoreTypeToHWTypeM :: Type
+unsafeCoreTypeToHWTypeM :: String
+                        -> Type
                         -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM ty = unsafeCoreTypeToHWType <$> Lens.use typeTranslator <*> pure ty
+unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> pure ty
 
 -- | Returns the name of the clock corresponding to a type
 synchronizedClk :: Type
@@ -161,9 +163,10 @@ typeLength _            = 0
 
 -- | Gives the HWType corresponding to a term. Returns an error if the term has
 -- a Core type that is not translatable to a HWType.
-termHWType :: Term
+termHWType :: String
+           -> Term
            -> NetlistMonad HWType
-termHWType e = unsafeCoreTypeToHWTypeM =<< termType e
+termHWType loc e = unsafeCoreTypeToHWTypeM loc =<< termType e
 
 -- | Turns a Core variable reference to a Netlist expression. Errors if the term
 -- is not a variable.
