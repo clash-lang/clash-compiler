@@ -173,8 +173,11 @@ architecture c =
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
 vhdlType hwty = do
-  when (needsTyDec hwty) (_1 %= HashSet.insert hwty)
+  when (needsTyDec hwty) (_1 %= HashSet.insert (mkVecZ hwty))
   vhdlType' hwty
+  where
+    mkVecZ (Vector _ elTy) = Vector 0 elTy
+    mkVecZ t               = t
 
 vhdlType' :: HWType -> VHDLM Doc
 vhdlType' Bit        = "std_logic"
