@@ -18,7 +18,7 @@ import qualified Data.HashMap.Lazy             as HashMap
 import           Data.List                     (partition)
 import           Data.Maybe                    (catMaybes, fromJust)
 import           Data.Monoid                   (mconcat)
-import           Data.Text.Lazy                (Text, pack)
+import           Data.Text.Lazy                (Text, pack, unpack)
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
@@ -95,7 +95,7 @@ mkInput (e, False) = case collectArgs e of
   _                -> fmap (first (first Left)) $ mkLitInput e
   where
     mkInput' nm args = do
-      bbM <- fmap (HashMap.lookup . pack $ name2String nm) $ Lens.use primitives
+      bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) -> do
           i           <- lift $ varCount <<%= (+1)
@@ -141,7 +141,7 @@ mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox app
            -> MaybeT NetlistMonad ((BlackBoxTemplate,BlackBoxContext),[Declaration])
 mkFunInput resId e = case collectArgs e of
   (Prim nm _, args) -> do
-    bbM <- fmap (HashMap.lookup . pack $ name2String nm) $ Lens.use primitives
+    bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
     case bbM of
       Just p@(P.BlackBox {}) -> do
         (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
@@ -151,7 +151,7 @@ mkFunInput resId e = case collectArgs e of
             l' <- lift $ instantiateSym l
             return ((l',bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
-      _ -> error $ "No blackbox found: " ++ name2String nm
+      _ -> error $ "No blackbox found: " ++ unpack nm
   (Var ty fun, args) -> do
     normalized <- Lens.use bindings
     case HashMap.lookup fun normalized of

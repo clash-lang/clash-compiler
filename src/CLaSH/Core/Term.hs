@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
@@ -19,6 +19,7 @@ where
 import                Unbound.LocallyNameless       as Unbound hiding (Data)
 import                Unbound.LocallyNameless.Alpha (aeqR1, fvR1)
 import                Unbound.LocallyNameless.Name  (isFree)
+import                Data.Text.Lazy                (Text)
 
 -- Internal Modules
 import                CLaSH.Core.DataCon            (DataCon)
@@ -32,7 +33,7 @@ data Term
   = Var     Type TmName -- ^ Variable reference
   | Data    DataCon -- ^ Datatype constructor
   | Literal Literal -- ^ Literal
-  | Prim    TmName Type -- ^ Primitive
+  | Prim    Text Type -- ^ Primitive
   | Lam     (Bind Id Term) -- ^ Term-abstraction
   | TyLam   (Bind TyVar Term) -- ^ Type-abstraction
   | App     Term Term -- ^ Application
@@ -58,6 +59,9 @@ data Pat
   -- ^ Default pattern
   deriving (Show)
 
+Unbound.derive_abstract [''Text]
+instance Alpha Text
+
 Unbound.derive [''Term,''Pat]
 
 instance Eq Term where
@@ -68,11 +72,11 @@ instance Ord Term where
 
 instance Alpha Term where
   fv' c (Var _ n)  = fv' c n
-  fv' c (Prim _ t) = fv' c t
   fv' c t          = fvR1 rep1 c t
 
-  aeq' c (Var _ n) (Var _ m) = aeq' c n m
-  aeq' c t1        t2        = aeqR1 rep1 c t1 t2
+  aeq' c (Var _ n)   (Var _ m)   = aeq' c n m
+  aeq' _ (Prim t1 _) (Prim t2 _) = t1 == t2
+  aeq' c t1          t2          = aeqR1 rep1 c t1 t2
 
 instance Alpha Pat
 
@@ -96,3 +100,6 @@ instance Subst Type Term where
     Prim nm ty     -> Prim   nm (subst tvN u ty)
     e              -> e
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
+
+instance Subst Term Text
+instance Subst Type Text

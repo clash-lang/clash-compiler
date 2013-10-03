@@ -252,7 +252,7 @@ mkExpr ty app = do
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
       | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
     Prim nm _ -> do
-      bbM <- fmap (HashMap.lookup . Text.pack $ name2String nm) $ Lens.use primitives
+      bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
       case bbM of
         Just p@(P.BlackBox {}) ->
           case template p of
@@ -269,7 +269,7 @@ mkExpr ty app = do
               (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
               bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox templE bbCtx
               return (bb,ctxDcls)
-        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
+        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ Text.unpack nm
     Var _ f
       | null args -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app

@@ -11,6 +11,7 @@ where
 
 import           Data.Char               (isSymbol, isUpper, ord)
 import           Data.Traversable        (sequenceA)
+import           Data.Text.Lazy          (unpack)
 import           GHC.Show                (showMultiLineString)
 import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
                                           hsep, int, integer, parens, punctuate,
@@ -95,7 +96,7 @@ instance Pretty Term where
     Var _ x        -> pprPrec prec x
     Data dc        -> pprPrec prec dc
     Literal l      -> pprPrec prec l
-    Prim nm _      -> return . text $ name2String nm
+    Prim nm _      -> return $ text $ unpack nm
     Lam b          -> lunbind b $ \(v,e')  -> pprPrecLam prec [v] e'
     TyLam b        -> lunbind b $ \(tv,e') -> pprPrecTyLam prec [tv] e'
     App fun arg    -> pprPrecApp prec fun arg

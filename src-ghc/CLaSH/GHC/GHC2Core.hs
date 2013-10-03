@@ -271,8 +271,8 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
     --                              return (C.App ca eC)
     term (Cast e _)        = term e
     term (Tick _ e)        = term e
-    term (Type t)          = C.Prim (string2Name "_TY_") <$> coreToType t
-    term (Coercion co)     = C.Prim (string2Name "_CO_") <$> coreToType (coercionType co)
+    term (Type t)          = C.Prim (pack "_TY_") <$> coreToType t
+    term (Coercion co)     = C.Prim (pack "_CO_") <$> coreToType (coercionType co)
 
     var x =
       let xVar   = coreToVar x
@@ -282,7 +282,7 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
         xType <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case HashMap.lookup xNameS primMap of
-                      Just _  -> return $ C.Prim xPrim xType
+                      Just _  -> return $ C.Prim xNameS xType
                       Nothing -> C.Data <$> coreToDataCon (isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))) dc
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive f _)
@@ -291,11 +291,11 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
               | f == pack "CLaSH.Signal.signal"    -> return (syncTerm xType)
               | f == pack "CLaSH.Signal.pack"      -> return (splitCombineTerm False xType)
               | f == pack "CLaSH.Signal.unpack"    -> return (splitCombineTerm True xType)
-              | otherwise                          -> return (C.Prim xPrim xType)
+              | otherwise                          -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
-              return (C.Prim xPrim xType)
+              return (C.Prim xNameS xType)
             Nothing
-              | x `elem` unlocs -> return (C.Prim xPrim xType)
+              | x `elem` unlocs -> return (C.Prim xNameS xType)
               | otherwise -> return  (C.Var xType xVar)
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> term e
