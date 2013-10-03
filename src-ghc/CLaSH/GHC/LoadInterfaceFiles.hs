@@ -177,7 +177,7 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         case (BasicTypes.inl_inline inlineInfo,BasicTypes.inl_act inlineInfo) of
           (BasicTypes.NoInline,BasicTypes.AlwaysActive) -> Right bndr
           (BasicTypes.NoInline,BasicTypes.NeverActive)  -> Right bndr
-          (BasicTypes.NoInline,il) -> traceIf True (showPpr bndr ++ " noinline: " ++ showPpr il) $ Left (bndr, CoreSyn.unfoldingTemplate unfolding)
+          (BasicTypes.NoInline,_) -> Left (bndr, CoreSyn.unfoldingTemplate unfolding)
           _ -> Left (bndr, CoreSyn.unfoldingTemplate unfolding)
       (CoreSyn.DFunUnfolding dfbndrs dc es) ->
         let dcApp  = MkCore.mkCoreConApps dc es
