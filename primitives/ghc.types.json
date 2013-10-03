@@ -3,4 +3,9 @@
     , "templateE" : "~ARG[0]"
     }
   }
+, { "Primitive" :
+    { "name"      : "GHC.Types.Eq#"
+    , "primType"  : "Constructor"
+    }
+  }
 ]

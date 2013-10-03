@@ -32,6 +32,11 @@ end block;"
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger#"
+    , "templateE" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.neqInteger"
     , "templateE" : "~ARG[0] /= ~ARG[1]"
     }

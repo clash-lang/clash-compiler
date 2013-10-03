@@ -361,12 +361,12 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vselect"
     , "templateD"  :
 "~SYM[0]_vselect : block
-  signal ~SYM[1] : ~TYP[4];
+  signal ~SYM[1] : ~TYP[3];
 begin
-  ~SYM[1] <= ~ARG[4];
+  ~SYM[1] <= ~ARG[3];
   ~SYM[2]_vselect : for ~SYM[3] in 0 to ~RESULT'high generate
   begin
-    ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[1]+(~LIT[2]*~SYM[3])));
+    ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[0]+(~LIT[1]*~SYM[3])));
   end generate;
 end block;"
     }
@@ -375,12 +375,12 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vselectI"
     , "templateD"  :
 "~SYM[0]_vselectI : block
-  signal ~SYM[1] : ~TYP[4];
+  signal ~SYM[1] : ~TYP[3];
 begin
-  ~SYM[1] <= ~ARG[4];
-  ~SYM[2]_vselect : for ~SYM[3] in 0 to ~RESULT'high generate
+  ~SYM[1] <= ~ARG[3];
+  ~SYM[2]_vselectI : for ~SYM[3] in 0 to ~RESULT'high generate
   begin
-    ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[1]+(~LIT[2]*~SYM[3])));
+    ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[0]+(~LIT[1]*~SYM[3])));
   end generate;
 end block;"
     }

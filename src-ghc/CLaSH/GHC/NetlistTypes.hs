@@ -21,7 +21,7 @@ ghcTypeToHWType ty@(tyView -> TyConApp tc args) = runErrorT $
   case name2String $ tyConName tc of
     "GHC.Integer.Type.Integer"      -> return Integer
     "GHC.Prim.Int#"                 -> return Integer
-    "GHC.Prim.Int"                  -> return Integer
+    "GHC.Types.Int"                 -> return Integer
     "GHC.Prim.ByteArray#"           -> fail $ "Can't translate type: " ++ showDoc ty
     "GHC.Types.Bool"                -> return Bool
     "GHC.TypeLits.Sing"             -> singletonToHWType (head args)
