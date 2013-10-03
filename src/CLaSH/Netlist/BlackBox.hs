@@ -117,7 +117,8 @@ mkInput (e, False) = case collectArgs e of
               bb   <- lift $ mkBlackBox tempE bbCtx
               let bb' = mconcat [pack "(",bb,pack ")"]
               return ((Left bb', hwTy),ctxDecls)
-        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ name2String nm
+        Just _  -> mzero
+        Nothing -> error $ $(curLoc) ++ "No blackbox found: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that
 -- the term is a literal. Returns 'Nothing' if the term is not a literal.
