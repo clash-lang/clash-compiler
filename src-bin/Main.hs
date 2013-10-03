@@ -71,6 +71,8 @@ import qualified Control.Exception as Exception
 import qualified GHC.Paths
 import           Paths_clash_ghc
 #endif
+import           Exception (gcatch)
+import           Control.Exception (ErrorCall (..))
 import qualified CLaSH.Driver
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
@@ -276,7 +278,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
-       DoVHDL                 -> doVHDL srcs
+       DoVHDL                 -> gcatch (doVHDL srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
 
   liftIO $ dumpFinalStats dflags6
 
