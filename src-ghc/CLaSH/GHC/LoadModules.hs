@@ -16,7 +16,7 @@ import           System.Process               (runInteractiveCommand,
 #else
 import qualified GHC.Paths
 #endif
-import           Data.List                    ((\\), nub)
+import           Data.List                    ((\\), lookup, nub)
 
 -- GHC API
 -- import qualified CorePrep
@@ -75,16 +75,22 @@ loadModules modName = defaultErrorHandler $ do
 
   GHC.runGhc (Just libDir) $ do
     dflags <- GHC.getSessionDynFlags
+    let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
+                      Just "YES" -> True
+                      _          -> False
     let dflags1 = foldl DynFlags.xopt_set
                     (dflags
                       { DynFlags.ctxtStkDepth = 1000
                       , DynFlags.optLevel = 2
                       , DynFlags.ghcMode  = GHC.CompManager
-                      , DynFlags.ghcLink  = GHC.LinkInMemory
+                      , DynFlags.ghcLink  = if ghcDynamic then GHC.NoLink
+                                                          else GHC.LinkInMemory
                       } )
                     [DynFlags.Opt_TemplateHaskell,DynFlags.Opt_Arrows]
     let dflags2 = wantedOptimizationFlags dflags1
-    _ <- GHC.setSessionDynFlags dflags2
+    let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
+                                else dflags2
+    _ <- GHC.setSessionDynFlags dflags3
     target <- GHC.guessTarget modName Nothing
     GHC.setTargets [target]
     ldRes <- GHC.load GHC.LoadAllTargets
@@ -160,7 +166,6 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_SimpleListLiterals -- Avoids 'build' rule
              , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
              , Opt_ForceRecomp -- Force recompilation: never bad
-             -- , Opt_BuildDynamicToo
              ]
 
     unwanted = [ Opt_FloatIn -- Moves let-bindings inwards: defeats the normal-form with a single top-level let-binding
