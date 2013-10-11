@@ -16,7 +16,7 @@ import           System.Process               (runInteractiveCommand,
 #else
 import qualified GHC.Paths
 #endif
-import           Data.List                    ((\\), lookup, nub)
+import           Data.List                    ((\\), nub)
 
 -- GHC API
 -- import qualified CorePrep
