@@ -108,6 +108,7 @@ mkADT builtInTranslation _ tc args = case tyConDataCons tc of
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
     argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation)) substArgTyss
     case (dcs,argHTyss) of
+      (_:[],[[elemTy]])      -> return elemTy
       (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
       (_   ,concat -> [])    -> return $ Sum tcName $ map (pack . name2String . dcName) dcs
       (_   ,elemHTys)        -> return $ SP tcName

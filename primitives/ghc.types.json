@@ -1,9 +1,4 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Types.I#"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "Primitive" :
+[ { "Primitive" :
     { "name"      : "GHC.Types.Eq#"
     , "primType"  : "Constructor"
     }

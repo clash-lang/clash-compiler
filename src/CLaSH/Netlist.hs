@@ -316,6 +316,7 @@ mkDcApplication dstHType dc args = do
     Integer ->
       let dc' = case name2String $ dcName dc of
                   "S#" -> Nothing
+                  "I#" -> Nothing
                   _    -> error $ $(curLoc) ++ "not a simple integer: " ++ show dc
       in return (HW.DataCon dstHType dc' argExprs)
     Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
