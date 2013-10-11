@@ -13,22 +13,22 @@ normalization = representable >-> simplification >-> apply "recToLetrec" recToLe
 
 -- | Simple cleanup transformation, currently only inlines \"Wrappers\"
 cleanup :: NormRewrite
-cleanup = repeatR $ topdownR (apply "inlineWrapper" inlineWrapper)
+cleanup = topdownR (repeatR $ apply "inlineWrapper" inlineWrapper)
 
 -- | Unsure that functions have representable arguments, results, and let-bindings
 representable :: NormRewrite
-representable = propagagition >-> specialisation
+representable = propagation >-> specialisation
   where
-    propagagition = repeatR ( upDownR  (apply "propagation" appProp) >->
-                              repeatBottomup [ ("bindNonRep"   , bindNonRep )
-                                             , ("liftNonRep"   , liftNonRep )
-                                             , ("caseLet"      , caseLet    )
-                                             , ("caseCase"     , caseCase   )
-                                             , ("caseCon"      , caseCon    )
-                                             ]
-                              >->
-                              doInline "inlineNonRep" inlineNonRep
-                            )
+    propagation = repeatR ( upDownR  (apply "propagation" appProp) >->
+                            repeatBottomup [ ("bindNonRep"   , bindNonRep )
+                                           , ("liftNonRep"   , liftNonRep )
+                                           , ("caseLet"      , caseLet    )
+                                           , ("caseCase"     , caseCase   )
+                                           , ("caseCon"      , caseCon    )
+                                           ]
+                            >->
+                            doInline "inlineNonRep" inlineNonRep
+                          )
     specialisation = repeatR (bottomupR (apply "typeSpec" typeSpec)) >->
                      repeatR (bottomupR (apply "nonRepSpec" nonRepSpec))
 
