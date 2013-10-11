@@ -1,0 +1,21 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Prim.tagToEnum#"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.negateInt#"
+    , "templateE" : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<#"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>#"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+]
