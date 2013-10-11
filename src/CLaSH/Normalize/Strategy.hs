@@ -56,7 +56,7 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
                                                 ]
                               )
 
-    anf             = apply "ANF" makeANF
+    anf             = apply "ANF" makeANF >-> topdownR (apply "bindConstantVar" bindConstantVar)
 
     deadCodeRemoval = bottomupR (apply "deadcode" deadCode)
 
