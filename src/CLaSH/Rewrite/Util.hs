@@ -414,7 +414,7 @@ mkSelectorCase caller ctx scrut dcI fieldI = do
               selBndr <- mkInternalVar "sel" (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI)
               let bndrs  = take fieldI wildBndrs ++ [fst selBndr] ++ drop (fieldI+1) wildBndrs
               let pat    = DataPat (embed dc) (rebind [] bndrs)
-              let retVal = Case scrut (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI) [ bind pat (snd selBndr) ]
+              let retVal = Case scrut [ bind pat (snd selBndr) ]
               return retVal
     _ -> cantCreate $(curLoc) "Type of subject is not a datatype"
 
@@ -576,18 +576,18 @@ termT nms = contramap inject (treeT finiteT)
   where
     inject (Var _ nm) | HashMap.member nm nms = mkNode (FnVarN nm) []
                       | otherwise             = mkNode VarN []
-    inject (Data dc)     = mkNode (DataN dc) []
-    inject (Literal l)   = mkNode (LiteralN l) []
-    inject (Prim t _)    = mkNode (PrimN t) []
-    inject (Lam b)       = let (_,e) = unsafeUnbind b
-                           in mkNode LamN [inject e]
-    inject (TyLam b)     = let (_,e) = unsafeUnbind b
-                           in mkNode TyLamN [inject e]
-    inject (App e1 e2)   = mkNode AppN [inject e1, inject e2]
-    inject (TyApp e _)   = mkNode TyAppN [inject e]
-    inject (Letrec b)    = let (es,e) = unsafeUnbind b
-                               es'    = map (unembed . snd) $ unrec es
-                           in mkNode LetN (map inject (e:es'))
-    inject (Case e _ bs) = let es = map (snd . unsafeUnbind) bs
-                           in mkNode CaseN (map inject (e:es))
+    inject (Data dc)   = mkNode (DataN dc) []
+    inject (Literal l) = mkNode (LiteralN l) []
+    inject (Prim t _)  = mkNode (PrimN t) []
+    inject (Lam b)     = let (_,e) = unsafeUnbind b
+                         in mkNode LamN [inject e]
+    inject (TyLam b)   = let (_,e) = unsafeUnbind b
+                         in mkNode TyLamN [inject e]
+    inject (App e1 e2) = mkNode AppN [inject e1, inject e2]
+    inject (TyApp e _) = mkNode TyAppN [inject e]
+    inject (Letrec b)  = let (es,e) = unsafeUnbind b
+                             es'    = map (unembed . snd) $ unrec es
+                         in mkNode LetN (map inject (e:es'))
+    inject (Case e bs) = let es = map (snd . unsafeUnbind) bs
+                         in mkNode CaseN (map inject (e:es))
 -- END Copy of http://www.cl.cam.ac.uk/~mb566/papers/termination-combinators-hs11.pdf

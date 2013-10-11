@@ -56,11 +56,11 @@ allR rf trans c (Letrec b) = do
       e' <- trans (LetBinding bndrs:c) (unembed e)
       return (b',embed e')
 
-allR rf trans c (Case scrut ty alts) = do
+allR rf trans c (Case scrut alts) = do
   scrut' <- trans (CaseScrut:c) scrut
   alts'  <- if rf then mapM (fmap (uncurry bind) . rewriteAlt <=< unbind) alts
                   else mapM (fmap (uncurry bind) . rewriteAlt . unsafeUnbind) alts
-  return $ Case scrut' ty alts'
+  return $ Case scrut' alts'
   where
     rewriteAlt :: (Pat, Term) -> m (Pat, Term)
     rewriteAlt (p,e) = do

@@ -93,16 +93,16 @@ instance Pretty LitTy where
 
 instance Pretty Term where
   pprPrec prec e = case e of
-    Var _ x        -> pprPrec prec x
-    Data dc        -> pprPrec prec dc
-    Literal l      -> pprPrec prec l
-    Prim nm _      -> return $ text $ unpack nm
-    Lam b          -> lunbind b $ \(v,e')  -> pprPrecLam prec [v] e'
-    TyLam b        -> lunbind b $ \(tv,e') -> pprPrecTyLam prec [tv] e'
-    App fun arg    -> pprPrecApp prec fun arg
-    TyApp e' ty    -> pprPrecTyApp prec e' ty
-    Letrec b       -> lunbind b $ \(xes,e') -> pprPrecLetrec prec (unrec xes) e'
-    Case e' _ alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
+    Var _ x      -> pprPrec prec x
+    Data dc      -> pprPrec prec dc
+    Literal l    -> pprPrec prec l
+    Prim nm _    -> return $ text $ unpack nm
+    Lam b        -> lunbind b $ \(v,e')  -> pprPrecLam prec [v] e'
+    TyLam b      -> lunbind b $ \(tv,e') -> pprPrecTyLam prec [tv] e'
+    App fun arg  -> pprPrecApp prec fun arg
+    TyApp e' ty  -> pprPrecTyApp prec e' ty
+    Letrec b     -> lunbind b $ \(xes,e') -> pprPrecLetrec prec (unrec xes) e'
+    Case e' alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
 
 data BindingSite
   = LambdaBind

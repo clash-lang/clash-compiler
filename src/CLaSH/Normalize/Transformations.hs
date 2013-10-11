@@ -45,7 +45,7 @@ import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
-import           CLaSH.Core.Type             (applyFunTy, applyTy, splitFunTy)
+import           CLaSH.Core.Type             (splitFunTy)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPrim, isVar,
                                               mkApps, mkLams, mkTmApps,
@@ -107,24 +107,26 @@ nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: NormRewrite
-caseLet _ (Case (Letrec b) ty alts) = R $ do
+caseLet _ (Case (Letrec b) alts) = R $ do
   (xes,e) <- unbind b
-  changed . Letrec $ bind xes (Case e ty alts)
+  changed . Letrec $ bind xes (Case e alts)
 
 caseLet _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: NormRewrite
-caseCase _ e@(Case (Case scrut ty1 alts1) ty2 alts2)
+caseCase _ e@(Case (Case scrut alts1) alts2)
   = R $ do
-    ty1Rep <- representableType <$> Lens.use typeTranslator <*> pure ty1
-    if ty1Rep
+    alt1E   <- snd <$> unbind (head alts1)
+    alts1Ty <- termType alt1E
+    ty1Rep  <- representableType <$> Lens.use typeTranslator <*> pure alts1Ty
+    if not ty1Rep
       then do newAlts <- mapM ( return
                                   . uncurry bind
-                                  . second (\altE -> Case altE ty2 alts2)
+                                  . second (\altE -> Case altE alts2)
                                   <=< unbind
                                   ) alts1
-              changed $ Case scrut ty2 newAlts
+              changed $ Case scrut newAlts
       else return e
 
 caseCase _ e = return e
@@ -132,7 +134,7 @@ caseCase _ e = return e
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
 inlineNonRep :: NormRewrite
-inlineNonRep ctx e@(Case scrut ty alts)
+inlineNonRep ctx e@(Case scrut alts)
   | (Var _ f, args) <- collectArgs scrut
   = R $ do
     isInlined <- liftR $ alreadyInlined f
@@ -147,7 +149,7 @@ inlineNonRep ctx e@(Case scrut ty alts)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
             liftR $ newInlined %= (f:)
-            changed $ Case (mkApps scrutBody args) ty alts
+            changed $ Case (mkApps scrutBody args) alts
           _ -> return e
 
 inlineNonRep _ e = return e
@@ -156,7 +158,7 @@ inlineNonRep _ e = return e
 -- the subject is (an application of) a DataCon; or if there is only a single
 -- alternative that doesn't reference variables bound by the pattern.
 caseCon :: NormRewrite
-caseCon _ (Case scrut ty alts)
+caseCon _ (Case scrut alts)
   | (Data dc, args) <- collectArgs scrut
   = R $ do
     alts' <- mapM unbind alts
@@ -186,7 +188,7 @@ caseCon _ (Case scrut ty alts)
     isDefPat DefaultPat = True
     isDefPat _          = False
 
-caseCon _ e@(Case _ _ [alt]) = R $ do
+caseCon _ e@(Case _ [alt]) = R $ do
   (pat,altE) <- unbind alt
   case pat of
     DefaultPat    -> changed altE
@@ -358,9 +360,7 @@ appProp _ (App (Letrec b) arg) = R $ do
   (v,e) <- unbind b
   changed . Letrec $ bind v (App e arg)
 
-appProp _ (App (Case scrut ty alts) arg) = R $ do
-  argTy <- termType arg
-  let ty' = applyFunTy ty argTy
+appProp _ (App (Case scrut alts) arg) = R $ do
   if isConstant arg || isVar arg
     then do
       alts' <- mapM ( return
@@ -368,7 +368,7 @@ appProp _ (App (Case scrut ty alts) arg) = R $ do
                     . second (`App` arg)
                     <=< unbind
                     ) alts
-      changed $ Case scrut ty' alts'
+      changed $ Case scrut alts'
     else do
       (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
       alts' <- mapM ( return
@@ -376,7 +376,7 @@ appProp _ (App (Case scrut ty alts) arg) = R $ do
                     . second (`App` argVar)
                     <=< unbind
                     ) alts
-      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
+      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut alts')
 
 appProp _ (TyApp (TyLam b) t) = R $ do
   (tv,e) <- unbind b
@@ -386,14 +386,13 @@ appProp _ (TyApp (Letrec b) t) = R $ do
   (v,e) <- unbind b
   changed . Letrec $ bind v (TyApp e t)
 
-appProp _ (TyApp (Case scrut ty' alts) ty) = R $ do
+appProp _ (TyApp (Case scrut alts) ty) = R $ do
   alts' <- mapM ( return
                 . uncurry bind
                 . second (`TyApp` ty)
                 <=< unbind
                 ) alts
-  ty'' <- applyTy ty' ty
-  changed $ Case scrut ty'' alts'
+  changed $ Case scrut alts'
 
 appProp _ e = return e
 
@@ -452,7 +451,7 @@ collectANF _ (Letrec b) = do
       tell [(argId,embed body)]
       return argVar
 
-collectANF ctx e@(Case subj ty alts) = do
+collectANF ctx e@(Case subj alts) = do
     untranslatableSubj <- liftNormR $ isUntranslatable subj
     localVar           <- liftNormR $ isLocalVar subj
     (bndr,subj') <- if localVar || untranslatableSubj || isConstant subj
@@ -466,7 +465,7 @@ collectANF ctx e@(Case subj ty alts) = do
       else fmap (first concat . unzip) $ liftNormR $ mapM doAlt alts
 
     tell (bndr ++ binds)
-    return (Case subj' ty alts')
+    return (Case subj' alts')
   where
     doAlt :: Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
     -- See NOTE [unsafeUnbind]

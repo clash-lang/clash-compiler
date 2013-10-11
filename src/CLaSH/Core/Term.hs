@@ -39,8 +39,8 @@ data Term
   | App     Term Term -- ^ Application
   | TyApp   Term Type -- ^ Type-application
   | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
-  | Case    Term Type [Bind Pat Term] -- ^ Case-expression: subject, type of
-                                      -- alternatives, list of alternatives
+  | Case    Term [Bind Pat Term] -- ^ Case-expression: subject, type of
+                                 -- alternatives, list of alternatives
   deriving Show
 
 -- | Term reference
@@ -93,9 +93,8 @@ instance Subst Type Term where
     App    fun arg -> App    (subst tvN u fun) (subst tvN u arg)
     TyApp  e   ty  -> TyApp  (subst tvN u e  ) (subst tvN u ty )
     Letrec b       -> Letrec (subst tvN u b  )
-    Case   e ty  a -> Case   (subst tvN u e  )
-                             (subst tvN u ty )
-                             (subst tvN u a  )
+    Case   e alts  -> Case   (subst tvN u e  )
+                             (subst tvN u alts )
     Var ty nm      -> Var    (subst tvN u ty ) nm
     Prim nm ty     -> Prim   nm (subst tvN u ty)
     e              -> e

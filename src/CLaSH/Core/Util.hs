@@ -25,21 +25,23 @@ termType :: (Functor m, Fresh m)
          => Term
          -> m Type
 termType e = case e of
-  Var t _     -> return t
-  Data dc     -> return $ dcType dc
-  Literal l   -> return $ literalType l
-  Prim _ t    -> return t
-  Lam b       -> do (v,e') <- unbind b
-                    mkFunTy (unembed $ varType v) <$> termType e'
-  TyLam b     -> do (tv,e') <- unbind b
-                    ForAllTy <$> bind tv <$> termType e'
-  App _ _     -> case collectArgs e of
-                   (fun, args) -> termType fun >>=
-                                  (`applyTypeToArgs` args)
-  TyApp e' ty -> termType e' >>= (`applyTy` ty)
-  Letrec b    -> do (_,e') <- unbind b
-                    termType e'
-  Case _ ty _ -> return ty
+  Var t _        -> return t
+  Data dc        -> return $ dcType dc
+  Literal l      -> return $ literalType l
+  Prim _ t       -> return t
+  Lam b          -> do (v,e') <- unbind b
+                       mkFunTy (unembed $ varType v) <$> termType e'
+  TyLam b        -> do (tv,e') <- unbind b
+                       ForAllTy <$> bind tv <$> termType e'
+  App _ _        -> case collectArgs e of
+                      (fun, args) -> termType fun >>=
+                                     (`applyTypeToArgs` args)
+  TyApp e' ty    -> termType e' >>= (`applyTy` ty)
+  Letrec b       -> do (_,e') <- unbind b
+                       termType e'
+  Case _ (alt:_) -> do (_,e') <- unbind alt
+                       termType e'
+  Case _ []      -> error $ $(curLoc) ++ "Empty case"
 
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term
