@@ -15,6 +15,7 @@ import           CLaSH.GHC.Compat.Outputable (showPpr, showSDoc)
 import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
+import qualified DataCon
 import qualified Exception
 import qualified FamInstEnv
 import qualified GHC
@@ -83,7 +84,8 @@ loadDecl = TcIface.tcIfaceDecl False
 
 ifaceTyCons :: HscTypes.ModIface -> TcRnTypes.IfL [GHC.TyCon]
 ifaceTyCons = fmap (\md -> (HscTypes.typeEnvTyCons . HscTypes.md_types) md ++
-                           (FamInstEnv.famInstsRepTyCons . HscTypes.md_fam_insts) md
+                           (FamInstEnv.famInstsRepTyCons . HscTypes.md_fam_insts) md ++
+                           (Maybes.catMaybes . map DataCon.promoteDataCon_maybe . HscTypes.typeEnvDataCons . HscTypes.md_types) md
                    ) . TcIface.typecheckIface
 
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
