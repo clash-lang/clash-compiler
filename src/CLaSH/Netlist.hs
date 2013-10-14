@@ -134,7 +134,7 @@ genComponentT compName componentExpr mStart = do
 
   let compInps       = zip (map (mkBasicId . Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
-      component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
+      component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
   return component
 
 -- | Generate a list of Declarations for a let-binder
