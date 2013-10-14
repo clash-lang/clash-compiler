@@ -75,12 +75,16 @@ topSortHWTys hwtys = sorted
     graph  = mkGraph nodes edges :: Gr HWType ()
     sorted = reverse $ topsort' graph
 
-    edge t@(Vector _ elTy) = maybe [] ((:[]) . (nodesI HashMap.! t,,())) (HashMap.lookup elTy nodesI)
+    edge t@(Vector _ elTy) = maybe [] ((:[]) . (nodesI HashMap.! t,,())) (HashMap.lookup (mkVecZ elTy) nodesI)
     edge t@(Product _ tys) = let ti = nodesI HashMap.! t
-                             in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys
+                             in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys
     edge t@(SP _ ctys)     = let ti = nodesI HashMap.! t
-                             in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
+                             in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys) ctys
     edge _                 = []
+
+mkVecZ :: HWType -> HWType
+mkVecZ (Vector _ elTy) = Vector 0 elTy
+mkVecZ t               = t
 
 needsTyDec :: HWType -> Bool
 needsTyDec (Vector _ Bit) = False
@@ -175,9 +179,6 @@ vhdlType :: HWType -> VHDLM Doc
 vhdlType hwty = do
   when (needsTyDec hwty) (_1 %= HashSet.insert (mkVecZ hwty))
   vhdlType' hwty
-  where
-    mkVecZ (Vector _ elTy) = Vector 0 elTy
-    mkVecZ t               = t
 
 vhdlType' :: HWType -> VHDLM Doc
 vhdlType' Bit        = "std_logic"
