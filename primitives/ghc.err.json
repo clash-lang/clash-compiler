@@ -3,4 +3,9 @@
     , "templateE" : "~DEFAULTO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Err.error"
+    , "templateE" : "~DEFAULTO"
+    }
+  }
 ]

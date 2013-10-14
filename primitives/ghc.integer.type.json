@@ -86,4 +86,9 @@ end block;"
     , "templateE" : "-~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToInt"
+    , "templateE" : "~ARG[0]"
+    }
+  }
 ]
