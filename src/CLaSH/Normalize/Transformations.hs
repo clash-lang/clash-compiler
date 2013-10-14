@@ -462,34 +462,34 @@ collectANF ctx e@(Case subj alts) = do
     untranslatableE <- liftNormR $ isUntranslatable e
     (binds,alts') <- if untranslatableE
       then return ([],alts)
-      else fmap (first concat . unzip) $ liftNormR $ mapM doAlt alts
+      else fmap (first concat . unzip) $ liftNormR $ mapM (doAlt subj') alts
 
     tell (bndr ++ binds)
     return (Case subj' alts')
   where
-    doAlt :: Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
+    doAlt :: Term -> Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
     -- See NOTE [unsafeUnbind]
-    doAlt = fmap (second (uncurry bind)) . doAlt' . unsafeUnbind
+    doAlt subj' = fmap (second (uncurry bind)) . doAlt' subj' . unsafeUnbind
 
-    doAlt' :: (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
-    doAlt' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
+    doAlt' :: Term -> (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
+    doAlt' subj' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
       lv      <- isLocalVar altExpr
-      patSels <- Monad.zipWithM (doPatBndr (unembed dc)) xs [0..]
+      patSels <- Monad.zipWithM (doPatBndr subj' (unembed dc)) xs [0..]
       if lv || isConstant altExpr
         then return (patSels,alt)
         else do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
                 return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
-    doAlt' alt@(DataPat _ _, _) = return ([],alt)
-    doAlt' alt@(pat,altExpr) = do
+    doAlt' _ alt@(DataPat _ _, _) = return ([],alt)
+    doAlt' _ alt@(pat,altExpr) = do
       lv <- isLocalVar altExpr
       if lv || isConstant altExpr
         then return ([],alt)
         else do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
                 return ([(altId,embed altExpr)],(pat,altVar))
 
-    doPatBndr :: DataCon -> Id -> Int -> RewriteMonad NormalizeMonad LetBinding
-    doPatBndr dc pId i
-      = do patExpr <- mkSelectorCase "doPatBndr" ctx subj (dcTag dc) i
+    doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeMonad LetBinding
+    doPatBndr subj' dc pId i
+      = do patExpr <- mkSelectorCase "doPatBndr" ctx subj' (dcTag dc) i
            return (pId,embed patExpr)
 
 collectANF _ e = return e
