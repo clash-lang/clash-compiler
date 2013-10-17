@@ -315,8 +315,8 @@ expr _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int st
     end   = typeSize ty - conSize ty
 
 expr _ (Identifier id_ (Just _)) = text id_
+expr _ (DataCon (Vector 1 _) _ [e])              = parens (int 0 <+> rarrow <+> expr False e)
 expr _ (vectorChain -> Just es)                  = tupled (mapM (expr False) es)
-expr _ (DataCon (Vector 1 _) _ [e])              = parens ("others" <+> rarrow <+> expr False e)
 expr _ (DataCon (Vector _ _) _ [e1,e2])          = expr False e1 <+> "&" <+> expr False e2
 expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
   where
