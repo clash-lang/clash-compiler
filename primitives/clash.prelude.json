@@ -9,7 +9,7 @@
 begin
   ~SYM[2] <= ~ARG[6];
 
-  process(~CLK[6]) is
+  process(~CLK[6])
   begin
     if rising_edge(~CLK[6]) then
       if ~ARG[5] then

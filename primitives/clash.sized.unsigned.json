@@ -25,7 +25,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.maxBoundU"
-    , "templateE" : "(others => '1')"
+    , "templateE" : "unsigned'((~LIT[0]-1) downto 0 => '1')"
     }
   }
 , { "BlackBox" :
@@ -91,18 +91,29 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.bitU"
     , "templateD"  :
-"process(~ARG[1]) is
-  variable ~SYM[0] : ~TYPO;
+"~SYM[0]_bitU : block
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[0] := (others => '0');
-  ~SYM[0](~ARG[1]) := '1';
-  ~RESULT <= ~SYM[0];
-end process;"
+  ~SYM[1] <= ~ARG[1];
+  process(~SYM[1])
+    variable ~SYM[2] : ~TYPO;
+  begin
+    ~SYM[2] := (others => '0');
+    ~SYM[2](~SYM[1]) := '1';
+    ~RESULT <= ~SYM[2];
+  end process;
+end block;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Unsigned.testBitU"
-    , "templateE" : "~ARG[0](~ARG[1]) = '1'"
+    , "templateD" :
+"~SYM[0]_testBitU : block
+  signal ~SYM[1];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](~ARG[1]) = '1';
+end block;"
     }
   }
 , { "BlackBox" :

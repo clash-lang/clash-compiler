@@ -4,7 +4,7 @@
 "~SYM[0]_block : block
   signal ~SYM[1] : ~TYP[1];
 begin
-  process(~CLK[1],~RST[1]) is
+  process(~CLK[1],~RST[1])
   begin
     if ~RST[1] = '0' then
       ~SYM[1] <= ~ARG[0];

@@ -25,12 +25,12 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.minBoundS"
-    , "templateE" : "((~RESULT'high-1) => '1', others => '0')"
+    , "templateE" : "signed'((~LIT[0]-1) => '1', (~LIT[0]-2) downto 0 => '0')"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.maxBoundS"
-    , "templateE" : "((~RESULT'high-1) => '0', others => '1')"
+    , "templateE" : "signed'((~LIT[0]-1) => '0', (~LIT[0]-2) downto 0 => '1')"
     }
   }
 , { "BlackBox" :
@@ -76,12 +76,16 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.divS"
     , "templateD" :
-"~SYM[0]_block : block
+"~SYM[0]_divS : block
   signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
+  signal ~SYM[3] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[1] / ~ARG[2];
-  ~RESULT <= ~SYM[1] - to_signed(1,~LIT[0]) when ~ARG[1](~ARG[1]'high) = not (~ARG[1](~ARG[1]'high)) else
-             ~SYM[1];
+  ~SYM[1] <= ~ARG[1];
+  ~SYM[2] <= ~ARG[2];
+  ~SYM[3] <= ~SYM[1] / ~SYM[2];
+  ~RESULT <= ~SYM[3] - to_signed(1,~LIT[0]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
+             ~SYM[3];
 end block;"
     }
   }
@@ -118,18 +122,29 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.bitS"
     , "templateD" :
-"process(~ARG[1]) is
-  variable ~SYM[0] : ~TYPO;
+"~SYM[0]_bitS : block
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[0] := (others => '0');
-  ~SYM[0](~ARG[1]) := '1';
-  ~RESULT <= ~SYM[0];
-end process;"
+  ~SYM[1] <= ~ARG[1];
+  process(~SYM[1])
+    variable ~SYM[2] : ~TYPO;
+  begin
+    ~SYM[2] := (others => '0');
+    ~SYM[2](~SYM[1]) := '1';
+    ~RESULT <= ~SYM[2];
+  end process;
+end block;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.testBitS"
-    , "templateE" : "~ARG[0](~ARG[1]) = '1'"
+    , "templateD" :
+"~SYM[0]_testBitS : block
+  signal ~SYM[1];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](~ARG[1]) = '1';
+end block;"
     }
   }
 , { "BlackBox" :
