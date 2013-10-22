@@ -23,14 +23,16 @@ data NormalizeState
   --
   -- * Elem: (name of specialised function,type of specialised function)
   , _specHist        :: HashMap TmName (TestResult Term)
-  , _inlined         :: HashMap TmName [TmName]
+  , _inlined         :: HashMap TmName (HashMap TmName Int)
   -- ^ Cache of function where inlining took place:
   --
   -- * Key: function where inlining took place
   --
-  -- * Elem: functions which were inlined
+  -- * Elem: (functions which were inlined, number of times inlined)
   , _newInlined      :: [TmName]
   -- ^ Inlined functions in the current traversal
+  , _inlineLimit     :: Int
+  -- ^ Number of times a function 'f' can be inlined in a function 'g'
   , _curFun          :: TmName
   -- ^ Function which is currently normalized
   }

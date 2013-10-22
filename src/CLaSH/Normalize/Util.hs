@@ -10,7 +10,6 @@ import qualified Data.Either             as Either
 import qualified Data.Graph              as Graph
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
-import qualified Data.List               as List
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
 import           Unbound.LocallyNameless (Fresh, unembed)
@@ -27,24 +26,29 @@ import           CLaSH.Rewrite.Util
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
 alreadyInlined :: TmName
-               -> NormalizeMonad Bool
+               -> NormalizeMonad (Maybe Int)
 alreadyInlined f = do
   cf <- Lens.use curFun
   inlinedHM <- Lens.use inlined
+  limit     <- Lens.use inlineLimit
   case HashMap.lookup cf inlinedHM of
-    Nothing       -> return False
-    Just inlined' -> return (f `elem` inlined')
+    Nothing       -> return Nothing
+    Just inlined' -> case HashMap.lookup f inlined'
+                      of Just n
+                           | n < limit -> return Nothing
+                           | otherwise -> return (Just n)
+                         Nothing -> return Nothing -- return (f `elem` inlined')
 
 -- | Move the names of inlined functions collected during a traversal into the
 -- permanent inlined function cache
 commitNewInlined :: NormRewrite
 commitNewInlined _ e = R $ liftR $ do
   cf <- Lens.use curFun
-  nI <- Lens.use newInlined
+  nI <- fmap (HashMap.fromList . (`zip` (repeat 1))) $ Lens.use newInlined
   inlinedHM <- Lens.use inlined
   case HashMap.lookup cf inlinedHM of
     Nothing -> inlined %= HashMap.insert cf nI
-    Just _  -> inlined %= HashMap.adjust (`List.union` nI) cf
+    Just _  -> inlined %= HashMap.adjust (HashMap.unionWith (+) nI) cf
   newInlined .= []
   return e
 

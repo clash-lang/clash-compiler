@@ -49,6 +49,7 @@ runNormalization lvl supply globals typeTrans
                   HashMap.empty
                   HashMap.empty
                   []
+                  10
                   (error "Report as bug: no curFun")
 
 -- | Normalize a list of global binders

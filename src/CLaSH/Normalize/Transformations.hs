@@ -138,11 +138,11 @@ inlineNonRep ctx e@(Case scrut alts)
   | (Var _ f, args) <- collectArgs scrut
   = R $ do
     isInlined <- liftR $ alreadyInlined f
-    if isInlined
-      then do
+    case isInlined of
+      Just n -> do
         cf <- liftR $ Lens.use curFun
-        traceIf True ($(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined in: " ++ show cf) $ return e
-      else do
+        error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show n ++ " times in:" ++ show cf
+      Nothing -> do
         scrutTy     <- termType scrut
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> pure scrutTy)
