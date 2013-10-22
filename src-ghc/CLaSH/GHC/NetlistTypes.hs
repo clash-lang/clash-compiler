@@ -19,6 +19,7 @@ ghcTypeToHWType ::
   -> Maybe (Either String HWType)
 ghcTypeToHWType ty@(tyView -> TyConApp tc args) = runErrorT $
   case name2String $ tyConName tc of
+    "__INT__"                       -> return Integer
     "GHC.Integer.Type.Integer"      -> return Integer
     "GHC.Prim.Int#"                 -> return Integer
     "GHC.Types.Int"                 -> return Integer

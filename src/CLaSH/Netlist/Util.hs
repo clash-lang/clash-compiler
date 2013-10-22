@@ -5,6 +5,7 @@
 -- | Utilities for converting Core Type/Term to Netlist datatypes
 module CLaSH.Netlist.Util where
 
+import           Control.Error           (hush)
 import           Control.Lens            ((.=),(<<%=))
 import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
@@ -55,11 +56,16 @@ unsafeCoreTypeToHWType :: String
                        -> HWType
 unsafeCoreTypeToHWType loc builtInTranslation = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation
 
--- | Converts a Core type to a HWType within the NetlistMonad
+-- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM :: String
                         -> Type
                         -> NetlistMonad HWType
 unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> pure ty
+
+-- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
+coreTypeToHWTypeM :: Type
+                  -> NetlistMonad (Maybe HWType)
+coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> pure ty)
 
 -- | Returns the name of the clock corresponding to a type
 synchronizedClk :: Type

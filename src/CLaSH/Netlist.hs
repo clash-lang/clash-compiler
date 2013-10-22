@@ -284,43 +284,40 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
 mkDcApplication dstHType dc args = do
   argTys              <- mapM termType args
   (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
+  argHWTys            <- mapM coreTypeToHWTypeM argTys
+  fmap (,argDecls) $! case (argHWTys,argExprs) of
+    -- Is the DC just a newtype wrapper?
+    ([Just argHwTy],[argExpr]) | argHwTy == dstHType -> return argExpr
+    _ -> case dstHType of
+      SP _ dcArgPairs -> do
+        let dcNameBS = Text.pack . name2String $ dcName dc
+            dcI      = dcTag dc - 1
+            dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
+        case compare (length dcArgs) (length argExprs) of
+          EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)
+          LT -> error $ $(curLoc) ++ "Over-applied constructor"
+          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+      Product _ dcArgs ->
+        case compare (length dcArgs) (length argExprs) of
+          EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,0)) argExprs)
+          LT -> error $ $(curLoc) ++ "Over-applied constructor"
+          GT -> error $ $(curLoc) ++ "Under-applied constructor"
+      Sum _ _ ->
+        return (HW.DataCon dstHType (Just $ DC (dstHType,dcTag dc - 1)) [])
+      Bool ->
+        let dc' = case name2String $ dcName dc of
+                   "True"  -> HW.Literal Nothing (BoolLit True)
+                   "False" -> HW.Literal Nothing (BoolLit False)
+                   _ -> error $ $(curLoc) ++ "unknown bool literal: " ++ show dc
+        in  return dc'
+      Bit ->
+        let dc' = case name2String $ dcName dc of
+                   "H" -> HW.Literal Nothing (BitLit H)
+                   "L" -> HW.Literal Nothing (BitLit L)
+                   _ -> error $ $(curLoc) ++ "unknown bit literal: " ++ show dc
+        in return dc'
+      Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
+      Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
+      Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
 
-  fmap (,argDecls) $! case dstHType of
-    SP _ dcArgPairs -> do
-      let dcNameBS = Text.pack . name2String $ dcName dc
-          dcI      = dcTag dc - 1
-          dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-      case compare (length dcArgs) (length argExprs) of
-        EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)
-        LT -> error $ $(curLoc) ++ "Over-applied constructor"
-        GT -> error $ $(curLoc) ++ "Under-applied constructor"
-    Product _ dcArgs ->
-      case compare (length dcArgs) (length argExprs) of
-        EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,0)) argExprs)
-        LT -> error $ $(curLoc) ++ "Over-applied constructor"
-        GT -> error $ $(curLoc) ++ "Under-applied constructor"
-    Sum _ _ ->
-      return (HW.DataCon dstHType (Just $ DC (dstHType,dcTag dc - 1)) [])
-    Bool ->
-      let dc' = case name2String $ dcName dc of
-                 "True"  -> HW.Literal Nothing (BoolLit True)
-                 "False" -> HW.Literal Nothing (BoolLit False)
-                 _ -> error $ $(curLoc) ++ "unknown bool literal: " ++ show dc
-      in  return dc'
-    Bit ->
-      let dc' = case name2String $ dcName dc of
-                 "H" -> HW.Literal Nothing (BitLit H)
-                 "L" -> HW.Literal Nothing (BitLit L)
-                 _ -> error $ $(curLoc) ++ "unknown bit literal: " ++ show dc
-      in return dc'
-    Integer ->
-      let dc' = case name2String $ dcName dc of
-                  "S#" -> Nothing
-                  "I#" -> Nothing
-                  _    -> error $ $(curLoc) ++ "not a simple integer: " ++ show dc
-      in return (HW.DataCon dstHType dc' argExprs)
-    Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
-    Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
-    Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
-
-    _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show dstHType
+      _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
