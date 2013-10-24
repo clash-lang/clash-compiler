@@ -377,13 +377,19 @@ bit_char U = char 'U'
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> VHDLM Doc -> VHDLM Doc
-toSLV Bit        d   = parens (int 0 <+> rarrow <+> d)
-toSLV Bool       d   = "toSLV" <> parens d
-toSLV Integer    d   = toSLV (Signed 32) ("to_signed" <> tupled (sequence [d,int 32]))
-toSLV (Signed _) d   = "std_logic_vector" <> parens d
-toSLV (Unsigned _) d = "std_logic_vector" <> parens d
-toSLV (Sum _ _) d    = "std_logic_vector" <> parens d
-toSLV hty          _ = error $ "toSLV: " ++ show hty
+toSLV Bit        d        = parens (int 0 <+> rarrow <+> d)
+toSLV Bool       d        = "toSLV" <> parens d
+toSLV Integer    d        = toSLV (Signed 32) ("to_signed" <> tupled (sequence [d,int 32]))
+toSLV (Signed _) d        = "std_logic_vector" <> parens d
+toSLV (Unsigned _) d      = "std_logic_vector" <> parens d
+toSLV (Sum _ _) d         = "std_logic_vector" <> parens d
+toSLV (SP _ _) d          = d
+toSLV t@(Product _ tys) d = parens (hcat $ punctuate " & " (sequence $ zipWith toSLV tys selNames))
+  where
+    tName    = tyName t
+    selNames = [d <> dot <> tName <> "_sel" <> int i | i <- [0..]]
+
+toSLV hty             _   = error $ "toSLV: " ++ show hty
 
 fromSLV :: HWType -> VHDLM Doc -> VHDLM Doc
 fromSLV Bit d          = d <> parens (int 0)
