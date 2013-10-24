@@ -153,4 +153,4 @@ mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B 
 mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ inputs b !! n
 mkSyncIdentifier b (Def Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b
 mkSyncIdentifier b (Def (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ inputs b !! n
-mkSyncIdentifier b (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
+mkSyncIdentifier _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"

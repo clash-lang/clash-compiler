@@ -153,7 +153,7 @@ mkFunInput resId e = case collectArgs e of
             return ((l',bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ unpack nm
-  (Var ty fun, args) -> do
+  (Var _ fun, args) -> do
     normalized <- Lens.use bindings
     case HashMap.lookup fun normalized of
       Just _ -> do

@@ -143,8 +143,8 @@ mkDeclarations :: Id -- ^ LHS of the let-binder
                -> NetlistMonad [Declaration]
 mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 
-mkDeclarations bndr e@(Case _ []) =
-  error $ $(curLoc) ++ "Case-decompositions with an empty list of alternatives not supported"
+mkDeclarations _ e@(Case _ []) =
+  error $ $(curLoc) ++ "Case-decompositions with an empty list of alternatives not supported: " ++ showDoc e
 
 mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
   (pat,Var varTy varTm)  <- unbind alt
@@ -245,7 +245,7 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
           _ -> error $ $(curLoc) ++ "not an integer literal"
 
 mkExpr ty app = do
-  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
+  let (appF,(args,_)) = second partitionEithers $ collectArgs app
   hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
   case appF of
@@ -290,8 +290,7 @@ mkDcApplication dstHType dc args = do
     ([Just argHwTy],[argExpr]) | argHwTy == dstHType -> return argExpr
     _ -> case dstHType of
       SP _ dcArgPairs -> do
-        let dcNameBS = Text.pack . name2String $ dcName dc
-            dcI      = dcTag dc - 1
+        let dcI      = dcTag dc - 1
             dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
         case compare (length dcArgs) (length argExprs) of
           EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)

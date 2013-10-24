@@ -134,7 +134,7 @@ caseCase _ e = return e
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
 inlineNonRep :: NormRewrite
-inlineNonRep ctx e@(Case scrut alts)
+inlineNonRep _ e@(Case scrut alts)
   | (Var _ f, args) <- collectArgs scrut
   = R $ do
     isInlined <- liftR $ alreadyInlined f

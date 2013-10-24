@@ -100,7 +100,7 @@ mkADT :: (Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType tr
       -> TyCon -- ^ The TyCon
       -> [Type] -- ^ Its applied arguments
       -> Either String HWType
-mkADT _ tyString tc args
+mkADT _ tyString tc _
   | isRecursiveTy tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 

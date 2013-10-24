@@ -173,10 +173,10 @@ contextEnv = go HashMap.empty HashMap.empty
     go gamma delta (_:ctx) = go gamma delta ctx
 
     addToGamma gamma (Id idName ty) = HashMap.insert idName (unembed ty) gamma
-    addToGamma gamma _              = error $ $(curLoc) ++ "Adding TyVar to Gamma"
+    addToGamma _     _              = error $ $(curLoc) ++ "Adding TyVar to Gamma"
 
     addToDelta delta (TyVar tvName ki) = HashMap.insert tvName (unembed ki) delta
-    addToDelta delta _                 = error $ $(curLoc) ++ "Adding Id to Delta"
+    addToDelta _     _                 = error $ $(curLoc) ++ "Adding Id to Delta"
 
 -- | Create a complete type and kind context out of the global binders and the
 -- transformation context
@@ -396,7 +396,7 @@ mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
                -> Int -- n'th DataCon
                -> Int -- n'th field
                -> m Term
-mkSelectorCase caller ctx scrut dcI fieldI = do
+mkSelectorCase caller _ scrut dcI fieldI = do
   scrutTy <- termType scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
   case transparentTy scrutTy of
