@@ -211,7 +211,7 @@ vhdlType' t@(Sum _ _) = "unsigned" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
 vhdlType' t@(Product _ _) = tyName t
-vhdlType' t          = error $ "vhdlType: " ++ show t
+vhdlType' t          = error $ $(curLoc) ++ "vhdlType: " ++ show t
 
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
@@ -227,7 +227,7 @@ vhdlTypeMark (Vector _ elTy) = "array_of_" <> tyName elTy
 vhdlTypeMark (SP _ _)        = "std_logic_vector"
 vhdlTypeMark (Sum _ _)       = "unsigned"
 vhdlTypeMark t@(Product _ _) = tyName t
-vhdlTypeMark t               = error $ "vhdlTypeMark: " ++ show t
+vhdlTypeMark t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
@@ -258,7 +258,7 @@ vhdlTypeDefault (Sum _ _)           = "(others => '0')"
 vhdlTypeDefault (Product _ elTys)   = tupled $ mapM vhdlTypeDefault elTys
 vhdlTypeDefault (Reset _)           = "'0'"
 vhdlTypeDefault (Clock _)           = "'0'"
-vhdlTypeDefault t                   = error $ "vhdlTypeDefault: " ++ show t
+vhdlTypeDefault t                   = error $ $(curLoc) ++ "vhdlTypeDefault: " ++ show t
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
@@ -369,7 +369,7 @@ exprLit Nothing   (NumLit i) = int i
 exprLit (Just sz) (NumLit i) = bits (toBits sz i)
 exprLit _         (BoolLit t) = if t then "true" else "false"
 exprLit _         (BitLit b) = squotes $ bit_char b
-exprLit _         _          = error "exprLit"
+exprLit _         l          = error $ $(curLoc) ++ "exprLit: " ++ showDoc l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)
