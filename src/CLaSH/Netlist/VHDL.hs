@@ -399,9 +399,8 @@ toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     parens (hcat $ punctuate " & " (zipWithM toSLV tys selIds'))
   where
     tName    = tyName t
-    selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..]]
+    selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
-
 toSLV (Product _ tys) (DataCon _ _ es) = parens (hcat $ punctuate " & " (zipWithM toSLV tys es))
 toSLV (SP _ _) e = expr False e
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
