@@ -9,5 +9,5 @@ import GHC.TypeLits
 
 class BitVector a where
   type BitSize a :: Nat
-  toBV   :: SingI (BitSize a) => a -> Vec (BitSize a) Bit
-  fromBV :: SingI (BitSize a) => Vec (BitSize a) Bit -> a
+  toBV   :: KnownNat (BitSize a) => a -> Vec (BitSize a) Bit
+  fromBV :: KnownNat (BitSize a) => Vec (BitSize a) Bit -> a

@@ -31,6 +31,7 @@ Library
                       CLaSH.Class.Default
                       CLaSH.Prelude
                       CLaSH.Promoted.Bool
+                      CLaSH.Promoted.Nats
                       CLaSH.Promoted.Ord
                       CLaSH.Signal
                       CLaSH.Sized.Index

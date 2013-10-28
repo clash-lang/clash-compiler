@@ -19,6 +19,7 @@ import Data.Bits             as Exported
 import CLaSH.Class.BitVector as Exported
 import CLaSH.Class.Default   as Exported
 import CLaSH.Promoted.Bool   as Exported
+import CLaSH.Promoted.Nats   as Exported
 import CLaSH.Promoted.Ord    as Exported
 import CLaSH.Sized.Index     as Exported
 import CLaSH.Sized.Signed    as Exported
@@ -30,7 +31,7 @@ import GHC.TypeLits          as Exported
 
 {-# INLINABLE window #-}
 window ::
-  (SingI (n + 1), Default a)
+  (KnownNat (n + 1), Default a)
   => Signal a
   -> Vec ((n + 1) + 1) (Signal a)
 window x = x :> prev
@@ -40,7 +41,7 @@ window x = x :> prev
 
 {-# INLINABLE windowP #-}
 windowP ::
-  (SingI (n + 1), Default a)
+  (KnownNat (n + 1), Default a)
   => Signal a
   -> Vec (n + 1) (Signal a)
 windowP x = prev
@@ -63,8 +64,8 @@ registerP :: Pack a => a -> SignalP a -> SignalP a
 registerP i = unpack Prelude.. register i Prelude.. pack
 
 {-# NOINLINE blockRam #-}
-blockRam :: forall n m a . (SingI n, SingI m, Pack a)
-         => Sing (n :: Nat)
+blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a)
+         => SNat (n :: Nat)
          -> Signal (Unsigned m)
          -> Signal (Unsigned m)
          -> Signal Bool
@@ -84,8 +85,8 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
         o'               = ram ! r
 
 {-# INLINABLE blockRamPow2 #-}
-blockRamPow2 :: (SingI n, SingI (2^n), Pack a)
-             => (Sing ((2^n) :: Nat))
+blockRamPow2 :: (KnownNat n, KnownNat (n^2), Pack a)
+             => (SNat ((n^2) :: Nat))
              -> Signal (Unsigned n)
              -> Signal (Unsigned n)
              -> Signal Bool
