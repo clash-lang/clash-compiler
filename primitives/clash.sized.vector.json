@@ -46,7 +46,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.shiftIntoL"
     , "templateD" :
 "~SYM[0]_shiftIntoL : block
-  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~ARG[0] & ~SYM[1](~SYM[1]'high downto 1);
@@ -62,7 +62,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.shiftIntoR"
     , "templateD" :
 "~SYM[0]_shiftIntoR : block
-  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1]((~SYM[1]'high)-1 downto 0) & ~ARG[0];
@@ -78,7 +78,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vsplit"
     , "templateD" :
 "~SYM[0]_vsplit : block
-  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0]),~SYM[1](~LIT[0]-1 downto 0));
@@ -89,7 +89,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vsplitI"
     , "templateD" :
 "~SYM[0]_vsplitI : block
-  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0]),~SYM[1](~LIT[0]-1 downto 0));
@@ -371,7 +371,7 @@ begin
     ~SYM[4](~SYM[2]) := ~SYM[3];
     ~RESULT <= ~SYM[4];
   end process;
-end;"
+end block;"
     }
   }
 , { "BlackBox" :

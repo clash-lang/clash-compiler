@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
@@ -17,11 +18,12 @@ where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (liftM,when,zipWithM)
+import           Control.Monad                        (join,liftM,when,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashSet                         as HashSet
+import           Data.List                            (mapAccumL)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
@@ -29,7 +31,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
-import           CLaSH.Util                           (makeCached, (<:>))
+import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
 type VHDLM a = State VHDLState a
 
@@ -96,7 +98,8 @@ needsTyDec Integer        = True
 needsTyDec _              = False
 
 tyDec :: HWType -> VHDLM Doc
-tyDec Bool = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi
+tyDec Bool = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
+             "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <> semi
 tyDec Integer = "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi
 
 tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
@@ -121,6 +124,15 @@ funDec Bool = fmap Just $
                               ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
                               ,"else"
                               ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
+                              ,"end" <+> "if" <> semi
+                              ]) <$>
+  "end" <> semi <$>
+  "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <+> "is" <$>
+  "begin" <$>
+    indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> squotes (int 1) <+> "then"
+                              ,   indent 2 ("return" <+> "true" <> semi)
+                              ,"else"
+                              ,   indent 2 ("return" <+> "false" <> semi)
                               ,"end" <+> "if" <> semi
                               ]) <$>
   "end" <> semi
@@ -199,7 +211,7 @@ vhdlType' t@(Sum _ _) = "unsigned" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
 vhdlType' t@(Product _ _) = tyName t
-vhdlType' t          = error $ "vhdlType: " ++ show t
+vhdlType' t          = error $ $(curLoc) ++ "vhdlType: " ++ show t
 
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
@@ -215,7 +227,7 @@ vhdlTypeMark (Vector _ elTy) = "array_of_" <> tyName elTy
 vhdlTypeMark (SP _ _)        = "std_logic_vector"
 vhdlTypeMark (Sum _ _)       = "unsigned"
 vhdlTypeMark t@(Product _ _) = tyName t
-vhdlTypeMark t               = error $ "vhdlTypeMark: " ++ show t
+vhdlTypeMark t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
@@ -246,7 +258,7 @@ vhdlTypeDefault (Sum _ _)           = "(others => '0')"
 vhdlTypeDefault (Product _ elTys)   = tupled $ mapM vhdlTypeDefault elTys
 vhdlTypeDefault (Reset _)           = "'0'"
 vhdlTypeDefault (Clock _)           = "'0'"
-vhdlTypeDefault t                   = error $ "vhdlTypeDefault: " ++ show t
+vhdlTypeDefault t                   = error $ $(curLoc) ++ "vhdlTypeDefault: " ++ show t
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
@@ -298,7 +310,7 @@ expr :: Bool -- ^ Enclose in parenthesis?
      -> VHDLM Doc
 expr _ (Literal sizeM lit)                           = exprLit sizeM lit
 expr _ (Identifier id_ Nothing)                      = text id_
-expr _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy selected
+expr _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy id_ start end
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -306,7 +318,6 @@ expr _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy
     other    = otherSize argTys (fI-1)
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
-    selected = text id_ <> parens (int start <+> "downto" <+> int end)
 
 expr _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> tyName ty <> "_sel" <> int fI
 expr _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
@@ -323,7 +334,7 @@ expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
     argTys     = snd $ args !! i
     dcSize     = conSize ty + sum (map typeSize argTys)
     dcExpr     = expr False (dcToExpr ty i)
-    argExprs   = zipWith toSLV argTys $ map (expr False) es
+    argExprs   = zipWith toSLV argTys es -- (map (expr False) es)
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
                    n -> [exprLit (Just n) (NumLit 0)]
@@ -358,7 +369,7 @@ exprLit Nothing   (NumLit i) = int i
 exprLit (Just sz) (NumLit i) = bits (toBits sz i)
 exprLit _         (BoolLit t) = if t then "true" else "false"
 exprLit _         (BitLit b) = squotes $ bit_char b
-exprLit _         _          = error "exprLit"
+exprLit _         l          = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)
@@ -376,30 +387,42 @@ bit_char L = char '0'
 bit_char U = char 'U'
 bit_char Z = char 'Z'
 
-toSLV :: HWType -> VHDLM Doc -> VHDLM Doc
-toSLV Bit        d        = parens (int 0 <+> rarrow <+> d)
-toSLV Bool       d        = "toSLV" <> parens d
-toSLV Integer    d        = toSLV (Signed 32) ("to_signed" <> tupled (sequence [d,int 32]))
-toSLV (Signed _) d        = "std_logic_vector" <> parens d
-toSLV (Unsigned _) d      = "std_logic_vector" <> parens d
-toSLV (Sum _ _) d         = "std_logic_vector" <> parens d
-toSLV (SP _ _) d          = d
-toSLV t@(Product _ tys) d = parens (hcat $ punctuate " & " (sequence $ zipWith toSLV tys selNames))
+toSLV :: HWType -> Expr -> VHDLM Doc
+toSLV Bit          e = parens (int 0 <+> rarrow <+> expr False e)
+toSLV Bool         e = "toSLV" <> parens (expr False e)
+toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr False e,int 32]))
+toSLV (Signed _)   e = "std_logic_vector" <> parens (expr False e)
+toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr False e)
+toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr False e)
+toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
+    selIds' <- sequence selIds
+    parens (hcat $ punctuate " & " (zipWithM toSLV tys selIds'))
   where
     tName    = tyName t
-    selNames = [d <> dot <> tName <> "_sel" <> int i | i <- [0..]]
+    selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
+    selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
+toSLV (Product _ tys) (DataCon _ _ es) = parens (hcat $ punctuate " & " (zipWithM toSLV tys es))
+toSLV (SP _ _) e = expr False e
+toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
-toSLV hty             _   = error $ "toSLV: " ++ show hty
+fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
+fromSLV Bit               id_ start _   = text id_ <> parens (int start)
+fromSLV Bool              id_ start _   = "fromSL" <> parens (text id_ <> parens (int start))
+fromSLV Integer           id_ start end = "to_integer" <> parens (fromSLV (Signed 32) id_ start end)
+fromSLV (Signed _)        id_ start end = "signed" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
+fromSLV (Unsigned _)      id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
+fromSLV (Sum _ _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
+fromSLV t@(Product _ tys) id_ start _   = tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
+  where
+    tName      = tyName t
+    selNames   = [tName <> "_sel" <> int i | i <- [0..]]
+    argLengths = map typeSize tys
+    starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
+    ends       = tail (map (subtract 1) starts)
+    args       = zipWith3 (`fromSLV` id_) tys starts ends
 
-fromSLV :: HWType -> VHDLM Doc -> VHDLM Doc
-fromSLV Bit d          = d <> parens (int 0)
-fromSLV Bool d         = "fromSLV" <> parens d
-fromSLV Integer d      = "to_integer" <> parens (fromSLV (Signed 32) d)
-fromSLV (Signed _) d   = "signed" <> parens d
-fromSLV (Unsigned _) d = "unsigned" <> parens d
-fromSLV (SP _ _) d     = d
-fromSLV (Sum _ _) d    = "unsigned" <> parens d
-fromSLV hty _          = error $ "fromSLV: " ++ show hty
+fromSLV (SP _ _)          id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV hty               _   _     _   = error $ $(curLoc) ++ "fromSLV: " ++ show hty
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just $ conSize ty) (NumLit i)
