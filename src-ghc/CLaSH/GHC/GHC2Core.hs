@@ -55,13 +55,15 @@ import           Name                        (Name, nameModule_maybe,
 import           OccName                     (occNameString)
 -- import           Pair                        (Pair (..))
 import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
-                                              TyCon, algTyConRhs, isAlgTyCon,
+                                              SynTyConRhs (..), TyCon,
+                                              algTyConRhs, isAlgTyCon,
                                               isFunTyCon, isNewTyCon,
                                               isPrimTyCon, isPromotedDataCon,
                                               isSynTyCon, isTupleTyCon,
-                                              tyConArity, tyConDataCons,
-                                              tyConKind, tyConName,
-                                              tyConPrimRep, tyConUnique)
+                                              synTyConRhs_maybe, tyConArity,
+                                              tyConDataCons, tyConKind,
+                                              tyConName, tyConPrimRep,
+                                              tyConUnique)
 import           Type                        (tcView)
 import           TypeRep                     (TyLit (..), Type (..))
 import           TysWiredIn                  (tupleTyCon,promotedFalseDataCon,
@@ -342,6 +344,8 @@ coreToType' ::
   Type
   -> R C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> pure (coreToVar tv)
+coreToType' (TyConApp (synTyConRhs_maybe -> Just (SynonymTyCon ty)) args) =
+  foldl C.AppTy <$> coreToType ty <*> mapM coreToType args
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
   | otherwise     = C.mkTyConApp <$> coreToTyCon tc <*> mapM coreToType args
@@ -360,9 +364,10 @@ coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 coreToTyCon ::
   TyCon
   -> R C.TyCon
-coreToTyCon tc = fmap ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc ++ " not found " ++ show (TyCon.isPromotedDataCon tc) )
-                      . HashMap.lookup tc
-                      ) $ view tyConMap
+coreToTyCon tc = ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc ++
+                                      " not found " ++ show (TyCon.isPromotedDataCon tc) )
+                 . HashMap.lookup tc
+                 ) <$> view tyConMap
 
 coreToPrimRep ::
   PrimRep
