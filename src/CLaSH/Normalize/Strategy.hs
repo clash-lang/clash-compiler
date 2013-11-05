@@ -13,7 +13,8 @@ normalization = representable >-> simplification >-> apply "recToLetrec" recToLe
 
 -- | Simple cleanup transformation, currently only inlines \"Wrappers\"
 cleanup :: NormRewrite
-cleanup = topdownR (repeatR $ apply "inlineWrapper" inlineWrapper)
+cleanup = repeatR (apply "inlineTLWrapper" inlineTLWrapper) >->
+          (topdownR (apply "inlineWrapper" inlineWrapper) !-> simplification)
 
 -- | Unsure that functions have representable arguments, results, and let-bindings
 representable :: NormRewrite

@@ -12,14 +12,12 @@ import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
-import           Unbound.LocallyNameless (Fresh, unembed)
+import           Unbound.LocallyNameless (Fresh)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
-import           CLaSH.Core.Type         (Type (..), splitFunForallTy)
+import           CLaSH.Core.Type         (splitFunForallTy)
 import           CLaSH.Core.Util         (collectArgs, termType)
-import           CLaSH.Core.Var          (Id, Var (..))
-import           CLaSH.Netlist.Util      (splitNormalized)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
@@ -68,23 +66,6 @@ isConstant e = case collectArgs e of
   (Prim _ _, args) -> all (either isConstant (const True)) args
   (Literal _,_)    -> True
   _                -> False
-
--- | Get the \"Wrapped\" function out of a normalized Term. Returns 'Nothing' if
--- the normalized term is not actually a wrapper.
-getWrappedF :: (Fresh m,Functor m) => Term -> m (Maybe Term)
-getWrappedF body = do
-    normalizedM <- splitNormalized body
-    case normalizedM of
-      Right (funArgs,[(_,bExpr)],_) -> return $! uncurry (reduceArgs True funArgs) (collectArgs $ unembed bExpr)
-      _                             -> return Nothing
-  where
-    reduceArgs :: Bool -> [Id] -> Term -> [Either Term Type] -> Maybe Term
-    reduceArgs _    []    appE []                         = Just appE
-    reduceArgs _    (_:_) _ []                            = Nothing
-    reduceArgs b    ids       appE (Right ty:args)        = reduceArgs b ids (TyApp appE ty) args
-    reduceArgs _    (id1:ids) appE (Left (Var _ nm):args) | varName id1 == nm = reduceArgs False ids appE args
-    reduceArgs True ids@(_:_) appE (Left arg:args)        = reduceArgs True ids (App appE arg) args
-    reduceArgs _ _ _ _                                    = Nothing
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph :: [TmName] -- ^ List of functions that should not be inspected
