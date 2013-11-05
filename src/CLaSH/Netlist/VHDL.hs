@@ -242,7 +242,7 @@ tyName t@(Product _ _)   = makeCached t _3 prodName
   where
     prodName = do i <- _2 <<%= (+1)
                   "product" <> int i
-
+tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
 tyName _ = empty
 
 -- | Convert a Netlist HWType to a default VHDL value for that type
