@@ -21,6 +21,7 @@ module CLaSH.Normalize.Transformations
   , makeANF
   , deadCode
   , topLet
+  , inlineTLWrapper
   , inlineWrapper
   , recToLetRec
   )
@@ -316,31 +317,36 @@ constantSpec ctx e@(App e1 e2)
 constantSpec _ e = return e
 
 -- | Inline functions which simply \"wrap\" another function
-inlineWrapper :: NormRewrite
-inlineWrapper [] e = R $ do
+inlineTLWrapper :: NormRewrite
+inlineTLWrapper [] e = R $ do
   normalizedM <- splitNormalized e
   case normalizedM of
     Right (_,[(_,bExpr)],_) -> case collectArgs (unembed bExpr) of
-      (Var _ fn,args) -> do allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
-                            bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
-                            case (bodyMaybe,allLocal) of
-                              (Just (bodyTy,body),True) -> do
-                                eTy <- termType e
-                                if eTy == bodyTy
-                                  then changed body
-                                  else return e
-                              _ -> return e
+      (Var _ fn,args) -> do
+        allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
+        bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
+        case (bodyMaybe,allLocal) of
+          (Just (bodyTy,body),True) -> do
+            eTy <- termType e
+            if eTy == bodyTy
+              then changed body
+              else return e
+          _ -> return e
       _ -> return e
     _ -> return e
 
+inlineTLWrapper _ e = return e
+
+-- | Inline functions which simply \"wrap\" another function
+inlineWrapper :: NormRewrite
 inlineWrapper _ e@(Var _ f) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
   case bodyMaybe of
     Just (_,body) -> do
-      wrappedF_maybe <- getWrappedF body
-      case wrappedF_maybe of
-        Just wrappedF -> changed wrappedF
-        Nothing       -> return e
+      normalizedBodyM <- splitNormalized body
+      case normalizedBodyM of
+        Right (_,[_],_) -> changed body
+        _ -> return e
     _ -> return e
 
 inlineWrapper _ e = return e
