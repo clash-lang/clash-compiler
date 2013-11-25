@@ -2,6 +2,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 
+{-# OPTIONS_GHC -fcontext-stack=21 #-}
+
 -- | Utilities for converting Core Type/Term to Netlist datatypes
 module CLaSH.Netlist.Util where
 

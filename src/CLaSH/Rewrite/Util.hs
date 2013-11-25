@@ -7,6 +7,8 @@
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
+{-# OPTIONS_GHC -fcontext-stack=21 #-}
+
 -- | Utilities for rewriting: e.g. inlining, specialisation, etc.
 module CLaSH.Rewrite.Util where
 
