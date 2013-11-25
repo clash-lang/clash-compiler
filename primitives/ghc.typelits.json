@@ -1,10 +1,5 @@
-[ { "Primitive" :
-    { "name"      : "GHC.TypeLits.Sing"
-    , "primType"  : "Dictionary"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.TypeLits.sing"
+[ { "BlackBox" :
+    { "name"      : "GHC.TypeLits.natVal"
     , "templateE" : "~LIT[0]"
     }
   }
