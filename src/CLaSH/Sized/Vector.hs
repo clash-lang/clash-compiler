@@ -287,12 +287,12 @@ vselect f s n xs = vselect' (isZero n) $ vdrop f (unsafeCoerce xs)
 
 {-# NOINLINE vselectI #-}
 vselectI ::
-  ((f + (s * n)) <= i, KnownNat f, KnownNat s, KnownNat (n + 1))
+  forall f s n i a . ((f + (s * n)) <= i, KnownNat f, KnownNat s, KnownNat (n + 1))
   => SNat f
   -> SNat s
   -> Vec i a
   -> Vec (n + 1) a
-vselectI f s xs = withSNat (\n -> vselect f s n xs)
+vselectI f s xs = withSNat (\(n :: (SNat (n + 1))) -> vselect f s n xs)
 
 {-# NOINLINE vcopy #-}
 vcopy :: KnownNat n => SNat n -> a -> Vec n a
