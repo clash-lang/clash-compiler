@@ -252,6 +252,7 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
       e' <- term e
       return $ C.Letrec $ bind (rec xes') e'
 
+    term (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> coreToType ty
     term (Case e b _ alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
                   $ rhssOfAlts alts
