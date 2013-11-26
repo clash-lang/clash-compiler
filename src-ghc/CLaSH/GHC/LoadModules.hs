@@ -104,15 +104,16 @@ loadModules modName = defaultErrorHandler $ do
                                         . GHC.ms_textual_imps
                                         ) modGraph
 
-        let internalMods = map GHC.ms_mod_name modGraph
+            internalMods = map (GHC.ms_mod_name) modGraph
+        externalMods   <- mapM (`GHC.findModule` Nothing ) (nub externalImports \\ internalMods)
         externalTyCons <- fmap snd $
-                            mapAccumLM getExternalTyCons internalMods (nub externalImports \\ internalMods)
+                            mapAccumLM getExternalTyCons internalMods externalMods
 
         let allExtTyCons = concat externalTyCons ++
                                   TysWiredIn.wiredInTyCons ++
                                   TysPrim.primTyCons
 
-        let modGraph' = map disableOptimizationsFlags modGraph
+            modGraph' = map disableOptimizationsFlags modGraph
         tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
                                      ; tcMod <- GHC.typecheckModule pMod
                                      ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod

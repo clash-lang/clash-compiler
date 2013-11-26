@@ -26,6 +26,7 @@ import qualified IfaceSyn
 import qualified LoadIface
 import qualified Maybes
 import qualified MkCore
+import qualified Module
 import qualified MonadUtils
 import qualified Name
 import           Outputable                  (text)
@@ -42,33 +43,35 @@ import           CLaSH.Util                  (curLoc, mapAccumLM, traceIf)
 getExternalTyCons ::
   GHC.GhcMonad m
   => [GHC.ModuleName]
-  -> GHC.ModuleName
+  -> GHC.Module
   -> m ([GHC.ModuleName],[GHC.TyCon])
-getExternalTyCons visited modName = (`Exception.gcatch` expCatch) $ do
-  foundMod   <- GHC.findModule modName Nothing
-  (tcs,used) <- runIfl foundMod $ do
-                  ifaceM <- loadIface foundMod
+getExternalTyCons visited module_ = (`Exception.gcatch` expCatch) $ do
+  (tcs,used) <- runIfl module_ $ do
+                  ifaceM <- loadIface module_
                   case ifaceM of
                     Nothing -> return ([],[])
                     Just iface -> do
-                      let used  = mapMaybe usageModuleName $ GHC.mi_usages iface
+                      let used = mapMaybe usageModule $ GHC.mi_usages iface
                       tcs <- ifaceTyCons iface
                       return (tcs,used)
 
-  let visited' = modName:visited
-  let used'    = filter (`notElem` visited') used
-  (visited'',tcs') <- mapAccumLM getExternalTyCons (visited' ++ used')
+  let used' = filter ((`notElem` visited') . GHC.moduleName) used
+  (visited'',tcs') <- mapAccumLM getExternalTyCons (visited' ++ map GHC.moduleName used')
                        used'
   return (visited'',tcs ++ concat tcs')
   where
+    modName  = GHC.moduleName module_
+    pId      = GHC.modulePackageId module_
+    visited' = modName:visited
+
     expCatch :: GHC.GhcMonad m
       => HscTypes.SourceError -> m ([GHC.ModuleName],[GHC.TyCon])
-    expCatch _ = return (modName:visited,[])
+    expCatch e = traceIf True ("Exception on loading interface for: " ++ showPpr modName ++ (":\n") ++ show e) return (modName:visited,[])
 
-    usageModuleName :: HscTypes.Usage -> Maybe GHC.ModuleName
-    usageModuleName (HscTypes.UsagePackageModule {..}) = Just $ GHC.moduleName usg_mod
-    usageModuleName (HscTypes.UsageHomeModule {..})    = Just usg_mod_name
-    usageModuleName _                                  = Nothing
+    usageModule :: HscTypes.Usage -> Maybe GHC.Module
+    usageModule (HscTypes.UsagePackageModule {..}) = Just usg_mod
+    usageModule (HscTypes.UsageHomeModule {..})    = Just (Module.mkModule pId usg_mod_name)
+    usageModule _                                  = Nothing
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
