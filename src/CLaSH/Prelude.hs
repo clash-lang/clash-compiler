@@ -31,31 +31,28 @@ import CLaSH.Signal          as Exported
 import GHC.TypeLits          as Exported
 
 {-# INLINABLE window #-}
-window ::
-  (KnownNat (n + 1), Default a)
-  => Signal a
-  -> Vec ((n + 1) + 1) (Signal a)
+window :: (KnownNat (n + 1), Default a)
+       => Signal a
+       -> Vec ((n + 1) + 1) (Signal a)
 window x = x :> prev
   where
     prev = registerP (vcopyI def) next
     next = x +>> prev
 
 {-# INLINABLE windowP #-}
-windowP ::
-  (KnownNat (n + 1), Default a)
-  => Signal a
-  -> Vec (n + 1) (Signal a)
+windowP :: (KnownNat (n + 1), Default a)
+        => Signal a
+        -> Vec (n + 1) (Signal a)
 windowP x = prev
   where
     prev = registerP (vcopyI def) next
     next = x +>> prev
 
 {-# INLINABLE (<^>) #-}
-(<^>) ::
-  (Pack i, Pack o)
-  => (s -> i -> (s,o))
-  -> s
-  -> (SignalP i -> SignalP o)
+(<^>) :: (Pack i, Pack o)
+      => (s -> i -> (s,o))
+      -> s
+      -> (SignalP i -> SignalP o)
 f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
                      s      = register iS s'
                  in unpack o
