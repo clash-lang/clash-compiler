@@ -40,5 +40,6 @@ Library
                       CLaSH.Sized.Vector
 
   Build-depends:      base                 >= 4.7.0.0,
+                      singletons           >= 0.9,
                       template-haskell     >= 2.9.0.0,
                       th-lift              >= 0.5.6
