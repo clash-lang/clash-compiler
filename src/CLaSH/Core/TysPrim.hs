@@ -15,10 +15,10 @@ import {-# SOURCE #-} CLaSH.Core.Type
 
 -- | Builtin Name
 tySuperKindTyConName, liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
-tySuperKindTyConName      = string2Name "__BOX__"
-liftedTypeKindTyConName   = string2Name "__*__"
-typeNatKindTyConName      = string2Name "__Nat__"
-typeSymbolKindTyConName   = string2Name "__Symbol__"
+tySuperKindTyConName      = string2Name "BOX"
+liftedTypeKindTyConName   = string2Name "*"
+typeNatKindTyConName      = string2Name "Nat"
+typeSymbolKindTyConName   = string2Name "Symbol"
 
 -- | Builtin Kind
 liftedTypeKind, tySuperKind, typeNatKind, typeSymbolKind :: Kind
@@ -28,8 +28,8 @@ typeNatKind    = mkTyConTy (mkKindTyCon typeNatKindTyConName tySuperKind)
 typeSymbolKind = mkTyConTy (mkKindTyCon typeSymbolKindTyConName tySuperKind)
 
 intPrimTyConName, voidPrimTyConName :: TyConName
-intPrimTyConName  = string2Name "__INT__"
-voidPrimTyConName = string2Name "__VOID__"
+intPrimTyConName  = string2Name "Int"
+voidPrimTyConName = string2Name "VOID"
 
 liftedPrimTC ::
   TyConName
