@@ -503,7 +503,7 @@ collectANF ctx e@(Case subj alts) = do
 
     doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeMonad LetBinding
     doPatBndr subj' dc pId i
-      = do patExpr <- mkSelectorCase "doPatBndr" ctx subj' (dcTag dc) i
+      = do patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") ctx subj' (dcTag dc) i
            return (pId,embed patExpr)
 
 collectANF _ e = return e
