@@ -78,9 +78,9 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vsplit"
     , "templateD" :
 "~SYM[0]_vsplit : block
-  signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[2];
+  ~SYM[1] <= ~ARG[1];
   ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0]),~SYM[1](~LIT[0]-1 downto 0));
 end block;"
     }
@@ -103,9 +103,9 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vunconcat"
     , "templateD" :
 "~SYM[0]_vunconcat : block
-  signal ~SYM[1] : ~TYP[4];
+  signal ~SYM[1] : ~TYP[2];
 begin
-  ~SYM[1] <= ~ARG[4];
+  ~SYM[1] <= ~ARG[2];
   ~SYM[2]_vunconcat : for ~SYM[3] in ~RESULT'high downto 0 generate
   begin
     ~RESULT(~SYM[3]) <= ~SYM[1]((~SYM[3] * ~RESULT(0)'length) + ~RESULT(0)'high) downto (~SYM[3] * ~RESULT(0)'length));
@@ -353,9 +353,9 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vtake"
     , "templateD" :
 "~SYM[0]_vtake : block
-  signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[2];
+  ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1](~SYM[1]'high downto (~SYM[1]'length - ~LIT[0]));
 end block;"
     }
@@ -364,9 +364,9 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vdrop"
     , "templateD" :
 "~SYM[0]_vdrop : block
-  signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[2];
+  ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1]((~SYM[1]'high - ~LIT[0]) downto 0);
 end block;"
     }
@@ -375,9 +375,9 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vexact"
     , "templateD" :
 "~SYM[0]_vexact : block
-  signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[2];
+  ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1](~LIT[0]);
 end block;"
     }
@@ -386,9 +386,9 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vselect"
     , "templateD" :
 "~SYM[0]_vselect : block
-  signal ~SYM[1] : ~TYP[6];
+  signal ~SYM[1] : ~TYP[3];
 begin
-  ~SYM[1] <= ~ARG[6];
+  ~SYM[1] <= ~ARG[3];
   ~SYM[2]_vselect : for ~SYM[3] in 0 to ~RESULT'high generate
   begin
     ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[0]+(~LIT[1]*~SYM[3])));
@@ -398,7 +398,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.vcopy"
-    , "templateE" : "~TYPMO'((~LIT[0] - 1) downto 0 => ~ARG[2])"
+    , "templateE" : "~TYPMO'((~LIT[0] - 1) downto 0 => ~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -408,30 +408,7 @@ end block;"
 begin
   ~SYM[2]_generate : if ~SYM[1] = (~RESULT'high) generate
   begin
-    ~RESULT(~SYM[1]) <= ~ARG[3];
-  end generate;
-
-  ~SYM[3]_generate : if ~SYM[1] /= (~RESULT'high) generate
-  begin
-    ~INST 0
-      ~OUTPUT <= ~RESULT(~SYM[1])~
-      ~INPUT  <= ~RESULT(~SYM[1]+1)~
-    ~INST
-  end generate;
-end generate;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.vgenerate"
-    , "templateD" :
-"~SYM[0]_vgenerate : for ~SYM[1] in ~RESULT'high downto 0 generate
-begin
-  ~SYM[2]_generate : if ~SYM[1] = (~RESULT'high) generate
-  begin
-    ~INST 0
-      ~OUTPUT <= ~RESULT(~SYM[1])~
-      ~INPUT  <= ~ARG[3]~
-    ~INST
+    ~RESULT(~SYM[1]) <= ~ARG[2];
   end generate;
 
   ~SYM[3]_generate : if ~SYM[1] /= (~RESULT'high) generate

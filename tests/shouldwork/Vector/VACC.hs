@@ -3,9 +3,9 @@ module VACC where
 
 import CLaSH.Prelude
 
-d4 = SNat :: SNat 4
-d1 = SNat :: SNat 1
-d2 = SNat :: SNat 2
+d4 = sing :: Sing 4
+d1 = sing :: Sing 1
+d2 = sing :: Sing 2
 
 
 topEntity :: Vec 8 Bit -> Vec 16 Bit
@@ -16,5 +16,5 @@ topEntity x = o <++> p <++> q <++> k <++> l
     o = vtakeI y :: Vec 2 Bit
     p = vdropI z :: Vec 2 Bit
     q = vselect d1 d2 d4 x
-    k = viterate d4 (xor L) H
+    k = vgenerateI (xor L) H :: Vec 4 Bit
     l = viterateI (xor H) L :: Vec 4 Bit

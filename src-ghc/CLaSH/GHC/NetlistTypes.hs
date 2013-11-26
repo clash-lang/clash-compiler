@@ -25,7 +25,6 @@ ghcTypeToHWType ty@(tyView -> TyConApp tc args) = runErrorT $
     "GHC.Types.Int"                 -> return Integer
     "GHC.Prim.ByteArray#"           -> fail $ "Can't translate type: " ++ showDoc ty
     "GHC.Types.Bool"                -> return Bool
-    "GHC.TypeLits.Sing"             -> singletonToHWType (head args)
     "GHC.Prim.~#"                   -> fail $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Bit.Bit"                 -> return Bit
     "CLaSH.Signal.Pack"             -> fail $ "Can't translate type: " ++ showDoc ty
@@ -41,15 +40,6 @@ ghcTypeToHWType ty@(tyView -> TyConApp tc args) = runErrorT $
     _ -> ErrorT Nothing
 
 ghcTypeToHWType _ = Nothing
-
-singletonToHWType ::
-  Type
-  -> ErrorT String Maybe HWType
-singletonToHWType (tyView -> TyConApp tc [])
-  | name2String (tyConName tc) == "GHC.TypeLits.Nat"
-  = return Integer
-
-singletonToHWType ty = fail $ "Can't translate singleton type: " ++ showDoc ty
 
 tyNatSize ::
   Type

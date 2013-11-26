@@ -1,0 +1,6 @@
+[ { "BlackBox" :
+    { "name"      : "Data.Singletons.Core.sing"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]
