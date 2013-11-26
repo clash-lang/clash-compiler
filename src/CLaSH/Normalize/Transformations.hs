@@ -29,6 +29,7 @@ module CLaSH.Normalize.Transformations
   )
 where
 
+import           Control.Error               (headMay)
 import           Control.Lens                ((.=),(%=))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
@@ -347,15 +348,17 @@ inlineTLWrapper _ e = return e
 
 -- | Inline functions which simply \"wrap\" another function
 inlineWrapper :: NormRewrite
-inlineWrapper _ e@(Var _ f) = R $ do
-  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-  case bodyMaybe of
-    Just (_,body) -> do
-      normalizedBodyM <- splitNormalized body
-      case normalizedBodyM of
-        Right (_,[_],_) -> changed body
-        _ -> return e
-    _ -> return e
+inlineWrapper ctx e@(Var _ f)
+  | maybe True (/= AppArg) (headMay ctx)
+  = R $ do
+    bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+    case bodyMaybe of
+      Just (_,body) -> do
+        normalizedBodyM <- splitNormalized body
+        case normalizedBodyM of
+          Right (_,[_],_) -> changed body
+          _ -> return e
+      _ -> return e
 
 inlineWrapper _ e = return e
 

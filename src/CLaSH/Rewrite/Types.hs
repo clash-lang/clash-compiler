@@ -31,7 +31,7 @@ data CoreContext = AppFun -- ^ Function position of an application
                  | TyLamBody  TyVar -- ^ Body of a TyLambda-term with the abstracted type-variable
                  | CaseAlt    [Id] -- ^ RHS of a case-alternative with the variables bound by the pattern on the LHS
                  | CaseScrut -- ^ Subject of a case-decomposition
-                 deriving Show
+                 deriving (Eq,Show)
 
 -- | State of a rewriting session
 data RewriteState
