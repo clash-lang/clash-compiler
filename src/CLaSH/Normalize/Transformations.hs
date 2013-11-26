@@ -45,6 +45,7 @@ import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 import           CLaSH.Core.DataCon          (DataCon, dcTag, dcUnivTyVars)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               termFreeVars, typeFreeVars)
+import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
@@ -161,7 +162,7 @@ inlineNonRep _ e = return e
 -- the subject is (an application of) a DataCon; or if there is only a single
 -- alternative that doesn't reference variables bound by the pattern.
 caseCon :: NormRewrite
-caseCon _ (Case scrut alts)
+caseCon _ c@(Case scrut alts)
   | (Data dc, args) <- collectArgs scrut
   = R $ do
     alts' <- mapM unbind alts
@@ -177,19 +178,24 @@ caseCon _ (Case scrut alts)
                   _  -> Letrec $ bind (rec $ map (second embed) binds) e
             substTyMap = zip (map varName tvs) (drop (length $ dcUnivTyVars dc) (Either.rights args))
         in  changed (substTysinTm substTyMap e')
-      Nothing -> do
-        let defAltM = List.find (isDefPat . fst) alts'
-        case defAltM of
-          Just (DefaultPat, e) -> changed e
-          Nothing -> error $ $(curLoc) ++ "Non-exhaustive case-statement"
-          Just _ -> error $ $(curLoc) ++ "Report as bug: caseCon error"
-      Just _ -> error $ $(curLoc) ++ "Report as bug: caseCon error"
+      _ -> case alts' of
+             ((DefaultPat,e):_) -> changed e
+             _ -> error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
   where
     equalCon dc (DataPat dc' _) = dcTag dc == dcTag (unembed dc')
     equalCon _  _               = False
 
-    isDefPat DefaultPat = True
-    isDefPat _          = False
+caseCon _ c@(Case (Literal l) alts) = R $ do
+  alts' <- mapM unbind alts
+  let ltAltsM = List.find (equalLit . fst) alts'
+  case ltAltsM of
+    Just (LitPat _,e) -> changed e
+    _ -> case alts' of
+           ((DefaultPat,e):_) -> changed e
+           _ -> error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
+  where
+    equalLit (LitPat l')     = l == (unembed l')
+    equalLit _               = False
 
 caseCon _ e@(Case _ [alt]) = R $ do
   (pat,altE) <- unbind alt
