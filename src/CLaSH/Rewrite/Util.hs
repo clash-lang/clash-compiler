@@ -307,16 +307,16 @@ liftBinding gamma delta (Id idName tyE,eE) = do
       e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
   (localFTVs,localFVs) <- fmap (Set.toList *** Set.toList) $ localFreeVars e
-  let localFTVkinds = map (delta HashMap.!) localFTVs
+  let localFTVkinds = map (\k -> HashMap.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k delta) localFTVs
       localFVs'     = filter (/= idName) localFVs
-      localFVtys'   = map (gamma HashMap.!) localFVs'
+      localFVtys'   = map (\k -> HashMap.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k gamma) localFVs'
   -- Abstract expression over its local FVs
       boundFTVs = zipWith mkTyVar localFTVkinds localFTVs
       boundFVs  = zipWith mkId localFVtys' localFVs'
   -- Make a new global ID
   newBodyTy <- termType $ mkTyLams (mkLams e boundFVs) boundFTVs
   newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
-  -- Make a new expression, consisting of the te lifted function applied to
+  -- Make a new expression, consisting of the the lifted function applied to
   -- its free variables
   let newExpr = mkTmApps
                   (mkTyApps (Var newBodyTy newBodyId)
@@ -504,9 +504,9 @@ specArgBndrsAndVars ctx specArg = do
                         either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
   (gamma,delta) <- mkEnv ctx
   let (specTyBndrs,specTyVars) = unzip
-                 $ map (\tv -> let ki = delta HashMap.! tv
+                 $ map (\tv -> let ki = HashMap.lookupDefault (error $ $(curLoc) ++ show tv ++ " not found") tv delta
                                in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
       (specTmBndrs,specTmVars) = unzip
-                 $ map (\tm -> let ty = gamma HashMap.! tm
+                 $ map (\tm -> let ty = HashMap.lookupDefault (error $ $(curLoc) ++ show tm ++ " not found") tm gamma
                                in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
   return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
