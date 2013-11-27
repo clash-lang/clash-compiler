@@ -4,7 +4,7 @@
 -- | Utility functions used by the normalisation transformations
 module CLaSH.Normalize.Util where
 
-import           Control.Lens            ((%=), (.=))
+import           Control.Lens            ((%=))
 import qualified Control.Lens            as Lens
 import qualified Data.Either             as Either
 import qualified Data.Graph              as Graph
@@ -19,15 +19,14 @@ import           CLaSH.Core.Term         (Term (..), TmName)
 import           CLaSH.Core.Type         (splitFunForallTy)
 import           CLaSH.Core.Util         (collectArgs, termType)
 import           CLaSH.Normalize.Types
-import           CLaSH.Rewrite.Types
-import           CLaSH.Rewrite.Util
+import           CLaSH.Rewrite.Util      (specialise)
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
 alreadyInlined :: TmName
                -> NormalizeMonad (Maybe Int)
 alreadyInlined f = do
   cf <- Lens.use curFun
-  inlinedHM <- Lens.use inlined
+  inlinedHM <- Lens.use inlineHistory
   limit     <- Lens.use inlineLimit
   case HashMap.lookup cf inlinedHM of
     Nothing       -> return Nothing
@@ -35,20 +34,20 @@ alreadyInlined f = do
                       of Just n
                            | n < limit -> return Nothing
                            | otherwise -> return (Just n)
-                         Nothing -> return Nothing -- return (f `elem` inlined')
+                         Nothing -> return Nothing
 
--- | Move the names of inlined functions collected during a traversal into the
--- permanent inlined function cache
-commitNewInlined :: NormRewrite
-commitNewInlined _ e = R $ liftR $ do
+addNewInline :: TmName
+             -> NormalizeMonad ()
+addNewInline f = do
   cf <- Lens.use curFun
-  nI <- fmap (HashMap.fromList . (`zip` (repeat 1))) $ Lens.use newInlined
-  inlinedHM <- Lens.use inlined
-  case HashMap.lookup cf inlinedHM of
-    Nothing -> inlined %= HashMap.insert cf nI
-    Just _  -> inlined %= HashMap.adjust (HashMap.unionWith (+) nI) cf
-  newInlined .= []
-  return e
+  inlineHistory %= HashMap.insertWith
+                     (\_ hm -> HashMap.insertWith (+) f 1 hm)
+                     cf
+                     (HashMap.singleton f 1)
+
+-- | Specialize under the Normalization Monad
+specializeNorm :: NormRewrite
+specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
 isClosed :: (Functor m, Fresh m)

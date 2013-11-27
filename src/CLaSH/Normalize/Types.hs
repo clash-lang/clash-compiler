@@ -3,7 +3,6 @@
 module CLaSH.Normalize.Types where
 
 import Control.Monad.State (State)
-import Control.Termination (TestResult)
 import Data.HashMap.Strict (HashMap)
 import Data.Map            (Map)
 
@@ -15,22 +14,24 @@ import CLaSH.Util
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized      :: HashMap TmName Term -- ^ Global binders
-  , _specialisations :: Map (TmName,Int,Either Term Type) (TmName,Type)
+  { _normalized          :: HashMap TmName Term
+  -- ^ Global binders
+  , _specialisationCache :: Map (TmName,Int,Either Term Type) (TmName,Type)
   -- ^ Cache of previously specialised functions:
   --
   -- * Key: (name of the original function, argument position, specialised term/type)
   --
   -- * Elem: (name of specialised function,type of specialised function)
-  , _specHist        :: HashMap TmName (TestResult Term)
-  , _inlined         :: HashMap TmName (HashMap TmName Int)
+  , _specialisationHistory :: HashMap TmName Int
+  -- ^ Cache of how many times a function was specialized
+  , _specialisationLimit :: Int
+  -- ^ Number of time a function 'f' can be specialized
+  , _inlineHistory   :: HashMap TmName (HashMap TmName Int)
   -- ^ Cache of function where inlining took place:
   --
   -- * Key: function where inlining took place
   --
   -- * Elem: (functions which were inlined, number of times inlined)
-  , _newInlined      :: [TmName]
-  -- ^ Inlined functions in the current traversal
   , _inlineLimit     :: Int
   -- ^ Number of times a function 'f' can be inlined in a function 'g'
   , _curFun          :: TmName

@@ -47,8 +47,8 @@ runNormalization lvl supply globals typeTrans
                   HashMap.empty
                   Map.empty
                   HashMap.empty
+                  100
                   HashMap.empty
-                  []
                   10
                   (error "Report as bug: no curFun")
 

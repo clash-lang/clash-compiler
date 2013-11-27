@@ -68,7 +68,6 @@ Library
                       pretty                  >= 1.1.1.0,
                       process                 >= 1.1.0.2,
                       template-haskell        >= 2.8.0.0,
-                      termination-combinators >= 0.1,
                       text                    >= 0.11.3.1,
                       time                    >= 1.4.0.1,
                       transformers            >= 0.3.0.0,

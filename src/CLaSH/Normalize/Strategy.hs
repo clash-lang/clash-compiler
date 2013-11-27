@@ -3,7 +3,6 @@ module CLaSH.Normalize.Strategy where
 
 import CLaSH.Normalize.Transformations
 import CLaSH.Normalize.Types
-import CLaSH.Normalize.Util
 import CLaSH.Rewrite.Combinators
 import CLaSH.Rewrite.Util
 
@@ -28,7 +27,7 @@ representable = propagation >-> specialisation
                                            , ("caseCon"      , caseCon    )
                                            ]
                             >->
-                            doInline "inlineNonRep" inlineNonRep
+                            bottomupR (apply "inlineNonRep" inlineNonRep)
                           )
     specialisation = repeatR (bottomupR (apply "typeSpec" typeSpec)) >->
                      repeatR (bottomupR (apply "nonRepSpec" nonRepSpec))
@@ -67,11 +66,6 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
                                                   "normalization"
                                                   normalization
                                                )
-
--- | Perform an inlining transformation using a bottomup traversal, and commit
--- inlined function names to the inlining log/cachce
-doInline :: String -> NormRewrite -> NormRewrite
-doInline n t = bottomupR (apply n t) >-> commitNewInlined
 
 -- | Repeatedly apply a set of transformation in a bottom-up traversal
 repeatBottomup :: [(String,NormRewrite)] -> NormRewrite
