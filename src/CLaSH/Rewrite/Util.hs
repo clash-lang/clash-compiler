@@ -239,18 +239,23 @@ substituteBinders :: [LetBinding] -- ^ Let-binders to substitute
                   -> Term -- ^ Expression where substitution takes place
                   -> ([LetBinding],Term)
 substituteBinders [] others res = (others,res)
-substituteBinders ((bndr,valE):rest) others res
-  = let val   = unembed valE
-        res'  = substTm (varName bndr) val res
-        rest' = map (second ( embed
-                            . substTm (varName bndr) val
-                            . unembed)
-                    ) rest
-        others' = map (second ( embed
-                            . substTm (varName bndr) val
-                            . unembed)
-                    ) others
-    in substituteBinders rest' others' res'
+substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others' res'
+  where
+    val      = unembed valE
+    bndrName = varName bndr
+    selfRef  = (bndrName `elem`) . snd $ termFreeVars val
+    (res',rest',others') = if selfRef
+      then (res,rest,(bndr,valE):others)
+      else ( substTm (varName bndr) val res
+           , map (second ( embed
+                         . substTm bndrName val
+                         . unembed)
+                 ) rest
+           , map (second ( embed
+                         . substTm bndrName val
+                         . unembed)
+                 ) others
+           )
 
 -- | Calculate the /local/ free variable of an expression: the free variables
 -- that are not bound in the global environment.
