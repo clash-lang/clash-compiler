@@ -284,10 +284,10 @@ liftBinders condition ctx expr@(Letrec b) = R $ do
   case replace of
     [] -> return expr
     _  -> do
-      (gamma,delta) <- mkEnv ctx
+      (gamma,delta) <- mkEnv (LetBinding (map fst $ unrec xes) : ctx)
       replace' <- mapM (liftBinding gamma delta) replace
       let (others',res') = substituteBinders replace' others res
-          newExpr = case others of
+          newExpr = case others' of
                           [] -> res'
                           _  -> Letrec (bind (rec others') res')
       changed newExpr
