@@ -280,7 +280,7 @@ vselect f s n xs = vselect' (isZero n) $ vdrop f (unsafeCoerce xs)
 
 {-# INLINEABLE vselectI #-}
 vselectI ::
-  ((f + (s * n)) <= i, SingI (n+1))
+  forall f s n i a . ((f + (s * n)) <= i, SingI (n+1))
   => Sing f
   -> Sing s
   -> Vec i a

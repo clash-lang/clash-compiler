@@ -22,3 +22,17 @@ isZero p = case fromSing p of
     isZero' :: Integer -> IsZero m
     isZero' 0 = unsafeCoerce IsZero
     isZero' m = unsafeCoerce (IsSucc (isZero' (m-1)))
+
+addIsZero :: IsZero n -> IsZero m -> IsZero (n + m)
+addIsZero IsZero     y      = y
+addIsZero x          IsZero = x
+addIsZero (IsSucc x) y      = IsSucc (addIsZero x y)
+
+multIsZero :: IsZero n -> IsZero m -> IsZero (n * m)
+multIsZero IsZero _      = IsZero
+multIsZero _      IsZero = IsZero
+multIsZero (IsSucc x)  y = addIsZero y (multIsZero x y)
+
+powerIsZero :: IsZero n -> IsZero m -> IsZero (n ^ m)
+powerIsZero _ IsZero     = IsSucc IsZero
+powerIsZero x (IsSucc y) = multIsZero x (powerIsZero x y)
