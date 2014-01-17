@@ -6,7 +6,6 @@ module CLaSH.Normalize.Util where
 
 import           Control.Lens            ((%=))
 import qualified Control.Lens            as Lens
-import qualified Data.Either             as Either
 import qualified Data.Graph              as Graph
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
@@ -56,7 +55,7 @@ isClosed :: (Functor m, Fresh m)
 isClosed = fmap (not . isPolyFunTy) . termType
   where
     -- Is a type a (polymorphic) function type?
-    isPolyFunTy = not . null . Either.lefts . fst . splitFunForallTy
+    isPolyFunTy = not . null . fst . splitFunForallTy
 
 -- | Determine if a term represents a constant
 isConstant :: Term -> Bool
