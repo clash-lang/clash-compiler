@@ -122,7 +122,7 @@ genComponentT compName componentExpr mStart = do
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans $ ids HashMap.! result
+  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) result ids
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans t) arguments
 
   let netDecls = map (\(id_,_) ->

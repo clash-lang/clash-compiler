@@ -77,10 +77,11 @@ topSortHWTys hwtys = sorted
     graph  = mkGraph nodes edges :: Gr HWType ()
     sorted = reverse $ topsort' graph
 
-    edge t@(Vector _ elTy) = maybe [] ((:[]) . (nodesI HashMap.! t,,())) (HashMap.lookup (mkVecZ elTy) nodesI)
-    edge t@(Product _ tys) = let ti = nodesI HashMap.! t
+    edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,,()))
+                                      (HashMap.lookup (mkVecZ elTy) nodesI)
+    edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
                              in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys
-    edge t@(SP _ ctys)     = let ti = nodesI HashMap.! t
+    edge t@(SP _ ctys)     = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "SP") t nodesI
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys) ctys
     edge _                 = []
 
