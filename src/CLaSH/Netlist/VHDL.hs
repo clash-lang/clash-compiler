@@ -212,7 +212,7 @@ vhdlType' t@(Sum _ _) = "unsigned" <>
                         parens ( int (typeSize t -1) <+>
                                  "downto 0")
 vhdlType' t@(Product _ _) = tyName t
-vhdlType' t          = error $ $(curLoc) ++ "vhdlType: " ++ show t
+vhdlType' Void       = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
 
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
@@ -259,7 +259,7 @@ vhdlTypeDefault (Sum _ _)           = "(others => '0')"
 vhdlTypeDefault (Product _ elTys)   = tupled $ mapM vhdlTypeDefault elTys
 vhdlTypeDefault (Reset _)           = "'0'"
 vhdlTypeDefault (Clock _)           = "'0'"
-vhdlTypeDefault t                   = error $ $(curLoc) ++ "vhdlTypeDefault: " ++ show t
+vhdlTypeDefault Void                = "((-1) downto 0 => '0')"
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
