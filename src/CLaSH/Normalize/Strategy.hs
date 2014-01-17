@@ -8,12 +8,42 @@ import CLaSH.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = representable >-> simplification >-> apply "recToLetrec" recToLetRec
+normalization = etaTL >-> constantPropgation >-> anf >-> letTL >-> recLetRec
+  where
+    etaTL      = apply "etaTL" etaExpansionTL
+    anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
+    letTL      = topdownSucR (apply "topLet" topLet)
+    recLetRec  = apply "recToLetRec" recToLetRec
+
+constantPropgation :: NormRewrite
+constantPropgation = upDownR   (repeatR $ foldr1 (>->) $ map (uncurry apply) transformationsDown) >->
+                     bottomupR (foldr1 (>->) $ map (uncurry apply) transformationsUp)
+  where
+    transformationsDown :: [(String,NormRewrite)]
+    transformationsDown = [ ("inlineClosed"          , inlineClosed   )
+                          , ("inlineNonRep"          , inlineNonRep   )
+                          , ("applicationPropagation", appProp        )
+                          , ("bindConstantVar"       , bindConstantVar)
+                          , ("liftNonRep"            , liftNonRep     )
+                          , ("caseLet"               , caseLet        )
+                          , ("caseCase"              , caseCase       )
+                          , ("caseCon"               , caseCon        )
+                          , ("deadcode"              , deadCode       )
+                          ]
+
+    transformationsUp :: [(String,NormRewrite)]
+    transformationsUp = [ ("typeSpec"    , typeSpec)
+                        , ("constantSpec", constantSpec)
+                        , ("nonRepSpec"  , nonRepSpec)
+                        ]
+
+--normalization = representable >-> simplification >-> apply "recToLetrec" recToLetRec
 
 -- | Simple cleanup transformation, currently only inlines \"Wrappers\"
 cleanup :: NormRewrite
 cleanup = repeatR (apply "inlineTLWrapper" inlineTLWrapper) >->
-          (topdownR (apply "inlineWrapper" inlineWrapper) !-> simplification)
+          (topdownR (apply "inlineWrapper" inlineWrapper) !-> normalization)
+--cleanup _ e = return e
 
 -- | Unsure that functions have representable arguments, results, and let-bindings
 representable :: NormRewrite
@@ -48,7 +78,7 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
     etaTL           = apply "etaTL" etaExpansionTL
 
     constSimpl      = repeatR ( upDownR (apply "propagation" appProp) >->
-                                bottomupR inlineClosed >->
+                                bottomupR inlineClosedT >->
                                 repeatBottomup  [ ("nonRepANF"       , nonRepANF       )
                                                 , ("bindConstantVar" , bindConstantVar )
                                                 , ("constantSpec"    , constantSpec    )
@@ -62,7 +92,7 @@ simplification = etaTL >-> constSimpl >-> anf >-> deadCodeRemoval >-> letTL
 
     letTL           = bottomupR (apply "topLet" topLet)
 
-    inlineClosed    = apply "inlineClosedTerm" (inlineClosedTerm
+    inlineClosedT   = apply "inlineClosedTerm" (inlineClosedTerm
                                                   "normalization"
                                                   normalization
                                                )

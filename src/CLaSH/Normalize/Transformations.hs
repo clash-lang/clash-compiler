@@ -26,6 +26,7 @@ module CLaSH.Normalize.Transformations
   , inlineTLWrapper
   , inlineWrapper
   , recToLetRec
+  , inlineClosed
   )
 where
 
@@ -75,13 +76,15 @@ bindNonRep = inlineBinders nonRepTest
 
     nonRepTest _ = return False
 
--- | Lift recursive, non-representable let-bindings
+-- | Lift non-representable let-bindings
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
-    nonRepTest (Id idName tyE, exprE)
-      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE)))
-             <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
+    nonRepTest (Id _ tyE, _) =
+      not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE))
+--     nonRepTest (Id idName tyE, exprE)
+--       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE)))
+--              <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
 
     nonRepTest _ = return False
 
@@ -290,6 +293,20 @@ bindConstantVar :: NormRewrite
 bindConstantVar = inlineBinders test
   where
     test (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
+
+inlineClosed :: NormRewrite
+inlineClosed _ e@(Var _ f) = R $ do
+  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+  case bodyMaybe of
+    Just (_,body) -> do
+      closed <- isClosed body
+      untranslatable <- isUntranslatable e
+      if closed && not untranslatable
+        then changed body
+        else return e
+    _ -> return e
+
+inlineClosed _ e = return e
 
 -- | Inline nullary/closed functions
 inlineClosedTerm :: String -> NormRewrite -> NormRewrite
