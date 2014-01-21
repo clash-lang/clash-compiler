@@ -11,6 +11,7 @@
 module CLaSH.Sized.Signed
   ( Signed
   , resizeS
+  , resizeS_wrap
   )
 where
 
@@ -242,6 +243,11 @@ fromBitList l = fromIntegerS_inlineable
                     ]
 
 {-# NOINLINE resizeS #-}
+-- | A sign-preserving resize operation
+--
+-- Increasing the size of the number replicates the sign bit to the left.
+-- Truncating a number to length L keeps the sign bit and the rightmost L-1 bits.
+--
 resizeS :: forall n m . (SingI n, SingI m) => Signed n -> Signed m
 resizeS s@(S n) | n' <= m'  = fromIntegerS_inlineable n
                 | otherwise = case l of
@@ -251,3 +257,12 @@ resizeS s@(S n) | n' <= m'  = fromIntegerS_inlineable n
     n' = fromInteger $ fromSing (sing :: Sing n) :: Int
     m' = fromInteger $ fromSing (sing :: Sing m) :: Int
     l  = toList $ toBitVector s
+
+{-# NOINLINE resizeS_wrap #-}
+-- | A resize operation that is sign-preserving on extension, but wraps on truncation.
+--
+-- Increasing the size of the number replicates the sign bit to the left.
+-- Truncating a number of length N to a length L just removes the leftmost N-L bits.
+--
+resizeS_wrap :: SingI m => Signed n -> Signed m
+resizeS_wrap s@(S n) = fromIntegerS_inlineable n
