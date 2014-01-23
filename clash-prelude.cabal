@@ -31,7 +31,7 @@ Library
                       CLaSH.Class.Default
                       CLaSH.Prelude
                       CLaSH.Promoted.Bool
-                      CLaSH.Promoted.Nats
+                      CLaSH.Promoted.Nat
                       CLaSH.Promoted.Ord
                       CLaSH.Signal
                       CLaSH.Sized.Index
@@ -40,6 +40,5 @@ Library
                       CLaSH.Sized.Vector
 
   Build-depends:      base                 >= 4.7.0.0,
-                      singletons           >= 0.9,
                       template-haskell     >= 2.9.0.0,
                       th-lift              >= 0.5.6

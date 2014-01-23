@@ -16,11 +16,10 @@ import Control.Arrow
 import Control.Applicative
 import Control.Category      as Category
 import Data.Bits             as Exported
-import Data.Singletons       as Exported
 import CLaSH.Class.BitVector as Exported
 import CLaSH.Class.Default   as Exported
 import CLaSH.Promoted.Bool   as Exported
-import CLaSH.Promoted.Nats   as Exported
+import CLaSH.Promoted.Nat    as Exported
 import CLaSH.Promoted.Ord    as Exported
 import CLaSH.Sized.Index     as Exported
 import CLaSH.Sized.Signed    as Exported
@@ -63,7 +62,7 @@ registerP i = unpack Prelude.. register i Prelude.. pack
 
 {-# NOINLINE blockRam #-}
 blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a)
-         => Sing n
+         => SNat n
          -> Signal (Unsigned m)
          -> Signal (Unsigned m)
          -> Signal Bool
@@ -84,7 +83,7 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
 
 {-# INLINABLE blockRamPow2 #-}
 blockRamPow2 :: (KnownNat n, KnownNat (n^2), Pack a)
-             => (Sing ((n^2) :: Nat))
+             => (SNat ((n^2) :: Nat))
              -> Signal (Unsigned n)
              -> Signal (Unsigned n)
              -> Signal Bool

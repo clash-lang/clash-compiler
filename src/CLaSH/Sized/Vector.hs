@@ -26,15 +26,13 @@ module CLaSH.Sized.Vector
 where
 
 import Control.Applicative
-import Data.Singletons
 import Data.Traversable
 import Data.Foldable hiding (toList)
 import GHC.TypeLits
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
-import Unsafe.Coerce (unsafeCoerce)
 
-import CLaSH.Promoted.Nats
+import CLaSH.Promoted.Nat
 
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
@@ -53,7 +51,7 @@ instance Show a => Show (Vec n a) where
 instance Eq a => Eq (Vec n a) where
   v1 == v2 = vfoldr (&&) True (vzipWith (==) v1 v2)
 
-instance SingI n => Applicative (Vec n) where
+instance KnownNat n => Applicative (Vec n) where
   pure  = vcopyI
   (<*>) = vzipWith ($)
 
@@ -73,7 +71,7 @@ vhead (x :> _) = x
 
 {-# NOINLINE vtail #-}
 vtail :: Vec (n + 1) a -> Vec n a
-vtail (_ :> xs) = unsafeCoerce xs
+vtail (_ :> xs) = xs
 
 {-# NOINLINE vlast #-}
 vlast :: Vec (n + 1) a -> a
@@ -82,8 +80,8 @@ vlast (_ :> y :> ys) = vlast (y :> ys)
 
 {-# NOINLINE vinit #-}
 vinit :: Vec (n + 1) a -> Vec n a
-vinit (_ :> Nil)     = unsafeCoerce Nil
-vinit (x :> y :> ys) = unsafeCoerce (x :> vinit (y :> ys))
+vinit (_ :> Nil)     = Nil
+vinit (x :> y :> ys) = (x :> vinit (y :> ys))
 
 {-# NOINLINE shiftIntoL #-}
 shiftIntoL :: a -> Vec n a -> Vec n a
@@ -118,7 +116,7 @@ xs <<+ s = shiftIntoR s xs
 {-# NOINLINE vappend #-}
 vappend :: Vec n a -> Vec m a -> Vec (n + m) a
 vappend Nil       ys = ys
-vappend (x :> xs) ys = unsafeCoerce (x :> (vappend xs ys))
+vappend (x :> xs) ys = (x :> (vappend xs ys))
 
 infixr 5 <++>
 {-# INLINE (<++>) #-}
@@ -126,40 +124,40 @@ infixr 5 <++>
 xs <++> ys = vappend xs ys
 
 {-# NOINLINE vsplit #-}
-vsplit :: Sing m -> Vec (m + n) a -> (Vec m a, Vec n a)
-vsplit n xs = vsplit' (isZero n) xs
-  where
-    vsplit' :: IsZero m -> Vec (m + n) a -> (Vec m a, Vec n a)
-    vsplit' IsZero                ys        = (Nil,ys)
-    vsplit' (IsSucc s) (y :> ys) = let (as,bs) = vsplit' s (unsafeCoerce ys)
-                                   in  (y :> as, bs)
+vsplit :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
+vsplit n xs = vsplitU (toUNat n) xs
+
+vsplitU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
+vsplitU UZero     ys        = (Nil,ys)
+vsplitU (USucc s) (y :> ys) = let (as,bs) = vsplitU s (ys)
+                              in  (y :> as, bs)
 
 {-# INLINEABLE vsplitI #-}
-vsplitI :: SingI m => Vec (m + n) a -> (Vec m a, Vec n a)
-vsplitI = withSing vsplit
+vsplitI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
+vsplitI = withSNat vsplit
 
 {-# NOINLINE vconcat #-}
 vconcat :: Vec n (Vec m a) -> Vec (n * m) a
 vconcat Nil       = Nil
-vconcat (x :> xs) = unsafeCoerce $ vappend x (vconcat xs)
+vconcat (x :> xs) = vappend x (vconcat xs)
 
 {-# NOINLINE vunconcat #-}
-vunconcat :: Sing n -> Sing m -> Vec (n * m) a -> Vec n (Vec m a)
-vunconcat n m xs = vunconcat' (isZero n) m xs
-  where
-    vunconcat' :: IsZero n -> Sing m -> Vec (n * m) a -> Vec n (Vec m a)
-    vunconcat' IsZero      _ _   = Nil
-    vunconcat' (IsSucc n') m' ys = let (as,bs) = vsplit m' (unsafeCoerce ys)
-                                   in  as :> vunconcat' n' m' bs
+vunconcat :: SNat n -> SNat m -> Vec (n * m) a -> Vec n (Vec m a)
+vunconcat n m xs = vunconcatU (toUNat n) (toUNat m) xs
+
+vunconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
+vunconcatU UZero      _  _  = Nil
+vunconcatU (USucc n') m' ys = let (as,bs) = vsplitU m' (ys)
+                              in  as :> vunconcatU n' m' bs
 
 {-# INLINEABLE vunconcatI #-}
-vunconcatI :: (SingI n, SingI m) => Vec (n * m) a -> Vec n (Vec m a)
-vunconcatI = (withSing . withSing) vunconcat
+vunconcatI :: (KnownNat n, KnownNat m) => Vec (n * m) a -> Vec n (Vec m a)
+vunconcatI = (withSNat . withSNat) vunconcat
 
 {-# NOINLINE vmerge #-}
-vmerge :: Vec n a -> Vec n a -> Vec (2 * n) a
-vmerge Nil Nil             = Nil
-vmerge (x :> xs) (y :> ys) = unsafeCoerce (x :> y :> (unsafeCoerce vmerge xs ys))
+vmerge :: Vec n a -> Vec n a -> Vec (n + n) a
+vmerge Nil       Nil       = Nil
+vmerge (x :> xs) (y :> ys) = (x :> y :> (vmerge xs ys))
 
 {-# NOINLINE vreverse #-}
 vreverse :: Vec n a -> Vec n a
@@ -174,7 +172,7 @@ vmap f (x :> xs) = f x :> vmap f xs
 {-# NOINLINE vzipWith #-}
 vzipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 vzipWith _ Nil       Nil       = Nil
-vzipWith f (x :> xs) (y :> ys) = f x y :> (unsafeCoerce vzipWith f xs ys)
+vzipWith f (x :> xs) (y :> ys) = f x y :> (vzipWith f xs ys)
 
 {-# NOINLINE vfoldr #-}
 vfoldr :: (a -> b -> b) -> b -> Vec n a -> b
@@ -198,7 +196,7 @@ vfoldl1 f xs = vfoldl f (vhead xs) (vtail xs)
 {-# NOINLINE vzip #-}
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
 vzip Nil       Nil       = Nil
-vzip (x :> xs) (y :> ys) = (x,y) :> (unsafeCoerce vzip xs ys)
+vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs ys)
 
 {-# NOINLINE vunzip #-}
 vunzip :: Vec n (a,b) -> (Vec n a, Vec n b)
@@ -213,18 +211,18 @@ vindexM_integer (x :> _)  0 = Just x
 vindexM_integer (_ :> xs) n = vindexM_integer xs (n-1)
 
 {-# NOINLINE vindex_integer #-}
-vindex_integer :: SingI n => Vec n a -> Integer -> a
+vindex_integer :: KnownNat n => Vec n a -> Integer -> a
 vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
     Just a  -> a
     Nothing -> error "index out of bounds"
 
 {-# INLINEABLE (!) #-}
-(!) :: (SingI n, Integral i) => Vec n a -> i -> a
+(!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
 xs ! i = vindex_integer xs (toInteger i)
 
 {-# NOINLINE maxIndex #-}
-maxIndex :: forall n a . SingI n => Vec n a -> Integer
-maxIndex _ = fromSing (sing :: Sing n) - 1
+maxIndex :: forall n a . KnownNat n => Vec n a -> Integer
+maxIndex _ = fromSNat (snat :: SNat n) - 1
 
 {-# NOINLINE vreplaceM_integer #-}
 vreplaceM_integer :: Vec n a -> Integer -> a -> Maybe (Vec n a)
@@ -235,89 +233,84 @@ vreplaceM_integer (x :> xs) n y = case vreplaceM_integer xs (n-1) y of
                                     Nothing  -> Nothing
 
 {-# NOINLINE vreplace_integer #-}
-vreplace_integer :: SingI n => Vec n a -> Integer -> a -> Vec n a
+vreplace_integer :: KnownNat n => Vec n a -> Integer -> a -> Vec n a
 vreplace_integer xs i a = case vreplaceM_integer xs (maxIndex xs - i) a of
   Just ys -> ys
   Nothing -> error "index out of bounds"
 
 {-# INLINEABLE vreplace #-}
-vreplace :: (SingI n, Integral i) => Vec n a -> i -> a -> Vec n a
+vreplace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
 vreplace xs i y = vreplace_integer xs (toInteger i) y
 
 {-# NOINLINE vtake #-}
-vtake :: Sing m -> Vec (m + n) a -> Vec m a
+vtake :: SNat m -> Vec (m + n) a -> Vec m a
 vtake n = fst . vsplit n
 
 {-# INLINEABLE vtakeI #-}
-vtakeI :: SingI m => Vec (m + n) a -> Vec m a
-vtakeI = withSing vtake
+vtakeI :: KnownNat m => Vec (m + n) a -> Vec m a
+vtakeI = withSNat vtake
 
 {-# NOINLINE vdrop #-}
-vdrop :: Sing m -> Vec (m + n) a -> Vec n a
+vdrop :: SNat m -> Vec (m + n) a -> Vec n a
 vdrop n = snd . vsplit n
 
 {-# INLINEABLE vdropI #-}
-vdropI :: SingI m => Vec (m + n) a -> Vec n a
-vdropI = withSing vdrop
+vdropI :: KnownNat m => Vec (m + n) a -> Vec n a
+vdropI = withSNat vdrop
 
 {-# NOINLINE vexact #-}
-vexact :: Sing m -> Vec (m + (n + 1)) a -> a
+vexact :: SNat m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n xs
 
 {-# NOINLINE vselect #-}
-vselect ::
-  ((f + (s * n)) <= i)
-  => Sing f
-  -> Sing s
-  -> Sing (n + 1)
-  -> Vec i a
-  -> Vec (n + 1) a
-vselect f s n xs = vselect' (isZero n) $ vdrop f (unsafeCoerce xs)
-  where
-    vselect' :: IsZero n -> Vec m a -> Vec n a
-    vselect' IsZero      _           = Nil
-    vselect' (IsSucc n') vs@(x :> _) = x :> vselect' n' (vdrop s (unsafeCoerce vs))
+vselect :: SNat k
+        -> SNat n
+        -> SNat (m + 1)
+        -> Vec (k + (n * (m + 1))) a
+        -> Vec n a
+vselect k n m xs = vselectU k (toUNat n) (toUNat m) xs
 
-{-# INLINEABLE vselectI #-}
-vselectI ::
-  forall f s n i a . ((f + (s * n)) <= i, SingI (n+1))
-  => Sing f
-  -> Sing s
-  -> Vec i a
-  -> Vec (n + 1) a
-vselectI f s xs = withSing (\(n :: (Sing (n + 1))) -> vselect f s n xs)
+vselectI :: KnownNat n
+         => SNat k
+         -> SNat (m + 1)
+         -> Vec (k + (n * (m + 1))) a
+         -> Vec n a
+vselectI k m1 xs = withSNat (\n -> vselect k n m1 xs)
+
+vselectU :: SNat k -> UNat n -> UNat (m+1) -> Vec (k + (n * (m + 1))) a -> Vec n a
+vselectU k n m xs = vmap vhead (vunconcatU n m (vdrop k xs))
 
 {-# NOINLINE vcopy #-}
-vcopy :: Sing n -> a -> Vec n a
-vcopy n a = vreplicate' (isZero n) a
-  where
-    vreplicate' :: IsZero n -> a -> Vec n a
-    vreplicate' IsZero     _ = Nil
-    vreplicate' (IsSucc s) x = x :> vreplicate' s x
+vcopy :: SNat n -> a -> Vec n a
+vcopy n a = vreplicateU (toUNat n) a
+
+vreplicateU :: UNat n -> a -> Vec n a
+vreplicateU UZero     _ = Nil
+vreplicateU (USucc s) x = x :> vreplicateU s x
 
 {-# INLINEABLE vcopyI #-}
-vcopyI :: SingI n => a -> Vec n a
-vcopyI = withSing vcopy
+vcopyI :: KnownNat n => a -> Vec n a
+vcopyI = withSNat vcopy
 
 {-# NOINLINE viterate #-}
-viterate :: Sing n -> (a -> a) -> a -> Vec n a
-viterate n f a = viterate' (isZero n) f a
-  where
-    viterate' :: IsZero n -> (a -> a) -> a -> Vec n a
-    viterate' IsZero     _ _ = Nil
-    viterate' (IsSucc s) g x = x :> viterate' s g (g x)
+viterate :: SNat n -> (a -> a) -> a -> Vec n a
+viterate n f a = viterateU (toUNat n) f a
+
+viterateU :: UNat n -> (a -> a) -> a -> Vec n a
+viterateU UZero     _ _ = Nil
+viterateU (USucc s) g x = x :> viterateU s g (g x)
 
 {-# INLINEABLE viterateI #-}
-viterateI :: SingI n => (a -> a) -> a -> Vec n a
-viterateI = withSing viterate
+viterateI :: KnownNat n => (a -> a) -> a -> Vec n a
+viterateI = withSNat viterate
 
 {-# INLINEABLE vgenerate #-}
-vgenerate :: Sing n -> (a -> a) -> a -> Vec n a
+vgenerate :: SNat n -> (a -> a) -> a -> Vec n a
 vgenerate n f a = viterate n f (f a)
 
 {-# INLINEABLE vgenerateI #-}
-vgenerateI :: SingI n => (a -> a) -> a -> Vec n a
-vgenerateI = withSing vgenerate
+vgenerateI :: KnownNat n => (a -> a) -> a -> Vec n a
+vgenerateI = withSNat vgenerate
 
 {-# NOINLINE toList #-}
 toList :: Vec n a -> [a]
