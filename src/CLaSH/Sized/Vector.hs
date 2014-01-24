@@ -31,6 +31,7 @@ import Data.Foldable hiding (toList)
 import GHC.TypeLits
 import Language.Haskell.TH (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
+import Unsafe.Coerce (unsafeCoerce)
 
 import CLaSH.Promoted.Nat
 
@@ -263,22 +264,27 @@ vexact :: SNat m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n xs
 
 {-# NOINLINE vselect #-}
-vselect :: SNat k
-        -> SNat n
-        -> SNat (m + 1)
-        -> Vec (k + (n * (m + 1))) a
-        -> Vec n a
-vselect k n m xs = vselectU k (toUNat n) (toUNat m) xs
+vselect ::
+  ((f + (s * n) + 1) <= i)
+  => SNat f
+  -> SNat s
+  -> SNat (n + 1)
+  -> Vec i a
+  -> Vec (n + 1) a
+vselect f s n xs = vselect' (toUNat n) $ vdrop f (unsafeCoerce xs)
+  where
+    vselect' :: UNat n -> Vec m a -> Vec n a
+    vselect' UZero      _           = Nil
+    vselect' (USucc n') vs@(x :> _) = x :> vselect' n' (vdrop s (unsafeCoerce vs))
 
-vselectI :: KnownNat n
-         => SNat k
-         -> SNat (m + 1)
-         -> Vec (k + (n * (m + 1))) a
-         -> Vec n a
-vselectI k m1 xs = withSNat (\n -> vselect k n m1 xs)
-
-vselectU :: SNat k -> UNat n -> UNat (m+1) -> Vec (k + (n * (m + 1))) a -> Vec n a
-vselectU k n m xs = vmap vhead (vunconcatU n m (vdrop k xs))
+{-# NOINLINE vselectI #-}
+vselectI ::
+  ((f + (s * n) + 1) <= i, KnownNat (n + 1))
+  => SNat f
+  -> SNat s
+  -> Vec i a
+  -> Vec (n + 1) a
+vselectI f s xs = withSNat (\n -> vselect f s n xs)
 
 {-# NOINLINE vcopy #-}
 vcopy :: SNat n -> a -> Vec n a
