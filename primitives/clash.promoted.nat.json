@@ -1,0 +1,6 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.SNat"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+]

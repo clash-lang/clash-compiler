@@ -91,4 +91,9 @@ end block;"
     , "templateE" : "~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger#"
+    , "templateE" : "~ARG[0] = ~ARG[1]"
+    }
+  }
 ]
