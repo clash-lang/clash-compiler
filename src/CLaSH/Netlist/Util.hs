@@ -93,7 +93,7 @@ coreTypeToHWType builtInTranslation ty =
   fromMaybe
     (case tyView ty of
        TyConApp tc args -> mkADT builtInTranslation (showDoc ty) tc args
-       _                -> Left $ "Can't translate non tycon-type: " ++ showDoc ty)
+       _                -> Left $ "Can't translate non-tycon type: " ++ showDoc ty)
     (builtInTranslation ty)
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
