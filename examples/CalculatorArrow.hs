@@ -30,7 +30,7 @@ topEntity = proc i -> do
         mem        <- (datamem ^^^ initMem)              -< (addr,val)
     returnA -< val
   where
-    initMem    = vcopy (sing :: Sing 8) 0
+    initMem    = vcopy (snat :: SNat 8) 0
 
 testInput :: [OPC Word]
 testInput = [Imm 1,Push,Imm 2,Push,Pop,Pop,Pop,ADD]

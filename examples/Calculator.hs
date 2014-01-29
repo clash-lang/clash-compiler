@@ -28,7 +28,7 @@ topEntity i = val
   where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
-    initMem    = vcopy (sing :: Sing 8) 0
+    initMem    = vcopy (snat :: SNat 8) 0
 
 testInput :: [OPC Word]
 testInput = [Imm 1,Push,Imm 2,Push,Pop,Pop,Pop,ADD]
