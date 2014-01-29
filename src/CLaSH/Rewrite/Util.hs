@@ -12,7 +12,7 @@
 -- | Utilities for rewriting: e.g. inlining, specialisation, etc.
 module CLaSH.Rewrite.Util where
 
-import           Control.Lens                (Lens', (%=), (+=))
+import           Control.Lens                (Lens', (%=), (+=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.Reader        as Reader
@@ -116,14 +116,15 @@ runRewrite name rewrite expr = do
   return expr'
 
 -- | Evaluate a RewriteSession to its inner monad
-runRewriteSession :: Monad m
+runRewriteSession :: (Functor m, Monad m)
                   => DebugLevel
                   -> RewriteState
                   -> RewriteSession m a
                   -> m a
 runRewriteSession lvl st
   = Unbound.runFreshMT
-  . (`State.evalStateT` st)
+  . fmap (\(a,s) -> traceIf True ("Applied " ++ show (s ^. transformCounter) ++ " transformations") a)
+  . (`State.runStateT` st)
   . (`Reader.runReaderT` RE lvl)
 
 -- | Notify that a transformation has changed the expression

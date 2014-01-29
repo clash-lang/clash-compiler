@@ -139,7 +139,7 @@ genTestBench dbgLvl supply primMap typeTrans vhdlState globals stimuliNmM expect
                     -> TmName
                     -> [(TmName,(Type,Term))])
     normalizeSignal glbls bndr =
-      runNormalization dbgLvl supply glbls typeTrans (normalize [bndr] >>= cleanupGraph [bndr])
+      runNormalization dbgLvl supply glbls typeTrans (normalize [bndr] >>= cleanupGraph bndr)
 
 genTestBench _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
 

@@ -70,7 +70,7 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
 
       let doNorm = do norm <- normalize [fst topEntity]
                       let normChecked = checkNonRecursive (fst topEntity) norm
-                      cleanupGraph [fst topEntity] normChecked
+                      cleanupGraph (fst topEntity) normChecked
 
           transformedBindings =
             runNormalization dbgLevel supplyN bindingsMap typeTrans doNorm
