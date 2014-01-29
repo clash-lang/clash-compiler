@@ -16,7 +16,6 @@ module CLaSH.Normalize.Transformations
   , typeSpec
   , nonRepSpec
   , etaExpansionTL
-  , inlineClosedTerm
   , nonRepANF
   , bindConstantVar
   , constantSpec
@@ -25,10 +24,10 @@ module CLaSH.Normalize.Transformations
   , topLet
   , recToLetRec
   , inlineClosed
+  , inlineHO
   )
 where
 
-import           Control.Lens                ((.=),(%=))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
@@ -50,12 +49,12 @@ import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
 import           CLaSH.Core.Type             (splitFunTy)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
-                                              isFun, isLet, isPrim, isVar,
-                                              mkApps, mkLams, mkTmApps,
+                                              isFun, isLet, isPolyFun, isPrim,
+                                              isVar, mkApps, mkLams, mkTmApps,
                                               termType)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
-                                              splitNormalized)
+                                              splitNormalized, unsafeCoreTypeToHWType)
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Rewrite.Combinators
@@ -77,11 +76,11 @@ bindNonRep = inlineBinders nonRepTest
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
-    nonRepTest (Id _ tyE, _) =
-      not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE))
---     nonRepTest (Id idName tyE, exprE)
---       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE)))
---              <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
+--  nonRepTest (Id _ tyE, _) =
+--    not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE))
+    nonRepTest (Id idName tyE, exprE)
+      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE)))
+             <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
 
     nonRepTest _ = return False
 
@@ -104,7 +103,8 @@ nonRepSpec ctx e@(App e1 e2)
   = R $ do e2Ty <- termType e2
            localVar <- isLocalVar e2
            nonRepE2 <- not <$> (representableType <$> Lens.use typeTranslator <*> pure e2Ty)
-           if nonRepE2 && not localVar
+           -- polyE2   <- isPolyFun e2
+           if nonRepE2 && not localVar -- && not polyE2
              then runR $ specializeNorm ctx e
              else return e
 
@@ -143,11 +143,15 @@ inlineNonRep _ e@(Case scrut alts)
   | (Var _ f, args) <- collectArgs scrut
   = R $ do
     isInlined <- liftR $ alreadyInlined f
-    case isInlined of
-      Just n -> do
+    limit     <- liftR $ Lens.use inlineLimit
+    if (Maybe.fromMaybe 0 isInlined) > limit
+      then do
         cf <- liftR $ Lens.use curFun
-        error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show n ++ " times in:" ++ show cf
-      Nothing -> do
+        tt <- Lens.use typeTranslator
+        ty <- termType scrut
+        let hwty = unsafeCoreTypeToHWType $(curLoc) tt ty
+        error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ show hwty
+      else do
         scrutTy     <- termType scrut
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> pure scrutTy)
@@ -291,6 +295,7 @@ bindConstantVar = inlineBinders test
   where
     test (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
 
+-- | Inline nullary/closed functions
 inlineClosed :: NormRewrite
 inlineClosed _ e@(Var _ f) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
@@ -304,29 +309,6 @@ inlineClosed _ e@(Var _ f) = R $ do
     _ -> return e
 
 inlineClosed _ e = return e
-
--- | Inline nullary/closed functions
-inlineClosedTerm :: String -> NormRewrite -> NormRewrite
-inlineClosedTerm rwS rw _ e@(Var _ f) = R $ do
-  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-  normMaybe <- fmap (HashMap.lookup f) $ liftR $ Lens.use normalized
-  case bodyMaybe of
-    Just (_,body) -> do
-      closed <- isClosed body
-      untranslatable <- isUntranslatable body
-      if closed && not untranslatable
-        then case normMaybe of
-               Just norm -> changed norm
-               Nothing   -> do cf <- liftR $ Lens.use curFun
-                               liftR $ curFun .= f
-                               newNorm <- lift $ runRewrite rwS rw body
-                               liftR $ curFun .= cf
-                               liftR $ normalized %= HashMap.insert f newNorm
-                               changed newNorm
-        else return e
-    _ -> return e
-
-inlineClosedTerm _ _ _ e = return e
 
 -- | Specialise functions on arguments which are constant
 constantSpec :: NormRewrite
@@ -535,3 +517,27 @@ recToLetRec [] e = R $ do
     _ -> return e
 
 recToLetRec _ e = return e
+
+-- | Inline a function with functional arguments
+inlineHO :: NormRewrite
+inlineHO _ e@(App _ _)
+  | (Var _ f, args) <- collectArgs e
+  = R $ do
+    hasPolyFunArgs <- or <$> mapM (either isPolyFun (const (return False))) args
+    if hasPolyFunArgs
+      then do isInlined <- liftR $ alreadyInlined f
+              limit     <- liftR $ Lens.use inlineLimit
+              if (Maybe.fromMaybe 0 isInlined) > limit
+                then do
+                  cf <- liftR $ Lens.use curFun
+                  error $ $(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf
+                else do
+                  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+                  case bodyMaybe of
+                    Just (_, body) -> do
+                      liftR $ addNewInline f
+                      changed $ mkApps body args
+                    _ -> return e
+      else return e
+
+inlineHO _ e = return e

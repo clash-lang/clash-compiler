@@ -202,8 +202,8 @@ mkDeclarations bndr app = do
   args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
   case appF of
     Var _ f
-      | all isVar args' && null tyArgs -> mkFunApp bndr f args'
-      | otherwise                      -> error $ $(curLoc) ++ "Not in normal form: Var-application with non-Var arguments"
+      | null tyArgs -> mkFunApp bndr f args'
+      | otherwise   -> error $ $(curLoc) ++ "Not in normal form: Var-application with Type arguments"
     _ -> do
       (exprApp,declsApp) <- mkExpr (unembed $ varType bndr) app
       let dstId = mkBasicId . Text.pack . name2String $ varName bndr
@@ -220,13 +220,14 @@ mkFunApp dst fun args = do
     Just _ -> do
       (Component compName hidden compInps compOutp _) <- preserveVarEnv $ genComponent fun Nothing
       if length args == length compInps
-        then let dstId         = mkBasicId . Text.pack . name2String $ varName dst
-                 args'         = map varToExpr args
-                 hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-                 inpAssigns    = zip (map fst compInps) args'
-                 outpAssign    = (fst compOutp,Identifier dstId Nothing)
-                 instDecl      = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
-             in return [instDecl]
+        then do argTys              <- mapM termType args
+                (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
+                let dstId         = mkBasicId . Text.pack . name2String $ varName dst
+                    hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
+                    inpAssigns    = zip (map fst compInps) argExprs
+                    outpAssign    = (fst compOutp,Identifier dstId Nothing)
+                    instDecl      = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
+                return (argDecls ++ [instDecl])
         else error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of
       [] -> do

@@ -1,22 +1,26 @@
 {-# LANGUAGE LambdaCase   #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -fcontext-stack=21 #-}
+
 -- | Utility functions used by the normalisation transformations
 module CLaSH.Normalize.Util where
 
 import           Control.Lens            ((%=))
 import qualified Control.Lens            as Lens
 import qualified Data.Graph              as Graph
+import           Data.Graph.Inductive    (Gr,LNode,lsuc,mkGraph,iDom)
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
-import           Unbound.LocallyNameless (Fresh)
+import           Unbound.LocallyNameless (Fresh, bind, embed, rec)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
+import           CLaSH.Core.Var          (Var (Id))
 import           CLaSH.Core.Term         (Term (..), TmName)
-import           CLaSH.Core.Type         (splitFunForallTy)
-import           CLaSH.Core.Util         (collectArgs, termType)
+import           CLaSH.Core.Type         (Type)
+import           CLaSH.Core.Util         (collectArgs, isPolyFun)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Util      (specialise)
 
@@ -26,14 +30,9 @@ alreadyInlined :: TmName
 alreadyInlined f = do
   cf <- Lens.use curFun
   inlinedHM <- Lens.use inlineHistory
-  limit     <- Lens.use inlineLimit
   case HashMap.lookup cf inlinedHM of
     Nothing       -> return Nothing
-    Just inlined' -> case HashMap.lookup f inlined'
-                      of Just n
-                           | n < limit -> return Nothing
-                           | otherwise -> return (Just n)
-                         Nothing -> return Nothing
+    Just inlined' -> return (HashMap.lookup f inlined')
 
 addNewInline :: TmName
              -> NormalizeMonad ()
@@ -52,10 +51,7 @@ specializeNorm = specialise specialisationCache specialisationHistory specialisa
 isClosed :: (Functor m, Fresh m)
          => Term
          -> m Bool
-isClosed = fmap (not . isPolyFunTy) . termType
-  where
-    -- Is a type a (polymorphic) function type?
-    isPolyFunTy = not . null . fst . splitFunForallTy
+isClosed = fmap not . isPolyFun
 
 -- | Determine if a term represents a constant
 isConstant :: Term -> Bool
@@ -84,3 +80,56 @@ recursiveComponents = Maybe.catMaybes
                     . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
                     . Graph.stronglyConnComp
                     . map (\(n,es) -> (n,n,es))
+
+lambdaDropPrep :: HashMap TmName (Type,Term)
+               -> TmName
+               -> HashMap TmName (Type,Term)
+lambdaDropPrep bndrs topEntity = bndrs'
+  where
+    depGraph = callGraph [] (HashMap.map snd bndrs) topEntity
+    used     = HashMap.fromList depGraph
+    rcs      = recursiveComponents depGraph
+    dropped  = map (lambdaDrop bndrs used) rcs
+    bndrs'   = foldr (\(k,v) b -> HashMap.insert k v b) bndrs dropped
+
+lambdaDrop :: HashMap TmName (Type,Term) -- ^ Original Binders
+           -> HashMap TmName [TmName]    -- ^ Dependency Graph
+           -> [TmName]                   -- ^ Recursive block
+           -> (TmName,(Type,Term))       -- ^ Lambda-dropped Binders
+lambdaDrop bndrs depGraph cyc@(root:_) = block
+  where
+    doms  = dominator depGraph cyc
+    block = blockSink bndrs doms (0,root)
+
+lambdaDrop _ _ [] = error "Can't lambdadrop empty cycle"
+
+dominator :: HashMap TmName [TmName] -- ^ Dependency Graph
+          -> [TmName]                -- ^ Recursive block
+          -> Gr TmName TmName        -- ^ Recursive block dominator
+dominator cfg cyc = mkGraph nodes (map (\(e,b) -> (b,e,nodesM HashMap.! e)) doms)
+  where
+    nodes    = zip [0..] cyc
+    nodesM   = HashMap.fromList nodes
+    nodesI   = HashMap.fromList $ zip cyc [0..]
+    cycEdges = HashMap.map ( map (nodesI HashMap.!)
+                           . filter (`elem` cyc)
+                           )
+             $ HashMap.filterWithKey (\k _ -> k `elem` cyc) cfg
+    edges    = concatMap (\(i,n) -> zip3 (repeat i) (cycEdges HashMap.! n) (repeat ())
+                         ) nodes
+    graph    = mkGraph nodes edges :: Gr TmName ()
+    doms     = iDom graph 0
+
+blockSink :: HashMap TmName (Type,Term) -- ^ Original Binders
+          -> Gr TmName TmName           -- ^ Recursive block dominator
+          -> LNode TmName               -- ^ Recursive block dominator root
+          -> (TmName,(Type,Term))       -- ^ Block sank binder
+blockSink bndrs doms (nId,tmName) = (tmName,(ty,newTm))
+  where
+    (ty,tm) = bndrs HashMap.! tmName
+    sucTm   = lsuc doms nId
+    tmS     = map (blockSink bndrs doms) sucTm
+    bnds    = map (\(tN,(ty',tm')) -> (Id tN (embed ty'),embed tm')) tmS
+    newTm   = case sucTm of
+                [] -> tm
+                _  -> Letrec (bind (rec bnds) tm)

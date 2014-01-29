@@ -31,6 +31,8 @@ module CLaSH.Core.Type
   , splitFunTy
   , splitFunForallTy
   , splitTyConAppM
+  , isPolyFunTy
+  , isPolyFunCoreTy
   , isPolyTy
   , isFunTy
   , applyFunTy
@@ -230,6 +232,18 @@ splitFunForallTy = go []
                            in  go (Left tv:args) ty
     go args (tyView -> FunTy arg res) = go (Right arg:args) res
     go args ty                        = (reverse args,ty)
+
+-- | Is a type a polymorphic or function type?
+isPolyFunTy :: Type
+            -> Bool
+isPolyFunTy = not . null . fst . splitFunForallTy
+
+-- | Is a type a polymorphic or function type under 'coreView'?
+isPolyFunCoreTy :: Type
+            -> Bool
+isPolyFunCoreTy (ForAllTy _) = True
+isPolyFunCoreTy (coreView -> FunTy _ _) = True
+isPolyFunCoreTy _ = True
 
 -- | Is a type a function type?
 isFunTy :: Type

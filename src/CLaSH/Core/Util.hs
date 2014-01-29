@@ -11,7 +11,8 @@ import           CLaSH.Core.Literal      (literalType)
 import           CLaSH.Core.Pretty       (showDoc)
 import           CLaSH.Core.Term         (Pat (..), Term (..), TmName)
 import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
-                                          isFunTy, mkFunTy, splitFunTy)
+                                          isFunTy, isPolyFunCoreTy, mkFunTy,
+                                          splitFunTy)
 import           CLaSH.Core.Var          (Id, TyVar, Var (..), varType)
 import           CLaSH.Util
 
@@ -142,6 +143,12 @@ isFun :: (Functor m, Fresh m)
       => Term
       -> m Bool
 isFun t = fmap isFunTy $ termType t
+
+-- | Does a term have a function or polymorphic type?
+isPolyFun :: (Functor m, Fresh m)
+          => Term
+          -> m Bool
+isPolyFun t = isPolyFunCoreTy <$> termType t
 
 -- | Is a term a term-abstraction?
 isLam :: Term

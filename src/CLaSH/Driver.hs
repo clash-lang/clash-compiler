@@ -26,6 +26,7 @@ import           CLaSH.Netlist.Types          (Component (..), HWType,
 import           CLaSH.Netlist.VHDL           (genVHDL, mkTyPackage)
 import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
                                                normalize, runNormalization)
+import           CLaSH.Normalize.Util         (lambdaDropPrep)
 import           CLaSH.Primitives.Types
 import           CLaSH.Rewrite.Types          (DebugLevel (..))
 import           CLaSH.Util
@@ -40,6 +41,9 @@ generateVHDL :: BindingMap -- ^ Set of functions
              -> IO ()
 generateVHDL bindingsMap primMap typeTrans dbgLevel = do
   start <- Clock.getCurrentTime
+  prepTime <- bindingsMap `seq` Clock.getCurrentTime
+  let prepStartDiff = Clock.diffUTCTime prepTime start
+  putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
   let topEntities = HashMap.toList
                   $ HashMap.filterWithKey
@@ -64,16 +68,13 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
                           . Supply.freshId
                          <$> Supply.newSupply
 
-      prepTime <- bindingsMap `seq` Clock.getCurrentTime
-      let prepStartDiff = Clock.diffUTCTime prepTime start
-      putStrLn $ "Loading dependencies took " ++ show prepStartDiff
-
-      let doNorm = do norm <- normalize [fst topEntity]
+      let preppedMap = lambdaDropPrep bindingsMap (fst topEntity)
+          doNorm = do norm <- normalize [fst topEntity]
                       let normChecked = checkNonRecursive (fst topEntity) norm
                       cleanupGraph (fst topEntity) normChecked
 
           transformedBindings =
-            runNormalization dbgLevel supplyN bindingsMap typeTrans doNorm
+            runNormalization dbgLevel supplyN preppedMap typeTrans doNorm
 
       normTime <- transformedBindings `seq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -94,7 +95,7 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
                                 netlist
 
       (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
-                                  typeTrans vhdlState bindingsMap
+                                  typeTrans vhdlState preppedMap
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
                                   topComponent

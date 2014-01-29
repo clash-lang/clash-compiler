@@ -90,18 +90,6 @@ bottomupR r = allR True (bottomupR r) >-> r
 unsafeBottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
 unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 
--- | Apply a transformation in a bottomup traversal, when a transformation
--- succeeds in a certain node, apply the transformation further in a topdown
--- traversal starting at that node.
-upDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
-upDownR r = bottomupR (r !-> bottomupR r)
-
--- | Apply a transformation in a bottomup traversal, when a transformation
--- succeeds in a certain node, apply the transformation further in a topdown
--- traversal starting at that node. Doesn't freshen bound variables
-unsafeUpDownR :: (Functor m,Monad m) => Rewrite m -> Rewrite m
-unsafeUpDownR r = unsafeBottomupR (r !-> unsafeTopdownR r)
-
 infixr 5 !->
 -- | Only apply the second transformation if the first one succeeds.
 (!->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
@@ -109,7 +97,7 @@ infixr 5 !->
   (expr',changed) <- runR $ Writer.listen $ r1 c expr
   if Monoid.getAny changed
     then runR $ r2 c expr'
-    else return expr
+    else return expr'
 
 infixr 5 >-!
 -- | Only apply the second transformation if the first one fails.
@@ -123,7 +111,3 @@ infixr 5 >-!
 -- | Keep applying a transformation until it fails.
 repeatR :: Monad m => Rewrite m -> Rewrite m
 repeatR r = r !-> repeatR r
-
--- | Topdown traversal, stops upon first success
-topdownSucR :: (Functor m, Monad m) => Rewrite m -> Rewrite m
-topdownSucR r = r >-! (allR True (topdownSucR r))

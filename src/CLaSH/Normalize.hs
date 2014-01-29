@@ -26,8 +26,10 @@ import           CLaSH.Core.Var            (Id,varName)
 import           CLaSH.Netlist.Types       (HWType)
 import           CLaSH.Netlist.Util        (splitNormalized)
 import           CLaSH.Normalize.Strategy
+import           CLaSH.Normalize.Transformations ( bindConstantVar, topLet )
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
+import           CLaSH.Rewrite.Combinators ((!->),topdownR)
 import           CLaSH.Rewrite.Types       (DebugLevel (..), RewriteState (..),
                                             bindings, dbgLevel)
 import           CLaSH.Rewrite.Util        (liftRS, runRewrite,
@@ -57,7 +59,7 @@ runNormalization lvl supply globals typeTrans
                   HashMap.empty
                   100
                   HashMap.empty
-                  10
+                  20
                   (error "Report as bug: no curFun")
 
 -- | Normalize a list of global binders
@@ -177,7 +179,10 @@ flattenCallTree (CBranch (nm,(ty,tm)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
-  return (CBranch (nm,(ty,substTms toInline tm)) (newUsed ++ (concat il_used)))
+  newExpr <- case toInline of
+               [] -> return tm
+               _  -> rewriteExpr ("bindConstants",(topdownR bindConstantVar) !-> topLet) (showDoc nm, substTms toInline tm)
+  return (CBranch (nm,(ty,newExpr)) (newUsed ++ (concat il_used)))
 
 callTreeToList :: [TmName]
                -> CallTree

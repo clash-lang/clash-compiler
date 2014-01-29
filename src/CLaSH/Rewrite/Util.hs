@@ -225,7 +225,7 @@ inlineBinders condition _ expr@(Letrec b) = R $ do
     [] -> return expr
     _  -> do
       let (others',res') = substituteBinders replace others res
-          newExpr = case others of
+          newExpr = case others' of
                           [] -> res'
                           _  -> Letrec (bind (rec others') res')
       changed newExpr
