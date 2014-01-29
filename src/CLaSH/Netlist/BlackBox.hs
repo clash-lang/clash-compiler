@@ -76,7 +76,7 @@ mkBlackBox templ bbCtx =
       (bb,clks) <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
       tell clks
       return $! bb
-    else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show bbCtx ++ "\nwith template:\n" ++ show templ ++ "\ngiven errors:\n" ++ show err
+    else error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++ "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++ show err
 
 -- | Create an template instantiation text for an argument term
 mkInput :: (Term, Bool)
