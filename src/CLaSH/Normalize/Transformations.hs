@@ -23,14 +23,11 @@ module CLaSH.Normalize.Transformations
   , makeANF
   , deadCode
   , topLet
-  , inlineTLWrapper
-  , inlineWrapper
   , recToLetRec
   , inlineClosed
   )
 where
 
-import           Control.Error               (headMay)
 import           Control.Lens                ((.=),(%=))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
@@ -342,42 +339,6 @@ constantSpec ctx e@(App e1 e2)
 
 constantSpec _ e = return e
 
--- | Inline functions which simply \"wrap\" another function
-inlineTLWrapper :: NormRewrite
-inlineTLWrapper [] e = R $ do
-  normalizedM <- splitNormalized e
-  case normalizedM of
-    Right (_,[(_,bExpr)],_) -> case collectArgs (unembed bExpr) of
-      (Var _ fn,args) -> do
-        allLocal <- fmap and $ mapM (either isLocalVar (\_ -> return True)) args
-        bodyMaybe <- fmap (HashMap.lookup fn) $ Lens.use bindings
-        case (bodyMaybe,allLocal) of
-          (Just (bodyTy,body),True) -> do
-            eTy <- termType e
-            if eTy == bodyTy
-              then changed body
-              else return e
-          _ -> return e
-      _ -> return e
-    _ -> return e
-
-inlineTLWrapper _ e = return e
-
--- | Inline functions which simply \"wrap\" another function
-inlineWrapper :: NormRewrite
-inlineWrapper ctx e@(Var _ f)
-  | maybe True (/= AppArg) (headMay ctx)
-  = R $ do
-    bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-    case bodyMaybe of
-      Just (_,body) -> do
-        normalizedBodyM <- splitNormalized body
-        case normalizedBodyM of
-          Right (_,[_],_) -> changed body
-          _ -> return e
-      _ -> return e
-
-inlineWrapper _ e = return e
 
 -- Experimental
 
