@@ -4,7 +4,6 @@
 -- | Create Netlists out of normalized CoreHW Terms
 module CLaSH.Netlist where
 
-import           Control.Applicative        (liftA2)
 import           Control.Lens               ((.=), (<<%=))
 import qualified Control.Lens               as Lens
 import qualified Control.Monad              as Monad
@@ -16,6 +15,7 @@ import qualified Data.HashMap.Lazy          as HashMap
 import qualified Data.HashSet               as HashSet
 import           Data.List                  (elemIndex, nub)
 import           Data.Maybe                 (fromMaybe)
+import qualified Data.Text                  as TextS
 import qualified Data.Text.Lazy             as Text
 import           Unbound.LocallyNameless    (Embed (..), name2String,
                                              runFreshMT, string2Name, unbind,
@@ -27,6 +27,7 @@ import           CLaSH.Core.Pretty          (showDoc)
 import           CLaSH.Core.Term            (Pat (..), Term (..), TmName)
 import qualified CLaSH.Core.Term            as Core
 import           CLaSH.Core.Type            (Type)
+import           CLaSH.Core.TyCon           (TyConName, TyCon)
 import           CLaSH.Core.Util            (collectArgs, isVar, termType)
 import           CLaSH.Core.Var             (Id, Var (..))
 import           CLaSH.Netlist.BlackBox
@@ -45,15 +46,17 @@ genNetlist :: Maybe VHDLState
            -- ^ Global binders
            -> PrimMap
            -- ^ Primitive definitions
-           -> (Type -> Maybe (Either String HWType))
+           -> HashMap TyConName TyCon
+           -- ^ TyCon cache
+           -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
            -> Maybe Int
            -- ^ Symbol count
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([Component],VHDLState)
-genNetlist vhdlStateM globals primMap typeTrans mStart topEntity = do
-  (_,s) <- runNetlistMonad vhdlStateM globals primMap typeTrans $ genComponent topEntity mStart
+genNetlist vhdlStateM globals primMap tcm typeTrans mStart topEntity = do
+  (_,s) <- runNetlistMonad vhdlStateM globals primMap tcm typeTrans $ genComponent topEntity mStart
   return (HashMap.elems $ _components s, _vhdlMState s)
 
 -- | Run a NetlistMonad action in a given environment
@@ -63,18 +66,20 @@ runNetlistMonad :: Maybe VHDLState
                 -- ^ Global binders
                 -> PrimMap
                 -- ^ Primitive Definitions
-                -> (Type -> Maybe (Either String HWType))
+                -> HashMap TyConName TyCon
+                -- ^ TyCon cache
+                -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a,NetlistState)
-runNetlistMonad vhdlStateM s p typeTrans
+runNetlistMonad vhdlStateM s p tcm typeTrans
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (fromMaybe (HashSet.empty,0,HashMap.empty) vhdlStateM) typeTrans
+    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (fromMaybe (HashSet.empty,0,HashMap.empty) vhdlStateM) typeTrans tcm
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -122,12 +127,13 @@ genComponentT compName componentExpr mStart = do
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) result ids
-      argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans t) arguments
+  tcm          <- Lens.use tcCache
+  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) result ids
+      argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
-                                (unsafeCoreTypeToHWType $(curLoc) typeTrans . unembed $ varType id_)
+                                (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
                                 Nothing
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkDeclarations . second unembed) binders
@@ -149,6 +155,7 @@ mkDeclarations _ e@(Case _ []) =
 mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
   (pat,Var varTy varTm)  <- unbind alt
   typeTrans    <- Lens.use typeTranslator
+  tcm          <- Lens.use tcCache
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
       altVarId = mkBasicId . Text.pack $ name2String varTm
       selId    = mkBasicId . Text.pack $ name2String scrutNm
@@ -156,14 +163,15 @@ mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
         DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
                                   in case elemIndex (Id varTm (Embed varTy)) tms of
                                        Nothing -> Nothing
-                                       Just fI -> Just (Indexed (unsafeCoreTypeToHWType $(curLoc) typeTrans scrutTy,dcTag dc - 1,fI))
+                                       Just fI -> Just (Indexed (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy,dcTag dc - 1,fI))
         _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
 
 mkDeclarations bndr (Case scrut alts) = do
   alts'                  <- mapM unbind alts
-  scrutTy                <- termType scrut
+  tcm                    <- Lens.use tcCache
+  scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
@@ -173,7 +181,8 @@ mkDeclarations bndr (Case scrut alts) = do
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
-      altTy <- termType alt
+      tcm <- Lens.use tcCache
+      altTy <- termType tcm alt
       (altExpr,altDecls) <- mkExpr altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
@@ -199,7 +208,8 @@ mkDeclarations bndr (Case scrut alts) = do
 
 mkDeclarations bndr app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
+  tcm <- Lens.use tcCache
+  args' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) args
   case appF of
     Var _ f
       | null tyArgs -> mkFunApp bndr f args'
@@ -220,7 +230,8 @@ mkFunApp dst fun args = do
     Just _ -> do
       (Component compName hidden compInps compOutp _) <- preserveVarEnv $ genComponent fun Nothing
       if length args == length compInps
-        then do argTys              <- mapM termType args
+        then do tcm <- Lens.use tcCache
+                argTys              <- mapM (termType tcm) args
                 (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
                 let dstId         = mkBasicId . Text.pack . name2String $ varName dst
                     hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
@@ -248,7 +259,8 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
 mkExpr ty app = do
   let (appF,(args,_)) = second partitionEithers $ collectArgs app
   hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  args' <- Monad.filterM (liftA2 representableType (Lens.use typeTranslator) . termType) args
+  tcm   <- Lens.use tcCache
+  args' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) args
   case appF of
     Data dc
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
@@ -271,7 +283,7 @@ mkExpr ty app = do
               (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
               bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox templE bbCtx
               return (bb,ctxDcls)
-        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ Text.unpack nm
+        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ TextS.unpack nm
     Var _ f
       | null args -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
@@ -283,7 +295,8 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
                 -> [Term] -- ^ DataCon Arguments
                 -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType dc args = do
-  argTys              <- mapM termType args
+  tcm                 <- Lens.use tcCache
+  argTys              <- mapM (termType tcm) args
   (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of

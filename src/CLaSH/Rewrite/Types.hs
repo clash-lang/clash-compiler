@@ -17,6 +17,7 @@ import Unbound.LocallyNameless   (Fresh, FreshMT)
 
 import CLaSH.Core.Term           (Term, TmName)
 import CLaSH.Core.Type           (Type)
+import CLaSH.Core.TyCon          (TyCon, TyConName)
 import CLaSH.Core.Var            (Id, TyVar)
 import CLaSH.Netlist.Types       (HWType)
 import CLaSH.Util
@@ -39,7 +40,8 @@ data RewriteState
   { _transformCounter :: Int -- ^ Number of applied transformations
   , _bindings         :: HashMap TmName (Type,Term) -- ^ Global binders
   , _uniqSupply       :: Supply -- ^ Supply of unique numbers
-  , _typeTranslator   :: Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
+  , _typeTranslator   :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
+  , _tcCache          :: HashMap TyConName TyCon -- ^ TyCon cache
   }
 
 makeLenses ''RewriteState

@@ -20,7 +20,8 @@ module CLaSH.Core.TyCon
 where
 
 -- External Import
-import                Unbound.LocallyNameless as Unbound
+import                Control.DeepSeq
+import                Unbound.LocallyNameless as Unbound hiding (rnf)
 
 -- Internal Imports
 import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
@@ -112,6 +113,25 @@ instance Subst Term TyCon
 instance Subst Term AlgTyConRhs
 instance Subst Term PrimRep
 
+instance NFData TyCon where
+  rnf tc = case tc of
+    AlgTyCon nm ki ar rhs  -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
+    PrimTyCon nm ki ar rep -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rep
+    SuperKindTyCon nm      -> rnf nm
+
+instance NFData (Name TyCon) where
+  rnf nm = rnf (show nm)
+
+instance NFData AlgTyConRhs where
+  rnf rhs = case rhs of
+    DataTyCon dcs   -> rnf dcs
+    NewTyCon dc eta -> rnf dc `seq` rnf eta
+
+instance NFData PrimRep where
+  rnf pm = case pm of
+    IntRep  -> ()
+    VoidRep -> ()
+
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName
             -> Kind
@@ -120,16 +140,14 @@ mkKindTyCon name kind
   = PrimTyCon name kind 0 VoidRep
 
 -- | Does the TyCon look like a tuple TyCon
-isTupleTyConLike :: TyCon -> Bool
-isTupleTyConLike (AlgTyCon {tyConName = nm}) = tupleName (name2String nm)
+isTupleTyConLike :: TyConName -> Bool
+isTupleTyConLike nm = tupleName (name2String nm)
   where
     tupleName nm
       | '(' <- head nm
       , ')' <- last nm
       = all (== ',') (init $ tail nm)
     tupleName _ = False
-
-isTupleTyConLike _ = False
 
 -- | Get the DataCons belonging to a TyCon
 tyConDataCons :: TyCon -> [DataCon]

@@ -12,6 +12,8 @@ import           Control.Lens            ((.=),(<<%=))
 import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
 import           Data.Either             (partitionEithers)
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (pack)
 import           Unbound.LocallyNameless (Embed, Fresh, bind, embed, makeName,
@@ -23,7 +25,7 @@ import           CLaSH.Core.FreeVars     (termFreeIds, typeFreeVars)
 import           CLaSH.Core.Pretty       (showDoc)
 import           CLaSH.Core.Subst        (substTys)
 import           CLaSH.Core.Term         (LetBinding, Term (..), TmName)
-import           CLaSH.Core.TyCon        (TyCon (..), tyConDataCons)
+import           CLaSH.Core.TyCon        (TyCon (..), TyConName, tyConDataCons)
 import           CLaSH.Core.Type         (Type (..), TypeView (..),
                                           splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType)
@@ -53,21 +55,22 @@ splitNormalized expr = do
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType :: String
-                       -> (Type -> Maybe (Either String HWType))
+                       -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+                       -> HashMap TyConName TyCon
                        -> Type
                        -> HWType
-unsafeCoreTypeToHWType loc builtInTranslation = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation
+unsafeCoreTypeToHWType loc builtInTranslation m = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation m
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM :: String
                         -> Type
                         -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> pure ty
+unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
 coreTypeToHWTypeM :: Type
                   -> NetlistMonad (Maybe HWType)
-coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> pure ty)
+coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
 
 -- | Returns the name of the clock corresponding to a type
 synchronizedClk :: Type
@@ -75,7 +78,7 @@ synchronizedClk :: Type
 synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
-  = case name2String (tyConName tyCon) of
+  = case name2String tyCon of
       "CLaSH.Signal.Signal"    -> Just (pack "clk")
       "CLaSH.Sized.Vector.Vec" -> synchronizedClk (args!!1)
       "CLaSH.Signal.SignalP"   -> Just (pack "clk")
@@ -86,35 +89,37 @@ synchronizedClk ty
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
-coreTypeToHWType :: (Type -> Maybe (Either String HWType))
+coreTypeToHWType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+                 -> HashMap TyConName TyCon
                  -> Type
                  -> Either String HWType
-coreTypeToHWType builtInTranslation ty =
+coreTypeToHWType builtInTranslation m ty =
   fromMaybe
     (case tyView ty of
-       TyConApp tc args -> mkADT builtInTranslation (showDoc ty) tc args
+       TyConApp tc args -> mkADT builtInTranslation m (showDoc ty) tc args
        _                -> Left $ "Can't translate non-tycon type: " ++ showDoc ty)
-    (builtInTranslation ty)
+    (builtInTranslation m ty)
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
-mkADT :: (Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
+mkADT :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
+      -> HashMap TyConName TyCon -- ^ TyCon cache
       -> String -- ^ String representation of the Core type for error messages
-      -> TyCon -- ^ The TyCon
+      -> TyConName -- ^ The TyCon
       -> [Type] -- ^ Its applied arguments
       -> Either String HWType
-mkADT _ tyString tc _
-  | isRecursiveTy tc
+mkADT _ m tyString tc _
+  | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation tyString tc args = case tyConDataCons tc of
+mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! tc) of
   []  -> Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
   dcs -> do
-    let tcName       = pack . name2String $ tyConName tc
+    let tcName       = pack $ name2String tc
         argTyss      = map dcArgTys dcs
         argTVss      = map dcUnivTyVars dcs
         argSubts     = map (`zip` args) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
-    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation)) substArgTyss
+    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m)) substArgTyss
     case (dcs,argHTyss) of
       (_:[],[[elemTy]])      -> return elemTy
       (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
@@ -127,8 +132,8 @@ mkADT builtInTranslation tyString tc args = case tyConDataCons tc of
                                                 ) dcs elemHTys
 
 -- | Simple check if a TyCon is recursively defined.
-isRecursiveTy :: TyCon -> Bool
-isRecursiveTy tc = case tyConDataCons tc of
+isRecursiveTy :: HashMap TyConName TyCon -> TyConName -> Bool
+isRecursiveTy m tc = case tyConDataCons (m HashMap.! tc) of
     []  -> False
     dcs -> let argTyss      = map dcArgTys dcs
                argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
@@ -136,10 +141,11 @@ isRecursiveTy tc = case tyConDataCons tc of
 
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
-representableType :: (Type -> Maybe (Either String HWType))
+representableType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+                  -> HashMap TyConName TyCon
                   -> Type
                   -> Bool
-representableType builtInTranslation = either (const False) (const True) . coreTypeToHWType builtInTranslation
+representableType builtInTranslation m = either (const False) (const True) . coreTypeToHWType builtInTranslation m
 
 -- | Determines the bitsize of a type
 typeSize :: HWType
@@ -175,7 +181,10 @@ typeLength _            = 0
 termHWType :: String
            -> Term
            -> NetlistMonad HWType
-termHWType loc e = unsafeCoreTypeToHWTypeM loc =<< termType e
+termHWType loc e = do
+  m  <- Lens.use tcCache
+  ty <- termType m e
+  unsafeCoreTypeToHWTypeM loc ty
 
 -- | Turns a Core variable reference to a Netlist expression. Errors if the term
 -- is not a variable.

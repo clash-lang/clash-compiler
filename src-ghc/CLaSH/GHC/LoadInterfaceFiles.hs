@@ -2,12 +2,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
-module CLaSH.GHC.LoadInterfaceFiles where
+module CLaSH.GHC.LoadInterfaceFiles
+  (loadExternalExprs)
+where
 
 -- External Modules
 import           Data.Either                 (partitionEithers)
 import           Data.List                   (elemIndex, partition)
-import           Data.Maybe                  (isJust, isNothing, mapMaybe)
+import           Data.Maybe                  (isJust, isNothing)
 
 -- GHC API
 import qualified BasicTypes
@@ -15,18 +17,13 @@ import           CLaSH.GHC.Compat.Outputable (showPpr, showSDoc)
 import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
-import qualified DataCon
-import qualified Exception
-import qualified FamInstEnv
 import qualified GHC
-import qualified HscTypes
 import qualified Id
 import qualified IdInfo
 import qualified IfaceSyn
 import qualified LoadIface
 import qualified Maybes
 import qualified MkCore
-import qualified Module
 import qualified MonadUtils
 import qualified Name
 import           Outputable                  (text)
@@ -38,40 +35,7 @@ import qualified Var
 import qualified VarSet
 
 -- Internal Modules
-import           CLaSH.Util                  (curLoc, mapAccumLM, traceIf)
-
-getExternalTyCons ::
-  GHC.GhcMonad m
-  => [GHC.ModuleName]
-  -> GHC.Module
-  -> m ([GHC.ModuleName],[GHC.TyCon])
-getExternalTyCons visited module_ = (`Exception.gcatch` expCatch) $ do
-  (tcs,used) <- runIfl module_ $ do
-                  ifaceM <- loadIface module_
-                  case ifaceM of
-                    Nothing -> return ([],[])
-                    Just iface -> do
-                      let used = mapMaybe usageModule $ GHC.mi_usages iface
-                      tcs <- ifaceTyCons iface
-                      return (tcs,used)
-
-  let used' = filter ((`notElem` visited') . GHC.moduleName) used
-  (visited'',tcs') <- mapAccumLM getExternalTyCons (visited' ++ map GHC.moduleName used')
-                       used'
-  return (visited'',tcs ++ concat tcs')
-  where
-    modName  = GHC.moduleName module_
-    pId      = GHC.modulePackageId module_
-    visited' = modName:visited
-
-    expCatch :: GHC.GhcMonad m
-      => HscTypes.SourceError -> m ([GHC.ModuleName],[GHC.TyCon])
-    expCatch e = traceIf True ("Exception on loading interface for: " ++ showPpr modName ++ (":\n") ++ show e) return (modName:visited,[])
-
-    usageModule :: HscTypes.Usage -> Maybe GHC.Module
-    usageModule (HscTypes.UsagePackageModule {..}) = Just usg_mod
-    usageModule (HscTypes.UsageHomeModule {..})    = Just (Module.mkModule pId usg_mod_name)
-    usageModule _                                  = Nothing
+import           CLaSH.Util                  (curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
@@ -84,12 +48,6 @@ runIfl modName action = do
 
 loadDecl :: IfaceSyn.IfaceDecl -> TcRnTypes.IfL GHC.TyThing
 loadDecl = TcIface.tcIfaceDecl False
-
-ifaceTyCons :: HscTypes.ModIface -> TcRnTypes.IfL [GHC.TyCon]
-ifaceTyCons = fmap (\md -> (HscTypes.typeEnvTyCons . HscTypes.md_types) md ++
-                           (FamInstEnv.famInstsRepTyCons . HscTypes.md_fam_insts) md ++
-                           (Maybes.catMaybes . map DataCon.promoteDataCon_maybe . HscTypes.typeEnvDataCons . HscTypes.md_types) md
-                   ) . TcIface.typecheckIface
 
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
 loadIface foundMod = do

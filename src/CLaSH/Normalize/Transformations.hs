@@ -67,7 +67,7 @@ bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
-      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE)))
+      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
              <*> ((notElem idName . snd) <$> localFreeVars (unembed exprE))
 
     nonRepTest _ = return False
@@ -79,7 +79,7 @@ liftNonRep = liftBinders nonRepTest
 --  nonRepTest (Id _ tyE, _) =
 --    not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE))
     nonRepTest (Id idName tyE, exprE)
-      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE)))
+      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
              <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
 
     nonRepTest _ = return False
@@ -100,9 +100,10 @@ nonRepSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ termFreeTyVars e2
-  = R $ do e2Ty <- termType e2
+  = R $ do tcm <- Lens.use tcCache
+           e2Ty <- termType tcm e2
            localVar <- isLocalVar e2
-           nonRepE2 <- not <$> (representableType <$> Lens.use typeTranslator <*> pure e2Ty)
+           nonRepE2 <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure e2Ty)
            -- polyE2   <- isPolyFun e2
            if nonRepE2 && not localVar -- && not polyE2
              then runR $ specializeNorm ctx e
@@ -123,8 +124,9 @@ caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1) alts2)
   = R $ do
     alt1E   <- snd <$> unbind (head alts1)
-    alts1Ty <- termType alt1E
-    ty1Rep  <- representableType <$> Lens.use typeTranslator <*> pure alts1Ty
+    tcm     <- Lens.use tcCache
+    alts1Ty <- termType tcm alt1E
+    ty1Rep  <- representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure alts1Ty
     if not ty1Rep
       then do newAlts <- mapM ( return
                                   . uncurry bind
@@ -144,17 +146,18 @@ inlineNonRep _ e@(Case scrut alts)
   = R $ do
     isInlined <- liftR $ alreadyInlined f
     limit     <- liftR $ Lens.use inlineLimit
+    tcm       <- Lens.use tcCache
     if (Maybe.fromMaybe 0 isInlined) > limit
       then do
         cf <- liftR $ Lens.use curFun
         tt <- Lens.use typeTranslator
-        ty <- termType scrut
-        let hwty = unsafeCoreTypeToHWType $(curLoc) tt ty
+        ty <- termType tcm scrut
+        let hwty = unsafeCoreTypeToHWType $(curLoc) tt tcm ty
         error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ show hwty
       else do
-        scrutTy     <- termType scrut
+        scrutTy     <- termType tcm scrut
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
-        nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> pure scrutTy)
+        nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
             liftR $ addNewInline f
@@ -243,7 +246,8 @@ topLet ctx e
   untranslatable <- isUntranslatable e
   if untranslatable
     then return e
-    else do (argId,argVar) <- mkTmBinderFor "topLet" e
+    else do tcm <- Lens.use tcCache
+            (argId,argVar) <- mkTmBinderFor tcm "topLet" e
             changed . Letrec $ bind (rec [(argId,embed e)]) argVar
 
 topLet ctx e@(Letrec b)
@@ -254,7 +258,8 @@ topLet ctx e@(Letrec b)
     untranslatable <- isUntranslatable body
     if localVar || untranslatable
       then return e
-      else do (argId,argVar) <- mkTmBinderFor "topLet" body
+      else do tcm <- Lens.use tcCache
+              (argId,argVar) <- mkTmBinderFor tcm "topLet" body
               changed . Letrec $ bind (rec $ unrec binds ++ [(argId,embed body)]) argVar
 
 topLet _ e = return e
@@ -301,7 +306,8 @@ inlineClosed _ e@(Var _ f) = R $ do
   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
   case bodyMaybe of
     Just (_,body) -> do
-      closed <- isClosed body
+      tcm <- Lens.use tcCache
+      closed <- isClosed tcm body
       untranslatable <- isUntranslatable e
       if closed && not untranslatable
         then changed body
@@ -347,7 +353,8 @@ appProp _ (App (Case scrut alts) arg) = R $ do
                     ) alts
       changed $ Case scrut alts'
     else do
-      (boundArg,argVar) <- mkTmBinderFor "caseApp" arg
+      tcm <- Lens.use tcCache
+      (boundArg,argVar) <- mkTmBinderFor tcm "caseApp" arg
       alts' <- mapM ( return
                     . uncurry bind
                     . second (`App` argVar)
@@ -407,7 +414,8 @@ collectANF _ e@(App appf arg)
     untranslatable <- liftNormR $ isUntranslatable arg
     localVar       <- liftNormR $ isLocalVar arg
     case (untranslatable,localVar || isConstant arg,arg) of
-      (False,False,_) -> do (argId,argVar) <- liftNormR $ mkTmBinderFor "repANF" arg
+      (False,False,_) -> do tcm <- Lens.use tcCache
+                            (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "repANF" arg
                             tell [(argId,embed arg)]
                             return (App appf argVar)
       (True,False,Letrec b) -> do (binds,body) <- unbind b
@@ -424,7 +432,8 @@ collectANF _ (Letrec b) = do
   if localVar || untranslatable
     then return body
     else do
-      (argId,argVar) <- liftNormR $ mkTmBinderFor "bodyVar" body
+      tcm <- Lens.use tcCache
+      (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "bodyVar" body
       tell [(argId,embed body)]
       return argVar
 
@@ -433,7 +442,8 @@ collectANF ctx e@(Case subj alts) = do
     localVar           <- liftNormR $ isLocalVar subj
     (bndr,subj') <- if localVar || untranslatableSubj || isConstant subj
       then return ([],subj)
-      else do (argId,argVar) <- liftNormR $ mkTmBinderFor "subjLet" subj
+      else do tcm <- Lens.use tcCache
+              (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "subjLet" subj
               return ([(argId,embed subj)],argVar)
 
     untranslatableE <- liftNormR $ isUntranslatable e
@@ -454,19 +464,22 @@ collectANF ctx e@(Case subj alts) = do
       patSels <- Monad.zipWithM (doPatBndr subj' (unembed dc)) xs [0..]
       if lv || isConstant altExpr
         then return (patSels,alt)
-        else do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
+        else do tcm <- Lens.use tcCache
+                (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
                 return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
     doAlt' _ alt@(DataPat _ _, _) = return ([],alt)
     doAlt' _ alt@(pat,altExpr) = do
       lv <- isLocalVar altExpr
       if lv || isConstant altExpr
         then return ([],alt)
-        else do (altId,altVar) <- mkTmBinderFor "altLet" altExpr
+        else do tcm <- Lens.use tcCache
+                (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
                 return ([(altId,embed altExpr)],(pat,altVar))
 
     doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeMonad LetBinding
     doPatBndr subj' dc pId i
-      = do patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") ctx subj' (dcTag dc) i
+      = do tcm <- Lens.use tcCache
+           patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") tcm ctx subj' (dcTag dc) i
            return (pId,embed patExpr)
 
 collectANF _ e = return e
@@ -480,14 +493,15 @@ etaExpansionTL ctx (Lam b) = do
 
 etaExpansionTL ctx e
   = R $ do
-    isF <- isFun e
+    tcm <- Lens.use tcCache
+    isF <- isFun tcm e
     if isF
       then do
         argTy <- ( return
                  . fst
                  . Maybe.fromMaybe (error "etaExpansion splitFunTy")
-                 . splitFunTy
-                 <=< termType
+                 . splitFunTy tcm
+                 <=< termType tcm
                  ) e
         (newIdB,newIdV) <- mkInternalVar "eta" argTy
         e' <- runR $ etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
@@ -523,7 +537,8 @@ inlineHO :: NormRewrite
 inlineHO _ e@(App _ _)
   | (Var _ f, args) <- collectArgs e
   = R $ do
-    hasPolyFunArgs <- or <$> mapM (either isPolyFun (const (return False))) args
+    tcm <- Lens.use tcCache
+    hasPolyFunArgs <- or <$> mapM (either (isPolyFun tcm) (const (return False))) args
     if hasPolyFunArgs
       then do isInlined <- liftR $ alreadyInlined f
               limit     <- liftR $ Lens.use inlineLimit

@@ -11,7 +11,7 @@ where
 
 import           Data.Char               (isSymbol, isUpper, ord)
 import           Data.Traversable        (sequenceA)
-import           Data.Text.Lazy          (unpack)
+import           Data.Text               (unpack)
 import           GHC.Show                (showMultiLineString)
 import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
                                           hsep, int, integer, parens, punctuate,
@@ -24,7 +24,7 @@ import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
 import           CLaSH.Core.DataCon      (DataCon (..))
 import           CLaSH.Core.Literal      (Literal (..))
 import           CLaSH.Core.Term         (Pat (..), Term (..))
-import           CLaSH.Core.TyCon        (TyCon (..), isTupleTyConLike)
+import           CLaSH.Core.TyCon        (TyCon (..), TyConName, isTupleTyConLike)
 import           CLaSH.Core.Type         (ConstTy (..), Kind, LitTy (..),
                                           Type (..), TypeView (..), tyView)
 import           CLaSH.Core.Var          (Id, TyVar, Var, varKind, varName,
@@ -259,18 +259,18 @@ pprKind :: (Applicative m, LFresh m) => Kind -> m Doc
 pprKind = pprType
 
 pprTcApp :: (Applicative m, LFresh m) => TypePrec -> (TypePrec -> Type -> m Doc)
-  -> TyCon -> [Type] -> m Doc
+  -> TyConName -> [Type] -> m Doc
 pprTcApp _ _  tc []
   = ppr tc
 
 pprTcApp p pp tc tys
-  | isTupleTyConLike tc && tyConArity tc == length tys
+  | isTupleTyConLike tc
   = do
     tys' <- mapM (pp TopPrec) tys
     return $ parens $ sep $ punctuate comma tys'
 
   | otherwise
-  = pprTypeNameApp p pp (tyConName tc) tys
+  = pprTypeNameApp p pp tc tys
 
 pprTypeNameApp :: LFresh m => TypePrec -> (TypePrec -> Type -> m Doc)
   -> Name a -> [Type] -> m Doc

@@ -21,6 +21,7 @@ import           Control.Monad.Trans.Class   (lift)
 import qualified Control.Monad.Writer        as Writer
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
+import qualified Data.HashMap.Strict         as HMS
 import qualified Data.Map                    as Map
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
@@ -37,7 +38,7 @@ import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
                                               TmName)
-import           CLaSH.Core.TyCon            (tyConDataCons)
+import           CLaSH.Core.TyCon            (TyCon, TyConName, tyConDataCons)
 import           CLaSH.Core.Type             (KindOrType, TyName, Type (..),
                                               TypeView (..), transparentTy,
                                               typeKind, tyView)
@@ -73,9 +74,10 @@ apply name rewrite ctx expr = R $ do
   let expr'' = if hasChanged then expr' else expr
 
   Monad.when (lvl > DebugNone && hasChanged) $ do
-    beforeTy             <- fmap transparentTy $ termType expr
+    tcm                  <- Lens.use tcCache
+    beforeTy             <- fmap transparentTy $ termType tcm expr
     (beforeFTV,beforeFV) <- localFreeVars expr
-    afterTy              <- fmap transparentTy $ termType expr'
+    afterTy              <- fmap transparentTy $ termType tcm expr'
     (afterFTV,afterFV)   <- localFreeVars expr'
     let newFV = Set.size afterFTV > Set.size beforeFTV ||
                 Set.size afterFV > Set.size beforeFV
@@ -185,24 +187,26 @@ mkEnv ctx = do
 
 -- | Make a new binder and variable reference for a term
 mkTmBinderFor :: (Functor m, Fresh m, MonadUnique m)
-              => String -- ^ Name of the new binder
+              => HashMap TyConName TyCon -- ^ TyCon cache
+              -> String -- ^ Name of the new binder
               -> Term -- ^ Term to bind
               -> m (Id, Term)
-mkTmBinderFor name e = do
-  (Left r) <- mkBinderFor name (Left e)
+mkTmBinderFor tcm name e = do
+  (Left r) <- mkBinderFor tcm name (Left e)
   return r
 
 -- | Make a new binder and variable reference for either a term or a type
 mkBinderFor :: (Functor m, Monad m, MonadUnique m, Fresh m)
-            => String -- ^ Name of the new binder
+            => HashMap TyConName TyCon -- ^ TyCon cache
+            -> String -- ^ Name of the new binder
             -> Either Term Type -- ^ Type or Term to bind
             -> m (Either (Id,Term) (TyVar,Type))
-mkBinderFor name (Left term) =
-  Left <$> (mkInternalVar name =<< termType term)
+mkBinderFor tcm name (Left term) =
+  Left <$> (mkInternalVar name =<< termType tcm term)
 
-mkBinderFor name (Right ty) = do
+mkBinderFor tcm name (Right ty) = do
   name'     <- fmap (makeName name . toInteger) getUniqueM
-  let kind  = typeKind ty
+  let kind  = typeKind tcm ty
   return $ Right (TyVar name' (embed kind), VarTy kind name')
 
 -- | Make a new, unique, identifier and corresponding variable reference
@@ -315,7 +319,8 @@ liftBinding gamma delta (Id idName tyE,eE) = do
       boundFTVs = zipWith mkTyVar localFTVkinds localFTVs
       boundFVs  = zipWith mkId localFVtys' localFVs'
   -- Make a new global ID
-  newBodyTy <- termType $ mkTyLams (mkLams e boundFVs) boundFTVs
+  tcm       <- Lens.use tcCache
+  newBodyTy <- termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
   newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
   -- Make a new expression, consisting of the the lifted function applied to
   -- its free variables
@@ -340,7 +345,8 @@ mkFunction :: (Functor m, Monad m)
            -> Term -- ^ Term bound to the function
            -> RewriteMonad m (TmName,Type) -- ^ Name with a proper unique and the type of the function
 mkFunction bndr body = do
-  bodyTy <- termType body
+  tcm    <- Lens.use tcCache
+  bodyTy <- termType tcm body
   bodyId <- cloneVar bndr
   addGlobalBind bodyId bodyTy body
   return (bodyId,bodyTy)
@@ -373,7 +379,9 @@ isLocalVar _ = return False
 isUntranslatable :: (Functor m, Monad m)
                  => Term
                  -> RewriteMonad m Bool
-isUntranslatable tm = not <$> (representableType <$> Lens.use typeTranslator <*> termType tm)
+isUntranslatable tm = do
+  tcm <- Lens.use tcCache
+  not <$> (representableType <$> Lens.use typeTranslator <*> pure tcm <*> termType tcm tm)
 
 -- | Is the Context a Lambda/Term-abstraction context?
 isLambdaBodyCtx :: CoreContext
@@ -390,17 +398,18 @@ mkWildValBinder = fmap fst . mkInternalVar "wild"
 -- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
 mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
                => String -- ^ Name of the caller of this function
+               -> HashMap TyConName TyCon -- ^ TyCon cache
                -> [CoreContext] -- ^ Transformation Context in which this function is called
                -> Term -- ^ Subject of the case-composition
                -> Int -- n'th DataCon
                -> Int -- n'th field
                -> m Term
-mkSelectorCase caller _ scrut dcI fieldI = do
-  scrutTy <- termType scrut
+mkSelectorCase caller tcm _ scrut dcI fieldI = do
+  scrutTy <- termType tcm scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
   case transparentTy scrutTy of
     (tyView -> TyConApp tc args) ->
-      case tyConDataCons tc of
+      case tyConDataCons (tcm HMS.! tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc)
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max"
             | otherwise -> do
@@ -468,8 +477,9 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
                                 ]
             else do
               -- Make new binders for existing arguments
+              tcm                 <- Lens.use tcCache
               (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
-                                     mapM (mkBinderFor "pTS") args
+                                     mapM (mkBinderFor tcm "pTS") args
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
               newf <- mkFunction f newBody

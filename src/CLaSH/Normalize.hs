@@ -21,6 +21,7 @@ import           CLaSH.Core.Pretty         (showDoc)
 import           CLaSH.Core.Subst          (substTms)
 import           CLaSH.Core.Term           (Term (..), TmName)
 import           CLaSH.Core.Type           (Type)
+import           CLaSH.Core.TyCon          (TyCon, TyConName)
 import           CLaSH.Core.Util           (collectArgs, mkApps)
 import           CLaSH.Core.Var            (Id,varName)
 import           CLaSH.Netlist.Types       (HWType)
@@ -43,16 +44,18 @@ runNormalization :: DebugLevel
                  -- ^ UniqueSupply
                  -> HashMap TmName (Type,Term)
                  -- ^ Global Binders
-                 -> (Type -> Maybe (Either String HWType))
+                 -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
                  -- ^ Hardcoded Type -> HWType translator
+                 -> HashMap TyConName TyCon
+                 -- ^ TyCon cache
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization lvl supply globals typeTrans
+runNormalization lvl supply globals typeTrans tcm
   = flip State.evalState normState
   . runRewriteSession lvl rwState
   where
-    rwState   = RewriteState 0 globals supply typeTrans
+    rwState   = RewriteState 0 globals supply typeTrans tcm
     normState = NormalizeState
                   HashMap.empty
                   Map.empty

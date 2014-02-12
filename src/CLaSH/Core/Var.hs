@@ -20,6 +20,7 @@ module CLaSH.Core.Var
   )
 where
 
+import                Control.DeepSeq              as DS
 import                Unbound.LocallyNameless      as Unbound
 import                Unbound.LocallyNameless.Name (isFree)
 
@@ -57,6 +58,11 @@ instance Subst Type TyVar
 instance Subst Type Id where
   subst tvN u (Id idN ty) | isFree tvN = Id idN (subst tvN u ty)
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
+
+instance NFData (Name a) => NFData (Var a) where
+  rnf v = case v of
+    TyVar nm ki -> nm `deepseq` DS.rnf (unembed ki)
+    Id    nm ty -> nm `deepseq` DS.rnf (unembed ty)
 
 -- | Change the name of a variable
 modifyVarName ::

@@ -16,7 +16,6 @@ import           System.Process               (runInteractiveCommand,
 #else
 import qualified GHC.Paths
 #endif
-import           Data.List                    ((\\), nub)
 
 -- GHC API
 -- import qualified CorePrep
@@ -28,18 +27,14 @@ import qualified DynFlags
 import qualified GHC
 -- import qualified HscMain
 import qualified HscTypes
-import qualified HsImpExp
 import qualified MonadUtils
 import qualified Panic
-import qualified SrcLoc
 import qualified TidyPgm
--- import qualified TyCon
-import qualified TysPrim
-import qualified TysWiredIn
+-- import qualified TyCons
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.Util                   ((***) ,curLoc, mapAccumLM)
+import           CLaSH.Util                   (curLoc)
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
@@ -68,10 +63,9 @@ loadModules ::
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
-        , [GHC.TyCon]                              -- Type Constructors
         )
 loadModules modName = defaultErrorHandler $ do
-  libDir     <- MonadUtils.liftIO ghcLibDir
+  libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
     dflags <- GHC.getSessionDynFlags
@@ -83,8 +77,6 @@ loadModules modName = defaultErrorHandler $ do
                       { DynFlags.ctxtStkDepth = 1000
                       , DynFlags.optLevel = 2
                       , DynFlags.ghcMode  = GHC.CompManager
-                      , DynFlags.ghcLink  = if ghcDynamic then GHC.NoLink
-                                                          else GHC.LinkInMemory
                       } )
                     [DynFlags.Opt_TemplateHaskell,DynFlags.Opt_Arrows]
     let dflags2 = wantedOptimizationFlags dflags1
@@ -97,46 +89,30 @@ loadModules modName = defaultErrorHandler $ do
     case ldRes of
       GHC.Succeeded -> do
         modGraph <- GHC.getModuleGraph
-        let externalImports = concatMap ( map ( SrcLoc.unLoc
-                                              . HsImpExp.ideclName
-                                              . SrcLoc.unLoc
-                                              )
-                                        . GHC.ms_textual_imps
-                                        ) modGraph
-
-            internalMods = map (GHC.ms_mod_name) modGraph
-        externalMods   <- mapM (`GHC.findModule` Nothing ) (nub externalImports \\ internalMods)
-        externalTyCons <- fmap snd $
-                            mapAccumLM getExternalTyCons internalMods externalMods
-
-        let allExtTyCons = concat externalTyCons ++
-                                  TysWiredIn.wiredInTyCons ++
-                                  TysPrim.primTyCons
-
-            modGraph' = map disableOptimizationsFlags modGraph
+        let modGraph' = map disableOptimizationsFlags modGraph
         tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
                                      ; tcMod <- GHC.typecheckModule pMod
                                      ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod
                                      ; hsc_env <- GHC.getSession
                                      -- ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
                                      ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env dsMod
-                                     ; let tycons     = HscTypes.cg_tycons tidy_guts
+                                     -- ; let tycons     = HscTypes.cg_tycons tidy_guts
                                      ; let pgm        = HscTypes.cg_binds tidy_guts
                                      -- ; let pgm = HscTypes.mg_binds dsMod
                                      -- ; let dataTyCons = filter TyCon.isDataTyCon tycons
                                      -- ; dflags'' <- GHC.getSessionDynFlags
                                      -- ; prepBinders <- MonadUtils.liftIO $ CorePrep.corePrepPgm dflags'' hsc_env pgm dataTyCons
-                                     ; return (CoreSyn.flattenBinds pgm,tycons)
+                                     ; return (CoreSyn.flattenBinds pgm)
                                      }
                              ) modGraph'
 
-        let (binders,tyCons) = (concat *** concat) (unzip tidiedMods)
+        let binders = concat tidiedMods
 
         (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
                                                 (map snd binders)
                                                 (map fst binders)
 
-        return (binders ++ externalBndrs,clsOps,unlocatable,tyCons ++ allExtTyCons)
+        return (binders ++ externalBndrs,clsOps,unlocatable)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

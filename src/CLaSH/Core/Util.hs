@@ -13,6 +13,7 @@ import           CLaSH.Core.Term         (Pat (..), Term (..), TmName)
 import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
                                           isFunTy, isPolyFunCoreTy, mkFunTy,
                                           splitFunTy)
+import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.Var          (Id, TyVar, Var (..), varType)
 import           CLaSH.Util
 
@@ -23,25 +24,26 @@ type Delta = HashMap TyName Kind
 
 -- | Determine the type of a term
 termType :: (Functor m, Fresh m)
-         => Term
+         => HashMap TyConName TyCon
+         -> Term
          -> m Type
-termType e = case e of
+termType m e = case e of
   Var t _        -> return t
   Data dc        -> return $ dcType dc
   Literal l      -> return $ literalType l
   Prim _ t       -> return t
   Lam b          -> do (v,e') <- unbind b
-                       mkFunTy (unembed $ varType v) <$> termType e'
+                       mkFunTy (unembed $ varType v) <$> termType m e'
   TyLam b        -> do (tv,e') <- unbind b
-                       ForAllTy <$> bind tv <$> termType e'
+                       ForAllTy <$> bind tv <$> termType m e'
   App _ _        -> case collectArgs e of
-                      (fun, args) -> termType fun >>=
-                                     (`applyTypeToArgs` args)
-  TyApp e' ty    -> termType e' >>= (`applyTy` ty)
+                      (fun, args) -> termType m fun >>=
+                                     (flip (applyTypeToArgs m) args)
+  TyApp e' ty    -> termType m e' >>= (`applyTy` ty)
   Letrec b       -> do (_,e') <- unbind b
-                       termType e'
+                       termType m e'
   Case _ (alt:_) -> do (_,e') <- unbind alt
-                       termType e'
+                       termType m e'
   Case _ []      -> error $ $(curLoc) ++ "Empty case"
 
 -- | Split a (Type)Application in the applied term and it arguments
@@ -68,12 +70,16 @@ collectBndrs = go []
     go bs e' = return (reverse bs,e')
 
 -- | Get the result type of a polymorphic function given a list of arguments
-applyTypeToArgs :: Fresh m => Type -> [Either Term Type] -> m Type
-applyTypeToArgs opTy []              = return opTy
-applyTypeToArgs opTy (Right ty:args) = applyTy opTy ty >>=
-                                       (`applyTypeToArgs` args)
-applyTypeToArgs opTy (Left e:args)   = case splitFunTy opTy of
-  Just (_,resTy) -> applyTypeToArgs resTy args
+applyTypeToArgs :: Fresh m
+                => HashMap TyConName TyCon
+                -> Type
+                -> [Either Term Type]
+                -> m Type
+applyTypeToArgs _ opTy []              = return opTy
+applyTypeToArgs m opTy (Right ty:args) = applyTy opTy ty >>=
+                                          (flip (applyTypeToArgs m) args)
+applyTypeToArgs m opTy (Left e:args)   = case splitFunTy m opTy of
+  Just (_,resTy) -> applyTypeToArgs m resTy args
   Nothing        -> error $
                     concat [ $(curLoc)
                            , "applyTypeToArgs splitFunTy: not a funTy:\n"
@@ -140,15 +146,17 @@ mkTyApps = foldl TyApp
 
 -- | Does a term have a function type?
 isFun :: (Functor m, Fresh m)
-      => Term
+      => HashMap TyConName TyCon
+      -> Term
       -> m Bool
-isFun t = fmap isFunTy $ termType t
+isFun m t = fmap (isFunTy m) $ (termType m) t
 
 -- | Does a term have a function or polymorphic type?
 isPolyFun :: (Functor m, Fresh m)
-          => Term
+          => HashMap TyConName TyCon
+          -> Term
           -> m Bool
-isPolyFun t = isPolyFunCoreTy <$> termType t
+isPolyFun m t = isPolyFunCoreTy m <$> termType m t
 
 -- | Is a term a term-abstraction?
 isLam :: Term

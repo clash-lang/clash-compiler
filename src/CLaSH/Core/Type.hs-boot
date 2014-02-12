@@ -1,6 +1,8 @@
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module CLaSH.Core.Type where
 
+import                Control.DeepSeq
 import                Unbound.LocallyNameless
 
 import {-# SOURCE #-} CLaSH.Core.Term
@@ -19,5 +21,7 @@ instance Show  Type
 instance Alpha Type
 instance Subst Type Type
 instance Subst Term Type
+instance NFData Type
+instance NFData (Name Type)
 
-mkTyConTy :: TyCon -> Type
+mkTyConTy :: TyConName -> Type

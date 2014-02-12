@@ -20,6 +20,7 @@ import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Var          (Var (Id))
 import           CLaSH.Core.Term         (Term (..), TmName)
 import           CLaSH.Core.Type         (Type)
+import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.Util         (collectArgs, isPolyFun)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Util      (specialise)
@@ -49,9 +50,10 @@ specializeNorm = specialise specialisationCache specialisationHistory specialisa
 
 -- | Determine if a term is closed
 isClosed :: (Functor m, Fresh m)
-         => Term
+         => HashMap TyConName TyCon
+         -> Term
          -> m Bool
-isClosed = fmap not . isPolyFun
+isClosed tcm = fmap not . isPolyFun tcm
 
 -- | Determine if a term represents a constant
 isConstant :: Term -> Bool

@@ -6,33 +6,29 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module CLaSH.GHC.GHC2Core
-  ( makeAllTyDataCons
-  , coreToTerm
-  , coreToBndr
+  ( coreToTerm
+  , coreToId
   , coreToPrimBndr
   , coreToVar
+  , makeAllTyCons
   )
 where
 
 -- External Modules
-import           Control.Lens                (use, view, (%=))
-import           Control.Monad               (unless)
-import           Control.Monad.Reader        (Reader)
-import qualified Control.Monad.Reader        as Reader
-import           Control.Monad.State         (StateT, lift)
+import           Control.Monad.State         (State)
 import qualified Control.Monad.State.Lazy    as State
-import           Data.Hashable               (Hashable (..), hash)
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
-import           Data.Maybe                  (fromMaybe, isJust)
-import           Data.Text.Lazy              (pack)
+import qualified Data.HashMap.Strict         as HSM
+import           Data.Maybe                  (fromMaybe)
+import           Data.Text                   (pack)
+import qualified Data.Traversable            as T
 import           Unbound.LocallyNameless     (Rep, bind, embed, rebind, rec,
                                               runFreshM, string2Name, unbind,
                                               unembed)
 import qualified Unbound.LocallyNameless     as Unbound
 
 -- GHC API
-import           BasicTypes                  (TupleSort (..))
 import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)
 import           CLaSH.GHC.Compat.Outputable (showPpr)
 import           CLaSH.GHC.Compat.TyCon      (isSuperKindTyCon)
@@ -58,7 +54,7 @@ import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
                                               SynTyConRhs (..), TyCon,
                                               algTyConRhs, isAlgTyCon,
                                               isFunTyCon, isNewTyCon,
-                                              isPrimTyCon, isPromotedDataCon,
+                                              isPrimTyCon,
                                               isSynTyCon, isTupleTyCon,
                                               synTyConRhs_maybe, tyConArity,
                                               tyConDataCons, tyConKind,
@@ -66,9 +62,6 @@ import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
                                               tyConUnique)
 import           Type                        (tcView)
 import           TypeRep                     (TyLit (..), Type (..))
-import           TysWiredIn                  (tupleTyCon,promotedFalseDataCon,
-                                              promotedTrueDataCon)
-import           TcTypeNats                  (typeNatTyCons)
 import           Unique                      (Uniquable (..), Unique, getKey)
 import           Var                         (Id, TyVar, Var, idDetails,
                                               isTyVar, varName, varType,
@@ -85,51 +78,20 @@ import qualified CLaSH.Core.Var              as C
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
 
-instance Show TyCon where
-  show = showPpr
-
-type R    = Reader GHC2CoreState
-type SR a = StateT GHC2CoreState R a
-
-data GHC2CoreState
-  = GHC2CoreState
-  { _tyConMap       :: HashMap TyCon   C.TyCon
-  , _dataConMap     :: HashMap DataCon C.DataCon
-  , _dataConWrapMap :: HashMap DataCon C.DataCon
-  }
-
-makeLenses ''GHC2CoreState
-
-instance Hashable TyCon where
-  hashWithSalt s = hashWithSalt s . getKey . getUnique
-
-instance Hashable DataCon where
-  hashWithSalt s dc = hashWithSalt s (dataConTag dc `hashWithSalt` hash (dataConTyCon dc))
-
-makeAllTyDataCons :: [TyCon] -> GHC2CoreState
-makeAllTyDataCons tyCons =
-  let s = Reader.runReader (State.execStateT
-                              (mapM_ makeTyCon toConvert)
-                              emptyState)
-                           s
-  in  s
+makeAllTyCons :: HashMap C.TyConName TyCon
+              -> HashMap C.TyConName C.TyCon
+makeAllTyCons hm = go hm hm
   where
-    emptyState     = GHC2CoreState HashMap.empty HashMap.empty HashMap.empty
-    tupleTyCons    = concat [ map (`tupleTyCon` x)
-                               [BoxedTuple,UnboxedTuple,ConstraintTuple]
-                            | x <- [2..62]
-                            ]
-    toConvert      = concat [tyCons,tupleTyCons,typeNatTyCons,[promotedFalseDataCon,promotedTrueDataCon]]
+    go old new
+        | HSM.null new = HSM.empty
+        | otherwise    = tcm `HSM.union` tcm'
+      where
+        (tcm,old') = State.runState (T.mapM makeTyCon new) old
+        tcm'       = go old' (old' `HSM.difference` old)
 
-
-makeTyCon ::
-  TyCon
-  -> SR ()
-makeTyCon tc = do
-    alreadyConverted <- fmap (isJust . HashMap.lookup tc) $ use tyConMap
-    unless alreadyConverted $ do
-      tycon' <- tycon
-      tyConMap %= HashMap.insert tc tycon'
+makeTyCon :: TyCon
+          -> State (HashMap C.TyConName TyCon) C.TyCon
+makeTyCon tc = tycon
   where
     tycon
       | isTupleTyCon tc     = mkTupleTyCon
@@ -143,7 +105,7 @@ makeTyCon tc = do
         tcArity = tyConArity tc
 
         mkAlgTyCon = do
-          tcKind <- lift $ coreToType (tyConKind tc)
+          tcKind <- coreToType (tyConKind tc)
           tcRhsM <- makeAlgTyConRhs $ algTyConRhs tc
           case tcRhsM of
             Just tcRhs ->
@@ -154,11 +116,11 @@ makeTyCon tc = do
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcRhs
                 }
-            Nothing -> return $! C.PrimTyCon tcName tcKind tcArity C.VoidRep
+            Nothing -> return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
 
         mkTupleTyCon = do
-          tcKind <- lift $ coreToType (tyConKind tc)
-          tcDc   <- fmap (C.DataTyCon . (:[])) . makeDataCon . head . tyConDataCons $ tc
+          tcKind <- coreToType (tyConKind tc)
+          tcDc   <- fmap (C.DataTyCon . (:[])) . coreToDataCon False . head . tyConDataCons $ tc
           return
             C.AlgTyCon
             { C.tyConName   = tcName
@@ -168,7 +130,7 @@ makeTyCon tc = do
             }
 
         mkPrimTyCon = do
-          tcKind <- lift $ coreToType (tyConKind tc)
+          tcKind <- coreToType (tyConKind tc)
           return
             C.PrimTyCon
             { C.tyConName    = tcName
@@ -182,55 +144,26 @@ makeTyCon tc = do
           }
 
         mkVoidTyCon = do
-          tcKind <- lift $ coreToType (tyConKind tc)
-          return $! C.PrimTyCon tcName tcKind tcArity C.VoidRep
+          tcKind <- coreToType (tyConKind tc)
+          return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
 
-makeAlgTyConRhs ::
-  AlgTyConRhs
-  -> SR (Maybe C.AlgTyConRhs)
+makeAlgTyConRhs :: AlgTyConRhs
+                -> State (HashMap C.TyConName TyCon) (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
-  DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM makeDataCon dcs
-  NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> makeDataCon dc
+  DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM (coreToDataCon False) dcs
+  NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon False dc
                                                            <*> ((,) (map coreToVar rhsTvs) <$>
-                                                                lift (coreToType rhsEtad)))
+                                                                    coreToType rhsEtad
+                                                               )
+                                               )
   AbstractTyCon _ -> return Nothing
   DataFamilyTyCon -> return Nothing
 
-makeDataCon ::
-  DataCon
-  -> SR C.DataCon
-makeDataCon dc = do
-  repTys   <- lift $ mapM coreToType (dataConRepArgTys dc)
-  workIdTy <- lift $ coreToType (varType $ dataConWorkId dc)
-  let mkDataCon dcty =
-        C.MkData
-          { C.dcName       = coreToName dataConName getUnique nameString dc
-          , C.dcTag        = dataConTag dc
-          , C.dcType       = dcty
-          , C.dcArgTys     = repTys
-          , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
-          , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
-          }
-
-      dataCon = mkDataCon workIdTy
-
-  dataConMap %= HashMap.insert dc dataCon
-
-  case dataConWrapId_maybe dc of
-    Just wrapId -> do wrapIdTy <- lift . coreToType $ varType wrapId
-                      let dataConWrap = mkDataCon wrapIdTy
-                      dataConWrapMap %= HashMap.insert dc dataConWrap
-    Nothing     -> return ()
-
-  return dataCon
-
-coreToTerm ::
-  PrimMap
-  -> [Var]
-  -> GHC2CoreState
-  -> CoreExpr
-  -> C.Term
-coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
+coreToTerm :: PrimMap
+           -> [Var]
+           -> CoreExpr
+           -> State (HashMap C.TyConName TyCon) C.Term
+coreToTerm primMap unlocs coreExpr = term coreExpr
   where
     term (Var x)                 = var x
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
@@ -312,21 +245,29 @@ coreToTerm primMap unlocs s coreExpr = Reader.runReader (term coreExpr) s
                                   mapM coreToId tmvs)) <*>
                               term e
 
-coreToDataCon ::
-  Bool
-  -> DataCon
-  -> R C.DataCon
-coreToDataCon False dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon: " ++ showPpr dc ++ " not found")
-                              . HashMap.lookup dc
-                              ) $ view dataConMap
+coreToDataCon :: Bool
+              -> DataCon
+              -> State (HashMap C.TyConName TyCon) C.DataCon
+coreToDataCon mkWrap dc = do
+    repTys <- mapM coreToType (dataConRepArgTys dc)
+    dcTy   <- if mkWrap
+                then case dataConWrapId_maybe dc of
+                        Just wrapId -> coreToType (varType wrapId)
+                        Nothing     -> error $ $(curLoc) ++ "DataCon Wrapper: " ++ showPpr dc ++ " not found"
+                else coreToType (varType $ dataConWorkId dc)
+    return (mkDc dcTy repTys)
+  where
+    mkDc dcTy repTys = C.MkData
+              { C.dcName       = coreToName dataConName getUnique nameString dc
+              , C.dcTag        = dataConTag dc
+              , C.dcType       = dcTy
+              , C.dcArgTys     = repTys
+              , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
+              , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
+              }
 
-coreToDataCon True dc = fmap ( fromMaybe (error $ $(curLoc) ++ "DataCon Wrapper: " ++ showPpr dc ++ " not found")
-                              . HashMap.lookup dc
-                              ) $ view dataConWrapMap
-
-coreToLiteral ::
-  Literal
-  -> C.Literal
+coreToLiteral :: Literal
+              -> C.Literal
 coreToLiteral l = case l of
   MachStr    fs  -> C.StringLiteral (unpackFB fs)
   MachInt    i   -> C.IntegerLiteral i
@@ -336,43 +277,33 @@ coreToLiteral l = case l of
   LitInteger i _ -> C.IntegerLiteral i
   _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ showPpr l
 
-coreToType ::
-  Type
-  -> R C.Type
+coreToType :: Type
+           -> State (HashMap C.TyConName TyCon) C.Type
 coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
 
-coreToType' ::
-  Type
-  -> R C.Type
+coreToType' :: Type
+            -> State (HashMap C.TyConName TyCon) C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> pure (coreToVar tv)
 coreToType' (TyConApp (synTyConRhs_maybe -> Just (SynonymTyCon ty)) args) =
   foldl C.AppTy <$> coreToType ty <*> mapM coreToType args
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
-  | otherwise     = C.mkTyConApp <$> coreToTyCon tc <*> mapM coreToType args
+  | otherwise     = do let tcName = coreToName tyConName tyConUnique qualfiedNameString tc
+                       State.modify (HSM.insert tcName tc)
+                       C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
                                (bind <$> coreToTyVar tv <*> coreToType ty)
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 
-coreToTyLit ::
-  TyLit
-  -> C.LitTy
+coreToTyLit :: TyLit
+            -> C.LitTy
 coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 
-coreToTyCon ::
-  TyCon
-  -> R C.TyCon
-coreToTyCon tc = ( fromMaybe (error $ $(curLoc) ++ "TyCon: " ++ showPpr tc ++
-                                      " not found " ++ show (TyCon.isPromotedDataCon tc) )
-                 . HashMap.lookup tc
-                 ) <$> view tyConMap
-
-coreToPrimRep ::
-  PrimRep
-  -> C.PrimRep
+coreToPrimRep :: PrimRep
+              -> C.PrimRep
 coreToPrimRep p = case p of
   VoidRep -> C.VoidRep
   IntRep  -> C.IntRep
@@ -380,67 +311,52 @@ coreToPrimRep p = case p of
   PtrRep  -> C.VoidRep
   _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p
 
-coreToTyVar ::
-  TyVar
-  -> R C.TyVar
+coreToTyVar :: TyVar
+            -> State (HashMap C.TyConName TyCon) C.TyVar
 coreToTyVar tv =
   C.TyVar (coreToVar tv) <$> (embed <$> coreToType (varType tv))
 
-coreToBndr ::
-  GHC2CoreState
-  -> Id
-  -> C.Id
-coreToBndr s bndr = Reader.runReader (coreToId bndr) s
+coreToPrimBndr :: HashMap C.TyConName TyCon
+               -> Id
+               -> C.Id
+coreToPrimBndr s bndr = State.evalState (coreToPrimId bndr) s
 
-coreToPrimBndr ::
-  GHC2CoreState
-  -> Id
-  -> C.Id
-coreToPrimBndr s bndr = Reader.runReader (coreToPrimId bndr) s
-
-coreToPrimId ::
-  Id
-  -> R C.Id
+coreToPrimId :: Id
+             -> State (HashMap C.TyConName TyCon) C.Id
 coreToPrimId i =
   C.Id (coreToPrimVar i) <$> (embed <$> coreToType (varType i))
 
-coreToId ::
-  Id
-  -> R C.Id
+coreToId :: Id
+         -> State (HashMap C.TyConName TyCon) C.Id
 coreToId i =
   C.Id (coreToVar i) <$> (embed <$> coreToType (varType i))
 
-coreToVar ::
-  Rep a
-  => Var
-  -> Unbound.Name a
+coreToVar :: Rep a
+          => Var
+          -> Unbound.Name a
 coreToVar = coreToName varName varUnique qualfiedNameStringM
 
-coreToPrimVar ::
-  Var
-  -> Unbound.Name C.Term
+coreToPrimVar :: Var
+              -> Unbound.Name C.Term
 coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
-coreToName ::
-  Rep a
-  => (b -> Name)
-  -> (b -> Unique)
-  -> (Name -> String)
-  -> b
-  -> Unbound.Name a
+coreToName :: Rep a
+           => (b -> Name)
+           -> (b -> Unique)
+           -> (Name -> String)
+           -> b
+           -> Unbound.Name a
 coreToName toName toUnique toString v =
   Unbound.makeName
     (toString $ toName v)
     (toInteger . getKey . toUnique $ v)
 
-nameString ::
-  Name
-  -> String
+nameString :: Name
+           -> String
 nameString = occNameString . nameOccName
 
-qualfiedNameString ::
-  Name
-  -> String
+qualfiedNameString :: Name
+                   -> String
 qualfiedNameString n = fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName)
   where
     occName = occNameString $ nameOccName n

@@ -7,21 +7,22 @@ import           Control.Applicative  ((<$>), (<*>), (<|>))
 import           Data.Aeson           (FromJSON (..), Value (..), (.:))
 import           Data.HashMap.Lazy    (HashMap)
 import qualified Data.HashMap.Strict  as H
+import qualified Data.Text            as S
 import           Data.Text.Lazy       (Text)
 
 -- | Primitive Definitions
-type PrimMap = HashMap Text Primitive
+type PrimMap = HashMap S.Text Primitive
 
 -- | Externally defined primitive
 data Primitive
   -- | A primitive that has a template that can be filled out by the backend render
   = BlackBox
-  { name     :: Text -- ^ Name of the primitive
+  { name     :: S.Text -- ^ Name of the primitive
   , template :: Either Text Text -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
   | Primitive
-  { name     :: Text -- ^ Name of the primitive
+  { name     :: S.Text -- ^ Name of the primitive
   , primType :: Text -- ^ Additional information
   }
 

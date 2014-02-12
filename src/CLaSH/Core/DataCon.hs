@@ -15,7 +15,8 @@ module CLaSH.Core.DataCon
   )
 where
 
-import                Unbound.LocallyNameless as Unbound
+import                Control.DeepSeq
+import                Unbound.LocallyNameless as Unbound hiding (rnf)
 
 import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
@@ -69,6 +70,14 @@ instance Alpha DataCon where
 
 instance Subst Type DataCon
 instance Subst Term DataCon
+
+instance NFData DataCon where
+  rnf dc = case dc of
+    MkData nm tag ty uv ev args -> rnf nm `seq` rnf tag `seq` rnf ty `seq`
+                                   rnf uv `seq` rnf ev `seq` rnf args
+
+instance NFData (Name DataCon) where
+  rnf nm = rnf (show nm)
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.

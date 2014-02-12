@@ -17,6 +17,7 @@ import Unbound.LocallyNameless              (Fresh, FreshMT)
 
 import CLaSH.Core.Term                      (Term, TmName)
 import CLaSH.Core.Type                      (Type)
+import CLaSH.Core.TyCon                     (TyCon, TyConName)
 import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Primitives.Types               (PrimMap)
 import CLaSH.Util
@@ -46,7 +47,8 @@ data NetlistState
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: PrimMap -- ^ Primitive Definitions
   , _vhdlMState     :: VHDLState -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
-  , _typeTranslator :: Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
+  , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
+  , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
   }
 
 -- | Signal reference

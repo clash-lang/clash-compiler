@@ -13,7 +13,8 @@ module CLaSH.Core.Literal
   )
 where
 
-import                Unbound.LocallyNameless       as Unbound
+import                Control.DeepSeq
+import                Unbound.LocallyNameless       as Unbound hiding (rnf)
 import                Unbound.LocallyNameless.Alpha
 
 import {-# SOURCE #-} CLaSH.Core.Term               (Term)
@@ -36,6 +37,11 @@ instance Alpha Literal where
 
 instance Subst Type Literal
 instance Subst Term Literal
+
+instance NFData Literal where
+  rnf l = case l of
+    IntegerLiteral i -> rnf i
+    StringLiteral s  -> rnf s
 
 -- | Determines the Type of a Literal
 literalType :: Literal

@@ -50,14 +50,15 @@ import           CLaSH.Util
 genTestBench :: DebugLevel
              -> Supply
              -> PrimMap                      -- ^ Primitives
-             -> (Type -> Maybe (Either String HWType))
+             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+             -> HashMap TyConName TyCon
              -> VHDLState
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],VHDLState)
-genTestBench dbgLvl supply primMap typeTrans vhdlState globals stimuliNmM expectedNmM
+genTestBench dbgLvl supply primMap typeTrans tcm vhdlState globals stimuliNmM expectedNmM
   (Component cName [(clkName,Clock rate),(rstName,Reset reset)] [inp] outp _)
   = eitherT error return $ do
   let rateF  = fromIntegral rate :: Float
@@ -65,7 +66,7 @@ genTestBench dbgLvl supply primMap typeTrans vhdlState globals stimuliNmM expect
       emptyStimuli = right ([],[],vhdlState,0)
   (inpDecls,inpComps,vhdlState',inpCnt) <- flip (maybe emptyStimuli) stimuliNmM $ \stimuliNm -> do
     (decls,sigVs,comps,vhdlState') <- prepareSignals vhdlState primMap globals
-                                        typeTrans normalizeSignal Nothing
+                                        typeTrans tcm normalizeSignal Nothing
                                         stimuliNm
 
     let sigAs     = zipWith delayedSignal sigVs
@@ -78,7 +79,7 @@ genTestBench dbgLvl supply primMap typeTrans vhdlState globals stimuliNmM expect
 
   let emptyExpected = right ([],[],vhdlState',0)
   (expDecls,expComps,vhdlState'',expCnt) <- flip (maybe emptyExpected) expectedNmM $ \expectedNm -> do
-    (decls,sigVs,comps,vhdlState'') <- prepareSignals vhdlState' primMap globals typeTrans normalizeSignal (Just inpCnt) expectedNm
+    (decls,sigVs,comps,vhdlState'') <- prepareSignals vhdlState' primMap globals typeTrans tcm normalizeSignal (Just inpCnt) expectedNm
     let asserts  = map (genAssert (fst outp)) sigVs
         procDecl = PP.vsep
                    [ "process is"
@@ -139,9 +140,9 @@ genTestBench dbgLvl supply primMap typeTrans vhdlState globals stimuliNmM expect
                     -> TmName
                     -> [(TmName,(Type,Term))])
     normalizeSignal glbls bndr =
-      runNormalization dbgLvl supply glbls typeTrans (normalize [bndr] >>= cleanupGraph bndr)
+      runNormalization dbgLvl supply glbls typeTrans tcm (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
+genTestBench _ _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
 
 delayedSignal :: Text
               -> Float
@@ -176,7 +177,8 @@ genAssert compO expV = PP.hsep
 prepareSignals :: VHDLState
                -> PrimMap
                -> HashMap TmName (Type,Term)
-               -> (Type -> Maybe (Either String HWType))
+               -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+               -> HashMap TyConName TyCon
                -> ( HashMap TmName (Type,Term)
                     -> TmName
                     -> [(TmName,(Type,Term))])
@@ -184,7 +186,7 @@ prepareSignals :: VHDLState
                -> TmName
                -> EitherT String IO
                     ([Declaration],[Identifier],[Component],VHDLState)
-prepareSignals vhdlState primMap globals typeTrans normalizeSignal mStart signalNm = do
+prepareSignals vhdlState primMap globals typeTrans tcm normalizeSignal mStart signalNm = do
   let signalS = name2String signalNm
   (signalTy,signalTm) <- hoistEither $ note ($(curLoc) ++ "Unable to find: " ++ signalS)
                                             (HashMap.lookup signalNm globals)
@@ -198,7 +200,7 @@ prepareSignals vhdlState primMap globals typeTrans normalizeSignal mStart signal
                                   . fst
                                   ) elemBnds
 
-  lift $ createSignal vhdlState primMap typeTrans mStart signalList_normalized
+  lift $ createSignal vhdlState primMap typeTrans tcm mStart signalList_normalized
 
 termToList :: Monad m => Term -> EitherT String m [Term]
 termToList e = case second lefts $ collectArgs e of
@@ -217,18 +219,19 @@ termToList e = case second lefts $ collectArgs e of
 stimuliElemTy :: Monad m => Type -> EitherT String m Type
 stimuliElemTy ty = case splitTyConAppM ty of
   (Just (tc,[arg]))
-    | name2String (tyConName tc) == "GHC.Types.[]" -> return arg
-    | name2String (tyConName tc) == "Prelude.List.List" -> return arg
+    | name2String tc == "GHC.Types.[]" -> return arg
+    | name2String tc == "Prelude.List.List" -> return arg
     | otherwise -> left $ $(curLoc) ++ "Not a List TyCon: " ++ showDoc ty
   _ -> left $ $(curLoc) ++ "Not a List TyCon: " ++ showDoc ty
 
 createSignal :: VHDLState
              -> PrimMap
-             -> (Type -> Maybe (Either String HWType))
+             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+             -> HashMap TyConName TyCon
              -> Maybe Int
              -> [[(TmName,(Type,Term))]]
              -> IO ([Declaration],[Identifier],[Component],VHDLState)
-createSignal vhdlState primMap typeTrans mStart normalizedSignals = do
+createSignal vhdlState primMap typeTrans tcm mStart normalizedSignals = do
   let (signalHds,signalTls) = unzip $ map (\(l:ls) -> (l,ls)) normalizedSignals
       sigEs                 = map (\(_,(_,Letrec b)) -> unrec . fst $ unsafeUnbind b
                                   ) signalHds
@@ -240,6 +243,7 @@ createSignal vhdlState primMap typeTrans mStart normalizedSignals = do
   (Component _ _ _ _ decls:comps,vhdlState') <- genNetlist (Just vhdlState)
                                                              (HashMap.fromList $ newBndr : concat signalTls)
                                                              primMap
+                                                             tcm
                                                              typeTrans
                                                              mStart
                                                              (fst $ head signalHds)

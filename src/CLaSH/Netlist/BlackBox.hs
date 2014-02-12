@@ -18,7 +18,8 @@ import qualified Data.HashMap.Lazy             as HashMap
 import           Data.List                     (partition)
 import           Data.Maybe                    (catMaybes, fromJust)
 import           Data.Monoid                   (mconcat)
-import           Data.Text.Lazy                (Text, pack, unpack)
+import           Data.Text.Lazy                (Text, pack)
+import           Data.Text                     (unpack)
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
@@ -45,7 +46,8 @@ mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox applicati
                   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
     -- Make context inputs
-    args'                 <- fmap (zip args) $ mapM isFun args
+    tcm                   <- Lens.use tcCache
+    args'                 <- fmap (zip args) $ mapM (isFun tcm) args
     (varInps,declssV)     <- fmap (unzip . catMaybes)  $ mapM (runMaybeT . mkInput) args'
     let (_,otherArgs)     = partitionEithers $ map unVar args'
         (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
@@ -99,7 +101,8 @@ mkInput (e, False) = case collectArgs e of
       case bbM of
         Just p@(P.BlackBox {}) -> do
           i           <- lift $ varCount <<%= (+1)
-          ty          <- termType e
+          tcm         <- Lens.use tcCache
+          ty          <- termType tcm e
           let dstNm   = "bb_sig_" ++ show i
               dstId   = pack dstNm
               resId   = Id (string2Name dstNm) (embed ty)
@@ -127,7 +130,8 @@ mkLitInput :: Term -- ^ The literal argument term
 mkLitInput (C.Literal (IntegerLiteral i))     = return ((pack $ show i,Integer),[])
 mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   typeTrans <- Lens.use typeTranslator
-  args' <- filterM (fmap (representableType typeTrans) . termType) (lefts args)
+  tcm   <- Lens.use tcCache
+  args' <- filterM (fmap (representableType typeTrans tcm) . termType tcm) (lefts args)
   hwTy  <- N.termHWType $(curLoc) e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'
   exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN

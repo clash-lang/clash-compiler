@@ -16,10 +16,12 @@ module CLaSH.Core.Term
 where
 
 -- External Modules
-import                Unbound.LocallyNameless       as Unbound hiding (Data)
+import                Control.DeepSeq
+import                Unbound.LocallyNameless       as Unbound hiding (Data,rnf)
 import                Unbound.LocallyNameless.Alpha (aeqR1, fvR1)
 import                Unbound.LocallyNameless.Name  (isFree)
-import                Data.Text.Lazy                (Text)
+import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
+import                Data.Text                     (Text)
 
 -- Internal Modules
 import                CLaSH.Core.DataCon            (DataCon)
@@ -102,3 +104,28 @@ instance Subst Type Term where
 
 instance Subst Term Text
 instance Subst Type Text
+
+instance NFData Term where
+  rnf tm = case tm of
+    Var     ty nm -> rnf ty `seq` rnf nm
+    Data    dc    -> rnf dc
+    Literal l     -> rnf l
+    Prim    nm ty -> rnf nm `seq` rnf ty
+    Lam     b     -> case unsafeUnbind b of
+                       (id_,tm) -> rnf id_ `seq` rnf tm
+    TyLam   b       -> case unsafeUnbind b of
+                         (tv,tm) -> rnf tv `seq` rnf tm
+    App     tmL tmR -> rnf tmL `seq` rnf tmR
+    TyApp   tm ty   -> rnf tm `seq` rnf ty
+    Letrec  b       -> case unsafeUnbind b of
+                        (bs,e) -> rnf (map (second unembed) (unrec bs)) `seq` rnf e
+    Case    sc alts -> rnf sc `seq` rnf (map unsafeUnbind alts)
+
+instance NFData Pat where
+  rnf p = case p of
+    DataPat dcE xs -> rnf (unembed dcE) `seq` rnf (unrebind xs)
+    LitPat  lE     -> rnf (unembed lE)
+    DefaultPat     -> ()
+
+instance NFData (Name Term) where
+  rnf nm = rnf (show nm)

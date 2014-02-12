@@ -4,8 +4,10 @@
 module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply    as Supply
+import           Control.DeepSeq
 import           Control.Monad.State          (evalState)
 import           Control.Lens                 (_1, use)
+import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Lazy            as HashMap
 import qualified Data.HashSet                 as HashSet
 import           Data.List                    (isSuffixOf)
@@ -18,6 +20,7 @@ import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
 import           Unbound.LocallyNameless      (name2String)
 
 import           CLaSH.Core.Type              (Type)
+import           CLaSH.Core.TyCon             (TyCon, TyConName)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
@@ -36,12 +39,13 @@ import qualified Data.Time.Clock              as Clock
 -- | Create a set of .VHDL files for a set of functions
 generateVHDL :: BindingMap -- ^ Set of functions
              -> PrimMap -- ^ Primitive / BlackBox Definitions
-             -> (Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
+             -> HashMap TyConName TyCon -- ^ TyCon cache
+             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
              -> DebugLevel -- ^ Debug information level for the normalization process
              -> IO ()
-generateVHDL bindingsMap primMap typeTrans dbgLevel = do
+generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
   start <- Clock.getCurrentTime
-  prepTime <- bindingsMap `seq` Clock.getCurrentTime
+  prepTime <- bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
   putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
@@ -74,15 +78,15 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
                       cleanupGraph (fst topEntity) normChecked
 
           transformedBindings =
-            runNormalization dbgLevel supplyN preppedMap typeTrans doNorm
+            runNormalization dbgLevel supplyN preppedMap typeTrans tcm doNorm
 
-      normTime <- transformedBindings `seq` Clock.getCurrentTime
+      normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       (netlist,vhdlState) <- genNetlist Nothing
                                (HashMap.fromList transformedBindings)
-                               primMap typeTrans Nothing (fst topEntity)
+                               primMap tcm typeTrans Nothing (fst topEntity)
 
       netlistTime <- netlist `seq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -95,7 +99,7 @@ generateVHDL bindingsMap primMap typeTrans dbgLevel = do
                                 netlist
 
       (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
-                                  typeTrans vhdlState preppedMap
+                                  typeTrans tcm vhdlState preppedMap
                                   (listToMaybe $ map fst testInputs)
                                   (listToMaybe $ map fst expectedOutputs)
                                   topComponent
