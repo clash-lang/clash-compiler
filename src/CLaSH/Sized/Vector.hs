@@ -72,7 +72,7 @@ vhead (x :> _) = x
 
 {-# NOINLINE vtail #-}
 vtail :: Vec (n + 1) a -> Vec n a
-vtail (_ :> xs) = xs
+vtail (_ :> xs) = unsafeCoerce xs
 
 {-# NOINLINE vlast #-}
 vlast :: Vec (n + 1) a -> a
@@ -81,8 +81,8 @@ vlast (_ :> y :> ys) = vlast (y :> ys)
 
 {-# NOINLINE vinit #-}
 vinit :: Vec (n + 1) a -> Vec n a
-vinit (_ :> Nil)     = Nil
-vinit (x :> y :> ys) = (x :> vinit (y :> ys))
+vinit (_ :> Nil)     = unsafeCoerce Nil
+vinit (x :> y :> ys) = unsafeCoerce (x :> vinit (y :> ys))
 
 {-# NOINLINE shiftIntoL #-}
 shiftIntoL :: a -> Vec n a -> Vec n a
@@ -117,7 +117,7 @@ xs <<+ s = shiftIntoR s xs
 {-# NOINLINE vappend #-}
 vappend :: Vec n a -> Vec m a -> Vec (n + m) a
 vappend Nil       ys = ys
-vappend (x :> xs) ys = (x :> (vappend xs ys))
+vappend (x :> xs) ys = unsafeCoerce (x :> (vappend xs ys))
 
 infixr 5 <++>
 {-# INLINE (<++>) #-}
@@ -130,7 +130,7 @@ vsplit n xs = vsplitU (toUNat n) xs
 
 vsplitU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 vsplitU UZero     ys        = (Nil,ys)
-vsplitU (USucc s) (y :> ys) = let (as,bs) = vsplitU s (ys)
+vsplitU (USucc s) (y :> ys) = let (as,bs) = vsplitU s (unsafeCoerce ys)
                               in  (y :> as, bs)
 
 {-# INLINEABLE vsplitI #-}
@@ -140,7 +140,7 @@ vsplitI = withSNat vsplit
 {-# NOINLINE vconcat #-}
 vconcat :: Vec n (Vec m a) -> Vec (n * m) a
 vconcat Nil       = Nil
-vconcat (x :> xs) = vappend x (vconcat xs)
+vconcat (x :> xs) = unsafeCoerce (vappend x (vconcat xs))
 
 {-# NOINLINE vunconcat #-}
 vunconcat :: SNat n -> SNat m -> Vec (n * m) a -> Vec n (Vec m a)
@@ -148,7 +148,7 @@ vunconcat n m xs = vunconcatU (toUNat n) (toUNat m) xs
 
 vunconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 vunconcatU UZero      _  _  = Nil
-vunconcatU (USucc n') m' ys = let (as,bs) = vsplitU m' (ys)
+vunconcatU (USucc n') m' ys = let (as,bs) = vsplitU m' (unsafeCoerce ys)
                               in  as :> vunconcatU n' m' bs
 
 {-# INLINEABLE vunconcatI #-}
@@ -158,7 +158,7 @@ vunconcatI = (withSNat . withSNat) vunconcat
 {-# NOINLINE vmerge #-}
 vmerge :: Vec n a -> Vec n a -> Vec (n + n) a
 vmerge Nil       Nil       = Nil
-vmerge (x :> xs) (y :> ys) = (x :> y :> (vmerge xs ys))
+vmerge (x :> xs) (y :> ys) = unsafeCoerce (x :> y :> (vmerge xs (unsafeCoerce ys)))
 
 {-# NOINLINE vreverse #-}
 vreverse :: Vec n a -> Vec n a
@@ -173,7 +173,7 @@ vmap f (x :> xs) = f x :> vmap f xs
 {-# NOINLINE vzipWith #-}
 vzipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 vzipWith _ Nil       Nil       = Nil
-vzipWith f (x :> xs) (y :> ys) = f x y :> (vzipWith f xs ys)
+vzipWith f (x :> xs) (y :> ys) = f x y :> (vzipWith f xs (unsafeCoerce ys))
 
 {-# NOINLINE vfoldr #-}
 vfoldr :: (a -> b -> b) -> b -> Vec n a -> b
@@ -197,7 +197,7 @@ vfoldl1 f xs = vfoldl f (vhead xs) (vtail xs)
 {-# NOINLINE vzip #-}
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
 vzip Nil       Nil       = Nil
-vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs ys)
+vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs (unsafeCoerce ys))
 
 {-# NOINLINE vunzip #-}
 vunzip :: Vec n (a,b) -> (Vec n a, Vec n b)

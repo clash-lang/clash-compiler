@@ -39,13 +39,13 @@ toUNat (SNat p) = fromI (natVal p)
 addUNat :: UNat n -> UNat m -> UNat (n + m)
 addUNat UZero     y     = y
 addUNat x         UZero = x
-addUNat (USucc x) y     = USucc (addUNat x y)
+addUNat (USucc x) y     = unsafeCoerce (USucc (addUNat x y))
 
 multUNat :: UNat n -> UNat m -> UNat (n * m)
 multUNat UZero      _     = UZero
 multUNat _          UZero = UZero
-multUNat (USucc x) y      = addUNat y (multUNat x y)
+multUNat (USucc x) y      = unsafeCoerce (addUNat y (multUNat x y))
 
 powUNat :: UNat n -> UNat m -> UNat (n ^ m)
 powUNat _ UZero     = USucc UZero
-powUNat x (USucc y) = multUNat x (powUNat x y)
+powUNat x (USucc y) = unsafeCoerce (multUNat x (powUNat x y))
