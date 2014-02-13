@@ -136,9 +136,9 @@ genTestBench dbgLvl supply primMap typeTrans tcm vhdlState globals stimuliNmM ex
   return (tbComp:inpComps ++ expComps,vhdlState'')
 
   where
-    normalizeSignal :: (HashMap TmName (Type,Term)
+    normalizeSignal :: HashMap TmName (Type,Term)
                     -> TmName
-                    -> [(TmName,(Type,Term))])
+                    -> HashMap TmName (Type,Term)
     normalizeSignal glbls bndr =
       runNormalization dbgLvl supply glbls typeTrans tcm (normalize [bndr] >>= cleanupGraph bndr)
 
@@ -181,7 +181,7 @@ prepareSignals :: VHDLState
                -> HashMap TyConName TyCon
                -> ( HashMap TmName (Type,Term)
                     -> TmName
-                    -> [(TmName,(Type,Term))])
+                    -> HashMap TmName (Type,Term) )
                -> Maybe Int
                -> TmName
                -> EitherT String IO
@@ -229,10 +229,10 @@ createSignal :: VHDLState
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
              -> Maybe Int
-             -> [[(TmName,(Type,Term))]]
+             -> [HashMap TmName (Type,Term)]
              -> IO ([Declaration],[Identifier],[Component],VHDLState)
 createSignal vhdlState primMap typeTrans tcm mStart normalizedSignals = do
-  let (signalHds,signalTls) = unzip $ map (\(l:ls) -> (l,ls)) normalizedSignals
+  let (signalHds,signalTls) = unzip $ map ((\(l:ls) -> (l,ls)) . HashMap.toList) normalizedSignals
       sigEs                 = map (\(_,(_,Letrec b)) -> unrec . fst $ unsafeUnbind b
                                   ) signalHds
       newExpr               = Letrec $ bind (rec $ concat sigEs)

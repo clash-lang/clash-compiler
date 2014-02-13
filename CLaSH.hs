@@ -12,4 +12,4 @@ genVHDL src = do
   generateVHDL bindingsMap primMap tcm ghcTypeToHWType DebugNone
 
 main :: IO ()
-main = genVHDL "./examples/FIR.hs"
+main = genVHDL "./examples/CalculatorArrow.hs"

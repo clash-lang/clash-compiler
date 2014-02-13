@@ -19,7 +19,7 @@ where
 import                Control.DeepSeq
 import                Unbound.LocallyNameless       as Unbound hiding (Data,rnf)
 import                Unbound.LocallyNameless.Alpha (aeqR1, fvR1)
-import                Unbound.LocallyNameless.Name  (isFree)
+import                Unbound.LocallyNameless.Name  (Name(Nm,Bn),isFree)
 import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
 import                Data.Text                     (Text)
 
@@ -128,4 +128,6 @@ instance NFData Pat where
     DefaultPat     -> ()
 
 instance NFData (Name Term) where
-  rnf nm = rnf (show nm)
+  rnf nm = case nm of
+    (Nm _ s)   -> rnf s
+    (Bn _ l r) -> rnf l `seq` rnf r

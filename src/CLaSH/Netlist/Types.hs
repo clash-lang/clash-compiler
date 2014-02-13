@@ -5,6 +5,7 @@
 -- | Type and instance definitions for Netlist modules
 module CLaSH.Netlist.Types where
 
+import Control.DeepSeq
 import Control.Monad.State                  (MonadIO, MonadState, StateT)
 import Control.Monad.Writer                 (MonadWriter, WriterT)
 import Data.Hashable
@@ -65,6 +66,11 @@ data Component
   }
   deriving Show
 
+instance NFData Component where
+  rnf c = case c of
+    Component nm hi inps outps decls -> rnf nm `seq` rnf hi `seq` rnf inps `seq`
+                                        rnf outps `seq` rnf decls
+
 -- | Size indication of a type (e.g. bit-size or number of elements)
 type Size = Int
 
@@ -85,6 +91,20 @@ data HWType
   deriving (Eq,Show,Generic)
 
 instance Hashable HWType
+instance NFData HWType where
+  rnf hwty = case hwty of
+    Void -> ()
+    Bit -> ()
+    Bool -> ()
+    Integer -> ()
+    Signed s -> rnf s
+    Unsigned s -> rnf s
+    Vector s el -> rnf s `seq` rnf el
+    Sum i ids -> rnf i `seq` rnf ids
+    Product i ids -> rnf i `seq` rnf ids
+    SP i ids -> rnf i `seq` rnf ids
+    Clock i -> rnf i
+    Reset i -> rnf i
 
 -- | Internals of a Component
 data Declaration
@@ -106,6 +126,9 @@ data Declaration
   | BlackBoxD Text -- ^ Instantiation of blackbox declaration
   | NetDecl Identifier HWType (Maybe Expr) -- ^ Signal declaration
   deriving Show
+
+instance NFData Declaration where
+  rnf a = a `seq` ()
 
 -- | Expression Modifier
 data Modifier

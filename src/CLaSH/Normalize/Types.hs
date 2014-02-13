@@ -14,7 +14,7 @@ import CLaSH.Util
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: HashMap TmName Term
+  { _normalized          :: HashMap TmName (Type,Term)
   -- ^ Global binders
   , _specialisationCache :: Map (TmName,Int,Either Term Type) (TmName,Type)
   -- ^ Cache of previously specialised functions:

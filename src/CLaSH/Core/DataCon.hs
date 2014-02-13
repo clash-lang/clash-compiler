@@ -17,6 +17,7 @@ where
 
 import                Control.DeepSeq
 import                Unbound.LocallyNameless as Unbound hiding (rnf)
+import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
 
 import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
@@ -77,7 +78,9 @@ instance NFData DataCon where
                                    rnf uv `seq` rnf ev `seq` rnf args
 
 instance NFData (Name DataCon) where
-  rnf nm = rnf (show nm)
+  rnf nm = case nm of
+    (Nm _ s)   -> rnf s
+    (Bn _ l r) -> rnf l `seq` rnf r
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.

@@ -22,6 +22,7 @@ where
 -- External Import
 import                Control.DeepSeq
 import                Unbound.LocallyNameless as Unbound hiding (rnf)
+import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
 
 -- Internal Imports
 import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
@@ -120,7 +121,9 @@ instance NFData TyCon where
     SuperKindTyCon nm      -> rnf nm
 
 instance NFData (Name TyCon) where
-  rnf nm = rnf (show nm)
+  rnf nm = case nm of
+    (Nm _ s)   -> rnf s
+    (Bn _ l r) -> rnf l `seq` rnf r
 
 instance NFData AlgTyConRhs where
   rnf rhs = case rhs of

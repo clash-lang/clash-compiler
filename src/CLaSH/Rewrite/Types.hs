@@ -11,7 +11,7 @@ import Control.Lens              (use, (.=))
 import Control.Monad.Reader      (MonadReader, ReaderT, lift)
 import Control.Monad.State       (MonadState, StateT)
 import Control.Monad.Writer      (MonadWriter, WriterT)
-import Data.HashMap.Lazy         (HashMap)
+import Data.HashMap.Strict       (HashMap)
 import Data.Monoid               (Any)
 import Unbound.LocallyNameless   (Fresh, FreshMT)
 

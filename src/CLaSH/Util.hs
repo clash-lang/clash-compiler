@@ -16,6 +16,7 @@ where
 
 import Control.Applicative            as X (Applicative,(<$>),(<*>),pure)
 import Control.Arrow                  as X ((***),first,second)
+import Control.DeepSeq
 import Control.Monad                  as X ((<=<),(>=>))
 import Control.Monad.State            (MonadState,State,StateT,runState)
 import qualified Control.Monad.State  as State
@@ -91,21 +92,22 @@ makeCachedT3 key l create = do
       return value
 
 -- | Spine-strict cache variant of 'mkCachedT3'
-makeCachedT3' :: ( MonadTrans t2, MonadTrans t1, MonadTrans t
+makeCachedT3S :: ( MonadTrans t2, MonadTrans t1, MonadTrans t
                  , Eq k, Hashable k
                  , MonadState s m
-                 , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m))))
+                 , Monad (t2 m), Monad (t1 (t2 m)), Monad (t (t1 (t2 m)))
+                 , NFData v)
               => k
               -> Lens' s (HashMap k v)
               -> (t (t1 (t2 m))) v
               -> (t (t1 (t2 m))) v
-makeCachedT3' key l create = do
+makeCachedT3S key l create = do
   cache <- (lift . lift . lift) $ use l
   case HashMapS.lookup key cache of
     Just value -> return value
     Nothing -> do
       value <- create
-      (lift . lift . lift) $ l %= HashMapS.insert key value
+      value `deepseq` ((lift . lift . lift) $ l %= HashMapS.insert key value)
       return value
 
 -- | Run a State-action using the State that is stored in a higher-layer Monad

@@ -8,8 +8,8 @@ import           Control.Lens              ((.=))
 import qualified Control.Lens              as Lens
 import qualified Control.Monad.State       as State
 import           Data.Either               (partitionEithers)
-import           Data.HashMap.Lazy         (HashMap)
-import qualified Data.HashMap.Lazy         as HashMap
+import           Data.HashMap.Strict       (HashMap)
+import qualified Data.HashMap.Strict       as HashMap
 import           Data.List                 (mapAccumL)
 import qualified Data.Map                  as Map
 import qualified Data.Maybe                as Maybe
@@ -22,7 +22,7 @@ import           CLaSH.Core.Subst          (substTms)
 import           CLaSH.Core.Term           (Term (..), TmName)
 import           CLaSH.Core.Type           (Type)
 import           CLaSH.Core.TyCon          (TyCon, TyConName)
-import           CLaSH.Core.Util           (collectArgs, mkApps)
+import           CLaSH.Core.Util           (collectArgs, mkApps, termType)
 import           CLaSH.Core.Var            (Id,varName)
 import           CLaSH.Netlist.Types       (HWType)
 import           CLaSH.Netlist.Util        (splitNormalized)
@@ -32,7 +32,7 @@ import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Rewrite.Combinators ((!->),topdownR)
 import           CLaSH.Rewrite.Types       (DebugLevel (..), RewriteState (..),
-                                            bindings, dbgLevel)
+                                            bindings, dbgLevel, tcCache)
 import           CLaSH.Rewrite.Util        (liftRS, runRewrite,
                                             runRewriteSession)
 import           CLaSH.Util
@@ -65,28 +65,36 @@ runNormalization lvl supply globals typeTrans tcm
                   20
                   (error "Report as bug: no curFun")
 
--- | Normalize a list of global binders
+
 normalize :: [TmName]
-          -> NormalizeSession [(TmName,(Type,Term))]
-normalize (bndr:bndrs) = do
-  let bndrS = showDoc bndr
-  exprM <- fmap (HashMap.lookup bndr) $ Lens.use bindings
+          -> NormalizeSession (HashMap TmName (Type,Term))
+normalize []  = return HashMap.empty
+normalize top = do
+  (new,topNormalized) <- unzip <$> mapM normalize' top
+  newNormalized <- normalize (concat new)
+  return (HashMap.union (HashMap.fromList topNormalized) newNormalized)
+
+normalize' :: TmName
+           -> NormalizeSession ([TmName],(TmName,(Type,Term)))
+normalize' nm = do
+  exprM <- HashMap.lookup nm <$> Lens.use bindings
+  let nmS = showDoc nm
   case exprM of
-    Just (ty,expr) -> do
-      liftRS $ curFun .= bndr
-      normalizedExpr <- makeCachedT3' bndr normalized $
-                         rewriteExpr ("normalization",normalization) (bndrS,expr)
-      let usedBndrs = Set.toList $ termFreeIds normalizedExpr
-      if bndr `elem` usedBndrs
-        then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " remains recursive after normalization."
+    Just (_,tm) -> do
+      tmNorm <- makeCachedT3S nm normalized $ do
+                  liftRS $ curFun .= nm
+                  tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
+                  tcm <- Lens.use tcCache
+                  ty' <- termType tcm tm'
+                  return (ty',tm')
+      let usedBndrs = termFreeIds (snd tmNorm)
+      if nm `elem` usedBndrs
+        then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " remains recursive after normalization."
         else do
           prevNorm <- fmap HashMap.keys $ liftRS $ Lens.use normalized
           let toNormalize = filter (`notElem` prevNorm) usedBndrs
-          normalizedOthers <- normalize (toNormalize ++ bndrs)
-          return ((bndr,(ty,normalizedExpr)):normalizedOthers)
-    Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ bndrS ++ " not found"
-
-normalize [] = return []
+          return (toNormalize,(nm,tmNorm))
+    Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
 -- | Rewrite a term according to the provided transformation
 rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
@@ -108,10 +116,10 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) = do
 -- (first argument) is non-recursive. Returns the list of normalized terms if
 -- call graph is indeed non-recursive, errors otherwise.
 checkNonRecursive :: TmName -- ^ @topEntity@
-                  -> [(TmName,(Type,Term))] -- ^ List of normalized binders
-                  -> [(TmName,(Type,Term))]
+                  -> HashMap TmName (Type,Term) -- ^ List of normalized binders
+                  -> HashMap TmName (Type,Term)
 checkNonRecursive topEntity norm =
-  let cg = callGraph [] (HashMap.fromList $ map (second snd) norm) topEntity
+  let cg = callGraph [] norm topEntity
   in  case recursiveComponents cg of
        []  -> norm
        rcs -> error $ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs
@@ -121,12 +129,12 @@ checkNonRecursive topEntity norm =
 --
 --   * Inlining functions that simply \"wrap\" another function
 cleanupGraph :: TmName
-             -> [(TmName,(Type,Term))]
-             -> NormalizeSession [(TmName,(Type,Term))]
+             -> (HashMap TmName (Type,Term))
+             -> NormalizeSession (HashMap TmName (Type,Term))
 cleanupGraph topEntity norm = do
-  let ct = mkCallTree [] (HashMap.fromList norm) topEntity
+  let ct = mkCallTree [] norm topEntity
   ctFlat <- flattenCallTree ct
-  return (snd $ callTreeToList [] ctFlat)
+  return (HashMap.fromList $ snd $ callTreeToList [] ctFlat)
 
 
 data CallTree = CLeaf   (TmName,(Type,Term))

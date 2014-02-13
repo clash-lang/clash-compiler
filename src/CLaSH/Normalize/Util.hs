@@ -65,13 +65,13 @@ isConstant e = case collectArgs e of
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph :: [TmName] -- ^ List of functions that should not be inspected
-          -> HashMap TmName Term -- ^ Global binders
+          -> HashMap TmName (Type,Term) -- ^ Global binders
           -> TmName -- ^ Root of the call graph
           -> [(TmName,[TmName])]
 callGraph visited bindingMap root = node:other
   where
     rootTm = Maybe.fromMaybe (error $ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ termFreeIds rootTm
+    used   = Set.toList $ termFreeIds (snd rootTm)
     node   = (root,used)
     other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
 
@@ -88,7 +88,7 @@ lambdaDropPrep :: HashMap TmName (Type,Term)
                -> HashMap TmName (Type,Term)
 lambdaDropPrep bndrs topEntity = bndrs'
   where
-    depGraph = callGraph [] (HashMap.map snd bndrs) topEntity
+    depGraph = callGraph [] bndrs topEntity
     used     = HashMap.fromList depGraph
     rcs      = recursiveComponents depGraph
     dropped  = map (lambdaDrop bndrs used) rcs

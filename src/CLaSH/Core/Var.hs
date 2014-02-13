@@ -21,7 +21,7 @@ module CLaSH.Core.Var
 where
 
 import                Control.DeepSeq              as DS
-import                Unbound.LocallyNameless      as Unbound
+import                Unbound.LocallyNameless      as Unbound hiding (rnf)
 import                Unbound.LocallyNameless.Name (isFree)
 
 import {-# SOURCE #-} CLaSH.Core.Term              (Term)
@@ -61,8 +61,8 @@ instance Subst Type Id where
 
 instance NFData (Name a) => NFData (Var a) where
   rnf v = case v of
-    TyVar nm ki -> nm `deepseq` DS.rnf (unembed ki)
-    Id    nm ty -> nm `deepseq` DS.rnf (unembed ty)
+    TyVar nm ki -> rnf nm `seq` rnf (unembed ki)
+    Id    nm ty -> rnf nm `seq` rnf (unembed ty)
 
 -- | Change the name of a variable
 modifyVarName ::

@@ -12,7 +12,7 @@ import           Unbound.LocallyNameless (runFreshM, unembed)
 import qualified TyCon                   as GHC
 import qualified CoreSyn                 as GHC
 
-import           CLaSH.Core.Term         (Term)
+import           CLaSH.Core.Term         (Term, TmName)
 import           CLaSH.Core.Type         (Type, splitFunForallTy)
 import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.TysPrim      (tysPrimMap)
@@ -32,17 +32,22 @@ generateBindings ::
   -> IO (BindingMap,HashMap TyConName TyCon)
 generateBindings primMap modName = do
   (bindings,clsOps,unlocatable) <- loadModules modName
-  let (bindingsMap,tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable tcCache) HashMap.empty
-      tcCache             = makeAllTyCons tcMap
-  return (bindingsMap,tysPrimMap `HashMap.union` tcCache)
+  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) HashMap.empty
+      tcCache                       = makeAllTyCons tcMap
+      allTcCache                    = tysPrimMap `HashMap.union` tcCache
+      clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
+      allBindings                   = bindingsMap `HashMap.union` clsMap
+  return (allBindings,allTcCache)
 
 mkBindings :: PrimMap
            -> [(GHC.CoreBndr, GHC.CoreExpr)] -- Binders
            -> [(GHC.CoreBndr,Int)]           -- Class operations
            -> [GHC.CoreBndr]                 -- Unlocatable Expressions
-           -> HashMap TyConName TyCon
-           -> State (HashMap TyConName GHC.TyCon) BindingMap
-mkBindings primMap bindings clsOps unlocatable tcm = do
+           -> State (HashMap TyConName GHC.TyCon)
+                    ( BindingMap
+                    , HashMap TmName (Type,Int)
+                    )
+mkBindings primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\(v,e) -> do
                           tm <- coreToTerm primMap unlocatable e
                           v' <- coreToId v
@@ -51,10 +56,10 @@ mkBindings primMap bindings clsOps unlocatable tcm = do
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v
                           let ty = unembed $ varType v'
-                          return (varName v', (ty,mkClassSelector tcm ty i))
+                          return (varName v', (ty,i))
                        ) clsOps
 
-  return (HashMap.fromList bindingsList `HashMap.union` HashMap.fromList clsOpList)
+  return (HashMap.fromList bindingsList, HashMap.fromList clsOpList)
 
 mkClassSelector :: HashMap TyConName TyCon
                 -> Type

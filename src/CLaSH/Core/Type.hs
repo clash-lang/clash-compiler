@@ -47,6 +47,7 @@ import qualified      Data.HashMap.Strict           as HashMap
 import                Data.Maybe                    (isJust)
 import                Unbound.LocallyNameless       as Unbound hiding (Arrow,rnf)
 import                Unbound.LocallyNameless.Alpha (aeqR1,fvR1)
+import                Unbound.LocallyNameless.Name  (Name(Nm,Bn))
 import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
 
 -- Local imports
@@ -132,7 +133,9 @@ instance NFData Type where
     LitTy    l       -> rnf l
 
 instance NFData (Name Type) where
-  rnf nm = (show nm) `deepseq` ()
+  rnf nm = case nm of
+    (Nm _ s)   -> rnf s
+    (Bn _ l r) -> rnf l `seq` rnf r
 
 instance NFData ConstTy where
   rnf cty = case cty of
@@ -293,8 +296,8 @@ applyTy :: Fresh m
         -> m Type
 applyTy (ForAllTy b) arg = do
   (tv,ty) <- unbind b
-  return $ substTy (varName tv) arg ty
-applyTy _ _ = error $ $(curLoc) ++ "applyTy: not a forall type"
+  return (substTy (varName tv) arg ty)
+applyTy _ _ = error ($(curLoc) ++ "applyTy: not a forall type")
 
 -- | Split a type application in the applied type and the argument types
 splitTyAppM :: Type

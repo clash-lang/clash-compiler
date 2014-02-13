@@ -8,7 +8,7 @@ import           Control.DeepSeq
 import           Control.Monad.State          (evalState)
 import           Control.Lens                 (_1, use)
 import           Data.HashMap.Strict          (HashMap)
-import qualified Data.HashMap.Lazy            as HashMap
+import qualified Data.HashMap.Strict          as HashMap
 import qualified Data.HashSet                 as HashSet
 import           Data.List                    (isSuffixOf)
 import           Data.Maybe                   (listToMaybe)
@@ -45,26 +45,23 @@ generateVHDL :: BindingMap -- ^ Set of functions
              -> IO ()
 generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
   start <- Clock.getCurrentTime
-  prepTime <- bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
+  prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
   putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
-  let topEntities = HashMap.toList
-                  $ HashMap.filterWithKey
-                      (\var _ -> isSuffixOf "topEntity" $ name2String var)
-                      bindingsMap
+  let topEntities     = HashMap.filterWithKey
+                          (\var _ -> isSuffixOf "topEntity" $ name2String var)
+                          bindingsMap
 
-      testInputs  = HashMap.toList
-                  $ HashMap.filterWithKey
-                      (\var _ -> isSuffixOf "testInput" $ name2String var)
-                      bindingsMap
+      testInputs      = HashMap.filterWithKey
+                          (\var _ -> isSuffixOf "testInput" $ name2String var)
+                          bindingsMap
 
-      expectedOutputs = HashMap.toList
-                      $ HashMap.filterWithKey
+      expectedOutputs = HashMap.filterWithKey
                           (\var _ -> isSuffixOf "expectedOutput" $ name2String var)
                           bindingsMap
 
-  start `seq` case topEntities of
+  case HashMap.toList topEntities of
     [topEntity] -> do
       -- Create unique supplies for normalisation and TB generation
       (supplyN,supplyTB) <- Supply.splitSupply
@@ -73,22 +70,20 @@ generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
                          <$> Supply.newSupply
 
       let preppedMap = lambdaDropPrep bindingsMap (fst topEntity)
-          doNorm = do norm <- normalize [fst topEntity]
-                      let normChecked = checkNonRecursive (fst topEntity) norm
-                      cleanupGraph (fst topEntity) normChecked
-
-          transformedBindings =
-            runNormalization dbgLevel supplyN preppedMap typeTrans tcm doNorm
+          doNorm     = do norm <- normalize [fst topEntity]
+                          let normChecked = checkNonRecursive (fst topEntity) norm
+                          cleanupGraph (fst topEntity) normChecked
+          transformedBindings = runNormalization dbgLevel supplyN preppedMap typeTrans tcm doNorm
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       (netlist,vhdlState) <- genNetlist Nothing
-                               (HashMap.fromList transformedBindings)
+                               transformedBindings
                                primMap tcm typeTrans Nothing (fst topEntity)
 
-      netlistTime <- netlist `seq` Clock.getCurrentTime
+      netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
@@ -100,8 +95,8 @@ generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
 
       (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
                                   typeTrans tcm vhdlState preppedMap
-                                  (listToMaybe $ map fst testInputs)
-                                  (listToMaybe $ map fst expectedOutputs)
+                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
+                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                   topComponent
 
 
