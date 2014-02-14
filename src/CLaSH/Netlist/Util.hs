@@ -152,6 +152,7 @@ typeSize :: HWType
          -> Int
 typeSize Void = 0
 typeSize Bool = 1
+typeSize Bit  = 1
 typeSize (Clock _) = 1
 typeSize (Reset _) = 1
 typeSize Integer = 32
@@ -162,7 +163,6 @@ typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
 typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
 typeSize (Product _ tys) = sum $ map typeSize tys
-typeSize _ = 0
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType
