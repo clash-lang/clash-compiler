@@ -109,6 +109,7 @@ getDefPrimDir :: IO FilePath
 getDefPrimDir = getDataFileName "primitives"
 #endif
 
+
 -----------------------------------------------------------------------------
 -- ToDo:
 
@@ -123,19 +124,15 @@ getDefPrimDir = getDataFileName "primitives"
 
 main :: IO ()
 main = do
-   libDir <- ghcLibDir
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
+    libDir <- ghcLibDir
 
-    -- let (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
-    --     mbMinusB | null minusB_args = Nothing
-    --              | otherwise = Just (drop 2 (last minusB_args))
-
-    let argv1' = map (mkGeneralLocated "on the commandline") argv0
-    (argv2, staticFlagWarnings) <- parseStaticFlags argv1'
+    let argv1 = map (mkGeneralLocated "on the commandline") argv0
+    (argv2, staticFlagWarnings) <- parseStaticFlags argv1
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
     (mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
@@ -870,8 +867,8 @@ doVHDL :: [(String,Maybe Phase)] -> Ghc ()
 doVHDL []   = throwGhcException (CmdLineError "No input files")
 doVHDL srcs = liftIO $ do primDir <- getDefPrimDir
                           primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                          mapM_ (\(src,_) -> do bindingsMap <- generateBindings primMap src
-                                                CLaSH.Driver.generateVHDL bindingsMap primMap ghcTypeToHWType DebugNone
+                          mapM_ (\(src,_) -> do (bindingsMap,tcm) <- generateBindings primMap src
+                                                CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType DebugNone
                                 ) srcs
 
 -- -----------------------------------------------------------------------------
@@ -884,4 +881,4 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         "unrecognised flag: " ++ f ++ "\n" ++
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
-            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 

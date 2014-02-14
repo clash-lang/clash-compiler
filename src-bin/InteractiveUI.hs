@@ -148,7 +148,7 @@ defaultGhciSettings =
     }
 
 ghciWelcomeMsg :: String
-ghciWelcomeMsg = "GHCi + CLaSH (:vhdl command), version " ++ cProjectVersion ++
+ghciWelcomeMsg = "CLaSHi, version " ++ cProjectVersion ++
                  ": http://www.haskell.org/ghc/  :? for help"
 
 cmdName :: Command -> String
@@ -550,7 +550,8 @@ runGHCi paths maybe_exprs = do
                                    $ topHandler e
                                    -- this used to be topHandlerFastExit, see #2228
             runInputTWithPrefs defaultPrefs defaultSettings $ do
-                runCommands' hdle (return Nothing)
+                -- make `ghc -e` exit nonzero on invalid input, see Trac #7962
+                runCommands' hdle (Just $ hdle (toException $ ExitFailure 1) >> return ()) (return Nothing)
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -693,7 +694,7 @@ installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
                 (name:_) <- GHC.parseName ipFun
-                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name 
                                       in he{hsc_IC = new_ic})
                 return Succeeded
 
@@ -701,11 +702,12 @@ installInteractivePrint (Just ipFun) exprmode = do
 
 -- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands = runCommands' handler
+runCommands = runCommands' handler Nothing
 
 runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
+             -> Maybe (GHCi ()) -- ^ Source error handler
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands' eh gCmd = do
+runCommands' eh sourceErrorHandler gCmd = do
     b <- ghandle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
@@ -717,7 +719,9 @@ runCommands' eh gCmd = do
             (runOneCommand eh gCmd)
     case b of
       Nothing -> return ()
-      Just _  -> runCommands' eh gCmd
+      Just success -> do
+        when (not success) $ maybe (return ()) lift sourceErrorHandler
+        runCommands' eh sourceErrorHandler gCmd
 
 -- | Evaluate a single line of user input (either :<command> or Haskell code)
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
@@ -748,8 +752,7 @@ runOneCommand eh gCmd = do
       st <- lift getGHCiState
       let p = prompt st
       lift $ setGHCiState st{ prompt = prompt2 st }
-      mb_cmd <- collectCommand q ""
-      lift $ getGHCiState >>= \st' -> setGHCiState st'{ prompt = p }
+      mb_cmd <- collectCommand q "" `GHC.gfinally` lift (getGHCiState >>= \st' -> setGHCiState st' { prompt = p })
       return mb_cmd
     -- we can't use removeSpaces for the sublines here, so
     -- multiline commands are somewhat more brittle against
@@ -1012,15 +1015,23 @@ lookupCommand' ":" = return Nothing
 lookupCommand' str' = do
   macros    <- liftIO $ readIORef macros_ref
   ghci_cmds <- ghci_commands `fmap` getGHCiState
-  let{ (str, cmds) = case str' of
-      ':' : rest -> (rest, ghci_cmds) -- "::" selects a builtin command
-      _ -> (str', macros ++ ghci_cmds) } -- otherwise prefer macros
-  -- look for exact match first, then the first prefix match
-  return $ case [ c | c <- cmds, str == cmdName c ] of
-           c:_ -> Just c
-           [] -> case [ c | c@(s,_,_) <- cmds, str `isPrefixOf` s ] of
-                 [] -> Nothing
-                 c:_ -> Just c
+  let (str, xcmds) = case str' of
+          ':' : rest -> (rest, [])     -- "::" selects a builtin command
+          _          -> (str', macros) -- otherwise include macros in lookup
+
+      lookupExact  s = find $ (s ==)           . cmdName
+      lookupPrefix s = find $ (s `isPrefixOf`) . cmdName
+
+      builtinPfxMatch = lookupPrefix str ghci_cmds
+
+  -- first, look for exact match (while preferring macros); then, look
+  -- for first prefix match (preferring builtins), *unless* a macro
+  -- overrides the builtin; see #8305 for motivation
+  return $ lookupExact str xcmds <|>
+           lookupExact str ghci_cmds <|>
+           (builtinPfxMatch >>= \c -> lookupExact (cmdName c) xcmds) <|>
+           builtinPfxMatch <|>
+           lookupPrefix str xcmds
 
 getCurrentBreakSpan :: GHCi (Maybe SrcSpan)
 getCurrentBreakSpan = do
@@ -1310,7 +1321,7 @@ checkModule m = do
 
 
 -----------------------------------------------------------------------------
--- :load, :add, :reload, :vhdl
+-- :load, :add, :reload
 
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
@@ -1389,8 +1400,7 @@ afterLoad ok retain_context = do
   lift discardTickArrays
   loaded_mod_summaries <- getLoadedModules
   let loaded_mods = map GHC.ms_mod loaded_mod_summaries
-      loaded_mod_names = map GHC.moduleName loaded_mods
-  modulesLoadedMsg ok loaded_mod_names
+  modulesLoadedMsg ok loaded_mods
   lift $ setContextAfterLoad retain_context loaded_mod_summaries
 
 
@@ -1463,19 +1473,22 @@ keepPackageImports = filterM is_pkg_import
           mod_name = unLoc (ideclName d)
 
 
-modulesLoadedMsg :: SuccessFlag -> [ModuleName] -> InputT GHCi ()
+modulesLoadedMsg :: SuccessFlag -> [Module] -> InputT GHCi ()
 modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
-  when (verbosity dflags > 0) $ do
-   let mod_commas
+  unqual <- GHC.getPrintUnqual
+  let mod_commas
         | null mods = text "none."
         | otherwise = hsep (
             punctuate comma (map ppr mods)) <> text "."
-   case ok of
-    Failed ->
-       liftIO $ putStrLn $ showSDoc dflags (text "Failed, modules loaded: " <> mod_commas)
-    Succeeded  ->
-       liftIO $ putStrLn $ showSDoc dflags (text "Ok, modules loaded: " <> mod_commas)
+      status = case ok of
+                   Failed    -> text "Failed"
+                   Succeeded -> text "Ok"
+
+      msg = status <> text ", modules loaded:" <+> mod_commas
+
+  when (verbosity dflags > 0) $
+     liftIO $ putStrLn $ showSDocForUser dflags unqual msg
 
 makeVHDL :: [FilePath] -> InputT GHCi ()
 makeVHDL [] = do
@@ -1486,14 +1499,14 @@ makeVHDL [] = do
       let loc = (GHC.ml_hs_file . GHC.ms_location) top
       maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
                                              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                                             bindingsMap <- generateBindings primMap src
-                                             CLaSH.Driver.generateVHDL bindingsMap primMap ghcTypeToHWType DebugNone
+                                             (bindingsMap,tcm) <- generateBindings primMap src
+                                             CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType DebugNone
                         ) loc
     _ -> return ()
 makeVHDL srcs = liftIO $ do primDir <- getDefPrimDir
                             primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                            mapM_ (\src -> do bindingsMap <- generateBindings primMap src
-                                              CLaSH.Driver.generateVHDL bindingsMap primMap ghcTypeToHWType DebugNone
+                            mapM_ (\src -> do (bindingsMap,tcm) <- generateBindings primMap src
+                                              CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType DebugNone
                                   ) srcs
 
 -----------------------------------------------------------------------------
@@ -1834,7 +1847,7 @@ restoreContextOnFailure do_this = do
 
 checkAdd :: InteractiveImport -> GHCi ()
 checkAdd ii = do
-  dflags <- getDynFlags
+  dflags <- getDynFlags 
   let safe = safeLanguageOn dflags
   case ii of
     IIModule modname
@@ -2261,6 +2274,7 @@ showImports = do
 
       prel_imp
         | any isPreludeImport (rem_ctx ++ trans_ctx) = []
+        | not (xopt Opt_ImplicitPrelude dflags)      = []
         | otherwise = ["import Prelude -- implicit"]
 
       trans_comment s = s ++ " -- added automatically"

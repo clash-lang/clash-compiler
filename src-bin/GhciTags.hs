@@ -22,6 +22,7 @@ import Outputable
 -- into the GHC API instead
 import Name (nameOccName)
 import OccName (pprOccName)
+import ConLike
 import MonadUtils
 
 import Data.Function
@@ -58,7 +59,7 @@ ghciCreateTagsFile :: TagsKind -> FilePath -> GHCi ()
 ghciCreateTagsFile kind file = do
   createTagsFile kind file
 
--- ToDo:
+-- ToDo: 
 --      - remove restriction that all modules must be interpreted
 --        (problem: we don't know source locations for entities unless
 --        we compiled the module.
@@ -103,10 +104,12 @@ listModuleTags m = do
                      ]
 
   where
-    tyThing2TagKind (AnId _)     = 'v'
-    tyThing2TagKind (ADataCon _) = 'd'
-    tyThing2TagKind (ATyCon _)   = 't'
-    tyThing2TagKind (ACoAxiom _) = 'x'
+    tyThing2TagKind (AnId _)                 = 'v'
+    tyThing2TagKind (AConLike RealDataCon{}) = 'd'
+    tyThing2TagKind (AConLike PatSynCon{})   = 'p'
+    tyThing2TagKind (ATyCon _)               = 't'
+    tyThing2TagKind (ACoAxiom _)             = 'x'
+
 
 data TagInfo = TagInfo
   { tagExported :: Bool -- is tag exported
