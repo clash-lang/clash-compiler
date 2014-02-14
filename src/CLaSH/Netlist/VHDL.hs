@@ -419,7 +419,7 @@ fromSLV t@(Product _ tys) id_ start _   = tupled $ zipWithM (\s e -> s <+> rarro
     selNames   = [tName <> "_sel" <> int i | i <- [0..]]
     argLengths = map typeSize tys
     starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
-    ends       = tail (map (subtract 1) starts)
+    ends       = map (+1) (tail starts)
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
 fromSLV (SP _ _)          id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
