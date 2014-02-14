@@ -273,7 +273,7 @@ isPolyFunCoreTy :: HashMap TyConName TyCon
                 -> Bool
 isPolyFunCoreTy _ (ForAllTy _) = True
 isPolyFunCoreTy m (coreView m -> FunTy _ _) = True
-isPolyFunCoreTy _ _ = True
+isPolyFunCoreTy _ _ = False
 
 -- | Is a type a function type?
 isFunTy :: HashMap TyConName TyCon
