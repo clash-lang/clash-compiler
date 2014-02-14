@@ -28,6 +28,7 @@ Extra-source-files:   README.md,
 
 Data-files:           primitives/clash.bit.json,
                       primitives/clash.prelude.json,
+                      primitives/clash.promoted.nat.json,
                       primitives/clash.signal.json,
                       primitives/clash.sized.signed.json,
                       primitives/clash.sized.unsigned.json,
