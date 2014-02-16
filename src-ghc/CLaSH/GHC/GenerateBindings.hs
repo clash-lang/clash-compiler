@@ -9,7 +9,6 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Unbound.LocallyNameless (runFreshM, unembed)
 
-import qualified TyCon                   as GHC
 import qualified CoreSyn                 as GHC
 
 import           CLaSH.Core.Term         (Term, TmName)
@@ -19,8 +18,8 @@ import           CLaSH.Core.TysPrim      (tysPrimMap)
 import           CLaSH.Core.Util         (mkLams, mkTyLams)
 import           CLaSH.Core.Var          (Var (..))
 import           CLaSH.Driver.Types      (BindingMap)
-import           CLaSH.GHC.GHC2Core      (coreToId, coreToTerm,
-                                          makeAllTyCons)
+import           CLaSH.GHC.GHC2Core      (GHC2CoreState, coreToId, coreToTerm,
+                                          makeAllTyCons, emptyGHC2CoreState)
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Primitives.Types  (PrimMap)
 import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
@@ -32,7 +31,7 @@ generateBindings ::
   -> IO (BindingMap,HashMap TyConName TyCon)
 generateBindings primMap modName = do
   (bindings,clsOps,unlocatable) <- loadModules modName
-  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) HashMap.empty
+  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       tcCache                       = makeAllTyCons tcMap
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
       clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
@@ -43,7 +42,7 @@ mkBindings :: PrimMap
            -> [(GHC.CoreBndr, GHC.CoreExpr)] -- Binders
            -> [(GHC.CoreBndr,Int)]           -- Class operations
            -> [GHC.CoreBndr]                 -- Unlocatable Expressions
-           -> State (HashMap TyConName GHC.TyCon)
+           -> State GHC2CoreState
                     ( BindingMap
                     , HashMap TmName (Type,Int)
                     )

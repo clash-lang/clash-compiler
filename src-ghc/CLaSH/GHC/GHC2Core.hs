@@ -6,17 +6,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module CLaSH.GHC.GHC2Core
-  ( coreToTerm
+  ( GHC2CoreState
+  , coreToTerm
   , coreToId
-  , coreToPrimBndr
-  , coreToVar
   , makeAllTyCons
+  , emptyGHC2CoreState
   )
 where
 
 -- External Modules
+import           Control.Lens                ((^.), (%~), (&), (%=))
 import           Control.Monad.State         (State)
 import qualified Control.Monad.State.Lazy    as State
+import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HSM
@@ -47,7 +49,7 @@ import           IdInfo                      (IdDetails (..))
 import           Literal                     (Literal (..))
 import           Module                      (moduleName, moduleNameString)
 import           Name                        (Name, nameModule_maybe,
-                                              nameOccName)
+                                              nameOccName, nameUnique)
 import           OccName                     (occNameString)
 -- import           Pair                        (Pair (..))
 import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
@@ -78,19 +80,33 @@ import qualified CLaSH.Core.Var              as C
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
 
-makeAllTyCons :: HashMap C.TyConName TyCon
+instance Hashable Name where
+  hashWithSalt s = hashWithSalt s . getKey . nameUnique
+
+data GHC2CoreState
+  = GHC2CoreState
+  { _tyConMap :: HashMap C.TyConName TyCon
+  , _nameMap  :: HashMap Name String
+  }
+
+makeLenses ''GHC2CoreState
+
+emptyGHC2CoreState :: GHC2CoreState
+emptyGHC2CoreState = GHC2CoreState HSM.empty HSM.empty
+
+makeAllTyCons :: GHC2CoreState
               -> HashMap C.TyConName C.TyCon
 makeAllTyCons hm = go hm hm
   where
     go old new
-        | HSM.null new = HSM.empty
-        | otherwise    = tcm `HSM.union` tcm'
+        | HSM.null (new ^. tyConMap) = HSM.empty
+        | otherwise                  = tcm `HSM.union` tcm'
       where
-        (tcm,old') = State.runState (T.mapM makeTyCon new) old
-        tcm'       = go old' (old' `HSM.difference` old)
+        (tcm,old') = State.runState (T.mapM makeTyCon (new ^. tyConMap)) old
+        tcm'       = go old' (old' & tyConMap %~ (`HSM.difference` (old ^. tyConMap)))
 
 makeTyCon :: TyCon
-          -> State (HashMap C.TyConName TyCon) C.TyCon
+          -> State GHC2CoreState C.TyCon
 makeTyCon tc = tycon
   where
     tycon
@@ -98,13 +114,13 @@ makeTyCon tc = tycon
       | isAlgTyCon tc       = mkAlgTyCon
       | isSynTyCon tc       = mkVoidTyCon
       | isPrimTyCon tc      = mkPrimTyCon
-      | isSuperKindTyCon tc = return mkSuperKindTyCon
+      | isSuperKindTyCon tc = mkSuperKindTyCon
       | otherwise           = mkVoidTyCon
       where
-        tcName  = coreToName tyConName tyConUnique qualfiedNameString tc
         tcArity = tyConArity tc
 
         mkAlgTyCon = do
+          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           tcRhsM <- makeAlgTyConRhs $ algTyConRhs tc
           case tcRhsM of
@@ -119,6 +135,7 @@ makeTyCon tc = tycon
             Nothing -> return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
 
         mkTupleTyCon = do
+          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           tcDc   <- fmap (C.DataTyCon . (:[])) . coreToDataCon False . head . tyConDataCons $ tc
           return
@@ -130,6 +147,7 @@ makeTyCon tc = tycon
             }
 
         mkPrimTyCon = do
+          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           return
             C.PrimTyCon
@@ -139,11 +157,14 @@ makeTyCon tc = tycon
             , C.primTyConRep = coreToPrimRep (tyConPrimRep tc)
             }
 
-        mkSuperKindTyCon = C.SuperKindTyCon
-          { C.tyConName = tcName
-          }
+        mkSuperKindTyCon = do
+          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          return C.SuperKindTyCon
+                   { C.tyConName = tcName
+                   }
 
         mkVoidTyCon = do
+          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
 
@@ -159,12 +180,12 @@ makeTyCon tc = tycon
           _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p ++ " in tycon: " ++ showPpr tc
 
 makeAlgTyConRhs :: AlgTyConRhs
-                -> State (HashMap C.TyConName TyCon) (Maybe C.AlgTyConRhs)
+                -> State GHC2CoreState (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
   DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM (coreToDataCon False) dcs
   NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon False dc
-                                                           <*> ((,) (map coreToVar rhsTvs) <$>
-                                                                    coreToType rhsEtad
+                                                           <*> ((,) <$> mapM coreToVar rhsTvs
+                                                                    <*> coreToType rhsEtad
                                                                )
                                                )
   AbstractTyCon _ -> return Nothing
@@ -173,7 +194,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
 coreToTerm :: PrimMap
            -> [Var]
            -> CoreExpr
-           -> State (HashMap C.TyConName TyCon) C.Term
+           -> State GHC2CoreState C.Term
 coreToTerm primMap unlocs coreExpr = term coreExpr
   where
     term (Var x)                 = var x
@@ -222,12 +243,11 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
     term (Type t)          = C.Prim (pack "_TY_") <$> coreToType t
     term (Coercion co)     = C.Prim (pack "_CO_") <$> coreToType (coercionType co)
 
-    var x =
-      let xVar   = coreToVar x
-          xPrim  = coreToPrimVar x
-          xNameS = pack $ Unbound.name2String xPrim
-      in do
-        xType <- coreToType (varType x)
+    var x = do
+        xVar   <- coreToVar x
+        xPrim  <- coreToPrimVar x
+        let xNameS = pack $ Unbound.name2String xPrim
+        xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case HashMap.lookup xNameS primMap of
                       Just _  -> return $ C.Prim xNameS xType
@@ -244,7 +264,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
               return (C.Prim xNameS xType)
             Nothing
               | x `elem` unlocs -> return (C.Prim xNameS xType)
-              | otherwise -> return  (C.Var xType xVar)
+              | otherwise       -> return  (C.Var xType xVar)
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> term e
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> term e
@@ -257,7 +277,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                               term e
 
     coreToLiteral :: Literal
-              -> C.Literal
+                  -> C.Literal
     coreToLiteral l = case l of
       MachStr    fs  -> C.StringLiteral (unpackFB fs)
       MachChar   c   -> C.StringLiteral [c]
@@ -273,7 +293,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
 
 coreToDataCon :: Bool
               -> DataCon
-              -> State (HashMap C.TyConName TyCon) C.DataCon
+              -> State GHC2CoreState C.DataCon
 coreToDataCon mkWrap dc = do
     repTys <- mapM coreToType (dataConRepArgTys dc)
     dcTy   <- if mkWrap
@@ -281,30 +301,34 @@ coreToDataCon mkWrap dc = do
                         Just wrapId -> coreToType (varType wrapId)
                         Nothing     -> error $ $(curLoc) ++ "DataCon Wrapper: " ++ showPpr dc ++ " not found"
                 else coreToType (varType $ dataConWorkId dc)
-    return (mkDc dcTy repTys)
+    mkDc dcTy repTys
   where
-    mkDc dcTy repTys = C.MkData
-              { C.dcName       = coreToName dataConName getUnique nameString dc
-              , C.dcTag        = dataConTag dc
-              , C.dcType       = dcTy
-              , C.dcArgTys     = repTys
-              , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
-              , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
-              }
+    mkDc dcTy repTys = do
+      nm   <- coreToName dataConName getUnique nameString dc
+      uTvs <- mapM coreToVar (dataConUnivTyVars dc)
+      eTvs <- mapM coreToVar (dataConExTyVars dc)
+      return $ C.MkData
+             { C.dcName       = nm
+             , C.dcTag        = dataConTag dc
+             , C.dcType       = dcTy
+             , C.dcArgTys     = repTys
+             , C.dcUnivTyVars = uTvs
+             , C.dcExtTyVars  = eTvs
+             }
 
 coreToType :: Type
-           -> State (HashMap C.TyConName TyCon) C.Type
+           -> State GHC2CoreState C.Type
 coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
 
 coreToType' :: Type
-            -> State (HashMap C.TyConName TyCon) C.Type
-coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> pure (coreToVar tv)
+            -> State GHC2CoreState C.Type
+coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> (coreToVar tv)
 coreToType' (TyConApp (synTyConRhs_maybe -> Just (SynonymTyCon ty)) args) =
   foldl C.AppTy <$> coreToType ty <*> mapM coreToType args
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
-  | otherwise     = do let tcName = coreToName tyConName tyConUnique qualfiedNameString tc
-                       State.modify (HSM.insert tcName tc)
+  | otherwise     = do tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+                       tyConMap %= (HSM.insert tcName tc)
                        C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
@@ -318,58 +342,49 @@ coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
 
 coreToTyVar :: TyVar
-            -> State (HashMap C.TyConName TyCon) C.TyVar
+            -> State GHC2CoreState C.TyVar
 coreToTyVar tv =
-  C.TyVar (coreToVar tv) <$> (embed <$> coreToType (varType tv))
-
-coreToPrimBndr :: HashMap C.TyConName TyCon
-               -> Id
-               -> C.Id
-coreToPrimBndr s bndr = State.evalState (coreToPrimId bndr) s
-
-coreToPrimId :: Id
-             -> State (HashMap C.TyConName TyCon) C.Id
-coreToPrimId i =
-  C.Id (coreToPrimVar i) <$> (embed <$> coreToType (varType i))
+  C.TyVar <$> (coreToVar tv) <*> (embed <$> coreToType (varType tv))
 
 coreToId :: Id
-         -> State (HashMap C.TyConName TyCon) C.Id
+         -> State GHC2CoreState C.Id
 coreToId i =
-  C.Id (coreToVar i) <$> (embed <$> coreToType (varType i))
+  C.Id <$> (coreToVar i) <*> (embed <$> coreToType (varType i))
 
 coreToVar :: Rep a
           => Var
-          -> Unbound.Name a
+          -> State GHC2CoreState (Unbound.Name a)
 coreToVar = coreToName varName varUnique qualfiedNameStringM
 
 coreToPrimVar :: Var
-              -> Unbound.Name C.Term
+              -> State GHC2CoreState (Unbound.Name C.Term)
 coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
 coreToName :: Rep a
            => (b -> Name)
            -> (b -> Unique)
-           -> (Name -> String)
+           -> (Name -> State GHC2CoreState String)
            -> b
-           -> Unbound.Name a
-coreToName toName toUnique toString v =
-  Unbound.makeName
-    (toString $ toName v)
-    (toInteger . getKey . toUnique $ v)
+           -> State GHC2CoreState (Unbound.Name a)
+coreToName toName toUnique toString v = do
+  ns <- toString (toName v)
+  return (Unbound.makeName ns (toInteger . getKey . toUnique $ v))
 
 nameString :: Name
-           -> String
-nameString = occNameString . nameOccName
+           -> State GHC2CoreState String
+nameString n = makeCached n nameMap (return (occNameString $ nameOccName n))
 
 qualfiedNameString :: Name
-                   -> String
-qualfiedNameString n = fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName)
+                   -> State GHC2CoreState String
+qualfiedNameString n = makeCached n nameMap
+                     $ return (fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName))
   where
     occName = occNameString $ nameOccName n
 
 qualfiedNameStringM :: Name
-                    -> String
-qualfiedNameStringM n = maybe occName (\modName -> modName ++ ('.':occName)) (modNameM n)
+                    -> State GHC2CoreState String
+qualfiedNameStringM n = makeCached n nameMap
+                      $ return (maybe occName (\modName -> modName ++ ('.':occName)) (modNameM n))
   where
     occName = occNameString $ nameOccName n
 
