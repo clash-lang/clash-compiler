@@ -3,4 +3,9 @@
     , "templateE" : "~LIT[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.fromSNat"
+    , "templateE" : "~LIT[0]"
+    }
+  }
 ]

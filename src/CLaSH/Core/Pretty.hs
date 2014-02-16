@@ -16,7 +16,7 @@ import           GHC.Show                (showMultiLineString)
 import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
                                           hsep, int, integer, parens, punctuate,
                                           render, sep, text, vcat, ($$), ($+$),
-                                          (<+>), (<>))
+                                          (<+>), (<>), rational)
 import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
                                           name2String, runLFreshM, unembed,
                                           unrebind, unrec)
@@ -121,9 +121,10 @@ instance Pretty DataCon where
 instance Pretty Literal where
   pprPrec _ l = case l of
     IntegerLiteral i
-      | i < 0       -> return $ parens (integer i)
-      | otherwise   -> return $ integer i
-    StringLiteral s -> return $ vcat $ map text $ showMultiLineString s
+      | i < 0         -> return $ parens (integer i)
+      | otherwise     -> return $ integer i
+    RationalLiteral r -> return $ rational r
+    StringLiteral s   -> return $ vcat $ map text $ showMultiLineString s
 
 instance Pretty Pat where
   pprPrec prec pat = case pat of

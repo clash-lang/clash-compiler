@@ -155,6 +155,7 @@ makeTyCon tc = tycon
           AddrRep -> C.VoidRep
           PtrRep  -> C.VoidRep
           WordRep -> C.VoidRep
+          DoubleRep -> C.VoidRep
           _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p ++ " in tycon: " ++ showPpr tc
 
 makeAlgTyConRhs :: AlgTyConRhs
@@ -265,6 +266,9 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
       MachWord   i   -> C.IntegerLiteral i
       MachWord64 i   -> C.IntegerLiteral i
       LitInteger i _ -> C.IntegerLiteral i
+      MachFloat r    -> C.RationalLiteral r
+      MachDouble r   -> C.RationalLiteral r
+      MachNullAddr   -> C.StringLiteral []
       _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ showPpr l ++ " in expression: " ++ showPpr coreExpr
 
 coreToDataCon :: Bool

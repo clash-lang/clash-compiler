@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- | Term Literal
 module CLaSH.Core.Literal
@@ -23,28 +23,35 @@ import                CLaSH.Core.TysPrim            (intPrimTy, voidPrimTy)
 
 -- | Term Literal
 data Literal
-  = IntegerLiteral Integer
-  | StringLiteral  String
+  = IntegerLiteral  Integer
+  | StringLiteral   String
+  | RationalLiteral Rational
   deriving (Eq,Ord,Show)
 
 Unbound.derive [''Literal]
 
+instance Alpha Rational
+instance Subst b Rational
+
 instance Alpha Literal where
   fv' _ _ = emptyC
 
-  acompare' _ (IntegerLiteral i) (IntegerLiteral j) = compare i j
-  acompare' c l1                 l2                 = acompareR1 rep1 c l1 l2
+  acompare' _ (IntegerLiteral i) (IntegerLiteral j)   = compare i j
+  acompare' _ (RationalLiteral i) (RationalLiteral j) = compare i j
+  acompare' c l1                 l2                   = acompareR1 rep1 c l1 l2
 
 instance Subst Type Literal
 instance Subst Term Literal
 
 instance NFData Literal where
   rnf l = case l of
-    IntegerLiteral i -> rnf i
-    StringLiteral s  -> rnf s
+    IntegerLiteral i  -> rnf i
+    StringLiteral s   -> rnf s
+    RationalLiteral r -> rnf r
 
 -- | Determines the Type of a Literal
 literalType :: Literal
             -> Type
-literalType (IntegerLiteral _) = intPrimTy
-literalType (StringLiteral  _) = voidPrimTy
+literalType (IntegerLiteral  _) = intPrimTy
+literalType (RationalLiteral _) = voidPrimTy
+literalType (StringLiteral   _) = voidPrimTy
