@@ -111,3 +111,13 @@ infixr 5 >-!
 -- | Keep applying a transformation until it fails.
 repeatR :: Monad m => Rewrite m -> Rewrite m
 repeatR r = r !-> repeatR r
+
+whenR :: Monad m
+      => ([CoreContext] -> Term -> m Bool)
+      -> Transform m
+      -> Transform m
+whenR f r1 ctx expr = do
+  b <- f ctx expr
+  if b
+    then r1 ctx expr
+    else return expr

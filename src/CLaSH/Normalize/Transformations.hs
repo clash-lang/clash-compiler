@@ -396,7 +396,12 @@ makeANF ctx (Lam b) = do
 
 makeANF ctx e
   = R $ do
-    (e',bndrs) <- runR $ runWriterT $ bottomupR collectANF ctx e
+    (e',bndrs) <- runR $ runWriterT $
+                      bottomupR (whenR (\ctx' tm -> fmap not $
+                                                    liftNormR $
+                                                    untranslatableFVs (ctx' ++ ctx) tm
+                                       ) collectANF
+                                ) ctx e
     case bndrs of
       [] -> return e
       _  -> changed . Letrec $ bind (rec bndrs) e'
