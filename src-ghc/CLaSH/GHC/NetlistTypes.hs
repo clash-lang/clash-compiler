@@ -51,6 +51,8 @@ tyNatSize (tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
   "GHC.TypeLits.*" -> (*) <$> tyNatSize ty1 <*> tyNatSize ty2
   "GHC.TypeLits.^" -> (^) <$> tyNatSize ty1 <*> tyNatSize ty2
   "GHC.TypeLits.-" -> (-) <$> tyNatSize ty1 <*> tyNatSize ty2
+  "CLaSH.Promoted.Ord.Max" -> max <$> tyNatSize ty1 <*> tyNatSize ty2
+  "CLaSH.Promoted.Ord.Min" -> min <$> tyNatSize ty1 <*> tyNatSize ty2
   _ -> fail $ $(curLoc) ++ "Can't convert tyNatOp: " ++ show tc
 -- TODO: Remove this conversion
 -- The current problem is that type-functions are not reduced by the GHC -> Core
