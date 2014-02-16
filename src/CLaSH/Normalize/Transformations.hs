@@ -76,8 +76,6 @@ bindNonRep = inlineBinders nonRepTest
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
---  nonRepTest (Id _ tyE, _) =
---    not <$> (representableType <$> Lens.use typeTranslator <*> pure (unembed tyE))
     nonRepTest (Id idName tyE, exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
              <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
