@@ -62,7 +62,7 @@ runNormalization lvl supply globals typeTrans tcm
                   HashMap.empty
                   100
                   HashMap.empty
-                  20
+                  100
                   (error "Report as bug: no curFun")
 
 

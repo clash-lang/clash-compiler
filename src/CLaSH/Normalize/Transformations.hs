@@ -54,7 +54,7 @@ import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               termType)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
-                                              splitNormalized, unsafeCoreTypeToHWType)
+                                              splitNormalized)
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Rewrite.Combinators
@@ -150,8 +150,7 @@ inlineNonRep _ e@(Case scrut alts)
         cf <- liftR $ Lens.use curFun
         tt <- Lens.use typeTranslator
         ty <- termType tcm scrut
-        let hwty = unsafeCoreTypeToHWType $(curLoc) tt tcm ty
-        error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ show hwty
+        error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ showDoc ty
       else do
         scrutTy     <- termType tcm scrut
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
