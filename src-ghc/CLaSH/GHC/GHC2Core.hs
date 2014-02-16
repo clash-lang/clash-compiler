@@ -147,6 +147,16 @@ makeTyCon tc = tycon
           tcKind <- coreToType (tyConKind tc)
           return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
 
+        coreToPrimRep :: PrimRep
+                      -> C.PrimRep
+        coreToPrimRep p = case p of
+          VoidRep -> C.VoidRep
+          IntRep  -> C.IntRep
+          AddrRep -> C.VoidRep
+          PtrRep  -> C.VoidRep
+          WordRep -> C.VoidRep
+          _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p ++ " in tycon: " ++ showPpr tc
+
 makeAlgTyConRhs :: AlgTyConRhs
                 -> State (HashMap C.TyConName TyCon) (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
@@ -245,6 +255,18 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                                   mapM coreToId tmvs)) <*>
                               term e
 
+    coreToLiteral :: Literal
+              -> C.Literal
+    coreToLiteral l = case l of
+      MachStr    fs  -> C.StringLiteral (unpackFB fs)
+      MachChar   c   -> C.StringLiteral [c]
+      MachInt    i   -> C.IntegerLiteral i
+      MachInt64  i   -> C.IntegerLiteral i
+      MachWord   i   -> C.IntegerLiteral i
+      MachWord64 i   -> C.IntegerLiteral i
+      LitInteger i _ -> C.IntegerLiteral i
+      _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ showPpr l ++ " in expression: " ++ showPpr coreExpr
+
 coreToDataCon :: Bool
               -> DataCon
               -> State (HashMap C.TyConName TyCon) C.DataCon
@@ -265,17 +287,6 @@ coreToDataCon mkWrap dc = do
               , C.dcUnivTyVars = map coreToVar (dataConUnivTyVars dc)
               , C.dcExtTyVars  = map coreToVar (dataConExTyVars dc)
               }
-
-coreToLiteral :: Literal
-              -> C.Literal
-coreToLiteral l = case l of
-  MachStr    fs  -> C.StringLiteral (unpackFB fs)
-  MachInt    i   -> C.IntegerLiteral i
-  MachInt64  i   -> C.IntegerLiteral i
-  MachWord   i   -> C.IntegerLiteral i
-  MachWord64 i   -> C.IntegerLiteral i
-  LitInteger i _ -> C.IntegerLiteral i
-  _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ showPpr l
 
 coreToType :: Type
            -> State (HashMap C.TyConName TyCon) C.Type
@@ -301,15 +312,6 @@ coreToTyLit :: TyLit
             -> C.LitTy
 coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
-
-coreToPrimRep :: PrimRep
-              -> C.PrimRep
-coreToPrimRep p = case p of
-  VoidRep -> C.VoidRep
-  IntRep  -> C.IntRep
-  AddrRep -> C.VoidRep
-  PtrRep  -> C.VoidRep
-  _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p
 
 coreToTyVar :: TyVar
             -> State (HashMap C.TyConName TyCon) C.TyVar
