@@ -50,6 +50,7 @@ makeLenses ''RewriteState
 data DebugLevel
   = DebugNone -- ^ Don't show debug messages
   | DebugFinal -- ^ Show completely normalized expressions
+  | DebugName -- ^ Names of applied transformations
   | DebugApplied -- ^ Show sub-expressions after a successful rewrite
   | DebugAll -- ^ Show all sub-expressions on which a rewrite is attempted
   deriving (Eq,Ord)

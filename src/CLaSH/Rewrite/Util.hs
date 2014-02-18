@@ -104,9 +104,10 @@ apply name rewrite ctx expr = R $ do
   Monad.when (lvl >= DebugApplied && not hasChanged && expr /= expr') $
     error $ "Expression changed without notice(" ++ name ++  "): before" ++ before ++ "\nafter:\n" ++ after
 
-  traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite " ++ name ++ " to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
-    traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n") $
-      return expr''
+  traceIf (lvl >= DebugName && hasChanged) name $
+    traceIf (lvl >= DebugApplied && hasChanged) (", changes when applying rewrite to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $
+      traceIf (lvl >= DebugAll && not hasChanged) ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n") $
+        return expr''
 
 -- | Perform a transformation on a Term
 runRewrite :: (Monad m, Functor m)
