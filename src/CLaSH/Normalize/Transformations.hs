@@ -102,8 +102,7 @@ nonRepSpec ctx e@(App e1 e2)
            e2Ty <- termType tcm e2
            localVar <- isLocalVar e2
            nonRepE2 <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure e2Ty)
-           -- polyE2   <- isPolyFun e2
-           if nonRepE2 && not localVar -- && not polyE2
+           if nonRepE2 && not localVar
              then runR $ specializeNorm ctx e
              else return e
 
