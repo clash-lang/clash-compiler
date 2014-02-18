@@ -147,7 +147,6 @@ inlineNonRep _ e@(Case scrut alts)
     if (Maybe.fromMaybe 0 isInlined) > limit
       then do
         cf <- liftR $ Lens.use curFun
-        tt <- Lens.use typeTranslator
         ty <- termType tcm scrut
         error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ showDoc ty
       else do
