@@ -31,6 +31,7 @@ Library
                       CLaSH.Class.Default
                       CLaSH.Prelude
                       CLaSH.Promoted.Bool
+                      CLaSH.Promoted.Nat
                       CLaSH.Promoted.Ord
                       CLaSH.Signal
                       CLaSH.Sized.Index
@@ -40,4 +41,4 @@ Library
 
   Build-depends:      base                 >= 4.7.0.0,
                       template-haskell     >= 2.9.0.0,
-                      th-lift              >= 0.5.5
+                      th-lift              >= 0.5.6

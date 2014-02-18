@@ -22,6 +22,7 @@ import GHC.TypeLits
 import CLaSH.Bit
 import CLaSH.Class.BitVector
 import CLaSH.Class.Default
+import CLaSH.Promoted.Nat
 import CLaSH.Sized.Vector
 
 newtype Unsigned (n :: Nat) = U Integer
@@ -49,21 +50,21 @@ gtU (U n) (U m) = n > m
 {-# NOINLINE leU #-}
 leU (U n) (U m) = n <= m
 
-instance SingI n => Enum (Unsigned n) where
+instance KnownNat n => Enum (Unsigned n) where
   succ           = plusU (fromIntegerU 1)
   pred           = minU (fromIntegerU 1)
   toEnum         = fromIntegerU . toInteger
   fromEnum       = fromEnum . toIntegerU
 
-instance SingI n => Bounded (Unsigned n) where
+instance KnownNat n => Bounded (Unsigned n) where
   minBound = fromIntegerU 0
   maxBound = maxBoundU
 
 {-# NOINLINE maxBoundU #-}
-maxBoundU :: forall n . SingI n => Unsigned n
-maxBoundU = U $ (2 ^ fromSing (sing :: Sing n)) - 1
+maxBoundU :: forall n . KnownNat n => Unsigned n
+maxBoundU = U $ (2 ^ fromSNat (snat :: SNat n)) - 1
 
-instance SingI n => Num (Unsigned n) where
+instance KnownNat n => Num (Unsigned n) where
   (+)         = plusU
   (-)         = minU
   (*)         = timesU
@@ -72,7 +73,7 @@ instance SingI n => Num (Unsigned n) where
   signum      = signumU
   fromInteger = fromIntegerU
 
-plusU,minU,timesU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+plusU,minU,timesU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE plusU #-}
 plusU (U a) (U b) = fromIntegerU_inlineable $ a + b
 
@@ -87,16 +88,16 @@ signumU :: Unsigned n -> Unsigned n
 signumU (U 0) = (U 0)
 signumU (U _) = (U 1)
 
-fromIntegerU,fromIntegerU_inlineable :: forall n . SingI n => Integer -> Unsigned (n :: Nat)
+fromIntegerU,fromIntegerU_inlineable :: forall n . KnownNat n => Integer -> Unsigned (n :: Nat)
 {-# NOINLINE fromIntegerU #-}
 fromIntegerU = fromIntegerU_inlineable
 {-# INLINABLE fromIntegerU_inlineable #-}
-fromIntegerU_inlineable i = U $ i `mod` (2 ^ fromSing (sing :: Sing n))
+fromIntegerU_inlineable i = U $ i `mod` (2 ^ fromSNat (snat :: SNat n))
 
-instance SingI n => Real (Unsigned n) where
+instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toIntegerU
 
-instance SingI n => Integral (Unsigned n) where
+instance KnownNat n => Integral (Unsigned n) where
   quot      = quotU
   rem       = remU
   div       = quotU
@@ -105,7 +106,7 @@ instance SingI n => Integral (Unsigned n) where
   divMod    = divModU
   toInteger = toIntegerU
 
-quotU,remU,modU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+quotU,remU,modU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE quotU #-}
 quotU = (fst.) . quotRemU_inlineable
 {-# NOINLINE remU #-}
@@ -113,12 +114,12 @@ remU = (snd.) . quotRemU_inlineable
 {-# NOINLINE modU #-}
 (U a) `modU` (U b) = fromIntegerU_inlineable (a `mod` b)
 
-quotRemU,divModU :: SingI n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
+quotRemU,divModU :: KnownNat n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
 quotRemU n d = (n `quotU` d,n `remU` d)
 divModU n d  = (n `quotU` d,n `modU` d)
 
 {-# INLINEABLE quotRemU_inlineable #-}
-quotRemU_inlineable :: SingI n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
+quotRemU_inlineable :: KnownNat n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
 (U a) `quotRemU_inlineable` (U b) = let (a',b') = a `quotRem` b
                                     in (fromIntegerU_inlineable a', fromIntegerU_inlineable b')
 
@@ -126,7 +127,7 @@ quotRemU_inlineable :: SingI n => Unsigned n -> Unsigned n -> (Unsigned n, Unsig
 toIntegerU :: Unsigned n -> Integer
 toIntegerU (U n) = n
 
-instance SingI n => Bits (Unsigned n) where
+instance KnownNat n => Bits (Unsigned n) where
   (.&.)          = andU
   (.|.)          = orU
   xor            = xorU
@@ -141,7 +142,7 @@ instance SingI n => Bits (Unsigned n) where
   rotateR        = rotateRU
   popCount       = popCountU
 
-andU,orU,xorU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
+andU,orU,xorU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE andU #-}
 (U a) `andU` (U b) = fromIntegerU_inlineable (a .&. b)
 {-# NOINLINE orU #-}
@@ -150,18 +151,18 @@ andU,orU,xorU :: SingI n => Unsigned n -> Unsigned n -> Unsigned n
 (U a) `xorU` (U b) = fromIntegerU_inlineable (xor a b)
 
 {-# NOINLINE complementU #-}
-complementU :: SingI n => Unsigned n -> Unsigned n
+complementU :: KnownNat n => Unsigned n -> Unsigned n
 complementU = fromBitVector . vmap complement . toBitVector
 
 {-# NOINLINE bitU #-}
-bitU :: SingI n => Int -> Unsigned n
+bitU :: KnownNat n => Int -> Unsigned n
 bitU = fromIntegerU_inlineable . bit
 
 {-# NOINLINE testBitU #-}
 testBitU :: Unsigned n -> Int -> Bool
 testBitU (U n) i = testBit n i
 
-shiftLU,shiftRU,rotateLU,rotateRU :: SingI n => Unsigned n -> Int -> Unsigned n
+shiftLU,shiftRU,rotateLU,rotateRU :: KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftLU #-}
 shiftLU _ b | b < 0  = error "'shiftL'{Unsigned} undefined for negative numbers"
 shiftLU (U n) b      = fromIntegerU_inlineable (shiftL n b)
@@ -181,15 +182,15 @@ rotateRU n b         = let b' = b `mod` finiteBitSizeU n
 popCountU :: Unsigned n -> Int
 popCountU (U n) = popCount n
 
-instance SingI n => FiniteBits (Unsigned n) where
+instance KnownNat n => FiniteBits (Unsigned n) where
   finiteBitSize  = finiteBitSizeU
 
 {-# NOINLINE finiteBitSizeU #-}
-finiteBitSizeU :: forall n . SingI n => Unsigned n -> Int
-finiteBitSizeU _ = fromInteger $ fromSing (sing :: Sing n)
+finiteBitSizeU :: forall n . KnownNat n => Unsigned n -> Int
+finiteBitSizeU _ = fromInteger $ fromSNat (snat :: SNat n)
 
-instance forall n . SingI n => Lift (Unsigned n) where
-  lift (U i) = sigE [| fromIntegerU i |] (decUnsigned $ fromSing (sing :: (Sing n)))
+instance forall n . KnownNat n => Lift (Unsigned n) where
+  lift (U i) = sigE [| fromIntegerU i |] (decUnsigned $ fromSNat (snat :: (SNat n)))
 
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
@@ -197,7 +198,7 @@ decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 instance Show (Unsigned n) where
   show (U n) = show n
 
-instance SingI n => Default (Unsigned n) where
+instance KnownNat n => Default (Unsigned n) where
   def = fromIntegerU 0
 
 instance BitVector (Unsigned n) where
@@ -206,15 +207,15 @@ instance BitVector (Unsigned n) where
   fromBV = fromBitVector
 
 {-# NOINLINE toBitVector #-}
-toBitVector :: SingI n => Unsigned n -> Vec n Bit
+toBitVector :: KnownNat n => Unsigned n -> Vec n Bit
 toBitVector (U m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterateI (`div` 2) m
 
 {-# NOINLINE fromBitVector #-}
-fromBitVector :: SingI n => Vec n Bit -> Unsigned n
+fromBitVector :: KnownNat n => Vec n Bit -> Unsigned n
 fromBitVector = fromBitList . reverse . toList
 
 {-# INLINABLE fromBitList #-}
-fromBitList :: SingI n => [Bit] -> Unsigned n
+fromBitList :: KnownNat n => [Bit] -> Unsigned n
 fromBitList l = fromIntegerU_inlineable
               $ sum [ n
                     | (n,b) <- zip (iterate (*2) 1) l
@@ -222,5 +223,5 @@ fromBitList l = fromIntegerU_inlineable
                     ]
 
 {-# NOINLINE resizeU #-}
-resizeU :: SingI m => Unsigned n -> Unsigned m
+resizeU :: KnownNat m => Unsigned n -> Unsigned m
 resizeU (U n) = fromIntegerU_inlineable n
