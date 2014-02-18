@@ -16,7 +16,7 @@ import           GHC.Show                (showMultiLineString)
 import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
                                           hsep, int, integer, parens, punctuate,
                                           render, sep, text, vcat, ($$), ($+$),
-                                          (<+>), (<>), rational)
+                                          (<+>), (<>), rational, nest)
 import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
                                           name2String, runLFreshM, unembed,
                                           unrebind, unrec)
@@ -133,7 +133,7 @@ instance Pretty Pat where
       dc'  <- ppr (unembed dc)
       txs' <- mapM (pprBndr LetBind) txs
       xs'  <- mapM (pprBndr CaseBind) xs
-      return $ prettyParen (prec >= appPrec) $ dc' <+> hsep txs' <+> hsep xs'
+      return $ prettyParen (prec >= appPrec) $ dc' <+> hsep txs' $$ (nest 2 (vcat xs'))
     LitPat l   -> ppr (unembed l)
     DefaultPat -> return $ char '_'
 
@@ -155,13 +155,13 @@ pprPrecApp :: (Applicative m, LFresh m) => Rational -> Term -> Term -> m Doc
 pprPrecApp prec e1 e2 = do
   e1' <- pprPrec opPrec e1
   e2' <- pprPrec appPrec e2
-  return $ prettyParen (prec >= appPrec) $ e1' <+> e2'
+  return $ prettyParen (prec >= appPrec) $ e1' $$ (nest 2 e2')
 
 pprPrecTyApp :: (Applicative m, LFresh m) => Rational -> Term -> Type -> m Doc
 pprPrecTyApp prec e ty = do
   e' <- pprPrec opPrec e
   ty' <- pprParendType ty
-  return $ prettyParen (prec >= appPrec) $ e' <+> char '@' <> ty'
+  return $ prettyParen (prec >= appPrec) $ e' $$ (char '@' <> ty')
 
 pprPrecLetrec :: (Applicative m, LFresh m) => Rational -> [(Id, Embed Term)] -> Term
   -> m Doc
@@ -172,7 +172,7 @@ pprPrecLetrec prec xes body
     xes'  <- mapM (\(x,e) -> do
                     x' <- pprBndr LetBind x
                     e' <- pprPrec noPrec (unembed e)
-                    return $ x' <+> equals <+> e'
+                    return $ x' $$ equals <+> e'
                   ) xes
     return $ prettyParen (prec > noPrec) $
       hang (text "letrec") 2 (vcat xes') $$ text "in" <+> body'
