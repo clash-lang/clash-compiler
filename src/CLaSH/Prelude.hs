@@ -12,12 +12,12 @@ module CLaSH.Prelude
   )
 where
 
-import Control.Arrow
-import Control.Applicative
+import Control.Arrow         as Exported
+import Control.Applicative   as Exported
 import Control.Category      as Category
 import Data.Bits             as Exported
+import Data.Default          as Exported
 import CLaSH.Class.BitVector as Exported
-import CLaSH.Class.Default   as Exported
 import CLaSH.Promoted.Bool   as Exported
 import CLaSH.Promoted.Nat    as Exported
 import CLaSH.Promoted.Ord    as Exported

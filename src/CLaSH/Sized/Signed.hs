@@ -16,13 +16,13 @@ module CLaSH.Sized.Signed
 where
 
 import Data.Bits
+import Data.Default
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax(Lift(..))
 import GHC.TypeLits
 
 import CLaSH.Bit
 import CLaSH.Class.BitVector
-import CLaSH.Class.Default
 import CLaSH.Promoted.Nat
 import CLaSH.Sized.Vector
 

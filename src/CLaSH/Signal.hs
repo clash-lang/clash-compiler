@@ -15,10 +15,10 @@ module CLaSH.Signal
   )
 where
 
+import Data.Default
 import Control.Applicative
 import Language.Haskell.TH.Syntax(Lift(..))
 
-import CLaSH.Class.Default
 import CLaSH.Bit            (Bit)
 import CLaSH.Sized.Signed   (Signed)
 import CLaSH.Sized.Unsigned (Unsigned)

@@ -7,9 +7,8 @@ module CLaSH.Bit
 where
 
 import Data.Bits
+import Data.Default
 import Language.Haskell.TH.Lift
-
-import CLaSH.Class.Default
 
 data Bit = H | L
 
