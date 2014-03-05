@@ -21,7 +21,6 @@ import CLaSH.Class.Default   as Exported
 import CLaSH.Promoted.Bool   as Exported
 import CLaSH.Promoted.Nat    as Exported
 import CLaSH.Promoted.Ord    as Exported
-import CLaSH.Sized.Index     as Exported
 import CLaSH.Sized.Signed    as Exported
 import CLaSH.Sized.Unsigned  as Exported
 import CLaSH.Sized.Vector    as Exported
