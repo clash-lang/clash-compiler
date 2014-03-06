@@ -333,7 +333,7 @@ end block;"
     , "templateD" :
 "~SYM[0]_vreplace_integer : block
   signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
+  signal ~SYM[2] : ~TYP[2] := ~DEFAULT[2];
   signal ~SYM[3] : ~TYP[3];
 begin
   ~SYM[1] <= ~ARG[1];

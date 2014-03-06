@@ -109,7 +109,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Unsigned.testBitU"
     , "templateD" :
 "~SYM[0]_testBitU : block
-  signal ~SYM[1];
+  signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= ~SYM[1](~ARG[1]) = '1';
