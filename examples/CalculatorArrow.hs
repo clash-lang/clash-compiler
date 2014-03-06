@@ -1,7 +1,6 @@
 module CalculatorArrow where
 
 import CLaSH.Prelude
-import Control.Arrow
 
 type Word = Signed 4
 data OPC a = ADD | MUL | Imm a | Pop | Push
