@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds #-}
 module MAC where
 
 import CLaSH.Prelude

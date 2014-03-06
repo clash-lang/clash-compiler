@@ -159,6 +159,12 @@ main = do
             GHC.runGhc (Just libDir) $ do
 
             dflags <- GHC.getSessionDynFlags
+            let dflagsExtra = foldl DynFlags.xopt_set
+                                    dflags
+                                    [ DynFlags.Opt_TemplateHaskell
+                                    , DynFlags.Opt_Arrows
+                                    , DynFlags.Opt_DataKinds
+                                    ]
 
             case postStartupMode of
                 Left preLoadMode ->
@@ -169,7 +175,7 @@ main = do
                             ShowGhciUsage          -> showGhciUsage dflags
                             PrintWithDynFlags f    -> putStrLn (f dflags)
                 Right postLoadMode ->
-                    main' postLoadMode dflags argv3 flagWarnings
+                    main' postLoadMode dflagsExtra argv3 flagWarnings
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
       -> Ghc ()

@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds #-}
 module BlockRamTest where
 
 import CLaSH.Prelude

@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds #-}
 module Calculator where
 
 import CLaSH.Prelude

@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds, Arrows #-}
 module CalculatorArrow where
 
 import CLaSH.Prelude
