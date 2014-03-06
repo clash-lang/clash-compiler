@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.2
+Version:              0.2.1
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -18,7 +18,7 @@ License:              OtherLicense
 License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
-Copyright:            Copyright (c) 2012-2013 University of Twente
+Copyright:            Copyright (c) 2012-2014 University of Twente
 Category:             Hardware
 Build-type:           Simple
 
@@ -33,7 +33,6 @@ Data-files:           primitives/clash.bit.json,
                       primitives/clash.sized.signed.json,
                       primitives/clash.sized.unsigned.json,
                       primitives/clash.sized.vector.json,
-                      primitives/data.singletons.core.json,
                       primitives/ghc.base.json,
                       primitives/ghc.classes.json,
                       primitives/ghc.cstring.json,
@@ -71,17 +70,17 @@ Executable clash
                       NondecreasingIndentation
 
   Build-Depends:      array                >= 0.4,
-                      base                 >= 4.3.1.0,
+                      base                 >= 4.3.1.0 && < 5,
                       bytestring           >= 0.9,
-                      clash-lib            >= 0.2,
+                      clash-lib            >= 0.2.1,
                       clash-prelude        >= 0.2,
                       directory            >= 1.2,
                       filepath             >= 1.3,
-                      ghc                  >= 7.7,
+                      ghc                  >= 7.8,
                       process              >= 1.2,
                       hashable             >= 1.1.2.3,
                       haskeline            >= 0.7.0.3,
-                      lens                 >= 3.7.1,
+                      lens                 >= 4.0.5,
                       mtl                  >= 2.1.1,
                       text                 >= 0.11.3.1,
                       transformers         >= 0.3,
