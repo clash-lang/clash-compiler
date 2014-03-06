@@ -8,8 +8,12 @@ import GHC.TypeLits
 
 import CLaSH.Promoted.Bool
 
+-- | Type-level 'min' function for natural numbers
 type family Min (x :: Nat) (y :: Nat) :: Nat
-type instance Min x y = If (x <=? y) x y
+  where
+    Min x y = If (x <=? y) x y
 
+-- | Type-level 'max' function for natural numbers
 type family Max (x :: Nat) (y :: Nat) :: Nat
-type instance Max x y = If (x <=? y) y x
+  where
+    Max x y = If (x <=? y) y x

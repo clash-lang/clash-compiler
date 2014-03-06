@@ -1,6 +1,6 @@
 Name:                 clash-prelude
-Version:              0.2
-Synopsis:             CAES Language for Synchronous Hardware
+Version:              0.2.1
+Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 -- Description:
 Homepage:             http://clash.ewi.utwente.nl/
 bug-reports:          http://github.com/christiaanb/clash-prelude/issues
@@ -8,7 +8,7 @@ License:              BSD3
 License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
-Copyright:            Copyright (C) 2013-2014 University of Twente
+Copyright:            Copyright © 2013-2014 University of Twente
 Category:             Hardware
 Build-type:           Simple
 
@@ -18,7 +18,7 @@ Cabal-version:        >=1.10
 
 source-repository head
   type: git
-  location: git://github.com/christiaanb/clash-prelude.git
+  location: https://github.com/christiaanb/clash-prelude.git
 
 Library
   HS-Source-Dirs:     src

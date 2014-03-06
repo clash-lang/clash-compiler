@@ -13,22 +13,28 @@ import Data.Proxy
 import GHC.TypeLits
 import Unsafe.Coerce
 
+-- | Singleton value for a type-level natural number 'n'
 data SNat (n :: Nat) = KnownNat n => SNat (Proxy n)
 
+-- | Singleton value for a type-level natural number
 snat :: KnownNat n => SNat n
 snat = SNat Proxy
 
+-- | Supply a function with a singleton natural 'n' according to the context
 withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f (SNat Proxy)
 
+-- | Unary representation of a type-level natural
 data UNat :: Nat -> * where
   UZero :: UNat 0
   USucc :: UNat n -> UNat (n + 1)
 
+-- | Convert a singleton natural number to an integer
 fromSNat :: SNat n -> Integer
 fromSNat (SNat p) = natVal p
 
 {-# NOINLINE fromSNat #-}
+-- | Convert a singleton natural number to it's unary representation
 toUNat :: SNat n -> UNat n
 toUNat (SNat p) = fromI (natVal p)
   where

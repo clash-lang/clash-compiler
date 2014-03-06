@@ -4,7 +4,8 @@
 {-# LANGUAGE PolyKinds      #-}
 module CLaSH.Promoted.Bool where
 
+-- | Type-level if-then-else
 type family If (x :: Bool) (y :: k) (z :: k) :: k
-
-type instance If True  y z = y
-type instance If False y z = z
+  where
+    If True  y z = y
+    If False y z = z

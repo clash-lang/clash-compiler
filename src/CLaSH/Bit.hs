@@ -10,6 +10,7 @@ import Data.Bits
 import Data.Default
 import Language.Haskell.TH.Lift
 
+-- | Two-level logic
 data Bit = H | L
 
 instance Eq Bit where

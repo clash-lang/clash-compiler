@@ -266,4 +266,4 @@ resizeS s@(S n) | n' <= m'  = fromIntegerS_inlineable n
 -- Truncating a number of length N to a length L just removes the leftmost N-L bits.
 --
 resizeS_wrap :: KnownNat m => Signed n -> Signed m
-resizeS_wrap s@(S n) = fromIntegerS_inlineable n
+resizeS_wrap (S n) = fromIntegerS_inlineable n
