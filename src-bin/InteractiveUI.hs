@@ -1890,7 +1890,7 @@ setGHCContextFromGHCiState = do
   dflags <- GHC.getSessionDynFlags
   GHC.setContext $
      if xopt Opt_ImplicitPrelude dflags && not (any isPreludeImport iidecls)
-        then iidecls ++ [implicitPreludeImport]
+        then iidecls ++ [implicitPreludeImport,implicitCLaSHPreludeImport]
         else iidecls
     -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
 
@@ -1914,8 +1914,14 @@ iiModuleName (IIDecl d)   = unLoc (ideclName d)
 preludeModuleName :: ModuleName
 preludeModuleName = GHC.mkModuleName "Prelude"
 
+clashPreludeModuleName :: ModuleName
+clashPreludeModuleName = GHC.mkModuleName "CLaSH.Prelude"
+
 implicitPreludeImport :: InteractiveImport
 implicitPreludeImport = IIDecl (simpleImportDecl preludeModuleName)
+
+implicitCLaSHPreludeImport :: InteractiveImport
+implicitCLaSHPreludeImport = IIDecl (simpleImportDecl clashPreludeModuleName)
 
 isPreludeImport :: InteractiveImport -> Bool
 isPreludeImport (IIModule {}) = True
