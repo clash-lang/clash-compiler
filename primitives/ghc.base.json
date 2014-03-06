@@ -8,4 +8,9 @@
     , "templateE" : "~ARG[0] * ~ARG[1]"
     }
   }
+, { "Primitive" :
+    { "name"      : "GHC.Base.$"
+    , "primType"  : "Function"
+    }
+  }
 ]

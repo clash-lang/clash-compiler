@@ -259,6 +259,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
               | f == pack "CLaSH.Signal.signal"    -> return (syncTerm xType)
               | f == pack "CLaSH.Signal.pack"      -> return (splitCombineTerm False xType)
               | f == pack "CLaSH.Signal.unpack"    -> return (splitCombineTerm True xType)
+              | f == pack "GHC.Base.$"             -> return (dollarAppTerm xType)
               | otherwise                          -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
               return (C.Prim xNameS xType)
@@ -444,6 +445,10 @@ splitCombineTerm b (C.ForAllTy tvTy) =
   in newExpr
 
 splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
+
+dollarAppTerm :: C.Type
+              -> C.Term
+dollarAppTerm = mapSyncTerm
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of
