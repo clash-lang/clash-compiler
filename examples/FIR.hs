@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds, TemplateHaskell #-}
 module FIR where
 
 import CLaSH.Prelude
