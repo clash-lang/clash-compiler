@@ -334,8 +334,8 @@ vdropI = withSNat vdrop
 {-# NOINLINE vexact #-}
 -- | 'vexact' @n xs@ returns @n@'th element of @xs@
 --
--- > vexact (snat :: SNat 2) <1,2,3,4,5> == 4
--- vexact :: SNat m -> Vec (m + (n + 1)) a -> a
+-- > vexact (snat :: SNat 1) <1,2,3,4,5> == 4
+vexact :: SNat m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n (vreverse xs)
 
 {-# NOINLINE vselect #-}
@@ -362,6 +362,7 @@ vselectI ::
 vselectI f s xs = withSNat (\n -> vselect f s n xs)
 
 {-# NOINLINE vcopy #-}
+-- | 'vcopy' @n a@ returns a vector that has @n@ copies of @a@
 vcopy :: SNat n -> a -> Vec n a
 vcopy n a = vreplicateU (toUNat n) a
 
@@ -370,6 +371,8 @@ vreplicateU UZero     _ = Nil
 vreplicateU (USucc s) x = x :> vreplicateU s x
 
 {-# INLINEABLE vcopyI #-}
+-- | 'vcopy' @a@ creates a vector with as many copies of @a@ as demanded by the
+-- context
 vcopyI :: KnownNat n => a -> Vec n a
 vcopyI = withSNat vcopy
 
@@ -393,10 +396,13 @@ vgenerate n f a = viterate n f (f a)
 vgenerateI :: KnownNat n => (a -> a) -> a -> Vec n a
 vgenerateI = withSNat vgenerate
 
-{-# NOINLINE toList #-}
+{-# INLINEABLE toList #-}
 toList :: Vec n a -> [a]
 toList = vfoldr (:) []
 
+-- | Create a vector literal from a list literal
+--
+-- > $(v [1::Signed 8,2,3,4,5]) == <1,2,3,4,5> :: Vec 5 (Signed 8)
 v :: Lift a => [a] -> ExpQ
 v []     = [| Nil |]
 v (x:xs) = [| x :> $(v xs) |]
