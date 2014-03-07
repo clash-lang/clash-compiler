@@ -342,7 +342,6 @@ vdropI = withSNat vdrop
 -- have a descending subscript starting from 'maxIndex' and ending at 0
 --
 -- > vexact (snat :: SNat 1) <1,2,3,4,5> == 4
--- > vexact (snat :: SNat 4) <1,2,3,4,5> == 1
 vexact :: SNat m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n (vreverse xs)
 
@@ -374,6 +373,7 @@ vselectI :: ((f + (s * n) + 1) <= i, KnownNat (n + 1))
 vselectI f s xs = withSNat (\n -> vselect f s n xs)
 
 {-# NOINLINE vcopy #-}
+-- | 'vcopy' @n a@ returns a vector that has @n@ copies of @a@
 vcopy :: SNat n -> a -> Vec n a
 vcopy n a = vreplicateU (toUNat n) a
 
@@ -382,10 +382,16 @@ vreplicateU UZero     _ = Nil
 vreplicateU (USucc s) x = x :> vreplicateU s x
 
 {-# INLINEABLE vcopyI #-}
+-- | 'vcopy' @a@ creates a vector with as many copies of @a@ as demanded by the
+-- context
 vcopyI :: KnownNat n => a -> Vec n a
 vcopyI = withSNat vcopy
 
 {-# NOINLINE viterate #-}
+-- | 'viterate' @n f x@ returns a vector starting with @x@ followed by @n@
+-- repeated applications of @f@ to @x@
+--
+-- > viterate (snat :: SNat 4) f x = <x, f x, f (f x), f (f (f x))>
 viterate :: SNat n -> (a -> a) -> a -> Vec n a
 viterate n f a = viterateU (toUNat n) f a
 
@@ -394,21 +400,33 @@ viterateU UZero     _ _ = Nil
 viterateU (USucc s) g x = x :> viterateU s g (g x)
 
 {-# INLINEABLE viterateI #-}
+-- | 'viterate' @f x@ returns a vector starting with @x@ followed by @n@
+-- repeated applications of @f@ to @x@, where @n@ is determined by the context
 viterateI :: KnownNat n => (a -> a) -> a -> Vec n a
 viterateI = withSNat viterate
 
 {-# INLINEABLE vgenerate #-}
+-- | 'vgenerate' @n f x@ returns a vector with @n@ repeated applications of @f@
+-- to @x@
+--
+-- > vgenerate (snat :: SNat 4) f x = <f x, f (f x), f (f (f x)), f (f (f (f x)))>
 vgenerate :: SNat n -> (a -> a) -> a -> Vec n a
 vgenerate n f a = viterate n f (f a)
 
 {-# INLINEABLE vgenerateI #-}
+-- | 'vgenerate' @f x@ returns a vector with @n@ repeated applications of @f@
+-- to @x@, where @n@ is determined by the context
 vgenerateI :: KnownNat n => (a -> a) -> a -> Vec n a
 vgenerateI = withSNat vgenerate
 
-{-# NOINLINE toList #-}
+{-# INLINEABLE toList #-}
+-- | Convert a vector to a list
 toList :: Vec n a -> [a]
 toList = vfoldr (:) []
 
+-- | Create a vector literal from a list literal
+--
+-- > $(v [1::Signed 8,2,3,4,5]) == <1,2,3,4,5> :: Vec 5 (Signed 8)
 v :: Lift a => [a] -> ExpQ
 v []     = [| Nil |]
 v (x:xs) = [| x :> $(v xs) |]

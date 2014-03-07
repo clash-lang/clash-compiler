@@ -1,5 +1,5 @@
 Name:                 clash-prelude
-Version:              0.2.1
+Version:              0.3
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 -- Description:
 Homepage:             http://clash.ewi.utwente.nl/
@@ -31,6 +31,8 @@ Library
                       CLaSH.Prelude
                       CLaSH.Promoted.Bool
                       CLaSH.Promoted.Nat
+                      CLaSH.Promoted.Nat.TH
+                      CLaSH.Promoted.Nat.Literals
                       CLaSH.Promoted.Ord
                       CLaSH.Signal
                       CLaSH.Sized.Signed

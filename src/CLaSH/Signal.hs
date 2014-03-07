@@ -7,6 +7,7 @@ module CLaSH.Signal
   , fromList
   , signal
   , sample
+  , sampleN
   , register
   , simulate
   , Pack(..)
@@ -45,9 +46,12 @@ instance Lift a => Lift (Signal a) where
 instance Default a => Default (Signal a) where
   def = signal def
 
-sample :: Int -> Signal a -> [a]
-sample 0 _         = []
-sample n ~(x :- xs) = x : (sample (n-1) xs)
+sample :: Signal a -> [a]
+sample ~(x :- xs) = x : sample xs
+
+sampleN :: Int -> Signal a -> [a]
+sampleN 0 _          = []
+sampleN n ~(x :- xs) = x : (sampleN (n-1) xs)
 
 signal :: a -> Signal a
 signal a = a :- signal a
@@ -82,7 +86,7 @@ register :: a -> Signal a -> Signal a
 register i s = i :- s
 
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
-simulate f as = sample (length as) (f (fromList as))
+simulate f = sample . f . fromList
 
 class Pack a where
   type SignalP a
