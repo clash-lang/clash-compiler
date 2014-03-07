@@ -30,7 +30,7 @@ import           CLaSH.Normalize.Strategy
 import           CLaSH.Normalize.Transformations ( bindConstantVar, topLet )
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
-import           CLaSH.Rewrite.Combinators ((!->),topdownR)
+import           CLaSH.Rewrite.Combinators ((!->),repeatR,topdownR)
 import           CLaSH.Rewrite.Types       (DebugLevel (..), RewriteState (..),
                                             bindings, dbgLevel, tcCache)
 import           CLaSH.Rewrite.Util        (liftRS, runRewrite,
@@ -192,7 +192,7 @@ flattenCallTree (CBranch (nm,(ty,tm)) used) = do
   let (toInline,il_used) = unzip il_ct
   newExpr <- case toInline of
                [] -> return tm
-               _  -> rewriteExpr ("bindConstants",(topdownR bindConstantVar) !-> topLet) (showDoc nm, substTms toInline tm)
+               _  -> rewriteExpr ("bindConstants",(topdownR (repeatR $ bindConstantVar)) !-> topLet) (showDoc nm, substTms toInline tm)
   return (CBranch (nm,(ty,newExpr)) (newUsed ++ (concat il_used)))
 
 callTreeToList :: [TmName]
