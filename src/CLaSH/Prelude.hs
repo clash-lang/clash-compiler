@@ -81,8 +81,8 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
         o'               = ram ! r
 
 {-# INLINABLE blockRamPow2 #-}
-blockRamPow2 :: (KnownNat n, KnownNat (n^2), Pack a)
-             => (SNat ((n^2) :: Nat))
+blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a)
+             => (SNat ((2^n) :: Nat))
              -> Signal (Unsigned n)
              -> Signal (Unsigned n)
              -> Signal Bool
