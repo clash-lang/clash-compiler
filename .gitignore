@@ -1,4 +1,11 @@
 dist
 *.hi
 *.o
+*.dyn_hi
+*.dyn_o
+*.po
+*.o-boot
+*.hi-boot
+*.dyn_hi-boot
+*.po-boot
 *.DS_Store
