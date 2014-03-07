@@ -25,8 +25,8 @@ import qualified Data.Text.Lazy.Builder.RealFloat as Builder
 import           Text.PrettyPrint.Leijen.Text     ((<+>), (<>))
 import qualified Text.PrettyPrint.Leijen.Text     as PP
 import           Unbound.LocallyNameless          (bind, makeName, name2Integer,
-                                                   name2String, rec, unrec)
-import           Unbound.LocallyNameless.Ops      (unsafeUnbind)
+                                                   name2String, rec, runFreshM,
+                                                   unbind, unrec)
 
 import           CLaSH.Core.DataCon
 import           CLaSH.Core.Pretty
@@ -233,8 +233,7 @@ createSignal :: VHDLState
              -> IO ([Declaration],[Identifier],[Component],VHDLState)
 createSignal vhdlState primMap typeTrans tcm mStart normalizedSignals = do
   let (signalHds,signalTls) = unzip $ map ((\(l:ls) -> (l,ls)) . HashMap.toList) normalizedSignals
-      sigEs                 = map (\(_,(_,Letrec b)) -> unrec . fst $ unsafeUnbind b
-                                  ) signalHds
+      sigEs                 = runFreshM $ mapM (\(_,(_,Letrec b)) -> (unrec . fst) <$> unbind b) signalHds
       newExpr               = Letrec $ bind (rec $ concat sigEs)
                                             (Var (fst . snd $ head signalHds)
                                                  (fst $ head signalHds))
