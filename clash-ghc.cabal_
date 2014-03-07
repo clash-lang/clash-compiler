@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.2.1
+Version:              0.2.2
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -12,6 +12,9 @@ Description:
   This package provides:
   .
   * CλaSH Compiler binary using GHC/Haskell as a frontend
+  .
+  .
+  Prelude library: http://hackage.haskell.org/package/clash-prelude
 Homepage:             http://christiaanb.github.io/clash2
 bug-reports:          http://github.com/christiaanb/clash2/issues
 License:              OtherLicense
