@@ -56,16 +56,24 @@ mkTyPackage hwtys =
    "end" <> semi <> packageBodyDec
   where
     hwTysSorted = topSortHWTys hwtys
+    usedTys     = concatMap mkUsedTys hwtys
     packageDec  = indent 2 (vcat $ mapM tyDec hwTysSorted)
 
     packageBodyDec = do
-      funDecs <- catMaybes A.<$> mapM funDec hwTysSorted
+      funDecs <- catMaybes A.<$> mapM funDec ((HashSet.toList . HashSet.fromList) usedTys)
       case funDecs of
         [] -> empty
         _  -> linebreak <$>
               "package" <+> "body" <+> "types" <+> "is" <$>
                 indent 2 (vcat $ return funDecs) <$>
               "end" <> semi
+
+mkUsedTys :: HWType
+        -> [HWType]
+mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
+mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
+mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
+mkUsedTys t                   = [t]
 
 topSortHWTys :: [HWType]
              -> [HWType]
