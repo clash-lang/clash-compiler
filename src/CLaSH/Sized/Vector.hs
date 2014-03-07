@@ -274,6 +274,10 @@ vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
 {-# INLINEABLE (!) #-}
 -- | Vector index (subscript) operator, descending from 'maxIndex', where the
 -- last element has subscript 0.
+--
+-- > <1,2,3,4,5> ! 4 == 1
+-- > <1,2,3,4,5> ! maxIndex == 1
+-- > <1,2,3,4,5> ! 1 == 4
 (!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
 xs ! i = vindex_integer xs (toInteger i)
 
@@ -300,6 +304,8 @@ vreplace_integer xs i a = case vreplaceM_integer xs (maxIndex xs - i) a of
 {-# INLINEABLE vreplace #-}
 -- | Replace an element of a vector at the given index (subscript), NB: vector
 -- elements have a descending subscript starting from 'maxIndex' and ending at 0
+--
+-- > vreplace <1,2,3,4,5> 3 7 == <1,7,3,4,5>
 vreplace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
 vreplace xs i y = vreplace_integer xs (toInteger i) y
 
@@ -332,20 +338,25 @@ vdropI :: KnownNat m => Vec (m + n) a -> Vec n a
 vdropI = withSNat vdrop
 
 {-# NOINLINE vexact #-}
--- | 'vexact' @n xs@ returns @n@'th element of @xs@
+-- | 'vexact' @n xs@ returns @n@'th element of @xs@, NB: vector elements
+-- have a descending subscript starting from 'maxIndex' and ending at 0
 --
--- > vexact (snat :: SNat 2) <1,2,3,4,5> == 4
--- vexact :: SNat m -> Vec (m + (n + 1)) a -> a
+-- > vexact (snat :: SNat 1) <1,2,3,4,5> == 4
+-- > vexact (snat :: SNat 4) <1,2,3,4,5> == 1
+vexact :: SNat m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n (vreverse xs)
 
 {-# NOINLINE vselect #-}
-vselect ::
-  ((f + (s * n) + 1) <= i)
-  => SNat f
-  -> SNat s
-  -> SNat (n + 1)
-  -> Vec i a
-  -> Vec (n + 1) a
+-- | 'vselect' @f s n xs@ selects @n@ elements with stepsize @s@ and
+-- offset @f@ from @xs@
+--
+-- vselect (snat :: SNat 1) (snat :: SNat 2) (snat :: SNat 3) <1,2,3,4,5,6,7,8> == <2,4,6>
+vselect :: ((f + (s * n) + 1) <= i)
+        => SNat f
+        -> SNat s
+        -> SNat (n + 1)
+        -> Vec i a
+        -> Vec (n + 1) a
 vselect f s n xs = vselect' (toUNat n) $ vdrop f (unsafeCoerce xs)
   where
     vselect' :: UNat n -> Vec m a -> Vec n a
@@ -353,12 +364,13 @@ vselect f s n xs = vselect' (toUNat n) $ vdrop f (unsafeCoerce xs)
     vselect' (USucc n') vs@(x :> _) = x :> vselect' n' (vdrop s (unsafeCoerce vs))
 
 {-# NOINLINE vselectI #-}
-vselectI ::
-  ((f + (s * n) + 1) <= i, KnownNat (n + 1))
-  => SNat f
-  -> SNat s
-  -> Vec i a
-  -> Vec (n + 1) a
+-- | 'vselectI' @f s xs@ selects as many elements as demanded by the context
+-- with stepsize @s@ and offset @f@ from @xs@
+vselectI :: ((f + (s * n) + 1) <= i, KnownNat (n + 1))
+         => SNat f
+         -> SNat s
+         -> Vec i a
+         -> Vec (n + 1) a
 vselectI f s xs = withSNat (\n -> vselect f s n xs)
 
 {-# NOINLINE vcopy #-}
