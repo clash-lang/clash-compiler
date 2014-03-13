@@ -461,7 +461,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
   case specM of
     -- Use previously specialized function
     Just (fname,fty) ->
-      traceIf (lvl >= DebugApplied) ("Using previous specialization: " ++ showDoc fname) $
+      traceIf (lvl >= DebugApplied) ("Using previous specialization of " ++ showDoc f ++ " on " ++ (either showDoc showDoc) specAbs ++ ": " ++ showDoc fname) $
         changed $ mkApps (Var fty fname) (args ++ specVars)
     -- Create new specialized function
     Nothing -> do
