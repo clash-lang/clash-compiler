@@ -18,7 +18,7 @@ where
 -- External Modules
 import                Control.DeepSeq
 import                Unbound.LocallyNameless       as Unbound hiding (Data,rnf)
-import                Unbound.LocallyNameless.Alpha (aeqR1, fvR1)
+import                Unbound.LocallyNameless.Alpha (acompareR1, aeqR1, fvR1)
 import                Unbound.LocallyNameless.Name  (Name(Nm,Bn),isFree)
 import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
 import                Data.Text                     (Text)
@@ -75,6 +75,10 @@ instance Ord Term where
 instance Alpha Term where
   fv' c (Var _ n)  = fv' c n
   fv' c t          = fvR1 rep1 c t
+
+  acompare' c (Var _ n)   (Var _ m)   = acompare' c n m
+  acompare' _ (Prim t1 _) (Prim t2 _) = compare t1 t2
+  acompare' c t1          t2          = acompareR1 rep1 c t1 t2
 
   aeq' c (Var _ n)   (Var _ m)   = aeq' c n m
   aeq' _ (Prim t1 _) (Prim t2 _) = t1 == t2
