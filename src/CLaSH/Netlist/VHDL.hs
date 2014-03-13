@@ -23,7 +23,7 @@ import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (mapAccumL)
+import           Data.List                            (mapAccumL,nub)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
@@ -52,20 +52,22 @@ mkTyPackage hwtys =
    "use IEEE.STD_LOGIC_1164.ALL;" <$>
    "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>
    "package" <+> "types" <+> "is" <$>
-      packageDec <$>
+      indent 2 ( packageDec <$>
+                 vcat (sequence funDecs)
+               ) <$>
    "end" <> semi <> packageBodyDec
   where
     hwTysSorted = topSortHWTys hwtys
-    usedTys     = concatMap mkUsedTys hwtys
-    packageDec  = indent 2 (vcat $ mapM tyDec hwTysSorted)
+    usedTys     = nub $ concatMap mkUsedTys hwtys
+    packageDec  = vcat $ mapM tyDec hwTysSorted
+    (funDecs,funBodys) = unzip . catMaybes $ map funDec usedTys
 
-    packageBodyDec = do
-      funDecs <- catMaybes A.<$> mapM funDec ((HashSet.toList . HashSet.fromList) usedTys)
-      case funDecs of
+    packageBodyDec :: VHDLM Doc
+    packageBodyDec = case funBodys of
         [] -> empty
         _  -> linebreak <$>
               "package" <+> "body" <+> "types" <+> "is" <$>
-                indent 2 (vcat $ return funDecs) <$>
+                indent 2 (vcat (sequence funBodys)) <$>
               "end" <> semi
 
 mkUsedTys :: HWType
@@ -125,34 +127,39 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
-funDec :: HWType -> VHDLM (Maybe Doc)
-funDec Bool = fmap Just $
-  "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
-  "begin" <$>
-    indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                              ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
-                              ,"else"
-                              ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
-                              ,"end" <+> "if" <> semi
-                              ]) <$>
-  "end" <> semi <$>
-  "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <+> "is" <$>
-  "begin" <$>
-    indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> squotes (int 1) <+> "then"
-                              ,   indent 2 ("return" <+> "true" <> semi)
-                              ,"else"
-                              ,   indent 2 ("return" <+> "false" <> semi)
-                              ,"end" <+> "if" <> semi
-                              ]) <$>
-  "end" <> semi
+funDec :: HWType -> Maybe (VHDLM Doc,VHDLM Doc)
+funDec Bool = Just
+  ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
+    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <> semi
+  , "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
+                                ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
+                                ,"else"
+                                ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <$>
+    "end" <> semi <$>
+    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> squotes (int 1) <+> "then"
+                                ,   indent 2 ("return" <+> "true" <> semi)
+                                ,"else"
+                                ,   indent 2 ("return" <+> "false" <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <$>
+    "end" <> semi
+  )
 
-funDec Integer = fmap Just $
-  "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
-  "begin" <$>
-    indent 2 ("return" <+> "i" <> semi) <$>
-  "end" <> semi
+funDec Integer = Just
+  ( "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi
+  , "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
+    "begin" <$>
+      indent 2 ("return" <+> "i" <> semi) <$>
+    "end" <> semi
+  )
 
-funDec _ = return Nothing
+funDec _ = Nothing
 
 tyImports :: VHDLM Doc
 tyImports =
