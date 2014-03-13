@@ -41,7 +41,8 @@ import           CLaSH.Core.Util
 
 import           CLaSH.Netlist
 import           CLaSH.Netlist.Types              as N
-import           CLaSH.Netlist.VHDL               (vhdlType)
+import           CLaSH.Netlist.Util               (typeSize)
+import           CLaSH.Netlist.VHDL               (vhdlType,vhdlTypeMark)
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
 import           CLaSH.Primitives.Types
@@ -192,7 +193,26 @@ mkToStringDecls t@(Product _ elTys) =
     elTyPrint = forM [0..(length elTys - 1)]
                      (\i -> "to_string" PPM.<>
                             PPM.parens ("value." PPM.<> vhdlType t PPM.<> "_sel" PPM.<> PPM.int i))
-
+mkToStringDecls (Vector _ Bit)  = PPM.empty
+mkToStringDecls t@(Vector _ elTy) =
+  mkToStringDecls elTy PPM.<$>
+  "function to_string" PPM.<+> PPM.parens ("value : " PPM.<+> vhdlTypeMark t) PPM.<+> "return STRING is" PPM.<$>
+    PPM.indent 2
+      ( "alias ivalue    : " PPM.<+> vhdlTypeMark t PPM.<> "(1 to value'length) is value;" PPM.<$>
+        "variable result : STRING" PPM.<> PPM.parens ("1 to value'length * " PPM.<> PPM.int (typeSize elTy)) PPM.<> PPM.semi
+      ) PPM.<$>
+  "begin" PPM.<$>
+    PPM.indent 2
+      ("for i in ivalue'range loop" PPM.<$>
+          PPM.indent 2
+            (  "result" PPM.<> PPM.parens (PPM.parens ("(i - 1) * " PPM.<> PPM.int (typeSize elTy)) PPM.<+> "+ 1" PPM.<+>
+                                           "to i*" PPM.<> PPM.int (typeSize elTy)) PPM.<+>
+                        ":= to_string" PPM.<> PPM.parens (if elTy == Bool then "toSLV(ivalue(i))" else "ivalue(i)") PPM.<> PPM.semi
+            ) PPM.<$>
+       "end loop;" PPM.<$>
+       "return result;"
+      ) PPM.<$>
+  "end function to_string;"
 mkToStringDecls _ = PPM.empty
 
 prepareSignals :: VHDLState
