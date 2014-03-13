@@ -305,7 +305,7 @@ coreToDataCon mkWrap dc = do
     mkDc dcTy repTys
   where
     mkDc dcTy repTys = do
-      nm   <- coreToName dataConName getUnique nameString dc
+      nm   <- coreToName dataConName getUnique qualfiedNameString dc
       uTvs <- mapM coreToVar (dataConUnivTyVars dc)
       eTvs <- mapM coreToVar (dataConExTyVars dc)
       return $ C.MkData
@@ -370,10 +370,6 @@ coreToName :: Rep a
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
   return (Unbound.makeName ns (toInteger . getKey . toUnique $ v))
-
-nameString :: Name
-           -> State GHC2CoreState String
-nameString n = makeCached n nameMap (return (occNameString $ nameOccName n))
 
 qualfiedNameString :: Name
                    -> State GHC2CoreState String
