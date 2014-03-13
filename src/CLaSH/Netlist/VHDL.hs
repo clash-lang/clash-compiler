@@ -109,10 +109,6 @@ needsTyDec Integer        = True
 needsTyDec _              = False
 
 tyDec :: HWType -> VHDLM Doc
-tyDec Bool = "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
-             "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <> semi
-tyDec Integer = "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi
-
 tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
 
 tyDec ty@(Product _ tys) = prodDec
