@@ -123,7 +123,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Signed.bitS"
     , "templateD" :
 "~SYM[0]_bitS : block
-  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[1] : ~TYP[1] := ~DEFAULT[1];
 begin
   ~SYM[1] <= ~ARG[1];
   process(~SYM[1])
