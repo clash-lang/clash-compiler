@@ -13,6 +13,8 @@ import           Control.Concurrent.Supply        (Supply)
 import           Control.Error                    (EitherT, eitherT,
                                                    hoistEither, left, note,
                                                    right)
+import           Control.Monad                    (forM)
+import           Control.Monad.State              (State,runState)
 import           Control.Monad.Trans.Class        (lift)
 import           Data.Either                      (lefts)
 import           Data.HashMap.Lazy                (HashMap)
@@ -24,6 +26,8 @@ import qualified Data.Text.Lazy.Builder           as Builder
 import qualified Data.Text.Lazy.Builder.RealFloat as Builder
 import           Text.PrettyPrint.Leijen.Text     ((<+>), (<>))
 import qualified Text.PrettyPrint.Leijen.Text     as PP
+import           Text.PrettyPrint.Leijen.Text.Monadic ()
+import qualified Text.PrettyPrint.Leijen.Text.Monadic as PPM
 import           Unbound.LocallyNameless          (bind, makeName, name2Integer,
                                                    name2String, rec, runFreshM,
                                                    unbind, unrec)
@@ -37,6 +41,7 @@ import           CLaSH.Core.Util
 
 import           CLaSH.Netlist
 import           CLaSH.Netlist.Types              as N
+import           CLaSH.Netlist.VHDL               (vhdlType)
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
 import           CLaSH.Primitives.Types
@@ -81,8 +86,10 @@ genTestBench dbgLvl supply primMap typeTrans tcm vhdlState globals stimuliNmM ex
   (expDecls,expComps,vhdlState'',expCnt) <- flip (maybe emptyExpected) expectedNmM $ \expectedNm -> do
     (decls,sigVs,comps,vhdlState'') <- prepareSignals vhdlState' primMap globals typeTrans tcm normalizeSignal (Just inpCnt) expectedNm
     let asserts  = map (genAssert (fst outp)) sigVs
+        (toStrDecls,vhdlState3) = runState (mkToStringDecls (snd outp)) vhdlState''
         procDecl = PP.vsep
                    [ "process is"
+                   , PP.indent 2 toStrDecls
                    , "begin"
                    , PP.indent 2 ( PP.vsep $
                                    map (<> PP.semi) $
@@ -94,7 +101,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm vhdlState globals stimuliNmM ex
                    , "end process" <> PP.semi
                    ]
         procDecl' = BlackBoxD (PP.displayT $ PP.renderPretty 0.4 80 procDecl)
-    return (procDecl':decls,comps,vhdlState'',length sigVs)
+    return (procDecl':decls,comps,vhdlState3,length sigVs)
 
   let finExpr = "'1' after" <+> renderFloat2Dec (rateF * (fromIntegral (max inpCnt expCnt) - 0.5)) <+> "ns"
       finDecl = [ NetDecl "finished" Bit (Just (N.Literal Nothing (BitLit L)))
@@ -173,6 +180,20 @@ genAssert compO expV = PP.hsep
                        ])
   , PP.text "severity error"
   ]
+
+mkToStringDecls :: HWType -> State VHDLState PP.Doc
+mkToStringDecls t@(Product _ elTys) =
+    PPM.vcat (mapM mkToStringDecls elTys) PPM.<$>
+    "function to_string" PPM.<+> PPM.parens ("value :" PPM.<+> vhdlType t) PPM.<+> "return STRING is" PPM.<$>
+    "begin" PPM.<$>
+    PPM.indent 2 ("return" PPM.<+> PPM.parens (PPM.hcat (PPM.punctuate " & " elTyPrint)) PPM.<> PPM.semi) PPM.<$>
+    "end function to_string;"
+  where
+    elTyPrint = forM [0..(length elTys - 1)]
+                     (\i -> "to_string" PPM.<>
+                            PPM.parens ("value." PPM.<> vhdlType t PPM.<> "_sel" PPM.<> PPM.int i))
+
+mkToStringDecls _ = PPM.empty
 
 prepareSignals :: VHDLState
                -> PrimMap
