@@ -246,13 +246,13 @@ prepareSignals vhdlState primMap globals typeTrans tcm normalizeSignal mStart si
 termToList :: Monad m => Term -> EitherT String m [Term]
 termToList e = case second lefts $ collectArgs e of
   (Data dc,[])
-    | name2String (dcName dc) == "[]" -> pure []
+    | name2String (dcName dc) == "GHC.Types.[]"     -> pure []
     | name2String (dcName dc) == "Prelude.List.Nil" -> pure []
-    | otherwise                                 -> errNoConstruct $(curLoc)
+    | otherwise                                     -> errNoConstruct $(curLoc)
   (Data dc,[hdArg,tlArg])
-    | name2String (dcName dc) == ":"  -> (hdArg:) <$> termToList tlArg
-    | name2String (dcName dc) == "Prelude.List.::"  -> (hdArg:) <$> termToList tlArg
-    | otherwise                                 -> errNoConstruct $(curLoc)
+    | name2String (dcName dc) == "GHC.Types.:"     -> (hdArg:) <$> termToList tlArg
+    | name2String (dcName dc) == "Prelude.List.::" -> (hdArg:) <$> termToList tlArg
+    | otherwise                                    -> errNoConstruct $(curLoc)
   _ -> errNoConstruct $(curLoc)
   where
     errNoConstruct l = left $ l ++ "Can't deconstruct list literal: " ++ show (second lefts $ collectArgs e)

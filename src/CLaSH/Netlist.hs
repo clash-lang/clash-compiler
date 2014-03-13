@@ -318,16 +318,16 @@ mkDcApplication dstHType dc args = do
       Sum _ _ ->
         return (HW.DataCon dstHType (Just $ DC (dstHType,dcTag dc - 1)) [])
       Bool ->
-        let dc' = case name2String $ dcName dc of
-                   "True"  -> HW.Literal Nothing (BoolLit True)
-                   "False" -> HW.Literal Nothing (BoolLit False)
-                   _ -> error $ $(curLoc) ++ "unknown bool literal: " ++ show dc
+        let dc' = case dcTag dc of
+                   2  -> HW.Literal Nothing (BoolLit True)
+                   1  -> HW.Literal Nothing (BoolLit False)
+                   tg -> error $ $(curLoc) ++ "unknown bool literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in  return dc'
       Bit ->
-        let dc' = case name2String $ dcName dc of
-                   "H" -> HW.Literal Nothing (BitLit H)
-                   "L" -> HW.Literal Nothing (BitLit L)
-                   _ -> error $ $(curLoc) ++ "unknown bit literal: " ++ show dc
+        let dc' = case dcTag dc of
+                   1 -> HW.Literal Nothing (BitLit H)
+                   2 -> HW.Literal Nothing (BitLit L)
+                   tg -> error $ $(curLoc) ++ "unknown bit literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in return dc'
       Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
       Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
