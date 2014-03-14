@@ -312,6 +312,7 @@ vreplace xs i y = vreplace_integer xs (toInteger i) y
 -- | 'vtake' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
 --
 -- > vtake (snat :: SNat 3) <1,2,3,4,5> == <1,2,3>
+-- > vtake d3 <1,2,3,4,5> == <1,2,3>
 -- > vtake (snat :: SNat 0) <1,2> == <>
 -- > vtake (snat :: SNat 4) <1,2> == TYPE ERROR
 vtake :: SNat m -> Vec (m + n) a -> Vec m a
@@ -326,6 +327,7 @@ vtakeI = withSNat vtake
 -- | 'vdrop' @n xs@ returns the suffix of @xs@ after the first @n@ elements
 --
 -- > vdrop (snat :: SNat 3) <1,2,3,4,5> == <4,5>
+-- > vdrop d3 <1,2,3,4,5> == <4,5>
 -- > vdrop (snat :: SNat 0) <1,2> == <1,2>
 -- > vdrop (snat :: SNat 4) <1,2> == TYPE ERROR
 vdrop :: SNat m -> Vec (m + n) a -> Vec n a

@@ -5,6 +5,9 @@ import Language.Haskell.TH
 
 import CLaSH.Promoted.Nat
 
+-- | Create an 'SNat' constant
+--
+-- > $(decLiteralD "d" 1200) == d1200 = snat :: SNat 1200
 decLiteralD :: String
             -> Integer
             -> Q [Dec]
@@ -15,6 +18,11 @@ decLiteralD valPrefix n =
        val   <- valD (varP valName) (normalB [| snat |]) []
        return [ sig, val ]
 
+-- | Create an 'SNat' constants
+--
+-- > $(decLiteralsD "d" 1200 1202) == d1200 = snat :: SNat 1200
+-- >                                  d1201 = snat :: SNat 1201
+-- >                                  d1202 = snat :: SNat 1202
 decLiteralsD :: String
              -> Integer
              -> Integer

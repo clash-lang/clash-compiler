@@ -257,9 +257,22 @@ instance Pack (Vec n a) where
   unpack (Nil :- _)         = Nil
   unpack vs@((_ :> _) :- _) = fmap vhead vs :> (unpack (fmap vtail vs))
 
+
+-- | Operator lifting, use in conjunction with '(^>)'
+--
+-- > add2 :: Signal Int -> Signal Int
+-- > add2 x = x <^(+)^> (signal 2)
+-- >
+-- > simulate add2 [1,2,3, = [3,4,5,...
 (<^) :: Applicative f => f a -> (a -> b -> c) -> f b -> f c
 v <^ f = liftA2 f v
 
+-- | Operator lifting, use in conjunction with '(<^)'
+--
+-- > add2 :: Signal Int -> Signal Int
+-- > add2 x = x <^(+)^> (signal 2)
+-- >
+-- > simulate add2 [1,2,3, = [3,4,5,...
 (^>) :: Applicative f => (f a -> f b) -> f a -> f b
 f ^> v = f v
 

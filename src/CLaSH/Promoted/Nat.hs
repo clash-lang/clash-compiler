@@ -42,16 +42,19 @@ toUNat (SNat p) = fromI (natVal p)
     fromI 0 = unsafeCoerce UZero
     fromI n = unsafeCoerce (USucc (fromI (n - 1)))
 
+-- | Add two singleton natural numbers
 addUNat :: UNat n -> UNat m -> UNat (n + m)
 addUNat UZero     y     = y
 addUNat x         UZero = x
 addUNat (USucc x) y     = unsafeCoerce (USucc (addUNat x y))
 
+-- | Multiply two singleton natural numbers
 multUNat :: UNat n -> UNat m -> UNat (n * m)
 multUNat UZero      _     = UZero
 multUNat _          UZero = UZero
 multUNat (USucc x) y      = unsafeCoerce (addUNat y (multUNat x y))
 
+-- | Exponential of two singleton natural numbers
 powUNat :: UNat n -> UNat m -> UNat (n ^ m)
 powUNat _ UZero     = USucc UZero
 powUNat x (USucc y) = unsafeCoerce (multUNat x (powUNat x y))

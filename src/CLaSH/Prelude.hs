@@ -17,7 +17,7 @@ module CLaSH.Prelude
   , blockRam
   , blockRamPow2
   , window
-  , windowP
+  , windowD
   )
 where
 
@@ -40,6 +40,12 @@ import CLaSH.Signal                as Exported
 import GHC.TypeLits                as Exported
 
 {-# INLINABLE window #-}
+-- | Give a window over a 'Signal'
+--
+-- > window4 :: Signal Int -> Vec 4 (Signal Int)
+-- > window4 = window
+-- >
+-- > simulateP window4 [1,2,3,4,5,... = [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>,...
 window :: (KnownNat (n + 1), Default a)
        => Signal a
        -> Vec ((n + 1) + 1) (Signal a)
@@ -48,11 +54,17 @@ window x = x :> prev
     prev = registerP (vcopyI def) next
     next = x +>> prev
 
-{-# INLINABLE windowP #-}
-windowP :: (KnownNat (n + 1), Default a)
+{-# INLINABLE windowD #-}
+-- | Give a delayed window over a 'Signal'
+--
+-- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
+-- > windowD3 = windowD
+-- >
+-- > simulateP windowD3 [1,2,3,4,... = [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>,...
+windowD :: (KnownNat (n + 1), Default a)
         => Signal a
         -> Vec (n + 1) (Signal a)
-windowP x = prev
+windowD x = prev
   where
     prev = registerP (vcopyI def) next
     next = x +>> prev
@@ -65,6 +77,7 @@ windowP x = prev
 -- >   where
 -- >     s' = x * y + s
 -- >
+-- > topEntity :: (Signal Int, Signal Int) -> Signal Int
 -- > topEntity = mac <^> 0
 -- >
 -- > simulateP topEntity [(1,1),(2,2),(3,3),(4,4),... = [0,1,5,14,30,...
@@ -77,9 +90,12 @@ f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
                  in unpack o
 
 {-# INLINABLE registerP #-}
--- | Create a 'register' function for product-type like signals
+-- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
--- > simulateP (registerP (8,8)) [(1,1),(2,2),(3,3),... = [(8,8),(1,1),(2,2),(3,3),...
+-- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
+-- > rP = registerP (8,8)
+-- >
+-- > simulateP rP [(1,1),(2,2),(3,3),... = [(8,8),(1,1),(2,2),(3,3),...
 registerP :: Pack a => a -> SignalP a -> SignalP a
 registerP i = unpack Prelude.. register i Prelude.. pack
 
@@ -143,9 +159,18 @@ instance ArrowLoop Comp where
       simpleLoop g b = let ~(c,d) = g (b,d)
                        in c
 
+-- | Create a 'register' 'Comp'onent
+--
+-- > rC :: Comp (Int,Int) (Int,Int)
+-- > rC = registerC (8,8)
+-- >
+-- > simulateC rP [(1,1),(2,2),(3,3),... = [(8,8),(1,1),(2,2),(3,3),...
 registerC :: a -> Comp a a
 registerC = C Prelude.. register
 
+-- | Simulate a 'Comp'onent given a list of samples
+--
+-- > simulateC (registerC 8) [1, 2, 3, ... = [8, 1, 2, 3, ...
 simulateC :: Comp a b -> [a] -> [b]
 simulateC f = simulate (asFunction f)
 
@@ -157,6 +182,7 @@ simulateC f = simulate (asFunction f)
 -- >   where
 -- >     s' = x * y + s
 -- >
+-- > topEntity :: Comp (Int,Int) Int
 -- > topEntity = mac ^^^ 0
 -- >
 -- > simulateC topEntity [(1,1),(2,2),(3,3),(4,4),... = [0,1,5,14,30,...
