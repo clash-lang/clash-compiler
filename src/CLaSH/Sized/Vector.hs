@@ -18,7 +18,7 @@ module CLaSH.Sized.Vector
   , vreverse, vmap, vzipWith
   , vfoldr, vfoldl, vfoldr1, vfoldl1
   , vzip, vunzip
-  , (!), vreplace
+  , (!), vreplace, maxIndex
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
   , toList, v
@@ -282,7 +282,6 @@ vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
 xs ! i = vindex_integer xs (toInteger i)
 
 {-# NOINLINE maxIndex #-}
-
 -- | Index (subscript) of the head of the vector
 maxIndex :: forall n a . KnownNat n => Vec n a -> Integer
 maxIndex _ = fromSNat (snat :: SNat n) - 1
