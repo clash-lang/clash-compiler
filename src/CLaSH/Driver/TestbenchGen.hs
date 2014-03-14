@@ -47,6 +47,7 @@ import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
 import           CLaSH.Primitives.Types
 import           CLaSH.Rewrite.Types
+import           CLaSH.Rewrite.Util               (substituteBinders)
 
 import           CLaSH.Util
 
@@ -253,6 +254,10 @@ termToList e = case second lefts $ collectArgs e of
     | name2String (dcName dc) == "GHC.Types.:"     -> (hdArg:) <$> termToList tlArg
     | name2String (dcName dc) == "Prelude.List.::" -> (hdArg:) <$> termToList tlArg
     | otherwise                                    -> errNoConstruct $(curLoc)
+  (Letrec b,[]) -> case (runFreshM $ unbind b) of
+    (bndrs,body) -> case substituteBinders (unrec bndrs) [] body of
+                      ([],bodyS) -> termToList bodyS
+                      _          -> errNoConstruct $(curLoc)
   _ -> errNoConstruct $(curLoc)
   where
     errNoConstruct l = left $ l ++ "Can't deconstruct list literal: " ++ show (second lefts $ collectArgs e)
