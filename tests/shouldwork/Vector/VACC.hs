@@ -3,11 +3,6 @@ module VACC where
 
 import CLaSH.Prelude
 
-d4 = snat :: SNat 4
-d1 = snat :: SNat 1
-d2 = snat :: SNat 2
-
-
 topEntity :: Vec 8 Bit -> Vec 16 Bit
 topEntity x = o <++> p <++> q <++> k <++> l
   where
