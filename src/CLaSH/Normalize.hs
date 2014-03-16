@@ -152,15 +152,23 @@ mkCallTree visited bindingMap root = case used of
     used   = Set.toList $ termFreeIds $ snd rootTm
     other  = map (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
 
-stripArgs :: [Id]
+stripArgs :: [TmName]
+          -> [Id]
           -> [Either Term Type]
           -> Maybe [Either Term Type]
-stripArgs (_:_) []   = Nothing
-stripArgs []    args = Just args
-stripArgs (id_:ids) (Left (Var _ nm):args)
-      | varName id_ == nm = stripArgs ids args
+stripArgs _      (_:_) []   = Nothing
+stripArgs allIds []    args = if any mentionsId args
+                                then Nothing
+                                else Just args
+  where
+    mentionsId t = case t of
+                     (Left (Var _ nm)) | nm `elem` allIds -> True
+                     _ -> False
+
+stripArgs allIds (id_:ids) (Left (Var _ nm):args)
+      | varName id_ == nm = stripArgs allIds ids args
       | otherwise         = Nothing
-stripArgs _ _ = Nothing
+stripArgs _ _ _ = Nothing
 
 flattenNode :: CallTree
             -> NormalizeSession (Either CallTree ((TmName,Term),[CallTree]))
@@ -169,7 +177,7 @@ flattenNode c@(CLeaf (nm,(_,e))) = do
   case norm of
     Right (ids,[(_,bExpr)],_) -> do
       let (fun,args) = collectArgs (unembed bExpr)
-      case stripArgs (reverse ids) (reverse args) of
+      case stripArgs (map varName ids) (reverse ids) (reverse args) of
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),[]))
         Nothing        -> return (Left c)
     _ -> return (Left c)
@@ -178,7 +186,7 @@ flattenNode b@(CBranch (nm,(_,e)) us) = do
   case norm of
     Right (ids,[(_,bExpr)],_) -> do
       let (fun,args) = collectArgs (unembed bExpr)
-      case stripArgs (reverse ids) (reverse args) of
+      case stripArgs (map varName ids) (reverse ids) (reverse args) of
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),us))
         Nothing        -> return (Left b)
     _ -> return (Left b)
