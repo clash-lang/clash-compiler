@@ -43,7 +43,7 @@ import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
 import           CLaSH.Core.TyCon            (TyCon, TyConName, tyConDataCons)
 import           CLaSH.Core.Type             (KindOrType, TyName, Type (..),
                                               TypeView (..), transparentTy,
-                                              typeKind, tyView)
+                                              typeKind, coreView)
 import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
                                               mkAbstraction, mkApps, mkId,
                                               mkLams, mkTmApps, mkTyApps,
@@ -410,8 +410,8 @@ mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
 mkSelectorCase caller tcm _ scrut dcI fieldI = do
   scrutTy <- termType tcm scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
-  case transparentTy scrutTy of
-    (tyView -> TyConApp tc args) ->
+  case scrutTy of
+    (coreView tcm -> TyConApp tc args) ->
       case tyConDataCons (tcm HMS.! tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc)
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max"
