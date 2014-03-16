@@ -22,7 +22,7 @@ constantPropgation :: NormRewrite
 constantPropgation = propagate >-> lifting >-> spec
   where
     propagate = innerMost (applyMany transInner) >-> inlining
-    inlining  = topdownR (applyMany transBUP) !-> propagate
+    inlining  = topdownR (applyMany transBUP !-> propagate)
     lifting   = bottomupR (apply "liftNonRep" liftNonRep)
     spec      = bottomupR (applyMany specRws)
 
