@@ -19,10 +19,11 @@ normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindCons
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
 
 constantPropgation :: NormRewrite
-constantPropgation = propagate >-> spec
+constantPropgation = propagate >-> lifting >-> spec
   where
     propagate = innerMost (applyMany transInner) >-> inlining
-    inlining  = bottomupR (applyMany transBUP) !-> propagate
+    inlining  = topdownR (applyMany transBUP) !-> propagate
+    lifting   = bottomupR (apply "liftNonRep" liftNonRep)
     spec      = bottomupR (applyMany specRws)
 
     transInner :: [(String,NormRewrite)]
@@ -40,8 +41,7 @@ constantPropgation = propagate >-> spec
                ]
 
     specRws :: [(String,NormRewrite)]
-    specRws = [ ("liftNonRep"  , liftNonRep)
-              , ("typeSpec"    , typeSpec)
+    specRws = [ ("typeSpec"    , typeSpec)
               , ("constantSpec", constantSpec)
               , ("nonRepSpec"  , nonRepSpec)
               ]
