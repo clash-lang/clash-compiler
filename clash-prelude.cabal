@@ -1,8 +1,18 @@
 Name:                 clash-prelude
 Version:              0.4
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
--- Description:
-Homepage:             http://clash.ewi.utwente.nl/
+Description:
+  CλaSH (pronounced ‘clash’) is a functional hardware description language that
+  borrows both its syntax and semantics from the functional programming language
+  Haskell. The merits of using a functional language to describe hardware comes
+  from the fact that combinational circuits can be directly modeled as
+  mathematical functions and that functional languages lend themselves very well
+  at describing and (de-)composing mathematical functions.
+  .
+  This package provides:
+  .
+  * Prelude library containing datatypes and functions for circuit design
+Homepage:             http://christiaanb.github.io/clash2/
 bug-reports:          http://github.com/christiaanb/clash-prelude/issues
 License:              BSD3
 License-file:         LICENSE
