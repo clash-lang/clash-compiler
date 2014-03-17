@@ -187,4 +187,19 @@ end block;"
     , "templateE" : "resize(~ARG[2],~LIT[1])"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.plusS2"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.minusS2"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Signed.multS2"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
 ]

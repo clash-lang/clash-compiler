@@ -156,4 +156,19 @@ end block;"
     , "templateE" : "resize(~ARG[1],~LIT[0])"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.plusU2"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.minusU2"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Unsigned.multU2"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
 ]

@@ -421,4 +421,9 @@ begin
 end generate;"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.lazyV"
+    , "templateE" : "~ARG[1]"
+    }
+  }
 ]
