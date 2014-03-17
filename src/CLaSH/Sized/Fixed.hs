@@ -13,22 +13,29 @@ module CLaSH.Sized.Fixed
   )
 where
 
+import Control.Arrow
 import Data.Bits
+import Data.List
+import Data.Maybe
+import Data.Ratio
 import GHC.TypeLits
 import Data.Function
 
 import CLaSH.Class.BitVector
+import CLaSH.Class.Num
 import CLaSH.Signal
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 
-import Debug.Trace
-
 -- | Fixed point signed integer with @i@ integer bits and @f@ fractional bits
+--
+-- For now, overflow behaviour for the 'Num' functions is wrap-around, not saturate
 newtype SFixed (i :: Nat) (f :: Nat) = SF { unSF :: Signed   (i + f) }
   deriving (Eq,Ord)
 
 -- | Fixed point unsigned integer with @i@ integer bits and @f@ fractional bits
+--
+-- For now, overflow behaviour for the 'Num' functions is wrap-around, not saturate
 newtype UFixed (i :: Nat) (f :: Nat) = UF { unUF :: Unsigned (i + f) }
   deriving (Eq,Ord)
 
