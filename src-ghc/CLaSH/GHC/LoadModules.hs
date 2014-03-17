@@ -78,7 +78,12 @@ loadModules modName = defaultErrorHandler $ do
                       , DynFlags.optLevel = 2
                       , DynFlags.ghcMode  = GHC.CompManager
                       } )
-                    [DynFlags.Opt_TemplateHaskell,DynFlags.Opt_Arrows,DynFlags.Opt_DataKinds]
+                    [ DynFlags.Opt_TemplateHaskell
+                    , DynFlags.Opt_Arrows
+                    , DynFlags.Opt_DataKinds
+                    , DynFlags.Opt_TypeOperators
+                    , DynFlags.Opt_FlexibleContexts
+                    ]
     let dflags2 = wantedOptimizationFlags dflags1
     let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
                                 else dflags2

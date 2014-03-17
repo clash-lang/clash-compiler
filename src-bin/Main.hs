@@ -164,6 +164,8 @@ main = do
                                     [ DynFlags.Opt_TemplateHaskell
                                     , DynFlags.Opt_Arrows
                                     , DynFlags.Opt_DataKinds
+                                    , DynFlags.Opt_TypeOperators
+                                    , DynFlags.Opt_FlexibleContexts
                                     ]
 
             case postStartupMode of
