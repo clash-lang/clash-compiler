@@ -29,6 +29,7 @@ Library
 
   Exposed-modules:    CLaSH.Bit
                       CLaSH.Class.BitVector
+                      CLaSH.Class.Num
                       CLaSH.Prelude
                       CLaSH.Promoted.Bool
                       CLaSH.Promoted.Nat

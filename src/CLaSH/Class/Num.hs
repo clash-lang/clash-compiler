@@ -4,13 +4,11 @@
 {-# LANGUAGE TypeFamilies           #-}
 module CLaSH.Class.Num where
 
-import Prelude (Integer)
-
-class Add a b | a -> b where
+class Add a b where
   type AResult a b
-  add    :: a -> b -> AResult a b
-  sub    :: a -> b -> AResult a b
+  plus  :: a -> b -> AResult a b
+  minus :: a -> b -> AResult a b
 
-class Mult a b | a -> b where
+class Mult a b where
   type MResult a b
   mult :: a -> b -> MResult a b

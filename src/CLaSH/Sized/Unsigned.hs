@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
@@ -21,6 +22,8 @@ import GHC.TypeLits
 
 import CLaSH.Bit
 import CLaSH.Class.BitVector
+import CLaSH.Class.Num
+import CLaSH.Promoted.Ord
 import CLaSH.Sized.Vector
 
 -- | Arbitrary precision unsigned integer represented by @n@ bits
@@ -92,6 +95,26 @@ fromIntegerU,fromIntegerU_inlineable :: KnownNat n => Integer -> Unsigned n
 fromIntegerU = fromIntegerU_inlineable
 {-# INLINABLE fromIntegerU_inlineable #-}
 fromIntegerU_inlineable i = let res = U (i `mod` (2 ^ natVal res)) in res
+
+instance KnownNat (Max m n) => Add (Unsigned m) (Unsigned n) where
+  type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n)
+  plus  = plusU2
+  minus = minusU2
+
+plusU2, minusU2 :: KnownNat (Max m n) => Unsigned m -> Unsigned n -> Unsigned (Max m n)
+{-# NOINLINE plusU2 #-}
+plusU2 (U a) (U b) = fromIntegerU_inlineable (a + b)
+
+{-# NOINLINE minusU2 #-}
+minusU2 (U a) (U b) = fromIntegerU_inlineable (a - b)
+
+instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
+  type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
+  mult = multU2
+
+{-# NOINLINE multU2 #-}
+multU2 :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
+multU2 (U a) (U b) = fromIntegerU_inlineable (a * b)
 
 instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toIntegerU

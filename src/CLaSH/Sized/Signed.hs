@@ -1,10 +1,10 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}
 
@@ -23,6 +23,8 @@ import GHC.TypeLits
 
 import CLaSH.Bit
 import CLaSH.Class.BitVector
+import CLaSH.Class.Num
+import CLaSH.Promoted.Ord
 import CLaSH.Sized.Vector
 
 -- | Arbitrary precision signed integer represented by @n@ bits
@@ -61,7 +63,7 @@ instance KnownNat n => Bounded (Signed n) where
   minBound = minBoundS
   maxBound = maxBoundS
 
-minBoundS,maxBoundS :: forall n . KnownNat n => Signed n
+minBoundS,maxBoundS :: KnownNat n => Signed n
 {-# NOINLINE minBoundS #-}
 minBoundS = let res = S $ negate $ 2 ^ (natVal res - 1) in res
 {-# NOINLINE maxBoundS #-}
@@ -78,13 +80,13 @@ instance KnownNat n => Num (Signed n) where
 
 plusS,minS,timesS :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE plusS #-}
-plusS (S a) (S b) = fromIntegerS_inlineable $ a + b
+plusS (S a) (S b) = fromIntegerS_inlineable (a + b)
 
 {-# NOINLINE minS #-}
-minS (S a) (S b) = fromIntegerS_inlineable $ a - b
+minS (S a) (S b) = fromIntegerS_inlineable (a - b)
 
 {-# NOINLINE timesS #-}
-timesS (S a) (S b) = fromIntegerS_inlineable $ a * b
+timesS (S a) (S b) = fromIntegerS_inlineable (a * b)
 
 negateS,absS,signumS :: KnownNat n => Signed n -> Signed n
 {-# NOINLINE negateS #-}
@@ -96,7 +98,7 @@ absS (S n) = fromIntegerS_inlineable (abs n)
 {-# NOINLINE signumS #-}
 signumS (S n) = fromIntegerS_inlineable (signum n)
 
-fromIntegerS,fromIntegerS_inlineable :: forall n . KnownNat n => Integer -> Signed (n :: Nat)
+fromIntegerS,fromIntegerS_inlineable :: KnownNat n => Integer -> Signed (n :: Nat)
 {-# NOINLINE fromIntegerS #-}
 fromIntegerS = fromIntegerS_inlineable
 {-# INLINABLE fromIntegerS_inlineable #-}
@@ -109,6 +111,26 @@ fromIntegerS_inlineable i
     res = case divMod i sz of
             (s,i') | even s    -> S i'
                    | otherwise -> S (i' - sz)
+
+instance KnownNat (Max m n) => Add (Signed m) (Signed n) where
+  type AResult (Signed m) (Signed n) = Signed (Max m n)
+  plus  = plusS2
+  minus = minusS2
+
+plusS2, minusS2 :: KnownNat (Max m n) => Signed m -> Signed n -> Signed (Max m n)
+{-# NOINLINE plusS2 #-}
+plusS2 (S a) (S b) = fromIntegerS_inlineable (a + b)
+
+{-# NOINLINE minusS2 #-}
+minusS2 (S a) (S b) = fromIntegerS_inlineable (a - b)
+
+instance KnownNat (m + n) => Mult (Signed m) (Signed n) where
+  type MResult (Signed m) (Signed n) = Signed (m + n)
+  mult = multS2
+
+{-# NOINLINE multS2 #-}
+multS2 :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)
+multS2 (S a) (S b) = fromIntegerS_inlineable (a * b)
 
 instance KnownNat n => Real (Signed n) where
   toRational = toRational . toIntegerS
@@ -267,7 +289,7 @@ fromBitList l = fromIntegerS_inlineable
 -- Increasing the size of the number replicates the sign bit to the left.
 -- Truncating a number to length L keeps the sign bit and the rightmost L-1 bits.
 --
-resizeS :: forall n m . (KnownNat n, KnownNat m) => Signed n -> Signed m
+resizeS :: (KnownNat n, KnownNat m) => Signed n -> Signed m
 resizeS s@(S n) | n' <= m'  = extend
                 | otherwise = trunc
   where

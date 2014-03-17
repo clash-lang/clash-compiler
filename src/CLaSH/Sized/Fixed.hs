@@ -67,20 +67,20 @@ instance (KnownNat (i + f), KnownNat f) => Show (SFixed i f) where
 instance (KnownNat (i + f), KnownNat f) => Show (UFixed i f) where
   show = showFixed unUF
 
-multFixedS :: forall i f . (KnownNat (2 * (i + f)), KnownNat (i + f), KnownNat f) => SFixed i f -> SFixed i f -> SFixed i f
+multFixedS :: (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f)
+           => SFixed i f -> SFixed i f -> SFixed i f
 multFixedS (SF a) (SF b) = res
   where
-    mult :: Signed (2 * (i + f))
-    mult = (resizeS a) * (resizeS b)
-    resS = mult `shiftR` (fracShift res)
+    resM = mult a b
+    resS = resM `shiftR` (fracShift res)
     res  = SF (resizeS resS)
 
-multFixedU :: forall i f . (KnownNat (2 * (i + f)), KnownNat (i + f), KnownNat f) => UFixed i f -> UFixed i f -> UFixed i f
+multFixedU :: (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f)
+           => UFixed i f -> UFixed i f -> UFixed i f
 multFixedU (UF a) (UF b) = res
   where
-    mult :: Unsigned (2 * (i + f))
-    mult = (resizeU a) * (resizeU b)
-    resS = mult `shiftR` (fracShift res)
+    resM = mult a b
+    resS = resM `shiftR` (fracShift res)
     res  = UF (resizeU resS)
 
 fixedFromInteger :: (Bits a, KnownNat n, Num a)
@@ -89,7 +89,7 @@ fixedFromInteger toF i = res
   where
     res = toF (fromInteger i `shiftL` fracShift res)
 
-instance (KnownNat (2 * (i + f)), KnownNat (i + f), KnownNat f) => Num (SFixed i f) where
+instance (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f) => Num (SFixed i f) where
   (+)           = (SF .) . on (+) unSF
   (*)           = multFixedS
   (-)           = (SF .) . on (-) unSF
@@ -98,7 +98,7 @@ instance (KnownNat (2 * (i + f)), KnownNat (i + f), KnownNat f) => Num (SFixed i
   signum        = SF . signum . unSF
   fromInteger   = fixedFromInteger SF
 
-instance (KnownNat (2 * (i + f)), KnownNat (i + f), KnownNat f) => Num (UFixed i f) where
+instance (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f) => Num (UFixed i f) where
   (+)           = (UF .) . on (+) unUF
   (*)           = multFixedU
   (-)           = (UF .) . on (-) unUF

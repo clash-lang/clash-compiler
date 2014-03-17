@@ -33,11 +33,13 @@ import Control.Category            as Category
 import Data.Bits                   as Exported
 import Data.Default                as Exported
 import CLaSH.Class.BitVector       as Exported
+import CLaSH.Class.Num             as Exported
 import CLaSH.Promoted.Bool         as Exported
 import CLaSH.Promoted.Nat          as Exported
 import CLaSH.Promoted.Nat.TH       as Exported
 import CLaSH.Promoted.Nat.Literals as Exported
 import CLaSH.Promoted.Ord          as Exported
+import CLaSH.Sized.Fixed           as Exported
 import CLaSH.Sized.Signed          as Exported
 import CLaSH.Sized.Unsigned        as Exported
 import CLaSH.Sized.Vector          as Exported
