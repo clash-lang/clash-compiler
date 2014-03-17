@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -15,11 +16,15 @@ where
 
 import Control.Arrow
 import Data.Bits
+import Data.Default
+import Data.Function
 import Data.List
 import Data.Maybe
+import Data.Proxy
 import Data.Ratio
 import GHC.TypeLits
-import Data.Function
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax(Lift(..))
 
 import CLaSH.Class.BitVector
 import CLaSH.Class.Num
@@ -126,3 +131,27 @@ instance Pack (UFixed i f) where
   type SignalP (UFixed i f) = Signal (UFixed i f)
   pack   = id
   unpack = id
+
+instance (KnownNat i, KnownNat f, KnownNat (i + f)) => Lift (SFixed i f) where
+  lift s@(SF i) = sigE [| SF i |] (decSFixed (natVal (asProxy s)) (natVal s))
+    where
+      asProxy :: SFixed n a -> Proxy n
+      asProxy _ = Proxy
+
+instance (KnownNat i, KnownNat f, KnownNat (i + f)) => Lift (UFixed i f) where
+  lift s@(UF i) = sigE [| UF i |] (decUFixed (natVal (asProxy s)) (natVal s))
+    where
+      asProxy :: UFixed n a -> Proxy n
+      asProxy _ = Proxy
+
+decSFixed :: Integer -> Integer -> TypeQ
+decSFixed i f = appT (appT (conT ''SFixed) (litT $ numTyLit i)) (litT $ numTyLit f)
+
+decUFixed :: Integer -> Integer -> TypeQ
+decUFixed i f = appT (appT (conT ''SFixed) (litT $ numTyLit i)) (litT $ numTyLit f)
+
+instance KnownNat (i + f) => Default (SFixed i f) where
+  def = SF 0
+
+instance KnownNat (i + f) => Default (UFixed i f) where
+  def = UF 0
