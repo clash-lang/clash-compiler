@@ -48,14 +48,18 @@ sf = SF
 uf :: Unsigned (i + f) -> UFixed i f
 uf = UF
 
-showFixed :: (Bits a, KnownNat n, Show a, Integral a)
-          => (proxy n -> a) -> proxy n -> [Char]
-showFixed unF f = show (dec + frac)
-  where
-    rep  = unF f
-    nF   = fracShift f
-    dec  = fromIntegral (rep `shiftR` nF)
-    frac = on (/) fromIntegral (toInteger rep .&. ((2 ^ nF) - 1)) (2 ^ nF) :: Double
+showFixed :: (Bits a, KnownNat n, Show a, Integral a) =>
+             (proxy n -> a) -> proxy n -> [Char]
+showFixed unRep f = show i ++ "." ++ (uncurry pad . second (show . numerator) .
+                                      fromJust . find ((==1) . denominator . snd) .
+                                      iterate (succ *** (*10)) . (,) 0 $ (nom % denom))
+    where
+      pad n str = replicate (n - length str) '0' ++ str
+      nF        = fracShift f
+      rep       = unRep f
+      i         = rep `shiftR` nF
+      nom       = toInteger rep .&. ((2 ^ nF) - 1)
+      denom     = 2 ^ nF
 
 instance (KnownNat (i + f), KnownNat f) => Show (SFixed i f) where
   show = showFixed unSF
