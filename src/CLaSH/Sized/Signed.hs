@@ -27,7 +27,7 @@ import CLaSH.Class.Num
 import CLaSH.Promoted.Ord
 import CLaSH.Sized.Vector
 
--- | Arbitrary precision signed integer represented by @n@ bits
+-- | Arbitrary-width signed integer represented by @n@ bits
 newtype Signed (n :: Nat) = S Integer
 
 instance Eq (Signed n) where
