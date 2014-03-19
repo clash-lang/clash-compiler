@@ -21,7 +21,7 @@ module CLaSH.Sized.Vector
   , (!), vreplace, maxIndex
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
-  , toList, v
+  , toList, v, lazyV
   )
 where
 
@@ -431,3 +431,14 @@ toList = vfoldr (:) []
 v :: Lift a => [a] -> ExpQ
 v []     = [| Nil |]
 v (x:xs) = [| x :> $(v xs) |]
+
+{-# NOINLINE lazyV #-}
+-- | For when your vector function are too strict in their arguments
+lazyV :: KnownNat n
+      => Vec n a
+      -> Vec n a
+lazyV = lazyV' (vcopyI undefined)
+  where
+    lazyV' :: Vec n a -> Vec n a -> Vec n a
+    lazyV' Nil       _  = Nil
+    lazyV' (_ :> xs) ys = vhead ys :> lazyV' xs (vtail ys)
