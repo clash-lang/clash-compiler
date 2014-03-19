@@ -410,8 +410,8 @@ mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
 mkSelectorCase caller tcm _ scrut dcI fieldI = do
   scrutTy <- termType tcm scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
-  case scrutTy of
-    (coreView tcm -> TyConApp tc args) ->
+  case coreView tcm scrutTy of
+    TyConApp tc args ->
       case tyConDataCons (tcm HMS.! tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc)
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max"
@@ -427,7 +427,10 @@ mkSelectorCase caller tcm _ scrut dcI fieldI = do
               let pat    = DataPat (embed dc) (rebind [] bndrs)
               let retVal = Case scrut [ bind pat (snd selBndr) ]
               return retVal
-    _ -> cantCreate $(curLoc) "Type of subject is not a datatype"
+    FunTy _ _ -> do
+      (id_,var) <- mkInternalVar "selector" scrutTy
+      return (mkLams var [id_])
+    (OtherType oTy) -> cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showDoc oTy)
 
 -- | Specialise an application on its argument
 specialise :: (Functor m, State.MonadState s m)
