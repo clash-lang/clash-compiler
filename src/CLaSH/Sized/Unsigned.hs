@@ -155,11 +155,29 @@ complementU = fromBitVector . vmap complement . toBitVector
 
 {-# NOINLINE bitU #-}
 bitU :: KnownNat n => Int -> Unsigned n
-bitU = fromIntegerU_inlineable . bit
+bitU i = res
+  where
+    sz = finiteBitSizeU res
+    res | sz > i    = fromIntegerU_inlineable (bit i)
+        | otherwise = error $ concat [ "bit: "
+                                     , "Setting out-of-range bit position, size: "
+                                     , show sz
+                                     , ", position: "
+                                     , show i
+                                     ]
 
 {-# NOINLINE testBitU #-}
-testBitU :: Unsigned n -> Int -> Bool
-testBitU (U n) i = testBit n i
+testBitU :: KnownNat n => Unsigned n -> Int -> Bool
+testBitU s@(U n) i
+  | sz > i    = testBit n i
+  | otherwise = error $ concat [ "testBit: "
+                               , "Setting out-of-range bit position, size: "
+                               , show sz
+                               , ", position: "
+                               , show i
+                               ]
+  where
+    sz = finiteBitSizeU s
 
 shiftLU,shiftRU,rotateLU,rotateRU :: KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftLU #-}

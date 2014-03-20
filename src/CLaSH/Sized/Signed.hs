@@ -177,11 +177,29 @@ complementS = fromBitVector . vmap complement . toBitVector
 
 {-# NOINLINE bitS #-}
 bitS :: KnownNat n => Int -> Signed n
-bitS = fromIntegerS_inlineable . bit
+bitS i = res
+  where
+    sz = finiteBitSizeS res
+    res | sz > i    = fromIntegerS_inlineable (bit i)
+        | otherwise = error $ concat [ "bit: "
+                                     , "Setting out-of-range bit position, size: "
+                                     , show sz
+                                     , ", position: "
+                                     , show i
+                                     ]
 
 {-# NOINLINE testBitS #-}
-testBitS :: Signed n -> Int -> Bool
-testBitS (S n) i = testBit n i
+testBitS :: KnownNat n => Signed n -> Int -> Bool
+testBitS s@(S n) i
+  | sz > i    = testBit n i
+  | otherwise = error $ concat [ "testBit: "
+                               , "Setting out-of-range bit position, size: "
+                               , show sz
+                               , ", position: "
+                               , show i
+                               ]
+  where
+    sz = finiteBitSizeS s
 
 shiftLS,shiftRS,rotateLS,rotateRS :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftLS #-}
