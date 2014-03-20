@@ -36,6 +36,7 @@ Library
                       CLaSH.Promoted.Nat.Literals
                       CLaSH.Promoted.Ord
                       CLaSH.Signal
+                      CLaSH.Sized.Fixed
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
