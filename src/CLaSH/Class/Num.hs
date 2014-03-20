@@ -14,6 +14,3 @@ class Add a b | a -> b where
 class Mult a b | a -> b where
   type MResult a b
   mult :: a -> b -> MResult a b
-
-class FromInteger a where
-  fromInt :: Integer -> a
