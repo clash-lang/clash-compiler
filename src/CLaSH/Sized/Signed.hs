@@ -26,6 +26,7 @@ import CLaSH.Class.BitVector
 import CLaSH.Promoted.Nat
 import CLaSH.Sized.Vector
 
+-- | Arbitrary precision signed integer represented by @n@ bits
 newtype Signed (n :: Nat) = S Integer
 
 instance Eq (Signed n) where

@@ -25,6 +25,7 @@ import CLaSH.Class.BitVector
 import CLaSH.Promoted.Nat
 import CLaSH.Sized.Vector
 
+-- | Arbitrary precision unsigned integer represented by @n@ bits
 newtype Unsigned (n :: Nat) = U Integer
 
 instance Eq (Unsigned n) where

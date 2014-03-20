@@ -7,17 +7,23 @@
 {-# OPTIONS_GHC -O0 -fno-omit-interface-pragmas #-}
 
 module CLaSH.Prelude
-  ( module Exported
-  , (<^>)
+  ( -- * Creating synchronous sequential circuits
+    (<^>)
   , registerP
+    -- * 'Arrow' interface for synchronous sequential circuits
   , Comp (..)
+  , (^^^)
   , registerC
   , simulateC
-  , (^^^)
+    -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+  , blockRamC
+  , blockRamPow2C
+    -- * Utility functions
   , window
   , windowD
+  , module Exported
   )
 where
 
@@ -45,7 +51,7 @@ import GHC.TypeLits                as Exported
 -- > window4 :: Signal Int -> Vec 4 (Signal Int)
 -- > window4 = window
 -- >
--- > simulateP window4 [1,2,3,4,5,... = [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>,...
+-- > simulateP window4 [1,2,3,4,5,... = [1:>0:>0:>0:>Nil, 2:>1:>0:>0:>Nil, 3:>2:>1:>0:>Nil, 4:>3:>2:>1:>Nil, 5:>4:>3:>2:>Nil,...
 window :: (KnownNat (n + 1), Default a)
        => Signal a
        -> Vec ((n + 1) + 1) (Signal a)
@@ -60,7 +66,7 @@ window x = x :> prev
 -- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
 -- > windowD3 = windowD
 -- >
--- > simulateP windowD3 [1,2,3,4,... = [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>,...
+-- > simulateP windowD3 [1,2,3,4,... = [0:>0:>0:>Nil, 1:>0:>0:>Nil, 2:>1:>0:>Nil, 3:>2:>1:>Nil, 4:>3:>2:>Nil,...
 windowD :: (KnownNat (n + 1), Default a)
         => Signal a
         -> Vec (n + 1) (Signal a)
@@ -73,6 +79,9 @@ windowD x = prev
 -- | Create a synchronous function from a combinational function describing
 -- a mealy machine
 --
+-- > mac :: Int        -- Current state
+-- >     -> (Int,Int)  -- Input
+-- >     -> (Int,Int)  -- (Updated state, output)
 -- > mac s (x,y) = (s',s)
 -- >   where
 -- >     s' = x * y + s
@@ -81,10 +90,20 @@ windowD x = prev
 -- > topEntity = mac <^> 0
 -- >
 -- > simulateP topEntity [(1,1),(2,2),(3,3),(4,4),... = [0,1,5,14,30,...
+--
+-- Synchronous sequential functions can be composed just like their combinational counterpart:
+--
+-- > dualMac :: (Signal Int, Signal Int)
+-- >         -> (Signal Int, Signal Int)
+-- >         -> Signal Int
+-- > dualMac (a,b) (x,y) = s1 + s2
+-- >   where
+-- >     s1 = (mac <^> 0) (a,b)
+-- >     s2 = (mac <^> 0) (x,y)
 (<^>) :: (Pack i, Pack o)
-      => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form
-      -> s -- ^ Initial state
-      -> (SignalP i -> SignalP o) -- ^ Synchronous function with input and output matching that of the mealy machine
+      => (s -> i -> (s,o))        -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+      -> s                        -- ^ Initial state
+      -> (SignalP i -> SignalP o) -- ^ Synchronous sequential function with input and output matching that of the mealy machine
 f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
                      s      = register iS s'
                  in unpack o
@@ -105,12 +124,12 @@ registerP i = unpack Prelude.. register i Prelude.. pack
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
 -- > bram40 = blockRam d50
 blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a)
-         => SNat n -- ^ Size @n@ of the blockram
+         => SNat n              -- ^ Size @n@ of the blockram
          -> Signal (Unsigned m) -- ^ Write address @w@
          -> Signal (Unsigned m) -- ^ Read address @r@
-         -> Signal Bool -- ^ Write enable
-         -> Signal a -- ^ Value to write (at address @w@)
-         -> Signal a -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
+         -> Signal Bool         -- ^ Write enable
+         -> Signal a            -- ^ Value to write (at address @w@)
+         -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
@@ -124,21 +143,39 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
              | otherwise = ram
         o'               = ram ! r
 
+-- | Create a blockRAM with space for @n@ elements
+--
+-- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, a) a
+-- > bramC40 = blockRamC d50
+blockRamC :: (KnownNat n, KnownNat m, Pack a)
+          => SNat n -- ^ Size @n@ of the blockram
+          -> Comp (Unsigned m, Unsigned m, Bool, a) a
+blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
+
 {-# INLINABLE blockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = blockRamPow2 d32
 blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a)
-             => (SNat ((2^n) :: Nat))  -- ^ Size 2^@n@ of the blockram
+             => SNat ((2^n) :: Nat) -- ^ Size @2^n@ of the blockram
              -> Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
-             -> Signal Bool -- ^ Write enable
-             -> Signal a -- ^ Value to write (at address @w@)
-             -> Signal a -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
+             -> Signal Bool         -- ^ Write enable
+             -> Signal a            -- ^ Value to write (at address @w@)
+             -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 blockRamPow2 = blockRam
 
--- | 'Arrow' interface to synchronous functions
+-- | Create a blockRAM with space for 2^@n@ elements
+--
+-- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, a) a
+-- > bramC32 = blockRamPow2C d32
+blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a)
+              => SNat ((2^n) :: Nat) -- ^ Size @2^n@ of the blockram
+              -> Comp (Unsigned n, Unsigned n, Bool, a) a
+blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
+
+-- | 'Comp'onent: an 'Arrow' interface to synchronous sequential functions
 newtype Comp a b = C { asFunction :: Signal a -> Signal b }
 
 instance Category Comp where
@@ -178,6 +215,9 @@ simulateC f = simulate (asFunction f)
 -- | Create a synchronous 'Comp'onent from a combinational function describing
 -- a mealy machine
 --
+-- > mac :: Int        -- Current state
+-- >     -> (Int,Int)  -- Input
+-- >     -> (Int,Int)  -- (Updated state, output)
 -- > mac s (x,y) = (s',s)
 -- >   where
 -- >     s' = x * y + s
@@ -186,7 +226,17 @@ simulateC f = simulate (asFunction f)
 -- > topEntity = mac ^^^ 0
 -- >
 -- > simulateC topEntity [(1,1),(2,2),(3,3),(4,4),... = [0,1,5,14,30,...
-(^^^) :: (s -> i -> (s,o)) -> s -> Comp i o
+--
+-- Synchronous sequential must be composed using the 'Arrow' syntax
+--
+-- > dualMac :: Comp (Int,Int,Int,Int) Int
+-- > dualMac = proc (a,b,x,y) -> do
+-- >   rec s1 <- mac ^^^ 0 -< (a,b)
+-- >       s2 <- mac ^^^ 0 -< (x,y)
+-- >   returnA -< (s1 + s2)
+(^^^) :: (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+      -> s                 -- ^ Initial state
+      -> Comp i o          -- ^ Synchronous sequential 'Comp'onent with input and output matching that of the mealy machine
 f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
                          s      = register sI s'
                      in  o
