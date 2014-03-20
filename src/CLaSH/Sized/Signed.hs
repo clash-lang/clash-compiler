@@ -23,7 +23,6 @@ import GHC.TypeLits
 
 import CLaSH.Bit
 import CLaSH.Class.BitVector
-import CLaSH.Promoted.Nat
 import CLaSH.Sized.Vector
 
 -- | Arbitrary precision signed integer represented by @n@ bits
@@ -64,9 +63,9 @@ instance KnownNat n => Bounded (Signed n) where
 
 minBoundS,maxBoundS :: forall n . KnownNat n => Signed n
 {-# NOINLINE minBoundS #-}
-minBoundS = S $ negate $ 2 ^ (fromSNat (snat :: SNat n) -1)
+minBoundS = let res = S $ negate $ 2 ^ (natVal res - 1) in res
 {-# NOINLINE maxBoundS #-}
-maxBoundS = S $ 2 ^ (fromSNat (snat :: SNat n) - 1) - 1
+maxBoundS = let res = S $ 2 ^ (natVal res - 1) - 1 in res
 
 instance KnownNat n => Num (Signed n) where
   (+)         = plusS
@@ -105,7 +104,7 @@ fromIntegerS_inlineable i
     | nS == 0   = S 0
     | otherwise = res
   where
-    nS  = fromSNat (snat :: SNat n)
+    nS  = natVal res
     sz  = 2 ^ (nS - 1)
     res = case divMod i sz of
             (s,i') | even s    -> S i'
@@ -208,8 +207,8 @@ instance KnownNat n => FiniteBits (Signed n) where
   finiteBitSize = finiteBitSizeS
 
 {-# NOINLINE finiteBitSizeS #-}
-finiteBitSizeS :: forall n . KnownNat n => Signed n -> Int
-finiteBitSizeS _ = fromInteger $ fromSNat (snat :: SNat n)
+finiteBitSizeS :: KnownNat n => Signed n -> Int
+finiteBitSizeS i = let res = fromInteger (natVal i) in res
 
 instance Show (Signed n) where
   show (S n) = show n
@@ -218,7 +217,7 @@ instance KnownNat n => Default (Signed n) where
   def = fromIntegerS 0
 
 instance KnownNat n => Lift (Signed n) where
-  lift (S i) = sigE [| fromIntegerS i |] (decSigned $ fromSNat (snat :: (SNat n)))
+  lift s@(S i) = sigE [| fromIntegerS i |] (decSigned (natVal s))
 
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
@@ -251,14 +250,15 @@ fromBitList l = fromIntegerS_inlineable
 -- Truncating a number to length L keeps the sign bit and the rightmost L-1 bits.
 --
 resizeS :: forall n m . (KnownNat n, KnownNat m) => Signed n -> Signed m
-resizeS s@(S n) | n' <= m'  = fromIntegerS_inlineable n
-                | otherwise = case l of
+resizeS s@(S n) | n' <= m'  = extend
+                | otherwise = trunc
+  where
+    n'     = fromInteger (natVal s)
+    m'     = fromInteger (natVal extend)
+    extend = fromIntegerS_inlineable n
+    trunc  = case toList (toBitVector s) of
                     (x:xs) -> fromBitList $ reverse $ x : (drop (n' - m') xs)
                     _      -> error "resizeS impossible case: empty list"
-  where
-    n' = fromInteger $ fromSNat (snat :: SNat n) :: Int
-    m' = fromInteger $ fromSNat (snat :: SNat m) :: Int
-    l  = toList $ toBitVector s
 
 {-# NOINLINE resizeS_wrap #-}
 -- | A resize operation that is sign-preserving on extension, but wraps on truncation.

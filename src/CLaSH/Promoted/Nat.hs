@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 module CLaSH.Promoted.Nat
-  ( SNat, snat, withSNat, fromSNat
+  ( SNat, snat, withSNat
   , UNat (..), toUNat, addUNat, multUNat, powUNat
   )
 where
@@ -29,11 +29,6 @@ data UNat :: Nat -> * where
   UZero :: UNat 0
   USucc :: UNat n -> UNat (n + 1)
 
--- | Convert a singleton natural number to an integer
-fromSNat :: SNat n -> Integer
-fromSNat (SNat p) = natVal p
-
-{-# NOINLINE fromSNat #-}
 -- | Convert a singleton natural number to it's unary representation
 toUNat :: SNat n -> UNat n
 toUNat (SNat p) = fromI (natVal p)

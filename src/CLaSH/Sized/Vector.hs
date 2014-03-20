@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
@@ -18,20 +17,21 @@ module CLaSH.Sized.Vector
   , vreverse, vmap, vzipWith
   , vfoldr, vfoldl, vfoldr1, vfoldl1
   , vzip, vunzip
-  , (!), vreplace, maxIndex
+  , (!), vreplace, maxIndex, vlength
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
-  , toList, v, lazyV
+  , toList, v, lazyV, asNatProxy
   )
 where
 
 import Control.Applicative
 import Data.Traversable
-import Data.Foldable hiding (toList)
+import Data.Foldable              hiding (toList)
+import Data.Proxy
 import GHC.TypeLits
-import Language.Haskell.TH (ExpQ)
+import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
-import Unsafe.Coerce (unsafeCoerce)
+import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat
 
@@ -328,16 +328,26 @@ vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
 -- | Vector index (subscript) operator, descending from 'maxIndex', where the
 -- last element has subscript 0.
 --
--- > <1,2,3,4,5> ! 4 == 1
--- > <1,2,3,4,5> ! maxIndex == 1
--- > <1,2,3,4,5> ! 1 == 4
+-- > (1:>2:>3:>4:>5:>Nil) ! 4        == 1
+-- > (1:>2:>3:>4:>5:>Nil) ! maxIndex == 1
+-- > (1:>2:>3:>4:>5:>Nil) ! 1        == 4
+-- > (1:>2:>3:>4:>5:>Nil) ! 14       == RUNTIME ERROR: Out of bounds
 (!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
 xs ! i = vindex_integer xs (toInteger i)
 
 {-# NOINLINE maxIndex #-}
--- | Index (subscript) of the head of the vector
-maxIndex :: forall n a . KnownNat n => Vec n a -> Integer
-maxIndex _ = fromSNat (snat :: SNat n) - 1
+-- | Index (subscript) of the head of the 'Vec'tor
+--
+-- > maxIndex (6 :> 7 :> 8 :> Nil) == 2
+maxIndex :: KnownNat n => Vec n a -> Integer
+maxIndex = subtract 1 . vlength
+
+{-# NOINLINE vlength #-}
+-- | Length of a 'Vec'tor as an Integer
+--
+-- > vlength (6 :> 7 :> 8 :> Nil) == 3
+vlength :: KnownNat n => Vec n a -> Integer
+vlength = natVal . asNatProxy
 
 {-# NOINLINE vreplaceM_integer #-}
 vreplaceM_integer :: Vec n a -> Integer -> a -> Maybe (Vec n a)

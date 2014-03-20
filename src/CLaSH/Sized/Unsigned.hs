@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -22,7 +21,6 @@ import GHC.TypeLits
 
 import CLaSH.Bit
 import CLaSH.Class.BitVector
-import CLaSH.Promoted.Nat
 import CLaSH.Sized.Vector
 
 -- | Arbitrary precision unsigned integer represented by @n@ bits
@@ -62,8 +60,8 @@ instance KnownNat n => Bounded (Unsigned n) where
   maxBound = maxBoundU
 
 {-# NOINLINE maxBoundU #-}
-maxBoundU :: forall n . KnownNat n => Unsigned n
-maxBoundU = U $ (2 ^ fromSNat (snat :: SNat n)) - 1
+maxBoundU :: KnownNat n => Unsigned n
+maxBoundU = let res = U ((2 ^ natVal res) - 1) in res
 
 instance KnownNat n => Num (Unsigned n) where
   (+)         = plusU
@@ -89,11 +87,11 @@ signumU :: Unsigned n -> Unsigned n
 signumU (U 0) = (U 0)
 signumU (U _) = (U 1)
 
-fromIntegerU,fromIntegerU_inlineable :: forall n . KnownNat n => Integer -> Unsigned (n :: Nat)
+fromIntegerU,fromIntegerU_inlineable :: KnownNat n => Integer -> Unsigned n
 {-# NOINLINE fromIntegerU #-}
 fromIntegerU = fromIntegerU_inlineable
 {-# INLINABLE fromIntegerU_inlineable #-}
-fromIntegerU_inlineable i = U $ i `mod` (2 ^ fromSNat (snat :: SNat n))
+fromIntegerU_inlineable i = let res = U (i `mod` (2 ^ natVal res)) in res
 
 instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toIntegerU
@@ -187,11 +185,11 @@ instance KnownNat n => FiniteBits (Unsigned n) where
   finiteBitSize  = finiteBitSizeU
 
 {-# NOINLINE finiteBitSizeU #-}
-finiteBitSizeU :: forall n . KnownNat n => Unsigned n -> Int
-finiteBitSizeU _ = fromInteger $ fromSNat (snat :: SNat n)
+finiteBitSizeU :: KnownNat n => Unsigned n -> Int
+finiteBitSizeU u = fromInteger (natVal u)
 
-instance forall n . KnownNat n => Lift (Unsigned n) where
-  lift (U i) = sigE [| fromIntegerU i |] (decUnsigned $ fromSNat (snat :: (SNat n)))
+instance KnownNat n => Lift (Unsigned n) where
+  lift u@(U i) = sigE [| fromIntegerU i |] (decUnsigned (natVal u))
 
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
