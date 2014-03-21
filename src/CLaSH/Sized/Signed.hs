@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -10,13 +11,13 @@
 
 module CLaSH.Sized.Signed
   ( Signed
-  , resizeS
   , resizeS_wrap
   )
 where
 
 import Data.Bits
 import Data.Default
+import Data.Typeable
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax(Lift(..))
 import GHC.TypeLits
@@ -29,6 +30,7 @@ import CLaSH.Sized.Vector
 
 -- | Arbitrary-width signed integer represented by @n@ bits
 newtype Signed (n :: Nat) = S Integer
+  deriving Typeable
 
 instance Eq (Signed n) where
   (==) = eqS
@@ -284,11 +286,6 @@ fromBitList l = fromIntegerS_inlineable
                     ]
 
 {-# NOINLINE resizeS #-}
--- | A sign-preserving resize operation
---
--- Increasing the size of the number replicates the sign bit to the left.
--- Truncating a number to length L keeps the sign bit and the rightmost L-1 bits.
---
 resizeS :: (KnownNat n, KnownNat m) => Signed n -> Signed m
 resizeS s@(S n) | n' <= m'  = extend
                 | otherwise = trunc
@@ -305,6 +302,12 @@ resizeS s@(S n) | n' <= m'  = extend
 --
 -- Increasing the size of the number replicates the sign bit to the left.
 -- Truncating a number of length N to a length L just removes the leftmost N-L bits.
---
 resizeS_wrap :: KnownNat m => Signed n -> Signed m
 resizeS_wrap (S n) = fromIntegerS_inlineable n
+
+-- | A sign-preserving resize operation
+--
+-- Increasing the size of the number replicates the sign bit to the left.
+-- Truncating a number to length L keeps the sign bit and the rightmost L-1 bits.
+instance Resize Signed where
+  resize = resizeS

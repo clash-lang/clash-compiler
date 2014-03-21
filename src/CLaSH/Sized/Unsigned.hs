@@ -10,7 +10,6 @@
 
 module CLaSH.Sized.Unsigned
   ( Unsigned
-  , resizeU
   )
 where
 
@@ -263,11 +262,13 @@ fromBitList l = fromIntegerU_inlineable
                     ]
 
 {-# NOINLINE resizeU #-}
--- | A resize operation that is zero-extends on extension, and wraps on truncation.
+resizeU :: KnownNat m => Unsigned n -> Unsigned m
+resizeU (U n) = fromIntegerU_inlineable n
+
+-- | A resize operation that zero-extends on extension, and wraps on truncation.
 --
 -- Increasing the size of the number extends with zeros to the left.
 -- Truncating a number of length N to a length L just removes the left
 -- (most significant) N-L bits.
---
-resizeU :: KnownNat m => Unsigned n -> Unsigned m
-resizeU (U n) = fromIntegerU_inlineable n
+instance Resize Unsigned where
+  resize = resizeU

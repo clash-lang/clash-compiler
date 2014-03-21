@@ -1,157 +1,144 @@
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE KindSignatures       #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
 module CLaSH.Sized.Fixed
   ( -- * Signed fixed point
     SFixed, sf, unSF
     -- * Unsigned fixed point
   , UFixed, uf, unUF
+    -- * Fixed point wrapper
+  , Fixed (..), fracShift
+    -- * Proxy
+  , asFracProxy, asRepProxy
   )
 where
 
 import Control.Arrow
 import Data.Bits
 import Data.Default
-import Data.Function
 import Data.List
 import Data.Maybe
 import Data.Proxy
 import Data.Ratio
+import Data.Typeable
 import GHC.TypeLits
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax(Lift(..))
 
 import CLaSH.Class.BitVector
 import CLaSH.Class.Num
+import CLaSH.Promoted.Nat
+import CLaSH.Promoted.Ord
 import CLaSH.Signal
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 
--- | Fixed point signed integer with @i@ integer bits and @f@ fractional bits
---
--- For now, overflow behaviour for the 'Num' functions is wrap-around, not saturate
-newtype SFixed (i :: Nat) (f :: Nat) = SF { unSF :: Signed   (i + f) }
+newtype Fixed (frac :: Nat) (rep :: Nat -> *) (size :: Nat) = Fixed { unFixed :: rep size }
   deriving (Eq,Ord)
 
--- | Fixed point unsigned integer with @i@ integer bits and @f@ fractional bits
---
--- For now, overflow behaviour for the 'Num' functions is wrap-around, not saturate
-newtype UFixed (i :: Nat) (f :: Nat) = UF { unUF :: Unsigned (i + f) }
-  deriving (Eq,Ord)
+type SFixed int frac = Fixed frac Signed   (int + frac)
+type UFixed int frac = Fixed frac Unsigned (int + frac)
 
-fracShift :: KnownNat n => proxy n -> Int
-fracShift = fromInteger . natVal
+sf :: SNat frac -> Signed (int + frac) -> SFixed int frac
+sf _ fRep = Fixed fRep
 
-sf :: Signed (i + f) -> SFixed i f
-sf = SF
+unSF :: SFixed int frac -> Signed (int + frac)
+unSF (Fixed fRep) = fRep
 
-uf :: Unsigned (i + f) -> UFixed i f
-uf = UF
+uf :: SNat frac -> Unsigned (int + frac) -> UFixed int frac
+uf _ fRep = Fixed fRep
 
-showFixed :: (Bits a, KnownNat n, Show a, Integral a) =>
-             (proxy n -> a) -> proxy n -> [Char]
-showFixed unRep f = show i ++ "." ++ (uncurry pad . second (show . numerator) .
-                                      fromJust . find ((==1) . denominator . snd) .
-                                      iterate (succ *** (*10)) . (,) 0 $ (nom % denom))
+unUF :: UFixed int frac -> Unsigned (int + frac)
+unUF (Fixed fRep) = fRep
+
+asFracProxy :: Fixed frac rep size -> Proxy frac
+asFracProxy _ = Proxy
+
+asRepProxy :: Fixed frac rep size -> Proxy rep
+asRepProxy _ = Proxy
+
+fracShift :: KnownNat frac => Fixed frac rep size -> Int
+fracShift f = fromInteger (natVal (asFracProxy f))
+
+multFixed :: forall frac rep size .
+             ( MResult (rep size) (rep size) ~ rep (size + size)
+             , Mult (rep size) (rep size) , Bits (rep (size + size))
+             , KnownNat frac , Resize rep , KnownNat size
+             , KnownNat (size + size)
+             )
+          => Fixed frac rep size
+          -> Fixed frac rep size
+          -> Fixed frac rep size
+multFixed (Fixed f1Rep) (Fixed f2Rep) = res
+  where
+    resM = mult f1Rep f2Rep :: rep (size + size)
+    resS = resM `shiftR` (fracShift res)
+    res  = Fixed (resize resS)
+
+instance ( Show (rep size), Bits (rep size), KnownNat frac
+         , Integral (rep size)
+         ) => Show (Fixed frac rep size) where
+  show f@(Fixed fRep) = show i ++ "." ++ (uncurry pad . second (show . numerator) .
+                                          fromJust . find ((==1) . denominator . snd) .
+                                          iterate (succ *** (*10)) . (,) 0 $ (nom % denom))
     where
       pad n str = replicate (n - length str) '0' ++ str
       nF        = fracShift f
-      rep       = unRep f
-      i         = rep `shiftR` nF
-      nom       = toInteger rep .&. ((2 ^ nF) - 1)
+      i         = fRep `shiftR` nF
+      nom       = toInteger fRep .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
 
-instance (KnownNat (i + f), KnownNat f) => Show (SFixed i f) where
-  show = showFixed unSF
+instance ( Mult (rep size1) (rep size2)
+         , MResult (rep size1) (rep size2) ~ rep (size1 + size2)
+         ) => Mult (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
+  type MResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (frac1 + frac2) rep (size1 + size2)
+  mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
 
-instance (KnownNat (i + f), KnownNat f) => Show (UFixed i f) where
-  show = showFixed unUF
+instance ( Add (rep size1) (rep size2)
+         , AResult (rep size1) (rep size2) ~ rep (Max size1 size2)
+         ) => Add (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
+  type AResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (Max frac1 frac2) rep (Max size1 size2)
+  plus  (Fixed fRep1) (Fixed fRep2) = Fixed (plus fRep1 fRep2)
+  minus (Fixed fRep1) (Fixed fRep2) = Fixed (minus fRep1 fRep2)
 
-multFixedS :: (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f)
-           => SFixed i f -> SFixed i f -> SFixed i f
-multFixedS (SF a) (SF b) = res
-  where
-    resM = mult a b
-    resS = resM `shiftR` (fracShift res)
-    res  = SF (resizeS resS)
+instance ( Num (rep size), MResult (rep size) (rep size) ~ rep (size + size)
+         , Bits (rep (size + size)), Mult (rep size) (rep size)
+         , Resize rep, KnownNat (size + size), KnownNat size
+         , KnownNat frac, Bits (rep size)
+         ) => Num (Fixed frac rep size) where
+  (Fixed a) + (Fixed b) = Fixed (a + b)
+  (*)                   = multFixed
+  (Fixed a) - (Fixed b) = Fixed (a - b)
+  negate (Fixed a)      = Fixed (negate a)
+  abs (Fixed a)         = Fixed (abs a)
+  signum (Fixed a)      = Fixed (signum a)
+  fromInteger i         = let res = Fixed (fromInteger i `shiftL` fracShift res)
+                          in  res
 
-multFixedU :: (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f)
-           => UFixed i f -> UFixed i f -> UFixed i f
-multFixedU (UF a) (UF b) = res
-  where
-    resM = mult a b
-    resS = resM `shiftR` (fracShift res)
-    res  = UF (resizeU resS)
+instance (BitVector (rep size), size ~ BitSize (rep size)) =>
+         BitVector (Fixed frac rep size) where
+  type BitSize (Fixed frac rep size) = size
+  toBV (Fixed fRep) = toBV fRep
+  fromBV bv         = Fixed (fromBV bv)
 
-fixedFromInteger :: (Bits a, KnownNat n, Num a)
-                 => (a -> proxy n) -> Integer -> proxy n
-fixedFromInteger toF i = res
-  where
-    res = toF (fromInteger i `shiftL` fracShift res)
-
-instance (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f) => Num (SFixed i f) where
-  (+)           = (SF .) . on (+) unSF
-  (*)           = multFixedS
-  (-)           = (SF .) . on (-) unSF
-  negate        = SF . negate . unSF
-  abs           = SF . abs . unSF
-  signum        = SF . signum . unSF
-  fromInteger   = fixedFromInteger SF
-
-instance (KnownNat ((i + f) + (i + f)), KnownNat (i + f), KnownNat f) => Num (UFixed i f) where
-  (+)           = (UF .) . on (+) unUF
-  (*)           = multFixedU
-  (-)           = (UF .) . on (-) unUF
-  negate        = UF . negate . unUF
-  abs           = UF . abs . unUF
-  signum        = UF . signum . unUF
-  fromInteger   = fixedFromInteger UF
-
-instance BitVector (SFixed i f) where
-  type BitSize (SFixed i f) = i + f
-  toBV   (SF s) = toBV s
-  fromBV bv     = SF (fromBV bv)
-
-instance BitVector (UFixed i f) where
-  type BitSize (UFixed i f) = i + f
-  toBV   (UF s) = toBV s
-  fromBV bv     = UF (fromBV bv)
-
-instance Pack (SFixed i f) where
-  type SignalP (SFixed i f) = Signal (SFixed i f)
+instance Pack (Fixed frac rep size) where
+  type SignalP (Fixed frac rep size) = Signal (Fixed frac rep size)
   pack   = id
   unpack = id
 
-instance Pack (UFixed i f) where
-  type SignalP (UFixed i f) = Signal (UFixed i f)
-  pack   = id
-  unpack = id
+instance (Lift (rep size), KnownNat frac, KnownNat size, Typeable rep) =>
+         Lift (Fixed frac rep size) where
+  lift f@(Fixed fRep) = sigE [| Fixed fRep |] (decFixed (natVal (asFracProxy f)) (typeRep (asRepProxy f)) (natVal f))
 
-instance (KnownNat i, KnownNat f, KnownNat (i + f)) => Lift (SFixed i f) where
-  lift s@(SF i) = sigE [| SF i |] (decSFixed (natVal (asProxy s)) (natVal s))
-    where
-      asProxy :: SFixed n a -> Proxy n
-      asProxy _ = Proxy
+decFixed :: Integer -> TypeRep -> Integer -> TypeQ
+decFixed f r s = do
+  foldl appT (conT ''Fixed) [litT (numTyLit f), conT (mkName (show r)), litT (numTyLit s)]
 
-instance (KnownNat i, KnownNat f, KnownNat (i + f)) => Lift (UFixed i f) where
-  lift s@(UF i) = sigE [| UF i |] (decUFixed (natVal (asProxy s)) (natVal s))
-    where
-      asProxy :: UFixed n a -> Proxy n
-      asProxy _ = Proxy
-
-decSFixed :: Integer -> Integer -> TypeQ
-decSFixed i f = appT (appT (conT ''SFixed) (litT $ numTyLit i)) (litT $ numTyLit f)
-
-decUFixed :: Integer -> Integer -> TypeQ
-decUFixed i f = appT (appT (conT ''SFixed) (litT $ numTyLit i)) (litT $ numTyLit f)
-
-instance KnownNat (i + f) => Default (SFixed i f) where
-  def = SF 0
-
-instance KnownNat (i + f) => Default (UFixed i f) where
-  def = UF 0
+instance Default (rep size) => Default (Fixed frac rep size) where
+  def = Fixed def
