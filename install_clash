@@ -1,0 +1,9 @@
+#!/bin/sh
+cp clash-lib.cabal_ clash-lib.cabal;
+cabal clean;
+cabal install;
+rm clash-lib.cabal;
+cp clash-ghc.cabal_ clash-ghc.cabal;
+cabal clean;
+cabal install;
+rm clash-ghc.cabal
