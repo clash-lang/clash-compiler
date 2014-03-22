@@ -4,9 +4,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 module CLaSH.Promoted.Ord where
 
+import Data.Type.Bool
 import GHC.TypeLits
-
-import CLaSH.Promoted.Bool
 
 -- | Type-level 'min' function for natural numbers
 type family Min (x :: Nat) (y :: Nat) :: Nat

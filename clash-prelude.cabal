@@ -41,7 +41,6 @@ Library
                       CLaSH.Class.BitVector
                       CLaSH.Class.Num
                       CLaSH.Prelude
-                      CLaSH.Promoted.Bool
                       CLaSH.Promoted.Nat
                       CLaSH.Promoted.Nat.TH
                       CLaSH.Promoted.Nat.Literals

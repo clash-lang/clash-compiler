@@ -34,7 +34,6 @@ import Data.Bits                   as Exported
 import Data.Default                as Exported
 import CLaSH.Class.BitVector       as Exported
 import CLaSH.Class.Num             as Exported
-import CLaSH.Promoted.Bool         as Exported
 import CLaSH.Promoted.Nat          as Exported
 import CLaSH.Promoted.Nat.TH       as Exported
 import CLaSH.Promoted.Nat.Literals as Exported
