@@ -427,10 +427,7 @@ mkSelectorCase caller tcm _ scrut dcI fieldI = do
               let pat    = DataPat (embed dc) (rebind [] bndrs)
               let retVal = Case scrut [ bind pat (snd selBndr) ]
               return retVal
-    FunTy _ _ -> do
-      (id_,var) <- mkInternalVar "selector" scrutTy
-      return (mkLams var [id_])
-    (OtherType oTy) -> cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showDoc oTy)
+    _ -> cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showDoc scrutTy)
 
 -- | Specialise an application on its argument
 specialise :: (Functor m, State.MonadState s m)

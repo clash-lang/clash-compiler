@@ -15,7 +15,7 @@ import qualified CoreSyn                 as GHC
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
-import           CLaSH.Core.Type         (Type, splitFunForallTy)
+import           CLaSH.Core.Type         (Type, TypeView (..), coreView, mkFunTy, splitFunForallTy)
 import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.TysPrim      (tysPrimMap)
 import           CLaSH.Core.Subst        (substTms)
@@ -95,7 +95,14 @@ mkClassSelector tcm ty sel = newExpr
                        $ first (span (\l -> case l of Left _ -> True
                                                       _      -> False))
                        $ splitFunForallTy ty
-    newExpr = runFreshM $ flip State.evalStateT (0 :: Int) $ do
-                (dcId,dcVar) <- mkInternalVar "dict" dictTy
-                selE         <- mkSelectorCase "mkClassSelector" tcm [] dcVar 1 sel
-                return (mkTyLams (mkLams selE [dcId]) tvs)
+    newExpr = case coreView tcm dictTy of
+      (TyConApp _ _) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
+                          (dcId,dcVar) <- mkInternalVar "dict" dictTy
+                          selE         <- mkSelectorCase "mkClassSelector" tcm [] dcVar 1 sel
+                          return (mkTyLams (mkLams selE [dcId]) tvs)
+      (FunTy arg res) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
+                           (dcId,dcVar) <- mkInternalVar "dict" (mkFunTy arg res)
+                           return (mkTyLams (mkLams dcVar [dcId]) tvs)
+      (OtherType oTy) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
+                           (dcId,dcVar) <- mkInternalVar "dict" oTy
+                           return (mkTyLams (mkLams dcVar [dcId]) tvs)
