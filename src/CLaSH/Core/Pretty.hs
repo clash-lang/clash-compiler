@@ -262,7 +262,7 @@ pprKind = pprType
 pprTcApp :: (Applicative m, LFresh m) => TypePrec -> (TypePrec -> Type -> m Doc)
   -> TyConName -> [Type] -> m Doc
 pprTcApp _ _  tc []
-  = ppr tc
+  = return . text $ name2String tc
 
 pprTcApp p pp tc tys
   | isTupleTyConLike tc
