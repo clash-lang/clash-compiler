@@ -297,7 +297,7 @@ applyTy :: Fresh m
 applyTy (ForAllTy b) arg = do
   (tv,ty) <- unbind b
   return (substTy (varName tv) arg ty)
-applyTy _ _ = error ($(curLoc) ++ "applyTy: not a forall type")
+applyTy ty arg = error ($(curLoc) ++ "applyTy: not a forall type:\n" ++ show ty ++ "\nArg:\n" ++ show arg)
 
 -- | Split a type application in the applied type and the argument types
 splitTyAppM :: Type
