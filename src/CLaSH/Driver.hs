@@ -29,7 +29,6 @@ import           CLaSH.Netlist.Types          (Component (..), HWType,
 import           CLaSH.Netlist.VHDL           (genVHDL, mkTyPackage)
 import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
                                                normalize, runNormalization)
-import           CLaSH.Normalize.Util         (lambdaDropPrep)
 import           CLaSH.Primitives.Types
 import           CLaSH.Rewrite.Types          (DebugLevel (..))
 import           CLaSH.Util
@@ -69,11 +68,10 @@ generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
                           . Supply.freshId
                          <$> Supply.newSupply
 
-      let preppedMap = lambdaDropPrep bindingsMap (fst topEntity)
-          doNorm     = do norm <- normalize [fst topEntity]
+      let doNorm     = do norm <- normalize [fst topEntity]
                           let normChecked = checkNonRecursive (fst topEntity) norm
                           cleanupGraph (fst topEntity) normChecked
-          transformedBindings = runNormalization dbgLevel supplyN preppedMap typeTrans tcm doNorm
+          transformedBindings = runNormalization dbgLevel supplyN bindingsMap typeTrans tcm doNorm
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -94,7 +92,7 @@ generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
                                 netlist
 
       (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
-                                  typeTrans tcm vhdlState preppedMap
+                                  typeTrans tcm vhdlState bindingsMap
                                   (listToMaybe $ map fst $ HashMap.toList testInputs)
                                   (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                   topComponent
