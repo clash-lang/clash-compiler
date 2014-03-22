@@ -109,7 +109,7 @@ needsTyDec Integer        = True
 needsTyDec _              = False
 
 tyDec :: HWType -> VHDLM Doc
-tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (natural range <>) of" <+> vhdlType elTy <> semi
+tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of" <+> vhdlType elTy <> semi
 
 tyDec ty@(Product _ tys) = prodDec
   where
@@ -205,25 +205,23 @@ vhdlType hwty = do
   vhdlType' hwty
 
 vhdlType' :: HWType -> VHDLM Doc
-vhdlType' Bit        = "std_logic"
-vhdlType' Bool       = "boolean"
-vhdlType' (Clock _)  = "std_logic"
-vhdlType' (Reset _)  = "std_logic"
-vhdlType' Integer    = "integer"
-vhdlType' (Signed n) = "signed" <>
-                      parens ( int (n-1) <+> "downto 0")
-vhdlType' (Unsigned n) = "unsigned" <>
-                        parens ( int (n-1) <+> "downto 0")
-vhdlType' (Vector n Bit) = "std_logic_vector" <> parens ( int (n-1) <+> "downto 0")
-vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ( int (n-1) <+> "downto 0")
-vhdlType' t@(SP _ _) = "std_logic_vector" <>
-                      parens ( int (typeSize t - 1) <+>
-                               "downto 0" )
-vhdlType' t@(Sum _ _) = "unsigned" <>
-                        parens ( int (typeSize t -1) <+>
-                                 "downto 0")
+vhdlType' Bit             = "std_logic"
+vhdlType' Bool            = "boolean"
+vhdlType' (Clock _)       = "std_logic"
+vhdlType' (Reset _)       = "std_logic"
+vhdlType' Integer         = "integer"
+vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
+                                      else "signed" <> parens (int (n-1) <+> "downto 0")
+vhdlType' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
+                                      else "unsigned" <> parens ( int (n-1) <+> "downto 0")
+vhdlType' (Vector n Bit)  = "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
+vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens (int (n-1) <+> "downto 0")
+vhdlType' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
+vhdlType' t@(Sum _ _)     = case typeSize t of
+                              0 -> "unsigned (0 downto 1)"
+                              n -> "unsigned" <> parens (int (n -1) <+> "downto 0")
 vhdlType' t@(Product _ _) = tyName t
-vhdlType' Void       = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
 
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
