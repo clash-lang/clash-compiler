@@ -181,12 +181,15 @@ entity c = do
       "end" <> semi
   where
     ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty)
+            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <> optionalDefault ty) -- <+> ":=" <+> vhdlTypeDefault ty)
               | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <+> ":=" <+> vhdlTypeDefault ty)
+              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <> optionalDefault ty) -- <+> ":=" <+> vhdlTypeDefault ty)
               | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c) <+> ":=" <+> vhdlTypeDefault (snd $ output c))
+              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c) <> optionalDefault (snd $ output c)) -- <+> ":=" <+> vhdlTypeDefault (snd $ output c))
               ]
+
+    optionalDefault ty@Integer = " :=" <+> vhdlTypeDefault ty
+    optionalDefault _          = empty
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -279,8 +282,11 @@ decls ds = do
       _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+decl l (NetDecl id_ ty@Integer netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
   "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <+> ":=" <+> maybe (vhdlTypeDefault ty) (expr False) netInit
+
+decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr False e) netInit)
 
 decl _ _ = return Nothing
 
