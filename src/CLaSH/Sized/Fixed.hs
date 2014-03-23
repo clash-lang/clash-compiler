@@ -7,6 +7,9 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
+
+{-# OPTIONS_GHC -fexpose-all-unfoldings #-}
+
 -- | Fixed point numbers
 --
 -- The 'Num' operators for the given types saturate on overflow,
