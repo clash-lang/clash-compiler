@@ -96,4 +96,9 @@ end block;"
     , "templateE" : "~ARG[0] = ~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger#"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
 ]

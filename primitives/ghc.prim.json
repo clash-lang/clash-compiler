@@ -33,4 +33,9 @@
     , "templateE" : "~ARG[0] * ~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<=#"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
 ]
