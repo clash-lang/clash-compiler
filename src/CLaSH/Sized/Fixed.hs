@@ -84,14 +84,19 @@ multFixed (Fixed f1Rep) (Fixed f2Rep) = res
 instance ( Show (rep size), Bits (rep size), KnownNat frac
          , Integral (rep size)
          ) => Show (Fixed frac rep size) where
-  show f@(Fixed fRep) = show i ++ "." ++ (uncurry pad . second (show . numerator) .
+  show f@(Fixed fRep) = i ++ "." ++ (uncurry pad . second (show . numerator) .
                                           fromJust . find ((==1) . denominator . snd) .
                                           iterate (succ *** (*10)) . (,) 0 $ (nom % denom))
     where
       pad n str = replicate (n - length str) '0' ++ str
+
       nF        = fracShift f
-      i         = fRep `shiftR` nF
-      nom       = toInteger fRep .&. ((2 ^ nF) - 1)
+      fRepI     = toInteger fRep
+      fRepI_abs = abs fRepI
+      i         = if fRepI < 0 then '-' : show (fRepI_abs `shiftR` nF)
+                               else show (fRepI `shiftR` nF)
+      nom       = if fRepI < 0 then fRepI_abs .&. ((2 ^ nF) - 1)
+                               else fRepI .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
 
 instance ( Mult (rep size1) (rep size2)
