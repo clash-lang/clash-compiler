@@ -250,7 +250,7 @@ instance KnownNat n => FiniteBits (Signed n) where
 
 {-# NOINLINE finiteBitSizeS #-}
 finiteBitSizeS :: KnownNat n => Signed n -> Int
-finiteBitSizeS i = let res = fromInteger (natVal i) in res
+finiteBitSizeS = fromInteger . natVal
 
 instance Show (Signed n) where
   show (S n) = show n
