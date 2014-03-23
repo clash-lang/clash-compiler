@@ -91,19 +91,19 @@ instance ( Mult (rep size1) (rep size2)
   mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
 
 instance ( Resize rep
-         , Bits (rep (Max size1 size2)), Bits (rep size1), Bits (rep size2)
-         , KnownNat (Max size1 size2), KnownNat size1, KnownNat size2
+         , Bits (rep ((Max size1 size2) + 1)), Bits (rep size1), Bits (rep size2)
+         , KnownNat ((Max size1 size2) + 1), KnownNat size1, KnownNat size2
          , KnownNat (Max frac1 frac2), KnownNat frac1, KnownNat frac2
          , Ord (rep size1), Ord (rep size2)
-         , Num (rep (Max size1 size2)), Num (rep size1), Num (rep size2)
-         , Bounded (rep (Max size1 size2)), Bounded (rep size1), Bounded (rep size2)
+         , Num (rep ((Max size1 size2) + 1)), Num (rep size1), Num (rep size2)
+         , Bounded (rep ((Max size1 size2) + 1)), Bounded (rep size1), Bounded (rep size2)
          ) => Add (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
-  type AResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (Max frac1 frac2) rep (Max size1 size2)
-  plus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
-                   (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
+  type AResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
+  plus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
+                   (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
                in  Fixed (f1R + f2R)
-  minus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
-                    (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
+  minus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
+                    (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
                 in  Fixed (f1R - f2R)
 
 instance ( Num (rep size), MResult (rep size) (rep size) ~ rep (size + size)
