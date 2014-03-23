@@ -13,7 +13,7 @@ module CLaSH.Sized.Fixed
     -- * Unsigned fixed point
   , UFixed, uf, unUF
     -- * Fixed point wrapper
-  , Fixed (..), fracShift
+  , Fixed (..), fracShift, resizeF
     -- * Proxy
   , asFracProxy, asRepProxy
   )
@@ -66,21 +66,6 @@ asRepProxy _ = Proxy
 fracShift :: KnownNat frac => Fixed frac rep size -> Int
 fracShift f = fromInteger (natVal (asFracProxy f))
 
-multFixed :: forall frac rep size .
-             ( MResult (rep size) (rep size) ~ rep (size + size)
-             , Mult (rep size) (rep size) , Bits (rep (size + size))
-             , KnownNat frac , Resize rep , KnownNat size
-             , KnownNat (size + size)
-             )
-          => Fixed frac rep size
-          -> Fixed frac rep size
-          -> Fixed frac rep size
-multFixed (Fixed f1Rep) (Fixed f2Rep) = res
-  where
-    resM = mult f1Rep f2Rep :: rep (size + size)
-    resS = resM `shiftR` (fracShift res)
-    res  = Fixed (resize resS)
-
 instance ( Show (rep size), Bits (rep size), KnownNat frac
          , Integral (rep size)
          ) => Show (Fixed frac rep size) where
@@ -105,20 +90,31 @@ instance ( Mult (rep size1) (rep size2)
   type MResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (frac1 + frac2) rep (size1 + size2)
   mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
 
-instance ( Add (rep size1) (rep size2)
-         , AResult (rep size1) (rep size2) ~ rep (Max size1 size2)
+instance ( Resize rep
+         , Bits (rep (Max size1 size2)), Bits (rep size1), Bits (rep size2)
+         , KnownNat (Max size1 size2), KnownNat size1, KnownNat size2
+         , KnownNat (Max frac1 frac2), KnownNat frac1, KnownNat frac2
+         , Ord (rep size1), Ord (rep size2)
+         , Num (rep (Max size1 size2)), Num (rep size1), Num (rep size2)
+         , Bounded (rep (Max size1 size2)), Bounded (rep size1), Bounded (rep size2)
          ) => Add (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
   type AResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (Max frac1 frac2) rep (Max size1 size2)
-  plus  (Fixed fRep1) (Fixed fRep2) = Fixed (plus fRep1 fRep2)
-  minus (Fixed fRep1) (Fixed fRep2) = Fixed (minus fRep1 fRep2)
+  plus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
+                   (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
+               in  Fixed (f1R + f2R)
+  minus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
+                    (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep (Max size1 size2)
+                in  Fixed (f1R - f2R)
 
 instance ( Num (rep size), MResult (rep size) (rep size) ~ rep (size + size)
          , Bits (rep (size + size)), Mult (rep size) (rep size)
          , Resize rep, KnownNat (size + size), KnownNat size
-         , KnownNat frac, Bits (rep size)
+         , KnownNat frac, Bits (rep size), KnownNat (frac + frac)
+         , Ord (rep (size + size)), Num (rep (size + size))
+         , Bounded (rep (size + size)), Bounded (rep size)
          ) => Num (Fixed frac rep size) where
   (Fixed a) + (Fixed b) = Fixed (a + b)
-  (*)                   = multFixed
+  (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size + size))
   (Fixed a) - (Fixed b) = Fixed (a - b)
   negate (Fixed a)      = Fixed (negate a)
   abs (Fixed a)         = Fixed (abs a)
@@ -126,9 +122,8 @@ instance ( Num (rep size), MResult (rep size) (rep size) ~ rep (size + size)
   fromInteger i         = let res = Fixed (fromInteger i `shiftL` fracShift res)
                           in  res
 
-instance (BitVector (rep size), size ~ BitSize (rep size)) =>
-         BitVector (Fixed frac rep size) where
-  type BitSize (Fixed frac rep size) = size
+instance (BitVector (rep size)) => BitVector (Fixed frac rep size) where
+  type BitSize (Fixed frac rep size) = BitSize (rep size)
   toBV (Fixed fRep) = toBV fRep
   fromBV bv         = Fixed (fromBV bv)
 
@@ -147,3 +142,42 @@ decFixed f r s = do
 
 instance Default (rep size) => Default (Fixed frac rep size) where
   def = Fixed def
+
+instance Bounded (rep size) => Bounded (Fixed frac rep size) where
+  minBound = Fixed minBound
+  maxBound = Fixed maxBound
+
+-- | Saturating resize operation, truncates for rounding
+resizeF :: forall frac1 frac2 rep size1 size2 .
+           ( Bounded (rep size2), Eq (rep size1), Ord (rep size1)
+           , Num (rep size1), Bits (rep size1), Resize rep
+           , KnownNat size2, KnownNat size1, Bits (rep size2)
+           , KnownNat frac2, KnownNat frac1, Bounded (rep size1))
+        => Fixed frac1 rep size1
+        -> Fixed frac2 rep size2
+resizeF (Fixed fRep) = res
+  where
+    argSZ = natVal (Proxy :: Proxy size1)
+    resSZ = natVal (Proxy :: Proxy size2)
+
+    argFracSZ = fromInteger (natVal (Proxy :: Proxy frac1))
+    resFracSZ = fromInteger (natVal (Proxy :: Proxy frac2))
+
+    trunc = if argFracSZ <= resFracSZ
+              then (resize fRep) `shiftL` (resFracSZ - argFracSZ)
+              else (resize fRep) `shiftR` (argFracSZ - resFracSZ)
+
+    sat   = if argSZ <= resSZ
+              then trunc
+              else let fMax = maxBound
+                       fMin = minBound
+                       mask = complement (resize fMax) :: rep size1
+                   in if fRep >= 0
+                         then if (fRep .&. mask) == 0
+                                    then trunc
+                                    else fMax
+                         else if (fRep .&. mask) == mask
+                                    then trunc
+                                    else fMin
+
+    res = Fixed sat
