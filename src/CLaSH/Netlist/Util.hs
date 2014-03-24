@@ -150,7 +150,7 @@ representableType builtInTranslation m = either (const False) (const True) . cor
 -- | Determines the bitsize of a type
 typeSize :: HWType
          -> Int
-typeSize Void = 0
+typeSize Void = 1
 typeSize Bool = 1
 typeSize Bit  = 1
 typeSize (Clock _) = 1
@@ -161,7 +161,7 @@ typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
-typeSize (Sum _ dcs) = ceiling . logBase (2 :: Float) . fromIntegral $ length dcs
+typeSize (Sum _ dcs) = max 1 (ceiling . logBase (2 :: Float) . fromIntegral $ length dcs)
 typeSize (Product _ tys) = sum $ map typeSize tys
 
 -- | Determines the bitsize of the constructor of a type
