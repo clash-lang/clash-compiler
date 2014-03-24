@@ -462,7 +462,9 @@ collectANF ctx e@(Case subj alts) = do
     doAlt' subj' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
       lv      <- isLocalVar altExpr
       patSels <- Monad.zipWithM (doPatBndr subj' (unembed dc)) xs [0..]
-      if lv || isConstant altExpr
+      let usesXs (Var _ n) = any ((== n) . varName) xs
+          usesXs _         = False
+      if (lv && not (usesXs altExpr)) || isConstant altExpr
         then return (patSels,alt)
         else do tcm <- Lens.use tcCache
                 (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
