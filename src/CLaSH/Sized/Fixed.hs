@@ -7,13 +7,23 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
+-- | Fixed point numbers
+--
+-- The 'Num' operators for the given types saturate on overflow,
+-- and use truncation as the rounding method.
+--
+-- BEWARE: rounding by truncation introduces a sign bias!
+--
+-- * Truncation for positive numbers effectively results in: round towards zero
+--
+-- * Truncation for negative numbers effectively results in: round towards -infinity
 module CLaSH.Sized.Fixed
-  ( -- * Signed fixed point
+  ( -- * Signed fixed point numbers
     SFixed, sf, unSF
-    -- * Unsigned fixed point
+    -- * Unsigned fixed point numbers
   , UFixed, uf, unUF
     -- * Fixed point wrapper
-  , Fixed (..), fracShift, resizeF
+  , Fixed (..), fracShift, resizeF, satN2
     -- * Proxy
   , asFracProxy, asRepProxy
   )
@@ -41,22 +51,101 @@ import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector
 
+-- | 'Fixed'-point number
+--
+-- Where:
+--
+-- * @frac@ denotes the position of the virtual @point@ counting from the LSB
+--
+-- * @rep@ is the underlying representation
+--
+-- * @size@ is the number of bits used to represent the number
+--
+-- The 'Num' operators for this type saturate on overflow,
+-- and use truncation as the rounding method.
 newtype Fixed (frac :: Nat) (rep :: Nat -> *) (size :: Nat) = Fixed { unFixed :: rep size }
   deriving (Eq,Ord)
 
-type SFixed int frac = Fixed frac Signed   (int + frac)
+-- | Signed 'Fixed'-point number, with @int@ integer bits (including sign-bit)
+-- and @frac@ fractional bits
+--
+-- The 'Num' operators for this type saturate on overflow,
+-- and use truncation as the rounding method.
+--
+-- > *Main> maxBound :: SFixed 3 4
+-- > 3.9375
+-- > *Main> minBound :: SFixed 3 4
+-- > -4.0
+-- > *Main> (1 :: SFixed 3 4) + (2 :: SFixed 3 4)
+-- > 3.0
+-- > *Main> (2 :: SFixed 3 4) + (3 :: SFixed 3 4)
+-- > 3.9375
+-- > *Main> (-2 :: SFixed 3 4) + (-3 :: SFixed 3 4)
+-- > -4.0
+-- > *Main> (sf d4 22 :: SFixed 3 4) * (sf d4 (-13) :: SFixed 3 4)
+-- > -1.125
+-- > *Main> (sf d4 22 :: SFixed 3 4) `mult` (sf d4 (-13) :: SFixed 3 4) :: SFixed 6 8
+-- > -1.1171875
+-- > *Main> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
+-- > 5.0
+-- > *Main> (-2 :: SFixed 3 4) `plus` (-3 :: SFixed 3 4) :: SFixed 4 4
+-- > -5.0
+type SFixed int frac = Fixed frac Signed (int + frac)
+
+-- | Unsigned 'Fixed'-point number, with @int@ integer bits and @frac@ fractional bits
+--
+-- The 'Num' operators for this type saturate on overflow,
+-- and use truncation as the rounding method.
+--
+-- > *Main> maxBound :: UFixed 3 4
+-- > 7.9375
+-- > *Main> minBound :: UFixed 3 4
+-- > 0.0
+-- > *Main> (1 :: UFixed 3 4) + (2 :: UFixed 3 4)
+-- > 3.0
+-- > *Main> (2 :: UFixed 3 4) + (6 :: UFixed 3 4)
+-- > 7.9375
+-- > *Main> (1 :: UFixed 3 4) - (3 :: UFixed 3 4)
+-- > 0.0
+-- > *Main> (uf d4 22 :: UFixed 3 4) * (uf d4 (13) :: UFixed 3 4)
+-- > 1.0625
+-- > *Main> (uf d4 22 :: UFixed 3 4) `mult` (uf d4 (13) :: UFixed 3 4) :: UFixed 6 8
+-- > 1.1171875
+-- > *Main> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
+-- > 8.0
+--
+-- However, 'minus' does not saturate to 'minBound' on underflow:
+--
+-- > *Main> (1 :: UFixed 3 4) `minus` (3 :: UFixed 3 4) :: UFixed 4 4
+-- > 14.0
 type UFixed int frac = Fixed frac Unsigned (int + frac)
 
-sf :: SNat frac -> Signed (int + frac) -> SFixed int frac
+-- | Treat a 'Signed' integer as a @Signed@ 'Fixed'-@point@ integer
+--
+-- > *Main> sf d4 (-22 :: Signed 7)
+-- > -1.375
+sf :: SNat frac           -- ^ Position of the virtual @point@
+   -> Signed (int + frac) -- ^ The 'Signed' integer
+   -> SFixed int frac
 sf _ fRep = Fixed fRep
 
-unSF :: SFixed int frac -> Signed (int + frac)
+-- | See the underlying representation of a Signed Fixed-point integer
+unSF :: SFixed int frac
+     -> Signed (int + frac)
 unSF (Fixed fRep) = fRep
 
-uf :: SNat frac -> Unsigned (int + frac) -> UFixed int frac
+-- | Treat an 'Unsigned' integer as a @Unsigned@ 'Fixed'-@point@ number
+--
+-- > *Main> uf d4 (92 :: Unsigned 7)
+-- > 5.75
+uf :: SNat frac             -- ^ Position of the virtual @point@
+   -> Unsigned (int + frac) -- ^ The 'Unsigned' integer
+   -> UFixed int frac
 uf _ fRep = Fixed fRep
 
-unUF :: UFixed int frac -> Unsigned (int + frac)
+-- | See the underlying representation of an Unsigned Fixed-point integer
+unUF :: UFixed int frac
+     -> Unsigned (int + frac)
 unUF (Fixed fRep) = fRep
 
 asFracProxy :: Fixed frac rep size -> Proxy frac
@@ -65,6 +154,7 @@ asFracProxy _ = Proxy
 asRepProxy :: Fixed frac rep size -> Proxy rep
 asRepProxy _ = Proxy
 
+-- | Get the position of the virtual @point@ of a 'Fixed'-@point@ number
 fracShift :: KnownNat frac => Fixed frac rep size -> Int
 fracShift f = fromInteger (natVal (asFracProxy f))
 
@@ -111,20 +201,21 @@ instance ( Resize rep
 -- | The operators of this instance saturate on overflow, and use truncation for rounding
 instance ( MResult (rep size1) (rep size1) ~ rep (size1 + size1)
          , Resize rep, Mult (rep size1) (rep size1)
-         , KnownNat frac, KnownNat (size1 + size1), KnownNat size1, KnownNat (size1 + 1)
-         , Bits (rep (size1 + size1)), Bits (rep size1), Bits (rep (size1 + 1)), KnownNat (frac + frac)
+         , KnownNat frac, KnownNat (frac + frac), KnownNat (size1 + size1), KnownNat size1, KnownNat (size1 + 1 + 1)
+         , Bits (rep (size1 + size1)), Bits (rep size1), Bits (rep (size1 + 1 + 1))
          , Ord (rep (size1 + size1)), Num (rep (size1 + size1))
          , Bounded (rep (size1 + size1)), Bounded (rep size1)
-         , BitSize (rep (size1 + 1)) ~ (size1 + 1), BitSize (rep size1) ~ size1
-         , BitVector (rep (size1 + 1)), BitVector (rep size1)
-         , Num (rep size1), Num (rep (size1 + 1))
+         , BitSize (rep (size1 + 1 + 1)) ~ (size1 + 1 + 1), BitSize (rep size1) ~ size1
+         , BitVector (rep (size1 + 1 + 1)), BitVector (rep size1)
+         , Num (rep size1), Num (rep (size1 + 1 + 1))
          , size1 ~ (size + 1)
+         , Show (rep (size1 + size1)), Show (rep size1)
          ) => Num (Fixed frac rep size1) where
-  (Fixed a) + (Fixed b) = Fixed (satN1 (resize a + resize b))
+  (Fixed a) + (Fixed b) = Fixed (satN2 (resize a + resize b))
   (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size1 + size1))
-  (Fixed a) - (Fixed b) = Fixed (satN1 (resize a - resize b))
-  negate (Fixed a)      = Fixed (satN1 (negate (resize a)))
-  abs (Fixed a)         = Fixed (satN1 (abs (resize a)))
+  (Fixed a) - (Fixed b) = Fixed (satN2 (resize a - resize b))
+  negate (Fixed a)      = Fixed (satN2 (negate (resize a)))
+  abs (Fixed a)         = Fixed (satN2 (abs (resize a)))
   signum (Fixed a)      = Fixed (signum a)
   fromInteger i         = let fSH = fromInteger (natVal (Proxy :: Proxy frac))
                               res = Fixed (fromInteger i `shiftL` fSH)
@@ -163,7 +254,7 @@ resizeF :: forall frac1 frac2 rep size1 size2 .
            , KnownNat frac2, KnownNat frac1, Bounded (rep size1))
         => Fixed frac1 rep size1
         -> Fixed frac2 rep size2
-resizeF (Fixed fRep) = res
+resizeF (Fixed fRep) = Fixed sat
   where
     argSZ = natVal (Proxy :: Proxy size1)
     resSZ = natVal (Proxy :: Proxy size2)
@@ -171,45 +262,62 @@ resizeF (Fixed fRep) = res
     argFracSZ = fromInteger (natVal (Proxy :: Proxy frac1))
     resFracSZ = fromInteger (natVal (Proxy :: Proxy frac2))
 
-    trunc = if argFracSZ <= resFracSZ
-              then (resize fRep) `shiftL` (resFracSZ - argFracSZ)
-              else (resize fRep) `shiftR` (argFracSZ - resFracSZ)
+    -- All size and frac comparisons and related if-then-else statements should
+    -- be optimized away by the compiler
+    sat = if argSZ <= resSZ
+            -- if the argument is smaller than the result, resize before shift
+            then if argFracSZ <= resFracSZ
+                    then resize fRep `shiftL` (resFracSZ - argFracSZ)
+                    else resize fRep `shiftR` (argFracSZ - resFracSZ)
+            -- if the argument is bigger than the result, shift before resize
+            else let fMax = maxBound
+                     fMin = minBound
+                     mask = complement (resize fMax) :: rep size1
+                 in if argFracSZ <= resFracSZ
+                      then let shifted = fRep `shiftL` (resFracSZ - argFracSZ)
+                           in if fRep >= 0
+                                 then if (shifted .&. mask) == 0
+                                         then resize shifted
+                                         else fMax
+                                 else if (shifted .&. mask) == mask
+                                         then resize shifted
+                                         else fMin
+                      else let shifted = fRep `shiftR` (argFracSZ - resFracSZ)
+                           in if fRep >= 0
+                                 then if (shifted .&. mask) == 0
+                                         then resize shifted
+                                         else fMax
+                                 else if (shifted .&. mask) == mask
+                                         then resize shifted
+                                         else fMin
 
-    sat   = if argSZ <= resSZ
-              then trunc
-              else let fMax = maxBound
-                       fMin = minBound
-                       mask = complement (resize fMax) :: rep size1
-                   in if fRep >= 0
-                         then if (fRep .&. mask) == 0
-                                    then trunc
-                                    else fMax
-                         else if (fRep .&. mask) == mask
-                                    then trunc
-                                    else fMin
-
-    res = Fixed sat
-
--- | Cheaper saturation when reducing the size of the number by only 1 bit
-satN1 :: ( BitVector (rep (n + 1 + 1)), BitVector (rep (n + 1))
-         , BitSize (rep (n + 1 + 1)) ~ (n + 1 + 1)
+-- | Resize an (N + 2)-bits number to an N-bits number, saturates to
+-- 'minBound' or 'maxBound' when the argument does not fit within
+-- the representations bounds of the result.
+--
+-- Uses cheaper saturation than 'resizeF', made possible by only reducing the
+-- size by 2 bit.
+satN2 :: ( BitVector (rep (n + 1 + 1 + 1)), BitVector (rep (n + 1))
+         , BitSize (rep (n + 1 + 1 + 1)) ~ (n + 1 + 1 + 1)
          , BitSize (rep (n + 1)) ~ (n + 1)
-         , KnownNat (n + 1 + 1), KnownNat (n + 1)
+         , KnownNat (n + 1 + 1 + 1), KnownNat (n + 1)
          , Bounded (rep (n + 1))
-         , Bits (rep (n + 1 + 1))
+         , Bits (rep (n + 1 + 1 + 1))
          )
-      => rep (n + 1 + 1)
-      -> rep (n + 1)
-satN1 rep = if isSigned rep
-              then case (c,sn) of
+      => rep (n + 1 + 1 + 1) -- ^ Number to saturate
+      -> rep (n + 1)         -- ^ Saturated number
+satN2 rep = if isSigned rep
+              then case (cS,sn) of
                      (L,H) -> maxBound
                      (H,L) -> minBound
                      _     -> fromBV s
-              else case c of
-                     H -> maxBound
-                     _ -> fromBV s
+              else case (cS,cU) of
+                     (H,H) -> minBound
+                     (L,H) -> maxBound
+                     _     -> fromBV s
   where
     repBV = toBV rep
-    c     = vhead repBV
-    s     = vtail repBV
+    cS    = vhead repBV
+    cU    = vhead (vtail repBV)
+    s     = vtail (vtail repBV)
     sn    = vhead s
