@@ -426,4 +426,15 @@ end generate;"
     , "templateE" : "~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.vhead'"
+    , "templateD" :
+"~SYM[0]_vhead : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](~SYM[1]'high);
+end block;"
+    }
+  }
 ]
