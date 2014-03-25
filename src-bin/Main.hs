@@ -166,6 +166,8 @@ main = do
                                     , DynFlags.Opt_DataKinds
                                     , DynFlags.Opt_TypeOperators
                                     , DynFlags.Opt_FlexibleContexts
+                                    , DynFlags.Opt_ConstraintKinds
+                                    , DynFlags.Opt_TypeFamilies
                                     ]
 
             case postStartupMode of
