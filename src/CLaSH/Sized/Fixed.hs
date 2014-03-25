@@ -31,6 +31,7 @@ import GHC.TypeLits
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax(Lift(..))
 
+import CLaSH.Bit
 import CLaSH.Class.BitVector
 import CLaSH.Class.Num
 import CLaSH.Promoted.Nat
@@ -38,6 +39,7 @@ import CLaSH.Promoted.Ord
 import CLaSH.Signal
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
+import CLaSH.Sized.Vector
 
 newtype Fixed (frac :: Nat) (rep :: Nat -> *) (size :: Nat) = Fixed { unFixed :: rep size }
   deriving (Eq,Ord)
@@ -106,20 +108,26 @@ instance ( Resize rep
                     (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
                 in  Fixed (f1R - f2R)
 
-instance ( Num (rep size), MResult (rep size) (rep size) ~ rep (size + size)
-         , Bits (rep (size + size)), Mult (rep size) (rep size)
-         , Resize rep, KnownNat (size + size), KnownNat size
-         , KnownNat frac, Bits (rep size), KnownNat (frac + frac)
-         , Ord (rep (size + size)), Num (rep (size + size))
-         , Bounded (rep (size + size)), Bounded (rep size)
-         ) => Num (Fixed frac rep size) where
-  (Fixed a) + (Fixed b) = Fixed (a + b)
-  (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size + size))
-  (Fixed a) - (Fixed b) = Fixed (a - b)
-  negate (Fixed a)      = Fixed (negate a)
-  abs (Fixed a)         = Fixed (abs a)
+-- | The operators of this instance saturate on overflow, and use truncation for rounding
+instance ( MResult (rep size1) (rep size1) ~ rep (size1 + size1)
+         , Resize rep, Mult (rep size1) (rep size1)
+         , KnownNat frac, KnownNat (size1 + size1), KnownNat size1, KnownNat (size1 + 1)
+         , Bits (rep (size1 + size1)), Bits (rep size1), Bits (rep (size1 + 1)), KnownNat (frac + frac)
+         , Ord (rep (size1 + size1)), Num (rep (size1 + size1))
+         , Bounded (rep (size1 + size1)), Bounded (rep size1)
+         , BitSize (rep (size1 + 1)) ~ (size1 + 1), BitSize (rep size1) ~ size1
+         , BitVector (rep (size1 + 1)), BitVector (rep size1)
+         , Num (rep size1), Num (rep (size1 + 1))
+         , size1 ~ (size + 1)
+         ) => Num (Fixed frac rep size1) where
+  (Fixed a) + (Fixed b) = Fixed (satN1 (resize a + resize b))
+  (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size1 + size1))
+  (Fixed a) - (Fixed b) = Fixed (satN1 (resize a - resize b))
+  negate (Fixed a)      = Fixed (satN1 (negate (resize a)))
+  abs (Fixed a)         = Fixed (satN1 (abs (resize a)))
   signum (Fixed a)      = Fixed (signum a)
-  fromInteger i         = let res = Fixed (fromInteger i `shiftL` fracShift res)
+  fromInteger i         = let fSH = fromInteger (natVal (Proxy :: Proxy frac))
+                              res = Fixed (fromInteger i `shiftL` fSH)
                           in  res
 
 instance (BitVector (rep size)) => BitVector (Fixed frac rep size) where
@@ -181,3 +189,27 @@ resizeF (Fixed fRep) = res
                                     else fMin
 
     res = Fixed sat
+
+-- | Cheaper saturation when reducing the size of the number by only 1 bit
+satN1 :: ( BitVector (rep (n + 1 + 1)), BitVector (rep (n + 1))
+         , BitSize (rep (n + 1 + 1)) ~ (n + 1 + 1)
+         , BitSize (rep (n + 1)) ~ (n + 1)
+         , KnownNat (n + 1 + 1), KnownNat (n + 1)
+         , Bounded (rep (n + 1))
+         , Bits (rep (n + 1 + 1))
+         )
+      => rep (n + 1 + 1)
+      -> rep (n + 1)
+satN1 rep = if isSigned rep
+              then case (c,sn) of
+                     (L,H) -> maxBound
+                     (H,L) -> minBound
+                     _     -> fromBV s
+              else case c of
+                     H -> maxBound
+                     _ -> fromBV s
+  where
+    repBV = toBV rep
+    c     = vhead repBV
+    s     = vtail repBV
+    sn    = vhead s
