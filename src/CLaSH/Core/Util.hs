@@ -39,7 +39,7 @@ termType m e = case e of
   App _ _        -> case collectArgs e of
                       (fun, args) -> termType m fun >>=
                                      (flip (applyTypeToArgs m) args)
-  TyApp e' ty    -> termType m e' >>= (`applyTy` ty)
+  TyApp e' ty    -> termType m e' >>= (\f -> applyTy m f ty)
   Letrec b       -> do (_,e') <- unbind b
                        termType m e'
   Case _ (alt:_) -> do (_,e') <- unbind alt
@@ -76,7 +76,7 @@ applyTypeToArgs :: Fresh m
                 -> [Either Term Type]
                 -> m Type
 applyTypeToArgs _ opTy []              = return opTy
-applyTypeToArgs m opTy (Right ty:args) = applyTy opTy ty >>=
+applyTypeToArgs m opTy (Right ty:args) = applyTy m opTy ty >>=
                                           (flip (applyTypeToArgs m) args)
 applyTypeToArgs m opTy (Left e:args)   = case splitFunTy m opTy of
   Just (_,resTy) -> applyTypeToArgs m resTy args

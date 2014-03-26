@@ -291,13 +291,14 @@ applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 -- | Substitute the type variable of a type ('ForAllTy') with another type
 applyTy :: Fresh m
-        => Type
+        => HashMap TyConName TyCon
+        -> Type
         -> KindOrType
         -> m Type
-applyTy (ForAllTy b) arg = do
+applyTy tcm (coreView tcm -> OtherType (ForAllTy b)) arg = do
   (tv,ty) <- unbind b
   return (substTy (varName tv) arg ty)
-applyTy ty arg = error ($(curLoc) ++ "applyTy: not a forall type:\n" ++ show ty ++ "\nArg:\n" ++ show arg)
+applyTy _ ty arg = error ($(curLoc) ++ "applyTy: not a forall type:\n" ++ show ty ++ "\nArg:\n" ++ show arg)
 
 -- | Split a type application in the applied type and the argument types
 splitTyAppM :: Type
