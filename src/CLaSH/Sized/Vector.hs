@@ -10,7 +10,8 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module CLaSH.Sized.Vector
-  ( Vec(..), (<:)
+  ( -- * Standard 'Vec'tor functions
+    Vec(..), (<:)
   , vhead, vtail, vlast, vinit
   , (+>>), (<<+), (<++>), vconcat
   , vsplit, vsplitI, vunconcat, vunconcatI, vmerge
@@ -20,7 +21,9 @@ module CLaSH.Sized.Vector
   , (!), vreplace, maxIndex, vlength
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
-  , toList, v, lazyV, asNatProxy, vhead'
+  , toList, v, lazyV, asNatProxy
+  -- * Alternative 'Vec'tor functions
+  , vhead'
   )
 where
 
@@ -551,7 +554,8 @@ lazyV = lazyV' (vcopyI undefined)
     lazyV' (_ :> xs) ys = vhead ys :> lazyV' xs (vtail ys)
 
 {-# NOINLINE vhead' #-}
--- | Same as 'vhead', but with a @(1 <= n)@ constraint instead of a 'Vec (n + 1) a' argument
+-- | Same as 'vhead', but with a "@(1 <= n)@" constraint and "@Vec n a@" argument,
+-- instead of a "@Vec (n + 1) a@" argument
 vhead' :: (1 <= n)
        => Vec n a
        -> a
