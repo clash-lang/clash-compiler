@@ -20,7 +20,7 @@ module CLaSH.Sized.Vector
   , (!), vreplace, maxIndex, vlength
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
   , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
-  , toList, v, lazyV, asNatProxy
+  , toList, v, lazyV, asNatProxy, vhead'
   )
 where
 
@@ -549,3 +549,10 @@ lazyV = lazyV' (vcopyI undefined)
     lazyV' :: Vec n a -> Vec n a -> Vec n a
     lazyV' Nil       _  = Nil
     lazyV' (_ :> xs) ys = vhead ys :> lazyV' xs (vtail ys)
+
+{-# NOINLINE vhead' #-}
+-- | Same as 'vhead', but with a @(1 <= n)@ constraint instead of a 'Vec (n + 1) a' argument
+vhead' :: (1 <= n)
+       => Vec n a
+       -> a
+vhead' (x :> _) = x

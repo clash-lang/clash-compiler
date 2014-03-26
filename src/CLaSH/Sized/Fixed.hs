@@ -13,8 +13,10 @@
 
 -- | Fixed point numbers
 --
--- The 'Num' operators for the given types saturate on overflow,
--- and use truncation as the rounding method.
+-- * The 'Num' operators for the given types saturate on overflow,
+--   and use truncation as the rounding method.
+--
+-- * Use @$$('fLit' d)@ to create Fixed-point number literals
 --
 -- BEWARE: rounding by truncation introduces a sign bias!
 --
@@ -26,8 +28,10 @@ module CLaSH.Sized.Fixed
     SFixed, sf, unSF
     -- * 'UFixed': Unsigned fixed point numbers
   , UFixed, uf, unUF
+    -- * Fixed point literals
+  , fLit
     -- * Fixed point wrapper
-  , Fixed (..), fracShift, resizeF, satN2
+  , Fixed (..), resizeF, fracShift, satN2
     -- * Easy Constraint synonyms
     -- ** Constraints for 'SFixed' and 'UFixed'
   , NumSFixed, NumUFixed, AddSFixed, AddUFixed, MultSFixed, MultUFixed
@@ -227,11 +231,11 @@ instance AddFixed rep frac1 frac2 size1 size2 => Add (Fixed frac1 rep size1) (Fi
 -- | Constraint for the 'Num' instance of 'Fixed'
 type NumFixed (frac :: Nat) rep (size :: Nat)
   = ( SatN2C   rep size
-    , ResizeFC rep (frac + frac) frac ((size + 1) + (size + 1)) (size + 1)
-    , Num      (rep (size + 1))
-    , Num      (rep (size + 3))
-    , Mult     (rep (size + 1)) (rep (size + 1))
-    , MResult  (rep (size + 1)) (rep (size + 1)) ~ rep ((size + 1) + (size + 1))
+    , ResizeFC rep (frac + frac) frac (size + size) size
+    , Num      (rep size)
+    , Num      (rep (size + 2))
+    , Mult     (rep size) (rep size)
+    , MResult  (rep size) (rep size) ~ rep (size + size)
     )
 
 -- | Constraint for the 'Num' instance of 'SFixed'
@@ -240,9 +244,9 @@ type NumSFixed int frac = NumFixed frac Signed (int + frac)
 type NumUFixed int frac = NumFixed frac Unsigned (int + frac)
 
 -- | The operators of this instance saturate on overflow, and use truncation as the rounding method.
-instance (NumFixed frac rep size, size1 ~ (size + 1)) => Num (Fixed frac rep size1) where
+instance (NumFixed frac rep size) => Num (Fixed frac rep size) where
   (Fixed a) + (Fixed b) = Fixed (satN2 (resize a + resize b))
-  (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size1 + size1))
+  (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size + size))
   (Fixed a) - (Fixed b) = Fixed (satN2 (resize a - resize b))
   negate (Fixed a)      = Fixed (satN2 (negate (resize a)))
   abs (Fixed a)         = Fixed (satN2 (abs (resize a)))
@@ -334,26 +338,27 @@ resizeF (Fixed fRep) = Fixed sat
 
 -- | Constraint for the 'satN2' function
 type SatN2C rep n
-  = ( (((n + 1) + 1) + 1) ~ (n + 3)
-    , BitVector (rep (n + 1))
-    , BitVector (rep (n + 3))
-    , BitSize   (rep (n + 1)) ~ (n + 1)
-    , BitSize   (rep (n + 3)) ~ (n + 3)
-    , KnownNat  (n + 1)
-    , KnownNat  (n + 3)
-    , Bounded   (rep (n + 1))
-    , Bits      (rep (n + 3))
+  = ( 1 <= n
+    , ((n + 1) + 1) ~ (n + 2)
+    , BitVector (rep n)
+    , BitVector (rep (n + 2))
+    , BitSize   (rep n) ~ n
+    , BitSize   (rep (n + 2)) ~ (n + 2)
+    , KnownNat  n
+    , KnownNat  (n + 2)
+    , Bounded   (rep n)
+    , Bits      (rep (n + 2))
     )
 
--- | Resize an (N + 3)-bits number to an (N + 1)-bits number, saturates to
+-- | Resize an (N + 2)-bits number to an N-bits number, saturates to
 -- 'minBound' or 'maxBound' when the argument does not fit within
 -- the representations bounds of the result.
 --
 -- Uses cheaper saturation than 'resizeF', which is made possible by knowing
 -- that we only reduce the size by 2 bits.
 satN2 :: SatN2C rep n
-      => rep (n + 3) -- ^ Number to saturate
-      -> rep (n + 1) -- ^ Saturated number
+      => rep (n + 2)
+      -> rep n
 satN2 rep = if isSigned rep
               then case (cS,sn) of
                      (L,H) -> maxBound
@@ -368,4 +373,36 @@ satN2 rep = if isSigned rep
     cS    = vhead repBV
     cU    = vhead (vtail repBV)
     s     = vtail (vtail repBV)
-    sn    = vhead s
+    sn    = vhead' s
+
+-- | Convert, at compile-time, a 'Double' literal to a 'Fixed'-point literal.
+-- The conversion saturates on overflow, and uses truncation as its rounding method.
+--
+-- So when you type:
+--
+-- > n = $$(fLit 2.2867) :: SFixed 4 4
+--
+-- The compiler sees:
+--
+-- > n = Fixed (fromInteger 45) :: SFixed 4 4
+--
+-- Upon evaluation you see that the value is rounded / truncated in accordance
+-- to the fixed point representation:
+--
+-- > *Main> n
+-- > 2.8125
+fLit :: forall frac rep size .
+        (KnownNat frac, Num (rep size), Bounded (rep size), Integral (rep size))
+     => Double
+     -> Q (TExp (Fixed frac rep size))
+fLit a = [|| Fixed (fromInteger sat) ||]
+  where
+    rMax      = toInteger (maxBound :: rep size)
+    rMin      = toInteger (minBound :: rep size)
+    sat       = if truncated > rMax
+                   then rMax
+                   else if truncated < rMin
+                           then rMin
+                           else truncated
+    truncated = truncate shifted :: Integer
+    shifted   = a * (2 ^ (natVal (Proxy :: Proxy frac)))
