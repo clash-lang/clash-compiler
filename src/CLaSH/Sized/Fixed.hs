@@ -33,12 +33,16 @@ module CLaSH.Sized.Fixed
     -- * Fixed point wrapper
   , Fixed (..), resizeF, fracShift, satN2
     -- * Easy Constraint synonyms
+    -- $constraintsynonyms
     -- ** Constraints for 'SFixed' and 'UFixed'
-  , NumSFixed, NumUFixed, AddSFixed, AddUFixed, MultSFixed, MultUFixed
-  , ResizeSFC, ResizeUFC
+  , NumSFixed, AddSFixed, MultSFixed, ResizeSFC
+    -- ** Constraints for 'UFixed'
+  , NumUFixed, AddUFixed, MultUFixed, ResizeUFC
     -- ** Constraints for 'Fixed' wrapper
   , NumFixed, AddFixed, MultFixed, ResizeFC, SatN2C
-      -- * Proxy
+    -- ** Constraints for 'Signed' and 'Unsigned'
+  , SatN2SC, SatN2UC
+    -- * Proxy
   , asFracProxy, asRepProxy
   )
 where
@@ -190,6 +194,41 @@ instance ( Show (rep size), Bits (rep size), KnownNat frac
                                else fRepI .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
 
+{- $constraintsynonyms
+Writing polymorphic functions over fixed point numbers can be a potentially
+verbose due to the many class constraints induced by the functions and operators
+of this module.
+
+Writing a simple multiply-and-accumulate function can already give rise to many
+lines of constraints:
+
+@
+mac :: ( 1 <= (int + frac), (((int + frac) + 1) + 1) ~ ((int + frac) + 2)
+       , KnownNat (frac + frac), KnownNat ((int + frac) + (int + frac))
+       , KnownNat ((int + frac) + 2), KnownNat (int + frac), KnownNat frac
+       )
+    => SFixed int frac
+    -> SFixed int frac
+    -> SFixed int frac
+    -> SFixed int frac
+mac s x y = s + (x * y)
+@
+
+But with constraint synonyms, you can write the type signature like this:
+
+@
+mac :: NumSFixed int frac
+    => SFixed int frac
+    -> SFixed int frac
+    -> SFixed int frac
+    -> SFixed int frac
+mac s x y = s + (x * y)
+@
+
+Where 'NumSFixed' refers to the @Constraints@ needed by the operators of
+the 'Num' class for the 'SFixed' datatype.
+-}
+
 -- | Constraint for the 'Mult' instance of 'Fixed'
 type MultFixed rep (frac1 :: Nat) (frac2 :: Nat) (size1 :: Nat) (size2 :: Nat)
   = ( Mult    (rep size1) (rep size2)
@@ -239,9 +278,15 @@ type NumFixed (frac :: Nat) rep (size :: Nat)
     )
 
 -- | Constraint for the 'Num' instance of 'SFixed'
-type NumSFixed int frac = NumFixed frac Signed (int + frac)
+type NumSFixed int frac = ( 1 <= (int + frac), (((int + frac) + 1) + 1) ~ ((int + frac) + 2)
+                          , KnownNat (frac + frac), KnownNat ((int + frac) + (int + frac))
+                          , KnownNat ((int + frac) + 2), KnownNat (int + frac), KnownNat frac
+                          )
 -- | Constraint for the 'Num' instance of 'UFixed'
-type NumUFixed int frac = NumFixed frac Unsigned (int + frac)
+type NumUFixed int frac = ( 1 <= (int + frac), (((int + frac) + 1) + 1) ~ ((int + frac) + 2)
+                          , KnownNat (frac + frac), KnownNat ((int + frac) + (int + frac))
+                          , KnownNat ((int + frac) + 2), KnownNat (int + frac), KnownNat frac
+                          )
 
 -- | The operators of this instance saturate on overflow, and use truncation as the rounding method.
 instance (NumFixed frac rep size) => Num (Fixed frac rep size) where
@@ -288,11 +333,11 @@ type ResizeFC rep frac1 frac2 size1 size2
     , KnownNat frac2, KnownNat frac1, Bounded (rep size1)
     )
 
--- | Constraint for the 'resizeF' function, specialized for SFixed
-type ResizeSFC int1 frac1 int2 frac2 = ResizeFC Signed frac1 frac2 (int1 + frac1) (int2 + frac2)
+-- | Constraint for the 'resizeF' function, specialized for 'SFixed'
+type ResizeSFC int1 frac1 int2 frac2 = (KnownNat (int2 + frac2), KnownNat (int1 + frac1), KnownNat frac1, KnownNat frac2)
 
--- | Constraint for the 'resizeF' function, specialized for UFixed
-type ResizeUFC int1 frac1 int2 frac2 = ResizeFC Unsigned frac1 frac2 (int1 + frac1) (int2 + frac2)
+-- | Constraint for the 'resizeF' function, specialized for 'UFixed'
+type ResizeUFC int1 frac1 int2 frac2 = (KnownNat (int2 + frac2), KnownNat (int1 + frac1), KnownNat frac1, KnownNat frac2)
 
 -- | Saturating resize operation, truncates for rounding
 resizeF :: forall frac1 frac2 rep size1 size2 .
@@ -349,6 +394,12 @@ type SatN2C rep n
     , Bounded   (rep n)
     , Bits      (rep (n + 2))
     )
+
+-- | Constraint for the 'satN2' function, specialized for 'Signed'
+type SatN2SC n = (1 <= n, ((n + 1) + 1) ~ (n + 2), KnownNat n, KnownNat (n + 2))
+
+-- | Constraint for the 'satN2' function, specialized for 'Unsigned'
+type SatN2UC n = (1 <= n, ((n + 1) + 1) ~ (n + 2), KnownNat n, KnownNat (n + 2))
 
 -- | Resize an (N + 2)-bits number to an N-bits number, saturates to
 -- 'minBound' or 'maxBound' when the argument does not fit within
