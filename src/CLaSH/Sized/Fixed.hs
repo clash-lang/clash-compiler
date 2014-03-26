@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fexpose-all-unfoldings #-}
+{-# OPTIONS_GHC -fexpose-all-unfoldings -O0 -fno-omit-interface-pragmas #-}
 
 -- | Fixed point numbers
 --
