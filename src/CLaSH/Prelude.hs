@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS_GHC -O0 -fno-omit-interface-pragmas #-}
@@ -159,7 +158,7 @@ blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = blockRamPow2 d32
 blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a)
-             => SNat ((2^n) :: Nat) -- ^ Size @2^n@ of the blockram
+             => SNat (2^n)          -- ^ Size @2^n@ of the blockram
              -> Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
              -> Signal Bool         -- ^ Write enable
@@ -172,7 +171,7 @@ blockRamPow2 = blockRam
 -- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, a) a
 -- > bramC32 = blockRamPow2C d32
 blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a)
-              => SNat ((2^n) :: Nat) -- ^ Size @2^n@ of the blockram
+              => SNat (2^n) -- ^ Size @2^n@ of the blockram
               -> Comp (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
 
