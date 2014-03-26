@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
@@ -21,13 +22,19 @@
 --
 -- * Truncation for negative numbers effectively results in: round towards -infinity
 module CLaSH.Sized.Fixed
-  ( -- * Signed fixed point numbers
+  ( -- * 'SFixed': Signed fixed point numbers
     SFixed, sf, unSF
-    -- * Unsigned fixed point numbers
+    -- * 'UFixed': Unsigned fixed point numbers
   , UFixed, uf, unUF
     -- * Fixed point wrapper
   , Fixed (..), fracShift, resizeF, satN2
-    -- * Proxy
+    -- * Easy Constraint synonyms
+    -- ** Constraints for 'SFixed' and 'UFixed'
+  , NumSFixed, NumUFixed, AddSFixed, AddUFixed, MultSFixed, MultUFixed
+  , ResizeSFC, ResizeUFC
+    -- ** Constraints for 'Fixed' wrapper
+  , NumFixed, AddFixed, MultFixed, ResizeFC, SatN2C
+      -- * Proxy
   , asFracProxy, asRepProxy
   )
 where
@@ -179,41 +186,61 @@ instance ( Show (rep size), Bits (rep size), KnownNat frac
                                else fRepI .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
 
-instance ( Mult (rep size1) (rep size2)
-         , MResult (rep size1) (rep size2) ~ rep (size1 + size2)
-         ) => Mult (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
+-- | Constraint for the 'Mult' instance of 'Fixed'
+type MultFixed rep (frac1 :: Nat) (frac2 :: Nat) (size1 :: Nat) (size2 :: Nat)
+  = ( Mult    (rep size1) (rep size2)
+    , MResult (rep size1) (rep size2) ~ rep (size1 + size2)
+    )
+
+-- | Constraint for the 'Mult' instance of 'SFixed'
+type MultSFixed int1 frac1 int2 frac2 = MultFixed Signed frac1 frac2 (int1 + frac1) (int2 + frac2)
+
+-- | Constraint for the 'Mult' instance of 'UFixed'
+type MultUFixed int1 frac1 int2 frac2 = MultFixed Unsigned frac1 frac2 (int1 + frac1) (int2 + frac2)
+
+instance MultFixed rep frac1 frac2 size1 size2 => Mult (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
   type MResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (frac1 + frac2) rep (size1 + size2)
   mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
 
-instance ( Resize rep
-         , Bits (rep ((Max size1 size2) + 1)), Bits (rep size1), Bits (rep size2)
-         , KnownNat ((Max size1 size2) + 1), KnownNat size1, KnownNat size2
-         , KnownNat (Max frac1 frac2), KnownNat frac1, KnownNat frac2
-         , Ord (rep size1), Ord (rep size2)
-         , Num (rep ((Max size1 size2) + 1)), Num (rep size1), Num (rep size2)
-         , Bounded (rep ((Max size1 size2) + 1)), Bounded (rep size1), Bounded (rep size2)
-         ) => Add (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
+-- | Constraint for the 'Add' instance of 'Fixed'
+type AddFixed rep (frac1 :: Nat) (frac2 :: Nat) (size1 :: Nat) (size2 :: Nat)
+  = ( ResizeFC rep frac1 (Max frac1 frac2) size1 ((Max size1 size2) + 1)
+    , ResizeFC rep frac2 (Max frac1 frac2) size2 ((Max size1 size2) + 1)
+    , Num (rep (Max size1 size2 + 1))
+    )
+
+-- | Constraint for the 'Add' instance of 'SFixed'
+type AddSFixed int1 frac1 int2 frac2 = AddFixed Signed frac1 frac2 (int1 + frac1) (int2 + frac2)
+
+-- | Constraint for the 'Add' instance of 'UFixed'
+type AddUFixed int1 frac1 int2 frac2 = AddFixed Unsigned frac1 frac2 (int1 + frac1) (int2 + frac2)
+
+instance AddFixed rep frac1 frac2 size1 size2 => Add (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
   type AResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
-  plus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
-                   (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
-               in  Fixed (f1R + f2R)
+  plus f1 f2  = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
+                    (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
+                in  Fixed (f1R + f2R)
   minus f1 f2 = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
                     (Fixed f2R) = resizeF f2 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
                 in  Fixed (f1R - f2R)
 
--- | The operators of this instance saturate on overflow, and use truncation for rounding
-instance ( MResult (rep size1) (rep size1) ~ rep (size1 + size1)
-         , Resize rep, Mult (rep size1) (rep size1)
-         , KnownNat frac, KnownNat (frac + frac), KnownNat (size1 + size1), KnownNat size1, KnownNat (size1 + 1 + 1)
-         , Bits (rep (size1 + size1)), Bits (rep size1), Bits (rep (size1 + 1 + 1))
-         , Ord (rep (size1 + size1)), Num (rep (size1 + size1))
-         , Bounded (rep (size1 + size1)), Bounded (rep size1)
-         , BitSize (rep (size1 + 1 + 1)) ~ (size1 + 1 + 1), BitSize (rep size1) ~ size1
-         , BitVector (rep (size1 + 1 + 1)), BitVector (rep size1)
-         , Num (rep size1), Num (rep (size1 + 1 + 1))
-         , size1 ~ (size + 1)
-         , Show (rep (size1 + size1)), Show (rep size1)
-         ) => Num (Fixed frac rep size1) where
+-- | Constraint for the 'Num' instance of 'Fixed'
+type NumFixed (frac :: Nat) rep (size :: Nat)
+  = ( SatN2C   rep size
+    , ResizeFC rep (frac + frac) frac ((size + 1) + (size + 1)) (size + 1)
+    , Num      (rep (size + 1))
+    , Num      (rep (size + 3))
+    , Mult     (rep (size + 1)) (rep (size + 1))
+    , MResult  (rep (size + 1)) (rep (size + 1)) ~ rep ((size + 1) + (size + 1))
+    )
+
+-- | Constraint for the 'Num' instance of 'SFixed'
+type NumSFixed int frac = NumFixed frac Signed (int + frac)
+-- | Constraint for the 'Num' instance of 'UFixed'
+type NumUFixed int frac = NumFixed frac Unsigned (int + frac)
+
+-- | The operators of this instance saturate on overflow, and use truncation as the rounding method.
+instance (NumFixed frac rep size, size1 ~ (size + 1)) => Num (Fixed frac rep size1) where
   (Fixed a) + (Fixed b) = Fixed (satN2 (resize a + resize b))
   (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size1 + size1))
   (Fixed a) - (Fixed b) = Fixed (satN2 (resize a - resize b))
@@ -249,12 +276,23 @@ instance Bounded (rep size) => Bounded (Fixed frac rep size) where
   minBound = Fixed minBound
   maxBound = Fixed maxBound
 
+-- | Constraint for the 'resizeF' function
+type ResizeFC rep frac1 frac2 size1 size2
+  = ( Bounded (rep size2), Eq (rep size1), Ord (rep size1)
+    , Num (rep size1), Bits (rep size1), Resize rep
+    , KnownNat size2, KnownNat size1, Bits (rep size2)
+    , KnownNat frac2, KnownNat frac1, Bounded (rep size1)
+    )
+
+-- | Constraint for the 'resizeF' function, specialized for SFixed
+type ResizeSFC int1 frac1 int2 frac2 = ResizeFC Signed frac1 frac2 (int1 + frac1) (int2 + frac2)
+
+-- | Constraint for the 'resizeF' function, specialized for UFixed
+type ResizeUFC int1 frac1 int2 frac2 = ResizeFC Unsigned frac1 frac2 (int1 + frac1) (int2 + frac2)
+
 -- | Saturating resize operation, truncates for rounding
 resizeF :: forall frac1 frac2 rep size1 size2 .
-           ( Bounded (rep size2), Eq (rep size1), Ord (rep size1)
-           , Num (rep size1), Bits (rep size1), Resize rep
-           , KnownNat size2, KnownNat size1, Bits (rep size2)
-           , KnownNat frac2, KnownNat frac1, Bounded (rep size1))
+           ResizeFC rep frac1 frac2 size1 size2
         => Fixed frac1 rep size1
         -> Fixed frac2 rep size2
 resizeF (Fixed fRep) = Fixed sat
@@ -294,21 +332,28 @@ resizeF (Fixed fRep) = Fixed sat
                                          then resize shifted
                                          else fMin
 
--- | Resize an (N + 2)-bits number to an N-bits number, saturates to
+-- | Constraint for the 'satN2' function
+type SatN2C rep n
+  = ( (((n + 1) + 1) + 1) ~ (n + 3)
+    , BitVector (rep (n + 1))
+    , BitVector (rep (n + 3))
+    , BitSize   (rep (n + 1)) ~ (n + 1)
+    , BitSize   (rep (n + 3)) ~ (n + 3)
+    , KnownNat  (n + 1)
+    , KnownNat  (n + 3)
+    , Bounded   (rep (n + 1))
+    , Bits      (rep (n + 3))
+    )
+
+-- | Resize an (N + 3)-bits number to an (N + 1)-bits number, saturates to
 -- 'minBound' or 'maxBound' when the argument does not fit within
 -- the representations bounds of the result.
 --
--- Uses cheaper saturation than 'resizeF', made possible by only reducing the
--- size by 2 bit.
-satN2 :: ( BitVector (rep (n + 1 + 1 + 1)), BitVector (rep (n + 1))
-         , BitSize (rep (n + 1 + 1 + 1)) ~ (n + 1 + 1 + 1)
-         , BitSize (rep (n + 1)) ~ (n + 1)
-         , KnownNat (n + 1 + 1 + 1), KnownNat (n + 1)
-         , Bounded (rep (n + 1))
-         , Bits (rep (n + 1 + 1 + 1))
-         )
-      => rep (n + 1 + 1 + 1) -- ^ Number to saturate
-      -> rep (n + 1)         -- ^ Saturated number
+-- Uses cheaper saturation than 'resizeF', which is made possible by knowing
+-- that we only reduce the size by 2 bits.
+satN2 :: SatN2C rep n
+      => rep (n + 3) -- ^ Number to saturate
+      -> rep (n + 1) -- ^ Saturated number
 satN2 rep = if isSigned rep
               then case (cS,sn) of
                      (L,H) -> maxBound
