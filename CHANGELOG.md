@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.4.1 *March 27th 2014*
+  * Add saturation to fixed-point operators
+  * Finalize most documentation
+
 ## 0.4 *March 20th 2014*
   * Add fixed-point integers
   * Extend documentation
