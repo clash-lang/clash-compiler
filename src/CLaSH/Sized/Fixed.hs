@@ -17,7 +17,7 @@
 --   and use truncation as the rounding method.
 --
 -- * Use @$$('fLit' d)@ to create 'Fixed' point number literals.
--- * Use <#constraintsynonyms Constrain synonyms> when writing type signatures
+-- * Use <#constraintsynonyms Constraint synonyms> when writing type signatures
 --   for polymorphic functions that use 'Fixed' point numbers.
 --
 -- BEWARE: rounding by truncation introduces a sign bias!
