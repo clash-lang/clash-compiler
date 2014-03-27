@@ -36,13 +36,13 @@ module CLaSH.Sized.Fixed
     -- * Constraint synonyms
     -- $constraintsynonyms
 
-    -- ** Constraints synonyms for 'SFixed'
+    -- ** Constraint synonyms for 'SFixed'
   , NumSFixed, AddSFixed, MultSFixed, ResizeSFC
-    -- ** Constraints synonyms for 'UFixed'
+    -- ** Constraint synonyms for 'UFixed'
   , NumUFixed, AddUFixed, MultUFixed, ResizeUFC
-    -- ** Constraints synonyms for 'Fixed' wrapper
+    -- ** Constraint synonyms for 'Fixed' wrapper
   , NumFixed, AddFixed, MultFixed, ResizeFC, SatN2C
-    -- ** Constraints synonyms for 'Signed' and 'Unsigned'
+    -- ** Constraint synonyms for 'Signed' and 'Unsigned'
   , SatN2SC, SatN2UC
     -- * Proxy
   , asFracProxy, asRepProxy
@@ -104,9 +104,9 @@ newtype Fixed (frac :: Nat) (rep :: Nat -> *) (size :: Nat) = Fixed { unFixed ::
 -- 3.9375
 -- >>> (-2 :: SFixed 3 4) + (-3 :: SFixed 3 4)
 -- -4.0
--- >>> (sf d4 22 :: SFixed 3 4) * (sf d4 (-13) :: SFixed 3 4)
+-- >>> ($$(fLit 1.375) :: SFixed 3 4) * ($$(fLit -0.8125) :: SFixed 3 4)
 -- -1.125
--- >>> (sf d4 22 :: SFixed 3 4) `mult` (sf d4 (-13) :: SFixed 3 4) :: SFixed 6 8
+-- >>> ($$(fLit 1.375) :: SFixed 3 4) `mult` ($$(fLit -0.8125) :: SFixed 3 4) :: SFixed 6 8
 -- -1.1171875
 -- >>> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
 -- 5.0
@@ -131,9 +131,9 @@ type SFixed int frac = Fixed frac Signed (int + frac)
 -- 7.9375
 -- >>> (1 :: UFixed 3 4) - (3 :: UFixed 3 4)
 -- 0.0
--- >>> (uf d4 22 :: UFixed 3 4) * (uf d4 (13) :: UFixed 3 4)
+-- >>> ($$(fLit 1.375) :: UFixed 3 4) * ($$(fLit 0.8125) :: UFixed 3 4)
 -- 1.0625
--- >>> (uf d4 22 :: UFixed 3 4) `mult` (uf d4 (13) :: UFixed 3 4) :: UFixed 6 8
+-- >>> ($$(fLit 1.375) :: UFixed 3 4) `mult` ($$(fLit 0.8125) :: UFixed 3 4) :: UFixed 6 8
 -- 1.1171875
 -- >>> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
 -- 8.0
