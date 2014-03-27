@@ -16,31 +16,33 @@
 -- * The 'Num' operators for the given types saturate on overflow,
 --   and use truncation as the rounding method.
 --
--- * Use @$$('fLit' d)@ to create Fixed-point number literals
+-- * Use @$$('fLit' d)@ to create 'Fixed' point number literals.
+-- * Use <#constraintsynonyms Constrain synonyms> when writing type signatures
+--   for polymorphic functions that use 'Fixed' point numbers.
 --
 -- BEWARE: rounding by truncation introduces a sign bias!
 --
--- * Truncation for positive numbers effectively results in: round towards zero
---
--- * Truncation for negative numbers effectively results in: round towards -infinity
+-- * Truncation for positive numbers effectively results in: round towards zero.
+-- * Truncation for negative numbers effectively results in: round towards -infinity.
 module CLaSH.Sized.Fixed
-  ( -- * 'SFixed': Signed fixed point numbers
+  ( -- * 'SFixed': 'Signed' 'Fixed' point numbers
     SFixed, sf, unSF
-    -- * 'UFixed': Unsigned fixed point numbers
+    -- * 'UFixed': 'Unsigned' 'Fixed' point numbers
   , UFixed, uf, unUF
-    -- * Fixed point literals
+    -- * 'Fixed' point literals
   , fLit
-    -- * Fixed point wrapper
+    -- * 'Fixed' point wrapper
   , Fixed (..), resizeF, fracShift, satN2
-    -- * Easy Constraint synonyms
+    -- * Constraint synonyms
     -- $constraintsynonyms
-    -- ** Constraints for 'SFixed' and 'UFixed'
+
+    -- ** Constraints synonyms for 'SFixed'
   , NumSFixed, AddSFixed, MultSFixed, ResizeSFC
-    -- ** Constraints for 'UFixed'
+    -- ** Constraints synonyms for 'UFixed'
   , NumUFixed, AddUFixed, MultUFixed, ResizeUFC
-    -- ** Constraints for 'Fixed' wrapper
+    -- ** Constraints synonyms for 'Fixed' wrapper
   , NumFixed, AddFixed, MultFixed, ResizeFC, SatN2C
-    -- ** Constraints for 'Signed' and 'Unsigned'
+    -- ** Constraints synonyms for 'Signed' and 'Unsigned'
   , SatN2SC, SatN2UC
     -- * Proxy
   , asFracProxy, asRepProxy
@@ -85,63 +87,67 @@ newtype Fixed (frac :: Nat) (rep :: Nat -> *) (size :: Nat) = Fixed { unFixed ::
   deriving (Eq,Ord)
 
 -- | Signed 'Fixed'-point number, with @int@ integer bits (including sign-bit)
--- and @frac@ fractional bits
+-- and @frac@ fractional bits.
 --
--- The 'Num' operators for this type saturate on overflow,
--- and use truncation as the rounding method.
+-- * The range 'SFixed' @int@ @frac@ numbers is: [-(2^(@int@ -1)) .. 2^(@int@-1) - 2^-@frac@ ]
+-- * The resolution of 'SFixed' @int@ @frac@ numbers is: 2^@frac@
+-- * The 'Num' operators for this type saturate on overflow,
+--   and use truncation as the rounding method.
 --
--- > *Main> maxBound :: SFixed 3 4
--- > 3.9375
--- > *Main> minBound :: SFixed 3 4
--- > -4.0
--- > *Main> (1 :: SFixed 3 4) + (2 :: SFixed 3 4)
--- > 3.0
--- > *Main> (2 :: SFixed 3 4) + (3 :: SFixed 3 4)
--- > 3.9375
--- > *Main> (-2 :: SFixed 3 4) + (-3 :: SFixed 3 4)
--- > -4.0
--- > *Main> (sf d4 22 :: SFixed 3 4) * (sf d4 (-13) :: SFixed 3 4)
--- > -1.125
--- > *Main> (sf d4 22 :: SFixed 3 4) `mult` (sf d4 (-13) :: SFixed 3 4) :: SFixed 6 8
--- > -1.1171875
--- > *Main> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
--- > 5.0
--- > *Main> (-2 :: SFixed 3 4) `plus` (-3 :: SFixed 3 4) :: SFixed 4 4
--- > -5.0
+-- >>>  maxBound :: SFixed 3 4
+-- 3.9375
+-- >>> minBound :: SFixed 3 4
+-- -4.0
+-- >>> (1 :: SFixed 3 4) + (2 :: SFixed 3 4)
+-- 3.0
+-- >>> (2 :: SFixed 3 4) + (3 :: SFixed 3 4)
+-- 3.9375
+-- >>> (-2 :: SFixed 3 4) + (-3 :: SFixed 3 4)
+-- -4.0
+-- >>> (sf d4 22 :: SFixed 3 4) * (sf d4 (-13) :: SFixed 3 4)
+-- -1.125
+-- >>> (sf d4 22 :: SFixed 3 4) `mult` (sf d4 (-13) :: SFixed 3 4) :: SFixed 6 8
+-- -1.1171875
+-- >>> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
+-- 5.0
+-- >>> (-2 :: SFixed 3 4) `plus` (-3 :: SFixed 3 4) :: SFixed 4 4
+-- -5.0
 type SFixed int frac = Fixed frac Signed (int + frac)
 
 -- | Unsigned 'Fixed'-point number, with @int@ integer bits and @frac@ fractional bits
 --
--- The 'Num' operators for this type saturate on overflow,
--- and use truncation as the rounding method.
+-- * The range 'UFixed' @int@ @frac@ numbers is: [0 .. 2^@int@ - 2^-@frac@ ]
+-- * The resolution of 'UFixed' @int@ @frac@ numbers is: 2^@frac@
+-- * The 'Num' operators for this type saturate on overflow,
+--   and use truncation as the rounding method.
 --
--- > *Main> maxBound :: UFixed 3 4
--- > 7.9375
--- > *Main> minBound :: UFixed 3 4
--- > 0.0
--- > *Main> (1 :: UFixed 3 4) + (2 :: UFixed 3 4)
--- > 3.0
--- > *Main> (2 :: UFixed 3 4) + (6 :: UFixed 3 4)
--- > 7.9375
--- > *Main> (1 :: UFixed 3 4) - (3 :: UFixed 3 4)
--- > 0.0
--- > *Main> (uf d4 22 :: UFixed 3 4) * (uf d4 (13) :: UFixed 3 4)
--- > 1.0625
--- > *Main> (uf d4 22 :: UFixed 3 4) `mult` (uf d4 (13) :: UFixed 3 4) :: UFixed 6 8
--- > 1.1171875
--- > *Main> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
--- > 8.0
+-- >>> maxBound :: UFixed 3 4
+-- 7.9375
+-- >>> minBound :: UFixed 3 4
+-- 0.0
+-- >>> (1 :: UFixed 3 4) + (2 :: UFixed 3 4)
+-- 3.0
+-- >>> (2 :: UFixed 3 4) + (6 :: UFixed 3 4)
+-- 7.9375
+-- >>> (1 :: UFixed 3 4) - (3 :: UFixed 3 4)
+-- 0.0
+-- >>> (uf d4 22 :: UFixed 3 4) * (uf d4 (13) :: UFixed 3 4)
+-- 1.0625
+-- >>> (uf d4 22 :: UFixed 3 4) `mult` (uf d4 (13) :: UFixed 3 4) :: UFixed 6 8
+-- 1.1171875
+-- >>> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
+-- 8.0
 --
 -- However, 'minus' does not saturate to 'minBound' on underflow:
 --
--- > *Main> (1 :: UFixed 3 4) `minus` (3 :: UFixed 3 4) :: UFixed 4 4
--- > 14.0
+-- >>> (1 :: UFixed 3 4) `minus` (3 :: UFixed 3 4) :: UFixed 4 4
+-- 14.0
 type UFixed int frac = Fixed frac Unsigned (int + frac)
 
 -- | Treat a 'Signed' integer as a @Signed@ 'Fixed'-@point@ integer
 --
--- > *Main> sf d4 (-22 :: Signed 7)
--- > -1.375
+-- >>> sf d4 (-22 :: Signed 7)
+-- -1.375
 sf :: SNat frac           -- ^ Position of the virtual @point@
    -> Signed (int + frac) -- ^ The 'Signed' integer
    -> SFixed int frac
@@ -154,8 +160,8 @@ unSF (Fixed fRep) = fRep
 
 -- | Treat an 'Unsigned' integer as a @Unsigned@ 'Fixed'-@point@ number
 --
--- > *Main> uf d4 (92 :: Unsigned 7)
--- > 5.75
+-- >>> uf d4 (92 :: Unsigned 7)
+-- 5.75
 uf :: SNat frac             -- ^ Position of the virtual @point@
    -> Unsigned (int + frac) -- ^ The 'Unsigned' integer
    -> UFixed int frac
@@ -194,7 +200,7 @@ instance ( Show (rep size), Bits (rep size), KnownNat frac
                                else fRepI .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
 
-{- $constraintsynonyms
+{- $constraintsynonyms #constraintsynonyms#
 Writing polymorphic functions over fixed point numbers can be a potentially
 verbose due to the many class constraints induced by the functions and operators
 of this module.
@@ -241,6 +247,12 @@ type MultSFixed int1 frac1 int2 frac2 = MultFixed Signed frac1 frac2 (int1 + fra
 -- | Constraint for the 'Mult' instance of 'UFixed'
 type MultUFixed int1 frac1 int2 frac2 = MultFixed Unsigned frac1 frac2 (int1 + frac1) (int2 + frac2)
 
+-- | When used in a polymorphic setting, use the following <CLaSH-Sized-Fixed.html#constraintsynonyms Constraint synonyms>
+-- for less verbose type signatures:
+--
+-- * @'MultFixed' rep frac1 frac2 size1 size2@ for: 'Fixed'
+-- * @'MultSFixed' int1 frac1 int2 frac2@      for: 'SFixed'
+-- * @'MultUFixed' int1 frac1 int2 frac2@      for: 'UFixed'
 instance MultFixed rep frac1 frac2 size1 size2 => Mult (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
   type MResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (frac1 + frac2) rep (size1 + size2)
   mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
@@ -258,6 +270,12 @@ type AddSFixed int1 frac1 int2 frac2 = AddFixed Signed frac1 frac2 (int1 + frac1
 -- | Constraint for the 'Add' instance of 'UFixed'
 type AddUFixed int1 frac1 int2 frac2 = AddFixed Unsigned frac1 frac2 (int1 + frac1) (int2 + frac2)
 
+-- | When used in a polymorphic setting, use the following <CLaSH-Sized-Fixed.html#constraintsynonyms Constraint synonyms>
+-- for less verbose type signatures:
+--
+-- * @'AddFixed'  rep frac1 frac2 size1 size2@ for: 'Fixed'
+-- * @'AddSFixed' int1 frac1 int2 frac2@       for: 'SFixed'
+-- * @'AddUFixed' int1 frac1 int2 frac2@       for: 'UFixed'
 instance AddFixed rep frac1 frac2 size1 size2 => Add (Fixed frac1 rep size1) (Fixed frac2 rep size2) where
   type AResult (Fixed frac1 rep size1) (Fixed frac2 rep size2) = Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
   plus f1 f2  = let (Fixed f1R) = resizeF f1 :: Fixed (Max frac1 frac2) rep ((Max size1 size2) + 1)
@@ -289,6 +307,13 @@ type NumUFixed int frac = ( 1 <= (int + frac), (((int + frac) + 1) + 1) ~ ((int 
                           )
 
 -- | The operators of this instance saturate on overflow, and use truncation as the rounding method.
+--
+-- When used in a polymorphic setting, use the following <CLaSH-Sized-Fixed.html#constraintsynonyms Constraint synonyms>
+-- for less verbose type signatures:
+--
+-- * @'NumFixed' frac rep size@ for: @'Fixed' frac rep size@
+-- * @'NumSFixed' int frac@     for: @'SFixed' int frac@
+-- * @'NumUFixed' int frac@     for: @'UFixed' int frac@
 instance (NumFixed frac rep size) => Num (Fixed frac rep size) where
   (Fixed a) + (Fixed b) = Fixed (satN2 (resize a + resize b))
   (Fixed a) * (Fixed b) = resizeF (Fixed (a `mult` b) :: Fixed (frac + frac) rep (size + size))
@@ -340,6 +365,24 @@ type ResizeSFC int1 frac1 int2 frac2 = (KnownNat (int2 + frac2), KnownNat (int1 
 type ResizeUFC int1 frac1 int2 frac2 = (KnownNat (int2 + frac2), KnownNat (int1 + frac1), KnownNat frac1, KnownNat frac2)
 
 -- | Saturating resize operation, truncates for rounding
+--
+-- >>> $$(fLit 0.8125) :: SFixed 3 4
+-- 0.8125
+-- >>> resizeF ($$(fLit 0.8125) :: SFixed 3 4) :: SFixed 2 3
+-- 0.75
+-- >>> $$(fLit 3.4) :: SFixed 3 4
+-- 3.375
+-- >>> resizeF ($$(fLit 3.4) :: SFixed 3 4) :: SFixed 2 3
+-- 1.875
+-- >>> maxBound :: SFixed 2 3
+-- 1.875
+--
+-- When used in a polymorphic setting, use the following <#constraintsynonyms Constraint synonyms>
+-- for less verbose type signatures:
+--
+-- * @'ResizeFC'  rep frac1 frac2 size1 size2@ for: @'Fixed' frac1 rep size1 -> 'Fixed' frac2 rep size2@
+-- * @'ResizeSFC' int1 frac1 int2 frac2@       for: @'SFixed' int1 frac1 -> 'SFixed' int2 frac2@
+-- * @'ResizeUFC' int1 frac1 int2 frac2@       for: @'UFixed' int1 frac1 -> 'UFixed' int2 frac2@
 resizeF :: forall frac1 frac2 rep size1 size2 .
            ResizeFC rep frac1 frac2 size1 size2
         => Fixed frac1 rep size1
@@ -401,12 +444,34 @@ type SatN2SC n = (1 <= n, ((n + 1) + 1) ~ (n + 2), KnownNat n, KnownNat (n + 2))
 -- | Constraint for the 'satN2' function, specialized for 'Unsigned'
 type SatN2UC n = (1 <= n, ((n + 1) + 1) ~ (n + 2), KnownNat n, KnownNat (n + 2))
 
--- | Resize an (N + 2)-bits number to an N-bits number, saturates to
+-- | Resize an (N+2)-bits number to an N-bits number, saturates to
 -- 'minBound' or 'maxBound' when the argument does not fit within
 -- the representations bounds of the result.
 --
 -- Uses cheaper saturation than 'resizeF', which is made possible by knowing
 -- that we only reduce the size by 2 bits.
+--
+-- >>> (2 :: Unsigned 2) + (3 :: Unsigned 2)
+-- 1
+-- >>> satN2 (resize (2 :: Unsigned 2) + resize (3 :: Unsigned 2)) :: Unsigned 2
+-- 3
+-- >>> satN2 (resize (1 :: Unsigned 2) + resize (1 :: Unsigned 2)) :: Unsigned 2
+-- 2
+-- >>> (2 :: Unsigned 2) - (3 :: Unsigned 2)
+-- 3
+-- >>> satN2 (resize (2 :: Unsigned 2) - resize (3 :: Unsigned 2)) :: Unsigned 2
+-- 0
+-- >>> (2 :: Signed 3) + (3 :: Signed 3)
+-- -3
+-- >>> satN2 (resize (2 :: Signed 3) + resize (3 :: Signed 3)) :: Signed 3
+-- 3
+--
+-- When used in a polymorphic setting, use the following <#constraintsynonyms Constraint synonyms>
+-- for less verbose type signatures:
+--
+-- * 'SatN2C'  for: @rep (n+2) -> rep n@
+-- * 'SatN2SC' for: @'Signed' (n+2) -> 'Signed' n@
+-- * 'SatN2UC' for: @'Unsigned' (n+2) -> 'Unsigned' n@
 satN2 :: SatN2C rep n
       => rep (n + 2)
       -> rep n
@@ -440,8 +505,8 @@ satN2 rep = if isSigned rep
 -- Upon evaluation you see that the value is rounded / truncated in accordance
 -- to the fixed point representation:
 --
--- > *Main> n
--- > 2.8125
+-- >>> n
+-- 2.8125
 fLit :: forall frac rep size .
         (KnownNat frac, Num (rep size), Bounded (rep size), Integral (rep size))
      => Double

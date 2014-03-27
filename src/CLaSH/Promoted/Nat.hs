@@ -16,6 +16,9 @@ import Unsafe.Coerce
 -- | Singleton value for a type-level natural number 'n'
 data SNat (n :: Nat) = KnownNat n => SNat (Proxy n)
 
+instance Show (SNat n) where
+  show (SNat p) = 'd' : show (natVal p)
+
 -- | Singleton value for a type-level natural number
 snat :: KnownNat n => SNat n
 snat = SNat Proxy

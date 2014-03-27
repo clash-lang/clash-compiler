@@ -12,6 +12,11 @@ Description:
   This package provides:
   .
   * Prelude library containing datatypes and functions for circuit design
+  .
+  Import "CLaSH.Prelude" to use the library.
+  .
+  For now, "CLaSH.Prelude" is also the best starting point for exploring the
+  library. A tutorial module will be added within due time.
 Homepage:             http://christiaanb.github.io/clash2/
 bug-reports:          http://github.com/christiaanb/clash-prelude/issues
 License:              BSD3

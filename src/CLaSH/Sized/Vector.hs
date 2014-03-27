@@ -10,19 +10,26 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module CLaSH.Sized.Vector
-  ( -- * Standard 'Vec'tor functions
+  ( -- * 'Vec'tor constructors
     Vec(..), (<:)
+    -- * Standard 'Vec'tor functions
+    -- ** Extracting sub-'Vec'tors
   , vhead, vtail, vlast, vinit
-  , (+>>), (<<+), (<++>), vconcat
-  , vsplit, vsplitI, vunconcat, vunconcatI, vmerge
-  , vreverse, vmap, vzipWith
-  , vfoldr, vfoldl, vfoldr1, vfoldl1
-  , vzip, vunzip
-  , (!), vreplace, maxIndex, vlength
   , vtake, vtakeI, vdrop, vdropI, vexact, vselect, vselectI
+    -- ** Combining 'Vec'tors
+  , (+>>), (<<+), (<++>), vconcat, vzip, vunzip
+    -- ** Splitting 'Vec'tors
+  , vsplit, vsplitI, vunconcat, vunconcatI, vmerge
+    -- ** Applying functions to 'Vec'tor elements
+  , vmap, vzipWith
+  , vfoldr, vfoldl, vfoldr1, vfoldl1
+    -- ** Indexing 'Vec'tors
+  , (!), vreplace, maxIndex, vlength
+    -- ** Generating 'Vec'tors
   , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
-  , toList, v, lazyV, asNatProxy
-  -- * Alternative 'Vec'tor functions
+    -- ** Misc
+  , vreverse, toList, v, lazyV, asNatProxy
+    -- * Alternative 'Vec'tor functions
   , vhead'
   )
 where
@@ -38,6 +45,16 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat
 
+-- | Fixed size vectors
+--
+-- * Lists with their length encoded in their type
+-- * 'Vec'tor elements have a descending subscript starting from 'maxIndex' ('vlength' - 1)
+--   and ending at 0
+--
+-- >>> (3:>4:>5:>Nil)
+-- <3,4,5>
+-- >>> :t (3:>4:>5:>Nil)
+-- (3:>4:>5:>Nil) :: Num a => Vec 3 a
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   (:>) :: a -> Vec n a -> Vec (n + 1) a
@@ -72,24 +89,45 @@ instance Functor (Vec n) where
 {-# NOINLINE vhead #-}
 -- | Extract the first element of a vector
 --
--- > vhead (1:>2:>3:>Nil) == 1
--- > vhead Nil            == TYPE ERROR
+-- >>> vhead (1:>2:>3:>Nil)
+-- 1
+-- >>> vhead Nil
+--   <interactive>
+--       Couldn't match type ‘1’ with ‘0’
+--       Expected type: Vec (0 + 1) a
+--         Actual type: Vec 0 a
+--       In the first argument of ‘vhead’, namely ‘Nil’
+--       In the expression: vhead Nil
 vhead :: Vec (n + 1) a -> a
 vhead (x :> _) = x
 
 {-# NOINLINE vtail #-}
 -- | Extract the elements after the head of a vector
 --
--- > vtail (1:>2:>3:>Nil) == (2:>3:>Nil)
--- > vtail Nil            == TYPE ERROR
+-- >>> vtail (1:>2:>3:>Nil)
+-- <2,3>
+-- >>> vtail Nil
+--   <interactive>
+--       Couldn't match type ‘1’ with ‘0’
+--       Expected type: Vec (0 + 1) a
+--         Actual type: Vec 0 a
+--       In the first argument of ‘vtail’, namely ‘Nil’
+--       In the expression: vtail Nil
 vtail :: Vec (n + 1) a -> Vec n a
 vtail (_ :> xs) = unsafeCoerce xs
 
 {-# NOINLINE vlast #-}
 -- | Extract the last element of a vector
 --
--- > vlast (1:>2:>3:>Nil) == 3
--- > vlast Nil            == TYPE ERROR
+-- >>> vlast (1:>2:>3:>Nil)
+-- 3
+-- >>> vlast Nil
+--   <interactive>
+--       Couldn't match type ‘1’ with ‘0’
+--       Expected type: Vec (0 + 1) a
+--         Actual type: Vec 0 a
+--       In the first argument of ‘vlast’, namely ‘Nil’
+--       In the expression: vlast Nil
 vlast :: Vec (n + 1) a -> a
 vlast (x :> Nil)     = x
 vlast (_ :> y :> ys) = vlast (y :> ys)
@@ -97,8 +135,15 @@ vlast (_ :> y :> ys) = vlast (y :> ys)
 {-# NOINLINE vinit #-}
 -- | Extract all the elements of a vector except the last element
 --
--- > vinit (1:>2:>3:>Nil) == (1:>2:>Nil)
--- > vinit Nil            == TYPE ERROR
+-- >>> vinit (1:>2:>3:>Nil)
+-- <1,2>
+-- >>> vinit Nil
+--   <interactive>
+--       Couldn't match type ‘1’ with ‘0’
+--       Expected type: Vec (0 + 1) a
+--         Actual type: Vec 0 a
+--       In the first argument of ‘vinit’, namely ‘Nil’
+--       In the expression: vinit Nil
 vinit :: Vec (n + 1) a -> Vec n a
 vinit (_ :> Nil)     = unsafeCoerce Nil
 vinit (x :> y :> ys) = unsafeCoerce (x :> vinit (y :> ys))
@@ -115,8 +160,10 @@ infixr 4 +>>
 -- | Add an element to the head of the vector, and extract all elements of the
 -- resulting vector except the last element
 --
--- > 1 +>> (3:>4:>5:>Nil) == (1:>3:>4:>Nil)
--- > 1 +>> Nil            == Nil
+-- >>> 1 +>> (3:>4:>5:>Nil)
+-- <1,3,4>
+-- >>> 1 +>> Nil
+-- <>
 (+>>) :: a -> Vec n a -> Vec n a
 s +>> xs = shiftIntoL s xs
 
@@ -130,8 +177,10 @@ infixl 5 <:
 {-# INLINEABLE (<:) #-}
 -- | Add an element to the tail of the vector
 --
--- > (3:>4:>5:>Nil) <: 1 == (3:>4:>5:>1:>Nil)
--- > Nil            <: 1 == (1:>Nil)
+-- >>> (3:>4:>5:>Nil) <: 1
+-- <3,4,5,1>
+-- >>> :t (3:>4:>5:>Nil) <: 1
+-- (3:>4:>5:>Nil) <: 1 :: Num a => Vec 4 a
 (<:) :: Vec n a -> a -> Vec (n + 1) a
 xs <: s = snoc s xs
 
@@ -147,8 +196,10 @@ infixl 4 <<+
 -- | Add an element to the tail of the vector, and extract all elements of the
 -- resulting vector except the first element
 --
--- > (3:>4:>5:>Nil) <<+ 1 == (4:>5:>1:>Nil)
--- > Nil            <<+ 1 == Nil
+-- >>> (3:>4:>5:>Nil) <<+ 1
+-- <4,5,1>
+-- >>> Nil <<+ 1
+-- <>
 (<<+) :: Vec n a -> a -> Vec n a
 xs <<+ s = shiftIntoR s xs
 
@@ -162,15 +213,18 @@ infixr 5 <++>
 {-# INLINE (<++>) #-}
 -- | Append two vectors
 --
--- > (1:>2:>3:>Nil) <++> (7:>8:>Nil) = (1:>2:>3:>7:>8:>Nil)
+-- >>> (1:>2:>3:>Nil) <++> (7:>8:>Nil)
+-- <1,2,3,7,8>
 (<++>) :: Vec n a -> Vec m a -> Vec (n + m) a
 xs <++> ys = vappend xs ys
 
 {-# NOINLINE vsplit #-}
 -- | Split a vector into two vectors at the given point
 --
--- > vsplit (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil) == (1:>2:>3:>Nil, 7:>8:>Nil)
--- > vsplit d3               (1:>2:>3:>7:>8:>Nil) == (1:>2:>3:>Nil, 7:>8:>Nil)
+-- >>> vsplit (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
+-- (<1,2,3>, <7,8>)
+-- >>> vsplit d3 (1:>2:>3:>7:>8:>Nil)
+-- (<1,2,3>, <7,8>)
 vsplit :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 vsplit n xs = vsplitU (toUNat n) xs
 
@@ -182,17 +236,17 @@ vsplitU (USucc s) (y :> ys) = let (as,bs) = vsplitU s (unsafeCoerce ys)
 {-# INLINEABLE vsplitI #-}
 -- | Split a vector into two vectors where the length of the two is determined
 -- by the context
+--
+-- >>> vsplitI (1:>2:>3:>7:>8:>Nil) :: (Vec 2 Int, Vec 3 Int)
+-- (<1,2>,<3,7,8>)
 vsplitI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
 vsplitI = withSNat vsplit
 
 {-# NOINLINE vconcat #-}
 -- | Concatenate a vector of vectors
 --
--- > vunconcat ((1:>2:>3:>Nil)    :>
--- >            (4:>5:>6:>Nil)    :>
--- >            (7:>8:>9:>Nil)    :>
--- >            (10:>11:>12:>Nil) :>
--- >            Nil)                  == (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
+-- >>> vconcat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
+-- <1,2,3,4,5,6,7,8,9,10,11,12>
 vconcat :: Vec n (Vec m a) -> Vec (n * m) a
 vconcat Nil       = Nil
 vconcat (x :> xs) = unsafeCoerce (vappend x (vconcat xs))
@@ -201,10 +255,8 @@ vconcat (x :> xs) = unsafeCoerce (vappend x (vconcat xs))
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
 -- where m is given
 --
--- > vunconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil) == ((1:>2:>3:>4:>Nil)    :>
--- >                                                               (5:>6:>7:>8:>Nil)    :>
--- >                                                               (9:>10:>11:>12:>Nil) :>
--- >                                                               Nil)
+-- >>> vunconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
+-- <<1,2,3,4>,<5,6,7,8>,<9,10,11,12>>
 vunconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 vunconcat n xs = vunconcatU (withSNat toUNat) (toUNat n) xs
 
@@ -216,20 +268,26 @@ vunconcatU (USucc n') m ys = let (as,bs) = vsplitU m (unsafeCoerce ys)
 {-# INLINEABLE vunconcatI #-}
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
 -- where m is determined by the context
+--
+-- >>> vunconcatI (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil) :: Vec 2 (Vec 6 Int)
+-- <<1,2,3,4,5,6>,<7,8,9,10,11,12>>
 vunconcatI :: (KnownNat n, KnownNat m) => Vec (n * m) a -> Vec n (Vec m a)
 vunconcatI = withSNat vunconcat
 
 {-# NOINLINE vmerge #-}
 -- | Merge two vectors, alternating their elements, i.e.,
 --
--- > vmerge (xn :> ... :> x2 :> x1 :> Nil)  (yn :> ... :> y2 :> y1 :> Nil) == (xn :> yn :> ... :> x2 :> y2 :> x1 :> y1 :> Nil)
---
+-- >>> vmerge (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> 7 :> 8 :> Nil)
+-- <1,5,2,6,3,7,4,8>
 vmerge :: Vec n a -> Vec n a -> Vec (n + n) a
 vmerge Nil       Nil       = Nil
 vmerge (x :> xs) (y :> ys) = unsafeCoerce (x :> y :> (vmerge xs (unsafeCoerce ys)))
 
 {-# NOINLINE vreverse #-}
 -- | Returns the elements in a list in reverse order
+--
+-- >>> vreverse (1:>2:>3:>4:>Nil)
+-- <4,3,2,1>
 vreverse :: Vec n a -> Vec n a
 vreverse Nil        = Nil
 vreverse (x :> xs)  = vreverse xs <: x
@@ -300,7 +358,8 @@ vfoldl1 f xs = vfoldl f (vhead xs) (vtail xs)
 {-# NOINLINE vzip #-}
 -- | 'vzip' takes two lists and returns a list of corresponding pairs.
 --
--- > vzip (xn :> ... :> x2 :> x1 :> Nil) (yn :> ... :> y2 :> y1 :> Nil) == ((xn,yn) :> ... :> ... (x2,y2) :> (x1,y1) :> Nil)
+-- >>> vzip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
+-- <(1,4),(2,3),(3,2),(4,1)>
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
 vzip Nil       Nil       = Nil
 vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs (unsafeCoerce ys))
@@ -309,7 +368,8 @@ vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs (unsafeCoerce ys))
 -- | 'vunzip' transforms a list of pairs into a list of first components
 -- and a list of second components.
 --
--- > vunzip ((xn,yn) :> ... :> ... (x2,y2) :> (x1,y1) :> Nil) == (xn :> ... :> x2 :> x1 :> Nil, yn :> ... :> y2 :> y1 :> Nil)
+-- >>> vunzip ((1,4):>(2,3):>(3,2):>(4,1):>Nil)
+-- (<1,2,3,4>,<4,3,2,1>)
 vunzip :: Vec n (a,b) -> (Vec n a, Vec n b)
 vunzip Nil = (Nil,Nil)
 vunzip ((a,b) :> xs) = let (as,bs) = vunzip xs
@@ -331,24 +391,30 @@ vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
 -- | Vector index (subscript) operator, descending from 'maxIndex', where the
 -- last element has subscript 0.
 --
--- > (1:>2:>3:>4:>5:>Nil) ! 4        == 1
--- > (1:>2:>3:>4:>5:>Nil) ! maxIndex == 1
--- > (1:>2:>3:>4:>5:>Nil) ! 1        == 4
--- > (1:>2:>3:>4:>5:>Nil) ! 14       == RUNTIME ERROR: Out of bounds
+-- >>> (1:>2:>3:>4:>5:>Nil) ! 4
+-- 1
+-- >>> (1:>2:>3:>4:>5:>Nil) ! maxIndex
+-- 1
+-- >>> (1:>2:>3:>4:>5:>Nil) ! 1
+-- 4
+-- >>> (1:>2:>3:>4:>5:>Nil) ! 14
+-- *** Exception: index out of bounds
 (!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
 xs ! i = vindex_integer xs (toInteger i)
 
 {-# NOINLINE maxIndex #-}
 -- | Index (subscript) of the head of the 'Vec'tor
 --
--- > maxIndex (6 :> 7 :> 8 :> Nil) == 2
+-- >>> maxIndex (6 :> 7 :> 8 :> Nil)
+-- 2
 maxIndex :: KnownNat n => Vec n a -> Integer
 maxIndex = subtract 1 . vlength
 
 {-# NOINLINE vlength #-}
 -- | Length of a 'Vec'tor as an Integer
 --
--- > vlength (6 :> 7 :> 8 :> Nil) == 3
+-- >>> vlength (6 :> 7 :> 8 :> Nil)
+-- 3
 vlength :: KnownNat n => Vec n a -> Integer
 vlength = natVal . asNatProxy
 
@@ -367,51 +433,85 @@ vreplace_integer xs i a = case vreplaceM_integer xs (maxIndex xs - i) a of
   Nothing -> error "index out of bounds"
 
 {-# INLINEABLE vreplace #-}
--- | Replace an element of a vector at the given index (subscript), NB: vector
--- elements have a descending subscript starting from 'maxIndex' and ending at 0
+-- | Replace an element of a vector at the given index (subscript).
 --
--- > vreplace (1:>2:>3:>4:>5:>Nil) 3 7 == (1:>7:>3:>4:>5:>Nil)
--- > vreplace (1:>2:>3:>4:>5:>Nil) 0 7 == (1:>2:>3:>4:>7:>Nil)
--- > vreplace (1:>2:>3:>4:>5:>Nil) 9 7 == RUNTIME ERROR: Out of bounds
+-- NB: vector elements have a descending subscript starting from 'maxIndex' and
+-- ending at 0
+--
+-- >>> vreplace (1:>2:>3:>4:>5:>Nil) 3 7
+-- <1,7,3,4,5>
+-- >>> vreplace (1:>2:>3:>4:>5:>Nil) 0 7
+-- <1,2,3,4,7>
+-- >>> vreplace (1:>2:>3:>4:>5:>Nil) 9 7
+-- <*** Exception: index out of bounds
 vreplace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
 vreplace xs i y = vreplace_integer xs (toInteger i) y
 
 {-# NOINLINE vtake #-}
 -- | 'vtake' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
 --
--- > vtake (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil) == (1:>2:>3:>Nil)
--- > vtake d3               (1:>2:>3:>4:>5:>Nil) == (1:>2:>3:>Nil)
--- > vtake d0               (1:>2:>Nil)          == Nil
--- > vtake d4               (1:>2:>Nil)          == TYPE ERROR
+-- >>> vtake (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
+-- <1,2,3>
+-- >>> vtake d3               (1:>2:>3:>4:>5:>Nil)
+-- <1,2,3>
+-- >>> vtake d0               (1:>2:>Nil)
+-- <>
+-- >>> vtake d4               (1:>2:>Nil)
+--   <interactive>
+--       Couldn't match type ‘4 + n0’ with ‘2’
+--       The type variable ‘n0’ is ambiguous
+--       Expected type: Vec (4 + n0) a
+--         Actual type: Vec (1 + 1) a
+--       In the second argument of ‘vtake’, namely ‘(1 :> 2 :> Nil)’
+--       In the expression: vtake d4 (1 :> 2 :> Nil)
+--       In an equation for ‘it’: it = vtake d4 (1 :> 2 :> Nil)
 vtake :: SNat m -> Vec (m + n) a -> Vec m a
 vtake n = fst . vsplit n
 
 {-# INLINEABLE vtakeI #-}
 -- | 'vtakeI' @xs@, returns the prefix of @xs@ as demanded by the context
+--
+-- >>> vtakeI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
+-- <1,2>
 vtakeI :: KnownNat m => Vec (m + n) a -> Vec m a
 vtakeI = withSNat vtake
 
 {-# NOINLINE vdrop #-}
 -- | 'vdrop' @n xs@ returns the suffix of @xs@ after the first @n@ elements
 --
--- > vdrop (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil) == (4:>5:>Nil)
--- > vdrop d3               (1:>2:>3:>4:>5:>Nil) == (4:>5:>Nil)
--- > vdrop d0               (1:>2:>Nil)          == (1:>2:>Nil)
--- > vdrop d4               (1:>2:>Nil)          == TYPE ERROR
+-- >>> vdrop (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
+-- <4,5>
+-- >>> vdrop d3               (1:>2:>3:>4:>5:>Nil)
+-- <4,5>
+-- >>> vdrop d0               (1:>2:>Nil)
+-- <1,2>
+-- >>> vdrop d4               (1:>2:>Nil)
+--   <interactive>
+--       Couldn't match expected type ‘2’ with actual type ‘4 + n0’
+--       The type variable ‘n0’ is ambiguous
+--       In the first argument of ‘print’, namely ‘it’
+--       In a stmt of an interactive GHCi command: print it
 vdrop :: SNat m -> Vec (m + n) a -> Vec n a
 vdrop n = snd . vsplit n
 
 {-# INLINEABLE vdropI #-}
 -- | 'vdropI' @xs@, returns the suffix of @xs@ as demanded by the context
+--
+-- >>> vdropI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
+-- <4,5>
 vdropI :: KnownNat m => Vec (m + n) a -> Vec n a
 vdropI = withSNat vdrop
 
 {-# NOINLINE vexact #-}
--- | 'vexact' @n xs@ returns @n@'th element of @xs@, NB: vector elements
--- have a descending subscript starting from 'maxIndex' and ending at 0
+-- | 'vexact' @n xs@ returns @n@'th element of @xs@
 --
--- > vexact (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil) == 4
--- > vexact d1               (1:>2:>3:>4:>5:>Nil) == 4
+-- NB: vector elements have a descending subscript starting from 'maxIndex' and
+-- ending at 0
+--
+-- >>> vexact (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
+-- 4
+-- >>> vexact d1               (1:>2:>3:>4:>5:>Nil)
+-- 4
 vexact :: SNat m -> Vec (m + (n + 1)) a -> a
 vexact n xs = vhead $ snd $ vsplit n (vreverse xs)
 
@@ -419,8 +519,10 @@ vexact n xs = vhead $ snd $ vsplit n (vreverse xs)
 -- | 'vselect' @f s n xs@ selects @n@ elements with stepsize @s@ and
 -- offset @f@ from @xs@
 --
--- > vselect (snat :: SNat 1) (snat :: SNat 2) (snat :: SNat 3) (1:>2:>3:>4:>5:>6:>7:>8:>Nil) == (2:>4:>6:>Nil)
--- > vselect d1 d2 d3                                           (1:>2:>3:>4:>5:>6:>7:>8:>Nil) == (2:>4:>6:>Nil)
+-- >>> vselect (snat :: SNat 1) (snat :: SNat 2) (snat :: SNat 3) (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
+-- <2,4,6>
+-- >>> vselect d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
+-- <2,4,6>
 vselect :: ((f + (s * n) + 1) <= i)
         => SNat f
         -> SNat s
@@ -436,6 +538,9 @@ vselect f s n xs = vselect' (toUNat n) $ vdrop f (unsafeCoerce xs)
 {-# NOINLINE vselectI #-}
 -- | 'vselectI' @f s xs@ selects as many elements as demanded by the context
 -- with stepsize @s@ and offset @f@ from @xs@
+--
+-- >>> vselectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
+-- <2,4>
 vselectI :: ((f + (s * n) + 1) <= i, KnownNat (n + 1))
          => SNat f
          -> SNat s
@@ -446,8 +551,10 @@ vselectI f s xs = withSNat (\n -> vselect f s n xs)
 {-# NOINLINE vcopy #-}
 -- | 'vcopy' @n a@ returns a vector that has @n@ copies of @a@
 --
--- > vcopy (snat :: SNat 3) 6 == (6:>6:>6:>Nil)
--- > vcopy d3 6               == (6:>6:>6:>Nil)
+-- >>> vcopy (snat :: SNat 3) 6
+-- <6,6,6>
+-- >>> vcopy d3 6
+-- <6,6,6>
 vcopy :: SNat n -> a -> Vec n a
 vcopy n a = vreplicateU (toUNat n) a
 
@@ -458,6 +565,9 @@ vreplicateU (USucc s) x = x :> vreplicateU s x
 {-# INLINEABLE vcopyI #-}
 -- | 'vcopyI' @a@ creates a vector with as many copies of @a@ as demanded by the
 -- context
+--
+-- >>> vcopy 6 :: Vec 5 Int
+-- <6,6,6,6,6>
 vcopyI :: KnownNat n => a -> Vec n a
 vcopyI = withSNat vcopy
 
@@ -477,6 +587,8 @@ viterateU (USucc s) g x = x :> viterateU s g (g x)
 {-# INLINEABLE viterateI #-}
 -- | 'viterate' @f x@ returns a vector starting with @x@ followed by @n@
 -- repeated applications of @f@ to @x@, where @n@ is determined by the context
+--
+-- > viterateI f x :: Vec 3 a == (x :> f x :> f (f x) :> Nil)
 viterateI :: KnownNat n => (a -> a) -> a -> Vec n a
 viterateI = withSNat viterate
 
@@ -492,17 +604,27 @@ vgenerate n f a = viterate n f (f a)
 {-# INLINEABLE vgenerateI #-}
 -- | 'vgenerate' @f x@ returns a vector with @n@ repeated applications of @f@
 -- to @x@, where @n@ is determined by the context
+--
+-- > vgenerateI f x :: Vec 3 a == (f x :> f (f x) :> f (f (f x)) :> Nil)
 vgenerateI :: KnownNat n => (a -> a) -> a -> Vec n a
 vgenerateI = withSNat vgenerate
 
 {-# INLINEABLE toList #-}
 -- | Convert a vector to a list
+--
+-- >>> toList (1:>2:>3:>Nil)
+-- [1,2,3]
 toList :: Vec n a -> [a]
 toList = vfoldr (:) []
 
 -- | Create a vector literal from a list literal
 --
 -- > $(v [1::Signed 8,2,3,4,5]) == (8:>2:>3:>4:>5:>Nil) :: Vec 5 (Signed 8)
+--
+-- >>> [1 :: Signed 8,2,3,4,5]
+-- [1,2,3,4,5]
+-- >>> $(v [1::Signed 8,2,3,4,5])
+-- <1,2,3,4,5>
 v :: Lift a => [a] -> ExpQ
 v []     = [| Nil |]
 v (x:xs) = [| x :> $(v xs) |]
@@ -529,8 +651,8 @@ asNatProxy _ = Proxy
 --
 -- Will not terminate because 'vzipWith' is too strict in its left argument:
 --
--- > *Main> sortV (4 :> 1 :> 2 :> 3 :> Nil)
--- > <*** Exception: <<loop>>
+-- >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
+-- <*** Exception: <<loop>>
 --
 -- In this case, adding 'lazyV' on 'vzipWith's left argument:
 --
@@ -542,8 +664,8 @@ asNatProxy _ = Proxy
 --
 -- Results in a successful computation:
 --
--- > *Main> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
--- > <1,2,3,4>
+-- >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
+-- <1,2,3,4>
 lazyV :: KnownNat n
       => Vec n a
       -> Vec n a

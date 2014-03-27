@@ -7,7 +7,10 @@ import CLaSH.Promoted.Nat
 
 -- | Create an 'SNat' constant
 --
--- > $(decLiteralD "d" 1200) == d1200 = snat :: SNat 1200
+-- > $(decLiteralD "d" 1200)
+--
+-- >>> :t d1200
+-- d1200 :: SNat 1200
 decLiteralD :: String
             -> Integer
             -> Q [Dec]
@@ -20,9 +23,14 @@ decLiteralD valPrefix n =
 
 -- | Create an 'SNat' constants
 --
--- > $(decLiteralsD "d" 1200 1202) == d1200 = snat :: SNat 1200
--- >                                  d1201 = snat :: SNat 1201
--- >                                  d1202 = snat :: SNat 1202
+-- > $(decLiteralsD "d" 1200 1202)
+--
+-- >>> :t d1200
+-- d1200 :: SNat 1200
+-- >>> :t d1201
+-- d1201 :: SNat 1201
+-- >>> :t d1202
+-- d1202 :: SNat 1202
 decLiteralsD :: String
              -> Integer
              -> Integer

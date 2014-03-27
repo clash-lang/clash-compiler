@@ -39,7 +39,8 @@ data Signal a = a :- Signal a
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
 --
--- > sampleN 2 (fromList [1,2,3,4,5]) == [1,2]
+-- >>> sampleN 2 (fromList [1,2,3,4,5])
+-- [1,2]
 fromList :: [a] -> Signal a
 fromList []     = error "finite list"
 fromList (x:xs) = x :- fromList xs
@@ -74,7 +75,8 @@ sampleN n ~(x :- xs) = x : (sampleN (n-1) xs)
 
 -- | Create a constant 'Signal' from a combinational value
 --
--- > sample (signal 4) == [4, 4, 4, 4, ...
+-- >>> sample (signal 4)
+-- [4, 4, 4, 4, ...
 signal :: a -> Signal a
 signal a = a :- signal a
 
@@ -107,13 +109,15 @@ instance Monad Signal where
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
 --
--- > sampleN 3 (register 8 (fromList [1,2,3,4])) == [8,1,2]
+-- >>> sampleN 3 (register 8 (fromList [1,2,3,4]))
+-- [8,1,2]
 register :: a -> Signal a -> Signal a
 register i s = i :- s
 
 -- | Simulate a ('Signal' -> 'Signal') function given a list of samples
 --
--- > simulate (register 8) [1, 2, 3, ... == [8, 1, 2, 3, ...
+-- >>> simulate (register 8) [1, 2, 3, ...
+-- [8, 1, 2, 3, ...
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
@@ -134,7 +138,8 @@ class Pack a where
 
 -- | Simulate a ('SignalP' -> 'SignalP') function given a list of samples
 --
--- > simulateP (unpack . register (8,8) . pack) [(1,1), (2,2), (3,3), ... == [(8,8), (1,1), (2,2), (3,3), ...
+-- >>> simulateP (unpack . register (8,8) . pack) [(1,1), (2,2), (3,3), ...
+-- [(8,8), (1,1), (2,2), (3,3), ...
 simulateP :: (Pack a, Pack b) => (SignalP a -> SignalP b) -> [a] -> [b]
 simulateP f = simulate (pack . f . unpack)
 
@@ -262,8 +267,9 @@ instance Pack (Vec n a) where
 --
 -- > add2 :: Signal Int -> Signal Int
 -- > add2 x = x <^(+)^> (signal 2)
--- >
--- > simulate add2 [1,2,3,... == [3,4,5,...
+--
+-- >>> simulate add2 [1,2,3,...
+-- [3,4,5,...
 (<^) :: Applicative f => f a -> (a -> b -> c) -> f b -> f c
 v <^ f = liftA2 f v
 
@@ -271,8 +277,9 @@ v <^ f = liftA2 f v
 --
 -- > add2 :: Signal Int -> Signal Int
 -- > add2 x = x <^(+)^> (signal 2)
--- >
--- > simulate add2 [1,2,3,... == [3,4,5,...
+--
+-- >>> simulate add2 [1,2,3,...
+-- [3,4,5,...
 (^>) :: Applicative f => (f a -> f b) -> f a -> f b
 f ^> v = f v
 

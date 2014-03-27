@@ -28,7 +28,13 @@ import CLaSH.Class.Num
 import CLaSH.Promoted.Ord
 import CLaSH.Sized.Vector
 
--- | Arbitrary-width signed integer represented by @n@ bits
+-- | Arbitrary-width signed integer represented by @n@ bits, including the sign bit.
+--
+-- Uses standard 2-complements representation. Meaning that, given @n@ bits,
+-- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1]
+--
+-- NB: The 'Num' operators perform @wrap-around@ on overflow. If you want saturation
+-- on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in "CLaSH.Sized.Fixed".
 newtype Signed (n :: Nat) = S Integer
   deriving Typeable
 
@@ -71,6 +77,7 @@ minBoundS = let res = S $ negate $ 2 ^ (natVal res - 1) in res
 {-# NOINLINE maxBoundS #-}
 maxBoundS = let res = S $ 2 ^ (natVal res - 1) - 1 in res
 
+-- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Signed n) where
   (+)         = plusS
   (-)         = minS

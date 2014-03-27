@@ -26,6 +26,11 @@ import CLaSH.Promoted.Ord
 import CLaSH.Sized.Vector
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
+--
+-- Given @n@ bits, an 'Unsigned' @n@ number has a range of: [0 .. 2^@n@-1]
+--
+-- NB: The 'Num' operators perform @wrap-around@ on overflow. If you want saturation
+-- on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in "CLaSH.Sized.Fixed".
 newtype Unsigned (n :: Nat) = U Integer
 
 instance Eq (Unsigned n) where
@@ -65,6 +70,7 @@ instance KnownNat n => Bounded (Unsigned n) where
 maxBoundU :: KnownNat n => Unsigned n
 maxBoundU = let res = U ((2 ^ natVal res) - 1) in res
 
+-- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Unsigned n) where
   (+)         = plusU
   (-)         = minU

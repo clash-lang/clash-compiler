@@ -9,7 +9,7 @@ import CLaSH.Bit
 import CLaSH.Sized.Vector
 import GHC.TypeLits
 
--- | Convert types from and to a vector of @Bit@s
+-- | Convert types from and to a 'Vec'tor of 'Bit's
 class BitVector a where
   -- | Number of 'Bit's needed to represents elements of type @a@
   type BitSize a :: Nat

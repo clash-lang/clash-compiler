@@ -22,36 +22,64 @@ module CLaSH.Prelude
     -- * Utility functions
   , window
   , windowD
-  , module Exported
+    -- * Exported modules
+    -- ** Synchronous signals
+  , module CLaSH.Signal
+    -- ** Datatypes
+  , module CLaSH.Bit
+    -- *** Arbitrary-width numbers
+  , module CLaSH.Sized.Signed
+  , module CLaSH.Sized.Unsigned
+    -- *** Fixed point numbers
+  , module CLaSH.Sized.Fixed
+    -- *** Fixed size vectors
+  , module CLaSH.Sized.Vector
+    -- ** Type-level natural numbers
+  , module GHC.TypeLits
+  , module CLaSH.Promoted.Nat
+  , module CLaSH.Promoted.Nat.Literals
+  , module CLaSH.Promoted.Nat.TH
+    -- ** Type-level functions
+  , module CLaSH.Promoted.Ord
+    -- ** Type classes
+    -- *** CLaSH
+  , module CLaSH.Class.BitVector
+  , module CLaSH.Class.Num
+    -- *** Other
+  , module Control.Arrow
+  , module Control.Applicative
+  , module Data.Bits
+  , module Data.Default
   )
 where
 
-import Control.Arrow               as Exported
-import Control.Applicative         as Exported
+import Control.Arrow
+import Control.Applicative
 import Control.Category            as Category
-import Data.Bits                   as Exported
-import Data.Default                as Exported
-import CLaSH.Class.BitVector       as Exported
-import CLaSH.Class.Num             as Exported
-import CLaSH.Promoted.Nat          as Exported
-import CLaSH.Promoted.Nat.TH       as Exported
-import CLaSH.Promoted.Nat.Literals as Exported
-import CLaSH.Promoted.Ord          as Exported
-import CLaSH.Sized.Fixed           as Exported
-import CLaSH.Sized.Signed          as Exported
-import CLaSH.Sized.Unsigned        as Exported
-import CLaSH.Sized.Vector          as Exported
-import CLaSH.Bit                   as Exported
-import CLaSH.Signal                as Exported
-import GHC.TypeLits                as Exported
+import Data.Bits
+import Data.Default
+import CLaSH.Class.BitVector
+import CLaSH.Class.Num
+import CLaSH.Promoted.Nat
+import CLaSH.Promoted.Nat.TH
+import CLaSH.Promoted.Nat.Literals
+import CLaSH.Promoted.Ord
+import CLaSH.Sized.Fixed
+import CLaSH.Sized.Signed
+import CLaSH.Sized.Unsigned
+import CLaSH.Sized.Vector
+import CLaSH.Bit
+import CLaSH.Signal
+import GHC.TypeLits
 
 {-# INLINABLE window #-}
 -- | Give a window over a 'Signal'
 --
 -- > window4 :: Signal Int -> Vec 4 (Signal Int)
 -- > window4 = window
--- >
--- > simulateP window4 [1,2,3,4,5,... == [1:>0:>0:>0:>Nil, 2:>1:>0:>0:>Nil, 3:>2:>1:>0:>Nil, 4:>3:>2:>1:>Nil, 5:>4:>3:>2:>Nil,...
+--
+-- >>> simulateP window4 [1,2,3,4,5,...
+-- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
 window :: (KnownNat (n + 1), Default a)
        => Signal a
        -> Vec ((n + 1) + 1) (Signal a)
@@ -65,8 +93,9 @@ window x = x :> prev
 --
 -- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
 -- > windowD3 = windowD
--- >
--- > simulateP windowD3 [1,2,3,4,... == [0:>0:>0:>Nil, 1:>0:>0:>Nil, 2:>1:>0:>Nil, 3:>2:>1:>Nil, 4:>3:>2:>Nil,...
+--
+-- >>> simulateP windowD3 [1,2,3,4,...
+-- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
 windowD :: (KnownNat (n + 1), Default a)
         => Signal a
         -> Vec (n + 1) (Signal a)
@@ -88,8 +117,9 @@ windowD x = prev
 -- >
 -- > topEntity :: (Signal Int, Signal Int) -> Signal Int
 -- > topEntity = mac <^> 0
--- >
--- > simulateP topEntity [(1,1),(2,2),(3,3),(4,4),... == [0,1,5,14,30,...
+--
+-- >>> simulateP topEntity [(1,1),(2,2),(3,3),(4,4),...
+-- [0,1,5,14,30,...
 --
 -- Synchronous sequential functions can be composed just like their combinational counterpart:
 --
@@ -113,8 +143,9 @@ f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
 --
 -- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
 -- > rP = registerP (8,8)
--- >
--- > simulateP rP [(1,1),(2,2),(3,3),... == [(8,8),(1,1),(2,2),(3,3),...
+--
+-- >>> simulateP rP [(1,1),(2,2),(3,3),...
+-- [(8,8),(1,1),(2,2),(3,3),...
 registerP :: Pack a => a -> SignalP a -> SignalP a
 registerP i = unpack Prelude.. register i Prelude.. pack
 
@@ -200,14 +231,16 @@ instance ArrowLoop Comp where
 --
 -- > rC :: Comp (Int,Int) (Int,Int)
 -- > rC = registerC (8,8)
--- >
--- > simulateC rP [(1,1),(2,2),(3,3),... == [(8,8),(1,1),(2,2),(3,3),...
+--
+-- >>> simulateC rP [(1,1),(2,2),(3,3),...
+-- [(8,8),(1,1),(2,2),(3,3),...
 registerC :: a -> Comp a a
 registerC = C Prelude.. register
 
 -- | Simulate a 'Comp'onent given a list of samples
 --
--- > simulateC (registerC 8) [1, 2, 3, ... == [8, 1, 2, 3, ...
+-- >>> simulateC (registerC 8) [1, 2, 3, ...
+-- [8, 1, 2, 3, ...
 simulateC :: Comp a b -> [a] -> [b]
 simulateC f = simulate (asFunction f)
 
@@ -224,8 +257,9 @@ simulateC f = simulate (asFunction f)
 -- >
 -- > topEntity :: Comp (Int,Int) Int
 -- > topEntity = mac ^^^ 0
--- >
--- > simulateC topEntity [(1,1),(2,2),(3,3),(4,4),... == [0,1,5,14,30,...
+--
+-- >>> simulateC topEntity [(1,1),(2,2),(3,3),(4,4),...
+-- [0,1,5,14,30,...
 --
 -- Synchronous sequential must be composed using the 'Arrow' syntax
 --
