@@ -85,7 +85,6 @@ loadModules modName = defaultErrorHandler $ do
                     , DynFlags.Opt_FlexibleContexts
                     , DynFlags.Opt_ConstraintKinds
                     , DynFlags.Opt_TypeFamilies
-                    , DynFlags.Opt_NegativeLiterals
                     ]
     let dflags2 = wantedOptimizationFlags dflags1
     let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
