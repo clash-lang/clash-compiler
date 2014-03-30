@@ -582,7 +582,7 @@ inlineHO _ e@(App _ _)
               if (Maybe.fromMaybe 0 isInlined) > limit
                 then do
                   cf <- liftR $ Lens.use curFun
-                  error $ $(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf
+                  traceIf True ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
                 else do
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
