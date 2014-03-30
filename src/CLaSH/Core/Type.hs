@@ -271,9 +271,10 @@ isPolyFunTy = not . null . fst . splitFunForallTy
 isPolyFunCoreTy :: HashMap TyConName TyCon
                 -> Type
                 -> Bool
-isPolyFunCoreTy _ (ForAllTy _) = True
-isPolyFunCoreTy m (coreView m -> FunTy _ _) = True
-isPolyFunCoreTy _ _ = False
+isPolyFunCoreTy m ty = case coreView m ty of
+                         (FunTy _ _) -> True
+                         (OtherType (ForAllTy _)) -> True
+                         _ -> False
 
 -- | Is a type a function type?
 isFunTy :: HashMap TyConName TyCon
