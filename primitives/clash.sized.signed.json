@@ -140,10 +140,10 @@ end block;"
     { "name"      : "CLaSH.Sized.Signed.testBitS"
     , "templateD" :
 "~SYM[0]_testBitS : block
-  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](~ARG[1]) = '1';
+  ~SYM[1] <= ~ARG[1];
+  ~RESULT <= ~SYM[1](~ARG[2]) = '1';
 end block;"
     }
   }
