@@ -297,17 +297,29 @@ bindConstantVar = inlineBinders test
 
 -- | Inline nullary/closed functions
 inlineClosed :: NormRewrite
+inlineClosed _ e@(collectArgs -> (Var _ f,args))
+  | all (either isConstant (const True)) args
+  = R $ do
+    untranslatable <- isUntranslatable e
+    if untranslatable
+      then return e
+      else do
+        bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+        case bodyMaybe of
+          Just (_,body) -> changed (mkApps body args)
+          _ -> return e
+
 inlineClosed _ e@(Var _ f) = R $ do
-  bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-  case bodyMaybe of
-    Just (_,body) -> do
-      tcm <- Lens.use tcCache
-      closed <- isClosed tcm body
-      untranslatable <- isUntranslatable e
-      if closed && not untranslatable
-        then changed body
-        else return e
-    _ -> return e
+  tcm <- Lens.use tcCache
+  closed <- isClosed tcm e
+  untranslatable <- isUntranslatable e
+  if closed && not untranslatable
+    then do
+      bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
+      case bodyMaybe of
+        Just (_,body) -> changed body
+        _ -> return e
+    else return e
 
 inlineClosed _ e = return e
 
