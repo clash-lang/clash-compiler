@@ -25,6 +25,7 @@ module CLaSH.Normalize.Transformations
   , recToLetRec
   , inlineClosed
   , inlineHO
+  , inlineSmall
   )
 where
 
@@ -51,7 +52,7 @@ import           CLaSH.Core.Type             (splitFunTy)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isVar, mkApps, mkLams, mkTmApps,
-                                              termType)
+                                              termSize,termType)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -322,6 +323,28 @@ inlineClosed _ e@(Var _ f) = R $ do
     else return e
 
 inlineClosed _ e = return e
+
+-- | Inline small functions
+inlineSmall :: NormRewrite
+inlineSmall _ e@(collectArgs -> (Var _ f,args)) = R $ do
+  untranslatable <- isUntranslatable e
+  if untranslatable
+    then return e
+    else do
+      isInlined <- liftR $ alreadyInlined f
+      limit     <- liftR $ Lens.use inlineLimit
+      if (Maybe.fromMaybe 0 isInlined) > limit
+        then do
+          cf <- liftR $ Lens.use curFun
+          traceIf True ($(curLoc) ++ "InlineSmall: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
+        else do
+          bodyMaybe <- HashMap.lookup f <$> Lens.use bindings
+          case bodyMaybe of
+            (Just (_,body))
+              | termSize body < 5 -> changed (mkApps body args)
+            _ -> return e
+
+inlineSmall _ e = return e
 
 -- | Specialise functions on arguments which are constant
 constantSpec :: NormRewrite

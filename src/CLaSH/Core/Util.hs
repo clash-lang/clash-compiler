@@ -1,10 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
+
+{-# OPTIONS_GHC -fcontext-stack=21 #-}
+
 -- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
 import           Data.HashMap.Lazy       (HashMap)
 import           Unbound.LocallyNameless (Fresh, bind, embed, unbind, unembed,
-                                          unrebind)
+                                          unrebind, unrec)
+import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           CLaSH.Core.DataCon      (dcType)
 import           CLaSH.Core.Literal      (literalType)
@@ -199,3 +203,23 @@ varToId :: Term
         -> Id
 varToId (Var ty nm) = Id nm (embed ty)
 varToId e           = error $ $(curLoc) ++ "varToId: not a var: " ++ showDoc e
+
+termSize :: Term
+         -> Int
+termSize (Var _ _)   = 1
+termSize (Data _)    = 1
+termSize (Literal _) = 1
+termSize (Prim _ _)  = 1
+termSize (Lam b)     = let (_,e) = unsafeUnbind b
+                       in  termSize e + 1
+termSize (TyLam b)   = let (_,e) = unsafeUnbind b
+                       in  termSize e
+termSize (App e1 e2) = termSize e1 + termSize e2
+termSize (TyApp e _) = termSize e
+termSize (Letrec b)  = let (bndrsR,body) = unsafeUnbind b
+                           bndrSzs       = map (termSize . unembed . snd) (unrec bndrsR)
+                           bodySz        = termSize body
+                       in sum (bodySz:bndrSzs)
+termSize (Case subj alts) = let subjSz = termSize subj
+                                altSzs = map (termSize . snd . unsafeUnbind) alts
+                            in  sum (subjSz:altSzs)
