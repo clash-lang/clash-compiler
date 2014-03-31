@@ -4,29 +4,31 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeFamilies        #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module CLaSH.Signal.Explicit
-  ( CSignal
+  ( -- * Explicitly clocked synchronous signal
+    CSignal
+    -- * Clock domain crossing
   , Clock (..)
   , veryUnsafeSynchronizer
   , fromImplicit
   , fromExplicit
+  -- * Basic circuit functions
+  , csignal
+  , cregister
+  , PackC (..)
+  -- * Simulation functions
+  , csimulate
+  , csimulateP
+    -- * List \<-\> CSignal conversion
   , csample
   , csampleN
   , cfromList
-  , csignal
-  , cregister
-  , csimulate
-  , PackC (..)
-  , csimulateP
   )
 where
 
-import Data.Default               (Default (..))
+import Data.Coerce
 import Control.Applicative        (Applicative (..), (<$>), liftA2)
 import GHC.TypeLits               (Nat)
-import Language.Haskell.TH.Syntax (Lift(..))
 
 import CLaSH.Bit                  (Bit)
 import CLaSH.Promoted.Nat         (snatToInteger)
@@ -35,12 +37,10 @@ import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 import CLaSH.Sized.Vector         (Vec(..), vmap, vhead, vtail)
 
+import CLaSH.Signal.Implicit
 import CLaSH.Signal.Types
 
 {-# NOINLINE cregister  #-}
-{-# NOINLINE csignal    #-}
-{-# NOINLINE cmapSignal #-}
-{-# NOINLINE cappSignal #-}
 
 {-# NOINLINE veryUnsafeSynchronizer #-}
 {-# NOINLINE fromImplicit           #-}
@@ -54,17 +54,7 @@ import CLaSH.Signal.Types
 -- >>> sampleN 2 (fromList [1,2,3,4,5])
 -- [1,2]
 cfromList :: [a] -> CSignal t a
-cfromList []     = error "finite list"
-cfromList (x:xs) = x ::- cfromList xs
-
-instance Show a => Show (CSignal t a) where
-  show (x ::- xs) = show x ++ " " ++ show xs
-
-instance Lift a => Lift (CSignal t a) where
-  lift ~(x ::- _) = [| csignal x |]
-
-instance Default a => Default (CSignal t a) where
-  def = csignal def
+cfromList = coerce . fromList
 
 -- | Get an infinite list of samples from a 'Signal'
 --
@@ -73,7 +63,7 @@ instance Default a => Default (CSignal t a) where
 --
 -- > sample s == [s0, s1, s2, s3, ...
 csample :: CSignal t a -> [a]
-csample ~(x ::- xs) = x : csample xs
+csample = sample . coerce
 
 -- | Get a list of @n@ samples from a 'Signal'
 --
@@ -82,41 +72,7 @@ csample ~(x ::- xs) = x : csample xs
 --
 -- > sampleN 3 s == [s0, s1, s2]
 csampleN :: Int -> CSignal t a -> [a]
-csampleN 0 _           = []
-csampleN n ~(x ::- xs) = x : (csampleN (n-1) xs)
-
--- | Create a constant 'Signal' from a combinational value
---
--- >>> sample (signal 4)
--- [4, 4, 4, 4, ...
-csignal :: a -> CSignal t a
-csignal a = let s = a ::- s in s
-
-cmapSignal :: (a -> b) -> CSignal t a -> CSignal t b
-cmapSignal f (a ::- as) = f a ::- cmapSignal f as
-
-cappSignal :: CSignal t (a -> b) -> CSignal t a -> CSignal t b
-cappSignal (f ::- fs) ~(a ::- as) = f a ::- cappSignal fs as
-
-instance Functor (CSignal t) where
-  fmap = cmapSignal
-
-instance Applicative (CSignal t) where
-  pure  = csignal
-  (<*>) = cappSignal
-
-unCSignal :: CSignal t a -> a
-unCSignal (a ::- _) = a
-
-cnext :: CSignal t a -> CSignal t a
-cnext (_ ::- as) = as
-
-cdiag :: CSignal t (CSignal t a) -> CSignal t a
-cdiag (xs ::- xss) = unCSignal xs ::- cdiag (fmap cnext xss)
-
-instance Monad (CSignal t) where
-  return    = csignal
-  xs >>= f  = cdiag (fmap f xs)
+csampleN n = sampleN n . coerce
 
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
@@ -124,7 +80,7 @@ instance Monad (CSignal t) where
 -- >>> sampleN 3 (register 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 cregister :: a -> CSignal t a -> CSignal t a
-cregister i s = i ::- s
+cregister i s = coerce (register i (coerce s))
 
 -- | Simulate a ('Signal' -> 'Signal') function given a list of samples
 --
@@ -266,18 +222,9 @@ instance PackC (a,b,c,d,e,f,g,h) where
 
 instance PackC (Vec n a) where
   type CSignalP t (Vec n a) = Vec n (CSignal t a)
-  cpack   clk vs                  = vmap unCSignal vs ::- cpack clk (vmap cnext vs)
-  cunpack _   (Nil ::- _)         = Nil
-  cunpack clk vs@((_ :> _) ::- _) = fmap vhead vs :> (cunpack clk (fmap vtail vs))
-
-instance Num a => Num (CSignal t a) where
-  (+)         = liftA2 (+)
-  (-)         = liftA2 (-)
-  (*)         = liftA2 (*)
-  negate      = fmap negate
-  abs         = fmap abs
-  signum      = fmap signum
-  fromInteger = csignal . fromInteger
+  cpack clk vs = mkCSignal (vmap (shead . coerce) vs) (cpack clk (vmap cstail vs))
+  cunpack _      (CSignal (Nil :- _))      = Nil
+  cunpack clk vs@(CSignal ((_ :> _) :- _)) = fmap vhead vs :> cunpack clk (fmap vtail vs)
 
 -- | Synchronisation function that is basically a represented by a wire in hardware.
 --
@@ -286,10 +233,10 @@ instance Num a => Num (CSignal t a) where
 --
 -- Currently oversimplifies oversampling and compression: oversampling and
 -- compression rate are calculated using an integer division.
-veryUnsafeSynchronizer :: Clock t1
-                       -> Clock t2
-                       -> CSignal t1 a
-                       -> CSignal t2 a
+veryUnsafeSynchronizer :: Clock clk1
+                       -> Clock clk2
+                       -> CSignal clk1 a
+                       -> CSignal clk2 a
 veryUnsafeSynchronizer (Clock clk1) (Clock clk2) s = s'
   where
     t1    = snatToInteger clk1
@@ -299,27 +246,26 @@ veryUnsafeSynchronizer (Clock clk1) (Clock clk2) s = s'
        | otherwise = same s
 
 same :: CSignal clk1 a -> CSignal clk2 a
-same (x ::- xs) = x ::- (same xs)
+same (CSignal s) = CSignal s
 
 -- Probably needs more parametrization
 oversample :: Integer -> CSignal clk1 a -> CSignal clk2 a
-oversample i (s ::- ss) = prefix (replicate (fromInteger i) s) (oversample i ss)
+oversample i (CSignal (s :- ss)) = (prefix (replicate (fromInteger i) s) (oversample i (CSignal ss)))
   where
-    prefix :: [a] -> CSignal clk a -> CSignal clk a
     prefix []     s' = s'
-    prefix (x:xs) s' = x ::- (prefix xs s')
+    prefix (x:xs) s' = mkCSignal x (prefix xs s')
 
 -- Probably needs more parametrization
 compress :: Integer -> CSignal clk1 a -> CSignal clk2 a
-compress i = compress' i
+compress i (CSignal x) = CSignal (compress' i x)
   where
-    compress' 1 (s ::- ss) = s ::- (compress' i ss)
-    compress' n (_ ::- ss) = compress' (n-1) ss
+    compress' 1 (s :- ss) = s :- compress' i ss
+    compress' n (_ :- ss) = compress' (n-1) ss
 
--- | Implicitly clocked signals are synchronized to clock 1000
+-- -- | Implicitly clocked signals are synchronized to clock 1000
 fromImplicit :: Signal a -> CSignal 1000 a
-fromImplicit (a :- as) = (a ::- fromImplicit as)
+fromImplicit s = CSignal s
 
 -- | Implicitly clocked signals are synchronized to clock 1000
 fromExplicit :: CSignal 1000 a -> Signal a
-fromExplicit (a ::- as) = (a :- fromExplicit as)
+fromExplicit (CSignal s) = s

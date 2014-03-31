@@ -1,26 +1,25 @@
 {-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies    #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module CLaSH.Signal.Implicit
-  ( Signal
+  ( -- * Implicitly clocked synchronous signal
+    Signal
+    -- * Basic circuit functions
+  , signal
+  , register
+  , Pack(..)
+  , (<^), (^>)
+    -- * Simulation functions
+  , simulate
+  , simulateP
+    -- * List \<-\> Signal conversion
   , sample
   , sampleN
   , fromList
-  , signal
-  , register
-  , simulate
-  , Pack(..)
-  , simulateP
-  , (<^), (^>)
   )
 where
 
-import Data.Default
 import Control.Applicative
-import Language.Haskell.TH.Syntax(Lift(..))
 
 import CLaSH.Bit            (Bit)
 import CLaSH.Sized.Signed   (Signed)
@@ -30,9 +29,6 @@ import CLaSH.Sized.Vector   (Vec(..), vmap, vhead, vtail)
 import CLaSH.Signal.Types
 
 {-# NOINLINE register  #-}
-{-# NOINLINE signal    #-}
-{-# NOINLINE mapSignal #-}
-{-# NOINLINE appSignal #-}
 
 -- | Create a 'Signal' from a list
 --
@@ -44,15 +40,6 @@ import CLaSH.Signal.Types
 fromList :: [a] -> Signal a
 fromList []     = error "finite list"
 fromList (x:xs) = x :- fromList xs
-
-instance Show a => Show (Signal a) where
-  show (x :- xs) = show x ++ " " ++ show xs
-
-instance Lift a => Lift (Signal a) where
-  lift ~(x :- _) = [| signal x |]
-
-instance Default a => Default (Signal a) where
-  def = signal def
 
 -- | Get an infinite list of samples from a 'Signal'
 --
@@ -72,39 +59,6 @@ sample ~(x :- xs) = x : sample xs
 sampleN :: Int -> Signal a -> [a]
 sampleN 0 _          = []
 sampleN n ~(x :- xs) = x : (sampleN (n-1) xs)
-
--- | Create a constant 'Signal' from a combinational value
---
--- >>> sample (signal 4)
--- [4, 4, 4, 4, ...
-signal :: a -> Signal a
-signal a = a :- signal a
-
-mapSignal :: (a -> b) -> Signal a -> Signal b
-mapSignal f (a :- as) = f a :- mapSignal f as
-
-appSignal :: Signal (a -> b) -> Signal a -> Signal b
-appSignal (f :- fs) ~(a :- as) = f a :- appSignal fs as
-
-instance Functor Signal where
-  fmap = mapSignal
-
-instance Applicative Signal where
-  pure  = signal
-  (<*>) = appSignal
-
-unSignal :: Signal a -> a
-unSignal (a :- _) = a
-
-next :: Signal a -> Signal a
-next (_ :- as) = as
-
-diag :: Signal (Signal a) -> Signal a
-diag (xs :- xss) = unSignal xs :- diag (fmap next xss)
-
-instance Monad Signal where
-  return    = signal
-  xs >>= f  = diag (fmap f xs)
 
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
@@ -258,7 +212,7 @@ instance Pack (a,b,c,d,e,f,g,h) where
 
 instance Pack (Vec n a) where
   type SignalP (Vec n a) = Vec n (Signal a)
-  pack vs                = vmap unSignal vs :- pack (vmap next vs)
+  pack vs                = vmap shead vs :- pack (vmap stail vs)
   unpack (Nil :- _)         = Nil
   unpack vs@((_ :> _) :- _) = fmap vhead vs :> (unpack (fmap vtail vs))
 
@@ -282,12 +236,3 @@ v <^ f = liftA2 f v
 -- [3,4,5,...
 (^>) :: Applicative f => (f a -> f b) -> f a -> f b
 f ^> v = f v
-
-instance Num a => Num (Signal a) where
-  (+)         = liftA2 (+)
-  (-)         = liftA2 (-)
-  (*)         = liftA2 (*)
-  negate      = fmap negate
-  abs         = fmap abs
-  signum      = fmap signum
-  fromInteger = signal . fromInteger
