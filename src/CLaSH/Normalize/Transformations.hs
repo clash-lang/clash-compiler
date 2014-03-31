@@ -346,7 +346,8 @@ inlineSmall _ e@(collectArgs -> (Var _ f,args)) = R $ do
       if (Maybe.fromMaybe 0 isInlined) > limit
         then do
           cf <- liftR $ Lens.use curFun
-          traceIf True ($(curLoc) ++ "InlineSmall: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
+          lvl <- Lens.view dbgLevel
+          traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineSmall: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
         else do
           bodyMaybe <- HashMap.lookup f <$> Lens.use bindings
           case bodyMaybe of
@@ -591,8 +592,9 @@ inlineHO _ e@(App _ _)
               limit     <- liftR $ Lens.use inlineLimit
               if (Maybe.fromMaybe 0 isInlined) > limit
                 then do
-                  cf <- liftR $ Lens.use curFun
-                  traceIf True ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
+                  cf  <- liftR $ Lens.use curFun
+                  lvl <- Lens.view dbgLevel
+                  traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
                 else do
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
