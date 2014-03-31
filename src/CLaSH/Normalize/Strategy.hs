@@ -9,7 +9,7 @@ import CLaSH.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindConst >-> letTL >-> recLetRec
+normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindConst >-> letTL >-> cse >-> recLetRec
   where
     etaTL      = apply "etaTL" etaExpansionTL
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
@@ -17,6 +17,7 @@ normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindCons
     recLetRec  = apply "recToLetRec" recToLetRec
     rmDeadcode = topdownR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
+    cse        = topdownSucR (apply "CSE" simpleCSE)
 
 constantPropgation :: NormRewrite
 constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> spec
