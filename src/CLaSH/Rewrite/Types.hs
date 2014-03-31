@@ -42,6 +42,7 @@ data RewriteState
   , _uniqSupply       :: Supply -- ^ Supply of unique numbers
   , _typeTranslator   :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
   , _tcCache          :: HashMap TyConName TyCon -- ^ TyCon cache
+  , _evaluator        :: HashMap TyConName TyCon -> Term -> Term -- ^ Hardcoded evaluator (delta-reduction)
   }
 
 makeLenses ''RewriteState

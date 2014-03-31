@@ -19,6 +19,7 @@ import qualified System.IO                    as IO
 import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
 import           Unbound.LocallyNameless      (name2String)
 
+import           CLaSH.Core.Term              (Term)
 import           CLaSH.Core.Type              (Type)
 import           CLaSH.Core.TyCon             (TyCon, TyConName)
 import           CLaSH.Driver.TestbenchGen
@@ -40,9 +41,10 @@ generateVHDL :: BindingMap -- ^ Set of functions
              -> PrimMap -- ^ Primitive / BlackBox Definitions
              -> HashMap TyConName TyCon -- ^ TyCon cache
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
+             -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
              -> DebugLevel -- ^ Debug information level for the normalization process
              -> IO ()
-generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
+generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -71,7 +73,7 @@ generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
       let doNorm     = do norm <- normalize [fst topEntity]
                           let normChecked = checkNonRecursive (fst topEntity) norm
                           cleanupGraph (fst topEntity) normChecked
-          transformedBindings = runNormalization dbgLevel supplyN bindingsMap typeTrans tcm doNorm
+          transformedBindings = runNormalization dbgLevel supplyN bindingsMap typeTrans tcm eval doNorm
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -92,7 +94,7 @@ generateVHDL bindingsMap primMap tcm typeTrans dbgLevel = do
                                 netlist
 
       (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
-                                  typeTrans tcm vhdlState bindingsMap
+                                  typeTrans tcm eval vhdlState bindingsMap
                                   (listToMaybe $ map fst $ HashMap.toList testInputs)
                                   (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                   topComponent

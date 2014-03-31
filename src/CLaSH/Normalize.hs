@@ -48,14 +48,16 @@ runNormalization :: DebugLevel
                  -- ^ Hardcoded Type -> HWType translator
                  -> HashMap TyConName TyCon
                  -- ^ TyCon cache
+                 -> (HashMap TyConName TyCon -> Term -> Term)
+                 -- ^ Hardcoded evaluator (delta-reduction)
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization lvl supply globals typeTrans tcm
+runNormalization lvl supply globals typeTrans tcm eval
   = flip State.evalState normState
   . runRewriteSession lvl rwState
   where
-    rwState   = RewriteState 0 globals supply typeTrans tcm
+    rwState   = RewriteState 0 globals supply typeTrans tcm eval
     normState = NormalizeState
                   HashMap.empty
                   Map.empty

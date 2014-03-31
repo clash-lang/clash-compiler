@@ -59,13 +59,14 @@ genTestBench :: DebugLevel
              -> PrimMap                      -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
+             -> (HashMap TyConName TyCon -> Term -> Term)
              -> VHDLState
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],VHDLState)
-genTestBench dbgLvl supply primMap typeTrans tcm vhdlState globals stimuliNmM expectedNmM
+genTestBench dbgLvl supply primMap typeTrans tcm eval vhdlState globals stimuliNmM expectedNmM
   (Component cName [(clkName,Clock rate),(rstName,Reset reset)] [inp] outp _)
   = eitherT error return $ do
   let rateF  = fromIntegral rate :: Float
@@ -149,9 +150,9 @@ genTestBench dbgLvl supply primMap typeTrans tcm vhdlState globals stimuliNmM ex
                     -> TmName
                     -> HashMap TmName (Type,Term)
     normalizeSignal glbls bndr =
-      runNormalization dbgLvl supply glbls typeTrans tcm (normalize [bndr] >>= cleanupGraph bndr)
+      runNormalization dbgLvl supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench _ _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
+genTestBench _ _ _ _ _ _ v _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
 
 delayedSignal :: Text
               -> Float

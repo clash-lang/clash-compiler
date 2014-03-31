@@ -214,6 +214,16 @@ caseCon _ e@(Case _ [alt]) = R $ do
                            ([],[]) -> changed altE
                            _       -> return e
 
+caseCon ctx e@(Case subj alts)
+  | isConstant subj = do
+    tcm <- Lens.use tcCache
+    lvl <- Lens.view dbgLevel
+    reduceConstant <- Lens.use evaluator
+    case reduceConstant tcm subj of
+      Data dc   -> caseCon ctx (Case (Data dc) alts)
+      Literal l -> caseCon ctx (Case (Literal l) alts)
+      subj' -> traceIf (lvl > DebugNone) ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj') (return e)
+
 caseCon _ e = return e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is

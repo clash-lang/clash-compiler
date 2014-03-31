@@ -73,6 +73,7 @@ import           Paths_clash_ghc
 import           Exception (gcatch)
 import           Control.Exception (ErrorCall (..))
 import qualified CLaSH.Driver
+import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
 import qualified CLaSH.Primitives.Util
@@ -878,7 +879,7 @@ doVHDL []   = throwGhcException (CmdLineError "No input files")
 doVHDL srcs = liftIO $ do primDir <- getDefPrimDir
                           primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
                           mapM_ (\(src,_) -> do (bindingsMap,tcm) <- generateBindings primMap src
-                                                CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType DebugNone
+                                                CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
                                 ) srcs
 
 -- -----------------------------------------------------------------------------
