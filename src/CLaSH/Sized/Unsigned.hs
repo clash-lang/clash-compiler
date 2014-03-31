@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -15,6 +16,7 @@ where
 
 import Data.Bits
 import Data.Default
+import Data.Typeable
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax(Lift(..))
 import GHC.TypeLits
@@ -32,6 +34,7 @@ import CLaSH.Sized.Vector
 -- NB: The 'Num' operators perform @wrap-around@ on overflow. If you want saturation
 -- on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in "CLaSH.Sized.Fixed".
 newtype Unsigned (n :: Nat) = U Integer
+  deriving Typeable
 
 instance Eq (Unsigned n) where
   (==) = eqU
