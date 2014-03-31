@@ -407,22 +407,26 @@ resizeF (Fixed fRep) = Fixed sat
                      fMin = minBound
                      mask = complement (resize fMax) :: rep size1
                  in if argFracSZ <= resFracSZ
-                      then let shifted = fRep `shiftL` (resFracSZ - argFracSZ)
-                           in if fRep >= 0
-                                 then if (shifted .&. mask) == 0
-                                         then resize shifted
-                                         else fMax
-                                 else if (shifted .&. mask) == mask
-                                         then resize shifted
-                                         else fMin
-                      else let shifted = fRep `shiftR` (argFracSZ - resFracSZ)
-                           in if fRep >= 0
-                                 then if (shifted .&. mask) == 0
-                                         then resize shifted
-                                         else fMax
-                                 else if (shifted .&. mask) == mask
-                                         then resize shifted
-                                         else fMin
+                       then let shiftedL         = fRep `shiftL` (resFracSZ - argFracSZ)
+                                shiftedL_masked  = shiftedL .&. mask
+                                shiftedL_resized = resize shiftedL
+                            in if fRep >= 0
+                                  then if shiftedL_masked == 0
+                                          then shiftedL_resized
+                                          else fMax
+                                  else if shiftedL_masked == mask
+                                          then shiftedL_resized
+                                          else fMin
+                       else let shiftedR         = fRep `shiftR` (argFracSZ - resFracSZ)
+                                shiftedR_masked  = shiftedR .&. mask
+                                shiftedR_resized = resize shiftedR
+                            in if fRep >= 0
+                                  then if shiftedR_masked == 0
+                                          then shiftedR_resized
+                                          else fMax
+                                  else if shiftedR_masked == mask
+                                          then shiftedR_resized
+                                          else fMin
 
 -- | Constraint for the 'satN2' function
 type SatN2C rep n
