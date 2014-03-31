@@ -34,9 +34,11 @@ reduceConstant tcm e@(collectArgs -> (Prim nm _, args))
   | nm == Text.pack "GHC.Prim.tagToEnum#"
   = case map (Bifunctor.bimap (reduceConstant tcm) id) args of
       [Right (ConstTy (TyCon tcN)), Left (Literal (IntegerLiteral i))] ->
-        let tc  = tcm HashMap.! tcN
-            dcs = tyConDataCons tc
-        in maybe e Data (List.find ((== (i+1)) . toInteger . dcTag) dcs)
+        let dc = do { tc <- HashMap.lookup tcN tcm
+                    ; let dcs = tyConDataCons tc
+                    ; List.find ((== (i+1)) . toInteger . dcTag) dcs
+                    }
+        in maybe e Data dc
       _ -> e
 
 reduceConstant _ e = e
