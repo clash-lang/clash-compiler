@@ -66,7 +66,6 @@ import CLaSH.Class.BitVector
 import CLaSH.Class.Num
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Ord
-import CLaSH.Signal
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector
@@ -329,11 +328,6 @@ instance (BitVector (rep size)) => BitVector (Fixed frac rep size) where
   type BitSize (Fixed frac rep size) = BitSize (rep size)
   toBV (Fixed fRep) = toBV fRep
   fromBV bv         = Fixed (fromBV bv)
-
-instance Pack (Fixed frac rep size) where
-  type SignalP (Fixed frac rep size) = Signal (Fixed frac rep size)
-  pack   = id
-  unpack = id
 
 instance (Lift (rep size), KnownNat frac, KnownNat size, Typeable rep) =>
          Lift (Fixed frac rep size) where

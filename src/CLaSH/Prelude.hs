@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ImplicitParams      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -80,9 +81,9 @@ import GHC.TypeLits
 --
 -- >>> simulateP window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
-window :: (KnownNat (n + 1), Default a)
-       => Signal a
-       -> Vec ((n + 1) + 1) (Signal a)
+window :: (KnownNat (n + 1), Default a, ?clk :: SNat t)
+       => Signal t a
+       -> Vec ((n + 1) + 1) (Signal t a)
 window x = x :> prev
   where
     prev = registerP (vcopyI def) next
@@ -96,9 +97,9 @@ window x = x :> prev
 --
 -- >>> simulateP windowD3 [1,2,3,4,...
 -- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
-windowD :: (KnownNat (n + 1), Default a)
-        => Signal a
-        -> Vec (n + 1) (Signal a)
+windowD :: (KnownNat (n + 1), Default a, ?clk :: SNat t)
+        => Signal t a
+        -> Vec (n + 1) (Signal t a)
 windowD x = prev
   where
     prev = registerP (vcopyI def) next
@@ -130,10 +131,10 @@ windowD x = prev
 -- >   where
 -- >     s1 = (mac <^> 0) (a,b)
 -- >     s2 = (mac <^> 0) (x,y)
-(<^>) :: (Pack i, Pack o)
-      => (s -> i -> (s,o))        -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-      -> s                        -- ^ Initial state
-      -> (SignalP i -> SignalP o) -- ^ Synchronous sequential function with input and output matching that of the mealy machine
+(<^>) :: (Pack i, Pack o, ?clk :: SNat t)
+      => (s -> i -> (s,o))            -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+      -> s                            -- ^ Initial state
+      -> (SignalP t i -> SignalP t o) -- ^ Synchronous sequential function with input and output matching that of the mealy machine
 f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
                      s      = register iS s'
                  in unpack o
@@ -146,7 +147,7 @@ f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> (pack i)
 --
 -- >>> simulateP rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-registerP :: Pack a => a -> SignalP a -> SignalP a
+registerP :: (Pack a, ?clk :: SNat t) => a -> SignalP t a -> SignalP t a
 registerP i = unpack Prelude.. register i Prelude.. pack
 
 {-# NOINLINE blockRam #-}
@@ -154,13 +155,13 @@ registerP i = unpack Prelude.. register i Prelude.. pack
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
 -- > bram40 = blockRam d50
-blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a)
-         => SNat n              -- ^ Size @n@ of the blockram
-         -> Signal (Unsigned m) -- ^ Write address @w@
-         -> Signal (Unsigned m) -- ^ Read address @r@
-         -> Signal Bool         -- ^ Write enable
-         -> Signal a            -- ^ Value to write (at address @w@)
-         -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
+blockRam :: forall n m a t . (KnownNat n, KnownNat m, Pack a, ?clk :: SNat t)
+         => SNat n                -- ^ Size @n@ of the blockram
+         -> Signal t (Unsigned m) -- ^ Write address @w@
+         -> Signal t (Unsigned m) -- ^ Read address @r@
+         -> Signal t Bool         -- ^ Write enable
+         -> Signal t a            -- ^ Value to write (at address @w@)
+         -> Signal t a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
@@ -178,9 +179,9 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
 --
 -- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, a) a
 -- > bramC40 = blockRamC d50
-blockRamC :: (KnownNat n, KnownNat m, Pack a)
+blockRamC :: (KnownNat n, KnownNat m, Pack a, ?clk :: SNat t)
           => SNat n -- ^ Size @n@ of the blockram
-          -> Comp (Unsigned m, Unsigned m, Bool, a) a
+          -> Comp t (Unsigned m, Unsigned m, Bool, a) a
 blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
 
 {-# INLINABLE blockRamPow2 #-}
@@ -188,28 +189,28 @@ blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = blockRamPow2 d32
-blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a)
+blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a, ?clk :: SNat t)
              => SNat (2^n)          -- ^ Size @2^n@ of the blockram
-             -> Signal (Unsigned n) -- ^ Write address @w@
-             -> Signal (Unsigned n) -- ^ Read address @r@
-             -> Signal Bool         -- ^ Write enable
-             -> Signal a            -- ^ Value to write (at address @w@)
-             -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
+             -> Signal t (Unsigned n) -- ^ Write address @w@
+             -> Signal t (Unsigned n) -- ^ Read address @r@
+             -> Signal t Bool         -- ^ Write enable
+             -> Signal t a            -- ^ Value to write (at address @w@)
+             -> Signal t a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 blockRamPow2 = blockRam
 
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, a) a
 -- > bramC32 = blockRamPow2C d32
-blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a)
+blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a, ?clk :: SNat t)
               => SNat (2^n) -- ^ Size @2^n@ of the blockram
-              -> Comp (Unsigned n, Unsigned n, Bool, a) a
+              -> Comp t (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
 
 -- | 'Comp'onent: an 'Arrow' interface to synchronous sequential functions
-newtype Comp a b = C { asFunction :: Signal a -> Signal b }
+newtype Comp t a b = C { asFunction :: Signal t a -> Signal t b }
 
-instance Category Comp where
+instance Category (Comp t) where
   id            = C Prelude.id
   (C f) . (C g) = C (f Prelude.. g)
 
@@ -217,11 +218,11 @@ infixr 8 ><
 (><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
 (f >< g) (x,y) = (f x,g y)
 
-instance Arrow Comp where
+instance (?clk :: SNat t) => Arrow (Comp t) where
   arr         = C Prelude.. fmap
   first (C f) = C $ pack Prelude.. (f >< Prelude.id) Prelude.. unpack
 
-instance ArrowLoop Comp where
+instance (?clk :: SNat t) => ArrowLoop (Comp t) where
   loop (C f) = C $ simpleLoop (unpack Prelude.. f Prelude.. pack)
     where
       simpleLoop g b = let ~(c,d) = g (b,d)
@@ -234,14 +235,14 @@ instance ArrowLoop Comp where
 --
 -- >>> simulateC rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-registerC :: a -> Comp a a
+registerC :: (?clk :: SNat t) => a -> Comp t a a
 registerC = C Prelude.. register
 
 -- | Simulate a 'Comp'onent given a list of samples
 --
 -- >>> simulateC (registerC 8) [1, 2, 3, ...
 -- [8, 1, 2, 3, ...
-simulateC :: Comp a b -> [a] -> [b]
+simulateC :: (?clk :: SNat t) => Comp t a b -> [a] -> [b]
 simulateC f = simulate (asFunction f)
 
 {-# INLINABLE (^^^) #-}
@@ -268,9 +269,10 @@ simulateC f = simulate (asFunction f)
 -- >   rec s1 <- mac ^^^ 0 -< (a,b)
 -- >       s2 <- mac ^^^ 0 -< (x,y)
 -- >   returnA -< (s1 + s2)
-(^^^) :: (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+(^^^) :: (?clk :: SNat t)
+      => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state
-      -> Comp i o          -- ^ Synchronous sequential 'Comp'onent with input and output matching that of the mealy machine
+      -> Comp t i o        -- ^ Synchronous sequential 'Comp'onent with input and output matching that of the mealy machine
 f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
                          s      = register sI s'
                      in  o
