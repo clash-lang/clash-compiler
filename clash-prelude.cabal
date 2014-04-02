@@ -50,11 +50,14 @@ Library
                       CLaSH.Promoted.Nat.TH
                       CLaSH.Promoted.Nat.Literals
                       CLaSH.Promoted.Ord
-                      CLaSH.Signal
+                      CLaSH.Signal.Explicit
+                      CLaSH.Signal.Implicit
                       CLaSH.Sized.Fixed
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
+
+  Other-modules:      CLaSH.Signal.Types
 
   Build-depends:      base                 >= 4.7.0.0 && < 5,
                       data-default         >= 0.5.3,

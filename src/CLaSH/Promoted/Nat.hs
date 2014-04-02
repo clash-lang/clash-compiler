@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 module CLaSH.Promoted.Nat
-  ( SNat, snat, withSNat
+  ( SNat, snat, withSNat, snatToInteger
   , UNat (..), toUNat, addUNat, multUNat, powUNat
   )
 where
@@ -26,6 +26,9 @@ snat = SNat Proxy
 -- | Supply a function with a singleton natural 'n' according to the context
 withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f (SNat Proxy)
+
+snatToInteger :: SNat n -> Integer
+snatToInteger (SNat p) = natVal p
 
 -- | Unary representation of a type-level natural
 data UNat :: Nat -> * where
