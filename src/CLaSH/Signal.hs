@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE ImplicitParams      #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -7,6 +6,7 @@
 
 module CLaSH.Signal
   ( Signal
+  , Clock (..)
   , sample
   , sampleN
   , fromList
@@ -40,6 +40,9 @@ infixr 5 :-
 -- | A synchronized signal with elements of type @a@, synchronized to the
 -- relative clock @clk@
 data Signal (clk :: Nat) a = a :- Signal clk a
+
+-- | Explicit Clock with relative period @clk@
+newtype Clock (clk :: Nat) = Clock (SNat clk)
 
 -- | Create a 'Signal' from a list
 --
@@ -131,139 +134,139 @@ simulate f = sample . f . fromList
 -- | Conversion between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's
 class Pack a where
-  type SignalP (t :: Nat) a
-  type SignalP t a = Signal t a
+  type SignalP (clk :: Nat) a
+  type SignalP clk a = Signal clk a
   -- | > pack :: (Signal a, Signal b) -> Signal (a,b)
   -- However:
   --
   -- > pack :: Signal Bit -> Signal Bit
-  pack   :: (?clk :: SNat t) => SignalP t a -> Signal t a
+  pack   :: Clock clk -> SignalP clk a -> Signal clk a
   -- | > unpack :: Signal (a,b) -> (Signal a, Signal b)
   -- However:
   --
   -- > unpack :: Signal Bit -> Signal Bit
-  unpack :: (?clk :: SNat t) => Signal t a -> SignalP t a
+  unpack :: Clock clk -> Signal clk a -> SignalP clk a
 
 -- | Simulate a ('SignalP' -> 'SignalP') function given a list of samples
 --
 -- >>> simulateP (unpack . register (8,8) . pack) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
-simulateP :: (Pack a, Pack b, ?clk :: SNat t) => (SignalP t a -> SignalP t b) -> [a] -> [b]
-simulateP f = simulate (pack . f . unpack)
+simulateP :: (Pack a, Pack b) => Clock t -> (SignalP t a -> SignalP t b) -> [a] -> [b]
+simulateP clk f = simulate (pack clk . f . unpack clk)
 
 instance Pack Bit where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack (Signed n) where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack (Unsigned n) where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack (Fixed frac rep size) where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack Bool where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack Integer where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack Int where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack Float where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack Double where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack () where
-  pack   = id
-  unpack = id
+  pack   _ = id
+  unpack _ = id
 
 instance Pack (a,b) where
   type SignalP t (a,b) = (Signal t a, Signal t b)
-  pack       = uncurry (liftA2 (,))
-  unpack tup = (fmap fst tup, fmap snd tup)
+  pack _       = uncurry (liftA2 (,))
+  unpack _ tup = (fmap fst tup, fmap snd tup)
 
 instance Pack (a,b,c) where
   type SignalP t (a,b,c) = (Signal t a, Signal t b, Signal t c)
-  pack (a,b,c) = (,,) <$> a <*> b <*> c
-  unpack tup   = (fmap (\(x,_,_) -> x) tup
-                 ,fmap (\(_,x,_) -> x) tup
-                 ,fmap (\(_,_,x) -> x) tup
-                 )
+  pack   _ (a,b,c) = (,,) <$> a <*> b <*> c
+  unpack _ tup     = (fmap (\(x,_,_) -> x) tup
+                     ,fmap (\(_,x,_) -> x) tup
+                     ,fmap (\(_,_,x) -> x) tup
+                     )
 
 instance Pack (a,b,c,d) where
   type SignalP t (a,b,c,d) = (Signal t a, Signal t b, Signal t c, Signal t d)
-  pack (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
-  unpack tup     = (fmap (\(x,_,_,_) -> x) tup
-                   ,fmap (\(_,x,_,_) -> x) tup
-                   ,fmap (\(_,_,x,_) -> x) tup
-                   ,fmap (\(_,_,_,x) -> x) tup
-                   )
+  pack   _ (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
+  unpack _ tup       = (fmap (\(x,_,_,_) -> x) tup
+                       ,fmap (\(_,x,_,_) -> x) tup
+                       ,fmap (\(_,_,x,_) -> x) tup
+                       ,fmap (\(_,_,_,x) -> x) tup
+                       )
 
 instance Pack (a,b,c,d,e) where
   type SignalP t (a,b,c,d,e) = (Signal t a, Signal t b, Signal t c, Signal t d, Signal t e)
-  pack (a,b,c,d,e) = (,,,,) <$> a <*> b <*> c <*> d <*> e
-  unpack tup       = (fmap (\(x,_,_,_,_) -> x) tup
-                     ,fmap (\(_,x,_,_,_) -> x) tup
-                     ,fmap (\(_,_,x,_,_) -> x) tup
-                     ,fmap (\(_,_,_,x,_) -> x) tup
-                     ,fmap (\(_,_,_,_,x) -> x) tup
-                     )
+  pack _ (a,b,c,d,e) = (,,,,) <$> a <*> b <*> c <*> d <*> e
+  unpack _ tup       = (fmap (\(x,_,_,_,_) -> x) tup
+                       ,fmap (\(_,x,_,_,_) -> x) tup
+                       ,fmap (\(_,_,x,_,_) -> x) tup
+                       ,fmap (\(_,_,_,x,_) -> x) tup
+                       ,fmap (\(_,_,_,_,x) -> x) tup
+                       )
 
 instance Pack (a,b,c,d,e,f) where
   type SignalP t (a,b,c,d,e,f) = (Signal t a, Signal t b, Signal t c, Signal t d, Signal t e, Signal t f)
-  pack (a,b,c,d,e,f) = (,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
-  unpack tup         = (fmap (\(x,_,_,_,_,_) -> x) tup
-                       ,fmap (\(_,x,_,_,_,_) -> x) tup
-                       ,fmap (\(_,_,x,_,_,_) -> x) tup
-                       ,fmap (\(_,_,_,x,_,_) -> x) tup
-                       ,fmap (\(_,_,_,_,x,_) -> x) tup
-                       ,fmap (\(_,_,_,_,_,x) -> x) tup
-                       )
+  pack   _ (a,b,c,d,e,f) = (,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
+  unpack _ tup           = (fmap (\(x,_,_,_,_,_) -> x) tup
+                         ,fmap (\(_,x,_,_,_,_) -> x) tup
+                         ,fmap (\(_,_,x,_,_,_) -> x) tup
+                         ,fmap (\(_,_,_,x,_,_) -> x) tup
+                         ,fmap (\(_,_,_,_,x,_) -> x) tup
+                         ,fmap (\(_,_,_,_,_,x) -> x) tup
+                         )
 
 instance Pack (a,b,c,d,e,f,g) where
   type SignalP t (a,b,c,d,e,f,g) = (Signal t a, Signal t b, Signal t c, Signal t d, Signal t e, Signal t f, Signal t g)
-  pack (a,b,c,d,e,f,g) = (,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f <*> g
-  unpack tup           = (fmap (\(x,_,_,_,_,_,_) -> x) tup
-                         ,fmap (\(_,x,_,_,_,_,_) -> x) tup
-                         ,fmap (\(_,_,x,_,_,_,_) -> x) tup
-                         ,fmap (\(_,_,_,x,_,_,_) -> x) tup
-                         ,fmap (\(_,_,_,_,x,_,_) -> x) tup
-                         ,fmap (\(_,_,_,_,_,x,_) -> x) tup
-                         ,fmap (\(_,_,_,_,_,_,x) -> x) tup
-                         )
+  pack   _ (a,b,c,d,e,f,g) = (,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f <*> g
+  unpack _ tup             = (fmap (\(x,_,_,_,_,_,_) -> x) tup
+                             ,fmap (\(_,x,_,_,_,_,_) -> x) tup
+                             ,fmap (\(_,_,x,_,_,_,_) -> x) tup
+                             ,fmap (\(_,_,_,x,_,_,_) -> x) tup
+                             ,fmap (\(_,_,_,_,x,_,_) -> x) tup
+                             ,fmap (\(_,_,_,_,_,x,_) -> x) tup
+                             ,fmap (\(_,_,_,_,_,_,x) -> x) tup
+                             )
 
 instance Pack (a,b,c,d,e,f,g,h) where
   type SignalP t (a,b,c,d,e,f,g,h) = (Signal t a, Signal t b, Signal t c, Signal t d, Signal t e, Signal t f, Signal t g, Signal t h)
-  pack (a,b,c,d,e,f,g,h) = (,,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f <*> g <*> h
-  unpack tup             = (fmap (\(x,_,_,_,_,_,_,_) -> x) tup
-                           ,fmap (\(_,x,_,_,_,_,_,_) -> x) tup
-                           ,fmap (\(_,_,x,_,_,_,_,_) -> x) tup
-                           ,fmap (\(_,_,_,x,_,_,_,_) -> x) tup
-                           ,fmap (\(_,_,_,_,x,_,_,_) -> x) tup
-                           ,fmap (\(_,_,_,_,_,x,_,_) -> x) tup
-                           ,fmap (\(_,_,_,_,_,_,x,_) -> x) tup
-                           ,fmap (\(_,_,_,_,_,_,_,x) -> x) tup
-                           )
+  pack   _ (a,b,c,d,e,f,g,h) = (,,,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f <*> g <*> h
+  unpack _ tup               = (fmap (\(x,_,_,_,_,_,_,_) -> x) tup
+                               ,fmap (\(_,x,_,_,_,_,_,_) -> x) tup
+                               ,fmap (\(_,_,x,_,_,_,_,_) -> x) tup
+                               ,fmap (\(_,_,_,x,_,_,_,_) -> x) tup
+                               ,fmap (\(_,_,_,_,x,_,_,_) -> x) tup
+                               ,fmap (\(_,_,_,_,_,x,_,_) -> x) tup
+                               ,fmap (\(_,_,_,_,_,_,x,_) -> x) tup
+                               ,fmap (\(_,_,_,_,_,_,_,x) -> x) tup
+                               )
 
 instance Pack (Vec n a) where
   type SignalP t (Vec n a) = Vec n (Signal t a)
-  pack vs                   = vmap unSignal vs :- pack (vmap next vs)
-  unpack (Nil :- _)         = Nil
-  unpack vs@((_ :> _) :- _) = fmap vhead vs :> (unpack (fmap vtail vs))
+  pack   clk vs                 = vmap unSignal vs :- pack clk (vmap next vs)
+  unpack _   (Nil :- _)         = Nil
+  unpack clk vs@((_ :> _) :- _) = fmap vhead vs :> (unpack clk (fmap vtail vs))
 
 -- | Operator lifting, use in conjunction with '(^>)'
 --
