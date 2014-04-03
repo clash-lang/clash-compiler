@@ -1,5 +1,8 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.5 *April 3rd 2014*
+ * Add explicitly clocked synchronous signals for multi-clock circuits
+
 ## 0.4.1 *March 27th 2014*
   * Add saturation to fixed-point operators
   * Finalize most documentation

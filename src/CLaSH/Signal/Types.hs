@@ -13,16 +13,16 @@ import Language.Haskell.TH.Syntax (Lift (..))
 import CLaSH.Promoted.Nat  (SNat)
 
 infixr 5 :-
--- | A synchronized signal with elements of type @a@, synchronized to an
--- implicit clock
+-- | A synchronized signal with elements of type @a@, implicitly synchronized to
+-- an unnamed global clock
 data Signal a = a :- Signal a
 
 -- | A synchronized signal with elements of type @a@, explicitly synchronized to
--- the clock @clk@
+-- a clock with period @clk@
 newtype CSignal (clk :: Nat) a = CSignal (Signal a)
   deriving (Show,Default,Lift,Functor,Applicative)
 
--- | Explicit Clock with period @clk@
+-- | A clock with period @clk@
 newtype Clock (clk :: Nat) = Clock (SNat clk)
 
 instance Show a => Show (Signal a) where
@@ -70,9 +70,9 @@ mkCSignal a (CSignal s) = CSignal (a :- s)
 cstail :: CSignal t a -> CSignal t a
 cstail (CSignal s) = CSignal (stail s)
 
--- | Create a constant 'Signal' from a combinational value
+-- | Create a constant 'CSignal' from a combinational value
 --
--- >>> sample (signal 4)
+-- >>> csample (csignal 4)
 -- [4, 4, 4, 4, ...
 csignal :: a -> CSignal t a
 csignal a = coerce (signal a)

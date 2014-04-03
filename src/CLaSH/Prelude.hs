@@ -6,6 +6,27 @@
 
 {-# OPTIONS_GHC -O0 -fno-omit-interface-pragmas #-}
 
+{- |
+  CλaSH (pronounced ‘clash’) is a functional hardware description language that
+  borrows both its syntax and semantics from the functional programming language
+  Haskell. The merits of using a functional language to describe hardware comes
+  from the fact that combinational circuits can be directly modeled as
+  mathematical functions and that functional languages lend themselves very well
+  at describing and (de-)composing mathematical functions.
+
+  This package provides:
+
+  * Prelude library containing datatypes and functions for circuit design
+
+  To use the library:
+
+  * Import "CLaSH.Prelude"
+  * Additionally import "CLaSH.Prelude.Explicit" if you want to design
+    explicitly clocked circuits in a multi-clock setting
+
+  For now, "CLaSH.Prelude" is also the best starting point for exploring the
+  library. A tutorial module will be added within due time.
+-}
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
     (<^>)
@@ -24,9 +45,8 @@ module CLaSH.Prelude
   , window
   , windowD
     -- * Exported modules
-    -- ** Synchronous signals
+    -- ** Implicitly clocked synchronous signals
   , module CLaSH.Signal.Implicit
-  , module CLaSH.Signal.Explicit
     -- ** Datatypes
   , module CLaSH.Bit
     -- *** Arbitrary-width numbers
@@ -72,7 +92,6 @@ import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector
 import CLaSH.Bit
 import CLaSH.Signal.Implicit
-import CLaSH.Signal.Explicit
 import GHC.TypeLits
 
 {-# INLINABLE window #-}
@@ -216,13 +235,11 @@ instance Category Comp where
   id            = C Prelude.id
   (C f) . (C g) = C (f Prelude.. g)
 
-infixr 8 ><
-(><) :: (a -> b) -> (c -> d) -> (a, c) -> (b, d)
-(f >< g) (x,y) = (f x,g y)
-
 instance Arrow Comp where
   arr         = C Prelude.. fmap
   first (C f) = C $ pack Prelude.. (f >< Prelude.id) Prelude.. unpack
+    where
+      (g >< h) (x,y) = (g x,h y)
 
 instance ArrowLoop Comp where
   loop (C f) = C $ simpleLoop (unpack Prelude.. f Prelude.. pack)

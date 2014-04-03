@@ -35,6 +35,8 @@ import CLaSH.Signal.Types
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
 --
+-- NB: Simulation only!
+--
 -- >>> sampleN 2 (fromList [1,2,3,4,5])
 -- [1,2]
 fromList :: [a] -> Signal a
@@ -68,7 +70,8 @@ sampleN n ~(x :- xs) = x : (sampleN (n-1) xs)
 register :: a -> Signal a -> Signal a
 register i s = i :- s
 
--- | Simulate a ('Signal' -> 'Signal') function given a list of samples
+-- | Simulate a (@'Signal' a -> 'Signal' b@) function given a list of samples of
+-- type @a@
 --
 -- >>> simulate (register 8) [1, 2, 3, ...
 -- [8, 1, 2, 3, ...
@@ -90,7 +93,8 @@ class Pack a where
   -- > unpack :: Signal Bit -> Signal Bit
   unpack :: Signal a -> SignalP a
 
--- | Simulate a ('SignalP' -> 'SignalP') function given a list of samples
+-- | Simulate a (@'SignalP' a -> 'SignalP' b@) function given a list of samples
+-- of type @a@
 --
 -- >>> simulateP (unpack . register (8,8) . pack) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
