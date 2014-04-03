@@ -254,13 +254,15 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                       Nothing -> C.Data <$> coreToDataCon (isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))) dc
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive f _)
-              | f == pack "CLaSH.Signal.Types.mapSignal" -> return (mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.Types.appSignal" -> return (mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.Types.signal"    -> return (syncTerm xType)
-              | f == pack "CLaSH.Signal.Implicit.pack"   -> return (splitCombineTerm False xType)
-              | f == pack "CLaSH.Signal.Implicit.unpack" -> return (splitCombineTerm True xType)
-              | f == pack "GHC.Base.$"             -> return (dollarAppTerm xType)
-              | otherwise                          -> return (C.Prim xNameS xType)
+              | f == pack "CLaSH.Signal.Types.mapSignal"  -> return (mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.Types.appSignal"  -> return (mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.Types.signal"     -> return (syncTerm xType)
+              | f == pack "CLaSH.Signal.Implicit.pack"    -> return (splitCombineTerm False xType)
+              | f == pack "CLaSH.Signal.Implicit.unpack"  -> return (splitCombineTerm True xType)
+              | f == pack "CLaSH.Signal.Explicit.cpack"   -> return (cpackCUnpackTerm False xType)
+              | f == pack "CLaSH.Signal.Explicit.cunpack" -> return (cpackCUnpackTerm True xType)
+              | f == pack "GHC.Base.$"                    -> return (dollarAppTerm xType)
+              | otherwise                                 -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
               return (C.Prim xNameS xType)
             Nothing
@@ -441,6 +443,31 @@ splitCombineTerm b (C.ForAllTy tvTy) =
   in newExpr
 
 splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
+
+cpackCUnpackTerm :: Bool
+                 -> C.Type
+                 -> C.Term
+cpackCUnpackTerm b (C.ForAllTy tvTy) = newExpr
+  where
+    (aTV,packCDict,clkTV,clkTy,inpTy,outpTy) = runFreshM $ do
+      (aTV',C.tyView -> C.FunTy packCDict' (C.ForAllTy ty2)) <- unbind tvTy
+      (clkTV',C.tyView -> (C.FunTy clkTy' (C.tyView -> C.FunTy inpTy' outpTy'))) <- unbind ty2
+      return (aTV',packCDict',clkTV',clkTy',inpTy',outpTy')
+    dictName = string2Name "cpackDict"
+    clkName  = string2Name "clk"
+    sigName  = string2Name "csig"
+    sigTy    = if b then inpTy else outpTy
+    dictId   = C.Id dictName (embed packCDict)
+    clkId    = C.Id clkName (embed clkTy)
+    sigId    = C.Id sigName (embed sigTy)
+    newExpr  = C.TyLam $ bind aTV $
+               C.Lam   $ bind dictId $
+               C.TyLam $ bind clkTV $
+               C.Lam   $ bind clkId $
+               C.Lam   $ bind sigId $
+               C.Var sigTy sigName
+
+cpackCUnpackTerm _ ty = error $ $(curLoc) ++ show ty
 
 dollarAppTerm :: C.Type
               -> C.Term

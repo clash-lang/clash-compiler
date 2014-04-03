@@ -10,7 +10,7 @@ genVHDL :: String
 genVHDL src = do
   primMap <- generatePrimMap ["./primitives"]
   (bindingsMap,tcm) <- generateBindings primMap src
-  generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
+  generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugFinal
 
 main :: IO ()
 main = genVHDL "./examples/CalculatorArrow.hs"

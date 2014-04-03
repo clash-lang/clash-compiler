@@ -163,6 +163,11 @@ transparentTy (AppTy (ConstTy (TyCon tc)) ty)
       "CLaSH.Signal.Types.Signal"  -> transparentTy ty
       "CLaSH.Signal.Implicit.SignalP" -> transparentTy ty
       _ -> AppTy (ConstTy (TyCon tc)) (transparentTy ty)
+transparentTy (AppTy (AppTy (ConstTy (TyCon tc)) clkTy) elTy)
+  = case name2String tc of
+      "CLaSH.Signal.Types.CSignal"  -> transparentTy elTy
+      "CLaSH.Signal.Explicit.SignalP" -> transparentTy elTy
+      _ -> (AppTy (AppTy (ConstTy (TyCon tc)) (transparentTy clkTy)) (transparentTy elTy))
 transparentTy (AppTy ty1 ty2) = AppTy (transparentTy ty1) (transparentTy ty2)
 transparentTy (ForAllTy b)    = ForAllTy (uncurry bind $ second transparentTy $ unsafeUnbind b)
 transparentTy ty              = ty
@@ -172,13 +177,19 @@ coreView :: HashMap TyConName TyCon -> Type -> TypeView
 coreView tcMap ty =
   let tView = tyView ty
   in case tView of
-       TyConApp ((tcMap HashMap.!) -> AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args
-         | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
-         | otherwise  -> tView
+       -- TyConApp ((tcMap HashMap.!) -> AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args
+       --   | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
+       --   | otherwise  -> tView
        TyConApp tc args -> case name2String tc of
          "CLaSH.Signal.Types.Signal"     -> coreView tcMap (head args)
          "CLaSH.Signal.Implicit.SignalP" -> coreView tcMap (head args)
-         _ -> tView
+         "CLaSH.Signal.Types.CSignal"     -> coreView tcMap (args !! 1)
+         "CLaSH.Signal.Implicit.CSignalP" -> coreView tcMap (args !! 1)
+         _ -> case (tcMap HashMap.! tc) of
+                (AlgTyCon {algTcRhs = (NewTyCon _ nt)})
+                  | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
+                  | otherwise -> tView
+                _ -> tView
        _ -> tView
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given

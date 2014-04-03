@@ -26,7 +26,7 @@ import           CLaSH.Core.Pretty       (showDoc)
 import           CLaSH.Core.Subst        (substTys)
 import           CLaSH.Core.Term         (LetBinding, Term (..), TmName)
 import           CLaSH.Core.TyCon        (TyCon (..), TyConName, tyConDataCons)
-import           CLaSH.Core.Type         (Type (..), TypeView (..),
+import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
@@ -82,6 +82,12 @@ synchronizedClk ty
       "CLaSH.Signal.Types.Signal"     -> Just (pack "clk1000")
       "CLaSH.Sized.Vector.Vec"        -> synchronizedClk (args!!1)
       "CLaSH.Signal.Implicit.SignalP" -> Just (pack "clk1000")
+      "CLaSH.Signal.Types.CSignal"    -> case (head args) of
+                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i))
+                                           _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
+      "CLaSH.Signal.Types.CSignalP"   -> case (head args) of
+                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i))
+                                           _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       _                               -> Nothing
   | otherwise
   = Nothing
