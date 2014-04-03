@@ -4,6 +4,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
+{-# OPTIONS_GHC -O0 -fno-omit-interface-pragmas #-}
+
 {- |
   This module defines the explicitly clocked counterparts of the functions
   defined in "CLaSH.Prelude".
