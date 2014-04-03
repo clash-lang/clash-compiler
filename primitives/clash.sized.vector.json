@@ -191,7 +191,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vfoldr"
     , "templateD" :
 "~SYM[0]_vfoldr : block
-  type ~SYM[7] is array (natural range <>) of ~TYP[1];
+  type ~SYM[7] is array (integer range <>) of ~TYP[1];
   signal ~SYM[6] : ~TYP[2];
   signal ~SYM[1] : ~SYM[7](~SYM[6]'high downto 0);
 begin
@@ -223,7 +223,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.vfoldl"
     , "templateD" :
 "~SYM[0]_vfoldl : block
-  type ~SYM[7] is array (natural range <>) of ~TYP[1];
+  type ~SYM[7] is array (integer range <>) of ~TYP[1];
   signal ~SYM[6] : ~TYP[2];
   signal ~SYM[1] : ~SYM[7](~SYM[6]'high downto 0);
 begin
