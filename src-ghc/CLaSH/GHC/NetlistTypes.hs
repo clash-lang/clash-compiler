@@ -28,9 +28,9 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runErrorT $
     "GHC.Types.Bool"                -> return Bool
     "GHC.Prim.~#"                   -> fail $ "Can't translate type: " ++ showDoc ty
     "CLaSH.Bit.Bit"                 -> return Bit
-    "CLaSH.Signal.Pack"             -> fail $ "Can't translate type: " ++ showDoc ty
-    "CLaSH.Signal.Signal"           -> ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m (head args)
-    "CLaSH.Signal.SignalP"          -> ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m (head args)
+    "CLaSH.Signal.Implicit.Pack"    -> fail $ "Can't translate type: " ++ showDoc ty
+    "CLaSH.Signal.Types.Signal"     -> ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m (head args)
+    "CLaSH.Signal.Implicit.SignalP" -> ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m (head args)
     "CLaSH.Sized.Signed.Signed"     -> Signed   <$> tyNatSize (head args)
     "CLaSH.Sized.Unsigned.Unsigned" -> Unsigned <$> tyNatSize (head args)
     "CLaSH.Sized.Vector.Vec"        -> do

@@ -79,10 +79,10 @@ synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case name2String tyCon of
-      "CLaSH.Signal.Signal"    -> Just (pack "clk")
-      "CLaSH.Sized.Vector.Vec" -> synchronizedClk (args!!1)
-      "CLaSH.Signal.SignalP"   -> Just (pack "clk")
-      _                        -> Nothing
+      "CLaSH.Signal.Types.Signal"     -> Just (pack "clk1000")
+      "CLaSH.Sized.Vector.Vec"        -> synchronizedClk (args!!1)
+      "CLaSH.Signal.Implicit.SignalP" -> Just (pack "clk1000")
+      _                               -> Nothing
   | otherwise
   = Nothing
 

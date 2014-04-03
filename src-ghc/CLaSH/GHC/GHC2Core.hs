@@ -254,11 +254,11 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                       Nothing -> C.Data <$> coreToDataCon (isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))) dc
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive f _)
-              | f == pack "CLaSH.Signal.mapSignal" -> return (mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.appSignal" -> return (mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.signal"    -> return (syncTerm xType)
-              | f == pack "CLaSH.Signal.pack"      -> return (splitCombineTerm False xType)
-              | f == pack "CLaSH.Signal.unpack"    -> return (splitCombineTerm True xType)
+              | f == pack "CLaSH.Signal.Types.mapSignal" -> return (mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.Types.appSignal" -> return (mapSyncTerm xType)
+              | f == pack "CLaSH.Signal.Types.signal"    -> return (syncTerm xType)
+              | f == pack "CLaSH.Signal.Implicit.pack"   -> return (splitCombineTerm False xType)
+              | f == pack "CLaSH.Signal.Implicit.unpack" -> return (splitCombineTerm True xType)
               | f == pack "GHC.Base.$"             -> return (dollarAppTerm xType)
               | otherwise                          -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->

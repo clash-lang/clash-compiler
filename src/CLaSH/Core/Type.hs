@@ -160,8 +160,8 @@ tyView t = OtherType t
 transparentTy :: Type -> Type
 transparentTy (AppTy (ConstTy (TyCon tc)) ty)
   = case name2String tc of
-      "CLaSH.Signal.Signal"  -> transparentTy ty
-      "CLaSH.Signal.SignalP" -> transparentTy ty
+      "CLaSH.Signal.Types.Signal"  -> transparentTy ty
+      "CLaSH.Signal.Implicit.SignalP" -> transparentTy ty
       _ -> AppTy (ConstTy (TyCon tc)) (transparentTy ty)
 transparentTy (AppTy ty1 ty2) = AppTy (transparentTy ty1) (transparentTy ty2)
 transparentTy (ForAllTy b)    = ForAllTy (uncurry bind $ second transparentTy $ unsafeUnbind b)
@@ -176,8 +176,8 @@ coreView tcMap ty =
          | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
          | otherwise  -> tView
        TyConApp tc args -> case name2String tc of
-         "CLaSH.Signal.Signal"  -> coreView tcMap (head args)
-         "CLaSH.Signal.SignalP" -> coreView tcMap (head args)
+         "CLaSH.Signal.Types.Signal"     -> coreView tcMap (head args)
+         "CLaSH.Signal.Implicit.SignalP" -> coreView tcMap (head args)
          _ -> tView
        _ -> tView
 

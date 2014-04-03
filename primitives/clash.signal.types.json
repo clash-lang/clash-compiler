@@ -1,0 +1,16 @@
+[ { "Primitive" :
+    { "name"      : "CLaSH.Signal.Types.signal"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Types.mapSignal"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Types.appSignal"
+    , "primType"  : "Function"
+    }
+  }
+]

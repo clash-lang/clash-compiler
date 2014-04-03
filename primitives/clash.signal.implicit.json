@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Signal.register"
+    { "name"      : "CLaSH.Signal.Implicit.register"
     , "templateD" :
 "~SYM[0]_block : block
   signal ~SYM[1] : ~TYP[1];
@@ -18,27 +18,12 @@ end block;"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.signal"
+    { "name"      : "CLaSH.Signal.Implicit.pack"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.mapSignal"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "CLaSH.Signal.appSignal"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "CLaSH.Signal.pack"
-    , "primType"  : "Function"
-    }
-  }
-, { "Primitive" :
-    { "name"      : "CLaSH.Signal.unpack"
+    { "name"      : "CLaSH.Signal.Implicit.unpack"
     , "primType"  : "Function"
     }
   }
