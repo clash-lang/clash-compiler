@@ -40,7 +40,7 @@ countArgs [] = -1
 countArgs l  = maximum
              $ map (\e -> case e of
                             I n -> n
-                            D (Decl _ l') -> maximum $ map countArgs l'
+                            D (Decl _ l') -> maximum $ map (countArgs . fst) l'
                             _ -> -1
                    ) l
 
@@ -50,7 +50,7 @@ countLits [] = -1
 countLits l  = maximum
              $ map (\e -> case e of
                             L n -> n
-                            D (Decl _ l') -> maximum $ map countLits l'
+                            D (Decl _ l') -> maximum $ map (countLits . fst) l'
                             _ -> -1
                    ) l
 
@@ -75,7 +75,7 @@ setSym i l
                                                           _2 %= IntMap.insert i' k
                                                           return (Sym k)
                                             Just k  -> return (Sym k)
-                      D (Decl n l') -> D <$> (Decl n <$> mapM setSym' l')
+                      D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
                       _             -> pure e
               )
 
@@ -102,8 +102,8 @@ renderElem :: BlackBoxContext
            -> Element
            -> BlackBoxMonad Text
 renderElem b (D (Decl n (l:ls))) = do
-  o  <- lineToIdentifier b l
-  is <- mapM (lineToIdentifier b) ls
+  o  <- combineM (lineToIdentifier b) (lineToType b) l
+  is <- mapM (combineM (lineToIdentifier b) (lineToType b)) ls
   let (templ,pCtx) = indexNote ($(curLoc) ++ "No function argument " ++ show n) (funInputs b) n
   let b' = pCtx { result = o, inputs = inputs pCtx ++ is }
   if verifyBlackBoxContext templ b'
@@ -117,17 +117,26 @@ renderElem b e = either id fst <$> mkSyncIdentifier b e
 -- be used for a new blackbox context.
 lineToIdentifier :: BlackBoxContext
                  -> BlackBoxTemplate
-                 -> BlackBoxMonad (SyncIdentifier,HWType)
-lineToIdentifier b = foldrM (\e (a,_) -> do
+                 -> BlackBoxMonad SyncIdentifier
+lineToIdentifier b = foldrM (\e a -> do
                               e' <- mkSyncIdentifier  b e
                               case (e', a) of
-                                (Left t, Left t')             -> return (Left  (t `Text.append` t'), ty)
-                                (Left t, Right (t',clk))      -> return (Right (t `Text.append` t',clk), ty)
-                                (Right (t,clk), Left t')      -> return (Right (t `Text.append` t',clk), ty)
-                                (Right (t,clk), Right (t',_)) -> return (Right (t `Text.append` t',clk), ty)
-                   ) (Left Text.empty,ty)
-  where
-    ty = Void
+                                (Left t, Left t')             -> return (Left  (t `Text.append` t'))
+                                (Left t, Right (t',clk))      -> return (Right (t `Text.append` t',clk))
+                                (Right (t,clk), Left t')      -> return (Right (t `Text.append` t',clk))
+                                (Right (t,clk), Right (t',_)) -> return (Right (t `Text.append` t',clk))
+                   ) (Left Text.empty)
+
+lineToType :: BlackBoxContext
+           -> BlackBoxTemplate
+           -> BlackBoxMonad HWType
+lineToType b [(Typ Nothing)]  = return (snd $ result b)
+lineToType b [(Typ (Just n))] = return (snd $ inputs b !! n)
+lineToType b [(TypElem t)]    = do hwty' <- lineToType b [t]
+                                   case hwty' of
+                                     Vector _ elTy -> return elTy
+                                     _ -> error $ $(curLoc) ++ "Element type selection of a non-vector type"
+lineToType _ _ = error $ $(curLoc) ++ "Unexpected type manipulation"
 
 -- | Give a context and a tagged hole (of a template), returns part of the
 -- context that matches the tag of the hole.
@@ -154,3 +163,4 @@ mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B 
 mkSyncIdentifier b (Def Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b
 mkSyncIdentifier b (Def (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ inputs b !! n
 mkSyncIdentifier _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
+mkSyncIdentifier _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"

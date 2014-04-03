@@ -42,13 +42,17 @@ data Element = C   Text          -- ^ Constant
              | Typ (Maybe Int)   -- ^ Type declaration hole
              | TypM (Maybe Int)  -- ^ Type root hole
              | Def (Maybe Int)   -- ^ Default value hole
+             | TypElem Element   -- ^ Select element type from a vector type
   deriving Show
 
 -- | Component instantiation hole. First argument indicates which function argument
 -- to instantiate. Second argument corresponds to output and input assignments,
 -- where the first element is the output assignment, and the subsequent elements
 -- are the consecutive input assignments.
-data Decl = Decl Int [BlackBoxTemplate]
+--
+-- The LHS of the tuple is the name of the signal, while the RHS of the tuple
+-- is the type of the signal
+data Decl = Decl Int [(BlackBoxTemplate,BlackBoxTemplate)]
   deriving Show
 
 -- | Monad that caches VHDL information and remembers hidden inputs of

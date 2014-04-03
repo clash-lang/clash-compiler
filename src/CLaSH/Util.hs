@@ -135,6 +135,13 @@ secondM :: Functor f
         -> f (a, c)
 secondM f (x,y) = (x,) <$> f y
 
+combineM :: (Applicative f)
+         => (a -> f b)
+         -> (c -> f d)
+         -> (a,c)
+         -> f (b,d)
+combineM f g (x,y) = (,) <$> f x <*> g y
+
 -- | Performs trace when first argument evaluates to 'True'
 traceIf :: Bool -> String -> a -> a
 traceIf True  msg = trace msg

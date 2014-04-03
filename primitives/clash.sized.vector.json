@@ -159,8 +159,8 @@ begin
   ~SYM[2]_vmap : for ~SYM[3] in ~RESULT'high downto 0 generate
   begin
     ~INST 0
-      ~OUTPUT <= ~RESULT(~SYM[3])~
-      ~INPUT  <= ~SYM[1](~SYM[3])~
+      ~OUTPUT <= ~RESULT(~SYM[3])~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[1](~SYM[3])~ ~TYPEL[~TYP[1]]~
     ~INST
   end generate;
 end block;"
@@ -179,9 +179,9 @@ begin
   ~SYM[3]_generate : for ~SYM[4] in ~RESULT'high downto 0 generate
   begin
     ~INST 0
-      ~OUTPUT <= ~RESULT(~SYM[4])~
-      ~INPUT  <= ~SYM[1](~SYM[4])~
-      ~INPUT  <= ~SYM[2](~SYM[4])~
+      ~OUTPUT <= ~RESULT(~SYM[4])~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[1](~SYM[4])~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[2](~SYM[4])~ ~TYPEL[~TYP[2]]~
     ~INST
   end generate;
 end block;"
@@ -202,17 +202,17 @@ begin
   begin
     ~SYM[4]_generate : if ~SYM[3] /= (~SYM[6]'high) generate
       ~INST 0
-        ~OUTPUT <= ~SYM[1](~SYM[3]+1)~
-        ~INPUT  <= ~SYM[6](~SYM[3])~
-        ~INPUT  <= ~SYM[1](~SYM[3])~
+        ~OUTPUT <= ~SYM[1](~SYM[3]+1)~ ~TYP[1]~
+        ~INPUT  <= ~SYM[6](~SYM[3])~ ~TYPEL[~TYP[2]]~
+        ~INPUT  <= ~SYM[1](~SYM[3])~ ~TYP[1]~
       ~INST
     end generate;
 
     ~SYM[5]_generate : if ~SYM[3] = (~SYM[6]'high) generate
       ~INST 0
-        ~OUTPUT <= ~RESULT~
-        ~INPUT  <= ~SYM[6](~SYM[3])~
-        ~INPUT  <= ~SYM[1](~SYM[3])~
+        ~OUTPUT <= ~RESULT~ ~TYPO~
+        ~INPUT  <= ~SYM[6](~SYM[3])~ ~TYPEL[~TYP[2]]~
+        ~INPUT  <= ~SYM[1](~SYM[3])~ ~TYP[1]~
       ~INST
     end generate;
   end generate;
@@ -234,17 +234,17 @@ begin
   begin
     ~SYM[4]_generate : if ~SYM[3] /= 0 generate
       ~INST 0
-        ~OUTPUT <= ~SYM[1](~SYM[3]-1)~
-        ~INPUT  <= ~SYM[1](~SYM[3])~
-        ~INPUT  <= ~SYM[6](~SYM[3])~
+        ~OUTPUT <= ~SYM[1](~SYM[3]-1)~ ~TYP[1]~
+        ~INPUT  <= ~SYM[1](~SYM[3])~ ~TYP[1]~
+        ~INPUT  <= ~SYM[6](~SYM[3])~ ~TYPEL[~TYP[2]]~
       ~INST
     end generate;
 
     ~SYM[5]_generate : if ~SYM[3] = 0 generate
       ~INST 0
-        ~OUTPUT <= ~RESULT~
-        ~INPUT  <= ~SYM[1](~SYM[3])~
-        ~INPUT  <= ~SYM[6](~SYM[3])~
+        ~OUTPUT <= ~RESULT~ ~TYPO~
+        ~INPUT  <= ~SYM[1](~SYM[3])~ ~TYP[1]~
+        ~INPUT  <= ~SYM[6](~SYM[3])~ ~TYPEL[~TYP[2]]~
       ~INST
     end generate;
   end generate;
@@ -264,9 +264,9 @@ begin
   ~SYM[3]_generate : for ~SYM[4] in 1 to ~SYM[2]'high generate
   begin
     ~INST 0
-      ~OUTPUT <= ~SYM[2](~SYM[4])~
-      ~INPUT  <= ~SYM[1](~SYM[4])~
-      ~INPUT  <= ~SYM[2](~SYM[4]-1)~
+      ~OUTPUT <= ~SYM[2](~SYM[4])~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[1](~SYM[4])~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[2](~SYM[4]-1)~ ~TYPEL[~TYP[1]]~
     ~INST
   end generate;
 
@@ -414,8 +414,8 @@ begin
   ~SYM[3]_generate : if ~SYM[1] /= (~RESULT'high) generate
   begin
     ~INST 0
-      ~OUTPUT <= ~RESULT(~SYM[1])~
-      ~INPUT  <= ~RESULT(~SYM[1]+1)~
+      ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~RESULT(~SYM[1]+1)~ ~TYPEL[~TYPO]~
     ~INST
   end generate;
 end generate;"

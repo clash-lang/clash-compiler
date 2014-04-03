@@ -45,12 +45,12 @@ pDecl = Decl <$> (pTokenWS "~INST" *> pNatural) <*>
         ((:) <$> pOutput <*> pList pInput) <* pToken "~INST"
 
 -- | Parse the output tag of Declaration
-pOutput :: Parser BlackBoxTemplate
-pOutput = pTokenWS "~OUTPUT" *> pTokenWS "<=" *> pBlackBoxE <* pTokenWS "~"
+pOutput :: Parser (BlackBoxTemplate,BlackBoxTemplate)
+pOutput = pTokenWS "~OUTPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS "~") <*> pBlackBoxE) <* pTokenWS "~"
 
 -- | Parse the input tag of Declaration
-pInput :: Parser BlackBoxTemplate
-pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> pBlackBoxE <* pTokenWS "~"
+pInput :: Parser (BlackBoxTemplate,BlackBoxTemplate)
+pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS "~") <*> pBlackBoxE) <* pTokenWS "~"
 
 -- | Parse an Expression element
 pTagE :: Parser Element
@@ -68,6 +68,7 @@ pTagE =  O             <$  pToken "~RESULT"
      <|> (TypM . Just) <$> (pToken "~TYPM" *> pBrackets pNatural)
      <|> Def Nothing   <$  pToken "~DEFAULTO"
      <|> (Def . Just)  <$> (pToken "~DEFAULT" *> pBrackets pNatural)
+     <|> TypElem       <$> (pToken "~TYPEL" *> pBrackets pTagE)
 
 -- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a
