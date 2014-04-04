@@ -13,7 +13,11 @@ Description:
   .
   * Prelude library containing datatypes and functions for circuit design
   .
-  Import "CLaSH.Prelude" to use the library.
+  To use the library:
+  .
+  * Import "CLaSH.Prelude"
+  * Additionally import "CLaSH.Prelude.Explicit" if you want to design
+    explicitly clocked circuits in a multi-clock setting
   .
   For now, "CLaSH.Prelude" is also the best starting point for exploring the
   library. A tutorial module will be added within due time.

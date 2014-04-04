@@ -247,63 +247,66 @@ instance CPack (Vec n a) where
 -- >              -> CSignal clk1 Bit -> CSignal clk2 Bit
 -- > dualFlipFlop clk1 clk2 = cregister clk2 L . cregister clk2 L . veryUnsafeSynchronizer clk1 clk2
 --
--- Currently, this 'veryUnsafeSynchronizer' function oversimplifies oversampling
--- and compression: oversampling and compression rates are calculated using
--- integer division (round towards 0).
---
--- So, given:
+-- The 'varyUnsafeSynchronizer' works in such a way that, given 2 clocks:
 --
 -- > clk7 = Clock d7
--- > clk6 = Clock d6
--- > clk2 = Clock d4
+-- > clk4 = Clock d4
 --
--- Oversampling from @clk6@ to @clk2@:
+-- Oversampling followed compression is the identity function:
 --
--- >>> csample (veryUnsafeSynchronizer clk6 clk2 (cfromList [1,2,3,4,5,6,7,8,9,10]))
--- [1,1,1,2,2,2, 3,3,3,4,4,4, 5,5,5,6,6,...
+-- > varyUnsafeSynchronizer clk7 clk2 (varyUnsafeSynchronizer clk2 clk7 s) == s
 --
--- Gives the same result as \"oversampling\" from @clk7@ to @clk2@:
+-- Something we can easily observe:
 --
--- >>> csample (veryUnsafeSynchronizer clk7 clk2 (cfromList [1,2,3,4,5,6,7,8,9,10]))
--- [1,1,1,2,2,2, 3,3,3,4,4,4, 5,5,5,6,6,...
---
--- That is, 2 samples at @clk7@ are \"oversampled\" to only 6 samples at @clk2@;
--- meaning that there is actually a slight undersampling! A \"better\", but
--- currently unimplemented, synchronisation function would give the following
--- result:
---
--- >>> csample (veryUnsafeSynchronizer clk7 clk2 (cfromList [1,2,3,4,5,6,7,8,9,10]))
--- [1,1,1,2,2,2,2, 3,3,3,4,4,4,4, 5,5,5,6,6,...
---
--- Where 2 samples at @clk7@ are properly oversampled to 7 samples at @clk2@.
+-- >>> csample (veryUnsafeSynchronizer clk7 clk4 (cfromList [1..10]))
+-- [1,1,2,2,3,3,4, 5,5,6,6,7,7,8, 9,9,10,10,...
+-- >>> csample (veryUnsafeSynchronizer clk4 clk7 $ veryUnsafeSynchronizer clk7 clk4 (cfromList [1..10]))
+-- [1,2,3,4,5,6,7,8,9,10,...
 veryUnsafeSynchronizer :: Clock clk1 -- ^ 'Clock' of the incoming signal
                        -> Clock clk2 -- ^ 'Clock' of the outgoing signal
                        -> CSignal clk1 a
                        -> CSignal clk2 a
 veryUnsafeSynchronizer (Clock clk1) (Clock clk2) s = s'
   where
-    t1    = snatToInteger clk1
-    t2    = snatToInteger clk2
-    s' | t1 < t2   = compress   (t2 `div` t1) s -- Integer devision is erroneous
-       | t1 > t2   = oversample (t1 `div` t2) s -- Integer devision is erroneous
+    t1    = fromInteger (snatToInteger clk1)
+    t2    = fromInteger (snatToInteger clk2)
+    s' | t1 < t2   = compress   t2 t1 s
+       | t1 > t2   = oversample t1 t2 s
        | otherwise = same s
 
 same :: CSignal clk1 a -> CSignal clk2 a
 same (CSignal s) = CSignal s
 
--- Probably needs more parametrization
-oversample :: Integer -> CSignal clk1 a -> CSignal clk2 a
-oversample i (CSignal (s :- ss)) = (prefix (replicate (fromInteger i) s) (oversample i (CSignal ss)))
-  where
-    prefix []     s' = s'
-    prefix (x:xs) s' = mkCSignal x (prefix xs s')
+oversample :: Int -> Int -> CSignal clk1 a -> CSignal clk2 a
+oversample high low (CSignal s) = CSignal (oversampleS (repSchedule high low) s)
 
--- Probably needs more parametrization
-compress :: Integer -> CSignal clk1 a -> CSignal clk2 a
-compress i (CSignal x) = CSignal (compress' i x)
+oversampleS :: [Int] -> Signal a -> Signal a
+oversampleS sched = oversample' sched
   where
-    compress' 1 (s :- ss) = s :- compress' i ss
-    compress' n (_ :- ss) = compress' (n-1) ss
+    oversample' []     s       = oversampleS sched s
+    oversample' (d:ds) (s:-ss) = prefixN d s (oversample' ds ss)
+
+    prefixN 0 _ s = s
+    prefixN n x s = x :- prefixN (n-1) x s
+
+compress :: Int -> Int -> CSignal clk1 a -> CSignal clk2 a
+compress high low (CSignal s) = CSignal (compressS (repSchedule high low) s)
+
+compressS :: [Int] -> Signal a -> Signal a
+compressS sched  = compress' sched
+  where
+    compress' []     s           = compressS sched s
+    compress' (d:ds) ss@(s :- _) = s :- compress' ds (dropS d ss)
+
+    dropS 0 s         = s
+    dropS n (_ :- ss) = dropS (n-1) ss
+
+repSchedule :: Int -> Int -> [Int]
+repSchedule high low = take low $ repSchedule' low high 1
+  where
+    repSchedule' cnt th rep
+      | cnt < th  = repSchedule' (cnt+low) th (rep + 1)
+      | otherwise = rep : repSchedule' (cnt + low) (th + high) 1
 
 -- | Implicitly clocked signals have a clock with period 1000
 fromImplicit :: Signal a -> CSignal 1000 a
