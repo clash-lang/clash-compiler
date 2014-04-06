@@ -17,6 +17,11 @@ begin
 end block;"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Explicit.veryUnsafeSynchronizer"
+    , "templateE" : "~ARG[2]"
+    }
+  }
 , { "Primitive" :
     { "name"      : "CLaSH.Signal.Explicit.cpack"
     , "primType"  : "Function"

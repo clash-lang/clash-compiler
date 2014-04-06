@@ -184,7 +184,7 @@ coreView tcMap ty =
          "CLaSH.Signal.Types.Signal"     -> coreView tcMap (head args)
          "CLaSH.Signal.Implicit.SignalP" -> coreView tcMap (head args)
          "CLaSH.Signal.Types.CSignal"     -> coreView tcMap (args !! 1)
-         "CLaSH.Signal.Implicit.CSignalP" -> coreView tcMap (args !! 1)
+         "CLaSH.Signal.Explicit.CSignalP" -> coreView tcMap (args !! 1)
          _ -> case (tcMap HashMap.! tc) of
                 (AlgTyCon {algTcRhs = (NewTyCon _ nt)})
                   | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
