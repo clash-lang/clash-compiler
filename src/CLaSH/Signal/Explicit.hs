@@ -278,10 +278,10 @@ same :: CSignal clk1 a -> CSignal clk2 a
 same (CSignal s) = CSignal s
 
 oversample :: Int -> Int -> CSignal clk1 a -> CSignal clk2 a
-oversample high low (CSignal s) = CSignal (oversampleS (repSchedule high low) s)
+oversample high low (CSignal (s :- ss)) = CSignal (s :- oversampleS (repSchedule high low) ss)
 
 oversampleS :: [Int] -> Signal a -> Signal a
-oversampleS sched = oversample' sched
+oversampleS sched = oversample' (rotateR sched)
   where
     oversample' []     s       = oversampleS sched s
     oversample' (d:ds) (s:-ss) = prefixN d s (oversample' ds ss)
@@ -307,6 +307,9 @@ repSchedule high low = take low $ repSchedule' low high 1
     repSchedule' cnt th rep
       | cnt < th  = repSchedule' (cnt+low) th (rep + 1)
       | otherwise = rep : repSchedule' (cnt + low) (th + high) 1
+
+rotateR :: [a] -> [a]
+rotateR xs = last xs : init xs
 
 -- | Implicitly clocked signals have a clock with period 1000
 fromImplicit :: Signal a -> CSignal 1000 a
