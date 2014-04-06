@@ -44,6 +44,10 @@ module CLaSH.Prelude
     -- * Utility functions
   , window
   , windowD
+    -- * Testbench functions
+  , sassert
+  , stimuliGenerator
+  , outputVerifier
     -- * Exported modules
     -- ** Implicitly clocked synchronous signals
   , module CLaSH.Signal.Implicit
@@ -80,6 +84,7 @@ import Control.Applicative
 import Control.Category            as Category
 import Data.Bits
 import Data.Default
+import Debug.Trace                 (trace)
 import CLaSH.Class.BitVector
 import CLaSH.Class.Num
 import CLaSH.Promoted.Nat
@@ -294,3 +299,36 @@ simulateC f = simulate (asFunction f)
 f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
                          s      = register sI s'
                      in  o
+
+{-# NOINLINE sassert #-}
+sassert :: Eq a => Signal a -> Signal a -> Signal b -> Signal b
+sassert = liftA3
+  (\a' b' c' -> if a' == b' then c'
+                            else trace ("expected value not equal to actual value") c')
+
+{-# INLINABLE stimuliGenerator #-}
+stimuliGenerator :: KnownNat l => Vec l a -> Signal a
+stimuliGenerator samples  =
+    let (r,o) = unpack (genT <$> register (maxIndex samples) r)
+    in  o
+  where
+    genT s = (s',samples ! s)
+      where
+        s' = if s > 0 then s - 1
+                      else s
+
+{-# INLINABLE outputVerifier #-}
+outputVerifier :: (KnownNat l, Eq a)
+                => Vec l a
+                -> Signal a -> Signal Bool
+outputVerifier samples i =
+    let (s,o) = unpack (genT <$> register (maxIndex samples) s)
+        (e,f) = unpack o
+    in  sassert i e f
+  where
+    genT s = (s',(samples ! s,finished))
+      where
+        s' = if s >= 1 then s - 1
+                       else s
+
+        finished = s == 0

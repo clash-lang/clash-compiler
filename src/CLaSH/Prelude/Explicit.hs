@@ -32,6 +32,10 @@ module CLaSH.Prelude.Explicit
     -- * Utility functions
   , cwindow
   , cwindowD
+    -- * Testbench functions
+  , csassert
+  , cstimuliGenerator
+  , coutputVerifier
     -- * Exported modules
     -- ** Explicitly clocked synchronous signals
   , module CLaSH.Signal.Explicit
@@ -39,7 +43,8 @@ module CLaSH.Prelude.Explicit
 where
 
 import Data.Default          (Default (..))
-import Control.Applicative   (Applicative (..), (<$>))
+import Debug.Trace           (trace)
+import Control.Applicative   (Applicative (..), (<$>),liftA3)
 import Control.Arrow         (Arrow (..), ArrowLoop (..))
 import Control.Category      as Category
 import GHC.TypeLits          (KnownNat,type (^), type (+))
@@ -47,7 +52,7 @@ import GHC.TypeLits          (KnownNat,type (^), type (+))
 import CLaSH.Promoted.Nat    (SNat, snat)
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.Sized.Vector    (Vec (..), (!), (+>>), vcopy, vcopyI, vreplace)
+import CLaSH.Sized.Vector    (Vec (..), (!), (+>>), maxIndex, vcopy, vcopyI, vreplace)
 
 {-# INLINABLE sync #-}
 -- | Create a synchronous function from a combinational function describing
@@ -276,3 +281,36 @@ cwindowD clk x = prev
   where
     prev = cregisterP clk (vcopyI def) next
     next = x +>> prev
+
+{-# NOINLINE csassert #-}
+csassert :: Eq a => CSignal t a -> CSignal t a -> CSignal t b -> CSignal t b
+csassert = liftA3
+  (\a' b' c' -> if a' == b' then c'
+                            else trace ("expected value not equal to actual value") c')
+
+{-# INLINABLE cstimuliGenerator #-}
+cstimuliGenerator :: KnownNat l => Vec l a -> Clock clk -> CSignal clk a
+cstimuliGenerator samples clk =
+    let (r,o) = cunpack clk (genT <$> cregister clk (maxIndex samples) r)
+    in  o
+  where
+    genT s = (s',samples ! s)
+      where
+        s' = if s > 0 then s - 1
+                      else s
+
+{-# INLINABLE coutputVerifier #-}
+coutputVerifier :: (KnownNat l, Eq a)
+                => Vec l a -> Clock clk
+                -> CSignal clk a -> CSignal clk Bool
+coutputVerifier samples clk i =
+    let (s,o) = cunpack clk (genT <$> cregister clk (maxIndex samples) s)
+        (e,f) = cunpack clk o
+    in  csassert i e f
+  where
+    genT s = (s',(samples ! s,finished))
+      where
+        s' = if s >= 1 then s - 1
+                       else s
+
+        finished = s == 0
