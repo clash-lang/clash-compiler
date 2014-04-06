@@ -24,7 +24,7 @@ data BlackBoxContext
 
 -- | Either the name of the identifier, or a tuple of the identifier and the
 -- corresponding clock
-type SyncIdentifier = Either Identifier (Identifier,Identifier)
+type SyncIdentifier = Either Identifier (Identifier,(Identifier,Int))
 
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]

@@ -80,7 +80,7 @@ setSym i l
               )
 
 -- | Get the name of the clock of an identifier
-clkSyncId :: SyncIdentifier -> Identifier
+clkSyncId :: SyncIdentifier -> (Identifier,Int)
 clkSyncId (Right (_,clk)) = clk
 clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 
@@ -148,14 +148,14 @@ mkSyncIdentifier b O               = return $ fst $ result b
 mkSyncIdentifier b (I n)           = return $ fst $ inputs b !! n
 mkSyncIdentifier b (L n)           = return $ Left $ litInputs b !! n
 mkSyncIdentifier _ (Sym n)         = return $ Left $ Text.pack ("n_" ++ show n)
-mkSyncIdentifier b (Clk Nothing)   = let t = clkSyncId $ fst $ result b
-                                     in tell [(t,Clock 10)] >> return (Left t)
-mkSyncIdentifier b (Clk (Just n))  = let t = clkSyncId $ fst $ inputs b !! n
-                                     in tell [(t,Clock 10)] >> return (Left t)
-mkSyncIdentifier b (Rst Nothing)   = let t = (`Text.append` Text.pack "_rst") . clkSyncId $ fst $ result b
-                                     in tell [(t,Reset 10)] >> return (Left t)
-mkSyncIdentifier b (Rst (Just n))  = let t = (`Text.append` Text.pack "_rst") . clkSyncId $ fst $ inputs b !! n
-                                     in tell [(t,Reset 10)] >> return (Left t)
+mkSyncIdentifier b (Clk Nothing)   = let (clk,rate) = clkSyncId $ fst $ result b
+                                     in tell [(clk,Clock rate)] >> return (Left clk)
+mkSyncIdentifier b (Clk (Just n))  = let (clk,rate) = clkSyncId $ fst $ inputs b !! n
+                                     in tell [(clk,Clock rate)] >> return (Left clk)
+mkSyncIdentifier b (Rst Nothing)   = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ result b
+                                     in tell [(rst,Reset rate)] >> return (Left rst)
+mkSyncIdentifier b (Rst (Just n))  = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ inputs b !! n
+                                     in tell [(rst,Reset rate)] >> return (Left rst)
 mkSyncIdentifier b (Typ Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
 mkSyncIdentifier b (Typ (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ inputs b !! n
 mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ result b

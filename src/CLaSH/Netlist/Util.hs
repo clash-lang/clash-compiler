@@ -72,21 +72,21 @@ coreTypeToHWTypeM :: Type
                   -> NetlistMonad (Maybe HWType)
 coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
 
--- | Returns the name of the clock corresponding to a type
+-- | Returns the name and period of the clock corresponding to a type
 synchronizedClk :: Type
-                -> Maybe Identifier
+                -> Maybe (Identifier,Int)
 synchronizedClk ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case name2String tyCon of
-      "CLaSH.Signal.Types.Signal"     -> Just (pack "clk1000")
+      "CLaSH.Signal.Types.Signal"     -> Just (pack "clk1000",1000)
       "CLaSH.Sized.Vector.Vec"        -> synchronizedClk (args!!1)
-      "CLaSH.Signal.Implicit.SignalP" -> Just (pack "clk1000")
+      "CLaSH.Signal.Implicit.SignalP" -> Just (pack "clk1000",1000)
       "CLaSH.Signal.Types.CSignal"    -> case (head args) of
-                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i))
+                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i),i)
                                            _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       "CLaSH.Signal.Types.CSignalP"   -> case (head args) of
-                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i))
+                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i),i)
                                            _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       _                               -> Nothing
   | otherwise
