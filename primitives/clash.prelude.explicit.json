@@ -1,0 +1,16 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Prelude.Explicit.csassert"
+    , "templateD" :
+"~SYM[0]_block : block
+begin
+  process(~CLK[1],~RST[1],~ARG[1],~ARG[2]) is
+  begin
+    if (rising_edge(~CLK[1]) or rising_edge(~RST[1])) then
+      assert (~ARG[1] = ~ARG[2]) report (\"expected: \" & to_string (~ARG[2]) & \", actual: \" & to_string (~ARG[1])) severity error;
+    end if;
+  end process;
+  ~RESULT <= ~ARG[3];
+end block;"
+    }
+  }
+]
