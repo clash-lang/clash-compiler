@@ -1,0 +1,16 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Show.showSignedInt"
+    , "templateE" : "integer'image(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Show.$fShowInt_$cshow"
+    , "templateE" : "integer'image(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Show.$fShowInt_$cshowList"
+    , "templateE" : "integer'image(~ARG[0])"
+    }
+  }
+]

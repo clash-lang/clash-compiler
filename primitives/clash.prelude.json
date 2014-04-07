@@ -29,14 +29,14 @@ end block;"
 "~SYM[0]_block : block
 begin
   -- pragma translate_off
-  process(~CLK[1],~RST[1],~ARG[1],~ARG[2]) is
+  process(~CLK[2],~RST[2],~ARG[2],~ARG[3]) is
   begin
-    if (rising_edge(~CLK[1]) or rising_edge(~RST[1])) then
-      assert (~ARG[1] = ~ARG[2]) report (\"expected: \" & to_string (~ARG[2]) & \", actual: \" & to_string (~ARG[1])) severity error;
+    if (rising_edge(~CLK[2]) or rising_edge(~RST[2])) then
+      assert (~ARG[2] = ~ARG[3]) report (\"expected: \" & to_string (~ARG[3]) & \", actual: \" & to_string (~ARG[2])) severity error;
     end if;
   end process;
   -- pragma translate_on
-  ~RESULT <= ~ARG[3];
+  ~RESULT <= ~ARG[4];
 end block;"
     }
   }
