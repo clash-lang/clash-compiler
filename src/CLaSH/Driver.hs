@@ -79,7 +79,7 @@ generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
-      (netlist,vhdlState) <- genNetlist Nothing
+      (netlist,vhdlState,cmpCnt) <- genNetlist Nothing Nothing
                                transformedBindings
                                primMap tcm typeTrans Nothing (fst topEntity)
 
@@ -94,7 +94,7 @@ generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
                                 netlist
 
       (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
-                                  typeTrans tcm eval vhdlState bindingsMap
+                                  typeTrans tcm eval vhdlState cmpCnt bindingsMap
                                   (listToMaybe $ map fst $ HashMap.toList testInputs)
                                   (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                   topComponent

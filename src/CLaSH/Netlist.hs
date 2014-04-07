@@ -42,6 +42,8 @@ import           CLaSH.Util
 -- @topEntity@ at the top.
 genNetlist :: Maybe VHDLState
            -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+           -> Maybe Int
+           -- ^ Starting number of the component counter
            -> HashMap TmName (Type,Term)
            -- ^ Global binders
            -> PrimMap
@@ -54,14 +56,16 @@ genNetlist :: Maybe VHDLState
            -- ^ Symbol count
            -> TmName
            -- ^ Name of the @topEntity@
-           -> IO ([Component],VHDLState)
-genNetlist vhdlStateM globals primMap tcm typeTrans mStart topEntity = do
-  (_,s) <- runNetlistMonad vhdlStateM globals primMap tcm typeTrans $ genComponent topEntity mStart
-  return (HashMap.elems $ _components s, _vhdlMState s)
+           -> IO ([Component],VHDLState,Int)
+genNetlist vhdlStateM compCntM globals primMap tcm typeTrans mStart topEntity = do
+  (_,s) <- runNetlistMonad vhdlStateM compCntM globals primMap tcm typeTrans $ genComponent topEntity mStart
+  return (HashMap.elems $ _components s, _vhdlMState s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad :: Maybe VHDLState
                 -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+                -> Maybe Int
+                -- ^ Starting number of the component counter
                 -> HashMap TmName (Type,Term)
                 -- ^ Global binders
                 -> PrimMap
@@ -73,13 +77,13 @@ runNetlistMonad :: Maybe VHDLState
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a,NetlistState)
-runNetlistMonad vhdlStateM s p tcm typeTrans
+runNetlistMonad vhdlStateM compCntM s p tcm typeTrans
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 0 HashMap.empty p (fromMaybe (HashSet.empty,0,HashMap.empty) vhdlStateM) typeTrans tcm
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe (HashSet.empty,0,HashMap.empty) vhdlStateM) typeTrans tcm
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function

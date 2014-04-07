@@ -14,15 +14,13 @@ transfer s i = (i,o)
 
 initS = (0,(Nothing,L))
 
-f b = Just (4,b)
+testInput :: Signal Inp
+testInput = stimuliGenerator $(v ([ (1,(Just (4,True), L))
+                                  , (3,(Nothing, H))
+                                  ]::[(Signed 4,(Maybe (Signed 8,Bool),Bit))]))
 
-testInput :: [Inp]
-testInput = [ (1,(f True, L))
-            , (3,(Nothing, H))
-            ]
-
-expectedOutput :: [Outp]
-expectedOutput = [(Nothing,L)
-                 ,(f False, L)
-                 ]
+expectedOutput :: Signal Outp -> Signal Bool
+expectedOutput = outputVerifier $(v ([(Nothing,L)
+                                      ,(Just (4,False), L)
+                                      ]::[(Maybe (Signed 8,Bool),Bit)]))
 
