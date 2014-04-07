@@ -283,7 +283,28 @@ cwindowD clk x = prev
     next = x +>> prev
 
 {-# NOINLINE csassert #-}
-csassert :: (Eq a,Show a) => CSignal t a -> CSignal t a -> CSignal t b -> CSignal t b
+-- | Compares the first two arguments for equality and logs a warning when they
+-- are not equal. The second argument is considered the expected value. This
+-- function simply returns the third argument unaltered as its result.
+--
+-- This function is translated to the following VHDL:
+--
+-- > -- pragma translate_off
+-- > process(clk_t,reset_t,arg0,arg1) is
+-- > begin
+-- >   if (rising_edge(clk_t) or rising_edge(reset_t)) then
+-- >     assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
+-- >   end if;
+-- > end process;
+-- > -- pragma translate_on
+-- > result <= arg2;
+--
+-- And can, due to the pragmas, be used in synthesizable designs
+csassert :: (Eq a,Show a)
+         => CSignal t a -- ^ Checked value
+         -> CSignal t a -- ^ Expected value
+         -> CSignal t b -- ^ Return valued
+         -> CSignal t b
 csassert = liftA3
   (\a' b' c' -> if a' == b' then c'
                             else trace ("expected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')

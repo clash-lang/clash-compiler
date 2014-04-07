@@ -301,12 +301,41 @@ f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
                      in  o
 
 {-# NOINLINE sassert #-}
-sassert :: (Eq a, Show a) => Signal a -> Signal a -> Signal b -> Signal b
+-- | Compares the first two arguments for equality and logs a warning when they
+-- are not equal. The second argument is considered the expected value. This
+-- function simply returns the third argument unaltered as its result.
+--
+-- This function is translated to the following VHDL:
+--
+-- > -- pragma translate_off
+-- > process(clk_1000,reset_1000,arg0,arg1) is
+-- > begin
+-- >   if (rising_edge(clk_1000) or rising_edge(reset_1000)) then
+-- >     assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
+-- >   end if;
+-- > end process;
+-- > -- pragma translate_on
+-- > result <= arg2;
+--
+-- And can, due to the pragmas, be used in synthesizable designs
+sassert :: (Eq a, Show a)
+        => Signal a -- ^ Checked value
+        -> Signal a -- ^ Expected value
+        -> Signal b -- ^ Returned value
+        -> Signal b
 sassert = liftA3
   (\a' b' c' -> if a' == b' then c'
                             else trace ("expected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
 
 {-# INLINABLE stimuliGenerator #-}
+-- | To be used as a function to generate the \"magical\" 'testInput' value,
+-- which the CλaSH compilers looks for to create the stimulus generator for the
+-- generated VHDL testbench.
+--
+-- Example:
+--
+-- > testInput :: Signal Int
+-- > testInput = stimuliGenerator $(v [(1::Int)..10])
 stimuliGenerator :: forall l a . KnownNat l => Vec l a -> Signal a
 stimuliGenerator samples  =
     let (r,o) = unpack (genT <$> register (fromInteger (maxIndex samples)) r)
@@ -319,6 +348,14 @@ stimuliGenerator samples  =
                       else s
 
 {-# INLINABLE outputVerifier #-}
+-- | To be used as a function to generate the \"magical\" 'expectedOutput'
+-- function, which the CλaSH compilers looks for to create the signal verifier
+-- for the generated VHDL testbench.
+--
+-- Example:
+--
+-- > expectedOutput :: Signal Int -> Signal Bool
+-- > expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
                => Vec l a
                -> Signal a -> Signal Bool
