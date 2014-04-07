@@ -18,7 +18,7 @@ where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (join,liftM,when,zipWithM)
+import           Control.Monad                        (forM,join,liftM,when,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -54,20 +54,32 @@ mkTyPackage hwtys =
    "package" <+> "types" <+> "is" <$>
       indent 2 ( packageDec <$>
                  vcat (sequence funDecs)
-               ) <$>
+               ) <>
+      (case showDecs of
+         [] -> empty
+         _  -> linebreak <$>
+               "-- pragma translate_off" <$>
+               indent 2 (vcat (sequence showDecs)) <$>
+               "-- pragma translate_on"
+      ) <$>
    "end" <> semi <> packageBodyDec
   where
     hwTysSorted = topSortHWTys hwtys
     usedTys     = nub $ concatMap mkUsedTys hwtys
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodys) = unzip . catMaybes $ map funDec usedTys
+    (funDecs,funBodies) = unzip . catMaybes $ map funDec usedTys
+    (showDecs,showBodies) = unzip $ map mkToStringDecls hwTysSorted
 
     packageBodyDec :: VHDLM Doc
-    packageBodyDec = case funBodys of
-        [] -> empty
+    packageBodyDec = case (funBodies,showBodies) of
+        ([],[]) -> empty
         _  -> linebreak <$>
               "package" <+> "body" <+> "types" <+> "is" <$>
-                indent 2 (vcat (sequence funBodys)) <$>
+                indent 2 (vcat (sequence funBodies)) <$>
+                linebreak <>
+                "-- pragma translate_off" <$>
+                indent 2 (vcat (sequence showBodies)) <$>
+                "-- pragma translate_on" <$>
               "end" <> semi
 
 mkUsedTys :: HWType
@@ -156,6 +168,41 @@ funDec Integer = Just
   )
 
 funDec _ = Nothing
+
+mkToStringDecls :: HWType -> (VHDLM Doc, VHDLM Doc)
+mkToStringDecls t@(Product _ elTys) =
+  ( "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING" <> semi
+  , "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING is" <$>
+    "begin" <$>
+    indent 2 ("return" <+> parens (hcat (punctuate " & " elTyPrint)) <> semi) <$>
+    "end function to_string;"
+  )
+  where
+    elTyPrint = forM [0..(length elTys - 1)]
+                     (\i -> "to_string" <>
+                            parens ("value." <> vhdlType t <> "_sel" <> int i))
+mkToStringDecls (Vector _ Bit)  = (empty,empty)
+mkToStringDecls t@(Vector _ elTy) =
+  ( "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING" <> semi
+  , "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING is" <$>
+      indent 2
+        ( "alias ivalue    : " <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
+          "variable result : STRING" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
+        ) <$>
+    "begin" <$>
+      indent 2
+        ("for i in ivalue'range loop" <$>
+            indent 2
+              (  "result" <> parens (parens ("(i - 1) * " <> int (typeSize elTy)) <+> "+ 1" <+>
+                                             "to i*" <> int (typeSize elTy)) <+>
+                          ":= to_string" <> parens (if elTy == Bool then "toSLV(ivalue(i))" else "ivalue(i)") <> semi
+              ) <$>
+         "end loop;" <$>
+         "return result;"
+        ) <$>
+    "end function to_string;"
+  )
+mkToStringDecls _ = (empty,empty)
 
 tyImports :: VHDLM Doc
 tyImports =

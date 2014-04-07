@@ -216,36 +216,3 @@ genVerifier vhdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidde
                         [(inp,Identifier (fst outp) Nothing),(fin,Identifier "finished" Nothing)]
                    )
   return (decl,comps,vhdlState',hidden'')
-
--- mkToStringDecls :: HWType -> State VHDLState PP.Doc
--- mkToStringDecls t@(Product _ elTys) =
---     PPM.vcat (mapM mkToStringDecls elTys) PPM.<$>
---     "function to_string" PPM.<+> PPM.parens ("value :" PPM.<+> vhdlType t) PPM.<+> "return STRING is" PPM.<$>
---     "begin" PPM.<$>
---     PPM.indent 2 ("return" PPM.<+> PPM.parens (PPM.hcat (PPM.punctuate " & " elTyPrint)) PPM.<> PPM.semi) PPM.<$>
---     "end function to_string;"
---   where
---     elTyPrint = forM [0..(length elTys - 1)]
---                      (\i -> "to_string" PPM.<>
---                             PPM.parens ("value." PPM.<> vhdlType t PPM.<> "_sel" PPM.<> PPM.int i))
--- mkToStringDecls (Vector _ Bit)  = PPM.empty
--- mkToStringDecls t@(Vector _ elTy) =
---   mkToStringDecls elTy PPM.<$>
---   "function to_string" PPM.<+> PPM.parens ("value : " PPM.<+> vhdlTypeMark t) PPM.<+> "return STRING is" PPM.<$>
---     PPM.indent 2
---       ( "alias ivalue    : " PPM.<+> vhdlTypeMark t PPM.<> "(1 to value'length) is value;" PPM.<$>
---         "variable result : STRING" PPM.<> PPM.parens ("1 to value'length * " PPM.<> PPM.int (typeSize elTy)) PPM.<> PPM.semi
---       ) PPM.<$>
---   "begin" PPM.<$>
---     PPM.indent 2
---       ("for i in ivalue'range loop" PPM.<$>
---           PPM.indent 2
---             (  "result" PPM.<> PPM.parens (PPM.parens ("(i - 1) * " PPM.<> PPM.int (typeSize elTy)) PPM.<+> "+ 1" PPM.<+>
---                                            "to i*" PPM.<> PPM.int (typeSize elTy)) PPM.<+>
---                         ":= to_string" PPM.<> PPM.parens (if elTy == Bool then "toSLV(ivalue(i))" else "ivalue(i)") PPM.<> PPM.semi
---             ) PPM.<$>
---        "end loop;" PPM.<$>
---        "return result;"
---       ) PPM.<$>
---   "end function to_string;"
--- mkToStringDecls _ = PPM.empty
