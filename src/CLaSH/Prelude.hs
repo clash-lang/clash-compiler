@@ -325,7 +325,7 @@ outputVerifier :: forall l a . (KnownNat l, Eq a)
 outputVerifier samples i =
     let (s,o) = unpack (genT <$> register (fromInteger (maxIndex samples)) s)
         (e,f) = unpack o
-    in  sassert i e f
+    in  sassert i e (register False f)
   where
     genT :: Unsigned l -> (Unsigned l, (a,Bool))
     genT s = (s',(samples ! s,finished))

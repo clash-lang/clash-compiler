@@ -307,7 +307,7 @@ coutputVerifier :: forall l clk a . (KnownNat l, Eq a)
 coutputVerifier samples clk i =
     let (s,o) = cunpack clk (genT <$> cregister clk (fromInteger (maxIndex samples)) s)
         (e,f) = cunpack clk o
-    in  csassert i e f
+    in  csassert i e (cregister clk False f)
   where
     genT :: Unsigned l -> (Unsigned l,(a,Bool))
     genT s = (s',(samples ! s,finished))
