@@ -301,10 +301,10 @@ f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
                      in  o
 
 {-# NOINLINE sassert #-}
-sassert :: Eq a => Signal a -> Signal a -> Signal b -> Signal b
+sassert :: (Eq a, Show a) => Signal a -> Signal a -> Signal b -> Signal b
 sassert = liftA3
   (\a' b' c' -> if a' == b' then c'
-                            else trace ("expected value not equal to actual value") c')
+                            else trace ("expected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
 
 {-# INLINABLE stimuliGenerator #-}
 stimuliGenerator :: forall l a . KnownNat l => Vec l a -> Signal a
@@ -319,7 +319,7 @@ stimuliGenerator samples  =
                       else s
 
 {-# INLINABLE outputVerifier #-}
-outputVerifier :: forall l a . (KnownNat l, Eq a)
+outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
                => Vec l a
                -> Signal a -> Signal Bool
 outputVerifier samples i =

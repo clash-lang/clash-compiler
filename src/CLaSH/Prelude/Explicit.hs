@@ -283,10 +283,10 @@ cwindowD clk x = prev
     next = x +>> prev
 
 {-# NOINLINE csassert #-}
-csassert :: Eq a => CSignal t a -> CSignal t a -> CSignal t b -> CSignal t b
+csassert :: (Eq a,Show a) => CSignal t a -> CSignal t a -> CSignal t b -> CSignal t b
 csassert = liftA3
   (\a' b' c' -> if a' == b' then c'
-                            else trace ("expected value not equal to actual value") c')
+                            else trace ("expected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
 
 {-# INLINABLE cstimuliGenerator #-}
 cstimuliGenerator :: forall l clk a . KnownNat l => Vec l a -> Clock clk -> CSignal clk a
@@ -301,7 +301,7 @@ cstimuliGenerator samples clk =
                       else s
 
 {-# INLINABLE coutputVerifier #-}
-coutputVerifier :: forall l clk a . (KnownNat l, Eq a)
+coutputVerifier :: forall l clk a . (KnownNat l, Eq a, Show a)
                 => Vec l a -> Clock clk
                 -> CSignal clk a -> CSignal clk Bool
 coutputVerifier samples clk i =
