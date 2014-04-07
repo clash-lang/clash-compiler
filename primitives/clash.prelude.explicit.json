@@ -1,4 +1,29 @@
 [ { "BlackBox" :
+    { "name"      : "CLaSH.Prelude.Explicit.cblockRam"
+    , "templateD" :
+"~SYM[0]_block : block
+  type ram_array is array (natural range <>) of ~TYP[7];
+  signal ~SYM[1] : ram_array((~ARG[0]-1) downto 0); -- ram
+  signal ~SYM[2] : ~TYP[7]; -- inp
+  signal ~SYM[3] : ~TYP[7]; -- outp
+begin
+  ~SYM[2] <= ~ARG[7];
+
+  process(~CLK[7])
+  begin
+    if rising_edge(~CLK[7]) then
+      if ~ARG[5] then
+        ~SYM[1](to_integer(~ARG[4])) <= ~SYM[2];
+      end if;
+      ~SYM[3] <= ~SYM[1](to_integer(~ARG[5]));
+    end if;
+  end process;
+
+  ~RESULT <= ~SYM[3];
+end block;"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Prelude.Explicit.csassert"
     , "templateD" :
 "~SYM[0]_block : block
