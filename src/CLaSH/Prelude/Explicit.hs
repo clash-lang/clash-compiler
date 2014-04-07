@@ -289,25 +289,27 @@ csassert = liftA3
                             else trace ("expected value not equal to actual value") c')
 
 {-# INLINABLE cstimuliGenerator #-}
-cstimuliGenerator :: KnownNat l => Vec l a -> Clock clk -> CSignal clk a
+cstimuliGenerator :: forall l clk a . KnownNat l => Vec l a -> Clock clk -> CSignal clk a
 cstimuliGenerator samples clk =
-    let (r,o) = cunpack clk (genT <$> cregister clk (maxIndex samples) r)
+    let (r,o) = cunpack clk (genT <$> cregister clk (fromInteger (maxIndex samples)) r)
     in  o
   where
+    genT :: Unsigned l -> (Unsigned l,a)
     genT s = (s',samples ! s)
       where
         s' = if s > 0 then s - 1
                       else s
 
 {-# INLINABLE coutputVerifier #-}
-coutputVerifier :: (KnownNat l, Eq a)
+coutputVerifier :: forall l clk a . (KnownNat l, Eq a)
                 => Vec l a -> Clock clk
                 -> CSignal clk a -> CSignal clk Bool
 coutputVerifier samples clk i =
-    let (s,o) = cunpack clk (genT <$> cregister clk (maxIndex samples) s)
+    let (s,o) = cunpack clk (genT <$> cregister clk (fromInteger (maxIndex samples)) s)
         (e,f) = cunpack clk o
     in  csassert i e f
   where
+    genT :: Unsigned l -> (Unsigned l,(a,Bool))
     genT s = (s',(samples ! s,finished))
       where
         s' = if s >= 1 then s - 1

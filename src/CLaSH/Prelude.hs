@@ -307,25 +307,27 @@ sassert = liftA3
                             else trace ("expected value not equal to actual value") c')
 
 {-# INLINABLE stimuliGenerator #-}
-stimuliGenerator :: KnownNat l => Vec l a -> Signal a
+stimuliGenerator :: forall l a . KnownNat l => Vec l a -> Signal a
 stimuliGenerator samples  =
-    let (r,o) = unpack (genT <$> register (maxIndex samples) r)
+    let (r,o) = unpack (genT <$> register (fromInteger (maxIndex samples)) r)
     in  o
   where
+    genT :: Unsigned l -> (Unsigned l, a)
     genT s = (s',samples ! s)
       where
         s' = if s > 0 then s - 1
                       else s
 
 {-# INLINABLE outputVerifier #-}
-outputVerifier :: (KnownNat l, Eq a)
-                => Vec l a
-                -> Signal a -> Signal Bool
+outputVerifier :: forall l a . (KnownNat l, Eq a)
+               => Vec l a
+               -> Signal a -> Signal Bool
 outputVerifier samples i =
-    let (s,o) = unpack (genT <$> register (maxIndex samples) s)
+    let (s,o) = unpack (genT <$> register (fromInteger (maxIndex samples)) s)
         (e,f) = unpack o
     in  sassert i e f
   where
+    genT :: Unsigned l -> (Unsigned l, (a,Bool))
     genT s = (s',(samples ! s,finished))
       where
         s' = if s >= 1 then s - 1
