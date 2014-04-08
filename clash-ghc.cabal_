@@ -47,7 +47,6 @@ Data-files:           primitives/clash.bit.json,
                       primitives/ghc.integer.type.json,
                       primitives/ghc.prim.json,
                       primitives/ghc.real.json,
-                      primitives/ghc.show.json,
                       primitives/ghc.typelits.json,
                       primitives/ghc.types.json,
                       primitives/unsafe.coerce.json

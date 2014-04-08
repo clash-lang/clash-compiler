@@ -23,7 +23,7 @@ import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (fromMaybe)
-import           Data.Text                   (pack)
+import           Data.Text                   (isInfixOf,pack)
 import qualified Data.Traversable            as T
 import           Unbound.LocallyNameless     (Rep, bind, embed, rebind, rec,
                                               runFreshM, string2Name, unbind,
@@ -267,6 +267,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
               return (C.Prim xNameS xType)
             Nothing
               | x `elem` unlocs -> return (C.Prim xNameS xType)
+              | pack "$cshow" `isInfixOf` xNameS -> return (C.Prim xNameS xType)
               | otherwise       -> return  (C.Var xType xVar)
 
     alt (DEFAULT   , _ , e) = bind C.DefaultPat <$> term e
