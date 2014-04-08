@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.2.2.2
+Version:              0.3
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -31,8 +31,12 @@ Extra-source-files:   README.md,
 
 Data-files:           primitives/clash.bit.json,
                       primitives/clash.prelude.json,
+                      primitives/clash.prelude.explicit.json
                       primitives/clash.promoted.nat.json,
-                      primitives/clash.signal.json,
+                      primitives/clash.signal.explicit.json,
+                      primitives/clash.signal.implicit.json,
+                      primitives/clash.signal.types.json,
+                      primitives/clash.sized.fixed.json,
                       primitives/clash.sized.signed.json,
                       primitives/clash.sized.unsigned.json,
                       primitives/clash.sized.vector.json,
@@ -43,6 +47,7 @@ Data-files:           primitives/clash.bit.json,
                       primitives/ghc.integer.type.json,
                       primitives/ghc.prim.json,
                       primitives/ghc.real.json,
+                      primitives/ghc.show.json,
                       primitives/ghc.typelits.json,
                       primitives/ghc.types.json,
                       primitives/unsafe.coerce.json
