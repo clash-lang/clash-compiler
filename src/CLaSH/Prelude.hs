@@ -67,6 +67,8 @@ module CLaSH.Prelude
   , module CLaSH.Promoted.Nat.TH
     -- ** Type-level functions
   , module CLaSH.Promoted.Ord
+    -- ** Template Haskell
+  , Lift (..), deriveLift
     -- ** Type classes
     -- *** CLaSH
   , module CLaSH.Class.BitVector
@@ -98,6 +100,7 @@ import CLaSH.Sized.Vector
 import CLaSH.Bit
 import CLaSH.Signal.Implicit
 import GHC.TypeLits
+import Language.Haskell.TH.Lift     (Lift(..),deriveLift)
 
 {-# INLINABLE window #-}
 -- | Give a window over a 'Signal'
