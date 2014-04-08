@@ -109,6 +109,7 @@ import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
 import qualified CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types (DebugLevel(..))
+import           Control.Concurrent (forkIO)
 
 #ifdef STANDALONE
 
@@ -1498,17 +1499,23 @@ makeVHDL [] = do
   case (reverse sortedGraph) of
     (AcyclicSCC top):_ -> do
       let loc = (GHC.ml_hs_file . GHC.ms_location) top
-      maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
+      maybe (return ())
+        (\src -> do
+                   _ <- liftIO $ forkIO $ do primDir <- getDefPrimDir
                                              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
                                              (bindingsMap,tcm) <- generateBindings primMap src
                                              CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
-                        ) loc
+                   return ()
+        ) loc
     _ -> return ()
-makeVHDL srcs = liftIO $ do primDir <- getDefPrimDir
+
+makeVHDL srcs = do
+  _ <- liftIO $ forkIO $ do primDir <- getDefPrimDir
                             primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
                             mapM_ (\src -> do (bindingsMap,tcm) <- generateBindings primMap src
                                               CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
                                   ) srcs
+  return ()
 
 -----------------------------------------------------------------------------
 -- :type
