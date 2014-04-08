@@ -78,16 +78,22 @@ register i s = i :- s
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
--- | Conversion between a 'Signal' of a product type (e.g. a tuple) and a
+-- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's
 class Pack a where
   type SignalP a
-  -- | > pack :: (Signal a, Signal b) -> Signal (a,b)
+  -- | Example:
+  --
+  -- > pack :: (Signal a, Signal b) -> Signal (a,b)
+  --
   -- However:
   --
   -- > pack :: Signal Bit -> Signal Bit
   pack   :: SignalP a -> Signal a
-  -- | > unpack :: Signal (a,b) -> (Signal a, Signal b)
+  -- | Example:
+  --
+  -- > unpack :: Signal (a,b) -> (Signal a, Signal b)
+  --
   -- However:
   --
   -- > unpack :: Signal Bit -> Signal Bit

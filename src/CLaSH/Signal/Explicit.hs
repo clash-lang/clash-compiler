@@ -113,20 +113,26 @@ cregister _ i s = coerce (register i (coerce s))
 csimulate :: (CSignal clk1 a -> CSignal clk2 b) -> [a] -> [b]
 csimulate f = csample . f . cfromList
 
--- | Conversion between a 'Signal' of a product type (e.g. a tuple) and a
--- product type of 'Signal's
+-- | Isomorphism between a @'CSignal' clk@ of a product type (e.g. a tuple) and a
+-- product type of @'CSignal' clk@'s
 class CPack a where
   type CSignalP (clk :: Nat) a
   type CSignalP clk a = CSignal clk a
-  -- | > pack :: (Signal a, Signal b) -> Signal (a,b)
+  -- | Example:
+  --
+  -- > cpack :: Clock clk -> (CSignal clk a, CSignal clk b) -> CSignal clk (a,b)
+  --
   -- However:
   --
-  -- > pack :: Signal Bit -> Signal Bit
+  -- > cpack :: Clock clk -> CSignal clk Bit -> CSignal clk Bit
   cpack   :: Clock clk -> CSignalP clk a -> CSignal clk a
-  -- | > unpack :: Signal (a,b) -> (Signal a, Signal b)
+  -- | Example:
+  --
+  -- > cunpack :: Clock clk -> CSignal clk (a,b) -> (CSignal clk a, CSignal clk b)
+  --
   -- However:
   --
-  -- > unpack :: Signal Bit -> Signal Bit
+  -- > cunpack :: Clock clk -> CSignal clk Bit -> CSignal clk Bit
   cunpack :: Clock clk -> CSignal clk a -> CSignalP clk a
 
 -- | Simulate a (@'CSignalP' clk1 a -> 'CSignalP' clk2 b@) function given a list
@@ -271,7 +277,7 @@ instance CPack (Vec n a) where
 -- > clk7 = Clock d7
 -- > clk2 = Clock d2
 --
--- Oversampling followed compression is the identity function plus 2 initial values:
+-- Oversampling followed by compression is the identity function plus 2 initial values:
 --
 -- > cregister clk7 i $
 -- > veryUnsafeSynchronizer clk2 clk7 $
