@@ -13,11 +13,11 @@ import Language.Haskell.TH.Syntax (Lift (..))
 import CLaSH.Promoted.Nat  (SNat)
 
 infixr 5 :-
--- | A synchronized signal with elements of type @a@, implicitly synchronized to
+-- | A synchronized signal with samples of type @a@, implicitly synchronized to
 -- an unnamed global clock
 data Signal a = a :- Signal a
 
--- | A synchronized signal with elements of type @a@, explicitly synchronized to
+-- | A synchronized signal with samples of type @a@, explicitly synchronized to
 -- a clock with period @clk@
 newtype CSignal (clk :: Nat) a = CSignal (Signal a)
   deriving (Show,Default,Lift,Functor,Applicative)

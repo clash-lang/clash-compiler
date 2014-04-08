@@ -108,8 +108,8 @@ import GHC.TypeLits
 -- >>> simulateP window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
 window :: (KnownNat (n + 1), Default a)
-       => Signal a
-       -> Vec ((n + 1) + 1) (Signal a)
+       => Signal a                     -- ^ Signal to create a window over
+       -> Vec ((n + 1) + 1) (Signal a) -- ^ Window of at least size 2
 window x = x :> prev
   where
     prev = registerP (vcopyI def) next
@@ -124,8 +124,8 @@ window x = x :> prev
 -- >>> simulateP windowD3 [1,2,3,4,...
 -- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
 windowD :: (KnownNat (n + 1), Default a)
-        => Signal a
-        -> Vec (n + 1) (Signal a)
+        => Signal a               -- ^ Signal to create a window over
+        -> Vec (n + 1) (Signal a) -- ^ Window of at least size 1
 windowD x = prev
   where
     prev = registerP (vcopyI def) next
@@ -303,19 +303,23 @@ f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
 {-# NOINLINE sassert #-}
 -- | Compares the first two arguments for equality and logs a warning when they
 -- are not equal. The second argument is considered the expected value. This
--- function simply returns the third argument unaltered as its result.
+-- function simply returns the third argument unaltered as its result. This
+-- function is used by 'outputVerifier'.
 --
 -- This function is translated to the following VHDL:
 --
--- > -- pragma translate_off
--- > process(clk_1000,reset_1000,arg0,arg1) is
+-- > sassert_block : block
 -- > begin
--- >   if (rising_edge(clk_1000) or rising_edge(reset_1000)) then
--- >     assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
--- >   end if;
--- > end process;
--- > -- pragma translate_on
--- > result <= arg2;
+-- >   -- pragma translate_off
+-- >   process(clk_1000,reset_1000,arg0,arg1) is
+-- >   begin
+-- >     if (rising_edge(clk_1000) or rising_edge(reset_1000)) then
+-- >       assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
+-- >     end if;
+-- >   end process;
+-- >   -- pragma translate_on
+-- >   result <= arg2;
+-- > end block;
 --
 -- And can, due to the pragmas, be used in synthesizable designs
 sassert :: (Eq a, Show a)
@@ -325,18 +329,23 @@ sassert :: (Eq a, Show a)
         -> Signal b
 sassert = liftA3
   (\a' b' c' -> if a' == b' then c'
-                            else trace ("expected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
+                            else trace ("\nexpected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
 
 {-# INLINABLE stimuliGenerator #-}
--- | To be used as a function to generate the \"magical\" 'testInput' value,
--- which the CλaSH compilers looks for to create the stimulus generator for the
--- generated VHDL testbench.
+-- | To be used as a one of the functions to create the \"magical\" 'testInput'
+-- value, which the CλaSH compilers looks for to create the stimulus generator
+-- for the generated VHDL testbench.
 --
 -- Example:
 --
 -- > testInput :: Signal Int
--- > testInput = stimuliGenerator $(v [(1::Int)..10])
-stimuliGenerator :: forall l a . KnownNat l => Vec l a -> Signal a
+-- > testInput = stimuliGenerator $(v [(1::Int),3..21])
+--
+-- >>> sample testInput
+-- [1,3,5,7,9,11,13,15,17,19,21,21,21,...
+stimuliGenerator :: forall l a . KnownNat l
+                 => Vec l a  -- ^ Samples to generate
+                 -> Signal a -- ^ Signal of given samples
 stimuliGenerator samples  =
     let (r,o) = unpack (genT <$> register (fromInteger (maxIndex samples)) r)
     in  o
@@ -348,7 +357,7 @@ stimuliGenerator samples  =
                       else s
 
 {-# INLINABLE outputVerifier #-}
--- | To be used as a function to generate the \"magical\" 'expectedOutput'
+-- | To be used as a functions to generate the \"magical\" 'expectedOutput'
 -- function, which the CλaSH compilers looks for to create the signal verifier
 -- for the generated VHDL testbench.
 --
@@ -356,9 +365,25 @@ stimuliGenerator samples  =
 --
 -- > expectedOutput :: Signal Int -> Signal Bool
 -- > expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+--
+-- >>> sample (expectedOutput (fromList ([0..10] ++ [10,10,10])))
+-- [
+-- expected value: 70, not equal to actual value: 0
+-- False,
+-- expected value: 99, not equal to actual value: 1
+-- False,False,False,False,False,
+-- expected value: 7, not equal to actual value: 6
+-- False,
+-- expected value: 8, not equal to actual value: 7
+-- False,
+-- expected value: 9, not equal to actual value: 8
+-- False,
+-- expected value: 10, not equal to actual value: 9
+-- False,True,True,...
 outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
-               => Vec l a
-               -> Signal a -> Signal Bool
+               => Vec l a     -- ^ Samples to compare with
+               -> Signal a    -- ^ Signal to verify
+               -> Signal Bool -- ^ Indicator that all samples are verified
 outputVerifier samples i =
     let (s,o) = unpack (genT <$> register (fromInteger (maxIndex samples)) s)
         (e,f) = unpack o

@@ -257,9 +257,9 @@ blockRamPow2CC clk n = CC ((\(wr,rd,en,din) -> cblockRamPow2 clk n wr rd en din)
 -- >>> csimulateP window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
 cwindow :: (KnownNat (n + 1), Default a)
-        => Clock clk
-        -> CSignal clk a
-        -> Vec ((n + 1) + 1) (CSignal clk a)
+        => Clock clk                         -- ^ Clock to which the incoming signal is synchronized
+        -> CSignal clk a                     -- ^ Signal to create a window over
+        -> Vec ((n + 1) + 1) (CSignal clk a) -- ^ Window of at least size 2
 cwindow clk x = x :> prev
   where
     prev = cregisterP clk (vcopyI def) next
@@ -274,9 +274,9 @@ cwindow clk x = x :> prev
 -- >>> csimulateP windowD3 [1,2,3,4,...
 -- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
 cwindowD :: (KnownNat (n + 1), Default a)
-        => Clock clk
-        -> CSignal clk a
-        -> Vec (n + 1) (CSignal clk a)
+        => Clock clk                    -- ^ Clock to which the incoming signal is synchronized
+        -> CSignal clk a                -- ^ Signal to create a window over
+        -> Vec (n + 1) (CSignal clk a)  -- ^ Window of at least size 1
 cwindowD clk x = prev
   where
     prev = cregisterP clk (vcopyI def) next
@@ -285,19 +285,24 @@ cwindowD clk x = prev
 {-# NOINLINE csassert #-}
 -- | Compares the first two arguments for equality and logs a warning when they
 -- are not equal. The second argument is considered the expected value. This
--- function simply returns the third argument unaltered as its result.
+-- function simply returns the third argument unaltered as its result. This
+-- function is used by 'coutputVerifier'.
+--
 --
 -- This function is translated to the following VHDL:
 --
--- > -- pragma translate_off
--- > process(clk_t,reset_t,arg0,arg1) is
+-- > csassert_block : block
 -- > begin
--- >   if (rising_edge(clk_t) or rising_edge(reset_t)) then
--- >     assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
--- >   end if;
--- > end process;
--- > -- pragma translate_on
--- > result <= arg2;
+-- >   -- pragma translate_off
+-- >   process(clk_t,reset_t,arg0,arg1) is
+-- >   begin
+-- >     if (rising_edge(clk_t) or rising_edge(reset_t)) then
+-- >       assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
+-- >     end if;
+-- >   end process;
+-- >   -- pragma translate_on
+-- >   result <= arg2;
+-- > end block;
 --
 -- And can, due to the pragmas, be used in synthesizable designs
 csassert :: (Eq a,Show a)
@@ -307,10 +312,26 @@ csassert :: (Eq a,Show a)
          -> CSignal t b
 csassert = liftA3
   (\a' b' c' -> if a' == b' then c'
-                            else trace ("expected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
+                            else trace ("\nexpected value: " ++ show b' ++ ", not equal to actual value: " ++ show a') c')
 
 {-# INLINABLE cstimuliGenerator #-}
-cstimuliGenerator :: forall l clk a . KnownNat l => Vec l a -> Clock clk -> CSignal clk a
+-- | To be used as a one of the functions to create the \"magical\" 'testInput'
+-- value, which the CλaSH compilers looks for to create the stimulus generator
+-- for the generated VHDL testbench.
+--
+-- Example:
+--
+-- > clk2 = Clock d2
+-- >
+-- > testInput :: CSignal 2 Int
+-- > testInput = cstimuliGenerator $(v [(1::Int),3..21]) clk2
+--
+-- >>> csample testInput
+-- [1,3,5,7,9,11,13,15,17,19,21,21,21,...
+cstimuliGenerator :: forall l clk a . KnownNat l
+                  => Vec l a        -- ^ Samples to generate
+                  -> Clock clk      -- ^ Clock to synchronize the output signal to
+                  -> CSignal clk a  -- ^ Signal of given samples
 cstimuliGenerator samples clk =
     let (r,o) = cunpack clk (genT <$> cregister clk (fromInteger (maxIndex samples)) r)
     in  o
@@ -322,9 +343,36 @@ cstimuliGenerator samples clk =
                       else s
 
 {-# INLINABLE coutputVerifier #-}
+-- | To be used as a functions to generate the \"magical\" 'expectedOutput'
+-- function, which the CλaSH compilers looks for to create the signal verifier
+-- for the generated VHDL testbench.
+--
+-- Example:
+--
+-- > clk7 = Clock d7
+-- >
+-- > expectedOutput :: CSignal 7 Int -> CSignal 7 Bool
+-- > expectedOutput = coutputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int])) clk7
+--
+-- >>> csample (expectedOutput (cfromList ([0..10] ++ [10,10,10])))
+-- [
+-- expected value: 70, not equal to actual value: 0
+-- False,
+-- expected value: 99, not equal to actual value: 1
+-- False,False,False,False,False,
+-- expected value: 7, not equal to actual value: 6
+-- False,
+-- expected value: 8, not equal to actual value: 7
+-- False,
+-- expected value: 9, not equal to actual value: 8
+-- False,
+-- expected value: 10, not equal to actual value: 9
+-- False,True,True,...
 coutputVerifier :: forall l clk a . (KnownNat l, Eq a, Show a)
-                => Vec l a -> Clock clk
-                -> CSignal clk a -> CSignal clk Bool
+                => Vec l a           -- ^ Samples to compare with
+                -> Clock clk         -- ^ Clock the input signal is synchronized to
+                -> CSignal clk a     -- ^ Signal to verify
+                -> CSignal clk Bool  -- ^ Indicator that all samples are verified
 coutputVerifier samples clk i =
     let (s,o) = cunpack clk (genT <$> cregister clk (fromInteger (maxIndex samples)) s)
         (e,f) = cunpack clk o
