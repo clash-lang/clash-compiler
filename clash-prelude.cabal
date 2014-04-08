@@ -61,6 +61,7 @@ Library
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
+                      CLaSH.Tutorial
 
   Other-modules:      CLaSH.Signal.Types
 
