@@ -434,22 +434,25 @@ specialise :: (Functor m, State.MonadState s m)
            => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
            -> Lens' s (HashMap TmName Int) -- ^ Lens into the specialisation history
            -> Lens' s Int -- ^ Lens into the specialisation limit
+           -> Bool
            -> Rewrite m
-specialise specMapLbl specHistLbl specLimitLbl ctx e@(TyApp e1 ty) = specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgs e1) (Right ty)
-specialise specMapLbl specHistLbl specLimitLbl ctx e@(App   e1 e2) = specialise' specMapLbl specHistLbl specLimitLbl ctx e (collectArgs e1) (Left  e2)
-specialise _          _           _            _   e               = return e
+specialise specMapLbl specHistLbl specLimitLbl doCheck ctx e = case e of
+  (TyApp e1 ty) -> specialise' specMapLbl specHistLbl specLimitLbl False ctx e (collectArgs e1) (Right ty)
+  (App e1 e2)   -> specialise' specMapLbl specHistLbl specLimitLbl doCheck ctx e (collectArgs e1) (Left  e2)
+  _             -> return e
 
 -- | Specialise an application on its argument
 specialise' :: (Functor m, State.MonadState s m)
             => Lens' s (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
             -> Lens' s (HashMap TmName Int) -- ^ Lens into specialisation history
             -> Lens' s Int -- ^ Lens into the specialisation limit
+            -> Bool -- ^ Perform specialisation limit check
             -> [CoreContext] -- Transformation context
             -> Term -- ^ Original term
             -> (Term, [Either Term Type]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> R m Term
-specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = R $ do
+specialise' specMapLbl specHistLbl specLimitLbl doCheck ctx e (Var _ f, args) specArg = R $ do
   lvl <- Lens.view dbgLevel
   -- Create binders and variable references for free variables in 'specArg'
   (specBndrs,specVars) <- specArgBndrsAndVars ctx specArg
@@ -472,7 +475,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- liftR $ fmap (HML.lookup f) (Lens.use specHistLbl)
           specLim   <- liftR $ Lens.use specLimitLbl
-          if maybe False (> specLim) specHistM
+          if doCheck && maybe False (> specLim) specHistM
             then fail $ unlines [ "Hit specialisation limit on function `" ++ showDoc f ++ "'.\n"
                                 , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
                                 , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
@@ -494,7 +497,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
               newf `deepseq` changed newExpr
         Nothing -> return e
 
-specialise' _ _ _ ctx _ (appE,args) (Left specArg) = R $ do
+specialise' _ _ _ _ ctx _ (appE,args) (Left specArg) = R $ do
   -- Create binders and variable references for free variables in 'specArg'
   (specBndrs,specVars) <- specArgBndrsAndVars ctx (Left specArg)
   -- Create specialized function
@@ -506,7 +509,7 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = R $ do
   let newExpr = mkApps appE (args ++ [newArg])
   changed newExpr
 
-specialise' _ _ _ _ e _ _ = return e
+specialise' _ _ _ _ _ e _ _ = return e
 
 -- | Create binders and variable references for free variables in 'specArg'
 specArgBndrsAndVars :: (Functor m, Monad m)

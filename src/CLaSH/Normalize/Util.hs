@@ -45,7 +45,7 @@ addNewInline f = do
                      (HashMap.singleton f 1)
 
 -- | Specialize under the Normalization Monad
-specializeNorm :: NormRewrite
+specializeNorm :: Bool -> NormRewrite
 specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
