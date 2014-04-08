@@ -1,9 +1,7 @@
 module CalculatorArrow where
 
 import CLaSH.Prelude
-
-type Word = Signed 4
-data OPC a = ADD | MUL | Imm a | Pop | Push
+import CalculatorTypes
 
 (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (f .: g) a b = f (g a b)
@@ -42,8 +40,8 @@ topEntity = proc i -> do
   where
     initMem    = vcopy (snat :: SNat 8) 0
 
-testInput :: [OPC Word]
-testInput = [Imm 1,Push,Imm 2,Push,Pop,Pop,Pop,ADD]
+testInput :: Signal (OPC Word)
+testInput = stimuliGenerator $(v [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
 
-expectedOutput :: [Maybe Word]
-expectedOutput = [Just 1,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3]
+expectedOutput :: Signal (Maybe Word) -> Signal Bool
+expectedOutput = outputVerifier $(v [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
