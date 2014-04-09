@@ -184,7 +184,7 @@ registerP i = unpack Prelude.. register i Prelude.. pack
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
 -- > bram40 = blockRam d50
-blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a)
+blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a, Default a)
          => SNat n              -- ^ Size @n@ of the blockram
          -> Signal (Unsigned m) -- ^ Write address @w@
          -> Signal (Unsigned m) -- ^ Read address @r@
@@ -194,7 +194,7 @@ blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a)
 blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
-    binit = (vcopy n (error "uninitialized ram"),error "uninitialized ram")
+    binit = (vcopy n def,def)
 
     bram' :: (Vec n a,a) -> (Unsigned m, Unsigned m, Bool, a)
           -> (((Vec n a),a),a)
@@ -208,7 +208,7 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
 --
 -- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, a) a
 -- > bramC40 = blockRamC d50
-blockRamC :: (KnownNat n, KnownNat m, Pack a)
+blockRamC :: (KnownNat n, KnownNat m, Pack a, Default a)
           => SNat n -- ^ Size @n@ of the blockram
           -> Comp (Unsigned m, Unsigned m, Bool, a) a
 blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
@@ -218,7 +218,7 @@ blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = blockRamPow2 d32
-blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a)
+blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a, Default a)
              => SNat (2^n)          -- ^ Size @2^n@ of the blockram
              -> Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
@@ -231,7 +231,7 @@ blockRamPow2 = blockRam
 --
 -- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, a) a
 -- > bramC32 = blockRamPow2C d32
-blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a)
+blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a, Default a)
               => SNat (2^n) -- ^ Size @2^n@ of the blockram
               -> Comp (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)

@@ -188,7 +188,7 @@ csimulateC f = csimulate (asCFunction f)
 -- > bram40 :: CSignal 100 (Unsigned 6) -> CSignal 100 (Unsigned 6)
 -- >        -> CSignal 100 Bool -> CSignal 100 a -> 100 CSignal a
 -- > bram40 = cblockRam clk100 d50
-cblockRam :: forall n m a clk . (KnownNat n, KnownNat m, CPack a)
+cblockRam :: forall n m a clk . (KnownNat n, KnownNat m, CPack a, Default a)
           => Clock clk                -- ^ 'Clock' to synchronize to
           -> SNat n                   -- ^ Size @n@ of the blockram
           -> CSignal clk (Unsigned m) -- ^ Write address @w@
@@ -199,7 +199,7 @@ cblockRam :: forall n m a clk . (KnownNat n, KnownNat m, CPack a)
 cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
-    binit = (vcopy n (error "uninitialized ram"),error "uninitialized ram")
+    binit = (vcopy n def,def)
 
     bram' :: (Vec n a,a) -> (Unsigned m, Unsigned m, Bool, a)
           -> (((Vec n a),a),a)
@@ -215,7 +215,7 @@ cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
 -- >
 -- > bramC40 :: CComp 100 (Unsigned 6, Unsigned 6, Bool, a) a
 -- > bramC40 = blockRamCC clk100 d50
-blockRamCC :: (KnownNat n, KnownNat m, CPack a)
+blockRamCC :: (KnownNat n, KnownNat m, CPack a, Default a)
            => Clock clk -- ^ 'Clock' to synchronize to
            -> SNat n    -- ^ Size @n@ of the blockram
            -> CComp clk (Unsigned m, Unsigned m, Bool, a) a
@@ -226,7 +226,7 @@ blockRamCC clk n = CC ((\(wr,rd,en,din) -> cblockRam clk n wr rd en din) Prelude
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = cblockRamPow2 d32
-cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a)
+cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a, Default a)
               => Clock clk                -- ^ 'Clock' to synchronize to
               -> SNat (2^n)               -- ^ Size @2^n@ of the blockram
               -> CSignal clk (Unsigned n) -- ^ Write address @w@
@@ -242,7 +242,7 @@ cblockRamPow2 = cblockRam
 -- >
 -- > bramC32 :: CComp 100 (Unsigned 5, Unsigned 5, Bool, a) a
 -- > bramC32 = blockRamPow2CC clk100 d32
-blockRamPow2CC :: (KnownNat n, KnownNat (2^n), CPack a)
+blockRamPow2CC :: (KnownNat n, KnownNat (2^n), CPack a, Default a)
                => Clock clk  -- ^ 'Clock' to synchronize to
                -> SNat (2^n) -- ^ Size @2^n@ of the blockram
                -> CComp clk (Unsigned n, Unsigned n, Bool, a) a
