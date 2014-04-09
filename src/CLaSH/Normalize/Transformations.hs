@@ -39,7 +39,7 @@ import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
 import           Unbound.LocallyNameless     (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
-                                              unrec)
+                                              unrec, name2String)
 import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           CLaSH.Core.DataCon          (DataCon, dcTag, dcUnivTyVars)
@@ -49,7 +49,7 @@ import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
-import           CLaSH.Core.Type             (splitFunTy)
+import           CLaSH.Core.Type             (TypeView (..), splitFunTy, tyView)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isVar, mkApps, mkLams, mkTmApps,
@@ -146,20 +146,28 @@ inlineNonRep _ e@(Case scrut alts)
     isInlined <- liftR $ alreadyInlined f
     limit     <- liftR $ Lens.use inlineLimit
     tcm       <- Lens.use tcCache
-    if (Maybe.fromMaybe 0 isInlined) > limit
+    scrutTy   <- termType tcm scrut
+    let noException = not (exception scrutTy)
+    if noException && (Maybe.fromMaybe 0 isInlined) > limit
       then do
         cf <- liftR $ Lens.use curFun
         ty <- termType tcm scrut
         error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ showDoc ty
       else do
-        scrutTy     <- termType tcm scrut
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
-            liftR $ addNewInline f
+            Monad.when noException (liftR $ addNewInline f)
             changed $ Case (mkApps scrutBody args) alts
           _ -> return e
+  where
+    exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") [arg]) = case tyView arg of
+      TyConApp (name2String -> "CLaSH.Sized.Signed.Signed") _ -> True
+      TyConApp (name2String -> "CLaSH.Sized.Signed.Unsigned") _ -> True
+      _ -> False
+    exception _ = False
+
 
 inlineNonRep _ e = return e
 
