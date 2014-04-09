@@ -77,6 +77,7 @@ loadModules modName = defaultErrorHandler $ do
                       { DynFlags.ctxtStkDepth = 1000
                       , DynFlags.optLevel = 2
                       , DynFlags.ghcMode  = GHC.CompManager
+                      , DynFlags.ghcLink  = GHC.LinkInMemory
                       } )
                     [ DynFlags.Opt_TemplateHaskell
                     , DynFlags.Opt_Arrows
