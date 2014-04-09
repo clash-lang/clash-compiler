@@ -1,11 +1,36 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.remInteger"
-    , "templateE" : "~ARG[0] rem ~ARG[1]"
+    { "name"      : "GHC.Integer.Type.smallInteger"
+    , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.quotInteger"
-    , "templateE" : "~ARG[0] div ~ARG[1]"
+    { "name"      : "GHC.Integer.Type.integerToInt"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.plusInteger"
+    , "templateE" : "~ARG[0] + ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.minusInteger"
+    , "templateE" : "~ARG[0] - ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.timesInteger"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.negateInteger"
+    , "templateE" : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.absInteger"
+    , "templateE" : "abs ~ARG[0]"
     }
   }
 , { "BlackBox" :
@@ -20,19 +45,23 @@ begin
 end block;"
     }
   }
-
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.modInteger"
     , "templateE" : "~ARG[0] mod ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.eqInteger"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    { "name"      : "GHC.Integer.Type.quotInteger"
+    , "templateE" : "~ARG[0] div ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.eqInteger#"
+    { "name"      : "GHC.Integer.Type.remInteger"
+    , "templateE" : "~ARG[0] rem ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger"
     , "templateE" : "~ARG[0] = ~ARG[1]"
     }
   }
@@ -62,43 +91,33 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.absInteger"
-    , "templateE" : "abs ~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.plusInteger"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.minusInteger"
-    , "templateE" : "~ARG[0] - ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.timesInteger"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.negateInteger"
-    , "templateE" : "-~ARG[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "GHC.Integer.Type.integerToInt"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "GHC.Integer.Type.eqInteger#"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "templateE" : "1 when ~ARG[0] = ~ARG[1] else 0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger#"
+    , "templateE" : "1 when ~ARG[0] /= ~ARG[1] else 0"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.leInteger#"
-    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    , "templateE" : "1 when ~ARG[0] <= ~ARG[1] else 0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger#"
+    , "templateE" : "1 when ~ARG[0] > ~ARG[1] else 0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger#"
+    , "templateE" : "1 when ~ARG[0] < ~ARG[1] else 0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger#"
+    , "templateE" : "1 when ~ARG[0] >= ~ARG[1] else 0"
     }
   }
 ]

@@ -3,4 +3,9 @@
     , "primType" : "Function"
     }
   }
+, { "Primitive" :
+    { "name"     : "GHC.CString.unpackCStringUtf8#"
+    , "primType" : "Function"
+    }
+  }
 ]

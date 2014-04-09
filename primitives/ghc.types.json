@@ -3,4 +3,9 @@
     , "primType"  : "Constructor"
     }
   }
+, { "Primitive" :
+    { "name"      : "GHC.Types.MkCoercible"
+    , "primType"  : "Constructor"
+    }
+  }
 ]

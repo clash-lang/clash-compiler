@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Err.error"
+    { "name"      : "EmptyCase"
     , "templateE" : "~DEFAULTO"
     }
   }

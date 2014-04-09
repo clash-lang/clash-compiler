@@ -31,7 +31,7 @@ import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
 import           CLaSH.Core.Util         (collectBndrs, termType)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
 import           CLaSH.Netlist.Id
-import           CLaSH.Netlist.Types
+import           CLaSH.Netlist.Types     as HW
 import           CLaSH.Util
 
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
@@ -260,3 +260,10 @@ preserveVarEnv action = do
   varCount .= vCnt
   varEnv   .= vEnv
   return val
+
+dcToLiteral :: HWType -> Int -> Expr
+dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
+dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit True)
+dcToLiteral Bit 1  = HW.Literal Nothing (BitLit H)
+dcToLiteral Bit 2  = HW.Literal Nothing (BitLit L)
+dcToLiteral t i    = HW.Literal (Just $ conSize t) (NumLit (i-1))

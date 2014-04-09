@@ -3,4 +3,14 @@
     , "templateE" : "~DEFAULTO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Real.ratioZeroDenominatorError"
+    , "templateE" : "~DEFAULTO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Real.overflowError"
+    , "templateE" : "~DEFAULTO"
+    }
+  }
 ]

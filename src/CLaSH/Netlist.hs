@@ -26,8 +26,8 @@ import           CLaSH.Core.Literal         (Literal (..))
 import           CLaSH.Core.Pretty          (showDoc)
 import           CLaSH.Core.Term            (Pat (..), Term (..), TmName)
 import qualified CLaSH.Core.Term            as Core
-import           CLaSH.Core.Type            (Type)
-import           CLaSH.Core.TyCon           (TyConName, TyCon)
+import           CLaSH.Core.Type            (Type (..), ConstTy (..))
+import           CLaSH.Core.TyCon           (TyConName, TyCon, tyConDataCons)
 import           CLaSH.Core.Util            (collectArgs, isVar, termType)
 import           CLaSH.Core.Var             (Id, Var (..))
 import           CLaSH.Netlist.BlackBox
@@ -203,13 +203,6 @@ mkDeclarations bndr (Case scrut alts) = do
                                   _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
       _ -> scrutE
 
-    dcToLiteral :: HWType -> Int -> Expr
-    dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
-    dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit True)
-    dcToLiteral Bit 1  = HW.Literal Nothing (BitLit H)
-    dcToLiteral Bit 2  = HW.Literal Nothing (BitLit L)
-    dcToLiteral t i    = HW.Literal (Just $ conSize t) (NumLit (i-1))
-
 mkDeclarations bndr app = do
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
   tcm <- Lens.use tcCache
@@ -262,32 +255,61 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
 
 mkExpr ty app = do
   let (appF,(args,_)) = second partitionEithers $ collectArgs app
-  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  hwTy  <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   tcm   <- Lens.use tcCache
   args' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) args
   case appF of
     Data dc
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
       | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim nm _ -> do
-      bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
-      case bbM of
-        Just p@(P.BlackBox {}) ->
-          case template p of
-            Left templD -> do
-              i <- varCount <<%= (+1)
-              let tmpNm   = "tmp_" ++ show i
-                  tmpId   = Id (string2Name tmpNm) (Embed ty)
-                  tmpS    = Text.pack tmpNm
-                  netDecl = NetDecl tmpS hwTy Nothing
-              (bbCtx,ctxDcls) <- mkBlackBoxContext tmpId args
-              bb <- fmap BlackBoxD $! mkBlackBox templD bbCtx
-              return (Identifier tmpS Nothing, ctxDcls ++ [netDecl,bb])
-            Right templE -> do
-              (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
-              bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox templE bbCtx
-              return (bb,ctxDcls)
-        _ -> error $ $(curLoc) ++ "No blackbox found: " ++ TextS.unpack nm
+    Prim nm _
+      | nm == TextS.pack "GHC.Prim.tagToEnum#" -> do
+        i <- varCount <<%= (+1)
+        scrutTy <- termType tcm (head args)
+        (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
+        let ConstTy (TyCon tcN) = ty
+            dcs       = tyConDataCons (tcm HashMap.! tcN)
+            tags      = map dcTag dcs
+            altLhs    = map (Just . HW.Literal Nothing . NumLit . (subtract 1)) tags
+            altRhs    = map (dcToLiteral hwTy) tags
+            tmpNm     = "tmp_" ++ show i
+            tmpS      = Text.pack tmpNm
+            netDecl   = NetDecl tmpS hwTy Nothing
+            netAssign = CondAssignment tmpS scrutExpr (zip altLhs altRhs)
+        return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
+      | nm == TextS.pack "GHC.Prim.dataToTag#" -> do
+        i <- varCount <<%= (+1)
+        scrutTy <- termType tcm (head args)
+        (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
+        let ConstTy (TyCon tcN) = scrutTy
+            dcs       = tyConDataCons (tcm HashMap.! tcN)
+            tags      = map dcTag dcs
+            altLhs    = map (Just . dcToLiteral hwTy) tags
+            altRhs    = map (HW.Literal Nothing . NumLit . (subtract 1)) tags
+            tmpNm     = "tmp_" ++ show i
+            tmpS      = Text.pack tmpNm
+            netDecl   = NetDecl tmpS hwTy Nothing
+            netAssign = CondAssignment tmpS scrutExpr (zip altLhs altRhs)
+        return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
+      | otherwise -> do
+        bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
+        case bbM of
+          Just p@(P.BlackBox {}) ->
+            case template p of
+              Left templD -> do
+                i <- varCount <<%= (+1)
+                let tmpNm   = "tmp_" ++ show i
+                    tmpId   = Id (string2Name tmpNm) (Embed ty)
+                    tmpS    = Text.pack tmpNm
+                    netDecl = NetDecl tmpS hwTy Nothing
+                (bbCtx,ctxDcls) <- mkBlackBoxContext tmpId args
+                bb <- fmap BlackBoxD $! mkBlackBox templD bbCtx
+                return (Identifier tmpS Nothing, ctxDcls ++ [netDecl,bb])
+              Right templE -> do
+                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
+                bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox templE bbCtx
+                return (bb,ctxDcls)
+          _ -> error $ $(curLoc) ++ "No blackbox found: " ++ TextS.unpack nm
     Var _ f
       | null args -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app

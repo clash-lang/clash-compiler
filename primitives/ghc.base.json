@@ -1,16 +1,33 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.Base.plusInt"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
+[ { "Primitive" :
+    { "name"      : "GHC.Base.$"
+    , "primType"  : "Function"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Base.timesInt"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    { "name"      : "GHC.Base.quotInt"
+    , "templateE" : "~ARG[0] div ~ARG[1]"
     }
   }
-, { "Primitive" :
-    { "name"      : "GHC.Base.$"
-    , "primType"  : "Function"
+, { "BlackBox" :
+    { "name"      : "GHC.Base.remInt"
+    , "templateE" : "~ARG[0] rem ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Base.divInt"
+    , "templateD" :
+"~SYM[0]_block : block
+  signal ~SYM[1] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[0] / ~ARG[1];
+  ~RESULT <= ~SYM[1] - 1 when ((~ARG[0] = abs ~ARG[0]) /= (~ARG[1] = abs ~ARG[1])) else
+             ~SYM[1];
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Base.modInt"
+    , "templateE" : "~ARG[0] mod ~ARG[1]"
     }
   }
 ]
