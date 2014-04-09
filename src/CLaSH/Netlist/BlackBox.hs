@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternGuards     #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
 -- | Functions to create BlackBox Contexts and fill in BlackBox templates
@@ -55,7 +56,9 @@ mkBlackBoxContext resId args = do
     (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
 
     -- Make context result
-    let res   = Left . mkBasicId . pack $ name2String (V.varName resId)
+    let res = case synchronizedClk (unembed $ V.varType resId) of
+                Just clk -> Right . (,clk) . mkBasicId . pack $ name2String (V.varName resId)
+                Nothing  -> Left . mkBasicId . pack $ name2String (V.varName resId)
     resTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) varInps (map fst litInps) funInps

@@ -4,11 +4,11 @@
 "~SYM[0]_block : block
   signal ~SYM[1] : ~TYP[2];
 begin
-  process(~CLK[2],~RST[2])
+  process(~CLKO,~RSTO)
   begin
-    if ~RST[2] = '0' then
+    if ~RSTO = '0' then
       ~SYM[1] <= ~ARG[1];
-    elsif rising_edge(~CLK[2]) then
+    elsif rising_edge(~CLKO) then
       ~SYM[1] <= ~ARG[2];
     end if;
   end process;

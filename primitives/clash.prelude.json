@@ -9,9 +9,9 @@
 begin
   ~SYM[2] <= ~ARG[8];
 
-  process(~CLK[8])
+  process(~CLKO)
   begin
-    if rising_edge(~CLK[8]) then
+    if rising_edge(~CLKO) then
       if ~ARG[7] then
         ~SYM[1](to_integer(~ARG[5])) <= ~SYM[2];
       end if;
