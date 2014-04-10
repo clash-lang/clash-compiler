@@ -35,7 +35,7 @@ module CLaSH.Sized.Vector
 where
 
 import Control.Applicative
-import Data.Traversable
+-- import Data.Traversable
 import Data.Foldable              hiding (toList)
 import Data.Proxy
 import GHC.TypeLits
@@ -76,15 +76,15 @@ instance KnownNat n => Applicative (Vec n) where
   pure  = vcopyI
   (<*>) = vzipWith ($)
 
-instance Traversable (Vec n) where
-  traverse _ Nil       = pure Nil
-  traverse f (x :> xs) = (:>) <$> f x <*> traverse f xs
+-- instance Traversable (Vec n) where
+--   traverse _ Nil       = pure Nil
+--   traverse f (x :> xs) = (:>) <$> f x <*> traverse f xs
 
 instance Foldable (Vec n) where
-  foldMap = foldMapDefault
+  foldr = vfoldr
 
 instance Functor (Vec n) where
-  fmap = fmapDefault
+  fmap = vmap
 
 {-# NOINLINE vhead #-}
 -- | Extract the first element of a vector
