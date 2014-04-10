@@ -170,8 +170,8 @@ inlineNonRep _ e@(Case scrut alts)
         "CLaSH.Sized.Signed.Signed"     -> True
         "CLaSH.Sized.Unsigned.Unsigned" -> True
         "CLaSH.Sized.Fixed.Fixed"       -> True
-        "CLaSH.Signal.Types.Signal"     -> numArg (head arg')
-        "CLaSH.Signal.Types.CSignal"    -> numArg (arg'!!1)
+        "CLaSH.Signal.Types.Signal"     -> numDictArg (head arg')
+        "CLaSH.Signal.Types.CSignal"    -> numDictArg (arg'!!1)
         "GHC.Integer.Type.Integer"      -> True
         "GHC.Types.Int"                 -> True
         _                               -> False
