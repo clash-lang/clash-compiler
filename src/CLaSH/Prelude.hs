@@ -238,7 +238,7 @@ blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a, Default a)
               -> Comp (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
 
-{-# DEPRECATED Comp "Use 'Applicative' interface and (<^>) instead" #-}
+{-# DEPRECATED Comp "Use 'Applicative' interface and ('<^>') instead" #-}
 -- | 'Comp'onent: an 'Arrow' interface to synchronous sequential functions
 newtype Comp  a b = C { asFunction :: Signal a -> Signal b }
 
@@ -277,7 +277,7 @@ registerC = C Prelude.. register
 simulateC :: Comp a b -> [a] -> [b]
 simulateC f = simulate (asFunction f)
 
-{-# DEPRECATED (^^^) "Use 'Applicative' interface and (<^>) instead" #-}
+{-# DEPRECATED (^^^) "Use 'Applicative' interface and ('<^>') instead" #-}
 {-# INLINABLE (^^^) #-}
 -- | Create a synchronous 'Comp'onent from a combinational function describing
 -- a mealy machine
