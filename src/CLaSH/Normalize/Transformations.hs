@@ -162,11 +162,20 @@ inlineNonRep _ e@(Case scrut alts)
             changed $ Case (mkApps scrutBody args) alts
           _ -> return e
   where
-    exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") [arg]) = case tyView arg of
-      TyConApp (name2String -> "CLaSH.Sized.Signed.Signed") _ -> True
-      TyConApp (name2String -> "CLaSH.Sized.Signed.Unsigned") _ -> True
-      _ -> False
+    exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") [arg]) = numDictArg arg
     exception _ = False
+
+    numDictArg arg = case tyView arg of
+      TyConApp tcNm arg' -> case name2String tcNm of
+        "CLaSH.Sized.Signed.Signed"     -> True
+        "CLaSH.Sized.Unsigned.Unsigned" -> True
+        "CLaSH.Sized.Fixed.Fixed"       -> True
+        "CLaSH.Signal.Types.Signal"     -> numArg (head arg')
+        "CLaSH.Signal.Types.CSignal"    -> numArg (arg'!!1)
+        "GHC.Integer.Type.Integer"      -> True
+        "GHC.Types.Int"                 -> True
+        _                               -> False
+      _ -> False
 
 
 inlineNonRep _ e = return e
