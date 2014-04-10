@@ -227,7 +227,7 @@ instance Pack (Vec n a) where
   unpack vs@((_ :> _) :- _) = fmap vhead vs :> (unpack (fmap vtail vs))
 
 
--- | Operator lifting, use in conjunction with '(^>)'
+-- | Operator lifting, use in conjunction with ('^>')
 --
 -- > add2 :: Signal Int -> Signal Int
 -- > add2 x = x <^(+)^> (signal 2)
@@ -237,7 +237,7 @@ instance Pack (Vec n a) where
 (<^) :: Applicative f => f a -> (a -> b -> c) -> f b -> f c
 v <^ f = liftA2 f v
 
--- | Operator lifting, use in conjunction with '(<^)'
+-- | Operator lifting, use in conjunction with ('<^')
 --
 -- > add2 :: Signal Int -> Signal Int
 -- > add2 x = x <^(+)^> (signal 2)
