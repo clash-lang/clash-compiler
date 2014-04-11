@@ -175,7 +175,7 @@ syncA clk f sI = CC $ \i -> let (s',o) = cunpack clk $ f <$> s <*> i
 cregisterC :: Clock clk -> a -> CComp clk a a
 cregisterC clk = CC Prelude.. cregister clk
 
-{-# DEPRECATED csimulateC "'Comp' is deprecated, use 'csimulate' instead" #-}
+{-# DEPRECATED csimulateC "'CComp' is deprecated, use 'csimulate' instead" #-}
 -- | Simulate a 'Comp'onent given a list of samples
 --
 -- > clk100 = Clock d100
@@ -213,7 +213,7 @@ cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
              | otherwise = ram
         o'               = ram ! r
 
-{-# DEPRECATED blockRamCC "'Comp' is deprecated, use 'cblockRam' instead" #-}
+{-# DEPRECATED blockRamCC "'CComp' is deprecated, use 'cblockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
 -- > clk100 = Clock 100
@@ -241,7 +241,7 @@ cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a, Default a)
               -> CSignal clk a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 cblockRamPow2 = cblockRam
 
-{-# DEPRECATED blockRamPow2CC "'Comp' is deprecated, use 'cblockRamPow2' instead" #-}
+{-# DEPRECATED blockRamPow2CC "'CComp' is deprecated, use 'cblockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- > clk100 = Clock d100
