@@ -1,8 +1,9 @@
-{- | A little tutorial to CλaSH
--}
 module CLaSH.Tutorial (
   -- * Introduction
   -- $introduction
+
+  -- * Installation
+  -- $installation
 
   -- * MAC Example
   -- $mac_example
@@ -19,6 +20,59 @@ module CLaSH.Tutorial (
 where
 
 {- $introduction
+CλaSH (pronounced ‘clash’) is a functional hardware description language that
+borrows both its syntax and semantics from the functional programming language
+Haskell. The merits of using a functional language to describe hardware comes
+from the fact that combinational circuits can be directly modeled as
+mathematical functions and that functional languages lend themselves very well
+at describing and (de-)composing mathematical functions.
+-}
+
+{- $installation
+The CλaSH compiler and Prelude library for circuit design only work with the
+<http://haskell.org/ghc GHC> Haskell compiler version 7.8.1 and up.
+
+(1) Install __GHC (version 7.8.1 or higher)__
+
+    * Download and install <http://www.haskell.org/ghc/download GHC for your platform>.
+      Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
+      location.
+
+    * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
+
+(2) Install __Cabal__
+
+    * Windows:
+
+        * Download the binary for <http://www.haskell.org/cabal/download.html cabal-install>
+        * Put the binary in a location mentioned in your @PATH@
+
+    * Unix:
+
+        * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
+        * Unpack (@tar xf@) the archive and @cd@ to the directory
+        * Run @sh bootstrap.sh@
+        * Follow the instructions to add @cabal@ to your @PATH@
+
+    * Run @cabal update@
+
+(3) Install update __RepLib__ library
+
+    * Download the sources for the modified <https://www.dropbox.com/s/k1nfbqpzwbub0c1/RepLib-0.5.3.2.tar.gz RepLib-0.5.3.2.tar.gz> library
+    * Run @cabal install RepLib-0.5.3.2.tar.gz@
+
+(4) Install __CλaSH__
+
+    * Run @cabal install clash-ghc@
+
+(5) Verify that everything is working by:
+
+    * Downloading the <https://raw.github.com/christiaanb/clash2/master/examples/FIR.hs Fir.hs> example
+    * Run @clash --interactive FIR.hs@
+    * Execute, in the interpreter, the @:vhdl@ command.
+    * Exit the interpreter using @:q@
+    * Examin the VHDL code in the @vhdl@ directory
+
 -}
 
 {- $mac_example
@@ -124,7 +178,7 @@ where
 
 -}
 
-{- $unsupported
+{- $unsupported #unsupported#
 Here is a list of Haskell features which the CλaSH compiler cannot synthesize
 to VHDL (for now):
 
