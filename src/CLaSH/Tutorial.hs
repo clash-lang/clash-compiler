@@ -14,7 +14,7 @@ module CLaSH.Tutorial (
   -- * Errors and their solutions
   -- $errorsandsolutions
 
-  -- * Haskell stuff that the CλaSH compiler does not support
+  -- * Unsupported Haskell
   -- $unsupported
   )
 where
@@ -26,6 +26,39 @@ Haskell. The merits of using a functional language to describe hardware comes
 from the fact that combinational circuits can be directly modeled as
 mathematical functions and that functional languages lend themselves very well
 at describing and (de-)composing mathematical functions.
+
+Although we say that CλaSH borrows the semantics of Haskell, that statement
+should be taken with a grain of salt. What we mean to say is that the CλaSH
+compiler views a circuit description as /structural/ description. This means,
+in an academic handwavy way, that every function denotes a component and every
+function application denotes an instantiation of said component. Now, this has
+consequences on how we view /recursive/ functions: structurally, a recursive
+function would denote an /infinitely/ deep / structured component, something
+that cannot be turned into an actual circuit (See also <#unsupported Unsupported Haskell>).
+Of course there are variants of recursion that cab be completely unfolded at
+compile-time with a finite amount of steps and hence could be converted to a
+realisable circuit. Sadly, this last feature is missing in the current version
+of the compiler.
+
+On the other hand, Haskell's by-default non-strict evaluation corresponds very
+well to the simulation of the feedback loops which are ubiquitous in digital
+circuits. That is, when we take our structural view to circuit descriptions,
+value-recursion corresponds directly to a feedback loop:
+
+@
+counter = s
+  where
+    s = register 0 (s + 1)
+@
+
+Over time, you will get a better feeling of what exact the consequences are of
+taking a \structural\ view on circuit descriptions. What is always important to
+remember is that every applied functions results in an instantiated component,
+and also that the compiler will never infer / invent more logic than what is
+specified in the circuit description.
+
+With that out of the way, let us continue with installing CλaSH and building
+our first circuit.
 -}
 
 {- $installation
