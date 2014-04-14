@@ -19,8 +19,8 @@ Description:
   * Additionally import "CLaSH.Prelude.Explicit" if you want to design
     explicitly clocked circuits in a multi-clock setting
   .
-  For now, "CLaSH.Prelude" is also the best starting point for exploring the
-  library. A tutorial module will be added within due time.
+  A preliminary version of a tutorial can be found in "CLaSH.Tutorial", for a
+  general overview of the library you should however check out "CLaSH.Prelude".
 Homepage:             http://christiaanb.github.io/clash2/
 bug-reports:          http://github.com/christiaanb/clash-prelude/issues
 License:              BSD3

@@ -14,7 +14,7 @@ module CLaSH.Tutorial (
   -- * Working with this tutorial
   -- $working
 
-  -- * First circuit
+  -- * Your first circuit
   -- $mac_example
 
   -- *** Sequential circuit
@@ -26,13 +26,22 @@ module CLaSH.Tutorial (
   -- *** Circuit testbench
   -- $mac4
 
+  -- *** Alternative specifications
+  -- $mac5
+
+  -- * Higher-order functions
+  -- $higher_order
+
+  -- * Composition of sequential circuits
+  -- $composition_sequential
+
   -- * Conclusion
   -- $conclusion
 
-  -- * Errors and their solutions
+  -- * Troubleshooting
   -- $errorsandsolutions
 
-  -- * Unsupported Haskell
+  -- * Unsupported Haskell features
   -- $unsupported
   )
 where
@@ -55,7 +64,7 @@ in an academic handwavy way, that every function denotes a component and every
 function application denotes an instantiation of said component. Now, this has
 consequences on how we view /recursive/ functions: structurally, a recursive
 function would denote an /infinitely/ deep / structured component, something
-that cannot be turned into an actual circuit (See also <#unsupported Unsupported Haskell>).
+that cannot be turned into an actual circuit (See also <#unsupported Unsupported Haskell features>).
 Of course there are variants of recursion that cab be completely unfolded at
 compile-time with a finite amount of steps and hence could be converted to a
 realisable circuit. Sadly, this last feature is missing in the current version
@@ -110,16 +119,11 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Run @cabal update@
 
-  (3) Install update __RepLib__ library
-
-      * Download the sources for the modified <https://www.dropbox.com/s/k1nfbqpzwbub0c1/RepLib-0.5.3.2.tar.gz RepLib-0.5.3.2.tar.gz> library
-      * Run @cabal install RepLib-0.5.3.2.tar.gz@
-
-  (4) Install __CλaSH__
+  (3) Install __CλaSH__
 
       * Run @cabal install clash-ghc@
 
-  (5) Verify that everything is working by:
+  (4) Verify that everything is working by:
 
       * Downloading the <https://raw.github.com/christiaanb/clash2/master/examples/FIR.hs Fir.hs> example
       * Run @clash --interactive FIR.hs@
@@ -485,20 +489,188 @@ We can see that for the first 4 samples, everything is working as expected,
 after which warnings are being reported. The reason is that 'stimuliGenerator'
 will keep on producing the last sample, (4,4), while the 'outputVerifier' will
 keep on expecting the last sample, 14. In the VHDL testbench these errors won't
-show, as the the global clock will be stopped.
+show, as the the global clock will be stopped after 4 ticks.
 
 You should now again run @:vhdl@ in the interpreter; this time the compiler
 will take a bit longer to generate all the circuits. After it is finished you
 can load all the files in your favourite VHDL simulation tool that has support
 for VHDL-2008. VHDL-2008 support is required because the output verifier will
-use the VHDL-2008 only @to_string@ function. Once loaded
+use the VHDL-2008-only @to_string@ function. Once all files are loaded into
+the VHDL simulator, run the simulation on the @testbench@ entity. On questasim /
+modelsim: doing a @run -all@ will finish once the output verifier will assert
+its output to @true@. The generated testbench, modulo the clock signal
+generator(s), is completely synthesizable. This means that if you want to test
+your circuit on an FPGA, you will only have to replace the clock signal
+generator(s) by actual clock sources, such as an onboard PLL.
+
+This concludes the main part of this section on \"Your first circuit\", read on
+for alternative specifications for the same 'mac' circuit, or just skip to the
+next section where we will describe another DSP classic: an FIR filter structure.
+-}
+
+{- $mac5
+* __'Num' instance__:
+
+    @'Signal' a@ is also also considered a 'Num'eric type as long as @a@ is also.
+    This means that we can also use the standard numeric operators, such as ('*')
+    and ('+'), directly on signals. An alternative specification of the 'mac'
+    circuit will also use the 'register' function directly:
+
+    @
+    macN (x,y) = acc
+      where
+        acc = register 0 (acc + x * y)
+    @
+
+* __'Applicative' interface__:
+
+    We can also mix the combinational 'ma' function, with the sequential
+    'register' function, by lifting the 'ma' function to the sequential 'Signal'
+    domain using the operators of the 'Applicative' type class:
+
+    @
+    macA (x,y) = acc
+      where
+        acc  = register 0 acc'
+        acc' = ma \<$\> acc \<*\> pack (x,y)
+    @
+
+* __<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State> Monad__
+
+    We can also implement the original 'macT' function as a <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
+    monadic computation. First we must an extra import statement, right after
+    the import of "CLaSH.Prelude":
+
+    @
+    import Control.Monad.State
+    @
+
+    We can then implement macT as follows:
+
+    @
+    macTS (x,y) = do
+      acc <- get
+      put (acc + x * y)
+      return acc
+    @
+
+    We can use the '<^>' operator again, although we will have to change
+    position of the arguments and result:
+
+    @
+    asStateM f i = g \<^\> i
+      where
+        g s x = let (o,s') = runState (f x) s
+                in  (s',o)
+    @
+
+    We can then create the complete 'mac' circuit as:
+
+    @
+    macS = asStateM macTS 0
+    @
+-}
+
+{- $higher_order
+An FIR filter is defined as: the dot-product of a set of filter coefficients and
+a window over the input, where the size of the window matches the number
+of coefficients.
+
+@
+dotp as bs = vfoldl (+) 0 (vzipWith (*) as bs)
+
+fir coeffs x_t = y_t
+  where
+    y_t = dotp coeffs xs
+    xs  = window x_t
+
+topEntity :: Signal (Signed 16) -> Signal (Signed 16)
+topEntity = fir $(v [0::Signal (Signed 16),1,2,3])
+@
+
+Here we can see that, although the CλaSH compiler does not support recursion,
+many of the regular patterns that we often encounter in circuit design are
+already captured by the higher-order functions that are present for the 'Vec'tor
+type.
+-}
+
+{- $composition_sequential
+
+First we define some types:
+
+@
+module CalculatorTypes where
+
+import CLaSH.Prelude
+
+type Word = Signed 4
+data OPC a = ADD | MUL | Imm a | Pop | Push
+
+deriveLift ''OPC
+@
+
+Now we define the actual calculator:
+
+@
+module Calculator where
+
+import CLaSH.Prelude
+import CalculatorTypes
+
+(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+(f .: g) a b = f (g a b)
+
+infixr 9 .:
+
+alu :: Num a => OPC a -> a -> a -> Maybe a
+alu ADD     = Just .: (+)
+alu MUL     = Just .: (*)
+alu (Imm i) = const . const (Just i)
+alu _       = const . const Nothing
+
+pu :: (Num a, Num b)
+   => (OPC a -> a -> a -> Maybe a)
+   -> (a, a, b)       -- Current state
+   -> (a, OPC a)      -- Input
+   -> ( (a, a, b)     -- New state
+      , (b, Maybe a)  -- Output
+      )
+pu alu (op1,op2,cnt) (dmem,Pop)  = ((dmem,op1,cnt-1),(cnt,Nothing))
+pu alu (op1,op2,cnt) (dmem,Push) = ((op1,op2,cnt+1) ,(cnt,Nothing))
+pu alu (op1,op2,cnt) (dmem,opc)  = ((op1,op2,cnt)   ,(cnt,alu opc op1 op2))
+
+datamem :: (KnownNat n, Integral i)
+        => Vec n a       -- Current state
+        -> (i, Maybe a)  -- Input
+        -> (Vec n a, a)  -- (New state, Output)
+datamem mem (addr,Nothing)  = (mem                  ,mem ! addr)
+datamem mem (addr,Just val) = (vreplace mem addr val,mem ! addr)
+
+topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
+topEntity i = val
+  where
+    (addr,val) = (pu alu \<^\> (0,0,0 :: Unsigned 3)) (mem,i)
+    mem        = (datamem \<^\> initMem) (addr,val)
+    initMem    = vcopy d8 0
+@
+
+Here we can finally see the advantage of having the '<^>' return a function
+of type @'SignalP' i -> 'SignalP' o@:
+
+  * We can use normal pattern matching to get parts of the result, and,
+  * We can use normal tuple-constructors to build the input values for the
+    circuits.
 -}
 
 {- $conclusion
-
+For now, this is the end of this tutorial. We will be adding updates over time,
+so check back from time to time. For now we recommend that you continue with
+exploring the "CLaSH.Prelude" module however, and like that hopefully get a feel
+of what CλaSH is capable of.
 -}
 
 {- $errorsandsolutions
+A list often encountered errors and their solutions:
 
 * __Type error: Couldn't match expected type ‘Signal (a,b)’ with actual type__
   __‘(Signal a, Signal b)’__:
@@ -591,6 +763,43 @@ use the VHDL-2008 only @to_string@ function. Once loaded
       @topEntity@ has no arguments, you're out of luck for now. If it has
       multiple arguments, consider bundling them in a tuple.
 
+*  __\<*** Exception: \<\<loop\>\>__
+
+    You are using value-recursion, but one of the 'Vec'tor functions that you
+    are using is too /strict/ in one of the recursive arguments. For example:
+
+    @
+    -- Bubble sort for 1 iteration
+    sortV xs = vmap fst sorted <: (snd (vlast sorted))
+     where
+       lefts  = vhead xs :> vmap snd (vinit sorted)
+       rights = vtail xs
+       sorted = vzipWith compareSwapL lefts rights
+
+    -- Compare and swap
+    compareSwapL a b = if a < b then (a,b)
+                                else (b,a)
+    @
+
+    Will not terminate because 'vzipWith' is too strict in its left argument:
+
+    >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
+    <*** Exception: <<loop>>
+
+    In this case, adding 'lazyV' on 'vzipWith's left argument:
+
+    @
+    sortVL xs = vmap fst sorted <: (snd (vlast sorted))
+     where
+       lefts  = vhead xs :> vmap snd (vinit sorted)
+       rights = vtail xs
+       sorted = vzipWith compareSwapL (lazyV lefts) rights
+    @
+
+    Results in a successful computation:
+
+    >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
+    <1,2,3,4>
 -}
 
 {- $unsupported #unsupported#
@@ -629,8 +838,12 @@ to VHDL (for now):
     to know the maximum number of bits needed to represent a value. While this
     is trivial for values of the elementary types, sum types, and product types,
     putting a fixed upper bound on recursive types is not (always) feasible.
-    The only recursive type that is currently supported by the CλaSH compiler
-    is the 'Vec'tor type, for which the compiler has hard-coded knowledge.
+    This means that the ubiquitous list type is unsupported! The only recursive
+    type that is currently supported by the CλaSH compiler is the 'Vec'tor type,
+    for which the compiler has hard-coded knowledge.
+
+    For \"easy\" 'Vec'tor literals you should use Template Haskell splices and
+    the 'v' /meta/-function that as we have seen earlier in this tutorial.
 
   [@GADT pattern matching@]
 
@@ -639,4 +852,9 @@ to VHDL (for now):
     exception! You can use the extraction and indexing functions of
     "CLaSH.Sized.Vector" to get access to individual ranges / elements of a
     'Vec'tor.
+
+  [@Floating point types@]
+
+    There is no support for the 'Float' and 'Double' type, if you need numbers
+    with a /fractional/ part you can use the 'Fixed' point type.
 -}
