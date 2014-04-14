@@ -1,3 +1,9 @@
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
+{-|
+Copyright : © Christiaan Baaij, 2014
+Licence   : Creative Commons 4.0 (CC BY-NC 4.0) (http://creativecommons.org/licenses/by-nc/4.0/)
+-}
 module CLaSH.Tutorial (
   -- * Introduction
   -- $introduction
@@ -5,8 +11,20 @@ module CLaSH.Tutorial (
   -- * Installation
   -- $installation
 
-  -- * MAC Example
+  -- * Working with this tutorial
+  -- $working
+
+  -- * First circuit
   -- $mac_example
+
+  -- *** Sequential circuit
+  -- $mac2
+
+  -- *** Creating VHDL
+  -- $mac3
+
+  -- *** Circuit testbench
+  -- $mac4
 
   -- * Conclusion
   -- $conclusion
@@ -18,6 +36,9 @@ module CLaSH.Tutorial (
   -- $unsupported
   )
 where
+
+import CLaSH.Prelude
+import CLaSH.Prelude.Explicit
 
 {- $introduction
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -65,53 +86,416 @@ our first circuit.
 The CλaSH compiler and Prelude library for circuit design only work with the
 <http://haskell.org/ghc GHC> Haskell compiler version 7.8.1 and up.
 
-(1) Install __GHC (version 7.8.1 or higher)__
+  (1) Install __GHC (version 7.8.1 or higher)__
 
-    * Download and install <http://www.haskell.org/ghc/download GHC for your platform>.
-      Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
-      location.
+      * Download and install <http://www.haskell.org/ghc/download GHC for your platform>.
+        Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
+        location.
 
-    * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
+      * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-(2) Install __Cabal__
+  (2) Install __Cabal__
 
-    * Windows:
+      * Windows:
 
-        * Download the binary for <http://www.haskell.org/cabal/download.html cabal-install>
-        * Put the binary in a location mentioned in your @PATH@
+          * Download the binary for <http://www.haskell.org/cabal/download.html cabal-install>
+          * Put the binary in a location mentioned in your @PATH@
 
-    * Unix:
+      * Unix:
 
-        * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
-        * Unpack (@tar xf@) the archive and @cd@ to the directory
-        * Run @sh bootstrap.sh@
-        * Follow the instructions to add @cabal@ to your @PATH@
+          * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
+          * Unpack (@tar xf@) the archive and @cd@ to the directory
+          * Run @sh bootstrap.sh@
+          * Follow the instructions to add @cabal@ to your @PATH@
 
-    * Run @cabal update@
+      * Run @cabal update@
 
-(3) Install update __RepLib__ library
+  (3) Install update __RepLib__ library
 
-    * Download the sources for the modified <https://www.dropbox.com/s/k1nfbqpzwbub0c1/RepLib-0.5.3.2.tar.gz RepLib-0.5.3.2.tar.gz> library
-    * Run @cabal install RepLib-0.5.3.2.tar.gz@
+      * Download the sources for the modified <https://www.dropbox.com/s/k1nfbqpzwbub0c1/RepLib-0.5.3.2.tar.gz RepLib-0.5.3.2.tar.gz> library
+      * Run @cabal install RepLib-0.5.3.2.tar.gz@
 
-(4) Install __CλaSH__
+  (4) Install __CλaSH__
 
-    * Run @cabal install clash-ghc@
+      * Run @cabal install clash-ghc@
 
-(5) Verify that everything is working by:
+  (5) Verify that everything is working by:
 
-    * Downloading the <https://raw.github.com/christiaanb/clash2/master/examples/FIR.hs Fir.hs> example
-    * Run @clash --interactive FIR.hs@
-    * Execute, in the interpreter, the @:vhdl@ command.
-    * Exit the interpreter using @:q@
-    * Examin the VHDL code in the @vhdl@ directory
+      * Downloading the <https://raw.github.com/christiaanb/clash2/master/examples/FIR.hs Fir.hs> example
+      * Run @clash --interactive FIR.hs@
+      * Execute, in the interpreter, the @:vhdl@ command.
+      * Exit the interpreter using @:q@
+      * Examin the VHDL code in the @vhdl@ directory
 
+-}
+
+{- $working
+This tutorial can be followed best whilst having the CλaSH interpreter running
+at the same time. If you followed the installation instructions, you already
+know how to start the CλaSH compiler in interpretive mode:
+
+@
+clash --interactive
+@
+
+For those familiar with Haskell/GHC, this is indeed just @GHCi@, with one added
+command (@:vhdl@). You can load files into the interpreter using the
+@:l \<FILENAME\>@ command. Now, depending on your choice in editor, the following
+@edit-load-run@ cycle probably work best for you:
+
+  * __Commandline (e.g. emacs, vim):__
+
+      * You can run system commands using @:!@, for example @:! touch \<FILENAME\>@
+      * Set the /editor/ mode to your favourite editor using: @:set editor \<EDITOR\>@
+      * You can load files using @:l@ as noted above.
+      * You can go into /editor/ mode using: @:e@
+      * Leave the editor mode by quitting the editor (e.g. @:wq@ in @vim@)
+
+  * __GUI (e.g. SublimeText, Notepad++):__
+
+      * Just create new files in your editor.
+      * Load the files using @:l@ as noted above.
+      * Once a file has been edited and saved, type @:r@ to reload the files in
+        the interpreter
+
+You are of course free to deviate from these suggestions as you see fit :-) It
+is just recommended that you have the CλaSH interpreter open during this
+tutorial.
 -}
 
 {- $mac_example
+The very first circuit that we will build is the \"classic\" multiply-and-accumulate
+(MAC) circuit. This circuit is as simple as it sounds, it multiplies its inputs
+and accumulates them. Before we describe any logic, we must first create the
+file we will be working on and input some preliminaries:
+
+  * Create the file:
+
+      @
+      MAC.hs
+      @
+
+  * Write on the first line the module header:
+
+      @
+      module MAC where
+      @
+
+      Module names must always start with a __C__apital letter. Also make sure that
+      the file name corresponds to the module name.
+
+  * Add the import statement for the CλaSH prelude library:
+
+      @
+      import CLaSH.Prelude
+      @
+
+      This imports all the necessary functions and datatypes for circuit description.
+
+We can now finally start describing the logic of our circuit, starting with just
+the multiplication and addition:
+
+@
+ma acc (x,y) = acc + x * y
+@
+
+If you followed the instructions of running the interpreter side-by-side, you
+can already test this function:
+
+>>> ma 4 (8,9)
+76
+>>> ma 2 (3,4)
+14
+
+We can also examine the inferred type of @ma@ in the interpreter:
+
+>>> :t ma
+ma :: Num a => a -> a -> a
+
+Talking about /types/ also brings us to one of the most important parts of this
+tutorial: /types/ and /synchronous sequential logic/. Especially how we can
+always determine, through the types of a specification, if it describes
+combinational logic or (synchronous) sequential logic. We do this by examining
+the type of one of the sequential primitives, the @register@ function:
+
+@
+register :: a -> Signal a -> Signal a
+regiser i s = ...
+@
+
+Where we see that the second argument and the result are not just of the
+/polymorphic/ @a@ type, but of the type: @'Signal' a@. All (synchronous)
+sequential circuits work on values of type @'Signal' a@. Combinational
+circuits always work on values of, well, not of type @'Signal' a@. A 'Signal'
+is an (infinite) list of samples, where the samples correspond to the values
+of the 'Signal' at discrete, consecutive, ticks of the /clock/. All (sequential)
+components in the circuit are synchronized to this global /clock/. For the
+rest of this tutorial, and probably at any moment where you will be working with
+CλaSH, you should probably not actively think about 'Signal's as infinite lists
+of samples, but just as values that are manipulated by sequential circuits. To
+make this even easier, it actually not possible to manipulate the underlying
+representation directly: you can only modify 'Signal' values through a set of
+primitives such as the 'register' function above.
+
+Now, let us get back to the functionality of the 'register' function: it is
+a simple @latch@ that only changes state at the tick of the global /clock/, and
+it has an initial value @a@ which is its output at time 0. We can further
+examine the 'register' function by taking a look at the first 4 samples of the
+'register' functions applied to a constant signal with the value 8:
+
+>>> sampleN 4 (register 0 (signal 8))
+[0,8,8,8]
+
+Where we see that the initial value of the signal is the specified 0 value,
+followed by 8's.
+-}
+
+{- $mac2
+The 'register' function is our primary sequential building block to capture
+/state/. It is used internally by one of the "CLaSH.Prelude" function that we
+will use to describe our MAC circuit. Note that the following paragraphs will
+only show one of many ways to specify a sequential circuit, at the section we
+will show a couple more.
+
+A principled way to describe a sequential circuit is to use one of the classic
+machine models, within the CλaSH prelude library offer standard function to
+support the <http://en.wikipedia.org/wiki/Mealy_machine Mealy machine>.
+To improve sharing, we will combine the transition function and output function
+into one. This gives rise to the following Mealy specification of the MAC
+circuit:
+
+@
+macT acc (x,y) = (acc',o)
+  where
+    acc' = ma acc (x,y)
+    o    = acc
+@
+
+Note that the @where@ clause and explicit tuple are just for demonstrative
+purposes, without loss of sharing we could've also written:
+
+@
+macT acc inp = (ma acc inp,acc)
+@
+
+Going back to the original specification we note the following:
+
+  * 'acc' is the current /state/ of the circuit.
+  * '(x,y)' is its input.
+  * 'acc'' is the updated, or next, /state/.
+  * 'o' is the output.
+
+When we examine the type of 'macT' we see that is still completely combinational:
+
+>>> :t macT
+macT :: Num t => t -> (t, t) -> (t, t)
+
+The "CLaSH.Prelude" library contains a function that creates a sequential
+circuit from a combinational circuit that has the same Mealy machine type /
+shape of 'macT':
+
+@
+(\<^\>) :: (Pack i, Pack o)
+      => (s -> i -> (s,o))
+      -> s
+      -> (SignalP i -> SignalP o)
+f \<^\> initS = ...
+@
+
+The complete sequential MAC circuit can now be specified as:
+
+@
+mac = macT \<^\> 0
+@
+
+Where the LHS of '<^>' is our 'macT' function, and the RHS is the initial state,
+in this case 0. We can see it is functioning correctly in our interpreter:
+
+>>> take 4 $ simulateP mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
+[0,1,5,14]
+
+Where we simulate our sequential circuit over a list of input samples and take
+the first 4 output samples. We have now completed our first sequential circuit
+and have made an initial confirmation that it is working as expected.
+
+The observant reader already saw that the '<^>' operator does not create a
+function that works on 'Signal's, but on on 'SignalP's. Indeed, when we look at
+the type of our 'mac' circuit:
+
+>>> :t mac
+mac :: (Pack o, Num o) => (Signal o, Signal o) -> SignalP o
+
+We see that our 'mac' function work on a two-tuple of 'Signal's and not on a
+'Signal' of a two-tuple. Indeed, the CλaSH prelude library defines that:
+
+@
+type instance SignalP (a,b) = (Signal a, Signal b)
+@
+
+'SignalP' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associcated type family>
+belonging to the 'Pack' <http://en.wikipedia.org/wiki/Type_class type class>,
+which, together with 'pack' and 'unpack' defines the isomorphism between a
+product type of 'Signal's and a 'Signal' of a product type. That is, while
+@(Signal a, Signal b)@ and @Signal (a,b)@ are not equal, they are /isomorphic/
+and can be converted from on to the other using 'pack' and 'unpack'. Instances
+of this 'Pack' type-class are defined as /isomorphisms/ for:
+
+  * All tuples until and including 8-tuples
+  * The 'Vec'tor type
+
+But they are defined as /identities/ for:
+
+  * All elementary / primitive types such as: 'Bit', 'Bool', @'Signed' n@, etc.
+
+That is:
+
+@
+instance Pack Bool where
+  type SignalP Bool = Signal Bool
+  pack :: SignalP Bool -> Signal Bool
+  pack = 'id'
+  unpack :: Signal Bool -> SignalP Bool
+  unpack = 'id'
+@
+
+We will see later why this 'Pack' type class is so convenient, for now, you just
+have to remember that it exists. And more importantly, that you understand that
+a product type of 'Signal's is not equal to a 'Signal' of a product type, but
+that the functions of the 'Pack' type class allow easy conversion between the
+two.
+-}
+
+{- $mac3
+We are now almost at the point that we can create actual hardware, in the form
+of a <http://en.wikipedia.org/wiki/VHDL VHDL> netlist, from our sequential
+circuit specification. The first thing we have to do is create a function
+called 'topEntity' and ensure that it has a __monomorphic__ type. In our case
+that means that we have to give it an explicit type annotation. It might now
+always be needed, you can always check the type with the @:t@ command and see
+if the function is monomorphic:
+
+@
+topEntity :: (Signal (Signed 9),Signal (Signed 9)) -> Signal (Signed 9)
+topEntity = mac
+@
+
+Which makes our circuit work on 9-bit signed integers. Including the above
+definition, our complete @MAC.hs@ should now have the following content:
+
+@
+module MAC where
+
+import CLaSH.Prelude
+
+ma acc (x,y) = acc + x * y
+
+macT acc (x,y) = (acc',o)
+  where
+    acc' = ma acc (x,y)
+    o    = acc
+
+mac = macT \<^\> 0
+
+topEntity :: (Signal (Signed 9),Signal (Signed 9)) -> Signal (Signed 9)
+topEntity = mac
+@
+
+The 'topEntity' function is the starting point for the CλaSH compiler to
+transform your circuit description into a VHDL netlist. It must meet the
+following restrictions in order for the CλaSH compiler to work:
+
+  * It must be completely monomorphic
+  * It must be completely first-order
+
+Our 'topEntity' meets those restrictions, and so we can convert it successfully
+to VHDL by executing the @:vhdl@ command in the interpreter. This will create
+a directory called 'vhdl', which contains a directory called @MAC@, which
+ultimately contains all the generated VHDL files. You can now load these files
+(except @testbench.vhdl@) into your favourite VHDL synthesis tool, marking
+@topEntity_0.vhdl@ as the file containing the top level entity.
+-}
+
+{- $mac4
+There are multiple reasons as to why might you want to create a so-called
+/testbench/ for the VHDL:
+
+  * You want to compare post-synthesis / post-place&route behaviour to that of
+    the behaviour of the original VHDL.
+  * Need representative stimuli for your dynamic power calculations
+  * Verify that the VHDL output of the CλaSH compiler has the same behaviour as
+    the Haskell / CλaSH specification.
+
+For these purposes, you can have CλaSH compiler generate a @testbench.vhdl@
+file which contains a stimulus generator and an expected output verifier. The
+CλaSH compiler looks for the following functions to generate these to aspects:
+
+  1. @testInput@ for the stimulus generator.
+  2. @expectedOutput@ for the output verification.
+
+Given a 'topEntity' with the type:
+
+@
+topEntity :: SignalP a -> SignalP b
+@
+
+Where @a@ and @b@ are placeholders for monomorphics types: the 'topEntity' is
+not allowed to be polymorphic. So given the above type for the 'topEntity', the
+type of 'testInput' should be:
+
+@
+testInput :: Signal a
+@
+
+And the type of 'expectedOutput' should be:
+
+@
+expectedOutput :: Signal b -> Signal Bool
+@
+
+Where the 'expectedOutput' function should assert to 'True' once it has verified
+all expected values. The "CLaSH.Prelude" module contains two standard functions
+to serve the above purpose, but a user is free to use any CλaSH specification
+to describe these two functions. For this tutorial we will be using the
+functions specified in the "CLaSH.Prelude" module, which are 'stimuliGenerator'
+and 'outputVerifier':
+
+@
+testInput :: Signal (Signed 9,Signed 9)
+testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+
+expectedOutput :: Signal (Signed 9) -> Signal Bool
+expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
+@
+
+This will create a stimulus generator that creates the same inputs as we used
+earlier for the simulation of the circuit, and creates an output verifier that
+compares against the results we got from our earlier simulation. We can even
+simulate the behaviour of the /testbench/:
+
+>>> sampleN 7 $ expectedOutput (topEntity $ unpack testInput)
+[False,False,False,False,
+expected value: 14, not equal to actual value: 30
+True,
+expected value: 14, not equal to actual value: 46
+True,
+expected value: 14, not equal to actual value: 62
+True]
+
+We can see that for the first 4 samples, everything is working as expected,
+after which warnings are being reported. The reason is that 'stimuliGenerator'
+will keep on producing the last sample, (4,4), while the 'outputVerifier' will
+keep on expecting the last sample, 14. In the VHDL testbench these errors won't
+show, as the the global clock will be stopped.
+
+You should now again run @:vhdl@ in the interpreter; this time the compiler
+will take a bit longer to generate all the circuits. After it is finished you
+can load all the files in your favourite VHDL simulation tool that has support
+for VHDL-2008. VHDL-2008 support is required because the output verifier will
+use the VHDL-2008 only @to_string@ function. Once loaded
 -}
 
 {- $conclusion
+
 -}
 
 {- $errorsandsolutions
@@ -120,53 +504,51 @@ The CλaSH compiler and Prelude library for circuit design only work with the
   __‘(Signal a, Signal b)’__:
 
     Signals of product types and product types (to which tuples belong) of
-    signals are __isomorphic__, but not (structurally) equal. Use the
-    'CLaSH.Signal.Implicit.pack' function to convert from a product type to the
-    signal type. So if your code which gives the error looks like:
+    signals are __isomorphic__ due to synchronisity principle, but are not
+    (structurally) equal. Use the 'pack' function to convert from a product type
+    to the signal type. So if your code which gives the error looks like:
 
     @
     ... = f a b (c,d)
     @
 
-    add the 'CLaSH.Signal.Implicit.pack' function like so:
+    add the 'pack' function like so:
 
     @
     ... = f a b (pack (c,d))
     @
 
-    Product types supported by 'CLaSH.Signal.Implicit.pack' are:
+    Product types supported by 'pack' are:
 
     * All tuples until and including 8-tuples
-    * The 'CLaSH.Sized.Vector.Vec'tor type
+    * The 'Vec'tor type
 
-    NB: Use 'CLaSH.Signal.Explicit.cpack' when you are using explicitly
-    clocked 'CLaSH.Signal.Explicit.CSignal's
+    NB: Use 'cpack' when you are using explicitly clocked 'CSignal's
 
 * __Type error: Couldn't match expected type ‘(Signal a, Signal b)’ with__
   __ actual type ‘Signal (a,b)’__:
 
     Product types (to which tuples belong) of signals and signals of product
-    types are __isomorphic__, but not (structurally) equal. Use the
-    'CLaSH.Signal.Implicit.unpack' function to convert from a signal type to the
-    product type. So if your code which gives the error looks like:
+    types are __isomorphic__ due to synchronisity principle, but are not
+    (structurally) equal. Use the 'unpack' function to convert from a signal
+    type to the product type. So if your code which gives the error looks like:
 
     @
     (c,d) = f a b
     @
 
-    add the 'CLaSH.Signal.Implicit.unpack' function like so:
+    add the 'unpack' function like so:
 
     @
     (c,d) = unpack (f a b)
     @
 
-    Product types supported by 'CLaSH.Signal.Implicit.unpack' are:
+    Product types supported by 'unpack' are:
 
     * All tuples until and including 8-tuples
-    * The 'CLaSH.Sized.Vector.Vec'tor type
+    * The 'Vec'tor type
 
-    NB: Use 'CLaSH.Signal.Explicit.cunpack' when you are using explicitly
-    clocked 'CLaSH.Signal.Explicit.CSignal's
+    NB: Use 'cunpack' when you are using explicitly clocked 'CSignal's
 
 * __CLaSH.Normalize(94): Expr belonging to bndr: \<FUNCTION\> remains__
   __recursive after normalization__:
@@ -248,14 +630,13 @@ to VHDL (for now):
     is trivial for values of the elementary types, sum types, and product types,
     putting a fixed upper bound on recursive types is not (always) feasible.
     The only recursive type that is currently supported by the CλaSH compiler
-    is the 'CLaSH.Sized.Vector.Vec'tor type, for which the compiler has
-    hard-coded knowledge.
+    is the 'Vec'tor type, for which the compiler has hard-coded knowledge.
 
   [@GADT pattern matching@]
 
     While pattern matching for regular ADTs is supported, pattern matching for
-    GADTs is __not__. The 'CLaSH.Sized.Vector.Vec'tor type, which is also a
-    GADT, is __no__ exception! You can use the extraction and indexing functions
-    of "CLaSH.Sized.Vector" to get access to individual ranges / elements of a
-    'CLaSH.Sized.Vector.Vec'tor.
+    GADTs is __not__. The 'Vec'tor type, which is also a GADT, is __no__
+    exception! You can use the extraction and indexing functions of
+    "CLaSH.Sized.Vector" to get access to individual ranges / elements of a
+    'Vec'tor.
 -}
