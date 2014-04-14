@@ -33,7 +33,7 @@ Extra-source-files:   README.md,
 Data-files:           primitives/clash.bit.json,
                       primitives/clash.ghc.ghc2core.json,
                       primitives/clash.prelude.json,
-                      primitives/clash.prelude.explicit.json
+                      primitives/clash.prelude.explicit.json,
                       primitives/clash.promoted.nat.json,
                       primitives/clash.signal.explicit.json,
                       primitives/clash.signal.implicit.json,
