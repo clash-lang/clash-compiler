@@ -49,13 +49,13 @@ end block;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~ARG[0] & ~SYM[1](~SYM[1]'high downto 1);
+  ~RESULT <= ~TYPM[0]'(~ARG[0]) & ~SYM[1](~SYM[1]'high downto 1);
 end block;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.snoc"
-    , "templateE" : "~ARG[1] & ~ARG[0]"
+    , "templateE" : "~TYPM[1]'(~ARG[1]) & ~TYPM[0]'(~ARG[0])"
     }
   }
 , { "BlackBox" :
@@ -65,13 +65,13 @@ end block;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1]((~SYM[1]'high)-1 downto 0) & ~ARG[0];
+  ~RESULT <= ~SYM[1]((~SYM[1]'high)-1 downto 0) & ~TYPM[0]'(~ARG[0]);
 end block;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.vappend"
-    , "templateE" : "~ARG[0] & ~ARG[1]"
+    , "templateE" : "~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1])"
     }
   }
 , { "BlackBox" :
