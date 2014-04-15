@@ -901,7 +901,7 @@ function. This enables the following features not available to Lava:
 * Automatic synthesis for user-defined ADTs
 * Synthesis of all choice constructs (pattern matching, guards, etc.)
 * 'Applicative' instance for the 'Signal' type
-* Working with \"normal\" function allows the use of e.g. the
+* Working with \"normal\" functions permits the use of e.g. the
   <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
   monad to describe the functionality of a circuit.
 
