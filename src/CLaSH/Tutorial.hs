@@ -894,14 +894,14 @@ mentioned earlier, the lack of support for recursive functions is amortized by
 the built-in support for the higher-order in "CLaSH.Sized.Vector".
 
 The big upside of CλaSH and its static analysis approach is that CλaSH can
-do synthesis of /normal/ functions: there is no forced encasing datatype (often
+do synthesis of \"normal\" functions: there is no forced encasing datatype (often
 called /Signal/ in Lava) on all the arguments and results of a synthesizable
 function. This enables the following features not available to Lava:
 
 * Automatic synthesis for user-defined ADTs
 * Synthesis of all choice constructs (pattern matching, guards, etc.)
 * 'Applicative' instance for the 'Signal' type
-* Working with pure function allows the use of e.g. the
+* Working with \"normal\" function allows the use of e.g. the
   <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
   monad to describe the functionality of a circuit.
 
