@@ -5,7 +5,7 @@ Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
   borrows both its syntax and semantics from the functional programming language
   Haskell. The merits of using a functional language to describe hardware comes
-  from the fact that combinational circuits can be directly modeled as
+  from the fact that combinational circuits can be directly modelled as
   mathematical functions and that functional languages lend themselves very well
   at describing and (de-)composing mathematical functions.
   .
@@ -21,7 +21,7 @@ Description:
   * Blackbox/Primitive Handling
   .
   .
-  Front-ends (for: parsing, typecheck, etc.) are provided by seperate packages:
+  Front-ends (for: parsing, typecheck, etc.) are provided by separate packages:
   .
   * <https://github.com/christiaanb/Idris-dev Idris Frontend>
   .
