@@ -60,8 +60,8 @@ type InputState = Vec (AdderDepth + 1) Cell
 
 type FpState    = Vec AdderDepth Cell
 
-data ResState   = Res { cellMem  :: Vec (2 ^ DiscrSize) Cell
-                      , indexMem :: Vec (2 ^ DiscrSize) ArrayIndex
+data ResState   = Res { cellMem  :: Vec DiscrRange Cell
+                      , indexMem :: Vec DiscrRange ArrayIndex
                       }
 
 -- ===========================================================
