@@ -340,7 +340,7 @@ We see that our 'mac' function work on a two-tuple of 'Signal's and not on a
 type instance SignalP (a,b) = (Signal a, Signal b)
 @
 
-'SignalP' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associcated type family>
+'SignalP' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
 belonging to the 'Pack' <http://en.wikipedia.org/wiki/Type_class type class>,
 which, together with 'pack' and 'unpack' defines the isomorphism between a
 product type of 'Signal's and a 'Signal' of a product type. That is, while
@@ -446,7 +446,7 @@ Given a 'topEntity' with the type:
 topEntity :: SignalP a -> SignalP b
 @
 
-Where @a@ and @b@ are placeholders for monomorphics types: the 'topEntity' is
+Where @a@ and @b@ are placeholders for monomorphic types: the 'topEntity' is
 not allowed to be polymorphic. So given the above type for the 'topEntity', the
 type of 'testInput' should be:
 
@@ -709,7 +709,7 @@ A list often encountered errors and their solutions:
   __ actual type ‘Signal (a,b)’__:
 
     Product types (to which tuples belong) of signals and signals of product
-    types are __isomorphic__ due to synchronisity principle, but are not
+    types are __isomorphic__ due to synchronicity principle, but are not
     (structurally) equal. Use the 'unpack' function to convert from a signal
     type to the product type. So if your code which gives the error looks like:
 
@@ -901,7 +901,7 @@ function. This enables the following features not available to Lava:
 * Automatic synthesis for user-defined ADTs
 * Synthesis of all choice constructs (pattern matching, guards, etc.)
 * 'Applicative' instance for the 'Signal' type
-* Working with \"normal\" function allows the use of e.g. the
+* Working with \"normal\" functions permits the use of e.g. the
   <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
   monad to describe the functionality of a circuit.
 
