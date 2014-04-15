@@ -43,6 +43,9 @@ module CLaSH.Tutorial (
 
   -- * Unsupported Haskell features
   -- $unsupported
+
+  -- * CλaSH vs Lava
+  -- $vslava
   )
 where
 
@@ -55,7 +58,8 @@ borrows both its syntax and semantics from the functional programming language
 Haskell. The merits of using a functional language to describe hardware comes
 from the fact that combinational circuits can be directly modeled as
 mathematical functions and that functional languages lend themselves very well
-at describing and (de-)composing mathematical functions.
+at describing and (de-)composing mathematical functions. The CλaSH compiler
+transforms these high-level descriptions to low-level synthesizable VHDL.
 
 Although we say that CλaSH borrows the semantics of Haskell, that statement
 should be taken with a grain of salt. What we mean to say is that the CλaSH
@@ -93,9 +97,9 @@ our first circuit.
 
 {- $installation
 The CλaSH compiler and Prelude library for circuit design only work with the
-<http://haskell.org/ghc GHC> Haskell compiler version 7.8.1 and up.
+<http://haskell.org/ghc GHC> Haskell compiler version 7.8.* and up.
 
-  (1) Install __GHC (version 7.8.1 or higher)__
+  (1) Install __GHC (version 7.8.* or higher)__
 
       * Download and install <http://www.haskell.org/ghc/download GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
@@ -105,12 +109,12 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
   (2) Install __Cabal__
 
-      * Windows:
+      * Windows and OS X Mavericks:
 
           * Download the binary for <http://www.haskell.org/cabal/download.html cabal-install>
           * Put the binary in a location mentioned in your @PATH@
 
-      * Unix:
+      * Other Unix systems:
 
           * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
           * Unpack (@tar xf@) the archive and @cd@ to the directory
@@ -129,7 +133,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
       * Run @clash --interactive FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command.
       * Exit the interpreter using @:q@
-      * Examin the VHDL code in the @vhdl@ directory
+      * Examine the VHDL code in the @vhdl@ directory
 
 -}
 
@@ -173,28 +177,28 @@ The very first circuit that we will build is the \"classic\" multiply-and-accumu
 and accumulates them. Before we describe any logic, we must first create the
 file we will be working on and input some preliminaries:
 
-  * Create the file:
+* Create the file:
 
-      @
-      MAC.hs
-      @
+    @
+    MAC.hs
+    @
 
-  * Write on the first line the module header:
+* Write on the first line the module header:
 
-      @
-      module MAC where
-      @
+    @
+    module MAC where
+    @
 
-      Module names must always start with a __C__apital letter. Also make sure that
-      the file name corresponds to the module name.
+    Module names must always start with a __C__apital letter. Also make sure that
+    the file name corresponds to the module name.
 
-  * Add the import statement for the CλaSH prelude library:
+* Add the import statement for the CλaSH prelude library:
 
-      @
-      import CLaSH.Prelude
-      @
+    @
+    import CLaSH.Prelude
+    @
 
-      This imports all the necessary functions and datatypes for circuit description.
+    This imports all the necessary functions and datatypes for circuit description.
 
 We can now finally start describing the logic of our circuit, starting with just
 the multiplication and addition:
@@ -505,16 +509,18 @@ generator(s) by actual clock sources, such as an onboard PLL.
 
 This concludes the main part of this section on \"Your first circuit\", read on
 for alternative specifications for the same 'mac' circuit, or just skip to the
-next section where we will describe another DSP classic: an FIR filter structure.
+next section where we will describe another DSP classic: an FIR filter
+structure.
 -}
 
 {- $mac5
-* __'Num' instance__:
+* __'Num' instance for 'Signal'__:
 
-    @'Signal' a@ is also also considered a 'Num'eric type as long as @a@ is also.
-    This means that we can also use the standard numeric operators, such as ('*')
-    and ('+'), directly on signals. An alternative specification of the 'mac'
-    circuit will also use the 'register' function directly:
+    @'Signal' a@ is also also considered a 'Num'eric type as long as the value
+    type /a/ is also 'Num'eric.  This means that we can also use the standard
+    numeric operators, such as ('*') and ('+'), directly on signals. An
+    alternative specification of the 'mac' circuit will also use the 'register'
+    function directly:
 
     @
     macN (x,y) = acc
@@ -522,11 +528,12 @@ next section where we will describe another DSP classic: an FIR filter structure
         acc = register 0 (acc + x * y)
     @
 
-* __'Applicative' interface__:
+* __'Applicative' instance for 'Signal'__:
 
     We can also mix the combinational 'ma' function, with the sequential
     'register' function, by lifting the 'ma' function to the sequential 'Signal'
-    domain using the operators of the 'Applicative' type class:
+    domain using the operators ('<$>' and '<*>') of the 'Applicative' type
+    class:
 
     @
     macA (x,y) = acc
@@ -655,7 +662,8 @@ topEntity i = val
 @
 
 Here we can finally see the advantage of having the '<^>' return a function
-of type @'SignalP' i -> 'SignalP' o@:
+of type: @('SignalP' i -> 'SignalP' o)@ (instead of:
+@('Signal' i -> 'Signal' o)@):
 
   * We can use normal pattern matching to get parts of the result, and,
   * We can use normal tuple-constructors to build the input values for the
@@ -726,25 +734,33 @@ A list often encountered errors and their solutions:
   __recursive after normalization__:
 
     * If you actually wrote a recursive function, rewrite it to a non-recursive
-      one :-)
+      one using e.g. one of the higher-order functions in "CLaSH.Sized.Vector" :-)
 
     * You defined a recursively defined value, but left it polymorphic:
 
     @
     topEntity x y = acc
-    where
-      acc = register 3 (x*y + acc)
+      where
+        acc = register 3 (acc + x * y)
     @
 
     The above function, works for any number-like type. This means that @acc@ is
     a recursively defined __polymorphic__ value. Adding a monomorphic type
-    annotation makes the error go away.
+    annotation makes the error go away:
 
     @
     topEntity :: Signal (Signed 8) -> Signal (Signed 8) -> Signal (Signed 8)
     topEntity x y = acc
-    where
-      acc = register 3 (x*y + acc)
+      where
+        acc = register 3 (acc + x * y)
+    @
+
+    Or, alternatively:
+
+    @
+    topEntity x y = acc
+      where
+        acc = register (3 :: Signed 8) (acc + x * y)
     @
 
 * __CLaSH.Normalize.Transformations(155): InlineNonRep: \<FUNCTION\> already__
@@ -855,6 +871,41 @@ to VHDL (for now):
 
   [@Floating point types@]
 
-    There is no support for the 'Float' and 'Double' type, if you need numbers
+    There is no support for the 'Float' and 'Double' types, if you need numbers
     with a /fractional/ part you can use the 'Fixed' point type.
+-}
+
+{- $vslava
+In Haskell land the most well-known way of describing digital circuits is the
+Lava family of languages:
+
+* <http://hackage.haskell.org/package/chalmers-lava2000 Chalmers Lava>
+* <http://hackage.haskell.org/package/xilinx-lava Xilinx Lava>
+* <http://hackage.haskell.org/package/york-lava York Lava>
+* <http://hackage.haskell.org/package/kansas-lava Kansas Lava>
+
+The big difference between CλaSH and Lava is that CλaSH uses a \"standard\"
+compiler (static analysis) approach towards synthesis, where Lava is an
+embedded domain specific language. One downside of static analysis vs. the
+embedded language approach is already clearly visible: synthesis of recursive
+descriptions does not come for \"free\". This will be implemented in CλaSH in
+due time, but that doesn't help the circuit designer right now. As already
+mentioned earlier, the lack of support for recursive functions is amortized by
+the built-in support for the higher-order in "CLaSH.Sized.Vector".
+
+The big upside of CλaSH and its static analysis approach is that CλaSH can
+do synthesis of /normal/ functions: there is no forced encasing datatype (often
+called /Signal/ in Lava) on all the arguments and results of a synthesizable
+function. This enables the following features not available to Lava:
+
+* Automatic synthesis for user-defined ADTs
+* Synthesis of all choice constructs (pattern matching, guards, etc.)
+* 'Applicative' instance for the 'Signal' type
+* Working with pure function allows the use of e.g. the
+  <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
+  monad to describe the functionality of a circuit.
+
+Although there are Lava alternatives to some of the above features (e.g.
+first-class patterns to replace pattern matching) they are not as \"beautiful\"
+and / or easy to use as the standard Haskell features.
 -}
