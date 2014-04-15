@@ -1,2 +1,2 @@
 = WARNING =
-Only works with GHC-7.8 (http://www.haskell.org/ghc/dist/7.8.1-rc2/)!
+Only works with GHC-7.8.* (http://www.haskell.org/ghc/download_ghc_7_8_2)!
