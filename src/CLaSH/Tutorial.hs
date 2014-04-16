@@ -569,6 +569,10 @@ structure.
     position of the arguments and result:
 
     @
+    asStateM :: (Pack o, Pack i)
+             => (i -> State s o)
+             -> s
+             -> (SignalP i -> SignalP o)
     asStateM f i = g \<^\> i
       where
         g s x = let (o,s') = runState (f x) s
