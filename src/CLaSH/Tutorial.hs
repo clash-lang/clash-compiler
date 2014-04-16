@@ -88,8 +88,8 @@ counter = s
     s = register 0 (s + 1)
 @
 
-Over time, you will get a better feeling of what exact the consequences are of
-taking a \structural\ view on circuit descriptions. What is always important to
+Over time, you will get a better feeling for the consequences of taking a
+/structural/ view on circuit descriptions. What is always important to
 remember is that every applied functions results in an instantiated component,
 and also that the compiler will never infer / invent more logic than what is
 specified in the circuit description.
