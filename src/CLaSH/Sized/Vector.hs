@@ -649,12 +649,12 @@ asNatProxy _ = Proxy
 -- > compareSwapL a b = if a < b then (a,b)
 -- >                             else (b,a)
 --
--- Will not terminate because 'vzipWith' is too strict in its left argument:
+-- Will not terminate because 'vzipWith' is too strict in its second argument:
 --
 -- >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
 -- <*** Exception: <<loop>>
 --
--- In this case, adding 'lazyV' on 'vzipWith's left argument:
+-- In this case, adding 'lazyV' on 'vzipWith's second argument:
 --
 -- > sortVL xs = vmap fst sorted <: (snd (vlast sorted))
 -- >  where

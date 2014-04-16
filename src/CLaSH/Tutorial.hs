@@ -544,7 +544,8 @@ structure.
 
 * __<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State> Monad__
 
-    We can also implement the original 'macT' function as a <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
+    We can also implement the original 'macT' function as a
+    @<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>@
     monadic computation. First we must an extra import statement, right after
     the import of "CLaSH.Prelude":
 
@@ -797,12 +798,12 @@ A list often encountered errors and their solutions:
                                 else (b,a)
     @
 
-    Will not terminate because 'vzipWith' is too strict in its left argument:
+    Will not terminate because 'vzipWith' is too strict in its second argument:
 
     >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
     <*** Exception: <<loop>>
 
-    In this case, adding 'lazyV' on 'vzipWith's left argument:
+    In this case, adding 'lazyV' on 'vzipWith's second argument:
 
     @
     sortVL xs = vmap fst sorted <: (snd (vlast sorted))
@@ -873,6 +874,13 @@ to VHDL (for now):
 
     There is no support for the 'Float' and 'Double' types, if you need numbers
     with a /fractional/ part you can use the 'Fixed' point type.
+
+  [@Side-effects: 'IO', <http://hackage.haskell.org/package/base/docs/Control-Monad-ST.html#t:ST ST>, etc.@]
+
+    There is no support for side-effecting computations such as those in the
+    'IO' or @<http://hackage.haskell.org/package/base/docs/Control-Monad-ST.html#t:ST ST>@
+    monad. There is also no support for Haskell's
+    <http://www.haskell.org/haskellwiki/Foreign_Function_Interface FFI>.
 -}
 
 {- $vslava
