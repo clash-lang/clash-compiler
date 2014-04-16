@@ -187,6 +187,8 @@ csimulateC f = csimulate (asCFunction f)
 {-# NOINLINE cblockRam #-}
 -- | Create a blockRAM with space for @n@ elements
 --
+-- NB: Read value is delayed by 1 cycle
+--
 -- > clk100 = Clock d100
 -- >
 -- > bram40 :: CSignal 100 (Unsigned 6) -> CSignal 100 (Unsigned 6)
@@ -216,6 +218,8 @@ cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
 {-# DEPRECATED blockRamCC "'CComp' is deprecated, use 'cblockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
+-- NB: Read value is delayed by 1 cycle
+--
 -- > clk100 = Clock 100
 -- >
 -- > bramC40 :: CComp 100 (Unsigned 6, Unsigned 6, Bool, a) a
@@ -228,6 +232,8 @@ blockRamCC clk n = CC ((\(wr,rd,en,din) -> cblockRam clk n wr rd en din) Prelude
 
 {-# INLINABLE cblockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
+--
+-- NB: Read value is delayed by 1 cycle
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = cblockRamPow2 d32
@@ -243,6 +249,8 @@ cblockRamPow2 = cblockRam
 
 {-# DEPRECATED blockRamPow2CC "'CComp' is deprecated, use 'cblockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
+--
+-- NB: Read value is delayed by 1 cycle
 --
 -- > clk100 = Clock d100
 -- >

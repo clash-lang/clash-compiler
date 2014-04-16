@@ -180,7 +180,9 @@ registerP :: Pack a => a -> SignalP a -> SignalP a
 registerP i = unpack Prelude.. register i Prelude.. pack
 
 {-# NOINLINE blockRam #-}
--- | Create a blockRAM with space for @n@ elements
+-- | Create a blockRAM with space for @n@ elements.
+--
+-- NB: Read value is delayed by 1 cycle
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
 -- > bram40 = blockRam d50
@@ -207,6 +209,8 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
 {-# DEPRECATED blockRamC "'Comp' is deprecated, use 'blockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
+-- NB: Read value is delayed by 1 cycle
+--
 -- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, a) a
 -- > bramC40 = blockRamC d50
 blockRamC :: (KnownNat n, KnownNat m, Pack a, Default a)
@@ -216,6 +220,8 @@ blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
 
 {-# INLINABLE blockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
+--
+-- NB: Read value is delayed by 1 cycle
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
 -- > bram32 = blockRamPow2 d32
@@ -230,6 +236,8 @@ blockRamPow2 = blockRam
 
 {-# DEPRECATED blockRamPow2C "'Comp' is deprecated, use 'blockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
+--
+-- NB: Read value is delayed by 1 cycle
 --
 -- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, a) a
 -- > bramC32 = blockRamPow2C d32
