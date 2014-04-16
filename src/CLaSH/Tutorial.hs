@@ -853,7 +853,7 @@ of what CλaSH is capable of.
 -}
 
 {- $errorsandsolutions
-A list often encountered errors and their solutions:
+A list of often encountered errors and their solutions:
 
 * __Type error: Couldn't match expected type ‘Signal (a,b)’ with actual type__
   __‘(Signal a, Signal b)’__:
