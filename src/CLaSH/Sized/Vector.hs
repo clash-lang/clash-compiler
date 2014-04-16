@@ -385,7 +385,7 @@ vindexM_integer (_ :> xs) n = vindexM_integer xs (n-1)
 vindex_integer :: KnownNat n => Vec n a -> Integer -> a
 vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
     Just a  -> a
-    Nothing -> error "index out of bounds"
+    Nothing -> error ("(!): Index " ++ show i ++ " is out of bounds 0 and " ++ show (maxIndex xs))
 
 {-# INLINEABLE (!) #-}
 -- | Vector index (subscript) operator, descending from 'maxIndex', where the
@@ -430,7 +430,7 @@ vreplaceM_integer (x :> xs) n y = case vreplaceM_integer xs (n-1) y of
 vreplace_integer :: KnownNat n => Vec n a -> Integer -> a -> Vec n a
 vreplace_integer xs i a = case vreplaceM_integer xs (maxIndex xs - i) a of
   Just ys -> ys
-  Nothing -> error "index out of bounds"
+  Nothing -> error ("vreplace: Index " ++ show i ++ " is out of bounds 0 and " ++ show (maxIndex xs))
 
 {-# INLINEABLE vreplace #-}
 -- | Replace an element of a vector at the given index (subscript).
