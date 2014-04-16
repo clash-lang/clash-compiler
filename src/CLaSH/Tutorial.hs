@@ -72,13 +72,13 @@ function application denotes an instantiation of said component. Now, this has
 consequences on how we view /recursive/ functions: structurally, a recursive
 function would denote an /infinitely/ deep / structured component, something
 that cannot be turned into an actual circuit (See also <#unsupported Unsupported Haskell features>).
-Of course there are variants of recursion that cab be completely unfolded at
+Of course there are variants of recursion that could be completely unfolded at
 compile-time with a finite amount of steps and hence could be converted to a
 realisable circuit. Sadly, this last feature is missing in the current version
 of the compiler.
 
-On the other hand, Haskell's by-default non-strict evaluation corresponds very
-well to the simulation of the feedback loops which are ubiquitous in digital
+On the other hand, Haskell's by-default non-strict evaluation works very well
+for the simulation of the feedback loops, which are ubiquitous in digital
 circuits. That is, when we take our structural view to circuit descriptions,
 value-recursion corresponds directly to a feedback loop:
 
@@ -91,7 +91,7 @@ counter = s
 Over time, you will get a better feeling for the consequences of taking a
 /structural/ view on circuit descriptions. What is always important to
 remember is that every applied functions results in an instantiated component,
-and also that the compiler will never infer / invent more logic than what is
+and also that the compiler will /never/ infer / invent more logic than what is
 specified in the circuit description.
 
 With that out of the way, let us continue with installing CλaSH and building
