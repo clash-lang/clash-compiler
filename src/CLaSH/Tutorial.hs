@@ -710,7 +710,7 @@ timesS :: KnownNat n => Signed n -> Signed n -> Signed n
 timesS (S a) (S b) = fromIntegerS_inlineable (a * b)
 @
 
-For which the primitive definition is:
+For which the /expression/ primitive is:
 
 @
 { \"BlackBox\" :
@@ -721,7 +721,7 @@ For which the primitive definition is:
 @
 
 The @name@ of the primitive is the /fully qualified/ name of the function you
-are creating the primitive for. Because we are creating an \expression\
+are creating the primitive for. Because we are creating an /expression/
 primitive we define a @template__E__@ field. As the name suggest, it is a VHDL
 /template/, meaning that the compiler must fill in the holes heralded by the
 tilde (~). Here:
@@ -743,24 +743,25 @@ constraints are actually represented by ordinary record types, with fields
 corresponding to the methods of the type class. In the above case, 'KnownNat'
 is actually just like a @newtype@ wrapper for 'Integer'.
 
-The second primitive type that we will explore is the /definition/ primitive.
-In this case we will use 'blockRam' as an example. The Haskell/CλaSH code for
-which is:
+The second kind of primitive that we will explore is the /declaration/ primitive.
+We will use 'blockRam' as an example, for which the Haskell/CλaSH code is:
 
 @
 {\-# NOINLINE blockRam #-\}
--- | Create a blockRAM with space for @n@ elements
+-- | Create a blockRAM with space for \@n\@ elements
+--
+-- NB: Read value is delayed by 1 cycle
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
 -- > bram40 = blockRam d50
 blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a, Default a)
-         => SNat n              -- ^ Size @n@ of the blockram
-         -> Signal (Unsigned m) -- ^ Write address @w@
-         -> Signal (Unsigned m) -- ^ Read address @r@
+         => SNat n              -- ^ Size \@n\@ of the blockram
+         -> Signal (Unsigned m) -- ^ Write address \@w\@
+         -> Signal (Unsigned m) -- ^ Read address \@r\@
          -> Signal Bool         -- ^ Write enable
-         -> Signal a            -- ^ Value to write (at address @w@)
-         -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
+         -> Signal a            -- ^ Value to write (at address \@w\@)
+         -> Signal a            -- ^ Value of the 'blockRAM' at address \@r\@ from the previous clock cycle
+blockRam n wr rd en din = pack $ (bram' \<^\> binit) (wr,rd,en,din)
   where
     binit :: (Vec n a,a)
     binit = (vcopy n def,def)
@@ -774,7 +775,7 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
         o'               = ram ! r
 @
 
-For which the primitive definition is:
+And for which the /definition/ primitive is:
 
 @
 { \"BlackBox\" :
@@ -805,7 +806,7 @@ end block;"
 @
 
 Again, the @name@ of the primitive is the fully qualified name of the function
-you are creating the primitive for. Because we are creating a \declaration\
+you are creating the primitive for. Because we are creating a /declaration/
 primitive we define a @template__D__@ field. Instead of discussing what the
 individual template holes mean in the above context, we will instead just give
 a general listing of the available template holes:
@@ -814,7 +815,7 @@ a general listing of the available template holes:
   to. NB: Only used in a /definition/ primitive.
 * @~ARG[N]@: @(N+1)@'th argument to the function.
 * @~LIT[N]@: @(N+1)@'th argument to the function An extra condition that must
-  hold is that this @N@'th argument is an (integer) literal.
+  hold is that this @(N+1)@'th argument is an (integer) literal.
 * @~CLK[N]@: Clock signal to which the @(N+1)@'th argument is synchronized to.
 * @~CLKO@: Clock signal to which the result is synchronized to.
 * @~RST[N]@: Asynchronous reset signal to the clock to which the @(N+1)@'th
@@ -836,24 +837,25 @@ a general listing of the available template holes:
   @~SYM[N]@ in the same primitive definition all refer to the same random, but
   unique, symbol.
 
-Some final remark to end this section: VHDL primitives only instruct the CλaSH
-compiler to use the given VHDL template, instead of trying to do normal
-synthesis. You can hence use constructs inside the Haskell definitions that
-are normally not synthesizable by the CλaSH compiler. However, VHDL primitives
-do not get you /co-simulation/: where you simulate VHDL and Haskell in a
-/single/ environment. If you still want to simulate your design in Haskell, you
-will have to describe, in a cycle- and bit-accurate way, the behaviour of that
-(potentially complex) IP you are trying include in your design.
+Some final remarks to end this section: VHDL primitives are there tp instruct the
+CλaSH compiler to use the given VHDL template, instead of trying to do normal
+synthesis. As a consequence you can use constructs inside the Haskell
+definitions that are normally not synthesizable by the CλaSH compiler. However,
+VHDL primitives do not give us /co-simulation/: where you would be able to
+simulate VHDL and Haskell in a /single/ environment. If you still want to
+simulate your design in Haskell, you will have to describe, in a cycle- and
+bit-accurate way, the behaviour of that (potentially complex) IP you are trying
+to include in your design.
 
 Perhaps in the future, someone will figure out how to connect the two simulation
-worlds using e.g. VHDL's foreign function interface VHPI.
+worlds, using e.g. VHDL's foreign function interface VHPI.
 -}
 
 {- $conclusion
 For now, this is the end of this tutorial. We will be adding updates over time,
-so check back from time to time. For now we recommend that you continue with
-exploring the "CLaSH.Prelude" module however, and like that hopefully get a feel
-of what CλaSH is capable of.
+so check back from time to time. For now, we recommend that you continue with
+exploring the "CLaSH.Prelude" module, and get a better understanding of the
+capabilities of CλaSH in the process.
 -}
 
 {- $errorsandsolutions
