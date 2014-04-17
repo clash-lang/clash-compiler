@@ -25,7 +25,7 @@ Description:
   .
   * <https://github.com/christiaanb/Idris-dev Idris Frontend>
   .
-  * <https://github.com/christiaanb/clash2 GHC/Haskell Frontend>
+  * <http://hackage.haskell.org/package/clash-ghc GHC/Haskell Frontend>
   .
   .
   Prelude library: <http://hackage.haskell.org/package/clash-prelude>
