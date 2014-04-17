@@ -206,7 +206,7 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
              | otherwise = ram
         o'               = ram ! r
 
-{-# DEPRECATED blockRamC "'Comp' is deprecated, use 'blockRam' instead" #-}
+{-# DEPRECATED blockRamC "'Comp' is deprecated and will be removed in version 0.6, use 'blockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
 -- NB: Read value is delayed by 1 cycle
@@ -234,7 +234,7 @@ blockRamPow2 :: (KnownNat n, KnownNat (2^n), Pack a, Default a)
              -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 blockRamPow2 = blockRam
 
-{-# DEPRECATED blockRamPow2C "'Comp' is deprecated, use 'blockRamPow2' instead" #-}
+{-# DEPRECATED blockRamPow2C "'Comp' is deprecated and will be removed in version 0.6, use 'blockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- NB: Read value is delayed by 1 cycle
@@ -246,7 +246,7 @@ blockRamPow2C :: (KnownNat n, KnownNat (2^n), Pack a, Default a)
               -> Comp (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
 
-{-# DEPRECATED Comp "Use 'Applicative' interface and ('<^>') instead" #-}
+{-# DEPRECATED Comp "Will be removed in version 0.6. Use 'Applicative' interface and ('<^>') instead" #-}
 -- | 'Comp'onent: an 'Arrow' interface to synchronous sequential functions
 newtype Comp  a b = C { asFunction :: Signal a -> Signal b }
 
@@ -266,7 +266,7 @@ instance ArrowLoop Comp where
       simpleLoop g b = let ~(c,d) = g (b,d)
                        in c
 
-{-# DEPRECATED registerC "'Comp' is deprecated, use 'register' instead" #-}
+{-# DEPRECATED registerC "'Comp' is deprecated and will be removed in version 0.6, use 'register' instead" #-}
 -- | Create a 'register' 'Comp'onent
 --
 -- > rC :: Comp (Int,Int) (Int,Int)
@@ -277,7 +277,7 @@ instance ArrowLoop Comp where
 registerC :: a -> Comp a a
 registerC = C Prelude.. register
 
-{-# DEPRECATED simulateC "'Comp' is deprecated, use 'simulate' instead" #-}
+{-# DEPRECATED simulateC "'Comp' is deprecated and will be removed in version 0.6, use 'simulate' instead" #-}
 -- | Simulate a 'Comp'onent given a list of samples
 --
 -- >>> simulateC (registerC 8) [1, 2, 3, ...
@@ -285,7 +285,7 @@ registerC = C Prelude.. register
 simulateC :: Comp a b -> [a] -> [b]
 simulateC f = simulate (asFunction f)
 
-{-# DEPRECATED (^^^) "Use 'Applicative' interface and ('<^>') instead" #-}
+{-# DEPRECATED (^^^) "Will be removed in version 0.6. Use 'Applicative' interface and ('<^>') instead" #-}
 {-# INLINABLE (^^^) #-}
 -- | Create a synchronous 'Comp'onent from a combinational function describing
 -- a mealy machine

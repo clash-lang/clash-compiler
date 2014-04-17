@@ -104,7 +104,7 @@ sync clk f iS = \i -> let (s',o) = cunpack clk $ f <$> s <*> cpack clk i
 cregisterP :: CPack a => Clock clk -> a -> CSignalP clk a -> CSignalP clk a
 cregisterP clk i = cunpack clk Prelude.. cregister clk i Prelude.. cpack clk
 
-{-# DEPRECATED CComp "Use 'Applicative' interface and 'sync' instead" #-}
+{-# DEPRECATED CComp "Will be removed in version 0.6. Use 'Applicative' interface and 'sync' instead" #-}
 -- | 'CComp'onent: an 'Arrow' interface to explicitly clocked synchronous
 -- sequential functions
 newtype CComp t a b = CC { asCFunction :: CSignal t a -> CSignal t b }
@@ -127,7 +127,7 @@ instance KnownNat t => ArrowLoop (CComp t) where
       simpleLoop g b = let ~(c,d) = g (b,d)
                        in c
 
-{-# DEPRECATED syncA "Use 'Applicative' interface and 'sync' instead" #-}
+{-# DEPRECATED syncA "Will be removed in version 0.6. Use 'Applicative' interface and 'sync' instead" #-}
 {-# INLINABLE syncA #-}
 -- | Create a synchronous 'CComp'onent from a combinational function describing
 -- a mealy machine
@@ -162,7 +162,7 @@ syncA clk f sI = CC $ \i -> let (s',o) = cunpack clk $ f <$> s <*> i
                                 s      = cregister clk sI s'
                             in  o
 
-{-# DEPRECATED cregisterC "'CComp' is deprecated, use 'cregister' instead" #-}
+{-# DEPRECATED cregisterC "'CComp' is deprecated and will be removed in version 0.6, use 'cregister' instead" #-}
 -- | Create a 'cregister' 'CComp'onent
 --
 -- > clk100 = Clock d100
@@ -175,7 +175,7 @@ syncA clk f sI = CC $ \i -> let (s',o) = cunpack clk $ f <$> s <*> i
 cregisterC :: Clock clk -> a -> CComp clk a a
 cregisterC clk = CC Prelude.. cregister clk
 
-{-# DEPRECATED csimulateC "'CComp' is deprecated, use 'csimulate' instead" #-}
+{-# DEPRECATED csimulateC "'CComp' is deprecated and will be removed in version 0.6, use 'csimulate' instead" #-}
 -- | Simulate a 'Comp'onent given a list of samples
 --
 -- > clk100 = Clock d100
@@ -215,7 +215,7 @@ cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
              | otherwise = ram
         o'               = ram ! r
 
-{-# DEPRECATED blockRamCC "'CComp' is deprecated, use 'cblockRam' instead" #-}
+{-# DEPRECATED blockRamCC "'CComp' is deprecated and will be removed in version 0.6, use 'cblockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
 -- NB: Read value is delayed by 1 cycle
@@ -247,7 +247,7 @@ cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a, Default a)
               -> CSignal clk a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
 cblockRamPow2 = cblockRam
 
-{-# DEPRECATED blockRamPow2CC "'CComp' is deprecated, use 'cblockRamPow2' instead" #-}
+{-# DEPRECATED blockRamPow2CC "'CComp' is deprecated and will be removed in version 0.6, use 'cblockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- NB: Read value is delayed by 1 cycle
