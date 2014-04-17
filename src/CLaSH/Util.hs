@@ -27,11 +27,14 @@ import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
 import qualified Data.HashMap.Strict  as HashMapS
 import Data.Maybe                     (fromMaybe)
+import Data.Version                   (Version)
 import Control.Lens
 import Debug.Trace                    (trace)
 import qualified Language.Haskell.TH  as TH
 import Unbound.LocallyNameless        (Embed(..))
 import Unbound.LocallyNameless.Name   (Name(..))
+
+import qualified Paths_clash_lib      (version)
 
 -- | A class that can generate unique numbers
 class MonadUnique m where
@@ -212,3 +215,6 @@ splitAtList _ xs@[]       = (xs, xs)
 splitAtList (_:xs) (y:ys) = (y:ys', ys'')
     where
       (ys', ys'') = splitAtList xs ys
+
+clashLibVersion :: Version
+clashLibVersion = Paths_clash_lib.version

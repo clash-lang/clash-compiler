@@ -33,7 +33,7 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
              handleSourceError )
 import HsImpExp
-import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC, 
+import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName )
 import Module
 import Name
@@ -49,7 +49,6 @@ import Outputable hiding ( printForUser, printForUserPartWay, bold )
 
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )
-import Config
 import Digraph
 import Encoding
 import FastString
@@ -109,6 +108,9 @@ import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
 import qualified CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types (DebugLevel(..))
+import           CLaSH.Util (clashLibVersion)
+import qualified Data.Version as Data.Version
+import qualified Paths_clash_ghc
 
 #ifdef STANDALONE
 
@@ -122,9 +124,8 @@ catchIO_ = Control.Exception.catch
 
 #else
 
-import           Paths_clash_ghc
 getDefPrimDir :: IO FilePath
-getDefPrimDir = getDataFileName "primitives"
+getDefPrimDir = Paths_clash_ghc.getDataFileName "primitives"
 
 #endif
 
@@ -149,8 +150,9 @@ defaultGhciSettings =
     }
 
 ghciWelcomeMsg :: String
-ghciWelcomeMsg = "CLaSHi, version " ++ cProjectVersion ++
-                 ": http://www.haskell.org/ghc/  :? for help"
+ghciWelcomeMsg = "CLaSHi, version " ++ Data.Version.showVersion Paths_clash_ghc.version ++
+                 " (using clash-lib, version " ++ Data.Version.showVersion clashLibVersion ++
+                 "):\nhttp://christiaanb.github.io/clash2/  :? for help"
 
 cmdName :: Command -> String
 cmdName (n,_,_) = n
@@ -695,7 +697,7 @@ installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
                 (name:_) <- GHC.parseName ipFun
-                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name 
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he{hsc_IC = new_ic})
                 return Succeeded
 
@@ -1848,7 +1850,7 @@ restoreContextOnFailure do_this = do
 
 checkAdd :: InteractiveImport -> GHCi ()
 checkAdd ii = do
-  dflags <- getDynFlags 
+  dflags <- getDynFlags
   let safe = safeLanguageOn dflags
   case ii of
     IIModule modname

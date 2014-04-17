@@ -26,7 +26,8 @@ Category:             Hardware
 Build-type:           Simple
 
 Extra-source-files:   README.md,
-                      src-bin/HsVersions.h
+                      LICENSE_GHC,
+                      src-bin/HsVersions.h,
                       src-bin/PosixSource.h
 
 Data-files:           primitives/clash.bit.json,
@@ -54,7 +55,7 @@ Cabal-version:        >=1.10
 
 source-repository head
   type: git
-  location: git@github.com:christiaanb/clash2.git
+  location: https://github.com/christiaanb/clash2.git
 
 Flag standalone
   Description: Build compiler for non-cabal installation

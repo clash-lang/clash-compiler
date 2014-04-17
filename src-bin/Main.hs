@@ -71,6 +71,7 @@ import qualified GHC.Paths
 import           Paths_clash_ghc
 #endif
 import           Exception (gcatch)
+import qualified Data.Version (showVersion)
 import           Control.Exception (ErrorCall (..))
 import qualified CLaSH.Driver
 import           CLaSH.GHC.Evaluator
@@ -78,6 +79,7 @@ import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
 import qualified CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types (DebugLevel(..))
+import           CLaSH.Util (clashLibVersion)
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
@@ -153,7 +155,7 @@ main = do
             do case preStartupMode of
                    ShowSupportedExtensions -> showSupportedExtensions
                    ShowVersion             -> showVersion
-                   ShowNumVersion          -> putStrLn cProjectVersion
+                   ShowNumVersion          -> putStrLn (Data.Version.showVersion Paths_clash_ghc.version)
                    ShowOptions             -> showOptions
         Right postStartupMode ->
             -- start our GHC session
@@ -758,7 +760,12 @@ showSupportedExtensions :: IO ()
 showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
 
 showVersion :: IO ()
-showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
+showVersion = putStrLn $ concat [ "CAES Language for Synchronous Hardware, version "
+                                , Data.Version.showVersion Paths_clash_ghc.version
+                                , " (using clash-lib, version: "
+                                , Data.Version.showVersion clashLibVersion
+                                , ")"
+                                ]
 
 showOptions :: IO ()
 showOptions = putStr (unlines availableOptions)
@@ -892,4 +899,4 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         "unrecognised flag: " ++ f ++ "\n" ++
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
-            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs)) 
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))

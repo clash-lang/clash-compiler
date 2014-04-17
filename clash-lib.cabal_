@@ -120,3 +120,5 @@ Library
                       CLaSH.Rewrite.Util
 
                       CLaSH.Util
+
+  Other-Modules:      Paths_clash_lib
