@@ -221,7 +221,7 @@ can already test this function:
 We can also examine the inferred type of @ma@ in the interpreter:
 
 >>> :t ma
-ma :: Num a => a -> a -> a
+ma :: Num a => a -> (a, a) -> a
 
 Talking about /types/ also brings us to one of the most important parts of this
 tutorial: /types/ and /synchronous sequential logic/. Especially how we can
@@ -837,7 +837,7 @@ a general listing of the available template holes:
   @~SYM[N]@ in the same primitive definition all refer to the same random, but
   unique, symbol.
 
-Some final remarks to end this section: VHDL primitives are there tp instruct the
+Some final remarks to end this section: VHDL primitives are there to instruct the
 CλaSH compiler to use the given VHDL template, instead of trying to do normal
 synthesis. As a consequence you can use constructs inside the Haskell
 definitions that are normally not synthesizable by the CλaSH compiler. However,
