@@ -753,7 +753,7 @@ We will use 'blockRam' as an example, for which the Haskell/CλaSH code is:
 -- NB: Read value is delayed by 1 cycle
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
--- > bram40 = blockRam d50
+-- > bram40 = blockRam d40
 blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a, Default a)
          => SNat n              -- ^ Size \@n\@ of the blockram
          -> Signal (Unsigned m) -- ^ Write address \@w\@

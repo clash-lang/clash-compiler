@@ -185,7 +185,7 @@ registerP i = unpack Prelude.. register i Prelude.. pack
 -- NB: Read value is delayed by 1 cycle
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
--- > bram40 = blockRam d50
+-- > bram40 = blockRam d40
 blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a, Default a)
          => SNat n              -- ^ Size @n@ of the blockram
          -> Signal (Unsigned m) -- ^ Write address @w@
@@ -212,7 +212,7 @@ blockRam n wr rd en din = pack $ (bram' <^> binit) (wr,rd,en,din)
 -- NB: Read value is delayed by 1 cycle
 --
 -- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, a) a
--- > bramC40 = blockRamC d50
+-- > bramC40 = blockRamC d40
 blockRamC :: (KnownNat n, KnownNat m, Pack a, Default a)
           => SNat n -- ^ Size @n@ of the blockram
           -> Comp (Unsigned m, Unsigned m, Bool, a) a

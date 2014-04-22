@@ -193,7 +193,7 @@ csimulateC f = csimulate (asCFunction f)
 -- >
 -- > bram40 :: CSignal 100 (Unsigned 6) -> CSignal 100 (Unsigned 6)
 -- >        -> CSignal 100 Bool -> CSignal 100 a -> 100 CSignal a
--- > bram40 = cblockRam clk100 d50
+-- > bram40 = cblockRam clk100 d40
 cblockRam :: forall n m a clk . (KnownNat n, KnownNat m, CPack a, Default a)
           => Clock clk                -- ^ 'Clock' to synchronize to
           -> SNat n                   -- ^ Size @n@ of the blockram
@@ -223,7 +223,7 @@ cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
 -- > clk100 = Clock 100
 -- >
 -- > bramC40 :: CComp 100 (Unsigned 6, Unsigned 6, Bool, a) a
--- > bramC40 = blockRamCC clk100 d50
+-- > bramC40 = blockRamCC clk100 d40
 blockRamCC :: (KnownNat n, KnownNat m, CPack a, Default a)
            => Clock clk -- ^ 'Clock' to synchronize to
            -> SNat n    -- ^ Size @n@ of the blockram
