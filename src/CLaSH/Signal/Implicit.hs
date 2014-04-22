@@ -79,7 +79,14 @@ simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
 -- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
--- product type of 'Signal's
+-- product type of 'Signal's.
+--
+-- Instances must of 'Pack' must satisfy the following laws:
+--
+-- @
+-- pack . unpack = 'id'
+-- unpack . pack = 'id'
+-- @
 class Pack a where
   type SignalP a
   -- | Example:
