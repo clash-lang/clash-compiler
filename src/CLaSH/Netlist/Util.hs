@@ -73,14 +73,15 @@ coreTypeToHWTypeM :: Type
 coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
-synchronizedClk :: Type
+synchronizedClk :: HashMap TyConName TyCon -- ^ TyCon cache
+                -> Type
                 -> Maybe (Identifier,Int)
-synchronizedClk ty
+synchronizedClk tcm ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case name2String tyCon of
       "CLaSH.Signal.Types.Signal"     -> Just (pack "clk1000",1000)
-      "CLaSH.Sized.Vector.Vec"        -> synchronizedClk (args!!1)
+      "CLaSH.Sized.Vector.Vec"        -> synchronizedClk tcm (args!!1)
       "CLaSH.Signal.Implicit.SignalP" -> Just (pack "clk1000",1000)
       "CLaSH.Signal.Types.CSignal"    -> case (head args) of
                                            (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i),i)
@@ -88,7 +89,15 @@ synchronizedClk ty
       "CLaSH.Signal.Types.CSignalP"   -> case (head args) of
                                            (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i),i)
                                            _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
-      _                               -> Nothing
+      _                               -> case tyConDataCons (tcm HashMap.! tyCon) of
+                                           [dc] -> let argTys   = dcArgTys dc
+                                                       argTVs   = dcUnivTyVars dc
+                                                       argSubts = zip argTVs args
+                                                       args'    = map (substTys argSubts) argTys
+                                                   in case args' of
+                                                      (arg:_) -> synchronizedClk tcm arg
+                                                      _ -> Nothing
+                                           _    -> Nothing
   | otherwise
   = Nothing
 

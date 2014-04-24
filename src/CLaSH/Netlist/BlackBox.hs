@@ -56,7 +56,7 @@ mkBlackBoxContext resId args = do
     (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
 
     -- Make context result
-    let res = case synchronizedClk (unembed $ V.varType resId) of
+    let res = case synchronizedClk tcm (unembed $ V.varType resId) of
                 Just clk -> Right . (,clk) . mkBasicId . pack $ name2String (V.varName resId)
                 Nothing  -> Left . mkBasicId . pack $ name2String (V.varName resId)
     resTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
@@ -90,8 +90,9 @@ mkInput (_, True) = return ((Left $ pack "__FUN__", Void),[])
 
 mkInput (Var ty v, False) = do
   let vT = mkBasicId . pack $ name2String v
+  tcm  <- Lens.use tcCache
   hwTy <- lift $ N.unsafeCoreTypeToHWTypeM $(curLoc) ty
-  case synchronizedClk ty of
+  case synchronizedClk tcm ty of
     Just clk -> return ((Right (vT,clk), hwTy),[])
     Nothing  -> return ((Left vT, hwTy),[])
 
