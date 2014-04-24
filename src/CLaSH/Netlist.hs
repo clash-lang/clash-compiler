@@ -263,6 +263,10 @@ mkExpr ty app = do
       | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
       | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
     Prim nm _
+      -- TODO: Optimize the tagToEnum and dataToTag translations so that in
+      --       general:
+      --       - tagToEnum is translated to 'to_unsigned'
+      --       - dataToTag is translated to 'to_integer'
       | nm == TextS.pack "GHC.Prim.tagToEnum#" -> do
         i <- varCount <<%= (+1)
         scrutTy <- termType tcm (head args)
@@ -272,7 +276,7 @@ mkExpr ty app = do
             tags      = map dcTag dcs
             altLhs    = map (Just . HW.Literal Nothing . NumLit . (subtract 1)) tags
             altRhs    = map (dcToLiteral hwTy) tags
-            tmpNm     = "tmp_" ++ show i
+            tmpNm     = "tmp_tte_" ++ show i
             tmpS      = Text.pack tmpNm
             netDecl   = NetDecl tmpS hwTy Nothing
             netAssign = CondAssignment tmpS scrutExpr (zip altLhs altRhs)
@@ -280,13 +284,14 @@ mkExpr ty app = do
       | nm == TextS.pack "GHC.Prim.dataToTag#" -> do
         i <- varCount <<%= (+1)
         scrutTy <- termType tcm (head args)
+        scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
         (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
         let ConstTy (TyCon tcN) = scrutTy
             dcs       = tyConDataCons (tcm HashMap.! tcN)
             tags      = map dcTag dcs
-            altLhs    = map (Just . dcToLiteral hwTy) tags
+            altLhs    = map (Just . dcToLiteral scrutHTy) tags
             altRhs    = map (HW.Literal Nothing . NumLit . (subtract 1)) tags
-            tmpNm     = "tmp_" ++ show i
+            tmpNm     = "tmp_dtt_" ++ show i
             tmpS      = Text.pack tmpNm
             netDecl   = NetDecl tmpS hwTy Nothing
             netAssign = CondAssignment tmpS scrutExpr (zip altLhs altRhs)

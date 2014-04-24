@@ -24,9 +24,12 @@ import           Data.Text                     (unpack)
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
+import           CLaSH.Core.DataCon            as D (dcTag)
 import           CLaSH.Core.Literal            as L (Literal (..))
 import           CLaSH.Core.Pretty             (showDoc)
 import           CLaSH.Core.Term               as C (Term (..), TmName)
+import           CLaSH.Core.Type               as C (Type (..), ConstTy (..))
+import           CLaSH.Core.TyCon              as C (tyConDataCons)
 import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
 import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication)
@@ -124,7 +127,20 @@ mkInput (e, False) = case collectArgs e of
               bb   <- lift $ mkBlackBox tempE bbCtx
               let bb' = mconcat [pack "(",bb,pack ")"]
               return ((Left bb', hwTy),ctxDecls)
-        Just _  -> mzero
+        Just (P.Primitive pNm _)
+          | pNm == "GHC.Prim.tagToEnum#" -> case collectArgs (head $ fst $ partitionEithers args) of
+              (C.Literal (IntegerLiteral i), _) -> do
+                tcm <- Lens.use tcCache
+                let ConstTy (TyCon tcN) = head . snd $ partitionEithers args
+                    dcs = tyConDataCons (tcm HashMap.! tcN)
+                    dc  = dcs !! (fromInteger $ i - 1)
+                ((id_,hwTy),decs) <- mkLitInput (Data dc)
+                return ((Left id_,hwTy),decs)
+              _ -> error $ $(curLoc) ++ "tagToEnum: " ++ showDoc e
+          | pNm == "GHC.Prim.dataToTag#" -> case collectArgs (head $ fst $ partitionEithers args) of
+              (Data dc, _) -> return ((Left . pack . show . subtract 1 $ dcTag dc,Integer),[])
+              _ -> error $ $(curLoc) ++ "dataToTag: " ++ showDoc e
+          | otherwise -> mzero
         Nothing -> error $ $(curLoc) ++ "No blackbox found: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that
