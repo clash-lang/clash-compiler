@@ -94,7 +94,7 @@ begin
   ~SYM[1] <= ~ARG[0];
   ~SYM[2]_vconcat : for ~SYM[3] in ~ARG[0]'high downto 0 generate
   begin
-    ~RESULT((~SYM[3] * ~SYM[1](0)'length) + ~SYM[1](0)'high) downto (~SYM[3] * ~SYM[1](0)'length)) <= ~SYM[1](~SYM[3]);
+    ~RESULT(((~SYM[3] * ~SYM[1](0)'length) + ~SYM[1](0)'high) downto (~SYM[3] * ~SYM[1](0)'length)) <= ~SYM[1](~SYM[3]);
   end generate;
 end block;"
     }
@@ -108,7 +108,7 @@ begin
   ~SYM[1] <= ~ARG[2];
   ~SYM[2]_vunconcat : for ~SYM[3] in ~RESULT'high downto 0 generate
   begin
-    ~RESULT(~SYM[3]) <= ~SYM[1]((~SYM[3] * ~RESULT(0)'length) + ~RESULT(0)'high) downto (~SYM[3] * ~RESULT(0)'length));
+    ~RESULT(~SYM[3]) <= ~SYM[1](((~SYM[3] * ~RESULT(0)'length) + ~RESULT(0)'high) downto (~SYM[3] * ~RESULT(0)'length));
   end generate;
 end block;"
     }
