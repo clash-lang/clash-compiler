@@ -11,8 +11,8 @@ import Data.Default
 import Language.Haskell.TH.Lift
 
 -- | Two-level logic
-data Bit = H -- ^ High
-         | L -- ^ Low
+data Bit = L -- ^ Low
+         | H -- ^ High
 
 instance Eq Bit where
   (==) = eqBit
