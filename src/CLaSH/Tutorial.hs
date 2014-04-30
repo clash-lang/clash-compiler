@@ -54,6 +54,10 @@ where
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
+import Data.Char
+import Data.Int
+import GHC.Word
+
 
 {- $introduction
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -911,6 +915,21 @@ A list of often encountered errors and their solutions:
 
     NB: Use 'cunpack' when you are using explicitly clocked 'CSignal's
 
+* __CLaSH.Netlist(..): Not in normal form: \<REASON\>: \<EXPR\>__:
+
+    A function could not be transformed into the expected normal form. This
+    usually means one of the following:
+
+    * The @topEntity@ has residual polymorphism.
+    * The @topEntity@ has higher-order arguments, or a higher-order result.
+    * You are using types which cannot be represented in hardware.
+
+    The solution for all the above listed reasons is quite simple: remove them.
+    That is, make sure that the @topEntity@ is completely monomorphic and
+    first-order. Also remove any variables and constants/literals that have a
+    non-representable type, see <#unsupported Unsupported Haskell features> to
+    find out which types are not representable.
+
 * __CLaSH.Normalize(94): Expr belonging to bndr: \<FUNCTION\> remains__
   __recursive after normalization__:
 
@@ -1054,6 +1073,20 @@ to VHDL (for now):
 
     There is no support for the 'Float' and 'Double' types, if you need numbers
     with a /fractional/ part you can use the 'Fixed' point type.
+
+  [@Other primitive types@]
+
+    Most primitive types are not supported, with the exception of 'Int',
+    @<http://hackage.haskell.org/package/ghc-prim/docs/GHC-Prim.html#t:Int-35- Int#>@,
+    and 'Integer'. This means that types such as: 'Word', 'Word8', 'Int8', 'Char',
+    @<http://hackage.haskell.org/package/array/docs/Data-Array.html#t:Array Array>@,
+    etc. cannot to translated to hardware.
+
+    The translations of 'Int',
+    @<http://hackage.haskell.org/package/ghc-prim/docs/GHC-Prim.html#t:Int-35- Int#>@,
+    and 'Integer' are also incorrect: they are translated to the VHDL @integer@
+    type, which can only represent 32-bit integer values. Use these types with
+    due diligence.
 
   [@Side-effects: 'IO', <http://hackage.haskell.org/package/base/docs/Control-Monad-ST.html#t:ST ST>, etc.@]
 
