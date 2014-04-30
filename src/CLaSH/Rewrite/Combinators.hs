@@ -121,3 +121,14 @@ whenR f r1 ctx expr = do
   if b
     then r1 ctx expr
     else return expr
+
+-- | Only traverse downwards when the assertion evaluates to true
+bottomupWhenR :: (Monad m, Fresh m, Functor m)
+              => ([CoreContext] -> Term -> m Bool)
+              -> Transform m
+              -> Transform m
+bottomupWhenR f r ctx expr = do
+  b <- f ctx expr
+  if b
+    then (allR True (bottomupWhenR f r) >-> r) ctx expr
+    else r ctx expr
