@@ -343,14 +343,14 @@ mkDcApplication dstHType dc args = do
         return (HW.DataCon dstHType (Just $ DC (dstHType,dcTag dc - 1)) [])
       Bool ->
         let dc' = case dcTag dc of
-                   2  -> HW.Literal Nothing (BoolLit True)
                    1  -> HW.Literal Nothing (BoolLit False)
+                   2  -> HW.Literal Nothing (BoolLit True)
                    tg -> error $ $(curLoc) ++ "unknown bool literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in  return dc'
       Bit ->
         let dc' = case dcTag dc of
-                   1 -> HW.Literal Nothing (BitLit H)
-                   2 -> HW.Literal Nothing (BitLit L)
+                   1 -> HW.Literal Nothing (BitLit L)
+                   2 -> HW.Literal Nothing (BitLit H)
                    tg -> error $ $(curLoc) ++ "unknown bit literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in return dc'
       Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
