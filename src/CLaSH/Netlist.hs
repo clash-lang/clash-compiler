@@ -154,10 +154,13 @@ mkDeclarations :: Id -- ^ LHS of the let-binder
 mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 
 mkDeclarations _ e@(Case _ []) =
-  error $ $(curLoc) ++ "Case-decompositions with an empty list of alternatives not supported: " ++ showDoc e
+  error $ $(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported: " ++ showDoc e
 
 mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
-  (pat,Var varTy varTm)  <- unbind alt
+  (pat,v) <- unbind alt
+  (varTy,varTm) <- case v of
+                     (Var t n) -> return (t,n)
+                     _ -> error $ $(curLoc) ++ "Not in normal form: RHS of case-projection is not a variable: " ++ showDoc e
   typeTrans    <- Lens.use typeTranslator
   tcm          <- Lens.use tcCache
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
@@ -168,7 +171,7 @@ mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
                                   in case elemIndex (Id varTm (Embed varTy)) tms of
                                        Nothing -> Nothing
                                        Just fI -> Just (Indexed (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy,dcTag dc - 1,fI))
-        _                      -> error $ $(curLoc) ++ "unexpected pattern in extractor: " ++ showDoc e
+        _                      -> error $ $(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
 
