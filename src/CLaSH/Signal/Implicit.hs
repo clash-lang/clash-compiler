@@ -81,7 +81,7 @@ simulate f = sample . f . fromList
 -- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's.
 --
--- Instances must of 'Pack' must satisfy the following laws:
+-- Instances of 'Pack' must satisfy the following laws:
 --
 -- @
 -- pack . unpack = 'id'

@@ -116,7 +116,7 @@ csimulate f = csample . f . cfromList
 -- | Isomorphism between a @'CSignal' clk@ of a product type (e.g. a tuple) and a
 -- product type of @'CSignal' clk@'s
 --
--- Instances must of 'CPack' must satisfy the following laws:
+-- Instances of 'CPack' must satisfy the following laws:
 --
 -- @
 -- cpack clk . cunpack clk = 'id'
