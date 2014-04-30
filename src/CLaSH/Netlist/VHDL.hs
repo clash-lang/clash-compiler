@@ -414,6 +414,25 @@ expr b (BlackBoxE bs (Just (DC (ty@(SP _ _),_)))) = parenIf b $ parens (string b
     end   = typeSize ty - conSize ty
 expr b (BlackBoxE bs _) = parenIf b $ string bs
 
+expr _ (DataTag Bool (Left e))           = "false when" <+> expr False e <+> "= 0 else true"
+expr _ (DataTag Bool (Right e))          = "1 when" <+> expr False e <+> "else 0"
+expr _ (DataTag Bit (Left e))            = "'0' when" <+> expr False e <+> "= 0 else '1'"
+expr _ (DataTag Bit (Right e))           = "0 when" <+> expr False e <+> "= '0' else 1"
+expr _ (DataTag hty@(Sum _ _) (Left e))  = "to_unsigned" <> tupled (sequence [expr False e,int (typeSize hty)])
+expr _ (DataTag (Sum _ _) (Right e))     = "to_integer" <> parens (expr False e)
+
+expr _ (DataTag (Product _ _) (Right _)) = int 0
+expr _ (DataTag hty@(SP _ _) (Right e))  = "to_integer" <> parens
+                                                ("unsigned" <> parens
+                                                (expr False e <> parens
+                                                (int start <+> "downto" <+> int end)))
+  where
+    start = typeSize hty - 1
+    end   = typeSize hty - conSize hty
+
+expr _ (DataTag (Vector 0 _) (Right _)) = int 0
+expr _ (DataTag (Vector _ _) (Right _)) = int 1
+
 expr _ _ = empty
 
 otherSize :: [HWType] -> Int -> Int

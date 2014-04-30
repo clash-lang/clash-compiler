@@ -26,8 +26,8 @@ import           CLaSH.Core.Literal         (Literal (..))
 import           CLaSH.Core.Pretty          (showDoc)
 import           CLaSH.Core.Term            (Pat (..), Term (..), TmName)
 import qualified CLaSH.Core.Term            as Core
-import           CLaSH.Core.Type            (Type (..), ConstTy (..))
-import           CLaSH.Core.TyCon           (TyConName, TyCon, tyConDataCons)
+import           CLaSH.Core.Type            (Type (..))
+import           CLaSH.Core.TyCon           (TyConName, TyCon)
 import           CLaSH.Core.Util            (collectArgs, isVar, termType)
 import           CLaSH.Core.Var             (Id, Var (..))
 import           CLaSH.Netlist.BlackBox
@@ -274,30 +274,20 @@ mkExpr ty app = do
         i <- varCount <<%= (+1)
         scrutTy <- termType tcm (head args)
         (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
-        let ConstTy (TyCon tcN) = ty
-            dcs       = tyConDataCons (tcm HashMap.! tcN)
-            tags      = map dcTag dcs
-            altLhs    = map (Just . HW.Literal Nothing . NumLit . (subtract 1)) tags
-            altRhs    = map (dcToLiteral hwTy) tags
-            tmpNm     = "tmp_tte_" ++ show i
+        let tmpNm     = "tmp_tte_" ++ show i
             tmpS      = Text.pack tmpNm
             netDecl   = NetDecl tmpS hwTy Nothing
-            netAssign = CondAssignment tmpS scrutExpr (zip altLhs altRhs)
+            netAssign = Assignment tmpS (DataTag hwTy (Left scrutExpr))
         return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
       | nm == TextS.pack "GHC.Prim.dataToTag#" -> do
         i <- varCount <<%= (+1)
         scrutTy <- termType tcm (head args)
         scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
         (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
-        let ConstTy (TyCon tcN) = scrutTy
-            dcs       = tyConDataCons (tcm HashMap.! tcN)
-            tags      = map dcTag dcs
-            altLhs    = map (Just . dcToLiteral scrutHTy) tags
-            altRhs    = map (HW.Literal Nothing . NumLit . (subtract 1)) tags
-            tmpNm     = "tmp_dtt_" ++ show i
+        let tmpNm     = "tmp_dtt_" ++ show i
             tmpS      = Text.pack tmpNm
             netDecl   = NetDecl tmpS hwTy Nothing
-            netAssign = CondAssignment tmpS scrutExpr (zip altLhs altRhs)
+            netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
         return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
       | otherwise -> do
         bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
