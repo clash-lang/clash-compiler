@@ -177,6 +177,7 @@ makeTyCon tc = tycon
           PtrRep  -> C.VoidRep
           WordRep -> C.VoidRep
           DoubleRep -> C.VoidRep
+          Word64Rep -> C.VoidRep
           _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p ++ " in tycon: " ++ showPpr tc
 
 makeAlgTyConRhs :: AlgTyConRhs
