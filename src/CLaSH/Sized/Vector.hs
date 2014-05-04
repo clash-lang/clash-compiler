@@ -23,6 +23,8 @@ module CLaSH.Sized.Vector
     -- ** Applying functions to 'Vec'tor elements
   , vmap, vzipWith
   , vfoldr, vfoldl, vfoldr1, vfoldl1
+  , vscanl, vscanl1, vscanr, vscanr1
+  , vmapAccumL, vmapAccumR
     -- ** Indexing 'Vec'tors
   , (!), vreplace, maxIndex, vlength
     -- ** Generating 'Vec'tors
@@ -354,6 +356,46 @@ vfoldr1 f (x :> (y :> ys)) = f x (vfoldr1 f (y :> ys))
 -- > vfoldl f Nil                                   == TYPE ERROR
 vfoldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
 vfoldl1 f xs = vfoldl f (vhead xs) (vtail xs)
+
+{-# NOINLINE vscanl #-}
+vscanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
+vscanl f z vs = z :> case vs of
+                       Nil       -> Nil
+                       (x :> xs) -> vscanl f (f z x) xs
+
+{-# NOINLINE vscanl1 #-}
+vscanl1 :: (a -> a -> a) -> Vec n a -> Vec n a
+vscanl1 _ Nil       = Nil
+vscanl1 f (x :> xs) = vscanl f x xs
+
+{-# NOINLINE vscanr #-}
+vscanr :: (a -> b -> b) -> b -> Vec n a -> Vec (n + 1) b
+vscanr _ z Nil       = z :> Nil
+vscanr f z (x :> xs) = case vscanr f z xs of
+                         (q :> qs) -> f x q :> q :> qs
+
+{-# NOINLINE vscanr1 #-}
+vscanr1 :: (a -> a -> a) -> Vec n a -> Vec n a
+vscanr1 _ Nil            = Nil
+vscanr1 _ (x :> Nil)     = x :> Nil
+vscanr1 f (x :> y :> ys) = case vscanr1 f (y :> ys) of
+                             (q :> qs) -> f x q :> q :> qs
+
+{-# NOINLINE vmapAccumL #-}
+vmapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
+vmapAccumL _ acc Nil       = (acc,Nil)
+vmapAccumL f acc (x :> xs) = (acc'',y :> ys)
+  where
+    (acc',y)   = f acc x
+    (acc'',ys) = vmapAccumL f acc' xs
+
+{-# NOINLINE vmapAccumR #-}
+vmapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
+vmapAccumR _ acc Nil       = (acc,Nil)
+vmapAccumR f acc (x :> xs) = (acc'',y :> ys)
+  where
+    (acc'',y) = f acc' x
+    (acc',ys) = vmapAccumL f acc xs
 
 {-# NOINLINE vzip #-}
 -- | 'vzip' takes two lists and returns a list of corresponding pairs.
