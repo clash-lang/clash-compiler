@@ -1,10 +1,10 @@
 [ { "BlackBox" :
-    { "name"      : "GHC.Err.error"
+    { "name"      : "Control.Exception.Base.patError"
     , "templateE" : "~DEFAULTO"
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Err.undefined"
+    { "name"      : "Control.Exception.Base.irrefutPatError"
     , "templateE" : "~DEFAULTO"
     }
   }
