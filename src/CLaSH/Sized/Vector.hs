@@ -50,8 +50,8 @@ import CLaSH.Promoted.Nat
 -- | Fixed size vectors
 --
 -- * Lists with their length encoded in their type
--- * 'Vec'tor elements have a descending subscript starting from 'maxIndex' ('vlength' - 1)
---   and ending at 0
+-- * 'Vec'tor elements have a DESCENDING subscript starting from 'maxIndex'
+--   ('vlength' - 1) and ending at 0
 --
 -- >>> (3:>4:>5:>Nil)
 -- <3,4,5>
@@ -430,7 +430,7 @@ vindex_integer xs i = case vindexM_integer xs (maxIndex xs - i) of
     Nothing -> error ("(!): Index " ++ show i ++ " is out of bounds 0 and " ++ show (maxIndex xs))
 
 {-# INLINEABLE (!) #-}
--- | Vector index (subscript) operator, descending from 'maxIndex', where the
+-- | Vector index (subscript) operator, DESCENDING from 'maxIndex', where the
 -- last element has subscript 0.
 --
 -- >>> (1:>2:>3:>4:>5:>Nil) ! 4
