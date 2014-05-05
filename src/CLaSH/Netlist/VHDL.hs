@@ -483,13 +483,21 @@ toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr False e)
 toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr False e)
 toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
-    parens (hcat $ punctuate " & " (zipWithM toSLV tys selIds'))
+    encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
   where
     tName    = tyName t
     selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
-toSLV (Product _ tys) (DataCon _ _ es) = parens (hcat $ punctuate " & " (zipWithM toSLV tys es))
+toSLV (Product _ tys) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV tys es)
 toSLV (SP _ _) e = expr False e
+toSLV (Vector _ Bit) e = expr False e
+toSLV (Vector n elTy) (Identifier id_ Nothing) = do
+    selIds' <- sequence selIds
+    parens (encloseSep lparen rparen " & " (mapM (toSLV elTy) selIds'))
+  where
+    selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> parens (int i) | i <- [0 .. (n-1)]]
+    selIds   = map (fmap (`Identifier` Nothing)) selNames
+toSLV (Vector n elTy) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
@@ -509,6 +517,13 @@ fromSLV t@(Product _ tys) id_ start _   = tupled $ zipWithM (\s e -> s <+> rarro
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
 fromSLV (SP _ _)          id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (Vector _ Bit)    id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (Vector n elTy)   id_ start _   = tupled args
+  where
+    argLength = typeSize elTy
+    starts    = take (n + 1) $ iterate (subtract argLength) start
+    ends      = map (+1) (tail starts)
+    args      = zipWithM (fromSLV elTy id_) starts ends
 fromSLV hty               _   _     _   = error $ $(curLoc) ++ "fromSLV: " ++ show hty
 
 dcToExpr :: HWType -> Int -> Expr
