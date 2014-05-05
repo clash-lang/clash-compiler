@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -403,8 +404,7 @@ vmapAccumR f acc xs = (acc',ys)
 -- >>> vzip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
 -- <(1,4),(2,3),(3,2),(4,1)>
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
-vzip Nil       Nil       = Nil
-vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs (unsafeCoerce ys))
+vzip = vzipWith (,)
 
 {-# NOINLINE vunzip #-}
 -- | 'vunzip' transforms a list of pairs into a list of first components
@@ -413,9 +413,7 @@ vzip (x :> xs) (y :> ys) = (x,y) :> (vzip xs (unsafeCoerce ys))
 -- >>> vunzip ((1,4):>(2,3):>(3,2):>(4,1):>Nil)
 -- (<1,2,3,4>,<4,3,2,1>)
 vunzip :: Vec n (a,b) -> (Vec n a, Vec n b)
-vunzip Nil = (Nil,Nil)
-vunzip ((a,b) :> xs) = let (as,bs) = vunzip xs
-                       in  (a :> as, b :> bs)
+vunzip xs = (vmap fst xs, vmap snd xs)
 
 {-# NOINLINE vindexM_integer #-}
 vindexM_integer :: Vec n a -> Integer -> Maybe a
