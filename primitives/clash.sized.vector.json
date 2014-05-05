@@ -81,7 +81,7 @@ end block;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0]),~SYM[1](~LIT[0]-1 downto 0));
+  ~RESULT <= (~SYM[1](~SYM[1]'high downto (~SYM[1]'high - ~LIT[0] + 1)),~SYM[1]((~SYM[1]'high - ~LIT[0]) downto 0));
 end block;"
     }
   }
