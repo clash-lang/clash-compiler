@@ -23,7 +23,7 @@ import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import qualified Data.HashMap.Lazy                    as HashMap
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (mapAccumL,nub)
+import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
@@ -64,8 +64,9 @@ mkTyPackage hwtys =
       ) <$>
    "end" <> semi <> packageBodyDec
   where
-    hwTysSorted = topSortHWTys hwtys
-    usedTys     = nub $ concatMap mkUsedTys hwtys
+    usedTys     = nubBy eqHWTy $ concatMap mkUsedTys hwtys
+    needsDec    = nubBy eqHWTy (hwtys ++ filter needsTyDec usedTys)
+    hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
     (funDecs,funBodies) = unzip . catMaybes $ map funDec usedTys
     (showDecs,showBodies) = unzip $ map mkToStringDecls hwTysSorted
@@ -81,6 +82,10 @@ mkTyPackage hwtys =
                 indent 2 (vcat (sequence showBodies)) <$>
                 "-- pragma translate_on" <$>
               "end" <> semi
+
+    eqHWTy :: HWType -> HWType -> Bool
+    eqHWTy (Vector _ elTy1) (Vector _ elty2) = elTy1 == elty2
+    eqHWTy ty1 ty2 = ty1 == ty2
 
 mkUsedTys :: HWType
         -> [HWType]
