@@ -23,7 +23,7 @@ module CLaSH.Sized.Vector
     -- ** Applying functions to 'Vec'tor elements
   , vmap, vzipWith
   , vfoldr, vfoldl, vfoldr1, vfoldl1
-  , vscanl, vscanl1, vscanr, vscanr1
+  , vscanl, vscanr, vscanl1, vscanr1
   , vmapAccumL, vmapAccumR
     -- ** Indexing 'Vec'tors
   , (!), vreplace, maxIndex, vlength
@@ -357,45 +357,45 @@ vfoldr1 f (x :> (y :> ys)) = f x (vfoldr1 f (y :> ys))
 vfoldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
 vfoldl1 f xs = vfoldl f (vhead xs) (vtail xs)
 
-{-# NOINLINE vscanl #-}
-vscanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
-vscanl f z vs = z :> case vs of
-                       Nil       -> Nil
-                       (x :> xs) -> vscanl f (f z x) xs
-
-{-# NOINLINE vscanl1 #-}
-vscanl1 :: (a -> a -> a) -> Vec n a -> Vec n a
-vscanl1 _ Nil       = Nil
-vscanl1 f (x :> xs) = vscanl f x xs
-
-{-# NOINLINE vscanr #-}
-vscanr :: (a -> b -> b) -> b -> Vec n a -> Vec (n + 1) b
-vscanr _ z Nil       = z :> Nil
-vscanr f z (x :> xs) = case vscanr f z xs of
-                         (q :> qs) -> f x q :> q :> qs
-
-{-# NOINLINE vscanr1 #-}
-vscanr1 :: (a -> a -> a) -> Vec n a -> Vec n a
-vscanr1 _ Nil            = Nil
-vscanr1 _ (x :> Nil)     = x :> Nil
-vscanr1 f (x :> y :> ys) = case vscanr1 f (y :> ys) of
-                             (q :> qs) -> f x q :> q :> qs
-
-{-# NOINLINE vmapAccumL #-}
-vmapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
-vmapAccumL _ acc Nil       = (acc,Nil)
-vmapAccumL f acc (x :> xs) = (acc'',y :> ys)
+{-# INLINEABLE vscanl #-}
+vscanl :: KnownNat n => (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
+vscanl f z xs = ws
   where
-    (acc',y)   = f acc x
-    (acc'',ys) = vmapAccumL f acc' xs
+    ws = z :> vzipWith f (lazyV (vinit ws)) xs
 
-{-# NOINLINE vmapAccumR #-}
-vmapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
-vmapAccumR _ acc Nil       = (acc,Nil)
-vmapAccumR f acc (x :> xs) = (acc'',y :> ys)
+{-# INLINEABLE vscanl1 #-}
+vscanl1 :: KnownNat n => (a -> a -> a) -> Vec n a -> Vec n a
+vscanl1 f xs = vinit (vscanl f (vhead xs') (vtail xs'))
   where
-    (acc'',y) = f acc' x
-    (acc',ys) = vmapAccumL f acc xs
+    xs' = xs <: undefined
+
+{-# INLINEABLE vscanr #-}
+vscanr :: KnownNat n => (a -> b -> b) -> b -> Vec n a -> Vec (n + 1) b
+vscanr f z xs = ws
+  where
+    ws = vzipWith f xs (lazyV (vtail ws)) <: z
+
+{-# INLINEABLE vscanr1 #-}
+vscanr1 :: KnownNat n => (a -> a -> a) -> Vec n a -> Vec n a
+vscanr1 f xs = vtail (vscanr f (vlast xs') (vinit xs'))
+  where
+    xs' = undefined :> xs
+
+{-# INLINEABLE vmapAccumL #-}
+vmapAccumL :: KnownNat n => (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
+vmapAccumL f acc xs = (acc',ys)
+  where
+    ws   = vscanl (\l r -> f (fst l) r) (acc,undefined) xs
+    acc' = fst (vlast ws)
+    ys   = vmap snd (vtail ws)
+
+{-# INLINEABLE vmapAccumR #-}
+vmapAccumR :: KnownNat n => (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
+vmapAccumR f acc xs = (acc',ys)
+  where
+    ws   = vscanr (\l r -> f (fst r) l) (acc,undefined) xs
+    acc' = fst (vhead ws)
+    ys   = vmap snd (vinit ws)
 
 {-# NOINLINE vzip #-}
 -- | 'vzip' takes two lists and returns a list of corresponding pairs.
