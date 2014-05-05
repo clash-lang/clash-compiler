@@ -275,39 +275,6 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.vzip"
-    , "templateD" :
-"~SYM[0]_vzip : block
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~SYM[2] <= ~ARG[1];
-
-  ~SYM[3]_vzip : for ~SYM[4] in ~RESULT'high downto 0 generate
-  begin
-    ~RESULT(~SYM[4]) <= (~SYM[1](~SYM[4]),~SYM[2](~SYM[4]));
-  end generate;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.vunzip"
-    , "templateD" :
-"~SYM[0]_vunzip : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-
-  ~SYM[2]_vunzip : for ~SYM[3] in ~RESULT'high downto 0 generate
-  begin
-    ~RESULT.~TYPO_sel0(~SYM[3]) <= ~SYM[1](~SYM[3]).~TYP[0]_sel0;
-    ~RESULT.~TYPO_sel1(~SYM[3]) <= ~SYM[1](~SYM[3]).~TYP[0]_sel1;
-  end generate;
-end block;"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.vindex_integer"
     , "templateD" :
 "~SYM[0]_vindex_integer : block
