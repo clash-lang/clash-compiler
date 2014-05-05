@@ -28,7 +28,8 @@ import           CLaSH.Core.DataCon            as D (dcTag)
 import           CLaSH.Core.Literal            as L (Literal (..))
 import           CLaSH.Core.Pretty             (showDoc)
 import           CLaSH.Core.Term               as C (Term (..), TmName)
-import           CLaSH.Core.Type               as C (Type (..), ConstTy (..))
+import           CLaSH.Core.Type               as C (Type (..), ConstTy (..),
+                                                splitFunTys)
 import           CLaSH.Core.TyCon              as C (tyConDataCons)
 import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
@@ -177,6 +178,37 @@ mkFunInput resId e = case collectArgs e of
             return ((l',bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
       _ -> error $ "No blackbox found: " ++ unpack nm
+  (Data dc,args) -> do
+    tcm <- Lens.use tcCache
+    eTy <- termType tcm e
+    let (_,resTy) = splitFunTys tcm eTy
+    resHTyM <- lift $ coreTypeToHWTypeM resTy
+    case resHTyM of
+      Just resHTy@(SP _ dcArgPairs) -> do
+        let dcI      = dcTag dc - 1
+            dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
+            dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
+            dcApp    = DataCon resHTy (Just $ DC (resHTy,dcI)) dcInps
+            dcAss    = Assignment (pack "~RESULT") dcApp
+        templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
+        let (line,err) = runParse templ
+        if null err
+          then do
+            (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
+            return ((line,bbCtx),dcls)
+          else return $ error $ $(curLoc) ++ "SP: Cannot make function input for: " ++ showDoc e
+      Just resHTy@(Product _ dcArgs) -> do
+        let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
+            dcApp  = DataCon resHTy (Just $ DC (resHTy,0)) dcInps
+            dcAss  = Assignment (pack "~RESULT") dcApp
+        templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
+        let (line,err) = runParse templ
+        if null err
+          then do
+            (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
+            return ((line,bbCtx),dcls)
+          else error $ $(curLoc) ++ "Product: Cannot make function input for: " ++ showDoc e
+      _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   (Var _ fun, args) -> do
     normalized <- Lens.use bindings
     case HashMap.lookup fun normalized of

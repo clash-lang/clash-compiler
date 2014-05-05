@@ -29,6 +29,7 @@ module CLaSH.Core.Type
   , mkFunTy
   , mkTyConApp
   , splitFunTy
+  , splitFunTys
   , splitFunForallTy
   , splitTyConAppM
   , isPolyFunTy
@@ -261,6 +262,14 @@ splitFunTy :: HashMap TyConName TyCon
            -> Maybe (Type, Type)
 splitFunTy m (coreView m -> FunTy arg res) = Just (arg,res)
 splitFunTy _ _                             = Nothing
+
+splitFunTys :: HashMap TyConName TyCon
+            -> Type
+            -> ([Type],Type)
+splitFunTys m (coreView m -> FunTy arg res) = (arg:args,res')
+  where
+    (args,res') = splitFunTys m res
+splitFunTys _ ty = ([],ty)
 
 -- | Split a poly-function type in a: list of type-binders and argument types,
 -- and the result type
