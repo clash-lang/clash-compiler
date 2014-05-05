@@ -398,7 +398,7 @@ vmapAccumR f acc xs = (acc',ys)
     acc' = fst (vhead ws)
     ys   = vmap snd (vinit ws)
 
-{-# NOINLINE vzip #-}
+{-# INLINEABLE vzip #-}
 -- | 'vzip' takes two lists and returns a list of corresponding pairs.
 --
 -- >>> vzip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
@@ -406,7 +406,7 @@ vmapAccumR f acc xs = (acc',ys)
 vzip :: Vec n a -> Vec n b -> Vec n (a,b)
 vzip = vzipWith (,)
 
-{-# NOINLINE vunzip #-}
+{-# INLINEABLE vunzip #-}
 -- | 'vunzip' transforms a list of pairs into a list of first components
 -- and a list of second components.
 --
