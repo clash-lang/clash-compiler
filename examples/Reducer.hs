@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards #-}
 module Reducer where
 
 import CLaSH.Prelude
@@ -27,11 +27,6 @@ type OutputSignal   = Maybe (DataInt, ArrayIndex)
 -- = Cell Definition and Accessors =
 -- =================================
 type Cell = Maybe (DataInt, Discr)
-
-instance Pack Cell where
-  type SignalP Cell = Signal Cell
-  pack   = id
-  unpack = id
 
 valid :: Cell -> Bool
 valid (Just _ ) = True
