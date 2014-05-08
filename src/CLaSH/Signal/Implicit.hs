@@ -1,5 +1,6 @@
-{-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE TypeFamilies      #-}
 
 module CLaSH.Signal.Implicit
   ( -- * Implicitly clocked synchronous signal
@@ -22,6 +23,7 @@ where
 import Control.Applicative
 
 import CLaSH.Bit            (Bit)
+import CLaSH.Sized.Fixed    (Fixed)
 import CLaSH.Sized.Signed   (Signed)
 import CLaSH.Sized.Unsigned (Unsigned)
 import CLaSH.Sized.Vector   (Vec(..), vmap, vhead, vtail)
@@ -89,6 +91,7 @@ simulate f = sample . f . fromList
 -- @
 class Pack a where
   type SignalP a
+  type SignalP a = Signal a
   -- | Example:
   --
   -- > pack :: (Signal a, Signal b) -> Signal (a,b)
@@ -97,6 +100,9 @@ class Pack a where
   --
   -- > pack :: Signal Bit -> Signal Bit
   pack   :: SignalP a -> Signal a
+
+  default pack :: Signal a -> Signal a
+  pack s = s
   -- | Example:
   --
   -- > unpack :: Signal (a,b) -> (Signal a, Signal b)
@@ -106,58 +112,21 @@ class Pack a where
   -- > unpack :: Signal Bit -> Signal Bit
   unpack :: Signal a -> SignalP a
 
--- | Simulate a (@'SignalP' a -> 'SignalP' b@) function given a list of samples
--- of type @a@
---
--- >>> simulateP (unpack . register (8,8) . pack) [(1,1), (2,2), (3,3), ...
--- [(8,8), (1,1), (2,2), (3,3), ...
-simulateP :: (Pack a, Pack b) => (SignalP a -> SignalP b) -> [a] -> [b]
-simulateP f = simulate (pack . f . unpack)
+  default unpack :: Signal a -> Signal a
+  unpack s = s
 
-instance Pack Bit where
-  type SignalP Bit = Signal Bit
-  pack   = id
-  unpack = id
-
-instance Pack (Signed n) where
-  type SignalP (Signed n) = Signal (Signed n)
-  pack   = id
-  unpack = id
-
-instance Pack (Unsigned n) where
-  type SignalP (Unsigned n) = Signal (Unsigned n)
-  pack   = id
-  unpack = id
-
-instance Pack Bool where
-  type SignalP Bool = Signal Bool
-  pack   = id
-  unpack = id
-
-instance Pack Integer where
-  type SignalP Integer = Signal Integer
-  pack   = id
-  unpack = id
-
-instance Pack Int where
-  type SignalP Int = Signal Int
-  pack   = id
-  unpack = id
-
-instance Pack Float where
-  type SignalP Float = Signal Float
-  pack   = id
-  unpack = id
-
-instance Pack Double where
-  type SignalP Double = Signal Double
-  pack   = id
-  unpack = id
-
-instance Pack () where
-  type SignalP () = Signal ()
-  pack   = id
-  unpack = id
+instance Pack Bit
+instance Pack (Signed n)
+instance Pack (Unsigned n)
+instance Pack (Fixed frac rep size)
+instance Pack Bool
+instance Pack Integer
+instance Pack Int
+instance Pack Float
+instance Pack Double
+instance Pack ()
+instance Pack (Maybe a)
+instance Pack (Either a b)
 
 instance Pack (a,b) where
   type SignalP (a,b) = (Signal a, Signal b)
@@ -233,6 +202,13 @@ instance Pack (Vec n a) where
   unpack (Nil :- _)         = Nil
   unpack vs@((_ :> _) :- _) = fmap vhead vs :> (unpack (fmap vtail vs))
 
+-- | Simulate a (@'SignalP' a -> 'SignalP' b@) function given a list of samples
+-- of type @a@
+--
+-- >>> simulateP (unpack . register (8,8) . pack) [(1,1), (2,2), (3,3), ...
+-- [(8,8), (1,1), (2,2), (3,3), ...
+simulateP :: (Pack a, Pack b) => (SignalP a -> SignalP b) -> [a] -> [b]
+simulateP f = simulate (pack . f . unpack)
 
 -- | Operator lifting, use in conjunction with ('^>')
 --

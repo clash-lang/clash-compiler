@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DefaultSignatures   #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -133,6 +134,9 @@ class CPack a where
   --
   -- > cpack :: Clock clk -> CSignal clk Bit -> CSignal clk Bit
   cpack   :: Clock clk -> CSignalP clk a -> CSignal clk a
+
+  default cpack :: Clock clk -> CSignal clk a -> CSignal clk a
+  cpack _ s = s
   -- | Example:
   --
   -- > cunpack :: Clock clk -> CSignal clk (a,b) -> (CSignal clk a, CSignal clk b)
@@ -142,59 +146,21 @@ class CPack a where
   -- > cunpack :: Clock clk -> CSignal clk Bit -> CSignal clk Bit
   cunpack :: Clock clk -> CSignal clk a -> CSignalP clk a
 
--- | Simulate a (@'CSignalP' clk1 a -> 'CSignalP' clk2 b@) function given a list
--- of samples of type @a@
---
--- > clk100 = Clock d100
---
--- >>> csimulateP clk100 clk100 (cunpack clk100 . cregister clk100 (8,8) . cpack clk100) [(1,1), (2,2), (3,3), ...
--- [(8,8), (1,1), (2,2), (3,3), ...
-csimulateP :: (CPack a, CPack b)
-           => Clock clk1 -- ^ 'Clock' of the incoming signal
-           -> Clock clk2 -- ^ 'Clock' of the outgoing signal
-           -> (CSignalP clk1 a -> CSignalP clk2 b) -- ^ Function to simulate
-           -> [a] -> [b]
-csimulateP clk1 clk2 f = csimulate (cpack clk2 . f . cunpack clk1)
+  default cunpack :: Clock clk -> CSignal clk a -> CSignal clk a
+  cunpack _ s = s
 
-instance CPack Bit where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack (Signed n) where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack (Unsigned n) where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack (Fixed frac rep size) where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack Bool where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack Integer where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack Int where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack Float where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack Double where
-  cpack   _ = id
-  cunpack _ = id
-
-instance CPack () where
-  cpack   _ = id
-  cunpack _ = id
+instance CPack Bit
+instance CPack (Signed n)
+instance CPack (Unsigned n)
+instance CPack (Fixed frac rep size)
+instance CPack Bool
+instance CPack Integer
+instance CPack Int
+instance CPack Float
+instance CPack Double
+instance CPack ()
+instance CPack (Maybe a)
+instance CPack (Either a b)
 
 instance CPack (a,b) where
   type CSignalP t (a,b) = (CSignal t a, CSignal t b)
@@ -269,6 +235,20 @@ instance CPack (Vec n a) where
   cpack clk vs = mkCSignal (vmap (shead . coerce) vs) (cpack clk (vmap cstail vs))
   cunpack _      (CSignal (Nil :- _))      = Nil
   cunpack clk vs@(CSignal ((_ :> _) :- _)) = fmap vhead vs :> cunpack clk (fmap vtail vs)
+
+-- | Simulate a (@'CSignalP' clk1 a -> 'CSignalP' clk2 b@) function given a list
+-- of samples of type @a@
+--
+-- > clk100 = Clock d100
+--
+-- >>> csimulateP clk100 clk100 (cunpack clk100 . cregister clk100 (8,8) . cpack clk100) [(1,1), (2,2), (3,3), ...
+-- [(8,8), (1,1), (2,2), (3,3), ...
+csimulateP :: (CPack a, CPack b)
+           => Clock clk1 -- ^ 'Clock' of the incoming signal
+           -> Clock clk2 -- ^ 'Clock' of the outgoing signal
+           -> (CSignalP clk1 a -> CSignalP clk2 b) -- ^ Function to simulate
+           -> [a] -> [b]
+csimulateP clk1 clk2 f = csimulate (cpack clk2 . f . cunpack clk1)
 
 -- | Synchronisation function that is basically a represented by a (bundle of)
 -- wire(s) in hardware. This function should only be used as part of a proper
