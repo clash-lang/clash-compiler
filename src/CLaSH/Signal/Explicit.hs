@@ -28,7 +28,7 @@ module CLaSH.Signal.Explicit
   )
 where
 
-import Data.Coerce
+import Data.Coerce                (coerce)
 import Control.Applicative        (Applicative (..), (<$>), liftA2)
 import GHC.TypeLits               (Nat)
 

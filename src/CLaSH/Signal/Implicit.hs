@@ -20,7 +20,7 @@ module CLaSH.Signal.Implicit
   )
 where
 
-import Control.Applicative
+import Control.Applicative  (Applicative (..), (<$>), liftA2)
 
 import CLaSH.Bit            (Bit)
 import CLaSH.Sized.Fixed    (Fixed)
