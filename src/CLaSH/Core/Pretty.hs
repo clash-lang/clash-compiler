@@ -225,7 +225,7 @@ ppr_type p (tyView -> FunTy ty1 ty2)    = pprArrowChain p <$> ppr_type FunPrec t
     pprFunTail otherTy                     = ppr_type TopPrec otherTy <:> pure []
 
 ppr_type p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1 <*> ppr_type TyConPrec ty2)
-ppr_type _ ty = error $ $(curLoc) ++ "Can't pretty print type: " ++ show ty
+ppr_type _ (ConstTy Arrow) = return (parens rarrow)
 
 pprForAllType :: (Applicative m, LFresh m) => TypePrec -> Type -> m Doc
 pprForAllType p ty = maybeParen p FunPrec <$> pprSigmaType True ty
