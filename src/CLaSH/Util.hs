@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE TupleSections        #-}
@@ -34,7 +35,9 @@ import qualified Language.Haskell.TH  as TH
 import Unbound.LocallyNameless        (Embed(..))
 import Unbound.LocallyNameless.Name   (Name(..))
 
+#ifdef CABAL
 import qualified Paths_clash_lib      (version)
+#endif
 
 -- | A class that can generate unique numbers
 class MonadUnique m where
@@ -217,4 +220,8 @@ splitAtList (_:xs) (y:ys) = (y:ys', ys'')
       (ys', ys'') = splitAtList xs ys
 
 clashLibVersion :: Version
+#ifdef CABAL
 clashLibVersion = Paths_clash_lib.version
+#else
+clashLibVersion = error "development version"
+#endif
