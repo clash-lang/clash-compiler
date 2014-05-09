@@ -35,7 +35,7 @@ import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)
 import           CLaSH.GHC.Compat.Outputable (showPpr)
 import           CLaSH.GHC.Compat.TyCon      (isSuperKindTyCon)
 -- import           Coercion                    (coercionKind, coercionType)
-import           Coercion                    (coercionType)
+import           Coercion                    (Coercion(..), coercionType)
 import           CoreFVs                     (exprSomeFreeVars)
 import           CoreSyn                     (AltCon (..), Bind (..), CoreExpr,
                                               Expr (..), rhssOfAlts)
@@ -76,6 +76,7 @@ import qualified CLaSH.Core.Literal          as C
 import qualified CLaSH.Core.Term             as C
 import qualified CLaSH.Core.TyCon            as C
 import qualified CLaSH.Core.Type             as C
+import qualified CLaSH.Core.Util             as C
 import qualified CLaSH.Core.Var              as C
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
@@ -239,7 +240,15 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
     --                              let caTy = C.mkFunTy ty1C ty2C
     --                                  ca   = C.Prim (string2Name "_CAST_") caTy
     --                              return (C.App ca eC)
-    term (Cast e _)        = term e
+    term (Cast e co)       = do
+      e' <- term e
+      case C.collectArgs e' of
+        (C.Prim nm pTy, [Right _, Left errMsg])
+          | nm == (pack "Control.Exception.Base.irrefutPatError") -> case co of
+            (UnivCo _ _ resTy) -> do resTy' <- coreToType resTy
+                                     return (C.mkApps (C.Prim nm pTy) [Right resTy', Left errMsg])
+            _ -> error $ $(curLoc) ++ "irrefutPatError casted with an unknown coercion: " ++ showPpr co
+        _ -> return e'
     term (Tick _ e)        = term e
     term (Type t)          = C.Prim (pack "_TY_") <$> coreToType t
     term (Coercion co)     = C.Prim (pack "_CO_") <$> coreToType (coercionType co)
