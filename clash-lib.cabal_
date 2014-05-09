@@ -51,7 +51,8 @@ Library
   HS-Source-Dirs:     src
 
   default-language:   Haskell2010
-  ghc-options:        -O2 -Wall -fwarn-tabs -DCABAL
+  ghc-options:        -O2 -Wall -fwarn-tabs
+  CPP-Options:        -DCABAL
 
   Build-depends:      aeson                   >= 0.6.2.0,
                       attoparsec              >= 0.10.4.0,
