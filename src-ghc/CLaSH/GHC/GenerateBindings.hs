@@ -35,9 +35,9 @@ generateBindings ::
   -> String
   -> IO (BindingMap,HashMap TyConName TyCon)
 generateBindings primMap modName = do
-  (bindings,clsOps,unlocatable) <- loadModules modName
+  (bindings,clsOps,unlocatable,fiEnvs) <- loadModules modName
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
-      tcCache                       = makeAllTyCons tcMap
+      tcCache                       = makeAllTyCons tcMap fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
       clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap

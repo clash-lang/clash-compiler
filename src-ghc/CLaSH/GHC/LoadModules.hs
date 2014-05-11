@@ -32,9 +32,15 @@ import qualified Panic
 import qualified TidyPgm
 -- import qualified TyCons
 
+import qualified TcRnMonad
+import qualified TcRnTypes
+import qualified UniqFM
+import qualified FamInst
+import qualified FamInstEnv
+
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.Util                   (curLoc)
+import           CLaSH.Util                   (curLoc,first)
 
 #ifdef STANDALONE
 ghcLibDir :: IO FilePath
@@ -63,6 +69,7 @@ loadModules ::
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
+        , FamInstEnv.FamInstEnvs
         )
 loadModules modName = defaultErrorHandler $ do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -110,17 +117,22 @@ loadModules modName = defaultErrorHandler $ do
                                      -- ; let dataTyCons = filter TyCon.isDataTyCon tycons
                                      -- ; dflags'' <- GHC.getSessionDynFlags
                                      -- ; prepBinders <- MonadUtils.liftIO $ CorePrep.corePrepPgm dflags'' hsc_env pgm dataTyCons
-                                     ; return (CoreSyn.flattenBinds pgm)
+                                     ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
+                                     ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
                                      }
                              ) modGraph'
 
-        let binders = concat tidiedMods
+        let (binders,modFamInstEnvs) = first concat $ unzip tidiedMods
+            modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
 
         (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
                                                 (map snd binders)
                                                 (map fst binders)
 
-        return (binders ++ externalBndrs,clsOps,unlocatable)
+        hscEnv <- GHC.getSession
+        famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
+
+        return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'))
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule

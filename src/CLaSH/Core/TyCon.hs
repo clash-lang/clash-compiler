@@ -39,6 +39,13 @@ data TyCon
   , tyConArity  :: Int         -- ^ Number of type arguments
   , algTcRhs    :: AlgTyConRhs -- ^ DataCon definitions
   }
+  -- | Function TyCons (e.g. type families)
+  | FunTyCon
+  { tyConName   :: TyConName       -- ^ Name of the TyCon
+  , tyConKind   :: Kind            -- ^ Kind of the TyCon
+  , tyConArity  :: Int             -- ^ Number of type arguments
+  , tyConSubst  :: [([Type],Type)] -- ^ List of: ([LHS match types], RHS type)
+  }
   -- | Primitive TyCons
   | PrimTyCon
   { tyConName    :: TyConName  -- ^ Name of the TyCon
@@ -53,6 +60,7 @@ data TyCon
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
+  show (FunTyCon       {tyConName = n}) = "FunTyCon: " ++ show n
   show (PrimTyCon      {tyConName = n}) = "PrimTyCon: " ++ show n
   show (SuperKindTyCon {tyConName = n}) = "SuperKindTyCon: " ++ show n
 
@@ -117,6 +125,7 @@ instance Subst Term PrimRep
 instance NFData TyCon where
   rnf tc = case tc of
     AlgTyCon nm ki ar rhs  -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
+    FunTyCon nm ki ar subst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf subst
     PrimTyCon nm ki ar rep -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rep
     SuperKindTyCon nm      -> rnf nm
 

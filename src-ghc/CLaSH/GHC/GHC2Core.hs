@@ -44,6 +44,8 @@ import           DataCon                     (DataCon, dataConExTyVars,
                                               dataConTag, dataConTyCon,
                                               dataConUnivTyVars, dataConWorkId,
                                               dataConWrapId_maybe)
+import           FamInstEnv                  (FamInst (..), FamInstEnvs,
+                                              familyInstances)
 import           Id                          (isDataConId_maybe)
 import           IdInfo                      (IdDetails (..))
 import           Literal                     (Literal (..))
@@ -96,24 +98,26 @@ emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState = GHC2CoreState HSM.empty HSM.empty
 
 makeAllTyCons :: GHC2CoreState
+              -> FamInstEnvs
               -> HashMap C.TyConName C.TyCon
-makeAllTyCons hm = go hm hm
+makeAllTyCons hm fiEnvs = go hm hm
   where
     go old new
         | HSM.null (new ^. tyConMap) = HSM.empty
         | otherwise                  = tcm `HSM.union` tcm'
       where
-        (tcm,old') = State.runState (T.mapM makeTyCon (new ^. tyConMap)) old
+        (tcm,old') = State.runState (T.mapM (makeTyCon fiEnvs) (new ^. tyConMap)) old
         tcm'       = go old' (old' & tyConMap %~ (`HSM.difference` (old ^. tyConMap)))
 
-makeTyCon :: TyCon
+makeTyCon :: FamInstEnvs
+          -> TyCon
           -> State GHC2CoreState C.TyCon
-makeTyCon tc = tycon
+makeTyCon fiEnvs tc = tycon
   where
     tycon
       | isTupleTyCon tc     = mkTupleTyCon
       | isAlgTyCon tc       = mkAlgTyCon
-      | isSynTyCon tc       = mkVoidTyCon
+      | isSynTyCon tc       = mkFunTyCon
       | isPrimTyCon tc      = mkPrimTyCon
       | isSuperKindTyCon tc = mkSuperKindTyCon
       | otherwise           = mkVoidTyCon
@@ -134,6 +138,19 @@ makeTyCon tc = tycon
                 , C.algTcRhs    = tcRhs
                 }
             Nothing -> return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
+
+        mkFunTyCon = do
+          tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+          tcKind <- coreToType (tyConKind tc)
+          let instances = familyInstances fiEnvs tc
+          substs <- mapM famInstToSubst instances
+          return
+            C.FunTyCon
+            { C.tyConName  = tcName
+            , C.tyConKind  = tcKind
+            , C.tyConArity = tcArity
+            , C.tyConSubst = substs
+            }
 
         mkTupleTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
@@ -168,6 +185,12 @@ makeTyCon tc = tycon
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
           return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
+
+        famInstToSubst :: FamInst -> State GHC2CoreState ([C.Type],C.Type)
+        famInstToSubst fi = do
+          tys <- mapM coreToType  (fi_tys fi)
+          ty  <- coreToType (fi_rhs fi)
+          return (tys,ty)
 
         coreToPrimRep :: PrimRep
                       -> C.PrimRep
