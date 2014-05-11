@@ -46,9 +46,7 @@ termType m e = case e of
   TyApp e' ty    -> termType m e' >>= (\f -> applyTy m f ty)
   Letrec b       -> do (_,e') <- unbind b
                        termType m e'
-  Case _ (alt:_) -> do (_,e') <- unbind alt
-                       termType m e'
-  Case _ []      -> error $ $(curLoc) ++ "Empty case"
+  Case _ ty _    -> return ty
 
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term
@@ -220,6 +218,6 @@ termSize (Letrec b)  = let (bndrsR,body) = unsafeUnbind b
                            bndrSzs       = map (termSize . unembed . snd) (unrec bndrsR)
                            bodySz        = termSize body
                        in sum (bodySz:bndrSzs)
-termSize (Case subj alts) = let subjSz = termSize subj
-                                altSzs = map (termSize . snd . unsafeUnbind) alts
-                            in  sum (subjSz:altSzs)
+termSize (Case subj _ alts) = let subjSz = termSize subj
+                                  altSzs = map (termSize . snd . unsafeUnbind) alts
+                              in  sum (subjSz:altSzs)

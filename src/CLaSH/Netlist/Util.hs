@@ -245,7 +245,8 @@ mkUniqueNormalized (args,binds,res) = do
       Var t v | v == varName f -> return . Var t $ varName r
       App e1 e2                -> App <$> subsBndr f r e1
                                       <*> subsBndr f r e2
-      Case scrut alts          -> Case <$> subsBndr f r scrut
+      Case scrut ty alts       -> Case <$> subsBndr f r scrut
+                                       <*> pure ty
                                        <*> mapM ( return
                                                 . uncurry bind
                                                 <=< secondM (subsBndr f r)

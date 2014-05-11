@@ -49,7 +49,8 @@ import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
-import           CLaSH.Core.Type             (TypeView (..), splitFunTy, tyView)
+import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
+                                              applyTy, splitFunTy, tyView)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isVar, mkApps, mkLams, mkTmApps,
@@ -112,27 +113,24 @@ nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: NormRewrite
-caseLet _ (Case (Letrec b) alts) = R $ do
+caseLet _ (Case (Letrec b) ty alts) = R $ do
   (xes,e) <- unbind b
-  changed . Letrec $ bind xes (Case e alts)
+  changed . Letrec $ bind xes (Case e ty alts)
 
 caseLet _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: NormRewrite
-caseCase _ e@(Case (Case scrut alts1) alts2)
+caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = R $ do
-    alt1E   <- snd <$> unbind (head alts1)
-    tcm     <- Lens.use tcCache
-    alts1Ty <- termType tcm alt1E
     ty1Rep  <- representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure alts1Ty
     if not ty1Rep
       then do newAlts <- mapM ( return
                                   . uncurry bind
-                                  . second (\altE -> Case altE alts2)
+                                  . second (\altE -> Case altE alts2Ty alts2)
                                   <=< unbind
                                   ) alts1
-              changed $ Case scrut newAlts
+              changed $ Case scrut alts2Ty newAlts
       else return e
 
 caseCase _ e = return e
@@ -140,7 +138,7 @@ caseCase _ e = return e
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition
 inlineNonRep :: NormRewrite
-inlineNonRep _ e@(Case scrut alts)
+inlineNonRep _ e@(Case scrut altsTy alts)
   | (Var _ f, args) <- collectArgs scrut
   = R $ do
     isInlined <- liftR $ alreadyInlined f
@@ -159,7 +157,7 @@ inlineNonRep _ e@(Case scrut alts)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
             Monad.when noException (liftR $ addNewInline f)
-            changed $ Case (mkApps scrutBody args) alts
+            changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
   where
     exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") [arg]) = numDictArg arg
@@ -184,7 +182,7 @@ inlineNonRep _ e = return e
 -- the subject is (an application of) a DataCon; or if there is only a single
 -- alternative that doesn't reference variables bound by the pattern.
 caseCon :: NormRewrite
-caseCon _ c@(Case scrut alts)
+caseCon _ c@(Case scrut _ alts)
   | (Data dc, args) <- collectArgs scrut
   = R $ do
     alts' <- mapM unbind alts
@@ -207,7 +205,7 @@ caseCon _ c@(Case scrut alts)
     equalCon dc (DataPat dc' _) = dcTag dc == dcTag (unembed dc')
     equalCon _  _               = False
 
-caseCon _ c@(Case (Literal l) alts) = R $ do
+caseCon _ c@(Case (Literal l) _ alts) = R $ do
   alts' <- mapM unbind alts
   let ltAltsM = List.find (equalLit . fst) alts'
   case ltAltsM of
@@ -219,7 +217,7 @@ caseCon _ c@(Case (Literal l) alts) = R $ do
     equalLit (LitPat l')     = l == (unembed l')
     equalLit _               = False
 
-caseCon _ e@(Case _ [alt]) = R $ do
+caseCon _ e@(Case _ _ [alt]) = R $ do
   (pat,altE) <- unbind alt
   case pat of
     DefaultPat    -> changed altE
@@ -232,14 +230,14 @@ caseCon _ e@(Case _ [alt]) = R $ do
                            ([],[]) -> changed altE
                            _       -> return e
 
-caseCon ctx e@(Case subj alts)
+caseCon ctx e@(Case subj ty alts)
   | isConstant subj = do
     tcm <- Lens.use tcCache
     lvl <- Lens.view dbgLevel
     reduceConstant <- Lens.use evaluator
     case reduceConstant tcm subj of
-      Data dc   -> caseCon ctx (Case (Data dc) alts)
-      Literal l -> caseCon ctx (Case (Literal l) alts)
+      Data dc   -> caseCon ctx (Case (Data dc) ty alts)
+      Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj' -> traceIf (lvl > DebugNone) ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj') (return e)
 
 caseCon _ e = return e
@@ -402,7 +400,10 @@ appProp _ (App (Letrec b) arg) = R $ do
   (v,e) <- unbind b
   changed . Letrec $ bind v (App e arg)
 
-appProp _ (App (Case scrut alts) arg) = R $ do
+appProp _ (App (Case scrut ty alts) arg) = R $ do
+  tcm <- Lens.use tcCache
+  argTy <- termType tcm arg
+  let ty' = applyFunTy tcm ty argTy
   if isConstant arg || isVar arg
     then do
       alts' <- mapM ( return
@@ -410,16 +411,15 @@ appProp _ (App (Case scrut alts) arg) = R $ do
                     . second (`App` arg)
                     <=< unbind
                     ) alts
-      changed $ Case scrut alts'
+      changed $ Case scrut ty' alts'
     else do
-      tcm <- Lens.use tcCache
       (boundArg,argVar) <- mkTmBinderFor tcm "caseApp" arg
       alts' <- mapM ( return
                     . uncurry bind
                     . second (`App` argVar)
                     <=< unbind
                     ) alts
-      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut alts')
+      changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
 
 appProp _ (TyApp (TyLam b) t) = R $ do
   (tv,e) <- unbind b
@@ -429,13 +429,15 @@ appProp _ (TyApp (Letrec b) t) = R $ do
   (v,e) <- unbind b
   changed . Letrec $ bind v (TyApp e t)
 
-appProp _ (TyApp (Case scrut alts) ty) = R $ do
+appProp _ (TyApp (Case scrut altsTy alts) ty) = R $ do
   alts' <- mapM ( return
                 . uncurry bind
                 . second (`TyApp` ty)
                 <=< unbind
                 ) alts
-  changed $ Case scrut alts'
+  tcm <- Lens.use tcCache
+  ty' <- applyTy tcm altsTy ty
+  changed $ Case scrut ty' alts'
 
 appProp _ e = return e
 
@@ -500,7 +502,7 @@ collectANF _ (Letrec b) = do
       tell [(argId,embed body)]
       return argVar
 
-collectANF ctx e@(Case subj alts) = do
+collectANF ctx e@(Case subj ty alts) = do
     untranslatableSubj <- liftNormR $ isUntranslatable subj
     localVar           <- liftNormR $ isLocalVar subj
     (bndr,subj') <- if localVar || untranslatableSubj || isConstant subj
@@ -515,7 +517,7 @@ collectANF ctx e@(Case subj alts) = do
       else fmap (first concat . unzip) $ liftNormR $ mapM (doAlt subj') alts
 
     tell (bndr ++ binds)
-    return (Case subj' alts')
+    return (Case subj' ty alts')
   where
     doAlt :: Term -> Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
     -- See NOTE [unsafeUnbind]

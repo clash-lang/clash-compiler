@@ -32,17 +32,17 @@ import                CLaSH.Util
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
-  = Var     Type TmName -- ^ Variable reference
-  | Data    DataCon -- ^ Datatype constructor
-  | Literal Literal -- ^ Literal
-  | Prim    Text Type -- ^ Primitive
-  | Lam     (Bind Id Term) -- ^ Term-abstraction
-  | TyLam   (Bind TyVar Term) -- ^ Type-abstraction
-  | App     Term Term -- ^ Application
-  | TyApp   Term Type -- ^ Type-application
+  = Var     Type TmName                    -- ^ Variable reference
+  | Data    DataCon                        -- ^ Datatype constructor
+  | Literal Literal                        -- ^ Literal
+  | Prim    Text Type                      -- ^ Primitive
+  | Lam     (Bind Id Term)                 -- ^ Term-abstraction
+  | TyLam   (Bind TyVar Term)              -- ^ Type-abstraction
+  | App     Term Term                      -- ^ Application
+  | TyApp   Term Type                      -- ^ Type-application
   | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
-  | Case    Term [Bind Pat Term] -- ^ Case-expression: subject, type of
-                                 -- alternatives, list of alternatives
+  | Case    Term Type [Bind Pat Term]      -- ^ Case-expression: subject, type of
+                                           -- alternatives, list of alternatives
   deriving Show
 
 -- | Term reference
@@ -94,16 +94,17 @@ instance Subst Term Term where
 instance Subst Type Pat
 instance Subst Type Term where
   subst tvN u x | isFree tvN = case x of
-    Lam    b       -> Lam    (subst tvN u b  )
-    TyLam  b       -> TyLam  (subst tvN u b  )
-    App    fun arg -> App    (subst tvN u fun) (subst tvN u arg)
-    TyApp  e   ty  -> TyApp  (subst tvN u e  ) (subst tvN u ty )
-    Letrec b       -> Letrec (subst tvN u b  )
-    Case   e alts  -> Case   (subst tvN u e  )
-                             (subst tvN u alts )
-    Var ty nm      -> Var    (subst tvN u ty ) nm
-    Prim nm ty     -> Prim   nm (subst tvN u ty)
-    e              -> e
+    Lam    b         -> Lam    (subst tvN u b  )
+    TyLam  b         -> TyLam  (subst tvN u b  )
+    App    fun arg   -> App    (subst tvN u fun) (subst tvN u arg)
+    TyApp  e   ty    -> TyApp  (subst tvN u e  ) (subst tvN u ty )
+    Letrec b         -> Letrec (subst tvN u b  )
+    Case   e ty alts -> Case   (subst tvN u e  )
+                               (subst tvN u ty )
+                               (subst tvN u alts )
+    Var ty nm        -> Var    (subst tvN u ty ) nm
+    Prim nm ty       -> Prim   nm (subst tvN u ty)
+    e                -> e
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
 
 instance Subst Term Text
@@ -123,7 +124,7 @@ instance NFData Term where
     TyApp   tm ty   -> rnf tm `seq` rnf ty
     Letrec  b       -> case unsafeUnbind b of
                         (bs,e) -> rnf (map (second unembed) (unrec bs)) `seq` rnf e
-    Case    sc alts -> rnf sc `seq` rnf (map unsafeUnbind alts)
+    Case    sc ty alts -> rnf sc `seq` rnf ty `seq` rnf (map unsafeUnbind alts)
 
 instance NFData Pat where
   rnf p = case p of

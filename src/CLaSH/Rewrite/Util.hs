@@ -422,10 +422,11 @@ mkSelectorCase caller tcm _ scrut dcI fieldI = do
             then cantCreate $(curLoc) "Field index exceed max"
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
-              selBndr <- mkInternalVar "sel" (indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI)
+              let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
+              selBndr <- mkInternalVar "sel" ty
               let bndrs  = take fieldI wildBndrs ++ [fst selBndr] ++ drop (fieldI+1) wildBndrs
-              let pat    = DataPat (embed dc) (rebind [] bndrs)
-              let retVal = Case scrut [ bind pat (snd selBndr) ]
+                  pat    = DataPat (embed dc) (rebind [] bndrs)
+                  retVal = Case scrut ty [ bind pat (snd selBndr) ]
               return retVal
     _ -> cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showDoc scrutTy)
 

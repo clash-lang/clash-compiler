@@ -153,10 +153,10 @@ mkDeclarations :: Id -- ^ LHS of the let-binder
                -> NetlistMonad [Declaration]
 mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 
-mkDeclarations _ e@(Case _ []) =
+mkDeclarations _ e@(Case _ _ []) =
   error $ $(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported: " ++ showDoc e
 
-mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
+mkDeclarations bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
   (pat,v) <- unbind alt
   (varTy,varTm) <- case v of
                      (Var t n) -> return (t,n)
@@ -175,7 +175,7 @@ mkDeclarations bndr e@(Case (Var scrutTy scrutNm) [alt]) = do
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return [Assignment dstId extractExpr]
 
-mkDeclarations bndr (Case scrut alts) = do
+mkDeclarations bndr (Case scrut altTy alts) = do
   alts'                  <- mapM unbind alts
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
@@ -188,8 +188,6 @@ mkDeclarations bndr (Case scrut alts) = do
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
-      tcm <- Lens.use tcCache
-      altTy <- termType tcm alt
       (altExpr,altDecls) <- mkExpr altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)

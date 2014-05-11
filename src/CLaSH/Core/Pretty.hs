@@ -102,7 +102,7 @@ instance Pretty Term where
     App fun arg  -> pprPrecApp prec fun arg
     TyApp e' ty  -> pprPrecTyApp prec e' ty
     Letrec b     -> lunbind b $ \(xes,e') -> pprPrecLetrec prec (unrec xes) e'
-    Case e' alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
+    Case e' _ alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
 
 data BindingSite
   = LambdaBind

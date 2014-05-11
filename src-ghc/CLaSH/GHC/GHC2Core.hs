@@ -220,12 +220,13 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
       return $ C.Letrec $ bind (rec xes') e'
 
     term (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> coreToType ty
-    term (Case e b _ alts) = do
+    term (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
                   $ rhssOfAlts alts
      b' <- coreToId b
      e' <- term e
-     let caseTerm v = C.Case v <$> mapM alt alts
+     ty' <- coreToType ty
+     let caseTerm v = C.Case v ty' <$> mapM alt alts
      if usesBndr
       then do
         ct <- caseTerm (C.Var (unembed $ C.varType b') (C.varName b'))
