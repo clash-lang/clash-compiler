@@ -43,9 +43,9 @@
     , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
     }
   }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Unsigned.fromIntegerU"
-    , "templateE" : "to_unsigned(~ARG[1], ~LIT[0])"
+, { "Primitive" :
+    { "name"     : "CLaSH.Sized.Unsigned.fromIntegerU"
+    , "primType" : "Function"
     }
   }
 , { "BlackBox" :

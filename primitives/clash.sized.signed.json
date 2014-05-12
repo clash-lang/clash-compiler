@@ -58,9 +58,9 @@
     , "templateE" : "abs ~ARG[1]"
     }
   }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Signed.fromIntegerS"
-    , "templateE" : "to_signed(~ARG[1], ~LIT[0])"
+, { "Primitive" :
+    { "name"     : "CLaSH.Sized.Signed.fromIntegerS"
+    , "primType" : "Function"
     }
   }
 , { "BlackBox" :

@@ -287,6 +287,24 @@ mkExpr ty app = do
             netDecl   = NetDecl tmpS hwTy Nothing
             netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
         return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
+      | nm == TextS.pack "CLaSH.Sized.Signed.fromIntegerS" -> case args of
+          [Core.Literal (IntegerLiteral i),(Core.Literal (IntegerLiteral j))]
+            | i > 32 -> do
+              let lit = HW.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
+              return (lit,[])
+          _ -> do
+            (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
+            bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox (Text.pack "to_signed(~ARG[1],~LIT[0])") bbCtx
+            return (bb,ctxDcls)
+      | nm == TextS.pack "CLaSH.Sized.Unsigned.fromIntegerU" -> case args of
+          [Core.Literal (IntegerLiteral i),(Core.Literal (IntegerLiteral j))]
+            | i > 31 -> do
+              let lit = HW.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
+              return (lit,[])
+          _ -> do
+            (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
+            bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox (Text.pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
+            return (bb,ctxDcls)
       | otherwise -> do
         bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
         case bbM of

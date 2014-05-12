@@ -141,6 +141,18 @@ mkInput (e, False) = case collectArgs e of
           | pNm == "GHC.Prim.dataToTag#" -> case collectArgs (head $ fst $ partitionEithers args) of
               (Data dc, _) -> return ((Left . pack . show . subtract 1 $ dcTag dc,Integer),[])
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ showDoc e
+          | pNm == "CLaSH.Sized.Signed.fromIntegerS" -> case lefts args of
+              [C.Literal (IntegerLiteral i),(C.Literal (IntegerLiteral j))] -> do
+                let lit = N.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
+                exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False lit
+                return ((Left exprV,Signed $ fromInteger i),[])
+              _ -> error $ $(curLoc) ++ "CLaSH.Sized.Signed.fromIntegerS: " ++ showDoc e
+          | pNm == "CLaSH.Sized.Unsigned.fromIntegerU" -> case lefts args of
+              [C.Literal (IntegerLiteral i),(C.Literal (IntegerLiteral j))] -> do
+                let lit = N.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
+                exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False lit
+                return ((Left exprV,Unsigned $ fromInteger i),[])
+              _ -> error $ $(curLoc) ++ "CLaSH.Sized.Unsigned.fromIntegerU: " ++ showDoc e
           | otherwise -> mzero
         Nothing -> error $ $(curLoc) ++ "No blackbox found: " ++ unpack nm
 
@@ -177,7 +189,26 @@ mkFunInput resId e = case collectArgs e of
             l' <- lift $ instantiateSym l
             return ((l',bbCtx),dcls)
           else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
-      _ -> error $ "No blackbox found: " ++ unpack nm
+      Just (P.Primitive pNm _)
+        | pNm == "CLaSH.Sized.Signed.fromIntegerS" -> do
+          (bbCtx,ctxDcls) <- lift $ mkBlackBoxContext resId (lefts args)
+          let templ = Right "to_signed(~ARG[1],~LIT[0])"
+              (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ
+          if null err
+            then do
+              l' <- lift $ instantiateSym l
+              return ((l',bbCtx),ctxDcls)
+            else error $ $(curLoc) ++ "\nTemplate:\n" ++ "to_signed(~ARG[1],~LIT[0])" ++ "\nHas errors:\n" ++ show err
+        | pNm == "CLaSH.Sized.Unsigned.fromIntegerU" -> do
+          (bbCtx,ctxDcls) <- lift $ mkBlackBoxContext resId (lefts args)
+          let templ = Right "to_unsigned(~ARG[1],~LIT[0])"
+              (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ
+          if null err
+            then do
+              l' <- lift $ instantiateSym l
+              return ((l',bbCtx),ctxDcls)
+            else error $ $(curLoc) ++ "\nTemplate:\n" ++ "to_unsigned(~ARG[1],~LIT[0])" ++ "\nHas errors:\n" ++ show err
+      _ -> error $ $(curLoc) ++ "No blackbox found: " ++ unpack nm
   (Data dc,args) -> do
     tcm <- Lens.use tcCache
     eTy <- termType tcm e
