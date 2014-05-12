@@ -84,7 +84,11 @@ mkTyPackage hwtys =
               "end" <> semi
 
     eqHWTy :: HWType -> HWType -> Bool
-    eqHWTy (Vector _ elTy1) (Vector _ elty2) = elTy1 == elty2
+    eqHWTy (Vector _ elTy1) (Vector _ elTy2) = case (elTy1,elTy2) of
+      (Sum _ cs1,Sum _ cs2) -> length cs1 == length cs2
+      (Unsigned n,Sum _ _)  -> n == typeSize elTy2
+      (Sum _ _,Unsigned n)  -> typeSize elTy1 == n
+      _ -> elTy1 == elTy2
     eqHWTy ty1 ty2 = ty1 == ty2
 
 mkUsedTys :: HWType
