@@ -202,6 +202,7 @@ makeTyCon fiEnvs tc = tycon
           WordRep -> C.VoidRep
           DoubleRep -> C.VoidRep
           Word64Rep -> C.VoidRep
+          FloatRep  -> C.VoidRep
           _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p ++ " in tycon: " ++ showPpr tc
 
 makeAlgTyConRhs :: AlgTyConRhs
