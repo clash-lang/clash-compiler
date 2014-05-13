@@ -279,19 +279,23 @@ end block;"
     , "templateD" :
 "~SYM[0]_vindex_integer : block
   signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1](~ARG[2]);
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.maxIndex"
-    , "templateD" :
-"~SYM[0]_maxIndex : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~RESULT <= ~SYM[1]'high;
+  ~SYM[2] <= ~ARG[2];
+  -- pragma translate_off
+  process (~SYM[1],~SYM[2])
+  begin
+    if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \" is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
+      ~RESULT <= ~DEFAULTO;
+    else
+    -- pragma translate_on
+      ~RESULT <= ~SYM[1](~SYM[2]);
+    -- pragma translate_off
+    end if;
+  end process;
+  -- pragma translate_on
 end block;"
     }
   }
@@ -300,7 +304,7 @@ end block;"
     , "templateD" :
 "~SYM[0]_vreplace_integer : block
   signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2] := ~DEFAULT[2];
+  signal ~SYM[2] : ~TYP[2];
   signal ~SYM[3] : ~TYP[3];
 begin
   ~SYM[1] <= ~ARG[1];
@@ -310,7 +314,15 @@ begin
     variable ~SYM[4] : ~TYP[1];
   begin
     ~SYM[4] := ~SYM[1];
-    ~SYM[4](~SYM[2]) := ~SYM[3];
+    -- pragma translate_off
+    if ~SYM[2] < ~SYM[4]'low or ~SYM[2] > ~SYM[4]'high then
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \" is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
+    else
+      -- pragma translate_on
+      ~SYM[4](~SYM[2]) := ~SYM[3];
+      -- pragma translate_off
+    end if;
+    -- pragma translate_on
     ~RESULT <= ~SYM[4];
   end process;
 end block;"
