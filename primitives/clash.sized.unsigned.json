@@ -92,14 +92,23 @@
     { "name"      : "CLaSH.Sized.Unsigned.bitU"
     , "templateD"  :
 "~SYM[0]_bitU : block
-  signal ~SYM[1] : ~TYP[1] := ~DEFAULT[1];
+  signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   process(~SYM[1])
     variable ~SYM[2] : ~TYPO;
   begin
     ~SYM[2] := (others => '0');
-    ~SYM[2](~SYM[1]) := '1';
+    -- pragma translate_off
+    if ~SYM[1] < ~SYM[2]'low or ~SYM[1] > ~SYM[2]'high then
+      assert false report (\"Index: \" & integer'image(~SYM[1]) & \", is out of bounds: \" & integer'image(~SYM[2]'low) & \" downto \" & integer'image(~SYM[2]'high)) severity warning;
+      ~SYM[2] := ~ERRORO;
+    else
+    -- pragma translate_on
+      ~SYM[2](~SYM[1]) := '1';
+    -- pragma translate_off
+    end if;
+    -- pragma translate_on;
     ~RESULT <= ~SYM[2];
   end process;
 end block;"
@@ -110,9 +119,22 @@ end block;"
     , "templateD" :
 "~SYM[0]_testBitU : block
   signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1](~ARG[2]) = '1';
+  ~SYM[2] <= ~ARG[2];
+  -- pragma translate_off
+  process(~SYM[1],~SYM[2])
+    if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
+      ~RESULT <= ~ERRORO;
+    else
+    -- pragma translate_on
+      ~RESULT <= ~SYM[1](~SYM[2]) = '1';
+    -- pragma translate_off
+    end if;
+  end process;
+  -- pragma translate_on
 end block;"
     }
   }

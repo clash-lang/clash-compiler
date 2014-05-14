@@ -287,8 +287,8 @@ begin
   process (~SYM[1],~SYM[2])
   begin
     if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
-      assert false report (\"Index: \" & integer'image(~SYM[2]) & \" is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
-      ~RESULT <= ~DEFAULTO;
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
+      ~RESULT <= ~ERRORO;
     else
     -- pragma translate_on
       ~RESULT <= ~SYM[1](~SYM[2]);
@@ -316,7 +316,8 @@ begin
     ~SYM[4] := ~SYM[1];
     -- pragma translate_off
     if ~SYM[2] < ~SYM[4]'low or ~SYM[2] > ~SYM[4]'high then
-      assert false report (\"Index: \" & integer'image(~SYM[2]) & \" is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
+      ~SYM[4] := ~ERROR[1];
     else
       -- pragma translate_on
       ~SYM[4](~SYM[2]) := ~SYM[3];

@@ -66,8 +66,8 @@ pTagE =  O             <$  pToken "~RESULT"
      <|> (Typ . Just)  <$> (pToken "~TYP" *> pBrackets pNatural)
      <|> TypM Nothing  <$  pToken "~TYPMO"
      <|> (TypM . Just) <$> (pToken "~TYPM" *> pBrackets pNatural)
-     <|> Def Nothing   <$  pToken "~DEFAULTO"
-     <|> (Def . Just)  <$> (pToken "~DEFAULT" *> pBrackets pNatural)
+     <|> Err Nothing   <$  pToken "~ERRORO"
+     <|> (Err . Just)  <$> (pToken "~ERROR" *> pBrackets pNatural)
      <|> TypElem       <$> (pToken "~TYPEL" *> pBrackets pTagE)
 
 -- | Parse a bracketed text

@@ -19,7 +19,7 @@ import           CLaSH.Netlist.BlackBox.Types
 import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
                                                        VHDLState)
 import           CLaSH.Netlist.VHDL                   (vhdlType,
-                                                       vhdlTypeDefault,
+                                                       vhdlTypeErrValue,
                                                        vhdlTypeMark)
 import           CLaSH.Util
 
@@ -160,7 +160,7 @@ mkSyncIdentifier b (Typ Nothing)   = fmap (Left . displayT . renderOneLine) . B 
 mkSyncIdentifier b (Typ (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ inputs b !! n
 mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ result b
 mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ inputs b !! n
-mkSyncIdentifier b (Def Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ result b
-mkSyncIdentifier b (Def (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeDefault . snd $ inputs b !! n
+mkSyncIdentifier b (Err Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeErrValue . snd $ result b
+mkSyncIdentifier b (Err (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeErrValue . snd $ inputs b !! n
 mkSyncIdentifier _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 mkSyncIdentifier _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"

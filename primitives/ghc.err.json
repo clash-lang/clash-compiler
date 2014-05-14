@@ -1,11 +1,11 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Err.error"
-    , "templateE" : "~DEFAULTO"
+    , "templateE" : "~ERRORO"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Err.undefined"
-    , "templateE" : "~DEFAULTO"
+    , "templateE" : "~ERRORO"
     }
   }
 ]

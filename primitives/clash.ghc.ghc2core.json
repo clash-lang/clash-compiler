@@ -1,6 +1,6 @@
 [ { "BlackBox" :
     { "name"      : "EmptyCase"
-    , "templateE" : "~DEFAULTO"
+    , "templateE" : "~ERRORO"
     }
   }
 ]

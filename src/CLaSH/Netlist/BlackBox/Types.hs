@@ -41,7 +41,7 @@ data Element = C   Text          -- ^ Constant
              | Rst (Maybe Int)   -- ^ Reset hole
              | Typ (Maybe Int)   -- ^ Type declaration hole
              | TypM (Maybe Int)  -- ^ Type root hole
-             | Def (Maybe Int)   -- ^ Default value hole
+             | Err (Maybe Int)   -- ^ Error value hole
              | TypElem Element   -- ^ Select element type from a vector type
   deriving Show
 

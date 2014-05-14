@@ -27,7 +27,7 @@ import           CLaSH.Core.Type
 
 import           CLaSH.Netlist
 import           CLaSH.Netlist.Types              as N
-import           CLaSH.Netlist.VHDL               (vhdlTypeDefault)
+import           CLaSH.Netlist.VHDL               (vhdlTypeErrValue)
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
 import           CLaSH.Primitives.Types
@@ -56,7 +56,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval vhdlState cmpCnt globals s
   let ioDecl  = [ uncurry NetDecl inp  Nothing
                 , uncurry NetDecl outp Nothing
                 ]
-      inpAssg = evalState (vhdlTypeDefault (snd inp)) vhdlState
+      inpAssg = evalState (vhdlTypeErrValue (snd inp)) vhdlState
       inpExpr = Assignment (fst inp) (BlackBoxE (PP.displayT $ PP.renderCompact inpAssg) Nothing)
   (inpInst,inpComps,vhdlState',cmpCnt',hidden') <- maybe (return (inpExpr,[],vhdlState,cmpCnt,hidden))
                                                  (genStimuli vhdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)

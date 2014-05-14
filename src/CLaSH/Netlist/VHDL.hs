@@ -9,7 +9,7 @@ module CLaSH.Netlist.VHDL
   ( genVHDL
   , mkTyPackage
   , vhdlType
-  , vhdlTypeDefault
+  , vhdlTypeErrValue
   , vhdlTypeMark
   , inst
   , expr
@@ -237,15 +237,12 @@ entity c = do
       "end" <> semi
   where
     ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <> optionalDefault ty) -- <+> ":=" <+> vhdlTypeDefault ty)
+            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty <> optionalDefault ty) -- <+> ":=" <+> vhdlTypeDefault ty)
+              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c) <> optionalDefault (snd $ output c)) -- <+> ":=" <+> vhdlTypeDefault (snd $ output c))
+              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c))
               ]
-
-    optionalDefault ty@Integer = " :=" <+> vhdlTypeDefault ty
-    optionalDefault _          = empty
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -314,20 +311,20 @@ tyName t@(Product _ _)   = makeCached t _3 prodName
 tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
 tyName _ = empty
 
--- | Convert a Netlist HWType to a default VHDL value for that type
-vhdlTypeDefault :: HWType -> VHDLM Doc
-vhdlTypeDefault Bit                 = "'0'"
-vhdlTypeDefault Bool                = "false"
-vhdlTypeDefault Integer             = "0"
-vhdlTypeDefault (Signed _)          = "(others => '0')"
-vhdlTypeDefault (Unsigned _)        = "(others => '0')"
-vhdlTypeDefault (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeDefault elTy)
-vhdlTypeDefault (SP _ _)            = "(others => '0')"
-vhdlTypeDefault (Sum _ _)           = "(others => '0')"
-vhdlTypeDefault (Product _ elTys)   = tupled $ mapM vhdlTypeDefault elTys
-vhdlTypeDefault (Reset _)           = "'0'"
-vhdlTypeDefault (Clock _)           = "'0'"
-vhdlTypeDefault Void                = "((-1) downto 0 => '0')"
+-- | Convert a Netlist HWType to an error VHDL value for that type
+vhdlTypeErrValue :: HWType -> VHDLM Doc
+vhdlTypeErrValue Bit                 = "'1'"
+vhdlTypeErrValue Bool                = "true"
+vhdlTypeErrValue Integer             = "integer'high"
+vhdlTypeErrValue (Signed _)          = "(others => 'X')"
+vhdlTypeErrValue (Unsigned _)        = "(others => 'X')"
+vhdlTypeErrValue (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeErrValue elTy)
+vhdlTypeErrValue (SP _ _)            = "(others => 'X')"
+vhdlTypeErrValue (Sum _ _)           = "(others => 'X')"
+vhdlTypeErrValue (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue elTys
+vhdlTypeErrValue (Reset _)           = "'X'"
+vhdlTypeErrValue (Clock _)           = "'X'"
+vhdlTypeErrValue Void                = "(0 downto 1 => 'X')"
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
@@ -338,9 +335,6 @@ decls ds = do
       _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl id_ ty@Integer netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
-  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <+> ":=" <+> maybe (vhdlTypeDefault ty) (expr False) netInit
-
 decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
   "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr False e) netInit)
 
