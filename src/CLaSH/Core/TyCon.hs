@@ -12,7 +12,6 @@ module CLaSH.Core.TyCon
   ( TyCon (..)
   , TyConName
   , AlgTyConRhs (..)
-  , PrimRep (..)
   , mkKindTyCon
   , isTupleTyConLike
   , tyConDataCons
@@ -51,7 +50,6 @@ data TyCon
   { tyConName    :: TyConName  -- ^ Name of the TyCon
   , tyConKind    :: Kind       -- ^ Kind of the TyCon
   , tyConArity   :: Int        -- ^ Number of type arguments
-  , primTyConRep :: PrimRep    -- ^ Representation
   }
   -- | To close the loop on the type hierarchy
   | SuperKindTyCon
@@ -88,15 +86,8 @@ data AlgTyConRhs
   }
   deriving Show
 
--- | Representations for primitive types
-data PrimRep
-  = IntRep
-  | VoidRep
-  deriving Show
+Unbound.derive [''TyCon,''AlgTyConRhs]
 
-Unbound.derive [''TyCon,''AlgTyConRhs,''PrimRep]
-
-instance Alpha PrimRep
 instance Alpha TyCon where
   swaps' _ _ d    = d
   fv' _ _         = emptyC
@@ -116,18 +107,16 @@ instance Alpha AlgTyConRhs
 
 instance Subst Type TyCon
 instance Subst Type AlgTyConRhs
-instance Subst Type PrimRep
 
 instance Subst Term TyCon
 instance Subst Term AlgTyConRhs
-instance Subst Term PrimRep
 
 instance NFData TyCon where
   rnf tc = case tc of
-    AlgTyCon nm ki ar rhs  -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
+    AlgTyCon nm ki ar rhs   -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
     FunTyCon nm ki ar subst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf subst
-    PrimTyCon nm ki ar rep -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rep
-    SuperKindTyCon nm      -> rnf nm
+    PrimTyCon nm ki ar      -> rnf nm `seq` rnf ki `seq` rnf ar
+    SuperKindTyCon nm       -> rnf nm
 
 instance NFData (Name TyCon) where
   rnf nm = case nm of
@@ -139,17 +128,12 @@ instance NFData AlgTyConRhs where
     DataTyCon dcs   -> rnf dcs
     NewTyCon dc eta -> rnf dc `seq` rnf eta
 
-instance NFData PrimRep where
-  rnf pm = case pm of
-    IntRep  -> ()
-    VoidRep -> ()
-
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName
             -> Kind
             -> TyCon
 mkKindTyCon name kind
-  = PrimTyCon name kind 0 VoidRep
+  = PrimTyCon name kind 0
 
 -- | Does the TyCon look like a tuple TyCon
 isTupleTyConLike :: TyConName -> Bool

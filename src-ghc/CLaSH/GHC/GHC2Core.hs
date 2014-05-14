@@ -54,7 +54,7 @@ import           Name                        (Name, nameModule_maybe,
                                               nameOccName, nameUnique)
 import           OccName                     (occNameString)
 -- import           Pair                        (Pair (..))
-import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
+import           TyCon                       (AlgTyConRhs (..),
                                               SynTyConRhs (..), TyCon,
                                               algTyConRhs, isAlgTyCon,
                                               isFunTyCon, isNewTyCon,
@@ -62,8 +62,7 @@ import           TyCon                       (AlgTyConRhs (..), PrimRep (..),
                                               isSynTyCon, isTupleTyCon,
                                               synTyConRhs_maybe, tyConArity,
                                               tyConDataCons, tyConKind,
-                                              tyConName, tyConPrimRep,
-                                              tyConUnique)
+                                              tyConName, tyConUnique)
 import           Type                        (tcView)
 import           TypeRep                     (TyLit (..), Type (..))
 import           Unique                      (Uniquable (..), Unique, getKey)
@@ -137,7 +136,7 @@ makeTyCon fiEnvs tc = tycon
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcRhs
                 }
-            Nothing -> return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
+            Nothing -> return (C.PrimTyCon tcName tcKind tcArity)
 
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
@@ -172,7 +171,6 @@ makeTyCon fiEnvs tc = tycon
             { C.tyConName    = tcName
             , C.tyConKind    = tcKind
             , C.tyConArity   = tcArity
-            , C.primTyConRep = coreToPrimRep (tyConPrimRep tc)
             }
 
         mkSuperKindTyCon = do
@@ -184,26 +182,13 @@ makeTyCon fiEnvs tc = tycon
         mkVoidTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          return (C.PrimTyCon tcName tcKind tcArity C.VoidRep)
+          return (C.PrimTyCon tcName tcKind tcArity)
 
         famInstToSubst :: FamInst -> State GHC2CoreState ([C.Type],C.Type)
         famInstToSubst fi = do
           tys <- mapM coreToType  (fi_tys fi)
           ty  <- coreToType (fi_rhs fi)
           return (tys,ty)
-
-        coreToPrimRep :: PrimRep
-                      -> C.PrimRep
-        coreToPrimRep p = case p of
-          VoidRep -> C.VoidRep
-          IntRep  -> C.IntRep
-          AddrRep -> C.VoidRep
-          PtrRep  -> C.VoidRep
-          WordRep -> C.VoidRep
-          DoubleRep -> C.VoidRep
-          Word64Rep -> C.VoidRep
-          FloatRep  -> C.VoidRep
-          _ -> error $ $(curLoc) ++ "Can't convert PrimRep: " ++ showPpr p ++ " in tycon: " ++ showPpr tc
 
 makeAlgTyConRhs :: AlgTyConRhs
                 -> State GHC2CoreState (Maybe C.AlgTyConRhs)

@@ -41,16 +41,14 @@ intPrimTyConName, voidPrimTyConName :: TyConName
 intPrimTyConName  = string2Name "Int"
 voidPrimTyConName = string2Name "VOID"
 
-liftedPrimTC ::
-  TyConName
-  -> PrimRep
-  -> TyCon
+liftedPrimTC :: TyConName
+             -> TyCon
 liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
 intPrimTc, voidPrimTc :: TyCon
-intPrimTc  = (liftedPrimTC intPrimTyConName  IntRep )
-voidPrimTc = (liftedPrimTC voidPrimTyConName VoidRep)
+intPrimTc  = (liftedPrimTC intPrimTyConName )
+voidPrimTc = (liftedPrimTC voidPrimTyConName)
 
 intPrimTy, voidPrimTy :: Type
 intPrimTy  = mkTyConTy intPrimTyConName
