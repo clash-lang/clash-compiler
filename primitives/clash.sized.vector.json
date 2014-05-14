@@ -300,6 +300,16 @@ end block;"
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.maxIndex"
+    , "templateD" :
+"~SYM[0]_maxIndex : block
+  signal ~SYM[1] : ~TYP[1];
+begin
+  ~RESULT <= ~SYM[1]'high;
+end block;"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.vreplace_integer"
     , "templateD" :
 "~SYM[0]_vreplace_integer : block
