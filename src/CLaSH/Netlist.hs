@@ -9,17 +9,16 @@ import qualified Control.Lens               as Lens
 import qualified Control.Monad              as Monad
 import           Control.Monad.State        (runStateT)
 import           Control.Monad.Writer       (listen, runWriterT)
-import           Data.Either                (partitionEithers)
+import           Data.Either                (lefts,partitionEithers)
 import           Data.HashMap.Lazy          (HashMap)
 import qualified Data.HashMap.Lazy          as HashMap
 import qualified Data.HashSet               as HashSet
 import           Data.List                  (elemIndex, nub)
 import           Data.Maybe                 (fromMaybe)
-import qualified Data.Text                  as TextS
 import qualified Data.Text.Lazy             as Text
 import           Unbound.LocallyNameless    (Embed (..), name2String,
-                                             runFreshMT, string2Name, unbind,
-                                             unembed, unrebind)
+                                             runFreshMT, unbind, unembed,
+                                             unrebind)
 
 import           CLaSH.Core.DataCon         (DataCon (..))
 import           CLaSH.Core.Literal         (Literal (..))
@@ -255,77 +254,18 @@ mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger 
           _ -> error $ $(curLoc) ++ "not an integer literal"
 
 mkExpr ty app = do
-  let (appF,(args,_)) = second partitionEithers $ collectArgs app
-  hwTy  <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  tcm   <- Lens.use tcCache
-  args' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) args
+  let (appF,args) = collectArgs app
+      tmArgs      = lefts args
+  hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  tcm     <- Lens.use tcCache
+  tmArgs' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) tmArgs
   case appF of
     Data dc
-      | all (\e -> isConstant e || isVar e) args' -> mkDcApplication hwTy dc args'
-      | otherwise                                 -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim nm _
-      -- TODO: Optimize the tagToEnum and dataToTag translations so that in
-      --       general:
-      --       - tagToEnum is translated to 'to_unsigned'
-      --       - dataToTag is translated to 'to_integer'
-      | nm == TextS.pack "GHC.Prim.tagToEnum#" -> do
-        i <- varCount <<%= (+1)
-        scrutTy <- termType tcm (head args)
-        (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
-        let tmpNm     = "tmp_tte_" ++ show i
-            tmpS      = Text.pack tmpNm
-            netDecl   = NetDecl tmpS hwTy Nothing
-            netAssign = Assignment tmpS (DataTag hwTy (Left scrutExpr))
-        return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
-      | nm == TextS.pack "GHC.Prim.dataToTag#" -> do
-        i <- varCount <<%= (+1)
-        scrutTy <- termType tcm (head args)
-        scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-        (scrutExpr,scrutDecls) <- mkExpr scrutTy (head args)
-        let tmpNm     = "tmp_dtt_" ++ show i
-            tmpS      = Text.pack tmpNm
-            netDecl   = NetDecl tmpS hwTy Nothing
-            netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
-        return (Identifier tmpS Nothing,netDecl:netAssign:scrutDecls)
-      | nm == TextS.pack "CLaSH.Sized.Signed.fromIntegerS" -> case args of
-          [Core.Literal (IntegerLiteral i),(Core.Literal (IntegerLiteral j))]
-            | i > 32 -> do
-              let lit = HW.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
-              return (lit,[])
-          _ -> do
-            (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
-            bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox (Text.pack "to_signed(~ARG[1],~LIT[0])") bbCtx
-            return (bb,ctxDcls)
-      | nm == TextS.pack "CLaSH.Sized.Unsigned.fromIntegerU" -> case args of
-          [Core.Literal (IntegerLiteral i),(Core.Literal (IntegerLiteral j))]
-            | i > 31 -> do
-              let lit = HW.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
-              return (lit,[])
-          _ -> do
-            (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
-            bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox (Text.pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
-            return (bb,ctxDcls)
-      | otherwise -> do
-        bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
-        case bbM of
-          Just p@(P.BlackBox {}) ->
-            case template p of
-              Left templD -> do
-                i <- varCount <<%= (+1)
-                let tmpNm   = "tmp_" ++ show i
-                    tmpId   = Id (string2Name tmpNm) (Embed ty)
-                    tmpS    = Text.pack tmpNm
-                    netDecl = NetDecl tmpS hwTy Nothing
-                (bbCtx,ctxDcls) <- mkBlackBoxContext tmpId args
-                bb <- fmap BlackBoxD $! mkBlackBox templD bbCtx
-                return (Identifier tmpS Nothing, ctxDcls ++ [netDecl,bb])
-              Right templE -> do
-                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (Embed ty)) args
-                bb <- fmap (`BlackBoxE` Nothing) $! mkBlackBox templE bbCtx
-                return (bb,ctxDcls)
-          _ -> error $ $(curLoc) ++ "No blackbox found: " ++ TextS.unpack nm
+      | all (\e -> isConstant e || isVar e) tmArgs' -> mkDcApplication hwTy dc tmArgs'
+      | otherwise                                   -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
+    Prim nm _ -> first fst <$> mkPrimitive False nm args ty
     Var _ f
-      | null args -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
+      | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
     _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
 

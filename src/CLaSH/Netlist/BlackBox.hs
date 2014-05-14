@@ -21,6 +21,7 @@ import           Data.Maybe                    (catMaybes, fromJust)
 import           Data.Monoid                   (mconcat)
 import           Data.Text.Lazy                (Text, pack)
 import           Data.Text                     (unpack)
+import qualified Data.Text                     as TextS
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
@@ -33,7 +34,8 @@ import           CLaSH.Core.Type               as C (Type (..), ConstTy (..),
 import           CLaSH.Core.TyCon              as C (tyConDataCons)
 import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
-import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication)
+import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication,
+                                                mkExpr)
 import           CLaSH.Netlist.BlackBox.Parser as B
 import           CLaSH.Netlist.BlackBox.Types  as B
 import           CLaSH.Netlist.BlackBox.Util   as B
@@ -101,60 +103,96 @@ mkInput (Var ty v, False) = do
     Nothing  -> return ((Left vT, hwTy),[])
 
 mkInput (e, False) = case collectArgs e of
-  (Prim f _, args) -> mkInput' f args
-  _                -> fmap (first (first Left)) $ mkLitInput e
-  where
-    mkInput' nm args = do
-      bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
-      case bbM of
-        Just p@(P.BlackBox {}) -> do
-          i           <- lift $ varCount <<%= (+1)
-          tcm         <- Lens.use tcCache
-          ty          <- termType tcm e
-          let dstNm   = "bb_sig_" ++ show i
-              dstId   = pack dstNm
-              resId   = Id (string2Name dstNm) (embed ty)
-          (bbCtx,ctxDecls) <- lift $ mkBlackBoxContext resId (lefts args)
-          let hwTy = snd $ result bbCtx
-          case template p of
-            (Left tempD)  -> do
-              let netDecl = N.NetDecl dstId hwTy Nothing
-                  bbCtx'  = bbCtx { result = first (either (Left . const dstId)
-                                                           (Right . first (const dstId)))
-                                                           (result bbCtx) }
-              bbDecl      <- fmap N.BlackBoxD $ lift $ mkBlackBox tempD bbCtx'
-              return ((Left dstId, hwTy),ctxDecls ++ [netDecl,bbDecl])
-            (Right tempE) -> do
-              bb   <- lift $ mkBlackBox tempE bbCtx
-              let bb' = mconcat [pack "(",bb,pack ")"]
-              return ((Left bb', hwTy),ctxDecls)
-        Just (P.Primitive pNm _)
-          | pNm == "GHC.Prim.tagToEnum#" -> case collectArgs (head $ fst $ partitionEithers args) of
-              (C.Literal (IntegerLiteral i), _) -> do
-                tcm <- Lens.use tcCache
-                let ConstTy (TyCon tcN) = head . snd $ partitionEithers args
-                    dcs = tyConDataCons (tcm HashMap.! tcN)
-                    dc  = dcs !! (fromInteger $ i - 1)
-                ((id_,hwTy),decs) <- mkLitInput (Data dc)
-                return ((Left id_,hwTy),decs)
-              _ -> error $ $(curLoc) ++ "tagToEnum: " ++ showDoc e
-          | pNm == "GHC.Prim.dataToTag#" -> case collectArgs (head $ fst $ partitionEithers args) of
-              (Data dc, _) -> return ((Left . pack . show . subtract 1 $ dcTag dc,Integer),[])
-              _ -> error $ $(curLoc) ++ "dataToTag: " ++ showDoc e
-          | pNm == "CLaSH.Sized.Signed.fromIntegerS" -> case lefts args of
-              [C.Literal (IntegerLiteral i),(C.Literal (IntegerLiteral j))] -> do
-                let lit = N.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
-                exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False lit
-                return ((Left exprV,Signed $ fromInteger i),[])
-              _ -> error $ $(curLoc) ++ "CLaSH.Sized.Signed.fromIntegerS: " ++ showDoc e
-          | pNm == "CLaSH.Sized.Unsigned.fromIntegerU" -> case lefts args of
-              [C.Literal (IntegerLiteral i),(C.Literal (IntegerLiteral j))] -> do
-                let lit = N.Literal (Just $ fromInteger i) (NumLit $ fromInteger j)
-                exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False lit
-                return ((Left exprV,Unsigned $ fromInteger i),[])
-              _ -> error $ $(curLoc) ++ "CLaSH.Sized.Unsigned.fromIntegerU: " ++ showDoc e
-          | otherwise -> mzero
-        Nothing -> error $ $(curLoc) ++ "No blackbox found: " ++ unpack nm
+  (Prim f _, args) -> do
+    tcm <- Lens.use tcCache
+    ty  <- termType tcm e
+    ((exprN,hwTy),decls) <- lift $ mkPrimitive True f args ty
+    exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN
+    return ((Left exprV,hwTy),decls)
+  _ -> fmap (first (first Left)) $ mkLitInput e
+
+mkPrimitive :: Bool
+            -> TextS.Text
+            -> [Either Term Type]
+            -> Type
+            -> NetlistMonad ((Expr,HWType),[Declaration])
+mkPrimitive bbEParen nm args ty = do
+  bbM <- HashMap.lookup nm <$> Lens.use primitives
+  case bbM of
+    Just p@(P.BlackBox {}) -> do
+      i   <- varCount <<%= (+1)
+      let tmpNm   = "tmp_" ++ show i
+          tmpNmT  = pack tmpNm
+          tmpId   = Id (string2Name tmpNm) (embed ty)
+      (bbCtx,ctxDcls) <- mkBlackBoxContext tmpId (lefts args)
+      let hwTy    = snd $ result bbCtx
+      case template p of
+        (Left tempD) -> do
+          let tmpDecl = NetDecl tmpNmT hwTy Nothing
+          bbDecl <- N.BlackBoxD <$> mkBlackBox tempD bbCtx
+          return ((Identifier tmpNmT Nothing,hwTy),ctxDcls ++ [tmpDecl,bbDecl])
+        (Right tempE) -> do
+          bbExpr <- mkBlackBox tempE bbCtx
+          let bbExpr' = if bbEParen then mconcat ["(",bbExpr,")"] else bbExpr
+          return ((BlackBoxE bbExpr' Nothing,hwTy),ctxDcls)
+    Just (P.Primitive pNm _)
+      | pNm == "GHC.Prim.tagToEnum#" -> do
+          hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
+          case args of
+            [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntegerLiteral i))] -> do
+              tcm <- Lens.use tcCache
+              let dcs = tyConDataCons (tcm HashMap.! tcN)
+                  dc  = dcs !! (fromInteger $ i - 1)
+              (exprN,dcDecls) <- mkDcApplication hwTy dc []
+              return ((exprN,hwTy),dcDecls)
+            [Right _, Left scrut] -> do
+              i <- varCount <<%= (+1)
+              tcm     <- Lens.use tcCache
+              scrutTy <- termType tcm scrut
+              (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
+              let tmpNm     = "tmp_tte_" ++ show i
+                  tmpS      = pack tmpNm
+                  netDecl   = NetDecl tmpS hwTy Nothing
+                  netAssign = Assignment tmpS (DataTag hwTy (Left scrutExpr))
+              return ((Identifier tmpS Nothing,hwTy),netDecl:netAssign:scrutDecls)
+            _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
+      | pNm == "GHC.Prim.dataToTag#" -> case args of
+          [Right _,Left (Data dc)] -> return ((N.Literal Nothing (NumLit $ dcTag dc - 1),Integer),[])
+          [Right _,Left scrut] -> do
+            i <- varCount <<%= (+1)
+            tcm      <- Lens.use tcCache
+            scrutTy  <- termType tcm scrut
+            scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+            (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
+            let tmpNm     = "tmp_dtt_" ++ show i
+                tmpS      = pack tmpNm
+                netDecl   = NetDecl tmpS Integer Nothing
+                netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
+            return ((Identifier tmpS Nothing,Integer),netDecl:netAssign:scrutDecls)
+          _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
+      | pNm ==  "CLaSH.Sized.Signed.fromIntegerS" -> case lefts args of
+          [C.Literal (IntegerLiteral i),arg] ->
+            let sz = fromInteger i
+            in case arg of
+              C.Literal (IntegerLiteral j)
+                | i > 32 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Signed sz),[])
+              _ -> do
+                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) (lefts args)
+                bb <- mkBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
+                return ((BlackBoxE bb Nothing,Signed sz),ctxDcls)
+          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Signed.fromIntegerS: " ++ show (map (either showDoc showDoc) args)
+      | pNm ==  "CLaSH.Sized.Unsigned.fromIntegerU" -> case lefts args of
+          [C.Literal (IntegerLiteral i),arg] ->
+            let sz = fromInteger i
+            in case arg of
+              C.Literal (IntegerLiteral j)
+                | i > 31 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Signed sz),[])
+              _ -> do
+                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) (lefts args)
+                bb <- mkBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
+                return ((BlackBoxE bb Nothing,Signed sz),ctxDcls)
+          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Unsigned.fromIntegerU: " ++ show (map (either showDoc showDoc) args)
+    _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that
 -- the term is a literal. Returns 'Nothing' if the term is not a literal.
@@ -177,87 +215,60 @@ mkLitInput _ = mzero
 mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
            -> MaybeT NetlistMonad ((BlackBoxTemplate,BlackBoxContext),[Declaration])
-mkFunInput resId e = case collectArgs e of
-  (Prim nm _, args) -> do
-    bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
-    case bbM of
-      Just p@(P.BlackBox {}) -> do
-        (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
-        let (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) (template p)
-        if null err
-          then do
-            l' <- lift $ instantiateSym l
-            return ((l',bbCtx),dcls)
-          else error $ $(curLoc) ++ "\nTemplate:\n" ++ show (template p) ++ "\nHas errors:\n" ++ show err
-      Just (P.Primitive pNm _)
-        | pNm == "CLaSH.Sized.Signed.fromIntegerS" -> do
-          (bbCtx,ctxDcls) <- lift $ mkBlackBoxContext resId (lefts args)
-          let templ = Right "to_signed(~ARG[1],~LIT[0])"
-              (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ
-          if null err
-            then do
-              l' <- lift $ instantiateSym l
-              return ((l',bbCtx),ctxDcls)
-            else error $ $(curLoc) ++ "\nTemplate:\n" ++ "to_signed(~ARG[1],~LIT[0])" ++ "\nHas errors:\n" ++ show err
-        | pNm == "CLaSH.Sized.Unsigned.fromIntegerU" -> do
-          (bbCtx,ctxDcls) <- lift $ mkBlackBoxContext resId (lefts args)
-          let templ = Right "to_unsigned(~ARG[1],~LIT[0])"
-              (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ
-          if null err
-            then do
-              l' <- lift $ instantiateSym l
-              return ((l',bbCtx),ctxDcls)
-            else error $ $(curLoc) ++ "\nTemplate:\n" ++ "to_unsigned(~ARG[1],~LIT[0])" ++ "\nHas errors:\n" ++ show err
-      _ -> error $ $(curLoc) ++ "No blackbox found: " ++ unpack nm
-  (Data dc,args) -> do
-    tcm <- Lens.use tcCache
-    eTy <- termType tcm e
-    let (_,resTy) = splitFunTys tcm eTy
-    resHTyM <- lift $ coreTypeToHWTypeM resTy
-    case resHTyM of
-      Just resHTy@(SP _ dcArgPairs) -> do
-        let dcI      = dcTag dc - 1
-            dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
-            dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
-            dcApp    = DataCon resHTy (Just $ DC (resHTy,dcI)) dcInps
-            dcAss    = Assignment (pack "~RESULT") dcApp
-        templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
-        let (line,err) = runParse templ
-        if null err
-          then do
-            (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
-            return ((line,bbCtx),dcls)
-          else return $ error $ $(curLoc) ++ "SP: Cannot make function input for: " ++ showDoc e
-      Just resHTy@(Product _ dcArgs) -> do
-        let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
-            dcApp  = DataCon resHTy (Just $ DC (resHTy,0)) dcInps
-            dcAss  = Assignment (pack "~RESULT") dcApp
-        templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
-        let (line,err) = runParse templ
-        if null err
-          then do
-            (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
-            return ((line,bbCtx),dcls)
-          else error $ $(curLoc) ++ "Product: Cannot make function input for: " ++ showDoc e
-      _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-  (Var _ fun, args) -> do
-    normalized <- Lens.use bindings
-    case HashMap.lookup fun normalized of
-      Just _ -> do
-        (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
-        (Component compName hidden compInps compOutp _) <- lift $ preserveVarEnv $ genComponent fun Nothing
-        let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-            inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
-            outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
-        i <- varCount <<%= (+1)
-        let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
-        templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
-        let (line,err)    = runParse templ
-        if null err
-          then return ((line,bbCtx),dcls)
-          else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
-      Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-  _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+mkFunInput resId e = do
+  let (appE,args) = collectArgs e
+  (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
+  templ <- case appE of
+            Prim nm _ -> do
+              bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
+              let templ = case bbM of
+                            Just p@(P.BlackBox {}) -> template p
+                            Just (P.Primitive pNm _)
+                              | pNm == "CLaSH.Sized.Signed.fromIntegerS"   -> Right "to_signed(~ARG[1],~LIT[0])"
+                              | pNm == "CLaSH.Sized.Unsigned.fromIntegerU" -> Right "to_unsigned(~ARG[1],~LIT[0])"
+                            _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
+              return templ
+            Data dc -> do
+              tcm <- Lens.use tcCache
+              eTy <- termType tcm e
+              let (_,resTy) = splitFunTys tcm eTy
+              resHTyM <- lift $ coreTypeToHWTypeM resTy
+              case resHTyM of
+                Just resHTy@(SP _ dcArgPairs) -> do
+                  let dcI      = dcTag dc - 1
+                      dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
+                      dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
+                      dcApp    = DataCon resHTy (Just $ DC (resHTy,dcI)) dcInps
+                      dcAss    = Assignment (pack "~RESULT") dcApp
+                  templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
+                  return (Left templ)
+                Just resHTy@(Product _ dcArgs) -> do
+                  let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
+                      dcApp  = DataCon resHTy (Just $ DC (resHTy,0)) dcInps
+                      dcAss  = Assignment (pack "~RESULT") dcApp
+                  templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
+                  return (Left templ)
+                _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+            Var _ fun -> do
+              normalized <- Lens.use bindings
+              case HashMap.lookup fun normalized of
+                Just _ -> do
+                  (Component compName hidden compInps compOutp _) <- lift $ preserveVarEnv $ genComponent fun Nothing
+                  let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
+                      inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                      outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
+                  i <- varCount <<%= (+1)
+                  let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
+                  templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
+                  return (Left templ)
+                Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+            _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+  let (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ
+  if null err
+    then do
+      l' <- lift $ instantiateSym l
+      return ((l',bbCtx),dcls)
+    else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
 instantiateSym :: BlackBoxTemplate
