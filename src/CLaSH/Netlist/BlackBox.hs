@@ -186,11 +186,11 @@ mkPrimitive bbEParen nm args ty = do
             let sz = fromInteger i
             in case arg of
               C.Literal (IntegerLiteral j)
-                | i > 31 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Signed sz),[])
+                | i > 31 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Unsigned sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) (lefts args)
                 bb <- mkBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE bb Nothing,Signed sz),ctxDcls)
+                return ((BlackBoxE bb Nothing,Unsigned sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Unsigned.fromIntegerU: " ++ show (map (either showDoc showDoc) args)
       | otherwise -> return ((BlackBoxE (mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]) Nothing,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
