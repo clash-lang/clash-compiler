@@ -1,4 +1,4 @@
-# Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-prelude) package
+# Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
 ## 0.3.1 *May 15th 2014*
 
@@ -12,8 +12,7 @@
   * Exception: CLaSH.Netlist.VHDL(512): fromSLV: Vector 13 Bool [#5](https://github.com/christiaanb/clash2/issues/5)
   * Incorrect vhdl generation for default value in blackbox [#6](https://github.com/christiaanb/clash2/issues/6)
   * Duplicate type names when multiple ADTs need the same amount of bits [#8](https://github.com/christiaanb/clash2/issues/8)
-  * Circuit testbench generation with MAC example fails[#15](https://github.com/christiaanb/clash2/issues/8)
-  * Missing begin keyword in Signed/Unsigned JSON files[#16](https://github.com/christiaanb/clash2/issues/16)
+  * Circuit testbench generation with MAC example fails[#15](https://github.com/christiaanb/clash2/issues/15)
 
 * Code improvements:
   * Refactor Netlist/BlackBox [#10](https://github.com/christiaanb/clash2/issues/10)
