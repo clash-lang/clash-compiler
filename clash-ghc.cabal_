@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.3.0.3
+Version:              0.3.1
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -26,6 +26,7 @@ Category:             Hardware
 Build-type:           Simple
 
 Extra-source-files:   README.md,
+                      CHANGELOG.md,
                       LICENSE_GHC,
                       src-bin/HsVersions.h,
                       src-bin/PosixSource.h
