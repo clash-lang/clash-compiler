@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TupleSections    #-}
@@ -34,8 +35,11 @@ import qualified Unbound.LocallyNameless     as Unbound
 import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)
 import           CLaSH.GHC.Compat.Outputable (showPpr)
 import           CLaSH.GHC.Compat.TyCon      (isSuperKindTyCon)
--- import           Coercion                    (coercionKind, coercionType)
+#if __GLASGOW_HASKELL__ < 710
 import           Coercion                    (Coercion(..), coercionType)
+#else
+import           Coercion                    (coercionType)
+#endif
 import           CoreFVs                     (exprSomeFreeVars)
 import           CoreSyn                     (AltCon (..), Bind (..), CoreExpr,
                                               Expr (..), rhssOfAlts)
@@ -53,7 +57,6 @@ import           Module                      (moduleName, moduleNameString)
 import           Name                        (Name, nameModule_maybe,
                                               nameOccName, nameUnique)
 import           OccName                     (occNameString)
--- import           Pair                        (Pair (..))
 import           TyCon                       (AlgTyConRhs (..),
                                               SynTyConRhs (..), TyCon,
                                               algTyConRhs, isAlgTyCon,
@@ -77,7 +80,9 @@ import qualified CLaSH.Core.Literal          as C
 import qualified CLaSH.Core.Term             as C
 import qualified CLaSH.Core.TyCon            as C
 import qualified CLaSH.Core.Type             as C
+#if __GLASGOW_HASKELL__ < 710
 import qualified CLaSH.Core.Util             as C
+#endif
 import qualified CLaSH.Core.Var              as C
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
@@ -242,14 +247,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
         return $ C.Letrec $ bind (rec [(b',embed e')]) ct
       else caseTerm e'
 
-    -- term j@(Cast e co)     = traceIf True ("CAST: " ++ showPpr j) $ case coercionKind co of
-    --                            Pair ty1 ty2 -> do
-    --                              ty1C <- coreToType ty1
-    --                              ty2C <- coreToType ty2
-    --                              eC   <- term e
-    --                              let caTy = C.mkFunTy ty1C ty2C
-    --                                  ca   = C.Prim (string2Name "_CAST_") caTy
-    --                              return (C.App ca eC)
+#if __GLASGOW_HASKELL__ < 710
     term (Cast e co)       = do
       e' <- term e
       case C.collectArgs e' of
@@ -259,6 +257,10 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                                      return (C.mkApps (C.Prim nm pTy) [Right resTy', Left errMsg])
             _ -> error $ $(curLoc) ++ "irrefutPatError casted with an unknown coercion: " ++ showPpr co
         _ -> return e'
+#else
+    term (Cast e _)        = term e
+#endif
+
     term (Tick _ e)        = term e
     term (Type t)          = C.Prim (pack "_TY_") <$> coreToType t
     term (Coercion co)     = C.Prim (pack "_CO_") <$> coreToType (coercionType co)
