@@ -142,7 +142,7 @@ mkPrimitive bbEParen nm args ty = do
             [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntegerLiteral i))] -> do
               tcm <- Lens.use tcCache
               let dcs = tyConDataCons (tcm HashMap.! tcN)
-                  dc  = dcs !! (fromInteger $ i - 1)
+                  dc  = dcs !! fromInteger i
               (exprN,dcDecls) <- mkDcApplication hwTy dc []
               return ((exprN,hwTy),dcDecls)
             [Right _, Left scrut] -> do
