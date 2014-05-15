@@ -374,14 +374,21 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.vselect"
+    , "comment"   :
+    "vselect :: ((f + (s * n) + 1) <= i) -- ARG[0]
+        => SNat f                        -- ARG[1]
+        -> SNat s                        -- ARG[2]
+        -> SNat (n + 1)                  -- ARG[3]
+        -> Vec i a                       -- ARG[4]
+        -> Vec (n + 1) a"
     , "templateD" :
 "~SYM[0]_vselect : block
-  signal ~SYM[1] : ~TYP[3];
+  signal ~SYM[1] : ~TYP[4];
 begin
-  ~SYM[1] <= ~ARG[3];
+  ~SYM[1] <= ~ARG[4];
   ~SYM[2]_vselect : for ~SYM[3] in 0 to ~RESULT'high generate
   begin
-    ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[0]+(~LIT[1]*~SYM[3])));
+    ~RESULT(~RESULT'high - ~SYM[3]) <= ~SYM[1](~SYM[1]'high - (~LIT[1]+(~LIT[2]*~SYM[3])));
   end generate;
 end block;"
     }
@@ -420,9 +427,9 @@ end generate;"
     { "name"      : "CLaSH.Sized.Vector.vhead'"
     , "templateD" :
 "~SYM[0]_vhead : block
-  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1] <= ~ARG[0];
+  ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1](~SYM[1]'high);
 end block;"
     }

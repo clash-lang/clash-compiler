@@ -6,7 +6,6 @@ module CLaSH.Netlist where
 
 import           Control.Lens               ((.=), (<<%=))
 import qualified Control.Lens               as Lens
-import qualified Control.Monad              as Monad
 import           Control.Monad.State        (runStateT)
 import           Control.Monad.Writer       (listen, runWriterT)
 import           Data.Either                (lefts,partitionEithers)
@@ -203,13 +202,11 @@ mkDeclarations bndr (Case scrut altTy alts) = do
                                   _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
       _ -> scrutE
 
-mkDeclarations bndr app = do
+mkDeclarations bndr app =
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  tcm <- Lens.use tcCache
-  args' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) args
-  case appF of
+  in case appF of
     Var _ f
-      | null tyArgs -> mkFunApp bndr f args'
+      | null tyArgs -> mkFunApp bndr f args
       | otherwise   -> error $ $(curLoc) ++ "Not in normal form: Var-application with Type arguments"
     _ -> do
       (exprApp,declsApp) <- mkExpr (unembed $ varType bndr) app
@@ -257,12 +254,10 @@ mkExpr ty app = do
   let (appF,args) = collectArgs app
       tmArgs      = lefts args
   hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  tcm     <- Lens.use tcCache
-  tmArgs' <- Monad.filterM (Monad.liftM3 representableType (Lens.use typeTranslator) (pure tcm) . termType tcm) tmArgs
   case appF of
     Data dc
-      | all (\e -> isConstant e || isVar e) tmArgs' -> mkDcApplication hwTy dc tmArgs'
-      | otherwise                                   -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
+      | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy dc tmArgs
+      | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
     Prim nm _ -> first fst <$> mkPrimitive False nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
@@ -309,8 +304,20 @@ mkDcApplication dstHType dc args = do
                    2 -> HW.Literal Nothing (BitLit H)
                    tg -> error $ $(curLoc) ++ "unknown bit literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in return dc'
-      Vector 0 _ -> return (HW.DataCon dstHType Nothing          [])
-      Vector 1 _ -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
-      Vector _ _ -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
+      Vector 0 _ -> return (HW.DataCon dstHType Nothing [])
+      -- Note [Vector Wrapper]
+      -- The Vector type has two versions of the cons constructor:
+      --   * The 'normal' one, which takes a coercion as its first argument,
+      --     followed by the element and the vector
+      --   * The wrapper one, which just takes the element and vector argument
+      --
+      -- We need to account for both occurrences, that's why we have the two
+      -- case statements below:
+      Vector 1 _ -> case argExprs of
+                      [_,e,_] -> return (HW.DataCon dstHType (Just VecAppend) [e])
+                      _       -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
+      Vector _ _ -> case argExprs of
+                      [_,e1,e2] -> return (HW.DataCon dstHType (Just VecAppend) [e1,e2])
+                      _         -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
 
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

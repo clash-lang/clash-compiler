@@ -19,7 +19,7 @@ import qualified Data.HashMap.Lazy             as HashMap
 import           Data.List                     (partition)
 import           Data.Maybe                    (catMaybes, fromJust)
 import           Data.Monoid                   (mconcat)
-import           Data.Text.Lazy                (Text, pack)
+import           Data.Text.Lazy                (Text, fromStrict, pack)
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
@@ -192,6 +192,7 @@ mkPrimitive bbEParen nm args ty = do
                 bb <- mkBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
                 return ((BlackBoxE bb Nothing,Signed sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Unsigned.fromIntegerU: " ++ show (map (either showDoc showDoc) args)
+      | otherwise -> return ((BlackBoxE (mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]) Nothing,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that
