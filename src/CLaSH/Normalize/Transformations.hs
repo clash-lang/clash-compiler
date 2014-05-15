@@ -583,7 +583,8 @@ recToLetRec :: NormRewrite
 recToLetRec [] e = R $ do
   fn          <- liftR $ Lens.use curFun
   bodyM       <- fmap (HashMap.lookup fn) $ Lens.use bindings
-  normalizedE <- splitNormalized e
+  tcm         <- Lens.use tcCache
+  normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
     (Right (args,bndrs,res), Just (bodyTy,_)) -> do
       let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)

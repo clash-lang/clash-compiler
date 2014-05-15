@@ -175,7 +175,8 @@ stripArgs _ _ _ = Nothing
 flattenNode :: CallTree
             -> NormalizeSession (Either CallTree ((TmName,Term),[CallTree]))
 flattenNode c@(CLeaf (nm,(_,e))) = do
-  norm <- splitNormalized e
+  tcm  <- Lens.use tcCache
+  norm <- splitNormalized tcm e
   case norm of
     Right (ids,[(_,bExpr)],_) -> do
       let (fun,args) = collectArgs (unembed bExpr)
@@ -184,7 +185,8 @@ flattenNode c@(CLeaf (nm,(_,e))) = do
         Nothing        -> return (Left c)
     _ -> return (Left c)
 flattenNode b@(CBranch (nm,(_,e)) us) = do
-  norm <- splitNormalized e
+  tcm  <- Lens.use tcCache
+  norm <- splitNormalized tcm e
   case norm of
     Right (ids,[(_,bExpr)],_) -> do
       let (fun,args) = collectArgs (unembed bExpr)

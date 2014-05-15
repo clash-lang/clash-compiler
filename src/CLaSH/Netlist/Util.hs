@@ -38,9 +38,10 @@ import           CLaSH.Util
 -- and a variable reference that is the body of the let-binding. Returns a
 -- String containing the error is the term was not in a normalized form.
 splitNormalized :: (Fresh m,Functor m)
-                => Term
+                => HashMap TyConName TyCon
+                -> Term
                 -> m (Either String ([Id],[LetBinding],Id))
-splitNormalized expr = do
+splitNormalized tcm expr = do
   (args,letExpr) <- fmap (first partitionEithers) $ collectBndrs expr
   case letExpr of
     Letrec b
@@ -50,7 +51,9 @@ splitNormalized expr = do
             Var t v -> return $! Right (tmArgs,unrec xes,Id v (embed t))
             _ -> return $! Left ($(curLoc) ++ "Not in normal form: res not simple var")
       | otherwise -> return $! Left ($(curLoc) ++ "Not in normal form: tyArgs")
-    _ -> return $! Left ($(curLoc) ++ "Not in normal from: no Letrec: " ++ showDoc expr)
+    _ -> do
+      ty <- termType tcm expr
+      return $! Left ($(curLoc) ++ "Not in normal from: no Letrec:\n" ++ showDoc expr ++ "\nWhich has type:\n"  ++ showDoc ty)
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.

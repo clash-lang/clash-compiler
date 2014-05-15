@@ -113,7 +113,8 @@ genComponentT compName componentExpr mStart = do
                      . Text.pack
                      $ name2String compName
 
-  (arguments,binders,result) <- do { normalizedM <- splitNormalized componentExpr
+  tcm <- Lens.use tcCache
+  (arguments,binders,result) <- do { normalizedM <- splitNormalized tcm componentExpr
                                    ; case normalizedM of
                                        Right normalized -> mkUniqueNormalized normalized
                                        Left err         -> error err
@@ -129,7 +130,6 @@ genComponentT compName componentExpr mStart = do
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  tcm          <- Lens.use tcCache
   let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) result ids
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
