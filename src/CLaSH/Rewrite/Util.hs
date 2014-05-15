@@ -24,7 +24,6 @@ import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (mapMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import           Unbound.LocallyNameless     (Collection (..), Fresh, bind,
@@ -35,7 +34,7 @@ import qualified Unbound.LocallyNameless     as Unbound
 import           Unbound.Util                (filterC)
 
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
-import           CLaSH.Core.FreeVars         (termFreeVars, typeFreeVars, termFreeIds)
+import           CLaSH.Core.FreeVars         (termFreeVars, typeFreeVars)
 import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
@@ -528,15 +527,3 @@ specArgBndrsAndVars ctx specArg = do
                  $ map (\tm -> let ty = HML.lookupDefault (error $ $(curLoc) ++ show tm ++ " not found") tm gamma
                                in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
   return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)
-
-untranslatableFVs :: (Functor m, Monad m)
-                  => [CoreContext]
-                  -> Term
-                  -> RewriteMonad m Bool
-untranslatableFVs ctx tm = do
-  let (gamma,_) = contextEnv ctx
-      fvs       = termFreeIds tm
-      vars      = mapMaybe (\n -> do fvTy <- HML.lookup n gamma
-                                     return (Var fvTy n)
-                           ) fvs
-  or <$> mapM isUntranslatable vars

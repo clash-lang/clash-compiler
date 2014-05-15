@@ -462,11 +462,7 @@ makeANF ctx (Lam b) = do
 
 makeANF ctx e
   = R $ do
-    (e',bndrs) <- runR $ runWriterT $
-                      bottomupWhenR (\ctx' tm -> fmap not $
-                                                liftNormR $
-                                                untranslatableFVs (ctx' ++ ctx) tm
-                                    ) collectANF ctx e
+    (e',bndrs) <- runR $ runWriterT $ bottomupR collectANF ctx e
     case bndrs of
       [] -> return e
       _  -> changed . Letrec $ bind (rec bndrs) e'
@@ -502,19 +498,15 @@ collectANF _ (Letrec b) = do
       tell [(argId,embed body)]
       return argVar
 
-collectANF ctx e@(Case subj ty alts) = do
-    untranslatableSubj <- liftNormR $ isUntranslatable subj
+collectANF ctx (Case subj ty alts) = do
     localVar           <- liftNormR $ isLocalVar subj
-    (bndr,subj') <- if localVar || untranslatableSubj || isConstant subj
+    (bndr,subj') <- if localVar || isConstant subj
       then return ([],subj)
       else do tcm <- Lens.use tcCache
               (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "subjLet" subj
               return ([(argId,embed subj)],argVar)
 
-    untranslatableE <- liftNormR $ isUntranslatable e
-    (binds,alts') <- if untranslatableE
-      then return ([],alts)
-      else fmap (first concat . unzip) $ liftNormR $ mapM (doAlt subj') alts
+    (binds,alts') <- fmap (first concat . unzip) $ liftNormR $ mapM (doAlt subj') alts
 
     tell (bndr ++ binds)
     return (Case subj' ty alts')
