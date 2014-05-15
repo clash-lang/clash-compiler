@@ -124,7 +124,7 @@ begin
   ~SYM[1] <= ~ARG[1];
   ~SYM[2] <= ~ARG[2];
   -- pragma translate_off
-  process(~SYM[1],~SYM[2])
+  process(~SYM[1],~SYM[2]) begin
     if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
       assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
       ~RESULT <= ~ERRORO;
