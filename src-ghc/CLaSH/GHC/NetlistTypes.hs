@@ -68,8 +68,8 @@ tyNatSize tcm ty@(tyView -> TyConApp tc tys) = do
   case tcm ! tc of
     FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst tys of
       Just ty' -> tyNatSize tcm ty'
-      Nothing  -> error $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
-    _ -> error $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
+      _ -> fail $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
+    _ -> fail $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
 
 tyNatSize _ t = fail $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
 
