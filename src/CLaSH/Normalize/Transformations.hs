@@ -460,6 +460,8 @@ makeANF ctx (Lam b) = do
   e' <- makeANF (LamBody bndr:ctx) e
   return $ Lam (bind bndr e')
 
+makeANF _ (TyLam b) = return (TyLam b)
+
 makeANF ctx e
   = R $ do
     (e',bndrs) <- runR $ runWriterT $ bottomupR collectANF ctx e
