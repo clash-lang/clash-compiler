@@ -57,16 +57,15 @@ import           Module                      (moduleName, moduleNameString)
 import           Name                        (Name, nameModule_maybe,
                                               nameOccName, nameUnique)
 import           OccName                     (occNameString)
-import           TyCon                       (AlgTyConRhs (..),
-                                              SynTyConRhs (..), TyCon,
+import           TyCon                       (AlgTyConRhs (..), TyCon,
                                               algTyConRhs, isAlgTyCon,
                                               isFunTyCon, isNewTyCon,
                                               isPrimTyCon,
                                               isSynTyCon, isTupleTyCon,
-                                              synTyConRhs_maybe, tyConArity,
+                                              tcExpandTyCon_maybe, tyConArity,
                                               tyConDataCons, tyConKind,
                                               tyConName, tyConUnique)
-import           Type                        (tcView)
+import           Type                        (mkTopTvSubst, substTy, tcView)
 import           TypeRep                     (TyLit (..), Type (..))
 import           Unique                      (Uniquable (..), Unique, getKey)
 import           Var                         (Id, TyVar, Var, idDetails,
@@ -349,13 +348,17 @@ coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
 coreToType' :: Type
             -> State GHC2CoreState C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> (coreToVar tv)
-coreToType' (TyConApp (synTyConRhs_maybe -> Just (SynonymTyCon ty)) args) =
-  foldl C.AppTy <$> coreToType ty <*> mapM coreToType args
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
-  | otherwise     = do tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
-                       tyConMap %= (HSM.insert tcName tc)
-                       C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
+  | otherwise     = case tcExpandTyCon_maybe tc args of
+                      Just (substs,synTy,remArgs) -> do
+                        let substs' = mkTopTvSubst substs
+                            synTy'  = substTy substs' synTy
+                        foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
+                      _ -> do
+                        tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
+                        tyConMap %= (HSM.insert tcName tc)
+                        C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
                                (bind <$> coreToTyVar tv <*> coreToType ty)
