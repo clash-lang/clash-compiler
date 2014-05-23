@@ -494,7 +494,7 @@ satN2 rep = if isSigned rep
 --
 -- So when you type:
 --
--- > n = $$(fLit 2.2867) :: SFixed 4 4
+-- > n = $$(fLit 2.8672) :: SFixed 4 4
 --
 -- The compiler sees:
 --
