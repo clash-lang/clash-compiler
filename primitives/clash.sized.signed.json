@@ -25,12 +25,12 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.minBoundS"
-    , "templateE" : "signed'((~LIT[0]-1) => '1', (~LIT[0]-2) downto 0 => '0')"
+    , "templateD" : "~RESULT <= ((~LIT[0]-1) => '1', (~LIT[0]-2) downto 0 => '0');"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Signed.maxBoundS"
-    , "templateE" : "signed'((~LIT[0]-1) => '0', (~LIT[0]-2) downto 0 => '1')"
+    , "templateD" : "~RESULT <= ((~LIT[0]-1) => '0', (~LIT[0]-2) downto 0 => '1');"
     }
   }
 , { "BlackBox" :
