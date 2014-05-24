@@ -66,6 +66,24 @@ instance KnownNat n => Enum (Signed n) where
   pred           = minS (fromIntegerS 1)
   toEnum         = fromIntegerS . toInteger
   fromEnum       = fromEnum . toIntegerS
+  enumFrom       = enumFromS
+  enumFromThen   = enumFromThenS
+  enumFromTo     = enumFromToS
+  enumFromThenTo = enumFromThenToS
+
+{-# NOINLINE enumFromS #-}
+{-# NOINLINE enumFromThenS #-}
+{-# NOINLINE enumFromToS #-}
+{-# NOINLINE enumFromThenToS #-}
+enumFromS       :: KnownNat n => Signed n -> [Signed n]
+enumFromThenS   :: KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromToS     :: KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromThenToS :: KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
+enumFromS x             = map toEnum [fromEnum x ..]
+enumFromThenS x y       = map toEnum [fromEnum x, fromEnum y ..]
+enumFromToS x y         = map toEnum [fromEnum x .. fromEnum y]
+enumFromThenToS x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+
 
 instance KnownNat n => Bounded (Signed n) where
   minBound = minBoundS

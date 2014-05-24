@@ -64,6 +64,23 @@ instance KnownNat n => Enum (Unsigned n) where
   pred           = minU (fromIntegerU 1)
   toEnum         = fromIntegerU . toInteger
   fromEnum       = fromEnum . toIntegerU
+  enumFrom       = enumFromU
+  enumFromThen   = enumFromThenU
+  enumFromTo     = enumFromToU
+  enumFromThenTo = enumFromThenToU
+
+{-# NOINLINE enumFromU #-}
+{-# NOINLINE enumFromThenU #-}
+{-# NOINLINE enumFromToU #-}
+{-# NOINLINE enumFromThenToU #-}
+enumFromU       :: KnownNat n => Unsigned n -> [Unsigned n]
+enumFromThenU   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromToU     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenToU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromU x             = map toEnum [fromEnum x ..]
+enumFromThenU x y       = map toEnum [fromEnum x, fromEnum y ..]
+enumFromToU x y         = map toEnum [fromEnum x .. fromEnum y]
+enumFromThenToU x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
 instance KnownNat n => Bounded (Unsigned n) where
   minBound = fromIntegerU 0
