@@ -287,7 +287,7 @@ vmerge Nil       Nil       = Nil
 vmerge (x :> xs) (y :> ys) = unsafeCoerce (x :> y :> (vmerge xs (unsafeCoerce ys)))
 
 {-# NOINLINE vreverse #-}
--- | Returns the elements in a list in reverse order
+-- | Returns the elements in a vector in reverse order
 --
 -- >>> vreverse (1:>2:>3:>4:>Nil)
 -- <4,3,2,1>
@@ -296,7 +296,7 @@ vreverse Nil        = Nil
 vreverse (x :> xs)  = vreverse xs <: x
 
 {-# NOINLINE vmap #-}
--- | 'vmap' @f xs@ is the list obtained by applying @f@ to each element
+-- | 'vmap' @f xs@ is the vector obtained by applying @f@ to each element
 -- of @xs@, i.e.,
 --
 -- > vmap f (xn :> ... :> x2 :> x1 :> Nil) == (f xn :> ... :> f x2 :> f x1 :> Nil)
@@ -399,7 +399,7 @@ vmapAccumR f acc xs = (acc',ys)
     ys   = vmap snd (vinit ws)
 
 {-# INLINEABLE vzip #-}
--- | 'vzip' takes two lists and returns a list of corresponding pairs.
+-- | 'vzip' takes two vectors and returns a vector of corresponding pairs.
 --
 -- >>> vzip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
 -- <(1,4),(2,3),(3,2),(4,1)>
@@ -407,8 +407,8 @@ vzip :: Vec n a -> Vec n b -> Vec n (a,b)
 vzip = vzipWith (,)
 
 {-# INLINEABLE vunzip #-}
--- | 'vunzip' transforms a list of pairs into a list of first components
--- and a list of second components.
+-- | 'vunzip' transforms a vector of pairs into a vector of first components
+-- and a vector of second components.
 --
 -- >>> vunzip ((1,4):>(2,3):>(3,2):>(4,1):>Nil)
 -- (<1,2,3,4>,<4,3,2,1>)
