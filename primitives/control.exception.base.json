@@ -8,4 +8,9 @@
     , "templateE" : "~ERRORO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.recSelError"
+    , "templateE" : "~ERRORO"
+    }
+  }
 ]
