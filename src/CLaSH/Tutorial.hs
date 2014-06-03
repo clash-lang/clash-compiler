@@ -831,12 +831,8 @@ a general listing of the available template holes:
 * @~TYPM[N]@: VHDL type/name/ of the @(N+1)@'th argument; used in /type/
   /qualification/.
 * @~TYPM@: VHDL type/name/ of the result; used in /type qualification/.
-* @~DEF[N]@: Default value for the VHDL type of the @(N+1)@'th argument. NB:
-  Does not correspond per se to the value of 'def' of the 'Default' type class
-  for the Haskell type.
-* @~DEFO@: Default value for the VHDL type of the result. NB: Does not
-  correspond per se to the value of the 'def' of the 'Default' type class for
-  the Haskell type.
+* @~ERROR[N]@: Error value for the VHDL type of the @(N+1)@'th argument.
+* @~ERRORO@: Error value for the VHDL type of the result.
 * @~SYM[N]@: Randomly generated, but unique, symbol. Multiple occurrences of
   @~SYM[N]@ in the same primitive definition all refer to the same random, but
   unique, symbol.
