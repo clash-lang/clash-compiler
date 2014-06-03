@@ -39,6 +39,7 @@ where
 
 import Control.Applicative
 -- import Data.Traversable
+import Data.Default
 import Data.Foldable              hiding (toList)
 import Data.Proxy
 import GHC.TypeLits
@@ -88,6 +89,9 @@ instance Foldable (Vec n) where
 
 instance Functor (Vec n) where
   fmap = vmap
+
+instance (Default a, KnownNat n) => Default (Vec n a) where
+  def = vcopyI def
 
 {-# NOINLINE vhead #-}
 -- | Extract the first element of a vector
