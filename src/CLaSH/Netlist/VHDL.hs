@@ -405,7 +405,7 @@ expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
                    n -> [exprLit (Just n) (NumLit 0)]
-    assignExpr = hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg)
+    assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
 expr _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr False e) [0..] es
