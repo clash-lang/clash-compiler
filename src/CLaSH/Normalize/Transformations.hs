@@ -42,7 +42,8 @@ import           Unbound.LocallyNameless     (Bind, Embed (..), bind, embed,
                                               unrec, name2String)
 import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
-import           CLaSH.Core.DataCon          (DataCon, dcTag, dcUnivTyVars)
+import           CLaSH.Core.DataCon          (DataCon, dcName, dcTag,
+                                              dcUnivTyVars)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               termFreeVars, typeFreeVars)
 import           CLaSH.Core.Pretty           (showDoc)
@@ -500,8 +501,27 @@ collectANF _ (Letrec b) = do
       tell [(argId,embed body)]
       return argVar
 
+-- TODO: The code below special-cases ANF for the ':-' constructor for the
+-- 'Signal' type. The 'Signal' type is essentially treated as a "transparent"
+-- type by the CLaSH compiler, so observing its constructor leads to all kinds
+-- of problems. In this case that "CLaSH.Rewrite.Util.mkSelectorCase" will
+-- try to project the LHS and RHS of the ':-' constructor, however,
+-- 'mkSelectorCase' uses 'coreView' to find the "real" data-constructor.
+-- 'coreView' however looks through the 'Signal' type, and hence 'mkSelector'
+-- finds the data constructors for the element type of Signal. This resulted in
+-- error #24 (https://github.com/christiaanb/clash2/issues/24), where we
+-- try to get the first field out of the 'Vec's 'Nil' constructor.
+--
+-- Ultimately we should stop treating Signal as a "transparent" type and deal
+-- handling of the Signal type, and the involved co-recursive functions,
+-- properly. At the moment, CLaSH cannot deal with this recursive type and the
+-- recursive functions involved, hence the need for special-casing code. After
+-- everything is done properly, we should remove the two lines below.
+collectANF _ e@(Case _ _ [unsafeUnbind -> (DataPat dc _,_)])
+  | name2String (dcName $ unembed dc) == "CLaSH.Signal.Types.:-" = return e
+
 collectANF ctx (Case subj ty alts) = do
-    localVar           <- liftNormR $ isLocalVar subj
+    localVar     <- liftNormR $ isLocalVar subj
     (bndr,subj') <- if localVar || isConstant subj
       then return ([],subj)
       else do tcm <- Lens.use tcCache
