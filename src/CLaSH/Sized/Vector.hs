@@ -579,7 +579,7 @@ vselect f s n xs = vselect' (toUNat n) $ vdrop f (unsafeCoerce xs)
     vselect' UZero      _           = Nil
     vselect' (USucc n') vs@(x :> _) = x :> vselect' n' (vdrop s (unsafeCoerce vs))
 
-{-# NOINLINE vselectI #-}
+{-# INLINEABLE vselectI #-}
 -- | 'vselectI' @f s xs@ selects as many elements as demanded by the context
 -- with stepsize @s@ and offset @f@ from @xs@
 --
