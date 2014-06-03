@@ -1,2 +1,2 @@
 #!/bin/sh
-ghci -isrc -isrc-ghc -idist/build/autogen -Wall -Werror -package ghc CLaSH.hs
+ghci -isrc -isrc-ghc -Wall -Werror -package ghc CLaSH.hs
