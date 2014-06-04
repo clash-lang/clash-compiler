@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.3.2
+
+* Fixes bugs:
+  * Type synonym improperly expanded [#17](https://github.com/christiaanb/clash2/issues/17)
+  * BlackBox for `Signed` `maxBound` and `minBound` generate incorrect VHDL. [#19](https://github.com/christiaanb/clash2/issues/19)
+  * Generate failure code in the VHDL for recSelError [#23](https://github.com/christiaanb/clash2/issues/23)
+
 ## 0.3.1 *May 15th 2014*
 
 * New features:
