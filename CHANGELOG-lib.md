@@ -1,6 +1,7 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
 ## 0.3.2
+
 * Fixes bugs:
   * VHDL array constant ambiguous [#18](https://github.com/christiaanb/clash2/issues/18)
   * Exception: can't create selector [#24](https://github.com/christiaanb/clash2/issues/24)
