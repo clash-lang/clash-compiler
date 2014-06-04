@@ -49,10 +49,10 @@ import Control.Arrow         (Arrow (..), ArrowLoop (..))
 import Control.Category      as Category
 import GHC.TypeLits          (KnownNat,type (^), type (+))
 
-import CLaSH.Promoted.Nat    (SNat, snat)
+import CLaSH.Promoted.Nat    (snat)
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.Sized.Vector    (Vec (..), (!), (+>>), maxIndex, vcopy, vcopyI, vreplace)
+import CLaSH.Sized.Vector    (Vec (..), (!), (+>>), maxIndex, vcopyI, vreplace)
 
 {-# INLINABLE sync #-}
 -- | Create a synchronous function from a combinational function describing
@@ -187,28 +187,25 @@ csimulateC f = csimulate (asCFunction f)
 {-# NOINLINE cblockRam #-}
 -- | Create a blockRAM with space for @n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
 -- > clk100 = Clock d100
 -- >
 -- > bram40 :: CSignal 100 (Unsigned 6) -> CSignal 100 (Unsigned 6)
--- >        -> CSignal 100 Bool -> CSignal 100 a -> 100 CSignal a
--- > bram40 = cblockRam clk100 d40
-cblockRam :: forall n m a clk . (KnownNat n, KnownNat m, CPack a, Default a)
+-- >        -> CSignal 100 Bool -> CSignal 100 Bit -> 100 CSignal Bit
+-- > bram40 = cblockRam clk100 (vcopy d40 H)
+cblockRam :: (CPack a, KnownNat n, KnownNat m)
           => Clock clk                -- ^ 'Clock' to synchronize to
-          -> SNat n                   -- ^ Size @n@ of the blockram
+          -> Vec n a                  -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
+                                      -- NB: *MUST* be a constant.
           -> CSignal clk (Unsigned m) -- ^ Write address @w@
           -> CSignal clk (Unsigned m) -- ^ Read address @r@
           -> CSignal clk Bool         -- ^ Write enable
           -> CSignal clk a            -- ^ Value to write (at address @w@)
           -> CSignal clk a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
+cblockRam clk binit wr rd en din = cpack clk $ (sync clk bram' (binit,undefined)) (wr,rd,en,din)
   where
-    binit :: (Vec n a,a)
-    binit = (vcopy n def,def)
-
-    bram' :: (Vec n a,a) -> (Unsigned m, Unsigned m, Bool, a)
-          -> (((Vec n a),a),a)
     bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
       where
         ram' | e         = vreplace ram w d
@@ -218,28 +215,34 @@ cblockRam clk n wr rd en din = cpack clk $ (sync clk bram' binit) (wr,rd,en,din)
 {-# DEPRECATED blockRamCC "'CComp' is deprecated and will be removed in version 0.6, use 'cblockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
--- > clk100 = Clock 100
+-- > clk100 = Clock d100
 -- >
--- > bramC40 :: CComp 100 (Unsigned 6, Unsigned 6, Bool, a) a
--- > bramC40 = blockRamCC clk100 d40
+-- > bramC40 :: CComp 100 (Unsigned 6, Unsigned 6, Bool, Bit) Bit
+-- > bramC40 = blockRamCC clk100 (vcopy d40 H)
 blockRamCC :: (KnownNat n, KnownNat m, CPack a, Default a)
            => Clock clk -- ^ 'Clock' to synchronize to
-           -> SNat n    -- ^ Size @n@ of the blockram
+           -> Vec n a   -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
+                        -- NB: *MUST* be a constant.
            -> CComp clk (Unsigned m, Unsigned m, Bool, a) a
 blockRamCC clk n = CC ((\(wr,rd,en,din) -> cblockRam clk n wr rd en din) Prelude.. cunpack clk)
 
 {-# INLINABLE cblockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
--- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
--- > bram32 = cblockRamPow2 d32
-cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a, Default a)
+-- > clk100 = Clock d100
+-- >
+-- > bramC32 :: CSignal 100 (Unsigned 5) -> CSignal 100 (Unsigned 5) -> CSignal 100 Bool -> CSignal 100 Bit -> CSignal 100 Bit
+-- > bramC32 = cblockRamPow2 clk100 (vcopy d32 H)
+cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a)
               => Clock clk                -- ^ 'Clock' to synchronize to
-              -> SNat (2^n)               -- ^ Size @2^n@ of the blockram
+              -> Vec (2^n) a              -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
+                                          -- NB: *MUST* be a constant.
               -> CSignal clk (Unsigned n) -- ^ Write address @w@
               -> CSignal clk (Unsigned n) -- ^ Read address @r@
               -> CSignal clk Bool         -- ^ Write enable
@@ -250,15 +253,17 @@ cblockRamPow2 = cblockRam
 {-# DEPRECATED blockRamPow2CC "'CComp' is deprecated and will be removed in version 0.6, use 'cblockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
 -- > clk100 = Clock d100
 -- >
--- > bramC32 :: CComp 100 (Unsigned 5, Unsigned 5, Bool, a) a
--- > bramC32 = blockRamPow2CC clk100 d32
-blockRamPow2CC :: (KnownNat n, KnownNat (2^n), CPack a, Default a)
-               => Clock clk  -- ^ 'Clock' to synchronize to
-               -> SNat (2^n) -- ^ Size @2^n@ of the blockram
+-- > bramC32 :: CComp 100 (Unsigned 5, Unsigned 5, Bool, Bit) Bit
+-- > bramC32 = blockRamPow2CC clk100 (vcopy d32 Bit)
+blockRamPow2CC :: (KnownNat n, KnownNat (2^n), CPack a)
+               => Clock clk   -- ^ 'Clock' to synchronize to
+               -> Vec (2^n) a -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
+                              -- NB: *MUST* be a constant.
                -> CComp clk (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2CC clk n = CC ((\(wr,rd,en,din) -> cblockRamPow2 clk n wr rd en din) Prelude.. cunpack clk)
 

@@ -182,12 +182,14 @@ registerP i = unpack Prelude.. register i Prelude.. pack
 {-# NOINLINE blockRam #-}
 -- | Create a blockRAM with space for @n@ elements.
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
--- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
--- > bram40 = blockRam d40
+-- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal Bit -> Signal Bit
+-- > bram40 = blockRam (vcopy d40 H)
 blockRam :: (Pack a, KnownNat n, KnownNat m)
-         => Vec n a             -- ^ Size @n@ of the blockram
+         => Vec n a             -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
+                                -- NB: *MUST* be a constant.
          -> Signal (Unsigned m) -- ^ Write address @w@
          -> Signal (Unsigned m) -- ^ Read address @r@
          -> Signal Bool         -- ^ Write enable
@@ -204,24 +206,28 @@ blockRam binit wr rd en din = pack $ (bram' <^> (binit,undefined)) (wr,rd,en,din
 {-# DEPRECATED blockRamC "'Comp' is deprecated and will be removed in version 0.6, use 'blockRam' instead" #-}
 -- | Create a blockRAM with space for @n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
--- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, a) a
--- > bramC40 = blockRamC d40
+-- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, Bit) Bit
+-- > bramC40 = blockRamC (vcopy d40 H)
 blockRamC :: (KnownNat n, KnownNat m, Pack a)
-          => Vec n a -- ^ Size @n@ of the blockram
+          => Vec n a -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
+                     -- NB: *MUST* be a constant.
           -> Comp (Unsigned m, Unsigned m, Bool, a) a
 blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
 
 {-# INLINABLE blockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
--- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal a -> Signal a
--- > bram32 = blockRamPow2 d32
+-- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal Bit -> Signal Bit
+-- > bram32 = blockRamPow2 (vcopy d32 H)
 blockRamPow2 :: (KnownNat (2^n), KnownNat n, Pack a)
-             => Vec (2^n) a         -- ^ Size @2^n@ of the blockram
+             => Vec (2^n) a         -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
+                                    -- NB: *MUST* be a constant.
              -> Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
              -> Signal Bool         -- ^ Write enable
@@ -232,12 +238,14 @@ blockRamPow2 = blockRam
 {-# DEPRECATED blockRamPow2C "'Comp' is deprecated and will be removed in version 0.6, use 'blockRamPow2' instead" #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * NB: Read value is delayed by 1 cycle
+-- * NB: Initial output value is `undefined`
 --
--- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, a) a
--- > bramC32 = blockRamPow2C d32
+-- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, Bit) Bit
+-- > bramC32 = blockRamPow2C (vcopy d32 H)
 blockRamPow2C :: (KnownNat (2^n), KnownNat n, Pack a)
-              => Vec (2^n) a -- ^ Size @2^n@ of the blockram
+              => Vec (2^n) a -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
+                             -- NB: *MUST* be a constant.
               -> Comp (Unsigned n, Unsigned n, Bool, a) a
 blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
 
