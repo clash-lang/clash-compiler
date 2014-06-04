@@ -1,21 +1,29 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Prelude.Explicit.cblockRam"
+    , "comment"   :
+    "cblockRam :: (CPack a, KnownNat n, KnownNat m) -- (ARG[0],ARG[1],ARG[2])
+          => Clock clk                -- clk,  ARG[3]
+          -> Vec n a                  -- init, ARG[4]
+          -> CSignal clk (Unsigned m) -- wr,   ARG[5]
+          -> CSignal clk (Unsigned m) -- rd,   ARG[6]
+          -> CSignal clk Bool         -- wren, ARG[7]
+          -> CSignal clk a            -- din,  ARG[8]
+          -> CSignal clk a"
     , "templateD" :
 "~SYM[0]_block : block
-  type ram_array is array (natural range <>) of ~TYP[9];
-  signal ~SYM[1] : ram_array((~ARG[0]-1) downto 0) := (others => ~ARG[3]); -- ram
-  signal ~SYM[2] : ~TYP[9]; -- inp
-  signal ~SYM[3] : ~TYP[9] := ~ARG[3]; -- outp
+  signal ~SYM[1] : ~TYP[4] := ~LIT[4]; -- ram
+  signal ~SYM[2] : ~TYP[8]; -- inp
+  signal ~SYM[3] : ~TYP[8]; -- outp
 begin
-  ~SYM[2] <= ~ARG[9];
+  ~SYM[2] <= ~ARG[8];
 
   process(~CLKO)
   begin
     if rising_edge(~CLKO) then
-      if ~ARG[8] then
-        ~SYM[1](to_integer(~ARG[6])) <= ~SYM[2];
+      if ~ARG[7] then
+        ~SYM[1](to_integer(~ARG[5])) <= ~SYM[2];
       end if;
-      ~SYM[3] <= ~SYM[1](to_integer(~ARG[7]));
+      ~SYM[3] <= ~SYM[1](to_integer(~ARG[6]));
     end if;
   end process;
 

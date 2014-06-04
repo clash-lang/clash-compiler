@@ -2,15 +2,15 @@
     { "name"      : "CLaSH.Prelude.blockRam"
     , "comment"   :
     "blockRam :: (Pack a, KnownNat n, KnownNat m) -- (ARG[0],ARG[1],ARG[2])
-              => Vec n a                          -- init, ARG[3]
+              => Vec n a                          -- init,  ARG[3]
               -> Signal (Unsigned m)              -- write, ARG[4]
-              -> Signal (Unsigned m)              -- read, ARG[5]
-              -> Signal Bool                      -- wen, ARG[6]
-              -> Signal a                         -- datain, ARG[7]
+              -> Signal (Unsigned m)              -- read,  ARG[5]
+              -> Signal Bool                      -- wen,   ARG[6]
+              -> Signal a                         -- din,   ARG[7]
               -> Signal a"
     , "templateD" :
 "~SYM[0]_block : block
-  signal ~SYM[1] : ~TYPM[3]((~LIT[1]-1) downto 0) := ~LIT[3]; -- ram
+  signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram
   signal ~SYM[2] : ~TYP[7]; -- inp
   signal ~SYM[3] : ~TYP[7]; -- outp
 begin
