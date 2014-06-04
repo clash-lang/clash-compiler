@@ -281,19 +281,23 @@ vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0
 
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
-vhdlTypeMark Bit             = "std_logic"
-vhdlTypeMark Bool            = "boolean"
-vhdlTypeMark (Clock _)       = "std_logic"
-vhdlTypeMark (Reset _)       = "std_logic"
-vhdlTypeMark Integer         = "integer"
-vhdlTypeMark (Signed _)      = "signed"
-vhdlTypeMark (Unsigned _)    = "unsigned"
-vhdlTypeMark (Vector _ Bit)  = "std_logic_vector"
-vhdlTypeMark (Vector _ elTy) = "array_of_" <> tyName elTy
-vhdlTypeMark (SP _ _)        = "std_logic_vector"
-vhdlTypeMark (Sum _ _)       = "unsigned"
-vhdlTypeMark t@(Product _ _) = tyName t
-vhdlTypeMark t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
+vhdlTypeMark hwty = do
+  when (needsTyDec hwty) (_1 %= HashSet.insert (mkVecZ hwty))
+  vhdlTypeMark' hwty
+  where
+    vhdlTypeMark' Bit             = "std_logic"
+    vhdlTypeMark' Bool            = "boolean"
+    vhdlTypeMark' (Clock _)       = "std_logic"
+    vhdlTypeMark' (Reset _)       = "std_logic"
+    vhdlTypeMark' Integer         = "integer"
+    vhdlTypeMark' (Signed _)      = "signed"
+    vhdlTypeMark' (Unsigned _)    = "unsigned"
+    vhdlTypeMark' (Vector _ Bit)  = "std_logic_vector"
+    vhdlTypeMark' (Vector _ elTy) = "array_of_" <> tyName elTy
+    vhdlTypeMark' (SP _ _)        = "std_logic_vector"
+    vhdlTypeMark' (Sum _ _)       = "unsigned"
+    vhdlTypeMark' t@(Product _ _) = tyName t
+    vhdlTypeMark' t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
