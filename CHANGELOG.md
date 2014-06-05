@@ -1,9 +1,10 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.5.1
+## 0.5.1 *June 5th 2014*
 
 * New features:
   * Add `Default` instance for `Vec` [#2](https://github.com/christiaanb/clash-prelude/issues/2)
+  * Instantiation for `blockRam` [#3](https://github.com/christiaanb/clash-prelude/issues/2)
 
 * Fixes bugs:
   * Fixed error on documentation of fLit in Fixed.hs [#6](https://github.com/christiaanb/clash-prelude/issues/6)
