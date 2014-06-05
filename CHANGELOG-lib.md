@@ -1,10 +1,11 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.3.2
+## 0.3.2 *June 5th 2014*
 
 * Fixes bugs:
   * VHDL array constant ambiguous [#18](https://github.com/christiaanb/clash2/issues/18)
   * Exception: can't create selector [#24](https://github.com/christiaanb/clash2/issues/24)
+  * Calls to `vhdlTypeMark` don't result to inclusion of VHDL type in types.vhdl [#28](https://github.com/christiaanb/clash2/issues/28)
 
 ## 0.3.1 *May 15th 2014*
 

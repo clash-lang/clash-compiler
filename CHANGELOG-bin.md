@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.3.2
+## 0.3.2 *June 5th 2014*
 
 * Fixes bugs:
   * Type synonym improperly expanded [#17](https://github.com/christiaanb/clash2/issues/17)
