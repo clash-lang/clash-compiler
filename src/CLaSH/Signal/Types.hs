@@ -25,6 +25,11 @@ newtype CSignal (clk :: Nat) a = CSignal (Signal a)
 -- | A clock with period @clk@
 newtype Clock (clk :: Nat) = Clock (SNat clk)
 
+-- | A synchronized signal with samples of type @a@, implicitly synchronized to
+-- an unnamed global clock, only produces a valid output after @delay@ samples.
+newtype DSignal (delay :: Nat) a = DSignal (Signal a)
+  deriving (Show,Default,Lift,Functor,Applicative)
+
 instance Show a => Show (Signal a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
@@ -70,12 +75,21 @@ mkCSignal a (CSignal s) = CSignal (a :- s)
 cstail :: CSignal t a -> CSignal t a
 cstail (CSignal s) = CSignal (stail s)
 
+mkDSignal :: a -> DSignal delay a -> DSignal delay a
+mkDSignal a (DSignal s) = DSignal (a :- s)
+
+dstail :: DSignal t a -> DSignal t a
+dstail (DSignal s) = DSignal (stail s)
+
 -- | Create a constant 'CSignal' from a combinational value
 --
 -- >>> csample (csignal 4)
 -- [4, 4, 4, 4, ...
 csignal :: a -> CSignal t a
 csignal a = coerce (signal a)
+
+dsignal :: a -> DSignal n a
+dsignal a = coerce (signal a)
 
 instance Num a => Num (Signal a) where
   (+)         = liftA2 (+)
@@ -94,3 +108,12 @@ instance Num a => Num (CSignal t a) where
   abs         = fmap abs
   signum      = fmap signum
   fromInteger = csignal . fromInteger
+
+instance Num a => Num (DSignal t a) where
+  (+)         = liftA2 (+)
+  (-)         = liftA2 (-)
+  (*)         = liftA2 (*)
+  negate      = fmap negate
+  abs         = fmap abs
+  signum      = fmap signum
+  fromInteger = dsignal . fromInteger

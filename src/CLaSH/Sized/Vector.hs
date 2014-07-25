@@ -29,7 +29,7 @@ module CLaSH.Sized.Vector
     -- ** Indexing 'Vec'tors
   , (!), vreplace, maxIndex, vlength
     -- ** Generating 'Vec'tors
-  , vcopy, vcopyI, viterate, viterateI, vgenerate, vgenerateI
+  , vcopy, vcopyI, vcopyU, viterate, viterateI, vgenerate, vgenerateI
     -- ** Misc
   , vreverse, toList, v, lazyV, asNatProxy
     -- * Alternative 'Vec'tor functions
@@ -600,11 +600,12 @@ vselectI f s xs = withSNat (\n -> vselect f s n xs)
 -- >>> vcopy d3 6
 -- <6,6,6>
 vcopy :: SNat n -> a -> Vec n a
-vcopy n a = vreplicateU (toUNat n) a
+vcopy n a = vcopyU (toUNat n) a
 
-vreplicateU :: UNat n -> a -> Vec n a
-vreplicateU UZero     _ = Nil
-vreplicateU (USucc s) x = x :> vreplicateU s x
+{-# NOINLINE vcopyU #-}
+vcopyU :: UNat n -> a -> Vec n a
+vcopyU UZero     _ = Nil
+vcopyU (USucc s) x = x :> vcopyU s x
 
 {-# INLINEABLE vcopyI #-}
 -- | 'vcopyI' @a@ creates a vector with as many copies of @a@ as demanded by the
