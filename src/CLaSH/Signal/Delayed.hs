@@ -3,12 +3,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
-
 module CLaSH.Signal.Delayed
   ( -- * Delay-annotated synchronous signals
     DSignal
   , dsignal
   , delay
+  , feedback
     -- * Signal \<-\> DSignal conversion
   , fromSignal
   , toSignal
@@ -49,6 +49,9 @@ delay m = coerce . delay' . coerce
                  UZero       -> s
                  u@(USucc _) -> let r = unpack (register (vcopyU u def) (pack (s +>> r)))
                                 in  vlast r
+
+feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
+feedback f = let (DSignal r) = f (DSignal r) in (DSignal r)
 
 fromSignal :: Signal a -> DSignal 0 a
 fromSignal = coerce
