@@ -65,6 +65,25 @@ Library
                       CLaSH.Tutorial
 
   Other-modules:      CLaSH.Signal.Types
+                      CLaSH.Signal.Delayed
+                      CLaSH.Sized.Index
+                      CLaSH.Prelude.FIFO
+
+  other-extensions:   DataKinds
+                      DefaultSignatures
+                      ExplicitNamespaces
+                      FlexibleContexts
+                      GADTs
+                      GeneralizedNewtypeDeriving
+                      ImplicitParams
+                      KindSignatures
+                      LambdaCase
+                      ScopedTypeVariables
+                      TemplateHaskell
+                      TupleSections
+                      TypeFamilies
+                      TypeOperators
+                      UndecidableInstances
 
   Build-depends:      base                 >= 4.7.0.0 && < 5,
                       data-default         >= 0.5.3,
