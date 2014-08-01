@@ -1,11 +1,14 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators        #-}
+
 module CLaSH.Prelude.Stream
   ( Valid
   , Ready
   , STREAM (..)
   , fifo
+  , fifoIC
   )
 where
 
@@ -39,35 +42,49 @@ type Ready = Bool
 --   * A control output indicating that it is ready to receive new data
 --   * A data output
 --
--- Two stream interfaces are connected like so:
+-- When we compose two components adhering to the 'STREAM' interface, the
+-- @valid@ and @data@ signals from from left to right, while the @ready@
+-- signals flow from right to left:
 --
--- > <---------------------------+   +------------------------------
--- >           component1        |   |         component2
--- >      /-------------------\  |   |   /-------------------\
--- > ---->|validIn    readyOut|--+   +-->|readyIn     dataOut|----->
--- >      |                   |          |                   |
--- > ---->|dataIn     validOut|--------->|validIn    validOut|----->
--- >      |                   |          |                   |
--- >  +-->|readyIn     dataOut|--------->|dataIn     readyOut|---+
--- >  |   \-------------------/          \-------------------/   |
--- >  |                                                          |
--- >  +----------------------------<-----------------------------+
+-- @
+-- compose (STREAM component1) (STREAM component2) = (STEAM component3)
+--   where
+--    component3 validIn1 readyIn2 dataIn1 = (validOut2, readyOut1, dataOut2)
+--      where
+--        (validOut1,readyOut1,dataOut1) = component1 validIn1 readyOut2 dataIn1
+--        (validOut2,readyOut2,dataOut2) = component2 validOut1 readyIn2 dataOut1
+-- @
 --
--- In code this is done as:
+-- When viewed as a circuit diagram, @compose@ looks like:
 --
--- > compose (STREAM component1) (STREAM component2) = (STEAM component3)
--- >   where
--- >    component3 validIn1 readyIn2 dataIn1 = (validOut2, readyOut1, dataOut2)
--- >      where
--- >        (validOut1,readyOut1,dataOut1) = component1 validIn1 readyOut2 dataIn1
--- >        (validOut2,readyOut2,dataOut2) = component2 validOut1 readyIn2 dataOut1
+-- <<doc/streamcompose.svg>>
+--
+-- 'STREAM' is an instance of 'Category', 'Arrow', and 'ArrowLoop', meaning
+-- you can define compositions of components adhering to the 'STREAM' inferface
+-- using the arrow syntax:
+--
+-- @
+-- sequenceAndLoop :: STREAM Int Int
+-- sequenceAndLoop = \proc a -> do
+--   rec b     <- component1           -< (a,d')
+--       b'    <- fifo d3              -< b
+--       c     <- component2           -< b'
+--       c'    <- fifo d3              -< c
+--       (d,e) <- component3           -< c'
+--       d'    <- fifoIC d3 (1 :\> Nil) -< d
+--   returnA -< e
+-- @
+--
+-- Which gives rise to the following circuit:
+--
+--
 
 newtype STREAM i o
   = STREAM
-  { runFIFO :: Signal Valid
-            -> Signal Ready
-            -> Signal i
-            -> (Signal Valid, Signal Ready, Signal o)
+  { runSTREAM :: Signal Valid
+              -> Signal Ready
+              -> Signal i
+              -> (Signal Valid, Signal Ready, Signal o)
   }
 
 instance Category STREAM where
@@ -128,12 +145,12 @@ instance ArrowLoop STREAM where
           (c,d) = unpack fDataOut
 
 
-fifoT :: (KnownNat (n + 1), KnownNat (n + 2))
-      => (Vec (n + 1) a, Index (n + 2))   -- ^ (FIFO Queue, content counter)
+fifoT :: (KnownNat n, KnownNat (n + 1))
+      => (Vec n a, Index (n + 1))   -- ^ (FIFO Queue, content counter)
       -> Valid                            -- ^ Input is valid
       -> Ready                            -- ^ Output is ready to receive values
       -> a                                -- ^ Data input
-      -> ( (Vec (n + 1) a, Index (n + 2)) -- (FIFO Queue, content counter)
+      -> ( (Vec n a, Index (n + 1)) -- (FIFO Queue, content counter)
          , ( Valid                        -- Output is valid
            , Ready                        -- FIFO ready for new values
            , a                            -- Data output
@@ -183,18 +200,31 @@ fifoT (queue,cntr) inputValid outputReady dataIn =
     dataOut | emptyQueue   = dataIn
             | otherwise    = queue ! rdpointer
 
--- | Zero-delay FIFO queue of @(n + 1)@ elements.
+-- | Zero-delay FIFO queue of @n@ elements.
 --
 -- * Zero-delay: when the queue is empty, valid inputs are immediately routed to
 --   the output, skipping the queue.
 -- * Forgets new inputs when the queue is full (as opposed to forgetting the
 --   oldest element)
-fifo :: (KnownNat (n + 1), KnownNat (n + 2), Default a)
-     => SNat (n + 1) -- ^ Number of elements in the FIFO queue
-     -> STREAM a a     -- ^ A FIFO adhering to the 'STREAM' interface
-fifo sz = STREAM fifo'
+fifo :: (KnownNat n, KnownNat (n + 1), Default a)
+     => SNat n     -- ^ Number of elements in the FIFO queue
+     -> STREAM a a -- ^ A FIFO adhering to the 'STREAM' interface
+fifo sz = fifoIC sz Nil
+
+-- | Zero-delay FIFO queue of @(m + n)@ elements, with @m@ initial elements.
+--
+-- * Zero-delay: when the queue is empty, valid inputs are immediately routed to
+--   the output, skipping the queue.
+-- * Forgets new inputs when the queue is full (as opposed to forgetting the
+--   oldest element)
+fifoIC :: forall m n a . ( KnownNat m, KnownNat n, KnownNat (m + n)
+                         , KnownNat (m + n + 1), Default a)
+       => SNat (m + n) -- ^ Number of elements in the FIFO queue
+       -> Vec  n a     -- ^ Initial elements
+       -> STREAM a a   -- ^ A FIFO adhering to the 'STREAM' interface
+fifoIC _ ivals = STREAM fifo'
   where
     fifo' valIn readyIn dataIn = unpack fOut
       where
         (queue',fOut) = unpack (fifoT <$> queue <*> valIn <*> readyIn <*> dataIn)
-        queue         = register (vcopy sz def,0) queue'
+        queue         = register ((vcopyI def :: Vec m a) <++> ivals,fromInteger (vlength ivals)) queue'
