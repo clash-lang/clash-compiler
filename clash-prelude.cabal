@@ -52,6 +52,7 @@ Library
                       CLaSH.Class.Num
                       CLaSH.Prelude
                       CLaSH.Prelude.Explicit
+                      CLaSH.Prelude.Stream
                       CLaSH.Promoted.Nat
                       CLaSH.Promoted.Nat.TH
                       CLaSH.Promoted.Nat.Literals
@@ -59,6 +60,7 @@ Library
                       CLaSH.Signal.Explicit
                       CLaSH.Signal.Implicit
                       CLaSH.Sized.Fixed
+                      CLaSH.Sized.Index
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
@@ -66,8 +68,6 @@ Library
 
   Other-modules:      CLaSH.Signal.Types
                       CLaSH.Signal.Delayed
-                      CLaSH.Sized.Index
-                      CLaSH.Prelude.FIFO
 
   other-extensions:   DataKinds
                       DefaultSignatures
