@@ -108,7 +108,12 @@ fromIntegerI,fromIntegerI_inlineable :: KnownNat n => Integer -> Index n
 {-# NOINLINE fromIntegerI #-}
 fromIntegerI = fromIntegerI_inlineable
 {-# INLINABLE fromIntegerI_inlineable #-}
-fromIntegerI_inlineable i = let res = I (i `mod` natVal res) in res
+fromIntegerI_inlineable i =
+  let bound = natVal res
+      i'    = i `mod` bound
+      err   = error (show i ++ " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
+      res   = if i' /= i then err else I i
+  in  res
 
 instance KnownNat n => Real (Index n) where
   toRational = toRational . toIntegerI
