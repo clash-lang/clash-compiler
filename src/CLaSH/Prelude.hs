@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE ImplicitParams      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -31,16 +30,6 @@ module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
     (<^>)
   , registerP
-    -- * 'Arrow' interface for synchronous sequential circuits
-  , Comp (..)
-  , (^^^)
-  , registerC
-  , simulateC
-    -- * BlockRAM primitives
-  , blockRam
-  , blockRamPow2
-  , blockRamC
-  , blockRamPow2C
     -- * Utility functions
   , window
   , windowD
@@ -74,16 +63,13 @@ module CLaSH.Prelude
   , module CLaSH.Class.BitVector
   , module CLaSH.Class.Num
     -- *** Other
-  , module Control.Arrow
   , module Control.Applicative
   , module Data.Bits
   , module Data.Default
   )
 where
 
-import Control.Arrow
 import Control.Applicative
-import Control.Category            as Category
 import Data.Bits
 import Data.Default
 import Debug.Trace                 (trace)
@@ -178,147 +164,6 @@ f <^> iS = \i -> let (s',o) = unpack $ f <$> s <*> pack i
 -- [(8,8),(1,1),(2,2),(3,3),...
 registerP :: Pack a => a -> SignalP a -> SignalP a
 registerP i = unpack Prelude.. register i Prelude.. pack
-
-{-# NOINLINE blockRam #-}
--- | Create a blockRAM with space for @n@ elements.
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal Bit -> Signal Bit
--- > bram40 = blockRam (vcopy d40 H)
-blockRam :: (Pack a, KnownNat n, KnownNat m)
-         => Vec n a             -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
-                                -- NB: *MUST* be a constant.
-         -> Signal (Unsigned m) -- ^ Write address @w@
-         -> Signal (Unsigned m) -- ^ Read address @r@
-         -> Signal Bool         -- ^ Write enable
-         -> Signal a            -- ^ Value to write (at address @w@)
-         -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-blockRam binit wr rd en din = pack $ (bram' <^> (binit,undefined)) (wr,rd,en,din)
-  where
-    bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
-      where
-        ram' | e         = vreplace ram w d
-             | otherwise = ram
-        o'               = ram ! r
-
-{-# DEPRECATED blockRamC "'Comp' is deprecated and will be removed in version 0.6, use 'blockRam' instead" #-}
--- | Create a blockRAM with space for @n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > bramC40 :: Comp (Unsigned 6, Unsigned 6, Bool, Bit) Bit
--- > bramC40 = blockRamC (vcopy d40 H)
-blockRamC :: (KnownNat n, KnownNat m, Pack a)
-          => Vec n a -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
-                     -- NB: *MUST* be a constant.
-          -> Comp (Unsigned m, Unsigned m, Bool, a) a
-blockRamC n = C ((\(wr,rd,en,din) -> blockRam n wr rd en din) Prelude.. unpack)
-
-{-# INLINABLE blockRamPow2 #-}
--- | Create a blockRAM with space for 2^@n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal Bit -> Signal Bit
--- > bram32 = blockRamPow2 (vcopy d32 H)
-blockRamPow2 :: (KnownNat (2^n), KnownNat n, Pack a)
-             => Vec (2^n) a         -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
-                                    -- NB: *MUST* be a constant.
-             -> Signal (Unsigned n) -- ^ Write address @w@
-             -> Signal (Unsigned n) -- ^ Read address @r@
-             -> Signal Bool         -- ^ Write enable
-             -> Signal a            -- ^ Value to write (at address @w@)
-             -> Signal a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-blockRamPow2 = blockRam
-
-{-# DEPRECATED blockRamPow2C "'Comp' is deprecated and will be removed in version 0.6, use 'blockRamPow2' instead" #-}
--- | Create a blockRAM with space for 2^@n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > bramC32 :: Comp (Unsigned 5, Unsigned 5, Bool, Bit) Bit
--- > bramC32 = blockRamPow2C (vcopy d32 H)
-blockRamPow2C :: (KnownNat (2^n), KnownNat n, Pack a)
-              => Vec (2^n) a -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
-                             -- NB: *MUST* be a constant.
-              -> Comp (Unsigned n, Unsigned n, Bool, a) a
-blockRamPow2C n = C ((\(wr,rd,en,din) -> blockRamPow2 n wr rd en din) Prelude.. unpack)
-
-{-# DEPRECATED Comp "Will be removed in version 0.6. Use 'Applicative' interface and ('<^>') instead" #-}
--- | 'Comp'onent: an 'Arrow' interface to synchronous sequential functions
-newtype Comp  a b = C { asFunction :: Signal a -> Signal b }
-
-instance Category Comp where
-  id            = C Prelude.id
-  (C f) . (C g) = C (f Prelude.. g)
-
-instance Arrow Comp where
-  arr         = C Prelude.. fmap
-  first (C f) = C $ pack Prelude.. (f >< Prelude.id) Prelude.. unpack
-    where
-      (g >< h) (x,y) = (g x,h y)
-
-instance ArrowLoop Comp where
-  loop (C f) = C $ simpleLoop (unpack Prelude.. f Prelude.. pack)
-    where
-      simpleLoop g b = let ~(c,d) = g (b,d)
-                       in c
-
-{-# DEPRECATED registerC "'Comp' is deprecated and will be removed in version 0.6, use 'register' instead" #-}
--- | Create a 'register' 'Comp'onent
---
--- > rC :: Comp (Int,Int) (Int,Int)
--- > rC = registerC (8,8)
---
--- >>> simulateC rP [(1,1),(2,2),(3,3),...
--- [(8,8),(1,1),(2,2),(3,3),...
-registerC :: a -> Comp a a
-registerC = C Prelude.. register
-
-{-# DEPRECATED simulateC "'Comp' is deprecated and will be removed in version 0.6, use 'simulate' instead" #-}
--- | Simulate a 'Comp'onent given a list of samples
---
--- >>> simulateC (registerC 8) [1, 2, 3, ...
--- [8, 1, 2, 3, ...
-simulateC :: Comp a b -> [a] -> [b]
-simulateC f = simulate (asFunction f)
-
-{-# DEPRECATED (^^^) "Will be removed in version 0.6. Use 'Applicative' interface and ('<^>') instead" #-}
-{-# INLINABLE (^^^) #-}
--- | Create a synchronous 'Comp'onent from a combinational function describing
--- a mealy machine
---
--- > mac :: Int        -- Current state
--- >     -> (Int,Int)  -- Input
--- >     -> (Int,Int)  -- (Updated state, output)
--- > mac s (x,y) = (s',s)
--- >   where
--- >     s' = x * y + s
--- >
--- > topEntity :: Comp (Int,Int) Int
--- > topEntity = mac ^^^ 0
---
--- >>> simulateC topEntity [(1,1),(2,2),(3,3),(4,4),...
--- [0,1,5,14,30,...
---
--- Synchronous sequential must be composed using the 'Arrow' syntax
---
--- > dualMac :: Comp (Int,Int,Int,Int) Int
--- > dualMac = proc (a,b,x,y) -> do
--- >   rec s1 <- mac ^^^ 0 -< (a,b)
--- >       s2 <- mac ^^^ 0 -< (x,y)
--- >   returnA -< (s1 + s2)
-(^^^) :: (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-      -> s                 -- ^ Initial state
-      -> Comp i o          -- ^ Synchronous sequential 'Comp'onent with input and output matching that of the mealy machine
-f ^^^ sI = C $ \i -> let (s',o) = unpack $ f <$> s <*> i
-                         s      = register sI s'
-                     in  o
 
 {-# NOINLINE sassert #-}
 -- | Compares the first two arguments for equality and logs a warning when they

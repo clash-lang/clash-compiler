@@ -53,6 +53,7 @@ Library
                       CLaSH.Class.BitVector
                       CLaSH.Class.Num
                       CLaSH.Prelude
+                      CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Stream
                       CLaSH.Promoted.Nat
@@ -73,7 +74,6 @@ Library
 
   other-extensions:   DataKinds
                       DefaultSignatures
-                      ExplicitNamespaces
                       FlexibleContexts
                       GADTs
                       GeneralizedNewtypeDeriving

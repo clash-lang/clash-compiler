@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE ExplicitNamespaces  #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -19,16 +18,6 @@ module CLaSH.Prelude.Explicit
   ( -- * Creating synchronous sequential circuits
     sync
   , cregisterP
-    -- * 'Arrow' interface for synchronous sequential circuits
-  , CComp (..)
-  , syncA
-  , cregisterC
-  , csimulateC
-    -- * BlockRAM primitives
-  , cblockRam
-  , cblockRamPow2
-  , blockRamCC
-  , blockRamPow2CC
     -- * Utility functions
   , cwindow
   , cwindowD
@@ -45,14 +34,11 @@ where
 import Data.Default          (Default (..))
 import Debug.Trace           (trace)
 import Control.Applicative   (Applicative (..), (<$>),liftA3)
-import Control.Arrow         (Arrow (..), ArrowLoop (..))
-import Control.Category      as Category
-import GHC.TypeLits          (KnownNat,type (^), type (+))
+import GHC.TypeLits          (KnownNat, type (+))
 
-import CLaSH.Promoted.Nat    (snat)
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.Sized.Vector    (Vec (..), (!), (+>>), maxIndex, vcopyI, vreplace)
+import CLaSH.Sized.Vector    (Vec (..), (!), (+>>), maxIndex, vcopyI)
 
 {-# INLINABLE sync #-}
 -- | Create a synchronous function from a combinational function describing
@@ -103,169 +89,6 @@ sync clk f iS = \i -> let (s',o) = cunpack clk $ f <$> s <*> cpack clk i
 -- [(8,8),(1,1),(2,2),(3,3),...
 cregisterP :: CPack a => Clock clk -> a -> CSignalP clk a -> CSignalP clk a
 cregisterP clk i = cunpack clk Prelude.. cregister clk i Prelude.. cpack clk
-
-{-# DEPRECATED CComp "Will be removed in version 0.6. Use 'Applicative' interface and 'sync' instead" #-}
--- | 'CComp'onent: an 'Arrow' interface to explicitly clocked synchronous
--- sequential functions
-newtype CComp t a b = CC { asCFunction :: CSignal t a -> CSignal t b }
-
-instance Category (CComp t) where
-  id              = CC Prelude.id
-  (CC f) . (CC g) = CC (f Prelude.. g)
-
-instance KnownNat t => Arrow (CComp t) where
-  arr          = CC Prelude.. fmap
-  first (CC f) = let clk = Clock snat
-                 in  CC $ cpack clk Prelude.. (f >< Prelude.id) Prelude.. cunpack clk
-    where
-      (g >< h) (x,y) = (g x,h y)
-
-instance KnownNat t => ArrowLoop (CComp t) where
-  loop (CC f) = let clk = Clock snat
-                in  CC $ simpleLoop (cunpack clk Prelude.. f Prelude.. cpack clk)
-    where
-      simpleLoop g b = let ~(c,d) = g (b,d)
-                       in c
-
-{-# DEPRECATED syncA "Will be removed in version 0.6. Use 'Applicative' interface and 'sync' instead" #-}
-{-# INLINABLE syncA #-}
--- | Create a synchronous 'CComp'onent from a combinational function describing
--- a mealy machine
---
--- > mac :: Int        -- Current state
--- >     -> (Int,Int)  -- Input
--- >     -> (Int,Int)  -- (Updated state, output)
--- > mac s (x,y) = (s',s)
--- >   where
--- >     s' = x * y + s
--- >
--- > clk100 = Clock d100
--- >
--- > topEntity :: CComp 100 (Int,Int) Int
--- > topEntity = syncA clk100 mac 0
---
--- >>> simulateC topEntity [(1,1),(2,2),(3,3),(4,4),...
--- [0,1,5,14,30,...
---
--- Synchronous sequential must be composed using the 'Arrow' syntax
---
--- > dualMac :: CComp 100 (Int,Int,Int,Int) Int
--- > dualMac = proc (a,b,x,y) -> do
--- >   rec s1 <- syncA clk100 mac 0 -< (a,b)
--- >       s2 <- syncA clk100 mac 0 -< (x,y)
--- >   returnA -< (s1 + s2)
-syncA :: Clock clk         -- ^ 'Clock' to synchronize to
-      -> (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
-      -> s                 -- ^ Initial state
-      -> CComp clk i o     -- ^ Synchronous sequential 'Comp'onent with input and output matching that of the mealy machine
-syncA clk f sI = CC $ \i -> let (s',o) = cunpack clk $ f <$> s <*> i
-                                s      = cregister clk sI s'
-                            in  o
-
-{-# DEPRECATED cregisterC "'CComp' is deprecated and will be removed in version 0.6, use 'cregister' instead" #-}
--- | Create a 'cregister' 'CComp'onent
---
--- > clk100 = Clock d100
--- >
--- > rC :: CComp 100 (Int,Int) (Int,Int)
--- > rC = cregisterC clk100 (8,8)
---
--- >>> simulateC rP [(1,1),(2,2),(3,3),...
--- [(8,8),(1,1),(2,2),(3,3),...
-cregisterC :: Clock clk -> a -> CComp clk a a
-cregisterC clk = CC Prelude.. cregister clk
-
-{-# DEPRECATED csimulateC "'CComp' is deprecated and will be removed in version 0.6, use 'csimulate' instead" #-}
--- | Simulate a 'Comp'onent given a list of samples
---
--- > clk100 = Clock d100
--- >>> csimulateC (cregisterC clk100 8) [1, 2, 3, ...
--- [8, 1, 2, 3, ...
-csimulateC :: CComp clk a b -> [a] -> [b]
-csimulateC f = csimulate (asCFunction f)
-
-{-# NOINLINE cblockRam #-}
--- | Create a blockRAM with space for @n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > clk100 = Clock d100
--- >
--- > bram40 :: CSignal 100 (Unsigned 6) -> CSignal 100 (Unsigned 6)
--- >        -> CSignal 100 Bool -> CSignal 100 Bit -> 100 CSignal Bit
--- > bram40 = cblockRam clk100 (vcopy d40 H)
-cblockRam :: (CPack a, KnownNat n, KnownNat m)
-          => Clock clk                -- ^ 'Clock' to synchronize to
-          -> Vec n a                  -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
-                                      -- NB: *MUST* be a constant.
-          -> CSignal clk (Unsigned m) -- ^ Write address @w@
-          -> CSignal clk (Unsigned m) -- ^ Read address @r@
-          -> CSignal clk Bool         -- ^ Write enable
-          -> CSignal clk a            -- ^ Value to write (at address @w@)
-          -> CSignal clk a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-cblockRam clk binit wr rd en din = cpack clk $ (sync clk bram' (binit,undefined)) (wr,rd,en,din)
-  where
-    bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
-      where
-        ram' | e         = vreplace ram w d
-             | otherwise = ram
-        o'               = ram ! r
-
-{-# DEPRECATED blockRamCC "'CComp' is deprecated and will be removed in version 0.6, use 'cblockRam' instead" #-}
--- | Create a blockRAM with space for @n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > clk100 = Clock d100
--- >
--- > bramC40 :: CComp 100 (Unsigned 6, Unsigned 6, Bool, Bit) Bit
--- > bramC40 = blockRamCC clk100 (vcopy d40 H)
-blockRamCC :: (KnownNat n, KnownNat m, CPack a, Default a)
-           => Clock clk -- ^ 'Clock' to synchronize to
-           -> Vec n a   -- ^ Initial content of the BRAM, also determines the size ,@n@, of the BRAM.
-                        -- NB: *MUST* be a constant.
-           -> CComp clk (Unsigned m, Unsigned m, Bool, a) a
-blockRamCC clk n = CC ((\(wr,rd,en,din) -> cblockRam clk n wr rd en din) Prelude.. cunpack clk)
-
-{-# INLINABLE cblockRamPow2 #-}
--- | Create a blockRAM with space for 2^@n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > clk100 = Clock d100
--- >
--- > bramC32 :: CSignal 100 (Unsigned 5) -> CSignal 100 (Unsigned 5) -> CSignal 100 Bool -> CSignal 100 Bit -> CSignal 100 Bit
--- > bramC32 = cblockRamPow2 clk100 (vcopy d32 H)
-cblockRamPow2 :: (KnownNat n, KnownNat (2^n), CPack a)
-              => Clock clk                -- ^ 'Clock' to synchronize to
-              -> Vec (2^n) a              -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
-                                          -- NB: *MUST* be a constant.
-              -> CSignal clk (Unsigned n) -- ^ Write address @w@
-              -> CSignal clk (Unsigned n) -- ^ Read address @r@
-              -> CSignal clk Bool         -- ^ Write enable
-              -> CSignal clk a            -- ^ Value to write (at address @w@)
-              -> CSignal clk a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-cblockRamPow2 = cblockRam
-
-{-# DEPRECATED blockRamPow2CC "'CComp' is deprecated and will be removed in version 0.6, use 'cblockRamPow2' instead" #-}
--- | Create a blockRAM with space for 2^@n@ elements
---
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
---
--- > clk100 = Clock d100
--- >
--- > bramC32 :: CComp 100 (Unsigned 5, Unsigned 5, Bool, Bit) Bit
--- > bramC32 = blockRamPow2CC clk100 (vcopy d32 Bit)
-blockRamPow2CC :: (KnownNat n, KnownNat (2^n), CPack a)
-               => Clock clk   -- ^ 'Clock' to synchronize to
-               -> Vec (2^n) a -- ^ Initial content of the BRAM, also determines the size ,@2^n@, of the BRAM.
-                              -- NB: *MUST* be a constant.
-               -> CComp clk (Unsigned n, Unsigned n, Bool, a) a
-blockRamPow2CC clk n = CC ((\(wr,rd,en,din) -> cblockRamPow2 clk n wr rd en din) Prelude.. cunpack clk)
 
 {-# INLINABLE cwindow #-}
 -- | Give a window over a 'CSignal'
