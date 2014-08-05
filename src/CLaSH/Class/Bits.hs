@@ -3,20 +3,19 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
-module CLaSH.Class.BitVector where
+module CLaSH.Class.Bits where
 
-import CLaSH.Bit
-import CLaSH.Sized.Vector
+import CLaSH.Sized.BitVector
 import GHC.TypeLits
 
 -- | Convert types from and to a 'Vec'tor of 'Bit's
-class BitVector a where
+class Bits a where
   -- | Number of 'Bit's needed to represents elements of type @a@
   type BitSize a :: Nat
   -- | Convert element of type @a@ to a 'Vec' of 'Bit's
-  toBV   :: KnownNat (BitSize a) => a -> Vec (BitSize a) Bit
+  pack   :: KnownNat (BitSize a) => a -> BitVector (BitSize a)
   -- | Convert a 'Vec' of 'Bit's to an element of type @a@
-  fromBV :: KnownNat (BitSize a) => Vec (BitSize a) Bit -> a
+  unpack :: KnownNat (BitSize a) => BitVector (BitSize a) -> a
 
 instance BitVector Bit where
   type BitSize Bit = 1
