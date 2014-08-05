@@ -21,6 +21,16 @@ module CLaSH.Sized.BitVector
   , (++#)
     -- * Modifying BitVectors
   , bupdate
+    -- * Bitwise operations
+  , band
+  , bor
+  , bxor
+  , bxnor
+  , bcomplement
+  , bshiftL
+  , bshiftR
+  , brotateL
+  , brotateR
   )
 where
 
@@ -125,3 +135,22 @@ bupdateInt :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
 bupdateInt bv@(BV v) i (BV b) = BV (update_ v (singleton i') b)
   where
     i' = fromInteger (natVal bv - 1) - i
+
+band :: BitVector n -> BitVector n -> BitVector n
+band = undefined
+bor :: BitVector n -> BitVector n -> BitVector n
+bor = undefined
+bxor :: BitVector n -> BitVector n -> BitVector n
+bxor = undefined
+bxnor :: BitVector n -> BitVector n -> BitVector n
+bxnor = undefined
+bcomplement :: BitVector n -> BitVector n
+bcomplement = undefined
+bshiftL :: Integral i => BitVector n -> i -> BitVector n
+bshiftL = undefined
+bshiftR :: Integral i => BitVector n -> i -> BitVector n
+bshiftR = undefined
+brotateL :: Integral i => BitVector n -> i -> BitVector n
+brotateL = undefined
+brotateR :: Integral i => BitVector n -> i -> BitVector n
+brotateR = undefined
