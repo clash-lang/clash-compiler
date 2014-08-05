@@ -15,8 +15,8 @@ import CLaSH.Sized.Vector     (Vec, (!), vreplace)
 {-# NOINLINE blockRam #-}
 -- | Create a blockRAM with space for @n@ elements.
 --
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
+-- * __NB__: Read value is delayed by 1 cycle
+-- * __NB__: Initial output value is `undefined`
 --
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal Bit -> Signal Bit
 -- > bram40 = blockRam (vcopy d40 H)
@@ -39,8 +39,8 @@ blockRam binit wr rd en din = pack $ (bram' <^> (binit,undefined)) (wr,rd,en,din
 {-# INLINABLE blockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
+-- * __NB__: Read value is delayed by 1 cycle
+-- * __NB__: Initial output value is `undefined`
 --
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool -> Signal Bit -> Signal Bit
 -- > bram32 = blockRamPow2 (vcopy d32 H)
@@ -57,8 +57,8 @@ blockRamPow2 = blockRam
 {-# NOINLINE cblockRam #-}
 -- | Create a blockRAM with space for @n@ elements
 --
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
+-- * __NB__: Read value is delayed by 1 cycle
+-- * __NB__: Initial output value is `undefined`
 --
 -- > clk100 = Clock d100
 -- >
@@ -85,8 +85,8 @@ cblockRam clk binit wr rd en din = cpack clk $ (sync clk bram' (binit,undefined)
 {-# INLINABLE cblockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
--- * NB: Read value is delayed by 1 cycle
--- * NB: Initial output value is `undefined`
+-- * __NB__: Read value is delayed by 1 cycle
+-- * __NB__: Initial output value is `undefined`
 --
 -- > clk100 = Clock d100
 -- >
