@@ -17,28 +17,19 @@ class Bits a where
   -- | Convert a 'Vec' of 'Bit's to an element of type @a@
   unpack :: KnownNat (BitSize a) => BitVector (BitSize a) -> a
 
-instance BitVector Bit where
-  type BitSize Bit = 1
-  toBV   = (:> Nil)
-  fromBV = vhead
-
-instance BitVector Bool where
+instance Bits Bool where
   type BitSize Bool = 1
-  toBV   = (:> Nil) . toBit
-    where
-      toBit True  = H
-      toBit False = L
-  fromBV = fromBit . vhead
-    where
-      fromBit H = True
-      fromBit L = False
+  pack True  = high
+  pack False = low
 
-instance (KnownNat (BitSize a), KnownNat (BitSize b), BitVector a, BitVector b) => BitVector (a,b) where
-  type BitSize (a,b) = (BitSize a) + (BitSize b)
-  toBV (a,b) = toBV a <++> toBV b
-  fromBV bv  = (fromBV (vtakeI bv), fromBV (vdropI bv))
+  unpack bv  = if bv == high then True else False
 
-instance (KnownNat n, KnownNat (BitSize a), BitVector a) => BitVector (Vec n a) where
-  type BitSize (Vec n a) = n * (BitSize a)
-  toBV   = vconcat . vmap toBV
-  fromBV = vmap fromBV . vunconcatI
+instance (KnownNat (BitSize a), KnownNat (BitSize b), Bits a, Bits b) => Bits (a,b) where
+  type BitSize (a,b) = BitSize a + BitSize b
+  pack (a,b) = pack a ++# pack b
+  unpack ab  = let (a,b) = split ab in (unpack a, unpack b)
+
+-- instance (KnownNat n, KnownNat (BitSize a), BitVector a) => BitVector (Vec n a) where
+--   type BitSize (Vec n a) = n * (BitSize a)
+--   toBV   = vconcat . vmap toBV
+--   fromBV = vmap fromBV . vunconcatI

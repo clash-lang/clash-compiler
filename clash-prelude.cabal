@@ -79,6 +79,8 @@ Library
                       ImplicitParams
                       KindSignatures
                       LambdaCase
+                      MagicHash
+                      NegativeLiterals
                       ScopedTypeVariables
                       TemplateHaskell
                       TupleSections
