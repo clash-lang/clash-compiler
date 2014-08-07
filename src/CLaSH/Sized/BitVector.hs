@@ -1,9 +1,11 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NegativeLiterals      #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -14,8 +16,8 @@ module CLaSH.Sized.BitVector
   , Bit
     -- * Accessors
     -- ** Length information
-  , length
-  , maxIndex
+  , size#
+  , maxIndex#
     -- ** Indexing
   , (!#)
   , msb#
@@ -40,26 +42,36 @@ module CLaSH.Sized.BitVector
   , shiftR#
   , rotateL#
   , rotateR#
+  -- * __VERY__ unsafe operations, that are not synthesizable
+  , veryUnsafeToInteger#
+  , veryUnsafeFromInteger#
   )
 where
 
-import Data.Bits           ((.&.), (.|.), complement, setBit, shiftL, shiftR,
-                            testBit, xor)
-import GHC.TypeLits        (KnownNat, Nat, type (+), natVal)
-import GHC.Prim            (dataToTag#)
-import GHC.Integer         (smallInteger)
-import Prelude             hiding (length)
+import Data.Default               (Default (..))
+import Data.Bits                  ((.&.), (.|.), complement, popCount, setBit,
+                                   shiftL, shiftR, testBit, xor)
+import Data.Typeable              (Typeable)
+import GHC.Integer                (smallInteger)
+import GHC.Prim                   (dataToTag#)
+import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
+import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Promoted.Ord  (Max)
-import CLaSH.Class.Num     (Add (..), Mult (..))
+import CLaSH.Class.BitReduction   (BitReduction (..))
+import CLaSH.Class.Num            (Add (..), Mult (..))
+import CLaSH.Class.Resize         (Resize (..))
+import CLaSH.Promoted.Ord         (Max)
 
 -- * Type definitions
-newtype BitVector (n :: Nat) = BV Integer
+newtype BitVector (n :: Nat) = BV { veryUnsafeToInteger# :: Integer}
+  deriving Typeable
+
 type Bit = BitVector 1
 
 -- * Instances
 instance KnownNat n => Show (BitVector n) where
-  show bv@(BV v) = showBV (natVal bv) v []
+  show bv@(BV i) = showBV (natVal bv) i []
     where
       showBV 0 _ s = s
       showBV n v s = let (a,b) = divMod v 2
@@ -122,10 +134,11 @@ instance KnownNat n => Bounded (BitVector n) where
   minBound = minBound#
   maxBound = maxBound#
 
-minBound#,maxBound# :: KnownNat n => BitVector n
 {-# NOINLINE minBound# #-}
+minBound# :: BitVector n
 minBound# = BV 0
 {-# NOINLINE maxBound# #-}
+maxBound# :: KnownNat n => BitVector n
 maxBound# = let res = BV ((2 ^ natVal res) - 1) in res
 
 instance KnownNat n => Num (BitVector n) where
@@ -133,11 +146,8 @@ instance KnownNat n => Num (BitVector n) where
   (-)         = (-#)
   (*)         = (*#)
   negate      = negate#
-  abs         = abs#
-  signum bv
-    | msb# bv == high = fromInteger# (-1)
-    | bv == 0         = 0
-    | otherwise       = 1
+  abs         = id
+  signum bv   = resize# (reduceOr# bv)
   fromInteger = fromInteger#
 
 (+#),(-#),(*#) :: KnownNat n => BitVector n -> BitVector n -> BitVector n
@@ -150,11 +160,11 @@ instance KnownNat n => Num (BitVector n) where
 {-# NOINLINE (*#) #-}
 (*#) (BV i) (BV j) = fromInteger_INLINE (i * j)
 
-negate#, abs# :: KnownNat n => BitVector n -> BitVector n
 {-# NOINLINE negate# #-}
-negate# (BV i) = fromInteger_INLINE (negate i)
-{-# NOINLINE abs# #-}
-abs# (BV i) = fromInteger_INLINE (abs i)
+negate# :: KnownNat n => BitVector n -> BitVector n
+negate# bv@(BV i) = BV (sz - i)
+  where
+    sz = 2 ^ natVal bv
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat n => Integer -> BitVector n
@@ -162,22 +172,15 @@ fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
 fromInteger_INLINE :: KnownNat n => Integer -> BitVector n
-fromInteger_INLINE i
-    | nS == 0   = BV 0
-    | otherwise = res
-  where
-    nS  = natVal res
-    sz  = 2 ^ (nS - 1)
-    res = case divMod i sz of
-            (s,i') | even s    -> BV i'
-                   | otherwise -> BV (i' - sz)
+fromInteger_INLINE i = let res = BV (i `mod` (2 ^ natVal res)) in res
 
 instance KnownNat (Max m n + 1) => Add (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
   plus  = plus#
   minus = minus#
 
-plus#, minus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n -> BitVector (Max m n + 1)
+plus#, minus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n
+              -> BitVector (Max m n + 1)
 {-# NOINLINE plus# #-}
 plus# (BV a) (BV b) = fromInteger_INLINE (a + b)
 
@@ -232,15 +235,39 @@ quotRem_INLINE,divMod_INLINE :: KnownNat n => BitVector n -> BitVector n
 toInteger# :: BitVector n -> Integer
 toInteger# (BV i) = i
 
+instance BitReduction BitVector where
+  reduceAnd  = reduceAnd#
+  reduceOr   = reduceOr#
+  reduceXor  = reduceXor#
+
+reduceAnd#, reduceOr#, reduceXor# :: KnownNat n => BitVector n -> BitVector 1
+
+{-# NOINLINE reduceAnd# #-}
+reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
+  where
+    check = i == maxI
+    maxI  = (2 ^ natVal bv) - 1
+
+{-# NOINLINE reduceOr# #-}
+reduceOr# (BV i) = BV (smallInteger (dataToTag# check))
+  where
+    check = i /= 0
+
+{-# NOINLINE reduceXor# #-}
+reduceXor# (BV i) = BV (toInteger (popCount i `mod` 2))
+
+instance Default (BitVector n) where
+  def = minBound#
+
 -- * Accessors
 -- ** Length information
-{-# NOINLINE length #-}
-length :: KnownNat n => BitVector n -> Integer
-length bv = natVal bv
+{-# NOINLINE size# #-}
+size# :: KnownNat n => BitVector n -> Integer
+size# bv = natVal bv
 
-{-# NOINLINE maxIndex #-}
-maxIndex :: KnownNat n => BitVector n -> Integer
-maxIndex bv = natVal bv - 1
+{-# NOINLINE maxIndex# #-}
+maxIndex# :: KnownNat n => BitVector n -> Integer
+maxIndex# bv = natVal bv - 1
 
 -- ** Indexing
 {-# NOINLINE (!#) #-}
@@ -257,12 +284,14 @@ bv@(BV v) !# i
                           , "..0]"
                           ]
 
+{-# NOINLINE msb# #-}
 -- | MSB
 msb# :: KnownNat n => BitVector n -> Bit
 msb# bv@(BV v) = BV (smallInteger (dataToTag# (testBit v i)))
   where
     i = fromInteger (natVal bv - 1)
 
+{-# NOINLINE lsb# #-}
 -- | LSB
 lsb# :: KnownNat n => BitVector n -> Bit
 lsb# (BV v) = BV (smallInteger (dataToTag# (testBit v 0)))
@@ -278,6 +307,10 @@ high = BV 1
 -- | logic '0'
 low :: Bit
 low = BV 0
+
+{-# INLINE veryUnsafeFromInteger# #-}
+veryUnsafeFromInteger# :: Integer -> BitVector n
+veryUnsafeFromInteger# = BV
 
 -- ** Concatenation
 {-# INLINABLE (#>) #-}
@@ -340,53 +373,71 @@ complement# :: BitVector n -> BitVector n
 complement# (BV v1) = BV (complement v1)
 
 {-# NOINLINE shiftL# #-}
-shiftL# :: KnownNat n => BitVector n -> Int -> BitVector n
+shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => BitVector n -> Int
+                                     -> BitVector n
 shiftL# (BV v) i
   | i < 0     = error
-              $ "'shiftL'{BitVector} undefined for negative number: " ++ show i
+              $ "'shiftL undefined for negative number: " ++ show i
   | otherwise = fromInteger# (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
-shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n
 shiftR# (BV v) i
   | i < 0     = error
-              $ "'shiftR'{BitVector} undefined for negative number: " ++ show i
+              $ "'shiftR undefined for negative number: " ++ show i
   | otherwise = fromInteger# (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
-rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n
-rotateL# bv i
-  | i < 0     = error
-              $ "'rotateL'{BitVector} undefined for negative number: " ++ show i
-  | otherwise = fromBitList (r ++ l)
+rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
+rotateL# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
   where
-    bl    = toBitList bv
-    (l,r) = splitAt i' bl
-    sz    = fromInteger (natVal bv)
-    i'    = i `mod` sz
+    l    = shiftL n b'
+    r    = shiftR n b'' .&. mask
+    mask = 2 ^ b' - 1
+
+    b'   = b `mod` sz
+    b''  = sz - b'
+    sz   = fromInteger (natVal bv)
 
 {-# NOINLINE rotateR# #-}
-rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n
-rotateR# bv i
-  | i < 0     = error
-              $ "'rotateR'{BitVector} undefined for negative number: " ++ show i
-  | otherwise = fromBitList (r ++ l)
+rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
+rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
   where
-    bl    = toBitList bv
-    (l,r) = splitAt i' bl
-    sz    = fromInteger (natVal bv)
-    i'    = sz - (i `mod` sz)
+    l    = shiftR n b' .&. mask
+    r    = shiftL n b''
+    mask = 2 ^ b'' - 1
 
-toBitList :: KnownNat n => BitVector n -> [Bit]
-toBitList bv@(BV v) = toBitList' (natVal bv) v []
-  where
-    toBitList' 0 _ l = l
-    toBitList' n v l = let (a,b) = divMod v 2
-                       in  toBitList' (n - 1) a ((BV b):l)
+    b'  = b `mod` sz
+    b'' = sz - b'
+    sz  = fromInteger (natVal bv)
 
-fromBitList :: KnownNat n => [Bit] -> BitVector n
-fromBitList l = bv
-  where
-    bv   = BV (sum [n | (n,b) <- zip pows l, b == (BV 1)])
-    sz   = natVal bv
-    pows = iterate (`div` 2) (2 ^ (sz - 1))
+-- toBitList :: KnownNat n => BitVector n -> [Bit]
+-- toBitList bv@(BV i) = toBitList' (natVal bv) i []
+--   where
+--     toBitList' 0 _ l = l
+--     toBitList' n v l = let (a,b) = divMod v 2
+--                        in  toBitList' (n - 1) a ((BV b):l)
+
+-- fromBitList :: KnownNat n => [Bit] -> BitVector n
+-- fromBitList l = bv
+--   where
+--     bv   = BV (sum [n | (n,b) <- zip pows l, b == (BV 1)])
+--     sz   = natVal bv
+--     pows = iterate (`div` 2) (2 ^ (sz - 1))
+
+-- | A resize operation that zero-extends on extension, and wraps on truncation.
+--
+-- Increasing the size of the number extends with zeros to the left.
+-- Truncating a number of length N to a length L just removes the left
+-- (most significant) N-L bits.
+instance Resize BitVector where
+  resize = resize#
+
+{-# NOINLINE resize# #-}
+resize# :: KnownNat m => BitVector n -> BitVector m
+resize# (BV n) = fromInteger_INLINE n
+
+instance KnownNat n => Lift (BitVector n) where
+  lift bv@(BV i) = sigE [| fromInteger# i |] (decUnsigned (natVal bv))
+
+decUnsigned :: Integer -> TypeQ
+decUnsigned n = appT (conT ''BitVector) (litT $ numTyLit n)

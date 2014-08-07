@@ -1,295 +1,272 @@
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
-
-{-# OPTIONS_GHC -fno-warn-missing-methods #-}
-
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 module CLaSH.Sized.Unsigned
-  ( Unsigned
-  )
+  (Unsigned)
 where
 
-import Data.Bits
-import Data.Default
-import Data.Typeable
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax(Lift(..))
-import GHC.TypeLits
+import Data.Default               (Default (..))
+import Data.Typeable              (Typeable)
+import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
+import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Bit
-import CLaSH.Class.BitVector
-import CLaSH.Class.Num
-import CLaSH.Promoted.Ord
-import CLaSH.Sized.Vector
+import CLaSH.Class.Bits           (Bits (..))
+import CLaSH.Class.BitReduction   (BitReduction (..))
+import CLaSH.Class.Bitwise        (Bitwise (..), Bit)
+import CLaSH.Class.Num            (Add (..), Mult (..))
+import CLaSH.Class.Resize         (Resize (..))
+import CLaSH.Promoted.Ord         (Max)
+import CLaSH.Sized.BitVector      (BitVector, veryUnsafeFromInteger#,
+                                   veryUnsafeToInteger#)
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
 -- Given @n@ bits, an 'Unsigned' @n@ number has a range of: [0 .. 2^@n@-1]
 --
--- NB: The 'Num' operators perform @wrap-around@ on overflow. If you want saturation
--- on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in "CLaSH.Sized.Fixed".
-newtype Unsigned (n :: Nat) = U Integer
+-- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
+-- saturation on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in
+-- "CLaSH.Sized.Fixed".
+newtype Unsigned (n :: Nat) = U { toBitVector :: BitVector n }
   deriving Typeable
 
-instance Eq (Unsigned n) where
-  (==) = eqU
+instance Show (Unsigned n) where
+  show (U bv) = show (veryUnsafeToInteger# bv)
 
-{-# NOINLINE eqU #-}
-eqU :: (Unsigned n) -> (Unsigned n) -> Bool
-(U n) `eqU` (U m) = n == m
+instance KnownNat n => Bits (Unsigned n) where
+  type BitSize (Unsigned n) = n
+  pack   = pack#
+  unpack = unpack#
+
+pack# :: KnownNat n => Unsigned n -> BitVector n
+pack# = toBitVector
+
+unpack# :: KnownNat n => BitVector n -> Unsigned n
+unpack# = U
+
+instance Eq (Unsigned n) where
+  (==) = eq#
+  (/=) = neq#
+
+{-# NOINLINE eq# #-}
+eq# :: Unsigned n -> Unsigned n -> Bool
+eq# (U v1) (U v2) = v1 == v2
+
+{-# NOINLINE neq# #-}
+neq# :: Unsigned n -> Unsigned n -> Bool
+neq# (U v1) (U v2) = v1 /= v2
 
 instance Ord (Unsigned n) where
-  (<)  = ltU
-  (>=) = geU
-  (>)  = gtU
-  (<=) = leU
+  (<)  = lt#
+  (>=) = ge#
+  (>)  = gt#
+  (<=) = le#
 
-ltU,geU,gtU,leU :: Unsigned n -> Unsigned n -> Bool
-{-# NOINLINE ltU #-}
-ltU (U n) (U m) = n < m
-{-# NOINLINE geU #-}
-geU (U n) (U m) = n >= m
-{-# NOINLINE gtU #-}
-gtU (U n) (U m) = n > m
-{-# NOINLINE leU #-}
-leU (U n) (U m) = n <= m
+lt#,ge#,gt#,le# :: Unsigned n -> Unsigned n -> Bool
+{-# NOINLINE lt# #-}
+lt# (U n) (U m) = n < m
+{-# NOINLINE ge# #-}
+ge# (U n) (U m) = n >= m
+{-# NOINLINE gt# #-}
+gt# (U n) (U m) = n > m
+{-# NOINLINE le# #-}
+le# (U n) (U m) = n <= m
 
 instance KnownNat n => Enum (Unsigned n) where
-  succ           = plusU (fromIntegerU 1)
-  pred           = minU (fromIntegerU 1)
-  toEnum         = fromIntegerU . toInteger
-  fromEnum       = fromEnum . toIntegerU
-  enumFrom       = enumFromU
-  enumFromThen   = enumFromThenU
-  enumFromTo     = enumFromToU
-  enumFromThenTo = enumFromThenToU
+  succ           = (+# fromInteger# 1)
+  pred           = (-# fromInteger# 1)
+  toEnum         = fromInteger# . toInteger
+  fromEnum       = fromEnum . toInteger#
+  enumFrom       = enumFrom#
+  enumFromThen   = enumFromThen#
+  enumFromTo     = enumFromTo#
+  enumFromThenTo = enumFromThenTo#
 
-{-# NOINLINE enumFromU #-}
-{-# NOINLINE enumFromThenU #-}
-{-# NOINLINE enumFromToU #-}
-{-# NOINLINE enumFromThenToU #-}
-enumFromU       :: KnownNat n => Unsigned n -> [Unsigned n]
-enumFromThenU   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromToU     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenToU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromU x             = map toEnum [fromEnum x ..]
-enumFromThenU x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromToU x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenToU x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+{-# NOINLINE enumFrom# #-}
+{-# NOINLINE enumFromThen# #-}
+{-# NOINLINE enumFromTo# #-}
+{-# NOINLINE enumFromThenTo# #-}
+enumFrom#       :: KnownNat n => Unsigned n -> [Unsigned n]
+enumFromThen#   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromTo#     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFrom# x             = map toEnum [fromEnum x ..]
+enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
+enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
+enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
 instance KnownNat n => Bounded (Unsigned n) where
-  minBound = fromIntegerU 0
-  maxBound = maxBoundU
+  minBound = minBound#
+  maxBound = maxBound#
 
-{-# NOINLINE maxBoundU #-}
-maxBoundU :: KnownNat n => Unsigned n
-maxBoundU = let res = U ((2 ^ natVal res) - 1) in res
+{-# NOINLINE minBound# #-}
+minBound# :: Unsigned n
+minBound# = U (veryUnsafeFromInteger# 0)
+{-# NOINLINE maxBound# #-}
+maxBound# :: KnownNat n => Unsigned n
+maxBound# = U maxBound
 
--- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Unsigned n) where
-  (+)         = plusU
-  (-)         = minU
-  (*)         = timesU
-  negate      = id
+  (+)         = (+#)
+  (-)         = (-#)
+  (*)         = (*#)
+  negate      = negate#
   abs         = id
-  signum      = signumU
-  fromInteger = fromIntegerU
+  signum bv   = resize# (reduceOr# bv)
+  fromInteger = fromInteger#
 
-plusU,minU,timesU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-{-# NOINLINE plusU #-}
-plusU (U a) (U b) = fromIntegerU_inlineable $ a + b
+(+#),(-#),(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+{-# NOINLINE (+#) #-}
+(+#) (U i) (U j) = U (i + j)
 
-{-# NOINLINE minU #-}
-minU (U a) (U b) = fromIntegerU_inlineable $ a - b
+{-# NOINLINE (-#) #-}
+(-#) (U i) (U j) = U (i - j)
 
-{-# NOINLINE timesU #-}
-timesU (U a) (U b) = fromIntegerU_inlineable $ a * b
+{-# NOINLINE (*#) #-}
+(*#) (U i) (U j) = U (i * j)
 
-{-# NOINLINE signumU #-}
-signumU :: Unsigned n -> Unsigned n
-signumU (U 0) = (U 0)
-signumU (U _) = (U 1)
+{-# NOINLINE negate# #-}
+negate# :: KnownNat n => Unsigned n -> Unsigned n
+negate# (U i) = U (negate i)
 
-fromIntegerU,fromIntegerU_inlineable :: KnownNat n => Integer -> Unsigned n
-{-# NOINLINE fromIntegerU #-}
-fromIntegerU = fromIntegerU_inlineable
-{-# INLINABLE fromIntegerU_inlineable #-}
-fromIntegerU_inlineable i = let res = U (i `mod` (2 ^ natVal res)) in res
+{-# NOINLINE fromInteger# #-}
+fromInteger# :: KnownNat n => Integer -> Unsigned n
+fromInteger# i = U (fromInteger i)
 
-instance KnownNat (Max m n) => Add (Unsigned m) (Unsigned n) where
-  type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n)
-  plus  = plusU2
-  minus = minusU2
+instance KnownNat (Max m n + 1) => Add (Unsigned m) (Unsigned n) where
+  type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
+  plus  = plus#
+  minus = minus#
 
-plusU2, minusU2 :: KnownNat (Max m n) => Unsigned m -> Unsigned n -> Unsigned (Max m n)
-{-# NOINLINE plusU2 #-}
-plusU2 (U a) (U b) = fromIntegerU_inlineable (a + b)
+plus#, minus# :: KnownNat (Max m n + 1) => Unsigned m -> Unsigned n
+              -> Unsigned (Max m n + 1)
+{-# NOINLINE plus# #-}
+plus# (U a) (U b) = U (a `plus` b)
 
-{-# NOINLINE minusU2 #-}
-minusU2 (U a) (U b) = fromIntegerU_inlineable (a - b)
+{-# NOINLINE minus# #-}
+minus# (U a) (U b) = U (a `minus` b)
 
 instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
-  mult = multU2
+  mult = mult#
 
-{-# NOINLINE multU2 #-}
-multU2 :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
-multU2 (U a) (U b) = fromIntegerU_inlineable (a * b)
+{-# NOINLINE mult# #-}
+mult# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
+mult# (U a) (U b) = U (a `mult` b)
 
 instance KnownNat n => Real (Unsigned n) where
-  toRational = toRational . toIntegerU
+  toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (Unsigned n) where
-  quot      = quotU
-  rem       = remU
-  div       = quotU
-  mod       = modU
-  quotRem   = quotRemU
-  divMod    = divModU
-  toInteger = toIntegerU
+  quot      = quot#
+  rem       = rem#
+  div       = div#
+  mod       = mod#
+  quotRem   = quotRem#
+  divMod    = divMod#
+  toInteger = toInteger#
 
-quotU,remU,modU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-{-# NOINLINE quotU #-}
-quotU = (fst.) . quotRemU_inlineable
-{-# NOINLINE remU #-}
-remU = (snd.) . quotRemU_inlineable
-{-# NOINLINE modU #-}
-(U a) `modU` (U b) = fromIntegerU_inlineable (a `mod` b)
+quot#,rem#,div#,mod# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+{-# NOINLINE quot# #-}
+quot# (U i) (U j) = U (i `quot` j)
+{-# NOINLINE rem# #-}
+rem# (U i) (U j) = U (i `rem` j)
+{-# NOINLINE div# #-}
+div# (U i) (U j) = U (i `div` j)
+{-# NOINLINE mod# #-}
+mod# (U i) (U j) = U (i `mod` j)
 
-quotRemU,divModU :: KnownNat n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
-quotRemU n d = (n `quotU` d,n `remU` d)
-divModU n d  = (n `quotU` d,n `modU` d)
+quotRem#,divMod# :: KnownNat n => Unsigned n -> Unsigned n
+                 -> (Unsigned n, Unsigned n)
+quotRem# n d = (n `quot#` d,n `rem#` d)
+divMod# n d  = (n `div#` d,n `mod#` d)
 
-{-# INLINEABLE quotRemU_inlineable #-}
-quotRemU_inlineable :: KnownNat n => Unsigned n -> Unsigned n -> (Unsigned n, Unsigned n)
-(U a) `quotRemU_inlineable` (U b) = let (a',b') = a `quotRem` b
-                                    in (fromIntegerU_inlineable a', fromIntegerU_inlineable b')
+{-# NOINLINE toInteger# #-}
+toInteger# :: KnownNat n => Unsigned n -> Integer
+toInteger# (U i) = toInteger i
 
-{-# NOINLINE toIntegerU #-}
-toIntegerU :: Unsigned n -> Integer
-toIntegerU (U n) = n
+instance KnownNat n => Bitwise (Unsigned n) where
+  (.&.)       = and#
+  (.|.)       = or#
+  xor         = xor#
+  complement  = complement#
+  (!) v i     = (!#)     v (fromIntegral i)
+  setBit v i  = setBit#  v (fromIntegral i)
+  shiftL v i  = shiftL#  v (fromIntegral i)
+  shiftR v i  = shiftR#  v (fromIntegral i)
+  rotateL v i = rotateL# v (fromIntegral i)
+  rotateR v i = rotateR# v (fromIntegral i)
+  msb         = msb#
+  lsb         = lsb#
 
-instance KnownNat n => Bits (Unsigned n) where
-  (.&.)          = andU
-  (.|.)          = orU
-  xor            = xorU
-  complement     = complementU
-  bit            = bitU
-  testBit        = testBitU
-  bitSizeMaybe   = Just . finiteBitSizeU
-  isSigned       = const False
-  shiftL         = shiftLU
-  shiftR         = shiftRU
-  rotateL        = rotateLU
-  rotateR        = rotateRU
-  popCount       = popCountU
+{-# NOINLINE and# #-}
+and# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+and# (U v1) (U v2) = U (v1 .&. v2)
 
-andU,orU,xorU :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-{-# NOINLINE andU #-}
-(U a) `andU` (U b) = fromIntegerU_inlineable (a .&. b)
-{-# NOINLINE orU #-}
-(U a) `orU` (U b)  = fromIntegerU_inlineable (a .|. b)
-{-# NOINLINE xorU #-}
-(U a) `xorU` (U b) = fromIntegerU_inlineable (xor a b)
+{-# NOINLINE or# #-}
+or# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+or# (U v1) (U v2) = U (v1 .|. v2)
 
-{-# NOINLINE complementU #-}
-complementU :: KnownNat n => Unsigned n -> Unsigned n
-complementU = fromBitVector . vmap complement . toBitVector
+{-# NOINLINE xor# #-}
+xor# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+xor# (U v1) (U v2) = U (v1 `xor` v2)
 
-{-# NOINLINE bitU #-}
-bitU :: KnownNat n => Int -> Unsigned n
-bitU i = res
-  where
-    sz = finiteBitSizeU res
-    res | sz > i    = fromIntegerU_inlineable (bit i)
-        | otherwise = error $ concat [ "bit: "
-                                     , "Setting out-of-range bit position, size: "
-                                     , show sz
-                                     , ", position: "
-                                     , show i
-                                     ]
+{-# NOINLINE complement# #-}
+complement# :: KnownNat n => Unsigned n -> Unsigned n
+complement# (U v1) = U (complement v1)
 
-{-# NOINLINE testBitU #-}
-testBitU :: KnownNat n => Unsigned n -> Int -> Bool
-testBitU s@(U n) i
-  | sz > i    = testBit n i
-  | otherwise = error $ concat [ "testBit: "
-                               , "Setting out-of-range bit position, size: "
-                               , show sz
-                               , ", position: "
-                               , show i
-                               ]
-  where
-    sz = finiteBitSizeU s
+{-# NOINLINE (!#) #-}
+(!#) :: KnownNat n => Unsigned n -> Int -> Bit
+(U v) !# i = v ! i
 
-shiftLU,shiftRU,rotateLU,rotateRU :: KnownNat n => Unsigned n -> Int -> Unsigned n
-{-# NOINLINE shiftLU #-}
-shiftLU _ b | b < 0  = error "'shiftL'{Unsigned} undefined for negative numbers"
-shiftLU (U n) b      = fromIntegerU_inlineable (shiftL n b)
-{-# NOINLINE shiftRU #-}
-shiftRU _ b | b < 0  = error "'shiftR'{Unsigned} undefined for negative numbers"
-shiftRU (U n) b      = fromIntegerU_inlineable (shiftR n b)
-{-# NOINLINE rotateLU #-}
-rotateLU _ b | b < 0 = error "'shiftL'{Unsigned} undefined for negative numbers"
-rotateLU n b         = let b' = b `mod` finiteBitSizeU n
-                       in shiftL n b' .|. shiftR n (finiteBitSizeU n - b')
-{-# NOINLINE rotateRU #-}
-rotateRU _ b | b < 0 = error "'shiftR'{Unsigned} undefined for negative numbers"
-rotateRU n b         = let b' = b `mod` finiteBitSizeU n
-                       in shiftR n b' .|. shiftL n (finiteBitSizeU n - b')
+{-# NOINLINE setBit# #-}
+setBit# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+setBit# (U v) i = U (setBit v i)
 
-{-# NOINLINE popCountU #-}
-popCountU :: Unsigned n -> Int
-popCountU (U n) = popCount n
+{-# NOINLINE shiftL# #-}
+shiftL# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+shiftL# (U v) i = U (shiftL v i)
 
-instance KnownNat n => FiniteBits (Unsigned n) where
-  finiteBitSize  = finiteBitSizeU
+{-# NOINLINE shiftR# #-}
+shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+shiftR# (U v) i = U (shiftL v i)
 
-{-# NOINLINE finiteBitSizeU #-}
-finiteBitSizeU :: KnownNat n => Unsigned n -> Int
-finiteBitSizeU u = fromInteger (natVal u)
+{-# NOINLINE rotateL# #-}
+rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+rotateL# (U bv) i = U (shiftL bv i)
 
-instance KnownNat n => Lift (Unsigned n) where
-  lift u@(U i) = sigE [| fromIntegerU i |] (decUnsigned (natVal u))
+{-# NOINLINE rotateR# #-}
+rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+rotateR# (U bv) i = U (shiftR bv i)
 
-decUnsigned :: Integer -> TypeQ
-decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
+{-# NOINLINE msb# #-}
+msb# :: KnownNat n => Unsigned n -> Bit
+msb# (U v) = msb v
 
-instance Show (Unsigned n) where
-  show (U n) = show n
+{-# NOINLINE lsb# #-}
+lsb# :: KnownNat n => Unsigned n -> Bit
+lsb# (U v) = lsb v
 
-instance KnownNat n => Default (Unsigned n) where
-  def = fromIntegerU 0
+instance BitReduction Unsigned where
+  reduceAnd  = reduceAnd#
+  reduceOr   = reduceOr#
+  reduceXor  = reduceXor#
 
-instance BitVector (Unsigned n) where
-  type BitSize (Unsigned n) = n
-  toBV   = toBitVector
-  fromBV = fromBitVector
+reduceAnd#, reduceOr#, reduceXor# :: KnownNat n => Unsigned n -> Unsigned 1
 
-{-# NOINLINE toBitVector #-}
-toBitVector :: KnownNat n => Unsigned n -> Vec n Bit
-toBitVector (U m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterateI (`div` 2) m
+{-# NOINLINE reduceAnd# #-}
+reduceAnd# (U i) = U (reduceAnd i)
 
-{-# NOINLINE fromBitVector #-}
-fromBitVector :: KnownNat n => Vec n Bit -> Unsigned n
-fromBitVector = fromBitList . reverse . toList
+{-# NOINLINE reduceOr# #-}
+reduceOr# (U i) = U (reduceOr i)
 
-{-# INLINABLE fromBitList #-}
-fromBitList :: KnownNat n => [Bit] -> Unsigned n
-fromBitList l = fromIntegerU_inlineable
-              $ sum [ n
-                    | (n,b) <- zip (iterate (*2) 1) l
-                    , b == H
-                    ]
-
-{-# NOINLINE resizeU #-}
-resizeU :: KnownNat m => Unsigned n -> Unsigned m
-resizeU (U n) = fromIntegerU_inlineable n
+{-# NOINLINE reduceXor# #-}
+reduceXor# (U i) = U (reduceXor i)
 
 -- | A resize operation that zero-extends on extension, and wraps on truncation.
 --
@@ -297,4 +274,17 @@ resizeU (U n) = fromIntegerU_inlineable n
 -- Truncating a number of length N to a length L just removes the left
 -- (most significant) N-L bits.
 instance Resize Unsigned where
-  resize = resizeU
+  resize = resize#
+
+{-# NOINLINE resize# #-}
+resize# :: KnownNat m => Unsigned n -> Unsigned m
+resize# (U n) = U (fromInteger (veryUnsafeToInteger# n))
+
+instance Default (Unsigned n) where
+  def = minBound#
+
+instance KnownNat n => Lift (Unsigned n) where
+  lift u@(U i) = sigE [| fromInteger# i |] (decUnsigned (natVal u))
+
+decUnsigned :: Integer -> TypeQ
+decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)

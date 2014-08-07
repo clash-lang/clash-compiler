@@ -2,134 +2,164 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
-
-{-# OPTIONS_GHC -fno-warn-missing-methods #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 module CLaSH.Sized.Signed
   ( Signed
-  , resizeS_wrap
+  , resize_wrap
   )
 where
 
-import Data.Bits
-import Data.Default
-import Data.Typeable
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax(Lift(..))
-import GHC.TypeLits
+import qualified Data.Bits        as B
+import Data.Default               (Default (..))
+import Data.Typeable              (Typeable)
+import GHC.Integer                (smallInteger)
+import GHC.Prim                   (dataToTag#)
+import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
+import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Bit
-import CLaSH.Class.BitVector
-import CLaSH.Class.Num
-import CLaSH.Promoted.Ord
-import CLaSH.Sized.Vector
+import CLaSH.Class.Bits           (Bits (..))
+-- import CLaSH.Class.BitReduction   (BitReduction (..))
+import CLaSH.Class.Bitwise        (Bitwise (..), Bit)
+import CLaSH.Class.Num            (Add (..), Mult (..))
+import CLaSH.Class.Resize         (Resize (..))
+import CLaSH.Promoted.Ord         (Max)
+import CLaSH.Sized.BitVector      (BitVector, veryUnsafeFromInteger#,
+                                   veryUnsafeToInteger#)
 
--- | Arbitrary-width signed integer represented by @n@ bits, including the sign bit.
+import Debug.Trace
+
+-- | Arbitrary-width signed integer represented by @n@ bits, including the sign
+-- bit.
 --
 -- Uses standard 2-complements representation. Meaning that, given @n@ bits,
 -- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1]
 --
--- NB: The 'Num' operators perform @wrap-around@ on overflow. If you want saturation
--- on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in "CLaSH.Sized.Fixed".
+-- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
+-- saturation on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in
+-- "CLaSH.Sized.Fixed".
 newtype Signed (n :: Nat) = S Integer
   deriving Typeable
 
-instance Eq (Signed n) where
-  (==) = eqS
+instance Show (Signed n) where
+  show (S n) = show n
 
-{-# NOINLINE eqS #-}
-eqS :: (Signed n) -> (Signed n) -> Bool
-(S n) `eqS` (S m) = n == m
+instance KnownNat n => Bits (Signed n) where
+  type BitSize (Signed n) = n
+  pack   = pack#
+  unpack = unpack#
+
+pack# :: KnownNat n => Signed n -> BitVector n
+pack# s@(S i) = veryUnsafeFromInteger# (i `mod` maxI)
+  where
+    maxI = 2 ^ natVal s
+
+unpack# :: KnownNat n => BitVector n -> Signed n
+unpack# bv = fromInteger_INLINE (veryUnsafeToInteger# bv)
+
+instance Eq (Signed n) where
+  (==) = eq#
+  (/=) = neq#
+
+{-# NOINLINE eq# #-}
+eq# :: Signed n -> Signed n -> Bool
+eq# (S v1) (S v2) = v1 == v2
+
+{-# NOINLINE neq# #-}
+neq# :: Signed n -> Signed n -> Bool
+neq# (S v1) (S v2) = v1 /= v2
 
 instance Ord (Signed n) where
-  (<)  = ltS
-  (>=) = geS
-  (>)  = gtS
-  (<=) = leS
+  (<)  = lt#
+  (>=) = ge#
+  (>)  = gt#
+  (<=) = le#
 
-ltS,geS,gtS,leS :: Signed n -> Signed n -> Bool
-{-# NOINLINE ltS #-}
-ltS (S n) (S m) = n < m
-{-# NOINLINE geS #-}
-geS (S n) (S m) = n >= m
-{-# NOINLINE gtS #-}
-gtS (S n) (S m) = n > m
-{-# NOINLINE leS #-}
-leS (S n) (S m) = n <= m
+lt#,ge#,gt#,le# :: Signed n -> Signed n -> Bool
+{-# NOINLINE lt# #-}
+lt# (S n) (S m) = n < m
+{-# NOINLINE ge# #-}
+ge# (S n) (S m) = n >= m
+{-# NOINLINE gt# #-}
+gt# (S n) (S m) = n > m
+{-# NOINLINE le# #-}
+le# (S n) (S m) = n <= m
 
 instance KnownNat n => Enum (Signed n) where
-  succ           = plusS (fromIntegerS 1)
-  pred           = minS (fromIntegerS 1)
-  toEnum         = fromIntegerS . toInteger
-  fromEnum       = fromEnum . toIntegerS
-  enumFrom       = enumFromS
-  enumFromThen   = enumFromThenS
-  enumFromTo     = enumFromToS
-  enumFromThenTo = enumFromThenToS
+  succ           = (+# fromInteger# 1)
+  pred           = (-# fromInteger# 1)
+  toEnum         = fromInteger# . toInteger
+  fromEnum       = fromEnum . toInteger#
+  enumFrom       = enumFrom#
+  enumFromThen   = enumFromThen#
+  enumFromTo     = enumFromTo#
+  enumFromThenTo = enumFromThenTo#
 
-{-# NOINLINE enumFromS #-}
-{-# NOINLINE enumFromThenS #-}
-{-# NOINLINE enumFromToS #-}
-{-# NOINLINE enumFromThenToS #-}
-enumFromS       :: KnownNat n => Signed n -> [Signed n]
-enumFromThenS   :: KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromToS     :: KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromThenToS :: KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
-enumFromS x             = map toEnum [fromEnum x ..]
-enumFromThenS x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromToS x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenToS x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+{-# NOINLINE enumFrom# #-}
+{-# NOINLINE enumFromThen# #-}
+{-# NOINLINE enumFromTo# #-}
+{-# NOINLINE enumFromThenTo# #-}
+enumFrom#       :: KnownNat n => Signed n -> [Signed n]
+enumFromThen#   :: KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromTo#     :: KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromThenTo# :: KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
+enumFrom# x             = map toEnum [fromEnum x ..]
+enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
+enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
+enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
 
 instance KnownNat n => Bounded (Signed n) where
-  minBound = minBoundS
-  maxBound = maxBoundS
+  minBound = minBound#
+  maxBound = maxBound#
 
-minBoundS,maxBoundS :: KnownNat n => Signed n
-{-# NOINLINE minBoundS #-}
-minBoundS = let res = S $ negate $ 2 ^ (natVal res - 1) in res
-{-# NOINLINE maxBoundS #-}
-maxBoundS = let res = S $ 2 ^ (natVal res - 1) - 1 in res
+minBound#,maxBound# :: KnownNat n => Signed n
+{-# NOINLINE minBound# #-}
+minBound# = let res = S $ negate $ 2 ^ (natVal res - 1) in res
+{-# NOINLINE maxBound# #-}
+maxBound# = let res = S $ 2 ^ (natVal res - 1) - 1 in res
 
 -- | Operators do @wrap-around@ on overflow
 instance KnownNat n => Num (Signed n) where
-  (+)         = plusS
-  (-)         = minS
-  (*)         = timesS
-  negate      = negateS
-  abs         = absS
-  signum      = signumS
-  fromInteger = fromIntegerS
+  (+)         = (+#)
+  (-)         = (-#)
+  (*)         = (*#)
+  negate      = negate#
+  abs         = abs#
+  signum      = signum#
+  fromInteger = fromInteger#
 
-plusS,minS,timesS :: KnownNat n => Signed n -> Signed n -> Signed n
-{-# NOINLINE plusS #-}
-plusS (S a) (S b) = fromIntegerS_inlineable (a + b)
+(+#), (-#), (*#) :: KnownNat n => Signed n -> Signed n -> Signed n
+{-# NOINLINE (+#) #-}
+(S a) +# (S b) = fromInteger_INLINE (a + b)
 
-{-# NOINLINE minS #-}
-minS (S a) (S b) = fromIntegerS_inlineable (a - b)
+{-# NOINLINE (-#) #-}
+(S a) -# (S b) = fromInteger_INLINE (a - b)
 
-{-# NOINLINE timesS #-}
-timesS (S a) (S b) = fromIntegerS_inlineable (a * b)
+{-# NOINLINE (*#) #-}
+(S a) *# (S b) = fromInteger_INLINE (a * b)
 
-negateS,absS,signumS :: KnownNat n => Signed n -> Signed n
-{-# NOINLINE negateS #-}
-negateS (S n) = fromIntegerS_inlineable (0 - n)
+negate#,abs#,signum# :: KnownNat n => Signed n -> Signed n
+{-# NOINLINE negate# #-}
+negate# (S n) = fromInteger_INLINE (0 - n)
 
-{-# NOINLINE absS #-}
-absS (S n) = fromIntegerS_inlineable (abs n)
+{-# NOINLINE abs# #-}
+abs# (S n) = fromInteger_INLINE (abs n)
 
-{-# NOINLINE signumS #-}
-signumS (S n) = fromIntegerS_inlineable (signum n)
+{-# NOINLINE signum# #-}
+signum# (S n) = fromInteger_INLINE (signum n)
 
-fromIntegerS,fromIntegerS_inlineable :: KnownNat n => Integer -> Signed (n :: Nat)
-{-# NOINLINE fromIntegerS #-}
-fromIntegerS = fromIntegerS_inlineable
-{-# INLINABLE fromIntegerS_inlineable #-}
-fromIntegerS_inlineable i
+fromInteger#,fromInteger_INLINE :: KnownNat n => Integer -> Signed (n :: Nat)
+{-# NOINLINE fromInteger# #-}
+fromInteger# = fromInteger_INLINE
+{-# INLINE fromInteger_INLINE #-}
+fromInteger_INLINE i
     | nS == 0   = S 0
     | otherwise = res
   where
@@ -139,200 +169,202 @@ fromIntegerS_inlineable i
             (s,i') | even s    -> S i'
                    | otherwise -> S (i' - sz)
 
-instance KnownNat (Max m n) => Add (Signed m) (Signed n) where
-  type AResult (Signed m) (Signed n) = Signed (Max m n)
-  plus  = plusS2
-  minus = minusS2
+instance KnownNat (Max m n + 1) => Add (Signed m) (Signed n) where
+  type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
+  plus  = plus#
+  minus = minus#
 
-plusS2, minusS2 :: KnownNat (Max m n) => Signed m -> Signed n -> Signed (Max m n)
-{-# NOINLINE plusS2 #-}
-plusS2 (S a) (S b) = fromIntegerS_inlineable (a + b)
+plus#, minus# :: KnownNat (Max m n + 1) => Signed m -> Signed n
+              -> Signed (Max m n + 1)
+{-# NOINLINE plus# #-}
+plus# (S a) (S b) = fromInteger_INLINE (a + b)
 
-{-# NOINLINE minusS2 #-}
-minusS2 (S a) (S b) = fromIntegerS_inlineable (a - b)
+{-# NOINLINE minus# #-}
+minus# (S a) (S b) = fromInteger_INLINE (a - b)
 
 instance KnownNat (m + n) => Mult (Signed m) (Signed n) where
   type MResult (Signed m) (Signed n) = Signed (m + n)
-  mult = multS2
+  mult = mult#
 
-{-# NOINLINE multS2 #-}
-multS2 :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)
-multS2 (S a) (S b) = fromIntegerS_inlineable (a * b)
+{-# NOINLINE mult# #-}
+mult# :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)
+mult# (S a) (S b) = fromInteger_INLINE (a * b)
 
 instance KnownNat n => Real (Signed n) where
-  toRational = toRational . toIntegerS
+  toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (Signed n) where
-  quot      = quotS
-  rem       = remS
-  div       = divS
-  mod       = modS
-  quotRem   = quotRemS
-  divMod    = divModS
-  toInteger = toIntegerS
+  quot      = quot#
+  rem       = rem#
+  div       = div#
+  mod       = mod#
+  quotRem   = quotRem#
+  divMod    = divMod#
+  toInteger = toInteger#
 
-quotS,remS,divS,modS :: KnownNat n => Signed n -> Signed n -> Signed n
-{-# NOINLINE quotS #-}
-quotS = (fst.) . quotRemS_inlineable
-{-# NOINLINE remS #-}
-remS = (snd.) . quotRemS_inlineable
-{-# NOINLINE divS #-}
-divS = (fst.) . divModS_inlineable
-{-# NOINLINE modS #-}
-modS = (snd.) . divModS_inlineable
+quot#,rem#,div#,mod# :: KnownNat n => Signed n -> Signed n -> Signed n
+{-# NOINLINE quot# #-}
+quot# = (fst.) . quotRem_INLINE
+{-# NOINLINE rem# #-}
+rem# = (snd.) . quotRem_INLINE
+{-# NOINLINE div# #-}
+div# = (fst.) . divMod_INLINE
+{-# NOINLINE mod# #-}
+mod# = (snd.) . divMod_INLINE
 
-quotRemS,divModS :: KnownNat n => Signed n -> Signed n -> (Signed n, Signed n)
-quotRemS n d = (n `quotS` d,n `remS` d)
-divModS n d  = (n `divS` d,n `modS` d)
+quotRem#,divMod# :: KnownNat n => Signed n -> Signed n -> (Signed n, Signed n)
+quotRem# n d = (n `quot#` d,n `rem#` d)
+divMod# n d  = (n `div#` d,n `mod#` d)
 
-quotRemS_inlineable,divModS_inlineable :: KnownNat n => Signed n -> Signed n -> (Signed n, Signed n)
-{-# INLINEABLE quotRemS_inlineable #-}
-(S a) `quotRemS_inlineable` (S b) = let (a',b') = a `quotRem` b
-                                    in (fromIntegerS_inlineable a', fromIntegerS_inlineable b')
-{-# INLINEABLE divModS_inlineable #-}
-(S a) `divModS_inlineable` (S b) = let (a',b') = a `divMod` b
-                                   in (fromIntegerS_inlineable a', fromIntegerS_inlineable b')
+quotRem_INLINE,divMod_INLINE :: KnownNat n => Signed n -> Signed n
+                             -> (Signed n, Signed n)
+{-# INLINE quotRem_INLINE #-}
+(S a) `quotRem_INLINE` (S b) = let (a',b') = a `quotRem` b
+                               in (fromInteger_INLINE a', fromInteger_INLINE b')
+{-# INLINE divMod_INLINE #-}
+(S a) `divMod_INLINE` (S b) = let (a',b') = a `divMod` b
+                              in (fromInteger_INLINE a', fromInteger_INLINE b')
 
-{-# NOINLINE toIntegerS #-}
-toIntegerS :: Signed n -> Integer
-toIntegerS (S n) = n
+{-# NOINLINE toInteger# #-}
+toInteger# :: Signed n -> Integer
+toInteger# (S n) = n
 
-instance KnownNat n => Bits (Signed n) where
-  (.&.)          = andS
-  (.|.)          = orS
-  xor            = xorS
-  complement     = complementS
-  bit            = bitS
-  testBit        = testBitS
-  bitSizeMaybe   = Just . finiteBitSizeS
-  isSigned       = const True
-  shiftL         = shiftLS
-  shiftR         = shiftRS
-  rotateL        = rotateLS
-  rotateR        = rotateRS
-  popCount       = popCountS
+instance KnownNat n => Bitwise (Signed n) where
+  (.&.)       = and#
+  (.|.)       = or#
+  xor         = xor#
+  complement  = complement#
+  (!) v i     = (!#)     v (fromIntegral i)
+  setBit v i  = setBit#  v (fromIntegral i)
+  shiftL v i  = shiftL#  v (fromIntegral i)
+  shiftR v i  = shiftR#  v (fromIntegral i)
+  rotateL v i = rotateL# v (fromIntegral i)
+  rotateR v i = rotateR# v (fromIntegral i)
+  msb         = msb#
+  lsb         = lsb#
 
-andS,orS,xorS :: KnownNat n => Signed n -> Signed n -> Signed n
-{-# NOINLINE andS #-}
-(S a) `andS` (S b) = fromIntegerS_inlineable (a .&. b)
-{-# NOINLINE orS #-}
-(S a) `orS` (S b)  = fromIntegerS_inlineable (a .|. b)
-{-# NOINLINE xorS #-}
-(S a) `xorS` (S b) = fromIntegerS_inlineable (xor a b)
+and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
+{-# NOINLINE and# #-}
+(S a) `and#` (S b) = fromInteger_INLINE (a B..&. b)
+{-# NOINLINE or# #-}
+(S a) `or#` (S b)  = fromInteger_INLINE (a B..|. b)
+{-# NOINLINE xor# #-}
+(S a) `xor#` (S b) = fromInteger_INLINE (B.xor a b)
 
-{-# NOINLINE complementS #-}
-complementS :: KnownNat n => Signed n -> Signed n
-complementS = fromBitVector . vmap complement . toBitVector
+{-# NOINLINE complement# #-}
+complement# :: KnownNat n => Signed n -> Signed n
+complement# = unpack# . complement . pack#
 
-{-# NOINLINE bitS #-}
-bitS :: KnownNat n => Int -> Signed n
-bitS i = res
+(!#) :: KnownNat n => Signed n -> Int -> Bit
+s@(S v) !# i
+    | i >= 0 && i <= maxI = veryUnsafeFromInteger# (smallInteger
+                                                   (dataToTag# (B.testBit v i)))
+    | otherwise           = err
   where
-    sz = finiteBitSizeS res
-    res | sz > i    = fromIntegerS_inlineable (bit i)
-        | otherwise = error $ concat [ "bit: "
-                                     , "Setting out-of-range bit position, size: "
-                                     , show sz
-                                     , ", position: "
-                                     , show i
-                                     ]
+    maxI = fromInteger (natVal s) - 1
+    err  = error $ concat [ "!: "
+                          , show i
+                          , " is out of range ["
+                          , show maxI
+                          , "..0]"
+                          ]
 
-{-# NOINLINE testBitS #-}
-testBitS :: KnownNat n => Signed n -> Int -> Bool
-testBitS s@(S n) i
-  | sz > i    = testBit n i
-  | otherwise = error $ concat [ "testBit: "
-                               , "Setting out-of-range bit position, size: "
-                               , show sz
-                               , ", position: "
-                               , show i
-                               ]
+{-# NOINLINE setBit# #-}
+setBit# :: KnownNat n => Signed n -> Int -> Signed n
+setBit# bv@(S v) i
+    | i >= 0 && i <= maxI = S (B.setBit v i)
+    | otherwise           = err
   where
-    sz = finiteBitSizeS s
+    maxI = fromInteger (natVal bv) - 1
+    err  = error $ concat [ "setBit: "
+                          , show i
+                          , " is out of range ["
+                          , show maxI
+                          , "..0]"
+                          ]
 
-shiftLS,shiftRS,rotateLS,rotateRS :: KnownNat n => Signed n -> Int -> Signed n
-{-# NOINLINE shiftLS #-}
-shiftLS _ b | b < 0  = error "'shiftL'{Signed} undefined for negative numbers"
-shiftLS (S n) b      = fromIntegerS_inlineable (shiftL n b)
-{-# NOINLINE shiftRS #-}
-shiftRS _ b | b < 0  = error "'shiftR'{Signed} undefined for negative numbers"
-shiftRS (S n) b      = fromIntegerS_inlineable (shiftR n b)
-{-# NOINLINE rotateLS #-}
-rotateLS _ b | b < 0 = error "'shiftL'{Signed} undefined for negative numbers"
-rotateLS n b         = let b' = b `mod` finiteBitSizeS n
-                       in shiftL n b' .|. shiftR n (finiteBitSizeS n - b')
-{-# NOINLINE rotateRS #-}
-rotateRS _ b | b < 0 = error "'shiftR'{Signed} undefined for negative numbers"
-rotateRS n b         = let b' = b `mod` finiteBitSizeS n
-                       in shiftR n b' .|. shiftL n (finiteBitSizeS n - b')
-
-{-# NOINLINE popCountS #-}
-popCountS :: Signed n -> Int
-popCountS (S n) = popCount n
-
-instance KnownNat n => FiniteBits (Signed n) where
-  finiteBitSize = finiteBitSizeS
-
-{-# NOINLINE finiteBitSizeS #-}
-finiteBitSizeS :: KnownNat n => Signed n -> Int
-finiteBitSizeS = fromInteger . natVal
-
-instance Show (Signed n) where
-  show (S n) = show n
-
-instance KnownNat n => Default (Signed n) where
-  def = fromIntegerS 0
-
-instance KnownNat n => Lift (Signed n) where
-  lift s@(S i) = sigE [| fromIntegerS i |] (decSigned (natVal s))
-
-decSigned :: Integer -> TypeQ
-decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
-
-instance BitVector (Signed n) where
-  type BitSize (Signed n) = n
-  toBV   = toBitVector
-  fromBV = fromBitVector
-
-{-# NOINLINE toBitVector #-}
-toBitVector :: KnownNat n => Signed n -> Vec n Bit
-toBitVector (S m) = vreverse $ vmap (\x -> if odd x then H else L) $ viterateI (`div` 2) m
-
-{-# NOINLINE fromBitVector #-}
-fromBitVector :: KnownNat n => Vec n Bit -> Signed n
-fromBitVector = fromBitList . reverse . toList
-
-{-# INLINABLE fromBitList #-}
-fromBitList :: KnownNat n => [Bit] -> Signed n
-fromBitList l = fromIntegerS_inlineable
-              $ sum [ n
-                    | (n,b) <- zip (iterate (*2) 1) l
-                    , b == H
-                    ]
-
-{-# NOINLINE resizeS #-}
-resizeS :: (KnownNat n, KnownNat m) => Signed n -> Signed m
-resizeS s@(S n) | n' <= m'  = extend
-                | otherwise = trunc
+shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
+{-# NOINLINE shiftL# #-}
+shiftL# _ b | b < 0  = error "'shiftL undefined for negative numbers"
+shiftL# (S n) b      = fromInteger_INLINE (B.shiftL n b)
+{-# NOINLINE shiftR# #-}
+shiftR# _ b | b < 0  = error "'shiftR undefined for negative numbers"
+shiftR# (S n) b      = fromInteger_INLINE (B.shiftR n b)
+{-# NOINLINE rotateL# #-}
+rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
+rotateL# s@(S n) b   = fromInteger_INLINE (l B..|. r)
   where
-    n'     = fromInteger (natVal s)
-    m'     = fromInteger (natVal extend)
-    extend = fromIntegerS_inlineable n
-    trunc  = case toList (toBitVector s) of
-                    (x:xs) -> fromBitList $ reverse $ x : (drop (n' - m') xs)
-                    _      -> error "resizeS impossible case: empty list"
+    l    = B.shiftL n b'
+    r    = B.shiftR n b'' B..&. mask
+    mask = 2 ^ b' - 1
 
-{-# NOINLINE resizeS_wrap #-}
--- | A resize operation that is sign-preserving on extension, but wraps on truncation.
---
--- Increasing the size of the number replicates the sign bit to the left.
--- Truncating a number of length N to a length L just removes the leftmost N-L bits.
-resizeS_wrap :: KnownNat m => Signed n -> Signed m
-resizeS_wrap (S n) = fromIntegerS_inlineable n
+    b'   = b `mod` sz
+    b''  = sz - b'
+    sz   = fromInteger (natVal s)
+
+{-# NOINLINE rotateR# #-}
+rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
+rotateR# s@(S n) b   = fromInteger_INLINE (l B..|. r)
+  where
+    l    = B.shiftR n b' B..&. mask
+    r    = B.shiftL n b''
+    mask = 2 ^ b'' - 1
+
+    b'  = b `mod` sz
+    b'' = sz - b'
+    sz  = fromInteger (natVal s)
+
+{-# NOINLINE msb# #-}
+msb# :: KnownNat n => Signed n -> Bit
+msb# s@(S i) = veryUnsafeFromInteger#
+                 (smallInteger (dataToTag# (B.testBit i sz)))
+  where
+    sz = fromInteger (natVal s - 1)
+
+{-# NOINLINE lsb# #-}
+lsb# :: KnownNat n => Signed n -> Bit
+lsb# (S i) = veryUnsafeFromInteger# (smallInteger (dataToTag# (B.testBit i 0)))
 
 -- | A sign-preserving resize operation
 --
 -- Increasing the size of the number replicates the sign bit to the left.
--- Truncating a number to length L keeps the sign bit and the rightmost L-1 bits.
+-- Truncating a number to length L keeps the sign bit and the rightmost L-1
+-- bits.
 instance Resize Signed where
-  resize = resizeS
+  resize = resize#
+
+{-# NOINLINE resize# #-}
+resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m
+resize# s@(S i) | n <= m    = extend
+                | otherwise = trunc
+  where
+    n = fromInteger (natVal s)
+    m = fromInteger (natVal extend)
+
+    extend = fromInteger_INLINE i
+
+    mask  = (2 ^ (m - 1)) - 1
+    sign  = 2 ^ (m - 1)
+    i'    = i B..&. mask
+    trunc = if B.testBit i (n - 1)
+               then fromInteger_INLINE (i' B..|. sign)
+               else fromInteger_INLINE i'
+
+{-# NOINLINE resize_wrap #-}
+-- | A resize operation that is sign-preserving on extension, but wraps on
+-- truncation.
+--
+-- Increasing the size of the number replicates the sign bit to the left.
+-- Truncating a number of length N to a length L just removes the leftmost
+-- N-L bits.
+resize_wrap :: KnownNat m => Signed n -> Signed m
+resize_wrap (S n) = fromInteger_INLINE n
+
+instance KnownNat n => Default (Signed n) where
+  def = fromInteger# 0
+
+instance KnownNat n => Lift (Signed n) where
+  lift s@(S i) = sigE [| fromInteger# i |] (decSigned (natVal s))
+
+decSigned :: Integer -> TypeQ
+decSigned n = appT (conT ''Signed) (litT $ numTyLit n)

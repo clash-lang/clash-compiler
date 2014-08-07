@@ -1,5 +1,8 @@
-{-# LANGUAGE MagicHash #-}
-module CLaSH.Class.Bitwise where
+module CLaSH.Class.Bitwise
+  ( Bitwise (..)
+  , Bit
+  )
+where
 
 import GHC.TypeLits          (KnownNat)
 import CLaSH.Sized.BitVector (BitVector, Bit, (!#), and#, complement#, lsb#,
