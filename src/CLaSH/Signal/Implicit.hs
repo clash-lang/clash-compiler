@@ -22,7 +22,6 @@ where
 
 import Control.Applicative  (Applicative (..), (<$>), liftA2)
 
-import CLaSH.Bit            (Bit)
 import CLaSH.Sized.Fixed    (Fixed)
 import CLaSH.Sized.Signed   (Signed)
 import CLaSH.Sized.Unsigned (Unsigned)

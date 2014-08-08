@@ -20,20 +20,20 @@ import Data.Default               (Default (..))
 import Data.Typeable              (Typeable)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
-import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 
 import CLaSH.Class.Bits           (Bits (..))
--- import CLaSH.Class.BitReduction   (BitReduction (..))
-import CLaSH.Class.Bitwise        (Bitwise (..), Bit)
+import CLaSH.Class.BitIndex       (BitIndex (..))
+import CLaSH.Class.BitReduction   (BitReduction (..))
+import CLaSH.Class.Bitwise        (Bitwise (..))
 import CLaSH.Class.Num            (Add (..), Mult (..))
 import CLaSH.Class.Resize         (Resize (..))
+import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
-import CLaSH.Sized.BitVector      (BitVector, veryUnsafeFromInteger#,
+import CLaSH.Sized.BitVector      (BitVector, Bit, veryUnsafeFromInteger#,
                                    veryUnsafeToInteger#)
-
-import Debug.Trace
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
 -- bit.
@@ -234,14 +234,11 @@ instance KnownNat n => Bitwise (Signed n) where
   (.|.)       = or#
   xor         = xor#
   complement  = complement#
-  (!) v i     = (!#)     v (fromIntegral i)
-  setBit v i  = setBit#  v (fromIntegral i)
   shiftL v i  = shiftL#  v (fromIntegral i)
   shiftR v i  = shiftR#  v (fromIntegral i)
   rotateL v i = rotateL# v (fromIntegral i)
   rotateR v i = rotateR# v (fromIntegral i)
-  msb         = msb#
-  lsb         = lsb#
+  isSigned    = const True
 
 and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
@@ -254,34 +251,6 @@ and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => Signed n -> Signed n
 complement# = unpack# . complement . pack#
-
-(!#) :: KnownNat n => Signed n -> Int -> Bit
-s@(S v) !# i
-    | i >= 0 && i <= maxI = veryUnsafeFromInteger# (smallInteger
-                                                   (dataToTag# (B.testBit v i)))
-    | otherwise           = err
-  where
-    maxI = fromInteger (natVal s) - 1
-    err  = error $ concat [ "!: "
-                          , show i
-                          , " is out of range ["
-                          , show maxI
-                          , "..0]"
-                          ]
-
-{-# NOINLINE setBit# #-}
-setBit# :: KnownNat n => Signed n -> Int -> Signed n
-setBit# bv@(S v) i
-    | i >= 0 && i <= maxI = S (B.setBit v i)
-    | otherwise           = err
-  where
-    maxI = fromInteger (natVal bv) - 1
-    err  = error $ concat [ "setBit: "
-                          , show i
-                          , " is out of range ["
-                          , show maxI
-                          , "..0]"
-                          ]
 
 shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
@@ -314,6 +283,72 @@ rotateR# s@(S n) b   = fromInteger_INLINE (l B..|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal s)
 
+
+instance BitIndex Signed where
+  (!) v i    = (!#) v (fromIntegral i)
+  slice      = slice#
+  setBit v i = setBit# v (fromIntegral i)
+  setSlice   = setSlice#
+  msb        = msb#
+  lsb        = lsb#
+
+
+(!#) :: KnownNat n => Signed n -> Int -> Bit
+s@(S v) !# i
+    | i >= 0 && i <= maxI = veryUnsafeFromInteger# (smallInteger
+                                                   (dataToTag# (B.testBit v i)))
+    | otherwise           = err
+  where
+    maxI = fromInteger (natVal s) - 1
+    err  = error $ concat [ "!: "
+                          , show i
+                          , " is out of range ["
+                          , show maxI
+                          , "..0]"
+                          ]
+
+{-# NOINLINE slice# #-}
+slice# :: Signed (m + 1 + i) -> SNat m -> SNat n -> Signed (m + 1 - n)
+slice# (S i) m n =
+    if sz < 1 then S 0
+              else case divMod i' maxI of
+                     (s,i'') | even s    -> S i''
+                             | otherwise -> S (i'' - maxI)
+  where
+    m'   = snatToInteger m
+    n'   = snatToInteger n
+    sz   = m' - n' + 1
+    maxI = 2 ^ (sz - 1)
+
+    mask = 2 ^ (m' + 1) - 1
+    i'   = B.shiftR (i B..&. mask) (fromInteger n')
+
+{-# NOINLINE setBit# #-}
+setBit# :: KnownNat n => Signed n -> Int -> Signed n
+setBit# bv@(S v) i
+    | i >= 0 && i <= maxI = S (B.setBit v i)
+    | otherwise           = err
+  where
+    maxI = fromInteger (natVal bv) - 1
+    err  = error $ concat [ "setBit: "
+                          , show i
+                          , " is out of range ["
+                          , show maxI
+                          , "..0]"
+                          ]
+
+{-# NOINLINE setSlice# #-}
+setSlice# :: Signed (m + 1 + i) -> SNat m -> SNat n -> Signed (m + 1 - n)
+          -> Signed (m + 1 + i)
+setSlice# (S i) m n (S j) = S ((i B..&. mask) B..|. j'')
+  where
+    m' = snatToInteger m
+    n' = snatToInteger n
+
+    j'   = j `mod` (2 ^ (m' - n' + 1))
+    j''  = B.shiftL j' (fromInteger n')
+    mask = B.complement ((2 ^ (m' + 1) - 1) `B.xor` (2 ^ n' - 1))
+
 {-# NOINLINE msb# #-}
 msb# :: KnownNat n => Signed n -> Bit
 msb# s@(S i) = veryUnsafeFromInteger#
@@ -324,6 +359,29 @@ msb# s@(S i) = veryUnsafeFromInteger#
 {-# NOINLINE lsb# #-}
 lsb# :: KnownNat n => Signed n -> Bit
 lsb# (S i) = veryUnsafeFromInteger# (smallInteger (dataToTag# (B.testBit i 0)))
+
+instance BitReduction Signed where
+  reduceAnd  = reduceAnd#
+  reduceOr   = reduceOr#
+  reduceXor  = reduceXor#
+
+reduceAnd#, reduceOr#, reduceXor# :: KnownNat n => Signed n -> Signed 1
+
+{-# NOINLINE reduceAnd# #-}
+reduceAnd# (S i) = S (smallInteger (dataToTag# check))
+  where
+    check = i == (-1)
+
+{-# NOINLINE reduceOr# #-}
+reduceOr# (S i) = S (smallInteger (dataToTag# check))
+  where
+    check = i /= 0
+
+{-# NOINLINE reduceXor# #-}
+reduceXor# s@(S i) = S (toInteger (B.popCount i' `mod` 2))
+  where
+    maxI = 2 ^ natVal s
+    i'   = i `mod` maxI
 
 -- | A sign-preserving resize operation
 --

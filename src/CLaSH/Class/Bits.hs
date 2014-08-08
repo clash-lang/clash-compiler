@@ -5,8 +5,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 module CLaSH.Class.Bits where
 
-import CLaSH.Sized.BitVector
-import GHC.TypeLits
+import CLaSH.Sized.BitVector (BitVector, (++#), high, low, split)
+import GHC.TypeLits          (KnownNat, Nat, type (+))
 
 -- | Convert types from and to a 'Vec'tor of 'Bit's
 class Bits a where

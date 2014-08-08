@@ -32,7 +32,6 @@ import Data.Coerce                (coerce)
 import Control.Applicative        (Applicative (..), (<$>), liftA2)
 import GHC.TypeLits               (Nat)
 
-import CLaSH.Bit                  (Bit)
 import CLaSH.Promoted.Nat         (snatToInteger)
 import CLaSH.Sized.Fixed          (Fixed)
 import CLaSH.Sized.Signed         (Signed)

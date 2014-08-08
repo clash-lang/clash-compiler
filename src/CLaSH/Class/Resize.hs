@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE KindSignatures #-}
 module CLaSH.Class.Resize where
 

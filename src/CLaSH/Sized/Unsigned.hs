@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE MagicHash                  #-}
@@ -12,17 +13,19 @@ where
 
 import Data.Default               (Default (..))
 import Data.Typeable              (Typeable)
-import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 
 import CLaSH.Class.Bits           (Bits (..))
+import CLaSH.Class.BitIndex       (BitIndex (..))
 import CLaSH.Class.BitReduction   (BitReduction (..))
-import CLaSH.Class.Bitwise        (Bitwise (..), Bit)
+import CLaSH.Class.Bitwise        (Bitwise (..))
 import CLaSH.Class.Num            (Add (..), Mult (..))
 import CLaSH.Class.Resize         (Resize (..))
+import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Promoted.Ord         (Max)
-import CLaSH.Sized.BitVector      (BitVector, veryUnsafeFromInteger#,
+import CLaSH.Sized.BitVector      (BitVector, Bit, veryUnsafeFromInteger#,
                                    veryUnsafeToInteger#)
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
@@ -94,7 +97,8 @@ instance KnownNat n => Enum (Unsigned n) where
 enumFrom#       :: KnownNat n => Unsigned n -> [Unsigned n]
 enumFromThen#   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromTo#     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenTo# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+                -> [Unsigned n]
 enumFrom# x             = map toEnum [fromEnum x ..]
 enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
 enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
@@ -195,14 +199,11 @@ instance KnownNat n => Bitwise (Unsigned n) where
   (.|.)       = or#
   xor         = xor#
   complement  = complement#
-  (!) v i     = (!#)     v (fromIntegral i)
-  setBit v i  = setBit#  v (fromIntegral i)
   shiftL v i  = shiftL#  v (fromIntegral i)
   shiftR v i  = shiftR#  v (fromIntegral i)
   rotateL v i = rotateL# v (fromIntegral i)
   rotateR v i = rotateR# v (fromIntegral i)
-  msb         = msb#
-  lsb         = lsb#
+  isSigned    = const False
 
 {-# NOINLINE and# #-}
 and# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
@@ -220,14 +221,6 @@ xor# (U v1) (U v2) = U (v1 `xor` v2)
 complement# :: KnownNat n => Unsigned n -> Unsigned n
 complement# (U v1) = U (complement v1)
 
-{-# NOINLINE (!#) #-}
-(!#) :: KnownNat n => Unsigned n -> Int -> Bit
-(U v) !# i = v ! i
-
-{-# NOINLINE setBit# #-}
-setBit# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-setBit# (U v) i = U (setBit v i)
-
 {-# NOINLINE shiftL# #-}
 shiftL# :: KnownNat n => Unsigned n -> Int -> Unsigned n
 shiftL# (U v) i = U (shiftL v i)
@@ -243,6 +236,31 @@ rotateL# (U bv) i = U (shiftL bv i)
 {-# NOINLINE rotateR# #-}
 rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
 rotateR# (U bv) i = U (shiftR bv i)
+
+instance BitIndex Unsigned where
+  (!) v i    = (!#) v (fromIntegral i)
+  slice      = slice#
+  setBit v i = setBit# v (fromIntegral i)
+  setSlice   = setSlice#
+  msb        = msb#
+  lsb        = lsb#
+
+{-# NOINLINE (!#) #-}
+(!#) :: KnownNat n => Unsigned n -> Int -> Bit
+(U v) !# i = v ! i
+
+{-# NOINLINE slice# #-}
+slice# :: Unsigned (m + 1 + i) -> SNat m -> SNat n -> Unsigned (m + 1 - n)
+slice# (U v) m n = U (slice v m n)
+
+{-# NOINLINE setBit# #-}
+setBit# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+setBit# (U v) i = U (setBit v i)
+
+{-# NOINLINE setSlice# #-}
+setSlice# :: Unsigned (m + 1 + i) -> SNat m -> SNat n -> Unsigned (m + 1 - n)
+          -> Unsigned (m + 1 + i)
+setSlice# (U v) i j (U w) = U (setSlice v i j w)
 
 {-# NOINLINE msb# #-}
 msb# :: KnownNat n => Unsigned n -> Bit

@@ -60,21 +60,30 @@ module CLaSH.Prelude
   , Lift (..), deriveLift
     -- ** Type classes
     -- *** CLaSH
-  , module CLaSH.Class.BitVector
+  , module CLaSH.Class.Bits
+  , module CLaSH.Class.BitIndex
+  , module CLaSH.Class.BitReduction
+  , module CLaSH.Class.Bitwise
   , module CLaSH.Class.Num
+  , module CLaSH.Class.Resize
     -- *** Other
   , module Control.Applicative
-  , module Data.Bits
   , module Data.Default
   )
 where
 
 import Control.Applicative
-import Data.Bits
 import Data.Default
-import Debug.Trace                 (trace)
-import CLaSH.Class.BitVector
+import Debug.Trace                  (trace)
+import GHC.TypeLits
+import Language.Haskell.TH.Lift     (Lift(..),deriveLift)
+
+import CLaSH.Class.Bits
+import CLaSH.Class.BitIndex
+import CLaSH.Class.BitReduction
+import CLaSH.Class.Bitwise
 import CLaSH.Class.Num
+import CLaSH.Class.Resize
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
@@ -83,10 +92,7 @@ import CLaSH.Sized.Fixed
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector
-import CLaSH.Bit
 import CLaSH.Signal.Implicit
-import GHC.TypeLits
-import Language.Haskell.TH.Lift     (Lift(..),deriveLift)
 
 {-# INLINABLE window #-}
 -- | Give a window over a 'Signal'

@@ -49,26 +49,28 @@ module CLaSH.Sized.Fixed
   )
 where
 
-import Control.Arrow
-import Data.Bits
-import Data.Default
-import Data.List
-import Data.Maybe
-import Data.Proxy
-import Data.Ratio
-import Data.Typeable
-import GHC.TypeLits
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax(Lift(..))
+import Control.Arrow              ((***), second)
+-- import Data.Bits                  ()
+import Data.Default               (Default (..))
+import Data.List                  (find)
+import Data.Maybe                 (fromJust)
+import Data.Proxy                 (Proxy (..))
+import Data.Ratio                 ((%), denominator, numerator)
+import Data.Typeable              (Typeable, TypeRep, typeRep)
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (<=), natVal)
+import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
+                                   numTyLit, sigE)
+import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Bit
-import CLaSH.Class.BitVector
-import CLaSH.Class.Num
-import CLaSH.Promoted.Nat
-import CLaSH.Promoted.Ord
-import CLaSH.Sized.Signed
-import CLaSH.Sized.Unsigned
-import CLaSH.Sized.Vector
+import CLaSH.Class.Bits           (Bits (..))
+import CLaSH.Class.Bitwise        (Bitwise (..))
+import CLaSH.Class.Num            (Mult (..), Add (..))
+import CLaSH.Class.Resize         (Resize (..))
+import CLaSH.Promoted.Nat         (SNat)
+import CLaSH.Promoted.Ord         (Max)
+import CLaSH.Sized.Signed         (Signed)
+import CLaSH.Sized.Unsigned       (Unsigned)
+-- import CLaSH.Sized.Vector         ()
 
 -- | 'Fixed'-point number
 --
@@ -324,10 +326,10 @@ instance (NumFixed frac rep size) => Num (Fixed frac rep size) where
                               res = Fixed (fromInteger i `shiftL` fSH)
                           in  res
 
-instance (BitVector (rep size)) => BitVector (Fixed frac rep size) where
+instance (Bits (rep size)) => Bits (Fixed frac rep size) where
   type BitSize (Fixed frac rep size) = BitSize (rep size)
-  toBV (Fixed fRep) = toBV fRep
-  fromBV bv         = Fixed (fromBV bv)
+  pack   (Fixed fRep) = pack fRep
+  unpack bv           = Fixed (unpack bv)
 
 instance (Lift (rep size), KnownNat frac, KnownNat size, Typeable rep) =>
          Lift (Fixed frac rep size) where
@@ -426,8 +428,8 @@ resizeF (Fixed fRep) = Fixed sat
 type SatN2C rep n
   = ( 1 <= n
     , ((n + 1) + 1) ~ (n + 2)
-    , BitVector (rep n)
-    , BitVector (rep (n + 2))
+    , Bits      (rep n)
+    , Bits      (rep (n + 2))
     , BitSize   (rep n) ~ n
     , BitSize   (rep (n + 2)) ~ (n + 2)
     , KnownNat  n

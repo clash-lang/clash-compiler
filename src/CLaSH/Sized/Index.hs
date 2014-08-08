@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
 
@@ -11,13 +12,13 @@ module CLaSH.Sized.Index
   )
 where
 
-import Data.Default
-import Data.Typeable
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax(Lift(..))
-import GHC.TypeLits
+import Data.Default               (Default (..))
+import Data.Typeable              (Typeable)
+import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH.Syntax (Lift(..))
+import GHC.TypeLits               (KnownNat, Nat, natVal)
 
-import CLaSH.Class.Num
+import CLaSH.Class.Resize         (Resize (..))
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log(n))@ bits
 --
@@ -26,89 +27,94 @@ newtype Index (n :: Nat) = I Integer
   deriving Typeable
 
 instance Eq (Index n) where
-  (==) = eqI
+  (==) = eq#
+  (/=) = neq#
 
-{-# NOINLINE eqI #-}
-eqI :: (Index n) -> (Index n) -> Bool
-(I n) `eqI` (I m) = n == m
+{-# NOINLINE eq# #-}
+eq# :: (Index n) -> (Index n) -> Bool
+(I n) `eq#` (I m) = n == m
+
+{-# NOINLINE neq# #-}
+neq# :: (Index n) -> (Index n) -> Bool
+(I n) `neq#` (I m) = n /= m
 
 instance Ord (Index n) where
-  (<)  = ltI
-  (>=) = geI
-  (>)  = gtI
-  (<=) = leI
+  (<)  = lt#
+  (>=) = ge#
+  (>)  = gt#
+  (<=) = le#
 
-ltI,geI,gtI,leI :: Index n -> Index n -> Bool
-{-# NOINLINE ltI #-}
-ltI (I n) (I m) = n < m
-{-# NOINLINE geI #-}
-geI (I n) (I m) = n >= m
-{-# NOINLINE gtI #-}
-gtI (I n) (I m) = n > m
-{-# NOINLINE leI #-}
-leI (I n) (I m) = n <= m
+lt#,ge#,gt#,le# :: Index n -> Index n -> Bool
+{-# NOINLINE lt# #-}
+lt# (I n) (I m) = n < m
+{-# NOINLINE ge# #-}
+ge# (I n) (I m) = n >= m
+{-# NOINLINE gt# #-}
+gt# (I n) (I m) = n > m
+{-# NOINLINE le# #-}
+le# (I n) (I m) = n <= m
 
 instance KnownNat n => Enum (Index n) where
-  succ           = plusI (fromIntegerI 1)
-  pred           = minI (fromIntegerI 1)
-  toEnum         = fromIntegerI . toInteger
-  fromEnum       = fromEnum . toIntegerI
-  enumFrom       = enumFromI
-  enumFromThen   = enumFromThenI
-  enumFromTo     = enumFromToI
-  enumFromThenTo = enumFromThenToI
+  succ           = (+# fromInteger# 1)
+  pred           = (-# fromInteger# 1)
+  toEnum         = fromInteger# . toInteger
+  fromEnum       = fromEnum . toInteger#
+  enumFrom       = enumFrom#
+  enumFromThen   = enumFromThen#
+  enumFromTo     = enumFromTo#
+  enumFromThenTo = enumFromThenTo#
 
-{-# NOINLINE enumFromI #-}
-{-# NOINLINE enumFromThenI #-}
-{-# NOINLINE enumFromToI #-}
-{-# NOINLINE enumFromThenToI #-}
-enumFromI       :: KnownNat n => Index n -> [Index n]
-enumFromThenI   :: KnownNat n => Index n -> Index n -> [Index n]
-enumFromToI     :: KnownNat n => Index n -> Index n -> [Index n]
-enumFromThenToI :: KnownNat n => Index n -> Index n -> Index n -> [Index n]
-enumFromI x             = map toEnum [fromEnum x ..]
-enumFromThenI x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromToI x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenToI x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+{-# NOINLINE enumFrom# #-}
+{-# NOINLINE enumFromThen# #-}
+{-# NOINLINE enumFromTo# #-}
+{-# NOINLINE enumFromThenTo# #-}
+enumFrom#       :: KnownNat n => Index n -> [Index n]
+enumFromThen#   :: KnownNat n => Index n -> Index n -> [Index n]
+enumFromTo#     :: KnownNat n => Index n -> Index n -> [Index n]
+enumFromThenTo# :: KnownNat n => Index n -> Index n -> Index n -> [Index n]
+enumFrom# x             = map toEnum [fromEnum x ..]
+enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
+enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
+enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
 instance KnownNat n => Bounded (Index n) where
-  minBound = fromIntegerI 0
-  maxBound = maxBoundI
+  minBound = fromInteger# 0
+  maxBound = maxBound#
 
-{-# NOINLINE maxBoundI #-}
-maxBoundI :: KnownNat n => Index n
-maxBoundI = let res = I (natVal res - 1) in res
+{-# NOINLINE maxBound# #-}
+maxBound# :: KnownNat n => Index n
+maxBound# = let res = I (natVal res - 1) in res
 
--- | Operators do @wrap-around@ on overflow
+-- | Operators report an error on overflow
 instance KnownNat n => Num (Index n) where
-  (+)         = plusI
-  (-)         = minI
-  (*)         = timesI
-  negate      = id
+  (+)         = (+#)
+  (-)         = (-#)
+  (*)         = (*#)
+  negate      = (maxBound# -#)
   abs         = id
-  signum      = signumI
-  fromInteger = fromIntegerI
+  signum      = signum#
+  fromInteger = fromInteger#
 
-plusI,minI,timesI :: KnownNat n => Index n -> Index n -> Index n
-{-# NOINLINE plusI #-}
-plusI (I a) (I b) = fromIntegerI_inlineable $ a + b
+(+#),(-#),(*#) :: KnownNat n => Index n -> Index n -> Index n
+{-# NOINLINE (+#) #-}
+(+#) (I a) (I b) = fromInteger_INLINE $ a + b
 
-{-# NOINLINE minI #-}
-minI (I a) (I b) = fromIntegerI_inlineable $ a - b
+{-# NOINLINE (-#) #-}
+(-#) (I a) (I b) = fromInteger_INLINE $ a - b
 
-{-# NOINLINE timesI #-}
-timesI (I a) (I b) = fromIntegerI_inlineable $ a * b
+{-# NOINLINE (*#) #-}
+(*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
-{-# NOINLINE signumI #-}
-signumI :: Index n -> Index n
-signumI (I 0) = (I 0)
-signumI (I _) = (I 1)
+{-# NOINLINE signum# #-}
+signum# :: Index n -> Index n
+signum# (I 0) = (I 0)
+signum# (I _) = (I 1)
 
-fromIntegerI,fromIntegerI_inlineable :: KnownNat n => Integer -> Index n
-{-# NOINLINE fromIntegerI #-}
-fromIntegerI = fromIntegerI_inlineable
-{-# INLINABLE fromIntegerI_inlineable #-}
-fromIntegerI_inlineable i =
+fromInteger#,fromInteger_INLINE :: KnownNat n => Integer -> Index n
+{-# NOINLINE fromInteger# #-}
+fromInteger# = fromInteger_INLINE
+{-# INLINE fromInteger_INLINE #-}
+fromInteger_INLINE i =
   let bound = natVal res
       i'    = i `mod` bound
       err   = error (show i ++ " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
@@ -116,40 +122,40 @@ fromIntegerI_inlineable i =
   in  res
 
 instance KnownNat n => Real (Index n) where
-  toRational = toRational . toIntegerI
+  toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (Index n) where
-  quot      = quotI
-  rem       = remI
-  div       = quotI
-  mod       = modI
-  quotRem   = quotRemI
-  divMod    = divModI
-  toInteger = toIntegerI
+  quot      = quot#
+  rem       = rem#
+  div       = quot#
+  mod       = mod#
+  quotRem   = quotRem#
+  divMod    = divMod#
+  toInteger = toInteger#
 
-quotI,remI,modI :: KnownNat n => Index n -> Index n -> Index n
-{-# NOINLINE quotI #-}
-quotI = (fst.) . quotRemI_inlineable
-{-# NOINLINE remI #-}
-remI = (snd.) . quotRemI_inlineable
-{-# NOINLINE modI #-}
-(I a) `modI` (I b) = fromIntegerI_inlineable (a `mod` b)
+quot#,rem#,mod# :: KnownNat n => Index n -> Index n -> Index n
+{-# NOINLINE quot# #-}
+quot# = (fst.) . quotRem_INLINE
+{-# NOINLINE rem# #-}
+rem# = (snd.) . quotRem_INLINE
+{-# NOINLINE mod# #-}
+(I a) `mod#` (I b) = fromInteger_INLINE (a `mod` b)
 
-quotRemI,divModI :: KnownNat n => Index n -> Index n -> (Index n, Index n)
-quotRemI n d = (n `quotI` d,n `remI` d)
-divModI n d  = (n `quotI` d,n `modI` d)
+quotRem#,divMod# :: KnownNat n => Index n -> Index n -> (Index n, Index n)
+quotRem# n d = (n `quot#` d,n `rem#` d)
+divMod# n d  = (n `quot#` d,n `mod#` d)
 
-{-# INLINEABLE quotRemI_inlineable #-}
-quotRemI_inlineable :: KnownNat n => Index n -> Index n -> (Index n, Index n)
-(I a) `quotRemI_inlineable` (I b) = let (a',b') = a `quotRem` b
-                                    in (fromIntegerI_inlineable a', fromIntegerI_inlineable b')
+{-# INLINE quotRem_INLINE #-}
+quotRem_INLINE :: KnownNat n => Index n -> Index n -> (Index n, Index n)
+(I a) `quotRem_INLINE` (I b) = let (a',b') = a `quotRem` b
+                               in  (fromInteger_INLINE a', fromInteger_INLINE b')
 
-{-# NOINLINE toIntegerI #-}
-toIntegerI :: Index n -> Integer
-toIntegerI (I n) = n
+{-# NOINLINE toInteger# #-}
+toInteger# :: Index n -> Integer
+toInteger# (I n) = n
 
 instance KnownNat n => Lift (Index n) where
-  lift u@(I i) = sigE [| fromIntegerI i |] (decIndex (natVal u))
+  lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
 
 decIndex :: Integer -> TypeQ
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
@@ -158,16 +164,13 @@ instance Show (Index n) where
   show (I n) = show n
 
 instance KnownNat n => Default (Index n) where
-  def = fromIntegerI 0
+  def = fromInteger# 0
 
-{-# NOINLINE resizeI #-}
-resizeI :: KnownNat m => Index n -> Index m
-resizeI (I n) = fromIntegerI_inlineable n
-
--- | A resize operation that zero-extends on extension, and wraps on truncation.
---
--- Increasing the size of the number extends with zeros to the left.
--- Truncating a number of length N to a length L just removes the left
--- (most significant) N-L bits.
+-- | A resize operation that errors when the value is out of the new
+-- representation bounds.
 instance Resize Index where
-  resize = resizeI
+  resize = resize#
+
+{-# NOINLINE resize# #-}
+resize# :: KnownNat m => Index n -> Index m
+resize# (I n) = fromInteger_INLINE n

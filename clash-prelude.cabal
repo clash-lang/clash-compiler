@@ -50,22 +50,31 @@ Library
   ghc-options:        -Wall -fwarn-tabs
 
   Exposed-modules:    CLaSH.Class.Bits
+                      CLaSH.Class.BitIndex
+                      CLaSH.Class.BitReduction
+                      CLaSH.Class.Bitwise
                       CLaSH.Class.Num
+                      CLaSH.Class.Resize
+
                       CLaSH.Prelude
                       CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Stream
+
                       CLaSH.Promoted.Nat
                       CLaSH.Promoted.Nat.TH
                       CLaSH.Promoted.Nat.Literals
                       CLaSH.Promoted.Ord
+
                       CLaSH.Signal.Explicit
                       CLaSH.Signal.Implicit
+
                       CLaSH.Sized.Fixed
                       CLaSH.Sized.Index
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
+
                       CLaSH.Tutorial
 
   Other-modules:      CLaSH.Signal.Types
@@ -91,6 +100,8 @@ Library
 
   Build-depends:      base                 >= 4.7.0.0 && < 5,
                       data-default         >= 0.5.3,
+                      integer-gmp          >= 0.5.1.0,
+                      ghc-prim             >= 0.3.1.0,
                       template-haskell     >= 2.9.0.0,
                       th-lift              >= 0.5.6,
                       vector               >= 0.10.11.0 && < 0.11
