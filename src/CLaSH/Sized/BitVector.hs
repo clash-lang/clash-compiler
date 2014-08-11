@@ -34,7 +34,7 @@ module CLaSH.Sized.BitVector
     -- * Modifying BitVectors
   , setBit#
   , setSlice#
-  , split
+  , split#
   -- * __VERY__ unsafe operations, not synthesisable
   , veryUnsafeToInteger#
   , veryUnsafeFromInteger#
@@ -373,9 +373,9 @@ setSlice# (BV i) m n (BV j) = BV ((i B..&. mask) B..|. j')
     j'   = B.shiftL j (fromInteger n')
     mask = B.complement ((2 ^ (m' + 1) - 1) `B.xor` (2 ^ n' - 1))
 
-{-# NOINLINE split #-}
-split :: KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
-split (BV i) = (l,r)
+{-# NOINLINE split# #-}
+split# :: KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
+split# (BV i) = (l,r)
   where
     n    = fromInteger (natVal r)
     mask = (2 ^ n) - 1
