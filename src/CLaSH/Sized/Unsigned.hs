@@ -227,7 +227,7 @@ shiftL# (U v) i = U (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
 shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-shiftR# (U v) i = U (shiftL v i)
+shiftR# (U v) i = U (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
 rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n
