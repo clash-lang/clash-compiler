@@ -70,7 +70,7 @@ import CLaSH.Class.Num            (Mult (..), Add (..))
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Promoted.Ord         (Max)
-import CLaSH.Sized.BitVector      (BitVector, (++#), split)
+import CLaSH.Sized.BitVector      (BitVector, (++#))
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 

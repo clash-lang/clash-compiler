@@ -23,11 +23,14 @@ import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (Applicative (..), (<$>))
 import GHC.TypeLits               (type (-))
-import CLaSH.Promoted.Nat         (SNat,UNat(..),snatToInteger,toUNat)
-import CLaSH.Sized.Vector         ((+>>), vlast, vcopyU)
+import Prelude                    hiding (last)
 
-import CLaSH.Signal.Implicit
-import CLaSH.Signal.Types
+import CLaSH.Promoted.Nat         (SNat,UNat(..),snatToInteger,toUNat)
+import CLaSH.Sized.Vector         ((+>>), last, replicateU)
+
+import CLaSH.Signal               (fromList, register, sample, sampleN, unwrap,
+                                   wrap)
+import CLaSH.Signal.Internal      (DSignal (..), Signal, dsignal)
 
 dfromList :: [a] -> DSignal t a
 dfromList = coerce . fromList
@@ -47,8 +50,8 @@ delay m = coerce . delay' . coerce
     delay' :: Signal a -> Signal a
     delay' s = case toUNat m of
                  UZero       -> s
-                 u@(USucc _) -> let r = unpack (register (vcopyU u def) (pack (s +>> r)))
-                                in  vlast r
+                 u@(USucc _) -> let r = wrap (register (replicateU u def) (unwrap (s +>> r)))
+                                in  last r
 
 feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
 feedback f = let (DSignal r) = f (DSignal r) in (DSignal r)
@@ -62,7 +65,7 @@ toSignal m s = count (coerce s)
     count s' = o
       where
         r      = register (snatToInteger m) r'
-        (r',o) = unpack (cntr <$> r <*> s')
+        (r',o) = wrap (cntr <$> r <*> s')
 
         cntr 0 v = (0,Just v)
         cntr k _ = (k-1,Nothing)

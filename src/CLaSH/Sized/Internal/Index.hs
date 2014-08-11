@@ -5,8 +5,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
 
--- {-# OPTIONS_GHC -fno-warn-missing-methods #-}
-
 module CLaSH.Sized.Internal.Index
   ( -- * Datatypes
     Index (..)

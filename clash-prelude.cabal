@@ -65,9 +65,12 @@ Library
                       CLaSH.Promoted.Nat.TH
                       CLaSH.Promoted.Nat.Literals
                       CLaSH.Promoted.Ord
+                      CLaSH.Promoted.Symbol
 
+                      CLaSH.Signal
                       CLaSH.Signal.Explicit
-                      CLaSH.Signal.Implicit
+                      CLaSH.Signal.Internal
+                      CLaSH.Signal.Wrap
 
                       CLaSH.Sized.Fixed
                       CLaSH.Sized.Index
@@ -82,8 +85,7 @@ Library
 
                       CLaSH.Tutorial
 
-  Other-modules:      CLaSH.Signal.Types
-                      CLaSH.Signal.Delayed
+  Other-modules:      CLaSH.Signal.Delayed
 
   other-extensions:   DataKinds
                       DefaultSignatures
