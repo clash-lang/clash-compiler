@@ -1,11 +1,14 @@
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
+
 module CLaSH.Class.Bits where
 
-import CLaSH.Sized.BitVector (BitVector, (++#), high, low, split)
+import CLaSH.Class.BitIndex  (split)
+import CLaSH.Sized.BitVector (BitVector, (++#), high, low)
 import GHC.TypeLits          (KnownNat, Nat, type (+))
 
 -- | Convert types from and to a 'Vec'tor of 'Bit's

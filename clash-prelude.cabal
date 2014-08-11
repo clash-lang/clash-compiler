@@ -75,6 +75,11 @@ Library
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
 
+                      CLaSH.Sized.Internal.BitVector
+                      CLaSH.Sized.Internal.Index
+                      CLaSH.Sized.Internal.Signed
+                      CLaSH.Sized.Internal.Unsigned
+
                       CLaSH.Tutorial
 
   Other-modules:      CLaSH.Signal.Types

@@ -9,11 +9,11 @@ module CLaSH.Class.BitIndex
   )
 where
 
-import GHC.TypeLits          (KnownNat, Nat, type (+), type (-))
+import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-))
 
-import CLaSH.Promoted.Nat    (SNat)
-import CLaSH.Sized.BitVector (BitVector, Bit, (!#), lsb#, msb#, slice#, setBit#,
-                              setSlice#)
+import CLaSH.Promoted.Nat             (SNat)
+import CLaSH.Sized.Internal.BitVector (BitVector, Bit, (!#), lsb#, msb#, slice#,
+                                       setBit#, setSlice#, split#)
 
 class BitIndex (a :: Nat -> *) where
   -- | Assert the bit at the specified index
@@ -21,6 +21,7 @@ class BitIndex (a :: Nat -> *) where
   -- __NB:__ Uses a /descending/ index
   (!)      :: (KnownNat n, Integral i) => a n -> i -> Bit
   slice    :: a (m + 1 + i) -> SNat m -> SNat n -> a (m + 1 - n)
+  split    :: KnownNat n => a (m + n) -> (a m, a n)
   -- | Set the bit at the specified index
   --
   -- __NB:__ Uses a /descending/ index
@@ -33,6 +34,7 @@ class BitIndex (a :: Nat -> *) where
 instance BitIndex BitVector where
   (!) v i     = (!#) v (fromIntegral i)
   slice       = slice#
+  split       = split#
   setBit v i  = setBit# v (fromIntegral i)
   setSlice    = setSlice#
   msb         = msb#
