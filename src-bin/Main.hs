@@ -127,6 +127,9 @@ getDefPrimDir = getDataFileName "primitives"
 
 main :: IO ()
 main = do
+#if MIN_VERSION_ghc(7,8,3)
+   initGCStatistics
+#endif
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -625,7 +628,11 @@ mode_flags =
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
   , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
+#if MIN_VERSION_ghc(7,8,3)
+  , Flag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
+#else
   , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
+#endif
   , Flag "-make"        (PassFlag (setMode doMakeMode))
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
@@ -693,7 +700,12 @@ doMake srcs  = do
         haskellish (f,Nothing) =
           looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
+#if MIN_VERSION_ghc(7,8,3)
+          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm
+                          , StopLn]
+#else
           phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
+#endif
 
     hsc_env <- GHC.getSession
 
@@ -900,3 +912,25 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
         (case fuzzyMatch f (nub allFlags) of
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
+
+{- Note [-Bsymbolic and hooks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Bsymbolic is a flag that prevents the binding of references to global
+symbols to symbols outside the shared library being compiled (see `man
+ld`). When dynamically linking, we don't use -Bsymbolic on the RTS
+package: that is because we want hooks to be overridden by the user,
+we don't want to constrain them to the RTS package.
+Unfortunately this seems to have broken somehow on OS X: as a result,
+defaultHooks (in hschooks.c) is not called, which does not initialize
+the GC stats. As a result, this breaks things like `:set +s` in GHCi
+(#8754). As a hacky workaround, we instead call 'defaultHooks'
+directly to initalize the flags in the RTS.
+A biproduct of this, I believe, is that hooks are likely broken on OS
+X when dynamically linking. But this probably doesn't affect most
+people since we're linking GHC dynamically, but most things themselves
+link statically.
+-}
+#if MIN_VERSION_ghc(7,8,3)
+foreign import ccall safe "initGCStatistics"
+  initGCStatistics :: IO ()
+#endif

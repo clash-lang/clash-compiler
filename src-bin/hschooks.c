@@ -16,6 +16,18 @@ in instead of the defaults.
 #endif
 
 void
+initGCStatistics(void)
+{
+  /* Workaround for #8754: if the GC stats aren't enabled because the
+   compiler couldn't use -Bsymbolic to link the default hooks, then
+   initialize them sensibly. See Note [-Bsymbolic and hooks] in
+   Main.hs. */
+  if (RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
+    RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
+  }
+}
+
+void
 defaultsHook (void)
 {
 #if __GLASGOW_HASKELL__ >= 707

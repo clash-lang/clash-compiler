@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.3.3 *August 12th 2014*
+* Fixes bugs:
+  * Compile with GHC 7.8.3 [#31](https://github.com/christiaanb/clash2/issues/31)
+
 ## 0.3.2 *June 5th 2014*
 
 * Fixes bugs:

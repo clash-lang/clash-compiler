@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.3.2
+Version:              0.3.3
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
