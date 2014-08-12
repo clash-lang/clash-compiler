@@ -21,7 +21,7 @@ module CLaSH.Sized.Vector
     -- ** Combining 'Vec'tors
   , (+>>), (<<+), (++), concat, zip, unzip
     -- ** Splitting 'Vec'tors
-  , split, splitI, unconcat, unconcatI, merge
+  , splitAt, splitAtI, unconcat, unconcatI, merge
     -- ** Applying functions to 'Vec'tor elements
   , map, zipWith
   , foldr, foldl, foldr1, foldl1
@@ -48,8 +48,8 @@ import Prelude                    hiding ((++), (!!), concat, drop, foldl,
                                           foldl1, foldr, foldr1, head, init,
                                           iterate, last, length, map, repeat,
                                           replicate, reverse, scanl, scanl1,
-                                          scanr, scanr1, tail, take, unzip, zip,
-                                          zipWith)
+                                          scanr, scanr1, splitAt, tail, take,
+                                          unzip, zip, zipWith)
 import qualified Prelude          as P
 import Unsafe.Coerce              (unsafeCoerce)
 
@@ -58,8 +58,8 @@ import CLaSH.Promoted.Nat         (SNat, UNat (..), withSNat, toUNat)
 -- | Fixed size vectors
 --
 -- * Lists with their length encoded in their type
--- * 'Vec'tor elements have a DESCENDING subscript starting from 'maxIndex'
---   ('vlength' - 1) and ending at 0
+-- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
+--   ending at 'maxIndex' (== 'length' - 1).
 --
 -- >>> (3:>4:>5:>Nil)
 -- <3,4,5>
@@ -236,29 +236,29 @@ infixr 5 ++
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
 xs ++ ys = append xs ys
 
-{-# NOINLINE split #-}
+{-# NOINLINE splitAt #-}
 -- | Split a vector into two vectors at the given point
 --
--- >>> split (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
+-- >>> splitAt (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
 -- (<1,2,3>, <7,8>)
--- >>> split d3 (1:>2:>3:>7:>8:>Nil)
+-- >>> splitAt d3 (1:>2:>3:>7:>8:>Nil)
 -- (<1,2,3>, <7,8>)
-split :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
-split n xs = splitU (toUNat n) xs
+splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
+splitAt n xs = splitAtU (toUNat n) xs
 
-splitU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
-splitU UZero     ys        = (Nil,ys)
-splitU (USucc s) (y :> ys) = let (as,bs) = splitU s (unsafeCoerce ys)
-                             in  (y :> as, bs)
+splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
+splitAtU UZero     ys        = (Nil,ys)
+splitAtU (USucc s) (y :> ys) = let (as,bs) = splitAtU s (unsafeCoerce ys)
+                               in  (y :> as, bs)
 
-{-# INLINEABLE splitI #-}
+{-# INLINEABLE splitAtI #-}
 -- | Split a vector into two vectors where the length of the two is determined
 -- by the context
 --
--- >>> splitI (1:>2:>3:>7:>8:>Nil) :: (Vec 2 Int, Vec 3 Int)
+-- >>> splitAtI (1:>2:>3:>7:>8:>Nil) :: (Vec 2 Int, Vec 3 Int)
 -- (<1,2>,<3,7,8>)
-splitI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
-splitI = withSNat split
+splitAtI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
+splitAtI = withSNat splitAt
 
 {-# NOINLINE concat #-}
 -- | Concatenate a vector of vectors
@@ -280,7 +280,7 @@ unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcatU UZero      _ _  = Nil
-unconcatU (USucc n') m ys = let (as,bs) = splitU m (unsafeCoerce ys)
+unconcatU (USucc n') m ys = let (as,bs) = splitAtU m (unsafeCoerce ys)
                             in  as :> unconcatU n' m bs
 
 {-# INLINEABLE unconcatI #-}
@@ -315,7 +315,7 @@ reverse (x :> xs)  = reverse xs <: x
 -- | 'map' @f xs@ is the vector obtained by applying @f@ to each element
 -- of @xs@, i.e.,
 --
--- > map f (xn :> ... :> x2 :> x1 :> Nil) == (f xn :> ... :> f x2 :> f x1 :> Nil)
+-- > map f (x1 :> x2 :>  ... :> xn :> Nil) == (f x1 :> f x2 :> ... :> f xn :> Nil)
 map :: (a -> b) -> Vec n a -> Vec n b
 map _ Nil       = Nil
 map f (x :> xs) = f x :> map f xs
@@ -326,7 +326,7 @@ map f (x :> xs) = f x :> map f xs
 -- For example, @'zipWith' (+)@ is applied to two vectors to produce the
 -- vector of corresponding sums.
 --
--- > zipWith f (xn :> ... :> x2 :> x1 :> Nil) (yn :> ... :> y2 :> y1 :> Nil) == (f xn yn :> ... :> f x2 y2 :> f x1 y1 :> Nil)
+-- > zipWith f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) == (f x1 y1 :> f x2 y2 :> ... :> f xn yn :> Nil)
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil       Nil       = Nil
 zipWith f (x :> xs) (y :> ys) = f x y :> (zipWith f xs (unsafeCoerce ys))
@@ -444,27 +444,30 @@ index_integer xs i = case indexM_integer xs i of
     Just a  -> a
     Nothing -> error (P.concat [ "(!!): Index "
                                , show i
-                               , " is out of bounds 0 and "
+                               , " is out of bounds [0.."
                                , show (maxIndex xs)
+                               , "]"
                                ])
 
 {-# INLINEABLE (!!) #-}
--- | Vector index (subscript) operator, DESCENDING from 'maxIndex', where the
--- last element has subscript 0.
+-- | Vector index (subscript) operator.
+--
+-- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
+-- ending at 'maxIndex'.
 --
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 4
--- 1
+-- 5
 -- >>> (1:>2:>3:>4:>5:>Nil) !! maxIndex
--- 1
+-- 5
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 1
--- 4
+-- 2
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 14
--- *** Exception: index out of bounds
+-- *** Exception: (!!): Index 14 is out of bounds [0..4]
 (!!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
 xs !! i = index_integer xs (toInteger i)
 
 {-# NOINLINE maxIndex #-}
--- | Index (subscript) of the head of the 'Vec'tor
+-- | Index (subscript) of the last element in a 'Vec'tor
 --
 -- >>> maxIndex (6 :> 7 :> 8 :> Nil)
 -- 2
@@ -490,24 +493,25 @@ replaceM_integer (x :> xs) n y = case replaceM_integer xs (n-1) y of
 replace_integer :: KnownNat n => Vec n a -> Integer -> a -> Vec n a
 replace_integer xs i a = case replaceM_integer xs i a of
   Just ys -> ys
-  Nothing -> error (P.concat [ "vreplace: Index "
+  Nothing -> error (P.concat [ "replace: Index "
                              , show i
-                             , " is out of bounds 0 and "
+                             , " is out of bounds [0.."
                              , show (maxIndex xs)
+                             , "]"
                              ])
 
 {-# INLINEABLE replace #-}
 -- | Replace an element of a vector at the given index (subscript).
 --
--- NB: vector elements have a descending subscript starting from 'maxIndex' and
--- ending at 0
+-- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
+-- ending at 'maxIndex'.
 --
 -- >>> replace (1:>2:>3:>4:>5:>Nil) 3 7
--- <1,7,3,4,5>
+-- <1,2,3,7,5>
 -- >>> replace (1:>2:>3:>4:>5:>Nil) 0 7
--- <1,2,3,4,7>
+-- <7,2,3,4,5>
 -- >>> replace (1:>2:>3:>4:>5:>Nil) 9 7
--- <*** Exception: index out of bounds
+-- <*** Exception: replace: Index 9 is out of bounds [0..4]
 replace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
 replace xs i y = replace_integer xs (toInteger i) y
 
@@ -530,7 +534,7 @@ replace xs i y = replace_integer xs (toInteger i) y
 --       In the expression: vtake d4 (1 :> 2 :> Nil)
 --       In an equation for ‘it’: it = vtake d4 (1 :> 2 :> Nil)
 take :: SNat m -> Vec (m + n) a -> Vec m a
-take n = fst . split n
+take n = fst . splitAt n
 
 {-# INLINEABLE takeI #-}
 -- | 'takeI' @xs@, returns the prefix of @xs@ as demanded by the context
@@ -556,7 +560,7 @@ takeI = withSNat take
 --       In the first argument of ‘print’, namely ‘it’
 --       In a stmt of an interactive GHCi command: print it
 drop :: SNat m -> Vec (m + n) a -> Vec n a
-drop n = snd . split n
+drop n = snd . splitAt n
 
 {-# INLINEABLE dropI #-}
 -- | 'dropI' @xs@, returns the suffix of @xs@ as demanded by the context
@@ -567,17 +571,17 @@ dropI :: KnownNat m => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
 
 {-# NOINLINE exact #-}
--- | 'vexact' @n xs@ returns @n@'th element of @xs@
+-- | 'exact' @n xs@ returns @n@'th element of @xs@
 --
--- NB: vector elements have a descending subscript starting from 'maxIndex' and
--- ending at 0
+-- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
+-- ending at 'maxIndex'.
 --
 -- >>> exact (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
 -- 4
 -- >>> exact d1               (1:>2:>3:>4:>5:>Nil)
 -- 4
 exact :: SNat m -> Vec (m + (n + 1)) a -> a
-exact n xs = head $ snd $ split n (reverse xs)
+exact n xs = head $ snd $ splitAt n xs
 
 {-# NOINLINE select #-}
 -- | 'select' @f s n xs@ selects @n@ elements with stepsize @s@ and
