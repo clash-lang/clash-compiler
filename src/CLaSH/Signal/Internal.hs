@@ -61,10 +61,8 @@ instance Lift a => Lift (CSignal clk a) where
 instance Default a => Default (CSignal clk a) where
   def = csignal def
 
-{-# NOINLINE csignal    #-}
-{-# NOINLINE cmapSignal #-}
-{-# NOINLINE cappSignal #-}
 
+{-# NOINLINE csignal    #-}
 -- | Create a constant 'CSignal' from a combinational value
 --
 -- >>> csample (csignal 4)
@@ -72,9 +70,11 @@ instance Default a => Default (CSignal clk a) where
 csignal :: a -> CSignal clk a
 csignal a = let s = a :- s in s
 
+{-# NOINLINE cmapSignal #-}
 cmapSignal :: (a -> b) -> CSignal clk a -> CSignal clk b
 cmapSignal f (a :- as) = f a :- cmapSignal f as
 
+{-# NOINLINE cappSignal #-}
 cappSignal :: CSignal clk (a -> b) -> CSignal clk a -> CSignal clk b
 cappSignal (f :- fs) ~(a :- as) = f a :- cappSignal fs as
 
@@ -85,31 +85,10 @@ instance Applicative (CSignal clk) where
   pure  = csignal
   (<*>) = cappSignal
 
--- shead :: Signal a -> a
--- shead (x :- _)  = x
-
--- stail :: Signal a -> Signal a
--- stail (_ :- xs) = xs
-
--- mkCSignal :: a -> CSignal clk a -> CSignal clk a
--- mkCSignal a (CSignal s) = CSignal (a :- s)
-
--- cstail :: CSignal t a -> CSignal t a
--- cstail (CSignal s) = CSignal (stail s)
-
--- mkDSignal :: a -> DSignal delay a -> DSignal delay a
--- mkDSignal a (DSignal s) = DSignal (a :- s)
-
--- dstail :: DSignal t a -> DSignal t a
--- dstail (DSignal s) = DSignal (stail s)
-
--- -- | Create a constant 'CSignal' from a combinational value
--- --
--- -- >>> csample (csignal 4)
--- -- [4, 4, 4, 4, ...
--- csignal :: a -> CSignal t a
--- csignal a = coerce (signal a)
-
+-- | Create a constant 'DSignal' from a combinational value
+--
+-- >>> dsample (dsignal 4)
+-- [4, 4, 4, 4, ...
 dsignal :: a -> DSignal n a
 dsignal a = coerce (csignal a)
 

@@ -19,18 +19,19 @@ module CLaSH.Sized.Vector
   , head, tail, last, init
   , take, takeI, drop, dropI, exact, select, selectI
     -- ** Combining 'Vec'tors
-  , (+>>), (<<+), (++), concat, zip, unzip
+  , (++), (+>>), (<<+), concat, zip, unzip, shiftInAt0, shiftInAtN
+  , shiftOutFrom0, shiftOutFromN
     -- ** Splitting 'Vec'tors
   , splitAt, splitAtI, unconcat, unconcatI, merge
     -- ** Applying functions to 'Vec'tor elements
   , map, zipWith
-  , foldr, foldl, foldr1, foldl1
+  , foldr, foldl, foldr1, foldl1, fold
   , scanl, scanr, scanl1, scanr1
   , mapAccumL, mapAccumR
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
     -- ** Generating 'Vec'tors
-  , replicate, repeat, replicateU, iterate, iterateI, generate, generateI
+  , replicate, replicateU, repeat, iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
   )
@@ -166,60 +167,102 @@ init :: Vec (n + 1) a -> Vec n a
 init (_ :> Nil)     = unsafeCoerce Nil
 init (x :> y :> ys) = unsafeCoerce (x :> init (y :> ys))
 
-{-# NOINLINE shiftIntoL #-}
--- | Add an element to the head of the vector, and extract all elements of the
--- resulting vector except the last element
-shiftIntoL :: a -> Vec n a -> Vec n a
-shiftIntoL _ Nil       = Nil
-shiftIntoL s (x :> xs) = s :> (init (x:>xs))
+-- | Add an element to the head of a vector, and split the resulting vector
+-- into a tuple containg:
+--
+-- * All elements but the last
+-- * The last element
+--
+-- >>> shiftInAt0 5 (1 :> 2 :> 3 :> 4 :> Nil)
+-- (<5,1,2,3>, 4)
+-- >>> shiftInAt0 5 Nil
+-- (<>, 5)
+shiftInAt0 :: a -> Vec n a -> (Vec n a, a)
+shiftInAt0 s xs = (init zs, last zs)
+  where
+    zs = s :> xs
 
 infixr 4 +>>
 {-# INLINEABLE (+>>) #-}
--- | Add an element to the head of the vector, and extract all elements of the
--- resulting vector except the last element
+-- | Add an element to the head of a vector, and extract all but the last
+-- element.
 --
 -- >>> 1 +>> (3:>4:>5:>Nil)
 -- <1,3,4>
 -- >>> 1 +>> Nil
 -- <>
 (+>>) :: a -> Vec n a -> Vec n a
-s +>> xs = shiftIntoL s xs
+s +>> xs = fst (shiftInAt0 s xs)
+
+-- | Shift @m@ elements out from the head of a vector, filling up the tail with
+-- 'Default' values. Returns the shifted out values, and the new vector.
+--
+-- >>> shiftOutFrom0 d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
+-- (<1,2>,<3,4,5,0,0>)
+shiftOutFrom0 :: Default a
+              => SNat m
+              -> Vec (m + n) a
+              -> (Vec m a, Vec (n + m) a)
+shiftOutFrom0 m xs = (ys,zs ++ replicate m def)
+  where
+    (ys,zs) = splitAt m xs
 
 {-# NOINLINE snoc #-}
--- | Add an element to the tail of the vector
-snoc :: a -> Vec n a -> Vec (n + 1) a
-snoc s Nil       = s :> Nil
-snoc s (x :> xs) = x :> (snoc s xs)
+-- | Add an element to the tail of a vector.
+snoc :: Vec n a -> a -> Vec (n + 1) a
+snoc Nil       s = s :> Nil
+snoc (x :> xs) s = x :> (snoc xs s)
 
 infixl 5 <:
 {-# INLINEABLE (<:) #-}
--- | Add an element to the tail of the vector
+-- | Add an element to the tail of a vector.
 --
 -- >>> (3:>4:>5:>Nil) <: 1
 -- <3,4,5,1>
 -- >>> :t (3:>4:>5:>Nil) <: 1
 -- (3:>4:>5:>Nil) <: 1 :: Num a => Vec 4 a
 (<:) :: Vec n a -> a -> Vec (n + 1) a
-xs <: s = snoc s xs
+(<:) = snoc
 
-{-# NOINLINE shiftIntoR #-}
--- | Add an element to the tail of the vector, and extract all elements of the
--- resulting vector except the first element
-shiftIntoR :: a -> Vec n a -> Vec n a
-shiftIntoR _ Nil     = Nil
-shiftIntoR s (x:>xs) = snoc s (tail (x:>xs))
+-- | Add an element to the tail of a vector, and split the resulting vector
+-- into a tuple containg:
+--
+-- * The first element
+-- * All elements but the first
+--
+-- >>> shiftInAtN 5 (1 :> 2 :> 3 :> 4 :> Nil)
+-- (1, <2,3,4,5>)
+-- >>> shiftInAtN 5 Nil
+-- (<>, 5)
+shiftInAtN :: a -> Vec n a -> (a,Vec n a)
+shiftInAtN s xs = (head zs, tail zs)
+  where
+    zs = snoc xs s
 
 infixl 4 <<+
 {-# INLINE (<<+) #-}
--- | Add an element to the tail of the vector, and extract all elements of the
--- resulting vector except the first element
+-- | Add an element to the tail of a vector, and extract all but the first
+-- element.
 --
 -- >>> (3:>4:>5:>Nil) <<+ 1
 -- <4,5,1>
 -- >>> Nil <<+ 1
 -- <>
 (<<+) :: Vec n a -> a -> Vec n a
-xs <<+ s = shiftIntoR s xs
+xs <<+ s = snd (shiftInAtN s xs)
+
+-- | Shift @m@ elements out from the tail of a vector, filling up the head with
+-- 'Default' values. Returns the shifted out values, and the new vector.
+--
+-- >>> shiftOutFromN d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
+-- (<4,5>,<0,0,1,2,3>)
+shiftOutFromN :: Default a
+              => SNat m
+              -> Vec (m + n) a
+              -> (Vec m a, Vec (m + n) a)
+shiftOutFromN m xs = (reverse ys, replicate m def ++ reverse zs)
+  where
+    (ys,zs) = splitAt m (reverse xs)
 
 {-# NOINLINE append #-}
 -- | Append two vectors
@@ -336,8 +379,16 @@ zipWith f (x :> xs) (y :> ys) = f x y :> (zipWith f xs (unsafeCoerce ys))
 -- the right-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from right to left:
 --
--- > foldr f z (xn :> ... :> x2 :> x1 :> Nil) == xn `f` (... (x2 `f` (x1 `f` z))...)
--- > foldr r z Nil                            == z
+-- > foldr f z (x1 :> ... :> xn1 :> xn :> Nil) == x1 `f` (... (xn1 `f` (xn `f` z))...)
+-- > foldr r z Nil                             == z
+--
+-- >>> foldr (/) 1 (5 :> 4 :> 3 :> 2 :> Nil)
+-- 1.875
+--
+-- __NB__: @"'foldr' f z xs"@ produces a linear structure, which has a depth, or
+-- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
+-- associative, as @"'fold' f xs"@ produces a structure with a depth of
+-- O(log_2(@'length' xs@)).
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
 foldr _ z Nil       = z
 foldr f z (x :> xs) = f x (foldr f z xs)
@@ -347,8 +398,16 @@ foldr f z (x :> xs) = f x (foldr f z xs)
 -- the left-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from left to right:
 --
--- > foldl f z (xn :> ... :> x2 :> x1 :> Nil) == (...((z `f` xn)... `f` x2) `f` x1
+-- > foldl f z (x1 :> x2 :> ... :> xn :> Nil) == (...((z `f` x1) `f` x2) `f`...) `f` xn
 -- > foldl f z Nil                            == z
+--
+-- >>> foldl (/) 1 (5 :> 4 :> 3 :> 2 :> Nil)
+-- 8.333333333333333e-3
+--
+-- __NB__: @"'foldl' f z xs"@ produces a linear structure, which has a depth, or
+-- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
+-- associative, as @"'fold' f xs"@ produces a structure with a depth of
+-- O(log_2(@'length' xs@)).
 foldl :: (b -> a -> b) -> b -> Vec n a -> b
 foldl _ z Nil       = z
 foldl f z (x :> xs) = foldl f (f z x) xs
@@ -357,9 +416,17 @@ foldl f z (x :> xs) = foldl f (f z x) xs
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty vectors.
 --
--- > foldr1 f (xn :> ... :> x3 :> x2 :> x1 :> Nil) == xn `f` (... (x3 `f` (x2 `f` x1))...)
--- > foldr1 f (x1 :> Nil)                          == x1
--- > foldr1 f Nil                                  == TYPE ERROR
+-- > foldr1 f (x1 :> ... :> xn2 :> xn1 :> xn :> Nil) == x1 `f` (... (xn2 `f` (xn1 `f` xn))...)
+-- > foldr1 f (x1 :> Nil)                            == x1
+-- > foldr1 f Nil                                    == TYPE ERROR
+--
+-- >>> foldr1 (/) (5 :> 4 :> 3 :> 2 :> 1 :> Nil)
+-- 1.875
+--
+-- __NB__: @"'foldr1' f z xs"@ produces a linear structure, which has a depth,
+-- or delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
+-- associative, as @"'fold' f xs"@ produces a structure with a depth of
+-- O(log_2(@'length' xs@)).
 foldr1 :: (a -> a -> a) -> Vec (n + 1) a -> a
 foldr1 _ (x :> Nil)       = x
 foldr1 f (x :> (y :> ys)) = f x (foldr1 f (y :> ys))
@@ -368,13 +435,50 @@ foldr1 f (x :> (y :> ys)) = f x (foldr1 f (y :> ys))
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty vectors.
 --
--- > foldl f (xn :> xn1 :> ... :> x2 :> x1 :> Nil) == (...((xn `f` xn1)... `f` x2) `f` x1
--- > foldl f (x1 :> Nil)                           == x1
--- > foldl f Nil                                   == TYPE ERROR
+-- > foldl1 f (x1 :> x2 :> x3 :> ... :> xn :> Nil) == (...((x1 `f` x2) `f` x3) `f`...) `f` xn
+-- > foldl1 f (x1 :> Nil)                          == x1
+-- > foldl1 f Nil                                  == TYPE ERROR
+--
+-- >>> foldl1 (/) (1 :> 5 :> 4 :> 3 :> 2 :> Nil)
+-- 8.333333333333333e-3
+--
+-- __NB__: @"'foldl1' f z xs"@ produces a linear structure, which has a depth,
+-- or delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
+-- associative, as @"'fold' f xs"@ produces a structure with a depth of
+-- O(log_2(@'length' xs@)).
 foldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
 foldl1 f xs = foldl f (head xs) (tail xs)
 
+{-# NOINLINE fold #-}
+-- | 'fold' is a variant of 'foldr1' and 'foldl1', but instead of reducing from
+-- right to left, or left to right, it reduces a vector using a tree-like
+-- structure. The depth, or delay, of the structure produced by @'fold' f xs@,
+-- is hence @O(log_2('length' xs))@, and not @O('length' xs)@.
+--
+-- __NB__: The binary operator @f@ in @'fold' f xs@ must be associative.
+--
+-- > fold f (x1 :> x2 :> ... :> xn1 :> xn :> Nil) == ((x1 `f` x2) `f` ...) `f` (... `f` (xn1 `f` xn))
+-- > fold f (x1 :> Nil)                           == x1
+-- > fold f Nil                                   == TYPE ERROR
+--
+-- >>> fold (+) (5 :> 4 :> 3 :> 2 :> 1 :> Nil)
+-- 15
+fold :: (a -> a -> a) -> Vec (n + 1) a -> a
+fold f vs = fold' (toList vs)
+  where
+    fold' [x] = x
+    fold' xs  = fold' ys `f` fold' zs
+      where
+        (ys,zs) = P.splitAt (P.length xs `div` 2) xs
+
 {-# INLINEABLE scanl #-}
+-- | 'scanl' is similar to 'foldl', but returns a list of successive reduced
+-- values from the left:
+--
+-- > scanl f z (x1 :> x2 :> ... :> Nil) == z :> (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
+--
+-- __NB__:
+-- > last (scanl f z xs) == foldl f z xs
 scanl :: KnownNat n => (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanl f z xs = ws
   where
@@ -617,11 +721,11 @@ selectI :: ((f + (s * n) + 1) <= i, KnownNat (n + 1))
 selectI f s xs = withSNat (\n -> select f s n xs)
 
 {-# NOINLINE replicate #-}
--- | 'vcopy' @n a@ returns a vector that has @n@ copies of @a@
+-- | 'replicate' @n a@ returns a vector that has @n@ copies of @a@
 --
--- >>> vcopy (snat :: SNat 3) 6
+-- >>> replicate (snat :: SNat 3) 6
 -- <6,6,6>
--- >>> vcopy d3 6
+-- >>> replicate d3 6
 -- <6,6,6>
 replicate :: SNat n -> a -> Vec n a
 replicate n a = replicateU (toUNat n) a
@@ -645,6 +749,9 @@ repeat = withSNat replicate
 --
 -- > iterate (snat :: SNat 4) f x == (x :> f x :> f (f x) :> f (f (f x)) :> Nil)
 -- > iterate d4 f x               == (x :> f x :> f (f x) :> f (f (f x)) :> Nil)
+--
+-- >>> iterate d4 (+1) 1
+-- <1,2,3,4>
 iterate :: SNat n -> (a -> a) -> a -> Vec n a
 iterate n f a = iterateU (toUNat n) f a
 
@@ -657,6 +764,9 @@ iterateU (USucc s) g x = x :> iterateU s g (g x)
 -- repeated applications of @f@ to @x@, where @n@ is determined by the context
 --
 -- > iterateI f x :: Vec 3 a == (x :> f x :> f (f x) :> Nil)
+--
+-- >>> iterateI (+1) 1 :: Vec 3 Int
+-- <1,2,3>
 iterateI :: KnownNat n => (a -> a) -> a -> Vec n a
 iterateI = withSNat iterate
 
@@ -666,6 +776,9 @@ iterateI = withSNat iterate
 --
 -- > generate (snat :: SNat 4) f x == (f x :> f (f x) :> f (f (f x)) :> f (f (f (f x))) :> Nil)
 -- > generate d4 f x               == (f x :> f (f x) :> f (f (f x)) :> f (f (f (f x))) :> Nil)
+--
+-- >>> generate d4 (+1) 1
+-- <2,3,4,5>
 generate :: SNat n -> (a -> a) -> a -> Vec n a
 generate n f a = iterate n f (f a)
 
@@ -674,6 +787,9 @@ generate n f a = iterate n f (f a)
 -- to @x@, where @n@ is determined by the context
 --
 -- > generateI f x :: Vec 3 a == (f x :> f (f x) :> f (f (f x)) :> Nil)
+--
+-- >>> generateI (+1) 1 :: Vec 3 Int
+-- <2,3,4>
 generateI :: KnownNat n => (a -> a) -> a -> Vec n a
 generateI = withSNat generate
 
@@ -682,6 +798,8 @@ generateI = withSNat generate
 --
 -- >>> toList (1:>2:>3:>Nil)
 -- [1,2,3]
+--
+-- __NB__: Not synthesisable
 toList :: Vec n a -> [a]
 toList = foldr (:) []
 
@@ -707,28 +825,28 @@ asNatProxy _ = Proxy
 -- For example:
 --
 -- > -- Bubble sort for 1 iteration
--- > sortV xs = vmap fst sorted <: (snd (vlast sorted))
+-- > sortV xs = map fst sorted <: (snd (last sorted))
 -- >  where
--- >    lefts  = vhead xs :> vmap snd (vinit sorted)
--- >    rights = vtail xs
--- >    sorted = vzipWith compareSwapL lefts rights
+-- >    lefts  = head xs :> map snd (init sorted)
+-- >    rights = tail xs
+-- >    sorted = zipWith compareSwapL lefts rights
 -- >
 -- > -- Compare and swap
 -- > compareSwapL a b = if a < b then (a,b)
 -- >                             else (b,a)
 --
--- Will not terminate because 'vzipWith' is too strict in its second argument:
+-- Will not terminate because 'zipWith' is too strict in its second argument:
 --
 -- >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
 -- <*** Exception: <<loop>>
 --
--- In this case, adding 'lazyV' on 'vzipWith's second argument:
+-- In this case, adding 'lazyV' on 'zipWith's second argument:
 --
--- > sortVL xs = vmap fst sorted <: (snd (vlast sorted))
+-- > sortVL xs = map fst sorted <: (snd (last sorted))
 -- >  where
--- >    lefts  = vhead xs :> vmap snd (vinit sorted)
--- >    rights = vtail xs
--- >    sorted = vzipWith compareSwapL (lazyV lefts) rights
+-- >    lefts  = head xs :> map snd (init sorted)
+-- >    rights = tail xs
+-- >    sorted = zipWith compareSwapL (lazyV lefts) rights
 --
 -- Results in a successful computation:
 --

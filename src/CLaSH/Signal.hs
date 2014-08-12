@@ -6,7 +6,7 @@ module CLaSH.Signal
   , register
     -- * Product/Signal isomorphism
   , W.Wrap
-  , Wrapped
+  , SWrapped
   , wrap
   , unwrap
     -- * Simulation functions (not synthesisable)
@@ -44,12 +44,12 @@ register = cregister systemClock
 
 -- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's.
-type Wrapped a = W.Wrapped SystemClock a
+type SWrapped a = W.Wrapped SystemClock a
 
-wrap :: W.Wrap a => Signal a -> Wrapped a
+wrap :: W.Wrap a => Signal a -> SWrapped a
 wrap = W.wrap systemClock
 
-unwrap :: W.Wrap a => Wrapped a -> Signal a
+unwrap :: W.Wrap a => SWrapped a -> Signal a
 unwrap = W.unwrap systemClock
 
 -- * Simulation functions (not synthesisable)
@@ -59,6 +59,8 @@ unwrap = W.unwrap systemClock
 --
 -- >>> simulate (register 8) [1, 2, 3, ...
 -- [8, 1, 2, 3, ...
+--
+-- __NB__: This function is not synthesisable
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
@@ -67,7 +69,9 @@ simulate f = sample . f . fromList
 --
 -- >>> simulateP (wrap . register (8,8) . unwrap) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
-simulateP :: (W.Wrap a, W.Wrap b) => (Wrapped a -> Wrapped b) -> [a] -> [b]
+--
+-- __NB__: This function is not synthesisable
+simulateP :: (W.Wrap a, W.Wrap b) => (SWrapped a -> SWrapped b) -> [a] -> [b]
 simulateP f = simulate (unwrap . f . wrap)
 
 -- * List \<-\> Signal conversion (not synthesisable)
@@ -78,6 +82,8 @@ simulateP f = simulate (unwrap . f . wrap)
 -- consecutive clock cycles
 --
 -- > sample s == [s0, s1, s2, s3, ...
+--
+-- __NB__: This function is not synthesisable
 sample :: Signal a -> [a]
 sample = csample
 
@@ -87,6 +93,8 @@ sample = csample
 -- consecutive clock cycles
 --
 -- > sampleN 3 s == [s0, s1, s2]
+--
+-- __NB__: This function is not synthesisable
 sampleN :: Int -> Signal a -> [a]
 sampleN = csampleN
 
@@ -95,9 +103,9 @@ sampleN = csampleN
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
 --
--- NB: Simulation only!
---
 -- >>> sampleN 2 (fromList [1,2,3,4,5])
 -- [1,2]
+--
+-- __NB__: This function is not synthesisable
 fromList :: [a] -> Signal a
 fromList = cfromList

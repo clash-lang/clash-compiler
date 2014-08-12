@@ -59,7 +59,8 @@ Library
                       CLaSH.Prelude
                       CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.Explicit
-                      CLaSH.Prelude.Stream
+                      CLaSH.Prelude.Mealy
+                      CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat
                       CLaSH.Promoted.Nat.TH
@@ -68,6 +69,7 @@ Library
                       CLaSH.Promoted.Symbol
 
                       CLaSH.Signal
+                      CLaSH.Signal.Delayed
                       CLaSH.Signal.Explicit
                       CLaSH.Signal.Internal
                       CLaSH.Signal.Wrap
@@ -84,8 +86,6 @@ Library
                       CLaSH.Sized.Internal.Unsigned
 
                       CLaSH.Tutorial
-
-  Other-modules:      CLaSH.Signal.Delayed
 
   other-extensions:   DataKinds
                       DefaultSignatures
@@ -110,5 +110,4 @@ Library
                       integer-gmp          >= 0.5.1.0,
                       ghc-prim             >= 0.3.1.0,
                       template-haskell     >= 2.9.0.0,
-                      th-lift              >= 0.5.6,
-                      vector               >= 0.10.11.0 && < 0.11
+                      th-lift              >= 0.5.6

@@ -25,7 +25,7 @@ import Prelude hiding ((.),id)
 import GHC.TypeLits
 
 import CLaSH.Promoted.Nat
-import CLaSH.Signal.Implicit
+import CLaSH.Signal
 import CLaSH.Sized.Index
 import CLaSH.Sized.Vector
 

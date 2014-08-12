@@ -18,7 +18,7 @@ module CLaSH.Signal.Explicit
   , cregister
     -- * Product/Signal isomorphism
   , Wrap
-  , Wrapped
+  , CWrapped
   , cunwrap
   , cwrap
     -- * Simulation functions (not synthesisable)
@@ -38,6 +38,24 @@ import CLaSH.Promoted.Symbol (ssymbol)
 import CLaSH.Signal.Internal (CSignal (..), Clock (..), SClock (..),
                               SystemClock, csignal)
 import CLaSH.Signal.Wrap     (Wrap (..), Wrapped)
+
+{- $relativeclocks #relativeclocks#
+CλaSH supports explicitly clocked 'Signal's in the form of: \"@'CSignal' clk a@\",
+where @clk@ is a 'Nat'ural number corresponding to the clock period of the clock
+the signal is synchronized to. NB: \"Bad things\"™  happen when you actually use
+a clock period of @0@, so don't do that!
+
+The clock periods are however dimension-less, they do not refer to any explicit
+time-scale (e.g. nano-seconds). The reason for the lack of an explicit time-scale
+is that the CλaSH compiler would not be able guarantee that the circuit can run
+at the specified frequency.
+
+The clock periods are just there to indicate relative frequency differences
+between two different clocks. That is, a \"@'CSignal' 500 a@\" is synchronized
+to a clock that runs 6.5 times faster than the clock to which a
+\"@'CSignal' 3250 a@\" is synchronized to. NB: You should be judicious using a
+clock with period @1@ as you can never create a clock that runs faster later on!
+-}
 
 -- * Clock domain crossing
 -- ** Clock
@@ -102,6 +120,8 @@ cregister :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 cregister _ a s = a :- s
 
 -- * Product/Signal isomorphism
+type CWrapped = Wrapped
+
 cunwrap :: Wrap a => SClock clk -> Wrapped clk a -> CSignal clk a
 cunwrap = unwrap
 
