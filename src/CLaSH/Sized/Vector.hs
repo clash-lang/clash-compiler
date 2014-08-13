@@ -34,6 +34,9 @@ module CLaSH.Sized.Vector
   , replicate, replicateU, repeat, iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
+    -- ** 'Bits'
+  , concatBitVector#
+  , unconcatBitVector#
   )
 where
 
@@ -54,7 +57,9 @@ import Prelude                    hiding ((++), (!!), concat, drop, foldl,
 import qualified Prelude          as P
 import Unsafe.Coerce              (unsafeCoerce)
 
+import CLaSH.Class.BitIndex       (split)
 import CLaSH.Promoted.Nat         (SNat, UNat (..), withSNat, toUNat)
+import CLaSH.Sized.BitVector      (BitVector, (++#))
 
 -- | Fixed size vectors
 --
@@ -860,3 +865,23 @@ lazyV = lazyV' (repeat undefined)
     lazyV' :: Vec n a -> Vec n a -> Vec n a
     lazyV' Nil       _  = Nil
     lazyV' (_ :> xs) ys = head ys :> lazyV' xs (tail ys)
+
+{-# NOINLINE concatBitVector# #-}
+concatBitVector# :: KnownNat m
+                 => Vec n (BitVector m)
+                 -> BitVector (n * m)
+concatBitVector# Nil       = 0
+concatBitVector# (x :> xs) = unsafeCoerce (concatBitVector# xs ++# x)
+
+{-# NOINLINE unconcatBitVector# #-}
+unconcatBitVector# :: (KnownNat n, KnownNat m)
+                   => BitVector (n * m)
+                   -> Vec n (BitVector m)
+unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
+
+{-# INLINE ucBV #-}
+ucBV :: forall n m . KnownNat m
+     => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
+ucBV UZero     _  = Nil
+ucBV (USucc n) bv = let (bv',x :: BitVector m) = split (unsafeCoerce bv)
+                    in  x :> ucBV n bv'
