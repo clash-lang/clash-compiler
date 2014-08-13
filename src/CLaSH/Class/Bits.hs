@@ -14,13 +14,14 @@ import CLaSH.Class.BitIndex  (split)
 import CLaSH.Sized.BitVector (BitVector, (++#), high, low)
 import CLaSH.Sized.Vector    (Vec, concatBitVector#, map, unconcatBitVector#)
 
--- | Convert types from and to a 'Vec'tor of 'Bit's
+-- | Convert to and from a 'BitVector'
 class Bits a where
-  -- | Number of 'Bit's needed to represents elements of type @a@
+  -- | Number of 'CLaSH.Sized.BitVector.Bit's needed to represents elements
+  -- of type @a@
   type BitSize a :: Nat
-  -- | Convert element of type @a@ to a 'Vec' of 'Bit's
+  -- | Convert element of type @a@ to a 'BitVector'
   pack   :: KnownNat (BitSize a) => a -> BitVector (BitSize a)
-  -- | Convert a 'Vec' of 'Bit's to an element of type @a@
+  -- | Convert a 'BitVector' to an element of type @a@
   unpack :: KnownNat (BitSize a) => BitVector (BitSize a) -> a
 
 instance Bits Bool where
@@ -35,7 +36,8 @@ instance Bits (BitVector n) where
   pack   v = v
   unpack v = v
 
-instance (KnownNat (BitSize a), KnownNat (BitSize b), Bits a, Bits b) => Bits (a,b) where
+instance (KnownNat (BitSize a), KnownNat (BitSize b), Bits a, Bits b) =>
+    Bits (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
   unpack ab  = let (a,b) = split ab in (unpack a, unpack b)

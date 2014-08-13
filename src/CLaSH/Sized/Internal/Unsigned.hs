@@ -108,17 +108,17 @@ newtype Unsigned (n :: Nat) =
 instance Show (Unsigned n) where
   show (U (BV i)) = show i
 
-instance KnownNat n => Bits (Unsigned n) where
+instance Bits (Unsigned n) where
   type BitSize (Unsigned n) = n
   pack   = pack#
   unpack = unpack#
 
 {-# NOINLINE pack# #-}
-pack# :: KnownNat n => Unsigned n -> BitVector n
+pack# :: Unsigned n -> BitVector n
 pack# = unsafeToBitVector
 
 {-# NOINLINE unpack# #-}
-unpack# :: KnownNat n => BitVector n -> Unsigned n
+unpack# :: BitVector n -> Unsigned n
 unpack# = U
 
 instance Eq (Unsigned n) where

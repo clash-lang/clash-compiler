@@ -110,7 +110,7 @@ import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit)
 -- "CLaSH.Sized.Fixed".
 newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
-    -- synthesisable
+    -- synthesisable.
     S { unsafeToInteger :: Integer}
   deriving Typeable
 

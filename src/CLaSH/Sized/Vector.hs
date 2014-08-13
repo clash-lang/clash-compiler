@@ -484,10 +484,13 @@ fold f vs = fold' (toList vs)
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
 
 {-# INLINEABLE scanl #-}
--- | 'scanl' is similar to 'foldl', but returns a list of successive reduced
+-- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:
 --
 -- > scanl f z (x1 :> x2 :> ... :> Nil) == z :> (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
+--
+-- >>> scanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
+-- <0,5,9,12,14>
 --
 -- __NB__:
 --
@@ -498,24 +501,62 @@ scanl f z xs = ws
     ws = z :> zipWith f (lazyV (init ws)) xs
 
 {-# INLINEABLE scanl1 #-}
+-- | 'scanl1' is a variant of 'scanl' that has no starting element:
+--
+-- > scanl1 f (x1 :> x2 :> x3 :> ... :> Nil) == x1 :> (x1 `f` x2) :> ((x1 `f` x2) `f` x3) :> ... :> Nil
+--
+-- >>> scanl1 (+) (5 :> 4 :> 3 :> 2 :> Nil)
+-- <5,9,12,14>
+--
+-- __NB__:
+--
+-- > last (scanl1 f xs) == foldl1 f xs
 scanl1 :: KnownNat n => (a -> a -> a) -> Vec n a -> Vec n a
 scanl1 f xs = init (scanl f (head xs') (tail xs'))
   where
     xs' = xs <: undefined
 
 {-# INLINEABLE scanr #-}
+-- | 'scanr' is similar to 'foldr', but returns a vector of successive reduced
+-- values from the right:
+--
+-- > scanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> z :> Nil
+--
+-- >>> scanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
+-- <14,9,5,2,0>
+--
+-- __NB__:
+--
+-- > head (scanr f z xs) == foldr f z xs
 scanr :: KnownNat n => (a -> b -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanr f z xs = ws
   where
     ws = zipWith f xs (lazyV (tail ws)) <: z
 
 {-# INLINEABLE scanr1 #-}
+-- | 'scanr1' is a variant of 'scanr' that has no starting element:
+--
+-- > scanr f (... :> xn2 :> xn1 :> xn :> Nil) == ... :> (xn3 `f` (xn2 `f` xn1)) :> (xn1 `f` xn) :> xn :> Nil
+--
+-- >>> scanr1 (+) (5 :> 4 :> 3 :> 2 :> Nil)
+-- <14,9,5,2>
+--
+-- __NB__:
+--
+-- > head (scanr1 f xs) == foldr1 f xs
 scanr1 :: KnownNat n => (a -> a -> a) -> Vec n a -> Vec n a
 scanr1 f xs = tail (scanr f (last xs') (init xs'))
   where
     xs' = undefined :> xs
 
 {-# INLINEABLE mapAccumL #-}
+-- | The 'mapAccumL' function behaves like a combination of 'map' and 'foldl';
+-- it applies a function to each element of a vector, passing an accumulating
+-- parameter from left to right, and returning a final value of this accumulator
+-- together with the new vector.
+--
+-- >>> mapAccumL (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
+-- (10,<1,2,4,7>)
 mapAccumL :: KnownNat n => (acc -> x -> (acc,y)) -> acc -> Vec n x
           -> (acc,Vec n y)
 mapAccumL f acc xs = (acc',ys)
@@ -525,6 +566,13 @@ mapAccumL f acc xs = (acc',ys)
     ys   = map snd (tail ws)
 
 {-# INLINEABLE mapAccumR #-}
+-- | The 'mapAccumR' function behaves like a combination of 'map' and 'foldr';
+-- it applies a function to each element of a vector, passing an accumulating
+-- parameter from right to left, and returning a final value of this accumulator
+-- together with the new vector.
+--
+-- >>> mapAccumR (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
+-- (10,<10,8,5,1>)
 mapAccumR :: KnownNat n => (acc -> x -> (acc,y)) -> acc -> Vec n x
           -> (acc, Vec n y)
 mapAccumR f acc xs = (acc',ys)
