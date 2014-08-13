@@ -13,7 +13,7 @@
 
 module CLaSH.Sized.Vector
   ( -- * 'Vec'tor constructors
-    Vec(..), (<:)
+    Vec(..), (<:), singleton
     -- * Standard 'Vec'tor functions
     -- ** Extracting sub-'Vec'tors
   , head, tail, last, init
@@ -110,6 +110,10 @@ instance Functor (Vec n) where
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
 
+{-# INLINABLE singleton #-}
+singleton :: a -> Vec 1 a
+singleton = (:> Nil)
+
 {-# NOINLINE head #-}
 -- | Extract the first element of a vector
 --
@@ -172,51 +176,44 @@ init :: Vec (n + 1) a -> Vec n a
 init (_ :> Nil)     = unsafeCoerce Nil
 init (x :> y :> ys) = unsafeCoerce (x :> init (y :> ys))
 
--- | Add an element to the head of a vector, and split the resulting vector
--- into a tuple containg:
+{-# INLINEABLE shiftInAt0 #-}
+-- | Shift in elements to the head of a vector, bumping out elements at the
+-- tail. The result is a tuple containing:
 --
--- * All elements but the last
--- * The last element
+-- * The new vector
+-- * The shifted out elements
 --
--- >>> shiftInAt0 5 (1 :> 2 :> 3 :> 4 :> Nil)
--- (<5,1,2,3>, 4)
--- >>> shiftInAt0 5 Nil
--- (<>, 5)
-shiftInAt0 :: a -> Vec n a -> (Vec n a, a)
-shiftInAt0 s xs = (init zs, last zs)
+-- >>> shiftInAt0 (1 :> 2 :> 3 :> 4 :> Nil) ((-1) :> 0 :> Nil)
+-- (<-1,0,1,2,>,<3,4>)
+-- >>> shiftInAt0 (1 :> Nil) ((-1) :> 0 :> Nil)
+-- (<-1>,<0,1>)
+shiftInAt0 :: KnownNat n
+           => Vec n a -- ^ The old vector
+           -> Vec m a -- ^ The elements to shift in at the head
+           -> (Vec n a, Vec m a) -- ^ (The new vector, shifted out elements)
+shiftInAt0 xs ys = splitAtI (unsafeCoerce zs)
   where
-    zs = s :> xs
+    zs = ys ++ xs
 
-infixr 4 +>>
-{-# INLINEABLE (+>>) #-}
--- | Add an element to the head of a vector, and extract all but the last
--- element.
+{-# INLINEABLE shiftInAtN #-}
+-- | Shift in element to the tail of a vector, bumping out elements at the head.
+-- The result is a tuple containing:
 --
--- >>> 1 +>> (3:>4:>5:>Nil)
--- <1,3,4>
--- >>> 1 +>> Nil
--- <>
-(+>>) :: a -> Vec n a -> Vec n a
-s +>> xs = fst (shiftInAt0 s xs)
-
--- | Shift @m@ elements out from the head of a vector, filling up the tail with
--- 'Default' values. Returns the shifted out values, and the new vector.
+-- * The new vector
+-- * The shifted out elements
 --
--- >>> shiftOutFrom0 d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
--- (<1,2>,<3,4,5,0,0>)
-shiftOutFrom0 :: Default a
-              => SNat m
-              -> Vec (m + n) a
-              -> (Vec m a, Vec (n + m) a)
-shiftOutFrom0 m xs = (ys,zs ++ replicate m def)
+-- >>> shiftInAtN (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> Nil)
+-- (<3,4,5,6>,<1,2>)
+-- >>> shiftInAtN (1 :> Nil) (2 :> 3 :> Nil)
+-- (<3>,<1,2>)
+shiftInAtN :: KnownNat m
+           => Vec n a -- ^ The old vector
+           -> Vec m a -- ^ The elements to shift in at the tail
+           -> (Vec n a,Vec m a) -- ^ (The new vector, shifted out elements)
+shiftInAtN xs ys = (zsR, zsL)
   where
-    (ys,zs) = splitAt m xs
-
-{-# NOINLINE snoc #-}
--- | Add an element to the tail of a vector.
-snoc :: Vec n a -> a -> Vec (n + 1) a
-snoc Nil       s = s :> Nil
-snoc (x :> xs) s = x :> (snoc xs s)
+    zs        = xs ++ ys
+    (zsL,zsR) = splitAtI (unsafeCoerce zs)
 
 infixl 5 <:
 {-# INLINEABLE (<:) #-}
@@ -227,25 +224,22 @@ infixl 5 <:
 -- >>> :t (3:>4:>5:>Nil) <: 1
 -- (3:>4:>5:>Nil) <: 1 :: Num a => Vec 4 a
 (<:) :: Vec n a -> a -> Vec (n + 1) a
-(<:) = snoc
+xs <: x = xs ++ singleton x
 
--- | Add an element to the tail of a vector, and split the resulting vector
--- into a tuple containg:
+infixr 4 +>>
+{-# INLINEABLE (+>>) #-}
+-- | Add an element to the head of a vector, and extract all but the last
+-- element.
 --
--- * The first element
--- * All elements but the first
---
--- >>> shiftInAtN 5 (1 :> 2 :> 3 :> 4 :> Nil)
--- (1, <2,3,4,5>)
--- >>> shiftInAtN 5 Nil
--- (<>, 5)
-shiftInAtN :: a -> Vec n a -> (a,Vec n a)
-shiftInAtN s xs = (head zs, tail zs)
-  where
-    zs = snoc xs s
+-- >>> 1 +>> (3:>4:>5:>Nil)
+-- <1,3,4>
+-- >>> 1 +>> Nil
+-- <>
+(+>>) :: KnownNat n => a -> Vec n a -> Vec n a
+s +>> xs = fst (shiftInAt0 xs (singleton s))
 
 infixl 4 <<+
-{-# INLINE (<<+) #-}
+{-# INLINEABLE (<<+) #-}
 -- | Add an element to the tail of a vector, and extract all but the first
 -- element.
 --
@@ -253,36 +247,50 @@ infixl 4 <<+
 -- <4,5,1>
 -- >>> Nil <<+ 1
 -- <>
-(<<+) :: Vec n a -> a -> Vec n a
-xs <<+ s = snd (shiftInAtN s xs)
+(<<+) :: KnownNat n => Vec n a -> a -> Vec n a
+xs <<+ s = fst (shiftInAtN xs (singleton s))
 
+{-# INLINEABLE shiftOutFrom0 #-}
+-- | Shift @m@ elements out from the head of a vector, filling up the tail with
+-- 'Default' values. The result is a tuple containing:
+--
+-- * The new vector
+-- * The shifted out values
+--
+-- >>> shiftOutFrom0 d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
+-- (<3,4,5,0,0>,<1,2>)
+shiftOutFrom0 :: (Default a, KnownNat m)
+              => SNat m        -- ^ @m@, the number of elements to shift out
+              -> Vec (m + n) a -- ^ The old vector
+              -> (Vec (m + n) a, Vec m a)
+              -- ^ (The new vector, shifted out elements)
+shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
+
+{-# INLINEABLE shiftOutFromN #-}
 -- | Shift @m@ elements out from the tail of a vector, filling up the head with
--- 'Default' values. Returns the shifted out values, and the new vector.
+-- 'Default' values. The result is a tuple containing:
+--
+-- * The new vector
+-- * The shifted out values
 --
 -- >>> shiftOutFromN d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
--- (<4,5>,<0,0,1,2,3>)
-shiftOutFromN :: Default a
-              => SNat m
-              -> Vec (m + n) a
-              -> (Vec m a, Vec (m + n) a)
-shiftOutFromN m xs = (reverse ys, replicate m def ++ reverse zs)
-  where
-    (ys,zs) = splitAt m (reverse xs)
-
-{-# NOINLINE append #-}
--- | Append two vectors
-append :: Vec n a -> Vec m a -> Vec (n + m) a
-append Nil       ys = ys
-append (x :> xs) ys = unsafeCoerce (x :> (append xs ys))
+-- (<0,0,1,2,3>,<4,5>)
+shiftOutFromN :: (Default a, KnownNat (m + n))
+              => SNat m        -- ^ @m@, the number of elements to shift out
+              -> Vec (m + n) a -- ^ The old vector
+              -> (Vec (m + n) a, Vec m a)
+              -- ^ (The new vector, shifted out elements)
+shiftOutFromN m xs = shiftInAt0 xs (replicate m def)
 
 infixr 5 ++
-{-# INLINE (++) #-}
+{-# NOINLINE (++) #-}
 -- | Append two vectors
 --
 -- >>> (1:>2:>3:>Nil) ++ (7:>8:>Nil)
 -- <1,2,3,7,8>
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
-xs ++ ys = append xs ys
+Nil       ++ ys = ys
+(x :> xs) ++ ys = unsafeCoerce (x :> (xs ++ ys))
 
 {-# NOINLINE splitAt #-}
 -- | Split a vector into two vectors at the given point
@@ -315,7 +323,7 @@ splitAtI = withSNat splitAt
 -- <1,2,3,4,5,6,7,8,9,10,11,12>
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil       = Nil
-concat (x :> xs) = unsafeCoerce (append x (concat xs))
+concat (x :> xs) = unsafeCoerce (x ++ (concat xs))
 
 {-# NOINLINE unconcat #-}
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
@@ -417,7 +425,7 @@ foldl :: (b -> a -> b) -> b -> Vec n a -> b
 foldl _ z Nil       = z
 foldl f z (x :> xs) = foldl f (f z x) xs
 
-{-# NOINLINE foldr1 #-}
+{-# INLINABLE foldr1 #-}
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty vectors.
 --
@@ -433,8 +441,7 @@ foldl f z (x :> xs) = foldl f (f z x) xs
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
 foldr1 :: (a -> a -> a) -> Vec (n + 1) a -> a
-foldr1 _ (x :> Nil)       = x
-foldr1 f (x :> (y :> ys)) = f x (foldr1 f (y :> ys))
+foldr1 f xs = foldr f (last xs) (init xs)
 
 {-# INLINEABLE foldl1 #-}
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
@@ -483,6 +490,7 @@ fold f vs = fold' (toList vs)
 -- > scanl f z (x1 :> x2 :> ... :> Nil) == z :> (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
 --
 -- __NB__:
+--
 -- > last (scanl f z xs) == foldl f z xs
 scanl :: KnownNat n => (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanl f z xs = ws
