@@ -36,6 +36,8 @@ data SClock (clk :: Clock)
 infixr 5 :-
 -- | A synchronized signal with samples of type @a@, explicitly synchronized to
 -- a clock @clk@
+--
+-- __NB__: The constructor, @(':-')@, is __not__ synthesisable.
 data CSignal (clk :: Clock) a = a :- CSignal clk a
 
 instance Show a => Show (CSignal clk a) where

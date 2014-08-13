@@ -16,7 +16,8 @@ import Unsafe.Coerce
 -- | Singleton value for a type-level natural number 'n'
 --
 -- * "CLaSH.Promoted.Nat.Literals" contains a list of predefined 'SNat' literals
--- * "CLaSH.Promoted.Nat.TH" has functions to easily create large ranges of new 'SNat' literals
+-- * "CLaSH.Promoted.Nat.TH" has functions to easily create large ranges of new
+--   'SNat' literals
 data SNat (n :: Nat) = KnownNat n => SNat (Proxy n)
 
 instance Show (SNat n) where
@@ -38,7 +39,7 @@ data UNat :: Nat -> * where
   UZero :: UNat 0
   USucc :: UNat n -> UNat (n + 1)
 
--- | Convert a singleton natural number to it's unary representation
+-- | Convert a singleton natural number to its unary representation
 toUNat :: SNat n -> UNat n
 toUNat (SNat p) = fromI (natVal p)
   where

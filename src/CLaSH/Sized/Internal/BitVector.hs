@@ -106,7 +106,8 @@ import CLaSH.Promoted.Ord         (Max)
 
 -- * Type definitions
 newtype BitVector (n :: Nat) =
-    -- | 'BV' constructor, and 'unsafeToInteger', are not synthesisable
+    -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
+    -- synthesisable.
     BV { unsafeToInteger :: Integer}
   deriving Typeable
 

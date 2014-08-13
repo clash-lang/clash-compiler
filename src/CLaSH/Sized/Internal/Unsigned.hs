@@ -100,7 +100,8 @@ import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit)
 -- saturation on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in
 -- "CLaSH.Sized.Fixed".
 newtype Unsigned (n :: Nat) =
-    -- | 'U' constructor, and 'unsafeToBitVector', are not synthesisable
+    -- | The constructor, 'U', and the field, 'unsafeToBitVector', are not
+    -- synthesisable.
     U { unsafeToBitVector :: BitVector n }
   deriving Typeable
 

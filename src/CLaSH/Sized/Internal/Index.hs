@@ -49,7 +49,8 @@ import GHC.TypeLits               (KnownNat, Nat, natVal)
 --
 -- Given an upper bound @n@, an 'Index' @n@ number has a range of: [0 .. @n@-1]
 newtype Index (n :: Nat) =
-    -- | 'I' constructor, and 'unsafeToInteger', are not synthesisable
+    -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
+    -- synthesisable.
     I { unsafeToInteger :: Integer }
   deriving Typeable
 

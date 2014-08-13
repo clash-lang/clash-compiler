@@ -19,10 +19,7 @@ module CLaSH.Signal.Explicit
   , csignal
   , cregister
     -- * Product/Signal isomorphism
-  , Wrap
-  , Wrapped
-  , unwrap
-  , wrap
+  , Wrap (..)
     -- * Simulation functions (not synthesisable)
   , csimulate
   , csimulateP
@@ -55,25 +52,67 @@ at the specified frequency.
 The clock periods are just there to indicate relative frequency differences
 between two different clocks. That is, a \"@'CSignal' 500 a@\" is synchronized
 to a clock that runs 6.5 times faster than the clock to which a
-\"@'CSignal' 3250 a@\" is synchronized to. NB: You should be judicious using a
-clock with period @1@ as you can never create a clock that runs faster later on!
+\"@'CSignal' 3250 a@\" is synchronized to.
+
+__NB__: You should be judicious using a clock with period @1@ as you can never
+create a clock that runs faster later on!
 -}
 
 -- * Clock domain crossing
 
--- | The standard system clock with a period of 1000
-type SystemClock = Clk "system" 1000
-
 -- ** Clock
+
+-- | Create a singleton clock
 sclock :: (KnownNat period, KnownSymbol name)
        => SClock (Clk name period)
 sclock = SClock ssymbol snat
 
-systemClock :: SClock (Clk "system" 1000)
+-- | The standard system clock with a period of 1000
+type SystemClock = Clk "system" 1000
+
+-- | The singleton clock for 'SystemClock'
+systemClock :: SClock SystemClock
 systemClock = sclock
 
 -- ** Synchronisation primitive
 {-# NOINLINE veryUnsafeSynchronizer #-}
+-- | Synchronisation function that is basically a represented by a (bundle of)
+-- wire(s) in hardware. This function should only be used as part of a proper
+-- synchronisation component, such as a dual flip-flop synchronizer, or a FIFO
+-- with an asynchronous memory element:
+--
+-- > dualFlipFlop :: SClock clkA -> SClock clkB
+-- >              -> CSignal clkA Bit -> CSignal clkB Bit
+-- > dualFlipFlop clkA clkB = cregister clkB L . cregister clkB L . veryUnsafeSynchronizer clkA clkB
+--
+-- The 'veryUnsafeSynchronizer' works in such a way that, given 2 clocks:
+--
+-- > clk7 = sclock :: SClock (Clk "clk7" 7)
+-- > clk2 = sclock :: SClock (Clk "clk2" 2)
+--
+-- Oversampling followed by compression is the identity function plus 2 initial values:
+--
+-- > cregister clk7 i $
+-- > veryUnsafeSynchronizer clk2 clk7 $
+-- > cregister clk2 j $
+-- > veryUnsafeSynchronizer clk7 clk2 $
+-- > cregister clk7 k s
+-- >
+-- > ==
+-- >
+-- > i :- j :- s
+--
+-- Something we can easily observe:
+--
+-- > oversampling = cregister clk2 99 . veryUnsafeSynchronizer clk7 clk2 . cregister clk7 50
+-- > almostId     = cregister clk7 70 . veryUnsafeSynchronizer clk2 clk7
+-- >              . cregister clk2 99 . veryUnsafeSynchronizer clk7 clk2 . cregister clk7 50
+-- >
+--
+-- >>> csample (oversampling (cfromList [1..10]))
+-- [99, 50,1,1,1,2,2,2,2, 3,3,3,4,4,4,4, 5,5,5,6,6,6,6, 7,7,7,8,8,8,8, 9,9,9,10,10,10,10, ...
+-- >>> csample (almostId (cfromList [1..10]))
+-- [70, 99,1,2,3,4,5,6,7,8,9,10,...
 veryUnsafeSynchronizer :: SClock clk1 -- ^ 'Clock' of the incoming signal
                        -> SClock clk2 -- ^ 'Clock' of the outgoing signal
                        -> CSignal clk1 a

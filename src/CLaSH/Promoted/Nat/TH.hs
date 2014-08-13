@@ -7,7 +7,7 @@ import CLaSH.Promoted.Nat
 
 -- | Create an 'SNat' literal
 --
--- > $(decLiteralD "d" 1200)
+-- > $(decLiteralD 1200)
 --
 -- >>> :t d1200
 -- d1200 :: SNat 1200
