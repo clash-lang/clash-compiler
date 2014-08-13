@@ -1,17 +1,73 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE TypeFamilies           #-}
-module CLaSH.Class.Num where
+module CLaSH.Class.Num
+  ( -- * Arithmetic functions for arguments and results of different precision
+    Add (..)
+  , Mult (..)
+    -- * Saturating arithmetic functions
+  , SaturationMode (..)
+  , SaturatingNum (..)
+  , boundedPlus
+  , boundedMin
+  , boundedMult
+  )
+where
 
 -- * Arithmetic functions for arguments and results of different precision
 
 -- | Adding or subtracting values of two different (sub-)types.
 class Add a b where
+  -- | Type of the result of the addition or subtraction
   type AResult a b
+  -- | Add values of different (sub-)types, return a value of a (sub-)type
+  -- that is potentially different from either argument.
   plus  :: a -> b -> AResult a b
+  -- | Subtract values of different (sub-)types, return a value of a (sub-)type
+  -- that is potentially different from either argument.
   minus :: a -> b -> AResult a b
 
 -- | Multiplying values of two different (sub-)types.
 class Mult a b where
+  -- | Type of the result of the multiplication
   type MResult a b
+  -- | Multiply values of different (sub-)types, return a value of a (sub-)type
+  -- that is potentially different from either argument.
   mult :: a -> b -> MResult a b
+
+-- * Saturating arithmetic functions
+
+-- | Determine how overflow and underflow are handled by the functions in
+-- 'SaturatingNum'
+data SaturationMode
+  = SatWrap  -- ^ Wrap around on overflow and underflow
+  | SatBound -- ^ Become 'maxBound' on overflow, and 'minBound' on underflow
+  | SatZero  -- ^ Become @0@ on overflow and underflow
+  | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' - 1@) on
+                 -- underflow for signed numbers, and 'minBound' for unsigned
+                 -- numbers.
+  deriving Eq
+
+-- | 'Num' operators in which overflow and underflow behaviour can be specified
+-- using 'SaturationMode'.
+class Bounded a => SaturatingNum a where
+  -- | Addition with parametrisable over- and underflow behaviour
+  satPlus :: SaturationMode -> a -> a -> a
+  -- | Subtraction with parametrisable over- and underflow behaviour
+  satMin  :: SaturationMode -> a -> a -> a
+  -- | Multiplication with parametrisable over- and underflow behaviour
+  satMult :: SaturationMode -> a -> a -> a
+
+-- | Addition that clips to 'maxBound' on overflow, and 'minBound' on underflow
+boundedPlus :: SaturatingNum a => a -> a -> a
+boundedPlus = satPlus SatBound
+
+-- | Subtraction that clips to 'maxBound' on overflow, and 'minBound' on
+-- underflow
+boundedMin  :: SaturatingNum a => a -> a -> a
+boundedMin = satMin SatBound
+
+-- | Multiplication that clips to 'maxBound' on overflow, and 'minBound' on
+-- underflow
+boundedMult :: SaturatingNum a => a -> a -> a
+boundedMult = satMult SatBound
