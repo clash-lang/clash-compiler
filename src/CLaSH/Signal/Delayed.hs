@@ -25,12 +25,12 @@ where
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (Applicative (..), (<$>))
-import GHC.TypeLits               (Nat, type (-))
+import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
-import Prelude                    hiding (replicate)
+import Prelude                    hiding (head, replicate)
 
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
-import CLaSH.Sized.Vector         (shiftInAt0, replicate)
+import CLaSH.Sized.Vector         (head, replicate, shiftInAt0, singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
                                    sUnwrap, sWrap)
@@ -83,7 +83,7 @@ dsampleN n = sampleN n . coerce
 dsignal :: a -> DSignal n a
 dsignal a = coerce (signal# a)
 
-delay :: forall a n m . Default a
+delay :: forall a n m . (Default a, KnownNat m)
       => SNat m
       -> DSignal (n - m) a
       -> DSignal n a
@@ -92,9 +92,9 @@ delay m = coerce . delay' . coerce
     delay' :: Signal a -> Signal a
     delay' s = case snatToInteger m of
                  0 -> s
-                 _ -> let (r',o) = shiftInAt0 s (sWrap r)
+                 _ -> let (r',o) = shiftInAt0 (sWrap r) (singleton s)
                           r      = register (replicate m def) (sUnwrap r')
-                      in  o
+                      in  head o
 
 feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
 feedback f = let (DSignal r) = f (DSignal r) in (DSignal r)
