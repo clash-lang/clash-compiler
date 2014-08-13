@@ -7,8 +7,9 @@ import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding ((!!))
 
 import CLaSH.Prelude.Mealy    (sync)
-import CLaSH.Signal.Explicit  (CSignal, SClock, Wrap, cunwrap, systemClock)
 import CLaSH.Signal           (Signal)
+import CLaSH.Signal.Explicit  (CSignal, SClock, systemClock)
+import CLaSH.Signal.Wrap      (Wrap, unwrap)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, (!!), replace)
 
@@ -68,7 +69,7 @@ cblockRam :: (Wrap a, KnownNat n, KnownNat m)
           -> CSignal clk Bool         -- ^ Write enable
           -> CSignal clk a            -- ^ Value to write (at address @w@)
           -> CSignal clk a            -- ^ Value of the 'blockRAM' at address @r@ from the previous clock cycle
-cblockRam clk binit wr rd en din = cunwrap clk $ (sync clk bram' (binit,undefined)) (wr,rd,en,din)
+cblockRam clk binit wr rd en din = unwrap clk $ (sync clk bram' (binit,undefined)) (wr,rd,en,din)
   where
     bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
       where

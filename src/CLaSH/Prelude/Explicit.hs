@@ -52,8 +52,8 @@ import CLaSH.Sized.Vector      (Vec (..), (+>>), repeat)
 --
 -- >>> csimulateP clk100 clk100 rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-cregisterP :: Wrap a => SClock clk -> a -> CWrapped clk a -> CWrapped clk a
-cregisterP clk i = cwrap clk Prelude.. cregister clk i Prelude.. cunwrap clk
+cregisterP :: Wrap a => SClock clk -> a -> Wrapped clk a -> Wrapped clk a
+cregisterP clk i = wrap clk Prelude.. cregister clk i Prelude.. unwrap clk
 
 {-# INLINABLE cwindow #-}
 -- | Give a window over a 'CSignal'

@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash #-}
+
 module CLaSH.Signal
   ( -- * Implicitly clocked synchronous signal
     Signal
@@ -5,10 +7,10 @@ module CLaSH.Signal
   , signal
   , register
     -- * Product/Signal isomorphism
-  , W.Wrap
+  , Wrap
   , SWrapped
-  , wrap
-  , unwrap
+  , sUnwrap
+  , sWrap
     -- * Simulation functions (not synthesisable)
   , simulate
   , simulateP
@@ -19,9 +21,15 @@ module CLaSH.Signal
   )
 where
 
-import CLaSH.Signal.Internal       (Signal, SystemClock, csignal)
-import CLaSH.Signal.Explicit       (cfromList, cregister, csample, csampleN, systemClock)
-import qualified CLaSH.Signal.Wrap as W
+import CLaSH.Signal.Internal  (CSignal, register#, signal#)
+import CLaSH.Signal.Explicit  (SystemClock, cfromList, csample, csampleN,
+                               systemClock)
+import CLaSH.Signal.Wrap      (Wrap (..), Wrapped)
+
+-- * Implicitly clocked synchronous signal
+
+-- | Signal synchronised to the \"system\" clock, which has a period of 1000.
+type Signal a = CSignal SystemClock a
 
 -- * Basic circuit functions
 
@@ -30,7 +38,7 @@ import qualified CLaSH.Signal.Wrap as W
 -- >>> sample (signal 4)
 -- [4, 4, 4, 4, ...
 signal :: a -> Signal a
-signal = csignal
+signal = signal#
 
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
@@ -38,19 +46,33 @@ signal = csignal
 -- >>> sampleN 3 (register 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register :: a -> Signal a -> Signal a
-register = cregister systemClock
+register = register# systemClock
 
 -- * Product/Signal isomorphism
 
 -- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's.
-type SWrapped a = W.Wrapped SystemClock a
+type SWrapped a = Wrapped SystemClock a
 
-wrap :: W.Wrap a => Signal a -> SWrapped a
-wrap = W.wrap systemClock
+-- | Example:
+--
+-- > sWrap :: Signal (a,b) -> (Signal a, Signal b)
+--
+-- However:
+--
+-- > sWrap :: Signal Bit -> Signal Bit
+sWrap :: Wrap a => Signal a -> SWrapped a
+sWrap = wrap systemClock
 
-unwrap :: W.Wrap a => SWrapped a -> Signal a
-unwrap = W.unwrap systemClock
+-- | Example:
+--
+-- > sUnwrap :: (Signal a, Signal b) -> Signal (a,b)
+--
+-- However:
+--
+-- > sUnwrap :: Signal Bit -> Signal Bit
+sUnwrap :: Wrap a => SWrapped a -> Signal a
+sUnwrap = unwrap systemClock
 
 -- * Simulation functions (not synthesisable)
 
@@ -71,8 +93,8 @@ simulate f = sample . f . fromList
 -- [(8,8), (1,1), (2,2), (3,3), ...
 --
 -- __NB__: This function is not synthesisable
-simulateP :: (W.Wrap a, W.Wrap b) => (SWrapped a -> SWrapped b) -> [a] -> [b]
-simulateP f = simulate (unwrap . f . wrap)
+simulateP :: (Wrap a, Wrap b) => (SWrapped a -> SWrapped b) -> [a] -> [b]
+simulateP f = simulate (sUnwrap . f . sWrap)
 
 -- * List \<-\> Signal conversion (not synthesisable)
 

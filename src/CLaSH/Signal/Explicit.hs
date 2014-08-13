@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs     #-}
+{-# LANGUAGE MagicHash #-}
+
 module CLaSH.Signal.Explicit
   ( -- * Explicitly clocked synchronous signal
     -- $relativeclocks
@@ -18,9 +20,9 @@ module CLaSH.Signal.Explicit
   , cregister
     -- * Product/Signal isomorphism
   , Wrap
-  , CWrapped
-  , cunwrap
-  , cwrap
+  , Wrapped
+  , unwrap
+  , wrap
     -- * Simulation functions (not synthesisable)
   , csimulate
   , csimulateP
@@ -35,8 +37,8 @@ import GHC.TypeLits          (KnownNat, KnownSymbol)
 
 import CLaSH.Promoted.Nat    (snat, snatToInteger)
 import CLaSH.Promoted.Symbol (ssymbol)
-import CLaSH.Signal.Internal (CSignal (..), Clock (..), SClock (..),
-                              SystemClock, csignal)
+import CLaSH.Signal.Internal (CSignal (..), Clock (..), SClock (..), signal#,
+                              register#)
 import CLaSH.Signal.Wrap     (Wrap (..), Wrapped)
 
 {- $relativeclocks #relativeclocks#
@@ -58,6 +60,10 @@ clock with period @1@ as you can never create a clock that runs faster later on!
 -}
 
 -- * Clock domain crossing
+
+-- | The standard system clock with a period of 1000
+type SystemClock = Clk "system" 1000
+
 -- ** Clock
 sclock :: (KnownNat period, KnownSymbol name)
        => SClock (Clk name period)
@@ -115,20 +121,28 @@ repSchedule high low = take low $ repSchedule' low high 1
       | otherwise = rep : repSchedule' (cnt + low) (th + high) 1
 
 -- * Basic circuit functions
-{-# NOINLINE cregister #-}
+
+-- | Create a constant 'CSignal' from a combinational value
+--
+-- >>> csample (csignal 4)
+-- [4, 4, 4, 4, ...
+csignal :: a -> CSignal clk a
+csignal = signal#
+
 cregister :: SClock clk -> a -> CSignal clk a -> CSignal clk a
-cregister _ a s = a :- s
-
--- * Product/Signal isomorphism
-type CWrapped = Wrapped
-
-cunwrap :: Wrap a => SClock clk -> Wrapped clk a -> CSignal clk a
-cunwrap = unwrap
-
-cwrap :: Wrap a => SClock clk -> CSignal clk a -> Wrapped clk a
-cwrap = wrap
+cregister = register#
 
 -- * Simulation functions
+
+-- | Simulate a (@'CSignal' clk1 a -> 'CSignal' clk2 b@) function given a list
+-- of samples of type @a@
+--
+-- > clk100 = sclock :: SClock "A" 100
+--
+-- >>> csimulate (cregister clk100 8) [1, 2, 3, ...
+-- [8, 1, 2, 3, ...
+--
+-- __NB__: This function is not synthesisable
 csimulate :: (CSignal clk1 a -> CSignal clk2 b) -> [a] -> [b]
 csimulate f = csample . f . cfromList
 
@@ -144,7 +158,7 @@ csimulateP :: (Wrap a, Wrap b)
            -> SClock clk2 -- ^ 'Clock' of the outgoing signal
            -> (Wrapped clk1 a -> Wrapped clk2 b) -- ^ Function to simulate
            -> [a] -> [b]
-csimulateP clk1 clk2 f = csimulate (cunwrap clk2 . f . cwrap clk1)
+csimulateP clk1 clk2 f = csimulate (unwrap clk2 . f . wrap clk1)
 
 -- * List \<-\> CSignal conversion
 csample :: CSignal clk a -> [a]

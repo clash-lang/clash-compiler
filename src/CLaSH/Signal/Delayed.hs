@@ -1,7 +1,10 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MagicHash                  #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeOperators              #-}
 
 module CLaSH.Signal.Delayed
   ( -- * Delay-annotated synchronous signals
@@ -22,15 +25,21 @@ where
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (Applicative (..), (<$>))
-import GHC.TypeLits               (type (-))
+import GHC.TypeLits               (Nat, type (-))
+import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (replicate)
 
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Sized.Vector         (shiftInAt0, replicate)
 
-import CLaSH.Signal               (fromList, register, sample, sampleN, unwrap,
-                                   wrap)
-import CLaSH.Signal.Internal      (DSignal (..), Signal, dsignal)
+import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
+                                   sUnwrap, sWrap)
+import CLaSH.Signal.Internal      (signal#)
+
+-- | A synchronized signal with samples of type @a@, synchronized to \"system\"
+-- clock (period 1000), only produces a valid output after @delay@ samples.
+newtype DSignal (delay :: Nat) a = DSignal (Signal a)
+  deriving (Show,Default,Lift,Functor,Applicative,Num)
 
 -- | Create a 'DSignal' from a list
 --
@@ -66,6 +75,14 @@ dsample = sample . coerce
 dsampleN :: Int -> DSignal t a -> [a]
 dsampleN n = sampleN n . coerce
 
+
+-- | Create a constant 'DSignal' from a combinational value
+--
+-- >>> dsample (dsignal 4)
+-- [4, 4, 4, 4, ...
+dsignal :: a -> DSignal n a
+dsignal a = coerce (signal# a)
+
 delay :: forall a n m . Default a
       => SNat m
       -> DSignal (n - m) a
@@ -75,8 +92,8 @@ delay m = coerce . delay' . coerce
     delay' :: Signal a -> Signal a
     delay' s = case snatToInteger m of
                  0 -> s
-                 _ -> let (r',o) = shiftInAt0 s (wrap r)
-                          r      = register (replicate m def) (unwrap r')
+                 _ -> let (r',o) = shiftInAt0 s (sWrap r)
+                          r      = register (replicate m def) (sUnwrap r')
                       in  o
 
 feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
@@ -91,7 +108,7 @@ toSignal m s = count (coerce s)
     count s' = o
       where
         r      = register (snatToInteger m) r'
-        (r',o) = wrap (cntr <$> r <*> s')
+        (r',o) = sWrap (cntr <$> r <*> s')
 
         cntr 0 v = (0,Just v)
         cntr k _ = (k-1,Nothing)

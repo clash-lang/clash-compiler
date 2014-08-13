@@ -1,25 +1,22 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE KindSignatures  #-}
+{-# LANGUAGE MagicHash       #-}
+{-# LANGUAGE TemplateHaskell #-}
 module CLaSH.Signal.Internal
   ( -- * Datatypes
     Clock (..)
   , SClock (..)
   , CSignal (..)
-  , SystemClock
-  , Signal
-  , DSignal (..)
     -- * Construction
-  , csignal
-  , cmapSignal
-  , cappSignal
-  , dsignal
+  , signal#
+  , mapSignal#
+  , appSignal#
+    -- * Basic circuits
+  , register#
   )
 where
 
-import Data.Coerce                (coerce)
 import Data.Default               (Default (..))
 import Control.Applicative        (Applicative (..), liftA2)
 import GHC.TypeLits               (Nat, Symbol)
@@ -41,56 +38,33 @@ infixr 5 :-
 -- a clock @clk@
 data CSignal (clk :: Clock) a = a :- CSignal clk a
 
--- | The standard system clock with a period of 1000
-type SystemClock = Clk "system" 1000
-
--- | Signal synchronised to the \"system\" clock, which has a period of 1000.
-type Signal a = CSignal SystemClock a
-
--- | A synchronized signal with samples of type @a@, synchronized to \"system\"
--- clock (period 1000), only produces a valid output after @delay@ samples.
-newtype DSignal (delay :: Nat) a = DSignal (Signal a)
-  deriving (Show,Default,Lift,Functor,Applicative)
-
 instance Show a => Show (CSignal clk a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
 instance Lift a => Lift (CSignal clk a) where
-  lift ~(x :- _) = [| csignal x |]
+  lift ~(x :- _) = [| signal# x |]
 
 instance Default a => Default (CSignal clk a) where
-  def = csignal def
-
-
-{-# NOINLINE csignal    #-}
--- | Create a constant 'CSignal' from a combinational value
---
--- >>> csample (csignal 4)
--- [4, 4, 4, 4, ...
-csignal :: a -> CSignal clk a
-csignal a = let s = a :- s in s
-
-{-# NOINLINE cmapSignal #-}
-cmapSignal :: (a -> b) -> CSignal clk a -> CSignal clk b
-cmapSignal f (a :- as) = f a :- cmapSignal f as
-
-{-# NOINLINE cappSignal #-}
-cappSignal :: CSignal clk (a -> b) -> CSignal clk a -> CSignal clk b
-cappSignal (f :- fs) ~(a :- as) = f a :- cappSignal fs as
+  def = signal# def
 
 instance Functor (CSignal clk) where
-  fmap = cmapSignal
+  fmap = mapSignal#
+
+{-# NOINLINE mapSignal# #-}
+mapSignal# :: (a -> b) -> CSignal clk a -> CSignal clk b
+mapSignal# f (a :- as) = f a :- mapSignal# f as
 
 instance Applicative (CSignal clk) where
-  pure  = csignal
-  (<*>) = cappSignal
+  pure  = signal#
+  (<*>) = appSignal#
 
--- | Create a constant 'DSignal' from a combinational value
---
--- >>> dsample (dsignal 4)
--- [4, 4, 4, 4, ...
-dsignal :: a -> DSignal n a
-dsignal a = coerce (csignal a)
+{-# NOINLINE signal# #-}
+signal# :: a -> CSignal clk a
+signal# a = let s = a :- s in s
+
+{-# NOINLINE appSignal# #-}
+appSignal# :: CSignal clk (a -> b) -> CSignal clk a -> CSignal clk b
+appSignal# (f :- fs) ~(a :- as) = f a :- appSignal# fs as
 
 instance Num a => Num (CSignal clk a) where
   (+)         = liftA2 (+)
@@ -99,13 +73,8 @@ instance Num a => Num (CSignal clk a) where
   negate      = fmap negate
   abs         = fmap abs
   signum      = fmap signum
-  fromInteger = csignal . fromInteger
+  fromInteger = signal# . fromInteger
 
-instance Num a => Num (DSignal delay a) where
-  (+)         = liftA2 (+)
-  (-)         = liftA2 (-)
-  (*)         = liftA2 (*)
-  negate      = fmap negate
-  abs         = fmap abs
-  signum      = fmap signum
-  fromInteger = dsignal . fromInteger
+{-# NOINLINE register# #-}
+register# :: SClock clk -> a -> CSignal clk a -> CSignal clk a
+register# _ i s = i :- s

@@ -1,7 +1,9 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE TypeFamilies      #-}
+
 -- | The Product/Signal isomorphism
 module CLaSH.Signal.Wrap
   ( Wrap (..)
@@ -12,6 +14,11 @@ import Control.Applicative   ((<$>), (<*>), liftA2)
 import Prelude               hiding (head, map, tail)
 
 import CLaSH.Signal.Internal (Clock, CSignal (..), SClock)
+import CLaSH.Sized.BitVector (BitVector)
+import CLaSH.Sized.Fixed     (Fixed)
+import CLaSH.Sized.Index     (Index)
+import CLaSH.Sized.Signed    (Signed)
+import CLaSH.Sized.Unsigned  (Unsigned)
 import CLaSH.Sized.Vector    (Vec (..), head, map, tail)
 
 -- | Isomorphism between a 'CSignal' of a product type (e.g. a tuple) and a
@@ -32,18 +39,18 @@ class Wrap a where
   --
   -- However:
   --
-  -- > unwrap :: CSignal clk Bit -> Signal clk Bit
+  -- > unwrap :: CSignal clk Bit -> CSignal clk Bit
   unwrap :: SClock clk -> Wrapped clk a -> CSignal clk a
 
   default unwrap :: SClock clk ->  CSignal clk a -> CSignal clk a
   unwrap _ s = s
   -- | Example:
   --
-  -- > wrap :: CSignal clk (a,b) -> (Signal clk a, Signal clk b)
+  -- > wrap :: CSignal clk (a,b) -> (CSignal clk a, CSignal clk b)
   --
   -- However:
   --
-  -- > wrap :: Signal Bit -> Signal Bit
+  -- > wrap :: CSignal clk Bit -> CSignal clk Bit
   wrap :: SClock clk -> CSignal clk a -> Wrapped clk a
 
   default wrap :: SClock clk -> CSignal clk a -> CSignal clk a
@@ -55,6 +62,12 @@ instance Wrap Int
 instance Wrap Float
 instance Wrap Double
 instance Wrap ()
+
+instance Wrap (BitVector n)
+instance Wrap (Index n)
+instance Wrap (Fixed rep size frac)
+instance Wrap (Signed n)
+instance Wrap (Unsigned n)
 
 instance Wrap (a,b) where
   type Wrapped t (a,b) = (CSignal t a, CSignal t b)
@@ -139,10 +152,17 @@ instance Wrap (a,b,c,d,e,f,g,h) where
 
 instance Wrap (Vec n a) where
   type Wrapped t (Vec n a) = Vec n (CSignal t a)
-  unwrap clk vs = (map shead vs) :- (unwrap clk (map stail vs))
+  unwrap = vecUnwrap#
+  wrap   = vecWrap#
+
+{-# NOINLINE vecUnwrap# #-}
+vecUnwrap# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
+vecUnwrap# clk vs = (map shead vs) :- (vecUnwrap# clk (map stail vs))
     where
       shead (s :- _)  = s
       stail (_ :- ss) = ss
 
-  wrap _      (Nil :- _)      = Nil
-  wrap clk vs@((_ :> _) :- _) = fmap head vs :> wrap clk (fmap tail vs)
+{-# NOINLINE vecWrap# #-}
+vecWrap# :: SClock t -> CSignal t (Vec n a) -> Vec n (CSignal t a)
+vecWrap# _   (Nil :- _)         = Nil
+vecWrap# clk vs@((_ :> _) :- _) = fmap head vs :> vecWrap# clk (fmap tail vs)
