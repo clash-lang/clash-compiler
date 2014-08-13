@@ -376,21 +376,21 @@ low = BV 0
 {-# INLINABLE (#>) #-}
 infixr 5 #>
 -- | Prepend a 'Bit'
-(#>) :: Bit -> BitVector n -> BitVector (1 + n)
+(#>) :: KnownNat n => Bit -> BitVector n -> BitVector (1 + n)
 (#>) = (++#)
 
 {-# INLINABLE (<#) #-}
 infixl 5 <#
 -- | Append a 'Bit'
-(<#) :: KnownNat n => BitVector n -> Bit -> BitVector (n + 1)
+(<#) :: BitVector n -> Bit -> BitVector (n + 1)
 (<#) = (++#)
 
 {-# NOINLINE (++#) #-}
 -- | Concatenate two 'BitVector's
-(++#) :: KnownNat n => BitVector n -> BitVector m -> BitVector (n + m)
-bv1@(BV v1) ++# (BV v2) = BV (v1' + v2)
+(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
+(BV v1) ++# bv2@(BV v2) = BV (v1' + v2)
   where
-    v1' = B.shiftL v1 (fromInteger (natVal bv1))
+    v1' = B.shiftL v1 (fromInteger (natVal bv2))
 
 -- * Modifying BitVectors
 {-# NOINLINE setBit# #-}
