@@ -59,38 +59,30 @@ module CLaSH.Sized.Internal.Unsigned
   , shiftR#
   , rotateL#
   , rotateR#
-    -- ** BitReduction
-  , reduceAnd#
-  , reduceOr#
-  , reduceXor#
-    -- ** BitIndex
-  , (!#)
-  , slice#
-  , split#
-  , setBit#
-  , setSlice#
-  , msb#
-  , lsb#
     -- ** Resize
   , resize#
+    -- ** SaturatingNum
+  , satPlus#
+  , satMin#
+  , satMult#
   )
 where
 
 import Data.Default                   (Default (..))
 import Data.Typeable                  (Typeable)
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-), natVal)
+import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
 import CLaSH.Class.Bits               (Bits (..))
-import CLaSH.Class.BitIndex           (BitIndex (..))
-import CLaSH.Class.BitReduction       (BitReduction (..))
 import CLaSH.Class.Bitwise            (Bitwise (..))
-import CLaSH.Class.Num                (Add (..), Mult (..))
+import CLaSH.Class.Num                (Add (..), Mult (..), SaturatingNum (..),
+                                       SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
-import CLaSH.Promoted.Nat             (SNat)
+import CLaSH.Prelude.BitIndex         (msb,split)
+import CLaSH.Prelude.BitReduction     (reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit)
+import CLaSH.Sized.Internal.BitVector (BitVector (..))
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -149,6 +141,8 @@ gt# (U n) (U m) = n > m
 {-# NOINLINE le# #-}
 le# (U n) (U m) = n <= m
 
+-- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
+-- 'enumFromThenTo', are not synthesisable.
 instance KnownNat n => Enum (Unsigned n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
@@ -190,7 +184,7 @@ instance KnownNat n => Num (Unsigned n) where
   (*)         = (*#)
   negate      = negate#
   abs         = id
-  signum bv   = resize# (reduceOr# bv)
+  signum bv   = resize# (unpack# (reduceOr bv))
   fromInteger = fromInteger#
 
 (+#),(-#),(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
@@ -272,7 +266,6 @@ instance KnownNat n => Bitwise (Unsigned n) where
   shiftR v i  = shiftR#  v (fromIntegral i)
   rotateL v i = rotateL# v (fromIntegral i)
   rotateR v i = rotateR# v (fromIntegral i)
-  isSigned    = const False
 
 {-# NOINLINE and# #-}
 and# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
@@ -306,61 +299,6 @@ rotateL# (U bv) i = U (shiftL bv i)
 rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
 rotateR# (U bv) i = U (shiftR bv i)
 
-instance BitIndex Unsigned where
-  (!) v i    = (!#) v (fromIntegral i)
-  slice      = slice#
-  split      = split#
-  setBit v i = setBit# v (fromIntegral i)
-  setSlice   = setSlice#
-  msb        = msb#
-  lsb        = lsb#
-
-{-# NOINLINE (!#) #-}
-(!#) :: KnownNat n => Unsigned n -> Int -> Bit
-(U v) !# i = v ! i
-
-{-# NOINLINE slice# #-}
-slice# :: Unsigned (m + 1 + i) -> SNat m -> SNat n -> Unsigned (m + 1 - n)
-slice# (U v) m n = U (slice v m n)
-
-{-# NOINLINE split# #-}
-split# :: KnownNat n => Unsigned (m + n) -> (Unsigned m, Unsigned n)
-split# (U bv) = let (a,b) = split bv
-                in  (U a, U b)
-
-{-# NOINLINE setBit# #-}
-setBit# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-setBit# (U v) i = U (setBit v i)
-
-{-# NOINLINE setSlice# #-}
-setSlice# :: Unsigned (m + 1 + i) -> SNat m -> SNat n -> Unsigned (m + 1 - n)
-          -> Unsigned (m + 1 + i)
-setSlice# (U v) i j (U w) = U (setSlice v i j w)
-
-{-# NOINLINE msb# #-}
-msb# :: KnownNat n => Unsigned n -> Bit
-msb# (U v) = msb v
-
-{-# NOINLINE lsb# #-}
-lsb# :: KnownNat n => Unsigned n -> Bit
-lsb# (U v) = lsb v
-
-instance BitReduction Unsigned where
-  reduceAnd  = reduceAnd#
-  reduceOr   = reduceOr#
-  reduceXor  = reduceXor#
-
-reduceAnd#, reduceOr#, reduceXor# :: KnownNat n => Unsigned n -> Unsigned 1
-
-{-# NOINLINE reduceAnd# #-}
-reduceAnd# (U i) = U (reduceAnd i)
-
-{-# NOINLINE reduceOr# #-}
-reduceOr# (U i) = U (reduceOr i)
-
-{-# NOINLINE reduceXor# #-}
-reduceXor# (U i) = U (reduceXor i)
-
 -- | A resize operation that zero-extends on extension, and wraps on truncation.
 --
 -- Increasing the size of the number extends with zeros to the left.
@@ -381,3 +319,40 @@ instance KnownNat n => Lift (Unsigned n) where
 
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
+
+instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
+  SaturatingNum (Unsigned n) where
+  satPlus = satPlus#
+  satMin  = satMin#
+  satMult = satMult#
+
+satPlus#, satMin# :: (KnownNat n, KnownNat (n + 1)) => SaturationMode
+                  -> Unsigned n -> Unsigned n -> Unsigned n
+
+satPlus# SatWrap a b = a +# b
+satPlus# w a b = case msb r of
+                   0 -> resize# r
+                   _ -> case w of
+                          SatZero  -> minBound#
+                          _        -> maxBound#
+  where
+    r = plus# a b
+
+satMin# SatWrap a b = a -# b
+satMin# _ a b = case msb r of
+                   0 -> resize# r
+                   _ -> minBound#
+  where
+    r = minus# a b
+
+satMult# :: (KnownNat n, KnownNat (n + n)) => SaturationMode -> Unsigned n
+         -> Unsigned n -> Unsigned n
+satMult# SatWrap a b = a *# b
+satMult# w a b = case rL of
+                   0 -> unpack# rR
+                   _ -> case w of
+                          SatZero  -> minBound#
+                          _        -> maxBound#
+  where
+    r       = mult# a b
+    (rL,rR) = split r

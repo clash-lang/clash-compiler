@@ -11,6 +11,7 @@ module CLaSH.Signal.Delayed
     DSignal
   , dsignal
   , delay
+  , delayI
   , feedback
     -- * Signal \<-\> DSignal conversion
   , fromSignal
@@ -29,7 +30,7 @@ import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, replicate)
 
-import CLaSH.Promoted.Nat         (SNat, snatToInteger)
+import CLaSH.Promoted.Nat         (SNat, snatToInteger, withSNat)
 import CLaSH.Sized.Vector         (head, replicate, shiftInAt0, singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
@@ -95,6 +96,11 @@ delay m = coerce . delay' . coerce
                  _ -> let (r',o) = shiftInAt0 (sWrap r) (singleton s)
                           r      = register (replicate m def) (sUnwrap r')
                       in  head o
+
+delayI :: (Default a, KnownNat m)
+       => DSignal (n - m) a
+       -> DSignal n a
+delayI = withSNat delay
 
 feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
 feedback f = let (DSignal r) = f (DSignal r) in (DSignal r)

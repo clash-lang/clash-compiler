@@ -8,17 +8,25 @@ module CLaSH.Signal.Internal
     Clock (..)
   , SClock (..)
   , CSignal (..)
-    -- * Construction
-  , signal#
+    -- * Type classes
+    -- ** Functor
   , mapSignal#
+    -- ** Applicative
+  , signal#
   , appSignal#
+    -- ** Foldable
+  , foldr#
+    -- ** Traversable
+  , traverse#
     -- * Basic circuits
   , register#
   )
 where
 
+import Control.Applicative        (Applicative (..), (<$>),liftA2)
 import Data.Default               (Default (..))
-import Control.Applicative        (Applicative (..), liftA2)
+import Data.Foldable              (Foldable (..))
+import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 
@@ -76,6 +84,28 @@ instance Num a => Num (CSignal clk a) where
   abs         = fmap abs
   signum      = fmap signum
   fromInteger = signal# . fromInteger
+
+-- | __NB__: Not synthesisable
+--
+-- Is used in conversions to lists
+instance Foldable (CSignal clk) where
+  foldr = foldr#
+
+-- | In \"@'foldr# f z s@\" the @z@ element never used.
+--
+-- __NB__: Not synthesisable
+foldr# :: (a -> b -> b) -> b -> CSignal clk a -> b
+foldr# f z (a :- s) = a `f` (foldr# f z s)
+
+-- | __NB__: Not synthesisable
+--
+-- Is used to define the 'CLaSH.Signal.Wrap' instance for 'CLaSH.Sized.Vec'
+instance Traversable (CSignal clk) where
+  traverse = traverse#
+
+-- | __NB__: Not synthesisable
+traverse# :: Applicative f => (a -> f b) -> CSignal clk a -> f (CSignal clk b)
+traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 
 {-# NOINLINE register# #-}
 register# :: SClock clk -> a -> CSignal clk a -> CSignal clk a

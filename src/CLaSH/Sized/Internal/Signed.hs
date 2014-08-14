@@ -61,21 +61,14 @@ module CLaSH.Sized.Internal.Signed
   , shiftR#
   , rotateL#
   , rotateR#
-    -- ** BitReduction
-  , reduceAnd#
-  , reduceOr#
-  , reduceXor#
-    -- ** BitIndex
-  , (!#)
-  , slice#
-  , split#
-  , setBit#
-  , setSlice#
-  , msb#
-  , lsb#
     -- ** Resize
   , resize#
   , resize_wrap
+    -- ** SaturatingNum
+  , satPlus#
+  , satMin#
+  , satMult#
+  , minBoundSym#
   )
 where
 
@@ -83,21 +76,20 @@ import qualified Data.Bits            as B
 import Data.Default                   (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Data.Typeable                  (Typeable)
-import GHC.Integer                    (smallInteger)
-import GHC.Prim                       (dataToTag#)
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-), natVal)
+import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
 import CLaSH.Class.Bits               (Bits (..))
-import CLaSH.Class.BitIndex           (BitIndex (..))
-import CLaSH.Class.BitReduction       (BitReduction (..))
 import CLaSH.Class.Bitwise            (Bitwise (..))
-import CLaSH.Class.Num                (Add (..), Mult (..))
+import CLaSH.Class.Num                (Add (..), Mult (..), SaturatingNum (..),
+                                       SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
-import CLaSH.Promoted.Nat             (SNat, snatToInteger)
+import CLaSH.Prelude.BitIndex         (msb,split)
+import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit)
+import CLaSH.Sized.Internal.BitVector (BitVector (..), (#>))
+
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
 -- bit.
@@ -160,6 +152,8 @@ gt# (S n) (S m) = n > m
 {-# NOINLINE le# #-}
 le# (S n) (S m) = n <= m
 
+-- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
+-- 'enumFromThenTo', are not synthesisable.
 instance KnownNat n => Enum (Signed n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
@@ -241,13 +235,13 @@ fromInteger_INLINE i n
             (s,i') | even s    -> S i'
                    | otherwise -> S (i' - sz)
 
-instance KnownNat (Max m n + 1) => Add (Signed m) (Signed n) where
-  type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
+instance KnownNat (1 + Max m n) => Add (Signed m) (Signed n) where
+  type AResult (Signed m) (Signed n) = Signed (1 + Max m n)
   plus  = plus#
   minus = minus#
 
-plus#, minus# :: KnownNat (Max m n + 1) => Signed m -> Signed n
-              -> Signed (Max m n + 1)
+plus#, minus# :: KnownNat (1 + Max m n) => Signed m -> Signed n
+              -> Signed (1 + Max m n)
 {-# NOINLINE plus# #-}
 plus# (S a) (S b) = fromIntegerProxy_INLINE Proxy (a + b)
 
@@ -312,7 +306,6 @@ instance KnownNat n => Bitwise (Signed n) where
   shiftR v i  = shiftR#  v (fromIntegral i)
   rotateL v i = rotateL# v (fromIntegral i)
   rotateR v i = rotateR# v (fromIntegral i)
-  isSigned    = const True
 
 and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
@@ -357,111 +350,6 @@ rotateR# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l B..|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal s)
 
-
-instance BitIndex Signed where
-  (!) v i    = (!#) v (fromIntegral i)
-  slice      = slice#
-  split      = split#
-  setBit v i = setBit# v (fromIntegral i)
-  setSlice   = setSlice#
-  msb        = msb#
-  lsb        = lsb#
-
-
-(!#) :: KnownNat n => Signed n -> Int -> Bit
-s@(S v) !# i
-    | i >= 0 && i <= maxI = BV (smallInteger (dataToTag# (B.testBit v i)))
-    | otherwise           = err
-  where
-    maxI = fromInteger (natVal s) - 1
-    err  = error $ concat [ "!: "
-                          , show i
-                          , " is out of range ["
-                          , show maxI
-                          , "..0]"
-                          ]
-
-{-# NOINLINE slice# #-}
-slice# :: Signed (m + 1 + i) -> SNat m -> SNat n -> Signed (m + 1 - n)
-slice# (S i) m n = fromInteger_INLINE i' sz
-  where
-    m'   = snatToInteger m
-    n'   = snatToInteger n
-    sz   = m' - n' + 1
-
-    mask = 2 ^ (m' + 1) - 1
-    i'   = B.shiftR (i B..&. mask) (fromInteger n')
-
-{-# NOINLINE split# #-}
-split# :: KnownNat n => Signed (m + n) -> (Signed m, Signed n)
-split# (S i) = (l,r)
-  where
-    n    = natVal r
-
-    l    = S (i `B.shiftR` fromInteger n)
-    mask = (2 ^ n) - 1
-    i'   = i B..&. mask
-    r    = fromInteger_INLINE i' n
-
-{-# NOINLINE setBit# #-}
-setBit# :: KnownNat n => Signed n -> Int -> Signed n
-setBit# bv@(S v) i
-    | i >= 0 && i <= maxI = S (B.setBit v i)
-    | otherwise           = err
-  where
-    maxI = fromInteger (natVal bv) - 1
-    err  = error $ concat [ "setBit: "
-                          , show i
-                          , " is out of range ["
-                          , show maxI
-                          , "..0]"
-                          ]
-
-{-# NOINLINE setSlice# #-}
-setSlice# :: Signed (m + 1 + i) -> SNat m -> SNat n -> Signed (m + 1 - n)
-          -> Signed (m + 1 + i)
-setSlice# (S i) m n (S j) = S ((i B..&. mask) B..|. j'')
-  where
-    m' = snatToInteger m
-    n' = snatToInteger n
-
-    j'   = j `mod` (2 ^ (m' - n' + 1))
-    j''  = B.shiftL j' (fromInteger n')
-    mask = B.complement ((2 ^ (m' + 1) - 1) `B.xor` (2 ^ n' - 1))
-
-{-# NOINLINE msb# #-}
-msb# :: KnownNat n => Signed n -> Bit
-msb# s@(S i) = BV (smallInteger (dataToTag# (B.testBit i sz)))
-  where
-    sz = fromInteger (natVal s - 1)
-
-{-# NOINLINE lsb# #-}
-lsb# :: KnownNat n => Signed n -> Bit
-lsb# (S i) = BV (smallInteger (dataToTag# (B.testBit i 0)))
-
-instance BitReduction Signed where
-  reduceAnd  = reduceAnd#
-  reduceOr   = reduceOr#
-  reduceXor  = reduceXor#
-
-reduceAnd#, reduceOr#, reduceXor# :: KnownNat n => Signed n -> Signed 1
-
-{-# NOINLINE reduceAnd# #-}
-reduceAnd# (S i) = S (smallInteger (dataToTag# check))
-  where
-    check = i == (-1)
-
-{-# NOINLINE reduceOr# #-}
-reduceOr# (S i) = S (smallInteger (dataToTag# check))
-  where
-    check = i /= 0
-
-{-# NOINLINE reduceXor# #-}
-reduceXor# s@(S i) = S (toInteger (B.popCount i' `mod` 2))
-  where
-    maxI = 2 ^ natVal s
-    i'   = i `mod` maxI
-
 -- | A sign-preserving resize operation
 --
 -- Increasing the size of the number replicates the sign bit to the left.
@@ -505,3 +393,65 @@ instance KnownNat n => Lift (Signed n) where
 
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
+
+instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
+  SaturatingNum (Signed n) where
+  satPlus = satPlus#
+  satMin  = satMin#
+  satMult = satMult#
+
+satPlus#, satMin# :: (KnownNat n, KnownNat (1 + n)) => SaturationMode
+                  -> Signed n -> Signed n -> Signed n
+
+satPlus# SatWrap a b = a +# b
+satPlus# w a b = case msb r `xor` msb r' of
+                   0 -> unpack# r'
+                   _ -> case msb a .&. msb b of
+                          1 -> case w of
+                                 SatBound     -> minBound#
+                                 SatSymmetric -> minBoundSym#
+                                 _            -> fromInteger# 0
+                          _ -> case w of
+                                 SatZero -> fromInteger# 0
+                                 _       -> maxBound#
+  where
+    r      = plus# a b
+    (_,r') = split r
+
+satMin# SatWrap a b = a -# b
+satMin# w a b = case msb r `xor` msb r' of
+                   0 -> unpack# r'
+                   _ -> case msb a #> msb b of
+                          2 -> case w of
+                                 SatBound     -> minBound#
+                                 SatSymmetric -> minBoundSym#
+                                 _            -> fromInteger# 0
+                          _ -> case w of
+                                 SatZero -> fromInteger# 0
+                                 _       -> maxBound#
+  where
+    r      = minus# a b
+    (_,r') = split r
+
+satMult# :: (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) => SaturationMode
+         -> Signed n -> Signed n -> Signed n
+satMult# SatWrap a b = a *# b
+satMult# w a b = case overflow of
+                   1 -> unpack# rR
+                   _ -> case msb rL of
+                          0 -> case w of
+                                 SatZero -> fromInteger# 0
+                                 _       -> maxBound#
+                          _ -> case w of
+                                 SatBound     -> minBound#
+                                 SatSymmetric -> minBoundSym#
+                                 _            -> fromInteger# 0
+  where
+    overflow = complement (reduceOr (msb rR #> pack rL)) .|.
+                          reduceAnd (msb rR #> pack rL)
+    r        = mult# a b
+    (rL,rR)  = split r
+
+{-# NOINLINE minBoundSym# #-}
+minBoundSym# :: KnownNat n => Signed n
+minBoundSym# = let res = S $ negate $ 2 ^ (natVal res - 1) - 1 in res

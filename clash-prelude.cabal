@@ -49,14 +49,13 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fwarn-tabs
 
-  Exposed-modules:    CLaSH.Class.Bits
-                      CLaSH.Class.BitIndex
-                      CLaSH.Class.BitReduction
-                      CLaSH.Class.Bitwise
+  Exposed-modules:    CLaSH.Class.BitConvert
                       CLaSH.Class.Num
                       CLaSH.Class.Resize
 
                       CLaSH.Prelude
+                      CLaSH.Prelude.BitIndex
+                      CLaSH.Prelude.BitReduction
                       CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Mealy

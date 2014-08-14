@@ -43,11 +43,13 @@ module CLaSH.Prelude
     -- ** Datatypes
     -- *** Bit vectors
   , module CLaSH.Sized.BitVector
+  , module CLaSH.Prelude.BitIndex
+  , module CLaSH.Prelude.BitReduction
     -- *** Arbitrary-width numbers
   , module CLaSH.Sized.Signed
   , module CLaSH.Sized.Unsigned
     -- *** Fixed point numbers
-  , module CLaSH.Sized.Fixed
+  -- , module CLaSH.Sized.Fixed
     -- *** Fixed size vectors
   , module CLaSH.Sized.Vector
     -- ** Type-level natural numbers
@@ -61,14 +63,12 @@ module CLaSH.Prelude
   , Lift (..), deriveLift
     -- ** Type classes
     -- *** CLaSH
-  , module CLaSH.Class.Bits
-  , module CLaSH.Class.BitIndex
-  , module CLaSH.Class.BitReduction
-  , module CLaSH.Class.Bitwise
+  , module CLaSH.Class.BitConvert
   , module CLaSH.Class.Num
   , module CLaSH.Class.Resize
     -- *** Other
   , module Control.Applicative
+  , module Data.Bits
   , module Data.Default
   )
 where
@@ -79,12 +79,12 @@ import GHC.TypeLits
 import Language.Haskell.TH.Lift    (Lift(..),deriveLift)
 import Prelude                     hiding (repeat)
 
-import CLaSH.Class.Bits
-import CLaSH.Class.BitIndex
-import CLaSH.Class.BitReduction
-import CLaSH.Class.Bitwise
+import CLaSH.Class.BitConvert
+-- import CLaSH.Class.Bitwise
 import CLaSH.Class.Num
 import CLaSH.Class.Resize
+import CLaSH.Prelude.BitIndex
+import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
 import CLaSH.Prelude.Explicit      (cregisterP, cwindow, cwindowD)
 import CLaSH.Prelude.Mealy         ((<^>))
@@ -94,7 +94,7 @@ import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
 import CLaSH.Promoted.Ord
 import CLaSH.Sized.BitVector
-import CLaSH.Sized.Fixed
+-- import CLaSH.Sized.Fixed
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector

@@ -26,6 +26,18 @@ module CLaSH.Sized.Internal.BitVector
   , (#>)
   , (<#)
   , (++#)
+    -- * Reduction
+  , reduceAnd#
+  , reduceOr#
+  , reduceXor#
+    -- * Indexing
+  , index#
+  , replaceBit#
+  , setSlice#
+  , slice#
+  , split#
+  , msb#
+  , lsb#
     -- * Type classes
     -- ** Eq
   , eq#
@@ -62,7 +74,7 @@ module CLaSH.Sized.Internal.BitVector
   , quotRem#
   , divMod#
   , toInteger#
-    -- ** Bitwise
+    -- ** Bits
   , and#
   , or#
   , xor#
@@ -71,25 +83,18 @@ module CLaSH.Sized.Internal.BitVector
   , shiftR#
   , rotateL#
   , rotateR#
-    -- ** BitReduction
-  , reduceAnd#
-  , reduceOr#
-  , reduceXor#
-    -- ** BitIndex
-  , (!#)
-  , slice#
-  , split#
-  , setBit#
-  , setSlice#
-  , msb#
-  , lsb#
+  , popCount#
     -- ** Resize
   , resize#
+    -- ** SaturatingNum
+  , satPlus#
+  , satMin#
+  , satMult#
   )
 where
 
 import Data.Default               (Default (..))
-import qualified Data.Bits        as B
+import Data.Bits                  (Bits (..))
 import Data.Typeable              (Typeable)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
@@ -97,9 +102,8 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Class.BitReduction   (BitReduction (..))
-import CLaSH.Class.Bitwise        (Bitwise (..))
-import CLaSH.Class.Num            (Add (..), Mult (..))
+import CLaSH.Class.Num            (Add (..), Mult (..), SaturatingNum (..),
+                                   SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
@@ -151,6 +155,8 @@ gt# (BV n) (BV m) = n > m
 {-# NOINLINE le# #-}
 le# (BV n) (BV m) = n <= m
 
+-- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
+-- 'enumFromThenTo', are not synthesisable.
 instance KnownNat n => Enum (BitVector n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
@@ -280,37 +286,42 @@ quotRem_INLINE,divMod_INLINE :: KnownNat n => BitVector n -> BitVector n
 toInteger# :: BitVector n -> Integer
 toInteger# (BV i) = i
 
-instance KnownNat n => Bitwise (BitVector n) where
-  (.&.)       = and#
-  (.|.)       = or#
-  xor         = xor#
-  complement  = complement#
-  shiftL v i  = shiftL# v (fromIntegral i)
-  shiftR v i  = shiftR# v (fromIntegral i)
-  rotateL v i = rotateL# v (fromIntegral i)
-  rotateR v i = rotateR# v (fromIntegral i)
-  isSigned    = const False
-
-instance BitReduction BitVector where
-  reduceAnd  = reduceAnd#
-  reduceOr   = reduceOr#
-  reduceXor  = reduceXor#
-
-reduceAnd#, reduceOr#, reduceXor# :: KnownNat n => BitVector n -> BitVector 1
+instance KnownNat n => Bits (BitVector n) where
+  (.&.)             = and#
+  (.|.)             = or#
+  xor               = xor#
+  complement        = complement#
+  zeroBits          = 0
+  bit i             = replaceBit# 0 i high
+  setBit v i        = replaceBit# v i high
+  clearBit v i      = replaceBit# v i low
+  complementBit v i = replaceBit# v i (complement# (index# v i))
+  testBit v i       = index# v i == 1
+  bitSizeMaybe v    = Just (size# v)
+  bitSize           = size#
+  isSigned _        = False
+  shiftL v i        = shiftL# v i
+  shiftR v i        = shiftR# v i
+  rotateL v i       = rotateL# v i
+  rotateR v i       = rotateR# v i
+  popCount          = popCount#
 
 {-# NOINLINE reduceAnd# #-}
-reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
+reduceAnd# :: Integer -> BitVector n -> BitVector 1
+reduceAnd# sz (BV i) = BV (smallInteger (dataToTag# check))
   where
     check = i == maxI
-    maxI  = (2 ^ natVal bv) - 1
+    maxI  = (2 ^ sz) - 1
 
 {-# NOINLINE reduceOr# #-}
+reduceOr# :: BitVector n -> BitVector 1
 reduceOr# (BV i) = BV (smallInteger (dataToTag# check))
   where
     check = i /= 0
 
 {-# NOINLINE reduceXor# #-}
-reduceXor# (BV i) = BV (toInteger (B.popCount i `mod` 2))
+reduceXor# :: BitVector n -> BitVector 1
+reduceXor# (BV i) = BV (toInteger (popCount i `mod` 2))
 
 instance Default (BitVector n) where
   def = minBound#
@@ -318,43 +329,45 @@ instance Default (BitVector n) where
 -- * Accessors
 -- ** Length information
 {-# NOINLINE size# #-}
-size# :: KnownNat n => BitVector n -> Integer
-size# bv = natVal bv
+size# :: KnownNat n => BitVector n -> Int
+size# bv = fromInteger (natVal bv)
 
 {-# NOINLINE maxIndex# #-}
-maxIndex# :: KnownNat n => BitVector n -> Integer
-maxIndex# bv = natVal bv - 1
+maxIndex# :: KnownNat n => BitVector n -> Int
+maxIndex# bv = fromInteger (natVal bv) - 1
 
 -- ** Indexing
-{-# NOINLINE (!#) #-}
-(!#) :: KnownNat n => BitVector n -> Int -> Bit
-bv@(BV v) !# i
-    | i >= 0 && i <= maxI = BV (smallInteger (dataToTag# (B.testBit v i)))
-    | otherwise           = err
+{-# NOINLINE index# #-}
+index# :: KnownNat n => BitVector n -> Int -> Bit
+index# bv@(BV v) i
+    | i >= 0 && i < sz = BV (smallInteger
+                            (dataToTag#
+                            (testBit v i)))
+    | otherwise        = err
   where
-    maxI = fromInteger (natVal bv) - 1
-    err  = error $ concat [ "!#: "
-                          , show i
-                          , " is out of range ["
-                          , show maxI
-                          , "..0]"
-                          ]
+    sz  = fromInteger (natVal bv)
+    err = error $ concat [ "(!): "
+                         , show i
+                         , " is out of range ["
+                         , show (sz - 1)
+                         , "..0]"
+                         ]
 
 {-# NOINLINE msb# #-}
 -- | MSB
 msb# :: KnownNat n => BitVector n -> Bit
-msb# bv@(BV v) = BV (smallInteger (dataToTag# (B.testBit v i)))
+msb# bv@(BV v) = BV (smallInteger (dataToTag# (testBit v i)))
   where
     i = fromInteger (natVal bv - 1)
 
 {-# NOINLINE lsb# #-}
 -- | LSB
-lsb# :: KnownNat n => BitVector n -> Bit
-lsb# (BV v) = BV (smallInteger (dataToTag# (B.testBit v 0)))
+lsb# :: BitVector n -> Bit
+lsb# (BV v) = BV (smallInteger (dataToTag# (testBit v 0)))
 
 {-# NOINLINE slice# #-}
 slice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
-slice# (BV i) m n = BV (B.shiftR (i B..&. mask) n')
+slice# (BV i) m n = BV (shiftR (i .&. mask) n')
   where
     m' = snatToInteger m
     n' = fromInteger (snatToInteger n)
@@ -391,33 +404,33 @@ infixl 5 <#
 (++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
 (BV v1) ++# bv2@(BV v2) = BV (v1' + v2)
   where
-    v1' = B.shiftL v1 (fromInteger (natVal bv2))
+    v1' = shiftL v1 (fromInteger (natVal bv2))
 
 -- * Modifying BitVectors
-{-# NOINLINE setBit# #-}
-setBit# :: KnownNat n => BitVector n -> Int -> BitVector n
-setBit# bv@(BV v) i
-    | i >= 0 && i <= maxI = BV (B.setBit v i)
-    | otherwise           = err
+{-# NOINLINE replaceBit# #-}
+replaceBit# :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
+replaceBit# bv@(BV v) i (BV b)
+    | i >= 0 && i < sz = BV (if b == 1 then setBit v i else clearBit v i)
+    | otherwise        = err
   where
-    maxI = fromInteger (natVal bv) - 1
-    err  = error $ concat [ "setBit#: "
+    sz   = fromInteger (natVal bv)
+    err  = error $ concat [ "replaceBit: "
                           , show i
                           , " is out of range ["
-                          , show maxI
+                          , show (sz - 1)
                           , "..0]"
                           ]
 
 {-# NOINLINE setSlice# #-}
 setSlice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
           -> BitVector (m + 1 + i)
-setSlice# (BV i) m n (BV j) = BV ((i B..&. mask) B..|. j')
+setSlice# (BV i) m n (BV j) = BV ((i .&. mask) .|. j')
   where
     m' = snatToInteger m
     n' = snatToInteger n
 
-    j'   = B.shiftL j (fromInteger n')
-    mask = B.complement ((2 ^ (m' + 1) - 1) `B.xor` (2 ^ n' - 1))
+    j'   = shiftL j (fromInteger n')
+    mask = complement ((2 ^ (m' + 1) - 1) `xor` (2 ^ n' - 1))
 
 {-# NOINLINE split# #-}
 split# :: KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
@@ -425,24 +438,24 @@ split# (BV i) = (l,r)
   where
     n    = fromInteger (natVal r)
     mask = (2 ^ n) - 1
-    r    = BV (i B..&. mask)
-    l    = BV (i `B.shiftR` n)
+    r    = BV (i .&. mask)
+    l    = BV (i `shiftR` n)
 
 {-# NOINLINE and# #-}
 and# :: BitVector n -> BitVector n -> BitVector n
-and# (BV v1) (BV v2) = BV (v1 B..&. v2)
+and# (BV v1) (BV v2) = BV (v1 .&. v2)
 
 {-# NOINLINE or# #-}
 or# :: BitVector n -> BitVector n -> BitVector n
-or# (BV v1) (BV v2) = BV (v1 B..|. v2)
+or# (BV v1) (BV v2) = BV (v1 .|. v2)
 
 {-# NOINLINE xor# #-}
 xor# :: BitVector n -> BitVector n -> BitVector n
-xor# (BV v1) (BV v2) = BV (v1 `B.xor` v2)
+xor# (BV v1) (BV v2) = BV (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => BitVector n -> BitVector n
-complement# (BV v1) = fromInteger_INLINE (B.complement v1)
+complement# (BV v1) = fromInteger_INLINE (complement v1)
 
 {-# NOINLINE shiftL# #-}
 shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => BitVector n -> Int
@@ -450,20 +463,20 @@ shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => BitVector n -> Int
 shiftL# (BV v) i
   | i < 0     = error
               $ "'shiftL undefined for negative number: " ++ show i
-  | otherwise = fromInteger_INLINE (B.shiftL v i)
+  | otherwise = fromInteger_INLINE (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
 shiftR# (BV v) i
   | i < 0     = error
               $ "'shiftR undefined for negative number: " ++ show i
-  | otherwise = fromInteger_INLINE (B.shiftR v i)
+  | otherwise = fromInteger_INLINE (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
 rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
-rotateL# bv@(BV n) b   = fromInteger_INLINE (l B..|. r)
+rotateL# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
   where
-    l    = B.shiftL n b'
-    r    = B.shiftR n b''
+    l    = shiftL n b'
+    r    = shiftR n b''
 
     b'   = b `mod` sz
     b''  = sz - b'
@@ -471,14 +484,18 @@ rotateL# bv@(BV n) b   = fromInteger_INLINE (l B..|. r)
 
 {-# NOINLINE rotateR# #-}
 rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
-rotateR# bv@(BV n) b   = fromInteger_INLINE (l B..|. r)
+rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
   where
-    l   = B.shiftR n b'
-    r   = B.shiftL n b''
+    l   = shiftR n b'
+    r   = shiftL n b''
 
     b'  = b `mod` sz
     b'' = sz - b'
     sz  = fromInteger (natVal bv)
+
+{-# NOINLINE popCount# #-}
+popCount# :: BitVector n -> Int
+popCount# (BV i) = popCount i
 
 -- | A resize operation that zero-extends on extension.
 --
@@ -497,3 +514,40 @@ instance KnownNat n => Lift (BitVector n) where
 
 decBitVector :: Integer -> TypeQ
 decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
+
+instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
+  SaturatingNum (BitVector n) where
+  satPlus = satPlus#
+  satMin  = satMin#
+  satMult = satMult#
+
+satPlus#, satMin# :: (KnownNat n, KnownNat (n + 1)) => SaturationMode
+                  -> BitVector n -> BitVector n -> BitVector n
+
+satPlus# SatWrap a b = a +# b
+satPlus# w a b = case msb# r of
+                   0 -> resize# r
+                   _ -> case w of
+                          SatZero  -> minBound#
+                          _        -> maxBound#
+  where
+    r = plus# a b
+
+satMin# SatWrap a b = a -# b
+satMin# _ a b = case msb# r of
+                   0 -> resize# r
+                   _ -> minBound#
+  where
+    r = minus# a b
+
+satMult# :: (KnownNat n, KnownNat (n + n)) => SaturationMode -> BitVector n
+         -> BitVector n -> BitVector n
+satMult# SatWrap a b = a *# b
+satMult# w a b = case rL of
+                   0 -> rR
+                   _ -> case w of
+                          SatZero  -> minBound#
+                          _        -> maxBound#
+  where
+    r       = mult# a b
+    (rL,rR) = split# r

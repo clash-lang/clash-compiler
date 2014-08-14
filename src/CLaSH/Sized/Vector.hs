@@ -31,19 +31,20 @@ module CLaSH.Sized.Vector
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
     -- ** Generating 'Vec'tors
-  , replicate, replicateU, repeat, iterate, iterateI, generate, generateI
+  , replicate, repeat, iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
-    -- ** 'Bits'
+    -- ** Functions for the 'CLaSH.Class.Bits.Bits' instance
   , concatBitVector#
   , unconcatBitVector#
   )
 where
 
-import Control.Applicative        (Applicative (..))
+import Control.Applicative        (Applicative (..), (<$>))
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
+import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (*), type (<=),
                                    natVal)
 import Language.Haskell.TH        (ExpQ)
@@ -57,9 +58,8 @@ import Prelude                    hiding ((++), (!!), concat, drop, foldl,
 import qualified Prelude          as P
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Class.BitIndex       (split)
 import CLaSH.Promoted.Nat         (SNat, UNat (..), withSNat, toUNat)
-import CLaSH.Sized.BitVector      (BitVector, (++#))
+import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
 
 -- | Fixed size vectors
 --
@@ -97,15 +97,25 @@ eq# v1 v2  = foldr (&&) True (zipWith (==) v1 v2)
 neq# :: Eq a => Vec n a -> Vec n a -> Bool
 neq# v1 v2 = not (foldr (&&) True (zipWith (==) v1 v2))
 
+-- | __NB__: Not synthesisable
 instance KnownNat n => Applicative (Vec n) where
-  pure  = repeat
-  (<*>) = zipWith ($)
+  pure      = repeat
+  fs <*> xs = zipWith ($) fs (lazyV xs)
 
 instance F.Foldable (Vec n) where
   foldr = foldr
 
 instance Functor (Vec n) where
   fmap = map
+
+-- | __NB__: Not synthesisable
+instance Traversable (Vec n) where
+  traverse = traverse#
+
+{-# NOINLINE traverse# #-}
+traverse# :: Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
+traverse# _ Nil       = pure Nil
+traverse# f (x :> xs) = (:>) <$> f x <*> traverse f xs
 
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
@@ -939,5 +949,5 @@ unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
 ucBV :: forall n m . KnownNat m
      => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
 ucBV UZero     _  = Nil
-ucBV (USucc n) bv = let (bv',x :: BitVector m) = split (unsafeCoerce bv)
+ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# (unsafeCoerce bv)
                     in  x :> ucBV n bv'

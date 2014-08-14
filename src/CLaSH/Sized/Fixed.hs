@@ -64,7 +64,7 @@ import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
 import Language.Haskell.TH.Syntax (Lift(..))
 
 import CLaSH.Class.Bits           (Bits (..))
-import CLaSH.Class.BitIndex       (BitIndex (..))
+import CLaSH.Prelude.BitIndex       (BitIndex (..))
 import CLaSH.Class.Bitwise        (Bitwise (..))
 import CLaSH.Class.Num            (Mult (..), Add (..))
 import CLaSH.Class.Resize         (Resize (..))

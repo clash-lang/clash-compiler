@@ -11,15 +11,17 @@ module CLaSH.Signal.Wrap
 where
 
 import Control.Applicative   ((<$>), (<*>), liftA2)
+import Data.Traversable      (sequenceA)
+import GHC.TypeLits          (KnownNat)
 import Prelude               hiding (head, map, tail)
 
 import CLaSH.Signal.Internal (Clock, CSignal (..), SClock)
 import CLaSH.Sized.BitVector (BitVector)
-import CLaSH.Sized.Fixed     (Fixed)
+-- import CLaSH.Sized.Fixed     (Fixed)
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Signed    (Signed)
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.Sized.Vector    (Vec (..), head, map, tail)
+import CLaSH.Sized.Vector    (Vec)
 
 -- | Isomorphism between a 'CSignal' of a product type (e.g. a tuple) and a
 -- product type of 'CSignal's.
@@ -65,7 +67,7 @@ instance Wrap ()
 
 instance Wrap (BitVector n)
 instance Wrap (Index n)
-instance Wrap (Fixed rep size frac)
+-- instance Wrap (Fixed rep size frac)
 instance Wrap (Signed n)
 instance Wrap (Unsigned n)
 
@@ -150,19 +152,17 @@ instance Wrap (a,b,c,d,e,f,g,h) where
                                ,fmap (\(_,_,_,_,_,_,_,x) -> x) tup
                                )
 
-instance Wrap (Vec n a) where
+instance KnownNat n => Wrap (Vec n a) where
   type Wrapped t (Vec n a) = Vec n (CSignal t a)
+  -- The 'Traversable' instances of both 'Vec' and 'CSignal' are not
+  -- synthesisable, so we must define these two functions as primitives.
   unwrap = vecUnwrap#
   wrap   = vecWrap#
 
 {-# NOINLINE vecUnwrap# #-}
 vecUnwrap# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
-vecUnwrap# clk vs = (map shead vs) :- (vecUnwrap# clk (map stail vs))
-    where
-      shead (s :- _)  = s
-      stail (_ :- ss) = ss
+vecUnwrap# _ = sequenceA
 
 {-# NOINLINE vecWrap# #-}
-vecWrap# :: SClock t -> CSignal t (Vec n a) -> Vec n (CSignal t a)
-vecWrap# _   (Nil :- _)         = Nil
-vecWrap# clk vs@((_ :> _) :- _) = fmap head vs :> vecWrap# clk (fmap tail vs)
+vecWrap# :: KnownNat n => SClock t -> CSignal t (Vec n a) -> Vec n (CSignal t a)
+vecWrap# _ = sequenceA

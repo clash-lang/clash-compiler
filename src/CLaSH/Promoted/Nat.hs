@@ -35,11 +35,15 @@ snatToInteger :: SNat n -> Integer
 snatToInteger (SNat p) = natVal p
 
 -- | Unary representation of a type-level natural
+--
+-- __NB__: Not synthesisable
 data UNat :: Nat -> * where
   UZero :: UNat 0
   USucc :: UNat n -> UNat (n + 1)
 
 -- | Convert a singleton natural number to its unary representation
+--
+-- __NB__: Not synthesisable
 toUNat :: SNat n -> UNat n
 toUNat (SNat p) = fromI (natVal p)
   where
@@ -48,18 +52,24 @@ toUNat (SNat p) = fromI (natVal p)
     fromI n = unsafeCoerce (USucc (fromI (n - 1)))
 
 -- | Add two singleton natural numbers
+--
+-- __NB__: Not synthesisable
 addUNat :: UNat n -> UNat m -> UNat (n + m)
 addUNat UZero     y     = y
 addUNat x         UZero = x
 addUNat (USucc x) y     = unsafeCoerce (USucc (addUNat x y))
 
 -- | Multiply two singleton natural numbers
+--
+-- __NB__: Not synthesisable
 multUNat :: UNat n -> UNat m -> UNat (n * m)
 multUNat UZero      _     = UZero
 multUNat _          UZero = UZero
 multUNat (USucc x) y      = unsafeCoerce (addUNat y (multUNat x y))
 
 -- | Exponential of two singleton natural numbers
+--
+-- __NB__: Not synthesisable
 powUNat :: UNat n -> UNat m -> UNat (n ^ m)
 powUNat _ UZero     = USucc UZero
 powUNat x (USucc y) = unsafeCoerce (multUNat x (powUNat x y))

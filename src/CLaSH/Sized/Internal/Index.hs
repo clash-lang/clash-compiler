@@ -17,7 +17,7 @@ module CLaSH.Sized.Internal.Index
   , ge#
   , gt#
   , le#
-    -- ** Enum
+    -- ** Enum (not synthesisable)
   , enumFrom#
   , enumFromThen#
   , enumFromTo#
@@ -45,7 +45,7 @@ import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, natVal)
 
--- | Arbitrary-bounded unsigned integer represented by @ceil(log(n))@ bits
+-- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
 -- Given an upper bound @n@, an 'Index' @n@ number has a range of: [0 .. @n@-1]
 newtype Index (n :: Nat) =
@@ -82,6 +82,8 @@ gt# (I n) (I m) = n > m
 {-# NOINLINE le# #-}
 le# (I n) (I m) = n <= m
 
+-- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
+-- 'enumFromThenTo', are not synthesisable.
 instance KnownNat n => Enum (Index n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
@@ -113,7 +115,7 @@ instance KnownNat n => Bounded (Index n) where
 maxBound# :: KnownNat n => Index n
 maxBound# = let res = I (natVal res - 1) in res
 
--- | Operators report an error on overflow
+-- | Operators report an error on overflow and underflow
 instance KnownNat n => Num (Index n) where
   (+)         = (+#)
   (-)         = (-#)

@@ -30,32 +30,55 @@ module CLaSH.Signal.Explicit
   )
 where
 
-import GHC.TypeLits          (KnownNat, KnownSymbol)
+import qualified Data.Foldable as F
+import GHC.TypeLits            (KnownNat, KnownSymbol)
 
-import CLaSH.Promoted.Nat    (snat, snatToInteger)
-import CLaSH.Promoted.Symbol (ssymbol)
-import CLaSH.Signal.Internal (CSignal (..), Clock (..), SClock (..), signal#,
-                              register#)
-import CLaSH.Signal.Wrap     (Wrap (..), Wrapped)
+import CLaSH.Promoted.Nat      (snat, snatToInteger)
+import CLaSH.Promoted.Symbol   (ssymbol)
+import CLaSH.Signal.Internal   (CSignal (..), Clock (..), SClock (..), signal#,
+                                register#)
+import CLaSH.Signal.Wrap       (Wrap (..), Wrapped)
 
 {- $relativeclocks #relativeclocks#
-CλaSH supports explicitly clocked 'Signal's in the form of: \"@'CSignal' clk a@\",
-where @clk@ is a 'Nat'ural number corresponding to the clock period of the clock
-the signal is synchronized to. NB: \"Bad things\"™  happen when you actually use
-a clock period of @0@, so don't do that!
+CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:
 
-The clock periods are however dimension-less, they do not refer to any explicit
-time-scale (e.g. nano-seconds). The reason for the lack of an explicit time-scale
-is that the CλaSH compiler would not be able guarantee that the circuit can run
-at the specified frequency.
+> 'CSignal' (clk :: Clock) a
 
-The clock periods are just there to indicate relative frequency differences
-between two different clocks. That is, a \"@'CSignal' 500 a@\" is synchronized
-to a clock that runs 6.5 times faster than the clock to which a
-\"@'CSignal' 3250 a@\" is synchronized to.
+Where @a@ is the type of the elements, and @clk@ is the clock to which the
+signal is synchronised. The type-parameter, @clk@, is of the kind 'Clock' which
+has types of the following shape:
 
-__NB__: You should be judicious using a clock with period @1@ as you can never
-create a clock that runs faster later on!
+@
+Clk \{\- name :: \-\} 'Symbol' \{\- period :: \-\} 'Nat'
+@
+
+Where @name@ is a type-level string ('Symbol') representing the the name of the
+clock, and @period@ is a type-level natural number ('Nat') representing the
+clock period. Two concrete instances of a 'Clk' could be:
+
+> type ClkA500  = Clk "A500" 500
+> type ClkB3250 = Clk "B3250" 3250
+
+The periods of these clocks are however dimension-less, they do not refer to any
+explicit time-scale (e.g. nano-seconds). The reason for the lack of an explicit
+time-scale is that the CλaSH compiler would not be able guarantee that the
+circuit can run at the specified frequency. The clock periods are just there to
+indicate relative frequency differences between two different clocks. That is, a
+signal:
+
+> 'CSignal' ClkA500 a
+
+is synchronized to a clock that runs 6.5 times faster than the clock to which
+the signal:
+
+> 'CSignal' ClkB3250 a
+
+is synchronized to.
+
+* __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
+so do __not__ do that!
+* __NB__: You should be judicious using a clock with period of @1@ as you can
+never create a clock that faster!
 -}
 
 -- * Clock domain crossing
@@ -76,21 +99,33 @@ systemClock = sclock
 
 -- ** Synchronisation primitive
 {-# NOINLINE veryUnsafeSynchronizer #-}
--- | Synchronisation function that is basically a represented by a (bundle of)
--- wire(s) in hardware. This function should only be used as part of a proper
--- synchronisation component, such as a dual flip-flop synchronizer, or a FIFO
--- with an asynchronous memory element:
+-- | The 'veryUnsafeSynchronizer' function is a primitive that must be used to
+-- connect one clock domain to the other, and will be synthesised to a (bundle
+-- of) wire(s) in the eventual circuit. This function should only be used as
+-- part of a proper synchronisation component, such as the following dual
+-- flip-flop synchronizer:
 --
 -- > dualFlipFlop :: SClock clkA -> SClock clkB
 -- >              -> CSignal clkA Bit -> CSignal clkB Bit
--- > dualFlipFlop clkA clkB = cregister clkB L . cregister clkB L . veryUnsafeSynchronizer clkA clkB
+-- > dualFlipFlop clkA clkB = cregister clkB low . cregister clkB low
+-- >                        . veryUnsafeSynchronizer clkA clkB
 --
 -- The 'veryUnsafeSynchronizer' works in such a way that, given 2 clocks:
 --
--- > clk7 = sclock :: SClock (Clk "clk7" 7)
--- > clk2 = sclock :: SClock (Clk "clk2" 2)
+-- > type Clk7 = Clk "clk7" 7
+-- >
+-- > clk7 :: SClock Clk7
+-- > clk7 = sclock
 --
--- Oversampling followed by compression is the identity function plus 2 initial values:
+-- and
+--
+-- > type Clk2 = Clk "clk2" 2
+-- >
+-- > clk2 :: SClock Clk2
+-- > clk2 = sclock
+--
+-- Oversampling followed by compression is the identity function plus 2 initial
+-- values:
 --
 -- > cregister clk7 i $
 -- > veryUnsafeSynchronizer clk2 clk7 $
@@ -104,10 +139,11 @@ systemClock = sclock
 --
 -- Something we can easily observe:
 --
--- > oversampling = cregister clk2 99 . veryUnsafeSynchronizer clk7 clk2 . cregister clk7 50
+-- > oversampling = cregister clk2 99 . veryUnsafeSynchronizer clk7 clk2
+-- >              . cregister clk7 50
 -- > almostId     = cregister clk7 70 . veryUnsafeSynchronizer clk2 clk7
--- >              . cregister clk2 99 . veryUnsafeSynchronizer clk7 clk2 . cregister clk7 50
--- >
+-- >              . cregister clk2 99 . veryUnsafeSynchronizer clk7 clk2
+-- >              . cregister clk7 50
 --
 -- >>> csample (oversampling (cfromList [1..10]))
 -- [99, 50,1,1,1,2,2,2,2, 3,3,3,4,4,4,4, 5,5,5,6,6,6,6, 7,7,7,8,8,8,8, 9,9,9,10,10,10,10, ...
@@ -168,6 +204,16 @@ repSchedule high low = take low $ repSchedule' low high 1
 csignal :: a -> CSignal clk a
 csignal = signal#
 
+-- | \"@'cregister' i s@\" delays the values in 'CSignal' @s@ for one cycle,
+-- and sets the value at time 0 to @i@
+--
+-- > type ClkA = Clk "A" 100
+-- >
+-- > clkA100 :: SClock ClkA
+-- > clkA100 = sclock
+--
+-- >>> csampleN 3 (cregister clkA100 8 (fromList [1,2,3,4]))
+-- [8,1,2]
 cregister :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 cregister = register#
 
@@ -176,9 +222,12 @@ cregister = register#
 -- | Simulate a (@'CSignal' clk1 a -> 'CSignal' clk2 b@) function given a list
 -- of samples of type @a@
 --
--- > clk100 = sclock :: SClock "A" 100
+-- > type ClkA = Clk "A" 100
+-- >
+-- > clkA100 :: SClock ClkA
+-- > clkA100 = sclock
 --
--- >>> csimulate (cregister clk100 8) [1, 2, 3, ...
+-- >>> csimulate (cregister clkA100 8) [1, 2, 3, ...
 -- [8, 1, 2, 3, ...
 --
 -- __NB__: This function is not synthesisable
@@ -188,10 +237,15 @@ csimulate f = csample . f . cfromList
 -- | Simulate a (@'CSignalP' clk1 a -> 'CSignalP' clk2 b@) function given a list
 -- of samples of type @a@
 --
--- > clk100 = Clock d100
+-- > type ClkA = Clk "A" 100
+-- >
+-- > clkA100 :: SClock ClkA
+-- > clkA100 = sclock
 --
--- >>> csimulateP clk100 clk100 (cunpack clk100 . cregister clk100 (8,8) . cpack clk100) [(1,1), (2,2), (3,3), ...
+-- >>> csimulateP clkA100 clkA100 (cunpack clkA100 . cregister clkA100 (8,8) . cpack clkA100) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
+--
+-- __NB__: This function is not synthesisable
 csimulateP :: (Wrap a, Wrap b)
            => SClock clk1 -- ^ 'Clock' of the incoming signal
            -> SClock clk2 -- ^ 'Clock' of the outgoing signal
@@ -200,13 +254,37 @@ csimulateP :: (Wrap a, Wrap b)
 csimulateP clk1 clk2 f = csimulate (unwrap clk2 . f . wrap clk1)
 
 -- * List \<-\> CSignal conversion
+
+-- | Get an infinite list of samples from a 'CSignal'
+--
+-- The elements in the list correspond to the values of the 'CSignal' at
+-- consecutive clock cycles
+--
+-- > csample s == [s0, s1, s2, s3, ...
+--
+-- __NB__: This function is not synthesisable
 csample :: CSignal clk a -> [a]
-csample ~(s :- ss) = s : csample ss
+csample = F.foldr (:) []
 
+-- | Get a list of @n@ samples from a 'CSignal'
+--
+-- The elements in the list correspond to the values of the 'CSignal' at
+-- consecutive clock cycles
+--
+-- > csampleN 3 s == [s0, s1, s2]
+--
+-- __NB__: This function is not synthesisable
 csampleN :: Int -> CSignal clk a -> [a]
-csampleN 0 _          = []
-csampleN n ~(s :- ss) = s : csampleN (n-1) ss
+csampleN n = take n . csample
 
+-- | Create a 'CSignal' from a list
+--
+-- Every element in the list will correspond to a value of the signal for one
+-- clock cycle.
+--
+-- >>> csampleN 2 (cfromList [1,2,3,4,5])
+-- [1,2]
+--
+-- __NB__: This function is not synthesisable
 cfromList :: [a] -> CSignal clk a
-cfromList []     = error "finite list"
-cfromList (s:ss) = s :- cfromList ss
+cfromList = foldr (:-) (error "finite list")
