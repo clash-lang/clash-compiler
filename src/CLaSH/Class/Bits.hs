@@ -7,12 +7,13 @@
 
 module CLaSH.Class.Bits where
 
-import GHC.TypeLits          (KnownNat, Nat, type (+), type (*))
-import Prelude               hiding (map)
+import GHC.TypeLits                   (KnownNat, Nat, type (+), type (*))
+import Prelude                        hiding (map)
 
-import CLaSH.Class.BitIndex  (split)
-import CLaSH.Sized.BitVector (BitVector, (++#), high, low)
-import CLaSH.Sized.Vector    (Vec, concatBitVector#, map, unconcatBitVector#)
+import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
+import CLaSH.Sized.Internal.BitVector (split#)
+import CLaSH.Sized.Vector             (Vec, concatBitVector#, map,
+                                       unconcatBitVector#)
 
 -- | Convert to and from a 'BitVector'
 class Bits a where
@@ -20,9 +21,9 @@ class Bits a where
   -- of type @a@
   type BitSize a :: Nat
   -- | Convert element of type @a@ to a 'BitVector'
-  pack   :: KnownNat (BitSize a) => a -> BitVector (BitSize a)
+  pack   :: a -> BitVector (BitSize a)
   -- | Convert a 'BitVector' to an element of type @a@
-  unpack :: KnownNat (BitSize a) => BitVector (BitSize a) -> a
+  unpack :: BitVector (BitSize a) -> a
 
 instance Bits Bool where
   type BitSize Bool = 1
@@ -40,7 +41,7 @@ instance (KnownNat (BitSize a), KnownNat (BitSize b), Bits a, Bits b) =>
     Bits (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
-  unpack ab  = let (a,b) = split ab in (unpack a, unpack b)
+  unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
 
 instance (KnownNat n, KnownNat (BitSize a), Bits a) => Bits (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
