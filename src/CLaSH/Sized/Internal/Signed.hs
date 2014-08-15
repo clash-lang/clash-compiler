@@ -12,8 +12,11 @@
 module CLaSH.Sized.Internal.Signed
   ( -- * Datatypes
     Signed (..)
+    -- * Accessors
+    -- ** Length information
+  , size#
     -- * Type classes
-    -- ** Bits
+    -- ** BitConvert
   , pack#
   , unpack#
     -- Eq
@@ -52,7 +55,7 @@ module CLaSH.Sized.Internal.Signed
   , quotRem#
   , divMod#
   , toInteger#
-    -- ** Bitwise
+    -- ** Bits
   , and#
   , or#
   , xor#
@@ -61,6 +64,7 @@ module CLaSH.Sized.Internal.Signed
   , shiftR#
   , rotateL#
   , rotateR#
+  , popCount#
     -- ** Resize
   , resize#
   , resize_wrap
@@ -72,7 +76,7 @@ module CLaSH.Sized.Internal.Signed
   )
 where
 
-import qualified Data.Bits            as B
+import Data.Bits                      (Bits (..))
 import Data.Default                   (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Data.Typeable                  (Typeable)
@@ -80,16 +84,15 @@ import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
-import CLaSH.Class.Bits               (Bits (..))
-import CLaSH.Class.Bitwise            (Bitwise (..))
+import CLaSH.Class.BitConvert         (BitConvert (..))
 import CLaSH.Class.Num                (Add (..), Mult (..), SaturatingNum (..),
                                        SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
-import CLaSH.Prelude.BitIndex         (msb,split)
+import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), (#>))
-
+import CLaSH.Sized.Internal.BitVector (BitVector (..), (#>), high, low)
+import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
 -- bit.
@@ -106,10 +109,14 @@ newtype Signed (n :: Nat) =
     S { unsafeToInteger :: Integer}
   deriving Typeable
 
+{-# NOINLINE size# #-}
+size# :: KnownNat n => Signed n -> Int
+size# bv = fromInteger (natVal bv)
+
 instance Show (Signed n) where
   show (S n) = show n
 
-instance KnownNat n => Bits (Signed n) where
+instance KnownNat n => BitConvert (Signed n) where
   type BitSize (Signed n) = n
   pack   = pack#
   unpack = unpack#
@@ -297,23 +304,33 @@ quotRem_INLINE,divMod_INLINE :: KnownNat n => Signed n -> Signed n
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
 
-instance KnownNat n => Bitwise (Signed n) where
-  (.&.)       = and#
-  (.|.)       = or#
-  xor         = xor#
-  complement  = complement#
-  shiftL v i  = shiftL#  v (fromIntegral i)
-  shiftR v i  = shiftR#  v (fromIntegral i)
-  rotateL v i = rotateL# v (fromIntegral i)
-  rotateR v i = rotateR# v (fromIntegral i)
+instance KnownNat n => Bits (Signed n) where
+  (.&.)             = and#
+  (.|.)             = or#
+  xor               = xor#
+  complement        = complement#
+  zeroBits          = 0
+  bit i             = replaceBit 0 i high
+  setBit v i        = replaceBit v i high
+  clearBit v i      = replaceBit v i low
+  complementBit v i = replaceBit v i (BV.complement# (v ! i))
+  testBit v i       = v ! i == 1
+  bitSizeMaybe v    = Just (size# v)
+  bitSize           = size#
+  isSigned _        = True
+  shiftL v i        = shiftL# v i
+  shiftR v i        = shiftR# v i
+  rotateL v i       = rotateL# v i
+  rotateR v i       = rotateR# v i
+  popCount          = popCount#
 
 and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
-(S a) `and#` (S b) = fromIntegerProxy_INLINE Proxy (a B..&. b)
+and# (S a) (S b) = fromIntegerProxy_INLINE Proxy (a .&. b)
 {-# NOINLINE or# #-}
-(S a) `or#` (S b)  = fromIntegerProxy_INLINE Proxy (a B..|. b)
+or# (S a) (S b)  = fromIntegerProxy_INLINE Proxy (a .|. b)
 {-# NOINLINE xor# #-}
-(S a) `xor#` (S b) = fromIntegerProxy_INLINE Proxy (B.xor a b)
+xor# (S a) (S b) = fromIntegerProxy_INLINE Proxy (xor a b)
 
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => Signed n -> Signed n
@@ -322,16 +339,16 @@ complement# = unpack# . complement . pack#
 shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
 shiftL# _ b | b < 0  = error "'shiftL undefined for negative numbers"
-shiftL# (S n) b      = fromIntegerProxy_INLINE Proxy (B.shiftL n b)
+shiftL# (S n) b      = fromIntegerProxy_INLINE Proxy (shiftL n b)
 {-# NOINLINE shiftR# #-}
 shiftR# _ b | b < 0  = error "'shiftR undefined for negative numbers"
-shiftR# (S n) b      = fromIntegerProxy_INLINE Proxy (B.shiftR n b)
+shiftR# (S n) b      = fromIntegerProxy_INLINE Proxy (shiftR n b)
 {-# NOINLINE rotateL# #-}
 rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
-rotateL# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l B..|. r)
+rotateL# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l .|. r)
   where
-    l    = B.shiftL n b'
-    r    = B.shiftR n b'' B..&. mask
+    l    = shiftL n b'
+    r    = shiftR n b'' .&. mask
     mask = 2 ^ b' - 1
 
     b'   = b `mod` sz
@@ -340,15 +357,22 @@ rotateL# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l B..|. r)
 
 {-# NOINLINE rotateR# #-}
 rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
-rotateR# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l B..|. r)
+rotateR# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l .|. r)
   where
-    l    = B.shiftR n b' B..&. mask
-    r    = B.shiftL n b''
+    l    = shiftR n b' .&. mask
+    r    = shiftL n b''
     mask = 2 ^ b'' - 1
 
     b'  = b `mod` sz
     b'' = sz - b'
     sz  = fromInteger (natVal s)
+
+{-# NOINLINE popCount# #-}
+popCount# :: KnownNat n => Signed n -> Int
+popCount# s@(S i) = popCount i'
+  where
+    maxI = 2 ^ natVal s
+    i'   = i `mod` maxI
 
 -- | A sign-preserving resize operation
 --
@@ -370,9 +394,9 @@ resize# s@(S i) | n <= m    = extend
 
     mask  = (2 ^ (m - 1)) - 1
     sign  = 2 ^ (m - 1)
-    i'    = i B..&. mask
-    trunc = if B.testBit i (n - 1)
-               then fromIntegerProxy_INLINE Proxy (i' B..|. sign)
+    i'    = i .&. mask
+    trunc = if testBit i (n - 1)
+               then fromIntegerProxy_INLINE Proxy (i' .|. sign)
                else fromIntegerProxy_INLINE Proxy i'
 
 {-# NOINLINE resize_wrap #-}

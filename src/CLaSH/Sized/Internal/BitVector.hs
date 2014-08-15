@@ -307,10 +307,12 @@ instance KnownNat n => Bits (BitVector n) where
   popCount          = popCount#
 
 {-# NOINLINE reduceAnd# #-}
-reduceAnd# :: Integer -> BitVector n -> BitVector 1
-reduceAnd# sz (BV i) = BV (smallInteger (dataToTag# check))
+reduceAnd# :: (KnownNat n) => BitVector n -> BitVector 1
+reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
   where
     check = i == maxI
+
+    sz    = natVal bv
     maxI  = (2 ^ sz) - 1
 
 {-# NOINLINE reduceOr# #-}
@@ -441,16 +443,14 @@ split# (BV i) = (l,r)
     r    = BV (i .&. mask)
     l    = BV (i `shiftR` n)
 
+and#, or#, xor# :: BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE and# #-}
-and# :: BitVector n -> BitVector n -> BitVector n
 and# (BV v1) (BV v2) = BV (v1 .&. v2)
 
 {-# NOINLINE or# #-}
-or# :: BitVector n -> BitVector n -> BitVector n
 or# (BV v1) (BV v2) = BV (v1 .|. v2)
 
 {-# NOINLINE xor# #-}
-xor# :: BitVector n -> BitVector n -> BitVector n
 xor# (BV v1) (BV v2) = BV (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}

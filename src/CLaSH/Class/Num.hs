@@ -50,7 +50,7 @@ data SaturationMode
 
 -- | 'Num' operators in which overflow and underflow behaviour can be specified
 -- using 'SaturationMode'.
-class Bounded a => SaturatingNum a where
+class (Bounded a, Num a) => SaturatingNum a where
   -- | Addition with parametrisable over- and underflow behaviour
   satPlus :: SaturationMode -> a -> a -> a
   -- | Subtraction with parametrisable over- and underflow behaviour

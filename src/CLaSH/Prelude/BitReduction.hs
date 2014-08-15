@@ -3,15 +3,13 @@
 
 module CLaSH.Prelude.BitReduction where
 
-import GHC.TypeLits                   (KnownNat, natVal)
+import GHC.TypeLits                   (KnownNat)
 
 import CLaSH.Class.BitConvert         (BitConvert (..))
 import CLaSH.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 
 reduceAnd :: (BitConvert a, KnownNat (BitSize a)) => a -> Bit
-reduceAnd v = reduceAnd# (natVal v') v'
-  where
-    v' = pack v
+reduceAnd v = reduceAnd# (pack v)
 
 reduceOr :: BitConvert a => a -> Bit
 reduceOr v = reduceOr# (pack v)

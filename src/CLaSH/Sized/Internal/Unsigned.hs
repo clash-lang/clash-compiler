@@ -11,8 +11,11 @@
 module CLaSH.Sized.Internal.Unsigned
   ( -- * Datatypes
     Unsigned (..)
+    -- * Accessors
+    -- ** Length information
+  , size#
     -- * Type classes
-    -- ** Bits
+    -- ** BitConvert
   , pack#
   , unpack#
     -- Eq
@@ -50,7 +53,7 @@ module CLaSH.Sized.Internal.Unsigned
   , quotRem#
   , divMod#
   , toInteger#
-    -- ** Bitwise
+    -- ** Bits
   , and#
   , or#
   , xor#
@@ -59,6 +62,7 @@ module CLaSH.Sized.Internal.Unsigned
   , shiftR#
   , rotateL#
   , rotateR#
+  , popCount#
     -- ** Resize
   , resize#
     -- ** SaturatingNum
@@ -68,21 +72,22 @@ module CLaSH.Sized.Internal.Unsigned
   )
 where
 
+import Data.Bits                      (Bits (..))
 import Data.Default                   (Default (..))
 import Data.Typeable                  (Typeable)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
-import CLaSH.Class.Bits               (Bits (..))
-import CLaSH.Class.Bitwise            (Bitwise (..))
+import CLaSH.Class.BitConvert         (BitConvert (..))
 import CLaSH.Class.Num                (Add (..), Mult (..), SaturatingNum (..),
                                        SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
-import CLaSH.Prelude.BitIndex         (msb,split)
+import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..))
+import CLaSH.Sized.Internal.BitVector (BitVector (..), high, low)
+import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -97,10 +102,14 @@ newtype Unsigned (n :: Nat) =
     U { unsafeToBitVector :: BitVector n }
   deriving Typeable
 
+{-# NOINLINE size# #-}
+size# :: KnownNat n => Unsigned n -> Int
+size# bv = fromInteger (natVal bv)
+
 instance Show (Unsigned n) where
   show (U (BV i)) = show i
 
-instance Bits (Unsigned n) where
+instance BitConvert (Unsigned n) where
   type BitSize (Unsigned n) = n
   pack   = pack#
   unpack = unpack#
@@ -257,47 +266,59 @@ divMod# n d  = (n `div#` d,n `mod#` d)
 toInteger# :: KnownNat n => Unsigned n -> Integer
 toInteger# (U i) = toInteger i
 
-instance KnownNat n => Bitwise (Unsigned n) where
-  (.&.)       = and#
-  (.|.)       = or#
-  xor         = xor#
-  complement  = complement#
-  shiftL v i  = shiftL#  v (fromIntegral i)
-  shiftR v i  = shiftR#  v (fromIntegral i)
-  rotateL v i = rotateL# v (fromIntegral i)
-  rotateR v i = rotateR# v (fromIntegral i)
+instance KnownNat n => Bits (Unsigned n) where
+  (.&.)             = and#
+  (.|.)             = or#
+  xor               = xor#
+  complement        = complement#
+  zeroBits          = 0
+  bit i             = replaceBit 0 i high
+  setBit v i        = replaceBit v i high
+  clearBit v i      = replaceBit v i low
+  complementBit v i = replaceBit v i (BV.complement# (v ! i))
+  testBit v i       = v ! i == 1
+  bitSizeMaybe v    = Just (size# v)
+  bitSize           = size#
+  isSigned _        = False
+  shiftL v i        = shiftL# v i
+  shiftR v i        = shiftR# v i
+  rotateL v i       = rotateL# v i
+  rotateR v i       = rotateR# v i
+  popCount          = popCount#
 
 {-# NOINLINE and# #-}
-and# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-and# (U v1) (U v2) = U (v1 .&. v2)
+and# :: Unsigned n -> Unsigned n -> Unsigned n
+and# (U v1) (U v2) = U (BV.and# v1 v2)
 
 {-# NOINLINE or# #-}
-or# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-or# (U v1) (U v2) = U (v1 .|. v2)
+or# :: Unsigned n -> Unsigned n -> Unsigned n
+or# (U v1) (U v2) = U (BV.or# v1 v2)
 
 {-# NOINLINE xor# #-}
-xor# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-xor# (U v1) (U v2) = U (v1 `xor` v2)
+xor# :: Unsigned n -> Unsigned n -> Unsigned n
+xor# (U v1) (U v2) = U (BV.xor# v1 v2)
 
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => Unsigned n -> Unsigned n
-complement# (U v1) = U (complement v1)
+complement# (U v1) = U (BV.complement# v1)
 
+shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int
+                                     -> Unsigned n
 {-# NOINLINE shiftL# #-}
-shiftL# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-shiftL# (U v) i = U (shiftL v i)
+shiftL# (U v) i = U (BV.shiftL# v i)
 
 {-# NOINLINE shiftR# #-}
-shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-shiftR# (U v) i = U (shiftR v i)
+shiftR# (U v) i = U (BV.shiftR# v i)
 
 {-# NOINLINE rotateL# #-}
-rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-rotateL# (U bv) i = U (shiftL bv i)
+rotateL# (U bv) i = U (BV.rotateL# bv i)
 
 {-# NOINLINE rotateR# #-}
-rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
-rotateR# (U bv) i = U (shiftR bv i)
+rotateR# (U bv) i = U (BV.rotateR# bv i)
+
+{-# NOINLINE popCount# #-}
+popCount# :: Unsigned n -> Int
+popCount# (U bv) = BV.popCount# bv
 
 -- | A resize operation that zero-extends on extension, and wraps on truncation.
 --

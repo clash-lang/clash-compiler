@@ -6,7 +6,7 @@
 
 module CLaSH.Prelude.BitIndex where
 
-import GHC.TypeLits                   (KnownNat, type (+), type (-), natVal)
+import GHC.TypeLits                   (KnownNat, type (+), type (-))
 
 import CLaSH.Class.BitConvert         (BitConvert (..))
 import CLaSH.Promoted.Nat             (SNat)
@@ -17,9 +17,7 @@ import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 --
 -- __NB:__ Bit indices are __DESCENDING__.
 (!) :: (BitConvert a, KnownNat (BitSize a), Integral i) => a -> i -> Bit
-(!) v i = index# (natVal v') v' (toInteger i)
-  where
-    v' = pack v
+(!) v i = index# (pack v) (fromIntegral i)
 
 -- | Get a slice between bit index @m@ and and bit index @n@.
 --
@@ -39,9 +37,7 @@ split v = split# (pack v)
 -- __NB:__ Bit indices are __DESCENDING__.
 replaceBit :: (BitConvert a, KnownNat (BitSize a), Integral i) => a -> i -> Bit
            -> a
-replaceBit v i = unpack (replaceBit# (natVal v') v' (toInteger i))
-  where
-    v' = pack v
+replaceBit v i b = unpack (replaceBit# (pack v) (fromIntegral i) b)
 
 -- | Set the bits between bit index @m@ and bit index @n@.
 --

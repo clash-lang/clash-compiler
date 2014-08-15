@@ -5,7 +5,9 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module CLaSH.Class.BitConvert where
+module CLaSH.Class.BitConvert
+  (BitConvert (..))
+where
 
 import GHC.TypeLits                   (KnownNat, Nat, type (+), type (*))
 import Prelude                        hiding (map)

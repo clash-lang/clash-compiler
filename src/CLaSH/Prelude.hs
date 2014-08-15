@@ -74,6 +74,7 @@ module CLaSH.Prelude
 where
 
 import Control.Applicative
+import Data.Bits
 import Data.Default
 import GHC.TypeLits
 import Language.Haskell.TH.Lift    (Lift(..),deriveLift)
