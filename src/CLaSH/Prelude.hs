@@ -49,7 +49,7 @@ module CLaSH.Prelude
   , module CLaSH.Sized.Signed
   , module CLaSH.Sized.Unsigned
     -- *** Fixed point numbers
-  -- , module CLaSH.Sized.Fixed
+  , module CLaSH.Sized.Fixed
     -- *** Fixed size vectors
   , module CLaSH.Sized.Vector
     -- ** Type-level natural numbers
@@ -95,7 +95,7 @@ import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
 import CLaSH.Promoted.Ord
 import CLaSH.Sized.BitVector
--- import CLaSH.Sized.Fixed
+import CLaSH.Sized.Fixed
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector

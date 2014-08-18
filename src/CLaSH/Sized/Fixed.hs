@@ -1,14 +1,15 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 {-# OPTIONS_GHC -fexpose-all-unfoldings -fno-strictness #-}
 
@@ -31,6 +32,8 @@ module CLaSH.Sized.Fixed
     SFixed, sf, unSF
     -- * 'UFixed': 'Unsigned' 'Fixed' point numbers
   , UFixed, uf, unUF
+      -- * Division
+  , divide
     -- * 'Fixed' point literals
   , fLit
     -- * 'Fixed' point wrapper
@@ -39,11 +42,11 @@ module CLaSH.Sized.Fixed
     -- $constraintsynonyms
 
     -- ** Constraint synonyms for 'SFixed'
-  , NumSFixedC, AddSFixedC, MultSFixedC, ResizeSFC
+  , NumSFixedC, AddSFixedC, MultSFixedC, FracSFixedC, ResizeSFC, DivideSC
     -- ** Constraint synonyms for 'UFixed'
-  , NumUFixedC, AddUFixedC, MultUFixedC, ResizeUFC
+  , NumUFixedC, AddUFixedC, MultUFixedC, FracUFixedC, ResizeUFC, DivideUC
     -- ** Constraint synonyms for 'Fixed' wrapper
-  , NumFixedC, AddFixedC, MultFixedC, ResizeFC
+  , NumFixedC, AddFixedC, MultFixedC, FracFixedC, ResizeFC, DivideC
     -- * Proxy
   , asRepProxy, asIntProxy
   )
@@ -72,7 +75,6 @@ import CLaSH.Promoted.Ord         (Max)
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 
-
 -- | 'Fixed'-point number
 --
 -- Where:
@@ -88,8 +90,12 @@ import CLaSH.Sized.Unsigned       (Unsigned)
 newtype Fixed (rep :: Nat -> *) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
 
-deriving instance Eq (rep (int + frac)) => Eq (Fixed rep int frac)
-deriving instance Ord (rep (int + frac)) => Ord (Fixed rep int frac)
+deriving instance Eq (rep (int + frac))   => Eq (Fixed rep int frac)
+deriving instance Ord (rep (int + frac))  => Ord (Fixed rep int frac)
+
+-- | Instance functions do not saturate.
+-- Meaning that \"@`'shiftL'` 1 == 'satMult' 'SatWrap' 2'@\""
+deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 
 -- | Signed 'Fixed'-point number, with @int@ integer bits (including sign-bit)
 -- and @frac@ fractional bits.
@@ -276,6 +282,7 @@ instance MultFixedC rep int1 frac1 int2 frac2 =>
                Fixed rep (int1 + int2) (frac1 + frac2)
   mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
 
+-- | Constraint for the 'Add' instance of 'Fixed'
 type AddFixedC rep int1 frac1 int2 frac2
   = ( ResizeFC rep int1 frac1 (Max int1 int2 + 1) (Max frac1 frac2)
     , ResizeFC rep int2 frac2 (Max int1 int2 + 1) (Max frac1 frac2)
@@ -317,6 +324,7 @@ instance AddFixedC rep int1 frac1 int2 frac2 =>
         (Fixed f2R) = resizeF f2 :: Fixed rep (Max int1 int2 + 1) (Max frac1 frac2)
     in  Fixed (f1R - f2R)
 
+-- | Constraint for the 'Num' instance of 'Fixed'
 type NumFixedC rep int frac
   = ( SaturatingNum (rep (int + frac))
     , Mult (rep (int + frac)) (rep (int + frac))
@@ -432,13 +440,13 @@ type ResizeUFC int1 frac1 int2 frac2 =
 -- When used in a polymorphic setting, use the following
 -- <#constraintsynonyms Constraint synonyms> for less verbose type signatures:
 --
--- * @'ResizeFC' rep frac1 frac2 size1 size2@ for:
---   @'Fixed' frac1 rep size1 -> 'Fixed' frac2 rep size2@
+-- * @'ResizeFC' rep int1 frac1 int2 frac2@ for:
+--   @'Fixed' rep int1 frac1 -> 'Fixed' rep int2 frac2@
 --
 -- * @'ResizeSFC' int1 frac1 int2 frac2@ for:
 --   @'SFixed' int1 frac1 -> 'SFixed' int2 frac2@
 --
--- * @'ResizeUFC' int1 frac1 int2 frac2@ for:
+-- * @'ResizeUFC' rep int1 frac1 int2 frac2@ for:
 --   @'UFixed' int1 frac1 -> 'UFixed' int2 frac2@
 resizeF ::(ResizeFC rep int1 frac1 int2 frac2, Bounded (rep (int2 + frac2)))
         => Fixed rep int1 frac1
@@ -540,3 +548,100 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
       fMinSym = if isSigned a
                    then 0
                    else minBound + 1
+
+-- | Constraint for the 'divide' function
+type DivideC rep int1 frac1 int2 frac2
+  = ( Resize   rep
+    , Integral (rep (((int1 + frac2) + 1) + (int2 + frac1)))
+    , Bits     (rep (((int1 + frac2) + 1) + (int2 + frac1)))
+    , KnownNat int2
+    , KnownNat frac2
+    , KnownNat (int1 + frac1)
+    , KnownNat (int2 + frac2)
+    , KnownNat ((int1 + frac2 + 1) + (int2 + frac1))
+    )
+
+-- | Constraint for the 'divide' function, specialized for 'SFixed'
+type DivideSC int1 frac1 int2 frac2
+  = ( KnownNat int2
+    , KnownNat frac2
+    , KnownNat (int1 + frac1)
+    , KnownNat (int2 + frac2)
+    , KnownNat ((int1 + frac2 + 1) + (int2 + frac1))
+    )
+
+-- | Constraint for the 'divide' function, specialized for 'UFixed'
+type DivideUC int1 frac1 int2 frac2 =
+     DivideSC int1 frac1 int2 frac2
+
+-- | Fixed point division
+--
+-- When used in a polymorphic setting, use the following
+-- <#constraintsynonyms Constraint synonyms> for less verbose type signatures:
+--
+-- * @'DivideC' rep int1 frac1 int2 frac2@ for:
+--   @'Fixed' rep int1 frac1 -> 'Fixed' rep int2 frac2 -> 'Fixed' rep (int1 + frac2 + 1) (int2 + frac1)@
+--
+-- * @'DivideSC' rep int1 frac1 int2 frac2@ for:
+--   @'SFixed' int1 frac1 -> 'SFixed' int2 frac2 -> 'SFixed' (int1 + frac2 + 1) (int2 + frac1)@
+--
+-- * @'DivideUC' rep int1 frac1 int2 frac2@ for:
+--   @'UFixed' int1 frac1 -> 'UFixed' int2 frac2 -> 'UFixed' (int1 + frac2 + 1) (int2 + frac1)@
+divide :: DivideC rep int1 frac1 int2 frac2
+       => Fixed rep int1 frac1
+       -> Fixed rep int2 frac2
+       -> Fixed rep (int1 + frac2 + 1) (int2 + frac1)
+divide (Fixed fr1) fx2@(Fixed fr2) = Fixed res
+  where
+    int2  = fromInteger (natVal (asIntProxy fx2))
+    frac2 = fromInteger (natVal fx2)
+    fr1'  = resize fr1
+    fr2'  = resize fr2
+    fr1SH = shiftL fr1' ((int2 + frac2))
+    res   = fr1SH `div` fr2'
+
+-- | Constraint for the 'Fractional' instance of 'Fixed'
+type FracFixedC rep int frac
+  = ( NumFixedC rep int frac
+    , DivideC   rep int frac int frac
+    , Integral  (rep (int + frac))
+    )
+
+-- | Constraint for the 'Fractional' instance of 'SFixed'
+type FracSFixedC int frac
+  = ( NumSFixedC int frac
+    , KnownNat int
+    , KnownNat ((int + frac + 1) + (int + frac))
+    )
+
+-- | Constraint for the 'Fractional' instance of 'UFixed'
+type FracUFixedC int frac
+  = FracSFixedC int frac
+
+-- | The operators of this instance saturate on overflow, and use truncation as
+-- the rounding method.
+--
+-- When used in a polymorphic setting, use the following
+-- <CLaSH-Sized-Fixed.html#constraintsynonyms Constraint synonyms> for less
+-- verbose type signatures:
+--
+-- * @'FracFixedC' frac rep size@ for: @'Fixed' frac rep size@
+-- * @'FracSFixedC' int frac@     for: @'SFixed' int frac@
+-- * @'FracUFixedC' int frac@     for: @'UFixed' int frac@
+instance (FracFixedC rep int frac) => Fractional (Fixed rep int frac) where
+  f1 / f2        = resizeF (divide f1 f2)
+  recip fx       = resizeF (divide (1 :: Fixed rep int frac) fx)
+  fromRational r = res
+    where
+      res  = Fixed (fromInteger sat)
+      sat  = if res' > rMax
+                then rMax
+                else if res' < rMin then rMin else res'
+
+      rMax = toInteger (maxBound :: rep (int + frac))
+      rMin = toInteger (minBound :: rep (int + frac))
+      res' = n `div` d
+
+      frac = fromInteger (natVal res)
+      n    = numerator   r `shiftL` (2 * frac)
+      d    = denominator r `shiftL` frac
