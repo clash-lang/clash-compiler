@@ -84,8 +84,15 @@ dsampleN n = sampleN n . coerce
 dsignal :: a -> DSignal n a
 dsignal a = coerce (signal# a)
 
+-- | Delay a 'DSignal' for @m@ periods.
+--
+-- > delay3 :: DSignal (n - 3) Int -> DSignal n Int
+-- > delay3 = delay d3
+--
+-- >>> dsampleN 6 (delay3 (dfromList [1..]))
+-- [0,0,0,1,2,3]
 delay :: forall a n m . (Default a, KnownNat m)
-      => SNat m
+      => SNat m -- ^ Number of periods, @m@, to delay the signal
       -> DSignal (n - m) a
       -> DSignal n a
 delay m = coerce . delay' . coerce
@@ -97,17 +104,44 @@ delay m = coerce . delay' . coerce
                           r      = register (replicate m def) (sUnwrap r')
                       in  head o
 
+-- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
+--
+-- > delay2 :: DSignal (n - 2) Int -> DSignal n Int
+-- > delay2 = delayI
+--
+-- >>> dsampleN 6 (delay2 (dfromList [1..])
+-- [0,0,1,2,3,4]
 delayI :: (Default a, KnownNat m)
        => DSignal (n - m) a
        -> DSignal n a
 delayI = withSNat delay
 
+-- | Feed the delayed result of a function back to its input:
+--
+-- @
+-- mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+-- mac x y = 'feedback' (mac' x y)
+--   where
+--     mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+--          -> DSignal 1 Int
+--     mac' a b acc = 'delay' d1 (a * b + acc)
+-- @
+--
+-- >>> dsampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
+-- [0,1,5,14,30,55]
 feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
 feedback f = let (DSignal r) = f (DSignal r) in (DSignal r)
 
+-- | 'Signal's are not delayed
+--
+-- > sample s == dsample (fromSignal s)
 fromSignal :: Signal a -> DSignal 0 a
 fromSignal = coerce
 
+-- | Filter out the samples [0..@m@] from a @'DSignal' m a@ signal.
+--
+-- >>> sampleN 4 (toSignal d2 (delay d2 (dfromList [1..])))
+-- [Nothing,Nothing,Just 1, Just 2]
 toSignal :: SNat m -> DSignal m a -> Signal (Maybe a)
 toSignal m s = count (coerce s)
   where
