@@ -51,7 +51,7 @@ newtype DSignal (delay :: Nat) a = DSignal (Signal a)
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-dfromList :: [a] -> DSignal t a
+dfromList :: [a] -> DSignal 0 a
 dfromList = coerce . fromList
 
 -- | Get an infinite list of samples from a 'DSignal'
@@ -119,7 +119,7 @@ delayI = withSNat delay
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
--- mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+-- mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 1 Int
 -- mac x y = 'feedback' (mac' x y)
 --   where
 --     mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
@@ -129,8 +129,8 @@ delayI = withSNat delay
 --
 -- >>> dsampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
-feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
-feedback f = let r = f (coerce r) in coerce r
+feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal n a
+feedback f = let r = f (coerce r) in r
 
 -- | 'Signal's are not delayed
 --
