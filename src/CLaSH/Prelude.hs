@@ -81,7 +81,6 @@ import Language.Haskell.TH.Lift    (Lift(..),deriveLift)
 import Prelude                     hiding (repeat)
 
 import CLaSH.Class.BitConvert
--- import CLaSH.Class.Bitwise
 import CLaSH.Class.Num
 import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex

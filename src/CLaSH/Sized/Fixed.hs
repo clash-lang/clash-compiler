@@ -598,7 +598,7 @@ divide (Fixed fr1) fx2@(Fixed fr2) = Fixed res
     fr1'  = resize fr1
     fr2'  = resize fr2
     fr1SH = shiftL fr1' ((int2 + frac2))
-    res   = fr1SH `div` fr2'
+    res   = fr1SH `quot` fr2'
 
 -- | Constraint for the 'Fractional' instance of 'Fixed'
 type FracFixedC rep int frac

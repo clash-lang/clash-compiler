@@ -69,10 +69,7 @@ module CLaSH.Sized.Internal.BitVector
     -- ** Integral
   , quot#
   , rem#
-  , div#
   , mod#
-  , quotRem#
-  , divMod#
   , toInteger#
     -- ** Bits
   , and#
@@ -86,10 +83,6 @@ module CLaSH.Sized.Internal.BitVector
   , popCount#
     -- ** Resize
   , resize#
-    -- ** SaturatingNum
-  , satPlus#
-  , satMin#
-  , satMult#
   )
 where
 
@@ -186,7 +179,7 @@ instance KnownNat n => Bounded (BitVector n) where
   maxBound = maxBound#
 
 {-# NOINLINE minBound# #-}
-minBound# :: BitVector n
+minBound# :: KnownNat n => BitVector n
 minBound# = BV 0
 {-# NOINLINE maxBound# #-}
 maxBound# :: KnownNat n => BitVector n
@@ -250,37 +243,21 @@ instance KnownNat n => Real (BitVector n) where
   toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (BitVector n) where
-  quot      = quot#
-  rem       = rem#
-  div       = div#
-  mod       = mod#
-  quotRem   = quotRem#
-  divMod    = divMod#
-  toInteger = toInteger#
+  quot        = quot#
+  rem         = rem#
+  div         = quot#
+  mod         = mod#
+  quotRem n d = (n `quot#` d,n `rem#` d)
+  divMod  n d = (n `quot#` d,n `mod#` d)
+  toInteger   = toInteger#
 
-quot#,rem#,div#,mod# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
+quot#,rem#,mod# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE quot# #-}
-quot# i j = case quotRem_INLINE i j of (a,_) -> a
+quot# (BV i) (BV j) = BV (i `div` j)
 {-# NOINLINE rem# #-}
-rem# i j = case quotRem_INLINE i j of (_,b) -> b
-{-# NOINLINE div# #-}
-div# i j = case divMod_INLINE i j of (a,_) -> a
+rem# (BV i) (BV j) = BV (i `rem` j)
 {-# NOINLINE mod# #-}
-mod# i j = case divMod_INLINE i j of (_,b) -> b
-
-quotRem#,divMod# :: KnownNat n => BitVector n -> BitVector n
-                 -> (BitVector n, BitVector n)
-quotRem# n d = (n `quot#` d,n `rem#` d)
-divMod# n d  = (n `div#` d,n `mod#` d)
-
-quotRem_INLINE,divMod_INLINE :: KnownNat n => BitVector n -> BitVector n
-                             -> (BitVector n, BitVector n)
-{-# INLINE quotRem_INLINE #-}
-(BV a) `quotRem_INLINE` (BV b) = let (a',b') = a `quotRem` b
-                                 in (BV a', BV b')
-{-# INLINE divMod_INLINE #-}
-(BV a) `divMod_INLINE` (BV b) = let (a',b') = a `divMod` b
-                                in (BV a', BV b')
+mod# (BV i) (BV j) = BV (i `mod` j)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: BitVector n -> Integer
@@ -296,7 +273,7 @@ instance KnownNat n => Bits (BitVector n) where
   setBit v i        = replaceBit# v i high
   clearBit v i      = replaceBit# v i low
   complementBit v i = replaceBit# v i (complement# (index# v i))
-  testBit v i       = index# v i == 1
+  testBit v i       = eq# (index# v i) high
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#
   isSigned _        = False
@@ -325,7 +302,7 @@ reduceOr# (BV i) = BV (smallInteger (dataToTag# check))
 reduceXor# :: BitVector n -> BitVector 1
 reduceXor# (BV i) = BV (toInteger (popCount i `mod` 2))
 
-instance Default (BitVector n) where
+instance KnownNat n => Default (BitVector n) where
   def = minBound#
 
 -- * Accessors
@@ -517,37 +494,28 @@ decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
 
 instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
   SaturatingNum (BitVector n) where
-  satPlus = satPlus#
-  satMin  = satMin#
-  satMult = satMult#
-
-satPlus#, satMin# :: (KnownNat n, KnownNat (n + 1)) => SaturationMode
-                  -> BitVector n -> BitVector n -> BitVector n
-
-satPlus# SatWrap a b = a +# b
-satPlus# w a b = case msb# r of
+  satPlus SatWrap a b = a +# b
+  satPlus w a b = case msb# r of
                    0 -> resize# r
                    _ -> case w of
                           SatZero  -> minBound#
                           _        -> maxBound#
-  where
-    r = plus# a b
+    where
+      r = plus# a b
 
-satMin# SatWrap a b = a -# b
-satMin# _ a b = case msb# r of
+  satMin SatWrap a b = a -# b
+  satMin _ a b = case msb# r of
                    0 -> resize# r
                    _ -> minBound#
-  where
-    r = minus# a b
+    where
+      r = minus# a b
 
-satMult# :: (KnownNat n, KnownNat (n + n)) => SaturationMode -> BitVector n
-         -> BitVector n -> BitVector n
-satMult# SatWrap a b = a *# b
-satMult# w a b = case rL of
-                   0 -> rR
-                   _ -> case w of
-                          SatZero  -> minBound#
-                          _        -> maxBound#
-  where
-    r       = mult# a b
-    (rL,rR) = split# r
+  satMult SatWrap a b = a *# b
+  satMult w a b = case rL of
+                     0 -> rR
+                     _ -> case w of
+                            SatZero  -> minBound#
+                            _        -> maxBound#
+    where
+      r       = mult# a b
+      (rL,rR) = split# r

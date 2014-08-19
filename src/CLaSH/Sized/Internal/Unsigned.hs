@@ -48,10 +48,7 @@ module CLaSH.Sized.Internal.Unsigned
     -- ** Integral
   , quot#
   , rem#
-  , div#
   , mod#
-  , quotRem#
-  , divMod#
   , toInteger#
     -- ** Bits
   , and#
@@ -239,28 +236,21 @@ instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (Unsigned n) where
-  quot      = quot#
-  rem       = rem#
-  div       = div#
-  mod       = mod#
-  quotRem   = quotRem#
-  divMod    = divMod#
-  toInteger = toInteger#
+  quot        = quot#
+  rem         = rem#
+  div         = quot#
+  mod         = mod#
+  quotRem n d = (n `quot#` d,n `rem#` d)
+  divMod  n d = (n `quot#` d,n `mod#` d)
+  toInteger   = toInteger#
 
-quot#,rem#,div#,mod# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+quot#,rem#,mod# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE quot# #-}
-quot# (U i) (U j) = U (i `quot` j)
+quot# (U i) (U j) = U (i `BV.quot#` j)
 {-# NOINLINE rem# #-}
-rem# (U i) (U j) = U (i `rem` j)
-{-# NOINLINE div# #-}
-div# (U i) (U j) = U (i `div` j)
+rem# (U i) (U j) = U (i `BV.rem#` j)
 {-# NOINLINE mod# #-}
-mod# (U i) (U j) = U (i `mod` j)
-
-quotRem#,divMod# :: KnownNat n => Unsigned n -> Unsigned n
-                 -> (Unsigned n, Unsigned n)
-quotRem# n d = (n `quot#` d,n `rem#` d)
-divMod# n d  = (n `div#` d,n `mod#` d)
+mod# (U i) (U j) = U (i `BV.mod#` j)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: KnownNat n => Unsigned n -> Integer
@@ -276,7 +266,7 @@ instance KnownNat n => Bits (Unsigned n) where
   setBit v i        = replaceBit v i high
   clearBit v i      = replaceBit v i low
   complementBit v i = replaceBit v i (BV.complement# (v ! i))
-  testBit v i       = v ! i == 1
+  testBit v i       = v ! i == high
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#
   isSigned _        = False

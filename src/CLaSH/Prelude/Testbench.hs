@@ -23,7 +23,7 @@ import CLaSH.Signal.Wrap     (wrap)
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 
-{-# NOINLINE sassert #-}
+{-# INLINE sassert #-}
 -- | Compares the first two arguments for equality and logs a warning when they
 -- are not equal. The second argument is considered the expected value. This
 -- function simply returns the third argument unaltered as its result. This

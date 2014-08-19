@@ -91,6 +91,7 @@ instance Num a => Num (CSignal clk a) where
 instance Foldable (CSignal clk) where
   foldr = foldr#
 
+{-# NOINLINE foldr# #-}
 -- | In \"@'foldr# f z s@\" the @z@ element never used.
 --
 -- __NB__: Not synthesisable
@@ -103,6 +104,7 @@ foldr# f z (a :- s) = a `f` (foldr# f z s)
 instance Traversable (CSignal clk) where
   traverse = traverse#
 
+{-# NOINLINE traverse# #-}
 -- | __NB__: Not synthesisable
 traverse# :: Applicative f => (a -> f b) -> CSignal clk a -> f (CSignal clk b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s

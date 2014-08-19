@@ -95,7 +95,7 @@ delay :: forall a n m . (Default a, KnownNat m)
       => SNat m -- ^ Number of periods, @m@, to delay the signal
       -> DSignal (n - m) a
       -> DSignal n a
-delay m = coerce . delay' . coerce
+delay m ds = coerce (delay' (coerce ds))
   where
     delay' :: Signal a -> Signal a
     delay' s = case snatToInteger m of
@@ -130,7 +130,7 @@ delayI = withSNat delay
 -- >>> dsampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
 feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal (n - m - 1) a
-feedback f = let (DSignal r) = f (DSignal r) in (DSignal r)
+feedback f = let r = f (coerce r) in coerce r
 
 -- | 'Signal's are not delayed
 --

@@ -33,8 +33,6 @@ module CLaSH.Sized.Internal.Index
   , quot#
   , rem#
   , mod#
-  , quotRem#
-  , divMod#
   , toInteger#
   )
 where
@@ -150,30 +148,21 @@ instance KnownNat n => Real (Index n) where
   toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (Index n) where
-  quot      = quot#
-  rem       = rem#
-  div       = quot#
-  mod       = mod#
-  quotRem   = quotRem#
-  divMod    = divMod#
-  toInteger = toInteger#
+  quot        = quot#
+  rem         = rem#
+  div         = quot#
+  mod         = mod#
+  quotRem n d = (n `quot#` d,n `rem#` d)
+  divMod  n d = (n `quot#` d,n `mod#` d)
+  toInteger   = toInteger#
 
 quot#,rem#,mod# :: KnownNat n => Index n -> Index n -> Index n
 {-# NOINLINE quot# #-}
-quot# = (fst.) . quotRem_INLINE
+(I a) `quot#` (I b) = I (a `div` b)
 {-# NOINLINE rem# #-}
-rem# = (snd.) . quotRem_INLINE
+(I a) `rem#` (I b) = I (a `rem` b)
 {-# NOINLINE mod# #-}
-(I a) `mod#` (I b) = fromInteger_INLINE (a `mod` b)
-
-quotRem#,divMod# :: KnownNat n => Index n -> Index n -> (Index n, Index n)
-quotRem# n d = (n `quot#` d,n `rem#` d)
-divMod# n d  = (n `quot#` d,n `mod#` d)
-
-{-# INLINE quotRem_INLINE #-}
-quotRem_INLINE :: KnownNat n => Index n -> Index n -> (Index n, Index n)
-(I a) `quotRem_INLINE` (I b) = let (a',b') = a `quotRem` b
-                               in  (fromInteger_INLINE a', fromInteger_INLINE b')
+(I a) `mod#` (I b) = I (a `mod` b)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: Index n -> Integer

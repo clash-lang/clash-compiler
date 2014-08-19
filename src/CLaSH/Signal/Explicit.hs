@@ -85,6 +85,7 @@ never create a clock that faster!
 
 -- ** Clock
 
+{-# INLINE sclock #-}
 -- | Create a singleton clock
 sclock :: (KnownNat period, KnownSymbol name)
        => SClock (Clk name period)
@@ -93,6 +94,7 @@ sclock = SClock ssymbol snat
 -- | The standard system clock with a period of 1000
 type SystemClock = Clk "system" 1000
 
+{-# INLINE systemClock #-}
 -- | The singleton clock for 'SystemClock'
 systemClock :: SClock SystemClock
 systemClock = sclock
@@ -197,6 +199,7 @@ repSchedule high low = take low $ repSchedule' low high 1
 
 -- * Basic circuit functions
 
+{-# INLINE csignal #-}
 -- | Create a constant 'CSignal' from a combinational value
 --
 -- >>> csample (csignal 4)
@@ -204,6 +207,7 @@ repSchedule high low = take low $ repSchedule' low high 1
 csignal :: a -> CSignal clk a
 csignal = signal#
 
+{-# INLINE cregister #-}
 -- | \"@'cregister' i s@\" delays the values in 'CSignal' @s@ for one cycle,
 -- and sets the value at time 0 to @i@
 --

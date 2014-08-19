@@ -13,7 +13,7 @@ import CLaSH.Signal.Wrap      (Wrap, unwrap)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, (!!), replace)
 
-{-# NOINLINE blockRam #-}
+{-# INLINABLE blockRam #-}
 -- | Create a blockRAM with space for @n@ elements.
 --
 -- * __NB__: Read value is delayed by 1 cycle

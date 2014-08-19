@@ -10,8 +10,11 @@ import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 data SSymbol (s :: Symbol) = KnownSymbol s => SSymbol (Proxy s)
 
 instance Show (SSymbol s) where
-  show (SSymbol p) = symbolVal p
+  show (SSymbol s) = symbolVal s
 
 -- | Create a singleton literal for a type-level natural number
 ssymbol :: KnownSymbol s => SSymbol s
 ssymbol = SSymbol Proxy
+
+symbolToString :: SSymbol s -> String
+symbolToString (SSymbol s) = symbolVal s

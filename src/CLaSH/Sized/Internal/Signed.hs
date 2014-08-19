@@ -52,8 +52,6 @@ module CLaSH.Sized.Internal.Signed
   , rem#
   , div#
   , mod#
-  , quotRem#
-  , divMod#
   , toInteger#
     -- ** Bits
   , and#
@@ -69,9 +67,6 @@ module CLaSH.Sized.Internal.Signed
   , resize#
   , resize_wrap
     -- ** SaturatingNum
-  , satPlus#
-  , satMin#
-  , satMult#
   , minBoundSym#
   )
 where
@@ -267,38 +262,23 @@ instance KnownNat n => Real (Signed n) where
   toRational = toRational . toInteger#
 
 instance KnownNat n => Integral (Signed n) where
-  quot      = quot#
-  rem       = rem#
-  div       = div#
-  mod       = mod#
-  quotRem   = quotRem#
-  divMod    = divMod#
-  toInteger = toInteger#
+  quot        = quot#
+  rem         = rem#
+  div         = div#
+  mod         = mod#
+  quotRem n d = (n `quot#` d,n `rem#` d)
+  divMod  n d = (n `div#`  d,n `mod#` d)
+  toInteger   = toInteger#
 
 quot#,rem#,div#,mod# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE quot# #-}
-quot# = (fst.) . quotRem_INLINE
+quot# (S a) (S b) = S (a `quot` b)
 {-# NOINLINE rem# #-}
-rem# = (snd.) . quotRem_INLINE
+rem# (S a) (S b) = S (a `rem` b)
 {-# NOINLINE div# #-}
-div# = (fst.) . divMod_INLINE
+div# (S a) (S b) = S (a `div` b)
 {-# NOINLINE mod# #-}
-mod# = (snd.) . divMod_INLINE
-
-quotRem#,divMod# :: KnownNat n => Signed n -> Signed n -> (Signed n, Signed n)
-quotRem# n d = (n `quot#` d,n `rem#` d)
-divMod# n d  = (n `div#` d,n `mod#` d)
-
-quotRem_INLINE,divMod_INLINE :: KnownNat n => Signed n -> Signed n
-                             -> (Signed n, Signed n)
-{-# INLINE quotRem_INLINE #-}
-(S a) `quotRem_INLINE` (S b) = let (a',b') = a `quotRem` b
-                               in ( fromIntegerProxy_INLINE Proxy a'
-                                  , fromIntegerProxy_INLINE Proxy b')
-{-# INLINE divMod_INLINE #-}
-(S a) `divMod_INLINE` (S b) = let (a',b') = a `divMod` b
-                              in ( fromIntegerProxy_INLINE Proxy a'
-                                 , fromIntegerProxy_INLINE Proxy b')
+mod# (S a) (S b) = S (a `mod` b)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: Signed n -> Integer
@@ -420,61 +400,53 @@ decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
 instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
   SaturatingNum (Signed n) where
-  satPlus = satPlus#
-  satMin  = satMin#
-  satMult = satMult#
+  satPlus SatWrap a b = a +# b
+  satPlus w a b = case msb r `xor` msb r' of
+                     0 -> unpack# r'
+                     _ -> case msb a .&. msb b of
+                            1 -> case w of
+                                   SatBound     -> minBound#
+                                   SatSymmetric -> minBoundSym#
+                                   _            -> fromInteger# 0
+                            _ -> case w of
+                                   SatZero -> fromInteger# 0
+                                   _       -> maxBound#
+    where
+      r      = plus# a b
+      (_,r') = split r
 
-satPlus#, satMin# :: (KnownNat n, KnownNat (1 + n)) => SaturationMode
-                  -> Signed n -> Signed n -> Signed n
+  satMin SatWrap a b = a -# b
+  satMin w a b = case msb r `xor` msb r' of
+                     0 -> unpack# r'
+                     _ -> case msb a #> msb b of
+                            2 -> case w of
+                                   SatBound     -> minBound#
+                                   SatSymmetric -> minBoundSym#
+                                   _            -> fromInteger# 0
+                            _ -> case w of
+                                   SatZero -> fromInteger# 0
+                                   _       -> maxBound#
+    where
+      r      = minus# a b
+      (_,r') = split r
 
-satPlus# SatWrap a b = a +# b
-satPlus# w a b = case msb r `xor` msb r' of
-                   0 -> unpack# r'
-                   _ -> case msb a .&. msb b of
-                          1 -> case w of
-                                 SatBound     -> minBound#
-                                 SatSymmetric -> minBoundSym#
-                                 _            -> fromInteger# 0
-                          _ -> case w of
-                                 SatZero -> fromInteger# 0
-                                 _       -> maxBound#
-  where
-    r      = plus# a b
-    (_,r') = split r
 
-satMin# SatWrap a b = a -# b
-satMin# w a b = case msb r `xor` msb r' of
-                   0 -> unpack# r'
-                   _ -> case msb a #> msb b of
-                          2 -> case w of
-                                 SatBound     -> minBound#
-                                 SatSymmetric -> minBoundSym#
-                                 _            -> fromInteger# 0
-                          _ -> case w of
-                                 SatZero -> fromInteger# 0
-                                 _       -> maxBound#
-  where
-    r      = minus# a b
-    (_,r') = split r
-
-satMult# :: (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) => SaturationMode
-         -> Signed n -> Signed n -> Signed n
-satMult# SatWrap a b = a *# b
-satMult# w a b = case overflow of
-                   1 -> unpack# rR
-                   _ -> case msb rL of
-                          0 -> case w of
-                                 SatZero -> fromInteger# 0
-                                 _       -> maxBound#
-                          _ -> case w of
-                                 SatBound     -> minBound#
-                                 SatSymmetric -> minBoundSym#
-                                 _            -> fromInteger# 0
-  where
-    overflow = complement (reduceOr (msb rR #> pack rL)) .|.
-                          reduceAnd (msb rR #> pack rL)
-    r        = mult# a b
-    (rL,rR)  = split r
+  satMult SatWrap a b = a *# b
+  satMult w a b = case overflow of
+                     1 -> unpack# rR
+                     _ -> case msb rL of
+                            0 -> case w of
+                                   SatZero -> fromInteger# 0
+                                   _       -> maxBound#
+                            _ -> case w of
+                                   SatBound     -> minBound#
+                                   SatSymmetric -> minBoundSym#
+                                   _            -> fromInteger# 0
+    where
+      overflow = complement (reduceOr (msb rR #> pack rL)) .|.
+                            reduceAnd (msb rR #> pack rL)
+      r        = mult# a b
+      (rL,rR)  = split r
 
 {-# NOINLINE minBoundSym# #-}
 minBoundSym# :: KnownNat n => Signed n
