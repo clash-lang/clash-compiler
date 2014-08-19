@@ -1,10 +1,10 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.SNat"
+    { "name"      : "CLaSH.Promoted.Symbol.SSymbol"
     , "templateE" : "~LIT[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.fromSNat"
+    { "name"      : "CLaSH.Promoted.Symbol.symbolToString"
     , "templateE" : "~LIT[0]"
     }
   }

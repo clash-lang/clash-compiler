@@ -1,0 +1,11 @@
+[ { "Primitive" :
+    { "name"      : "CLaSH.Signal.Wrap.vecUnwrap#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Wrap.vecWrap#"
+    , "primType"  : "Function"
+    }
+  }
+]

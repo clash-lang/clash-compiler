@@ -1,0 +1,53 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.register#"
+    , "comment"   :
+    "register# :: SClock clk     -- ARG[0]
+               -> a              -- ARG[1]
+               -> CSignal clk a  -- ARG[2]
+               -> CSignal clk a"
+    , "templateD" :
+"~SYM[0]_block : block
+  signal ~SYM[1] : ~TYP[2];
+  signal ~SYM[2] : ~TYP[1];
+begin
+  ~SYM[2] <= ~ARG[1];
+
+  process(~CLKO,~RSTO,~SYM[2])
+  begin
+    if ~RSTO = '0' then
+      ~SYM[1] <= ~SYM[2];
+    elsif rising_edge(~CLKO) then
+      ~SYM[1] <= ~ARG[2];
+    end if;
+  end process;
+
+  ~RESULT <= ~SYM[1];
+end block;"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.signal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.mapSignal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.appSignal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.foldr#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.traverse#"
+    , "primType"  : "Function"
+    }
+  }
+]
