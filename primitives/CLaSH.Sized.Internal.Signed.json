@@ -1,0 +1,228 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Internal.Signed.size#"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.pack#"
+    , "templateE" : "std_logic_vector(~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.unpack#"
+    , "templateE" : "signed(~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.eq#"
+    , "templateE" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.neq#"
+    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.lt#"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.ge#"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.gt#"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.le#"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.minBound#"
+    , "templateD" :
+"~SYM[0]_minBound : block
+begin
+  ~SYM[1]_generate : if ~LIT[0] = 0 generate
+  begin
+    ~RESULT <= (0 downto 1 => '0');
+  end generate;
+
+  ~SYM[2]_generate : if ~LIT[0] /= 0 generate
+  begin
+    ~RESULT <= (~RESULT'high => '1', others => '0');
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.maxBound#"
+    , "templateD" :
+"~SYM[0]_maxBound : block
+begin
+  ~SYM[1]_generate : if ~LIT[0] = 0 generate
+  begin
+    ~RESULT <= (0 downto 1 => '0');
+  end generate;
+
+  ~SYM[2]_generate : if ~LIT[0] /= 0 generate
+  begin
+    ~RESULT <= (~RESULT'high => '0', others => '1');
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.+#"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.-#"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.*#"
+    , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.negate#"
+    , "templateE" : "-~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.abs#"
+    , "templateE" : "abs ~ARG[1]"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "CLaSH.Sized.Internal.Signed.fromInteger#"
+    , "primType" : "Function"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.plus#"
+    , "templateE" : "resize(~ARG[1],~LIT[0]) + resize(~ARG[2],~LIT[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.minus#"
+    , "templateE" : "resize(~ARG[1],~LIT[0]) - resize(~ARG[2],~LIT[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.mult#"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.quot#"
+    , "templateE" : "~ARG[1] / ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.rem#"
+    , "templateE" : "~ARG[1] rem ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.div#"
+    , "templateD" :
+"~SYM[0]_divS : block
+  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
+  signal ~SYM[3] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~SYM[2] <= ~ARG[2];
+  ~SYM[3] <= ~SYM[1] / ~SYM[2];
+  ~RESULT <= ~SYM[3] - to_signed(1,~LIT[0]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
+             ~SYM[3];
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
+    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.toInteger#"
+    , "templateE" : "to_integer(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.and#"
+    , "templateE" : "~ARG[1] and ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.or#"
+    , "templateE" : "~ARG[1] or ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.xor#"
+    , "templateE" : "~ARG[1] xor ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.complement#"
+    , "templateE" : "not ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.shiftL#"
+    , "templateE" : "shift_left(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.shiftR#"
+    , "templateE" : "shift_right(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.rotateL#"
+    , "templateE" : "rotate_left(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.rotateR#"
+    , "templateE" : "rotate_right(~ARG[1],~ARG[2])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.resize#"
+    , "templateE" : "resize(~ARG[2],~LIT[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.minBoundSym#"
+    , "templateD" :
+"~SYM[0]_minBoundSym : block
+begin
+  ~SYM[1]_generate : if ~LIT[0] = 0 generate
+  begin
+    ~RESULT <= (0 downto 1 => '0');
+  end generate;
+
+  ~SYM[2]_generate : if ~LIT[0] = 1 generate
+  begin
+    ~RESULT <= \"0\";
+  end generate;
+
+  ~SYM[3]_generate : if ~LIT[0] > 1 generate
+  begin
+    ~RESULT <= (~RESULT'high => '1', 0 => '1', others => '0');
+  end generate;
+end block;"
+    }
+  }
+]

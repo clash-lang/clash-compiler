@@ -20,7 +20,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.++#"
-    , "templateE" : "~ARG[1] & ~ARG[2]"
+    , "templateD" : "~RESULT <= ~ARG[1] & ~ARG[2];"
     }
   }
 , { "BlackBox" :
@@ -312,12 +312,12 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
-    , "templateE" : "std_logic_vector'((~LIT[0]-1) downto 0 => '0')"
+    , "templateD" : "RESULT <= (others => '0');"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.maxBound#"
-    , "templateE" : "std_logic_vector'((~LIT[0]-1) downto 0 => '1')"
+    , "templateD" : "~RESULT <= (others => '1');"
     }
   }
 , { "BlackBox" :
