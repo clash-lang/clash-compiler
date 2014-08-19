@@ -253,7 +253,7 @@ instance KnownNat n => Integral (BitVector n) where
 
 quot#,rem#,mod# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE quot# #-}
-quot# (BV i) (BV j) = BV (i `div` j)
+quot# (BV i) (BV j) = BV (i `quot` j)
 {-# NOINLINE rem# #-}
 rem# (BV i) (BV j) = BV (i `rem` j)
 {-# NOINLINE mod# #-}
