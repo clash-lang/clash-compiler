@@ -29,15 +29,15 @@ datamem :: (KnownNat n, Integral i)
         => Vec n a       -- Current state
         -> (i, Maybe a)  -- Input
         -> (Vec n a, a)  -- (New state, Output)
-datamem mem (addr,Nothing)  = (mem                  ,mem ! addr)
-datamem mem (addr,Just val) = (vreplace mem addr val,mem ! addr)
+datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
+datamem mem (addr,Just val) = (replace mem addr val,mem !! addr)
 
 topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
 topEntity i = val
   where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
-    initMem    = vcopy (snat :: SNat 8) 0
+    initMem    = replicate (snat :: SNat 8) 0
 
 testInput :: Signal (OPC Word)
 testInput = stimuliGenerator $(v [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
