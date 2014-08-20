@@ -62,10 +62,6 @@ module CLaSH.Sized.Internal.Unsigned
   , popCount#
     -- ** Resize
   , resize#
-    -- ** SaturatingNum
-  , satPlus#
-  , satMin#
-  , satMult#
   )
 where
 
@@ -125,11 +121,11 @@ instance Eq (Unsigned n) where
 
 {-# NOINLINE eq# #-}
 eq# :: Unsigned n -> Unsigned n -> Bool
-eq# (U v1) (U v2) = v1 == v2
+eq# (U v1) (U v2) = v1 `BV.eq#` v2
 
 {-# NOINLINE neq# #-}
 neq# :: Unsigned n -> Unsigned n -> Bool
-neq# (U v1) (U v2) = v1 /= v2
+neq# (U v1) (U v2) = v1 `BV.neq#` v2
 
 instance Ord (Unsigned n) where
   (<)  = lt#
@@ -139,13 +135,13 @@ instance Ord (Unsigned n) where
 
 lt#,ge#,gt#,le# :: Unsigned n -> Unsigned n -> Bool
 {-# NOINLINE lt# #-}
-lt# (U n) (U m) = n < m
+lt# (U n) (U m) = n `BV.lt#` m
 {-# NOINLINE ge# #-}
-ge# (U n) (U m) = n >= m
+ge# (U n) (U m) = n `BV.ge#` m
 {-# NOINLINE gt# #-}
-gt# (U n) (U m) = n > m
+gt# (U n) (U m) = n `BV.gt#` m
 {-# NOINLINE le# #-}
-le# (U n) (U m) = n <= m
+le# (U n) (U m) = n `BV.le#` m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesisable.
@@ -180,9 +176,10 @@ instance KnownNat n => Bounded (Unsigned n) where
 {-# NOINLINE minBound# #-}
 minBound# :: Unsigned n
 minBound# = U (BV 0)
+
 {-# NOINLINE maxBound# #-}
 maxBound# :: KnownNat n => Unsigned n
-maxBound# = U maxBound
+maxBound# = U BV.maxBound#
 
 instance KnownNat n => Num (Unsigned n) where
   (+)         = (+#)
@@ -195,21 +192,21 @@ instance KnownNat n => Num (Unsigned n) where
 
 (+#),(-#),(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
-(+#) (U i) (U j) = U (i + j)
+(+#) (U i) (U j) = U (i BV.+# j)
 
 {-# NOINLINE (-#) #-}
-(-#) (U i) (U j) = U (i - j)
+(-#) (U i) (U j) = U (i BV.-# j)
 
 {-# NOINLINE (*#) #-}
-(*#) (U i) (U j) = U (i * j)
+(*#) (U i) (U j) = U (i BV.*# j)
 
 {-# NOINLINE negate# #-}
 negate# :: KnownNat n => Unsigned n -> Unsigned n
-negate# (U i) = U (negate i)
+negate# (U i) = U (BV.negate# i)
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat n => Integer -> Unsigned n
-fromInteger# i = U (fromInteger i)
+fromInteger# i = U (BV.fromInteger# i)
 
 instance KnownNat (Max m n + 1) => Add (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
@@ -219,10 +216,10 @@ instance KnownNat (Max m n + 1) => Add (Unsigned m) (Unsigned n) where
 plus#, minus# :: KnownNat (Max m n + 1) => Unsigned m -> Unsigned n
               -> Unsigned (Max m n + 1)
 {-# NOINLINE plus# #-}
-plus# (U a) (U b) = U (a `plus` b)
+plus# (U a) (U b) = U (a `BV.plus#` b)
 
 {-# NOINLINE minus# #-}
-minus# (U a) (U b) = U (a `minus` b)
+minus# (U a) (U b) = U (a `BV.minus#` b)
 
 instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
@@ -230,7 +227,7 @@ instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
 
 {-# NOINLINE mult# #-}
 mult# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
-mult# (U a) (U b) = U (a `mult` b)
+mult# (U a) (U b) = U (a `BV.mult#` b)
 
 instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toInteger#
@@ -320,7 +317,7 @@ instance Resize Unsigned where
 
 {-# NOINLINE resize# #-}
 resize# :: KnownNat m => Unsigned n -> Unsigned m
-resize# (U (BV i)) = U (fromInteger i)
+resize# (U bv) = U (BV.resize# bv)
 
 instance Default (Unsigned n) where
   def = minBound#
@@ -333,37 +330,28 @@ decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
 instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
   SaturatingNum (Unsigned n) where
-  satPlus = satPlus#
-  satMin  = satMin#
-  satMult = satMult#
+  satPlus SatWrap a b = a +# b
+  satPlus w a b = case msb r of
+                    0 -> resize# r
+                    _ -> case w of
+                           SatZero  -> minBound#
+                           _        -> maxBound#
+    where
+      r = plus# a b
 
-satPlus#, satMin# :: (KnownNat n, KnownNat (n + 1)) => SaturationMode
-                  -> Unsigned n -> Unsigned n -> Unsigned n
+  satMin SatWrap a b = a -# b
+  satMin _ a b = case msb r of
+                    0 -> resize# r
+                    _ -> minBound#
+    where
+      r = minus# a b
 
-satPlus# SatWrap a b = a +# b
-satPlus# w a b = case msb r of
-                   0 -> resize# r
-                   _ -> case w of
-                          SatZero  -> minBound#
-                          _        -> maxBound#
-  where
-    r = plus# a b
-
-satMin# SatWrap a b = a -# b
-satMin# _ a b = case msb r of
-                   0 -> resize# r
-                   _ -> minBound#
-  where
-    r = minus# a b
-
-satMult# :: (KnownNat n, KnownNat (n + n)) => SaturationMode -> Unsigned n
-         -> Unsigned n -> Unsigned n
-satMult# SatWrap a b = a *# b
-satMult# w a b = case rL of
-                   0 -> unpack# rR
-                   _ -> case w of
-                          SatZero  -> minBound#
-                          _        -> maxBound#
-  where
-    r       = mult# a b
-    (rL,rR) = split r
+  satMult SatWrap a b = a *# b
+  satMult w a b = case rL of
+                    0 -> unpack# rR
+                    _ -> case w of
+                           SatZero  -> minBound#
+                           _        -> maxBound#
+    where
+      r       = mult# a b
+      (rL,rR) = split r
