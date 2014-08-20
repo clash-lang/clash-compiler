@@ -243,17 +243,16 @@ end block;"
           -> Bit"
     , "templateD" :
 "~SYM[0]_msb : block
+  signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[1]_generate : if ~LIT[0] = 0 generate
+  ~SYM[2]_generate : if ~SYM[1]'length = 0 generate
   begin
     ~RESULT <= '0';
   end generate;
 
-  ~SYM[2]_generate : if ~LIT[0] /= 0 generate
-    signal ~SYM[3] : ~TYP[1];
-  begin
-    ~SYM[3] <= ~ARG[1];
-    ~RESULT <= ~SYM[3](~SYM[3]'high);
+  ~SYM[3]_generate : if ~SYM[1]'length /= 0 generate
+    ~SYM[1] <= ~ARG[1];
+    ~RESULT <= ~SYM[1](~SYM[1]'high);
   end generate;
 end block;"
     }
