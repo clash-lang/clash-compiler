@@ -73,7 +73,6 @@ where
 
 import Data.Bits                      (Bits (..))
 import Data.Default                   (Default (..))
-import Data.Proxy                     (Proxy (..))
 import Data.Typeable                  (Typeable)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -124,7 +123,7 @@ pack# s@(S i) = BV (i `mod` maxI)
 
 {-# NOINLINE unpack# #-}
 unpack# :: KnownNat n => BitVector n -> Signed n
-unpack# (BV i) = fromIntegerProxy_INLINE Proxy i
+unpack# (BV i) = fromInteger_INLINE i
 
 instance Eq (Signed n) where
   (==) = eq#
@@ -203,35 +202,32 @@ instance KnownNat n => Num (Signed n) where
 
 (+#), (-#), (*#) :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE (+#) #-}
-(S a) +# (S b) = fromIntegerProxy_INLINE Proxy (a + b)
+(S a) +# (S b) = fromInteger_INLINE (a + b)
 
 {-# NOINLINE (-#) #-}
-(S a) -# (S b) = fromIntegerProxy_INLINE Proxy (a - b)
+(S a) -# (S b) = fromInteger_INLINE (a - b)
 
 {-# NOINLINE (*#) #-}
-(S a) *# (S b) = fromIntegerProxy_INLINE Proxy (a * b)
+(S a) *# (S b) = fromInteger_INLINE (a * b)
 
 negate#,abs# :: KnownNat n => Signed n -> Signed n
 {-# NOINLINE negate# #-}
-negate# (S n) = fromIntegerProxy_INLINE Proxy (negate n)
+negate# (S n) = fromInteger_INLINE (negate n)
 
 {-# NOINLINE abs# #-}
-abs# (S n) = fromIntegerProxy_INLINE Proxy (abs n)
+abs# (S n) = fromInteger_INLINE (abs n)
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)
-fromInteger# = fromIntegerProxy_INLINE Proxy
-
-{-# INLINE fromIntegerProxy_INLINE #-}
-fromIntegerProxy_INLINE :: KnownNat n => proxy n -> Integer -> Signed (n :: Nat)
-fromIntegerProxy_INLINE p i = fromInteger_INLINE i (natVal p)
+fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: Integer -> Integer -> Signed (n :: Nat)
-fromInteger_INLINE i n
+fromInteger_INLINE :: KnownNat n => Integer -> Signed n
+fromInteger_INLINE i
     | n == 0    = S 0
     | otherwise = res
   where
+    n   = natVal res
     sz  = 2 ^ (n - 1)
     res = case divMod i sz of
             (s,i') | even s    -> S i'
@@ -245,10 +241,10 @@ instance KnownNat (1 + Max m n) => Add (Signed m) (Signed n) where
 plus#, minus# :: KnownNat (1 + Max m n) => Signed m -> Signed n
               -> Signed (1 + Max m n)
 {-# NOINLINE plus# #-}
-plus# (S a) (S b) = fromIntegerProxy_INLINE Proxy (a + b)
+plus# (S a) (S b) = fromInteger_INLINE (a + b)
 
 {-# NOINLINE minus# #-}
-minus# (S a) (S b) = fromIntegerProxy_INLINE Proxy (a - b)
+minus# (S a) (S b) = fromInteger_INLINE (a - b)
 
 instance KnownNat (m + n) => Mult (Signed m) (Signed n) where
   type MResult (Signed m) (Signed n) = Signed (m + n)
@@ -256,7 +252,7 @@ instance KnownNat (m + n) => Mult (Signed m) (Signed n) where
 
 {-# NOINLINE mult# #-}
 mult# :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)
-mult# (S a) (S b) = fromIntegerProxy_INLINE Proxy (a * b)
+mult# (S a) (S b) = fromInteger_INLINE (a * b)
 
 instance KnownNat n => Real (Signed n) where
   toRational = toRational . toInteger#
@@ -306,11 +302,11 @@ instance KnownNat n => Bits (Signed n) where
 
 and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
-and# (S a) (S b) = fromIntegerProxy_INLINE Proxy (a .&. b)
+and# (S a) (S b) = fromInteger_INLINE (a .&. b)
 {-# NOINLINE or# #-}
-or# (S a) (S b)  = fromIntegerProxy_INLINE Proxy (a .|. b)
+or# (S a) (S b)  = fromInteger_INLINE (a .|. b)
 {-# NOINLINE xor# #-}
-xor# (S a) (S b) = fromIntegerProxy_INLINE Proxy (xor a b)
+xor# (S a) (S b) = fromInteger_INLINE (xor a b)
 
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => Signed n -> Signed n
@@ -319,13 +315,13 @@ complement# = unpack# . complement . pack#
 shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
 shiftL# _ b | b < 0  = error "'shiftL undefined for negative numbers"
-shiftL# (S n) b      = fromIntegerProxy_INLINE Proxy (shiftL n b)
+shiftL# (S n) b      = fromInteger_INLINE (shiftL n b)
 {-# NOINLINE shiftR# #-}
 shiftR# _ b | b < 0  = error "'shiftR undefined for negative numbers"
-shiftR# (S n) b      = fromIntegerProxy_INLINE Proxy (shiftR n b)
+shiftR# (S n) b      = fromInteger_INLINE (shiftR n b)
 {-# NOINLINE rotateL# #-}
 rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
-rotateL# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l .|. r)
+rotateL# s@(S n) b   = fromInteger_INLINE (l .|. r)
   where
     l    = shiftL n b'
     r    = shiftR n b'' .&. mask
@@ -337,7 +333,7 @@ rotateL# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l .|. r)
 
 {-# NOINLINE rotateR# #-}
 rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
-rotateR# s@(S n) b   = fromIntegerProxy_INLINE Proxy (l .|. r)
+rotateR# s@(S n) b   = fromInteger_INLINE (l .|. r)
   where
     l    = shiftR n b' .&. mask
     r    = shiftL n b''
@@ -370,14 +366,14 @@ resize# s@(S i) | n <= m    = extend
     n = fromInteger (natVal s)
     m = fromInteger (natVal extend)
 
-    extend = fromIntegerProxy_INLINE Proxy i
+    extend = fromInteger_INLINE i
 
     mask  = (2 ^ (m - 1)) - 1
     sign  = 2 ^ (m - 1)
     i'    = i .&. mask
     trunc = if testBit i (n - 1)
-               then fromIntegerProxy_INLINE Proxy (i' .|. sign)
-               else fromIntegerProxy_INLINE Proxy i'
+               then fromInteger_INLINE (i' .|. sign)
+               else fromInteger_INLINE i'
 
 {-# NOINLINE resize_wrap #-}
 -- | A resize operation that is sign-preserving on extension, but wraps on
@@ -387,7 +383,7 @@ resize# s@(S i) | n <= m    = extend
 -- Truncating a number of length N to a length L just removes the leftmost
 -- N-L bits.
 resize_wrap :: KnownNat m => Signed n -> Signed m
-resize_wrap (S n) = fromIntegerProxy_INLINE Proxy n
+resize_wrap (S n) = fromInteger_INLINE n
 
 instance KnownNat n => Default (Signed n) where
   def = fromInteger# 0
