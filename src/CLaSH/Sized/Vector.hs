@@ -45,7 +45,7 @@ import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
 import Data.Traversable           (Traversable (..))
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (*), type (<=),
+import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
                                    natVal)
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -766,15 +766,15 @@ exact n xs = head $ snd $ splitAt n xs
 -- <2,4,6>
 -- >>> select d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
 -- <2,4,6>
-select :: ((f + (s * n) + 1) <= i)
+select :: (CmpNat (i + s) (s * n) ~ GT)
        => SNat f
        -> SNat s
-       -> SNat (n + 1)
-       -> Vec i a
-       -> Vec (n + 1) a
-select f s n xs = select' (toUNat n) $ drop f (unsafeCoerce xs)
+       -> SNat n
+       -> Vec (f + i) a
+       -> Vec n a
+select f s n xs = select' (toUNat n) $ drop f xs
   where
-    select' :: UNat n -> Vec m a -> Vec n a
+    select' :: UNat n -> Vec i a -> Vec n a
     select' UZero      _           = Nil
     select' (USucc n') vs@(x :> _) = x :> select' n' (drop s (unsafeCoerce vs))
 
@@ -784,11 +784,11 @@ select f s n xs = select' (toUNat n) $ drop f (unsafeCoerce xs)
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
 -- <2,4>
-selectI :: ((f + (s * n) + 1) <= i, KnownNat (n + 1))
+selectI :: (CmpNat (i + s) (s * n) ~ GT, KnownNat n)
         => SNat f
         -> SNat s
-        -> Vec i a
-        -> Vec (n + 1) a
+        -> Vec (f + i) a
+        -> Vec n a
 selectI f s xs = withSNat (\n -> select f s n xs)
 
 {-# NOINLINE replicate #-}
