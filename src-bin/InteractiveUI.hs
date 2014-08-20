@@ -1890,10 +1890,9 @@ setGHCContextFromGHCiState = do
       -- the actual exception thrown by checkAdd, using tryBool to
       -- turn it into a Bool.
   iidecls <- filterM (tryBool.checkAdd) (transient_ctx st ++ remembered_ctx st)
-  dflags <- GHC.getSessionDynFlags
   GHC.setContext $
-     if xopt Opt_ImplicitPrelude dflags && not (any isPreludeImport iidecls)
-        then iidecls ++ [implicitPreludeImport,implicitCLaSHPreludeImport]
+     if not (any isPreludeImport iidecls)
+        then iidecls ++ [implicitPreludeImport]
         else iidecls
     -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
 
@@ -1915,16 +1914,10 @@ iiModuleName (IIModule m) = m
 iiModuleName (IIDecl d)   = unLoc (ideclName d)
 
 preludeModuleName :: ModuleName
-preludeModuleName = GHC.mkModuleName "Prelude"
-
-clashPreludeModuleName :: ModuleName
-clashPreludeModuleName = GHC.mkModuleName "CLaSH.Prelude"
+preludeModuleName = GHC.mkModuleName "CLaSH.Prelude"
 
 implicitPreludeImport :: InteractiveImport
 implicitPreludeImport = IIDecl (simpleImportDecl preludeModuleName)
-
-implicitCLaSHPreludeImport :: InteractiveImport
-implicitCLaSHPreludeImport = IIDecl (simpleImportDecl clashPreludeModuleName)
 
 isPreludeImport :: InteractiveImport -> Bool
 isPreludeImport (IIModule {}) = True
@@ -2283,8 +2276,7 @@ showImports = do
 
       prel_imp
         | any isPreludeImport (rem_ctx ++ trans_ctx) = []
-        | not (xopt Opt_ImplicitPrelude dflags)      = []
-        | otherwise = ["import Prelude -- implicit"]
+        | otherwise = ["import CLaSH.Prelude -- implicit"]
 
       trans_comment s = s ++ " -- added automatically"
   --

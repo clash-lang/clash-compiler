@@ -94,7 +94,8 @@ loadModules modName = defaultErrorHandler $ do
                     , DynFlags.Opt_ConstraintKinds
                     , DynFlags.Opt_TypeFamilies
                     ]
-    let dflags2 = wantedOptimizationFlags dflags1
+    let dflags1' = foldl DynFlags.xopt_unset dflags1 [DynFlags.Opt_ImplicitPrelude]
+    let dflags2 = wantedOptimizationFlags dflags1'
     let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
                                 else dflags2
     _ <- GHC.setSessionDynFlags dflags3

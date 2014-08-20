@@ -175,6 +175,8 @@ main = do
                                     , DynFlags.Opt_ConstraintKinds
                                     , DynFlags.Opt_TypeFamilies
                                     ]
+                dflagsExtra' = foldl DynFlags.xopt_unset dflagsExtra
+                                     [ DynFlags.Opt_ImplicitPrelude ]
 
             case postStartupMode of
                 Left preLoadMode ->
@@ -185,7 +187,7 @@ main = do
                             ShowGhciUsage          -> showGhciUsage dflags
                             PrintWithDynFlags f    -> putStrLn (f dflags)
                 Right postLoadMode ->
-                    main' postLoadMode dflagsExtra argv3 flagWarnings
+                    main' postLoadMode dflagsExtra' argv3 flagWarnings
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
       -> Ghc ()
