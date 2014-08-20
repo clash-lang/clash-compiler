@@ -382,17 +382,17 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.and#"
-    , "templateE" : "~ARG[1] and ~ARG[2]"
+    , "templateE" : "~ARG[0] and ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.or#"
-    , "templateE" : "~ARG[1] or ~ARG[2]"
+    , "templateE" : "~ARG[0] or ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.xor#"
-    , "templateE" : "~ARG[1] xor ~ARG[2]"
+    , "templateE" : "~ARG[0] xor ~ARG[1]"
     }
   }
 , { "BlackBox" :

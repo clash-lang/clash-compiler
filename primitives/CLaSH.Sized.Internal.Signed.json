@@ -215,7 +215,7 @@ begin
 
   ~SYM[2]_generate : if ~LIT[0] = 1 generate
   begin
-    ~RESULT <= \"0\";
+    ~RESULT <= (others => '0');
   end generate;
 
   ~SYM[3]_generate : if ~LIT[0] > 1 generate

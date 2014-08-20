@@ -1,0 +1,76 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.eq#"
+    , "templateE" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.neq#"
+    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.lt#"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.ge#"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.gt#"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.le#"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.maxBound#"
+    , "templateE" : "~RESULT <= to_unsigned(~LIT[0]-1,~RESULT'length);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.+#"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.-#"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.*#"
+    , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "CLaSH.Sized.Internal.Index.fromInteger#"
+    , "primType" : "Function"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.quot#"
+    , "templateE" : "~ARG[1] / ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.rem#"
+    , "templateE" : "~ARG[1] rem ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.mod#"
+    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.toInteger#"
+    , "templateE" : "to_integer(~ARG[0])"
+    }
+  }
+]
