@@ -275,15 +275,13 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                       Nothing -> C.Data <$> coreToDataCon (isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))) dc
           Nothing -> case HashMap.lookup xNameS primMap of
             Just (Primitive f _)
-              | f == pack "CLaSH.Signal.Types.mapSignal"  -> return (mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.Types.appSignal"  -> return (mapSyncTerm xType)
-              | f == pack "CLaSH.Signal.Types.signal"     -> return (syncTerm xType)
-              | f == pack "CLaSH.Signal.Implicit.pack"    -> return (splitCombineTerm False xType)
-              | f == pack "CLaSH.Signal.Implicit.unpack"  -> return (splitCombineTerm True xType)
-              | f == pack "CLaSH.Signal.Explicit.cpack"   -> return (cpackCUnpackTerm False xType)
-              | f == pack "CLaSH.Signal.Explicit.cunpack" -> return (cpackCUnpackTerm True xType)
-              | f == pack "GHC.Base.$"                    -> return (dollarAppTerm xType)
-              | otherwise                                 -> return (C.Prim xNameS xType)
+              | f == pack "CLaSH.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
+              | f == pack "CLaSH.Signal.Internal.signal#"    -> return (signalTerm xType)
+              | f == pack "CLaSH.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
+              | f == pack "CLaSH.Signal.Wrap.vecUnwrap#"     -> return (vecUnwrapTerm xType)
+              | f == pack "CLaSH.Signal.Wrap.vecWrap#"       -> return (vecWrapTerm xType)
+              | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
+              | otherwise                                    -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
               return (C.Prim xNameS xType)
             Nothing
@@ -420,84 +418,213 @@ modNameM n = do
       let moduleNm = moduleName module_
       return (moduleNameString moduleNm)
 
-mapSyncTerm :: C.Type
-            -> C.Term
-mapSyncTerm (C.ForAllTy tvATy) =
-  let (aTV,bTV,C.tyView -> C.FunTy _ (C.tyView -> C.FunTy aTy bTy)) = runFreshM $ do
-                { (aTV',C.ForAllTy tvBTy) <- unbind tvATy
-                ; (bTV',funTy)            <- unbind tvBTy
-                ; return (aTV',bTV',funTy) }
-      fName = string2Name "f"
-      xName = string2Name "x"
-      fTy = C.mkFunTy aTy bTy
-      fId = C.Id fName (embed fTy)
-      xId = C.Id xName (embed aTy)
-  in C.TyLam $ bind aTV $
-     C.TyLam $ bind bTV $
-     C.Lam   $ bind fId $
-     C.Lam   $ bind xId $
-     C.App (C.Var fTy fName) (C.Var aTy xName)
-
-mapSyncTerm ty = error $ $(curLoc) ++ show ty
-
-syncTerm :: C.Type
-         -> C.Term
-syncTerm (C.ForAllTy tvTy) =
-  let (aTV,C.tyView -> C.FunTy _ aTy) = runFreshM $ unbind tvTy
-      xName = string2Name "x"
-      xId = C.Id xName (embed aTy)
-  in C.TyLam $ bind aTV $
-     C.Lam   $ bind xId $
-     C.Var   aTy xName
-
-syncTerm ty = error $ $(curLoc) ++ show ty
-
-splitCombineTerm :: Bool
-                 -> C.Type
-                 -> C.Term
-splitCombineTerm b (C.ForAllTy tvTy) =
-  let (aTV,C.tyView -> C.FunTy dictTy (C.tyView -> C.FunTy inpTy outpTy)) = runFreshM $ unbind tvTy
-      dictName = string2Name "splitCombineDict"
-      xName    = string2Name "x"
-      nTy      = if b then inpTy else outpTy
-      dId      = C.Id dictName (embed dictTy)
-      xId      = C.Id xName    (embed nTy)
-      newExpr  = C.TyLam $ bind aTV $
-                 C.Lam   $ bind dId $
-                 C.Lam   $ bind xId $
-                 C.Var nTy xName
-  in newExpr
-
-splitCombineTerm _ ty = error $ $(curLoc) ++ show ty
-
-cpackCUnpackTerm :: Bool
-                 -> C.Type
-                 -> C.Term
-cpackCUnpackTerm b (C.ForAllTy tvTy) = newExpr
-  where
-    (aTV,packCDict,clkTV,clkTy,inpTy,outpTy) = runFreshM $ do
-      (aTV',C.tyView -> C.FunTy packCDict' (C.ForAllTy ty2)) <- unbind tvTy
-      (clkTV',C.tyView -> (C.FunTy clkTy' (C.tyView -> C.FunTy inpTy' outpTy'))) <- unbind ty2
-      return (aTV',packCDict',clkTV',clkTy',inpTy',outpTy')
-    dictName = string2Name "cpackDict"
-    clkName  = string2Name "clk"
-    sigName  = string2Name "csig"
-    sigTy    = if b then inpTy else outpTy
-    dictId   = C.Id dictName (embed packCDict)
-    clkId    = C.Id clkName (embed clkTy)
-    sigId    = C.Id sigName (embed sigTy)
-    newExpr  = C.TyLam $ bind aTV $
-               C.Lam   $ bind dictId $
-               C.TyLam $ bind clkTV $
-               C.Lam   $ bind clkId $
-               C.Lam   $ bind sigId $
-               C.Var sigTy sigName
-
-cpackCUnpackTerm _ ty = error $ $(curLoc) ++ show ty
-
-dollarAppTerm :: C.Type
+-- | Given the type:
+--
+-- @forall a. forall b. forall clk. (a -> b) -> CSignal clk a -> CSignal clk b@
+--
+-- Generate the term:
+--
+-- @
+-- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (CSignal clk a -> CSignal clk b)).
+-- \(x : CSignal clk a).f x
+-- @
+mapSignalTerm :: C.Type
               -> C.Term
-dollarAppTerm = mapSyncTerm
+mapSignalTerm (C.ForAllTy tvATy) =
+    C.TyLam (bind aTV (
+    C.TyLam (bind bTV (
+    C.TyLam (bind clkTV (
+    C.Lam   (bind fId (
+    C.Lam   (bind xId (
+    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))))
+  where
+    (aTV,bTV,clkTV,funTy) = runFreshM $ do
+      { (aTV',C.ForAllTy tvBTy)   <- unbind tvATy
+      ; (bTV',C.ForAllTy tvClkTy) <- unbind tvBTy
+      ; (clkTV',funTy')           <- unbind tvClkTy
+      ; return (aTV',bTV',clkTV',funTy')
+      }
+    (C.FunTy _ funTy'') = C.tyView funTy
+    (C.FunTy aTy bTy)   = C.tyView funTy''
+    fName = string2Name "f"
+    xName = string2Name "x"
+    fTy   = C.mkFunTy aTy bTy
+    fId   = C.Id fName (embed fTy)
+    xId   = C.Id xName (embed aTy)
+
+mapSignalTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @forall a. forall clk. a -> CSignal clk a@
+--
+-- Generate the term
+--
+-- @/\(a:*)./\(clk:Clock).\(x:CSignal clk a).x@
+signalTerm :: C.Type
+           -> C.Term
+signalTerm (C.ForAllTy tvATy) =
+    C.TyLam (bind aTV (
+    C.TyLam (bind clkTV (
+    C.Lam   (bind xId (
+    C.Var   aTy xName))))))
+  where
+    (aTV,clkTV,funTy) = runFreshM $ do
+      { (aTV', C.ForAllTy tvClkTy) <- unbind tvATy
+      ; (clkTV', funTy')           <- unbind tvClkTy
+      ; return (aTV',clkTV',funTy')
+      }
+    (C.FunTy _ aTy) = C.tyView funTy
+    xName = string2Name "x"
+    xId   = C.Id xName (embed aTy)
+
+signalTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @
+-- forall clk. forall a. forall b. CSignal clk (a -> b) -> CSignal clk a ->
+-- CSignal clk b
+-- @
+--
+-- Generate the term:
+--
+-- @
+-- /\(clk:Clock)./\(a:*)./\(b:*).\(f : (CSignal clk a -> CSignal clk b)).
+-- \(x : CSignal clk a).f x
+-- @
+appSignalTerm :: C.Type
+              -> C.Term
+appSignalTerm (C.ForAllTy tvClkTy) =
+    C.TyLam (bind clkTV (
+    C.TyLam (bind aTV (
+    C.TyLam (bind bTV (
+    C.Lam   (bind fId (
+    C.Lam   (bind xId (
+    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))))
+  where
+    (clkTV,aTV,bTV,funTy) = runFreshM $ do
+      { (clkTV',C.ForAllTy tvATy) <- unbind tvClkTy
+      ; (aTV',C.ForAllTy tvBTy)   <- unbind tvATy
+      ; (bTV',funTy')           <- unbind tvBTy
+      ; return (clkTV',aTV',bTV',funTy')
+      }
+    (C.FunTy _ funTy'') = C.tyView funTy
+    (C.FunTy aTy bTy)   = C.tyView funTy''
+    fName = string2Name "f"
+    xName = string2Name "x"
+    fTy   = C.mkFunTy aTy bTy
+    fId   = C.Id fName (embed fTy)
+    xId   = C.Id xName (embed aTy)
+
+appSignalTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @
+-- forall t.forall n.forall a.SClock t -> Vec n (CSignal t a) ->
+-- CSignal t (Vec n a)
+-- @
+--
+-- Generate the term:
+--
+-- @/\(t:Clock)./\(n:Nat)./\(a:*).\(sclk:SClock t).\(vs:CSignal t (Vec n a)).vs@
+vecUnwrapTerm :: C.Type
+              -> C.Term
+vecUnwrapTerm (C.ForAllTy tvTTy) =
+    C.TyLam (bind tTV (
+    C.TyLam (bind nTV (
+    C.TyLam (bind aTV (
+    C.Lam   (bind sclkId (
+    C.Lam   (bind vsId (
+    C.Var vsTy vsName))))))))))
+  where
+    (tTV,nTV,aTV,funTy) = runFreshM $ do
+      { (tTV',C.ForAllTy tvNTy) <- unbind tvTTy
+      ; (nTV',C.ForAllTy tvATy) <- unbind tvNTy
+      ; (aTV',funTy')           <- unbind tvATy
+      ; return (tTV',nTV',aTV',funTy')
+      }
+    (C.FunTy sclkTy funTy'') = C.tyView funTy
+    (C.FunTy _ vsTy)         = C.tyView funTy''
+    sclkName = string2Name "sclk"
+    vsName   = string2Name "vs"
+    sclkId   = C.Id sclkName (embed sclkTy)
+    vsId     = C.Id vsName   (embed vsTy)
+
+vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @
+-- forall n.forall t.forall a.KnownNat n => SClock t -> CSignal (Vec n a) ->
+-- Vec n (CSignal t a)
+-- @
+--
+-- Generate the term:
+--
+-- @
+-- /\(n:Nat)./\(t:Clock)./\(a:*).\(dict:KnownNat n).\(sclk:SClock t).
+-- \(vs:CSignal (Vec n a)).vs
+-- @
+vecWrapTerm :: C.Type
+              -> C.Term
+vecWrapTerm (C.ForAllTy tvNTy) =
+    C.TyLam (bind nTV (
+    C.TyLam (bind tTV (
+    C.TyLam (bind aTV (
+    C.Lam   (bind dictId (
+    C.Lam   (bind sclkId (
+    C.Lam   (bind vsId (
+    C.Var vsTy vsName))))))))))))
+  where
+    (nTV,tTV,aTV,funTy) = runFreshM $ do
+      { (nTV',C.ForAllTy tvTTy) <- unbind tvNTy
+      ; (tTV',C.ForAllTy tvATy) <- unbind tvTTy
+      ; (aTV',funTy')           <- unbind tvATy
+      ; return (nTV',tTV',aTV',funTy')
+      }
+    (C.FunTy dictTy funTy'') = C.tyView funTy
+    (C.FunTy sclkTy funTy3)  = C.tyView funTy''
+    (C.FunTy vsTy _)         = C.tyView funTy3
+    dictName = string2Name "dict"
+    sclkName = string2Name "sclk"
+    vsName   = string2Name "vs"
+    dictId   = C.Id dictName (embed dictTy)
+    sclkId   = C.Id sclkName (embed sclkTy)
+    vsId     = C.Id vsName   (embed vsTy)
+
+vecWrapTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @forall a. forall b. (a -> b) -> a -> b@
+--
+-- Generate the term:
+--
+-- @/\(a:*)./\(b:*).\(f : (a -> b)).\(x : a).f x@
+dollarTerm :: C.Type
+           -> C.Term
+dollarTerm (C.ForAllTy tvATy) =
+    C.TyLam (bind aTV (
+    C.TyLam (bind bTV (
+    C.Lam   (bind fId (
+    C.Lam   (bind xId (
+    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))
+  where
+    (aTV,bTV,funTy) = runFreshM $ do
+      { (aTV',C.ForAllTy tvBTy) <- unbind tvATy
+      ; (bTV',funTy')           <- unbind tvBTy
+      ; return (aTV',bTV',funTy')
+      }
+    (C.FunTy fTy funTy'') = C.tyView funTy
+    (C.FunTy aTy _)       = C.tyView funTy''
+    fName = string2Name "f"
+    xName = string2Name "x"
+    fId   = C.Id fName (embed fTy)
+    xId   = C.Id xName (embed aTy)
+
+dollarTerm ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of
