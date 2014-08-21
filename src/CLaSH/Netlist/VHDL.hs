@@ -31,7 +31,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
-import           CLaSH.Util                           (curLoc, makeCached, (<:>))
+import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
 
 type VHDLM a = State VHDLState a
 
@@ -88,6 +88,8 @@ mkTyPackage hwtys =
       (Sum _ _,Sum _ _)    -> typeSize elTy1 == typeSize elTy2
       (Unsigned n,Sum _ _) -> n == typeSize elTy2
       (Sum _ _,Unsigned n) -> typeSize elTy1 == n
+      (Index u,Unsigned n) -> clog2 (max 1 u) == n
+      (Unsigned n,Index u) -> clog2 (max 1 u) == n
       _ -> elTy1 == elTy2
     eqHWTy ty1 ty2 = ty1 == ty2
 
@@ -176,6 +178,17 @@ funDec Integer = Just
     "end" <> semi
   )
 
+funDec (Index _) =  Just
+  ( "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <> semi
+  , "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence [ "if" <+> "left > right" <+> "then return left" <> semi
+                                , "else return right" <> semi
+                                , "end if" <> semi
+                                ]) <$>
+    "end" <> semi
+  )
+
 funDec _ = Nothing
 
 mkToStringDecls :: HWType -> (VHDLM Doc, VHDLM Doc)
@@ -190,7 +203,6 @@ mkToStringDecls t@(Product _ elTys) =
     elTyPrint = forM [0..(length elTys - 1)]
                      (\i -> "to_string" <>
                             parens ("value." <> vhdlType t <> "_sel" <> int i))
-mkToStringDecls (Vector _ Bit)  = (empty,empty)
 mkToStringDecls t@(Vector _ elTy) =
   ( "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING" <> semi
   , "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING is" <$>
@@ -219,6 +231,7 @@ tyImports =
     [ "library IEEE"
     , "use IEEE.STD_LOGIC_1164.ALL"
     , "use IEEE.NUMERIC_STD.ALL"
+    , "use IEEE.MATH_REAL.ALL"
     , "use work.all"
     , "use work.types.all"
     ]
@@ -266,12 +279,16 @@ vhdlType' Bool            = "boolean"
 vhdlType' (Clock _)       = "std_logic"
 vhdlType' (Reset _)       = "std_logic"
 vhdlType' Integer         = "integer"
+vhdlType' (BitVector n)   = case n of
+                              0 -> "std_logic_vector (0 downto 1)"
+                              1 -> "std_logic"
+                              _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
+vhdlType' (Index u)       = "unsigned" <> parens (int (clog2 (max 2 u) - 1) <+> "downto 0")
 vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
                                       else "signed" <> parens (int (n-1) <+> "downto 0")
 vhdlType' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
                                       else "unsigned" <> parens ( int (n-1) <+> "downto 0")
-vhdlType' (Vector n Bit)  = "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
-vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens (int (n-1) <+> "downto 0")
+vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
 vhdlType' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
 vhdlType' t@(Sum _ _)     = case typeSize t of
                               0 -> "unsigned (0 downto 1)"
@@ -290,9 +307,11 @@ vhdlTypeMark hwty = do
     vhdlTypeMark' (Clock _)       = "std_logic"
     vhdlTypeMark' (Reset _)       = "std_logic"
     vhdlTypeMark' Integer         = "integer"
+    vhdlTypeMark' (BitVector 1)   = "std_logic"
+    vhdlTypeMark' (BitVector _)   = "std_logic_vector"
+    vhdlTypeMark' (Index _)       = "unsigned"
     vhdlTypeMark' (Signed _)      = "signed"
     vhdlTypeMark' (Unsigned _)    = "unsigned"
-    vhdlTypeMark' (Vector _ Bit)  = "std_logic_vector"
     vhdlTypeMark' (Vector _ elTy) = "array_of_" <> tyName elTy
     vhdlTypeMark' (SP _ _)        = "std_logic_vector"
     vhdlTypeMark' (Sum _ _)       = "unsigned"
@@ -303,8 +322,10 @@ tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
 tyName Bit               = "std_logic"
 tyName Bool              = "boolean"
-tyName (Vector n Bit)    = "std_logic_vector_" <> int n
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (BitVector 1)     = "std_logic"
+tyName (BitVector n)     = "std_logic_vector_" <> int n
+tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
 tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
@@ -320,6 +341,8 @@ vhdlTypeErrValue :: HWType -> VHDLM Doc
 vhdlTypeErrValue Bit                 = "'1'"
 vhdlTypeErrValue Bool                = "true"
 vhdlTypeErrValue Integer             = "integer'high"
+vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
+vhdlTypeErrValue (Index _)           = "(others => 'X')"
 vhdlTypeErrValue (Signed _)          = "(others => 'X')"
 vhdlTypeErrValue (Unsigned _)        = "(others => 'X')"
 vhdlTypeErrValue (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeErrValue elTy)
@@ -481,6 +504,7 @@ toSLV :: HWType -> Expr -> VHDLM Doc
 toSLV Bit          e = parens (int 0 <+> rarrow <+> expr False e)
 toSLV Bool         e = "toSLV" <> parens (expr False e)
 toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr False e,int 32]))
+toSLV (BitVector _) e = expr False e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr False e)
 toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr False e)
@@ -493,9 +517,8 @@ toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ tys) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV tys es)
 toSLV (SP _ _) e = expr False e
-toSLV (Vector _ Bit) e = expr False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
-    selIds' <- sequence selIds
+    selIds' <- sequence (reverse selIds)
     parens (encloseSep lparen rparen " & " (mapM (toSLV elTy) selIds'))
   where
     selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> parens (int i) | i <- [0 .. (n-1)]]
@@ -507,6 +530,8 @@ fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
 fromSLV Bit               id_ start _   = text id_ <> parens (int start)
 fromSLV Bool              id_ start _   = "fromSL" <> parens (text id_ <> parens (int start))
 fromSLV Integer           id_ start end = "to_integer" <> parens (fromSLV (Signed 32) id_ start end)
+fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Signed _)        id_ start end = "signed" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Unsigned _)      id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Sum _ _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
@@ -520,8 +545,7 @@ fromSLV t@(Product _ tys) id_ start _   = tupled $ zipWithM (\s e -> s <+> rarro
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
 fromSLV (SP _ _)          id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (Vector _ Bit)    id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
-fromSLV (Vector n elTy)   id_ start _   = tupled args
+fromSLV (Vector n elTy)   id_ start _   = tupled (fmap reverse args)
   where
     argLength = typeSize elTy
     starts    = take (n + 1) $ iterate (subtract argLength) start

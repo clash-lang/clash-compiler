@@ -3,9 +3,15 @@ module CBlockRamTest where
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 
-topEntity :: CSignal 10 (Unsigned 7)
-          -> CSignal 10 (Unsigned 7)
-          -> CSignal 10 (Bool)
-          -> CSignal 10 (Vec 4 Bit)
-          -> CSignal 10 (Vec 4 Bit)
-topEntity = cblockRam (Clock d10) (vcopy d128 (vcopyI H))
+type Clk10 = Clk "clk" 10
+
+clk10 :: SClock Clk10
+clk10 = sclock
+
+
+topEntity :: CSignal Clk10 (Unsigned 7)
+          -> CSignal Clk10 (Unsigned 7)
+          -> CSignal Clk10 (Bool)
+          -> CSignal Clk10 (Vec 4 Bit)
+          -> CSignal Clk10 (Vec 4 Bit)
+topEntity = cblockRam clk10 (replicate d128 (repeat high))

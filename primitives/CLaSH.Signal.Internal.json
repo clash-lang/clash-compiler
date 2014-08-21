@@ -12,11 +12,11 @@
 begin
   ~SYM[2] <= ~ARG[1];
 
-  process(~CLKO,~RSTO,~SYM[2])
+  process(~CLK[0],~RST[0],~SYM[2])
   begin
-    if ~RSTO = '0' then
+    if ~RST[0] = '0' then
       ~SYM[1] <= ~SYM[2];
-    elsif rising_edge(~CLKO) then
+    elsif rising_edge(~CLK[0]) then
       ~SYM[1] <= ~ARG[2];
     end if;
   end process;

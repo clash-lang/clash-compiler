@@ -83,14 +83,12 @@ synchronizedClk tcm ty
   | not . null . typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case name2String tyCon of
-      "CLaSH.Signal.Types.Signal"     -> Just (pack "clk1000",1000)
       "CLaSH.Sized.Vector.Vec"        -> synchronizedClk tcm (args!!1)
-      "CLaSH.Signal.Implicit.SignalP" -> Just (pack "clk1000",1000)
-      "CLaSH.Signal.Types.CSignal"    -> case (head args) of
-                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i),i)
-                                           _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
-      "CLaSH.Signal.Explicit.CSignalP" -> case (head args) of
-                                           (LitTy (NumTy i)) -> Just (pack ("clk" ++ show i),i)
+      "CLaSH.Signal.Internal.SClock" -> case splitTyConAppM (head args) of
+                                          Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack (s ++ show i),i)
+                                          _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
+      "CLaSH.Signal.Internal.CSignal" -> case splitTyConAppM (head args) of
+                                           Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack (s ++ show i),i)
                                            _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       _                               -> case tyConDataCons (tcm HashMap.! tyCon) of
                                            [dc] -> let argTys   = dcArgTys dc
@@ -174,18 +172,20 @@ typeSize Bit  = 1
 typeSize (Clock _) = 1
 typeSize (Reset _) = 1
 typeSize Integer = 32
+typeSize (BitVector i) = i
+typeSize (Index u) = clog2 (max 2 u)
 typeSize (Signed i) = i
 typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
-typeSize (Sum _ dcs) = max 1 (ceiling . logBase (2 :: Float) . fromIntegral $ length dcs)
+typeSize (Sum _ dcs) = max 1 (clog2 $ length dcs)
 typeSize (Product _ tys) = sum $ map typeSize tys
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType
         -> Int
-conSize (SP _ cons) = ceiling . logBase (2 :: Float) . fromIntegral $ length cons
+conSize (SP _ cons) = clog2 $ length cons
 conSize t           = typeSize t
 
 -- | Gives the length of length-indexed types

@@ -400,7 +400,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
-    , "templateD" : "~RESULT <= ~TYPMO'(others => ~ARG[1]);"
+    , "templateE" : "~TYPMO'(others => ~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -464,7 +464,7 @@ begin
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_concatBitVectorSN : if RESULT'length /= 0 generate
+  ~SYM[3]_concatBitVectorSN : if ~RESULT'length /= 0 generate
     ~SYM[4]_concatBitVectorIter : for ~SYM[5] in ~SYM[1]'range generate
       ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~SYM[1](~SYM[5]);
     end generate;

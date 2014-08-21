@@ -3,7 +3,7 @@ module NestedPrimitives where
 import CLaSH.Prelude
 
 topEntity :: Vec 3 (Signed 16)
-topEntity = vmap resize o
+topEntity = map resize o
   where
     o :: Vec 3 (Signed 32)
-    o = vcopy d3 (bit 31)
+    o = replicate d3 (bit 31)

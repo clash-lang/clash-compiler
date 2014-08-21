@@ -170,28 +170,39 @@ mkPrimitive bbEParen nm args ty = do
                 netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
             return ((Identifier tmpS Nothing,Integer),netDecl:netAssign:scrutDecls)
           _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
-      | pNm ==  "CLaSH.Sized.Signed.fromIntegerS" -> case lefts args of
-          [C.Literal (IntegerLiteral i),arg] ->
+      | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#" -> case lefts args of
+          largs@[C.Literal (IntegerLiteral i),arg] ->
+            let sz = fromInteger i
+            in case arg of
+              C.Literal (IntegerLiteral j) ->
+                return ((N.Literal (Just sz) (NumLit $ fromInteger j), BitVector sz),[])
+              _ -> do
+                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
+                bb <- mkBlackBox (pack "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))") bbCtx
+                return ((BlackBoxE bb Nothing,BitVector sz),ctxDcls)
+          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
+      | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#" -> case lefts args of
+          largs@[C.Literal (IntegerLiteral i),arg] ->
             let sz = fromInteger i
             in case arg of
               C.Literal (IntegerLiteral j)
                 | i > 32 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Signed sz),[])
               _ -> do
-                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) (lefts args)
+                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- mkBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
                 return ((BlackBoxE bb Nothing,Signed sz),ctxDcls)
-          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Signed.fromIntegerS: " ++ show (map (either showDoc showDoc) args)
-      | pNm ==  "CLaSH.Sized.Unsigned.fromIntegerU" -> case lefts args of
-          [C.Literal (IntegerLiteral i),arg] ->
+          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
+      | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#" -> case lefts args of
+          largs@[C.Literal (IntegerLiteral i),arg] ->
             let sz = fromInteger i
             in case arg of
               C.Literal (IntegerLiteral j)
                 | i > 31 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Unsigned sz),[])
               _ -> do
-                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) (lefts args)
+                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- mkBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
                 return ((BlackBoxE bb Nothing,Unsigned sz),ctxDcls)
-          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Unsigned.fromIntegerU: " ++ show (map (either showDoc showDoc) args)
+          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Unsigned.fromInteger#: " ++ show (map (either showDoc showDoc) args)
       | otherwise -> return ((BlackBoxE (mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]) Nothing,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
@@ -225,8 +236,9 @@ mkFunInput resId e = do
               let templ = case bbM of
                             Just p@(P.BlackBox {}) -> template p
                             Just (P.Primitive pNm _)
-                              | pNm == "CLaSH.Sized.Signed.fromIntegerS"   -> Right "to_signed(~ARG[1],~LIT[0])"
-                              | pNm == "CLaSH.Sized.Unsigned.fromIntegerU" -> Right "to_unsigned(~ARG[1],~LIT[0])"
+                              | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#" -> Right "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
+                              | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"    -> Right "to_signed(~ARG[1],~LIT[0])"
+                              | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"  -> Right "to_unsigned(~ARG[1],~LIT[0])"
                             _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
               return templ
             Data dc -> do

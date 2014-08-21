@@ -5,7 +5,7 @@ import CLaSH.Prelude
 
 topEntity = f
 
-f (x :: Bool) = (second x False, second x H)
+f (x :: Bool) = (second x False, second x high)
   where
     second :: Bool -> (forall a . a -> a)
     second a b = b

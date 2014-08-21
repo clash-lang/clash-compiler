@@ -27,6 +27,7 @@ module CLaSH.Normalize.Transformations
   , inlineHO
   , inlineSmall
   , simpleCSE
+  , reduceConst
   )
 where
 
@@ -161,21 +162,8 @@ inlineNonRep _ e@(Case scrut altsTy alts)
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
   where
-    exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") [arg]) = numDictArg arg
+    exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") _) = True
     exception _ = False
-
-    numDictArg arg = case tyView arg of
-      TyConApp tcNm arg' -> case name2String tcNm of
-        "CLaSH.Sized.Signed.Signed"     -> True
-        "CLaSH.Sized.Unsigned.Unsigned" -> True
-        "CLaSH.Sized.Fixed.Fixed"       -> True
-        "CLaSH.Signal.Types.Signal"     -> numDictArg (head arg')
-        "CLaSH.Signal.Types.CSignal"    -> numDictArg (arg'!!1)
-        "GHC.Integer.Type.Integer"      -> True
-        "GHC.Types.Int"                 -> True
-        _                               -> False
-      _ -> False
-
 
 inlineNonRep _ e = return e
 
@@ -665,3 +653,18 @@ reduceBinders processed body ((id_,expr):binders) = case List.find ((== expr) . 
         body'      = substTm idName var body
     in  reduceBinders processed' body' binders'
   Nothing -> reduceBinders ((id_,expr):processed) body binders
+
+reduceConst :: NormRewrite
+reduceConst _ e@(App _ _)
+  | isConstant e
+  , (conPrim, _) <- collectArgs e
+  , isPrim conPrim
+  = R $ do
+    tcm <- Lens.use tcCache
+    reduceConstant <- Lens.use evaluator
+    case reduceConstant tcm e of
+      e'@(Data _)    -> changed e'
+      e'@(Literal _) -> changed e'
+      _              -> return e
+
+reduceConst _ e = return e

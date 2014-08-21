@@ -38,11 +38,13 @@ module CLaSH.Core.Type
   , isFunTy
   , applyFunTy
   , applyTy
+  , findFunSubst
   )
 where
 
 -- External import
 import                Control.DeepSeq               as DS
+import                Control.Monad                 (zipWithM)
 import                Data.HashMap.Strict           (HashMap)
 import qualified      Data.HashMap.Strict           as HashMap
 import                Data.Maybe                    (isJust)
@@ -159,37 +161,29 @@ tyView t = OtherType t
 
 -- | A transformation that renders 'Signal' types transparent
 transparentTy :: Type -> Type
-transparentTy (AppTy (ConstTy (TyCon tc)) ty)
+transparentTy ty@(AppTy (AppTy (ConstTy (TyCon tc)) _) elTy)
   = case name2String tc of
-      "CLaSH.Signal.Types.Signal"  -> transparentTy ty
-      "CLaSH.Signal.Implicit.SignalP" -> transparentTy ty
-      _ -> AppTy (ConstTy (TyCon tc)) (transparentTy ty)
-transparentTy (AppTy (AppTy (ConstTy (TyCon tc)) clkTy) elTy)
-  = case name2String tc of
-      "CLaSH.Signal.Types.CSignal"  -> transparentTy elTy
-      "CLaSH.Signal.Explicit.SignalP" -> transparentTy elTy
-      _ -> (AppTy (AppTy (ConstTy (TyCon tc)) (transparentTy clkTy)) (transparentTy elTy))
+      "CLaSH.Signal.Internal.CSignal" -> transparentTy elTy
+      _ -> ty
 transparentTy (AppTy ty1 ty2) = AppTy (transparentTy ty1) (transparentTy ty2)
 transparentTy (ForAllTy b)    = ForAllTy (uncurry bind $ second transparentTy $ unsafeUnbind b)
 transparentTy ty              = ty
 
--- | A view on types in which 'Signal' types and newtypes are transparent
+-- | A view on types in which 'Signal' types and newtypes are transparent, and
+-- type functions are evaluated when possible.
 coreView :: HashMap TyConName TyCon -> Type -> TypeView
 coreView tcMap ty =
   let tView = tyView ty
   in case tView of
-       -- TyConApp ((tcMap HashMap.!) -> AlgTyCon {algTcRhs = (NewTyCon _ nt)}) args
-       --   | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
-       --   | otherwise  -> tView
        TyConApp tc args -> case name2String tc of
-         "CLaSH.Signal.Types.Signal"     -> coreView tcMap (head args)
-         "CLaSH.Signal.Implicit.SignalP" -> coreView tcMap (head args)
-         "CLaSH.Signal.Types.CSignal"     -> coreView tcMap (args !! 1)
-         "CLaSH.Signal.Explicit.CSignalP" -> coreView tcMap (args !! 1)
+         "CLaSH.Signal.Internal.CSignal" -> coreView tcMap (args !! 1)
          _ -> case (tcMap HashMap.! tc) of
                 (AlgTyCon {algTcRhs = (NewTyCon _ nt)})
                   | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
                   | otherwise -> tView
+                FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst args of
+                  Just ty' -> coreView tcMap ty'
+                  _ -> tView
                 _ -> tView
        _ -> tView
 
@@ -331,3 +325,35 @@ splitTyAppM = fmap (second reverse) . go []
         Nothing             -> Just (ty1,ty2:args)
         Just (ty1',ty1args) -> Just (ty1',ty2:ty1args )
     go _ _ = Nothing
+
+-- Type function substitutions
+
+-- Given a set of type functions, and list of argument types, get the first
+-- type function that matches, and return its substituted RHS type.
+findFunSubst :: [([Type],Type)] -> [Type] -> Maybe Type
+findFunSubst [] _ = Nothing
+findFunSubst (tcSubst:rest) args = case funSubsts tcSubst args of
+  Just ty -> Just ty
+  Nothing -> findFunSubst rest args
+
+-- Given a ([LHS match type], RHS type) representing a type function, and
+-- a set of applied types. Match LHS with args, and when successful, return
+-- a substituted RHS
+funSubsts :: ([Type],Type) -> [Type] -> Maybe Type
+funSubsts (tcSubstLhs,tcSubstRhs) args = do
+  tySubts <- concat <$> zipWithM funSubst tcSubstLhs args
+  let tyRhs = substTys tySubts tcSubstRhs
+  return tyRhs
+
+-- Given a LHS matching type, and a RHS to-match type, check if LHS and RHS
+-- are a match. If they do match, and the LHS is a variable, return a
+-- substitution
+funSubst :: Type -> Type -> Maybe [(TyName,Type)]
+funSubst (VarTy _ nmF) ty = Just [(nmF,ty)]
+funSubst tyL@(LitTy _) tyR = if tyL == tyR then Just [] else Nothing
+funSubst (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
+  | tc == tc'
+  = do
+    tySubts <- zipWithM funSubst argTys argTys'
+    return (concat tySubts)
+funSubst _ _ = Nothing

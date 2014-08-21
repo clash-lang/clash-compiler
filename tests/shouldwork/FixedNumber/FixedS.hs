@@ -4,13 +4,11 @@ import CLaSH.Prelude
 
 type SF = SFixed 4 20
 
-co = $$(fLit 4.578) :: SF
-
 topEntity :: SF -> SF
-topEntity x = x + co
+topEntity x = x + 4.578
 
 testInput :: Signal SF
-testInput = stimuliGenerator $ $(v ([$$(fLit 1.0), $$(fLit 2.0), $$(fLit 4.0)] :: [SFixed 4 20] ))
+testInput = stimuliGenerator $ $(v ([1.0, 2.0, 4.0] :: [SFixed 4 20] ))
 
 expectedOutput :: Signal SF -> Signal Bool
-expectedOutput = outputVerifier $ $(v ([$$(fLit 5.578), $$(fLit 6.578), $$(fLit 8.578)] :: [SFixed 4 20]))
+expectedOutput = outputVerifier $ $(v ([5.578, 6.578, 8.578] :: [SFixed 4 20]))

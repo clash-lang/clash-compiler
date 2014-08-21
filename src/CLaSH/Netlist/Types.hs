@@ -80,6 +80,8 @@ data HWType
   | Bit -- ^ Bit type
   | Bool -- ^ Boolean type
   | Integer -- ^ Integer type
+  | BitVector Size -- ^ BitVector of a specified size
+  | Index    Size -- ^ Unsigned integer with specified (exclusive) upper bounder
   | Signed   Size -- ^ Signed integer of a specified size
   | Unsigned Size -- ^ Unsigned integer of a specified size
   | Vector   Size       HWType -- ^ Vector type
@@ -97,6 +99,8 @@ instance NFData HWType where
     Bit -> ()
     Bool -> ()
     Integer -> ()
+    BitVector s -> rnf s
+    Index u -> rnf u
     Signed s -> rnf s
     Unsigned s -> rnf s
     Vector s el -> rnf s `seq` rnf el

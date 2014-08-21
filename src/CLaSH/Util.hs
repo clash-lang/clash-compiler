@@ -225,3 +225,7 @@ clashLibVersion = Paths_clash_lib.version
 #else
 clashLibVersion = error "development version"
 #endif
+
+-- | ceiling (log_2(c))
+clog2 :: (Integral a, Integral c) => a -> c
+clog2 = ceiling . logBase (2 :: Float) . fromIntegral
