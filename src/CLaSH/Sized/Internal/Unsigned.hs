@@ -241,7 +241,7 @@ instance KnownNat n => Integral (Unsigned n) where
   divMod  n d = (n `quot#` d,n `mod#` d)
   toInteger   = toInteger#
 
-quot#,rem#,mod# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+quot#,rem#,mod# :: Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE quot# #-}
 quot# (U i) (U j) = U (i `BV.quot#` j)
 {-# NOINLINE rem# #-}
@@ -250,8 +250,8 @@ rem# (U i) (U j) = U (i `BV.rem#` j)
 mod# (U i) (U j) = U (i `BV.mod#` j)
 
 {-# NOINLINE toInteger# #-}
-toInteger# :: KnownNat n => Unsigned n -> Integer
-toInteger# (U i) = toInteger i
+toInteger# :: Unsigned n -> Integer
+toInteger# (U i) = BV.toInteger# i
 
 instance KnownNat n => Bits (Unsigned n) where
   (.&.)             = and#

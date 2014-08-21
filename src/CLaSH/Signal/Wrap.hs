@@ -11,13 +11,14 @@ module CLaSH.Signal.Wrap
 where
 
 import Control.Applicative   ((<$>), (<*>), liftA2)
+import Data.Default          (Default (..))
 import Data.Traversable      (sequenceA)
 import GHC.TypeLits          (KnownNat)
 import Prelude               hiding (head, map, tail)
 
 import CLaSH.Signal.Internal (Clock, CSignal (..), SClock)
 import CLaSH.Sized.BitVector (BitVector)
--- import CLaSH.Sized.Fixed     (Fixed)
+import CLaSH.Sized.Fixed     (Fixed)
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Signed    (Signed)
 import CLaSH.Sized.Unsigned  (Unsigned)
@@ -67,7 +68,7 @@ instance Wrap ()
 
 instance Wrap (BitVector n)
 instance Wrap (Index n)
--- instance Wrap (Fixed rep size frac)
+instance Wrap (Fixed rep int frac)
 instance Wrap (Signed n)
 instance Wrap (Unsigned n)
 
