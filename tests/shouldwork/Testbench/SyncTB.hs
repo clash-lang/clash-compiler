@@ -3,19 +3,24 @@ module SyncTB where
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 
-clk2 = Clock d2
-clk3 = Clock d3
-clk4 = Clock d4
-clk5 = Clock d5
-clk6 = Clock d6
-clk7 = Clock d7
-clk9 = Clock d9
+type Clk2 = Clk "clk" 2
+type Clk7 = Clk "clk" 7
+type Clk9 = Clk "clk" 9
 
-topEntity :: CSignal 7 Int -> CSignal 9 Int
-topEntity i = cregister (Clock d9) 70 (veryUnsafeSynchronizer (Clock d2) (Clock d9) (cregister (Clock d2) 99 (veryUnsafeSynchronizer (Clock d7) (Clock d2) (cregister (Clock d7) 50 i))))
+clk2 :: SClock Clk2
+clk2 = sclock
 
-testInput :: CSignal 7 Int
-testInput = cstimuliGenerator $(v [(1::Int)..10]) clk7
+clk7 :: SClock Clk7
+clk7 = sclock
 
-expectedOutput :: CSignal 9 Int -> CSignal 9 Bool
-expectedOutput = coutputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int])) clk9
+clk9 :: SClock Clk9
+clk9 = sclock
+
+topEntity :: CSignal Clk7 Int -> CSignal Clk9 Int
+topEntity i = cregister clk9 70 (veryUnsafeSynchronizer clk2 clk9 (cregister clk2 99 (veryUnsafeSynchronizer clk7 clk2 (cregister clk7 50 i))))
+
+testInput :: CSignal Clk7 Int
+testInput = cstimuliGenerator clk7 $(v [(1::Int)..10])
+
+expectedOutput :: CSignal Clk9 Int -> CSignal Clk9 Bool
+expectedOutput = coutputVerifier clk9 $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))

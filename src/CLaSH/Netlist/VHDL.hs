@@ -88,8 +88,8 @@ mkTyPackage hwtys =
       (Sum _ _,Sum _ _)    -> typeSize elTy1 == typeSize elTy2
       (Unsigned n,Sum _ _) -> n == typeSize elTy2
       (Sum _ _,Unsigned n) -> typeSize elTy1 == n
-      (Index u,Unsigned n) -> clog2 (max 1 u) == n
-      (Unsigned n,Index u) -> clog2 (max 1 u) == n
+      (Index u,Unsigned n) -> clog2 (max 2 u) == n
+      (Unsigned n,Index u) -> clog2 (max 2 u) == n
       _ -> elTy1 == elTy2
     eqHWTy ty1 ty2 = ty1 == ty2
 

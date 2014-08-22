@@ -115,6 +115,10 @@ reduceConstant tcm e@(collectArgs -> (Prim nm _, args))
       [App _ (Literal (IntegerLiteral i))]
         -> Literal (IntegerLiteral i)
       _ -> e
+  | nm == "GHC.TypeLits.natVal"
+  = case (map (reduceConstant tcm) . Either.lefts) args of
+      [Literal (IntegerLiteral i), _] -> Literal (IntegerLiteral i)
+      _ -> e
 
 reduceConstant _ e = e
 
