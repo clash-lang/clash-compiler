@@ -179,7 +179,7 @@ instance KnownNat n => Bounded (BitVector n) where
   maxBound = maxBound#
 
 {-# NOINLINE minBound# #-}
-minBound# :: BitVector n
+minBound# :: KnownNat n => BitVector n
 minBound# = BV 0
 
 {-# NOINLINE maxBound# #-}
@@ -303,7 +303,7 @@ reduceOr# (BV i) = BV (smallInteger (dataToTag# check))
 reduceXor# :: BitVector n -> BitVector 1
 reduceXor# (BV i) = BV (toInteger (popCount i `mod` 2))
 
-instance Default (BitVector n) where
+instance KnownNat n => Default (BitVector n) where
   def = minBound#
 
 -- * Accessors
@@ -435,9 +435,9 @@ xor# (BV v1) (BV v2) = BV (v1 `xor` v2)
 complement# :: KnownNat n => BitVector n -> BitVector n
 complement# (BV v1) = fromInteger_INLINE (complement v1)
 
-{-# NOINLINE shiftL# #-}
 shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => BitVector n -> Int
                                      -> BitVector n
+{-# NOINLINE shiftL# #-}
 shiftL# (BV v) i
   | i < 0     = error
               $ "'shiftL undefined for negative number: " ++ show i

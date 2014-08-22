@@ -92,15 +92,15 @@ import qualified CLaSH.Sized.Internal.BitVector as BV
 newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToBitVector', are not
     -- synthesisable.
-    U { unsafeToBitVector :: BitVector n }
+    U { unsafeToBitVector :: Integer }
   deriving Typeable
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int
-size# bv = fromInteger (natVal bv)
+size# u = fromInteger (natVal u)
 
 instance Show (Unsigned n) where
-  show (U (BV i)) = show i
+  show (U i) = show i
 
 instance BitConvert (Unsigned n) where
   type BitSize (Unsigned n) = n
@@ -109,11 +109,11 @@ instance BitConvert (Unsigned n) where
 
 {-# NOINLINE pack# #-}
 pack# :: Unsigned n -> BitVector n
-pack# = unsafeToBitVector
+pack# (U i) = BV i
 
 {-# NOINLINE unpack# #-}
 unpack# :: BitVector n -> Unsigned n
-unpack# = U
+unpack# (BV i) = U i
 
 instance Eq (Unsigned n) where
   (==) = eq#
@@ -121,11 +121,11 @@ instance Eq (Unsigned n) where
 
 {-# NOINLINE eq# #-}
 eq# :: Unsigned n -> Unsigned n -> Bool
-eq# (U v1) (U v2) = v1 `BV.eq#` v2
+eq# (U v1) (U v2) = v1 == v2
 
 {-# NOINLINE neq# #-}
 neq# :: Unsigned n -> Unsigned n -> Bool
-neq# (U v1) (U v2) = v1 `BV.neq#` v2
+neq# (U v1) (U v2) = v1 /= v2
 
 instance Ord (Unsigned n) where
   (<)  = lt#
@@ -135,13 +135,13 @@ instance Ord (Unsigned n) where
 
 lt#,ge#,gt#,le# :: Unsigned n -> Unsigned n -> Bool
 {-# NOINLINE lt# #-}
-lt# (U n) (U m) = n `BV.lt#` m
+lt# (U n) (U m) = n < m
 {-# NOINLINE ge# #-}
-ge# (U n) (U m) = n `BV.ge#` m
+ge# (U n) (U m) = n >= m
 {-# NOINLINE gt# #-}
-gt# (U n) (U m) = n `BV.gt#` m
+gt# (U n) (U m) = n > m
 {-# NOINLINE le# #-}
-le# (U n) (U m) = n `BV.le#` m
+le# (U n) (U m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesisable.
@@ -174,12 +174,12 @@ instance KnownNat n => Bounded (Unsigned n) where
   maxBound = maxBound#
 
 {-# NOINLINE minBound# #-}
-minBound# :: Unsigned n
-minBound# = U (BV 0)
+minBound# :: KnownNat n => Unsigned n
+minBound# = U 0
 
 {-# NOINLINE maxBound# #-}
 maxBound# :: KnownNat n => Unsigned n
-maxBound# = U BV.maxBound#
+maxBound# = let res = U ((2 ^ natVal res) - 1) in res
 
 instance KnownNat n => Num (Unsigned n) where
   (+)         = (+#)
@@ -192,21 +192,27 @@ instance KnownNat n => Num (Unsigned n) where
 
 (+#),(-#),(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
-(+#) (U i) (U j) = U (i BV.+# j)
+(+#) (U i) (U j) = fromInteger_INLINE (i + j)
 
 {-# NOINLINE (-#) #-}
-(-#) (U i) (U j) = U (i BV.-# j)
+(-#) (U i) (U j) = fromInteger_INLINE (i - j)
 
 {-# NOINLINE (*#) #-}
-(*#) (U i) (U j) = U (i BV.*# j)
+(*#) (U i) (U j) = fromInteger_INLINE (i * j)
 
 {-# NOINLINE negate# #-}
 negate# :: KnownNat n => Unsigned n -> Unsigned n
-negate# (U i) = U (BV.negate# i)
+negate# u@(U i) = U (sz - i)
+  where
+    sz = 2 ^ natVal u
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat n => Integer -> Unsigned n
-fromInteger# i = U (BV.fromInteger# i)
+fromInteger# = fromInteger_INLINE
+
+{-# INLINE fromInteger_INLINE #-}
+fromInteger_INLINE :: KnownNat n => Integer -> Unsigned n
+fromInteger_INLINE i = let res = U (i `mod` (2 ^ natVal res)) in res
 
 instance KnownNat (Max m n + 1) => Add (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
@@ -216,10 +222,10 @@ instance KnownNat (Max m n + 1) => Add (Unsigned m) (Unsigned n) where
 plus#, minus# :: KnownNat (Max m n + 1) => Unsigned m -> Unsigned n
               -> Unsigned (Max m n + 1)
 {-# NOINLINE plus# #-}
-plus# (U a) (U b) = U (a `BV.plus#` b)
+plus# (U a) (U b) = fromInteger_INLINE (a + b)
 
 {-# NOINLINE minus# #-}
-minus# (U a) (U b) = U (a `BV.minus#` b)
+minus# (U a) (U b) = fromInteger_INLINE (a - b)
 
 instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
@@ -227,7 +233,7 @@ instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
 
 {-# NOINLINE mult# #-}
 mult# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
-mult# (U a) (U b) = U (a `BV.mult#` b)
+mult# (U a) (U b) = fromInteger_INLINE (a * b)
 
 instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toInteger#
@@ -243,15 +249,15 @@ instance KnownNat n => Integral (Unsigned n) where
 
 quot#,rem#,mod# :: Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE quot# #-}
-quot# (U i) (U j) = U (i `BV.quot#` j)
+quot# (U i) (U j) = U (i `quot` j)
 {-# NOINLINE rem# #-}
-rem# (U i) (U j) = U (i `BV.rem#` j)
+rem# (U i) (U j) = U (i `rem` j)
 {-# NOINLINE mod# #-}
-mod# (U i) (U j) = U (i `BV.mod#` j)
+mod# (U i) (U j) = U (i `mod` j)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: Unsigned n -> Integer
-toInteger# (U i) = BV.toInteger# i
+toInteger# (U i) = i
 
 instance KnownNat n => Bits (Unsigned n) where
   (.&.)             = and#
@@ -275,37 +281,59 @@ instance KnownNat n => Bits (Unsigned n) where
 
 {-# NOINLINE and# #-}
 and# :: Unsigned n -> Unsigned n -> Unsigned n
-and# (U v1) (U v2) = U (BV.and# v1 v2)
+and# (U v1) (U v2) = U (v1 .&. v2)
 
 {-# NOINLINE or# #-}
 or# :: Unsigned n -> Unsigned n -> Unsigned n
-or# (U v1) (U v2) = U (BV.or# v1 v2)
+or# (U v1) (U v2) = U (v1 .|. v2)
 
 {-# NOINLINE xor# #-}
 xor# :: Unsigned n -> Unsigned n -> Unsigned n
-xor# (U v1) (U v2) = U (BV.xor# v1 v2)
+xor# (U v1) (U v2) = U (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => Unsigned n -> Unsigned n
-complement# (U v1) = U (BV.complement# v1)
+complement# (U i) = fromInteger_INLINE (complement i)
 
 shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int
                                      -> Unsigned n
 {-# NOINLINE shiftL# #-}
-shiftL# (U v) i = U (BV.shiftL# v i)
+shiftL# (U v) i
+  | i < 0     = error
+              $ "'shiftL undefined for negative number: " ++ show i
+  | otherwise = fromInteger_INLINE (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
-shiftR# (U v) i = U (BV.shiftR# v i)
+shiftR# (U v) i
+  | i < 0     = error
+              $ "'shiftR undefined for negative number: " ++ show i
+  | otherwise = fromInteger_INLINE (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
-rotateL# (U bv) i = U (BV.rotateL# bv i)
+rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
+rotateL# bv@(U n) b   = fromInteger_INLINE (l .|. r)
+  where
+    l    = shiftL n b'
+    r    = shiftR n b''
+
+    b'   = b `mod` sz
+    b''  = sz - b'
+    sz   = fromInteger (natVal bv)
 
 {-# NOINLINE rotateR# #-}
-rotateR# (U bv) i = U (BV.rotateR# bv i)
+rotateR# _ b | b < 0 = error "'shiftR undefined for negative numbers"
+rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
+  where
+    l   = shiftR n b'
+    r   = shiftL n b''
+
+    b'  = b `mod` sz
+    b'' = sz - b'
+    sz  = fromInteger (natVal bv)
 
 {-# NOINLINE popCount# #-}
 popCount# :: Unsigned n -> Int
-popCount# (U bv) = BV.popCount# bv
+popCount# (U i) = popCount i
 
 -- | A resize operation that zero-extends on extension, and wraps on truncation.
 --
@@ -317,9 +345,9 @@ instance Resize Unsigned where
 
 {-# NOINLINE resize# #-}
 resize# :: KnownNat m => Unsigned n -> Unsigned m
-resize# (U bv) = U (BV.resize# bv)
+resize# (U i) = fromInteger_INLINE i
 
-instance Default (Unsigned n) where
+instance KnownNat n => Default (Unsigned n) where
   def = minBound#
 
 instance KnownNat n => Lift (Unsigned n) where

@@ -444,6 +444,5 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
       r        = mult# a b
       (rL,rR)  = split r
 
-{-# NOINLINE minBoundSym# #-}
 minBoundSym# :: KnownNat n => Signed n
-minBoundSym# = let res = S $ negate $ 2 ^ (natVal res - 1) - 1 in res
+minBoundSym# = minBound# +# fromInteger# 1
