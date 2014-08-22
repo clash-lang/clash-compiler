@@ -680,7 +680,7 @@ replace_integer xs i a = case replaceM_integer xs i a of
 replace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
 replace xs i y = replace_integer xs (toInteger i) y
 
-{-# NOINLINE take #-}
+{-# INLINABLE take #-}
 -- | 'take' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
 --
 -- >>> take (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
@@ -709,7 +709,7 @@ take n = fst . splitAt n
 takeI :: KnownNat m => Vec (m + n) a -> Vec m a
 takeI = withSNat take
 
-{-# NOINLINE drop #-}
+{-# INLINABLE drop #-}
 -- | 'drop' @n xs@ returns the suffix of @xs@ after the first @n@ elements
 --
 -- >>> drop (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
@@ -735,7 +735,7 @@ drop n = snd . splitAt n
 dropI :: KnownNat m => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
 
-{-# NOINLINE exact #-}
+{-# INLINABLE exact #-}
 -- | 'exact' @n xs@ returns @n@'th element of @xs@
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
@@ -804,7 +804,7 @@ replicateU (USucc s) x = x :> replicateU s x
 repeat :: KnownNat n => a -> Vec n a
 repeat = withSNat replicate
 
-{-# NOINLINE iterate #-}
+{-# INLINE iterate #-}
 -- | 'iterate' @n f x@ returns a vector starting with @x@ followed by @n@
 -- repeated applications of @f@ to @x@
 --
@@ -813,12 +813,8 @@ repeat = withSNat replicate
 --
 -- >>> iterate d4 (+1) 1
 -- <1,2,3,4>
-iterate :: SNat n -> (a -> a) -> a -> Vec n a
-iterate n f a = iterateU (toUNat n) f a
-
-iterateU :: UNat n -> (a -> a) -> a -> Vec n a
-iterateU UZero     _ _ = Nil
-iterateU (USucc s) g x = x :> iterateU s g (g x)
+iterate :: KnownNat n => SNat n -> (a -> a) -> a -> Vec n a
+iterate _ = iterateI
 
 {-# INLINEABLE iterateI #-}
 -- | 'iterate' @f x@ returns a vector starting with @x@ followed by @n@
@@ -829,7 +825,10 @@ iterateU (USucc s) g x = x :> iterateU s g (g x)
 -- >>> iterateI (+1) 1 :: Vec 3 Int
 -- <1,2,3>
 iterateI :: KnownNat n => (a -> a) -> a -> Vec n a
-iterateI = withSNat iterate
+iterateI f a = xs
+  where
+    xs = init (a :> ws)
+    ws = map f (lazyV xs)
 
 {-# INLINEABLE generate #-}
 -- | 'generate' @n f x@ returns a vector with @n@ repeated applications of @f@
@@ -840,8 +839,8 @@ iterateI = withSNat iterate
 --
 -- >>> generate d4 (+1) 1
 -- <2,3,4,5>
-generate :: SNat n -> (a -> a) -> a -> Vec n a
-generate n f a = iterate n f (f a)
+generate :: KnownNat n => SNat n -> (a -> a) -> a -> Vec n a
+generate _ f a = iterateI f (f a)
 
 {-# INLINEABLE generateI #-}
 -- | 'generate' @f x@ returns a vector with @n@ repeated applications of @f@
@@ -852,7 +851,7 @@ generate n f a = iterate n f (f a)
 -- >>> generateI (+1) 1 :: Vec 3 Int
 -- <2,3,4>
 generateI :: KnownNat n => (a -> a) -> a -> Vec n a
-generateI = withSNat generate
+generateI f a = iterateI f (f a)
 
 {-# INLINEABLE toList #-}
 -- | Convert a vector to a list
