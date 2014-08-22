@@ -32,14 +32,14 @@ module CLaSH.Prelude.Explicit
 where
 
 import Data.Default            (Default (..))
-import GHC.TypeLits            (KnownNat, type (+))
+import GHC.TypeLits            (KnownNat, type (+), natVal)
 import Prelude                 hiding (repeat)
 
 import CLaSH.Prelude.BlockRam  (cblockRam, cblockRamPow2)
 import CLaSH.Prelude.Mealy     (sync)
 import CLaSH.Prelude.Testbench (csassert, cstimuliGenerator, coutputVerifier)
 import CLaSH.Signal.Explicit
-import CLaSH.Sized.Vector      (Vec (..), (+>>), repeat)
+import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 
 {-# INLINABLE cregisterP #-}
 -- | Create a 'register' function for product-type like signals (e.g.
@@ -63,15 +63,18 @@ cregisterP clk i = wrap clk Prelude.. cregister clk i Prelude.. unwrap clk
 --
 -- >>> csimulateP window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
-cwindow :: (KnownNat (n + 1), Default a)
-        => SClock clk                        -- ^ Clock to which the incoming
-                                             -- signal is synchronized
-        -> CSignal clk a                     -- ^ Signal to create a window over
-        -> Vec ((n + 1) + 1) (CSignal clk a) -- ^ Window of at least size 2
-cwindow clk x = x :> prev
+cwindow :: (KnownNat n, Default a)
+        => SClock clk                  -- ^ Clock to which the incoming
+                                       -- signal is synchronized
+        -> CSignal clk a               -- ^ Signal to create a window over
+        -> Vec (n + 1) (CSignal clk a) -- ^ Window of at least size 1
+cwindow clk x = res
   where
-    prev = cregisterP clk (repeat def) next
-    next = x +>> prev
+    res  = x :> prev
+    prev = case natVal (asNatProxy prev) of
+             0 -> repeat def
+             _ -> let next = x +>> prev
+                  in  cregisterP clk (repeat def) next
 
 {-# INLINABLE cwindowD #-}
 -- | Give a delayed window over a 'CSignal'
