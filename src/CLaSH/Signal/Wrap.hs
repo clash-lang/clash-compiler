@@ -11,7 +11,6 @@ module CLaSH.Signal.Wrap
 where
 
 import Control.Applicative   ((<$>), (<*>), liftA2)
-import Data.Default          (Default (..))
 import Data.Traversable      (sequenceA)
 import GHC.TypeLits          (KnownNat)
 import Prelude               hiding (head, map, tail)
