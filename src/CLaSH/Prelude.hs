@@ -82,9 +82,9 @@ import Language.Haskell.TH.Lift    (Lift(..),deriveLift)
 import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            foldl1, foldr, foldr1, head, init,
                                            iterate, last, length, map, repeat,
-                                           replicate, reverse, scanl, scanl1,
-                                           scanr, scanr1, splitAt, tail, take,
-                                           unzip, zip, zipWith)
+                                           replicate, reverse, scanl, scanr,
+                                           splitAt, tail, take, unzip, zip,
+                                           zipWith)
 
 import CLaSH.Class.BitConvert
 import CLaSH.Class.Num

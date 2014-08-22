@@ -26,7 +26,7 @@ module CLaSH.Sized.Vector
     -- ** Applying functions to 'Vec'tor elements
   , map, zipWith
   , foldr, foldl, foldr1, foldl1, fold
-  , scanl, scanr, scanl1, scanr1
+  , scanl, scanr, sscanl, sscanr
   , mapAccumL, mapAccumR
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
@@ -52,9 +52,9 @@ import Language.Haskell.TH.Syntax (Lift(..))
 import Prelude                    hiding ((++), (!!), concat, drop, foldl,
                                           foldl1, foldr, foldr1, head, init,
                                           iterate, last, length, map, repeat,
-                                          replicate, reverse, scanl, scanl1,
-                                          scanr, scanr1, splitAt, tail, take,
-                                          unzip, zip, zipWith)
+                                          replicate, reverse, scanl, scanr,
+                                          splitAt, tail, take, unzip, zip,
+                                          zipWith)
 import qualified Prelude          as P
 import Unsafe.Coerce              (unsafeCoerce)
 
@@ -85,37 +85,37 @@ instance Show a => Show (Vec n a) where
       punc (x :> Nil) = show x
       punc (x :> xs)  = show x P.++ "," P.++ punc xs
 
-instance Eq a => Eq (Vec n a) where
+instance (KnownNat n, Eq a) => Eq (Vec n a) where
   (==) = eq#
   (/=) = neq#
 
 {-# NOINLINE eq# #-}
-eq# :: Eq a => Vec n a -> Vec n a -> Bool
+eq# :: (KnownNat n, Eq a) => Vec n a -> Vec n a -> Bool
 eq# v1 v2  = foldr (&&) True (zipWith (==) v1 v2)
 
 {-# NOINLINE neq# #-}
-neq# :: Eq a => Vec n a -> Vec n a -> Bool
-neq# v1 v2 = not (foldr (&&) True (zipWith (==) v1 v2))
+neq# :: (KnownNat n, Eq a) => Vec n a -> Vec n a -> Bool
+neq# v1 v2 = not (eq# v1 v2)
 
 -- | __NB__: Not synthesisable
 instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
   fs <*> xs = zipWith ($) fs (lazyV xs)
 
-instance F.Foldable (Vec n) where
+instance KnownNat n => F.Foldable (Vec n) where
   foldr = foldr
 
 instance Functor (Vec n) where
   fmap = map
 
 -- | __NB__: Not synthesisable
-instance Traversable (Vec n) where
+instance KnownNat n => Traversable (Vec n) where
   traverse = traverse#
 
 {-# NOINLINE traverse# #-}
 traverse# :: Applicative f => (a -> f b) -> Vec n a -> f (Vec n b)
 traverse# _ Nil       = pure Nil
-traverse# f (x :> xs) = (:>) <$> f x <*> traverse f xs
+traverse# f (x :> xs) = (:>) <$> f x <*> traverse# f xs
 
 instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
@@ -397,7 +397,7 @@ zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil       Nil       = Nil
 zipWith f (x :> xs) (y :> ys) = f x y :> (zipWith f xs (unsafeCoerce ys))
 
-{-# NOINLINE foldr #-}
+{-# INLINABLE foldr #-}
 -- | 'vfoldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from right to left:
@@ -412,11 +412,10 @@ zipWith f (x :> xs) (y :> ys) = f x y :> (zipWith f xs (unsafeCoerce ys))
 -- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
-foldr :: (a -> b -> b) -> b -> Vec n a -> b
-foldr _ z Nil       = z
-foldr f z (x :> xs) = f x (foldr f z xs)
+foldr :: KnownNat n => (a -> b -> b) -> b -> Vec n a -> b
+foldr f z xs = head (scanr f z xs)
 
-{-# NOINLINE foldl #-}
+{-# INLINABLE foldl #-}
 -- | 'foldl', applied to a binary operator, a starting value (typically
 -- the left-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from left to right:
@@ -431,9 +430,8 @@ foldr f z (x :> xs) = f x (foldr f z xs)
 -- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
-foldl :: (b -> a -> b) -> b -> Vec n a -> b
-foldl _ z Nil       = z
-foldl f z (x :> xs) = foldl f (f z x) xs
+foldl :: KnownNat n => (b -> a -> b) -> b -> Vec n a -> b
+foldl f z xs = last (scanl f z xs)
 
 {-# INLINABLE foldr1 #-}
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
@@ -450,7 +448,7 @@ foldl f z (x :> xs) = foldl f (f z x) xs
 -- or delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
-foldr1 :: (a -> a -> a) -> Vec (n + 1) a -> a
+foldr1 :: KnownNat n => (a -> a -> a) -> Vec (n + 1) a -> a
 foldr1 f xs = foldr f (last xs) (init xs)
 
 {-# INLINEABLE foldl1 #-}
@@ -468,7 +466,7 @@ foldr1 f xs = foldr f (last xs) (init xs)
 -- or delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
-foldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
+foldl1 :: KnownNat n => (a -> a -> a) -> Vec (n + 1) a -> a
 foldl1 f xs = foldl f (head xs) (tail xs)
 
 {-# NOINLINE fold #-}
@@ -485,7 +483,7 @@ foldl1 f xs = foldl f (head xs) (tail xs)
 --
 -- >>> fold (+) (5 :> 4 :> 3 :> 2 :> 1 :> Nil)
 -- 15
-fold :: (a -> a -> a) -> Vec (n + 1) a -> a
+fold :: KnownNat (n + 1) => (a -> a -> a) -> Vec (n + 1) a -> a
 fold f vs = fold' (toList vs)
   where
     fold' [x] = x
@@ -510,21 +508,15 @@ scanl f z xs = ws
   where
     ws = z :> zipWith f (lazyV (init ws)) xs
 
-{-# INLINEABLE scanl1 #-}
--- | 'scanl1' is a variant of 'scanl' that has no starting element:
+{-# INLINEABLE sscanl #-}
+-- | 'sscanl' is a variant of 'scanl' where the first result is dropped:
 --
--- > scanl1 f (x1 :> x2 :> x3 :> ... :> Nil) == x1 :> (x1 `f` x2) :> ((x1 `f` x2) `f` x3) :> ... :> Nil
+-- > sscanl f z (x1 :> x2 :> ... :> Nil) == (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
 --
--- >>> scanl1 (+) (5 :> 4 :> 3 :> 2 :> Nil)
+-- >>> sscanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <5,9,12,14>
---
--- __NB__:
---
--- > last (scanl1 f xs) == foldl1 f xs
-scanl1 :: KnownNat n => (a -> a -> a) -> Vec n a -> Vec n a
-scanl1 f xs = init (scanl f (head xs') (tail xs'))
-  where
-    xs' = xs <: undefined
+sscanl :: KnownNat n => (b -> a -> b) -> b -> Vec n a -> Vec n b
+sscanl f z xs = tail (scanl f z xs)
 
 {-# INLINEABLE scanr #-}
 -- | 'scanr' is similar to 'foldr', but returns a vector of successive reduced
@@ -543,21 +535,15 @@ scanr f z xs = ws
   where
     ws = zipWith f xs (lazyV (tail ws)) <: z
 
-{-# INLINEABLE scanr1 #-}
--- | 'scanr1' is a variant of 'scanr' that has no starting element:
+{-# INLINEABLE sscanr #-}
+-- | 'sscanr' is a variant of 'scanr' that where the last result is dropped:
 --
--- > scanr f (... :> xn2 :> xn1 :> xn :> Nil) == ... :> (xn3 `f` (xn2 `f` xn1)) :> (xn1 `f` xn) :> xn :> Nil
+-- > sscanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> Nil
 --
--- >>> scanr1 (+) (5 :> 4 :> 3 :> 2 :> Nil)
+-- >>> sscanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <14,9,5,2>
---
--- __NB__:
---
--- > head (scanr1 f xs) == foldr1 f xs
-scanr1 :: KnownNat n => (a -> a -> a) -> Vec n a -> Vec n a
-scanr1 f xs = tail (scanr f (last xs') (init xs'))
-  where
-    xs' = undefined :> xs
+sscanr :: KnownNat n => (a -> b -> b) -> b -> Vec n a -> Vec n b
+sscanr f z xs = init (scanr f z xs)
 
 {-# INLINEABLE mapAccumL #-}
 -- | The 'mapAccumL' function behaves like a combination of 'map' and 'foldl';
@@ -571,9 +557,11 @@ mapAccumL :: KnownNat n => (acc -> x -> (acc,y)) -> acc -> Vec n x
           -> (acc,Vec n y)
 mapAccumL f acc xs = (acc',ys)
   where
-    ws   = scanl (\l r -> f (fst l) r) (acc,undefined) xs
-    acc' = fst (last ws)
-    ys   = map snd (tail ws)
+    accs  = acc :> accs'
+    ws    = zipWith f (lazyV (init accs)) xs
+    accs' = map fst ws
+    ys    = map snd ws
+    acc'  = last accs
 
 {-# INLINEABLE mapAccumR #-}
 -- | The 'mapAccumR' function behaves like a combination of 'map' and 'foldr';
@@ -587,9 +575,11 @@ mapAccumR :: KnownNat n => (acc -> x -> (acc,y)) -> acc -> Vec n x
           -> (acc, Vec n y)
 mapAccumR f acc xs = (acc',ys)
   where
-    ws   = scanr (\l r -> f (fst r) l) (acc,undefined) xs
-    acc' = fst (head ws)
-    ys   = map snd (init ws)
+    accs  = accs' <: acc
+    ws    = zipWith f (lazyV (tail accs)) xs
+    accs' = map fst ws
+    ys    = map snd ws
+    acc'  = head accs
 
 {-# INLINEABLE zip #-}
 -- | 'zip' takes two vectors and returns a vector of corresponding pairs.
@@ -871,7 +861,7 @@ generateI = withSNat generate
 -- [1,2,3]
 --
 -- __NB__: Not synthesisable
-toList :: Vec n a -> [a]
+toList :: KnownNat n => Vec n a -> [a]
 toList = foldr (:) []
 
 -- | Create a vector literal from a list literal

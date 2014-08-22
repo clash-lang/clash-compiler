@@ -161,7 +161,8 @@ instance KnownNat n => Wrap (Vec n a) where
   wrap   = vecWrap#
 
 {-# NOINLINE vecUnwrap# #-}
-vecUnwrap# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
+vecUnwrap# :: KnownNat n => SClock t -> Vec n (CSignal t a)
+           -> CSignal t (Vec n a)
 vecUnwrap# _ = sequenceA
 
 {-# NOINLINE vecWrap# #-}
