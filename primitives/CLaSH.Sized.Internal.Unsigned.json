@@ -45,12 +45,14 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.minBound#"
-    , "templateD" : "~RESULT <= (others => '0');"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '0');"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.maxBound#"
-    , "templateD" : "~RESULT <= (others => '1');"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '1');"
     }
   }
 , { "BlackBox" :

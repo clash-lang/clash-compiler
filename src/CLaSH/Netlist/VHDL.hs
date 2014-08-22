@@ -123,7 +123,6 @@ mkVecZ (Vector _ elTy) = Vector 0 elTy
 mkVecZ t               = t
 
 needsTyDec :: HWType -> Bool
-needsTyDec (Vector _ Bit) = False
 needsTyDec (Vector _ _)   = True
 needsTyDec (Product _ _)  = True
 needsTyDec (SP _ _)       = True
@@ -149,7 +148,7 @@ tyDec _ = empty
 funDec :: HWType -> Maybe (VHDLM Doc,VHDLM Doc)
 funDec Bool = Just
   ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
-    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <> semi
+    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi
   , "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
     "begin" <$>
       indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
@@ -159,9 +158,9 @@ funDec Bool = Just
                                 ,"end" <+> "if" <> semi
                                 ]) <$>
     "end" <> semi <$>
-    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "boolean" <+> "is" <$>
+    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <+> "is" <$>
     "begin" <$>
-      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> squotes (int 1) <+> "then"
+      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> dquotes (int 1) <+> "then"
                                 ,   indent 2 ("return" <+> "true" <> semi)
                                 ,"else"
                                 ,   indent 2 ("return" <+> "false" <> semi)
@@ -274,14 +273,12 @@ vhdlType hwty = do
   vhdlType' hwty
 
 vhdlType' :: HWType -> VHDLM Doc
-vhdlType' Bit             = "std_logic"
 vhdlType' Bool            = "boolean"
 vhdlType' (Clock _)       = "std_logic"
 vhdlType' (Reset _)       = "std_logic"
 vhdlType' Integer         = "integer"
 vhdlType' (BitVector n)   = case n of
                               0 -> "std_logic_vector (0 downto 1)"
-                              1 -> "std_logic"
                               _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
 vhdlType' (Index u)       = "unsigned" <> parens (int (clog2 (max 2 u) - 1) <+> "downto 0")
 vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
@@ -302,12 +299,10 @@ vhdlTypeMark hwty = do
   when (needsTyDec hwty) (_1 %= HashSet.insert (mkVecZ hwty))
   vhdlTypeMark' hwty
   where
-    vhdlTypeMark' Bit             = "std_logic"
     vhdlTypeMark' Bool            = "boolean"
     vhdlTypeMark' (Clock _)       = "std_logic"
     vhdlTypeMark' (Reset _)       = "std_logic"
     vhdlTypeMark' Integer         = "integer"
-    vhdlTypeMark' (BitVector 1)   = "std_logic"
     vhdlTypeMark' (BitVector _)   = "std_logic_vector"
     vhdlTypeMark' (Index _)       = "unsigned"
     vhdlTypeMark' (Signed _)      = "signed"
@@ -320,10 +315,8 @@ vhdlTypeMark hwty = do
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
-tyName Bit               = "std_logic"
 tyName Bool              = "boolean"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (BitVector 1)     = "std_logic"
 tyName (BitVector n)     = "std_logic_vector_" <> int n
 tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
@@ -338,7 +331,6 @@ tyName _ = empty
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 vhdlTypeErrValue :: HWType -> VHDLM Doc
-vhdlTypeErrValue Bit                 = "'1'"
 vhdlTypeErrValue Bool                = "true"
 vhdlTypeErrValue Integer             = "integer'high"
 vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
@@ -447,8 +439,6 @@ expr b (BlackBoxE bs _) = parenIf b $ string bs
 
 expr _ (DataTag Bool (Left e))           = "false when" <+> expr False e <+> "= 0 else true"
 expr _ (DataTag Bool (Right e))          = "1 when" <+> expr False e <+> "else 0"
-expr _ (DataTag Bit (Left e))            = "'0' when" <+> expr False e <+> "= 0 else '1'"
-expr _ (DataTag Bit (Right e))           = "0 when" <+> expr False e <+> "= '0' else 1"
 expr _ (DataTag hty@(Sum _ _) (Left e))  = "to_unsigned" <> tupled (sequence [expr False e,int (typeSize hty)])
 expr _ (DataTag (Sum _ _) (Right e))     = "to_integer" <> parens (expr False e)
 
@@ -501,7 +491,6 @@ bit_char U = char 'U'
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VHDLM Doc
-toSLV Bit          e = parens (int 0 <+> rarrow <+> expr False e)
 toSLV Bool         e = "toSLV" <> parens (expr False e)
 toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr False e,int 32]))
 toSLV (BitVector _) e = expr False e
@@ -527,7 +516,6 @@ toSLV (Vector n elTy) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWith
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
-fromSLV Bit               id_ start _   = text id_ <> parens (int start)
 fromSLV Bool              id_ start _   = "fromSL" <> parens (text id_ <> parens (int start))
 fromSLV Integer           id_ start end = "to_integer" <> parens (fromSLV (Signed 32) id_ start end)
 fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)

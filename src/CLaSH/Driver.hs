@@ -127,11 +127,8 @@ createVHDL vhdlState components = flip evalState vhdlState $ do
   (vhdlNms,vhdlDocs) <- unzip <$> mapM genVHDL components
   let vhdlNmDocs = zip vhdlNms vhdlDocs
   hwtys <- HashSet.toList <$> use _1
-  typesPkgM <- case hwtys of
-                 [] -> return Nothing
-                 _  -> Just <$> mkTyPackage hwtys
-
-  return $ maybe vhdlNmDocs (\t -> ("types",t):vhdlNmDocs) typesPkgM
+  typesPkg <- mkTyPackage hwtys
+  return (("types",typesPkg):vhdlNmDocs)
 
 -- | Prepares the directory for writing VHDL files. This means creating the
 --   dir if it does not exist and removing all existing .vhdl files from it.

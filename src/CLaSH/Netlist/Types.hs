@@ -77,7 +77,6 @@ type Size = Int
 -- | Representable hardware types
 data HWType
   = Void -- ^ Empty type
-  | Bit -- ^ Bit type
   | Bool -- ^ Boolean type
   | Integer -- ^ Integer type
   | BitVector Size -- ^ BitVector of a specified size
@@ -96,7 +95,6 @@ instance Hashable HWType
 instance NFData HWType where
   rnf hwty = case hwty of
     Void -> ()
-    Bit -> ()
     Bool -> ()
     Integer -> ()
     BitVector s -> rnf s

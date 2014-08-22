@@ -45,36 +45,14 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minBound#"
-    , "templateD" :
-"~SYM[0]_minBound : block
-begin
-  ~SYM[1]_generate : if ~RESULT'length = 0 generate
-  begin
-    ~RESULT <= (0 downto 1 => '0');
-  end generate;
-
-  ~SYM[2]_generate : if ~RESULT'length /= 0 generate
-  begin
-    ~RESULT <= (~RESULT'high => '1', others => '0');
-  end generate;
-end block;"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "signed'(~LIT[0]-1 => '1', ~LIT[0]-2 downto 0 => '0')"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.maxBound#"
-    , "templateD" :
-"~SYM[0]_maxBound : block
-begin
-  ~SYM[1]_generate : if ~RESULT'length = 0 generate
-  begin
-    ~RESULT <= (0 downto 1 => '0');
-  end generate;
-
-  ~SYM[2]_generate : if ~RESULT'length /= 0 generate
-  begin
-    ~RESULT <= (~RESULT'high => '0', others => '1');
-  end generate;
-end block;"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "signed'(~LIT[0]-1 => '0', ~LIT[0]-2 downto 0 => '1')"
     }
   }
 , { "BlackBox" :
@@ -201,28 +179,6 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.resize#"
     , "templateE" : "resize(~ARG[2],~LIT[1])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.minBoundSym#"
-    , "templateD" :
-"~SYM[0]_minBoundSym : block
-begin
-  ~SYM[1]_generate : if ~RESULT'length = 0 generate
-  begin
-    ~RESULT <= (0 downto 1 => '0');
-  end generate;
-
-  ~SYM[2]_generate : if  ~RESULT'length = 1 generate
-  begin
-    ~RESULT <= (others => '0');
-  end generate;
-
-  ~SYM[3]_generate : if  ~RESULT'length > 1 generate
-  begin
-    ~RESULT <= (~RESULT'high => '1', 0 => '1', others => '0');
-  end generate;
-end block;"
     }
   }
 ]

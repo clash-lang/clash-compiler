@@ -30,7 +30,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.maxBound#"
-    , "templateE" : "~RESULT <= to_unsigned(max (0,~LIT[0]-1),~RESULT'length);"
+    , "templateE" : "to_unsigned(max(0,~LIT[0]-1),~RESULT'length);"
     }
   }
 , { "BlackBox" :
@@ -50,7 +50,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.fromInteger#"
-    , "templateE" : "to_unsigned(~ARG[1],integer(ceil(log2(real(max (2,~LIT[0]))))))"
+    , "templateE" : "to_unsigned(~ARG[1],integer(ceil(log2(real(max(2,~LIT[0]))))))"
     }
   }
 , { "BlackBox" :

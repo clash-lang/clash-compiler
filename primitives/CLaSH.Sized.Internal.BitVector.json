@@ -10,17 +10,17 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.high"
-    , "templateE" : "'1'"
+    , "templateE" : "\"1\""
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.low"
-    , "templateE" : "'0'"
+    , "templateE" : "\"0\""
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.++#"
-    , "templateD" : "~RESULT <= ~ARG[1] & ~ARG[2];"
+    , "templateE" : "std_logic_vector'(~ARG[1]) & std_logic_vector'(~ARG[2])"
     }
   }
 , { "BlackBox" :
@@ -49,7 +49,7 @@
     return result;
   end;
 begin
-  ~RESULT <= and_reduce(~ARG[1]);
+  ~RESULT <= (0 => and_reduce(~ARG[1]));
 end block;"
     }
   }
@@ -79,7 +79,7 @@ end block;"
     return result;
   end;
 begin
-  ~RESULT <= or_reduce(~ARG[0]);
+  ~RESULT <= (0 => or_reduce(~ARG[0]));
 end block;"
     }
   }
@@ -109,7 +109,7 @@ end block;"
     return result;
   end;
 begin
-  ~RESULT <= xor_reduce(~ARG[0]);
+  ~RESULT <= (0 => xor_reduce(~ARG[0]));
 end block;"
     }
   }
@@ -135,7 +135,7 @@ begin
       ~RESULT <= ~ERRORO;
     else
     -- pragma translate_on
-      ~RESULT <= ~SYM[1](~SYM[2]);
+      ~RESULT <= ~SYM[1](~SYM[2] downto ~SYM[2]);
     -- pragma translate_off
     end if;
   end process;
@@ -170,7 +170,7 @@ begin
       ~SYM[4] := ~ERROR[1];
     else
       -- pragma translate_on
-      ~SYM[4](~SYM[2]) := ~SYM[3];
+      ~SYM[4](~SYM[2] downto ~SYM[2]) := ~SYM[3];
       -- pragma translate_off
     end if;
     -- pragma translate_on
@@ -231,7 +231,8 @@ end block;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0]),~SYM[1](~LIT[0] - 1 downto 0));
+  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left + ~RESULT.~TYPMO_sel1'length downto ~RESULT.~TYPMO_sel0'right + ~RESULT.~TYPMO_sel1'length)
+             ,~SYM[1](~RESULT.~TYPMO_sel1'left downto ~RESULT.~TYPMO_sel1'right));
 end block;"
     }
   }
@@ -247,12 +248,12 @@ end block;"
 begin
   ~SYM[2]_generate : if ~SYM[1]'length = 0 generate
   begin
-    ~RESULT <= '0';
+    ~RESULT <= \"0\";
   end generate;
 
   ~SYM[3]_generate : if ~SYM[1]'length /= 0 generate
     ~SYM[1] <= ~ARG[1];
-    ~RESULT <= ~SYM[1](~SYM[1]'high);
+    ~RESULT <= ~SYM[1](~SYM[1]'high downto ~SYM[1]'high);
   end generate;
 end block;"
     }
@@ -268,13 +269,13 @@ end block;"
 begin
   ~SYM[2]_generate : if ~SYM[1]'length = 0 generate
   begin
-    ~RESULT <= '0';
+    ~RESULT <= \"0\";
   end generate;
 
   ~SYM[3]_generate : if ~SYM[1]'length /= 0 generate
   begin
     ~SYM[1] <= ~ARG[0];
-    ~RESULT <= ~SYM[1](0);
+    ~RESULT <= ~SYM[1](0 downto 0);
   end generate;
 end block;"
     }

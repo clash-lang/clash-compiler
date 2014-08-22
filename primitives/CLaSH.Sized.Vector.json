@@ -53,61 +53,6 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.take"
-    , "comment"   :
-    "take :: SNat m         -- ARG[0]
-          -> Vec (m + n) a  -- ARG[1]
-          -> Vec m a"
-    , "templateD" :
-"~SYM[0]_take : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-
-  ~SYM[2]_takeZ : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  ~SYM[3]_takeSN : if ~RESULT'length /= 0 generate
-    ~RESULT <= ~SYM[1](0 to ~RESULT'high);
-  end generate;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.drop"
-    , "comment"   :
-    "drop :: SNat m         -- ARG[0]
-          -> Vec (m + n) a  -- ARG[1]
-          -> Vec n a"
-    , "templateD" :
-"~SYM[0]_drop : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-
-  ~SYM[2]_dropZ : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  ~SYM[3]_dropSN : if ~RESULT'length /= 0 generate
-    ~RESULT <= ~SYM[1](~LIT[0] to SYM[1]'high);
-  end generate;
-end block;"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.exact"
-    , "templateD" :
-"~SYM[0]_exact : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1](~LIT[0]);
-end block;"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.select"
     , "comment"   :
     "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
@@ -168,7 +113,8 @@ end block;"
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](0 to ~LIT[0]-1),~SYM[1](~LIT[0] to ~SYM[1]'high));
+  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
+             ,~SYM[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));
 end block;"
     }
   }
@@ -340,27 +286,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
-    , "templateE" : "~TYPMO'(others => ~ARG[1])"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.iterate"
-    , "templateD" :
-"~SYM[0]_iterate : for ~SYM[1] in ~RESULT'range generate
-begin
-  ~SYM[2]_iterateZ : if ~SYM[1] = 0 generate
-  begin
-    ~RESULT(~SYM[1]) <= ~ARG[2];
-  end generate;
-
-  ~SYM[3]_iterateSN : if ~SYM[1] /= 0 generate
-  begin
-    ~INST 0
-      ~OUTPUT <= ~RESULT(~SYM[1])~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~RESULT(~SYM[1]-1)~ ~TYPEL[~TYPO]~
-    ~INST
-  end generate;
-end generate;"
+    , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -406,7 +332,7 @@ begin
 
   ~SYM[3]_concatBitVectorSN : if ~RESULT'length /= 0 generate
     ~SYM[4]_concatBitVectorIter : for ~SYM[5] in ~SYM[1]'range generate
-      ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~SYM[1](~SYM[5]);
+      ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[5]));
     end generate;
   end generate;
 end block;"

@@ -141,7 +141,7 @@ genReset (rstName,Reset _) = Just rstDecls
                 , "-- pragma translate_on"
                 ]
 
-    rstDecls = [ NetDecl rstName Bit Nothing
+    rstDecls = [ NetDecl rstName (BitVector 1) Nothing
                , BlackBoxD (PP.displayT $ PP.renderCompact rstExpr)
                ]
 

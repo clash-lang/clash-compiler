@@ -168,7 +168,6 @@ typeSize :: HWType
          -> Int
 typeSize Void = 1
 typeSize Bool = 1
-typeSize Bit  = 1
 typeSize (Clock _) = 1
 typeSize (Reset _) = 1
 typeSize Integer = 32
@@ -277,6 +276,4 @@ preserveVarEnv action = do
 dcToLiteral :: HWType -> Int -> Expr
 dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
 dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit True)
-dcToLiteral Bit 1  = HW.Literal Nothing (BitLit L)
-dcToLiteral Bit 2  = HW.Literal Nothing (BitLit H)
 dcToLiteral t i    = HW.Literal (Just $ conSize t) (NumLit (i-1))
