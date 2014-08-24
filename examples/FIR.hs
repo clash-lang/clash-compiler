@@ -16,4 +16,10 @@ fir coeffs x_t = y_t
     xs  = window x_t
 
 topEntity :: Signal (Signed 16) -> Signal (Signed 16)
-topEntity = fir $(v [0::Signal (Signed 16),1,2,3])
+topEntity = fir $(v [2::Signal (Signed 16),3,-2,8])
+
+testInput :: Signal (Signed 16)
+testInput = stimuliGenerator $(v [2::Signed 16,3,-2,8])
+
+expectedOutput :: Signal (Signed 16) -> Signal Bool
+expectedOutput = outputVerifier $(v [4::Signed 16,12,1,20])
