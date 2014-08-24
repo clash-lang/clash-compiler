@@ -1,3 +1,4 @@
+{-# LANGUAGE MagicHash     #-}
 {-# LANGUAGE TupleSections #-}
 module CLaSH.Signal.Enabled
   ( Enabled
@@ -8,11 +9,11 @@ module CLaSH.Signal.Enabled
   )
 where
 
-import Control.Applicative   (Applicative (..), (<$>), liftA2)
+import Control.Applicative   (liftA2)
 import Control.Arrow         (second)
 
-import CLaSH.Signal.Internal ((&&$),mux)
-import CLaSH.Signal.Explicit (CSignal, SClock, cregister)
+import CLaSH.Signal.Internal ((&&$), mux, register#)
+import CLaSH.Signal.Explicit (CSignal, SClock)
 import CLaSH.Signal.Wrap     (Wrap (..))
 
 type Enabled a = (Bool, a)
@@ -23,9 +24,15 @@ regEn :: SClock clk
       -> CSignal clk a
 regEn clk is s = r
   where
-    r     = cregister clk is d
-    (v,a) = wrap clk s
-    d     = mux v a r
+    (en,a) = wrap clk s
+    r      = regEn# clk is en a
+
+{-# NOINLINE regEn# #-}
+regEn# :: SClock clk -> a -> CSignal clk Bool -> CSignal clk a -> CSignal clk a
+regEn# clk is en s = r
+  where
+    r = register# clk is d
+    d = mux en s r
 
 enabled :: CSignal clk a
         -> CSignal clk (Enabled a)

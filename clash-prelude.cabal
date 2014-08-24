@@ -94,11 +94,9 @@ Library
                       FlexibleContexts
                       GADTs
                       GeneralizedNewtypeDeriving
-                      ImplicitParams
                       KindSignatures
-                      LambdaCase
                       MagicHash
-                      NegativeLiterals
+                      MultiParamTypeClasses
                       ScopedTypeVariables
                       StandaloneDeriving
                       TemplateHaskell

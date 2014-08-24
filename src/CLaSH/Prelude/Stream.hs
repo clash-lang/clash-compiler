@@ -1,13 +1,8 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE TypeOperators       #-}
-
-{-# LANGUAGE Arrows #-}
+ {-# LANGUAGE DataKinds           #-}
+ {-# LANGUAGE FlexibleContexts    #-}
+ {-# LANGUAGE KindSignatures      #-}
+ {-# LANGUAGE ScopedTypeVariables #-}
+ {-# LANGUAGE TypeOperators       #-}
 
 module CLaSH.Prelude.Stream
   ( Stream (..)
@@ -35,42 +30,42 @@ import CLaSH.Sized.Vector    (Vec (..), (++), (!!), (<<+), length)
 
 -- | A simple streaming interface with back-pressure
 --
--- A component adhering to the 'STREAM' interface has three inputs:
+-- A component adhering to the 'Stream' interface has two inputs:
 --
---   * A control input indicating that there the data input contains valid data
 --   * A control input indicating that the component connected to the output is
---     ready to receive new data
---   * The data input
+--     ready to receive new data.
+--   * The data input which is flagged with a bit indicating whether the data
+--     is valid.
 --
 -- It also has three outputs:
 --
---   * A control output indicating that its output is valid
---   * A control output indicating that it is ready to receive new data
---   * The data output
+--   * A control output indicating that it is ready to receive new data.
+--   * The data output which is flagged with a bit indicating whether the data
+--     is valid.
 --
--- When we compose two components adhering to the 'STREAM' interface, the
--- @valid@ and @data@ signals flow from left to right, while the @ready@
--- signals flow from right to left:
+-- When we compose two components adhering to the 'Stream' interface, the
+-- @data@ signals flow from left to right, while the @ready@  signals flow from
+-- right to left:
 --
 -- @
--- (STREAM component1) >>> (STREAM component2) = (STEAM component3)
---   where
---    component3 validIn1 readyIn2 dataIn1 = (validOut2, readyOut1, dataOut2)
---      where
---        (validOut1,readyOut1,dataOut1) = component1 validIn1 readyOut2 dataIn1
---        (validOut2,readyOut2,dataOut2) = component2 validOut1 readyIn2 dataOut1
+--  (Stream f) . (Stream g) = Stream h
+--    where
+--      h clk readyIn dataIn = (gReadyOut,fDataOut)
+--        where
+--          (gReadyOut,gDataOut) = g clk gReadyOut dIn
+--          (fReadyOut,fDataOut) = f clk readyIn gDataOut
 -- @
 --
 -- When viewed as a circuit diagram, @>>>@ looks like:
 --
 -- <<doc/streamcompose.svg>>
 --
--- 'STREAM' is an instance of 'Category', 'Arrow', and 'ArrowLoop', meaning
--- you can define compositions of components adhering to the 'STREAM' inferface
--- using the arrow syntax:
+-- 'Stream' is an instance of 'Category', 'Arrow', 'ArrowLoop', and
+-- 'ArrowChoice' meaning you can define compositions of components adhering to
+-- the 'Stream' inferface using the arrow syntax:
 --
 -- @
--- sequenceAndLoop :: STREAM Int Int
+-- sequenceAndLoop :: Stream clk Int Int
 -- sequenceAndLoop = proc a -> do
 --   rec b     <- component1           -< (a,d)
 --       c     <- component2           -< b
@@ -407,34 +402,3 @@ fifoZeroIC _ ivals = Stream fifo'
                           ( (def :: Vec m a) ++ ivals
                             ,fromInteger (length ivals))
                           queue'
-
--- -- test :: STREAM Int Int
--- -- test = proc a -> do
--- --     rec b <- fifo d3 -< (a,d')
--- --         c <- (arr g) -< b
--- --         d' <- fifoIC d3 (0 :> Nil) -< d
--- --         (d,e) <- fifo d3 -< c
--- --     returnA -< e
--- --   where
--- --     g (p,q) = let z = p + q in (z,z)
-
--- -- sometimesFalseReady :: Signal Ready
--- -- -- sometimesFalseReady = fromList ([False,False] ++ repeat True)
--- -- sometimesFalseReady = fromList ([True,False,False,False] ++ repeat True)
-
--- -- sometimesFalseValid :: Signal Ready
--- -- sometimesFalseValid = fromList (repeat True)
-
--- -- runTest :: [(Int,Maybe Int)]
--- -- runTest = sampleN 50 $ pack (samples, filterValid ((&&) <$> val <*> sometimesFalseReady) dout)
--- --   where
--- --     (val,red,dout) = runSTREAM (fifo d3) sometimesFalseValid sometimesFalseReady samples
--- --     samples        = extendValid ((&&) <$> sometimesFalseValid <*> red) (fromList $ cycle [1..10])
-
--- -- extendValid a b = fromList (f (sample a) (sample b))
--- --   where
--- --     f (p:ps) (q:qs) = q : if p then f ps qs else f ps (q:qs)
-
--- -- filterValid a b = f <$> a <*> b
--- --   where
--- --     f p q = if p then Just q else Nothing
