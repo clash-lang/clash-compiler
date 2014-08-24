@@ -12,6 +12,7 @@ module CLaSH.Sized.BitVector
     -- ** Initialisation
   , high
   , low
+  , bLit
     -- ** Concatenation
   , (++#)
   )

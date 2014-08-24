@@ -21,6 +21,7 @@ module CLaSH.Sized.Internal.BitVector
     -- ** Initialisation
   , high
   , low
+  , bLit
     -- ** Concatenation
   , (++#)
     -- * Reduction
@@ -82,14 +83,17 @@ module CLaSH.Sized.Internal.BitVector
   )
 where
 
-import Data.Default               (Default (..))
 import Data.Bits                  (Bits (..), FiniteBits (..))
+import Data.Char                  (digitToInt)
+import Data.Default               (Default (..))
+import Data.Maybe                 (listToMaybe)
 import Data.Typeable              (Typeable)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
-import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
+import Numeric                    (readInt)
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
@@ -120,6 +124,29 @@ instance KnownNat n => Show (BitVector n) where
                      in  case b of
                            1 -> showBV (n - 1) a ('1':s)
                            _ -> showBV (n - 1) a ('0':s)
+
+-- | Create a binary literal
+--
+-- >>> $$(bLit "1001") :: BitVector 4
+-- 1001
+-- >>> $$(bLit "1001") :: BitVector 3
+-- 001
+--
+-- __NB__: Will be removed once GHC 7.10 is released which has support for
+-- binary literals. Once GHC 7.10 is released you can just write:
+--
+-- >>> 0b1001 :: BitVector 4
+-- 1001
+bLit :: KnownNat n => String -> Q (TExp (BitVector n))
+bLit s = [|| fromInteger# i' ||]
+  where
+    i :: Maybe Integer
+    i = fmap fst . listToMaybe $ (readInt 2 (`elem` "01") digitToInt) s
+
+    i' :: Integer
+    i' = case i of
+           Just j -> j
+           _      -> error "Failed to parse: " s
 
 instance Eq (BitVector n) where
   (==) = eq#
