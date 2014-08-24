@@ -91,7 +91,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Unsigned.mult#"
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.times#"
     , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }

@@ -360,7 +360,7 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.mult#"
+    { "name"      : "CLaSH.Sized.Internal.BitVector.times#"
     , "templateE" : "std_logic_vector(unsigned(~ARG[1]) * unsigned(~ARG[2]))"
     }
   }

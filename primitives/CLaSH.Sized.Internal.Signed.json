@@ -98,7 +98,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.mult#"
+    { "name"      : "CLaSH.Sized.Internal.Signed.times#"
     , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }
