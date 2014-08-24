@@ -82,7 +82,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
-    , "templateE" : "TYMPO'(~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1]))"
+    , "templateE" : "~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1])"
     }
   }
 , { "BlackBox" :
