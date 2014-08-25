@@ -130,7 +130,7 @@ genClock _ = Nothing
 
 genReset :: (Identifier,HWType)
          -> Maybe [Declaration]
-genReset (rstName,Reset _) = Just rstDecls
+genReset (rstName,Reset clk) = Just rstDecls
   where
     rstExpr = PP.vsep
                 [ "-- pragma translate_off"
@@ -141,7 +141,7 @@ genReset (rstName,Reset _) = Just rstDecls
                 , "-- pragma translate_on"
                 ]
 
-    rstDecls = [ NetDecl rstName (BitVector 1) Nothing
+    rstDecls = [ NetDecl rstName (Reset clk) Nothing
                , BlackBoxD (PP.displayT $ PP.renderCompact rstExpr)
                ]
 
