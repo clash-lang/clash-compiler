@@ -423,7 +423,7 @@ expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
     argExprs   = zipWith toSLV argTys es -- (map (expr False) es)
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
-                   n -> [exprLit (Just n) (NumLit 0)]
+                   n -> [exprLit (Just (ty,n)) (NumLit 0)]
     assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
@@ -467,12 +467,19 @@ vectorChain (DataCon (Vector 1 _) (Just _) [e])     = Just [e]
 vectorChain (DataCon (Vector _ _) (Just _) [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
-exprLit :: Maybe Size -> Literal -> VHDLM Doc
-exprLit Nothing   (NumLit i) = integer i
-exprLit (Just sz) (NumLit i) = bits (toBits sz i)
-exprLit _         (BoolLit t) = if t then "true" else "false"
-exprLit _         (BitLit b) = squotes $ bit_char b
-exprLit _         l          = error $ $(curLoc) ++ "exprLit: " ++ show l
+exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc
+exprLit Nothing       (NumLit i)   = integer i
+exprLit (Just (hty,sz)) (NumLit i) = case hty of
+                                       Unsigned _  -> "unsigned'" <> parens blit
+                                       Signed   _  -> "signed'" <> parens blit
+                                       BitVector _ -> "std_logic_vector'" <> parens blit
+                                       _           -> blit
+
+  where
+    blit = bits (toBits sz i)
+exprLit _             (BoolLit t)  = if t then "true" else "false"
+exprLit _             (BitLit b)   = squotes $ bit_char b
+exprLit _             l            = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)
@@ -542,7 +549,7 @@ fromSLV (Vector n elTy)   id_ start _   = tupled (fmap reverse args)
 fromSLV hty               _   _     _   = error $ $(curLoc) ++ "fromSLV: " ++ show hty
 
 dcToExpr :: HWType -> Int -> Expr
-dcToExpr ty i = Literal (Just $ conSize ty) (NumLit (toInteger i))
+dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 
 larrow :: VHDLM Doc
 larrow = "<="

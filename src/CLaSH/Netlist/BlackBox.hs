@@ -176,7 +176,7 @@ mkPrimitive bbEParen nm args ty = do
             let sz = fromInteger i
             in case arg of
               C.Literal (IntegerLiteral j) ->
-                return ((N.Literal (Just sz) (NumLit $ fromInteger j), BitVector sz),[])
+                return ((N.Literal (Just (BitVector sz,sz)) (NumLit $ fromInteger j), BitVector sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- mkBlackBox (pack "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))") bbCtx
@@ -187,7 +187,7 @@ mkPrimitive bbEParen nm args ty = do
             let sz = fromInteger i
             in case arg of
               C.Literal (IntegerLiteral j)
-                | i > 32 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Signed sz),[])
+                | i > 32 -> return ((N.Literal (Just (Signed sz,sz)) (NumLit $ fromInteger j), Signed sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- mkBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
@@ -198,7 +198,7 @@ mkPrimitive bbEParen nm args ty = do
             let sz = fromInteger i
             in case arg of
               C.Literal (IntegerLiteral j)
-                | i > 31 -> return ((N.Literal (Just sz) (NumLit $ fromInteger j), Unsigned sz),[])
+                | i > 31 -> return ((N.Literal (Just (Unsigned sz,sz)) (NumLit $ fromInteger j), Unsigned sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- mkBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx

@@ -276,4 +276,4 @@ preserveVarEnv action = do
 dcToLiteral :: HWType -> Int -> Expr
 dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
 dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit True)
-dcToLiteral t i    = HW.Literal (Just $ conSize t) (NumLit (toInteger i-1))
+dcToLiteral t i    = HW.Literal (Just  (t,conSize t)) (NumLit (toInteger i-1))

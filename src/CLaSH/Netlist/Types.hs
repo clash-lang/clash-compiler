@@ -141,7 +141,7 @@ data Modifier
 
 -- | Expression used in RHS of a declaration
 data Expr
-  = Literal    (Maybe Size) Literal -- ^ Literal expression
+  = Literal    (Maybe (HWType,Size)) Literal -- ^ Literal expression
   | DataCon    HWType       (Maybe Modifier)  [Expr] -- ^ DataCon application
   | Identifier Identifier   (Maybe Modifier) -- ^ Signal reference
   | DataTag    HWType       (Either Expr Expr) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
