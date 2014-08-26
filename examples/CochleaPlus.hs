@@ -60,7 +60,7 @@ sim f s (x:xs) = y : sim f s' xs
 	where
 	  (s',y) = f s x
 -- CLaSH
-c_sim f i = L.take (L.length i) $ simulateP f c_vss
+c_sim f i = L.take (L.length i) $ simulateW f c_vss
 
 c_outp :: [Vec 12 Integer]
 c_outp = c_sim topEntity c_vss
