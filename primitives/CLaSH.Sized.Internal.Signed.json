@@ -46,13 +46,15 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minBound#"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "signed'(~LIT[0]-1 => '1', ~LIT[0]-2 downto 0 => '0')"
+    , "comment2"  : "the quantification with signed gives the array an ascending index"
+    , "templateE" : "signed'(0 => '1', 1 to ~LIT[0]-1 => '0')"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.maxBound#"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "signed'(~LIT[0]-1 => '0', ~LIT[0]-2 downto 0 => '1')"
+    , "comment2"  : "the quantification with signed gives the array an ascending index"
+    , "templateE" : "signed'(0 => '0', 1 to ~LIT[0]-1  => '1')"
     }
   }
 , { "BlackBox" :

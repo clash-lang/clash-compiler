@@ -312,12 +312,14 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
-    , "templateD" : "RESULT <= (others => '0');"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '0');"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.maxBound#"
-    , "templateD" : "~RESULT <= (others => '1');"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '1');"
     }
   }
 , { "BlackBox" :
