@@ -59,6 +59,7 @@ Library
                       CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Mealy
+                      CLaSH.Prelude.Stream
                       CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat
