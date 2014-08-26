@@ -18,19 +18,19 @@ import qualified GHC.Paths
 #endif
 
 -- GHC API
--- import qualified CorePrep
+import qualified CorePrep
 import           CLaSH.GHC.Compat.DynFlags    (dopt_set, dopt_unset)
 import           CLaSH.GHC.Compat.GHC         (defaultErrorHandler)
 import qualified CoreSyn
 import           DynFlags                     (GeneralFlag (..))
 import qualified DynFlags
 import qualified GHC
--- import qualified HscMain
+import qualified HscMain
 import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
 import qualified TidyPgm
--- import qualified TyCons
+import qualified TyCon
 
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -110,16 +110,16 @@ loadModules modName = defaultErrorHandler $ do
                                      ; tcMod <- GHC.typecheckModule pMod
                                      ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod
                                      ; hsc_env <- GHC.getSession
-                                     -- ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
-                                     ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env dsMod
-                                     -- ; let tycons     = HscTypes.cg_tycons tidy_guts
+                                     ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
+                                     ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                      ; let pgm        = HscTypes.cg_binds tidy_guts
                                      -- ; let pgm = HscTypes.mg_binds dsMod
-                                     -- ; let dataTyCons = filter TyCon.isDataTyCon tycons
-                                     -- ; dflags'' <- GHC.getSessionDynFlags
-                                     -- ; prepBinders <- MonadUtils.liftIO $ CorePrep.corePrepPgm dflags'' hsc_env pgm dataTyCons
+                                     ; dflags4 <- GHC.getSessionDynFlags
+                                     ; let tycons     = HscTypes.cg_tycons tidy_guts
+                                     ; let dataTyCons = filter TyCon.isDataTyCon tycons
+                                     ; prepBinders <- MonadUtils.liftIO $ CorePrep.corePrepPgm dflags4 hsc_env pgm dataTyCons
                                      ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
-                                     ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
+                                     ; return (CoreSyn.flattenBinds prepBinders,modFamInstEnv)
                                      }
                              ) modGraph'
 
@@ -154,8 +154,7 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
 wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
 wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwanted
   where
-    wanted = [ Opt_Strictness -- [Wanted?] don't care about strictness
-             , Opt_CSE -- CSE
+    wanted = [ Opt_CSE -- CSE
              , Opt_FullLaziness -- Floats let-bindings outside enclosing lambdas
              , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
              , Opt_DoLambdaEtaExpansion -- We need eta-expansion anyway, so the more GHC does, the better
@@ -164,6 +163,8 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_SimpleListLiterals -- Avoids 'build' rule
              , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
              , Opt_ForceRecomp -- Force recompilation: never bad
+             , Opt_EnableRewriteRules -- Reduce number of functions
+             , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
              ]
 
     unwanted = [ Opt_FloatIn -- Moves let-bindings inwards: defeats the normal-form with a single top-level let-binding
@@ -174,7 +175,6 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
                , Opt_DoEtaReduction -- We want eta-expansion
                , Opt_UnboxStrictFields -- Unboxed types are not handled properly: avoid
                , Opt_UnboxSmallStrictFields -- Unboxed types are not handled properly: avoid
-               , Opt_EnableRewriteRules -- Intermediate data-structures take up no space
                , Opt_Vectorise -- Don't care
                , Opt_VectorisationAvoidance -- Don't care
                , Opt_RegsGraph -- Don't care
@@ -186,6 +186,6 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
                , Opt_OmitYields -- Don't care
                , Opt_IgnoreInterfacePragmas -- We need all the unfoldings we can get
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
-               , Opt_SimplPreInlining -- Does inlining, which destroys function hierarchy: avoid
                , Opt_IrrefutableTuples -- Introduce irrefuntPatError: avoid
+               , Opt_Strictness -- don't care about strictness [Wanted?]
                ]
