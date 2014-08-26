@@ -1,0 +1,33 @@
+module Queens where
+
+import CLaSH.Prelude
+import Data.Maybe
+
+mem <~ (i,x)    = replace mem i x
+
+type Word3 = Unsigned 3
+
+type MbWord3 = Maybe Word3
+type Din     = Vec 8 (MbWord3)
+type Dout    = Vec 8 Word3
+
+din :: Din
+din = $(v [ Nothing :: Maybe (Unsigned 3), Just 1, Nothing, Nothing, Just 4, Nothing, Just 6, Just 7 ])
+
+dout0 :: Dout
+dout0 = 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil :: Dout
+
+ind0 :: Word3
+ind0 = 0
+
+mbfilter (dout,ind) din = ((dout',ind'), low)
+                where
+
+                  f (dout,ind) v = case v of
+                                        Just x  -> (dout<~(ind,x), ind+1)
+                                        Nothing -> (dout, ind)
+
+                  (dout',ind') = foldl f (dout0,ind0) din
+
+topEntity :: SWrapped Din -> Signal Bit
+topEntity = mbfilter <^> (dout0, ind0)
