@@ -11,8 +11,6 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
-{-# OPTIONS_GHC -fexpose-all-unfoldings -fno-strictness #-}
-
 -- | Fixed point numbers
 --
 -- * The 'Num' operators for the given types saturate on overflow,
@@ -157,6 +155,7 @@ type SFixed = Fixed Signed
 -- 14.0
 type UFixed = Fixed Unsigned
 
+{-# INLINE sf #-}
 -- | Treat a 'Signed' integer as a @Signed@ 'Fixed'-@point@ integer
 --
 -- >>> sf d4 (-22 :: Signed 7)
@@ -166,11 +165,13 @@ sf :: SNat frac           -- ^ Position of the virtual @point@
    -> SFixed int frac
 sf _ fRep = Fixed fRep
 
+{-# INLINE unSF #-}
 -- | See the underlying representation of a Signed Fixed-point integer
 unSF :: SFixed int frac
      -> Signed (int + frac)
 unSF (Fixed fRep) = fRep
 
+{-# INLINE uf #-}
 -- | Treat an 'Unsigned' integer as a @Unsigned@ 'Fixed'-@point@ number
 --
 -- >>> uf d4 (92 :: Unsigned 7)
@@ -180,14 +181,17 @@ uf :: SNat frac             -- ^ Position of the virtual @point@
    -> UFixed int frac
 uf _ fRep = Fixed fRep
 
+{-# INLINE unUF #-}
 -- | See the underlying representation of an Unsigned Fixed-point integer
 unUF :: UFixed int frac
      -> Unsigned (int + frac)
 unUF (Fixed fRep) = fRep
 
+{-# INLINE asRepProxy #-}
 asRepProxy :: Fixed rep int frac -> Proxy rep
 asRepProxy _ = Proxy
 
+{-# INLINE asIntProxy #-}
 asIntProxy :: Fixed rep int frac -> Proxy int
 asIntProxy _ = Proxy
 
@@ -424,6 +428,7 @@ type ResizeSFC int1 frac1 int2 frac2
 type ResizeUFC int1 frac1 int2 frac2 =
      ResizeSFC int1 frac1 int2 frac2
 
+{-# INLINE resizeF #-}
 -- | Saturating resize operation, truncates for rounding
 --
 -- >>> $$(fLit 0.8125) :: SFixed 3 4
