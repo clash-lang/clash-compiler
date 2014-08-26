@@ -468,7 +468,7 @@ vectorChain (DataCon (Vector _ _) (Just _) [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe Size -> Literal -> VHDLM Doc
-exprLit Nothing   (NumLit i) = int i
+exprLit Nothing   (NumLit i) = integer i
 exprLit (Just sz) (NumLit i) = bits (toBits sz i)
 exprLit _         (BoolLit t) = if t then "true" else "false"
 exprLit _         (BitLit b) = squotes $ bit_char b
@@ -542,7 +542,7 @@ fromSLV (Vector n elTy)   id_ start _   = tupled (fmap reverse args)
 fromSLV hty               _   _     _   = error $ $(curLoc) ++ "fromSLV: " ++ show hty
 
 dcToExpr :: HWType -> Int -> Expr
-dcToExpr ty i = Literal (Just $ conSize ty) (NumLit i)
+dcToExpr ty i = Literal (Just $ conSize ty) (NumLit (toInteger i))
 
 larrow :: VHDLM Doc
 larrow = "<="

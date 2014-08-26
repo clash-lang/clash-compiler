@@ -157,7 +157,7 @@ mkPrimitive bbEParen nm args ty = do
               return ((Identifier tmpS Nothing,hwTy),netDecl:netAssign:scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
       | pNm == "GHC.Prim.dataToTag#" -> case args of
-          [Right _,Left (Data dc)] -> return ((N.Literal Nothing (NumLit $ dcTag dc - 1),Integer),[])
+          [Right _,Left (Data dc)] -> return ((N.Literal Nothing (NumLit $ toInteger $ dcTag dc - 1),Integer),[])
           [Right _,Left scrut] -> do
             i <- varCount <<%= (+1)
             tcm      <- Lens.use tcCache

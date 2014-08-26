@@ -150,7 +150,7 @@ data Expr
 
 -- | Literals used in an expression
 data Literal
-  = NumLit  Int -- ^ Number literal
+  = NumLit  Integer -- ^ Number literal
   | BitLit  Bit -- ^ Bit literal
   | BoolLit Bool -- ^ Boolean literal
   | VecLit  [Literal] -- ^ Vector literal
