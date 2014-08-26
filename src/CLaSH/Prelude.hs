@@ -48,6 +48,7 @@ module CLaSH.Prelude
     -- *** Arbitrary-width numbers
   , module CLaSH.Sized.Signed
   , module CLaSH.Sized.Unsigned
+  , module CLaSH.Sized.Index
     -- *** Fixed point numbers
   , module CLaSH.Sized.Fixed
     -- *** Fixed size vectors
@@ -101,6 +102,7 @@ import CLaSH.Promoted.Nat.Literals
 import CLaSH.Promoted.Ord
 import CLaSH.Sized.BitVector
 import CLaSH.Sized.Fixed
+import CLaSH.Sized.Index
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector
