@@ -41,7 +41,7 @@ import CLaSH.Prelude.Testbench (csassert, cstimuliGenerator, coutputVerifier)
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 
-{-# INLINABLE cregisterP #-}
+{-# INLINE cregisterP #-}
 -- | Create a 'register' function for product-type like signals (e.g.
 -- '(Signal a, Signal b)')
 --

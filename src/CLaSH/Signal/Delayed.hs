@@ -30,7 +30,7 @@ import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, replicate)
 
-import CLaSH.Promoted.Nat         (SNat, snatToInteger, withSNat)
+import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, withSNat)
 import CLaSH.Sized.Vector         (head, replicate, shiftInAt0, singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
@@ -91,7 +91,7 @@ dsignal a = coerce (signal# a)
 --
 -- >>> dsampleN 6 (delay3 (dfromList [1..]))
 -- [0,0,0,1,2,3]
-delay :: forall a n m . (Default a, KnownNat m)
+delay :: forall a n m . Default a
       => SNat m -- ^ Number of periods, @m@, to delay the signal
       -> DSignal (n - m) a
       -> DSignal n a
@@ -99,10 +99,11 @@ delay m ds = coerce (delay' (coerce ds))
   where
     delay' :: Signal a -> Signal a
     delay' s = case snatToInteger m of
-                 0 -> s
-                 _ -> let (r',o) = shiftInAt0 (sWrap r) (singleton s)
-                          r      = register (replicate m def) (sUnwrap r')
-                      in  head o
+      0 -> s
+      _ -> case m of
+             SNat _ -> let (r',o) = shiftInAt0 (sWrap r) (singleton s)
+                           r      = register (replicate m def) (sUnwrap r')
+                       in  head o
 
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
 --

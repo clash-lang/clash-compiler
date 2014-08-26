@@ -33,6 +33,7 @@ type Signal a = CSignal SystemClock a
 
 -- * Basic circuit functions
 
+{-# INLINE signal #-}
 -- | Create a constant 'Signal' from a combinational value
 --
 -- >>> sample (signal 4)
@@ -40,6 +41,7 @@ type Signal a = CSignal SystemClock a
 signal :: a -> Signal a
 signal = signal#
 
+{-# INLINE register #-}
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
 --
@@ -54,6 +56,7 @@ register = register# systemClock
 -- product type of 'Signal's.
 type SWrapped a = Wrapped SystemClock a
 
+{-# INLINE sWrap #-}
 -- | Example:
 --
 -- > sWrap :: Signal (a,b) -> (Signal a, Signal b)
@@ -64,6 +67,7 @@ type SWrapped a = Wrapped SystemClock a
 sWrap :: Wrap a => Signal a -> SWrapped a
 sWrap = wrap systemClock
 
+{-# INLINE sUnwrap #-}
 -- | Example:
 --
 -- > sUnwrap :: (Signal a, Signal b) -> Signal (a,b)

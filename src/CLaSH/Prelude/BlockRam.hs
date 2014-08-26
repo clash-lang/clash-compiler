@@ -13,7 +13,7 @@ import CLaSH.Signal.Wrap      (Wrap, unwrap)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, (!!), replace)
 
-{-# INLINABLE blockRam #-}
+{-# INLINE blockRam #-}
 -- | Create a blockRAM with space for @n@ elements.
 --
 -- * __NB__: Read value is delayed by 1 cycle
@@ -36,7 +36,7 @@ blockRam :: (Wrap a, KnownNat n, KnownNat m)
          -- cycle
 blockRam = cblockRam systemClock
 
-{-# INLINABLE blockRamPow2 #-}
+{-# INLINE blockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
@@ -95,7 +95,7 @@ cblockRam clk binit wr rd en din =
              | otherwise = ram
         o'               = ram !! r
 
-{-# INLINABLE cblockRamPow2 #-}
+{-# INLINE cblockRamPow2 #-}
 -- | Create a blockRAM with space for 2^@n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle

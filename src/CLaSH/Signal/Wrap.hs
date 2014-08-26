@@ -44,6 +44,7 @@ class Wrap a where
   -- > unwrap :: CSignal clk Bit -> CSignal clk Bit
   unwrap :: SClock clk -> Wrapped clk a -> CSignal clk a
 
+  {-# INLINE unwrap #-}
   default unwrap :: SClock clk ->  CSignal clk a -> CSignal clk a
   unwrap _ s = s
   -- | Example:
@@ -55,6 +56,7 @@ class Wrap a where
   -- > wrap :: CSignal clk Bit -> CSignal clk Bit
   wrap :: SClock clk -> CSignal clk a -> Wrapped clk a
 
+  {-# INLINE wrap #-}
   default wrap :: SClock clk -> CSignal clk a -> CSignal clk a
   wrap _ s = s
 
@@ -160,8 +162,7 @@ instance KnownNat n => Wrap (Vec n a) where
   wrap   = vecWrap#
 
 {-# NOINLINE vecUnwrap# #-}
-vecUnwrap# :: KnownNat n => SClock t -> Vec n (CSignal t a)
-           -> CSignal t (Vec n a)
+vecUnwrap# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
 vecUnwrap# _ = sequenceA
 
 {-# NOINLINE vecWrap# #-}

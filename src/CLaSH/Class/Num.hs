@@ -58,15 +58,18 @@ class (Bounded a, Num a) => SaturatingNum a where
   -- | Multiplication with parametrisable over- and underflow behaviour
   satMult :: SaturationMode -> a -> a -> a
 
+{-# INLINE boundedPlus #-}
 -- | Addition that clips to 'maxBound' on overflow, and 'minBound' on underflow
 boundedPlus :: SaturatingNum a => a -> a -> a
 boundedPlus = satPlus SatBound
 
+{-# INLINE boundedMin #-}
 -- | Subtraction that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
 boundedMin  :: SaturatingNum a => a -> a -> a
 boundedMin = satMin SatBound
 
+{-# INLINE boundedMult #-}
 -- | Multiplication that clips to 'maxBound' on overflow, and 'minBound' on
 -- underflow
 boundedMult :: SaturatingNum a => a -> a -> a
