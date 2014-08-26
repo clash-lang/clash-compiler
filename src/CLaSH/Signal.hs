@@ -13,7 +13,7 @@ module CLaSH.Signal
   , sWrap
     -- * Simulation functions (not synthesisable)
   , simulate
-  , simulateP
+  , simulateW
     -- * List \<-\> Signal conversion (not synthesisable)
   , sample
   , sampleN
@@ -93,12 +93,12 @@ simulate f = sample . f . fromList
 -- | Simulate a (@'Wrapped' a -> 'Wrapped' b@) function given a list of samples
 -- of type @a@
 --
--- >>> simulateP (wrap . register (8,8) . unwrap) [(1,1), (2,2), (3,3), ...
+-- >>> simulateW (wrap . register (8,8) . unwrap) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
 --
 -- __NB__: This function is not synthesisable
-simulateP :: (Wrap a, Wrap b) => (SWrapped a -> SWrapped b) -> [a] -> [b]
-simulateP f = simulate (sUnwrap . f . sWrap)
+simulateW :: (Wrap a, Wrap b) => (SWrapped a -> SWrapped b) -> [a] -> [b]
+simulateW f = simulate (sUnwrap . f . sWrap)
 
 -- * List \<-\> Signal conversion (not synthesisable)
 

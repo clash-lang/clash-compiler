@@ -23,7 +23,7 @@ module CLaSH.Signal.Explicit
   , Wrap (..)
     -- * Simulation functions (not synthesisable)
   , csimulate
-  , csimulateP
+  , csimulateW
     -- * List \<-\> CSignal conversion (not synthesisable)
   , csample
   , csampleN
@@ -253,16 +253,16 @@ csimulate f = csample . f . cfromList
 -- > clkA100 :: SClock ClkA
 -- > clkA100 = sclock
 --
--- >>> csimulateP clkA100 clkA100 (cunpack clkA100 . cregister clkA100 (8,8) . cpack clkA100) [(1,1), (2,2), (3,3), ...
+-- >>> csimulateW clkA100 clkA100 (cunpack clkA100 . cregister clkA100 (8,8) . cpack clkA100) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
 --
 -- __NB__: This function is not synthesisable
-csimulateP :: (Wrap a, Wrap b)
+csimulateW :: (Wrap a, Wrap b)
            => SClock clk1 -- ^ 'Clock' of the incoming signal
            -> SClock clk2 -- ^ 'Clock' of the outgoing signal
            -> (Wrapped clk1 a -> Wrapped clk2 b) -- ^ Function to simulate
            -> [a] -> [b]
-csimulateP clk1 clk2 f = csimulate (unwrap clk2 . f . wrap clk1)
+csimulateW clk1 clk2 f = csimulate (unwrap clk2 . f . wrap clk1)
 
 -- * List \<-\> CSignal conversion
 

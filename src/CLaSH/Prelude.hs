@@ -26,7 +26,7 @@
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
     (<^>)
-  , registerP
+  , registerW
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
@@ -92,7 +92,7 @@ import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
-import CLaSH.Prelude.Explicit      (cregisterP, cwindow, cwindowD)
+import CLaSH.Prelude.Explicit      (cregisterW, cwindow, cwindowD)
 import CLaSH.Prelude.Mealy         ((<^>))
 import CLaSH.Prelude.Testbench     (sassert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat
@@ -113,7 +113,7 @@ import CLaSH.Signal.Explicit       (systemClock)
 -- > window4 :: Signal Int -> Vec 4 (Signal Int)
 -- > window4 = window
 --
--- >>> simulateP window4 [1,2,3,4,5,...
+-- >>> simulateW window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
 window :: (KnownNat n, Default a)
        => Signal a                -- ^ Signal to create a window over
@@ -126,20 +126,20 @@ window = cwindow systemClock
 -- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
 -- > windowD3 = windowD
 --
--- >>> simulateP windowD3 [1,2,3,4,...
+-- >>> simulateW windowD3 [1,2,3,4,...
 -- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
 windowD :: (KnownNat (n + 1), Default a)
         => Signal a               -- ^ Signal to create a window over
         -> Vec (n + 1) (Signal a) -- ^ Window of at least size 1
 windowD = cwindowD systemClock
 
-{-# INLINE registerP #-}
+{-# INLINE registerW #-}
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
 -- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
--- > rP = registerP (8,8)
+-- > rP = registerW (8,8)
 --
--- >>> simulateP rP [(1,1),(2,2),(3,3),...
+-- >>> simulateW rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-registerP :: Wrap a => a -> SWrapped a -> SWrapped a
-registerP = cregisterP systemClock
+registerW :: Wrap a => a -> SWrapped a -> SWrapped a
+registerW = cregisterW systemClock
