@@ -18,7 +18,6 @@ import qualified GHC.Paths
 #endif
 
 -- GHC API
-import qualified CorePrep
 import           CLaSH.GHC.Compat.DynFlags    (dopt_set, dopt_unset)
 import           CLaSH.GHC.Compat.GHC         (defaultErrorHandler)
 import qualified CoreSyn
@@ -30,7 +29,6 @@ import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
 import qualified TidyPgm
-import qualified TyCon
 
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -113,12 +111,8 @@ loadModules modName = defaultErrorHandler $ do
                                      ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
                                      ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                      ; let pgm        = HscTypes.cg_binds tidy_guts
-                                     ; dflags4 <- GHC.getSessionDynFlags
-                                     ; let tycons     = HscTypes.cg_tycons tidy_guts
-                                     ; let dataTyCons = filter TyCon.isDataTyCon tycons
-                                     ; prepBinders <- MonadUtils.liftIO $ CorePrep.corePrepPgm dflags4 hsc_env pgm dataTyCons
                                      ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
-                                     ; return (CoreSyn.flattenBinds prepBinders,modFamInstEnv)
+                                     ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
                                      }
                              ) modGraph'
 
@@ -164,6 +158,7 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_ForceRecomp -- Force recompilation: never bad
              , Opt_EnableRewriteRules -- Reduce number of functions
              , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
+             , Opt_Strictness -- don't care about strictness [Wanted?]
              ]
 
     unwanted = [ Opt_FloatIn -- Moves let-bindings inwards: defeats the normal-form with a single top-level let-binding
@@ -186,5 +181,4 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
                , Opt_IgnoreInterfacePragmas -- We need all the unfoldings we can get
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
                , Opt_IrrefutableTuples -- Introduce irrefuntPatError: avoid
-               , Opt_Strictness -- don't care about strictness [Wanted?]
                ]
