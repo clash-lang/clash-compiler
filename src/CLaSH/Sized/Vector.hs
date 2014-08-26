@@ -58,7 +58,7 @@ import Prelude                    hiding ((++), (!!), concat, drop, foldl,
 import qualified Prelude          as P
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Promoted.Nat         (SNat, UNat (..), withSNat, toUNat)
+import CLaSH.Promoted.Nat         (SNat (..), UNat (..), withSNat, toUNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
 
 -- | Fixed size vectors
@@ -813,8 +813,8 @@ repeat = withSNat replicate
 --
 -- >>> iterate d4 (+1) 1
 -- <1,2,3,4>
-iterate :: KnownNat n => SNat n -> (a -> a) -> a -> Vec n a
-iterate _ = iterateI
+iterate :: SNat n -> (a -> a) -> a -> Vec n a
+iterate (SNat _) = iterateI
 
 {-# INLINE iterateI #-}
 -- | 'iterate' @f x@ returns a vector starting with @x@ followed by @n@
@@ -839,8 +839,8 @@ iterateI f a = xs
 --
 -- >>> generate d4 (+1) 1
 -- <2,3,4,5>
-generate :: KnownNat n => SNat n -> (a -> a) -> a -> Vec n a
-generate _ f a = iterateI f (f a)
+generate :: SNat n -> (a -> a) -> a -> Vec n a
+generate (SNat _) f a = iterateI f (f a)
 
 {-# INLINE generateI #-}
 -- | 'generate' @f x@ returns a vector with @n@ repeated applications of @f@
