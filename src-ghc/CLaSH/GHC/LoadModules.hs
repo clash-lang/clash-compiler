@@ -113,7 +113,6 @@ loadModules modName = defaultErrorHandler $ do
                                      ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
                                      ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                      ; let pgm        = HscTypes.cg_binds tidy_guts
-                                     -- ; let pgm = HscTypes.mg_binds dsMod
                                      ; dflags4 <- GHC.getSessionDynFlags
                                      ; let tycons     = HscTypes.cg_tycons tidy_guts
                                      ; let dataTyCons = filter TyCon.isDataTyCon tycons
