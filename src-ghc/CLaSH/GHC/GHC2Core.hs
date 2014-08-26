@@ -522,40 +522,35 @@ appSignalTerm ty = error $ $(curLoc) ++ show ty
 -- | Given the type:
 --
 -- @
--- forall n.forall t.forall a.KnownNat n => SClock t -> Vec n (CSignal t a) ->
+-- forall t.forall n.forall a.SClock t -> Vec n (CSignal t a) ->
 -- CSignal t (Vec n a)
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(n:Nat)./\(t:Clock)./\(a:*).\(dict:KnownNat n).\(sclk:SClock t).
--- \(vs:CSignal (Vec n a)).vs
+-- /\(t:Clock)./\(n:Nat)./\(a:*).\(sclk:SClock t).\(vs:CSignal (Vec n a)).vs
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
-vecUnwrapTerm (C.ForAllTy tvNTy) =
-    C.TyLam (bind nTV (
+vecUnwrapTerm (C.ForAllTy tvTTy) =
     C.TyLam (bind tTV (
+    C.TyLam (bind nTV (
     C.TyLam (bind aTV (
-    C.Lam   (bind dictId (
     C.Lam   (bind sclkId (
     C.Lam   (bind vsId (
-    C.Var vsTy vsName))))))))))))
+    C.Var vsTy vsName))))))))))
   where
-    (nTV,tTV,aTV,funTy) = runFreshM $ do
-      { (nTV',C.ForAllTy tvTTy) <- unbind tvNTy
-      ; (tTV',C.ForAllTy tvATy) <- unbind tvTTy
+    (tTV,nTV,aTV,funTy) = runFreshM $ do
+      { (tTV',C.ForAllTy tvNTy) <- unbind tvTTy
+      ; (nTV',C.ForAllTy tvATy) <- unbind tvNTy
       ; (aTV',funTy')           <- unbind tvATy
-      ; return (nTV',tTV',aTV',funTy')
+      ; return (tTV',nTV',aTV',funTy')
       }
-    (C.FunTy dictTy funTy'') = C.tyView funTy
-    (C.FunTy sclkTy funTy3)  = C.tyView funTy''
-    (C.FunTy _ vsTy)         = C.tyView funTy3
-    dictName = string2Name "dict"
+    (C.FunTy sclkTy funTy'') = C.tyView funTy
+    (C.FunTy _ vsTy)         = C.tyView funTy''
     sclkName = string2Name "sclk"
     vsName   = string2Name "vs"
-    dictId   = C.Id dictName (embed dictTy)
     sclkId   = C.Id sclkName (embed sclkTy)
     vsId     = C.Id vsName   (embed vsTy)
 

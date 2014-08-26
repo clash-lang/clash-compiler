@@ -2,13 +2,13 @@ module FIR where
 
 import CLaSH.Prelude
 
-dotp :: (KnownNat n, Num a)
+dotp :: Num a
      => Vec n a
      -> Vec n a
      -> a
 dotp as bs = foldl (+) 0 (zipWith (*) as bs)
 
-fir :: (Default a, KnownNat n, KnownNat (n + 1), Num a)
+fir :: (Default a, KnownNat n, Num a)
     => Vec (n + 1) (Signal a) -> Signal a -> Signal a
 fir coeffs x_t = y_t
   where
