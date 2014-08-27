@@ -18,10 +18,39 @@ module CLaSH.Signal
   , sample
   , sampleN
   , fromList
+    -- * Type classes
+    -- ** 'Eq'-like
+  , (==&), (/=&)
+    -- ** 'Ord'-like
+  , compare1, (<&), (<=&), (>=&), (>&)
+    -- ** 'Enum'-like
+  , fromEnum1
+    -- ** 'Rational'-like
+  , toRational1
+    -- ** 'Integral'-like
+  , toInteger1
+    -- ** 'Bits'-like
+  , testBit1
+  , popCount1
+  , shift1
+  , rotate1
+  , setBit1
+  , clearBit1
+  , shiftL1
+  , unsafeShiftL1
+  , shiftR1
+  , unsafeShiftR1
+  , rotateL1
+  , rotateR1
   )
 where
 
-import CLaSH.Signal.Internal  (CSignal, register#, signal#)
+import CLaSH.Signal.Internal  (CSignal, register#, signal#, (==&), (/=&),
+                               compare1, (<&), (<=&), (>=&), (>&), fromEnum1,
+                               toRational1, toInteger1, testBit1, popCount1,
+                               shift1, rotate1, setBit1, clearBit1, shiftL1,
+                               unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
+                               rotateR1)
 import CLaSH.Signal.Explicit  (SystemClock, cfromList, csample, csampleN,
                                systemClock)
 import CLaSH.Signal.Wrap      (Wrap (..), Wrapped)

@@ -88,8 +88,11 @@ import CLaSH.Sized.Unsigned       (Unsigned)
 newtype Fixed (rep :: Nat -> *) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
 
-deriving instance Eq (rep (int + frac))   => Eq (Fixed rep int frac)
-deriving instance Ord (rep (int + frac))  => Ord (Fixed rep int frac)
+deriving instance Eq (rep (int + frac))      => Eq (Fixed rep int frac)
+deriving instance Ord (rep (int + frac))     => Ord (Fixed rep int frac)
+deriving instance Enum (rep (int + frac))    => Enum (Fixed rep int frac)
+deriving instance Bounded (rep (int + frac)) => Bounded (Fixed rep int frac)
+deriving instance Default (rep (int + frac)) => Default (Fixed rep int frac)
 
 -- | Instance functions do not saturate.
 -- Meaning that \"@`'shiftL'` 1 == 'satMult' 'SatWrap' 2'@\""
@@ -395,13 +398,6 @@ decFixed r i f = do
                             , litT (numTyLit i)
                             , litT (numTyLit f)
                             ]
-
-instance Default (rep (int + frac)) => Default (Fixed rep int frac) where
-  def = Fixed def
-
-instance Bounded (rep (int + frac)) => Bounded (Fixed rep int frac) where
-  minBound = Fixed minBound
-  maxBound = Fixed maxBound
 
 -- | Constraint for the 'resizeF' function
 type ResizeFC rep int1 frac1 int2 frac2

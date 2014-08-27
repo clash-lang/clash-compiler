@@ -394,7 +394,9 @@ map f (x :> xs) = f x :> map f xs
 --
 -- > zipWith f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) == (f x1 y1 :> f x2 y2 :> ... :> f xn yn :> Nil)
 --
--- __NB:__ 'zipWith' is /strict/ in its second argument, and /lazy/ in its third.
+-- __NB:__ 'zipWith' is /strict/ in its second argument, and /lazy/ in its
+-- third. This matters when 'zipWith' is used in a recursive setting. See
+-- 'lazyV' for more information.
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil       _  = Nil
 zipWith f (x :> xs) ys = f x (head ys) :> zipWith f xs (tail ys)
@@ -902,11 +904,13 @@ asNatProxy _ = Proxy
 --
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
 --
--- > sortVL xs = map fst sorted <: (snd (last sorted))
--- >  where
--- >    lefts  = head xs :> map snd (init sorted)
--- >    rights = tail xs
--- >    sorted = zipWith compareSwapL (lazyV lefts) rights
+-- @
+-- sortVL xs = map fst sorted <: (snd (last sorted))
+--  where
+--    lefts  = head xs :> map snd (init sorted)
+--    rights = tail xs
+--    sorted = zipWith compareSwapL ('lazyV' lefts) rights
+-- @
 --
 -- Results in a successful computation:
 --
@@ -916,13 +920,15 @@ asNatProxy _ = Proxy
 -- __NB__: There is also a solution using 'flip', but it slightly obfuscates the
 -- meaning of the code:
 --
--- > sortV_flip xs = map fst sorted <: (snd (last sorted))
--- >  where
--- >    lefts  = head xs :> map snd (init sorted)
--- >    rights = tail xs
--- >    sorted = zipWith (flip compareSwapL) rights lefts
+-- @
+-- sortV_flip xs = map fst sorted <: (snd (last sorted))
+--  where
+--    lefts  = head xs :> map snd (init sorted)
+--    rights = tail xs
+--    sorted = zipWith ('flip' compareSwapL) rights lefts
+-- @
 --
--- >> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
+-- >>> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
 -- <1,2,3,4>
 lazyV :: KnownNat n
       => Vec n a

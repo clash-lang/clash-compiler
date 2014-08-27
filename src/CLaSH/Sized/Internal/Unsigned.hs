@@ -65,7 +65,7 @@ module CLaSH.Sized.Internal.Unsigned
   )
 where
 
-import Data.Bits                      (Bits (..))
+import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
 import Data.Typeable                  (Typeable)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
@@ -335,13 +335,14 @@ rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
 popCount# :: Unsigned n -> Int
 popCount# (U i) = popCount i
 
--- | A resize operation that zero-extends on extension, and wraps on truncation.
---
--- Increasing the size of the number extends with zeros to the left.
--- Truncating a number of length N to a length L just removes the left
--- (most significant) N-L bits.
+instance KnownNat n => FiniteBits (Unsigned n) where
+  finiteBitSize = size#
+
 instance Resize Unsigned where
-  resize = resize#
+  resize     = resize#
+  zeroExtend = resize#
+  signExtend = resize#
+  truncateB  = resize#
 
 {-# NOINLINE resize# #-}
 resize# :: KnownNat m => Unsigned n -> Unsigned m

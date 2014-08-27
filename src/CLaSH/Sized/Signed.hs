@@ -1,6 +1,5 @@
 module CLaSH.Sized.Signed
   ( Signed
-  , resize_wrap
   )
 where
 

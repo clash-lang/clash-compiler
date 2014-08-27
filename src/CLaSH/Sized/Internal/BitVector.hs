@@ -23,8 +23,6 @@ module CLaSH.Sized.Internal.BitVector
   , high
   , low
     -- ** Concatenation
-  , (#>)
-  , (<#)
   , (++#)
     -- * Reduction
   , reduceAnd#
@@ -87,7 +85,7 @@ module CLaSH.Sized.Internal.BitVector
 where
 
 import Data.Default               (Default (..))
-import Data.Bits                  (Bits (..))
+import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Typeable              (Typeable)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
@@ -284,6 +282,9 @@ instance KnownNat n => Bits (BitVector n) where
   rotateR v i       = rotateR# v i
   popCount          = popCount#
 
+instance KnownNat n => FiniteBits (BitVector n) where
+  finiteBitSize = size#
+
 {-# NOINLINE reduceAnd# #-}
 reduceAnd# :: (KnownNat n) => BitVector n -> BitVector 1
 reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
@@ -367,18 +368,6 @@ low :: Bit
 low = BV 0
 
 -- ** Concatenation
-{-# INLINABLE (#>) #-}
-infixr 5 #>
--- | Prepend a 'Bit'
-(#>) :: KnownNat n => Bit -> BitVector n -> BitVector (1 + n)
-(#>) = (++#)
-
-{-# INLINABLE (<#) #-}
-infixl 5 <#
--- | Append a 'Bit'
-(<#) :: BitVector n -> Bit -> BitVector (n + 1)
-(<#) = (++#)
-
 {-# NOINLINE (++#) #-}
 -- | Concatenate two 'BitVector's
 (++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)
@@ -475,13 +464,11 @@ rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
 popCount# :: BitVector n -> Int
 popCount# (BV i) = popCount i
 
--- | A resize operation that zero-extends on extension.
---
--- Increasing the size of the BitVector extends with zeros to the left.
--- Truncating a BitVector of length N to a length L just removes the left
--- (most significant) N-L bits.
 instance Resize BitVector where
-  resize = resize#
+  resize     = resize#
+  zeroExtend = resize#
+  signExtend = resize#
+  truncateB  = resize#
 
 {-# NOINLINE resize# #-}
 resize# :: KnownNat m => BitVector n -> BitVector m

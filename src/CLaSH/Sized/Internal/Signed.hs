@@ -65,13 +65,13 @@ module CLaSH.Sized.Internal.Signed
   , popCount#
     -- ** Resize
   , resize#
-  , resize_wrap
+  , truncateB#
     -- ** SaturatingNum
   , minBoundSym#
   )
 where
 
-import Data.Bits                      (Bits (..))
+import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
 import Data.Typeable                  (Typeable)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
@@ -85,7 +85,7 @@ import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), (#>), high, low)
+import CLaSH.Sized.Internal.BitVector (BitVector (..), (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
@@ -350,40 +350,36 @@ popCount# s@(S i) = popCount i'
     maxI = 2 ^ natVal s
     i'   = i `mod` maxI
 
--- | A sign-preserving resize operation
---
--- Increasing the size of the number replicates the sign bit to the left.
--- Truncating a number to length L keeps the sign bit and the rightmost L-1
--- bits.
+instance KnownNat n => FiniteBits (Signed n) where
+  finiteBitSize = size#
+
 instance Resize Signed where
-  resize = resize#
+  resize       = resize#
+  extend       = resize#
+  zeroExtend s = unpack# (0 ++# pack s)
+  signExtend   = resize#
+  truncateB    = truncateB#
 
 {-# NOINLINE resize# #-}
 resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m
-resize# s@(S i) | n <= m    = extend
-                | otherwise = trunc
+resize# s@(S i) | n <= m    = extended
+                | otherwise = truncated
   where
     n = fromInteger (natVal s)
-    m = fromInteger (natVal extend)
+    m = fromInteger (natVal extended)
 
-    extend = fromInteger_INLINE i
+    extended = fromInteger_INLINE i
 
-    mask  = (2 ^ (m - 1)) - 1
-    sign  = 2 ^ (m - 1)
-    i'    = i .&. mask
-    trunc = if testBit i (n - 1)
-               then fromInteger_INLINE (i' .|. sign)
-               else fromInteger_INLINE i'
+    mask      = (2 ^ (m - 1)) - 1
+    sign      = 2 ^ (m - 1)
+    i'        = i .&. mask
+    truncated = if testBit i (n - 1)
+                   then fromInteger_INLINE (i' .|. sign)
+                   else fromInteger_INLINE i'
 
-{-# NOINLINE resize_wrap #-}
--- | A resize operation that is sign-preserving on extension, but wraps on
--- truncation.
---
--- Increasing the size of the number replicates the sign bit to the left.
--- Truncating a number of length N to a length L just removes the leftmost
--- N-L bits.
-resize_wrap :: KnownNat m => Signed n -> Signed m
-resize_wrap (S n) = fromInteger_INLINE n
+{-# NOINLINE truncateB# #-}
+truncateB# :: KnownNat m => Signed (n + m) -> Signed m
+truncateB# (S n) = fromInteger_INLINE n
 
 instance KnownNat n => Default (Signed n) where
   def = fromInteger# 0
@@ -414,7 +410,7 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
   satMin SatWrap a b = a -# b
   satMin w a b = case msb r `xor` msb r' of
                      0 -> unpack# r'
-                     _ -> case msb a #> msb b of
+                     _ -> case msb a ++# msb b of
                             2 -> case w of
                                    SatBound     -> minBound#
                                    SatSymmetric -> minBoundSym#
@@ -439,8 +435,8 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
                                    SatSymmetric -> minBoundSym#
                                    _            -> fromInteger# 0
     where
-      overflow = complement (reduceOr (msb rR #> pack rL)) .|.
-                            reduceAnd (msb rR #> pack rL)
+      overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                            reduceAnd (msb rR ++# pack rL)
       r        = mult# a b
       (rL,rR)  = split r
 

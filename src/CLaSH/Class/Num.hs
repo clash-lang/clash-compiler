@@ -1,6 +1,6 @@
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies          #-}
 module CLaSH.Class.Num
   ( -- * Arithmetic functions for arguments and results of different precision
     Add (..)

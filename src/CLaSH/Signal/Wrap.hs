@@ -156,15 +156,11 @@ instance Wrap (a,b,c,d,e,f,g,h) where
 
 instance KnownNat n => Wrap (Vec n a) where
   type Wrapped t (Vec n a) = Vec n (CSignal t a)
-  -- The 'Traversable' instances of both 'Vec' and 'CSignal' are not
-  -- synthesisable, so we must define these two functions as primitives.
+  -- The 'Traversable' instance of 'Vec' is not synthesisable, so we must
+  -- define 'unwrap' as a primitive.
   unwrap = vecUnwrap#
-  wrap   = vecWrap#
+  wrap _ = sequenceA
 
 {-# NOINLINE vecUnwrap# #-}
 vecUnwrap# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
 vecUnwrap# _ = sequenceA
-
-{-# NOINLINE vecWrap# #-}
-vecWrap# :: KnownNat n => SClock t -> CSignal t (Vec n a) -> Vec n (CSignal t a)
-vecWrap# _ = sequenceA

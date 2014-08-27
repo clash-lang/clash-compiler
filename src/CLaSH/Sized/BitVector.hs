@@ -13,8 +13,6 @@ module CLaSH.Sized.BitVector
   , high
   , low
     -- ** Concatenation
-  , (#>)
-  , (<#)
   , (++#)
   )
 where
