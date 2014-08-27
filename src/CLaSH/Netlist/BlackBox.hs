@@ -20,6 +20,7 @@ import           Data.List                     (partition)
 import           Data.Maybe                    (catMaybes, fromJust)
 import           Data.Monoid                   (mconcat)
 import           Data.Text.Lazy                (Text, fromStrict, pack)
+import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
@@ -271,7 +272,8 @@ mkFunInput resId e = do
                       inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
                   i <- varCount <<%= (+1)
-                  let instDecl      = InstDecl compName (pack ("comp_inst_" ++ show i)) (outpAssign:hiddenAssigns ++ inpAssigns)
+                  let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
+                      instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
                   templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
                   return (Left templ)
                 Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e

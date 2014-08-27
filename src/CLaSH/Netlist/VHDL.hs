@@ -378,7 +378,7 @@ inst (CondAssignment id_ scrut es) = fmap Just $
       conds ((Just c ,e):es') = (expr False e <+> "when" <+> parens (expr True scrut <+> "=" <+> expr True c) <+> "else") <:> conds es'
 
 inst (InstDecl nm lbl pms) = fmap Just $
-    nest 2 $ text lbl <> "_comp_inst" <+> colon <+> "entity"
+    nest 2 $ text lbl <+> colon <+> "entity"
               <+> text nm <$$> pms' <> semi
   where
     pms' = do

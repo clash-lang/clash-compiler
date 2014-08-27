@@ -107,7 +107,8 @@ genComponentT compName componentExpr mStart = do
                      . ifThenElse Text.null
                           (`Text.append` Text.pack "Component_")
                           (`Text.append` Text.pack "_")
-                     . mkBasicId
+                     . mkBasicId' True
+                     . stripDollarPrefixes
                      . last
                      . Text.splitOn (Text.pack ".")
                      . Text.pack
@@ -231,7 +232,8 @@ mkFunApp dst fun args = do
                     hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
                     inpAssigns    = zip (map fst compInps) argExprs
                     outpAssign    = (fst compOutp,Identifier dstId Nothing)
-                    instDecl      = InstDecl compName dstId (outpAssign:hiddenAssigns ++ inpAssigns)
+                    instLabel     = Text.concat [compName, Text.pack "_", dstId]
+                    instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
                 return (argDecls ++ [instDecl])
         else error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of

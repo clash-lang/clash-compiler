@@ -1,7 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns      #-}
 -- | Transform/format a Netlist Identifier so that it is acceptable as a VHDL identifier
 module CLaSH.Netlist.Id
-  (mkBasicId)
+  ( mkBasicId
+  , mkBasicId'
+  , stripDollarPrefixes
+  )
 where
 
 import Data.Char      (isAsciiLower,isAsciiUpper,isDigit,ord)
@@ -11,7 +15,12 @@ import Numeric        (showHex)
 -- | Transform/format a text so that it is acceptable as a VHDL identifier
 mkBasicId :: Text
           -> Text
-mkBasicId = stripMultiscore . stripLeading . zEncode
+mkBasicId = mkBasicId' False
+
+mkBasicId' :: Bool
+           -> Text
+           -> Text
+mkBasicId' tupEncode = stripMultiscore . stripLeading . zEncode tupEncode
   where
     stripLeading    = Text.dropWhile (`elem` ['0'..'9'])
     stripMultiscore = Text.concat
@@ -21,16 +30,48 @@ mkBasicId = stripMultiscore . stripLeading . zEncode
                                   )
                     . Text.group
 
+stripDollarPrefixes :: Text -> Text
+stripDollarPrefixes = stripSpecPrefix . stripConPrefix
+                    . stripWorkerPrefix . stripDictFunPrefix
+  where
+    stripDictFunPrefix t = case Text.stripPrefix "$f" t of
+                             Just k  -> takeWhileEnd (/= '_') k
+                             Nothing -> t
+
+    takeWhileEnd p = Text.reverse . Text.takeWhile p . Text.reverse
+
+    stripWorkerPrefix t = case Text.stripPrefix "$w" t of
+                              Just k  -> k
+                              Nothing -> t
+
+    stripConPrefix t = case Text.stripPrefix "$c" t of
+                         Just k  -> k
+                         Nothing -> t
+
+    stripSpecPrefix t = snd (Text.breakOnEnd "$s" t)
+
+
 type UserString    = Text -- As the user typed it
 type EncodedString = Text -- Encoded form
 
-zEncode :: UserString -> EncodedString
-zEncode cs = go (uncons cs)
+zEncode :: Bool -> UserString -> EncodedString
+zEncode False cs = go (uncons cs)
   where
     go Nothing         = empty
     go (Just (c,cs'))  = append (encodeDigitCh c) (go' $ uncons cs')
     go' Nothing        = empty
     go' (Just (c,cs')) = append (encodeCh c) (go' $ uncons cs')
+
+zEncode True cs = case maybeTuple cs of
+                    Just (n,cs') -> append n (go' (uncons cs'))
+                    Nothing      -> go (uncons cs)
+  where
+    go Nothing         = empty
+    go (Just (c,cs'))  = append (encodeDigitCh c) (go' $ uncons cs')
+    go' Nothing        = empty
+    go' (Just (c,cs')) = case maybeTuple (cons c cs') of
+                           Just (n,cs2) -> append n (go' $ uncons cs2)
+                           Nothing      -> append (encodeCh c) (go' $ uncons cs')
 
 encodeDigitCh :: Char -> EncodedString
 encodeDigitCh c | isDigit c = encodeAsUnicodeChar c
@@ -75,3 +116,20 @@ unencodedChar c  = or [ isAsciiLower c
                       , isAsciiUpper c
                       , isDigit c
                       , c == '_']
+
+maybeTuple :: UserString -> Maybe (EncodedString,UserString)
+maybeTuple "(# #)" = Just ("Z1H",empty)
+maybeTuple "()"    = Just ("Z0T",empty)
+maybeTuple (uncons -> Just ('(',uncons -> Just ('#',cs))) =
+  case countCommas 0 cs of
+    (n,uncons -> Just ('#',uncons -> Just (')',cs'))) -> Just (pack ('Z':shows (n+1) "H"),cs')
+    _ -> Nothing
+maybeTuple (uncons -> Just ('(',cs)) =
+  case countCommas 0 cs of
+    (n,uncons -> Just (')',cs')) -> Just (pack ('Z':shows (n+1) "T"),cs')
+    _ -> Nothing
+maybeTuple _  = Nothing
+
+countCommas :: Int -> UserString -> (Int,UserString)
+countCommas n (uncons -> Just (',',cs)) = countCommas (n+1) cs
+countCommas n cs                        = (n,cs)
