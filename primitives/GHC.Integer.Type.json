@@ -36,7 +36,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.divInteger"
     , "templateD" :
-"~SYM[0]_block : block
+"divInteger_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[0] / ~ARG[1];

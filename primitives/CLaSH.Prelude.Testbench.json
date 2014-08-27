@@ -7,7 +7,7 @@
          -> CSignal t b -- ^ Return valued (ARG[4])
          -> CSignal t b"
     , "templateD" :
-"~SYM[0]_block : block
+"assert_~SYM[0] : block
 begin
   -- pragma translate_off
   process(~CLK[2],~RST[2],~ARG[2],~ARG[3]) is

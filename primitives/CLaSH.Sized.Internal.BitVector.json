@@ -26,7 +26,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceAnd#"
     , "templateD"  :
-"~SYM[0]_reduceAnd : block
+"reduceAnd_~SYM[0] : block
   function and_reduce (arg : std_logic_vector) return std_logic is
     variable upper, lower : std_logic;
     variable half         : integer;
@@ -56,7 +56,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceOr#"
     , "templateD"  :
-"~SYM[0]_reduceOr : block
+"reduceOr_~SYM[0] : block
   function or_reduce (arg : std_logic_vector) return std_logic is
     variable upper, lower : std_logic;
     variable half         : integer;
@@ -86,7 +86,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceXor#"
     , "templateD"  :
-"~SYM[0]_reduceXor : block
+"reduceXor_~SYM[0] : block
   function xor_reduce (arg : std_logic_vector) return std_logic is
     variable upper, lower : std_logic;
     variable half         : integer;
@@ -121,7 +121,7 @@ end block;"
             -> Int         -- ARG[2]
             -> Bit"
     , "templateD" :
-"~SYM[0]_index : block
+"indexBit_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
 begin
@@ -152,7 +152,7 @@ end block;"
                  -> Bit         -- ARG[3]
                  -> BitVector n"
     , "templateD" :
-"~SYM[0]_replaceBit : block
+"replaceBit_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
   signal ~SYM[3] : ~TYP[3];
@@ -188,7 +188,7 @@ end block;"
                -> BitVector (m + 1 - n) -- ARG[3]
                -> BitVector (m + 1 + i)"
     , "templateD" :
-"~SYM[0]_setSlice : block
+"setSlice_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
   signal ~SYM[2] : ~TYP[3];
 begin
@@ -212,7 +212,7 @@ end block;"
             -> SNat n                -- ARG[2]
             -> BitVector (m + 1 - n)"
     , "templateD" :
-"~SYM[0]_slice : block
+"slice_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -227,12 +227,14 @@ end block;"
             => BitVector (m + n) -- ARG[1]
             -> (BitVector m, BitVector n)"
     , "templateD" :
-"~SYM[0]_split: block
+"split_~SYM[0]: block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left + ~RESULT.~TYPMO_sel1'length downto ~RESULT.~TYPMO_sel0'right + ~RESULT.~TYPMO_sel1'length)
-             ,~SYM[1](~RESULT.~TYPMO_sel1'left downto ~RESULT.~TYPMO_sel1'right));
+  ~RESULT <= ( ~SYM[1](~RESULT.~TYPMO_sel0'left + ~RESULT.~TYPMO_sel1'length downto
+               ~RESULT.~TYPMO_sel0'right + ~RESULT.~TYPMO_sel1'length)
+             , ~SYM[1](~RESULT.~TYPMO_sel1'left downto ~RESULT.~TYPMO_sel1'right)
+             );
 end block;"
     }
   }
@@ -243,7 +245,7 @@ end block;"
           => BitVector n -- ARG[1]
           -> Bit"
     , "templateD" :
-"~SYM[0]_msb : block
+"msb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[2]_generate : if ~SYM[1]'length = 0 generate
@@ -264,7 +266,7 @@ end block;"
     "lsb# :: BitVector n -- ARG[0]
           -> Bit"
     , "templateD" :
-"~SYM[0]_lsb : block
+"lsb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[2]_generate : if ~SYM[1]'length = 0 generate

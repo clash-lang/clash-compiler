@@ -11,7 +11,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.head"
     , "templateD" :
-"~SYM[0]_head : block
+"head_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -22,7 +22,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.tail"
     , "templateD" :
-"~SYM[0]_tail : block
+"tail_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -33,7 +33,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.last"
     , "templateD" :
-"~SYM[0]_last : block
+"last_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -44,7 +44,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.init"
     , "templateD" :
-"~SYM[0]_init : block
+"init_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -62,17 +62,17 @@ end block;"
             -> Vec i a                       -- ARG[4]
             -> Vec n a"
     , "templateD" :
-"~SYM[0]_select : block
+"select_~SYM[0] : block
   signal ~SYM[1] : ~TYP[4];
 begin
   ~SYM[1] <= ~ARG[4];
 
-  ~SYM[2]_selectZ : if ~RESULT'length = 0 generate
+  selectZ_~SYM[2] : if ~RESULT'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_selectSN : if ~RESULT'length /= 0 generate
-    ~SYM[4]_selectIter : for ~SYM[5] in ~RESULT'range generate
+  selectSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    selectIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
     begin
       ~RESULT(~SYM[5]) <= ~SYM[1](~LIT[1]+(~LIT[2]*~SYM[5]));
     end generate;
@@ -82,23 +82,23 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
-    , "templateD" : "~RESULT <= ~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1]);"
+    , "templateE" : "TYMPO'(~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.concat"
     , "templateD" :
-"~SYM[0]_concat : block
+"concat_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
 
-  ~SYM[2]_concatZ : if ~RESULT'length = 0 generate
+  concatZ_~SYM[2] : if ~RESULT'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_concatSN : if ~RESULT'length /= 0 generate
-    ~SYM[4]_concatIter : for ~SYM[5] in ~SYM[1]'range generate
+  concatSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    concatIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
     begin
       ~RESULT((~SYM[5] * ~SYM[1](0)'length) to ((~SYM[5] * ~SYM[1](0)'length) + ~SYM[1](0)'high)) <= ~SYM[1](~SYM[5]);
     end generate;
@@ -109,7 +109,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.splitAt"
     , "templateD" :
-"~SYM[0]_splitAt : block
+"splitAt_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
@@ -126,17 +126,17 @@ end block;"
               -> Vec (n * m) a  -- ARG[2]
               -> Vec n (Vec m a)"
     , "templateD" :
-"~SYM[0]_unconcat : block
+"unconcat_~SYM[0] : block
   signal ~SYM[1] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[2];
 
-  ~SYM[2]_unconcatZ : if ~SYM[1]'length = 0 generate
+  unconcatZ_~SYM[2] : if ~SYM[1]'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_unconcatSN : if ~SYM[1]'length /= 0 generate
-    ~SYM[4]_unconcatIter : for ~SYM[5] in ~RESULT'range generate
+  unconcatSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
+    unconcatIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
     begin
       ~RESULT(~SYM[5]) <= ~SYM[1]((~SYM[5] * ~LIT[1]) to ((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1));
     end generate;
@@ -147,19 +147,19 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.merge"
     , "templateD" :
-"~SYM[0]_merge : block
+"merge_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
   signal ~SYM[2] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[0];
   ~SYM[2] <= ~ARG[1];
 
-  ~SYM[3]_mergeZ : if ~RESULT'length = 0 generate
+  mergeZ_~SYM[3] : if ~RESULT'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[4]_mergeSN : if ~RESULT'length /= 0 generate
-    ~SYM[5]_mergeIter : for ~SYM[6] in ~SYM[1]'range generate
+  mergeSN_~SYM[4] : if ~RESULT'length /= 0 generate
+    mergeIter_~SYM[5] : for ~SYM[6] in ~SYM[1]'range generate
     begin
       ~RESULT(2*~SYM[6])   <= ~SYM[1](~SYM[6]);
       ~RESULT(2*~SYM[6]+1) <= ~SYM[2](~SYM[6]);
@@ -171,17 +171,17 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
     , "templateD" :
-"~SYM[0]_map : block
+"map_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
 
-  ~SYM[2]_mapZ : if ~RESULT'length = 0 generate
+  mapZ_~SYM[2] : if ~RESULT'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_mapSN : if ~RESULT'length /= 0 generate
-    ~SYM[4]_mapIter : for ~SYM[5] in ~RESULT'range generate
+  mapSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    mapIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
     begin
       ~INST 0
         ~OUTPUT <= ~RESULT(~SYM[5])~ ~TYPEL[~TYPO]~
@@ -195,19 +195,19 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.zipWith"
     , "templateD" :
-"~SYM[0]_zipWith : block
+"zipWith_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[1];
   ~SYM[2] <= ~ARG[2];
 
-  ~SYM[3]_zipWithZ : if ~RESULT'length = 0 generate
+  zipWithZ_~SYM[3] : if ~RESULT'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[4]_zipWithSN : if ~RESULT'length /= 0 generate
-    ~SYM[5]_zipWithIter : for ~SYM[6] in ~RESULT'range generate
+  zipWithSN_~SYM[4] : if ~RESULT'length /= 0 generate
+    zipWithIter_~SYM[5] : for ~SYM[6] in ~RESULT'range generate
     begin
       ~INST 0
         ~OUTPUT <= ~RESULT(~SYM[6])~ ~TYPEL[~TYPO]~
@@ -222,7 +222,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_integer"
     , "templateD" :
-"~SYM[0]_index_integer : block
+"indexVec_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
 begin
@@ -247,7 +247,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replace_integer"
     , "templateD" :
-"~SYM[0]_replace_integer : block
+"replaceVec_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
   signal ~SYM[3] : ~TYP[3];
@@ -292,17 +292,17 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "templateD" :
-"~SYM[0]_reverse : block
+"reverse_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
 
-  ~SYM[2]_reverseZ : if ~RESULT'length = 0 generate
+  reverseZ_~SYM[2] : if ~RESULT'length = 0 generate
     ~RESULT <= ~SYM[1];
   end generate;
 
-  ~SYM[3]_reverseSN : if ~RESULT'length /= 0 generate
-    ~SYM[4]_reverseIter : for ~SYM[5] in ~SYM[1]'range generate
+  reverseSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    reverseIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
       ~RESULT(~SYM[1]'high - ~SYM[5]) <= ~SYM[1](~SYM[5]);
     end generate;
   end generate;
@@ -321,17 +321,17 @@ end block;"
                         => Vec n (BitVector m)
                         -> BitVector (n * m)"
     , "templateD" :
-"~SYM[0]_concatBitVector : block
+"concatBitVector_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
 
-  ~SYM[2]_concatBitVectorZ : if ~RESULT'length = 0 generate
+  concatBitVectorZ_~SYM[2] : if ~RESULT'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_concatBitVectorSN : if ~RESULT'length /= 0 generate
-    ~SYM[4]_concatBitVectorIter : for ~SYM[5] in ~SYM[1]'range generate
+  concatBitVectorSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    concatBitVectorIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
       ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[5]));
     end generate;
   end generate;
@@ -345,17 +345,17 @@ end block;"
                           => BitVector (n * m)
                           -> Vec n (BitVector m)"
     , "templateD" :
-"~SYM[0]_unconcatBitVector : block
+"unconcatBitVector_~SYM[0] : block
   signal ~SYM[1] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[2];
 
-  ~SYM[2]_unconcatBitVectorZ : if ~SYM[1]'length = 0 generate
+  unconcatBitVectorZ_~SYM[2] : if ~SYM[1]'length = 0 generate
     ~RESULT <= ~ERRORO;
   end generate;
 
-  ~SYM[3]_unconcatBitVectorSN : if ~SYM[1]'length /= 0 generate
-    ~SYM[4]_unconcatBitVectorIter : for ~SYM[5] in ~RESULT'range generate
+  unconcatBitVectorSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
+    unconcatBitVectorIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
       ~RESULT(~SYM[5]) <= ~SYM[1](((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[5] * ~LIT[1]));
     end generate;
   end generate;

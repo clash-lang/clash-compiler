@@ -115,7 +115,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
     , "templateD" :
-"~SYM[0]_divS : block
+"divSigned_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
   signal ~SYM[3] : ~TYP[1];

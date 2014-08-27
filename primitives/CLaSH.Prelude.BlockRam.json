@@ -10,7 +10,7 @@
           -> CSignal clk a            -- din,  ARG[8]
           -> CSignal clk a"
     , "templateD" :
-"~SYM[0]_block : block
+"blockram_~SYM[0] : block
   signal ~SYM[1] : ~TYP[4] := ~LIT[4]; -- ram
   signal ~SYM[2] : ~TYP[8]; -- inp
   signal ~SYM[3] : ~TYP[8]; -- outp
