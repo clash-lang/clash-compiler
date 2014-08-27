@@ -100,6 +100,11 @@ import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
 
 -- * Type definitions
+
+-- | A vector of bits.
+--
+-- * Bit indices are descending
+-- * 'Num' instance performs /unsigned/ arithmetic.
 newtype BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.

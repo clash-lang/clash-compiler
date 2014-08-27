@@ -183,6 +183,7 @@ instance Ord a => Ord (CSignal clk a) where
   max     = liftA2 max
   min     = liftA2 min
 
+-- | Version of 'compare' that returns a 'CSignal' of 'Ordering'
 compare1 :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Ordering
 compare1 = liftA2 compare
 

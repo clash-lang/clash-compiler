@@ -87,8 +87,7 @@ import qualified CLaSH.Sized.Internal.BitVector as BV
 -- Given @n@ bits, an 'Unsigned' @n@ number has a range of: [0 .. 2^@n@-1]
 --
 -- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
--- saturation on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in
--- "CLaSH.Sized.Fixed".
+-- saturation on overflow, check out the 'SaturatingNum' class.
 newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToBitVector', are not
     -- synthesisable.

@@ -95,8 +95,7 @@ import qualified CLaSH.Sized.Internal.BitVector as BV
 -- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1]
 --
 -- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
--- saturation on overflow, check out the 'CLaSH.Sized.Fixed.satN2' function in
--- "CLaSH.Sized.Fixed".
+-- saturation on overflow, check out the 'SaturatingNum' class.
 newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesisable.

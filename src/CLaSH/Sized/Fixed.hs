@@ -15,16 +15,19 @@
 --
 -- * The 'Num' operators for the given types saturate on overflow,
 --   and use truncation as the rounding method.
---
--- * Use @$$('fLit' d)@ to create 'Fixed' point number literals.
+-- * 'Fixed' has an instance for 'Fractional' meaning you use fractional
+--   literals @(3.75 :: 'SFixed' 4 18)@.
+-- * Both integer literals and fractional literals are clipped to 'minBound' and
+--  'maxBound'.
+-- * There is no 'Floating' instance for 'Fixed', but you can use @$$('fLit' d)@
+--   to create 'Fixed' point literal from 'Double' constant at compile-time.
 -- * Use <#constraintsynonyms Constraint synonyms> when writing type signatures
 --   for polymorphic functions that use 'Fixed' point numbers.
 --
 -- BEWARE: rounding by truncation introduces a sign bias!
 --
 -- * Truncation for positive numbers effectively results in: round towards zero.
--- * Truncation for negative numbers effectively results in: round towards
---   -infinity.
+-- * Truncation for negative numbers effectively results in: round towards -infinity.
 module CLaSH.Sized.Fixed
   ( -- * 'SFixed': 'Signed' 'Fixed' point numbers
     SFixed, sf, unSF
@@ -32,7 +35,7 @@ module CLaSH.Sized.Fixed
   , UFixed, uf, unUF
       -- * Division
   , divide
-    -- * 'Fixed' point literals
+    -- * Compile-time 'Double' conversion
   , fLit
     -- * 'Fixed' point wrapper
   , Fixed (..), resizeF, fracShift
@@ -111,15 +114,15 @@ deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 -- 3.9375
 -- >>> minBound :: SFixed 3 4
 -- -4.0
--- >>> (1 :: SFixed 3 4) + (2 :: SFixed 3 4)
+-- >>> 1  + 2 :: SFixed 3 4
 -- 3.0
--- >>> (2 :: SFixed 3 4) + (3 :: SFixed 3 4)
+-- >>> 2 + 3 :: SFixed 3 4
 -- 3.9375
--- >>> (-2 :: SFixed 3 4) + (-3 :: SFixed 3 4)
+-- >>> (-2) + (-3) :: SFixed 3 4
 -- -4.0
--- >>> ($$(fLit 1.375) :: SFixed 3 4) * ($$(fLit -0.8125) :: SFixed 3 4)
+-- >>> 1.375 * (-0.8125) :: SFixed 3 4
 -- -1.125
--- >>> ($$(fLit 1.375) :: SFixed 3 4) `mult` ($$(fLit -0.8125) :: SFixed 3 4) :: SFixed 6 8
+-- >>> (1.375 :: SFixed 3 4) `mult` (-0.8125 :: SFixed 3 4) :: SFixed 6 8
 -- -1.1171875
 -- >>> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
 -- 5.0
@@ -139,15 +142,15 @@ type SFixed = Fixed Signed
 -- 7.9375
 -- >>> minBound :: UFixed 3 4
 -- 0.0
--- >>> (1 :: UFixed 3 4) + (2 :: UFixed 3 4)
+-- >>> 1 + 2 :: UFixed 3 4
 -- 3.0
--- >>> (2 :: UFixed 3 4) + (6 :: UFixed 3 4)
+-- >>> 2 + 6 :: UFixed 3 4
 -- 7.9375
--- >>> (1 :: UFixed 3 4) - (3 :: UFixed 3 4)
+-- >>> 1 - 3 :: UFixed 3 4
 -- 0.0
--- >>> ($$(fLit 1.375) :: UFixed 3 4) * ($$(fLit 0.8125) :: UFixed 3 4)
+-- >>> 1.375 * 0.8125 :: UFixed 3 4
 -- 1.0625
--- >>> ($$(fLit 1.375) :: UFixed 3 4) `mult` ($$(fLit 0.8125) :: UFixed 3 4) :: UFixed 6 8
+-- >>> (1.375 :: UFixed 3 4) `mult` (0.8125 :: UFixed 3 4) :: UFixed 6 8
 -- 1.1171875
 -- >>> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
 -- 8.0
@@ -427,13 +430,13 @@ type ResizeUFC int1 frac1 int2 frac2 =
 {-# INLINE resizeF #-}
 -- | Saturating resize operation, truncates for rounding
 --
--- >>> $$(fLit 0.8125) :: SFixed 3 4
+-- >>> 0.8125 :: SFixed 3 4
 -- 0.8125
--- >>> resizeF ($$(fLit 0.8125) :: SFixed 3 4) :: SFixed 2 3
+-- >>> resizeF (0.8125 :: SFixed 3 4) :: SFixed 2 3
 -- 0.75
--- >>> $$(fLit 3.4) :: SFixed 3 4
+-- >>> 3.4 :: SFixed 3 4
 -- 3.375
--- >>> resizeF ($$(fLit 3.4) :: SFixed 3 4) :: SFixed 2 3
+-- >>> resizeF (3.4 :: SFixed 3 4) :: SFixed 2 3
 -- 1.875
 -- >>> maxBound :: SFixed 2 3
 -- 1.875
@@ -501,23 +504,36 @@ resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
                                           then shiftedR_resized
                                           else fMin
 
--- | Convert, at compile-time, a 'Double' literal to a 'Fixed'-point literal.
+-- | Convert, at compile-time, a 'Double' /constant/ to a 'Fixed'-point /literal/.
 -- The conversion saturates on overflow, and uses truncation as its rounding
 -- method.
 --
 -- So when you type:
 --
--- > n = $$(fLit 2.8672) :: SFixed 4 4
+-- > n = $$(fLit pi) :: SFixed 4 4
 --
 -- The compiler sees:
 --
--- > n = Fixed (fromInteger 45) :: SFixed 4 4
+-- > n = Fixed (fromInteger 50) :: SFixed 4 4
 --
 -- Upon evaluation you see that the value is rounded / truncated in accordance
 -- to the fixed point representation:
 --
 -- >>> n
--- 2.8125
+-- 3.125
+--
+-- Further examples:
+--
+-- >>> sin 0.5 :: Double
+-- 0.479425538604203
+-- >>> $$(fLit (sin 0.5)) :: SFixed 1 8
+-- 0.4765625
+-- >>> atan 0.2 :: Double
+-- 0.19739555984988078
+-- >>> $$(fLit (atan 0.2)) :: SFixed 1 8
+-- 0.1953125
+-- >>> $$(fLit (atan 0.2)) :: SFixed 1 20
+-- 0.19739532470703125
 fLit :: forall rep int frac size .
         ( size ~ (int + frac), KnownNat frac, Num (rep size), Bounded (rep size)
         , Integral (rep size))
