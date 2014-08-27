@@ -150,7 +150,7 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
     wanted = [ Opt_CSE -- CSE
              , Opt_FullLaziness -- Floats let-bindings outside enclosing lambdas
              , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
-             , Opt_DoLambdaEtaExpansion -- We need eta-expansion anyway, so the more GHC does, the better
+             , Opt_DoLambdaEtaExpansion -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
              , Opt_CaseMerge -- We want fewer case-statements
              , Opt_DictsCheap -- Makes dictionaries seem cheap to optimizer: hopefully inline
              , Opt_SimpleListLiterals -- Avoids 'build' rule
@@ -158,12 +158,14 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_ForceRecomp -- Force recompilation: never bad
              , Opt_EnableRewriteRules -- Reduce number of functions
              , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
-             , Opt_Strictness -- don't care about strictness [Wanted?]
+             , Opt_Strictness -- Strictness analysis helps with dead-code analysis
+             , Opt_StaticArgumentTransformation -- Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
+             , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
+             , Opt_DictsStrict -- Hopefully helps remove class method selectors
+             , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
              ]
 
-    unwanted = [ Opt_FloatIn -- Moves let-bindings inwards: defeats the normal-form with a single top-level let-binding
-               , Opt_StaticArgumentTransformation -- [Wanted?] Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
-               , Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
+    unwanted = [ Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
                , Opt_SpecConstr -- Creates local-functions: avoid
                , Opt_IgnoreAsserts -- We don't care about assertions
                , Opt_DoEtaReduction -- We want eta-expansion
@@ -180,5 +182,6 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
                , Opt_OmitYields -- Don't care
                , Opt_IgnoreInterfacePragmas -- We need all the unfoldings we can get
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
-               , Opt_IrrefutableTuples -- Introduce irrefuntPatError: avoid
+               , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
+               , Opt_Loopification -- STG pass, don't care
                ]
