@@ -278,8 +278,8 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
               | f == pack "CLaSH.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
               | f == pack "CLaSH.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == pack "CLaSH.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
+              | f == pack "CLaSH.Signal.Internal.traverse#"  -> return (traverseTerm xType)
               | f == pack "CLaSH.Signal.Wrap.vecUnwrap#"     -> return (vecUnwrapTerm xType)
-              | f == pack "CLaSH.Signal.Wrap.vecWrap#"       -> return (vecWrapTerm xType)
               | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
@@ -559,44 +559,46 @@ vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 -- | Given the type:
 --
 -- @
--- forall n.forall t.forall a.KnownNat n => SClock t -> CSignal (Vec n a) ->
--- Vec n (CSignal t a)
+-- forall f.forall a.forall b.forall clk.Applicative f => (a -> f b) ->
+-- CSignal clk a -> f (CSignal clk b)
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(n:Nat)./\(t:Clock)./\(a:*).\(dict:KnownNat n).\(sclk:SClock t).
--- \(vs:CSignal (Vec n a)).vs
+-- /\(f:* -> *)./\(a:*)./\(b:*)./\(clk:Clock).\(dict:Applicative f).
+-- \(g:a -> f b).\(x:CSignal clk a).g x
 -- @
-vecWrapTerm :: C.Type
-              -> C.Term
-vecWrapTerm (C.ForAllTy tvNTy) =
-    C.TyLam (bind nTV (
-    C.TyLam (bind tTV (
+traverseTerm :: C.Type
+             -> C.Term
+traverseTerm (C.ForAllTy tvFTy) =
+    C.TyLam (bind fTV (
     C.TyLam (bind aTV (
+    C.TyLam (bind bTV (
+    C.TyLam (bind clkTV (
     C.Lam   (bind dictId (
-    C.Lam   (bind sclkId (
-    C.Lam   (bind vsId (
-    C.Var vsTy vsName))))))))))))
+    C.Lam   (bind gId (
+    C.Lam   (bind xId (
+    C.App (C.Var gTy gName) (C.Var xTy xName)))))))))))))))
   where
-    (nTV,tTV,aTV,funTy) = runFreshM $ do
-      { (nTV',C.ForAllTy tvTTy) <- unbind tvNTy
-      ; (tTV',C.ForAllTy tvATy) <- unbind tvTTy
-      ; (aTV',funTy')           <- unbind tvATy
-      ; return (nTV',tTV',aTV',funTy')
+    (fTV,aTV,bTV,clkTV,funTy) = runFreshM $ do
+      { (fTV',C.ForAllTy tvATy) <- unbind tvFTy
+      ; (aTV',C.ForAllTy tvBTy) <- unbind tvATy
+      ; (bTV',C.ForAllTy tvClkTy) <- unbind tvBTy
+      ; (clkTV',funTy') <- unbind tvClkTy
+      ; return (fTV',aTV',bTV',clkTV',funTy')
       }
-    (C.FunTy dictTy funTy'') = C.tyView funTy
-    (C.FunTy sclkTy funTy3)  = C.tyView funTy''
-    (C.FunTy vsTy _)         = C.tyView funTy3
+    (C.FunTy dictTy funTy1) = C.tyView funTy
+    (C.FunTy gTy    funTy2) = C.tyView funTy1
+    (C.FunTy xTy    _)      = C.tyView funTy2
     dictName = string2Name "dict"
-    sclkName = string2Name "sclk"
-    vsName   = string2Name "vs"
+    gName    = string2Name "g"
+    xName    = string2Name "x"
     dictId   = C.Id dictName (embed dictTy)
-    sclkId   = C.Id sclkName (embed sclkTy)
-    vsId     = C.Id vsName   (embed vsTy)
+    gId      = C.Id gName (embed gTy)
+    xId      = C.Id xName (embed xTy)
 
-vecWrapTerm ty = error $ $(curLoc) ++ show ty
+traverseTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --
