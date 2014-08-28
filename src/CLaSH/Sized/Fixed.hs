@@ -310,7 +310,7 @@ type AddSFixedC int1 frac1 int2 frac2
     , KnownNat ((Max int1 int2 + 1) + Max frac1 frac2)
     )
 
--- -- | Constraint for the 'Add' instance of 'UFixed'
+-- | Constraint for the 'Add' instance of 'UFixed'
 type AddUFixedC int1 frac1 int2 frac2 =
      AddSFixedC int1 frac1 int2 frac2
 

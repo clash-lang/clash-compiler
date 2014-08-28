@@ -121,6 +121,10 @@ instance (Default a, KnownNat n) => Default (Vec n a) where
   def = repeat def
 
 {-# INLINE singleton #-}
+-- | Create a vector of one element
+--
+-- >>> singleton 5
+-- <5>
 singleton :: a -> Vec 1 a
 singleton = (:> Nil)
 
@@ -476,10 +480,11 @@ foldl1 f xs = foldl f (head xs) (tail xs)
 {-# NOINLINE fold #-}
 -- | 'fold' is a variant of 'foldr1' and 'foldl1', but instead of reducing from
 -- right to left, or left to right, it reduces a vector using a tree-like
--- structure. The depth, or delay, of the structure produced by @'fold' f xs@,
--- is hence @O(log_2('length' xs))@, and not @O('length' xs)@.
+-- structure. The depth, or delay, of the structure produced by
+-- \"@'fold' f xs@\", is hence @O(log_2('length' xs))@, and not
+-- @O('length' xs)@.
 --
--- __NB__: The binary operator @f@ in @'fold' f xs@ must be associative.
+-- __NB__: The binary operator \"@f@ in @'fold' f xs@\" must be associative.
 --
 -- > fold f (x1 :> x2 :> ... :> xn1 :> xn :> Nil) == ((x1 `f` x2) `f` ...) `f` (... `f` (xn1 `f` xn))
 -- > fold f (x1 :> Nil)                           == x1

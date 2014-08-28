@@ -6,7 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module CLaSH.Class.BitConvert
-  (BitConvert (..))
+  ( BitConvert (..)
+  , bitCoerce
+  )
 where
 
 import GHC.TypeLits                   (KnownNat, Nat, type (+), type (*))
@@ -23,9 +25,34 @@ class BitConvert a where
   -- of type @a@
   type BitSize a :: Nat
   -- | Convert element of type @a@ to a 'BitVector'
+  --
+  -- >>> pack (-5 :: Signed 6)
+  -- 111011
   pack   :: a -> BitVector (BitSize a)
   -- | Convert a 'BitVector' to an element of type @a@
+  --
+  -- >>> pack (-5 :: Signed 6)
+  -- 111011
+  -- >>> let x = pack (-5 :: Signed 6)
+  -- >>> unpack x :: Unsigned 6
+  -- 59
+  -- >>> pack (59 :: Unsigned 6)
+  -- 111011
   unpack :: BitVector (BitSize a) -> a
+
+{-# INLINE bitCoerce #-}
+-- | Coerce a value from one type to another through its bit representation.
+--
+-- >>> pack (-5 :: Signed 6)
+-- 111011
+-- >>> bitCoerce (-5 :: Signed 6) :: Unsigned 6
+-- 59
+-- >>> pack (59 :: Unsigned 6)
+-- 111011
+bitCoerce :: (BitConvert a, BitConvert b, BitSize a ~ BitSize b)
+          => a
+          -> b
+bitCoerce = unpack . pack
 
 instance BitConvert Bool where
   type BitSize Bool = 1
