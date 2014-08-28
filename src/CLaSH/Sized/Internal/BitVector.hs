@@ -59,11 +59,10 @@ module CLaSH.Sized.Internal.BitVector
   , (*#)
   , negate#
   , fromInteger#
-    -- ** Add
+    -- ** ExtendingNum
   , plus#
   , minus#
-    -- ** Mult
-  , mult#
+  , times#
     -- ** Integral
   , quot#
   , rem#
@@ -93,7 +92,7 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Class.Num            (Add (..), Mult (..), SaturatingNum (..),
+import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
@@ -222,10 +221,13 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: KnownNat n => Integer -> BitVector n
 fromInteger_INLINE i = let res = BV (i `mod` (2 ^ natVal res)) in res
 
-instance KnownNat (Max m n + 1) => Add (BitVector m) (BitVector n) where
+instance (KnownNat (Max m n + 1), KnownNat (m + n)) =>
+  ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
   plus  = plus#
   minus = minus#
+  type MResult (BitVector m) (BitVector n) = BitVector (m + n)
+  times = times#
 
 plus#, minus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n
               -> BitVector (Max m n + 1)
@@ -235,13 +237,9 @@ plus# (BV a) (BV b) = fromInteger_INLINE (a + b)
 {-# NOINLINE minus# #-}
 minus# (BV a) (BV b) = fromInteger_INLINE (a - b)
 
-instance KnownNat (m + n) => Mult (BitVector m) (BitVector n) where
-  type MResult (BitVector m) (BitVector n) = BitVector (m + n)
-  mult = mult#
-
-{-# NOINLINE mult# #-}
-mult# :: KnownNat (m + n) => BitVector m -> BitVector n -> BitVector (m + n)
-mult# (BV a) (BV b) = fromInteger_INLINE (a * b)
+{-# NOINLINE times# #-}
+times# :: KnownNat (m + n) => BitVector m -> BitVector n -> BitVector (m + n)
+times# (BV a) (BV b) = fromInteger_INLINE (a * b)
 
 instance KnownNat n => Real (BitVector n) where
   toRational = toRational . toInteger#
@@ -510,5 +508,5 @@ instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
                             SatZero  -> minBound#
                             _        -> maxBound#
     where
-      r       = mult# a b
+      r       = times# a b
       (rL,rR) = split# r

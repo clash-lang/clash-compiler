@@ -42,11 +42,10 @@ module CLaSH.Sized.Internal.Signed
   , negate#
   , abs#
   , fromInteger#
-    -- ** Add
+    -- ** ExtendingNum
   , plus#
   , minus#
-    -- ** Mult
-  , mult#
+  , times#
     -- ** Integral
   , quot#
   , rem#
@@ -79,7 +78,7 @@ import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
 import CLaSH.Class.BitConvert         (BitConvert (..))
-import CLaSH.Class.Num                (Add (..), Mult (..), SaturatingNum (..),
+import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
@@ -232,10 +231,13 @@ fromInteger_INLINE i
             (s,i') | even s    -> S i'
                    | otherwise -> S (i' - sz)
 
-instance KnownNat (1 + Max m n) => Add (Signed m) (Signed n) where
+instance (KnownNat (1 + Max m n), KnownNat (m + n)) =>
+  ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (1 + Max m n)
   plus  = plus#
   minus = minus#
+  type MResult (Signed m) (Signed n) = Signed (m + n)
+  times = times#
 
 plus#, minus# :: KnownNat (1 + Max m n) => Signed m -> Signed n
               -> Signed (1 + Max m n)
@@ -245,13 +247,9 @@ plus# (S a) (S b) = fromInteger_INLINE (a + b)
 {-# NOINLINE minus# #-}
 minus# (S a) (S b) = fromInteger_INLINE (a - b)
 
-instance KnownNat (m + n) => Mult (Signed m) (Signed n) where
-  type MResult (Signed m) (Signed n) = Signed (m + n)
-  mult = mult#
-
-{-# NOINLINE mult# #-}
-mult# :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)
-mult# (S a) (S b) = fromInteger_INLINE (a * b)
+{-# NOINLINE times# #-}
+times# :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)
+times# (S a) (S b) = fromInteger_INLINE (a * b)
 
 instance KnownNat n => Real (Signed n) where
   toRational = toRational . toInteger#
@@ -436,7 +434,7 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
     where
       overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
                             reduceAnd (msb rR ++# pack rL)
-      r        = mult# a b
+      r        = times# a b
       (rL,rR)  = split r
 
 minBoundSym# :: KnownNat n => Signed n

@@ -3,8 +3,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 module CLaSH.Class.Num
   ( -- * Arithmetic functions for arguments and results of different precision
-    Add (..)
-  , Mult (..)
+    ExtendingNum (..)
     -- * Saturating arithmetic functions
   , SaturationMode (..)
   , SaturatingNum (..)
@@ -16,8 +15,8 @@ where
 
 -- * Arithmetic functions for arguments and results of different precision
 
--- | Adding or subtracting values of two different (sub-)types.
-class Add a b where
+-- | Adding, subtracting, and multiplying values of two different (sub-)types.
+class ExtendingNum a b where
   -- | Type of the result of the addition or subtraction
   type AResult a b
   -- | Add values of different (sub-)types, return a value of a (sub-)type
@@ -26,14 +25,11 @@ class Add a b where
   -- | Subtract values of different (sub-)types, return a value of a (sub-)type
   -- that is potentially different from either argument.
   minus :: a -> b -> AResult a b
-
--- | Multiplying values of two different (sub-)types.
-class Mult a b where
   -- | Type of the result of the multiplication
   type MResult a b
   -- | Multiply values of different (sub-)types, return a value of a (sub-)type
   -- that is potentially different from either argument.
-  mult :: a -> b -> MResult a b
+  times :: a -> b -> MResult a b
 
 -- * Saturating arithmetic functions
 

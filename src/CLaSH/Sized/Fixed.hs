@@ -43,11 +43,11 @@ module CLaSH.Sized.Fixed
     -- $constraintsynonyms
 
     -- ** Constraint synonyms for 'SFixed'
-  , NumSFixedC, AddSFixedC, MultSFixedC, FracSFixedC, ResizeSFC, DivideSC
+  , NumSFixedC, ENumSFixedC, FracSFixedC, ResizeSFC, DivideSC
     -- ** Constraint synonyms for 'UFixed'
-  , NumUFixedC, AddUFixedC, MultUFixedC, FracUFixedC, ResizeUFC, DivideUC
+  , NumUFixedC, ENumUFixedC, FracUFixedC, ResizeUFC, DivideUC
     -- ** Constraint synonyms for 'Fixed' wrapper
-  , NumFixedC, AddFixedC, MultFixedC, FracFixedC, ResizeFC, DivideC
+  , NumFixedC, ENumFixedC, FracFixedC, ResizeFC, DivideC
     -- * Proxy
   , asRepProxy, asIntProxy
   )
@@ -67,7 +67,7 @@ import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
 import Language.Haskell.TH.Syntax (Lift(..))
 
 import CLaSH.Class.BitConvert     (BitConvert (..))
-import CLaSH.Class.Num            (Mult (..), Add (..), SaturatingNum (..),
+import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..), boundedPlus, boundedMin,
                                    boundedMult)
 import CLaSH.Class.Resize         (Resize (..))
@@ -122,7 +122,7 @@ deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 -- -4.0
 -- >>> 1.375 * (-0.8125) :: SFixed 3 4
 -- -1.125
--- >>> (1.375 :: SFixed 3 4) `mult` (-0.8125 :: SFixed 3 4) :: SFixed 6 8
+-- >>> (1.375 :: SFixed 3 4) `times` (-0.8125 :: SFixed 3 4) :: SFixed 6 8
 -- -1.1171875
 -- >>> (2 :: SFixed 3 4) `plus` (3 :: SFixed 3 4) :: SFixed 4 4
 -- 5.0
@@ -150,7 +150,7 @@ type SFixed = Fixed Signed
 -- 0.0
 -- >>> 1.375 * 0.8125 :: UFixed 3 4
 -- 1.0625
--- >>> (1.375 :: UFixed 3 4) `mult` (0.8125 :: UFixed 3 4) :: UFixed 6 8
+-- >>> (1.375 :: UFixed 3 4) `times` (0.8125 :: UFixed 3 4) :: UFixed 6 8
 -- 1.1171875
 -- >>> (2 :: UFixed 3 4) `plus` (6 :: UFixed 3 4) :: UFixed 4 4
 -- 8.0
@@ -250,94 +250,116 @@ mac s x y = s + (x * y)
 But with constraint synonyms, you can write the type signature like this:
 
 @
-mac :: NumSFixedC int frac
+mac1 :: 'NumSFixedC' int frac
     => SFixed int frac
     -> SFixed int frac
     -> SFixed int frac
     -> SFixed int frac
-mac s x y = s + (x * y)
+mac1 s x y = s + (x * y)
 @
 
 Where 'NumSFixedC' refers to the @Constraints@ needed by the operators of
 the 'Num' class for the 'SFixed' datatype.
+
+Although the number of constraints for the @mac@ function defined earlier might
+be considered small, here is an \"this way lies madness\" example where you
+really want to use constraint kinds:
+
+@
+mac2 :: ( KnownNat frac1
+        , KnownNat frac2
+        , KnownNat frac3
+        , KnownNat (Max frac1 frac2)
+        , KnownNat (int1 + frac1)
+        , KnownNat (int2 + frac2)
+        , KnownNat (int3 + frac3)
+        , KnownNat (frac1 + frac2)
+        , KnownNat (Max (frac1 + frac2) frac3)
+        , KnownNat (((int1 + int2) + (frac1 + frac2)) + (int3 + frac3))
+        , KnownNat ((int1 + int2) + (frac1 + frac2))
+        , KnownNat (1 + Max (int1 + frac1) (int2 + frac2))
+        , KnownNat (1 + Max (int1 + int2) int3 + Max (frac1 + frac2) frac3)
+        , KnownNat ((1 + Max int1 int2) + Max frac1 frac2)
+        , KnownNat ((1 + Max ((int1 + int2) + (frac1 + frac2)) (int3 + frac3)))
+        , ((int1 + frac1) + (int2 + frac2)) ~ ((int1 + int2) + (frac1 + frac2))
+        , (((int1 + int2) + int3) + ((frac1 + frac2) + frac3)) ~ (((int1 + int2) + (frac1 + frac2)) + (int3 + frac3))
+        )
+     => SFixed int1 frac1
+     -> SFixed int2 frac2
+     -> SFixed int3 frac3
+     -> SFixed (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
+mac2 x y s = (x \`times\` y) \`plus\` s
+@
+
+Which, with the proper constraint kinds can be reduced to:
+
+@
+mac3 :: ( 'ENumSFixedC' int1 frac1 int2 frac2
+        , 'ENumSFixedC' (int1 + int2) (frac1 + frac2) int3 frac3
+        )
+     => SFixed int1 frac1
+     -> SFixed int2 frac2
+     -> SFixed int3 frac3
+     -> SFixed (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
+mac3 x y s = (x \`times\` y) \`plus\` s
+@
 -}
 
--- | Constraint for the 'Mult' instance of 'Fixed'
-type MultFixedC rep (int1 :: Nat) (frac1 :: Nat) (int2 :: Nat) (frac2 :: Nat)
-  = ( Mult    (rep (int1 + frac1)) (rep (int2 + frac2))
+-- | Constraint for the 'ExtendingNum' instance of 'Fixed'
+type ENumFixedC rep int1 frac1 int2 frac2
+  = ( ResizeFC rep int1 frac1 (1 + Max int1 int2) (Max frac1 frac2)
+    , ResizeFC rep int2 frac2 (1 + Max int1 int2) (Max frac1 frac2)
+    , Bounded  (rep ((1 + Max int1 int2) + Max frac1 frac2))
+    , Num      (rep ((1 + Max int1 int2) + Max frac1 frac2))
+    , ExtendingNum (rep (int1 + frac1)) (rep (int2 + frac2))
     , MResult (rep (int1 + frac1)) (rep (int2 + frac2)) ~
               rep ((int1 + int2) + (frac1 + frac2))
     )
 
--- | Constraint for the 'Mult' instance of 'SFixed'
-type MultSFixedC int1 frac1 int2 frac2
-  = ( KnownNat ((int1 + int2) + (frac1 + frac2))
+-- | Constraint for the 'ExtendingNum' instance of 'SFixed'
+type ENumSFixedC int1 frac1 int2 frac2
+  = ( KnownNat frac1
+    , KnownNat frac2
+    , KnownNat (Max frac1 frac2)
+    , KnownNat (int1 + frac1)
+    , KnownNat (int2 + frac2)
+    , KnownNat ((int1 + int2) + (frac1 + frac2))
+    , KnownNat (1 + Max (int1 + frac1) (int2 + frac2))
+    , KnownNat ((1 + Max int1 int2) + Max frac1 frac2)
     , ((int1 + frac1) + (int2 + frac2)) ~ ((int1 + int2) + (frac1 + frac2))
     )
 
--- | Constraint for the 'Mult' instance of 'UFixed'
-type MultUFixedC int1 frac1 int2 frac2 =
-     MultSFixedC int1 frac1 int2 frac2
+-- | Constraint for the 'ExtendingNum' instance of 'UFixed'
+type ENumUFixedC int1 frac1 int2 frac2 =
+     ENumSFixedC int1 frac1 int2 frac2
 
 -- | When used in a polymorphic setting, use the following
 -- <CLaSH-Sized-Fixed.html#constraintsynonyms Constraint synonyms> for less
 -- verbose type signatures:
 --
--- * @'MultFixedC' rep frac1 frac2 size1 size2@ for: 'Fixed'
--- * @'MultSFixedC' int1 frac1 int2 frac2@      for: 'SFixed'
--- * @'MultUFixedC' int1 frac1 int2 frac2@      for: 'UFixed'
-instance MultFixedC rep int1 frac1 int2 frac2 =>
-  Mult (Fixed rep int1 frac1) (Fixed rep int2 frac2) where
-  type MResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
-               Fixed rep (int1 + int2) (frac1 + frac2)
-  mult (Fixed fRep1) (Fixed fRep2) = Fixed (mult fRep1 fRep2)
-
--- | Constraint for the 'Add' instance of 'Fixed'
-type AddFixedC rep int1 frac1 int2 frac2
-  = ( ResizeFC rep int1 frac1 (Max int1 int2 + 1) (Max frac1 frac2)
-    , ResizeFC rep int2 frac2 (Max int1 int2 + 1) (Max frac1 frac2)
-    , Bounded  (rep ((Max int1 int2 + 1) + Max frac1 frac2))
-    , Num      (rep ((Max int1 int2 + 1) + Max frac1 frac2))
-    )
-
--- | Constraint for the 'Add' instance of 'SFixed'
-type AddSFixedC int1 frac1 int2 frac2
-  = ( KnownNat frac1
-    , KnownNat frac2
-    , KnownNat (int1 + frac1)
-    , KnownNat (int2 + frac2)
-    , KnownNat (Max frac1 frac2)
-    , KnownNat ((Max int1 int2 + 1) + Max frac1 frac2)
-    )
-
--- | Constraint for the 'Add' instance of 'UFixed'
-type AddUFixedC int1 frac1 int2 frac2 =
-     AddSFixedC int1 frac1 int2 frac2
-
--- | When used in a polymorphic setting, use the following
--- <CLaSH-Sized-Fixed.html#constraintsynonyms Constraint synonyms> for less
--- verbose type signatures:
---
--- * @'AddFixedC'  rep frac1 frac2 size1 size2@ for: 'Fixed'
--- * @'AddSFixedC' int1 frac1 int2 frac2@       for: 'SFixed'
--- * @'AddUFixedC' int1 frac1 int2 frac2@       for: 'UFixed'
-instance AddFixedC rep int1 frac1 int2 frac2 =>
-  Add (Fixed rep int1 frac1) (Fixed rep int2 frac2) where
+-- * @'ENumFixedC'  rep frac1 frac2 size1 size2@ for: 'Fixed'
+-- * @'ENumSFixedC' int1 frac1 int2 frac2@       for: 'SFixed'
+-- * @'ENumUFixedC' int1 frac1 int2 frac2@       for: 'UFixed'
+instance ENumFixedC rep int1 frac1 int2 frac2 =>
+  ExtendingNum (Fixed rep int1 frac1) (Fixed rep int2 frac2) where
   type AResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
-               Fixed rep (Max int1 int2 + 1) (Max frac1 frac2)
+               Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
   plus f1 f2  =
-    let (Fixed f1R) = resizeF f1 :: Fixed rep (Max int1 int2 + 1) (Max frac1 frac2)
-        (Fixed f2R) = resizeF f2 :: Fixed rep (Max int1 int2 + 1) (Max frac1 frac2)
+    let (Fixed f1R) = resizeF f1 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
+        (Fixed f2R) = resizeF f2 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
     in  Fixed (f1R + f2R)
   minus f1 f2 =
-    let (Fixed f1R) = resizeF f1 :: Fixed rep (Max int1 int2 + 1) (Max frac1 frac2)
-        (Fixed f2R) = resizeF f2 :: Fixed rep (Max int1 int2 + 1) (Max frac1 frac2)
+    let (Fixed f1R) = resizeF f1 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
+        (Fixed f2R) = resizeF f2 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
     in  Fixed (f1R - f2R)
+  type MResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
+               Fixed rep (int1 + int2) (frac1 + frac2)
+  times (Fixed fRep1) (Fixed fRep2) = Fixed (times fRep1 fRep2)
 
 -- | Constraint for the 'Num' instance of 'Fixed'
 type NumFixedC rep int frac
   = ( SaturatingNum (rep (int + frac))
-    , Mult (rep (int + frac)) (rep (int + frac))
+    , ExtendingNum (rep (int + frac)) (rep (int + frac))
     , ResizeFC rep (int + int) (frac + frac) int frac
     , MResult (rep (int + frac)) (rep (int + frac)) ~
               rep ((int + int) + (frac + frac))
@@ -354,13 +376,7 @@ type NumSFixedC int frac =
   )
 -- | Constraint for the 'Num' instance of 'UFixed'
 type NumUFixedC int frac =
-  ( KnownNat frac
-  , KnownNat (frac + frac)
-  , KnownNat (int + frac)
-  , KnownNat ((int + frac) + 1)
-  , KnownNat ((int + frac) + (int + frac))
-  , ((int + int) + (frac + frac)) ~ ((int + frac) + (int + frac))
-  )
+     NumSFixedC int frac
 
 -- | The operators of this instance saturate on overflow, and use truncation as
 -- the rounding method.
@@ -561,7 +577,7 @@ instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
       SatZero      -> resizeF' False 0 0 res
       SatSymmetric -> resizeF' False fMinSym maxBound res
     where
-      res     = Fixed (a `mult` b) :: Fixed rep (int + int) (frac + frac)
+      res     = Fixed (a `times` b) :: Fixed rep (int + int) (frac + frac)
       fMinSym = if isSigned a
                    then 0
                    else minBound + 1

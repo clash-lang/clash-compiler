@@ -40,11 +40,10 @@ module CLaSH.Sized.Internal.Unsigned
   , (*#)
   , negate#
   , fromInteger#
-    -- ** Add
+    -- ** ExtendingNum
   , plus#
   , minus#
-    -- ** Mult
-  , mult#
+  , times#
     -- ** Integral
   , quot#
   , rem#
@@ -73,7 +72,7 @@ import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
 import CLaSH.Class.BitConvert         (BitConvert (..))
-import CLaSH.Class.Num                (Add (..), Mult (..), SaturatingNum (..),
+import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
@@ -213,26 +212,25 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: KnownNat n => Integer -> Unsigned n
 fromInteger_INLINE i = let res = U (i `mod` (2 ^ natVal res)) in res
 
-instance KnownNat (Max m n + 1) => Add (Unsigned m) (Unsigned n) where
-  type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
+instance (KnownNat (1 + Max m n), KnownNat (m + n)) =>
+  ExtendingNum (Unsigned m) (Unsigned n) where
+  type AResult (Unsigned m) (Unsigned n) = Unsigned (1 + Max m n)
   plus  = plus#
   minus = minus#
+  type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
+  times = times#
 
-plus#, minus# :: KnownNat (Max m n + 1) => Unsigned m -> Unsigned n
-              -> Unsigned (Max m n + 1)
+plus#, minus# :: KnownNat (1 + Max m n) => Unsigned m -> Unsigned n
+              -> Unsigned (1 + Max m n)
 {-# NOINLINE plus# #-}
 plus# (U a) (U b) = fromInteger_INLINE (a + b)
 
 {-# NOINLINE minus# #-}
 minus# (U a) (U b) = fromInteger_INLINE (a - b)
 
-instance KnownNat (m + n) => Mult (Unsigned m) (Unsigned n) where
-  type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
-  mult = mult#
-
-{-# NOINLINE mult# #-}
-mult# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
-mult# (U a) (U b) = fromInteger_INLINE (a * b)
+{-# NOINLINE times# #-}
+times# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
+times# (U a) (U b) = fromInteger_INLINE (a * b)
 
 instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toInteger#
@@ -356,7 +354,7 @@ instance KnownNat n => Lift (Unsigned n) where
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
-instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
+instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
   SaturatingNum (Unsigned n) where
   satPlus SatWrap a b = a +# b
   satPlus w a b = case msb r of
@@ -381,5 +379,5 @@ instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
                            SatZero  -> minBound#
                            _        -> maxBound#
     where
-      r       = mult# a b
+      r       = times# a b
       (rL,rR) = split r

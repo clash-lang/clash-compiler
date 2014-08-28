@@ -57,7 +57,7 @@ import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 
-import CLaSH.Class.Num            (Add (..), Mult (..), SaturatingNum (..))
+import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
 import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Promoted.Symbol      (SSymbol)
 
@@ -147,14 +147,12 @@ instance Bounded a => Bounded (CSignal clk a) where
   minBound = signal# minBound
   maxBound = signal# maxBound
 
-instance Add a b => Add (CSignal clk a) (CSignal clk b) where
+instance ExtendingNum a b => ExtendingNum (CSignal clk a) (CSignal clk b) where
   type AResult (CSignal clk a) (CSignal clk b) = CSignal clk (AResult a b)
   plus  = liftA2 plus
   minus = liftA2 minus
-
-instance Mult a b => Mult (CSignal clk a) (CSignal clk b) where
   type MResult (CSignal clk a) (CSignal clk b) = CSignal clk (MResult a b)
-  mult = liftA2 mult
+  times = liftA2 times
 
 instance SaturatingNum a => SaturatingNum (CSignal clk a) where
   satPlus s = liftA2 (satPlus s)
