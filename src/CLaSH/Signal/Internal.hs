@@ -13,6 +13,9 @@ module CLaSH.Signal.Internal
   , CSignal (..)
     -- * Basic circuits
   , register#
+  , mux
+    -- * Boolean connectives
+  , (&&$), (||$), not1
     -- * Type classes
     -- ** 'Eq'-like
   , (==&), (/=&)
@@ -139,9 +142,23 @@ instance Traversable (CSignal clk) where
 traverse# :: Applicative f => (a -> f b) -> CSignal clk a -> f (CSignal clk b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 
+infixr 2 ||$
+(||$) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
+(||$) = liftA2 (||)
+
+infixr 3 &&$
+(&&$) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
+(&&$) = liftA2 (&&)
+
+not1 :: CSignal clk Bool -> CSignal clk Bool
+not1 = fmap not
+
 {-# NOINLINE register# #-}
 register# :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 register# _ i s = i :- s
+
+mux :: CSignal clk Bool -> CSignal clk a -> CSignal clk a -> CSignal clk a
+mux = liftA3 (\b t f -> if b then t else f)
 
 instance Bounded a => Bounded (CSignal clk a) where
   minBound = signal# minBound

@@ -40,6 +40,10 @@ module CLaSH.Prelude
     -- * Exported modules
     -- ** Synchronous signals
   , module CLaSH.Signal
+  , module CLaSH.Signal.Delayed
+  , module CLaSH.Signal.Enabled
+    -- ** Streaming interface
+  , module CLaSH.Prelude.Stream
     -- ** Datatypes
     -- *** Bit vectors
   , module CLaSH.Sized.BitVector
@@ -95,6 +99,7 @@ import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
 import CLaSH.Prelude.Explicit      (cregisterW, cwindow, cwindowD)
 import CLaSH.Prelude.Mealy         ((<^>))
+import CLaSH.Prelude.Stream
 import CLaSH.Prelude.Testbench     (sassert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
@@ -107,6 +112,8 @@ import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector
 import CLaSH.Signal
+import CLaSH.Signal.Delayed
+import CLaSH.Signal.Enabled
 import CLaSH.Signal.Explicit       (systemClock)
 
 {-# INLINE window #-}

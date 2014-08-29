@@ -2,13 +2,16 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE TypeOperators       #-}
 
+{-# LANGUAGE Arrows #-}
+
 module CLaSH.Prelude.Stream
-  ( STREAM (..)
-  , Valid
-  , Ready
+  ( Stream (..)
+  , sregister
   , fifo
   , fifoIC
   , fifoZero
@@ -17,20 +20,18 @@ module CLaSH.Prelude.Stream
 where
 
 import Control.Applicative   (Applicative (..), (<$>))
-import Control.Arrow         (Arrow (..), ArrowLoop (..))
+import Control.Arrow         (Arrow (..), ArrowLoop (..), ArrowChoice (..))
 import Control.Category      (Category (..))
 import Data.Default          (Default (..))
 import Prelude               hiding ((.), (++), (!!), id, length)
-import GHC.TypeLits          (KnownNat, KnownSymbol, type (+))
+import GHC.TypeLits          (KnownNat, type (+))
 
 import CLaSH.Promoted.Nat    (SNat)
-import CLaSH.Signal.Explicit (CSignal, Clock (..), SClock, cregister, unwrap,
-                              withSClock, wrap)
+import CLaSH.Signal.Enabled  (Enabled, enabled, mapEnabled, regEn, zipWithEnabled)
+import CLaSH.Signal.Explicit (CSignal, Clock (..), SClock, cregister, wrap)
+import CLaSH.Signal.Internal ((&&$))
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec (..), (++), (!!), (<<+), length)
-
-type Valid = Bool
-type Ready = Bool
 
 -- | A simple streaming interface with back-pressure
 --
@@ -81,87 +82,146 @@ type Ready = Bool
 --
 -- <<doc/streamarrowcompose.svg>>
 
-newtype STREAM (clk :: Clock) i o
-  = STREAM
-  { runSTREAM :: CSignal clk Valid
-              -> CSignal clk Ready
-              -> CSignal clk i
-              -> (CSignal clk Valid, CSignal clk Ready, CSignal clk o)
+newtype Stream (clk :: Clock) i o
+  = Stream
+  { runStream :: SClock clk
+              -> CSignal clk Bool
+              -> CSignal clk (Enabled i)
+              -> (CSignal clk Bool, CSignal clk (Enabled o))
   }
 
-instance Category (STREAM clk) where
-  id = STREAM (\valid ready dataIn -> (valid,ready,dataIn))
-  (STREAM f2) . (STREAM f1) = STREAM f3
+instance Category (Stream clk) where
+  id = Stream (\_ r d -> (r,d))
+  (Stream f) . (Stream g) = Stream h
     where
-      f3 f1ValIn f2ReadyIn f1DataIn = (f2ValOut,f1ReadyOut,f2DataOut)
+      h clk rIn dIn = (gRout,fDout)
         where
-          (f1ValOut,f1ReadyOut,f1DataOut) = f1 f1ValIn  f2ReadyOut f1DataIn
-          (f2ValOut,f2ReadyOut,f2DataOut) = f2 f1ValOut f2ReadyIn  f1DataOut
+          (gRout,gDout) = g clk fRout dIn
+          (fRout,fDout) = f clk rIn gDout
 
-instance (KnownSymbol name, KnownNat period) =>
-  Arrow (STREAM (Clk name period)) where
-  arr f = STREAM (\valid ready dataIn -> (valid,ready,f <$> dataIn))
-
-  first (STREAM f) = STREAM (withSClock f')
+instance Arrow (Stream clk) where
+  arr f = Stream (\_ r d -> (r,fmap (second f) d))
+  first (Stream f) = Stream g
     where
-      f' clk valIn readyIn dataIn = (valOut,readyOut,unwrap clk (dOut,dInR))
+      g clk rIn dIn = (rIn &&$ rOut,zipWithEnabled clk (,) l' r)
         where
-          (dInL,dInR)            = wrap clk dataIn
-          (valOut,readyOut,dOut) = f valIn readyIn dInL
+          l         = mapEnabled fst dIn
+          r         = mapEnabled snd dIn
+          (rOut,l') = f clk rIn l
 
-  second (STREAM f) = STREAM (withSClock f')
+  second (Stream f) = Stream g
     where
-      f' clk valIn readyIn dataIn = (valOut,readyOut,unwrap clk (dInL,dOut))
+      g clk rIn dIn = (rIn &&$ rOut,zipWithEnabled clk (,) l r')
         where
-          (dInL,dInR)            = wrap clk dataIn
-          (valOut,readyOut,dOut) = f valIn readyIn dInR
+          l         = mapEnabled fst dIn
+          r         = mapEnabled snd dIn
+          (rOut,r') = f clk rIn r
 
-  (STREAM f1) *** (STREAM f2) = STREAM (withSClock f3)
+
+  (Stream f) *** (Stream g) = Stream h
     where
-      f3 clk valIn readyIn dataIn = ( (&&) <$> f1ValOut   <*> f2ValOut
-                                    , (&&) <$> f1ReadyOut <*> f2ReadyOut
-                                    , unwrap clk (f1DataOut,f2DataOut)
-                                    )
+      h clk rIn dIn = (fRout &&$ gRout, zipWithEnabled clk (,) l' r')
         where
-          (dInL,dInR)                     = wrap clk dataIn
-          (f1ValOut,f1ReadyOut,f1DataOut) = f1 valIn readyIn dInL
-          (f2ValOut,f2ReadyOut,f2DataOut) = f2 valIn readyIn dInR
+          l = mapEnabled fst dIn
+          r = mapEnabled snd dIn
+          (fRout,l') = f clk rIn l
+          (gRout,r') = g clk rIn r
 
-  (STREAM f1) &&& (STREAM f2) = STREAM (withSClock f3)
+  (Stream f) &&& (Stream g) = Stream h
     where
-      f3 clk valIn readyIn dataIn = ( (&&) <$> f1ValOut   <*> f2ValOut
-                                    , (&&) <$> f1ReadyOut <*> f2ReadyOut
-                                    , unwrap clk (f1DataOut,f2DataOut)
-                                    )
+      h clk rIn dIn = (fRout &&$ gRout, zipWithEnabled clk (,) fDout gDout)
         where
-          (f1ValOut,f1ReadyOut,f1DataOut) = f1 valIn readyIn dataIn
-          (f2ValOut,f2ReadyOut,f2DataOut) = f2 valIn readyIn dataIn
+          (fRout,fDout) = f clk rIn dIn
+          (gRout,gDout) = g clk rIn dIn
 
-instance (KnownSymbol name, KnownNat period) =>
-  ArrowLoop (STREAM (Clk name period)) where
-  loop (STREAM f) = STREAM (withSClock g)
+instance ArrowLoop (Stream clk) where
+  loop (Stream f) = Stream g
     where
-      g clk valIn readyIn b = (fValOut,fReadyOut,c)
+      g clk rIn b = (rOut,c)
         where
-          (fValOut,fReadyOut,fDataOut) = f valid ready (unwrap clk (b,d))
-          valid = (&&) <$> valIn   <*> fValOut
-          ready = (&&) <$> readyIn <*> fReadyOut
-          (c,d) = wrap clk fDataOut
+          (rOut,dOut) = f clk ready (zipWithEnabled clk (,) b d)
+          c           = mapEnabled fst dOut
+          d           = mapEnabled snd dOut
+          ready       = rIn &&$ rOut
 
+instance ArrowChoice (Stream clk) where
+  left (Stream f) = Stream g
+    where
+      g clk rIn dIn = (rOut,dOut)
+        where
+          (rOut,dOut,fRin,fDin) = wrap clk (route <$> rIn <*> dIn <*> fRout
+                                                  <*> fDout)
+
+          (fRout,fDout)         = f clk fRin fDin
+
+      route rIn (vIn,Left a) fRout fDout =
+        (fRout,second Left fDout,rIn,(vIn,a))
+      route rIn (vIn,Right b) _ _ =
+        (rIn,(vIn,Right b),False,(False,undefined))
+
+  right (Stream f) = Stream g
+    where
+      g clk rIn dIn = (rOut,dOut)
+        where
+          (rOut,dOut,fRin,fDin) = wrap clk (route <$> rIn <*> dIn <*> fRout
+                                                  <*> fDout)
+
+          (fRout,fDout)         = f clk fRin fDin
+
+      route rIn (vIn,Left a) _ _ =
+        (rIn,(vIn,Left a),False,(False,undefined))
+      route rIn (vIn,Right b) fRout fDout =
+        (fRout,second Right fDout,rIn,(vIn,b))
+
+  (Stream f) +++ (Stream g) = Stream h
+    where
+      h clk rIn dIn = (rOut,dOut)
+        where
+          (rOut,dOut,fRin,fDin,gRin,gDin) =
+            wrap clk (route <$> rIn <*> dIn <*> fRout <*> fDout <*> gRout <*> gDout)
+
+          (fRout,fDout) = f clk fRin fDin
+          (gRout,gDout) = g clk gRin gDin
+
+      route rIn (vIn,Left a) fRout fDout _ _ =
+        (fRout,second Left fDout,rIn,(vIn,a),False,(False,undefined))
+
+      route rIn (vIn,Right b) _ _ gRout gDout =
+        (gRout,second Right gDout,False,(False,undefined),rIn,(vIn,b))
+
+  (Stream f) ||| (Stream g) = Stream h
+    where
+      h clk rIn dIn = (rOut,dOut)
+        where
+          (rOut,dOut,fRin,fDin,gRin,gDin) =
+            wrap clk (route <$> rIn <*> dIn <*> fRout <*> fDout <*> gRout <*> gDout)
+
+          (fRout,fDout) = f clk fRin fDin
+          (gRout,gDout) = g clk gRin gDin
+
+      route rIn (vIn,Left a) fRout fDout _ _ =
+        (fRout,fDout,rIn,(vIn,a),False,(False,undefined))
+
+      route rIn (vIn,Right b) _ _ gRout gDout =
+        (gRout,gDout,False,(False,undefined),rIn,(vIn,b))
+
+
+sregister :: a -> Stream clk a a
+sregister is = Stream sregister'
+  where
+    sregister' clk rIn inp = (rIn,enabled (regEn clk is inp))
 
 fifoT :: (KnownNat n, KnownNat (n + 1))
       => (Vec n a, Index (n + 1))
-      -> Valid
-      -> Ready
-      -> a
+      -> Bool
+      -> Enabled a
       -> ( (Vec n a, Index (n + 1))
-         , ( Valid
-           , Ready
-           , a
+         , ( Bool
+           , Enabled a
            )
          )
-fifoT (queue,cntr) inputValid outputReady dataIn =
-    ((queue',cntr'), (queueValid, queueReady, dataOut))
+fifoT (queue,cntr) outputReady (inputValid,dataIn) =
+    ((queue',cntr'), (queueReady, (queueValid, dataOut)))
   where
     -- Derived input signals
     outputNotReady = not outputReady
@@ -220,10 +280,9 @@ fifoT (queue,cntr) inputValid outputReady dataIn =
 -- * The minimum delay for values wanting to pass through the FIFO is:
 --   "number of values in the queue" + 1
 fifo :: (KnownNat n, KnownNat (n + 1), Default a)
-     => SClock clk -- ^ Clock to synchronise the FIFO to
-     -> SNat n     -- ^ Number of elements in the FIFO queue
-     -> STREAM clk a a -- ^ A FIFO adhering to the 'STREAM' interface
-fifo clk sz = fifoIC clk sz Nil
+     => SNat n         -- ^ Number of elements in the FIFO queue
+     -> Stream clk a a -- ^ A FIFO adhering to the 'STREAM' interface
+fifo sz = fifoIC sz Nil
 
 -- | FIFO queue of @(m + n)@ elements, with @m@ initial elements.
 --
@@ -236,16 +295,15 @@ fifo clk sz = fifoIC clk sz Nil
 --   "number of values in the queue" + 1
 fifoIC :: forall m n a clk . (KnownNat m, KnownNat n, KnownNat (m + n),
                               KnownNat (m + n + 1), Default a)
-       => SClock clk      -- ^ Clock to synchronise the FIFO to
-       -> SNat (m + n)    -- ^ Number of elements in the FIFO queue
+       => SNat (m + n)    -- ^ Number of elements in the FIFO queue
        -> Vec  n a        -- ^ Initial elements
-       -> STREAM clk a a  -- ^ A FIFO adhering to the 'STREAM' interface
-fifoIC clk _ ivals = STREAM fifo'
+       -> Stream clk a a  -- ^ A FIFO adhering to the 'STREAM' interface
+fifoIC _ ivals = Stream fifo'
   where
-    fifo' valIn readyIn dataIn = wrap clk fOut
+    fifo' clk readyIn dataIn = wrap clk fOut
       where
         (queue',fOut) = wrap clk
-                          (fifoT <$> queue <*> valIn <*> readyIn <*> dataIn)
+                          (fifoT <$> queue <*> readyIn <*> dataIn)
         queue         = cregister clk
                           ( (def :: Vec m a) ++ ivals
                           , fromInteger (length ivals))
@@ -254,17 +312,15 @@ fifoIC clk _ ivals = STREAM fifo'
 
 fifoZeroT :: (KnownNat n, KnownNat (n + 1))
           => (Vec n a, Index (n + 1))   -- ^ (FIFO Queue, content counter)
-          -> Valid                      -- ^ Input is valid
-          -> Ready                      -- ^ Output is ready to receive values
-          -> a                          -- ^ Data input
+          -> Bool                       -- ^ Output is ready to receive values
+          -> Enabled a                  -- ^ Data input
           -> ( (Vec n a, Index (n + 1)) -- (FIFO Queue, content counter)
-             , ( Valid                  -- Output is valid
-               , Ready                  -- FIFO ready for new values
-               , a                      -- Data output
+             , ( Bool                   -- FIFO ready for new values
+               , Enabled a              -- Data output
                )
              )
-fifoZeroT (queue,cntr) inputValid outputReady dataIn =
-    ((queue',cntr'), (queueValid, queueReady, dataOut))
+fifoZeroT (queue,cntr) outputReady (inputValid,dataIn) =
+    ((queue',cntr'), (queueReady, (queueValid, dataOut)))
   where
     -- Derived input signals
     outputNotReady = not outputReady
@@ -320,10 +376,9 @@ fifoZeroT (queue,cntr) inputValid outputReady dataIn =
 -- * Forgets new inputs when the queue is full (as opposed to forgetting the
 --   oldest element)
 fifoZero :: (KnownNat n, KnownNat (n + 1), Default a, Show a)
-     => SClock clk     -- ^ Clock to synchronise the FIFO to
-     -> SNat n         -- ^ Number of elements in the FIFO queue
-     -> STREAM clk a a -- ^ A FIFO adhering to the 'STREAM' interface
-fifoZero clk sz = fifoZeroIC clk sz Nil
+     => SNat n         -- ^ Number of elements in the FIFO queue
+     -> Stream clk a a -- ^ A FIFO adhering to the 'STREAM' interface
+fifoZero sz = fifoZeroIC sz Nil
 
 -- | Zero-delay FIFO queue of @(m + n)@ elements, with @m@ initial elements.
 --
@@ -339,16 +394,15 @@ fifoZero clk sz = fifoZeroIC clk sz Nil
 --   oldest element)
 fifoZeroIC :: forall m n a clk . ( KnownNat m, KnownNat n, KnownNat (m + n),
                                    KnownNat (m + n + 1), Default a)
-       => SClock clk   -- ^ Clock to synchronise the FIFO to
-       -> SNat (m + n) -- ^ Number of elements in the FIFO queue
+       => SNat (m + n) -- ^ Number of elements in the FIFO queue
        -> Vec  n a     -- ^ Initial elements
-       -> STREAM clk a a   -- ^ A FIFO adhering to the 'STREAM' interface
-fifoZeroIC clk _ ivals = STREAM fifo'
+       -> Stream clk a a   -- ^ A FIFO adhering to the 'STREAM' interface
+fifoZeroIC _ ivals = Stream fifo'
   where
-    fifo' valIn readyIn dataIn = wrap clk fOut
+    fifo' clk readyIn dataIn = wrap clk fOut
       where
         (queue',fOut) = wrap clk
-                          (fifoZeroT <$> queue <*> valIn <*> readyIn <*> dataIn)
+                          (fifoZeroT <$> queue <*> readyIn <*> dataIn)
         queue         = cregister clk
                           ( (def :: Vec m a) ++ ivals
                             ,fromInteger (length ivals))

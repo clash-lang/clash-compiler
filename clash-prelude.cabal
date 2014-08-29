@@ -70,6 +70,7 @@ Library
 
                       CLaSH.Signal
                       CLaSH.Signal.Delayed
+                      CLaSH.Signal.Enabled
                       CLaSH.Signal.Explicit
                       CLaSH.Signal.Internal
                       CLaSH.Signal.Wrap

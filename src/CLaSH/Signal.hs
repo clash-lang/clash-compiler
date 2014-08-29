@@ -6,6 +6,9 @@ module CLaSH.Signal
     -- * Basic circuit functions
   , signal
   , register
+  , mux
+    -- * Boolean connectives
+  , (&&$), (||$), not1
     -- * Product/Signal isomorphism
   , Wrap
   , SWrapped
@@ -50,7 +53,7 @@ import CLaSH.Signal.Internal  (CSignal, register#, signal#, (==&), (/=&),
                                toRational1, toInteger1, testBit1, popCount1,
                                shift1, rotate1, setBit1, clearBit1, shiftL1,
                                unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
-                               rotateR1)
+                               rotateR1, (||$), (&&$), not1, mux)
 import CLaSH.Signal.Explicit  (SystemClock, cfromList, csample, csampleN,
                                systemClock)
 import CLaSH.Signal.Wrap      (Wrap (..), Wrapped)
