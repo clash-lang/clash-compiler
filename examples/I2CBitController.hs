@@ -32,49 +32,18 @@ data MachineState =
     , sdaChk    :: Bool            -- check SDA statur (multi-master arbitration)
     }
 
-isRising :: Bit
-         -> Signal Bit
-         -> Signal Bool
-isRising is s = isRisingT <$> delayed <*> s
-  where
-    isRisingT old new = old == 0 && new == 1
-    delayed = register is s
-
-isFalling :: Bit
-          -> Signal Bit
-          -> Signal Bool
-isFalling is s = isFallingT <$> delayed <*> s
-  where
-    isFallingT old new = old == 1 && new == 0
-    delayed = register is s
-
-isFallingB :: Bool
-           -> Signal Bool
-           -> Signal Bool
-isFallingB is s = isFallingT <$> delayed <*> s
-  where
-    isFallingT old new = old && not new
-    delayed = register is s
-
-topEntity = i2cMasterBitCtrl
-
 i2cMasterBitCtrl :: Signal (Unsigned 16)
-                 -> Signal I2CCommand
-                 -> Signal Bit
-                 -> Signal (Bit, Bit)
-                 -> ((Signal Bool,
-                      Signal Bool,
-                      Signal Bit),
-                     Signal Bool,
-                     (Signal Bit, Signal Bool, Signal Bit, Signal Bool))
-i2cMasterBitCtrl clkCnt cmd dIn i2cIn = ((icmdAck,al,dout),busy,i2cOut)
+                 -> SWrapped BitCtrlSig
+                 -> Signal I2CIn
+                 -> (SWrapped BitRespSig, Signal Bool, Signal I2COut)
+i2cMasterBitCtrl clkCnt (cmd,dIn) i2cIn = ((icmdAck,al,dout),busy,i2cOut)
   where
     -- whenever the slave is not ready it can delay the cycle by pulling SCL low
     -- slave_wait is asserted when master wants to drive SCL high, but the slave pulls it low
     -- slave_wait remains asserted until the slave releases SCL
-    isclOenFalling = isFallingB False isclOen
-    slaveWait  = register False slaveWait'
-    slaveWait' = syncSCL ==& 0 &&$ (isclOenFalling ||$ slaveWait)
+    isclOenFalling = isFalling False isclOen
+    slaveWait      = register False slaveWait'
+    slaveWait'     = syncSCL ==& 0 &&$ (isclOenFalling ||$ slaveWait)
 
     -- master drives SCL high, but another master pulls it low
     -- master start counting down its low cycle now (clock synchronization)
@@ -98,7 +67,7 @@ i2cMasterBitCtrl clkCnt cmd dIn i2cIn = ((icmdAck,al,dout),busy,i2cOut)
     isclOen = sclOen <$> sm
     isdaOen = sdaOen <$> sm
 
-    i2cOut = (0,isclOen,0,isdaOen)
+    i2cOut     = sUnwrap (0,isclOen,0,isdaOen)
 
 genClkEn :: ( Signal Bool
             , Signal Bool
@@ -419,4 +388,3 @@ nextStateDecoder (MachineState {..}) al clkEn cmd din
   | otherwise =
       MachineState {bitStateM = bitStateM, cmdAck = False, sclOen = sclOen,
                     sdaOen = sdaOen, sdaChk = sdaChk}
-
