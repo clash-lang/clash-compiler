@@ -33,6 +33,8 @@ module CLaSH.Prelude
     -- * Utility functions
   , window
   , windowD
+  , isRising
+  , isFalling
     -- * Testbench functions
   , sassert
   , stimuliGenerator
@@ -97,7 +99,8 @@ import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
-import CLaSH.Prelude.Explicit      (cregisterW, cwindow, cwindowD)
+import CLaSH.Prelude.Explicit      (cregisterW, cwindow, cwindowD, cisRising,
+                                    cisFalling)
 import CLaSH.Prelude.Mealy         ((<^>))
 import CLaSH.Prelude.Stream
 import CLaSH.Prelude.Testbench     (sassert, stimuliGenerator, outputVerifier)
@@ -152,3 +155,19 @@ windowD = cwindowD systemClock
 -- [(8,8),(1,1),(2,2),(3,3),...
 registerW :: Wrap a => a -> SWrapped a -> SWrapped a
 registerW = cregisterW systemClock
+
+{-# INLINE isRising #-}
+-- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
+isRising :: (Bounded a, Eq a)
+         => a -- ^ Starting value
+         -> Signal a
+         -> Signal Bool
+isRising = cisRising systemClock
+
+{-# INLINE isFalling #-}
+-- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
+isFalling :: (Bounded a, Eq a)
+          => a -- ^ Starting value
+          -> Signal a
+          -> Signal Bool
+isFalling = cisFalling systemClock

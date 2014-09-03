@@ -21,6 +21,8 @@ module CLaSH.Prelude.Explicit
     -- * Utility functions
   , cwindow
   , cwindowD
+  , cisRising
+  , cisFalling
     -- * Testbench functions
   , csassert
   , cstimuliGenerator
@@ -31,6 +33,7 @@ module CLaSH.Prelude.Explicit
   )
 where
 
+import Control.Applicative     (liftA2)
 import Data.Default            (Default (..))
 import GHC.TypeLits            (KnownNat, type (+), natVal)
 import Prelude                 hiding (repeat)
@@ -93,3 +96,27 @@ cwindowD clk x = prev
   where
     prev = cregisterW clk (repeat def) next
     next = x +>> prev
+
+{-# INLINABLE cisRising #-}
+-- | Give a pulse when the 'CSignal' goes from 'minBound' to 'maxBound'
+cisRising :: (Bounded a, Eq a)
+          => SClock clk
+          -> a -- ^ Starting value
+          -> CSignal clk a
+          -> CSignal clk Bool
+cisRising clk is s = liftA2 edgeDetect prev s
+  where
+    prev = cregister clk is s
+    edgeDetect old new = old == minBound && new == maxBound
+
+{-# INLINABLE cisFalling #-}
+-- | Give a pulse when the 'CSignal' goes from 'maxBound' to 'minBound'
+cisFalling :: (Bounded a, Eq a)
+           => SClock clk
+           -> a -- ^ Starting value
+           -> CSignal clk a
+           -> CSignal clk Bool
+cisFalling clk is s = liftA2 edgeDetect prev s
+  where
+    prev = cregister clk is s
+    edgeDetect old new = old == maxBound && new == minBound
