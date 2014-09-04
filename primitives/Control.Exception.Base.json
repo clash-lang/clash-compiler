@@ -13,4 +13,9 @@
     , "templateE" : "~ERRORO"
     }
   }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.absentError"
+    , "templateE" : "~ERRORO"
+    }
+  }
 ]
