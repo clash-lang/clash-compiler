@@ -155,16 +155,27 @@ mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 mkDeclarations _ e@(Case _ _ []) =
   error $ $(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported: " ++ showDoc e
 
-mkDeclarations bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
+mkDeclarations bndr e@(Case scrut _ [alt]) = do
   (pat,v) <- unbind alt
   (varTy,varTm) <- case v of
                      (Var t n) -> return (t,n)
                      _ -> error $ $(curLoc) ++ "Not in normal form: RHS of case-projection is not a variable: " ++ showDoc e
   typeTrans    <- Lens.use typeTranslator
   tcm          <- Lens.use tcCache
+  scrutTy      <- termType tcm scrut
+  let sHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy
+  (selId,decls) <- case scrut of
+                     (Var _ scrutNm) -> return (mkBasicId . Text.pack $ name2String scrutNm,[])
+                     _ -> do
+                        (newExpr, newDecls) <- mkExpr scrutTy scrut
+                        i   <- varCount <<%= (+1)
+                        let tmpNm   = "tmp_" ++ show i
+                            tmpNmT  = Text.pack tmpNm
+                            tmpDecl = NetDecl tmpNmT sHwTy Nothing
+                            tmpAssn = Assignment tmpNmT newExpr
+                        return (tmpNmT,newDecls ++ [tmpDecl,tmpAssn])
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
       altVarId = mkBasicId . Text.pack $ name2String varTm
-      selId    = mkBasicId . Text.pack $ name2String scrutNm
       modifier = case pat of
         DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
                                   in case elemIndex (Id varTm (Embed varTy)) tms of
@@ -172,7 +183,7 @@ mkDeclarations bndr e@(Case (Var scrutTy scrutNm) _ [alt]) = do
                                        Just fI -> Just (Indexed (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy,dcTag dc - 1,fI))
         _                      -> error $ $(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
-  return [Assignment dstId extractExpr]
+  return (decls ++ [Assignment dstId extractExpr])
 
 mkDeclarations bndr (Case scrut altTy alts) = do
   alts'                  <- mapM unbind alts
