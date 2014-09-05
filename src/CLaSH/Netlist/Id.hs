@@ -22,7 +22,7 @@ mkBasicId' :: Bool
            -> Text
 mkBasicId' tupEncode = stripMultiscore . stripLeading . zEncode tupEncode
   where
-    stripLeading    = Text.dropWhile (`elem` ['0'..'9'])
+    stripLeading    = Text.dropWhile (`elem` ('_':['0'..'9']))
     stripMultiscore = Text.concat
                     . Prelude.map (\cs -> case Text.head cs of
                                             '_' -> "_"
