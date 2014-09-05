@@ -137,7 +137,7 @@ unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.U" (ForAllTy (bind nTV fun
   where
     funTy      = mkFunTy intTy (AppTy unsignedTy nVar)
     intTy      = ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
-    unsignedTy = ConstTy (TyCon (string2Name "CLaSH.Sized.Internal.Unsigned.Signed"))
+    unsignedTy = ConstTy (TyCon (string2Name "CLaSH.Sized.Internal.Unsigned.Unsigned"))
     nName      = string2Name "n"
     nVar       = VarTy typeNatKind nName
     nTV        = TyVar nName (embed typeNatKind)
