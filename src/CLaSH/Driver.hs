@@ -51,15 +51,15 @@ generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
   putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
   let topEntities     = HashMap.filterWithKey
-                          (\var _ -> isSuffixOf "topEntity" $ name2String var)
+                          (\var _ -> isSuffixOf ".topEntity" $ name2String var)
                           bindingsMap
 
       testInputs      = HashMap.filterWithKey
-                          (\var _ -> isSuffixOf "testInput" $ name2String var)
+                          (\var _ -> isSuffixOf ".testInput" $ name2String var)
                           bindingsMap
 
       expectedOutputs = HashMap.filterWithKey
-                          (\var _ -> isSuffixOf "expectedOutput" $ name2String var)
+                          (\var _ -> isSuffixOf ".expectedOutput" $ name2String var)
                           bindingsMap
 
   case HashMap.toList topEntities of
