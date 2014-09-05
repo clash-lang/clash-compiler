@@ -632,12 +632,21 @@ inlineHO _ e = return e
 simpleCSE :: NormRewrite
 simpleCSE _ e@(Letrec b) = R $ do
   (binders,body) <- first unrec <$> unbind b
-  let (reducedBindings,body') = reduceBinders [] body binders
+  let (reducedBindings,body') = reduceBindersFix binders body
   if length binders /= length reducedBindings
      then changed (Letrec (bind (rec reducedBindings) body'))
      else return e
 
 simpleCSE _ e = return e
+
+reduceBindersFix :: [LetBinding]
+                 -> Term
+                 -> ([LetBinding],Term)
+reduceBindersFix binders body = if length binders /= length reduced
+                                   then reduceBindersFix reduced body'
+                                   else (binders,body)
+  where
+    (reduced,body') = reduceBinders [] body binders
 
 reduceBinders :: [LetBinding]
               -> Term
@@ -645,14 +654,14 @@ reduceBinders :: [LetBinding]
               -> ([LetBinding],Term)
 reduceBinders processed body [] = (processed,body)
 reduceBinders processed body ((id_,expr):binders) = case List.find ((== expr) . snd) processed of
-  Just (id2,_) ->
-    let var        = Var (unembed (varType id2)) (varName id2)
-        idName     = varName id_
-        processed' = map (second (Embed . (substTm idName var) . unembed)) processed
-        binders'   = map (second (Embed . (substTm idName var) . unembed)) binders
-        body'      = substTm idName var body
-    in  reduceBinders processed' body' binders'
-  Nothing -> reduceBinders ((id_,expr):processed) body binders
+    Just (id2,_) ->
+      let var        = Var (unembed (varType id2)) (varName id2)
+          idName     = varName id_
+          processed' = map (second (Embed . (substTm idName var) . unembed)) processed
+          binders'   = map (second (Embed . (substTm idName var) . unembed)) binders
+          body'      = substTm idName var body
+      in  reduceBinders processed' body' binders'
+    Nothing -> reduceBinders ((id_,expr):processed) body binders
 
 reduceConst :: NormRewrite
 reduceConst _ e@(App _ _)

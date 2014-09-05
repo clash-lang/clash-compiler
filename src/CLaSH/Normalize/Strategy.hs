@@ -17,7 +17,7 @@ normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindCons
     recLetRec  = apply "recToLetRec" recToLetRec
     rmDeadcode = topdownR (apply "deadcode" deadCode)
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
-    cse        = topdownSucR (apply "CSE" simpleCSE)
+    cse        = topdownR (apply "CSE" simpleCSE)
 
 constantPropgation :: NormRewrite
 constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> spec
