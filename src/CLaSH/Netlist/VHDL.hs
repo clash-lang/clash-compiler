@@ -68,7 +68,7 @@ mkTyPackage hwtys =
     needsDec    = nubBy eqHWTy (hwtys ++ filter needsTyDec usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodies) = unzip . catMaybes $ map funDec usedTys
+    (funDecs,funBodies) = unzip . catMaybes $ map funDec (nubBy eqIndexTy usedTys)
     (showDecs,showBodies) = unzip $ map mkToStringDecls hwTysSorted
 
     packageBodyDec :: VHDLM Doc
@@ -82,6 +82,10 @@ mkTyPackage hwtys =
                 indent 2 (vcat (sequence showBodies)) <$>
                 "-- pragma translate_on" <$>
               "end" <> semi
+
+    eqIndexTy :: HWType -> HWType -> Bool
+    eqIndexTy (Index _) (Index _) = True
+    eqIndexTy _ _ = False
 
     eqHWTy :: HWType -> HWType -> Bool
     eqHWTy (Vector _ elTy1) (Vector _ elTy2) = case (elTy1,elTy2) of
