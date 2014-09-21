@@ -8,9 +8,9 @@ where
 
 import Control.Applicative   ((<$>), (<*>))
 
-import CLaSH.Signal          (SWrapped)
+import CLaSH.Signal          (SBundled)
 import CLaSH.Signal.Explicit (SClock, cregister, systemClock)
-import CLaSH.Signal.Wrap     (Wrap (..), Wrapped)
+import CLaSH.Signal.Bundle   (Bundle (..), Bundled)
 
 {-# INLINE (<^>) #-}
 -- | Create a synchronous function from a combinational function describing
@@ -39,11 +39,11 @@ import CLaSH.Signal.Wrap     (Wrap (..), Wrapped)
 -- >   where
 -- >     s1 = (mac <^> 0) (a,b)
 -- >     s2 = (mac <^> 0) (x,y)
-(<^>) :: (Wrap i, Wrap o)
+(<^>) :: (Bundle i, Bundle o)
       => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                            -- @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state
-      -> (SWrapped i -> SWrapped o)
+      -> (SBundled i -> SBundled o)
       -- ^ Synchronous sequential function with input and output matching that
       -- of the mealy machine
 (<^>) = sync systemClock
@@ -77,14 +77,14 @@ import CLaSH.Signal.Wrap     (Wrap (..), Wrapped)
 -- >   where
 -- >     s1 = sync clk100 mac 0 (a,b)
 -- >     s2 = sync clk100 mac 0 (x,y)
-sync :: (Wrap i, Wrap o)
+sync :: (Bundle i, Bundle o)
      => SClock clk        -- ^ 'Clock' to synchronize to
      -> (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                           -- @state -> input -> (newstate,output)@
      -> s                 -- ^ Initial state
-     -> (Wrapped clk i -> Wrapped clk o)
+     -> (Bundled clk i -> Bundled clk o)
     -- ^ Synchronous sequential function with input and output matching that
     -- of the mealy machine
-sync clk f iS = \i -> let (s',o) = wrap clk $ f <$> s <*> unwrap clk i
+sync clk f iS = \i -> let (s',o) = unbundle clk $ f <$> s <*> bundle clk i
                           s      = cregister clk iS s'
-                      in wrap clk o
+                      in unbundle clk o

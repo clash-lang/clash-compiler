@@ -23,7 +23,7 @@ import GHC.TypeLits          (KnownNat, type (+))
 
 import CLaSH.Promoted.Nat    (SNat)
 import CLaSH.Signal.Enabled  (Enabled, enabled, mapEnabled, regEn, zipWithEnabled)
-import CLaSH.Signal.Explicit (CSignal, Clock (..), SClock, cregister, wrap)
+import CLaSH.Signal.Explicit (CSignal, Clock (..), SClock, cregister, unbundle)
 import CLaSH.Signal.Internal ((&&$))
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec (..), (++), (!!), (<<+), length)
@@ -144,7 +144,7 @@ instance ArrowChoice (Stream clk) where
     where
       g clk rIn dIn = (rOut,dOut)
         where
-          (rOut,dOut,fRin,fDin) = wrap clk (route <$> rIn <*> dIn <*> fRout
+          (rOut,dOut,fRin,fDin) = unbundle clk (route <$> rIn <*> dIn <*> fRout
                                                   <*> fDout)
 
           (fRout,fDout)         = f clk fRin fDin
@@ -158,7 +158,7 @@ instance ArrowChoice (Stream clk) where
     where
       g clk rIn dIn = (rOut,dOut)
         where
-          (rOut,dOut,fRin,fDin) = wrap clk (route <$> rIn <*> dIn <*> fRout
+          (rOut,dOut,fRin,fDin) = unbundle clk (route <$> rIn <*> dIn <*> fRout
                                                   <*> fDout)
 
           (fRout,fDout)         = f clk fRin fDin
@@ -173,7 +173,7 @@ instance ArrowChoice (Stream clk) where
       h clk rIn dIn = (rOut,dOut)
         where
           (rOut,dOut,fRin,fDin,gRin,gDin) =
-            wrap clk (route <$> rIn <*> dIn <*> fRout <*> fDout <*> gRout <*> gDout)
+            unbundle clk (route <$> rIn <*> dIn <*> fRout <*> fDout <*> gRout <*> gDout)
 
           (fRout,fDout) = f clk fRin fDin
           (gRout,gDout) = g clk gRin gDin
@@ -189,7 +189,7 @@ instance ArrowChoice (Stream clk) where
       h clk rIn dIn = (rOut,dOut)
         where
           (rOut,dOut,fRin,fDin,gRin,gDin) =
-            wrap clk (route <$> rIn <*> dIn <*> fRout <*> fDout <*> gRout <*> gDout)
+            unbundle clk (route <$> rIn <*> dIn <*> fRout <*> fDout <*> gRout <*> gDout)
 
           (fRout,fDout) = f clk fRin fDin
           (gRout,gDout) = g clk gRin gDin
@@ -295,9 +295,9 @@ fifoIC :: forall m n a clk . (KnownNat m, KnownNat n, KnownNat (m + n),
        -> Stream clk a a  -- ^ A FIFO adhering to the 'STREAM' interface
 fifoIC _ ivals = Stream fifo'
   where
-    fifo' clk readyIn dataIn = wrap clk fOut
+    fifo' clk readyIn dataIn = unbundle clk fOut
       where
-        (queue',fOut) = wrap clk
+        (queue',fOut) = unbundle clk
                           (fifoT <$> queue <*> readyIn <*> dataIn)
         queue         = cregister clk
                           ( (def :: Vec m a) ++ ivals
@@ -394,9 +394,9 @@ fifoZeroIC :: forall m n a clk . ( KnownNat m, KnownNat n, KnownNat (m + n),
        -> Stream clk a a   -- ^ A FIFO adhering to the 'STREAM' interface
 fifoZeroIC _ ivals = Stream fifo'
   where
-    fifo' clk readyIn dataIn = wrap clk fOut
+    fifo' clk readyIn dataIn = unbundle clk fOut
       where
-        (queue',fOut) = wrap clk
+        (queue',fOut) = unbundle clk
                           (fifoZeroT <$> queue <*> readyIn <*> dataIn)
         queue         = cregister clk
                           ( (def :: Vec m a) ++ ivals

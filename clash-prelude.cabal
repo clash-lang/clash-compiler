@@ -69,11 +69,11 @@ Library
                       CLaSH.Promoted.Symbol
 
                       CLaSH.Signal
+                      CLaSH.Signal.Bundle
                       CLaSH.Signal.Delayed
                       CLaSH.Signal.Enabled
                       CLaSH.Signal.Explicit
                       CLaSH.Signal.Internal
-                      CLaSH.Signal.Wrap
 
                       CLaSH.Sized.Fixed
                       CLaSH.Sized.Index

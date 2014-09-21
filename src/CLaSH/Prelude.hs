@@ -26,7 +26,7 @@
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
     (<^>)
-  , registerW
+  , registerB
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
@@ -99,7 +99,7 @@ import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
-import CLaSH.Prelude.Explicit      (cregisterW, cwindow, cwindowD, cisRising,
+import CLaSH.Prelude.Explicit      (cregisterB, cwindow, cwindowD, cisRising,
                                     cisFalling)
 import CLaSH.Prelude.Mealy         ((<^>))
 import CLaSH.Prelude.Stream
@@ -125,7 +125,7 @@ import CLaSH.Signal.Explicit       (systemClock)
 -- > window4 :: Signal Int -> Vec 4 (Signal Int)
 -- > window4 = window
 --
--- >>> simulateW window4 [1,2,3,4,5,...
+-- >>> simulateB window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
 window :: (KnownNat n, Default a)
        => Signal a                -- ^ Signal to create a window over
@@ -138,23 +138,23 @@ window = cwindow systemClock
 -- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
 -- > windowD3 = windowD
 --
--- >>> simulateW windowD3 [1,2,3,4,...
+-- >>> simulateB windowD3 [1,2,3,4,...
 -- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
 windowD :: (KnownNat (n + 1), Default a)
         => Signal a               -- ^ Signal to create a window over
         -> Vec (n + 1) (Signal a) -- ^ Window of at least size 1
 windowD = cwindowD systemClock
 
-{-# INLINE registerW #-}
+{-# INLINE registerB #-}
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
 -- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
--- > rP = registerW (8,8)
+-- > rP = registerB (8,8)
 --
--- >>> simulateW rP [(1,1),(2,2),(3,3),...
+-- >>> simulateB rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-registerW :: Wrap a => a -> SWrapped a -> SWrapped a
-registerW = cregisterW systemClock
+registerB :: Bundle a => a -> SBundled a -> SBundled a
+registerB = cregisterB systemClock
 
 {-# INLINE isRising #-}
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'

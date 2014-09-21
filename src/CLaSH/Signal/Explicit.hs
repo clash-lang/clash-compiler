@@ -20,10 +20,10 @@ module CLaSH.Signal.Explicit
   , csignal
   , cregister
     -- * Product/Signal isomorphism
-  , Wrap (..)
+  , Bundle (..)
     -- * Simulation functions (not synthesisable)
   , csimulate
-  , csimulateW
+  , csimulateB
     -- * List \<-\> CSignal conversion (not synthesisable)
   , csample
   , csampleN
@@ -38,7 +38,7 @@ import CLaSH.Promoted.Nat      (snat, snatToInteger)
 import CLaSH.Promoted.Symbol   (ssymbol)
 import CLaSH.Signal.Internal   (CSignal (..), Clock (..), SClock (..), signal#,
                                 register#)
-import CLaSH.Signal.Wrap       (Wrap (..), Wrapped)
+import CLaSH.Signal.Bundle     (Bundle (..), Bundled)
 
 {- $relativeclocks #relativeclocks#
 CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:
@@ -253,16 +253,16 @@ csimulate f = csample . f . cfromList
 -- > clkA100 :: SClock ClkA
 -- > clkA100 = sclock
 --
--- >>> csimulateW clkA100 clkA100 (cunpack clkA100 . cregister clkA100 (8,8) . cpack clkA100) [(1,1), (2,2), (3,3), ...
+-- >>> csimulateB clkA100 clkA100 (cunpack clkA100 . cregister clkA100 (8,8) . cpack clkA100) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
 --
 -- __NB__: This function is not synthesisable
-csimulateW :: (Wrap a, Wrap b)
+csimulateB :: (Bundle a, Bundle b)
            => SClock clk1 -- ^ 'Clock' of the incoming signal
            -> SClock clk2 -- ^ 'Clock' of the outgoing signal
-           -> (Wrapped clk1 a -> Wrapped clk2 b) -- ^ Function to simulate
+           -> (Bundled clk1 a -> Bundled clk2 b) -- ^ Function to simulate
            -> [a] -> [b]
-csimulateW clk1 clk2 f = csimulate (unwrap clk2 . f . wrap clk1)
+csimulateB clk1 clk2 f = csimulate (bundle clk2 . f . unbundle clk1)
 
 -- * List \<-\> CSignal conversion
 

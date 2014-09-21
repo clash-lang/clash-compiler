@@ -10,13 +10,13 @@ module CLaSH.Signal
     -- * Boolean connectives
   , (&&$), (||$), not1
     -- * Product/Signal isomorphism
-  , Wrap
-  , SWrapped
-  , sUnwrap
-  , sWrap
+  , Bundle
+  , SBundled
+  , sBundle
+  , sUnbundle
     -- * Simulation functions (not synthesisable)
   , simulate
-  , simulateW
+  , simulateB
     -- * List \<-\> Signal conversion (not synthesisable)
   , sample
   , sampleN
@@ -56,7 +56,7 @@ import CLaSH.Signal.Internal  (CSignal, register#, signal#, (==&), (/=&),
                                rotateR1, (||$), (&&$), not1, mux)
 import CLaSH.Signal.Explicit  (SystemClock, cfromList, csample, csampleN,
                                systemClock)
-import CLaSH.Signal.Wrap      (Wrap (..), Wrapped)
+import CLaSH.Signal.Bundle    (Bundle (..), Bundled)
 
 -- * Implicitly clocked synchronous signal
 
@@ -86,9 +86,9 @@ register = register# systemClock
 
 -- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's.
-type SWrapped a = Wrapped SystemClock a
+type SBundled a = Bundled SystemClock a
 
-{-# INLINE sWrap #-}
+{-# INLINE sUnbundle #-}
 -- | Example:
 --
 -- > sWrap :: Signal (a,b) -> (Signal a, Signal b)
@@ -96,10 +96,10 @@ type SWrapped a = Wrapped SystemClock a
 -- However:
 --
 -- > sWrap :: Signal Bit -> Signal Bit
-sWrap :: Wrap a => Signal a -> SWrapped a
-sWrap = wrap systemClock
+sUnbundle :: Bundle a => Signal a -> SBundled a
+sUnbundle = unbundle systemClock
 
-{-# INLINE sUnwrap #-}
+{-# INLINE sBundle #-}
 -- | Example:
 --
 -- > sUnwrap :: (Signal a, Signal b) -> Signal (a,b)
@@ -107,8 +107,8 @@ sWrap = wrap systemClock
 -- However:
 --
 -- > sUnwrap :: Signal Bit -> Signal Bit
-sUnwrap :: Wrap a => SWrapped a -> Signal a
-sUnwrap = unwrap systemClock
+sBundle :: Bundle a => SBundled a -> Signal a
+sBundle = bundle systemClock
 
 -- * Simulation functions (not synthesisable)
 
@@ -122,15 +122,15 @@ sUnwrap = unwrap systemClock
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
--- | Simulate a (@'Wrapped' a -> 'Wrapped' b@) function given a list of samples
+-- | Simulate a (@'Bundled' a -> 'Bundled' b@) function given a list of samples
 -- of type @a@
 --
--- >>> simulateW (wrap . register (8,8) . unwrap) [(1,1), (2,2), (3,3), ...
+-- >>> simulateB (wrap . register (8,8) . unwrap) [(1,1), (2,2), (3,3), ...
 -- [(8,8), (1,1), (2,2), (3,3), ...
 --
 -- __NB__: This function is not synthesisable
-simulateW :: (Wrap a, Wrap b) => (SWrapped a -> SWrapped b) -> [a] -> [b]
-simulateW f = simulate (sUnwrap . f . sWrap)
+simulateB :: (Bundle a, Bundle b) => (SBundled a -> SBundled b) -> [a] -> [b]
+simulateB f = simulate (sBundle . f . sUnbundle)
 
 -- * List \<-\> Signal conversion (not synthesisable)
 
