@@ -6,7 +6,7 @@ module CLaSH.Prelude.BlockRam where
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding ((!!))
 
-import CLaSH.Prelude.Mealy    (sync)
+import CLaSH.Prelude.Mealy    (cmealy)
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Explicit  (CSignal, SClock, systemClock)
 import CLaSH.Signal.Bundle    (Bundle, bundle)
@@ -87,7 +87,7 @@ cblockRam :: (Bundle a, KnownNat n, KnownNat m)
           -- ^ Value of the 'blockRAM' at address @r@ from the previous clock
           -- cycle
 cblockRam clk binit wr rd en din =
-    bundle clk $ (sync clk bram' (binit,undefined)) (wr,rd,en,din)
+    cmealy clk bram' (binit,undefined) (bundle clk (wr,rd,en,din))
   where
     bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
       where

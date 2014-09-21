@@ -13,7 +13,8 @@
 -}
 module CLaSH.Prelude.Explicit
   ( -- * Creating synchronous sequential circuits
-    sync
+    cmealy
+  , cmealyB
   , cregisterB
     -- * BlockRAM primitives
   , cblockRam
@@ -39,7 +40,7 @@ import GHC.TypeLits            (KnownNat, type (+), natVal)
 import Prelude                 hiding (repeat)
 
 import CLaSH.Prelude.BlockRam  (cblockRam, cblockRamPow2)
-import CLaSH.Prelude.Mealy     (sync)
+import CLaSH.Prelude.Mealy     (cmealy, cmealyB)
 import CLaSH.Prelude.Testbench (csassert, cstimuliGenerator, coutputVerifier)
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)

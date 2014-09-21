@@ -25,7 +25,8 @@
 -}
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
-    (<^>)
+    mealy
+  , mealyB
   , registerB
     -- * BlockRAM primitives
   , blockRam
@@ -101,7 +102,7 @@ import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
 import CLaSH.Prelude.Explicit      (cregisterB, cwindow, cwindowD, cisRising,
                                     cisFalling)
-import CLaSH.Prelude.Mealy         ((<^>))
+import CLaSH.Prelude.Mealy         (mealy, mealyB)
 import CLaSH.Prelude.Stream
 import CLaSH.Prelude.Testbench     (sassert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat
