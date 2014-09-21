@@ -5,7 +5,7 @@ module CLaSH.Prelude.BitReduction where
 
 import GHC.TypeLits                   (KnownNat)
 
-import CLaSH.Class.BitConvert         (BitConvert (..))
+import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 
 {-# INLINE reduceAnd #-}
@@ -19,7 +19,7 @@ import CLaSH.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 -- 111111
 -- >>> reduceAnd (-1 :: Signed 6)
 -- 1
-reduceAnd :: (BitConvert a, KnownNat (BitSize a)) => a -> Bit
+reduceAnd :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
 reduceAnd v = reduceAnd# (pack v)
 
 {-# INLINE reduceOr #-}
@@ -33,7 +33,7 @@ reduceAnd v = reduceAnd# (pack v)
 -- 000000
 -- >>> reduceOr (0 :: Signed 6)
 -- 0
-reduceOr :: BitConvert a => a -> Bit
+reduceOr :: BitPack a => a -> Bit
 reduceOr v = reduceOr# (pack v)
 
 {-# INLINE reduceXor #-}
@@ -51,5 +51,5 @@ reduceOr v = reduceOr# (pack v)
 -- 111011
 -- >>> reduceXor (-5 :: Signed 6)
 -- 1
-reduceXor :: BitConvert a => a -> Bit
+reduceXor :: BitPack a => a -> Bit
 reduceXor v = reduceXor# (pack v)

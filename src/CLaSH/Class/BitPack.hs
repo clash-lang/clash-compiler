@@ -5,8 +5,8 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module CLaSH.Class.BitConvert
-  ( BitConvert (..)
+module CLaSH.Class.BitPack
+  ( BitPack (..)
   , bitCoerce
   )
 where
@@ -20,7 +20,7 @@ import CLaSH.Sized.Vector             (Vec, concatBitVector#, map,
                                        unconcatBitVector#)
 
 -- | Convert to and from a 'BitVector'
-class BitConvert a where
+class BitPack a where
   -- | Number of 'CLaSH.Sized.BitVector.Bit's needed to represents elements
   -- of type @a@
   type BitSize a :: Nat
@@ -49,30 +49,30 @@ class BitConvert a where
 -- 59
 -- >>> pack (59 :: Unsigned 6)
 -- 111011
-bitCoerce :: (BitConvert a, BitConvert b, BitSize a ~ BitSize b)
+bitCoerce :: (BitPack a, BitPack b, BitSize a ~ BitSize b)
           => a
           -> b
 bitCoerce = unpack . pack
 
-instance BitConvert Bool where
+instance BitPack Bool where
   type BitSize Bool = 1
   pack True  = high
   pack False = low
 
   unpack bv  = if bv == high then True else False
 
-instance BitConvert (BitVector n) where
+instance BitPack (BitVector n) where
   type BitSize (BitVector n) = n
   pack   v = v
   unpack v = v
 
-instance (KnownNat (BitSize a), KnownNat (BitSize b), BitConvert a, BitConvert b) =>
-    BitConvert (a,b) where
+instance (KnownNat (BitSize a), KnownNat (BitSize b), BitPack a, BitPack b) =>
+    BitPack (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
 
-instance (KnownNat n, KnownNat (BitSize a), BitConvert a) => BitConvert (Vec n a) where
+instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
   pack   = concatBitVector# . map pack
   unpack = map unpack . unconcatBitVector#

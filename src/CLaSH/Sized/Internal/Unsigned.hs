@@ -71,7 +71,7 @@ import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 
-import CLaSH.Class.BitConvert         (BitConvert (..))
+import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
                                        SaturationMode (..))
 import CLaSH.Class.Resize             (Resize (..))
@@ -100,7 +100,7 @@ size# u = fromInteger (natVal u)
 instance Show (Unsigned n) where
   show (U i) = show i
 
-instance BitConvert (Unsigned n) where
+instance BitPack (Unsigned n) where
   type BitSize (Unsigned n) = n
   pack   = pack#
   unpack = unpack#

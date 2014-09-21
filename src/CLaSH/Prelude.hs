@@ -70,7 +70,7 @@ module CLaSH.Prelude
   , Lift (..), deriveLift
     -- ** Type classes
     -- *** CLaSH
-  , module CLaSH.Class.BitConvert
+  , module CLaSH.Class.BitPack
   , module CLaSH.Class.Num
   , module CLaSH.Class.Resize
     -- *** Other
@@ -93,7 +93,7 @@ import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            splitAt, tail, take, unzip, zip,
                                            zipWith)
 
-import CLaSH.Class.BitConvert
+import CLaSH.Class.BitPack
 import CLaSH.Class.Num
 import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex

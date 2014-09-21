@@ -49,7 +49,7 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fwarn-tabs -fexpose-all-unfoldings
 
-  Exposed-modules:    CLaSH.Class.BitConvert
+  Exposed-modules:    CLaSH.Class.BitPack
                       CLaSH.Class.Num
                       CLaSH.Class.Resize
 

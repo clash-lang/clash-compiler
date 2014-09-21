@@ -66,7 +66,7 @@ import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
                                    numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 
-import CLaSH.Class.BitConvert     (BitConvert (..))
+import CLaSH.Class.BitPack        (BitPack (..))
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..), boundedPlus, boundedMin,
                                    boundedMult)
@@ -399,7 +399,7 @@ instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
                          res = Fixed (fromInteger i `shiftL` fSH)
                      in  res
 
-instance (BitConvert (rep (int + frac))) => BitConvert (Fixed rep int frac) where
+instance (BitPack (rep (int + frac))) => BitPack (Fixed rep int frac) where
   type BitSize (Fixed rep int frac) = BitSize (rep (int + frac))
   pack   (Fixed fRep) = pack fRep
   unpack bv           = Fixed (unpack bv)
