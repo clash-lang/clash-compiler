@@ -15,12 +15,12 @@ module CLaSH.Signal.Internal
   , register#
   , mux
     -- * Boolean connectives
-  , (&&$), (||$), not1
+  , (.&&.), (.||.), not1
     -- * Type classes
     -- ** 'Eq'-like
-  , (==&), (/=&)
+  , (.==.), (./=.)
     -- ** 'Ord'-like
-  , compare1, (<&), (<=&), (>=&), (>&)
+  , compare1, (.<.), (.<=.), (.>=.), (.>.)
     -- ** 'Functor'
   , mapSignal#
     -- ** 'Applicative'
@@ -142,13 +142,13 @@ instance Traversable (CSignal clk) where
 traverse# :: Applicative f => (a -> f b) -> CSignal clk a -> f (CSignal clk b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 
-infixr 2 ||$
-(||$) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
-(||$) = liftA2 (||)
+infixr 2 .||.
+(.||.) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
+(.||.) = liftA2 (||)
 
-infixr 3 &&$
-(&&$) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
-(&&$) = liftA2 (&&)
+infixr 3 .&&.
+(.&&.) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
+(.&&.) = liftA2 (&&)
 
 not1 :: CSignal clk Bool -> CSignal clk Bool
 not1 = fmap not
@@ -179,27 +179,27 @@ instance SaturatingNum a => SaturatingNum (CSignal clk a) where
 -- | __WARNING__: ('==') and ('/=') are undefined, use ('==&') and ('/=&')
 -- instead
 instance Eq (CSignal clk a) where
-  (==) = error "(==)' undefined for 'CSignal', use '(==&)' instead"
-  (/=) = error "(/=)' undefined for 'CSignal', use '(/=&)' instead"
+  (==) = error "(==)' undefined for 'CSignal', use '(.==.)' instead"
+  (/=) = error "(/=)' undefined for 'CSignal', use '(./=.)' instead"
 
-infix 4 ==&
+infix 4 .==.
 -- | Version of ('==') that returns a 'CSignal' of 'Bool'
-(==&) :: Eq a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
-(==&) = liftA2 (==)
+(.==.) :: Eq a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
+(.==.) = liftA2 (==)
 
-infix 4 /=&
+infix 4 ./=.
 -- | Version of ('/=') that returns a 'CSignal' of 'Bool'
-(/=&) :: Eq a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
-(/=&) = liftA2 (/=)
+(./=.) :: Eq a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
+(./=.) = liftA2 (/=)
 
 -- | __WARNING__: 'compare', ('<'), ('>='), ('>'), and ('<=') are
 -- undefined, use 'compare1', ('<&'), ('>=&'), ('>&'), and ('<=&') instead
 instance Ord a => Ord (CSignal clk a) where
   compare = error "'compare' undefined for 'CSignal', use 'compare1' instead"
-  (<)     = error "'(<)' undefined for 'CSignal', use '(<&)' instead"
-  (>=)    = error "'(>=)' undefined for 'CSignal', use '(>=&)' instead"
-  (>)     = error "'(>)' undefined for 'CSignal', use '(>&)' instead"
-  (<=)    = error "'(<=)' undefined for 'CSignal', use '(<=&)' instead"
+  (<)     = error "'(<)' undefined for 'CSignal', use '(.<.)' instead"
+  (>=)    = error "'(>=)' undefined for 'CSignal', use '(.>=.)' instead"
+  (>)     = error "'(>)' undefined for 'CSignal', use '(.>.)' instead"
+  (<=)    = error "'(<=)' undefined for 'CSignal', use '(.<=.)' instead"
   max     = liftA2 max
   min     = liftA2 min
 
@@ -207,25 +207,25 @@ instance Ord a => Ord (CSignal clk a) where
 compare1 :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Ordering
 compare1 = liftA2 compare
 
-infix 4 <&
+infix 4 .<.
 -- | Version of ('<') that returns a 'CSignal' of 'Bool'
-(<&) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
-(<&) = liftA2 (<)
+(.<.) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
+(.<.) = liftA2 (<)
 
-infix 4 <=&
+infix 4 .<=.
 -- | Version of ('<=') that returns a 'CSignal' of 'Bool'
-(<=&) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
-(<=&) = liftA2 (<=)
+(.<=.) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
+(.<=.) = liftA2 (<=)
 
-infix 4 >&
+infix 4 .>.
 -- | Version of ('>') that returns a 'CSignal' of 'Bool'
-(>&) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
-(>&) = liftA2 (>)
+(.>.) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
+(.>.) = liftA2 (>)
 
-infix 4 >=&
+infix 4 .>=.
 -- | Version of ('>=') that returns a 'CSignal' of 'Bool'
-(>=&) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
-(>=&) = liftA2 (>=)
+(.>=.) :: Ord a => CSignal clk a -> CSignal clk a -> CSignal clk Bool
+(.>=.) = liftA2 (>=)
 
 -- | __WARNING__: 'fromEnum' is undefined, use 'fromEnum1' instead
 instance Enum a => Enum (CSignal clk a) where

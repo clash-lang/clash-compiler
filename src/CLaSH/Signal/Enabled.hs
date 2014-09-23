@@ -12,7 +12,7 @@ where
 import Control.Applicative   (liftA2)
 import Control.Arrow         (second)
 
-import CLaSH.Signal.Internal ((&&$), mux, register#)
+import CLaSH.Signal.Internal ((.&&.), mux, register#)
 import CLaSH.Signal.Explicit (CSignal, SClock)
 import CLaSH.Signal.Bundle   (Bundle (..))
 
@@ -48,7 +48,7 @@ zipWithEnabled :: SClock clk
                -> CSignal clk (Enabled a)
                -> CSignal clk (Enabled b)
                -> CSignal clk (Enabled c)
-zipWithEnabled clk f l r = bundle clk (b1 &&$ b2, liftA2 f l' r')
+zipWithEnabled clk f l r = bundle clk (b1 .&&. b2, liftA2 f l' r')
   where
     (b1,l') = unbundle clk l
     (b2,r') = unbundle clk r

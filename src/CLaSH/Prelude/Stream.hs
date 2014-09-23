@@ -24,7 +24,7 @@ import GHC.TypeLits          (KnownNat, type (+))
 import CLaSH.Promoted.Nat    (SNat)
 import CLaSH.Signal.Enabled  (Enabled, enabled, mapEnabled, regEn, zipWithEnabled)
 import CLaSH.Signal.Explicit (CSignal, Clock (..), SClock, cregister, unbundle)
-import CLaSH.Signal.Internal ((&&$))
+import CLaSH.Signal.Internal ((.&&.))
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec (..), (++), (!!), (<<+), length)
 
@@ -98,7 +98,7 @@ instance Arrow (Stream clk) where
   arr f = Stream (\_ r d -> (r,fmap (second f) d))
   first (Stream f) = Stream g
     where
-      g clk rIn dIn = (rIn &&$ rOut,zipWithEnabled clk (,) l' r)
+      g clk rIn dIn = (rIn .&&. rOut,zipWithEnabled clk (,) l' r)
         where
           l         = mapEnabled fst dIn
           r         = mapEnabled snd dIn
@@ -106,7 +106,7 @@ instance Arrow (Stream clk) where
 
   second (Stream f) = Stream g
     where
-      g clk rIn dIn = (rIn &&$ rOut,zipWithEnabled clk (,) l r')
+      g clk rIn dIn = (rIn .&&. rOut,zipWithEnabled clk (,) l r')
         where
           l         = mapEnabled fst dIn
           r         = mapEnabled snd dIn
@@ -115,7 +115,7 @@ instance Arrow (Stream clk) where
 
   (Stream f) *** (Stream g) = Stream h
     where
-      h clk rIn dIn = (fRout &&$ gRout, zipWithEnabled clk (,) l' r')
+      h clk rIn dIn = (fRout .&&. gRout, zipWithEnabled clk (,) l' r')
         where
           l = mapEnabled fst dIn
           r = mapEnabled snd dIn
@@ -124,7 +124,7 @@ instance Arrow (Stream clk) where
 
   (Stream f) &&& (Stream g) = Stream h
     where
-      h clk rIn dIn = (fRout &&$ gRout, zipWithEnabled clk (,) fDout gDout)
+      h clk rIn dIn = (fRout .&&. gRout, zipWithEnabled clk (,) fDout gDout)
         where
           (fRout,fDout) = f clk rIn dIn
           (gRout,gDout) = g clk rIn dIn
@@ -137,7 +137,7 @@ instance ArrowLoop (Stream clk) where
           (rOut,dOut) = f clk ready (zipWithEnabled clk (,) b d)
           c           = mapEnabled fst dOut
           d           = mapEnabled snd dOut
-          ready       = rIn &&$ rOut
+          ready       = rIn .&&. rOut
 
 instance ArrowChoice (Stream clk) where
   left (Stream f) = Stream g

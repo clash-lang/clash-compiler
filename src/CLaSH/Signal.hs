@@ -8,7 +8,7 @@ module CLaSH.Signal
   , register
   , mux
     -- * Boolean connectives
-  , (&&$), (||$), not1
+  , (.&&.), (.||.), not1
     -- * Product/Signal isomorphism
   , Bundle
   , Unbundled'
@@ -23,9 +23,9 @@ module CLaSH.Signal
   , fromList
     -- * Type classes
     -- ** 'Eq'-like
-  , (==&), (/=&)
+  , (.==.), (./=.)
     -- ** 'Ord'-like
-  , compare1, (<&), (<=&), (>=&), (>&)
+  , compare1, (.<.), (.<=.), (.>=.), (.>.)
     -- ** 'Enum'-like
   , fromEnum1
     -- ** 'Rational'-like
@@ -48,12 +48,12 @@ module CLaSH.Signal
   )
 where
 
-import CLaSH.Signal.Internal  (CSignal, register#, signal#, (==&), (/=&),
-                               compare1, (<&), (<=&), (>=&), (>&), fromEnum1,
+import CLaSH.Signal.Internal  (CSignal, register#, signal#, (.==.), (./=.),
+                               compare1, (.<.), (.<=.), (.>=.), (.>.), fromEnum1,
                                toRational1, toInteger1, testBit1, popCount1,
                                shift1, rotate1, setBit1, clearBit1, shiftL1,
                                unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
-                               rotateR1, (||$), (&&$), not1, mux)
+                               rotateR1, (.||.), (.&&.), not1, mux)
 import CLaSH.Signal.Explicit  (SystemClock, cfromList, csample, csampleN,
                                systemClock)
 import CLaSH.Signal.Bundle    (Bundle (..), Unbundled)
