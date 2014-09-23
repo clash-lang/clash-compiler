@@ -56,7 +56,7 @@ import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 --
 -- >>> csimulateB clk100 clk100 rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-cregisterB :: Bundle a => SClock clk -> a -> Bundled clk a -> Bundled clk a
+cregisterB :: Bundle a => SClock clk -> a -> Unbundled clk a -> Unbundled clk a
 cregisterB clk i = unbundle clk Prelude.. cregister clk i Prelude.. bundle clk
 
 {-# INLINABLE cwindow #-}

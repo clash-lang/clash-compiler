@@ -154,7 +154,7 @@ windowD = cwindowD systemClock
 --
 -- >>> simulateB rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-registerB :: Bundle a => a -> SBundled a -> SBundled a
+registerB :: Bundle a => a -> Unbundled' a -> Unbundled' a
 registerB = cregisterB systemClock
 
 {-# INLINE isRising #-}

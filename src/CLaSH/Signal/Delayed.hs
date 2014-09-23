@@ -34,7 +34,7 @@ import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, withSNat)
 import CLaSH.Sized.Vector         (head, replicate, shiftInAt0, singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
-                                   sBundle, sUnbundle)
+                                   bundle', unbundle')
 import CLaSH.Signal.Internal      (signal#)
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
@@ -101,8 +101,8 @@ delay m ds = coerce (delay' (coerce ds))
     delay' s = case snatToInteger m of
       0 -> s
       _ -> case m of
-             SNat _ -> let (r',o) = shiftInAt0 (sUnbundle r) (singleton s)
-                           r      = register (replicate m def) (sBundle r')
+             SNat _ -> let (r',o) = shiftInAt0 (unbundle' r) (singleton s)
+                           r      = register (replicate m def) (bundle' r')
                        in  head o
 
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
@@ -149,7 +149,7 @@ toSignal m s = count (coerce s)
     count s' = o
       where
         r      = register (snatToInteger m) r'
-        (r',o) = sUnbundle (cntr <$> r <*> s')
+        (r',o) = unbundle' (cntr <$> r <*> s')
 
         cntr 0 v = (0,Just v)
         cntr k _ = (k-1,Nothing)

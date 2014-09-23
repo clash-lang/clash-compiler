@@ -38,7 +38,7 @@ import CLaSH.Promoted.Nat      (snat, snatToInteger)
 import CLaSH.Promoted.Symbol   (ssymbol)
 import CLaSH.Signal.Internal   (CSignal (..), Clock (..), SClock (..), signal#,
                                 register#)
-import CLaSH.Signal.Bundle     (Bundle (..), Bundled)
+import CLaSH.Signal.Bundle     (Bundle (..), Unbundled)
 
 {- $relativeclocks #relativeclocks#
 CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:
@@ -260,7 +260,7 @@ csimulate f = csample . f . cfromList
 csimulateB :: (Bundle a, Bundle b)
            => SClock clk1 -- ^ 'Clock' of the incoming signal
            -> SClock clk2 -- ^ 'Clock' of the outgoing signal
-           -> (Bundled clk1 a -> Bundled clk2 b) -- ^ Function to simulate
+           -> (Unbundled clk1 a -> Unbundled clk2 b) -- ^ Function to simulate
            -> [a] -> [b]
 csimulateB clk1 clk2 f = csimulate (bundle clk2 . f . unbundle clk1)
 

@@ -33,8 +33,8 @@ import CLaSH.Sized.Vector    (Vec)
 -- unbundle . bundle = 'id'
 -- @
 class Bundle a where
-  type Bundled (clk :: Clock) a
-  type Bundled clk a = CSignal clk a
+  type Unbundled (clk :: Clock) a
+  type Unbundled clk a = CSignal clk a
   -- | Example:
   --
   -- > bundle :: (CSignal clk a, CSignal clk b) -> CSignal clk (a,b)
@@ -42,7 +42,7 @@ class Bundle a where
   -- However:
   --
   -- > bundle :: CSignal clk Bit -> CSignal clk Bit
-  bundle :: SClock clk -> Bundled clk a -> CSignal clk a
+  bundle :: SClock clk -> Unbundled clk a -> CSignal clk a
 
   {-# INLINE bundle #-}
   default bundle :: SClock clk ->  CSignal clk a -> CSignal clk a
@@ -54,7 +54,7 @@ class Bundle a where
   -- However:
   --
   -- > unbundle :: CSignal clk Bit -> CSignal clk Bit
-  unbundle :: SClock clk -> CSignal clk a -> Bundled clk a
+  unbundle :: SClock clk -> CSignal clk a -> Unbundled clk a
 
   {-# INLINE unbundle #-}
   default unbundle :: SClock clk -> CSignal clk a -> CSignal clk a
@@ -74,12 +74,12 @@ instance Bundle (Signed n)
 instance Bundle (Unsigned n)
 
 instance Bundle (a,b) where
-  type Bundled t (a,b) = (CSignal t a, CSignal t b)
+  type Unbundled t (a,b) = (CSignal t a, CSignal t b)
   bundle   _     = uncurry (liftA2 (,))
   unbundle _ tup = (fmap fst tup, fmap snd tup)
 
 instance Bundle (a,b,c) where
-  type Bundled t (a,b,c) = (CSignal t a, CSignal t b, CSignal t c)
+  type Unbundled t (a,b,c) = (CSignal t a, CSignal t b, CSignal t c)
   bundle   _ (a,b,c) = (,,) <$> a <*> b <*> c
   unbundle _ tup     = (fmap (\(x,_,_) -> x) tup
                        ,fmap (\(_,x,_) -> x) tup
@@ -87,7 +87,7 @@ instance Bundle (a,b,c) where
                        )
 
 instance Bundle (a,b,c,d) where
-  type Bundled t (a,b,c,d) = ( CSignal t a, CSignal t b, CSignal t c
+  type Unbundled t (a,b,c,d) = ( CSignal t a, CSignal t b, CSignal t c
                              , CSignal t d
                              )
   bundle   _ (a,b,c,d) = (,,,) <$> a <*> b <*> c <*> d
@@ -98,7 +98,7 @@ instance Bundle (a,b,c,d) where
                          )
 
 instance Bundle (a,b,c,d,e) where
-  type Bundled t (a,b,c,d,e) = ( CSignal t a, CSignal t b, CSignal t c
+  type Unbundled t (a,b,c,d,e) = ( CSignal t a, CSignal t b, CSignal t c
                                , CSignal t d, CSignal t e
                                )
   bundle   _ (a,b,c,d,e) = (,,,,) <$> a <*> b <*> c <*> d <*> e
@@ -110,7 +110,7 @@ instance Bundle (a,b,c,d,e) where
                            )
 
 instance Bundle (a,b,c,d,e,f) where
-  type Bundled t (a,b,c,d,e,f) = ( CSignal t a, CSignal t b, CSignal t c
+  type Unbundled t (a,b,c,d,e,f) = ( CSignal t a, CSignal t b, CSignal t c
                                  , CSignal t d, CSignal t e, CSignal t f
                                  )
   bundle   _ (a,b,c,d,e,f) = (,,,,,) <$> a <*> b <*> c <*> d <*> e <*> f
@@ -123,7 +123,7 @@ instance Bundle (a,b,c,d,e,f) where
                              )
 
 instance Bundle (a,b,c,d,e,f,g) where
-  type Bundled t (a,b,c,d,e,f,g) = ( CSignal t a, CSignal t b, CSignal t c
+  type Unbundled t (a,b,c,d,e,f,g) = ( CSignal t a, CSignal t b, CSignal t c
                                    , CSignal t d, CSignal t e, CSignal t f
                                    , CSignal t g
                                    )
@@ -139,7 +139,7 @@ instance Bundle (a,b,c,d,e,f,g) where
                                )
 
 instance Bundle (a,b,c,d,e,f,g,h) where
-  type Bundled t (a,b,c,d,e,f,g,h) = ( CSignal t a, CSignal t b, CSignal t c
+  type Unbundled t (a,b,c,d,e,f,g,h) = ( CSignal t a, CSignal t b, CSignal t c
                                      , CSignal t d, CSignal t e, CSignal t f
                                      , CSignal t g, CSignal t h
                                      )
@@ -156,7 +156,7 @@ instance Bundle (a,b,c,d,e,f,g,h) where
                                  )
 
 instance KnownNat n => Bundle (Vec n a) where
-  type Bundled t (Vec n a) = Vec n (CSignal t a)
+  type Unbundled t (Vec n a) = Vec n (CSignal t a)
   -- The 'Traversable' instance of 'Vec' is not synthesisable, so we must
   -- define 'bundle' as a primitive.
   bundle     = vecUnwrap#

@@ -11,9 +11,9 @@ module CLaSH.Signal
   , (&&$), (||$), not1
     -- * Product/Signal isomorphism
   , Bundle
-  , SBundled
-  , sBundle
-  , sUnbundle
+  , Unbundled'
+  , bundle'
+  , unbundle'
     -- * Simulation functions (not synthesisable)
   , simulate
   , simulateB
@@ -56,7 +56,7 @@ import CLaSH.Signal.Internal  (CSignal, register#, signal#, (==&), (/=&),
                                rotateR1, (||$), (&&$), not1, mux)
 import CLaSH.Signal.Explicit  (SystemClock, cfromList, csample, csampleN,
                                systemClock)
-import CLaSH.Signal.Bundle    (Bundle (..), Bundled)
+import CLaSH.Signal.Bundle    (Bundle (..), Unbundled)
 
 -- * Implicitly clocked synchronous signal
 
@@ -86,29 +86,29 @@ register = register# systemClock
 
 -- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
 -- product type of 'Signal's.
-type SBundled a = Bundled SystemClock a
+type Unbundled' a = Unbundled SystemClock a
 
-{-# INLINE sUnbundle #-}
+{-# INLINE unbundle' #-}
 -- | Example:
 --
--- > sWrap :: Signal (a,b) -> (Signal a, Signal b)
+-- > unbundle' :: Signal (a,b) -> (Signal a, Signal b)
 --
 -- However:
 --
--- > sWrap :: Signal Bit -> Signal Bit
-sUnbundle :: Bundle a => Signal a -> SBundled a
-sUnbundle = unbundle systemClock
+-- > unbundle' :: Signal Bit -> Signal Bit
+unbundle' :: Bundle a => Signal a -> Unbundled' a
+unbundle' = unbundle systemClock
 
-{-# INLINE sBundle #-}
+{-# INLINE bundle' #-}
 -- | Example:
 --
--- > sUnwrap :: (Signal a, Signal b) -> Signal (a,b)
+-- > bundle' :: (Signal a, Signal b) -> Signal (a,b)
 --
 -- However:
 --
--- > sUnwrap :: Signal Bit -> Signal Bit
-sBundle :: Bundle a => SBundled a -> Signal a
-sBundle = bundle systemClock
+-- > bundle' :: Signal Bit -> Signal Bit
+bundle' :: Bundle a => Unbundled' a -> Signal a
+bundle' = bundle systemClock
 
 -- * Simulation functions (not synthesisable)
 
@@ -129,8 +129,8 @@ simulate f = sample . f . fromList
 -- [(8,8), (1,1), (2,2), (3,3), ...
 --
 -- __NB__: This function is not synthesisable
-simulateB :: (Bundle a, Bundle b) => (SBundled a -> SBundled b) -> [a] -> [b]
-simulateB f = simulate (sBundle . f . sUnbundle)
+simulateB :: (Bundle a, Bundle b) => (Unbundled' a -> Unbundled' b) -> [a] -> [b]
+simulateB f = simulate (bundle' . f . unbundle')
 
 -- * List \<-\> Signal conversion (not synthesisable)
 

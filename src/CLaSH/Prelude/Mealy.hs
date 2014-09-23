@@ -10,9 +10,9 @@ where
 
 import Control.Applicative   ((<$>), (<*>))
 
-import CLaSH.Signal          (Signal, SBundled)
+import CLaSH.Signal          (Signal, Unbundled')
 import CLaSH.Signal.Explicit (CSignal, SClock, cregister, systemClock)
-import CLaSH.Signal.Bundle   (Bundle (..), Bundled)
+import CLaSH.Signal.Bundle   (Bundle (..), Unbundled)
 
 {-# INLINE mealy #-}
 -- | Create a synchronous function from a combinational function describing
@@ -76,7 +76,7 @@ mealyB :: (Bundle i, Bundle o)
        => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                             -- @state -> input -> (newstate,output)@
        -> s                 -- ^ Initial state
-       -> (SBundled i -> SBundled o)
+       -> (Unbundled' i -> Unbundled' o)
        -- ^ Synchronous sequential function with input and output matching that
        -- of the mealy machine
 mealyB = cmealyB systemClock
@@ -149,7 +149,7 @@ cmealyB :: (Bundle i, Bundle o)
         -> (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                      -- @state -> input -> (newstate,output)@
         -> s                 -- ^ Initial state
-        -> (Bundled clk i -> Bundled clk o)
+        -> (Unbundled clk i -> Unbundled clk o)
         -- ^ Synchronous sequential function with input and output matching that
         -- of the mealy machine
 cmealyB clk f iS i = unbundle clk (cmealy clk f iS (bundle clk i))
