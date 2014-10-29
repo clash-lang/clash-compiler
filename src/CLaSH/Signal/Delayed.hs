@@ -16,6 +16,7 @@ module CLaSH.Signal.Delayed
     -- * Signal \<-\> DSignal conversion
   , fromSignal
   , toSignal
+  , unsafeFromSignal
     -- * List \<-\> DSignal conversion (not synthesisable)
   , dsample
   , dsampleN
@@ -28,10 +29,11 @@ import Data.Default               (Default(..))
 import Control.Applicative        (Applicative (..), (<$>))
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
-import Prelude                    hiding (head, replicate)
+import Prelude                    hiding (head, length, repeat)
 
 import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, withSNat)
-import CLaSH.Sized.Vector         (head, replicate, shiftInAt0, singleton)
+import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
+                                   singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
                                    bundle', unbundle')
@@ -39,7 +41,7 @@ import CLaSH.Signal.Internal      (signal#)
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), only produces a valid output after @delay@ samples.
-newtype DSignal (delay :: Nat) a = DSignal (Signal a)
+newtype DSignal (delay :: Nat) a = DSignal { toSignal :: Signal a }
   deriving (Show,Default,Lift,Functor,Applicative,Num)
 
 -- | Create a 'DSignal' from a list
@@ -82,7 +84,7 @@ dsampleN n = sampleN n . coerce
 -- >>> dsample (dsignal 4)
 -- [4, 4, 4, 4, ...
 dsignal :: a -> DSignal n a
-dsignal a = coerce (signal# a)
+dsignal = pure
 
 -- | Delay a 'DSignal' for @m@ periods.
 --
@@ -91,19 +93,18 @@ dsignal a = coerce (signal# a)
 --
 -- >>> dsampleN 6 (delay3 (dfromList [1..]))
 -- [0,0,0,1,2,3]
-delay :: forall a n m . Default a
-      => SNat m -- ^ Number of periods, @m@, to delay the signal
+delay :: forall a n m . KnownNat m
+      => Vec m a
       -> DSignal (n - m) a
       -> DSignal n a
 delay m ds = coerce (delay' (coerce ds))
   where
     delay' :: Signal a -> Signal a
-    delay' s = case snatToInteger m of
+    delay' s = case length m of
       0 -> s
-      _ -> case m of
-             SNat _ -> let (r',o) = shiftInAt0 (unbundle' r) (singleton s)
-                           r      = register (replicate m def) (bundle' r')
-                       in  head o
+      _ -> let (r',o) = shiftInAt0 (unbundle' r) (singleton s)
+               r      = register m (bundle' r')
+           in  head o
 
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
 --
@@ -115,23 +116,25 @@ delay m ds = coerce (delay' (coerce ds))
 delayI :: (Default a, KnownNat m)
        => DSignal (n - m) a
        -> DSignal n a
-delayI = withSNat delay
+delayI = delay (repeat def)
 
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
--- mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 1 Int
+-- mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
 -- mac x y = 'feedback' (mac' x y)
 --   where
 --     mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---          -> DSignal 1 Int
---     mac' a b acc = 'delay' d1 (a * b + acc)
+--          -> (DSignal 0 Int, DSignal 1 Int)
+--     mac' a b acc = let acc' = a * b + acc
+--                    in  (acc, delay (singleton 0) acc')
 -- @
 --
 -- >>> dsampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
-feedback :: (DSignal (n - m - 1) a -> DSignal n a) -> DSignal n a
-feedback f = let r = f (coerce r) in r
+feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
+         -> DSignal (n - m - 1) a
+feedback f = let (o,r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
 --
@@ -139,17 +142,5 @@ feedback f = let r = f (coerce r) in r
 fromSignal :: Signal a -> DSignal 0 a
 fromSignal = coerce
 
--- | Filter out the samples [0..@m@] from a @'DSignal' m a@ signal.
---
--- >>> sampleN 4 (toSignal d2 (delay d2 (dfromList [1..])))
--- [Nothing,Nothing,Just 1, Just 2]
-toSignal :: SNat m -> DSignal m a -> Signal (Maybe a)
-toSignal m s = count (coerce s)
-  where
-    count s' = o
-      where
-        r      = register (snatToInteger m) r'
-        (r',o) = unbundle' (cntr <$> r <*> s')
-
-        cntr 0 v = (0,Just v)
-        cntr k _ = (k-1,Nothing)
+unsafeFromSignal :: Signal a -> DSignal n a
+unsafeFromSignal = DSignal
