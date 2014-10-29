@@ -66,6 +66,8 @@ instance Bundle Int
 instance Bundle Float
 instance Bundle Double
 instance Bundle ()
+instance Bundle (Maybe a)
+instance Bundle (Either a b)
 
 instance Bundle (BitVector n)
 instance Bundle (Index n)
