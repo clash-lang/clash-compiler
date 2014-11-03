@@ -84,15 +84,15 @@ inputBuffer :: InputState
 inputBuffer buf (discr, dataInt, shift) = (buf', (cell1, cell2))
   where
     -- Write new input value
-    nextValids        = (vmap valid buf) <<+ True
-    buf''             = vzipWith selects buf nextValids
+    nextValids        = (map valid buf) <<+ True
+    buf''             = zipWith selects buf nextValids
     -- Shift buffer values
     buf' | shift == 2 = Nothing +>> (Nothing +>> buf'')
          | shift == 1 = Nothing +>> buf''
          | otherwise  = buf''
     -- Read cells
-    cell1             = vlast buf
-    cell2             = vlast (vinit buf)
+    cell1             = last buf
+    cell2             = last (init buf)
 
     selects :: Cell -> Bool -> Cell
     selects Nothing True = Just (dataInt, discr)
@@ -109,7 +109,7 @@ fpAdder pipe (cell1, cell2) = (pipe', out)
     newHead | valid cell1 = Just (value cell1 + value cell2, discr cell1)
             | otherwise   = Nothing
     pipe'                 = newHead +>> pipe
-    out                   = vlast pipe
+    out                   = last pipe
 
 -- =========================
 -- = Partial Result Buffer =
@@ -124,19 +124,19 @@ resBuffer (Res {..}) (newDiscr, newDiscrVal, index, pipeCell, newCell) = ( Res {
                                                                          )
   where
     -- Purge completely reduced results from the system
-    cleanMem  | newDiscr                      = vreplace cellMem newDiscrVal Nothing
+    cleanMem  | newDiscr                      = replace cellMem newDiscrVal Nothing
               | otherwise                     = cellMem
     -- If a partial is fed  back to the pipeline, make its location invalid
-    cellMem'                                  = vreplace cleanMem (discr pipeCell) newCell
+    cellMem'                                  = replace cleanMem (discr pipeCell) newCell
     -- Update Index LUT when new Discr enters circuit
-    indexMem' | newDiscr                      = vreplace indexMem newDiscrVal index
+    indexMem' | newDiscr                      = replace indexMem newDiscrVal index
               | otherwise                     = indexMem
     -- Value fed back into circuit
-    resMemOut | valid pipeCell                = cellMem ! (discr pipeCell)
+    resMemOut | valid pipeCell                = cellMem !! (discr pipeCell)
               | otherwise                     = Nothing
     -- Value purged from the circuit
-    redOut    | valid (cellMem ! newDiscrVal) = Just (value (cellMem ! newDiscrVal), indexMem ! newDiscrVal)
-              | otherwise                     = Nothing
+    redOut    | valid (cellMem !! newDiscrVal) = Just (value (cellMem !! newDiscrVal), indexMem !! newDiscrVal)
+              | otherwise                      = Nothing
 
 -- ================================================================
 -- = Controller guides correct inputs to the floating point adder =
@@ -159,13 +159,15 @@ controller (inp1, inp2, pipe, fromResMem) = (arg1, arg2, shift, toResMem)
 reducer :: (Signal DataInt, Signal ArrayIndex) -> Signal OutputSignal
 reducer (dataIn,index) = redOut
   where
-    (newDiscrVal,newDiscr)     = (discriminator <^> initDiscrState) index
-    (inp1,inp2)                = (inputBuffer   <^> initInputState) (newDiscrVal,dataIn,shift)
-    pipe                       = (fpAdder       <^> initPipeState)  (arg1,arg2)
-    (fromResMem,redOut)        = (resBuffer     <^> initResState)   (newDiscr,newDiscrVal,index,pipe,toResMem)
-    (arg1,arg2,shift,toResMem) = unpack (controller <$> pack (inp1, inp2, pipe, fromResMem))
+    (newDiscrVal,newDiscr)     = mealyB discriminator initDiscrState index
+    (inp1,inp2)                = mealyB inputBuffer   initInputState  (newDiscrVal,dataIn,shift)
+    pipe                       = mealyB fpAdder       initPipeState (arg1,arg2)
+    (fromResMem,redOut)        = mealyB resBuffer     initResState (newDiscr,newDiscrVal,index,pipe,toResMem)
+    (arg1,arg2,shift,toResMem) = fmapB controller (inp1, inp2, pipe, fromResMem)
 
 topEntity = reducer
+
+fmapB f = unbundle' . fmap f . bundle'
 
 initDiscrState :: DiscrState
 initDiscrState = Discr { prevIndex = 255
@@ -173,12 +175,12 @@ initDiscrState = Discr { prevIndex = 255
                        }
 
 initInputState :: InputState
-initInputState = vcopyI Nothing
+initInputState = repeat Nothing
 
 initPipeState :: FpState
-initPipeState  = vcopyI Nothing
+initPipeState  = repeat Nothing
 
 initResState :: ResState
-initResState = Res { cellMem  = vcopyI Nothing
-                   , indexMem = vcopyI 0
+initResState = Res { cellMem  = repeat Nothing
+                   , indexMem = repeat 0
                    }
