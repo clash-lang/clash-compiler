@@ -161,9 +161,9 @@ instance KnownNat n => Bundle (Vec n a) where
   type Unbundled t (Vec n a) = Vec n (CSignal t a)
   -- The 'Traversable' instance of 'Vec' is not synthesisable, so we must
   -- define 'bundle' as a primitive.
-  bundle     = vecUnwrap#
+  bundle     = vecBundle#
   unbundle _ = sequenceA
 
-{-# NOINLINE vecUnwrap# #-}
-vecUnwrap# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
-vecUnwrap# _ = sequenceA
+{-# NOINLINE vecBundle# #-}
+vecBundle# :: SClock t -> Vec n (CSignal t a) -> CSignal t (Vec n a)
+vecBundle# _ = sequenceA
