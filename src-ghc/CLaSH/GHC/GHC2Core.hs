@@ -279,7 +279,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
               | f == pack "CLaSH.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == pack "CLaSH.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
               | f == pack "CLaSH.Signal.Internal.traverse#"  -> return (traverseTerm xType)
-              | f == pack "CLaSH.Signal.Wrap.vecUnwrap#"     -> return (vecUnwrapTerm xType)
+              | f == pack "CLaSH.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
               | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
