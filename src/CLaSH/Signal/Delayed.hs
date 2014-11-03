@@ -142,5 +142,10 @@ feedback f = let (o,r) = f (coerce r) in o
 fromSignal :: Signal a -> DSignal 0 a
 fromSignal = coerce
 
+
+-- | __Unsafely__ convert a 'Signal' to /any/ 'DSignal'.
+--
+-- __NB__: Should only be used to interface with functions specified in terms of
+-- 'Signal'.
 unsafeFromSignal :: Signal a -> DSignal n a
 unsafeFromSignal = DSignal
