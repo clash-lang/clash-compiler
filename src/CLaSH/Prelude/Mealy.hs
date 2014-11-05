@@ -2,6 +2,7 @@ module CLaSH.Prelude.Mealy
   ( -- * Mealy machine synchronised to the system clock
     mealy
   , mealyB
+  , (<^>)
     -- * Mealy machine synchronised to an arbitrary clock
   , cmealy
   , cmealyB
@@ -80,6 +81,17 @@ mealyB :: (Bundle i, Bundle o)
        -- ^ Synchronous sequential function with input and output matching that
        -- of the mealy machine
 mealyB = cmealyB systemClock
+
+{-# INLINE (<^>) #-}
+-- | Infix version of 'mealyB'
+(<^>) :: (Bundle i, Bundle o)
+      => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
+                           -- @state -> input -> (newstate,output)@
+      -> s                 -- ^ Initial state
+      -> (Unbundled' i -> Unbundled' o)
+      -- ^ Synchronous sequential function with input and output matching that
+      -- of the mealy machine
+(<^>) = mealyB
 
 {-# INLINABLE cmealy #-}
 -- | Create a synchronous function from a combinational function describing
