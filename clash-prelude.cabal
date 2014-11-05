@@ -57,6 +57,7 @@ Library
                       CLaSH.Prelude.BitIndex
                       CLaSH.Prelude.BitReduction
                       CLaSH.Prelude.BlockRam
+                      CLaSH.Prelude.DataFlow
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Mealy
                       CLaSH.Prelude.Testbench
