@@ -26,18 +26,16 @@ where
 
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
-import Control.Applicative        (Applicative (..), (<$>))
+import Control.Applicative        (Applicative (..))
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
 
-import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, withSNat)
 import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
                                    bundle', unbundle')
-import CLaSH.Signal.Internal      (signal#)
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), only produces a valid output after @delay@ samples.
