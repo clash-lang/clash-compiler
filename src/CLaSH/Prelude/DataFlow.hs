@@ -78,7 +78,8 @@ parametrise in the types of the synchronisation channels.
 -}
 newtype DataFlow clk iEn oEn i o
   = DF
-  { df :: CSignal clk i     -- Incoming data
+  { -- | Create an ordinary circuit from a 'DataFlow' circuit
+    df :: CSignal clk i     -- Incoming data
        -> CSignal clk iEn   -- Flagged with /valid/ bits @iEn@.
        -> CSignal clk oEn   -- Incoming back-pressure, /ready/ edge.
        -> ( CSignal clk o   -- Outgoing data.
