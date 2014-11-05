@@ -19,6 +19,7 @@ module CLaSH.Signal.Explicit
     -- * Basic circuit functions
   , csignal
   , cregister
+  , cregEn
     -- * Product/Signal isomorphism
   , Bundle (..)
     -- * Simulation functions (not synthesisable)
@@ -37,7 +38,7 @@ import GHC.TypeLits            (KnownNat, KnownSymbol)
 import CLaSH.Promoted.Nat      (snat, snatToInteger)
 import CLaSH.Promoted.Symbol   (ssymbol)
 import CLaSH.Signal.Internal   (CSignal (..), Clock (..), SClock (..), signal#,
-                                register#)
+                                register#, regEn#)
 import CLaSH.Signal.Bundle     (Bundle (..), Unbundled)
 
 {- $relativeclocks #relativeclocks#
@@ -227,6 +228,10 @@ csignal = signal#
 -- [8,1,2]
 cregister :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 cregister = register#
+
+{-# INLINE cregEn #-}
+cregEn :: SClock clk -> a -> CSignal clk Bool -> CSignal clk a -> CSignal clk a
+cregEn = regEn#
 
 -- * Simulation functions
 

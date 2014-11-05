@@ -6,6 +6,7 @@ module CLaSH.Signal
     -- * Basic circuit functions
   , signal
   , register
+  , regEn
   , mux
     -- * Boolean connectives
   , (.&&.), (.||.), not1
@@ -48,7 +49,7 @@ module CLaSH.Signal
   )
 where
 
-import CLaSH.Signal.Internal  (CSignal, register#, signal#, (.==.), (./=.),
+import CLaSH.Signal.Internal  (CSignal, register#, regEn#, signal#, (.==.), (./=.),
                                compare1, (.<.), (.<=.), (.>=.), (.>.), fromEnum1,
                                toRational1, toInteger1, testBit1, popCount1,
                                shift1, rotate1, setBit1, clearBit1, shiftL1,
@@ -81,6 +82,10 @@ signal = signal#
 -- [8,1,2]
 register :: a -> Signal a -> Signal a
 register = register# systemClock
+
+{-# INLINE regEn #-}
+regEn :: a -> Signal Bool -> Signal a -> Signal a
+regEn = regEn# systemClock
 
 -- * Product/Signal isomorphism
 

@@ -13,6 +13,7 @@ module CLaSH.Signal.Internal
   , CSignal (..)
     -- * Basic circuits
   , register#
+  , regEn#
   , mux
     -- * Boolean connectives
   , (.&&.), (.||.), not1
@@ -156,6 +157,13 @@ not1 = fmap not
 {-# NOINLINE register# #-}
 register# :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 register# _ i s = i :- s
+
+{-# NOINLINE regEn# #-}
+regEn# :: SClock clk -> a -> CSignal clk Bool -> CSignal clk a -> CSignal clk a
+regEn# clk i b s = r
+  where
+    r  = register# clk i s'
+    s' = mux b s r
 
 mux :: CSignal clk Bool -> CSignal clk a -> CSignal clk a -> CSignal clk a
 mux = liftA3 (\b t f -> if b then t else f)
