@@ -1,5 +1,27 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.6 *November 11th 2014*
+
+* New features:
+  * Add `Fractional` instance for `Fixed` [#9](https://github.com/christiaanb/clash-prelude/issues/9)
+  * Make indexing/subscript of `Vec` ascending [#4](https://github.com/christiaanb/clash-prelude/issues/4)
+  * Add separate `BitVector` type, which has a descending index.
+  * Add bit indexing operators, including the index/subscript operator `(!)`.
+  * Add bit reduction operators: `reduceOr`, `reduceAnd`, `reduceOr`.
+  * Rename `BitVector` class to `BitPack` with `pack` and `unpack` class methods.
+  * Rename `Pack` class to `Bundle` with `bundle` and `unbundle` class methods.
+  * Strip all `Vec` functions from their `v` prefix, i.e. `vmap` -> `map`.
+  * Rename `Vec` indexing operator from `(!)` to `(!!)`.
+  * Combine `Add` and `Mult` class into `ExtendingNum` class.
+  * Add extend and truncate methods to the `Resize` class.
+  * Add `SaturatingNum` class with saturating numeric operators.
+  * Add multitude of lifted `Signal` operators, i.e. `(.==.) :: Eq a => Signal a -> Signal a -> Signal Bool`
+  * Add `CLaSH.Signal.Delayed` with functions and data types for delay-annotated signals to support safe synchronisation.
+  * Add `CLASH.Prelude.DataFlow` with functions and data types to create self-synchronising circuits based on data-flow principles.
+
+* Fixes bugs:
+  * Remove deprecated 'Arrow' instance for and related functions for `Comp` [#5](https://github.com/christiaanb/clash-prelude/issues/5)
+
 ## 0.5.1 *June 5th 2014*
 
 * New features:
