@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.4 *November 17th 2014*
+* New features:
+  * Support for clash-prelude 0.6
+
+* Fixes bugs:
+  * clash-ghc ignores "-package-db" flag [#35](https://github.com/christiaanb/clash2/issues/35)
+
 ## 0.3.3 *August 12th 2014*
 * Fixes bugs:
   * Compile with GHC 7.8.3 [#31](https://github.com/christiaanb/clash2/issues/31)

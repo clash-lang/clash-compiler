@@ -1,5 +1,12 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.4 *November 17th 2014*
+* New features:
+  * Support for clash-prelude 0.6
+
+* Fixes bugs:
+  * Ambiguous type: 'std_logic_vector' or 'std_ulogic_vector' [#33](https://github.com/christiaanb/clash2/issues/33)
+
 ## 0.3.2 *June 5th 2014*
 
 * Fixes bugs:
