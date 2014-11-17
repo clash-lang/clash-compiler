@@ -176,7 +176,9 @@ main = do
                                     , DynFlags.Opt_TypeFamilies
                                     ]
                 dflagsExtra' = foldl DynFlags.xopt_unset dflagsExtra
-                                     [ DynFlags.Opt_ImplicitPrelude ]
+                                     [ DynFlags.Opt_ImplicitPrelude
+                                     , DynFlags.Opt_MonomorphismRestriction
+                                     ]
 
             case postStartupMode of
                 Left preLoadMode ->
