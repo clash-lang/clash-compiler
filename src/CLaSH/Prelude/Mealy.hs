@@ -40,8 +40,8 @@ import CLaSH.Signal.Bundle   (Bundle (..), Unbundled)
 -- >         -> Signal Int
 -- > dualMac (a,b) (x,y) = s1 + s2
 -- >   where
--- >     s1 = mealy mac 0 (sBundle (a,x))
--- >     s2 = mealy mac 0 (sBundle (b,y))
+-- >     s1 = mealy mac 0 (bundle' (a,x))
+-- >     s2 = mealy mac 0 (bundle' (b,y))
 mealy :: (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                            -- @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state
@@ -63,8 +63,8 @@ mealy = cmealy systemClock
 -- @
 -- g a b c = (b1,b2,i2)
 --   where
---     (i1,b1) = 'CLaSH.Signal.sUnbundle' (mealy f 0 ('CLaSH.Signal.sBundle' (a,b)))
---     (i2,b2) = 'CLaSH.Signal.sUnbundle' (mealy f 3 ('CLaSH.Signal.sBundle' (i1,c)))
+--     (i1,b1) = 'CLaSH.Signal.unbundle'' (mealy f 0 ('CLaSH.Signal.bundle'' (a,b)))
+--     (i2,b2) = 'CLaSH.Signal.unbundle'' (mealy f 3 ('CLaSH.Signal.bundle'' (i1,c)))
 -- @
 --
 -- Using 'mealyB' however we can write:

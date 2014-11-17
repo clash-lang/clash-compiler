@@ -142,10 +142,13 @@ csassert = liftA3
 --
 -- Example:
 --
--- > clk2 = Clock d2
+-- > type ClkA = Clk "A" 100
 -- >
--- > testInput :: CSignal 2 Int
--- > testInput = cstimuliGenerator $(v [(1::Int),3..21]) clk2
+-- > clkA :: SClock ClkA
+-- > clkA = sclock
+-- >
+-- > testInput :: CSignal clkA Int
+-- > testInput = cstimuliGenerator clkA $(v [(1::Int),3..21])
 --
 -- >>> csample testInput
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21,...
@@ -174,10 +177,13 @@ cstimuliGenerator clk samples =
 --
 -- Example:
 --
--- > clk7 = Clock d7
+-- > type ClkA = Clk "A" 100
 -- >
--- > expectedOutput :: CSignal 7 Int -> CSignal 7 Bool
--- > expectedOutput = coutputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int])) clk7
+-- > clkA :: SClock ClkA
+-- > clkA = sclock
+-- >
+-- > expectedOutput :: CSignal ClkA Int -> CSignal ClkA Bool
+-- > expectedOutput = coutputVerifier clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 --
 -- >>> csample (expectedOutput (cfromList ([0..10] ++ [10,10,10])))
 -- [

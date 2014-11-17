@@ -17,6 +17,6 @@ instance Show (SSymbol s) where
 ssymbol :: KnownSymbol s => SSymbol s
 ssymbol = SSymbol Proxy
 
-{-# INLINE symbolToString #-}
-symbolToString :: SSymbol s -> String
-symbolToString (SSymbol s) = symbolVal s
+{-# INLINE ssymbolToString #-}
+ssymbolToString :: SSymbol s -> String
+ssymbolToString (SSymbol s) = symbolVal s

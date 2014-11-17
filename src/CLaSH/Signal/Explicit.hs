@@ -44,19 +44,21 @@ import CLaSH.Signal.Bundle     (Bundle (..), Unbundled)
 {- $relativeclocks #relativeclocks#
 CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:
 
-> 'CSignal' (clk :: Clock) a
+@
+'CSignal' (clk :: 'Clock') a
+@
 
 Where @a@ is the type of the elements, and @clk@ is the clock to which the
 signal is synchronised. The type-parameter, @clk@, is of the kind 'Clock' which
 has types of the following shape:
 
 @
-Clk \{\- name :: \-\} 'Symbol' \{\- period :: \-\} 'Nat'
+Clk \{\- name :: \-\} 'GHC.TypeLits.Symbol' \{\- period :: \-\} 'GHC.TypeLits.Nat'
 @
 
-Where @name@ is a type-level string ('Symbol') representing the the name of the
-clock, and @period@ is a type-level natural number ('Nat') representing the
-clock period. Two concrete instances of a 'Clk' could be:
+Where @name@ is a type-level string ('GHC.TypeLits.Symbol') representing the the
+name of the clock, and @period@ is a type-level natural number ('GHC.TypeLits.Nat')
+representing the clock period. Two concrete instances of a 'Clk' could be:
 
 > type ClkA500  = Clk "A500" 500
 > type ClkB3250 = Clk "B3250" 3250
@@ -68,12 +70,16 @@ circuit can run at the specified frequency. The clock periods are just there to
 indicate relative frequency differences between two different clocks. That is, a
 signal:
 
-> 'CSignal' ClkA500 a
+@
+'CSignal' ClkA500 a
+@
 
 is synchronized to a clock that runs 6.5 times faster than the clock to which
 the signal:
 
-> 'CSignal' ClkB3250 a
+@
+'CSignal' ClkB3250 a
+@
 
 is synchronized to.
 
@@ -230,6 +236,24 @@ cregister :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 cregister = register#
 
 {-# INLINE cregEn #-}
+-- | Version of 'cregister' that only updates its content when its second
+-- argument is asserted. So given:
+--
+-- @
+-- type ClkA = Clk \"A\" 100
+-- clkA :: SClock Clka
+-- clkA = sclock
+--
+-- oscillate = cregister clkA False ('not1' oscillate)
+-- count     = cregEn clkA 0 oscillate (count + 1)
+-- @
+--
+-- We get:
+--
+-- >>> csampleN 8 oscillate
+-- [False,True,False,True,False,True,False,True]
+-- >>> csampleN 8 count
+-- [0,0,1,1,2,2,3,3]
 cregEn :: SClock clk -> a -> CSignal clk Bool -> CSignal clk a -> CSignal clk a
 cregEn = regEn#
 

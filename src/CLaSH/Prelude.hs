@@ -21,12 +21,13 @@
     explicitly clocked circuits in a multi-clock setting
 
   For now, "CLaSH.Prelude" is also the best starting point for exploring the
-  library. A tutorial module will be added within due time.
+  library. A preliminary version of a tutorial can be found in "CLaSH.Tutorial".
 -}
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
     mealy
   , mealyB
+  , (<^>)
   , registerB
     -- * BlockRAM primitives
   , blockRam
@@ -101,7 +102,7 @@ import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
 import CLaSH.Prelude.Explicit      (cregisterB, cwindow, cwindowD, cisRising,
                                     cisFalling)
-import CLaSH.Prelude.Mealy         (mealy, mealyB)
+import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.DataFlow
 import CLaSH.Prelude.Testbench     (sassert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat

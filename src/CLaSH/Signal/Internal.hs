@@ -144,13 +144,16 @@ traverse# :: Applicative f => (a -> f b) -> CSignal clk a -> f (CSignal clk b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 
 infixr 2 .||.
+-- | Version of ('||') that returns a 'CSignal' of 'Bool'
 (.||.) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
 (.||.) = liftA2 (||)
 
 infixr 3 .&&.
+-- | Version of ('&&') that returns a 'CSignal' of 'Bool'
 (.&&.) :: CSignal clk Bool -> CSignal clk Bool -> CSignal clk Bool
 (.&&.) = liftA2 (&&)
 
+-- | Version of 'not' that operates on 'CSignal's of 'Bool'
 not1 :: CSignal clk Bool -> CSignal clk Bool
 not1 = fmap not
 
@@ -165,6 +168,9 @@ regEn# clk i b s = r
     r  = register# clk i s'
     s' = mux b s r
 
+{-# INLINE mux #-}
+-- | A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
+-- when @b@ is 'False'.
 mux :: CSignal clk Bool -> CSignal clk a -> CSignal clk a -> CSignal clk a
 mux = liftA3 (\b t f -> if b then t else f)
 
@@ -184,7 +190,7 @@ instance SaturatingNum a => SaturatingNum (CSignal clk a) where
   satMin  s = liftA2 (satMin s)
   satMult s = liftA2 (satMult s)
 
--- | __WARNING__: ('==') and ('/=') are undefined, use ('==&') and ('/=&')
+-- | __WARNING__: ('==') and ('/=') are undefined, use ('.==.') and ('./=.')
 -- instead
 instance Eq (CSignal clk a) where
   (==) = error "(==)' undefined for 'CSignal', use '(.==.)' instead"
@@ -201,7 +207,7 @@ infix 4 ./=.
 (./=.) = liftA2 (/=)
 
 -- | __WARNING__: 'compare', ('<'), ('>='), ('>'), and ('<=') are
--- undefined, use 'compare1', ('<&'), ('>=&'), ('>&'), and ('<=&') instead
+-- undefined, use 'compare1', ('.<.'), ('.>=.'), ('.>.'), and ('.<=.') instead
 instance Ord a => Ord (CSignal clk a) where
   compare = error "'compare' undefined for 'CSignal', use 'compare1' instead"
   (<)     = error "'(<)' undefined for 'CSignal', use '(.<.)' instead"

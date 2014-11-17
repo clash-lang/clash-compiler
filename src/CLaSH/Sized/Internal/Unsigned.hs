@@ -18,7 +18,7 @@ module CLaSH.Sized.Internal.Unsigned
     -- ** BitConvert
   , pack#
   , unpack#
-    -- Eq
+    -- ** Eq
   , eq#
   , neq#
     -- ** Ord

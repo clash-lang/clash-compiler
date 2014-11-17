@@ -34,7 +34,7 @@ module CLaSH.Sized.Vector
   , replicate, repeat, iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
-    -- ** Functions for the 'CLaSH.Class.Bits.Bits' instance
+    -- ** Functions for the 'CLaSH.Class.BitPack.BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
   )

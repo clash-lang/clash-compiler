@@ -130,7 +130,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Run @cabal update@
 
-  (3) Install __CλaSH__
+  (2) Install __CλaSH__
 
       * Run @cabal install clash-ghc@
 
@@ -310,10 +310,10 @@ circuit from a combinational circuit that has the same Mealy machine type /
 shape of 'macT':
 
 @
-(\<^\>) :: (Pack i, Pack o)
+(\<^\>) :: (Bundle i, Bundle o)
       => (s -> i -> (s,o))
       -> s
-      -> (SignalP i -> SignalP o)
+      -> (Unbudled' i -> Unbundled' o)
 f \<^\> initS = ...
 @
 
@@ -326,7 +326,7 @@ mac = macT \<^\> 0
 Where the LHS of '<^>' is our 'macT' function, and the RHS is the initial state,
 in this case 0. We can see it is functioning correctly in our interpreter:
 
->>> take 4 $ simulateP mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
+>>> Data.List.take 4 $ simulateB mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
 [0,1,5,14]
 
 Where we simulate our sequential circuit over a list of input samples and take
@@ -338,22 +338,22 @@ function that works on 'Signal's, but on on 'SignalP's. Indeed, when we look at
 the type of our 'mac' circuit:
 
 >>> :t mac
-mac :: (Pack o, Num o) => (Signal o, Signal o) -> SignalP o
+mac :: (Bundle o, Num o) => Unbundled' (o, o) -> Unbundled o
 
 We see that our 'mac' function work on a two-tuple of 'Signal's and not on a
 'Signal' of a two-tuple. Indeed, the CλaSH prelude library defines that:
 
 @
-type instance SignalP (a,b) = (Signal a, Signal b)
+type instance Unbundled (a,b) = (Signal a, Signal b)
 @
 
-'SignalP' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
-belonging to the 'Pack' <http://en.wikipedia.org/wiki/Type_class type class>,
-which, together with 'pack' and 'unpack' defines the isomorphism between a
+'Unbundled' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
+belonging to the 'Bundle' <http://en.wikipedia.org/wiki/Type_class type class>,
+which, together with 'bundle' and 'unbundle' defines the isomorphism between a
 product type of 'Signal's and a 'Signal' of a product type. That is, while
 @(Signal a, Signal b)@ and @Signal (a,b)@ are not equal, they are /isomorphic/
-and can be converted from on to the other using 'pack' and 'unpack'. Instances
-of this 'Pack' type-class are defined as /isomorphisms/ for:
+and can be converted from on to the other using 'bundle' and 'unbundle'. Instances
+of this 'Bundle' type-class are defined as /isomorphisms/ for:
 
   * All tuples until and including 8-tuples
   * The 'Vec'tor type
@@ -365,18 +365,18 @@ But they are defined as /identities/ for:
 That is:
 
 @
-instance Pack Bool where
-  type SignalP Bool = Signal Bool
-  pack :: SignalP Bool -> Signal Bool
-  pack = 'id'
-  unpack :: Signal Bool -> SignalP Bool
+instance Bundle Bool where
+  type Unbundled Bool = Signal Bool
+  bundle :: Unbundled Bool -> Signal Bool
+  bundle = 'id'
+  unpack :: Signal Bool -> Unbundled Bool
   unpack = 'id'
 @
 
-We will see later why this 'Pack' type class is so convenient, for now, you just
+We will see later why this 'Bundle' type class is so convenient, for now, you just
 have to remember that it exists. And more importantly, that you understand that
 a product type of 'Signal's is not equal to a 'Signal' of a product type, but
-that the functions of the 'Pack' type class allow easy conversion between the
+that the functions of the 'Bunlde' type class allow easy conversion between the
 two.
 -}
 
@@ -573,10 +573,10 @@ structure.
     position of the arguments and result:
 
     @
-    asStateM :: (Pack o, Pack i)
+    asStateM :: (Bundle o, Bundle i)
              => (i -> State s o)
              -> s
-             -> (SignalP i -> SignalP o)
+             -> (Unbundled i -> Unbundled o)
     asStateM f i = g \<^\> i
       where
         g s x = let (o,s') = runState (f x) s
@@ -596,7 +596,7 @@ a window over the input, where the size of the window matches the number
 of coefficients.
 
 @
-dotp as bs = vfoldl (+) 0 (vzipWith (*) as bs)
+dotp as bs = foldl (+) 0 (zipWith (*) as bs)
 
 fir coeffs x_t = y_t
   where
@@ -662,19 +662,19 @@ datamem :: (KnownNat n, Integral i)
         => Vec n a       -- Current state
         -> (i, Maybe a)  -- Input
         -> (Vec n a, a)  -- (New state, Output)
-datamem mem (addr,Nothing)  = (mem                  ,mem ! addr)
-datamem mem (addr,Just val) = (vreplace mem addr val,mem ! addr)
+datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
+datamem mem (addr,Just val) = (replace mem addr val,mem !! addr)
 
 topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
 topEntity i = val
   where
     (addr,val) = (pu alu \<^\> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem \<^\> initMem) (addr,val)
-    initMem    = vcopy d8 0
+    initMem    = replicate d8 0
 @
 
 Here we can finally see the advantage of having the '<^>' return a function
-of type: @('SignalP' i -> 'SignalP' o)@ (instead of:
+of type: @('Unbundled' i -> 'Unbundled' o)@ (instead of:
 @('Signal' i -> 'Signal' o)@):
 
   * We can use normal pattern matching to get parts of the result, and,
@@ -706,19 +706,19 @@ CλaSH differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
 /expression/ or a VHDL /declaration/. We will first explore /expression/
 primitives, using 'Signed' multiplication ('*') as an example. The
-"CLaSH.Sized.Signed" module specifies multiplication as follows:
+"CLaSH.Sized.Internal.Signed" module specifies multiplication as follows:
 
 @
-{\-# NOINLINE timesS #-\}
-timesS :: KnownNat n => Signed n -> Signed n -> Signed n
-timesS (S a) (S b) = fromIntegerS_inlineable (a * b)
+{\-\# NOINLINE (*#) \#-\}
+(*#) :: KnownNat n => Signed n -> Signed n -> Signed n
+(S a) *# (S b) = fromInteger_INLINE (a * b)
 @
 
 For which the /expression/ primitive is:
 
 @
 { \"BlackBox\" :
-  { "name"      : "CLaSH.Sized.Signed.timesS"
+  { "name"      : "CLaSH.Sized.Internal.Signed.*#"
   , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
   }
 }
@@ -748,54 +748,62 @@ corresponding to the methods of the type class. In the above case, 'KnownNat'
 is actually just like a @newtype@ wrapper for 'Integer'.
 
 The second kind of primitive that we will explore is the /declaration/ primitive.
-We will use 'blockRam' as an example, for which the Haskell/CλaSH code is:
+We will use 'cblockRam' as an example, for which the Haskell/CλaSH code is:
 
 @
-{\-# NOINLINE blockRam #-\}
--- | Create a blockRAM with space for \@n\@ elements
+{\-\# NOINLINE cblockRam \#-\}
+-- | Create a blockRAM with space for @n@ elements
 --
--- NB: Read value is delayed by 1 cycle
+-- * \_\_NB\_\_: Read value is delayed by 1 cycle
+-- * \_\_NB\_\_: Initial output value is \'undefined\'
 --
--- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool -> Signal a -> Signal a
--- > bram40 = blockRam d40
-blockRam :: forall n m a . (KnownNat n, KnownNat m, Pack a, Default a)
-         => SNat n              -- ^ Size \@n\@ of the blockram
-         -> Signal (Unsigned m) -- ^ Write address \@w\@
-         -> Signal (Unsigned m) -- ^ Read address \@r\@
-         -> Signal Bool         -- ^ Write enable
-         -> Signal a            -- ^ Value to write (at address \@w\@)
-         -> Signal a            -- ^ Value of the 'blockRAM' at address \@r\@ from the previous clock cycle
-blockRam n wr rd en din = pack $ (bram' \<^\> binit) (wr,rd,en,din)
+-- > type ClkA = Clk \"A\" 100
+-- >
+-- > clkA100 :: SClock ClkA
+-- > clkA100 = sclock
+-- >
+-- > bram40 :: CSignal ClkA (Unsigned 6) -> CSignal ClkA (Unsigned 6)
+-- >        -> CSignal ClkA Bool -> CSignal ClkA Bit -> ClkA CSignal Bit
+-- > bram40 = cblockRam clkA100 (replicate d40 H)
+cblockRam :: (Bundle a, KnownNat n, KnownNat m)
+          => SClock clk               -- ^ \'Clock\' to synchronize to
+          -> Vec n a                  -- ^ Initial content of the BRAM, also
+                                      -- determines the size, \@n\@, of the BRAM.
+                                      --
+                                      -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
+          -> CSignal clk (Unsigned m) -- ^ Write address \@w\@
+          -> CSignal clk (Unsigned m) -- ^ Read address \@r\@
+          -> CSignal clk Bool         -- ^ Write enable
+          -> CSignal clk a            -- ^ Value to write (at address \@w\@)
+          -> CSignal clk a
+          -- ^ Value of the \'blockRAM\' at address \@r\@ from the previous clock
+          -- cycle
+cblockRam clk binit wr rd en din =
+    cmealy clk bram' (binit,undefined) (bundle clk (wr,rd,en,din))
   where
-    binit :: (Vec n a,a)
-    binit = (vcopy n def,def)
-
-    bram' :: (Vec n a,a) -> (Unsigned m, Unsigned m, Bool, a)
-          -> (((Vec n a),a),a)
     bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
       where
-        ram' | e         = vreplace ram w d
+        ram' | e         = replace ram w d
              | otherwise = ram
-        o'               = ram ! r
+        o'               = ram !! r
 @
 
 And for which the /definition/ primitive is:
 
 @
 { \"BlackBox\" :
-  { "name"      : "CLaSH.Prelude.blockRam"
-  , "templateD" :
-"~SYM[0]_block : block
-  type ram_array is array (natural range <>) of ~TYP[8];
-  signal ~SYM[1] : ram_array((~ARG[0]-1) downto 0) := (others => ~ARG[3]); -- ram
+    { "name"      : "CLaSH.Prelude.BlockRam.cblockRam"
+    , "templateD" :
+"blockram_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[4] := ~LIT[4]; -- ram
   signal ~SYM[2] : ~TYP[8]; -- inp
-  signal ~SYM[3] : ~TYP[8] := ~ARG[3]; -- outp
+  signal ~SYM[3] : ~TYP[8]; -- outp
 begin
   ~SYM[2] <= ~ARG[8];
 
-  process(~CLKO)
+  process(~CLK[3])
   begin
-    if rising_edge(~CLKO) then
+    if rising_edge(~CLK[3]) then
       if ~ARG[7] then
         ~SYM[1](to_integer(~ARG[5])) <= ~SYM[2];
       end if;
@@ -805,8 +813,8 @@ begin
 
   ~RESULT <= ~SYM[3];
 end block;"
+    }
   }
-}
 @
 
 Again, the @name@ of the primitive is the fully qualified name of the function
@@ -873,18 +881,18 @@ A list of often encountered errors and their solutions:
     ... = f a b (c,d)
     @
 
-    add the 'pack' function like so:
+    add the 'bundle'' function like so:
 
     @
-    ... = f a b (pack (c,d))
+    ... = f a b (bundle' (c,d))
     @
 
-    Product types supported by 'pack' are:
+    Product types supported by 'bundle'' are:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'cpack' when you are using explicitly clocked 'CSignal's
+    NB: Use 'bundle' when you are using explicitly clocked 'CSignal's
 
 * __Type error: Couldn't match expected type ‘(Signal a, Signal b)’ with__
   __ actual type ‘Signal (a,b)’__:
@@ -898,18 +906,18 @@ A list of often encountered errors and their solutions:
     (c,d) = f a b
     @
 
-    add the 'unpack' function like so:
+    add the 'unbundle'' function like so:
 
     @
-    (c,d) = unpack (f a b)
+    (c,d) = unbundle' (f a b)
     @
 
-    Product types supported by 'unpack' are:
+    Product types supported by 'unbundle'' are:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'cunpack' when you are using explicitly clocked 'CSignal's
+    NB: Use 'unbundle' when you are using explicitly clocked 'CSignal's
 
 * __CLaSH.Netlist(..): Not in normal form: \<REASON\>: \<EXPR\>__:
 
@@ -982,30 +990,30 @@ A list of often encountered errors and their solutions:
 
     @
     -- Bubble sort for 1 iteration
-    sortV xs = vmap fst sorted <: (snd (vlast sorted))
+    sortV xs = map fst sorted <: (snd (last sorted))
      where
-       lefts  = vhead xs :> vmap snd (vinit sorted)
-       rights = vtail xs
-       sorted = vzipWith compareSwapL lefts rights
+       lefts  = head xs :> map snd (init sorted)
+       rights = tail xs
+       sorted = zipWith compareSwapL lefts rights
 
     -- Compare and swap
     compareSwapL a b = if a < b then (a,b)
                                 else (b,a)
     @
 
-    Will not terminate because 'vzipWith' is too strict in its second argument:
+    Will not terminate because 'zipWith' is too strict in its second argument:
 
     >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
     <*** Exception: <<loop>>
 
-    In this case, adding 'lazyV' on 'vzipWith's second argument:
+    In this case, adding 'lazyV' on 'zipWith's second argument:
 
     @
-    sortVL xs = vmap fst sorted <: (snd (vlast sorted))
+    sortVL xs = map fst sorted <: (snd (last sorted))
      where
-       lefts  = vhead xs :> vmap snd (vinit sorted)
-       rights = vtail xs
-       sorted = vzipWith compareSwapL (lazyV lefts) rights
+       lefts  = head xs :> map snd (init sorted)
+       rights = tail xs
+       sorted = zipWith compareSwapL ('lazyV' lefts) rights
     @
 
     Results in a successful computation:
@@ -1033,11 +1041,11 @@ to VHDL (for now):
     is the following function that performs one iteration of bubble sort:
 
     @
-    sortVL xs = vmap fst sorted <: (snd (vlast sorted))
+    sortV xs = map fst sorted <: (snd (last sorted))
      where
-       lefts  = vhead xs :> vmap snd (vinit sorted)
-       rights = vtail xs
-       sorted = vzipWith compareSwapL (lazyV lefts) rights
+       lefts  = head xs :> map snd (init sorted)
+       rights = tail xs
+       sorted = zipWith compareSwapL lefts rights
     @
 
     Where we can clearly see that 'lefts' and 'sorted' are defined in terms of

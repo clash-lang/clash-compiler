@@ -84,6 +84,20 @@ register :: a -> Signal a -> Signal a
 register = register# systemClock
 
 {-# INLINE regEn #-}
+-- | Version of 'register' that only updates its content when its second argument
+-- is asserted. So given:
+--
+-- @
+-- oscillate = register False ('not1' oscillate)
+-- count     = regEn 0 oscillate (count + 1)
+-- @
+--
+-- We get:
+--
+-- >>> sampleN 8 oscillate
+-- [False,True,False,True,False,True,False,True]
+-- >>> sampleN 8 count
+-- [0,0,1,1,2,2,3,3]
 regEn :: a -> Signal Bool -> Signal a -> Signal a
 regEn = regEn# systemClock
 

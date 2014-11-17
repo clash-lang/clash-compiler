@@ -38,8 +38,12 @@ import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
                                    bundle', unbundle')
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
--- clock (period 1000), only produces a valid output after @delay@ samples.
-newtype DSignal (delay :: Nat) a = DSignal { toSignal :: Signal a }
+-- clock (period 1000), that has accumulated @delay@ amount of samples delay
+-- along its path.
+newtype DSignal (delay :: Nat) a =
+    DSignal { -- | Strip a 'DSignal' from its delay information.
+              toSignal :: Signal a
+            }
   deriving (Show,Default,Lift,Functor,Applicative,Num)
 
 -- | Create a 'DSignal' from a list
@@ -87,7 +91,7 @@ dsignal = pure
 -- | Delay a 'DSignal' for @m@ periods.
 --
 -- > delay3 :: DSignal (n - 3) Int -> DSignal n Int
--- > delay3 = delay d3
+-- > delay3 = delay (0 :> 0 :> 0 :> Nil)
 --
 -- >>> dsampleN 6 (delay3 (dfromList [1..]))
 -- [0,0,0,1,2,3]
@@ -125,7 +129,7 @@ delayI = delay (repeat def)
 --     mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
 --          -> (DSignal 0 Int, DSignal 1 Int)
 --     mac' a b acc = let acc' = a * b + acc
---                    in  (acc, delay (singleton 0) acc')
+--                    in  (acc, delay ('singleton' 0) acc')
 -- @
 --
 -- >>> dsampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
