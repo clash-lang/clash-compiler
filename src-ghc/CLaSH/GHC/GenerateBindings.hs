@@ -12,6 +12,7 @@ import qualified Data.Set                as Set
 import           Unbound.LocallyNameless (name2String, runFreshM, unembed)
 
 import qualified CoreSyn                 as GHC
+import qualified DynFlags                as GHC
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
@@ -33,9 +34,10 @@ import           CLaSH.Util              ((***),first)
 generateBindings ::
   PrimMap
   -> String
+  -> Maybe  (GHC.DynFlags)
   -> IO (BindingMap,HashMap TyConName TyCon)
-generateBindings primMap modName = do
-  (bindings,clsOps,unlocatable,fiEnvs) <- loadModules modName
+generateBindings primMap modName dflagsM = do
+  (bindings,clsOps,unlocatable,fiEnvs) <- loadModules modName dflagsM
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       tcCache                       = makeAllTyCons tcMap fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache

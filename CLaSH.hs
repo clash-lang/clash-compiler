@@ -9,7 +9,7 @@ genVHDL :: String
         -> IO ()
 genVHDL src = do
   primMap <- generatePrimMap ["./primitives"]
-  (bindingsMap,tcm) <- generateBindings primMap src
+  (bindingsMap,tcm) <- generateBindings primMap src Nothing
   generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugFinal
 
 main :: IO ()

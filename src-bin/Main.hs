@@ -897,11 +897,13 @@ abiHash strs = do
 
 doVHDL :: [(String,Maybe Phase)] -> Ghc ()
 doVHDL []   = throwGhcException (CmdLineError "No input files")
-doVHDL srcs = liftIO $ do primDir <- getDefPrimDir
-                          primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                          mapM_ (\(src,_) -> do (bindingsMap,tcm) <- generateBindings primMap src
-                                                CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
-                                ) srcs
+doVHDL srcs = do
+  dflags <- GHC.getSessionDynFlags
+  liftIO $ do primDir <- getDefPrimDir
+              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
+              mapM_ (\(src,_) -> do (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
+                                    CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
+                    ) srcs
 
 -- -----------------------------------------------------------------------------
 -- Util

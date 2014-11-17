@@ -64,36 +64,44 @@ ghcLibDir = return GHC.Paths.libdir
 
 loadModules ::
   String
+  -> Maybe (DynFlags.DynFlags)
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
         )
-loadModules modName = defaultErrorHandler $ do
+loadModules modName dflagsM = defaultErrorHandler $ do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
-    dflags <- GHC.getSessionDynFlags
+    dflags <- case dflagsM of
+                Just df -> return df
+                Nothing -> do
+                  df <- GHC.getSessionDynFlags
+                  let dfEn = foldl DynFlags.xopt_set df
+                                [ DynFlags.Opt_TemplateHaskell
+                                , DynFlags.Opt_DataKinds
+                                , DynFlags.Opt_TypeOperators
+                                , DynFlags.Opt_FlexibleContexts
+                                , DynFlags.Opt_ConstraintKinds
+                                , DynFlags.Opt_TypeFamilies
+                                ]
+                  let dfDis = foldl DynFlags.xopt_unset dfEn
+                                [ DynFlags.Opt_ImplicitPrelude
+                                , DynFlags.Opt_MonomorphismRestriction
+                                ]
+                  return dfDis
+    let dflags1 = dflags { DynFlags.ctxtStkDepth = 1000
+                         , DynFlags.optLevel = 2
+                         , DynFlags.ghcMode  = GHC.CompManager
+                         , DynFlags.ghcLink  = GHC.LinkInMemory
+                         , DynFlags.hscTarget = DynFlags.defaultObjectTarget
+                                                  (DynFlags.targetPlatform dflags)
+                         }
+    let dflags2 = wantedOptimizationFlags dflags1
     let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
                       Just "YES" -> True
                       _          -> False
-    let dflags1 = foldl DynFlags.xopt_set
-                    (dflags
-                      { DynFlags.ctxtStkDepth = 1000
-                      , DynFlags.optLevel = 2
-                      , DynFlags.ghcMode  = GHC.CompManager
-                      , DynFlags.ghcLink  = GHC.LinkInMemory
-                      } )
-                    [ DynFlags.Opt_TemplateHaskell
-                    , DynFlags.Opt_Arrows
-                    , DynFlags.Opt_DataKinds
-                    , DynFlags.Opt_TypeOperators
-                    , DynFlags.Opt_FlexibleContexts
-                    , DynFlags.Opt_ConstraintKinds
-                    , DynFlags.Opt_TypeFamilies
-                    ]
-    let dflags1' = foldl DynFlags.xopt_unset dflags1 [DynFlags.Opt_ImplicitPrelude]
-    let dflags2 = wantedOptimizationFlags dflags1'
     let dflags3 = if ghcDynamic then DynFlags.gopt_set dflags2 DynFlags.Opt_BuildDynamicToo
                                 else dflags2
     _ <- GHC.setSessionDynFlags dflags3

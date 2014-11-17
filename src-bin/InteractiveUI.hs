@@ -1496,21 +1496,24 @@ modulesLoadedMsg ok mods = do
 makeVHDL :: [FilePath] -> InputT GHCi ()
 makeVHDL [] = do
   modGraph <- GHC.getModuleGraph
+  dflags <- getDynFlags
   let sortedGraph = GHC.topSortModuleGraph False modGraph Nothing
   case (reverse sortedGraph) of
     (AcyclicSCC top):_ -> do
       let loc = (GHC.ml_hs_file . GHC.ms_location) top
       maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
                                              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                                             (bindingsMap,tcm) <- generateBindings primMap src
+                                             (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
                                              CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
                         ) loc
     _ -> return ()
-makeVHDL srcs = liftIO $ do primDir <- getDefPrimDir
-                            primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                            mapM_ (\src -> do (bindingsMap,tcm) <- generateBindings primMap src
-                                              CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
-                                  ) srcs
+makeVHDL srcs = do
+  dflags <- getDynFlags
+  liftIO $ do primDir <- getDefPrimDir
+              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
+              mapM_ (\src -> do (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
+                                CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
+                    ) srcs
 
 -----------------------------------------------------------------------------
 -- :type
