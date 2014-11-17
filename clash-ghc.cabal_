@@ -85,7 +85,7 @@ Executable clash
                       base                 >= 4.3.1.0 && < 5,
                       bifunctors           >= 4.1.1,
                       bytestring           >= 0.9,
-                      clash-lib            >= 0.3.2,
+                      clash-lib            >= 0.4,
                       clash-prelude        >= 0.6,
                       containers           >= 0.5.4.0,
                       directory            >= 1.2,
