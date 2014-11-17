@@ -416,9 +416,9 @@ expr _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int st
 
 expr _ (Identifier id_ (Just _)) = text id_
 expr _ (DataCon ty@(Vector 1 _) _ [e])           = vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr False e)
-expr _ e@(DataCon ty@(Vector _ _) _ [e1,e2])     = vhdlTypeMark ty <> "'" <> case vectorChain e of
+expr _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2])     = vhdlTypeMark ty <> "'" <> case vectorChain e of
                                                      Just es -> tupled (mapM (expr False) es)
-                                                     Nothing -> parens (expr False e1 <+> "&" <+> expr False e2)
+                                                     Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr False e1) <+> "&" <+> expr False e2)
 expr _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
   where
     argTys     = snd $ args !! i
