@@ -9,7 +9,7 @@ import Prelude                hiding ((!!))
 import CLaSH.Prelude.Mealy    (cmealy)
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Explicit  (CSignal, SClock, systemClock)
-import CLaSH.Signal.Bundle    (Bundle, bundle)
+import CLaSH.Signal.Bundle    (bundle)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, (!!), replace)
 
@@ -22,7 +22,7 @@ import CLaSH.Sized.Vector     (Vec, (!!), replace)
 -- > bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool
 -- >        -> Signal Bit -> Signal Bit
 -- > bram40 = blockRam (replicate d40 H)
-blockRam :: (Bundle a, KnownNat n, KnownNat m)
+blockRam :: (KnownNat n, KnownNat m)
          => Vec n a             -- ^ Initial content of the BRAM, also
                                 -- determines the size, @n@, of the BRAM.
                                 --
@@ -45,7 +45,7 @@ blockRam = cblockRam systemClock
 -- > bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool
 -- >        -> Signal Bit -> Signal Bit
 -- > bram32 = blockRamPow2 (replicate d32 H)
-blockRamPow2 :: (Bundle a, KnownNat (2^n), KnownNat n)
+blockRamPow2 :: (KnownNat (2^n), KnownNat n)
              => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                                     -- determines the size, @2^n@, of the BRAM.
                                     --
@@ -73,7 +73,7 @@ blockRamPow2 = blockRam
 -- > bram40 :: CSignal ClkA (Unsigned 6) -> CSignal ClkA (Unsigned 6)
 -- >        -> CSignal ClkA Bool -> CSignal ClkA Bit -> ClkA CSignal Bit
 -- > bram40 = cblockRam clkA100 (replicate d40 H)
-cblockRam :: (Bundle a, KnownNat n, KnownNat m)
+cblockRam :: (KnownNat n, KnownNat m)
           => SClock clk               -- ^ 'Clock' to synchronize to
           -> Vec n a                  -- ^ Initial content of the BRAM, also
                                       -- determines the size, @n@, of the BRAM.
@@ -109,7 +109,7 @@ cblockRam clk binit wr rd en din =
 -- > bramC32 :: CSignal ClkA (Unsigned 5) -> CSignal ClkA (Unsigned 5)
 -- >         -> CSignal ClkA Bool -> CSignal ClkA Bit -> CSignal ClkA Bit
 -- > bramC32 = cblockRamPow2 clkA100 (replicate d32 H)
-cblockRamPow2 :: (Bundle a, KnownNat n, KnownNat (2^n))
+cblockRamPow2 :: (KnownNat n, KnownNat (2^n))
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
                                           -- determines the size, @2^n@, of

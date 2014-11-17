@@ -765,7 +765,7 @@ We will use 'cblockRam' as an example, for which the Haskell/CλaSH code is:
 -- > bram40 :: CSignal ClkA (Unsigned 6) -> CSignal ClkA (Unsigned 6)
 -- >        -> CSignal ClkA Bool -> CSignal ClkA Bit -> ClkA CSignal Bit
 -- > bram40 = cblockRam clkA100 (replicate d40 H)
-cblockRam :: (Bundle a, KnownNat n, KnownNat m)
+cblockRam :: (KnownNat n, KnownNat m)
           => SClock clk               -- ^ \'Clock\' to synchronize to
           -> Vec n a                  -- ^ Initial content of the BRAM, also
                                       -- determines the size, \@n\@, of the BRAM.
@@ -795,19 +795,19 @@ And for which the /definition/ primitive is:
     { "name"      : "CLaSH.Prelude.BlockRam.cblockRam"
     , "templateD" :
 "blockram_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[4] := ~LIT[4]; -- ram
-  signal ~SYM[2] : ~TYP[8]; -- inp
-  signal ~SYM[3] : ~TYP[8]; -- outp
+  signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram
+  signal ~SYM[2] : ~TYP[7]; -- inp
+  signal ~SYM[3] : ~TYP[7]; -- outp
 begin
-  ~SYM[2] <= ~ARG[8];
+  ~SYM[2] <= ~ARG[7];
 
-  process(~CLK[3])
+  process(~CLK[2])
   begin
-    if rising_edge(~CLK[3]) then
-      if ~ARG[7] then
-        ~SYM[1](to_integer(~ARG[5])) <= ~SYM[2];
+    if rising_edge(~CLK[2]) then
+      if ~ARG[6] then
+        ~SYM[1](to_integer(~ARG[4])) <= ~SYM[2];
       end if;
-      ~SYM[3] <= ~SYM[1](to_integer(~ARG[6]));
+      ~SYM[3] <= ~SYM[1](to_integer(~ARG[5]));
     end if;
   end process;
 
