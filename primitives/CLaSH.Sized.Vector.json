@@ -317,8 +317,8 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.concatBitVector#"
     , "comment"   :
-      "concatBitVector# :: KnownNat m
-                        => Vec n (BitVector m)
+      "concatBitVector# :: KnownNat m           -- ARG[0]
+                        => Vec n (BitVector m)  -- ARG[1]
                         -> BitVector (n * m)"
     , "templateD" :
 "concatBitVector_~SYM[0] : block
@@ -342,7 +342,7 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.unconcatBitVector#"
     , "comment"   :
       "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
-                          => BitVector (n * m)
+                          => BitVector (n * m)        -- ARG[2]
                           -> Vec n (BitVector m)"
     , "templateD" :
 "unconcatBitVector_~SYM[0] : block

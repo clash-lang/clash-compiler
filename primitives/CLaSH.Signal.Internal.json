@@ -7,21 +7,21 @@
                -> CSignal clk a"
     , "templateD" :
 "register_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[2];
-  signal ~SYM[2] : ~TYP[1];
+  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
 begin
-  ~SYM[2] <= ~ARG[1];
+  ~SYM[1] <= ~ARG[1];
 
-  process(~CLK[0],~RST[0],~SYM[2])
+  process(~CLK[0],~RST[0],~SYM[1])
   begin
     if ~RST[0] = '0' then
-      ~SYM[1] <= ~SYM[2];
+      ~SYM[2] <= ~SYM[1];
     elsif rising_edge(~CLK[0]) then
-      ~SYM[1] <= ~ARG[2];
+      ~SYM[2] <= ~ARG[2];
     end if;
   end process;
 
-  ~RESULT <= ~SYM[1];
+  ~RESULT <= ~SYM[2];
 end block;"
     }
   }
