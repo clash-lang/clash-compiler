@@ -141,7 +141,7 @@ bundle' = bundle systemClock
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
--- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
+-- | Simulate a (@'Unbundled'' a -> 'Unbundled'' b@) function given a list of
 -- samples of type @a@
 --
 -- >>> simulateB (unbundle' . register (8,8) . bundle') [(1,1), (2,2), (3,3)] :: [(Int,Int)]

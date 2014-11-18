@@ -274,8 +274,8 @@ cregEn = regEn#
 csimulate :: (CSignal clk1 a -> CSignal clk2 b) -> [a] -> [b]
 csimulate f = csample . f . cfromList
 
--- | Simulate a (@'Unbundled' clk1 a -> 'Unbundled' clk2 b@) function given a list
--- of samples of type @a@
+-- | Simulate a (@'Unbundled' clk1 a -> 'Unbundled' clk2 b@) function given a
+-- list of samples of type @a@
 --
 -- > type ClkA = Clk "A" 100
 -- >
