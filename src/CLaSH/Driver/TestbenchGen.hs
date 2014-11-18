@@ -96,7 +96,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval vhdlState cmpCnt globals s
     normalizeSignal glbls bndr =
       runNormalization dbgLvl supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench _ _ _ _ _ _ v _ _ _ _ c = traceIf True ("Can't make testbench for: " ++ show c) $ return ([],v)
+genTestBench dbgLvl _ _ _ _ _ v _ _ _ _ c = traceIf (dbgLvl > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],v)
 
 genClock :: (Identifier,HWType)
          -> Maybe [Declaration]
