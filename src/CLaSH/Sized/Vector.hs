@@ -629,7 +629,7 @@ index_integer xs i = case indexM_integer xs i of
 --
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 4
 -- 5
--- >>> (1:>2:>3:>4:>5:>Nil) !! maxIndex
+-- >>> (1:>2:>3:>4:>5:>Nil) !! maxIndex (1:>2:>3:>4:>5:>Nil)
 -- 5
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 1
 -- 2
@@ -749,9 +749,9 @@ dropI = withSNat drop
 -- ending at 'maxIndex'.
 --
 -- >>> exact (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
--- 4
+-- 2
 -- >>> exact d1               (1:>2:>3:>4:>5:>Nil)
--- 4
+-- 2
 exact :: SNat m -> Vec (m + (n + 1)) a -> a
 exact n xs = head $ snd $ splitAt n xs
 
