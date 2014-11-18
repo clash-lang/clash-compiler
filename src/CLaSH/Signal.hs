@@ -141,11 +141,11 @@ bundle' = bundle systemClock
 simulate :: (Signal a -> Signal b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
--- | Simulate a (@'Bundled' a -> 'Bundled' b@) function given a list of samples
--- of type @a@
+-- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
+-- samples of type @a@
 --
--- >>> simulateB (wrap . register (8,8) . unwrap) [(1,1), (2,2), (3,3), ...
--- [(8,8), (1,1), (2,2), (3,3), ...
+-- >>> simulateB (unbundle' . register (8,8) . bundle') [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- [(8,8), (1,1), (2,2), (3,3),*** Exception: finite list
 --
 -- __NB__: This function is not synthesisable
 simulateB :: (Bundle a, Bundle b) => (Unbundled' a -> Unbundled' b) -> [a] -> [b]

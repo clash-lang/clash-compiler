@@ -227,10 +227,10 @@ csignal = signal#
 --
 -- > type ClkA = Clk "A" 100
 -- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
+-- > clkA :: SClock ClkA
+-- > clkA = sclock
 --
--- >>> csampleN 3 (cregister clkA100 8 (fromList [1,2,3,4]))
+-- >>> csampleN 3 (cregister clkA 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 cregister :: SClock clk -> a -> CSignal clk a -> CSignal clk a
 cregister = register#
@@ -241,7 +241,7 @@ cregister = register#
 --
 -- @
 -- type ClkA = Clk \"A\" 100
--- clkA :: SClock Clka
+-- clkA :: SClock ClkA
 -- clkA = sclock
 --
 -- oscillate = cregister clkA False ('not1' oscillate)
@@ -264,26 +264,26 @@ cregEn = regEn#
 --
 -- > type ClkA = Clk "A" 100
 -- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
+-- > clkA :: SClock ClkA
+-- > clkA = sclock
 --
--- >>> csimulate (cregister clkA100 8) [1, 2, 3, ...
+-- >>> csimulate (cregister clkA 8) [1, 2, 3, ...
 -- [8, 1, 2, 3, ...
 --
 -- __NB__: This function is not synthesisable
 csimulate :: (CSignal clk1 a -> CSignal clk2 b) -> [a] -> [b]
 csimulate f = csample . f . cfromList
 
--- | Simulate a (@'CSignalP' clk1 a -> 'CSignalP' clk2 b@) function given a list
+-- | Simulate a (@'Unbundled' clk1 a -> 'Unbundled' clk2 b@) function given a list
 -- of samples of type @a@
 --
 -- > type ClkA = Clk "A" 100
 -- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
+-- > clkA :: SClock ClkA
+-- > clkA = sclock
 --
--- >>> csimulateB clkA100 clkA100 (cunpack clkA100 . cregister clkA100 (8,8) . cpack clkA100) [(1,1), (2,2), (3,3), ...
--- [(8,8), (1,1), (2,2), (3,3), ...
+-- >>> csimulateB clkA clkA (unbundle clkA . cregister clkA (8,8) . bundle clkA) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- [(8,8), (1,1), (2,2), (3,3), *** Exception: finite list
 --
 -- __NB__: This function is not synthesisable
 csimulateB :: (Bundle a, Bundle b)
