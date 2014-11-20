@@ -10,7 +10,8 @@ genComponent ::
   -> Maybe Int
   -> NetlistMonad Component
 
-mkExpr :: Type
+mkExpr :: Bool
+       -> Type
        -> Term
        -> NetlistMonad (Expr,[Declaration])
 

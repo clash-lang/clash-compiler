@@ -167,7 +167,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   (selId,decls) <- case scrut of
                      (Var _ scrutNm) -> return (mkBasicId . Text.pack $ name2String scrutNm,[])
                      _ -> do
-                        (newExpr, newDecls) <- mkExpr scrutTy scrut
+                        (newExpr, newDecls) <- mkExpr False scrutTy scrut
                         i   <- varCount <<%= (+1)
                         let tmpNm   = "tmp_" ++ show i
                             tmpNmT  = Text.pack tmpNm
@@ -190,7 +190,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr scrutTy scrut
+  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr False scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
@@ -198,7 +198,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
-      (altExpr,altDecls) <- mkExpr altTy alt
+      (altExpr,altDecls) <- mkExpr False altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
         DataPat (Embed dc) _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
@@ -221,7 +221,7 @@ mkDeclarations bndr app =
       | null tyArgs -> mkFunApp bndr f args
       | otherwise   -> error $ $(curLoc) ++ "Not in normal form: Var-application with Type arguments"
     _ -> do
-      (exprApp,declsApp) <- mkExpr (unembed $ varType bndr) app
+      (exprApp,declsApp) <- mkExpr False (unembed $ varType bndr) app
       let dstId = mkBasicId . Text.pack . name2String $ varName bndr
       return (declsApp ++ [Assignment dstId exprApp])
 
@@ -238,7 +238,7 @@ mkFunApp dst fun args = do
       if length args == length compInps
         then do tcm <- Lens.use tcCache
                 argTys              <- mapM (termType tcm) args
-                (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
+                (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False t e) (zip args argTys)
                 let dstId         = mkBasicId . Text.pack . name2String $ varName dst
                     hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
                     inpAssigns    = zip (map fst compInps) argExprs
@@ -254,16 +254,17 @@ mkFunApp dst fun args = do
       _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
-mkExpr :: Type -- ^ Type of the LHS of the let-binder
+mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
+       -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
+mkExpr _ _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
   where
     i = case lit of
           (IntegerLiteral i') -> i'
           _ -> error $ $(curLoc) ++ "not an integer literal"
 
-mkExpr ty app = do
+mkExpr bbEasD ty app = do
   let (appF,args) = collectArgs app
       tmArgs      = lefts args
   hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -271,7 +272,7 @@ mkExpr ty app = do
     Data dc
       | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy dc tmArgs
       | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim nm _ -> first fst <$> mkPrimitive False nm args ty
+    Prim nm _ -> first fst <$> mkPrimitive False bbEasD nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
@@ -285,7 +286,7 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
 mkDcApplication dstHType dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr t e) (zip args argTys)
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr True t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of
     -- Is the DC just a newtype wrapper?

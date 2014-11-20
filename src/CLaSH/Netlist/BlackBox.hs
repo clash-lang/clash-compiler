@@ -107,17 +107,18 @@ mkInput (e, False) = case collectArgs e of
   (Prim f _, args) -> do
     tcm <- Lens.use tcCache
     ty  <- termType tcm e
-    ((exprN,hwTy),decls) <- lift $ mkPrimitive True f args ty
+    ((exprN,hwTy),decls) <- lift $ mkPrimitive True False f args ty
     exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN
     return ((Left exprV,hwTy),decls)
   _ -> fmap (first (first Left)) $ mkLitInput e
 
-mkPrimitive :: Bool
+mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
+            -> Bool -- ^ Treat BlackBox expression as declaration
             -> TextS.Text
             -> [Either Term Type]
             -> Type
             -> NetlistMonad ((Expr,HWType),[Declaration])
-mkPrimitive bbEParen nm args ty = do
+mkPrimitive bbEParen bbEasD nm args ty = do
   bbM <- HashMap.lookup nm <$> Lens.use primitives
   case bbM of
     Just p@(P.BlackBox {}) -> do
@@ -135,7 +136,11 @@ mkPrimitive bbEParen nm args ty = do
         (Right tempE) -> do
           bbExpr <- mkBlackBox tempE bbCtx
           let bbExpr' = if bbEParen then mconcat ["(",bbExpr,")"] else bbExpr
-          return ((BlackBoxE bbExpr' Nothing,hwTy),ctxDcls)
+          if bbEasD
+            then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
+                     tmpAssgn = Assignment tmpNmT (BlackBoxE bbExpr' Nothing)
+                 in  return ((Identifier tmpNmT Nothing, hwTy), ctxDcls ++ [tmpDecl,tmpAssgn])
+            else return ((BlackBoxE bbExpr' Nothing,hwTy),ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -150,7 +155,7 @@ mkPrimitive bbEParen nm args ty = do
               i <- varCount <<%= (+1)
               tcm     <- Lens.use tcCache
               scrutTy <- termType tcm scrut
-              (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
+              (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
               let tmpNm     = "tmp_tte_" ++ show i
                   tmpS      = pack tmpNm
                   netDecl   = NetDecl tmpS hwTy Nothing
@@ -164,7 +169,7 @@ mkPrimitive bbEParen nm args ty = do
             tcm      <- Lens.use tcCache
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-            (scrutExpr,scrutDecls) <- mkExpr scrutTy scrut
+            (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
             let tmpNm     = "tmp_dtt_" ++ show i
                 tmpS      = pack tmpNm
                 netDecl   = NetDecl tmpS Integer Nothing
