@@ -17,7 +17,7 @@ module CLaSH.Sized.Vector
     -- * Standard 'Vec'tor functions
     -- ** Extracting sub-'Vec'tors
   , head, tail, last, init
-  , take, takeI, drop, dropI, exact, select, selectI
+  , take, takeI, drop, dropI, at, select, selectI
     -- ** Combining 'Vec'tors
   , (++), (+>>), (<<+), concat, zip, unzip, shiftInAt0, shiftInAtN
   , shiftOutFrom0, shiftOutFromN
@@ -742,18 +742,18 @@ drop n = snd . splitAt n
 dropI :: KnownNat m => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
 
-{-# INLINE exact #-}
--- | 'exact' @n xs@ returns @n@'th element of @xs@
+{-# INLINE at #-}
+-- | 'at' @n xs@ returns @n@'th element of @xs@
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
 --
--- >>> exact (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
+-- >>> at (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
 -- 2
--- >>> exact d1               (1:>2:>3:>4:>5:>Nil)
+-- >>> at d1               (1:>2:>3:>4:>5:>Nil)
 -- 2
-exact :: SNat m -> Vec (m + (n + 1)) a -> a
-exact n xs = head $ snd $ splitAt n xs
+at :: SNat m -> Vec (m + (n + 1)) a -> a
+at n xs = head $ snd $ splitAt n xs
 
 {-# NOINLINE select #-}
 -- | 'select' @f s n xs@ selects @n@ elements with stepsize @s@ and
