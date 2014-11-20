@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TupleSections       #-}
@@ -28,6 +29,8 @@ module CLaSH.Sized.Vector
   , foldr, foldl, foldr1, foldl1, fold
   , scanl, scanr, sscanl, sscanr
   , mapAccumL, mapAccumR
+    -- ** Special folds
+  , dfold, vfold
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
     -- ** Generating 'Vec'tors
@@ -44,6 +47,7 @@ import Control.Applicative        (Applicative (..), (<$>))
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
+import Data.Singletons.Prelude    (TyFun,Apply,type ($))
 import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
                                    natVal)
@@ -485,6 +489,7 @@ foldl1 f xs = foldl f (head xs) (tail xs)
 -- @O('length' xs)@.
 --
 -- __NB__: The binary operator \"@f@ in @'fold' f xs@\" must be associative.
+-- __NB__: Not synthesisable
 --
 -- > fold f (x1 :> x2 :> ... :> xn1 :> xn :> Nil) == ((x1 `f` x2) `f` ...) `f` (... `f` (xn1 `f` xn))
 -- > fold f (x1 :> Nil)                           == x1
@@ -943,6 +948,108 @@ lazyV = lazyV' (repeat undefined)
     lazyV' :: Vec n a -> Vec n a -> Vec n a
     lazyV' Nil       _  = Nil
     lazyV' (_ :> xs) ys = head ys :> lazyV' xs (tail ys)
+
+{-# NOINLINE dfold #-}
+-- | A /dependently/ typed fold.
+--
+--  __NB__: Not synthesisable
+--
+-- Using lists, we can define append ('Prelude.++') using 'Prelude.foldr':
+--
+-- @
+-- xs ++ ys = 'Prelude.foldr' (':') ys xs
+-- @
+--
+-- >>> [1,2] ++ [3,4]
+-- [1,2,3,4]
+--
+-- However, when we try to do the same for 'Vec':
+--
+-- @
+-- xs ++ ys = 'foldr' (:>) ys xs
+-- @
+--
+-- We get a function with a very strange type:
+--
+-- >>> :t (++)
+-- (++) :: (m + 1) ~ m => Vec n a -> Vec m a -> Vec m a
+--
+-- Which has an insoluble constraint @(m + 1) ~ m@. This becomes obvious when
+-- we try to use it:
+--
+-- >>> (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
+-- <interactive>:7:1:
+--     Couldn't match type ‘2’ with ‘1’
+--     Expected type: 1
+--       Actual type: 1 + 1
+--     In the expression: (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
+--     In an equation for ‘it’: it = (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
+--
+-- The reason is that the type of 'foldr' is:
+--
+-- >>> :t foldr
+-- (a -> b -> b) -> b -> Vec n a -> b
+--
+-- While the type of (':>') is:
+--
+-- >>> :t (:>)
+-- (:>) :: a -> Vec n a -> Vec (n + 1) a
+--
+-- We thus need a @fold@ function that can handle the growing vector type:
+-- 'dfold'. Compared to 'foldr', 'dfold' takes an extra parameter, called the
+-- /motive/, that allows the folded function to have an argument and result type
+-- that /depends/ on the current index into the vector. Using 'dfold', we can
+-- now correctly define ('++'):
+--
+-- @
+-- data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
+-- type instance Apply (Append m a) l = Vec (l + m) a
+--
+-- xs ++ ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+-- @
+--
+-- We now see that ('++') has the appropriate type:
+--
+-- >>> :t (++)
+-- (++) :: Vec k a -> Vec m a -> Vec (k + m) a
+--
+-- And that it works:
+--
+-- >>> (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
+-- <1,2,3,4>
+dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
+      -> (forall l . Proxy l -> a -> p $ l -> p $ (l + 1)) -- ^ Function to fold
+      -> (p $ 0) -- ^ Initial element
+      -> Vec k a -- ^ Vector to fold over
+      -> p $ k
+dfold _ _ z Nil                    = z
+dfold p f z (x :> (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
+
+data V (a :: *) (f :: TyFun Nat *) :: *
+type instance Apply (V a) l = Vec l a
+
+{-# NOINLINE vfold #-}
+-- | Specialised version of 'dfold' that builds a triangular computational
+-- structure.
+--
+-- __NB__: Not synthesisable
+--
+-- Example:
+--
+-- @
+-- cs a b     = if a > b then (a,b) else (b,a)
+-- csRow y xs = let (y',xs') = 'mapAccumL' cs y xs in xs' '<:' y'
+-- csSort     = 'vfold' csRow
+-- @
+--
+-- Builds a triangular structure of compare and swaps to sort a row.
+--
+-- >>> csSort (7 :> 3 :> 9 :> 1 :> Nil)
+-- <1,3,7,9>
+vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
+      -> Vec k a
+      -> Vec k b
+vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
 
 {-# NOINLINE concatBitVector# #-}
 concatBitVector# :: KnownNat m
