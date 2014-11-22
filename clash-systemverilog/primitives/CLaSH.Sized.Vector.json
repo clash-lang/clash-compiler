@@ -77,12 +77,12 @@ endgenerate"
 ~SIGD[~SYM[0]][0];
 ~SIGD[~SYM[1]][1];
 
-assign ~SYM[0] = ~ARG[0]
-assign ~SYM[1] = ~ARG[1]
+assign ~SYM[0] = ~ARG[0];
+assign ~SYM[1] = ~ARG[1];
 
-genvar ~SYM[2]
+genvar ~SYM[2];
 generate
-  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin
+  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : append_~SYM[3]
     if (~SYM[2] < $size(~SYM[0])) begin
       assign ~RESULT[~SYM[2]] = ~SYM[0][~SYM[2]];
     end else begin
