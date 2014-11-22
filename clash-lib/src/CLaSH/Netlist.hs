@@ -281,7 +281,9 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
 mkDcApplication dstHType dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr True t e) (zip args argTys)
+  let isSP (SP _ _) = True
+      isSP _        = False
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr (isSP dstHType) t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of
     -- Is the DC just a newtype wrapper?
