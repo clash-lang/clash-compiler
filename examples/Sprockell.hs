@@ -141,7 +141,7 @@ jmpreg  =  5 :: RegBankAddr  -- for jump instructions
 tobit True  = 1
 tobit False = 0
 
-oddB = (== L) . vlast . toBV
+oddB = (== 1) . lsb
 -- wmax :: Word -> Word -> Word
 -- wmax w1 w2 = if w1 > w2 then w1 else w2
 

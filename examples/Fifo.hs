@@ -1,17 +1,13 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE TypeOperators       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Fifo where
 
 import CLaSH.Prelude
-import Debug.Trace
 
 type Elm  = Unsigned 8
 type Pntr n = Unsigned (n + 1)
 type Elms = Vec 4 Elm
 
-fifo :: forall n e . (SingRep n, SingI (n+1), SingI (n^2))
+fifo :: forall n e . (KnownNat n, KnownNat (n+1), KnownNat (n^2))
      => (Pntr n, Pntr n, Vec (n^2) e)
      -> (e, Bool, Bool)
      -> ((Pntr n,Pntr n,Vec (n^2) e),(Bool,Bool,e))
@@ -22,23 +18,23 @@ fifo (rpntr, wpntr, elms) (datain,wrt,rd) = ((rpntr',wpntr',elms'),(full,empty,d
     rpntr' | rd        = rpntr + 1
            | otherwise = rpntr
 
-    mask  = resizeU (maxBound :: Unsigned n)
+    mask  = resize (maxBound :: Unsigned n)
     wind  = wpntr .&. mask
     rind  = rpntr .&. mask
 
-    elms' | wrt       = vreplace elms wind datain
+    elms' | wrt       = replace elms wind datain
           | otherwise = elms
 
-    n = fromInteger $ fromSing (sing :: Sing n)
+    n = fromInteger $ snatToInteger (snat :: SNat n)
 
     empty = wpntr == rpntr
     full  = (testBit wpntr n) /= (testBit rpntr n) &&
             (wind == rind)
 
-    dataout = vindex elms rind
+    dataout = elms !! rind
 
-fifoL :: Comp (Elm,Bool,Bool) (Bool,Bool,Elm)
-fifoL = fifo ^^^ (0,0,vcopyE (sing :: Sing 4) 0)
+fifoL :: Signal (Elm,Bool,Bool) -> Signal (Bool,Bool,Elm)
+fifoL = fifo `mealy` (0,0,replicate d4 0)
 
 testdatas :: [[(Elm,Bool,Bool)]]
 testdatas = [

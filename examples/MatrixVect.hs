@@ -23,4 +23,4 @@ expectedOutput :: [Vec 3 (Signed 16)]
 expectedOutput = [20 :> 47 :> 74 :> Nil]
 
 test = matrixVector matrix vector
-test2 = L.take (L.length testInput) (simulateW topEntity testInput) == expectedOutput
+test2 = L.take (L.length testInput) (simulateB topEntity testInput) == expectedOutput

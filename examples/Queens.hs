@@ -29,5 +29,5 @@ mbfilter (dout,ind) din = ((dout',ind'), low)
 
                   (dout',ind') = foldl f (dout0,ind0) din
 
-topEntity :: SWrapped Din -> Signal Bit
-topEntity = mbfilter <^> (dout0, ind0)
+topEntity :: Signal Din -> Signal Bit
+topEntity = mbfilter `mealy` (dout0, ind0)

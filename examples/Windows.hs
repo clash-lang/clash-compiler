@@ -48,12 +48,19 @@ swarch1d f xs inp = (xs', outp)
     xs'  = inp +>>> xs
     outp = map f $ windowsII xs
 
+-- hfk1d :: Vec 3 Temp -> Temp
+-- hfk1d (x1 :> x2 :> x3 :> Nil) = x2 + multwc (x1 - 2 * x2 + x3)
+--   where
+--     multwc a = shiftR (a * 410) 10
 hfk1d :: Vec 3 Temp -> Temp
-hfk1d (x1 :> x2 :> x3 :> Nil) = x2 + multwc (x1 - 2 * x2 + x3)
+hfk1d xs = x2 + multwc (x1 - 2 * x2 + x3)
   where
     multwc a = shiftR (a * 410) 10
+    x1 = xs !! 0
+    x2 = xs !! 1
+    x3 = xs !! 2
 
-topEntity = (swarch1d hfk1d) <^> (repeat 0)
+topEntity = (swarch1d hfk1d) `mealy` (repeat 0)
 
 res :: [Vec 2 Temp]
-res = simulateW topEntity $ L.repeat (repeat 45)
+res = simulate topEntity $ L.repeat (repeat 45)
