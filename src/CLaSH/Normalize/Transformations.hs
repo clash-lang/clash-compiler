@@ -322,7 +322,10 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
       else do
         bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
         case bodyMaybe of
-          Just (_,body) -> changed (mkApps body args)
+          -- Don't inline recursive expressions
+          Just (_,body) -> if f `elem` (termFreeIds body)
+                              then return e
+                              else changed (mkApps body args)
           _ -> return e
 
 inlineClosed _ e@(Var _ f) = R $ do
@@ -333,7 +336,10 @@ inlineClosed _ e@(Var _ f) = R $ do
     then do
       bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
       case bodyMaybe of
-        Just (_,body) -> changed body
+        -- Don't inline recursive expressions
+        Just (_,body) -> if f `elem` (termFreeIds body)
+                            then return e
+                            else changed body
         _ -> return e
     else return e
 
