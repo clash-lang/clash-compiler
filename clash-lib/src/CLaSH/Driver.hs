@@ -6,7 +6,6 @@ module CLaSH.Driver where
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq
 import           Control.Monad.State          (evalState, get)
-import           Control.Lens                 (use)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as HashMap
 import qualified Data.HashSet                 as HashSet

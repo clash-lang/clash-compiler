@@ -16,8 +16,6 @@ Description:
   * The normalisation process that brings CoreHW in a normal form that can be
   converted to a netlist
   .
-  * VHDL Backend
-  .
   * Blackbox/Primitive Handling
   .
   .
@@ -82,7 +80,9 @@ Library
                       uu-parsinglib           >= 2.8.1,
                       wl-pprint-text          >= 1.1.0.0
 
-  Exposed-modules:    CLaSH.Core.DataCon
+  Exposed-modules:    CLaSH.Backend
+
+                      CLaSH.Core.DataCon
                       CLaSH.Core.FreeVars
                       CLaSH.Core.Literal
                       CLaSH.Core.Pretty
@@ -106,7 +106,6 @@ Library
                       CLaSH.Netlist.Id
                       CLaSH.Netlist.Types
                       CLaSH.Netlist.Util
-                      CLaSH.Netlist.VHDL
 
                       CLaSH.Normalize
                       CLaSH.Normalize.Strategy

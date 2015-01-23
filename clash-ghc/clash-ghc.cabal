@@ -85,8 +85,6 @@ Executable clash
                       base                 >= 4.3.1.0 && < 5,
                       bifunctors           >= 4.1.1,
                       bytestring           >= 0.9,
-                      clash-lib            >= 0.4,
-                      clash-prelude        >= 0.6,
                       containers           >= 0.5.4.0,
                       directory            >= 1.2,
                       filepath             >= 1.3,
@@ -99,7 +97,10 @@ Executable clash
                       text                 >= 0.11.3.1,
                       transformers         >= 0.3,
                       unbound              >= 0.4.0.2,
-                      unordered-containers >= 0.2.1.0
+                      unordered-containers >= 0.2.1.0,
+
+                      clash-lib            >= 0.4,
+                      clash-prelude        >= 0.6
 
   if os(windows)
     Build-Depends:    Win32

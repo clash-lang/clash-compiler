@@ -5,7 +5,7 @@
 {-# LANGUAGE ViewPatterns      #-}
 
 -- | Generate VHDL for assorted Netlist datatypes
-module CLaSH.Netlist.VHDL (VHDLState) where
+module CLaSH.Backend.VHDL (VHDLState) where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)

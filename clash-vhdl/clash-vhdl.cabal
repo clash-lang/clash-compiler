@@ -1,0 +1,59 @@
+Name:                 clash-vhdl
+Version:              0.4
+Synopsis:             CAES Language for Synchronous Hardware - As a Library
+Description:
+  CλaSH (pronounced ‘clash’) is a functional hardware description language that
+  borrows both its syntax and semantics from the functional programming language
+  Haskell. The merits of using a functional language to describe hardware comes
+  from the fact that combinational circuits can be directly modelled as
+  mathematical functions and that functional languages lend themselves very well
+  at describing and (de-)composing mathematical functions.
+  .
+  This package provides:
+  .
+  * VHDL Backend
+Homepage:             http://christiaanb.github.io/clash2
+bug-reports:          http://github.com/christiaanb/clash2/issues
+License:              OtherLicense
+License-file:         ../LICENSE
+Author:               Christiaan Baaij
+Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
+Copyright:            Copyright © 2012-2014 University of Twente
+Category:             Hardware
+Build-type:           Simple
+
+Extra-source-files:   ../README.md,
+                      CHANGELOG.md
+
+Cabal-version:        >=1.10
+
+source-repository head
+  type: git
+  location: https://github.com/christiaanb/clash2.git
+
+Library
+  HS-Source-Dirs:     src
+
+  default-language:   Haskell2010
+  ghc-options:        -O2 -Wall -fwarn-tabs
+  CPP-Options:        -DCABAL
+
+  Build-depends:      aeson                   >= 0.6.2.0,
+                      attoparsec              >= 0.10.4.0,
+                      base                    >= 4.6.0.1 && < 5,
+                      concurrent-supply       >= 0.1.7,
+                      containers              >= 0.5.0.0,
+                      fgl                     >= 5.4.2.4,
+                      hashable                >= 1.2.1.0,
+                      lens                    >= 3.9.2,
+                      mtl                     >= 2.1.2,
+                      pretty                  >= 1.1.1.0,
+                      template-haskell        >= 2.8.0.0,
+                      text                    >= 0.11.3.1,
+                      transformers            >= 0.3.0.0,
+                      unordered-containers    >= 0.2.3.3,
+                      wl-pprint-text          >= 1.1.0.0,
+
+                      clash-lib               >= 0.4
+
+  Exposed-modules:    CLaSH.Backend.VHDL
