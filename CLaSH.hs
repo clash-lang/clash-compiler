@@ -8,7 +8,7 @@ import CLaSH.Primitives.Util
 genVHDL :: String
         -> IO ()
 genVHDL src = do
-  primMap <- generatePrimMap ["./primitives"]
+  primMap <- generatePrimMap ["./clash-ghc/primitives"]
   (bindingsMap,tcm) <- generateBindings primMap src Nothing
   generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugFinal
 

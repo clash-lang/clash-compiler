@@ -1,11 +1,11 @@
 #!/bin/sh
-cp clash-lib.cabal_ clash-lib.cabal;
-cp CHANGELOG-lib.md CHANGELOG.md;
-cabal clean;
-cabal install;
-rm clash-lib.cabal;
-cp clash-ghc.cabal_ clash-ghc.cabal;
-cp CHANGELOG-bin.md CHANGELOG.md;
-cabal clean;
-cabal install;
-rm clash-ghc.cabal
+
+cd clash-lib
+cabal clean
+cabal install
+cd ..
+
+cd clash-ghc
+cabal clean
+cabal install
+cd ..
