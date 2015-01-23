@@ -1,24 +1,26 @@
 module CLaSH.Netlist (genComponent,mkExpr,mkDcApplication) where
 
+import CLaSH.Backend
+
 import CLaSH.Core.DataCon   (DataCon)
 import CLaSH.Core.Term      (Term,TmName)
 import CLaSH.Core.Type      (Type)
 import CLaSH.Netlist.Types  (Expr, HWType, NetlistMonad, Component,
                              Declaration)
-import CLaSH.Netlist.VHDL   (VHDLState)
 
-genComponent ::
-  TmName
+genComponent :: Backend backend
+  => TmName
   -> Maybe Int
-  -> NetlistMonad VHDLState Component
+  -> NetlistMonad backend Component
 
-mkExpr :: Bool
+mkExpr :: Backend backend
+       => Bool
        -> Type
        -> Term
-       -> NetlistMonad VHDLState (Expr,[Declaration])
+       -> NetlistMonad backend (Expr,[Declaration])
 
-mkDcApplication ::
-  HWType
+mkDcApplication :: Backend backend
+  => HWType
   -> DataCon
   -> [Term]
-  -> NetlistMonad VHDLState (Expr,[Declaration])
+  -> NetlistMonad backend (Expr,[Declaration])

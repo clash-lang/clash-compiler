@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 
@@ -11,7 +12,6 @@ import           Control.Monad.Writer       (listen, runWriterT)
 import           Data.Either                (lefts,partitionEithers)
 import           Data.HashMap.Lazy          (HashMap)
 import qualified Data.HashMap.Lazy          as HashMap
-import qualified Data.HashSet               as HashSet
 import           Data.List                  (elemIndex, nub)
 import           Data.Maybe                 (fromMaybe)
 import qualified Data.Text.Lazy             as Text
@@ -19,6 +19,7 @@ import           Unbound.LocallyNameless    (Embed (..), name2String,
                                              runFreshMT, unbind, unembed,
                                              unrebind)
 
+import           CLaSH.Backend              as Back
 import           CLaSH.Core.DataCon         (DataCon (..))
 import           CLaSH.Core.Literal         (Literal (..))
 import           CLaSH.Core.Pretty          (showDoc)
@@ -32,14 +33,14 @@ import           CLaSH.Netlist.BlackBox
 import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types        as HW
 import           CLaSH.Netlist.Util
-import           CLaSH.Netlist.VHDL         (VHDLState)
 import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types     as P
 import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: Maybe VHDLState
+genNetlist :: Backend backend
+           => Maybe backend
            -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
            -> Maybe Int
            -- ^ Starting number of the component counter
@@ -55,13 +56,14 @@ genNetlist :: Maybe VHDLState
            -- ^ Symbol count
            -> TmName
            -- ^ Name of the @topEntity@
-           -> IO ([Component],VHDLState,Int)
+           -> IO ([Component],backend,Int)
 genNetlist vhdlStateM compCntM globals primMap tcm typeTrans mStart topEntity = do
   (_,s) <- runNetlistMonad vhdlStateM compCntM globals primMap tcm typeTrans $ genComponent topEntity mStart
   return (HashMap.elems $ _components s, _vhdlMState s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: Maybe VHDLState
+runNetlistMonad :: Backend backend
+                => Maybe backend
                 -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
                 -> Maybe Int
                 -- ^ Starting number of the component counter
@@ -73,33 +75,35 @@ runNetlistMonad :: Maybe VHDLState
                 -- ^ TyCon cache
                 -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
-                -> NetlistMonad VHDLState a
+                -> NetlistMonad backend a
                 -- ^ Action to run
-                -> IO (a, NetlistState VHDLState)
+                -> IO (a, NetlistState backend)
 runNetlistMonad vhdlStateM compCntM s p tcm typeTrans
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe (HashSet.empty,0,HashMap.empty) vhdlStateM) typeTrans tcm
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe Back.init vhdlStateM) typeTrans tcm
 
 -- | Generate a component for a given function (caching)
-genComponent :: TmName -- ^ Name of the function
+genComponent :: Backend backend
+             => TmName -- ^ Name of the function
              -> Maybe Int -- ^ Starting value of the unique counter
-             -> NetlistMonad VHDLState Component
+             -> NetlistMonad backend Component
 genComponent compName mStart = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
     Nothing -> error $ $(curLoc) ++ "No normalized expression found for: " ++ show compName
-    Just (_,expr) -> makeCached compName components $
-                      genComponentT compName expr mStart
+    Just (_,expr_) -> makeCached compName components $
+                      genComponentT compName expr_ mStart
 
 -- | Generate a component for a given function
-genComponentT :: TmName -- ^ Name of the function
+genComponentT :: Backend backend
+              => TmName -- ^ Name of the function
               -> Term -- ^ Corresponding term
               -> Maybe Int -- ^ Starting value of the unique counter
-              -> NetlistMonad VHDLState Component
+              -> NetlistMonad backend Component
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
   componentNumber <- cmpCount <<%= (+1)
@@ -148,9 +152,11 @@ genComponentT compName componentExpr mStart = do
   return component
 
 -- | Generate a list of Declarations for a let-binder
-mkDeclarations :: Id -- ^ LHS of the let-binder
+mkDeclarations :: forall backend
+               .  Backend backend
+               => Id -- ^ LHS of the let-binder
                -> Term -- ^ RHS of the let-binder
-               -> NetlistMonad VHDLState [Declaration]
+               -> NetlistMonad backend [Declaration]
 mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 
 mkDeclarations _ e@(Case _ _ []) =
@@ -197,7 +203,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
   return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId scrutExpr (reverse exprs)]
   where
-    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad VHDLState ((Maybe Expr,Expr),[Declaration])
+    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad backend ((Maybe Expr,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
       (altExpr,altDecls) <- mkExpr False altTy alt
       (,altDecls) <$> case pat of
@@ -227,10 +233,11 @@ mkDeclarations bndr app =
       return (declsApp ++ [Assignment dstId exprApp])
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
-mkFunApp :: Id -- ^ LHS of the let-binder
+mkFunApp :: Backend backend
+         => Id -- ^ LHS of the let-binder
          -> TmName -- ^ Name of the applied function
          -> [Term] -- ^ Function arguments
-         -> NetlistMonad VHDLState [Declaration]
+         -> NetlistMonad backend [Declaration]
 mkFunApp dst fun args = do
   normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
@@ -255,10 +262,11 @@ mkFunApp dst fun args = do
       _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
-mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
+mkExpr :: Backend backend
+       => Bool -- ^ Treat BlackBox expression as declaration
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
-       -> NetlistMonad VHDLState (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
+       -> NetlistMonad backend (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
   where
     i = case lit of
@@ -280,10 +288,11 @@ mkExpr bbEasD ty app = do
     _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
-mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
+mkDcApplication :: Backend backend
+                => HWType -- ^ HWType of the LHS of the let-binder
                 -> DataCon -- ^ Applied DataCon
                 -> [Term] -- ^ DataCon Arguments
-                -> NetlistMonad VHDLState (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
+                -> NetlistMonad backend (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args

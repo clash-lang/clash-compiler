@@ -5,8 +5,8 @@ module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply    as Supply
 import           Control.DeepSeq
-import           Control.Monad.State          (evalState)
-import           Control.Lens                 (_1, use)
+import           Control.Monad.State          (evalState, get)
+import           Control.Lens                 (use)
 import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as HashMap
 import qualified Data.HashSet                 as HashSet
@@ -19,6 +19,7 @@ import qualified System.IO                    as IO
 import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
 import           Unbound.LocallyNameless      (name2String)
 
+import           CLaSH.Backend
 import           CLaSH.Core.Term              (Term)
 import           CLaSH.Core.Type              (Type)
 import           CLaSH.Core.TyCon             (TyCon, TyConName)
@@ -26,7 +27,6 @@ import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
 import           CLaSH.Netlist.Types          (Component (..), HWType)
-import           CLaSH.Netlist.VHDL           (VHDLState, genVHDL, mkTyPackage)
 import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
                                                normalize, runNormalization)
 import           CLaSH.Primitives.Types
@@ -36,14 +36,16 @@ import           CLaSH.Util
 import qualified Data.Time.Clock              as Clock
 
 -- | Create a set of .VHDL files for a set of functions
-generateVHDL :: BindingMap -- ^ Set of functions
+generateVHDL :: Backend backend
+             => BindingMap -- ^ Set of functions
+             -> Maybe backend
              -> PrimMap -- ^ Primitive / BlackBox Definitions
              -> HashMap TyConName TyCon -- ^ TyCon cache
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
              -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
              -> DebugLevel -- ^ Debug information level for the normalization process
              -> IO ()
-generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
+generateVHDL bindingsMap vhdlState primMap tcm typeTrans eval dbgLevel = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -78,7 +80,7 @@ generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
-      (netlist,vhdlState,cmpCnt) <- genNetlist Nothing Nothing
+      (netlist,vhdlState',cmpCnt) <- genNetlist vhdlState Nothing
                                transformedBindings
                                primMap tcm typeTrans Nothing (fst topEntity)
 
@@ -92,18 +94,18 @@ generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
                                       cName)
                                 netlist
 
-      (testBench,vhdlState') <- genTestBench dbgLevel supplyTB primMap
-                                  typeTrans tcm eval vhdlState cmpCnt bindingsMap
-                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
-                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
-                                  topComponent
+      (testBench,vhdlState'') <- genTestBench dbgLevel supplyTB primMap
+                                 typeTrans tcm eval vhdlState' cmpCnt bindingsMap
+                                 (listToMaybe $ map fst $ HashMap.toList testInputs)
+                                 (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
+                                 topComponent
 
 
       testBenchTime <- testBench `seq` Clock.getCurrentTime
       let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-      let vhdlDocs = createVHDL vhdlState' (netlist ++ testBench)
+      let vhdlDocs = createVHDL vhdlState'' (netlist ++ testBench)
           dir = concat [ "./vhdl/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
@@ -119,13 +121,14 @@ generateVHDL bindingsMap primMap tcm typeTrans eval dbgLevel = do
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
 
 -- | Pretty print Components to VHDL Documents
-createVHDL :: VHDLState
+createVHDL :: Backend backend
+           => backend
            -> [Component]
            -> [(String,Doc)]
-createVHDL vhdlState components = flip evalState vhdlState $ do
+createVHDL backend components = flip evalState backend $ do
   (vhdlNms,vhdlDocs) <- unzip <$> mapM genVHDL components
   let vhdlNmDocs = zip vhdlNms vhdlDocs
-  hwtys <- HashSet.toList <$> use _1
+  hwtys <- HashSet.toList <$> extractTypes <$> get
   typesPkg <- mkTyPackage hwtys
   return (("types",typesPkg):vhdlNmDocs)
 

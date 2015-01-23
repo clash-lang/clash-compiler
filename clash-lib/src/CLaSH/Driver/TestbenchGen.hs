@@ -25,9 +25,9 @@ import           CLaSH.Core.Term
 import           CLaSH.Core.TyCon
 import           CLaSH.Core.Type
 
+import           CLaSH.Backend
 import           CLaSH.Netlist
 import           CLaSH.Netlist.Types              as N
-import           CLaSH.Netlist.VHDL               (VHDLState, vhdlTypeErrValue)
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
 import           CLaSH.Primitives.Types
@@ -35,22 +35,22 @@ import           CLaSH.Rewrite.Types
 
 import           CLaSH.Util
 
-
 -- | Generate a VHDL testbench for a component given a set of stimuli and a
 -- set of matching expected outputs
-genTestBench :: DebugLevel
+genTestBench :: Backend backend
+             => DebugLevel
              -> Supply
              -> PrimMap                      -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
              -> (HashMap TyConName TyCon -> Term -> Term)
-             -> VHDLState
+             -> backend                      -- ^ Backend corresponding to target language
              -> Int
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
-             -> IO ([Component],VHDLState)
+             -> IO ([Component],backend)
 genTestBench dbgLvl supply primMap typeTrans tcm eval vhdlState cmpCnt globals stimuliNmM expectedNmM
   (Component cName hidden [inp] outp _) = do
   let ioDecl  = [ uncurry NetDecl inp  Nothing
@@ -150,7 +150,8 @@ genReset _ = Nothing
 renderFloat2Dec :: Float -> PP.Doc
 renderFloat2Dec = PP.text . Builder.toLazyText . Builder.formatRealFloat Builder.Fixed (Just 2)
 
-genStimuli :: VHDLState
+genStimuli :: Backend backend
+           => backend
            -> Int
            -> PrimMap
            -> HashMap TmName (Type,Term)
@@ -162,7 +163,7 @@ genStimuli :: VHDLState
            -> [(Identifier,HWType)]
            -> (Identifier,HWType)
            -> TmName
-           -> IO (Declaration,[Component],VHDLState,Int,[(Identifier,HWType)])
+           -> IO (Declaration,[Component],backend,Int,[(Identifier,HWType)])
 genStimuli vhdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
   (comps,vhdlState',cmpCnt') <- genNetlist (Just vhdlState) (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
@@ -184,7 +185,8 @@ genStimuli vhdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden
                    )
   return (decl,comps,vhdlState',cmpCnt',hidden'')
 
-genVerifier :: VHDLState
+genVerifier :: Backend backend
+            => backend
             -> Int
             -> PrimMap
             -> HashMap TmName (Type,Term)
@@ -196,7 +198,7 @@ genVerifier :: VHDLState
             -> [(Identifier,HWType)]
             -> (Identifier,HWType)
             -> TmName
-            -> IO (Declaration,[Component],VHDLState,[(Identifier,HWType)])
+            -> IO (Declaration,[Component],backend,[(Identifier,HWType)])
 genVerifier vhdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
   (comps,vhdlState',_) <- genNetlist (Just vhdlState) (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm

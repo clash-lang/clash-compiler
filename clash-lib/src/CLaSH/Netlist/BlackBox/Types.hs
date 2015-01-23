@@ -8,7 +8,6 @@ import Control.Monad.Writer (MonadWriter,WriterT)
 import Data.Text.Lazy       (Text)
 
 import CLaSH.Netlist.Types
-import CLaSH.Netlist.VHDL   (VHDLState)
 
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
@@ -58,5 +57,7 @@ data Decl = Decl Int [(BlackBoxTemplate,BlackBoxTemplate)]
 
 -- | Monad that caches VHDL information and remembers hidden inputs of
 -- black boxes that are being generated (WriterT)
-newtype BlackBoxMonad a = B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State VHDLState) a }
-  deriving (Functor, Applicative, Monad, MonadWriter [(Identifier,HWType)], MonadState VHDLState)
+newtype BlackBoxMonad backend a =
+  B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State backend) a }
+  deriving (Functor, Applicative, Monad, MonadWriter [(Identifier,HWType)],
+            MonadState backend)

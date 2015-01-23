@@ -15,12 +15,9 @@ import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
 
+import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Types
 import           CLaSH.Netlist.Types                  (HWType (..), Identifier)
-import           CLaSH.Netlist.VHDL                   (VHDLState,
-                                                       vhdlType,
-                                                       vhdlTypeErrValue,
-                                                       vhdlTypeMark)
 import           CLaSH.Util
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
@@ -86,10 +83,11 @@ clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 
 -- | Render a blackbox given a certain context. Returns a filled out template
 -- and a list of 'hidden' inputs that must be added to the encompassing component.
-renderBlackBox :: BlackBoxTemplate -- ^ Blackbox template
+renderBlackBox :: Backend backend
+               => BlackBoxTemplate -- ^ Blackbox template
                -> BlackBoxContext -- ^ Context used to fill in the hole
-               -> VHDLState
-               -> ((Text, [(Identifier,HWType)]),VHDLState)
+               -> backend
+               -> ((Text, [(Identifier,HWType)]),backend)
 renderBlackBox l bbCtx s
   = first (Text.concat *** List.nub)
   $ flip runState s
@@ -98,9 +96,10 @@ renderBlackBox l bbCtx s
   $ mapM (renderElem bbCtx) l
 
 -- | Render a single template element
-renderElem :: BlackBoxContext
+renderElem :: Backend backend
+              => BlackBoxContext
            -> Element
-           -> BlackBoxMonad Text
+           -> BlackBoxMonad backend Text
 renderElem b (D (Decl n (l:ls))) = do
   o  <- combineM (lineToIdentifier b) (lineToType b) l
   is <- mapM (combineM (lineToIdentifier b) (lineToType b)) ls
@@ -115,9 +114,10 @@ renderElem b e = either id fst <$> mkSyncIdentifier b e
 -- | Fill out the template corresponding to an output/input assignment of a
 -- component instantiation, and turn it into a single identifier so it can
 -- be used for a new blackbox context.
-lineToIdentifier :: BlackBoxContext
+lineToIdentifier :: Backend backend
+                 => BlackBoxContext
                  -> BlackBoxTemplate
-                 -> BlackBoxMonad SyncIdentifier
+                 -> BlackBoxMonad backend SyncIdentifier
 lineToIdentifier b = foldrM (\e a -> do
                               e' <- mkSyncIdentifier  b e
                               case (e', a) of
@@ -129,7 +129,7 @@ lineToIdentifier b = foldrM (\e a -> do
 
 lineToType :: BlackBoxContext
            -> BlackBoxTemplate
-           -> BlackBoxMonad HWType
+           -> BlackBoxMonad backend HWType
 lineToType b [(Typ Nothing)]  = return (snd $ result b)
 lineToType b [(Typ (Just n))] = return (snd $ inputs b !! n)
 lineToType b [(TypElem t)]    = do hwty' <- lineToType b [t]
@@ -140,9 +140,10 @@ lineToType _ _ = error $ $(curLoc) ++ "Unexpected type manipulation"
 
 -- | Give a context and a tagged hole (of a template), returns part of the
 -- context that matches the tag of the hole.
-mkSyncIdentifier :: BlackBoxContext
+mkSyncIdentifier :: Backend backend
+                 => BlackBoxContext
                  -> Element
-                 -> BlackBoxMonad SyncIdentifier
+                 -> BlackBoxMonad backend SyncIdentifier
 mkSyncIdentifier _ (C t)           = return $ Left t
 mkSyncIdentifier b O               = return $ fst $ result b
 mkSyncIdentifier b (I n)           = return $ fst $ inputs b !! n
