@@ -9,3 +9,5 @@ dist
 *.dyn_hi-boot
 *.po-boot
 *.DS_Store
+
+*~
