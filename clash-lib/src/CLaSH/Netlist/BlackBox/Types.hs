@@ -8,6 +8,7 @@ import Control.Monad.Writer (MonadWriter,WriterT)
 import Data.Text.Lazy       (Text)
 
 import CLaSH.Netlist.Types
+import CLaSH.Netlist.VHDL   (VHDLState)
 
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext

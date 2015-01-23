@@ -32,6 +32,7 @@ import           CLaSH.Netlist.BlackBox
 import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types        as HW
 import           CLaSH.Netlist.Util
+import           CLaSH.Netlist.VHDL         (VHDLState)
 import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types     as P
 import           CLaSH.Util

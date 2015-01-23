@@ -12,10 +12,8 @@ import Control.Monad.State                  (MonadIO, MonadState, StateT)
 import Control.Monad.Writer                 (MonadWriter, WriterT)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
-import Data.HashSet                         (HashSet)
 import Data.Text.Lazy                       (Text)
 import GHC.Generics                         (Generic)
-import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 import Unbound.LocallyNameless              (Fresh, FreshMT)
 
 import CLaSH.Core.Term                      (Term, TmName)
@@ -37,16 +35,6 @@ newtype NetlistMonad backend a =
             Fresh, MonadIO)
 
 deriving instance MonadState (NetlistState backend) (NetlistMonad backend)
-
--- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
---
--- * Previously encountered HWTypes
---
--- * Product type counter
---
--- * Cache for previously generated product type names
-type VHDLState = (HashSet HWType,Int,HashMap HWType Doc)
--- VHDLState
 
 -- | State of the NetlistMonad
 data NetlistState backend

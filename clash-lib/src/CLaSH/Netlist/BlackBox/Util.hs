@@ -16,9 +16,9 @@ import qualified Data.Text.Lazy                       as Text
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
 
 import           CLaSH.Netlist.BlackBox.Types
-import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
-                                                       VHDLState)
-import           CLaSH.Netlist.VHDL                   (vhdlType,
+import           CLaSH.Netlist.Types                  (HWType (..), Identifier)
+import           CLaSH.Netlist.VHDL                   (VHDLState,
+                                                       vhdlType,
                                                        vhdlTypeErrValue,
                                                        vhdlTypeMark)
 import           CLaSH.Util

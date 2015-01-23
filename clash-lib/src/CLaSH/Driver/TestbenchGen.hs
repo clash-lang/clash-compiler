@@ -27,7 +27,7 @@ import           CLaSH.Core.Type
 
 import           CLaSH.Netlist
 import           CLaSH.Netlist.Types              as N
-import           CLaSH.Netlist.VHDL               (vhdlTypeErrValue)
+import           CLaSH.Netlist.VHDL               (VHDLState, vhdlTypeErrValue)
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
 import           CLaSH.Primitives.Types

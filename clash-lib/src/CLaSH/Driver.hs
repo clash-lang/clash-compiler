@@ -25,9 +25,8 @@ import           CLaSH.Core.TyCon             (TyCon, TyConName)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                (genNetlist)
-import           CLaSH.Netlist.Types          (Component (..), HWType,
-                                               VHDLState)
-import           CLaSH.Netlist.VHDL           (genVHDL, mkTyPackage)
+import           CLaSH.Netlist.Types          (Component (..), HWType)
+import           CLaSH.Netlist.VHDL           (VHDLState, genVHDL, mkTyPackage)
 import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
                                                normalize, runNormalization)
 import           CLaSH.Primitives.Types

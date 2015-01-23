@@ -6,7 +6,8 @@
 
 -- | Generate VHDL for assorted Netlist datatypes
 module CLaSH.Netlist.VHDL
-  ( genVHDL
+  ( VHDLState
+  , genVHDL
   , mkTyPackage
   , vhdlType
   , vhdlTypeErrValue
@@ -21,7 +22,9 @@ import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,when,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
+import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
+import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
@@ -32,6 +35,15 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
+
+-- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
+--
+-- * Previously encountered HWTypes
+--
+-- * Product type counter
+--
+-- * Cache for previously generated product type names
+type VHDLState = (HashSet HWType,Int,HashMap HWType Doc)
 
 type VHDLM a = State VHDLState a
 
