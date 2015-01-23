@@ -72,9 +72,9 @@ runNetlistMonad :: Maybe VHDLState
                 -- ^ TyCon cache
                 -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
-                -> NetlistMonad a
+                -> NetlistMonad VHDLState a
                 -- ^ Action to run
-                -> IO (a,NetlistState)
+                -> IO (a, NetlistState VHDLState)
 runNetlistMonad vhdlStateM compCntM s p tcm typeTrans
   = runFreshMT
   . flip runStateT s'
@@ -86,7 +86,7 @@ runNetlistMonad vhdlStateM compCntM s p tcm typeTrans
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
              -> Maybe Int -- ^ Starting value of the unique counter
-             -> NetlistMonad Component
+             -> NetlistMonad VHDLState Component
 genComponent compName mStart = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
@@ -98,7 +98,7 @@ genComponent compName mStart = do
 genComponentT :: TmName -- ^ Name of the function
               -> Term -- ^ Corresponding term
               -> Maybe Int -- ^ Starting value of the unique counter
-              -> NetlistMonad Component
+              -> NetlistMonad VHDLState Component
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
   componentNumber <- cmpCount <<%= (+1)
@@ -149,7 +149,7 @@ genComponentT compName componentExpr mStart = do
 -- | Generate a list of Declarations for a let-binder
 mkDeclarations :: Id -- ^ LHS of the let-binder
                -> Term -- ^ RHS of the let-binder
-               -> NetlistMonad [Declaration]
+               -> NetlistMonad VHDLState [Declaration]
 mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 
 mkDeclarations _ e@(Case _ _ []) =
@@ -196,7 +196,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
   return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId scrutExpr (reverse exprs)]
   where
-    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
+    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad VHDLState ((Maybe Expr,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
       (altExpr,altDecls) <- mkExpr False altTy alt
       (,altDecls) <$> case pat of
@@ -229,7 +229,7 @@ mkDeclarations bndr app =
 mkFunApp :: Id -- ^ LHS of the let-binder
          -> TmName -- ^ Name of the applied function
          -> [Term] -- ^ Function arguments
-         -> NetlistMonad [Declaration]
+         -> NetlistMonad VHDLState [Declaration]
 mkFunApp dst fun args = do
   normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
@@ -257,7 +257,7 @@ mkFunApp dst fun args = do
 mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
-       -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
+       -> NetlistMonad VHDLState (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
   where
     i = case lit of
@@ -282,7 +282,7 @@ mkExpr bbEasD ty app = do
 mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
                 -> DataCon -- ^ Applied DataCon
                 -> [Term] -- ^ DataCon Arguments
-                -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
+                -> NetlistMonad VHDLState (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args

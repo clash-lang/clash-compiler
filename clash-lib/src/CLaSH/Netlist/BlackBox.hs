@@ -48,10 +48,12 @@ import           CLaSH.Normalize.Util          (isConstant)
 import           CLaSH.Primitives.Types        as P
 import           CLaSH.Util
 
+type Backend = VHDLState
+
 -- | Generate the context for a BlackBox instantiation.
 mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox application
                   -> [Term] -- ^ Arguments of the primitive/blackbox application
-                  -> NetlistMonad (BlackBoxContext,[Declaration])
+                  -> NetlistMonad Backend (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
     -- Make context inputs
     tcm                   <- Lens.use tcCache
@@ -79,7 +81,7 @@ mkBlackBoxContext resId args = do
 -- | Instantiate a BlackBox template according to the given context
 mkBlackBox :: Text -- ^ Template to instantiate
            -> BlackBoxContext -- ^ Context to instantiate template with
-           -> NetlistMonad Text
+           -> NetlistMonad Backend Text
 mkBlackBox templ bbCtx =
   let (l,err) = runParse templ
   in if null err && verifyBlackBoxContext l bbCtx
@@ -92,16 +94,16 @@ mkBlackBox templ bbCtx =
 
 -- | Create an template instantiation text for an argument term
 mkInput :: (Term, Bool)
-        -> MaybeT NetlistMonad ((SyncIdentifier,HWType),[Declaration])
+        -> MaybeT (NetlistMonad Backend) ((SyncIdentifier,HWType),[Declaration])
 mkInput (_, True) = return ((Left $ pack "__FUN__", Void),[])
 
 mkInput (Var ty v, False) = do
   let vT = mkBasicId . pack $ name2String v
-  tcm  <- Lens.use tcCache
+  tcm <- Lens.use tcCache
   hwTy <- lift $ N.unsafeCoreTypeToHWTypeM $(curLoc) ty
-  case synchronizedClk tcm ty of
-    Just clk -> return ((Right (vT,clk), hwTy),[])
-    Nothing  -> return ((Left vT, hwTy),[])
+  return $ case synchronizedClk tcm ty of
+    Just clk -> ((Right (vT,clk), hwTy), [])
+    Nothing  -> ((Left  vT,       hwTy), [])
 
 mkInput (e, False) = case collectArgs e of
   (Prim f _, args) -> do
@@ -117,7 +119,7 @@ mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
             -> TextS.Text
             -> [Either Term Type]
             -> Type
-            -> NetlistMonad ((Expr,HWType),[Declaration])
+            -> NetlistMonad Backend ((Expr,HWType),[Declaration])
 mkPrimitive bbEParen bbEasD nm args ty = do
   bbM <- HashMap.lookup nm <$> Lens.use primitives
   case bbM of
@@ -215,7 +217,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
 -- | Create an template instantiation text for an argument term, given that
 -- the term is a literal. Returns 'Nothing' if the term is not a literal.
 mkLitInput :: Term -- ^ The literal argument term
-           -> MaybeT NetlistMonad ((Identifier,HWType),[Declaration])
+           -> MaybeT (NetlistMonad Backend) ((Identifier,HWType),[Declaration])
 mkLitInput (C.Literal (IntegerLiteral i))     = return ((pack $ show i,Integer),[])
 mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   typeTrans <- Lens.use typeTranslator
@@ -232,7 +234,7 @@ mkLitInput _ = mzero
 -- a function
 mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
-           -> MaybeT NetlistMonad ((BlackBoxTemplate,BlackBoxContext),[Declaration])
+           -> MaybeT (NetlistMonad Backend) ((BlackBoxTemplate,BlackBoxContext),[Declaration])
 mkFunInput resId e = do
   let (appE,args) = collectArgs e
   (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
@@ -292,7 +294,7 @@ mkFunInput resId e = do
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
 instantiateSym :: BlackBoxTemplate
-               -> NetlistMonad BlackBoxTemplate
+               -> NetlistMonad Backend BlackBoxTemplate
 instantiateSym l = do
   i <- Lens.use varCount
   let (l',i') = setSym i l

@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -25,9 +27,16 @@ import CLaSH.Util
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
-newtype NetlistMonad a =
-    NetlistMonad { runNetlist :: WriterT [(Identifier,HWType)] (StateT NetlistState (FreshMT IO)) a }
-  deriving (Functor, Monad, Applicative, MonadState NetlistState, MonadWriter [(Identifier,HWType)], Fresh, MonadIO)
+newtype NetlistMonad backend a =
+  NetlistMonad { runNetlist :: WriterT
+                               [(Identifier,HWType)]
+                               (StateT (NetlistState backend) (FreshMT IO))
+                               a
+               }
+  deriving (Functor, Monad, Applicative, MonadWriter [(Identifier,HWType)],
+            Fresh, MonadIO)
+
+deriving instance MonadState (NetlistState backend) (NetlistMonad backend)
 
 -- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
 --
@@ -37,9 +46,10 @@ newtype NetlistMonad a =
 --
 -- * Cache for previously generated product type names
 type VHDLState = (HashSet HWType,Int,HashMap HWType Doc)
+-- VHDLState
 
 -- | State of the NetlistMonad
-data NetlistState
+data NetlistState backend
   = NetlistState
   { _bindings       :: HashMap TmName (Type,Term) -- ^ Global binders
   , _varEnv         :: Gamma -- ^ Type environment/context
@@ -47,7 +57,7 @@ data NetlistState
   , _cmpCount       :: Int -- ^ Number of create components
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: PrimMap -- ^ Primitive Definitions
-  , _vhdlMState     :: VHDLState -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+  , _vhdlMState     :: backend -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
   }
