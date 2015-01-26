@@ -41,7 +41,7 @@ import           CLaSH.Util
 -- @topEntity@ at the top.
 genNetlist :: Backend backend
            => Maybe backend
-           -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+           -- ^ State for the 'CLaSH.Netlist.HDL.HDLM' Monad
            -> Maybe Int
            -- ^ Starting number of the component counter
            -> HashMap TmName (Type,Term)
@@ -57,14 +57,14 @@ genNetlist :: Backend backend
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([Component],backend,Int)
-genNetlist vhdlStateM compCntM globals primMap tcm typeTrans mStart topEntity = do
-  (_,s) <- runNetlistMonad vhdlStateM compCntM globals primMap tcm typeTrans $ genComponent topEntity mStart
-  return (HashMap.elems $ _components s, _vhdlMState s, _cmpCount s)
+genNetlist hdlStateM compCntM globals primMap tcm typeTrans mStart topEntity = do
+  (_,s) <- runNetlistMonad hdlStateM compCntM globals primMap tcm typeTrans $ genComponent topEntity mStart
+  return (HashMap.elems $ _components s, _hdlMState s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad :: Backend backend
                 => Maybe backend
-                -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+                -- ^ State for the 'CLaSH.Netlist.HDL.HDLM' Monad
                 -> Maybe Int
                 -- ^ Starting number of the component counter
                 -> HashMap TmName (Type,Term)
@@ -78,13 +78,13 @@ runNetlistMonad :: Backend backend
                 -> NetlistMonad backend a
                 -- ^ Action to run
                 -> IO (a, NetlistState backend)
-runNetlistMonad vhdlStateM compCntM s p tcm typeTrans
+runNetlistMonad hdlStateM compCntM s p tcm typeTrans
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe Back.init vhdlStateM) typeTrans tcm
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe Back.init hdlStateM) typeTrans tcm
 
 -- | Generate a component for a given function (caching)
 genComponent :: Backend backend

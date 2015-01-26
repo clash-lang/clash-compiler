@@ -55,7 +55,7 @@ data Element = C   Text          -- ^ Constant
 data Decl = Decl Int [(BlackBoxTemplate,BlackBoxTemplate)]
   deriving Show
 
--- | Monad that caches VHDL information and remembers hidden inputs of
+-- | Monad that caches HDL information and remembers hidden inputs of
 -- black boxes that are being generated (WriterT)
 newtype BlackBoxMonad backend a =
   B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State backend) a }

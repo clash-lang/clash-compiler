@@ -157,11 +157,11 @@ mkSyncIdentifier b (Rst Nothing)   = let (rst,rate) = (first (`Text.append` Text
                                      in tell [(rst,Reset rate)] >> return (Left rst)
 mkSyncIdentifier b (Rst (Just n))  = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ inputs b !! n
                                      in tell [(rst,Reset rate)] >> return (Left rst)
-mkSyncIdentifier b (Typ Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ result b
-mkSyncIdentifier b (Typ (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlType . snd $ inputs b !! n
-mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ result b
-mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeMark . snd $ inputs b !! n
-mkSyncIdentifier b (Err Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeErrValue . snd $ result b
-mkSyncIdentifier b (Err (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . vhdlTypeErrValue . snd $ inputs b !! n
+mkSyncIdentifier b (Typ Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . hdlType . snd $ result b
+mkSyncIdentifier b (Typ (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . hdlType . snd $ inputs b !! n
+mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeMark . snd $ result b
+mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeMark . snd $ inputs b !! n
+mkSyncIdentifier b (Err Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeErrValue . snd $ result b
+mkSyncIdentifier b (Err (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeErrValue . snd $ inputs b !! n
 mkSyncIdentifier _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 mkSyncIdentifier _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"

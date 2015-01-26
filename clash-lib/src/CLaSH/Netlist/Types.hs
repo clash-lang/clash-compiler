@@ -45,7 +45,7 @@ data NetlistState backend
   , _cmpCount       :: Int -- ^ Number of create components
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: PrimMap -- ^ Primitive Definitions
-  , _vhdlMState     :: backend -- ^ State for the 'CLaSH.Netlist.VHDL.VHDLM' Monad
+  , _hdlMState     :: backend -- ^ State for the 'CLaSH.Netlist.HDL.HDLM' Monad
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
   }

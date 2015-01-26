@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
--- | Transform/format a Netlist Identifier so that it is acceptable as a VHDL identifier
+-- | Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
 module CLaSH.Netlist.Id
   ( mkBasicId
   , mkBasicId'
@@ -12,7 +12,7 @@ import Data.Char      (isAsciiLower,isAsciiUpper,isDigit,ord)
 import Data.Text.Lazy as Text
 import Numeric        (showHex)
 
--- | Transform/format a text so that it is acceptable as a VHDL identifier
+-- | Transform/format a text so that it is acceptable as a HDL identifier
 mkBasicId :: Text
           -> Text
 mkBasicId = mkBasicId' False

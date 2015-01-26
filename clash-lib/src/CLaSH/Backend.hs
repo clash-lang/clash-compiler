@@ -10,24 +10,24 @@ class Backend state where
   -- | Initial state for state monad
   init :: state
 
-  -- | name of backend, used for directory to put output files in
-  -- | Should be constant function / ignore value
+  -- | Name of backend, used for directory to put output files in. Should be
+  -- | constant function / ignore argument.
   name :: state -> String
 
-  -- | get set of types out of state
+  -- | Get the set of types out of state
   extractTypes     :: state -> HashSet HWType
 
-  -- | Generate VHDL for a Netlist component
-  genVHDL          :: Component    -> State state (String, Doc)
-  -- | Generate a VHDL package containing type definitions for the given HWTypes
+  -- | Generate HDL for a Netlist component
+  genHDL           :: Component    -> State state (String, Doc)
+  -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: [HWType]     -> State state Doc
-  -- | Convert a Netlist HWType to a VHDL type
-  vhdlType         :: HWType       -> State state Doc
-  -- | Convert a Netlist HWType to an error VHDL value for that type
-  vhdlTypeErrValue :: HWType       -> State state Doc
-  -- | Convert a Netlist HWType to the root of a VHDL type
-  vhdlTypeMark     :: HWType       -> State state Doc
-  -- | Turn a Netlist Declaration to a VHDL concurrent block
+  -- | Convert a Netlist HWType to a target HDL type
+  hdlType          :: HWType       -> State state Doc
+  -- | Convert a Netlist HWType to an HDL error value for that type 
+  hdlTypeErrValue  :: HWType       -> State state Doc
+  -- | Convert a Netlist HWType to the root of a target HDL type
+  hdlTypeMark      :: HWType       -> State state Doc
+  -- | Turn a Netlist Declaration to a HDL concurrent block
   inst             :: Declaration  -> State state (Maybe Doc)
-  -- | Turn a Netlist expression into a VHDL expression
+  -- | Turn a Netlist expression into a HDL expression
   expr             :: Bool -> Expr -> State state Doc

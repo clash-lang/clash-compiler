@@ -87,7 +87,7 @@ mkBlackBox templ bbCtx =
   in if null err && verifyBlackBoxContext l bbCtx
     then do
       l'        <- instantiateSym l
-      (bb,clks) <- liftState vhdlMState $ state $ renderBlackBox l' bbCtx
+      (bb,clks) <- liftState hdlMState $ state $ renderBlackBox l' bbCtx
       tell clks
       return $! bb
     else error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++ "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++ show err
@@ -111,7 +111,7 @@ mkInput (e, False) = case collectArgs e of
     tcm <- Lens.use tcCache
     ty  <- termType tcm e
     ((exprN,hwTy),decls) <- lift $ mkPrimitive True False f args ty
-    exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN
+    exprV <- fmap (pack . show) $ liftState hdlMState $ N.expr False exprN
     return ((Left exprV,hwTy),decls)
   _ -> fmap (first (first Left)) $ mkLitInput e
 
@@ -228,7 +228,7 @@ mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   args' <- filterM (fmap (representableType typeTrans tcm) . termType tcm) (lefts args)
   hwTy  <- N.termHWType $(curLoc) e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'
-  exprV <- fmap (pack . show) $ liftState vhdlMState $ N.expr False exprN
+  exprV <- fmap (pack . show) $ liftState hdlMState $ N.expr False exprN
   return ((exprV,hwTy),dcDecls)
 mkLitInput _ = mzero
 
@@ -265,13 +265,13 @@ mkFunInput resId e = do
                       dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp    = DataCon resHTy (Just $ DC (resHTy,dcI)) dcInps
                       dcAss    = Assignment (pack "~RESULT") dcApp
-                  templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
+                  templ <- fmap (pack . show . fromJust) $ liftState hdlMState $ inst dcAss
                   return (Left templ)
                 Just resHTy@(Product _ dcArgs) -> do
                   let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp  = DataCon resHTy (Just $ DC (resHTy,0)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
-                  templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst dcAss
+                  templ <- fmap (pack . show . fromJust) $ liftState hdlMState $ inst dcAss
                   return (Left templ)
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             Var _ fun -> do
@@ -285,7 +285,7 @@ mkFunInput resId e = do
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
                       instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
-                  templ <- fmap (pack . show . fromJust) $ liftState vhdlMState $ inst instDecl
+                  templ <- fmap (pack . show . fromJust) $ liftState hdlMState $ inst instDecl
                   return (Left templ)
                 Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e

@@ -34,8 +34,8 @@ import           CLaSH.Util
 
 import qualified Data.Time.Clock              as Clock
 
--- | Create a set of .VHDL files for a set of functions
-generateVHDL :: Backend backend
+-- | Create a set of target HDL files for a set of functions
+generateHDL :: Backend backend
              => BindingMap -- ^ Set of functions
              -> Maybe backend
              -> PrimMap -- ^ Primitive / BlackBox Definitions
@@ -44,7 +44,7 @@ generateVHDL :: Backend backend
              -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
              -> DebugLevel -- ^ Debug information level for the normalization process
              -> IO ()
-generateVHDL bindingsMap vhdlState primMap tcm typeTrans eval dbgLevel = do
+generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -79,7 +79,7 @@ generateVHDL bindingsMap vhdlState primMap tcm typeTrans eval dbgLevel = do
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
-      (netlist,vhdlState',cmpCnt) <- genNetlist vhdlState Nothing
+      (netlist,hdlState',cmpCnt) <- genNetlist hdlState Nothing
                                transformedBindings
                                primMap tcm typeTrans Nothing (fst topEntity)
 
@@ -93,8 +93,8 @@ generateVHDL bindingsMap vhdlState primMap tcm typeTrans eval dbgLevel = do
                                       cName)
                                 netlist
 
-      (testBench,vhdlState'') <- genTestBench dbgLevel supplyTB primMap
-                                 typeTrans tcm eval vhdlState' cmpCnt bindingsMap
+      (testBench,hdlState'') <- genTestBench dbgLevel supplyTB primMap
+                                 typeTrans tcm eval hdlState' cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                  topComponent
@@ -104,52 +104,52 @@ generateVHDL bindingsMap vhdlState primMap tcm typeTrans eval dbgLevel = do
       let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-      let vhdlDocs = createVHDL vhdlState'' (netlist ++ testBench)
-          dir = concat [ "./vhdl/"
+      let hdlDocs = createHDL hdlState'' (netlist ++ testBench)
+          dir = concat [ "./hdl/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
                        ]
       prepareDir dir
-      mapM_ (writeVHDL dir) vhdlDocs
+      mapM_ (writeHDL dir) hdlDocs
 
-      end <- vhdlDocs `seq` Clock.getCurrentTime
+      end <- hdlDocs `seq` Clock.getCurrentTime
       let startEndDiff = Clock.diffUTCTime end start
       putStrLn $ "Total compilation took " ++ show startEndDiff
 
     [] -> error $ $(curLoc) ++ "No 'topEntity' found"
     _  -> error $ $(curLoc) ++ "Multiple 'topEntity's found"
 
--- | Pretty print Components to VHDL Documents
-createVHDL :: Backend backend
+-- | Pretty print Components to HDL Documents
+createHDL :: Backend backend
            => backend
            -> [Component]
            -> [(String,Doc)]
-createVHDL backend components = flip evalState backend $ do
-  (vhdlNms,vhdlDocs) <- unzip <$> mapM genVHDL components
-  let vhdlNmDocs = zip vhdlNms vhdlDocs
+createHDL backend components = flip evalState backend $ do
+  (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
+  let hdlNmDocs = zip hdlNms hdlDocs
   hwtys <- HashSet.toList <$> extractTypes <$> get
   typesPkg <- mkTyPackage hwtys
-  return (("types",typesPkg):vhdlNmDocs)
+  return (("types",typesPkg):hdlNmDocs)
 
--- | Prepares the directory for writing VHDL files. This means creating the
---   dir if it does not exist and removing all existing .vhdl files from it.
+-- | Prepares the directory for writing HDL files. This means creating the
+--   dir if it does not exist and removing all existing .hdl files from it.
 prepareDir :: String -> IO ()
 prepareDir dir = do
   -- Create the dir if needed
   Directory.createDirectoryIfMissing True dir
-  -- Find all .vhdl files in the directory
+  -- Find all .hdl files in the directory
   files <- Directory.getDirectoryContents dir
-  let to_remove = filter ((==".vhdl") . FilePath.takeExtension) files
+  let to_remove = filter ((==".hdl") . FilePath.takeExtension) files
   -- Prepend the dirname to the filenames
   let abs_to_remove = map (FilePath.combine dir) to_remove
   -- Remove the files
   mapM_ Directory.removeFile abs_to_remove
 
--- | Writes a VHDL file to the given directory
-writeVHDL :: FilePath -> (String, Doc) -> IO ()
-writeVHDL dir (cname, vhdl) = do
-  handle <- IO.openFile (dir ++ cname ++ ".vhdl") IO.WriteMode
-  IO.hPutStrLn handle "-- Automatically generated VHDL"
-  hPutDoc handle vhdl
+-- | Writes a HDL file to the given directory
+writeHDL :: FilePath -> (String, Doc) -> IO ()
+writeHDL dir (cname, hdl) = do
+  handle <- IO.openFile (dir ++ cname ++ ".hdl") IO.WriteMode
+  IO.hPutStrLn handle "-- Automatically generated HDL"
+  hPutDoc handle hdl
   IO.hPutStr handle "\n"
   IO.hClose handle
