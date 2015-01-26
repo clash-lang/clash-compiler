@@ -70,9 +70,13 @@ import qualified Control.Exception as Exception
 import qualified GHC.Paths
 import           Paths_clash_ghc
 #endif
+import           InteractiveUI (makeHDL)
 import           Exception (gcatch)
 import qualified Data.Version (showVersion)
 import           Control.Exception (ErrorCall (..))
+
+import qualified CLaSH.Backend
+import           CLaSH.Backend.VHDL (VHDLState)
 import qualified CLaSH.Driver
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
@@ -207,6 +211,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                DoVHDL          -> (CompManager, dflt_target,    LinkInMemory)
+               DoVerilog       -> (CompManager, dflt_target,    LinkInMemory)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = case lang of
@@ -283,10 +288,13 @@ main' postLoadMode dflags0 args flagWarnings = do
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
 
   ---------------- Do the business -----------
-  handleSourceError (\e -> do
-       GHC.printException e
-       liftIO $ exitWith (ExitFailure 1)) $ do
-    case postLoadMode of
+  handleSourceError
+    (\e -> do
+        GHC.printException e
+        liftIO $ exitWith (ExitFailure 1))
+    $ do
+      let clash fun = gcatch (fun srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
+      case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
@@ -294,7 +302,8 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
-       DoVHDL                 -> gcatch (doVHDL srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
+       DoVHDL                 -> clash makeVHDL
+       DoVerilog              -> clash makeVerilog
 
   liftIO $ dumpFinalStats dflags6
 
@@ -494,13 +503,15 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | DoVHDL                  -- ghc --vhdl
+  | DoVerilog               -- ghc --verilog
 
-doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode, doVHDLMode :: Mode
+doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode, doVHDLMode, doVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
 doVHDLMode = mkPostLoadMode DoVHDL
+doVerilogMode = mkPostLoadMode DoVerilog
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -543,6 +554,7 @@ needsInputsMode DoMkDependHS    = True
 needsInputsMode (StopBefore _)  = True
 needsInputsMode DoMake          = True
 needsInputsMode DoVHDL          = True
+needsInputsMode DoVerilog       = True
 needsInputsMode _               = False
 
 -- True if we are going to attempt to link in this mode.
@@ -553,6 +565,7 @@ isLinkMode DoMake              = True
 isLinkMode DoInteractive       = True
 isLinkMode (DoEval _)          = True
 isLinkMode DoVHDL              = True
+isLinkMode DoVerilog           = True
 isLinkMode _                   = False
 
 isCompManagerMode :: PostLoadMode -> Bool
@@ -560,6 +573,7 @@ isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
 isCompManagerMode DoVHDL        = True
+isCompManagerMode DoVerilog     = True
 isCompManagerMode _             = False
 
 -- -----------------------------------------------------------------------------
@@ -642,6 +656,7 @@ mode_flags =
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   , Flag "-vhdl"        (PassFlag (setMode doVHDLMode))
+  , Flag "-verilog"     (PassFlag (setMode doVerilogMode))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -897,15 +912,15 @@ abiHash strs = do
 -- -----------------------------------------------------------------------------
 -- VHDL Generation
 
-doVHDL :: [(String,Maybe Phase)] -> Ghc ()
-doVHDL []   = throwGhcException (CmdLineError "No input files")
-doVHDL srcs = do
-  dflags <- GHC.getSessionDynFlags
-  liftIO $ do primDir <- getDefPrimDir
-              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-              mapM_ (\(src,_) -> do (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
-                                    CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
-                    ) srcs
+makeHDL' :: CLaSH.Backend.Backend backend => backend -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' _       []   = throwGhcException (CmdLineError "No input files")
+makeHDL' backend srcs = makeHDL backend $ fmap fst srcs
+
+makeVHDL :: [(String, Maybe Phase)] -> Ghc ()
+makeVHDL = makeHDL' (CLaSH.Backend.init :: VHDLState)
+
+makeVerilog :: [(String, Maybe Phase)] -> Ghc ()
+makeVerilog = makeHDL' (undefined :: VHDLState)
 
 -- -----------------------------------------------------------------------------
 -- Util

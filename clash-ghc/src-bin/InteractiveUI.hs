@@ -14,7 +14,8 @@ module InteractiveUI (
         GhciSettings(..),
         defaultGhciSettings,
         ghciCommands,
-        ghciWelcomeMsg
+        ghciWelcomeMsg,
+        makeHDL
     ) where
 
 #include "HsVersions.h"
@@ -102,6 +103,8 @@ import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
 import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
+import qualified CLaSH.Backend
+import           CLaSH.Backend.VHDL (VHDLState)
 import qualified CLaSH.Driver
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
@@ -211,7 +214,8 @@ ghciCommands = [
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
-  ("vhdl",      keepGoingPaths makeVHDL,        completeHomeModuleOrFile)
+  ("vhdl",      keepGoingPaths makeVHDL,        completeHomeModuleOrFile),
+  ("verilog",   keepGoingPaths makeVerilog,     completeHomeModuleOrFile)
   ]
 
 
@@ -1493,27 +1497,31 @@ modulesLoadedMsg ok mods = do
   when (verbosity dflags > 0) $
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
 
-makeVHDL :: [FilePath] -> InputT GHCi ()
-makeVHDL [] = do
-  modGraph <- GHC.getModuleGraph
-  dflags <- getDynFlags
-  let sortedGraph = GHC.topSortModuleGraph False modGraph Nothing
-  case (reverse sortedGraph) of
-    (AcyclicSCC top):_ -> do
-      let loc = (GHC.ml_hs_file . GHC.ms_location) top
-      maybe (return ()) (\src -> liftIO $ do primDir <- getDefPrimDir
-                                             primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-                                             (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
-                                             CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
-                        ) loc
-    _ -> return ()
-makeVHDL srcs = do
-  dflags <- getDynFlags
+makeHDL' :: CLaSH.Backend.Backend backend => backend -> [FilePath] -> InputT GHCi ()
+makeHDL' backend lst = makeHDL backend =<< case lst of
+  srcs@(_:_) -> return srcs
+  []         -> do
+    modGraph <- GHC.getModuleGraph
+    let sortedGraph = GHC.topSortModuleGraph False modGraph Nothing
+    return $ case (reverse sortedGraph) of
+      ((AcyclicSCC top) : _) -> maybeToList $ (GHC.ml_hs_file . GHC.ms_location) top
+      _                      -> []
+
+makeHDL :: GHC.GhcMonad m => CLaSH.Backend.Backend backend => backend -> [FilePath] -> m ()
+makeHDL backend srcs = do
+  dflags <- GHC.getSessionDynFlags
   liftIO $ do primDir <- getDefPrimDir
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-              mapM_ (\src -> do (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
-                                CLaSH.Driver.generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugNone
+              mapM_ (\(src) -> do (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
+                                  CLaSH.Driver.generateVHDL bindingsMap (Just backend) primMap tcm ghcTypeToHWType reduceConstant DebugNone
                     ) srcs
+
+
+makeVHDL :: [FilePath] -> InputT GHCi ()
+makeVHDL = makeHDL' (CLaSH.Backend.init :: VHDLState)
+
+makeVerilog :: [FilePath] -> InputT GHCi ()
+makeVerilog = makeHDL' (undefined :: VHDLState)
 
 -----------------------------------------------------------------------------
 -- :type

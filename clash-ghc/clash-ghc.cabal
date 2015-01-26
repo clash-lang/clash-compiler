@@ -100,6 +100,7 @@ Executable clash
                       unordered-containers >= 0.2.1.0,
 
                       clash-lib            >= 0.4,
+                      clash-vhdl           >= 0.4,
                       clash-prelude        >= 0.6
 
   if os(windows)
