@@ -14,6 +14,9 @@ class Backend state where
   -- | constant function / ignore argument.
   name :: state -> String
 
+  -- | File extension for target langauge
+  extension :: state -> String
+
   -- | Get the set of types out of state
   extractTypes     :: state -> HashSet HWType
 

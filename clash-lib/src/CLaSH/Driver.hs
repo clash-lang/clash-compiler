@@ -105,12 +105,12 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
       let hdlDocs = createHDL hdlState'' (netlist ++ testBench)
-          dir = concat [ "./hdl/"
+          dir = concat [ "./" ++ CLaSH.Backend.name hdlState'' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
                        ]
       prepareDir dir
-      mapM_ (writeHDL dir) hdlDocs
+      mapM_ (writeHDL hdlState'' dir) hdlDocs
 
       end <- hdlDocs `seq` Clock.getCurrentTime
       let startEndDiff = Clock.diffUTCTime end start
@@ -146,10 +146,10 @@ prepareDir dir = do
   mapM_ Directory.removeFile abs_to_remove
 
 -- | Writes a HDL file to the given directory
-writeHDL :: FilePath -> (String, Doc) -> IO ()
-writeHDL dir (cname, hdl) = do
-  handle <- IO.openFile (dir ++ cname ++ ".hdl") IO.WriteMode
-  IO.hPutStrLn handle "-- Automatically generated HDL"
+writeHDL :: Backend backend => backend -> FilePath -> (String, Doc) -> IO ()
+writeHDL backend dir (cname, hdl) = do
+  handle <- IO.openFile (dir ++ cname ++ CLaSH.Backend.extension backend) IO.WriteMode
+  IO.hPutStrLn handle $ "-- Automatically generated " ++ CLaSH.Backend.name backend
   hPutDoc handle hdl
   IO.hPutStr handle "\n"
   IO.hClose handle
