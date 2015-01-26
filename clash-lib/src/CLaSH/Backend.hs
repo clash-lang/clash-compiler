@@ -7,7 +7,16 @@ import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 import CLaSH.Netlist.Types
 
 class Backend state where
-  init             :: state
+  -- | Initial state for state monad
+  init :: state
+
+  -- | name of backend, used for directory to put output files in
+  -- | Should be constant function / ignore value
+  name :: state -> String
+
+  -- | get set of types out of state
+  extractTypes     :: state -> HashSet HWType
+
   -- | Generate VHDL for a Netlist component
   genVHDL          :: Component    -> State state (String, Doc)
   -- | Generate a VHDL package containing type definitions for the given HWTypes
@@ -22,5 +31,3 @@ class Backend state where
   inst             :: Declaration  -> State state (Maybe Doc)
   -- | Turn a Netlist expression into a VHDL expression
   expr             :: Bool -> Expr -> State state Doc
-  extractTypes     :: state -> HashSet HWType
-  --expr             :: Declaration  -> State state Doc
