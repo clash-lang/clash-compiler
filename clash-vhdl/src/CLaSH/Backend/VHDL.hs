@@ -38,21 +38,24 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  init             = VHDLState HashSet.empty 0 HashMap.empty
-  genVHDL          = genVHDL_
-  mkTyPackage      = mkTyPackage_
-  vhdlType         = vhdlType_
-  vhdlTypeErrValue = vhdlTypeErrValue_
-  vhdlTypeMark     = vhdlTypeMark_
-  inst             = inst_
-  expr             = expr_
-  extractTypes     = _tyCache
+  init            = VHDLState HashSet.empty 0 HashMap.empty
+  extractTypes    = _tyCache
+  name            = const "vhdl"
+  extension       = const ".vhdl"
+
+  genHDL          = genVHDL
+  mkTyPackage     = mkTyPackage_
+  hdlType         = vhdlType
+  hdlTypeErrValue = vhdlTypeErrValue
+  hdlTypeMark     = vhdlTypeMark
+  inst            = inst_
+  expr            = expr_
 
 type VHDLM a = State VHDLState a
 
 -- | Generate VHDL for a Netlist component
-genVHDL_ :: Component -> VHDLM (String,Doc)
-genVHDL_ c = (unpack cName,) A.<$> vhdl
+genVHDL :: Component -> VHDLM (String,Doc)
+genVHDL c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
     vhdl    = tyImports <$$> linebreak <>
@@ -150,7 +153,7 @@ needsTyDec Integer        = True
 needsTyDec _              = False
 
 tyDec :: HWType -> VHDLM Doc
-tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of" <+> vhdlType_ elTy <> semi
+tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of" <+> vhdlType elTy <> semi
 
 tyDec ty@(Product _ tys) = prodDec
   where
@@ -160,7 +163,7 @@ tyDec ty@(Product _ tys) = prodDec
 
     tName    = tyName ty
     selNames = map (\i -> tName <> "_sel" <> int i) [0..]
-    selTys   = map vhdlType_ tys
+    selTys   = map vhdlType tys
 
 tyDec _ = empty
 
@@ -211,8 +214,8 @@ funDec _ = Nothing
 
 mkToStringDecls :: HWType -> (VHDLM Doc, VHDLM Doc)
 mkToStringDecls t@(Product _ elTys) =
-  ( "function to_string" <+> parens ("value :" <+> vhdlType_ t) <+> "return STRING" <> semi
-  , "function to_string" <+> parens ("value :" <+> vhdlType_ t) <+> "return STRING is" <$>
+  ( "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING" <> semi
+  , "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING is" <$>
     "begin" <$>
     indent 2 ("return" <+> parens (hcat (punctuate " & " elTyPrint)) <> semi) <$>
     "end function to_string;"
@@ -220,12 +223,12 @@ mkToStringDecls t@(Product _ elTys) =
   where
     elTyPrint = forM [0..(length elTys - 1)]
                      (\i -> "to_string" <>
-                            parens ("value." <> vhdlType_ t <> "_sel" <> int i))
+                            parens ("value." <> vhdlType t <> "_sel" <> int i))
 mkToStringDecls t@(Vector _ elTy) =
-  ( "function to_string" <+> parens ("value : " <+> vhdlTypeMark_ t) <+> "return STRING" <> semi
-  , "function to_string" <+> parens ("value : " <+> vhdlTypeMark_ t) <+> "return STRING is" <$>
+  ( "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING" <> semi
+  , "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING is" <$>
       indent 2
-        ( "alias ivalue    : " <+> vhdlTypeMark_ t <> "(1 to value'length) is value;" <$>
+        ( "alias ivalue    : " <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
           "variable result : STRING" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
         ) <$>
     "begin" <$>
@@ -268,11 +271,11 @@ entity c = do
       "end" <> semi
   where
     ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType_ ty)
+            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType_ ty)
+              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType_ (snd $ output c))
+              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c))
               ]
 
 architecture :: Component -> VHDLM Doc
@@ -286,51 +289,51 @@ architecture c =
     "end" <> semi
 
 -- | Convert a Netlist HWType to a VHDL type
-vhdlType_ :: HWType -> VHDLM Doc
-vhdlType_ hwty = do
+vhdlType :: HWType -> VHDLM Doc
+vhdlType hwty = do
   when (needsTyDec hwty) (tyCache %= HashSet.insert (mkVecZ hwty))
-  vhdlType_' hwty
+  vhdlType' hwty
 
-vhdlType_' :: HWType -> VHDLM Doc
-vhdlType_' Bool            = "boolean"
-vhdlType_' (Clock _)       = "std_logic"
-vhdlType_' (Reset _)       = "std_logic"
-vhdlType_' Integer         = "integer"
-vhdlType_' (BitVector n)   = case n of
+vhdlType' :: HWType -> VHDLM Doc
+vhdlType' Bool            = "boolean"
+vhdlType' (Clock _)       = "std_logic"
+vhdlType' (Reset _)       = "std_logic"
+vhdlType' Integer         = "integer"
+vhdlType' (BitVector n)   = case n of
                               0 -> "std_logic_vector (0 downto 1)"
                               _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
-vhdlType_' (Index u)       = "unsigned" <> parens (int (clog2 (max 2 u) - 1) <+> "downto 0")
-vhdlType_' (Signed n)      = if n == 0 then "signed (0 downto 1)"
+vhdlType' (Index u)       = "unsigned" <> parens (int (clog2 (max 2 u) - 1) <+> "downto 0")
+vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
                                       else "signed" <> parens (int (n-1) <+> "downto 0")
-vhdlType_' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
+vhdlType' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
                                       else "unsigned" <> parens ( int (n-1) <+> "downto 0")
-vhdlType_' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
-vhdlType_' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
-vhdlType_' t@(Sum _ _)     = case typeSize t of
+vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
+vhdlType' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
+vhdlType' t@(Sum _ _)     = case typeSize t of
                               0 -> "unsigned (0 downto 1)"
                               n -> "unsigned" <> parens (int (n -1) <+> "downto 0")
-vhdlType_' t@(Product _ _) = tyName t
-vhdlType_' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+vhdlType' t@(Product _ _) = tyName t
+vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
 
 -- | Convert a Netlist HWType to the root of a VHDL type
-vhdlTypeMark_ :: HWType -> VHDLM Doc
-vhdlTypeMark_ hwty = do
+vhdlTypeMark :: HWType -> VHDLM Doc
+vhdlTypeMark hwty = do
   when (needsTyDec hwty) (tyCache %= HashSet.insert (mkVecZ hwty))
-  vhdlTypeMark_' hwty
+  vhdlTypeMark' hwty
   where
-    vhdlTypeMark_' Bool            = "boolean"
-    vhdlTypeMark_' (Clock _)       = "std_logic"
-    vhdlTypeMark_' (Reset _)       = "std_logic"
-    vhdlTypeMark_' Integer         = "integer"
-    vhdlTypeMark_' (BitVector _)   = "std_logic_vector"
-    vhdlTypeMark_' (Index _)       = "unsigned"
-    vhdlTypeMark_' (Signed _)      = "signed"
-    vhdlTypeMark_' (Unsigned _)    = "unsigned"
-    vhdlTypeMark_' (Vector _ elTy) = "array_of_" <> tyName elTy
-    vhdlTypeMark_' (SP _ _)        = "std_logic_vector"
-    vhdlTypeMark_' (Sum _ _)       = "unsigned"
-    vhdlTypeMark_' t@(Product _ _) = tyName t
-    vhdlTypeMark_' t               = error $ $(curLoc) ++ "vhdlTypeMark_: " ++ show t
+    vhdlTypeMark' Bool            = "boolean"
+    vhdlTypeMark' (Clock _)       = "std_logic"
+    vhdlTypeMark' (Reset _)       = "std_logic"
+    vhdlTypeMark' Integer         = "integer"
+    vhdlTypeMark' (BitVector _)   = "std_logic_vector"
+    vhdlTypeMark' (Index _)       = "unsigned"
+    vhdlTypeMark' (Signed _)      = "signed"
+    vhdlTypeMark' (Unsigned _)    = "unsigned"
+    vhdlTypeMark' (Vector _ elTy) = "array_of_" <> tyName elTy
+    vhdlTypeMark' (SP _ _)        = "std_logic_vector"
+    vhdlTypeMark' (Sum _ _)       = "unsigned"
+    vhdlTypeMark' t@(Product _ _) = tyName t
+    vhdlTypeMark' t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
@@ -349,20 +352,20 @@ tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
 tyName _ = empty
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
-vhdlTypeErrValue_ :: HWType -> VHDLM Doc
-vhdlTypeErrValue_ Bool                = "true"
-vhdlTypeErrValue_ Integer             = "integer'high"
-vhdlTypeErrValue_ (BitVector _)       = "(others => 'X')"
-vhdlTypeErrValue_ (Index _)           = "(others => 'X')"
-vhdlTypeErrValue_ (Signed _)          = "(others => 'X')"
-vhdlTypeErrValue_ (Unsigned _)        = "(others => 'X')"
-vhdlTypeErrValue_ (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeErrValue_ elTy)
-vhdlTypeErrValue_ (SP _ _)            = "(others => 'X')"
-vhdlTypeErrValue_ (Sum _ _)           = "(others => 'X')"
-vhdlTypeErrValue_ (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue_ elTys
-vhdlTypeErrValue_ (Reset _)           = "'X'"
-vhdlTypeErrValue_ (Clock _)           = "'X'"
-vhdlTypeErrValue_ Void                = "(0 downto 1 => 'X')"
+vhdlTypeErrValue :: HWType -> VHDLM Doc
+vhdlTypeErrValue Bool                = "true"
+vhdlTypeErrValue Integer             = "integer'high"
+vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
+vhdlTypeErrValue (Index _)           = "(others => 'X')"
+vhdlTypeErrValue (Signed _)          = "(others => 'X')"
+vhdlTypeErrValue (Unsigned _)        = "(others => 'X')"
+vhdlTypeErrValue (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeErrValue elTy)
+vhdlTypeErrValue (SP _ _)            = "(others => 'X')"
+vhdlTypeErrValue (Sum _ _)           = "(others => 'X')"
+vhdlTypeErrValue (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue elTys
+vhdlTypeErrValue (Reset _)           = "'X'"
+vhdlTypeErrValue (Clock _)           = "'X'"
+vhdlTypeErrValue Void                = "(0 downto 1 => 'X')"
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
@@ -374,7 +377,7 @@ decls ds = do
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
 decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
-  "signal" <+> fill l (text id_) <+> colon <+> vhdlType_ ty <> (maybe empty (\e -> " :=" <+> expr_ False e) netInit)
+  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr_ False e) netInit)
 
 decl _ _ = return Nothing
 
@@ -430,10 +433,10 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int s
     end   = typeSize ty - conSize ty
 
 expr_ _ (Identifier id_ (Just _)) = text id_
-expr_ _ (DataCon ty@(Vector 1 _) _ [e])           = vhdlTypeMark_ ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
-expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2])     = vhdlTypeMark_ ty <> "'" <> case vectorChain e of
+expr_ _ (DataCon ty@(Vector 1 _) _ [e])           = vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
+expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2])     = vhdlTypeMark ty <> "'" <> case vectorChain e of
                                                      Just es -> tupled (mapM (expr_ False) es)
-                                                     Nothing -> parens (vhdlTypeMark_ elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
+                                                     Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
 expr_ _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
   where
     argTys     = snd $ args !! i
