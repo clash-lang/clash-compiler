@@ -41,13 +41,13 @@ instance Backend VerilogState where
   name            = const "verilog"
   extension       = const ".v"
 
-  genHDL          = return . _ . component
+  genHDL          = return . undefined . component
   mkTyPackage     = return empty
-  hdlType         = return . _ . hwtype
-  hdlTypeErrValue = _
-  hdlTypeMark     = _
-  inst            = return . _ . declaration
-  expr _ e        = return $ _ $ CLaSH.Backend.Verilog.Bore.expr e
+  hdlType         = return . undefined . hwtype
+  hdlTypeErrValue = undefined
+  hdlTypeMark     = undefined
+  inst            = return . undefined . declaration
+  expr _ e        = return $ undefined $ CLaSH.Backend.Verilog.Bore.expr e
 
 {-
 type VerilogM a = State VerilogState a
