@@ -105,6 +105,7 @@ import GHC.TopHandler ( topHandler )
 
 import qualified CLaSH.Backend
 import           CLaSH.Backend.VHDL (VHDLState)
+import           CLaSH.Backend.Verilog (VerilogState)
 import qualified CLaSH.Driver
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
@@ -1530,7 +1531,7 @@ makeVHDL :: [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.init :: VHDLState)
 
 makeVerilog :: [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (undefined :: VHDLState)
+makeVerilog = makeHDL' (CLaSH.Backend.init :: VerilogState)
 
 -----------------------------------------------------------------------------
 -- :type

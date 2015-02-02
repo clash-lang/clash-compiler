@@ -76,7 +76,8 @@ import qualified Data.Version (showVersion)
 import           Control.Exception (ErrorCall (..))
 
 import qualified CLaSH.Backend
-import           CLaSH.Backend.VHDL (VHDLState)
+import           CLaSH.Backend.VHDL    (VHDLState)
+import           CLaSH.Backend.Verilog (VerilogState)
 import qualified CLaSH.Driver
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
@@ -920,7 +921,7 @@ makeVHDL :: [(String, Maybe Phase)] -> Ghc ()
 makeVHDL = makeHDL' (CLaSH.Backend.init :: VHDLState)
 
 makeVerilog :: [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (undefined :: VHDLState)
+makeVerilog = makeHDL' (CLaSH.Backend.init :: VerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util
