@@ -1497,7 +1497,10 @@ modulesLoadedMsg ok mods = do
   when (verbosity dflags > 0) $
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
 
-makeHDL' :: CLaSH.Backend.Backend backend => backend -> [FilePath] -> InputT GHCi ()
+makeHDL' :: CLaSH.Backend.Backend backend
+         => backend
+         -> [FilePath]
+         -> InputT GHCi ()
 makeHDL' backend lst = makeHDL backend =<< case lst of
   srcs@(_:_) -> return srcs
   []         -> do
@@ -1507,14 +1510,20 @@ makeHDL' backend lst = makeHDL backend =<< case lst of
       ((AcyclicSCC top) : _) -> maybeToList $ (GHC.ml_hs_file . GHC.ms_location) top
       _                      -> []
 
-makeHDL :: GHC.GhcMonad m => CLaSH.Backend.Backend backend => backend -> [FilePath] -> m ()
+makeHDL :: GHC.GhcMonad m
+        => CLaSH.Backend.Backend backend
+        => backend
+        -> [FilePath]
+        -> m ()
 makeHDL backend srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do primDir <- getDefPrimDir
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
-              mapM_ (\(src) -> do (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
-                                  CLaSH.Driver.generateVHDL bindingsMap (Just backend) primMap tcm ghcTypeToHWType reduceConstant DebugNone
-                    ) srcs
+              forM_ srcs $ \src -> do
+                (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
+                CLaSH.Driver.generateHDL bindingsMap (Just backend) primMap tcm
+                  ghcTypeToHWType reduceConstant DebugNone
+
 
 
 makeVHDL :: [FilePath] -> InputT GHCi ()
