@@ -1,5 +1,10 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.4.1 *February 4th 2015*
+* Fixes bugs:
+  * Treat BlackBox expressions as declarations when DC args. [#37](https://github.com/christiaanb/clash2/issues/33)
+  * Don't inline recursive closed bindings
+
 ## 0.4 *November 17th 2014*
 * New features:
   * Support for clash-prelude 0.6
