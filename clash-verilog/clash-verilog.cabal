@@ -60,4 +60,7 @@ Library
 
                       , clash-lib               >= 0.4.1
 
-  Exposed-modules:    CLaSH.Backend.Verilog
+  Exposed-modules:      CLaSH.Backend.Verilog
+
+  other-modules:        CLaSH.Backend.Verilog.Bore
+                      , CLaSH.Backend.Verilog.BoringTypes
