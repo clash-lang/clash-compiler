@@ -1,5 +1,8 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.4.1 *February 4th 2015*
+* Include bug fixes from clash-lib 0.4.1
+
 ## 0.4 *November 17th 2014*
 * New features:
   * Support for clash-prelude 0.6

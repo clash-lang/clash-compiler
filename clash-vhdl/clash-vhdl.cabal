@@ -1,5 +1,5 @@
 Name:                 clash-vhdl
-Version:              0.4
+Version:              0.4.1
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -54,6 +54,6 @@ Library
                       unordered-containers    >= 0.2.3.3,
                       wl-pprint-text          >= 1.1.0.0,
 
-                      clash-lib               >= 0.4
+                      clash-lib               >= 0.4.1
 
   Exposed-modules:    CLaSH.Backend.VHDL
