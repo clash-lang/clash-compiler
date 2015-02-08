@@ -9,6 +9,8 @@ import Data.Text.Lazy                              (Text)
 import qualified CLaSH.Netlist.Types as N
 import           CLaSH.Util                        (curLoc)
 
+import           Language.Verilog.AST (Literal(..))
+
 import           CLaSH.Backend.Verilog.BoringTypes
 
 
@@ -19,14 +21,14 @@ component (N.Component name hports inpts outpt decls) =
 
 
 -- | Clash Decleration converted to somethign approximating Verilog's decleration
-declaration :: N.Declaration -> Declaration Text
+declaration :: N.Declaration -> Either Text (Declaration Text)
 declaration = \case
-  N.Assignment i e            -> Assignment [i] $ expr e
-  N.CondAssignment i e branches -> CondAssignment i (expr e) $ custMap expr <$> branches
+  N.Assignment i e            -> Right $ Assignment [i] $ expr e
+  N.CondAssignment i e branches -> Right $ CondAssignment i (expr e) $ custMap expr <$> branches
     where custMap f (x , y) = (f <$> x , f y)
-  N.InstDecl i1 i2 portAssigns -> InstDecl i1 i2 $ expr <$$> portAssigns
-  N.BlackBoxD bb               -> BlackBoxD bb
-  N.NetDecl i t me             -> NetDecl i (hwtype t) $ expr <$> me
+  N.InstDecl i1 i2 portAssigns -> Right $ InstDecl i1 i2 $ expr <$$> portAssigns
+  N.BlackBoxD bb               -> Left bb
+  N.NetDecl i t me             -> Right $ NetDecl i (hwtype t) $ expr <$> me
 
 
 -- | Clash Hardware type converted to somethign approximating Verilog's fixed
@@ -79,7 +81,7 @@ modifier :: Maybe N.Modifier
          -> Expr blackbox
 modifier mm e = MTBBE $ MT Nothing $ case mm of
   Nothing                             -> E <$> e
-  (Just (N.Indexed (ty, start, end))) -> Right $ Index (hwtype ty) start end $ MT (Just $ hwtype ty) e
+  (Just (N.Indexed (ty, start, end))) -> Right $ Index start end $ MT (Just $ hwtype ty) e
   (Just (N.DC _))                     -> error $ $(curLoc) ++ "DataCon context unsupported"
   (Just (N.VecAppend))                -> error $ $(curLoc) ++ "Not sure how VecAppend works"
 
@@ -104,3 +106,6 @@ infixr 0 <$$>
 
 (<$$>) :: (Functor fx, Functor fy) => (a -> b) -> fx (fy a) -> fx (fy b)
 f <$$> x = (fmap . fmap) f x
+
+(<$$$>) :: (Functor fx, Functor fy, Functor fz) => (a -> b) -> fx (fy (fz a)) -> fx (fy (fz b))
+f <$$$> x = (fmap . fmap . fmap) f x

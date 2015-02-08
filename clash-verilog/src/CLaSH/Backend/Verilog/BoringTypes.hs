@@ -3,13 +3,13 @@
 {-# LANGUAGE LambdaCase #-}
 module CLaSH.Backend.Verilog.BoringTypes where
 
-import Data.Foldable
-import Data.Traversable
+import           Data.Foldable
+import           Data.Traversable
 
-import Control.Applicative
-import Control.DeepSeq
+import           Control.Applicative
+import           Control.DeepSeq
 
-
+import           Language.Verilog.AST (Literal)
 
 import qualified CLaSH.Netlist.Types as N
 
@@ -20,7 +20,7 @@ data Component blackbox
   , hiddenPorts   :: [(N.Identifier, HWType)] -- ^ Ports that have no correspondence the original function definition
   , inputs        :: [(N.Identifier, HWType)] -- ^ Input ports
   , output        :: (N.Identifier, HWType) -- ^ Output port
-  , declarations  :: [Declaration blackbox] -- ^ Internal declarations
+  , declarations  :: [Either blackbox (Declaration blackbox)] -- ^ Internal declarations
   }
   deriving Show
 
@@ -54,8 +54,6 @@ data Declaration blackbox
     N.Identifier
     [(N.Identifier, Expr blackbox)]
 
-  | BlackBoxD blackbox -- ^ Instantiation of blackbox declaration
-
   | NetDecl N.Identifier HWType (Maybe (Expr blackbox)) -- ^ Signal declaration
   deriving Show
 
@@ -72,16 +70,10 @@ data NonIndex recur
   -- -| DataCon  HWType  (Maybe Modifier) [CoreExpr] -- ^ DataCon application
   deriving (Show, Functor, Foldable, Traversable)
 
-data Literal
-  = Number Integer
-  | HighImpedence
-  | Undefined
-  deriving Show
-
 -- | Core Expression type that doesn't permit indexing "twice in a row"
 data CoreExpr index noIndex
   = E index
-  | Index HWType Int Int noIndex
+  | Index Int Int noIndex
   deriving (Show, Functor, Foldable, Traversable)
 
 type CoreExprHelper (splice :: * -> *) recur = splice :$ CoreExpr (NonIndex :$ recur) (splice :$ NonIndex :$ recur)
