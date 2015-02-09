@@ -56,7 +56,7 @@ instance Backend VerilogState where
   hdlTypeErrValue = error $ $(curLoc) ++ "not yet implemented"
   hdlTypeMark     = error $ $(curLoc) ++ "not yet implemented"
   inst            = return . Just . pp . toItemBB . declaration
-  expr _ e        = return $ pp $ toVExpr $ CLaSH.Backend.Verilog.Bore.expr e
+  expr _ e        = return $ pp $ toVExprBB $ CLaSH.Backend.Verilog.Bore.expr e
 
 -- TODO replace orphan instances with implicit arguments?
 
@@ -72,17 +72,20 @@ newtype VExpr iden blackbox = VE (Either blackbox (V.Expr iden (VExpr iden black
                             deriving (Show, PrettyPrint)
 
 
--- TODO: exploit the types to make this more flexible
 -- TODO: state monad to bind index'd expressions and index gensym id
-toVExpr :: B.Expr blackbox -> VExpr Text blackbox
-toVExpr (MTBBE (MT _ (Left bb))) = VE $ Left bb
-toVExpr (MTBBE (MT t (Right e))) = VE $ Right $ case e of
+toVExpr :: Maybe HWType
+        -> CoreExpr (NonIndex (B.Expr blackbox)) t
+        -> V.Expr Text (VExpr Text blackbox)
+toVExpr t e = case e of
   E (B.Literal lit)  -> V.Literal (toVTy <$> t) lit
-  E (B.Concat es)    -> V.LValue $ V.Concat $ toVExpr <$> es
+  E (B.Concat es)    -> V.LValue $ V.Concat $ toVExprBB <$> es
   E (B.Identifier i) -> V.LValue $ V.Identifier i
   B.Index h l _      -> V.LValue $ V.Range
                         (error $ $(curLoc) ++ "not yet implemented")
                         (nToVE $ fromIntegral h, nToVE $ fromIntegral l)
+
+toVExprBB :: B.Expr blackbox -> VExpr Text blackbox
+toVExprBB (MTBBE (MT t e)) = VE $ toVExpr t <$> e
 
 toVTy :: B.HWType -> Int
 toVTy = \case
@@ -91,20 +94,20 @@ toVTy = \case
 
 toItem :: forall blackbox. Declaration blackbox -> ModuleItem Text (VExpr Text blackbox)
 toItem = \case
-  Assignment is e -> V.Assign (V.Concat $ idToVE <$> is) $ toVExpr e
+  Assignment is e -> V.Assign (V.Concat $ idToVE <$> is) $ toVExprBB e
 
   CondAssignment i sc es -> Assign (V.Identifier i) $ conds es
     where
       conds :: [(Maybe (B.Expr blackbox), B.Expr blackbox)] -> (VExpr Text blackbox)
       conds = \case
         []                -> error $ $(curLoc) ++ "CondAssigment cannot have zero branches"
-        [(_,e)]           -> toVExpr e
-        ((Nothing,e):_)   -> toVExpr e
-        ((Just c ,e):es') -> injE $ V.Mux (injE $ BinOp Eq (toVExpr c) (toVExpr sc)) (toVExpr e) (conds es')
+        [(_,e)]           -> toVExprBB e
+        ((Nothing,e):_)   -> toVExprBB e
+        ((Just c ,e):es') -> injE $ V.Mux (injE $ BinOp Eq (toVExprBB c) (toVExprBB sc)) (toVExprBB e) (conds es')
 
-  InstDecl m i  ps -> V.Instance m [] i $ Just . toVExpr <$$> ps
+  InstDecl m i  ps -> V.Instance m [] i $ Just . toVExprBB <$$> ps
 
-  NetDecl i t me -> Wire (Just (nToVE $ fromIntegral $ toVTy t, nToVE 0)) [(i, toVExpr <$> me)]
+  NetDecl i t me -> Wire (Just (nToVE $ fromIntegral $ toVTy t, nToVE 0)) [(i, toVExprBB <$> me)]
 
   where injE = VE . Right
         idToVE e = injE $ LValue $ V.Identifier $ e
@@ -115,11 +118,8 @@ nToVE  n = VE $ Right $ V.Literal Nothing $ V.Number n
 
 type VItem blackbox = Either blackbox (ModuleItem Text (VExpr Text blackbox))
 
--- TODO use some lens mapLeft shit
 toItemBB :: Either blackbox (Declaration blackbox) -> VItem blackbox
-toItemBB = \case
-  Left bb -> Left bb
-  Right x -> Right $ toItem x
+toItemBB = fmap toItem
 
 toModule :: forall blackbox. Component blackbox -> V.Module Text (VItem blackbox)
 toModule (Component modName ports ins out decls) = Module modName (fst <$> out : ins) items
