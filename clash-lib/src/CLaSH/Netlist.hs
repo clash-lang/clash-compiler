@@ -84,7 +84,7 @@ runNetlistMonad hdlStateM compCntM s p tcm typeTrans
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe Back.init hdlStateM) typeTrans tcm
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p (fromMaybe Back.initBackend hdlStateM) typeTrans tcm
 
 -- | Generate a component for a given function (caching)
 genComponent :: Backend backend

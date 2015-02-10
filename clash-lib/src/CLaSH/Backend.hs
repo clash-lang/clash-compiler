@@ -8,7 +8,7 @@ import CLaSH.Netlist.Types
 
 class Backend state where
   -- | Initial state for state monad
-  init :: state
+  initBackend :: state
 
   -- | Name of backend, used for directory to put output files in. Should be
   -- | constant function / ignore argument.

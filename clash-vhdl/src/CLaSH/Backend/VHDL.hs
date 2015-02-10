@@ -38,7 +38,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  init            = VHDLState HashSet.empty 0 HashMap.empty
+  initBackend     = VHDLState HashSet.empty 0 HashMap.empty
   extractTypes    = _tyCache
   name            = const "vhdl"
   extension       = const ".vhdl"

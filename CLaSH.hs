@@ -4,13 +4,22 @@ import CLaSH.GHC.Evaluator
 import CLaSH.GHC.GenerateBindings
 import CLaSH.GHC.NetlistTypes
 import CLaSH.Primitives.Util
+import CLaSH.Backend
+import CLaSH.Backend.VHDL
 
 genVHDL :: String
         -> IO ()
-genVHDL src = do
+genVHDL = doHDL (initBackend :: VHDLState)
+
+
+doHDL :: Backend s
+       => s
+       -> String
+       -> IO ()
+doHDL b src = do
   primMap <- generatePrimMap ["./clash-ghc/primitives"]
   (bindingsMap,tcm) <- generateBindings primMap src Nothing
-  generateVHDL bindingsMap primMap tcm ghcTypeToHWType reduceConstant DebugFinal
+  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant DebugFinal
 
 main :: IO ()
 main = genVHDL "./examples/CalculatorArrow.hs"

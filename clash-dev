@@ -1,2 +1,2 @@
 #!/bin/sh
-ghci -iclash-lib/src -iclash-ghc/src-ghc -Wall -Werror -package ghc CLaSH.hs
+ghci -iclash-lib/src -iclash-vhdl/src -iclash-ghc/src-ghc -Wall -Werror -package ghc CLaSH.hs
