@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -27,6 +28,12 @@ import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
 
+#ifdef CABAL
+import qualified Paths_clash_vhdl
+#else
+import qualified System.FilePath
+#endif
+
 -- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
 data VHDLState =
   VHDLState
@@ -39,6 +46,11 @@ makeLenses ''VHDLState
 
 instance Backend VHDLState where
   initBackend     = VHDLState HashSet.empty 0 HashMap.empty
+#ifdef CABAL
+  primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
+#else
+  primDir _       = return ("clash-vhdl" System.FilePath.</> "primitives")
+#endif
   extractTypes    = _tyCache
   name            = const "vhdl"
   extension       = const ".vhdl"

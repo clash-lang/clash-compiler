@@ -10,6 +10,9 @@ class Backend state where
   -- | Initial state for state monad
   initBackend :: state
 
+  -- | Location for the primitive definitions
+  primDir :: state -> IO FilePath
+
   -- | Name of backend, used for directory to put output files in. Should be
   -- | constant function / ignore argument.
   name :: state -> String

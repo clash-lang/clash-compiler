@@ -1,11 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecursiveDo       #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecursiveDo                #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -41,6 +42,12 @@ import           CLaSH.Util                           (curLoc)
 import           CLaSH.Backend.Verilog.BoringTypes as B
 import           CLaSH.Backend.Verilog.Bore
 
+#ifdef CABAL
+import qualified Paths_clash_verilog
+#else
+import qualified System.FilePath
+#endif
+
 -- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
 data VerilogState = VerilogState {}
 
@@ -48,6 +55,11 @@ makeLenses ''VerilogState
 
 instance Backend VerilogState where
   initBackend     = VerilogState
+#ifdef CABAL
+  primDir         = const (Paths_clash_verilog.getDataFileName "primitives")
+#else
+  primDir _       = return ("clash-verilog" System.FilePath.</> "primitives")
+#endif
   extractTypes    = const HashSet.empty
   name            = const "verilog"
   extension       = const ".v"

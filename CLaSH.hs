@@ -21,7 +21,8 @@ doHDL :: Backend s
        -> String
        -> IO ()
 doHDL b src = do
-  primMap <- generatePrimMap ["./clash-ghc/primitives"]
+  pd      <- primDir b
+  primMap <- generatePrimMap [pd]
   (bindingsMap,tcm) <- generateBindings primMap src Nothing
   generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant DebugFinal
 

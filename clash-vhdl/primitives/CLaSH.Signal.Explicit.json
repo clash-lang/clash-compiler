@@ -1,0 +1,6 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Explicit.veryUnsafeSynchronizer"
+    , "templateE" : "~ARG[2]"
+    }
+  }
+]
