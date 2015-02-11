@@ -18,16 +18,16 @@ Description:
 Homepage:             http://christiaanb.github.io/clash2
 bug-reports:          http://github.com/christiaanb/clash2/issues
 License:              OtherLicense
-License-file:         ../LICENSE
+License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
 Copyright:            Copyright © 2012-2014 University of Twente
 Category:             Hardware
 Build-type:           Simple
 
-Extra-source-files:   ../README.md,
+Extra-source-files:   README.md,
                       CHANGELOG.md,
-                      ../LICENSE_GHC,
+                      LICENSE_GHC,
                       src-bin/HsVersions.h,
                       src-bin/PosixSource.h
 
