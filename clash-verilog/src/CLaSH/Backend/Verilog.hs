@@ -7,6 +7,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- | Generate VHDL for assorted Netlist datatypes
 module CLaSH.Backend.Verilog (VerilogState) where
 
