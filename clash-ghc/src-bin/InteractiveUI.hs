@@ -116,9 +116,6 @@ import           CLaSH.Util (clashLibVersion)
 import qualified Data.Version as Data.Version
 import qualified Paths_clash_ghc
 
-getDefPrimDir :: IO FilePath
-getDefPrimDir = Paths_clash_ghc.getDataFileName "primitives"
-
 -----------------------------------------------------------------------------
 
 data GhciSettings = GhciSettings {
@@ -1504,7 +1501,7 @@ makeHDL :: GHC.GhcMonad m
         -> m ()
 makeHDL backend srcs = do
   dflags <- GHC.getSessionDynFlags
-  liftIO $ do primDir <- getDefPrimDir
+  liftIO $ do primDir <- CLaSH.Backend.primDir backend
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)

@@ -99,9 +99,6 @@ getProcessOutput command =
      -- return both the output and the exit code.
      return (output, exitCode)
 
-getDefPrimDir :: IO FilePath
-getDefPrimDir = getDataFileName "primitives"
-
 -----------------------------------------------------------------------------
 -- ToDo:
 
