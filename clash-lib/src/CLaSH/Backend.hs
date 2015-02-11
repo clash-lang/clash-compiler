@@ -29,7 +29,7 @@ class Backend state where
   mkTyPackage      :: [HWType]     -> State state Doc
   -- | Convert a Netlist HWType to a target HDL type
   hdlType          :: HWType       -> State state Doc
-  -- | Convert a Netlist HWType to an HDL error value for that type 
+  -- | Convert a Netlist HWType to an HDL error value for that type
   hdlTypeErrValue  :: HWType       -> State state Doc
   -- | Convert a Netlist HWType to the root of a target HDL type
   hdlTypeMark      :: HWType       -> State state Doc
