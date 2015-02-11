@@ -63,13 +63,9 @@ import Data.List
 import Data.Maybe
 
 -- clash additions
-#ifdef STANDALONE
 import           System.Process (runInteractiveCommand, waitForProcess)
 import qualified Control.Exception as Exception
-#else
-import qualified GHC.Paths
 import           Paths_clash_ghc
-#endif
 import           InteractiveUI (makeHDL)
 import           Exception (gcatch)
 import qualified Data.Version (showVersion)
@@ -86,7 +82,6 @@ import qualified CLaSH.Primitives.Util
 import           CLaSH.Rewrite.Types (DebugLevel(..))
 import           CLaSH.Util (clashLibVersion)
 
-#ifdef STANDALONE
 ghcLibDir :: IO FilePath
 ghcLibDir = do (libDir,exitCode) <- getProcessOutput "ghc --print-libdir"
                case exitCode of
@@ -105,18 +100,7 @@ getProcessOutput command =
      return (output, exitCode)
 
 getDefPrimDir :: IO FilePath
-getDefPrimDir = catchIO (getEnv "CLASH_PRIMDIR") (error "Environment variable \"CLASH_PRIMDIR\" undefined")
-
-catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO = Exception.catch
-#else
-ghcLibDir :: IO FilePath
-ghcLibDir = return GHC.Paths.libdir
-
-getDefPrimDir :: IO FilePath
 getDefPrimDir = getDataFileName "primitives"
-#endif
-
 
 -----------------------------------------------------------------------------
 -- ToDo:

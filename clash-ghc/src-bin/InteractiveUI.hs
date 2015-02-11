@@ -116,22 +116,8 @@ import           CLaSH.Util (clashLibVersion)
 import qualified Data.Version as Data.Version
 import qualified Paths_clash_ghc
 
-#ifdef STANDALONE
-
-import qualified Control.Exception
-
-getDefPrimDir :: IO FilePath
-getDefPrimDir = catchIO_ (getEnv "CLASH_PRIMDIR") (error "Environment variable \"CLASH_PRIMDIR\" undefined")
-
-catchIO_ :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO_ = Control.Exception.catch
-
-#else
-
 getDefPrimDir :: IO FilePath
 getDefPrimDir = Paths_clash_ghc.getDataFileName "primitives"
-
-#endif
 
 -----------------------------------------------------------------------------
 

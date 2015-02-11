@@ -62,10 +62,6 @@ source-repository head
   type: git
   location: https://github.com/christiaanb/clash2.git
 
-Flag standalone
-  Description: Build compiler for non-cabal installation
-  Default: False
-
 Executable clash
   HS-Source-Dirs:     src-ghc src-bin
   Main-Is:            Main.hs
@@ -127,9 +123,4 @@ Executable clash
                       CLaSH.GHC.LoadInterfaceFiles
                       CLaSH.GHC.LoadModules
                       CLaSH.GHC.NetlistTypes
-
-  if flag(standalone)
-    CPP-Options:      -DSTANDALONE
-  else
-    Build-Depends:    ghc-paths
-    Other-Modules:    Paths_clash_ghc
+                      Paths_clash_ghc

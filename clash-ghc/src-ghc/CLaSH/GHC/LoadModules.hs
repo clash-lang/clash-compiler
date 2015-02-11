@@ -8,14 +8,10 @@ module CLaSH.GHC.LoadModules
 where
 
 -- External Modules
-#ifdef STANDALONE
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
 import           System.Process               (runInteractiveCommand,
                                                waitForProcess)
-#else
-import qualified GHC.Paths
-#endif
 
 -- GHC API
 import           CLaSH.GHC.Compat.DynFlags    (dopt_set, dopt_unset)
@@ -40,7 +36,6 @@ import qualified FamInstEnv
 import           CLaSH.GHC.LoadInterfaceFiles
 import           CLaSH.Util                   (curLoc,first)
 
-#ifdef STANDALONE
 ghcLibDir :: IO FilePath
 ghcLibDir = do (libDir,exitCode) <- getProcessOutput "ghc --print-libdir"
                case exitCode of
@@ -57,10 +52,6 @@ getProcessOutput command =
      output   <- hGetLine pOut
      -- return both the output and the exit code.
      return (output, exitCode)
-#else
-ghcLibDir :: IO FilePath
-ghcLibDir = return GHC.Paths.libdir
-#endif
 
 loadModules ::
   String
