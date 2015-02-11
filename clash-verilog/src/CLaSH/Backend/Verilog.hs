@@ -45,7 +45,7 @@ data VerilogState = VerilogState {}
 makeLenses ''VerilogState
 
 instance Backend VerilogState where
-  init            = VerilogState
+  initBackend     = VerilogState
   extractTypes    = const HashSet.empty
   name            = const "verilog"
   extension       = const ".v"

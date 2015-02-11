@@ -918,10 +918,10 @@ makeHDL' _       []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend srcs = makeHDL backend $ fmap fst srcs
 
 makeVHDL :: [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (CLaSH.Backend.init :: VHDLState)
+makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
 
 makeVerilog :: [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (CLaSH.Backend.init :: VerilogState)
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: VerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

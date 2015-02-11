@@ -1528,10 +1528,10 @@ makeHDL backend srcs = do
 
 
 makeVHDL :: [FilePath] -> InputT GHCi ()
-makeVHDL = makeHDL' (CLaSH.Backend.init :: VHDLState)
+makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
 
 makeVerilog :: [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (CLaSH.Backend.init :: VerilogState)
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: VerilogState)
 
 -----------------------------------------------------------------------------
 -- :type
