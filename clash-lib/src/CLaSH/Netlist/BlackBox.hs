@@ -10,14 +10,12 @@ module CLaSH.Netlist.BlackBox where
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (filterM, mzero)
-import           Control.Monad.State           (state)
 import           Control.Monad.Trans.Class     (lift)
 import           Control.Monad.Trans.Maybe     (MaybeT (..))
-import           Control.Monad.Writer          (tell)
 import           Data.Either                   (lefts, partitionEithers)
 import qualified Data.HashMap.Lazy             as HashMap
 import           Data.List                     (partition)
-import           Data.Maybe                    (catMaybes, fromJust)
+import           Data.Maybe                    (catMaybes)
 import           Data.Monoid                   (mconcat)
 import           Data.Text.Lazy                (Text, fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
@@ -26,7 +24,7 @@ import qualified Data.Text                     as TextS
 import           Unbound.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
-import           CLaSH.Backend                 as N
+-- import           CLaSH.Backend                 as N
 import           CLaSH.Core.DataCon            as D (dcTag)
 import           CLaSH.Core.Literal            as L (Literal (..))
 import           CLaSH.Core.Pretty             (showDoc)
@@ -49,10 +47,9 @@ import           CLaSH.Primitives.Types        as P
 import           CLaSH.Util
 
 -- | Generate the context for a BlackBox instantiation.
-mkBlackBoxContext :: Backend backend
-                  => Id -- ^ Identifier binding the primitive/blackbox application
+mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox application
                   -> [Term] -- ^ Arguments of the primitive/blackbox application
-                  -> NetlistMonad backend (BlackBoxContext,[Declaration])
+                  -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
     -- Make context inputs
     tcm                   <- Lens.use tcCache
@@ -65,8 +62,8 @@ mkBlackBoxContext resId args = do
 
     -- Make context result
     let res = case synchronizedClk tcm (unembed $ V.varType resId) of
-                Just clk -> Right . (,clk) . mkBasicId . pack $ name2String (V.varName resId)
-                Nothing  -> Left . mkBasicId . pack $ name2String (V.varName resId)
+                Just clk -> Right . (,clk) . (`N.Identifier` Nothing) . mkBasicId . pack $ name2String (V.varName resId)
+                Nothing  -> Left . (`N.Identifier` Nothing) . mkBasicId . pack $ name2String (V.varName resId)
     resTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) varInps (map fst litInps) funInps
@@ -77,29 +74,44 @@ mkBlackBoxContext resId args = do
     unVar (Var _ v, False) = Left v
     unVar t                = Right t
 
--- | Instantiate a BlackBox template according to the given context
-mkBlackBox :: Backend backend
-           => Text -- ^ Template to instantiate
-           -> BlackBoxContext -- ^ Context to instantiate template with
-           -> NetlistMonad backend Text
-mkBlackBox templ bbCtx =
-  let (l,err) = runParse templ
-  in if null err && verifyBlackBoxContext l bbCtx
-    then do
-      l'        <- instantiateSym l
-      (bb,clks) <- liftState hdlMState $ state $ renderBlackBox l' bbCtx
-      tell clks
-      return $! bb
-    else error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++ "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++ show err
+-- -- | Instantiate a BlackBox template according to the given context
+-- mkBlackBox :: Backend backend
+--            => Text -- ^ Template to instantiate
+--            -> BlackBoxContext -- ^ Context to instantiate template with
+--            -> NetlistMonad backend Text
+-- mkBlackBox templ bbCtx =
+--   let (l,err) = runParse templ
+--   in if null err && verifyBlackBoxContext l bbCtx
+--     then do
+--       l'        <- instantiateSym l
+--       (bb,clks) <- liftState hdlMState $ state $ renderBlackBox l' bbCtx
+--       tell clks
+--       return $! bb
+--     else error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++ "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++ show err
+
+prepareBlackBox :: Text
+                -> BlackBoxContext
+                -> NetlistMonad BlackBoxTemplate
+prepareBlackBox t bbCtx =
+  let (templ,err) = runParse t
+  in  if null err && verifyBlackBoxContext templ bbCtx
+         then do
+           templ'  <- instantiateSym templ
+           templ'' <- setClocks bbCtx templ'
+           return $! templ''
+         else
+           error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++
+                   "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++
+                   show err
+
 
 -- | Create an template instantiation text for an argument term
-mkInput :: Backend backend
-        => (Term, Bool)
-        -> MaybeT (NetlistMonad backend) ((SyncIdentifier,HWType),[Declaration])
-mkInput (_, True) = return ((Left $ pack "__FUN__", Void),[])
+mkInput :: (Term, Bool)
+        -> MaybeT NetlistMonad ((SyncExpr,HWType),[Declaration])
+mkInput (_, True) = return ((Left $ Identifier (pack "__FUN__") Nothing, Void),[])
 
 mkInput (Var ty v, False) = do
-  let vT = mkBasicId . pack $ name2String v
+  let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
   tcm <- Lens.use tcCache
   hwTy <- lift $ N.unsafeCoreTypeToHWTypeM $(curLoc) ty
   return $ case synchronizedClk tcm ty of
@@ -111,17 +123,15 @@ mkInput (e, False) = case collectArgs e of
     tcm <- Lens.use tcCache
     ty  <- termType tcm e
     ((exprN,hwTy),decls) <- lift $ mkPrimitive True False f args ty
-    exprV <- fmap (pack . show) $ liftState hdlMState $ N.expr False exprN
-    return ((Left exprV,hwTy),decls)
+    return ((Left exprN,hwTy),decls)
   _ -> fmap (first (first Left)) $ mkLitInput e
 
-mkPrimitive :: Backend backend
-            => Bool -- ^ Put BlackBox expression in parenthesis
+mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
             -> Bool -- ^ Treat BlackBox expression as declaration
             -> TextS.Text
             -> [Either Term Type]
             -> Type
-            -> NetlistMonad backend ((Expr,HWType),[Declaration])
+            -> NetlistMonad ((Expr,HWType),[Declaration])
 mkPrimitive bbEParen bbEasD nm args ty = do
   bbM <- HashMap.lookup nm <$> Lens.use primitives
   case bbM of
@@ -131,20 +141,19 @@ mkPrimitive bbEParen bbEasD nm args ty = do
           tmpNmT  = pack tmpNm
           tmpId   = Id (string2Name tmpNm) (embed ty)
       (bbCtx,ctxDcls) <- mkBlackBoxContext tmpId (lefts args)
-      let hwTy    = snd $ result bbCtx
+      let hwTy    = snd $ bbResult bbCtx
       case template p of
         (Left tempD) -> do
           let tmpDecl = NetDecl tmpNmT hwTy Nothing
-          bbDecl <- N.BlackBoxD <$> mkBlackBox tempD bbCtx
+          bbDecl <- N.BlackBoxD <$> prepareBlackBox tempD bbCtx <*> pure bbCtx
           return ((Identifier tmpNmT Nothing,hwTy),ctxDcls ++ [tmpDecl,bbDecl])
         (Right tempE) -> do
-          bbExpr <- mkBlackBox tempE bbCtx
-          let bbExpr' = if bbEParen then mconcat ["(",bbExpr,")"] else bbExpr
+          bbTempl <- prepareBlackBox tempE bbCtx
           if bbEasD
             then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
-                     tmpAssgn = Assignment tmpNmT (BlackBoxE bbExpr' Nothing)
+                     tmpAssgn = Assignment tmpNmT (BlackBoxE bbTempl bbCtx bbEParen Nothing)
                  in  return ((Identifier tmpNmT Nothing, hwTy), ctxDcls ++ [tmpDecl,tmpAssgn])
-            else return ((BlackBoxE bbExpr' Nothing,hwTy),ctxDcls)
+            else return ((BlackBoxE bbTempl bbCtx bbEParen Nothing,hwTy),ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -188,8 +197,8 @@ mkPrimitive bbEParen bbEasD nm args ty = do
                 return ((N.Literal (Just (BitVector sz,sz)) (NumLit $ fromInteger j), BitVector sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
-                bb <- mkBlackBox (pack "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))") bbCtx
-                return ((BlackBoxE bb Nothing,BitVector sz),ctxDcls)
+                bb <- prepareBlackBox (pack "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))") bbCtx
+                return ((BlackBoxE bb bbCtx False Nothing,BitVector sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
       | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#" -> case lefts args of
           largs@[C.Literal (IntegerLiteral i),arg] ->
@@ -199,8 +208,8 @@ mkPrimitive bbEParen bbEasD nm args ty = do
                 | i > 32 -> return ((N.Literal (Just (Signed sz,sz)) (NumLit $ fromInteger j), Signed sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
-                bb <- mkBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE bb Nothing,Signed sz),ctxDcls)
+                bb <- prepareBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
+                return ((BlackBoxE bb bbCtx False Nothing,Signed sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
       | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#" -> case lefts args of
           largs@[C.Literal (IntegerLiteral i),arg] ->
@@ -210,35 +219,32 @@ mkPrimitive bbEParen bbEasD nm args ty = do
                 | i > 31 -> return ((N.Literal (Just (Unsigned sz,sz)) (NumLit $ fromInteger j), Unsigned sz),[])
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
-                bb <- mkBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE bb Nothing,Unsigned sz),ctxDcls)
+                bb <- prepareBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
+                return ((BlackBoxE bb bbCtx False Nothing,Unsigned sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Unsigned.fromInteger#: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return ((BlackBoxE (mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]) Nothing,Void),[])
+      | otherwise -> return ((BlackBoxE [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False Nothing,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that
 -- the term is a literal. Returns 'Nothing' if the term is not a literal.
-mkLitInput :: Backend backend
-           => Term -- ^ The literal argument term
-           -> MaybeT (NetlistMonad backend) ((Identifier,HWType),[Declaration])
-mkLitInput (C.Literal (IntegerLiteral i))     = return ((pack $ show i,Integer),[])
+mkLitInput :: Term -- ^ The literal argument term
+           -> MaybeT NetlistMonad ((Expr,HWType),[Declaration])
+mkLitInput (C.Literal (IntegerLiteral i))     = return ((N.Literal Nothing (N.NumLit i),Integer),[])
 mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   typeTrans <- Lens.use typeTranslator
   tcm   <- Lens.use tcCache
   args' <- filterM (fmap (representableType typeTrans tcm) . termType tcm) (lefts args)
   hwTy  <- N.termHWType $(curLoc) e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'
-  exprV <- fmap (pack . show) $ liftState hdlMState $ N.expr False exprN
-  return ((exprV,hwTy),dcDecls)
+  return ((exprN,hwTy),dcDecls)
 mkLitInput _ = mzero
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
 -- a function
-mkFunInput :: Backend backend
-           => Id -- ^ Identifier binding the encompassing primitive/blackbox application
+mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
-           -> MaybeT (NetlistMonad backend) ((BlackBoxTemplate,BlackBoxContext),[Declaration])
+           -> MaybeT NetlistMonad ((Either BlackBoxTemplate Declaration,BlackBoxContext),[Declaration])
 mkFunInput resId e = do
   let (appE,args) = collectArgs e
   (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
@@ -246,11 +252,11 @@ mkFunInput resId e = do
             Prim nm _ -> do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               let templ = case bbM of
-                            Just p@(P.BlackBox {}) -> template p
+                            Just p@(P.BlackBox {}) -> Left (template p)
                             Just (P.Primitive pNm _)
-                              | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#" -> Right "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
-                              | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"    -> Right "to_signed(~ARG[1],~LIT[0])"
-                              | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"  -> Right "to_unsigned(~ARG[1],~LIT[0])"
+                              | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#" -> Left $ Left "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
+                              | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"    -> Left $ Left "to_signed(~ARG[1],~LIT[0])"
+                              | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"  -> Left $ Left "to_unsigned(~ARG[1],~LIT[0])"
                             _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
               return templ
             Data dc -> do
@@ -265,14 +271,12 @@ mkFunInput resId e = do
                       dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp    = DataCon resHTy (Just $ DC (resHTy,dcI)) dcInps
                       dcAss    = Assignment (pack "~RESULT") dcApp
-                  templ <- fmap (pack . show . fromJust) $ liftState hdlMState $ inst dcAss
-                  return (Left templ)
+                  return (Right dcAss)
                 Just resHTy@(Product _ dcArgs) -> do
                   let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp  = DataCon resHTy (Just $ DC (resHTy,0)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
-                  templ <- fmap (pack . show . fromJust) $ liftState hdlMState $ inst dcAss
-                  return (Left templ)
+                  return (Right dcAss)
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             Var _ fun -> do
               normalized <- Lens.use bindings
@@ -285,21 +289,22 @@ mkFunInput resId e = do
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
                       instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
-                  templ <- fmap (pack . show . fromJust) $ liftState hdlMState $ inst instDecl
-                  return (Left templ)
+                  return (Right instDecl)
                 Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-  let (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ
-  if null err
-    then do
-      l' <- lift $ instantiateSym l
-      return ((l',bbCtx),dcls)
-    else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
+  case templ of
+    Left templ' -> do let (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ'
+                      if null err
+                         then do
+                           l' <- lift $ instantiateSym l
+                           l'' <- setClocks bbCtx l'
+                           return ((Left l'',bbCtx),dcls)
+                         else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
+    Right templ' -> return ((Right templ',bbCtx),dcls)
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
-instantiateSym :: Backend backend
-               => BlackBoxTemplate
-               -> NetlistMonad backend BlackBoxTemplate
+instantiateSym :: BlackBoxTemplate
+               -> NetlistMonad BlackBoxTemplate
 instantiateSym l = do
   i <- Lens.use varCount
   let (l',i') = setSym i l

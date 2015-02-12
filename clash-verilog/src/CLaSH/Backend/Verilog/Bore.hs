@@ -6,6 +6,7 @@ import           Control.Applicative
 
 import Data.Text.Lazy                              (Text)
 
+import qualified CLaSH.Netlist.BlackBox.Util as N
 import qualified CLaSH.Netlist.Types as N
 import           CLaSH.Util                        (curLoc)
 

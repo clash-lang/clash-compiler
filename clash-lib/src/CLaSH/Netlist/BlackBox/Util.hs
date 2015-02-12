@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Utilties to verify blackbox contexts against templates and rendering
 -- filled in templates
@@ -6,18 +7,22 @@ module CLaSH.Netlist.BlackBox.Util where
 
 import           Control.Lens                         (at, use, (%=), (+=), _1,
                                                        _2)
-import           Control.Monad.State                  (State, lift, runState)
-import           Control.Monad.Writer                 (runWriterT, tell)
+import           Control.Monad.State                  (State, runState)
+import           Control.Monad.Writer                 (MonadWriter, tell)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
-import qualified Data.List                            as List
+import           Data.Maybe                           (fromJust)
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
-import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
+import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
+                                                       renderOneLine)
 
-import           CLaSH.Backend
+import           CLaSH.Backend                        (Backend (..))
+import           CLaSH.Netlist.BlackBox.Parser
 import           CLaSH.Netlist.BlackBox.Types
-import           CLaSH.Netlist.Types                  (HWType (..), Identifier)
+import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
+                                                       BlackBoxContext (..),
+                                                       SyncExpr, Expr(Identifier))
 import           CLaSH.Util
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
@@ -27,9 +32,9 @@ verifyBlackBoxContext :: BlackBoxTemplate -- ^ Template to check against
                       -> BlackBoxContext -- ^ Blackbox to verify
                       -> Bool
 verifyBlackBoxContext tmpl bbCtx =
-  ((length (inputs bbCtx) - 1)    >= countArgs tmpl) &&
-  ((length (litInputs bbCtx) - 1) >= countLits tmpl) &&
-  ((length (funInputs bbCtx) - 1) >= countFuns tmpl)
+  ((length (bbInputs bbCtx) - 1)    >= countArgs tmpl) &&
+  ((length (bbLitInputs bbCtx) - 1) >= countLits tmpl) &&
+  ((length (bbFunInputs bbCtx) - 1) >= countFuns tmpl)
 
 -- | Count the number of argument tags/holes in a blackbox template
 countArgs :: BlackBoxTemplate -> Int
@@ -76,8 +81,27 @@ setSym i l
                       _             -> pure e
               )
 
+setClocks :: ( MonadWriter [(Identifier,HWType)] m
+             , Applicative m
+             )
+          => BlackBoxContext
+          -> BlackBoxTemplate
+          -> m BlackBoxTemplate
+setClocks bc bt = mapM setClocks' bt
+  where
+    setClocks' (D (Decl n l))  = D <$> (Decl n <$> mapM (combineM (setClocks bc) (setClocks bc)) l)
+    setClocks' (Clk Nothing)   = let (clk,rate) = clkSyncId $ fst $ bbResult bc
+                                 in  tell [(clk,Clock rate)] >> return (C clk)
+    setClocks' (Clk (Just n))  = let (clk,rate) = clkSyncId $ fst $ bbInputs bc !! n
+                                 in  tell [(clk,Clock rate)] >> return (C clk)
+    setClocks' (Rst Nothing)   = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ bbResult bc
+                                 in  tell [(rst,Reset rate)] >> return (C rst)
+    setClocks'  (Rst (Just n)) = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ bbInputs bc !! n
+                                 in  tell [(rst,Reset rate)] >> return (C rst)
+    setClocks' e               = return e
+
 -- | Get the name of the clock of an identifier
-clkSyncId :: SyncIdentifier -> (Identifier,Int)
+clkSyncId :: SyncExpr -> (Identifier,Int)
 clkSyncId (Right (_,clk)) = clk
 clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 
@@ -86,30 +110,40 @@ clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 renderBlackBox :: Backend backend
                => BlackBoxTemplate -- ^ Blackbox template
                -> BlackBoxContext -- ^ Context used to fill in the hole
-               -> backend
-               -> ((Text, [(Identifier,HWType)]),backend)
-renderBlackBox l bbCtx s
-  = first (Text.concat *** List.nub)
-  $ flip runState s
-  $ runWriterT
-  $ runBlackBoxM
+               -> State backend Text
+               -- -> ((Text, [(Identifier,HWType)]),backend)
+renderBlackBox l bbCtx
+  = fmap Text.concat
+  -- $ flip runState s
+  -- $ runWriterT
+  -- $ runBlackBoxM
   $ mapM (renderElem bbCtx) l
 
 -- | Render a single template element
 renderElem :: Backend backend
-              => BlackBoxContext
+           => BlackBoxContext
            -> Element
-           -> BlackBoxMonad backend Text
+           -> State backend Text
 renderElem b (D (Decl n (l:ls))) = do
-  o  <- combineM (lineToIdentifier b) (lineToType b) l
-  is <- mapM (combineM (lineToIdentifier b) (lineToType b)) ls
-  let (templ,pCtx) = indexNote ($(curLoc) ++ "No function argument " ++ show n) (funInputs b) n
-  let b' = pCtx { result = o, inputs = inputs pCtx ++ is }
-  if verifyBlackBoxContext templ b'
-    then Text.concat <$> mapM (renderElem b') templ
-    else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ
+    o  <- syncIdToSyncExpr <$> combineM (lineToIdentifier b) (lineToType b) l
+    is <- mapM (fmap syncIdToSyncExpr . combineM (lineToIdentifier b) (lineToType b)) ls
+    let (templ,pCtx) = indexNote ($(curLoc) ++ "No function argument " ++ show n) (bbFunInputs b) n
+        b' = pCtx { bbResult = o, bbInputs = bbInputs pCtx ++ is }
+    templ' <- either return (fmap (parseFail . displayT . renderCompact . fromJust) . inst) templ
+    if verifyBlackBoxContext templ' b'
+      then Text.concat <$> mapM (renderElem b') templ'
+      else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ
 
-renderElem b e = either id fst <$> mkSyncIdentifier b e
+renderElem b e = renderTag b e
+
+parseFail :: Text -> BlackBoxTemplate
+parseFail t = case runParse t of
+                    (templ,err) | null err  -> templ
+                                | otherwise -> error $ $(curLoc) ++ "\nTemplate:\n" ++ show t ++ "\nHas errors:\n" ++ show err
+
+syncIdToSyncExpr :: (Text,HWType)
+                 -> (SyncExpr,HWType)
+syncIdToSyncExpr (t,ty) = (Left (Identifier t Nothing),ty)
 
 -- | Fill out the template corresponding to an output/input assignment of a
 -- component instantiation, and turn it into a single identifier so it can
@@ -117,21 +151,17 @@ renderElem b e = either id fst <$> mkSyncIdentifier b e
 lineToIdentifier :: Backend backend
                  => BlackBoxContext
                  -> BlackBoxTemplate
-                 -> BlackBoxMonad backend SyncIdentifier
+                 -> State backend Text
 lineToIdentifier b = foldrM (\e a -> do
-                              e' <- mkSyncIdentifier  b e
-                              case (e', a) of
-                                (Left t, Left t')             -> return (Left  (t `Text.append` t'))
-                                (Left t, Right (t',clk))      -> return (Right (t `Text.append` t',clk))
-                                (Right (t,clk), Left t')      -> return (Right (t `Text.append` t',clk))
-                                (Right (t,clk), Right (t',_)) -> return (Right (t `Text.append` t',clk))
-                   ) (Left Text.empty)
+                              e' <- renderTag b e
+                              return (e' `Text.append` a)
+                   ) Text.empty
 
 lineToType :: BlackBoxContext
            -> BlackBoxTemplate
-           -> BlackBoxMonad backend HWType
-lineToType b [(Typ Nothing)]  = return (snd $ result b)
-lineToType b [(Typ (Just n))] = return (snd $ inputs b !! n)
+           -> State backend HWType
+lineToType b [(Typ Nothing)]  = return (snd $ bbResult b)
+lineToType b [(Typ (Just n))] = return (snd $ bbInputs b !! n)
 lineToType b [(TypElem t)]    = do hwty' <- lineToType b [t]
                                    case hwty' of
                                      Vector _ elTy -> return elTy
@@ -140,28 +170,22 @@ lineToType _ _ = error $ $(curLoc) ++ "Unexpected type manipulation"
 
 -- | Give a context and a tagged hole (of a template), returns part of the
 -- context that matches the tag of the hole.
-mkSyncIdentifier :: Backend backend
+renderTag :: Backend backend
                  => BlackBoxContext
                  -> Element
-                 -> BlackBoxMonad backend SyncIdentifier
-mkSyncIdentifier _ (C t)           = return $ Left t
-mkSyncIdentifier b O               = return $ fst $ result b
-mkSyncIdentifier b (I n)           = return $ fst $ inputs b !! n
-mkSyncIdentifier b (L n)           = return $ Left $ litInputs b !! n
-mkSyncIdentifier _ (Sym n)         = return $ Left $ Text.pack ("n_" ++ show n)
-mkSyncIdentifier b (Clk Nothing)   = let (clk,rate) = clkSyncId $ fst $ result b
-                                     in tell [(clk,Clock rate)] >> return (Left clk)
-mkSyncIdentifier b (Clk (Just n))  = let (clk,rate) = clkSyncId $ fst $ inputs b !! n
-                                     in tell [(clk,Clock rate)] >> return (Left clk)
-mkSyncIdentifier b (Rst Nothing)   = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ result b
-                                     in tell [(rst,Reset rate)] >> return (Left rst)
-mkSyncIdentifier b (Rst (Just n))  = let (rst,rate) = (first (`Text.append` Text.pack "_rst")) . clkSyncId $ fst $ inputs b !! n
-                                     in tell [(rst,Reset rate)] >> return (Left rst)
-mkSyncIdentifier b (Typ Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . hdlType . snd $ result b
-mkSyncIdentifier b (Typ (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . hdlType . snd $ inputs b !! n
-mkSyncIdentifier b (TypM Nothing)  = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeMark . snd $ result b
-mkSyncIdentifier b (TypM (Just n)) = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeMark . snd $ inputs b !! n
-mkSyncIdentifier b (Err Nothing)   = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeErrValue . snd $ result b
-mkSyncIdentifier b (Err (Just n))  = fmap (Left . displayT . renderOneLine) . B . lift . hdlTypeErrValue . snd $ inputs b !! n
-mkSyncIdentifier _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
-mkSyncIdentifier _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"
+                 -> State backend Text
+renderTag _ (C t)           = return t
+renderTag b O               = fmap (displayT . renderOneLine) . expr False . either id fst . fst $ bbResult b
+renderTag b (I n)           = fmap (displayT . renderOneLine) . expr False . either id fst . fst $ bbInputs b !! n
+renderTag b (L n)           = fmap (displayT . renderOneLine) . expr False $ bbLitInputs b !! n
+renderTag _ (Sym n)         = return $ Text.pack ("n_" ++ show n)
+renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType . snd $ bbResult b
+renderTag b (Typ (Just n))  = fmap (displayT . renderOneLine) . hdlType . snd $ bbInputs b !! n
+renderTag b (TypM Nothing)  = fmap (displayT . renderOneLine) . hdlTypeMark . snd $ bbResult b
+renderTag b (TypM (Just n)) = fmap (displayT . renderOneLine) . hdlTypeMark . snd $ bbInputs b !! n
+renderTag b (Err Nothing)   = fmap (displayT . renderOneLine) . hdlTypeErrValue . snd $ bbResult b
+renderTag b (Err (Just n))  = fmap (displayT . renderOneLine) . hdlTypeErrValue . snd $ bbInputs b !! n
+renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
+renderTag _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"
+renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
+renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"

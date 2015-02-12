@@ -10,7 +10,6 @@ module CLaSH.Driver.TestbenchGen
 where
 
 import           Control.Concurrent.Supply        (Supply)
-import           Control.Monad.State              (evalState)
 import           Data.HashMap.Lazy                (HashMap)
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (mapMaybe)
@@ -25,8 +24,9 @@ import           CLaSH.Core.Term
 import           CLaSH.Core.TyCon
 import           CLaSH.Core.Type
 
-import           CLaSH.Backend
 import           CLaSH.Netlist
+import           CLaSH.Netlist.BlackBox.Types     (Element (Err))
+import           CLaSH.Netlist.BlackBox.Util      (parseFail)
 import           CLaSH.Netlist.Types              as N
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
@@ -37,38 +37,35 @@ import           CLaSH.Util
 
 -- | Generate a HDL testbench for a component given a set of stimuli and a
 -- set of matching expected outputs
-genTestBench :: Backend backend
-             => DebugLevel
+genTestBench :: DebugLevel
              -> Supply
              -> PrimMap                      -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
              -> (HashMap TyConName TyCon -> Term -> Term)
-             -> backend                      -- ^ Backend corresponding to target language
              -> Int
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
-             -> IO ([Component],backend)
-genTestBench dbgLvl supply primMap typeTrans tcm eval hdlState cmpCnt globals stimuliNmM expectedNmM
+             -> IO ([Component])
+genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
   (Component cName hidden [inp] outp _) = do
   let ioDecl  = [ uncurry NetDecl inp  Nothing
                 , uncurry NetDecl outp Nothing
                 ]
-      inpAssg = evalState (hdlTypeErrValue (snd inp)) hdlState
-      inpExpr = Assignment (fst inp) (BlackBoxE (PP.displayT $ PP.renderCompact inpAssg) Nothing)
-  (inpInst,inpComps,hdlState',cmpCnt',hidden') <- maybe (return (inpExpr,[],hdlState,cmpCnt,hidden))
-                                                 (genStimuli hdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
+      inpExpr = Assignment (fst inp) (BlackBoxE [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False Nothing)
+  (inpInst,inpComps,cmpCnt',hidden') <- maybe (return (inpExpr,[],cmpCnt,hidden))
+                                                 (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
                                                  stimuliNmM
 
   let finDecl = [ NetDecl "finished" Bool (Just (N.Literal Nothing (BoolLit False)))
                 , Assignment "done" (Identifier "finished" Nothing)
                 ]
       finAssg = "true after 100 ns"
-      finExpr = Assignment "finished" (BlackBoxE (PP.displayT $ PP.renderCompact finAssg) Nothing)
-  (expInst,expComps,hdlState'',hidden'') <- maybe (return (finExpr,[],hdlState',hidden'))
-                                                 (genVerifier hdlState' cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
+      finExpr = Assignment "finished" (BlackBoxE (parseFail . PP.displayT $ PP.renderCompact finAssg) emptyBBContext False Nothing)
+  (expInst,expComps,hidden'') <- maybe (return (finExpr,[],hidden'))
+                                                 (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
                                                  expectedNmM
   let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden
@@ -88,7 +85,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval hdlState cmpCnt globals st
                           , [instDecl,inpInst,expInst]
                           ])
 
-  return (tbComp:(inpComps++expComps),hdlState'')
+  return (tbComp:(inpComps++expComps))
   where
     normalizeSignal :: HashMap TmName (Type,Term)
                     -> TmName
@@ -96,7 +93,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval hdlState cmpCnt globals st
     normalizeSignal glbls bndr =
       runNormalization dbgLvl supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench dbgLvl _ _ _ _ _ v _ _ _ _ c = traceIf (dbgLvl > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],v)
+genTestBench dbgLvl _ _ _ _ _ _ _ _ _ c = traceIf (dbgLvl > DebugNone) ("Can't make testbench for: " ++ show c) $ return []
 
 genClock :: (Identifier,HWType)
          -> Maybe [Declaration]
@@ -123,7 +120,7 @@ genClock (clkName,Clock rate) = Just clkDecls
                   ]
 
     clkDecls = [ NetDecl clkName (Clock rate) (Just (N.Literal Nothing (BitLit L)))
-               , BlackBoxD (PP.displayT $ PP.renderPretty 0.4 80 clkGenDecl)
+               , BlackBoxD (parseFail . PP.displayT $ PP.renderPretty 0.4 80 clkGenDecl) emptyBBContext
                ]
 
 genClock _ = Nothing
@@ -142,7 +139,7 @@ genReset (rstName,Reset clk) = Just rstDecls
                 ]
 
     rstDecls = [ NetDecl rstName (Reset clk) Nothing
-               , BlackBoxD (PP.displayT $ PP.renderCompact rstExpr)
+               , BlackBoxD (parseFail . PP.displayT $ PP.renderCompact rstExpr) emptyBBContext
                ]
 
 genReset _ = Nothing
@@ -150,9 +147,7 @@ genReset _ = Nothing
 renderFloat2Dec :: Float -> PP.Doc
 renderFloat2Dec = PP.text . Builder.toLazyText . Builder.formatRealFloat Builder.Fixed (Just 2)
 
-genStimuli :: Backend backend
-           => backend
-           -> Int
+genStimuli :: Int
            -> PrimMap
            -> HashMap TmName (Type,Term)
            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
@@ -163,10 +158,10 @@ genStimuli :: Backend backend
            -> [(Identifier,HWType)]
            -> (Identifier,HWType)
            -> TmName
-           -> IO (Declaration,[Component],backend,Int,[(Identifier,HWType)])
-genStimuli hdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signalNm = do
+           -> IO (Declaration,[Component],Int,[(Identifier,HWType)])
+genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,hdlState',cmpCnt') <- genNetlist (Just hdlState) (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
+  (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
   let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm)))
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
@@ -183,11 +178,9 @@ genStimuli hdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden 
                         (concat [ clkNms, rstNms ]) ++
                         [(outp,Identifier (fst inp) Nothing)]
                    )
-  return (decl,comps,hdlState',cmpCnt',hidden'')
+  return (decl,comps,cmpCnt',hidden'')
 
-genVerifier :: Backend backend
-            => backend
-            -> Int
+genVerifier :: Int
             -> PrimMap
             -> HashMap TmName (Type,Term)
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
@@ -198,10 +191,10 @@ genVerifier :: Backend backend
             -> [(Identifier,HWType)]
             -> (Identifier,HWType)
             -> TmName
-            -> IO (Declaration,[Component],backend,[(Identifier,HWType)])
-genVerifier hdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp signalNm = do
+            -> IO (Declaration,[Component],[(Identifier,HWType)])
+genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,hdlState',_) <- genNetlist (Just hdlState) (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
+  (comps,_) <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
   let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm)))
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
@@ -217,4 +210,4 @@ genVerifier hdlState cmpCnt primMap globals typeTrans tcm normalizeSignal hidden
                         (concat [ clkNms, rstNms ]) ++
                         [(inp,Identifier (fst outp) Nothing),(fin,Identifier "finished" Nothing)]
                    )
-  return (decl,comps,hdlState',hidden'')
+  return (decl,comps,hidden'')

@@ -67,12 +67,12 @@ unsafeCoreTypeToHWType loc builtInTranslation m = either (error . (loc ++)) id .
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
 unsafeCoreTypeToHWTypeM :: String
                         -> Type
-                        -> NetlistMonad backend HWType
+                        -> NetlistMonad HWType
 unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
 coreTypeToHWTypeM :: Type
-                  -> NetlistMonad backend (Maybe HWType)
+                  -> NetlistMonad (Maybe HWType)
 coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
@@ -197,7 +197,7 @@ typeLength _            = 0
 -- a Core type that is not translatable to a HWType.
 termHWType :: String
            -> Term
-           -> NetlistMonad backend HWType
+           -> NetlistMonad HWType
 termHWType loc e = do
   m  <- Lens.use tcCache
   ty <- termType m e
@@ -213,7 +213,7 @@ varToExpr _           = error "not a var"
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
 mkUniqueNormalized :: ([Id],[LetBinding],Id)
-                   -> NetlistMonad backend ([Id],[LetBinding],TmName)
+                   -> NetlistMonad ([Id],[LetBinding],TmName)
 mkUniqueNormalized (args,binds,res) = do
   let args' = zipWith (\n s -> modifyVarName (`appendToName` s) n)
                 args ["_i" ++ show i | i <- [(1::Integer)..]]
@@ -231,7 +231,7 @@ mkUniqueNormalized (args,binds,res) = do
   return (args',zip bndrs' exprs' ++ extraBndr,res1)
 
   where
-    mkUnique :: (TmName,TmName) -> Id -> NetlistMonad backend Id
+    mkUnique :: (TmName,TmName) -> Id -> NetlistMonad Id
     mkUnique (find,repl) v = if find == varName v
       then return $ modifyVarName (const repl) v
       else do
@@ -239,10 +239,10 @@ mkUniqueNormalized (args,binds,res) = do
         let v' = modifyVarName (`appendToName` ('_' : show varCnt)) v
         return v'
 
-    subsBndrs :: [Term] -> (Id,Id) -> NetlistMonad backend [Term]
+    subsBndrs :: [Term] -> (Id,Id) -> NetlistMonad [Term]
     subsBndrs es (f,r) = mapM (subsBndr f r) es
 
-    subsBndr :: Id -> Id -> Term -> NetlistMonad backend Term
+    subsBndr :: Id -> Id -> Term -> NetlistMonad Term
     subsBndr f r e = case e of
       Var t v | v == varName f -> return . Var t $ varName r
       App e1 e2                -> App <$> subsBndr f r e1
@@ -263,8 +263,8 @@ appendToName :: TmName
 appendToName n s = makeName (name2String n ++ s) (name2Integer n)
 
 -- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
-preserveVarEnv :: NetlistMonad backend a
-               -> NetlistMonad backend a
+preserveVarEnv :: NetlistMonad a
+               -> NetlistMonad a
 preserveVarEnv action = do
   vCnt <- Lens.use varCount
   vEnv <- Lens.use varEnv

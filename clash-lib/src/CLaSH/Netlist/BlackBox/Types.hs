@@ -2,29 +2,7 @@
 -- | Types used in BlackBox modules
 module CLaSH.Netlist.BlackBox.Types where
 
-import Control.Applicative  (Applicative)
-import Control.Monad.State  (MonadState, State)
-import Control.Monad.Writer (MonadWriter,WriterT)
 import Data.Text.Lazy       (Text)
-
-import CLaSH.Netlist.Types
-
--- | Context used to fill in the holes of a BlackBox template
-data BlackBoxContext
-  = Context
-  { result    :: (SyncIdentifier,HWType) -- ^ Result name and type
-  , inputs    :: [(SyncIdentifier,HWType)] -- ^ Argument names and types
-  , litInputs :: [Identifier] -- ^ Literal arguments (subset of inputs)
-  , funInputs :: [(BlackBoxTemplate,BlackBoxContext)]
-  -- ^ Function arguments (subset of inputs):
-  --
-  -- * (Blackbox Template,Partial Blackbox Concext)
-  }
-  deriving Show
-
--- | Either the name of the identifier, or a tuple of the identifier and the
--- corresponding clock
-type SyncIdentifier = Either Identifier (Identifier,(Identifier,Int))
 
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]
@@ -54,10 +32,3 @@ data Element = C   Text          -- ^ Constant
 -- is the type of the signal
 data Decl = Decl Int [(BlackBoxTemplate,BlackBoxTemplate)]
   deriving Show
-
--- | Monad that caches HDL information and remembers hidden inputs of
--- black boxes that are being generated (WriterT)
-newtype BlackBoxMonad backend a =
-  B { runBlackBoxM :: WriterT [(Identifier,HWType)] (State backend) a }
-  deriving (Functor, Applicative, Monad, MonadWriter [(Identifier,HWType)],
-            MonadState backend)

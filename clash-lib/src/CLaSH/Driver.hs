@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
 -- | Module that connects all the parts of the CLaSH compiler library
@@ -10,7 +11,7 @@ import           Data.HashMap.Strict          (HashMap)
 import qualified Data.HashMap.Strict          as HashMap
 import qualified Data.HashSet                 as HashSet
 import           Data.List                    (isSuffixOf)
-import           Data.Maybe                   (listToMaybe)
+import           Data.Maybe                   (fromMaybe, listToMaybe)
 import qualified Data.Text.Lazy               as Text
 import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
@@ -35,15 +36,15 @@ import           CLaSH.Util
 import qualified Data.Time.Clock              as Clock
 
 -- | Create a set of target HDL files for a set of functions
-generateHDL :: Backend backend
-             => BindingMap -- ^ Set of functions
-             -> Maybe backend
-             -> PrimMap -- ^ Primitive / BlackBox Definitions
-             -> HashMap TyConName TyCon -- ^ TyCon cache
-             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
-             -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
-             -> DebugLevel -- ^ Debug information level for the normalization process
-             -> IO ()
+generateHDL :: forall backend . Backend backend
+            => BindingMap -- ^ Set of functions
+            -> Maybe backend
+            -> PrimMap -- ^ Primitive / BlackBox Definitions
+            -> HashMap TyConName TyCon -- ^ TyCon cache
+            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
+            -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
+            -> DebugLevel -- ^ Debug information level for the normalization process
+            -> IO ()
 generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
@@ -79,7 +80,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
-      (netlist,hdlState',cmpCnt) <- genNetlist hdlState Nothing
+      (netlist,cmpCnt) <- genNetlist Nothing
                                transformedBindings
                                primMap tcm typeTrans Nothing (fst topEntity)
 
@@ -93,8 +94,8 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
                                       cName)
                                 netlist
 
-      (testBench,hdlState'') <- genTestBench dbgLevel supplyTB primMap
-                                 typeTrans tcm eval hdlState' cmpCnt bindingsMap
+      testBench <- genTestBench dbgLevel supplyTB primMap
+                                 typeTrans tcm eval cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                  topComponent
@@ -104,13 +105,14 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
       let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-      let hdlDocs = createHDL hdlState'' (netlist ++ testBench)
-          dir = concat [ "./" ++ CLaSH.Backend.name hdlState'' ++ "/"
+      let hdlState' = fromMaybe (initBackend :: backend) hdlState
+          hdlDocs = createHDL hdlState' (netlist ++ testBench)
+          dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
                        ]
       prepareDir dir
-      mapM_ (writeHDL hdlState'' dir) hdlDocs
+      mapM_ (writeHDL hdlState' dir) hdlDocs
 
       end <- hdlDocs `seq` Clock.getCurrentTime
       let startEndDiff = Clock.diffUTCTime end start

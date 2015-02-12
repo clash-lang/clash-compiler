@@ -24,6 +24,7 @@ import qualified Data.Text.Lazy                       as T
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
+import           CLaSH.Netlist.BlackBox.Util          (renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
@@ -419,7 +420,8 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
       rec (p,ls) <- fmap unzip $ sequence [ (,fromIntegral (T.length i)) A.<$> fill (maximum ls) (text i) <+> "=>" <+> expr_ False e | (i,e) <- pms]
       nest 2 $ "port map" <$$> tupled (A.pure p)
 
-inst_ (BlackBoxD bs) = fmap Just $ string bs
+inst_ (BlackBoxD bs bbCtx) = do t <- renderBlackBox bs bbCtx
+                                fmap Just (string t)
 
 inst_ _ = return Nothing
 
@@ -465,11 +467,15 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
   where
     tName = tyName ty
 
-expr_ b (BlackBoxE bs (Just (DC (ty@(SP _ _),_)))) = parenIf b $ parens (string bs) <> parens (int start <+> "downto" <+> int end)
+expr_ b (BlackBoxE bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
+    t <- renderBlackBox bs bbCtx
+    parenIf (b || b') $ parens (string t) <> parens (int start <+> "downto" <+> int end)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
-expr_ b (BlackBoxE bs _) = parenIf b $ string bs
+expr_ b (BlackBoxE bs bbCtx b' _) = do
+  t <- renderBlackBox bs bbCtx
+  parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left e))           = "false when" <+> expr_ False e <+> "= 0 else true"
 expr_ _ (DataTag Bool (Right e))          = "1 when" <+> expr_ False e <+> "else 0"

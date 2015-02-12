@@ -24,7 +24,7 @@ doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd]
   (bindingsMap,tcm) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant DebugFinal
+  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant DebugNone
 
 main :: IO ()
 main = genVHDL "./examples/CalculatorArrow.hs"
