@@ -6,6 +6,7 @@
 {-# LANGUAGE ViewPatterns               #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -35,8 +36,8 @@ import           Language.Verilog.AST as V
 import           Language.Verilog.PrettyPrint ()
 
 import           CLaSH.Backend
--- import           CLaSH.Netlist.Types
--- import           CLaSH.Netlist.Util
+import qualified CLaSH.Netlist.BlackBox.Types as BB
+import qualified CLaSH.Netlist.Types as N
 import           CLaSH.Util                           (curLoc)
 
 import           CLaSH.Backend.Verilog.BoringTypes as B
@@ -74,6 +75,9 @@ instance Backend VerilogState where
 
 -- TODO replace orphan instances with implicit arguments?
 
+instance PrettyPrint (BB.BlackBoxTemplate, N.BlackBoxContext) where
+  pp = _
+
 instance PrettyPrint Text where
   pp = D.text
 
@@ -86,30 +90,52 @@ newtype VExpr iden blackbox = VE (Either blackbox (V.Expr iden (VExpr iden black
                             deriving (Show, PrettyPrint)
 
 
--- TODO: state monad to bind index'd expressions and index gensym id
-toVExpr :: Maybe HWType
-        -> CoreExpr (NonIndex (B.Expr blackbox)) t
-        -> V.Expr Text (VExpr Text blackbox)
-toVExpr t e = case e of
-  E (B.Literal lit)  -> V.Literal (toVTy <$> t) lit
-  E (B.Concat es)    -> V.LValue $ V.Concat $ toVExprBB <$> es
+-- TODO: ?state? monad to bind index'd expressions and index gensym id
+toVExpr :: (Int -> expr)
+        -> Maybe HWType
+        -> CoreExpr (NonIndex expr) t
+        -> V.Expr Text expr
+toVExpr f t = \case
+  E (B.Literal lit)  -> V.Literal (sizeTy <$> t) lit
+  E (B.Concat es)    -> V.LValue $ V.Concat $ es
   E (B.Identifier i) -> V.LValue $ V.Identifier i
-  B.Index h l _      -> V.LValue $ V.Range
-                        (error $ $(curLoc) ++ "not yet implemented")
-                        (nToVE $ fromIntegral h, nToVE $ fromIntegral l)
+  -- TODO do something about the inner expr
+  B.Index h l _e     -> V.LValue $ V.SubRange _ $ V.Range (f h) (f l)
+  E (B.DataCon es)   -> V.LValue $ V.Concat es -- TODO should be struct literal, not concat
+  --where tagPrefix = "__clash_variant_tag_"
 
 toVExprBB :: B.Expr blackbox -> VExpr Text blackbox
-toVExprBB (MTBBE (MT t e)) = VE $ toVExpr t <$> e
+toVExprBB (MTBBE (MT t e)) = VE $ toVExprBB <$$> toVExpr inj t <$> e
+  where inj = MTBBE . MT (Just B.Integer) . Right . E . B.Literal . V.Number . fromIntegral
 
-toVTy :: B.HWType -> Int
+-- TODO Writer monad to cache types to gen
+toVTy :: B.HWType -> V.Type Text
 toVTy = \case
-  B.Integer -> error $ $(curLoc) ++ "integers are not synthesizable"
-  B.Bits lst -> sum $ fst <$> lst
+  B.Integer          -> error $ $(curLoc) ++ "integers are not synthesizable"
+  B.Bits _signed size -> Wire size -- TODO Signed
+  B.Vector len ty    -> UnpackedArray (toVTy ty) len
+  B.Sum     name' _  -> Nominal name'
+  B.Product name' _  -> Nominal name'
+  B.SP      name' _  -> Nominal name'
+  --Enum name (log $ length ctors) ctors
+  -- B.Bits lst -> sum $ fst <$> lst
+
+sizeTy :: B.HWType -> Int
+sizeTy = \case
+  B.Integer          -> error $ $(curLoc) ++ "Integer is countably infinite -- no fixed number of bits"
+  B.Bits _ size      -> size
+  B.Vector len ty    -> len * sizeTy ty
+  B.Sum     _ ctors  -> ceilingLog ctors
+  B.Product _ tys    -> sum $ sizeTy <$> tys
+  B.SP      _ tyss   -> (maximum $ sum <$> (sizeTy <$$> snd <$> tyss)) + ceilingLog tyss
+  where ceilingLog :: [x] -> Int
+        ceilingLog xs = ceiling $ log (fromIntegral $ length xs :: Double)
 
 toItem :: forall blackbox. Declaration blackbox -> ModuleItem Text (VExpr Text blackbox)
 toItem = \case
-  Assignment is e -> V.Assign (V.Concat $ idToVE <$> is) $ toVExprBB e
-
+  Assignment is e        -> V.Assign (V.Concat $ idToVE <$> is) $ toVExprBB e
+  InstDecl m i  ps       -> V.Instance m [] i $ Just . toVExprBB <$$> ps
+  NetDecl i t _me        -> LocalNet (Decl (toVTy t) i) -- , toVExprBB <$> me) -- TODO RHS
   CondAssignment i sc es -> Assign (V.Identifier i) $ conds es
     where
       conds :: [(Maybe (B.Expr blackbox), B.Expr blackbox)] -> (VExpr Text blackbox)
@@ -118,17 +144,8 @@ toItem = \case
         [(_,e)]           -> toVExprBB e
         ((Nothing,e):_)   -> toVExprBB e
         ((Just c ,e):es') -> injE $ V.Mux (injE $ BinOp Eq (toVExprBB c) (toVExprBB sc)) (toVExprBB e) (conds es')
-
-  InstDecl m i  ps -> V.Instance m [] i $ Just . toVExprBB <$$> ps
-
-  NetDecl i t me -> Wire (Just (nToVE $ fromIntegral $ toVTy t, nToVE 0)) [(i, toVExprBB <$> me)]
-
   where injE = VE . Right
         idToVE e = injE $ LValue $ V.Identifier $ e
-
-
-nToVE :: Integer -> VExpr iden blackbox
-nToVE  n = VE $ Right $ V.Literal Nothing $ V.Number n
 
 type VItem blackbox = Either blackbox (ModuleItem Text (VExpr Text blackbox))
 
@@ -136,16 +153,9 @@ toItemBB :: Either blackbox (Declaration blackbox) -> VItem blackbox
 toItemBB = fmap toItem
 
 toModule :: forall blackbox. Component blackbox -> V.Module Text (VItem blackbox)
-toModule (Component modName ports ins out decls) = Module modName (fst <$> out : ins) items
-  where items :: [VItem blackbox]
-        items = [f Output out]
-                ++ (f Input <$> ins)
-                ++ (f wire <$> ports)
-                ++ (toItemBB <$> decls)
-
-        f ctor (i, t) = Right $ ctor range [i]
-          where range = case toVTy t of
-                  0 -> Nothing
-                  n -> Just (nToVE $ fromIntegral n, nToVE 0)
-
-        wire r ps = Wire r $ (,Nothing) <$> ps
+toModule (Component modName ports ins out decls) = Module modName params items
+  where items            = (Right . LocalNet . decl <$> ports)
+                           ++ (toItemBB <$> decls)
+        params           = mkParam Output out : (mkParam Input <$> ins)
+        mkParam dir d    = (dir, decl d)
+        decl (param, ty) = V.Decl (toVTy ty) param

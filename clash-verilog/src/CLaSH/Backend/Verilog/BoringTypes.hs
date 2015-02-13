@@ -6,10 +6,10 @@ module CLaSH.Backend.Verilog.BoringTypes where
 import           Data.Foldable
 import           Data.Traversable
 
-import           Control.Applicative
+--import           Control.Applicative
 import           Control.DeepSeq
 
-import           Language.Verilog.AST (Literal)
+import           Language.Verilog.AST (SizedLiteral)
 
 import qualified CLaSH.Netlist.Types as N
 
@@ -29,14 +29,22 @@ instance NFData blackbox => NFData (Component blackbox) where
     rnf nm `seq` rnf hi `seq` rnf inps `seq` rnf outps `seq` rnf decls
 
 data HWType
-  = Integer               -- ^ Just for meta ?
-  | Bits [(N.Size, Bool)] -- ^ Bits, [size of old field, isSigned]. List should never be empty
+  = Integer              -- ^ Just for meta ?
+  | Bits Bool N.Size     -- ^ Bits, is-signed
+  | Vector N.Size HWType
+  | Sum N.Identifier [N.Identifier]
+  | Product N.Identifier [HWType]
+  | SP N.Identifier [(N.Identifier,[HWType])]
   deriving (Eq, Show)
 
 instance NFData HWType where
   rnf = \case
     Integer  -> ()
-    Bits lst -> rnf $ rnf <$> lst
+    Bits bool size -> rnf bool `seq` rnf size
+    Vector s el -> rnf s `seq` rnf el
+    Sum i ids -> rnf i `seq` rnf ids
+    Product i ids -> rnf i `seq` rnf ids
+    SP i ids -> rnf i `seq` rnf ids
 
 data Declaration blackbox
   = Assignment      -- ^ Signal assignment
@@ -56,6 +64,7 @@ data Declaration blackbox
 
   | NetDecl N.Identifier HWType (Maybe (Expr blackbox)) -- ^ Signal declaration
   deriving Show
+  --deriving (Show, Functor, Foldable, Traversable)
 
 instance NFData (Declaration blackbox) where
   rnf a = a `seq` ()
@@ -63,11 +72,11 @@ instance NFData (Declaration blackbox) where
 
 -- | CoreExpression used in RHS of a declaration
 data NonIndex recur
-  = Literal    Literal      -- ^ Literal expression
+  = Literal    SizedLiteral -- ^ Literal expression
   | Concat     [recur]      -- ^ New!
   | Identifier N.Identifier -- ^ Signal reference
-  -- - | DataTag    HWType       -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  -- -| DataCon  HWType  (Maybe Modifier) [CoreExpr] -- ^ DataCon application
+  | DataTag    Bool recur -- ^ @False e@: tagToEnum#, @True e@: dataToTag#
+  | DataCon    [recur] -- ^ DataCon application
   deriving (Show, Functor, Foldable, Traversable)
 
 -- | Core Expression type that doesn't permit indexing "twice in a row"
@@ -98,3 +107,4 @@ data Expr blackbox =
                 (CoreExpr (BigRecur blackbox)
                       (Splice blackbox (BigRecur blackbox))))
   deriving Show
+  --deriving (Show, Functor, Foldable, Traversable)

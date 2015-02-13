@@ -4,31 +4,33 @@ module CLaSH.Backend.Verilog.Bore where
 
 import           Control.Applicative
 
-import Data.Text.Lazy                              (Text)
 
-import qualified CLaSH.Netlist.BlackBox.Util as N
+
+-- import qualified CLaSH.Netlist.BlackBox.Util as BB
+import qualified CLaSH.Netlist.BlackBox.Types as BB
 import qualified CLaSH.Netlist.Types as N
 import           CLaSH.Util                        (curLoc)
 
-import           Language.Verilog.AST (Literal(..))
+import           Language.Verilog.AST (SizedLiteral(..))
 
 import           CLaSH.Backend.Verilog.BoringTypes
 
 
 -- | Clash Conponent converted to somethign approximating Verilog's module
-component :: N.Component -> Component Text
+component :: N.Component -> Component BB
 component (N.Component name hports inpts outpt decls) =
   Component name (hwtype <$$> hports) (hwtype <$$> inpts) (hwtype <$> outpt) (declaration <$> decls)
 
+type BB = (BB.BlackBoxTemplate, N.BlackBoxContext)
 
 -- | Clash Decleration converted to somethign approximating Verilog's decleration
-declaration :: N.Declaration -> Either Text (Declaration Text)
+declaration :: N.Declaration -> Either BB (Declaration BB)
 declaration = \case
   N.Assignment i e            -> Right $ Assignment [i] $ expr e
   N.CondAssignment i e branches -> Right $ CondAssignment i (expr e) $ custMap expr <$> branches
     where custMap f (x , y) = (f <$> x , f y)
   N.InstDecl i1 i2 portAssigns -> Right $ InstDecl i1 i2 $ expr <$$> portAssigns
-  N.BlackBoxD bb               -> Left bb
+  N.BlackBoxD tplt ctx         -> Left (tplt, ctx)
   N.NetDecl i t me             -> Right $ NetDecl i (hwtype t) $ expr <$> me
 
 
@@ -36,45 +38,35 @@ declaration = \case
 -- types
 hwtype :: N.HWType -> HWType
 hwtype = \case
-  N.Void         -> Bits [(0, undefined)] -- try this
-  N.Bool         -> Bits [(1, False)]
+  N.Void         -> Bits undefined 0 -- try this
+  N.Bool         -> Bits False 1
 
   N.Integer      -> Integer
-  N.BitVector n  -> Bits [(n, False)]
-  N.Signed    n  -> Bits [(n, True)]
+  N.BitVector n  -> Bits False n
+  N.Signed    n  -> Bits True  n
 
   -- TODO could be improoved ?
   N.Index     _  -> error $ $(curLoc) ++ "index types unsupported"
 
-  N.Unsigned  n  -> Bits [(n, False)]
-  N.Vector  n t  -> Bits $ concat $ replicate n lst
-    where lst = case hwtype t of
-            Integer  -> error $ $(curLoc) ++ "cannot vector integer"
-            Bits lst' -> lst'
+  N.Unsigned  n  -> Bits False n
+  N.Vector  n t  -> Vector n $ hwtype t
 
+  N.Sum n ctors  -> Sum n ctors
+  N.Product n ts -> Product n $ hwtype <$> ts
 
-  N.Sum     _ _  -> error $ $(curLoc) ++ "sum types unsupported"
-  N.Product _ ts -> Bits $ concat $ bitsOnly <$> hwtype <$> ts
-
-  N.SP      _ _  -> error $ $(curLoc) ++ "sum of products unsupported"
+  N.SP      n vs -> SP n $ hwtype <$$$> vs
 
   N.Clock _      -> hwtype N.Bool
   N.Reset _      -> hwtype N.Bool
 
-  where bitsOnly :: HWType -> [(N.Size, Bool)]
-        bitsOnly = \case
-          Integer  -> error $ $(curLoc) ++ "Cannot tuple Integers"
-          Bits lst -> lst
-
-
-expr :: N.Expr -> Expr Text
+expr :: N.Expr -> Expr BB
 expr = \case
   N.DataCon _ _ _    -> error $ $(curLoc) ++ "Data constructors unsupported"
   N.DataTag _ _      -> error $ $(curLoc) ++ "Data tags unsupported"
 
   N.Literal mty l    -> literal (fst <$> mty) l
   N.Identifier i mm  -> modifier mm $ Right $ Identifier i
-  N.BlackBoxE str mm -> modifier mm $ Left str
+  N.BlackBoxE t c _ mm -> modifier mm $ Left (t, c)
 
 
 modifier :: Maybe N.Modifier
