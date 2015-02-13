@@ -78,6 +78,7 @@ setSym i l
                                                           return (Sym k)
                                             Just k  -> return (Sym k)
                       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
+                      SigD e m      -> SigD <$> (head <$> setSym' [e]) <*> pure m
                       _             -> pure e
               )
 
@@ -90,6 +91,7 @@ setClocks :: ( MonadWriter [(Identifier,HWType)] m
 setClocks bc bt = mapM setClocks' bt
   where
     setClocks' (D (Decl n l))  = D <$> (Decl n <$> mapM (combineM (setClocks bc) (setClocks bc)) l)
+    setClocks' (SigD e m)      = SigD <$> (head <$> setClocks bc [e]) <*> pure m
     setClocks' (Clk Nothing)   = let (clk,rate) = clkSyncId $ fst $ bbResult bc
                                  in  tell [(clk,Clock rate)] >> return (C clk)
     setClocks' (Clk (Just n))  = let (clk,rate) = clkSyncId $ fst $ bbInputs bc !! n
@@ -133,6 +135,11 @@ renderElem b (D (Decl n (l:ls))) = do
     if verifyBlackBoxContext templ' b'
       then Text.concat <$> mapM (renderElem b') templ'
       else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ
+
+renderElem b (SigD e m) = do
+  e' <- renderElem b e
+  t  <- hdlSig e' (maybe (snd $ bbResult b) (snd . (bbInputs b !!)) m)
+  return (displayT $ renderOneLine t)
 
 renderElem b e = renderTag b e
 

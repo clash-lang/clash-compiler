@@ -1,6 +1,7 @@
 module CLaSH.Backend where
 
 import           Data.HashSet               (HashSet)
+import           Data.Text.Lazy                       (Text)
 import Control.Monad.State                  (State)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 
@@ -33,6 +34,8 @@ class Backend state where
   hdlTypeErrValue  :: HWType       -> State state Doc
   -- | Convert a Netlist HWType to the root of a target HDL type
   hdlTypeMark      :: HWType       -> State state Doc
+  -- | Create a signal declaration from an identifier (Text) and Netlist HWType
+  hdlSig           :: Text -> HWType -> State state Doc
   -- | Turn a Netlist Declaration to a HDL concurrent block
   inst             :: Declaration  -> State state (Maybe Doc)
   -- | Turn a Netlist expression into a HDL expression

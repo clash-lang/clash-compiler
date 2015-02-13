@@ -29,6 +29,7 @@ pBlackBoxD = pSome pElement
 pElement :: Parser Element
 pElement  =  pTagD
          <|> C <$> pText
+         <|> C <$> (pack <$> pToken "~ ")
 
 -- | Parse the Text part of a Template
 pText :: Parser Text
@@ -54,21 +55,23 @@ pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS 
 
 -- | Parse an Expression element
 pTagE :: Parser Element
-pTagE =  O             <$  pToken "~RESULT"
-     <|> I             <$> (pToken "~ARG" *> pBrackets pNatural)
-     <|> I             <$> (pToken "~LIT" *> pBrackets pNatural)
-     <|> (Clk . Just)  <$> (pToken "~CLK" *> pBrackets pNatural)
-     <|> Clk Nothing   <$  pToken "~CLKO"
-     <|> (Rst . Just)  <$> (pToken "~RST" *> pBrackets pNatural)
-     <|> Rst Nothing   <$  pToken "~RSTO"
-     <|> Sym           <$> (pToken "~SYM" *> pBrackets pNatural)
-     <|> Typ Nothing   <$  pToken "~TYPO"
-     <|> (Typ . Just)  <$> (pToken "~TYP" *> pBrackets pNatural)
-     <|> TypM Nothing  <$  pToken "~TYPMO"
-     <|> (TypM . Just) <$> (pToken "~TYPM" *> pBrackets pNatural)
-     <|> Err Nothing   <$  pToken "~ERRORO"
-     <|> (Err . Just)  <$> (pToken "~ERROR" *> pBrackets pNatural)
-     <|> TypElem       <$> (pToken "~TYPEL" *> pBrackets pTagE)
+pTagE =  O                 <$  pToken "~RESULT"
+     <|> I                 <$> (pToken "~ARG" *> pBrackets pNatural)
+     <|> I                 <$> (pToken "~LIT" *> pBrackets pNatural)
+     <|> (Clk . Just)      <$> (pToken "~CLK" *> pBrackets pNatural)
+     <|> Clk Nothing       <$  pToken "~CLKO"
+     <|> (Rst . Just)      <$> (pToken "~RST" *> pBrackets pNatural)
+     <|> Rst Nothing       <$  pToken "~RSTO"
+     <|> Sym               <$> (pToken "~SYM" *> pBrackets pNatural)
+     <|> Typ Nothing       <$  pToken "~TYPO"
+     <|> (Typ . Just)      <$> (pToken "~TYP" *> pBrackets pNatural)
+     <|> TypM Nothing      <$  pToken "~TYPMO"
+     <|> (TypM . Just)     <$> (pToken "~TYPM" *> pBrackets pNatural)
+     <|> Err Nothing       <$  pToken "~ERRORO"
+     <|> (Err . Just)      <$> (pToken "~ERROR" *> pBrackets pNatural)
+     <|> TypElem           <$> (pToken "~TYPEL" *> pBrackets pTagE)
+     <|> SigD              <$> (pToken "~SIGD" *> pBrackets pTagE) <*> (Just <$> (pBrackets pNatural))
+     <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pTagE)
 
 -- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a
