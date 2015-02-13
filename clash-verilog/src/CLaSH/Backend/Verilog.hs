@@ -17,7 +17,7 @@ module CLaSH.Backend.Verilog (VerilogState) where
 import           Control.Applicative
 import           Control.Lens hiding (Indexed)
 -- import           Control.Monad                        (forM,join,liftM,when,zipWithM)
--- import           Control.Monad.State                  (State)
+import           Control.Monad.State                  (evalState)
 -- import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 -- import           Data.HashMap.Lazy                    (HashMap)
 -- import qualified Data.HashMap.Lazy                    as HashMap
@@ -36,6 +36,7 @@ import           Language.Verilog.AST as V
 import           Language.Verilog.PrettyPrint ()
 
 import           CLaSH.Backend
+import qualified CLaSH.Netlist.BlackBox.Util  as BB
 import qualified CLaSH.Netlist.BlackBox.Types as BB
 import qualified CLaSH.Netlist.Types as N
 import           CLaSH.Util                           (curLoc)
@@ -76,7 +77,8 @@ instance Backend VerilogState where
 -- TODO replace orphan instances with implicit arguments?
 
 instance PrettyPrint (BB.BlackBoxTemplate, N.BlackBoxContext) where
-  pp = _
+  pp (bbT,bbCtx) = let t = evalState (BB.renderBlackBox bbT bbCtx) VerilogState
+                   in  D.text t
 
 instance PrettyPrint Text where
   pp = D.text
