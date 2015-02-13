@@ -1,0 +1,360 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.eq#"
+    , "templateE" : "~ARG[0] = ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.neq#"
+    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.head"
+    , "templateD" :
+"head_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](0);
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.tail"
+    , "templateD" :
+"tail_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](1 to ~SYM[1]'high);
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.last"
+    , "templateD" :
+"last_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](~SYM[1]'high);
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.init"
+    , "templateD" :
+"init_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](0 to ~SYM[1]'high - 1);
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.select"
+    , "comment"   :
+    "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
+            => SNat f                        -- ARG[1]
+            -> SNat s                        -- ARG[2]
+            -> SNat n                        -- ARG[3]
+            -> Vec i a                       -- ARG[4]
+            -> Vec n a"
+    , "templateD" :
+"select_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[4];
+begin
+  ~SYM[1] <= ~ARG[4];
+
+  selectZ_~SYM[2] : if ~RESULT'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  selectSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    selectIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
+    begin
+      ~RESULT(~SYM[5]) <= ~SYM[1](~LIT[1]+(~LIT[2]*~SYM[5]));
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.++"
+    , "templateE" : "~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.concat"
+    , "templateD" :
+"concat_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+
+  concatZ_~SYM[2] : if ~RESULT'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  concatSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    concatIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
+    begin
+      ~RESULT((~SYM[5] * ~SYM[1](0)'length) to ((~SYM[5] * ~SYM[1](0)'length) + ~SYM[1](0)'high)) <= ~SYM[1](~SYM[5]);
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.splitAt"
+    , "templateD" :
+"splitAt_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
+             ,~SYM[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.unconcat"
+    , "comment"   :
+    "unconcat :: KnownNat n     -- ARG[0]
+              => SNat m         -- ARG[1]
+              -> Vec (n * m) a  -- ARG[2]
+              -> Vec n (Vec m a)"
+    , "templateD" :
+"unconcat_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[2];
+begin
+  ~SYM[1] <= ~ARG[2];
+
+  unconcatZ_~SYM[2] : if ~SYM[1]'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  unconcatSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
+    unconcatIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
+    begin
+      ~RESULT(~SYM[5]) <= ~SYM[1]((~SYM[5] * ~LIT[1]) to ((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1));
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.merge"
+    , "templateD" :
+"merge_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~SYM[2] <= ~ARG[1];
+
+  mergeZ_~SYM[3] : if ~RESULT'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  mergeSN_~SYM[4] : if ~RESULT'length /= 0 generate
+    mergeIter_~SYM[5] : for ~SYM[6] in ~SYM[1]'range generate
+    begin
+      ~RESULT(2*~SYM[6])   <= ~SYM[1](~SYM[6]);
+      ~RESULT(2*~SYM[6]+1) <= ~SYM[2](~SYM[6]);
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.map"
+    , "templateD" :
+"wire ~SIGD[~SYM[1]][1];
+assign ~SYM[1] = ~ARG[1];
+
+genvar ~SYM[2];
+
+generate
+  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : map_~SYM[3]
+    ~INST 0
+      ~OUTPUT <= ~RESULT[~SYM[2]]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[1][~SYM[2]]~ ~TYPEL[~TYP[1]]~
+    ~INST
+  end
+endgenerate
+"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.zipWith"
+    , "templateD" :
+"zipWith_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~SYM[2] <= ~ARG[2];
+
+  zipWithZ_~SYM[3] : if ~RESULT'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  zipWithSN_~SYM[4] : if ~RESULT'length /= 0 generate
+    zipWithIter_~SYM[5] : for ~SYM[6] in ~RESULT'range generate
+    begin
+      ~INST 0
+        ~OUTPUT <= ~RESULT(~SYM[6])~ ~TYPEL[~TYPO]~
+        ~INPUT  <= ~SYM[1](~SYM[6])~ ~TYPEL[~TYP[1]]~
+        ~INPUT  <= ~SYM[2](~SYM[6])~ ~TYPEL[~TYP[2]]~
+      ~INST
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.index_integer"
+    , "templateD" :
+"indexVec_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~SYM[2] <= ~ARG[2];
+  -- pragma translate_off
+  process (~SYM[1],~SYM[2])
+  begin
+    if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" to \" & integer'image(~SYM[1]'high)) severity warning;
+      ~RESULT <= ~ERRORO;
+    else
+    -- pragma translate_on
+      ~RESULT <= ~SYM[1](~SYM[2]);
+    -- pragma translate_off
+    end if;
+  end process;
+  -- pragma translate_on
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.replace_integer"
+    , "templateD" :
+"replaceVec_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[1];
+  signal ~SYM[2] : ~TYP[2];
+  signal ~SYM[3] : ~TYP[3];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~SYM[2] <= ~ARG[2];
+  ~SYM[3] <= ~ARG[3];
+  process(~SYM[1],~SYM[2],~SYM[3])
+    variable ~SYM[4] : ~TYP[1];
+  begin
+    ~SYM[4] := ~SYM[1];
+    -- pragma translate_off
+    if ~SYM[2] < ~SYM[4]'low or ~SYM[2] > ~SYM[4]'high then
+      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" to \" & integer'image(~SYM[1]'high)) severity warning;
+      ~SYM[4] := ~ERROR[1];
+    else
+      -- pragma translate_on
+      ~SYM[4](~SYM[2]) := ~SYM[3];
+      -- pragma translate_off
+    end if;
+    -- pragma translate_on
+    ~RESULT <= ~SYM[4];
+  end process;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.maxIndex"
+    , "templateE" : "~LIT[0] - 1"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.length"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.replicate"
+    , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.reverse"
+    , "templateD" :
+"reverse_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+
+  reverseZ_~SYM[2] : if ~RESULT'length = 0 generate
+    ~RESULT <= ~SYM[1];
+  end generate;
+
+  reverseSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    reverseIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
+      ~RESULT(~SYM[1]'high - ~SYM[5]) <= ~SYM[1](~SYM[5]);
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.lazyV"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.concatBitVector#"
+    , "comment"   :
+      "concatBitVector# :: KnownNat m           -- ARG[0]
+                        => Vec n (BitVector m)  -- ARG[1]
+                        -> BitVector (n * m)"
+    , "templateD" :
+"concatBitVector_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[1];
+
+  concatBitVectorZ_~SYM[2] : if ~RESULT'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  concatBitVectorSN_~SYM[3] : if ~RESULT'length /= 0 generate
+    concatBitVectorIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
+      ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[5]));
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.unconcatBitVector#"
+    , "comment"   :
+      "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
+                          => BitVector (n * m)        -- ARG[2]
+                          -> Vec n (BitVector m)"
+    , "templateD" :
+"unconcatBitVector_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[2];
+begin
+  ~SYM[1] <= ~ARG[2];
+
+  unconcatBitVectorZ_~SYM[2] : if ~SYM[1]'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  unconcatBitVectorSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
+    unconcatBitVectorIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
+      ~RESULT(~SYM[5]) <= ~SYM[1](((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[5] * ~LIT[1]));
+    end generate;
+  end generate;
+end block;"
+    }
+  }
+]

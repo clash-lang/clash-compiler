@@ -151,7 +151,6 @@ prepareDir dir = do
 writeHDL :: Backend backend => backend -> FilePath -> (String, Doc) -> IO ()
 writeHDL backend dir (cname, hdl) = do
   handle <- IO.openFile (dir ++ cname ++ CLaSH.Backend.extension backend) IO.WriteMode
-  IO.hPutStrLn handle $ "-- Automatically generated " ++ CLaSH.Backend.name backend
   hPutDoc handle hdl
   IO.hPutStr handle "\n"
   IO.hClose handle

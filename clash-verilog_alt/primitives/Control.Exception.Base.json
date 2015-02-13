@@ -1,0 +1,21 @@
+[ { "BlackBox" :
+    { "name"      : "Control.Exception.Base.patError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.irrefutPatError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.recSelError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.absentError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+]

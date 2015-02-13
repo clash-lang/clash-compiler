@@ -1,0 +1,24 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Prelude.Testbench.csassert"
+    , "comment"   :
+    "csassert :: (Eq a,Show a) -- (ARG[0],ARG[1])
+         => CSignal t a -- ^ Checked value (ARG[2])
+         -> CSignal t a -- ^ Expected value (ARG[3])
+         -> CSignal t b -- ^ Return valued (ARG[4])
+         -> CSignal t b"
+    , "templateD" :
+"assert_~SYM[0] : block
+begin
+  -- pragma translate_off
+  process(~CLK[2],~RST[2],~ARG[2],~ARG[3]) is
+  begin
+    if (rising_edge(~CLK[2]) or rising_edge(~RST[2])) then
+      assert (~ARG[2] = ~ARG[3]) report (\"expected: \" & to_string (~ARG[3]) & \", actual: \" & to_string (~ARG[2])) severity error;
+    end if;
+  end process;
+  -- pragma translate_on
+  ~RESULT <= ~ARG[4];
+end block;"
+    }
+  }
+]
