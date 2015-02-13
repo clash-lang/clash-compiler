@@ -399,7 +399,7 @@ tyName _ = empty
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 verilogTypeErrValue :: HWType -> VHDLM Doc
-verilogTypeErrValue Integer         = "32'sd" <> int (2 ^ 31)
+verilogTypeErrValue Integer         = "32'sd" <> int ((2 ^ 31) - 1)
 verilogTypeErrValue (Vector n elTy) = braces (hcat $ punctuate comma (mapM verilogTypeErrValue (replicate n elTy)))
 vhdlTypeErrValue e = error $ $(curLoc) ++ "no error value defined for: " ++ show e
 -- vhdlTypeErrValue Bool                = "true"
@@ -438,27 +438,27 @@ inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
--- inst_ (CondAssignment id_ scrut es) = fmap Just $
---   text id_ <+> larrow <+> align (vcat (conds es)) <> semi
---     where
---       conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
---       conds []                = return []
---       conds [(_,e)]           = expr_ False e <:> return []
---       conds ((Nothing,e):_)   = expr_ False e <:> return []
---       conds ((Just c ,e):es') = (expr_ False e <+> "when" <+> parens (expr_ True scrut <+> "=" <+> expr_ True c) <+> "else") <:> conds es'
+inst_ (CondAssignment id_ scrut es) = fmap Just $
+    "always @(*)" <$>
+    "case" <> parens (expr_ True scrut) <$>
+      (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
+    "endcase"
+  where
+    conds :: [(Maybe Expr,Expr)] -> VerilogM [Doc]
+    conds []                = return []
+    conds [(_,e)]           = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
+    conds ((Nothing,e):_)   = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
+    conds ((Just c ,e):es') = (expr_ True c <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> conds es'
 
--- inst_ (InstDecl nm lbl pms) = fmap Just $
---     nest 2 $ text lbl <+> colon <+> "entity"
---               <+> text nm <$$> pms' <> semi
---   where
---     pms' = do
---       rec (p,ls) <- fmap unzip $ sequence [ (,fromIntegral (T.length i)) A.<$> fill (maximum ls) (text i) <+> "=>" <+> expr_ False e | (i,e) <- pms]
---       nest 2 $ "port map" <$$> tupled (A.pure p)
+inst_ (InstDecl nm lbl pms) = fmap Just $
+    text nm <+> text lbl <$$> pms' <> semi
+  where
+    pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,e) <- pms]
 
 inst_ (BlackBoxD bs bbCtx) = do t <- renderBlackBox bs bbCtx
                                 fmap Just (string t)
 
-inst_ _ = return Nothing
+inst_ (NetDecl _ _ _) = return Nothing
 
 -- | Turn a Netlist expression into a VHDL expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
@@ -476,12 +476,12 @@ expr_ _ (Identifier id_ Nothing)                      = text id_
 --     end      = start - argSize + 1
 
 -- expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> tyName ty <> "_sel" <> int fI
--- expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
---   where
---     start = typeSize ty - 1
---     end   = typeSize ty - conSize ty
+expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int start <> colon <> int end)
+  where
+    start = typeSize ty - 1
+    end   = typeSize ty - conSize ty
 
--- expr_ _ (Identifier id_ (Just _)) = text id_
+expr_ _ (Identifier id_ (Just _)) = text id_
 -- expr_ _ (DataCon ty@(Vector 1 _) _ [e])           = vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
 -- expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2])     = vhdlTypeMark ty <> "'" <> case vectorChain e of
 --                                                      Just es -> tupled (mapM (expr_ False) es)
@@ -512,7 +512,7 @@ expr_ b (BlackBoxE bs bbCtx b' _) = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
--- expr_ _ (DataTag Bool (Left e))           = "false when" <+> expr_ False e <+> "= 0 else true"
+expr_ _ (DataTag Bool (Left e))           = parens (expr False e <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
 -- expr_ _ (DataTag Bool (Right e))          = "1 when" <+> expr_ False e <+> "else 0"
 -- expr_ _ (DataTag hty@(Sum _ _) (Left e))  = "to_unsigned" <> tupled (sequence [expr_ False e,int (typeSize hty)])
 -- expr_ _ (DataTag (Sum _ _) (Right e))     = "to_integer" <> parens (expr_ False e)
@@ -556,7 +556,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
 
   where
     blit = bits (toBits sz i)
--- exprLit _             (BoolLit t)  = if t then "true" else "false"
+exprLit _             (BoolLit t)  = if t then "1'b1" else "1'b0"
 -- exprLit _             (BitLit b)   = squotes $ bit_char b
 exprLit _             l            = error $ $(curLoc) ++ "exprLit: " ++ show l
 

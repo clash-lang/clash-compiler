@@ -36,13 +36,22 @@
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.divInteger"
     , "templateD" :
-"divInteger_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[0] / ~ARG[1];
-  ~RESULT <= ~SYM[1] - 1 when ((~ARG[0] = abs ~ARG[0]) /= (~ARG[1] = abs ~ARG[1])) else
-             ~SYM[1];
-end block;"
+"// divInteger_~SYM[0]
+wire ~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[2]][0];
+wire ~SIGD[~SYM[3]][1];
+
+// divide (rounds towards zero)
+assign ~SYM[1] = ~ARG[0] / ~ARG[1];
+
+// take absolute
+assign ~SYM[2] = ~ARG[0] < 32'sd0 ? -~ARG[0] : ~ARG[0];
+assign ~SYM[3] = ~ARG[1] < 32'sd0 ? -~ARG[1] : ~ARG[1];
+
+// round toward minus infinity
+assign ~RESULT = ((~ARG[0] == ~SYM[2]) != (~ARG[1] == ~SYM[3])) ?
+                 ~SYM[1] - 1 :
+                 ~SYM[1];"
     }
   }
 , { "BlackBox" :
@@ -92,7 +101,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.eqInteger#"
-    , "templateE" : "1 when ~ARG[0] = ~ARG[1] else 0"
+    , "templateE" : "(~ARG[0] == ~ARG[1]) ? 32'sd1 : 32'sd0"
     }
   }
 , { "BlackBox" :
