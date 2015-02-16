@@ -1,55 +1,51 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.eq#"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.neq#"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.head"
     , "templateD" :
-"head_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](0);
-end block;"
+"// head
+wire ~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][0];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.tail"
     , "templateD" :
-"tail_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](1 to ~SYM[1]'high);
-end block;"
+"// tail
+wire ~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.last"
     , "templateD" :
-"last_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](~SYM[1]'high);
-end block;"
+"// last
+wire ~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][$high(~SYM[0])];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.init"
     , "templateD" :
-"init_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](0 to ~SYM[1]'high - 1);
-end block;"
+"// init
+wire ~SIGD[~SYM[1]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];"
     }
   }
 , { "BlackBox" :
@@ -62,60 +58,48 @@ end block;"
             -> Vec i a                       -- ARG[4]
             -> Vec n a"
     , "templateD" :
-"select_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[4];
-begin
-  ~SYM[1] <= ~ARG[4];
+"// select
+wire ~SIGD[~SYM[0]][4];
+assign ~SYM[0] = ~ARG[4];
 
-  selectZ_~SYM[2] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  selectSN_~SYM[3] : if ~RESULT'length /= 0 generate
-    selectIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
-    begin
-      ~RESULT(~SYM[5]) <= ~SYM[1](~LIT[1]+(~LIT[2]*~SYM[5]));
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[1];
+generate
+  for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : select_~SYM[2]
+    assign ~RESULT[~SYM[1]] = ~SYM[0][~LIT[1] + (~LIT[2] * ~SYM[1])];
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
-    , "templateE" : "~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1])"
+    , "templateE" : "{~ARG[0], ~ARG[1]}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.concat"
     , "templateD" :
-"concat_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
+"// concat
+wire ~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
 
-  concatZ_~SYM[2] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  concatSN_~SYM[3] : if ~RESULT'length /= 0 generate
-    concatIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
-    begin
-      ~RESULT((~SYM[5] * ~SYM[1](0)'length) to ((~SYM[5] * ~SYM[1](0)'length) + ~SYM[1](0)'high)) <= ~SYM[1](~SYM[5]);
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[1];
+generate
+  for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concat_~SYM[2]
+    assign ~RESULT[(~SYM[5] * $size(~SYM[0][0])) : ((~SYM[5] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.splitAt"
     , "templateD" :
-"splitAt_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
-             ,~SYM[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));
-end block;"
+"// splitAt
+wire ~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+
+assign ~RESULT = `{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0]
+                  ,~SYM[0][($left(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0)) : ($right(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0))]
+                  };"
     }
   }
 , { "BlackBox" :
@@ -126,61 +110,49 @@ end block;"
               -> Vec (n * m) a  -- ARG[2]
               -> Vec n (Vec m a)"
     , "templateD" :
-"unconcat_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[2];
-begin
-  ~SYM[1] <= ~ARG[2];
+"// unconcat
+wire ~SIGD[~SYM[0]][2];
+~SYM[0] <= ~ARG[2];
 
-  unconcatZ_~SYM[2] : if ~SYM[1]'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  unconcatSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
-    unconcatIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
-    begin
-      ~RESULT(~SYM[5]) <= ~SYM[1]((~SYM[5] * ~LIT[1]) to ((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1));
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcat_~SYM[2]
+    assign ~RESULT[~SYM[1]] = ~SYM[0][(~SYM[1] * ~LIT[1]) : ((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1)];
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.merge"
     , "templateD" :
-"merge_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~SYM[2] <= ~ARG[1];
+"// merge
+wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[1]][1];
+assign ~SYM[0] = ~ARG[0];
+assign ~SYM[1] = ~ARG[1];
 
-  mergeZ_~SYM[3] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  mergeSN_~SYM[4] : if ~RESULT'length /= 0 generate
-    mergeIter_~SYM[5] : for ~SYM[6] in ~SYM[1]'range generate
-    begin
-      ~RESULT(2*~SYM[6])   <= ~SYM[1](~SYM[6]);
-      ~RESULT(2*~SYM[6]+1) <= ~SYM[2](~SYM[6]);
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[2];
+generate
+  for (~SYM[2] = 0; ~SYM[2] < $size(~SYM[0]); ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
+    assign ~RESULT[2*~SYM[2]]   = ~SYM[0][~SYM[2]];
+    assign ~RESULT[2*~SYM[2]+1] = ~SYM[1][~SYM[2]];
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
     , "templateD" :
-"wire ~SIGD[~SYM[1]][1];
-assign ~SYM[1] = ~ARG[1];
+"// map
+wire ~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
 
-genvar ~SYM[2];
-
+genvar ~SYM[1];
 generate
-  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : map_~SYM[3]
+  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
     ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[2]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[1][~SYM[2]]~ ~TYPEL[~TYP[1]]~
+      ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[1]]~
     ~INST
   end
 endgenerate
@@ -190,83 +162,69 @@ endgenerate
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.zipWith"
     , "templateD" :
-"zipWith_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
+"// zipWith
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][2];
+assign ~SYM[0] <= ~ARG[1];
+assign ~SYM[1] <= ~ARG[2];
 
-  zipWithZ_~SYM[3] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  zipWithSN_~SYM[4] : if ~RESULT'length /= 0 generate
-    zipWithIter_~SYM[5] : for ~SYM[6] in ~RESULT'range generate
-    begin
-      ~INST 0
-        ~OUTPUT <= ~RESULT(~SYM[6])~ ~TYPEL[~TYPO]~
-        ~INPUT  <= ~SYM[1](~SYM[6])~ ~TYPEL[~TYP[1]]~
-        ~INPUT  <= ~SYM[2](~SYM[6])~ ~TYPEL[~TYP[2]]~
-      ~INST
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[2];
+generate
+  for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
+    ~INST 0
+      ~OUTPUT <= ~RESULT(~SYM[2])~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[0](~SYM[2])~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[1](~SYM[2])~ ~TYPEL[~TYP[2]]~
+    ~INST
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_integer"
     , "templateD" :
-"indexVec_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
-  -- pragma translate_off
-  process (~SYM[1],~SYM[2])
-  begin
-    if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
-      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" to \" & integer'image(~SYM[1]'high)) severity warning;
-      ~RESULT <= ~ERRORO;
-    else
-    -- pragma translate_on
-      ~RESULT <= ~SYM[1](~SYM[2]);
-    -- pragma translate_off
-    end if;
-  end process;
-  -- pragma translate_on
-end block;"
+"// index_integer
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][2];
+
+assign ~SYM[0] = ~ARG[1];
+assign ~SYM[1] = ~ARG[2];
+
+// pragma translate_off
+always @(*) begin
+  if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
+    ~RESULT = ~ERRORO;
+  end else begin
+  // pragma translate_on
+    ~RESULT = ~SYM[0][~SYM[1]];
+  // pragma translate_off
+  end
+end
+// pragma translate_on"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replace_integer"
     , "templateD" :
-"replaceVec_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-  signal ~SYM[3] : ~TYP[3];
-begin
+"// replace_integer
+wire ~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
+
+reg ~SIGD[~SYM[1]][1];
+always @(*) begin
   ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
-  ~SYM[3] <= ~ARG[3];
-  process(~SYM[1],~SYM[2],~SYM[3])
-    variable ~SYM[4] : ~TYP[1];
-  begin
-    ~SYM[4] := ~SYM[1];
-    -- pragma translate_off
-    if ~SYM[2] < ~SYM[4]'low or ~SYM[2] > ~SYM[4]'high then
-      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" to \" & integer'image(~SYM[1]'high)) severity warning;
-      ~SYM[4] := ~ERROR[1];
-    else
-      -- pragma translate_on
-      ~SYM[4](~SYM[2]) := ~SYM[3];
-      -- pragma translate_off
-    end if;
+  -- pragma translate_off
+  if ~SYM[0] < $low(~SYM[2]) || ~SYM[0] > $high(~SYM[2]) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
+    ~SYM[1] <= ~ERROR[1];
+  end else begin
     -- pragma translate_on
-    ~RESULT <= ~SYM[4];
-  end process;
-end block;"
+    ~SYM[1][~SYM[0]] <= ~ARG[3];
+    -- pragma translate_off
+  end
+  -- translate_on
+end"
     }
   }
 , { "BlackBox" :
@@ -281,27 +239,22 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
-    , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~ARG[1])"
+    , "templateE" : "{~LIT[0] {~ARG[1]}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "templateD" :
-"reverse_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
+"// reverse
+wire ~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
 
-  reverseZ_~SYM[2] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~SYM[1];
-  end generate;
-
-  reverseSN_~SYM[3] : if ~RESULT'length /= 0 generate
-    reverseIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
-      ~RESULT(~SYM[1]'high - ~SYM[5]) <= ~SYM[1](~SYM[5]);
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
+    assign ~RESULT[$high(~SYM[0]) - ~SYM[1]] = ~SYM[0][~SYM[1]];
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
@@ -316,21 +269,16 @@ end block;"
                         => Vec n (BitVector m)  -- ARG[1]
                         -> BitVector (n * m)"
     , "templateD" :
-"concatBitVector_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
+"// concatBitVector
+wire ~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
 
-  concatBitVectorZ_~SYM[2] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  concatBitVectorSN_~SYM[3] : if ~RESULT'length /= 0 generate
-    concatBitVectorIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
-      ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[5]));
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concatBitVector_~SYM[2]
+    assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][~SYM[1]];
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
@@ -340,21 +288,16 @@ end block;"
                           => BitVector (n * m)        -- ARG[2]
                           -> Vec n (BitVector m)"
     , "templateD" :
-"unconcatBitVector_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[2];
-begin
-  ~SYM[1] <= ~ARG[2];
+"// unconcatBitVector
+wire ~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
 
-  unconcatBitVectorZ_~SYM[2] : if ~SYM[1]'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  unconcatBitVectorSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
-    unconcatBitVectorIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
-      ~RESULT(~SYM[5]) <= ~SYM[1](((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[5] * ~LIT[1]));
-    end generate;
-  end generate;
-end block;"
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcatBitVector_~SYM[2]
+    assign ~RESULT[~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
+  end
+endgenerate"
     }
   }
 ]

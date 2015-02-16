@@ -6,13 +6,13 @@
                -> CSignal clk a  -- ARG[2]
                -> CSignal clk a"
     , "templateD" :
-"reg ~SIGD[~SYM[1]][2];
+"reg ~SIGD[~SYM[0]][2];
 
 always @ (posedge ~CLK[0] or negedge ~RST[0])
 if (~ ~RST[0]) begin
-  ~SYM[1] <= ~ARG[1];
+  ~SYM[0] <= ~ARG[1];
 end else begin
-  ~SYM[1] <= ~ARG[2];
+  ~SYM[0] <= ~ARG[2];
 end
 
 assign ~RESULT = ~SYM[1];"
@@ -27,27 +27,18 @@ assign ~RESULT = ~SYM[1];"
             -> CSignal clk a    -- ARG[3]
             -> CSignal clk a"
     , "templateD" :
-"regEn_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-  signal ~SYM[3] : ~TYP[3];
-begin
+"reg ~SIGD[~SYM[0]][3];
+
+always @ (posedge ~CLK[0] or negedge ~RST[0])
+if (~ ~RST[0]) begin
   ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
+end else begin
+  if (~ARG[2]) begin
+    ~SYM[1] <= ~ARG[3];
+  end
+end
 
-  process(~CLK[0],~RST[0],~SYM[1],~SYM[2])
-  begin
-    if ~RST[0] = '0' then
-      ~SYM[3] <= ~SYM[1];
-    elsif rising_edge(~CLK[0]) then
-      if ~SYM[2] then
-        ~SYM[3] <= ~ARG[3];
-      end if;
-    end if;
-  end process;
-
-  ~RESULT <= ~SYM[3];
-end block;"
+assign ~RESULT = ~SYM[1];"
     }
   }
 
