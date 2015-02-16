@@ -223,8 +223,11 @@ always @(*) begin
     ~SYM[1][~SYM[0]] <= ~ARG[3];
     -- pragma translate_off
   end
-  -- translate_on
-end"
+  -- pragma translate_on
+end
+
+assign ~RESULT = ~SYM[1];
+"
     }
   }
 , { "BlackBox" :

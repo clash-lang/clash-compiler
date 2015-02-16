@@ -5,22 +5,22 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.pack#"
-    , "templateE" : "std_logic_vector(~ARG[1])"
+    , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.unpack#"
-    , "templateE" : "signed(~ARG[1])"
+    , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.eq#"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.neq#"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
     }
   }
 , { "BlackBox" :
@@ -47,14 +47,14 @@
     { "name"      : "CLaSH.Sized.Internal.Signed.minBound#"
     , "comment"   : "Generates incorrect VDHL for n=0"
     , "comment2"  : "the quantification with signed gives the array an ascending index"
-    , "templateE" : "signed'(0 => '1', 1 to ~LIT[0]-1 => '0')"
+    , "templateE" : "{1'b1, {(~LIT[0]-1) {1'b0}}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.maxBound#"
     , "comment"   : "Generates incorrect VDHL for n=0"
     , "comment2"  : "the quantification with signed gives the array an ascending index"
-    , "templateE" : "signed'(0 => '0', 1 to ~LIT[0]-1  => '1')"
+    , "templateE" : "{1'b0, {(~LIT[0]-1) {1'b1}}}"
     }
   }
 , { "BlackBox" :
@@ -69,7 +69,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.*#"
-    , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }
 , { "BlackBox" :
@@ -79,7 +79,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.abs#"
-    , "templateE" : "abs ~ARG[1]"
+    , "templateE" : "(~ARG[1] < ~LIT[0]'sd0) ? -~ARG[1] : ~ARG[1]"
     }
   }
 , { "Primitive" :
@@ -89,12 +89,12 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.plus#"
-    , "templateE" : "resize(~ARG[1],~LIT[0]) + resize(~ARG[2],~LIT[0])"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minus#"
-    , "templateE" : "resize(~ARG[1],~LIT[0]) - resize(~ARG[2],~LIT[0])"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
@@ -109,78 +109,101 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rem#"
-    , "templateE" : "~ARG[1] rem ~ARG[2]"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
     , "templateD" :
-"divSigned_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-  signal ~SYM[3] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
-  ~SYM[3] <= ~SYM[1] / ~SYM[2];
-  ~RESULT <= ~SYM[3] - to_signed(1,~LIT[0]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
-             ~SYM[3];
-end block;"
+"// divInt
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[2]][2];
+
+// divide (rounds towards zero)
+assign ~SYM[0] = ~ARG[1] / ~ARG[2];
+
+// round toward minus infinity
+assign ~SYM[1] = ~ARG[1];
+assign ~SYM[2] = ~ARG[2];
+assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] - ~LIT[0]'sd1;"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
-    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    , "templateD" :
+"// modSigned
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[2]][2];
+
+// remainder
+assign ~SYM[0] = ~ARG[1] % ~ARG[2];
+
+// modulo
+assign ~SYM[1] = ~ARG[1];
+assign ~SYM[2] = ~ARG[2];
+assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
+                 ~SYM[0] :
+                 (~ARG[1] == ~LIT[0]'sd0 ? ~LIT[0]'sd0 : ~SYM[0] + ~ARG[1]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.toInteger#"
-    , "templateE" : "to_integer(~ARG[0])"
+    , "templateE" : "$signed(~ARG[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.and#"
-    , "templateE" : "~ARG[1] and ~ARG[2]"
+    , "templateE" : "~ARG[1] & ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.or#"
-    , "templateE" : "~ARG[1] or ~ARG[2]"
+    , "templateE" : "~ARG[1] | ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.xor#"
-    , "templateE" : "~ARG[1] xor ~ARG[2]"
+    , "templateE" : "~ARG[1] ^ ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.complement#"
-    , "templateE" : "not ~ARG[1]"
+    , "templateE" : "~ ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.shiftL#"
-    , "templateE" : "shift_left(~ARG[1],~ARG[2])"
+    , "templateE" : "~ARG[1] <<< ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.shiftR#"
-    , "templateE" : "shift_right(~ARG[1],~ARG[2])"
+    , "templateE" : "~ARG[1] >>> ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateL#"
-    , "templateE" : "rotate_left(~ARG[1],~ARG[2])"
+    , "templateD" :
+"// rotateL
+wire [2*~LIT[0]-1:0] ~SYM[0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
+assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateR#"
-    , "templateE" : "rotate_right(~ARG[1],~ARG[2])"
+    , "templateD" :
+"// rotateR
+wire [2*~LIT[0]-1:0] ~SYM[0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
+assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.resize#"
-    , "templateE" : "resize(~ARG[2],~LIT[1])"
+    , "templateE" : "$signed(~ARG[2])"
     }
   }
 ]

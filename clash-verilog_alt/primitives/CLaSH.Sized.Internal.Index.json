@@ -1,11 +1,11 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.eq#"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.neq#"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
     }
   }
 , { "BlackBox" :
@@ -30,7 +30,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.maxBound#"
-    , "templateE" : "to_unsigned(max(0,~LIT[0]-1),~RESULT'length);"
+    , "templateE" : "~LIT[0]-1"
     }
   }
 , { "BlackBox" :
@@ -45,12 +45,12 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.*#"
-    , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.fromInteger#"
-    , "templateE" : "to_unsigned(~ARG[1],integer(ceil(log2(real(max(2,~LIT[0]))))))"
+    , "templateE" : "$unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -60,17 +60,17 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.rem#"
-    , "templateE" : "~ARG[1] rem ~ARG[2]"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.mod#"
-    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.toInteger#"
-    , "templateE" : "to_integer(~ARG[0])"
+    , "templateE" : "$unsigned(~ARG[0])"
     }
   }
 ]

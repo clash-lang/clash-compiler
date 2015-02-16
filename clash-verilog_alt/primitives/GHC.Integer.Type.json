@@ -30,7 +30,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.absInteger"
-    , "templateE" : "~ARG[0] < 32sd0 ? -~ARG[0] : ~ARG[0]"
+    , "templateE" : "~ARG[0] < 32'sd0 ? -~ARG[0] : ~ARG[0]"
     }
   }
 , { "BlackBox" :
@@ -47,7 +47,7 @@ assign ~SYM[0] = ~ARG[0] / ~ARG[1];
 // round toward minus infinity
 assign ~SYM[1] = ~ARG[0];
 assign ~SYM[2] = ~ARG[1];
-assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32sd1;"
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
     }
   }
 , { "BlackBox" :
@@ -66,7 +66,7 @@ assign ~SYM[1] = ~ARG[0];
 assign ~SYM[2] = ~ARG[1];
 assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ?
                  ~SYM[0] :
-                 (~ARG[1] == 32sd0 ? 32sd0 : ~SYM[0] + ~ARG[1]);"
+                 (~ARG[1] == 32'sd0 ? 32'sd0 : ~SYM[0] + ~ARG[1]);"
     }
   }
 , { "BlackBox" :
