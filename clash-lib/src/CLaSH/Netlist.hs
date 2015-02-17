@@ -206,7 +206,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
       DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
                               in case scrutE of
                                   Identifier scrutId _     -> Identifier scrutId modifier
-                                  BlackBoxE bbE bbCt bbP _ -> BlackBoxE bbE bbCt bbP modifier
+                                  BlackBoxE nm bbE bbCt bbP _ -> BlackBoxE nm bbE bbCt bbP modifier
                                   _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
       _ -> scrutE
 

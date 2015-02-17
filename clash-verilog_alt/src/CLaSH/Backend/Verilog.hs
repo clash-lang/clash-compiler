@@ -353,8 +353,8 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
   where
     pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,e) <- pms]
 
-inst_ (BlackBoxD bs bbCtx) = do t <- renderBlackBox bs bbCtx
-                                fmap Just (string t)
+inst_ (BlackBoxD _ bs bbCtx) = do t <- renderBlackBox bs bbCtx
+                                  fmap Just (string t)
 
 inst_ (NetDecl _ _ _) = return Nothing
 
@@ -411,7 +411,7 @@ expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> t
 --   where
 --     start = typeSize ty - 1
 --     end   = typeSize ty - conSize ty
-expr_ b (BlackBoxE bs bbCtx b' _) = do
+expr_ b (BlackBoxE _ bs bbCtx b' _) = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 

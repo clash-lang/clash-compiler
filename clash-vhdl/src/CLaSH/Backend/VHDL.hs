@@ -421,8 +421,8 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
       rec (p,ls) <- fmap unzip $ sequence [ (,fromIntegral (T.length i)) A.<$> fill (maximum ls) (text i) <+> "=>" <+> expr_ False e | (i,e) <- pms]
       nest 2 $ "port map" <$$> tupled (A.pure p)
 
-inst_ (BlackBoxD bs bbCtx) = do t <- renderBlackBox bs bbCtx
-                                fmap Just (string t)
+inst_ (BlackBoxD _ bs bbCtx) = do t <- renderBlackBox bs bbCtx
+                                  fmap Just (string t)
 
 inst_ _ = return Nothing
 
@@ -468,13 +468,13 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
   where
     tName = tyName ty
 
-expr_ b (BlackBoxE bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
+expr_ b (BlackBoxE _ bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
     t <- renderBlackBox bs bbCtx
     parenIf (b || b') $ parens (string t) <> parens (int start <+> "downto" <+> int end)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
-expr_ b (BlackBoxE bs bbCtx b' _) = do
+expr_ b (BlackBoxE _ bs bbCtx b' _) = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 

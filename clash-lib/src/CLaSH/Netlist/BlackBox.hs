@@ -145,15 +145,15 @@ mkPrimitive bbEParen bbEasD nm args ty = do
       case template p of
         (Left tempD) -> do
           let tmpDecl = NetDecl tmpNmT hwTy Nothing
-          bbDecl <- N.BlackBoxD <$> prepareBlackBox tempD bbCtx <*> pure bbCtx
+          bbDecl <- N.BlackBoxD (name p) <$> prepareBlackBox tempD bbCtx <*> pure bbCtx
           return ((Identifier tmpNmT Nothing,hwTy),ctxDcls ++ [tmpDecl,bbDecl])
         (Right tempE) -> do
           bbTempl <- prepareBlackBox tempE bbCtx
           if bbEasD
             then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
-                     tmpAssgn = Assignment tmpNmT (BlackBoxE bbTempl bbCtx bbEParen Nothing)
+                     tmpAssgn = Assignment tmpNmT (BlackBoxE (name p) bbTempl bbCtx bbEParen Nothing)
                  in  return ((Identifier tmpNmT Nothing, hwTy), ctxDcls ++ [tmpDecl,tmpAssgn])
-            else return ((BlackBoxE bbTempl bbCtx bbEParen Nothing,hwTy),ctxDcls)
+            else return ((BlackBoxE (name p) bbTempl bbCtx bbEParen Nothing,hwTy),ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -198,7 +198,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- prepareBlackBox (pack "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))") bbCtx
-                return ((BlackBoxE bb bbCtx False Nothing,BitVector sz),ctxDcls)
+                return ((BlackBoxE pNm bb bbCtx False Nothing,BitVector sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
       | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#" -> case lefts args of
           largs@[C.Literal (IntegerLiteral i),arg] ->
@@ -209,7 +209,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- prepareBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE bb bbCtx False Nothing,Signed sz),ctxDcls)
+                return ((BlackBoxE pNm bb bbCtx False Nothing,Signed sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
       | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#" -> case lefts args of
           largs@[C.Literal (IntegerLiteral i),arg] ->
@@ -220,9 +220,9 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               _ -> do
                 (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
                 bb <- prepareBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE bb bbCtx False Nothing,Unsigned sz),ctxDcls)
+                return ((BlackBoxE pNm bb bbCtx False Nothing,Unsigned sz),ctxDcls)
           _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Unsigned.fromInteger#: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return ((BlackBoxE [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False Nothing,Void),[])
+      | otherwise -> return ((BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False Nothing,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that

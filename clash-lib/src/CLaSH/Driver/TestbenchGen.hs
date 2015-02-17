@@ -54,7 +54,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
   let ioDecl  = [ uncurry NetDecl inp  Nothing
                 , uncurry NetDecl outp Nothing
                 ]
-      inpExpr = Assignment (fst inp) (BlackBoxE [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False Nothing)
+      inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False Nothing)
   (inpInst,inpComps,cmpCnt',hidden') <- maybe (return (inpExpr,[],cmpCnt,hidden))
                                                  (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
                                                  stimuliNmM
@@ -63,7 +63,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
                 , Assignment "done" (Identifier "finished" Nothing)
                 ]
       finAssg = "true after 100 ns"
-      finExpr = Assignment "finished" (BlackBoxE (parseFail . PP.displayT $ PP.renderCompact finAssg) emptyBBContext False Nothing)
+      finExpr = Assignment "finished" (BlackBoxE "" (parseFail . PP.displayT $ PP.renderCompact finAssg) emptyBBContext False Nothing)
   (expInst,expComps,hidden'') <- maybe (return (finExpr,[],hidden'))
                                                  (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
                                                  expectedNmM
@@ -120,7 +120,7 @@ genClock (clkName,Clock rate) = Just clkDecls
                   ]
 
     clkDecls = [ NetDecl clkName (Clock rate) (Just (N.Literal Nothing (BitLit L)))
-               , BlackBoxD (parseFail . PP.displayT $ PP.renderPretty 0.4 80 clkGenDecl) emptyBBContext
+               , BlackBoxD "" (parseFail . PP.displayT $ PP.renderPretty 0.4 80 clkGenDecl) emptyBBContext
                ]
 
 genClock _ = Nothing
@@ -139,7 +139,7 @@ genReset (rstName,Reset clk) = Just rstDecls
                 ]
 
     rstDecls = [ NetDecl rstName (Reset clk) Nothing
-               , BlackBoxD (parseFail . PP.displayT $ PP.renderCompact rstExpr) emptyBBContext
+               , BlackBoxD "" (parseFail . PP.displayT $ PP.renderCompact rstExpr) emptyBBContext
                ]
 
 genReset _ = Nothing
