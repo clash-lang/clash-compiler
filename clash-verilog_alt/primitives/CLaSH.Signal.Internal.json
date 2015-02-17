@@ -6,7 +6,7 @@
                -> CSignal clk a  -- ARG[2]
                -> CSignal clk a"
     , "templateD" :
-"reg ~SIGD[~SYM[0]][2];
+"~SIGD[~SYM[0]][2];
 
 always @ (posedge ~CLK[0] or negedge ~RST[0])
 if (~ ~RST[0]) begin
@@ -15,7 +15,7 @@ end else begin
   ~SYM[0] <= ~ARG[2];
 end
 
-assign ~RESULT = ~SYM[1];"
+assign ~RESULT = ~SYM[0];"
     }
   }
 , { "BlackBox" :
@@ -27,7 +27,7 @@ assign ~RESULT = ~SYM[1];"
             -> CSignal clk a    -- ARG[3]
             -> CSignal clk a"
     , "templateD" :
-"reg ~SIGD[~SYM[0]][3];
+"~SIGD[~SYM[0]][3];
 
 always @ (posedge ~CLK[0] or negedge ~RST[0])
 if (~ ~RST[0]) begin

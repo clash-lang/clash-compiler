@@ -11,15 +11,15 @@
           -> CSignal clk a"
     , "templateD" :
 "// blockRam
-reg ~SIGD[~SYM[0]][3];
-reg ~SIGD[~SYM[1]][7];
+~SIGD[~SYM[0]][3];
+~SIGD[~SYM[1]][7];
 
 initial begin
   ~SYM[0] = ~LIT[3];
 end
 
 always @ (posedge ~CLK[2]) begin
-  if ~ARG[6] begin
+  if (~ARG[6]) begin
     ~SYM[0][~ARG[4]] <= ~ARG[7];
   end
   ~SYM[1] <= ~SYM[0][~ARG[5]];

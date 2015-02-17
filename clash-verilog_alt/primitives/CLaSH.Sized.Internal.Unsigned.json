@@ -149,7 +149,7 @@
     { "name"      : "CLaSH.Sized.Internal.Unsigned.rotateL#"
     , "templateD" :
 "// rotateL
-wire [2*~LIT[0]-1:0] ~SYM[0];
+logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
     }
@@ -158,7 +158,7 @@ assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
     { "name"      : "CLaSH.Sized.Internal.Unsigned.rotateR#"
     , "templateD" :
 "// rotateR
-wire [2*~LIT[0]-1:0] ~SYM[0];
+logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
     }

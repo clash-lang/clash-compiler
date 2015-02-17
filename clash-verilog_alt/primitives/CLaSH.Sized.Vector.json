@@ -12,7 +12,7 @@
     { "name"      : "CLaSH.Sized.Vector.head"
     , "templateD" :
 "// head
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][0];"
@@ -22,7 +22,7 @@ assign ~RESULT = ~SYM[0][0];"
     { "name"      : "CLaSH.Sized.Vector.tail"
     , "templateD" :
 "// tail
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];"
@@ -32,7 +32,7 @@ assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];"
     { "name"      : "CLaSH.Sized.Vector.last"
     , "templateD" :
 "// last
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][$high(~SYM[0])];"
@@ -42,7 +42,7 @@ assign ~RESULT = ~SYM[0][$high(~SYM[0])];"
     { "name"      : "CLaSH.Sized.Vector.init"
     , "templateD" :
 "// init
-wire ~SIGD[~SYM[1]][0];
+~SIGD[~SYM[1]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];"
@@ -59,7 +59,7 @@ assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];"
             -> Vec n a"
     , "templateD" :
 "// select
-wire ~SIGD[~SYM[0]][4];
+~SIGD[~SYM[0]][4];
 assign ~SYM[0] = ~ARG[4];
 
 genvar ~SYM[1];
@@ -79,7 +79,7 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.concat"
     , "templateD" :
 "// concat
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
@@ -94,10 +94,10 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.splitAt"
     , "templateD" :
 "// splitAt
-wire ~SIGD[~SYM[0]][1];
+~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
-assign ~RESULT = `{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0]
+assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0)]
                   ,~SYM[0][($left(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0)) : ($right(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0))]
                   };"
     }
@@ -111,7 +111,7 @@ assign ~RESULT = `{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_se
               -> Vec n (Vec m a)"
     , "templateD" :
 "// unconcat
-wire ~SIGD[~SYM[0]][2];
+~SIGD[~SYM[0]][2];
 ~SYM[0] <= ~ARG[2];
 
 genvar ~SYM[1];
@@ -126,8 +126,8 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.merge"
     , "templateD" :
 "// merge
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][1];
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][1];
 assign ~SYM[0] = ~ARG[0];
 assign ~SYM[1] = ~ARG[1];
 
@@ -144,7 +144,7 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.map"
     , "templateD" :
 "// map
-wire ~SIGD[~SYM[0]][1];
+~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 genvar ~SYM[1];
@@ -155,16 +155,15 @@ generate
       ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[1]]~
     ~INST
   end
-endgenerate
-"
+endgenerate"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.zipWith"
     , "templateD" :
 "// zipWith
-wire ~SIGD[~SYM[0]][1];
-wire ~SIGD[~SYM[1]][2];
+~SIGD[~SYM[0]][1];
+~SIGD[~SYM[1]][2];
 assign ~SYM[0] <= ~ARG[1];
 assign ~SYM[1] <= ~ARG[2];
 
@@ -184,8 +183,8 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.index_integer"
     , "templateD" :
 "// index_integer
-wire ~SIGD[~SYM[0]][1];
-wire ~SIGD[~SYM[1]][2];
+~SIGD[~SYM[0]][1];
+~SIGD[~SYM[1]][2];
 
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
@@ -208,26 +207,25 @@ end
     { "name"      : "CLaSH.Sized.Vector.replace_integer"
     , "templateD" :
 "// replace_integer
-wire ~SIGD[~SYM[0]][2];
+~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-reg ~SIGD[~SYM[1]][1];
+~SIGD[~SYM[1]][1];
 always @(*) begin
   ~SYM[1] <= ~ARG[1];
-  -- pragma translate_off
+  // pragma translate_off
   if ~SYM[0] < $low(~SYM[2]) || ~SYM[0] > $high(~SYM[2]) begin
     $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
     ~SYM[1] <= ~ERROR[1];
   end else begin
-    -- pragma translate_on
+    // pragma translate_on
     ~SYM[1][~SYM[0]] <= ~ARG[3];
-    -- pragma translate_off
+    // pragma translate_off
   end
-  -- pragma translate_on
+  // pragma translate_on
 end
 
-assign ~RESULT = ~SYM[1];
-"
+assign ~RESULT = ~SYM[1];"
     }
   }
 , { "BlackBox" :
@@ -242,14 +240,14 @@ assign ~RESULT = ~SYM[1];
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
-    , "templateE" : "{~LIT[0] {~ARG[1]}}"
+    , "templateE" : "~TYPMO'({~LIT[0] {~ARG[1]}})"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "templateD" :
 "// reverse
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
@@ -273,7 +271,7 @@ endgenerate"
                         -> BitVector (n * m)"
     , "templateD" :
 "// concatBitVector
-wire ~SIGD[~SYM[0]][1];
+~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 genvar ~SYM[1];
@@ -292,7 +290,7 @@ endgenerate"
                           -> Vec n (BitVector m)"
     , "templateD" :
 "// unconcatBitVector
-wire ~SIGD[~SYM[0]][2];
+~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
 genvar ~SYM[1];

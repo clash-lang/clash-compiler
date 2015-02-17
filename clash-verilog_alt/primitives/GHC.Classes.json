@@ -47,9 +47,9 @@
     { "name"      : "GHC.Classes.divInt#"
     , "templateD" :
 "// divInt
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][0];
-wire ~SIGD[~SYM[2]][1];
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
 
 // divide (rounds towards zero)
 assign ~SYM[0] = ~ARG[0] / ~ARG[1];
@@ -64,9 +64,9 @@ assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
     { "name"      : "GHC.Classes.modInt#"
     , "templateD" :
 "// modInt
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][0];
-wire ~SIGD[~SYM[2]][1];
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
 
 // remainder
 assign ~SYM[0] = ~ARG[0] % ~ARG[1];

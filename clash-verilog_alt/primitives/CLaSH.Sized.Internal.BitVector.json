@@ -35,7 +35,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceXor#"
-    , "templateD" : "^ (~ARG[0])"
+    , "templateE" : "^ (~ARG[0])"
     }
   }
 , { "BlackBox" :
@@ -47,8 +47,8 @@
             -> Bit"
     , "templateD" :
 "// index
-wire ~SIGD[~SYM[0]][1];
-wire ~SIGD[~SYM[1]][2];
+~SIGD[~SYM[0]][1];
+~SIGD[~SYM[1]][2];
 
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
@@ -69,24 +69,24 @@ end
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.replaceBit#"
-    , "comment"   :
+    , "templateD" :
 "// replaceBit
-wire ~SIGD[~SYM[0]][2];
+~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-reg ~SIGD[~SYM[1]][1];
+~SIGD[~SYM[1]][1];
 always @(*) begin
   ~SYM[1] <= ~ARG[1];
-  -- pragma translate_off
+  // pragma translate_off
   if ~SYM[0] < $low(~SYM[2]) || ~SYM[0] > $high(~SYM[2]) begin
     $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
     ~SYM[1] <= ~ERROR[1];
   end else begin
-    -- pragma translate_on
-    ~SYM[1][~SYM[0]] <= ~ARG[3];
-    -- pragma translate_off
+    // pragma translate_on
+    ~SYM[1][~SYM[0]] = ~ARG[3];
+    // pragma translate_off
   end
-  -- pragma translate_on
+  // pragma translate_on
 end
 
 assign ~RESULT = ~SYM[1];"
@@ -102,7 +102,7 @@ assign ~RESULT = ~SYM[1];"
                -> BitVector (m + 1 + i)"
     , "templateD" :
 "// setSlice
-reg ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 
 always @(*) begin
   ~SYM[0] <= ~ARG[0];
@@ -121,7 +121,7 @@ assign ~RESULT = ~SYM[0];"
             -> BitVector (m + 1 - n)"
     , "templateD" :
 "// slice
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
     }
@@ -134,7 +134,7 @@ assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
             -> (BitVector m, BitVector n)"
     , "templateD" :
 "// split
-wire ~SIGD[~SYM[0]][1];
+~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 assign ~RESULT = `{ ~SYM[1][$high(~SYM[1]) : ~LIT[0]]
                   , ~SYM[1][(~LIT[0]-1) : 0]
@@ -149,7 +149,7 @@ assign ~RESULT = `{ ~SYM[1][$high(~SYM[1]) : ~LIT[0]]
           -> Bit"
     , "templateD" :
 "// msb
-wire ~SIGD[~SYM[0]][1];
+~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 assign ~RESULT = ~SYM[0][~LIT[0]-1];"
     }
@@ -161,7 +161,7 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1];"
           -> Bit"
     , "templateD" :
 "// lsb
-wire ~SIGD[~SYM[0]][0];
+~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 assign ~RESULT = ~SYM[0][0];"
     }
@@ -302,7 +302,7 @@ assign ~RESULT = ~SYM[0][0];"
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateL#"
     , "templateD" :
 "// rotateL
-wire [2*~LIT[0]-1:0] ~SYM[0];
+logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
     }
@@ -311,7 +311,7 @@ assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateR#"
     , "templateD" :
 "// rotateR
-wire [2*~LIT[0]-1:0] ~SYM[0];
+logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
     }
