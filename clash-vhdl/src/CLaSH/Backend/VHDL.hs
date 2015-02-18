@@ -452,56 +452,50 @@ expr_ _ (DataCon ty@(Vector 1 _) _ [e])           = vhdlTypeMark ty <> "'" <> pa
 expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2])     = vhdlTypeMark ty <> "'" <> case vectorChain e of
                                                      Just es -> tupled (mapM (expr_ False) es)
                                                      Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
-expr_ _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
+expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
     argTys     = snd $ args !! i
     dcSize     = conSize ty + sum (map typeSize argTys)
     dcExpr     = expr_ False (dcToExpr ty i)
-    argExprs   = zipWith toSLV argTys es -- (map (expr_ False) es)
+    argExprs   = zipWith toSLV argTys es
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
                    n -> [exprLit (Just (ty,n)) (NumLit 0)]
     assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
-expr_ _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
+expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
 expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr_ False e) [0..] es
   where
     tName = tyName ty
 
-expr_ b (BlackBoxE pNm _ bbCtx _ _)
+expr_ b (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _ _)
+expr_ b (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _ _)
+expr_ b (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE _ bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
-    t <- renderBlackBox bs bbCtx
-    parenIf (b || b') $ parens (string t) <> parens (int start <+> "downto" <+> int end)
-  where
-    start = typeSize ty - 1
-    end   = typeSize ty - conSize ty
-expr_ b (BlackBoxE _ bs bbCtx b' _) = do
+expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left e))           = "false when" <+> expr_ False e <+> "= 0 else true"
-expr_ _ (DataTag Bool (Right e))          = "1 when" <+> expr_ False e <+> "else 0"
+expr_ _ (DataTag Bool (Right id_))          = "1 when" <+> text id_ <+> "else 0"
 expr_ _ (DataTag hty@(Sum _ _) (Left e))  = "to_unsigned" <> tupled (sequence [expr_ False e,int (typeSize hty)])
-expr_ _ (DataTag (Sum _ _) (Right e))     = "to_integer" <> parens (expr_ False e)
+expr_ _ (DataTag (Sum _ _) (Right id_))     = "to_integer" <> parens (text id_)
 
 expr_ _ (DataTag (Product _ _) (Right _)) = int 0
-expr_ _ (DataTag hty@(SP _ _) (Right e))  = "to_integer" <> parens
+expr_ _ (DataTag hty@(SP _ _) (Right id_))  = "to_integer" <> parens
                                                 ("unsigned" <> parens
-                                                (expr_ False e <> parens
+                                                (text id_ <> parens
                                                 (int start <+> "downto" <+> int end)))
   where
     start = typeSize hty - 1
@@ -518,9 +512,9 @@ otherSize []     _    = 0
 otherSize (a:as) n    = typeSize a + otherSize as (n-1)
 
 vectorChain :: Expr -> Maybe [Expr]
-vectorChain (DataCon (Vector _ _) Nothing _)        = Just []
-vectorChain (DataCon (Vector 1 _) (Just _) [e])     = Just [e]
-vectorChain (DataCon (Vector _ _) (Just _) [e1,e2]) = Just e1 <:> vectorChain e2
+vectorChain (DataCon (Vector 0 _) _ _)        = Just []
+vectorChain (DataCon (Vector 1 _) _ [e])     = Just [e]
+vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc

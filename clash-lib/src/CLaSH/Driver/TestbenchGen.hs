@@ -54,7 +54,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
   let ioDecl  = [ uncurry NetDecl inp  Nothing
                 , uncurry NetDecl outp Nothing
                 ]
-      inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False Nothing)
+      inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
   (inpInst,inpComps,cmpCnt',hidden') <- maybe (return (inpExpr,[],cmpCnt,hidden))
                                                  (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
                                                  stimuliNmM
@@ -63,7 +63,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
                 , Assignment "done" (Identifier "finished" Nothing)
                 ]
       finAssg = "true after 100 ns"
-      finExpr = Assignment "finished" (BlackBoxE "" (parseFail . PP.displayT $ PP.renderCompact finAssg) emptyBBContext False Nothing)
+      finExpr = Assignment "finished" (BlackBoxE "" (parseFail . PP.displayT $ PP.renderCompact finAssg) emptyBBContext False)
   (expInst,expComps,hidden'') <- maybe (return (finExpr,[],hidden'))
                                                  (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
                                                  expectedNmM

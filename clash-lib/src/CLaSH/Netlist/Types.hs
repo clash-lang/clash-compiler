@@ -47,7 +47,6 @@ data NetlistState
   , _cmpCount       :: Int -- ^ Number of create components
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: PrimMap -- ^ Primitive Definitions
-  -- , _hdlMState     :: backend -- ^ State for the 'CLaSH.Netlist.HDL.HDLM' Monad
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
   }
@@ -142,10 +141,10 @@ data Modifier
 -- | Expression used in RHS of a declaration
 data Expr
   = Literal    (Maybe (HWType,Size)) Literal -- ^ Literal expression
-  | DataCon    HWType       (Maybe Modifier)  [Expr] -- ^ DataCon application
+  | DataCon    HWType       Modifier  [Expr] -- ^ DataCon application
   | Identifier Identifier   (Maybe Modifier) -- ^ Signal reference
-  | DataTag    HWType       (Either Expr Expr) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE S.Text BlackBoxTemplate BlackBoxContext Bool (Maybe Modifier) -- ^ Instantiation of a BlackBox expression
+  | DataTag    HWType       (Either Expr Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
+  | BlackBoxE S.Text BlackBoxTemplate BlackBoxContext Bool -- ^ Instantiation of a BlackBox expression
   deriving Show
 
 -- | Literals used in an expression

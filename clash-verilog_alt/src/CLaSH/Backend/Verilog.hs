@@ -234,6 +234,9 @@ verilogType t@(Sum _ _) = case typeSize t of
 verilogType t@(Vector n elTy) = do
   tyCache %= HashSet.insert t
   tyName t
+verilogType t@(Product _ _) = do
+  tyCache %= HashSet.insert t
+  tyName t
 verilogType x = error ($(curLoc) ++ show x ++ "not supported")
 
 
@@ -291,6 +294,7 @@ tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 verilogTypeErrValue :: HWType -> VHDLM Doc
+verilogTypeErrValue Bool                = "1'bx"
 verilogTypeErrValue Integer         = "{32 {1'bx}}"
 verilogTypeErrValue (Unsigned n)    = braces (int n <+> braces "1'bx")
 verilogTypeErrValue (Vector n elTy) = braces (int n <+> braces (verilogTypeErrValue elTy))
@@ -300,7 +304,7 @@ verilogTypeErrValue (BitVector 1)   = "1'bx"
 verilogTypeErrValue (BitVector n)   = braces (int n <+> braces "1'bx")
 verilogTypeErrValue t@(SP _ _)      = braces (int (typeSize t) <+> braces "1'bx")
 verilogTypeErrValue e = error $ $(curLoc) ++ "no error value defined for: " ++ show e
--- vhdlTypeErrValue Bool                = "true"
+
 -- vhdlTypeErrValue Integer             = "integer'high"
 -- vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
 -- vhdlTypeErrValue (Index _)           = "(others => 'X')"
@@ -373,82 +377,67 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argT
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
--- expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> tyName ty <> "_sel" <> int fI
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> verilogTypeMark ty <> "_sel" <> int fI
 expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int start <> colon <> int end)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
--- expr_ _ (Identifier id_ (Just _)) = text id_
--- expr_ _ (DataCon ty@(Vector 1 _) _ [e])           = vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
--- expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2])     = vhdlTypeMark ty <> "'" <> case vectorChain e of
---                                                      Just es -> tupled (mapM (expr_ False) es)
---                                                      Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
-expr_ _ (DataCon ty@(SP _ args) (Just (DC (_,i))) es) = assignExpr
+expr_ _ (DataCon ty@(Vector 1 _) _ [e]) = verilogTypeMark ty <> "'" <> braces (expr_ False e)
+expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = verilogTypeMark ty <> "'" <> case vectorChain e of
+                                                     Just es -> listBraces (mapM (expr_ False) es)
+                                                     Nothing -> braces (expr_ False e1 <+> comma <+> expr_ False e2)
+
+expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
     argTys     = snd $ args !! i
     dcSize     = conSize ty + sum (map typeSize argTys)
     dcExpr     = expr_ False (dcToExpr ty i)
-    argExprs   = zipWith toSLV argTys es -- (map (expr_ False) es)
+    argExprs   = zipWith toSLV argTys es
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
                    n -> [exprLit (Just (ty,n)) (NumLit 0)]
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
-expr_ _ (DataCon ty@(Sum _ _) (Just (DC (_,i))) []) = int (typeSize ty) <> "'d" <> int i
-expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> tName <> "_sel" <> int i <> colon <+> expr_ False e) [0..] es)
-  where
-    tName = tyName ty
+expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
+expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> verilogTypeMark ty <> "_sel" <> int i <> colon <+> expr_ False e) [0..] es)
 
--- expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e -> tName <> "_sel" <> int i <+> rarrow <+> expr_ False e) [0..] es
---   where
---     tName = tyName ty
-
-
-
-expr_ b (BlackBoxE pNm _ bbCtx _ _)
+expr_ b (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _ _)
+expr_ b (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _ _)
+expr_ b (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
--- expr_ b (BlackBoxE bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
---     t <- renderBlackBox bs bbCtx
---     parenIf (b || b') $ parens (string t) <> parens (int start <+> "downto" <+> int end)
---   where
---     start = typeSize ty - 1
---     end   = typeSize ty - conSize ty
-
-expr_ b (BlackBoxE _ bs bbCtx b' _) = do
+expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
-expr_ _ (DataTag Bool (Left e))           = parens (expr False e <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
--- expr_ _ (DataTag Bool (Right e))          = "1 when" <+> expr_ False e <+> "else 0"
--- expr_ _ (DataTag hty@(Sum _ _) (Left e))  = "to_unsigned" <> tupled (sequence [expr_ False e,int (typeSize hty)])
--- expr_ _ (DataTag (Sum _ _) (Right e))     = "to_integer" <> parens (expr_ False e)
+expr_ _ (DataTag Bool (Left e))           = parens (expr_ False e <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
+expr_ _ (DataTag Bool (Right id_))        = parens (text id_ <+> "== 1'b0") <+> "? 32'sd0 : 31'sd1"
 
--- expr_ _ (DataTag (Product _ _) (Right _)) = int 0
--- expr_ _ (DataTag hty@(SP _ _) (Right e))  = "to_integer" <> parens
---                                                 ("unsigned" <> parens
---                                                 (expr_ False e <> parens
---                                                 (int start <+> "downto" <+> int end)))
---   where
---     start = typeSize hty - 1
---     end   = typeSize hty - conSize hty
+expr_ _ (DataTag hty@(Sum _ _) (Left e))  = "$unsigned" <> parens (expr_ False e)
+expr_ _ (DataTag (Sum _ _) (Right id_))     = "$unsigned" <> parens (text id_)
 
--- expr_ _ (DataTag (Vector 0 _) (Right _)) = int 0
--- expr_ _ (DataTag (Vector _ _) (Right _)) = int 1
+expr_ _ (DataTag (Product _ _) (Right _)) = "32'sd0"
+
+expr_ _ (DataTag hty@(SP _ _) (Right id_))  = "$unsigned" <> parens
+                                                (text id_ <> brackets
+                                                (int start <> colon <> int end))
+  where
+    start = typeSize hty - 1
+    end   = typeSize hty - conSize hty
+
+expr_ _ (DataTag (Vector 0 _) (Right _)) = "32'sd0"
+expr_ _ (DataTag (Vector _ _) (Right _)) = "32'sd1"
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
@@ -458,9 +447,9 @@ otherSize []     _    = 0
 otherSize (a:as) n    = typeSize a + otherSize as (n-1)
 
 vectorChain :: Expr -> Maybe [Expr]
-vectorChain (DataCon (Vector _ _) Nothing _)        = Just []
-vectorChain (DataCon (Vector 1 _) (Just _) [e])     = Just [e]
-vectorChain (DataCon (Vector _ _) (Just _) [e1,e2]) = Just e1 <:> vectorChain e2
+vectorChain (DataCon (Vector 0 _) _ _)        = Just []
+vectorChain (DataCon (Vector 1 _) _ [e])     = Just [e]
+vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc

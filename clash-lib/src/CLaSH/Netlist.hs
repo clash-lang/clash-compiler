@@ -186,7 +186,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr False scrutTy scrut
+  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr True scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
@@ -205,8 +205,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
     mkScrutExpr scrutHTy pat scrutE = case pat of
       DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
                               in case scrutE of
-                                  Identifier scrutId _     -> Identifier scrutId modifier
-                                  BlackBoxE nm bbE bbCt bbP _ -> BlackBoxE nm bbE bbCt bbP modifier
+                                  Identifier scrutId _ -> Identifier scrutId modifier
                                   _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
       _ -> scrutE
 
@@ -292,23 +291,23 @@ mkDcApplication dstHType dc args = do
         let dcI      = dcTag dc - 1
             dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
         case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,dcI)) argExprs)
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,dcI)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Product _ dcArgs ->
         case compare (length dcArgs) (length argExprs) of
-          EQ -> return (HW.DataCon dstHType (Just $ DC (dstHType,0)) argExprs)
+          EQ -> return (HW.DataCon dstHType (DC (dstHType,0)) argExprs)
           LT -> error $ $(curLoc) ++ "Over-applied constructor"
           GT -> error $ $(curLoc) ++ "Under-applied constructor"
       Sum _ _ ->
-        return (HW.DataCon dstHType (Just $ DC (dstHType,dcTag dc - 1)) [])
+        return (HW.DataCon dstHType (DC (dstHType,dcTag dc - 1)) [])
       Bool ->
         let dc' = case dcTag dc of
                    1  -> HW.Literal Nothing (BoolLit False)
                    2  -> HW.Literal Nothing (BoolLit True)
                    tg -> error $ $(curLoc) ++ "unknown bool literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in  return dc'
-      Vector 0 _ -> return (HW.DataCon dstHType Nothing [])
+      Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
       -- Note [Vector Wrapper]
       -- The Vector type has two versions of the cons constructor:
       --   * The 'normal' one, which takes a coercion as its first argument,
@@ -318,10 +317,10 @@ mkDcApplication dstHType dc args = do
       -- We need to account for both occurrences, that's why we have the two
       -- case statements below:
       Vector 1 _ -> case argExprs of
-                      [_,e,_] -> return (HW.DataCon dstHType (Just VecAppend) [e])
-                      _       -> return (HW.DataCon dstHType (Just VecAppend) [head argExprs])
+                      [_,e,_] -> return (HW.DataCon dstHType VecAppend [e])
+                      _       -> return (HW.DataCon dstHType VecAppend [head argExprs])
       Vector _ _ -> case argExprs of
-                      [_,e1,e2] -> return (HW.DataCon dstHType (Just VecAppend) [e1,e2])
-                      _         -> return (HW.DataCon dstHType (Just VecAppend) argExprs)
+                      [_,e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
+                      _         -> return (HW.DataCon dstHType VecAppend argExprs)
 
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

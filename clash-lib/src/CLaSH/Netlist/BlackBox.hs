@@ -136,9 +136,9 @@ mkPrimitive bbEParen bbEasD nm args ty = do
           bbTempl <- prepareBlackBox tempE bbCtx
           if bbEasD
             then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
-                     tmpAssgn = Assignment tmpNmT (BlackBoxE (name p) bbTempl bbCtx bbEParen Nothing)
+                     tmpAssgn = Assignment tmpNmT (BlackBoxE (name p) bbTempl bbCtx bbEParen)
                  in  return ((Identifier tmpNmT Nothing, hwTy), ctxDcls ++ [tmpDecl,tmpAssgn])
-            else return ((BlackBoxE (name p) bbTempl bbCtx bbEParen Nothing,hwTy),ctxDcls)
+            else return ((BlackBoxE (name p) bbTempl bbCtx bbEParen,hwTy),ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -164,17 +164,20 @@ mkPrimitive bbEParen bbEasD nm args ty = do
           [Right _,Left (Data dc)] -> return ((N.Literal Nothing (NumLit $ toInteger $ dcTag dc - 1),Integer),[])
           [Right _,Left scrut] -> do
             i <- varCount <<%= (+1)
+            j <- varCount <<%= (+1)
             tcm      <- Lens.use tcCache
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
             (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
-            let tmpNm     = "tmp_dtt_" ++ show i
-                tmpS      = pack tmpNm
-                netDecl   = NetDecl tmpS Integer Nothing
-                netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
-            return ((Identifier tmpS Nothing,Integer),netDecl:netAssign:scrutDecls)
+            let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
+                tmpS         = pack ("tmp_dtt_" ++ show j)
+                netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
+                netDeclS     = NetDecl tmpS Integer  Nothing
+                netAssignRhs = Assignment tmpRhs scrutExpr
+                netAssignS   = Assignment tmpS   (DataTag scrutHTy (Right tmpRhs))
+            return ((Identifier tmpS Nothing,Integer),[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return ((BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False Nothing,Void),[])
+      | otherwise -> return ((BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
 -- | Create an template instantiation text for an argument term, given that
@@ -217,12 +220,12 @@ mkFunInput resId e = do
                   let dcI      = dcTag dc - 1
                       dcArgs   = snd $ indexNote ($(curLoc) ++ "No DC with tag: " ++ show dcI) dcArgPairs dcI
                       dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
-                      dcApp    = DataCon resHTy (Just $ DC (resHTy,dcI)) dcInps
+                      dcApp    = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss    = Assignment (pack "~RESULT") dcApp
                   return (Right dcAss)
                 Just resHTy@(Product _ dcArgs) -> do
                   let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
-                      dcApp  = DataCon resHTy (Just $ DC (resHTy,0)) dcInps
+                      dcApp  = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
                   return (Right dcAss)
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
