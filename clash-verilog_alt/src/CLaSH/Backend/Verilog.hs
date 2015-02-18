@@ -488,7 +488,7 @@ toSLV Integer e = expr_ False e
 -- toSLV Bool         e = "toSLV" <> parens (expr_ False e)
 -- toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr_ False e,int 32]))
 -- toSLV (BitVector _) e = expr_ False e
--- toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
+toSLV (Signed _)   e = expr_ False e
 -- toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
 -- toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr_ False e)
 -- toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
@@ -500,12 +500,12 @@ toSLV Integer e = expr_ False e
 --     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 -- toSLV (Product _ tys) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV tys es)
 -- toSLV (SP _ _) e = expr_ False e
--- toSLV (Vector n elTy) (Identifier id_ Nothing) = do
---     selIds' <- sequence (reverse selIds)
---     parens (encloseSep lparen rparen " & " (mapM (toSLV elTy) selIds'))
---   where
---     selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> parens (int i) | i <- [0 .. (n-1)]]
---     selIds   = map (fmap (`Identifier` Nothing)) selNames
+toSLV (Vector n elTy) (Identifier id_ Nothing) = do
+    selIds' <- sequence (reverse selIds)
+    listBraces (mapM (toSLV elTy) selIds')
+  where
+    selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> brackets (int i) | i <- [0 .. (n-1)]]
+    selIds   = map (fmap (`Identifier` Nothing)) selNames
 -- toSLV (Vector n elTy) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
