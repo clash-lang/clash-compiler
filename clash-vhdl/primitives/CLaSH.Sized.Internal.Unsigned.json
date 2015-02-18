@@ -75,9 +75,9 @@
     , "templateE" : "unsigned(std_logic_vector(-(signed(std_logic_vector(~ARG[1])))))"
     }
   }
-, { "Primitive" :
-    { "name"     : "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-    , "primType" : "Function"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+    , "templateE" : "to_unsigned(~ARG[1],~LIT[0])"
     }
   }
 , { "BlackBox" :

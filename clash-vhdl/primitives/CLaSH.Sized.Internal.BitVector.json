@@ -344,9 +344,9 @@ end block;"
     , "templateE" : "std_logic_vector(-(signed(~ARG[1])))"
     }
   }
-, { "Primitive" :
-    { "name"     : "CLaSH.Sized.Internal.BitVector.fromInteger#"
-    , "primType" : "Function"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.fromInteger#"
+    , "templateE" : "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
     }
   }
 , { "BlackBox" :

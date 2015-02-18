@@ -405,12 +405,30 @@ expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> t
 --   where
 --     tName = tyName ty
 
+
+
+expr_ b (BlackBoxE pNm _ bbCtx _ _)
+  | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
+
+expr_ b (BlackBoxE pNm _ bbCtx _ _)
+  | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
+
+expr_ b (BlackBoxE pNm _ bbCtx _ _)
+  | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+
 -- expr_ b (BlackBoxE bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
 --     t <- renderBlackBox bs bbCtx
 --     parenIf (b || b') $ parens (string t) <> parens (int start <+> "downto" <+> int end)
 --   where
 --     start = typeSize ty - 1
 --     end   = typeSize ty - conSize ty
+
 expr_ b (BlackBoxE _ bs bbCtx b' _) = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
@@ -446,7 +464,7 @@ vectorChain (DataCon (Vector _ _) (Just _) [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
-exprLit Nothing         (NumLit i) = "32'sd" <> integer i
+exprLit Nothing         (NumLit i) = integer i
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Unsigned _  -> int sz <> "'d" <> integer i
                                        Signed _    -> int sz <> "'sd" <> integer i

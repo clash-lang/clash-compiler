@@ -75,9 +75,9 @@
     , "templateE" : "- ~ARG[1]"
     }
   }
-, { "Primitive" :
-    { "name"     : "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-    , "primType" : "Function"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+    , "templateE" : "$unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :

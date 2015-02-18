@@ -82,9 +82,9 @@
     , "templateE" : "abs ~ARG[1]"
     }
   }
-, { "Primitive" :
-    { "name"     : "CLaSH.Sized.Internal.Signed.fromInteger#"
-    , "primType" : "Function"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.fromInteger#"
+    , "templateE" : "to_signed(~ARG[1],~LIT[0])"
     }
   }
 , { "BlackBox" :

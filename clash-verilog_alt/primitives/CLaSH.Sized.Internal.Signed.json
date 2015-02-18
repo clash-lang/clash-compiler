@@ -82,9 +82,9 @@
     , "templateE" : "(~ARG[1] < ~LIT[0]'sd0) ? -~ARG[1] : ~ARG[1]"
     }
   }
-, { "Primitive" :
-    { "name"     : "CLaSH.Sized.Internal.Signed.fromInteger#"
-    , "primType" : "Function"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.fromInteger#"
+    , "templateE" : "$signed(~ARG[1])"
     }
   }
 , { "BlackBox" :

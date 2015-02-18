@@ -468,6 +468,21 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
   where
     tName = tyName ty
 
+expr_ b (BlackBoxE pNm _ bbCtx _ _)
+  | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
+
+expr_ b (BlackBoxE pNm _ bbCtx _ _)
+  | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
+
+expr_ b (BlackBoxE pNm _ bbCtx _ _)
+  | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
+
 expr_ b (BlackBoxE _ bs bbCtx b' (Just (DC (ty@(SP _ _),_)))) = do
     t <- renderBlackBox bs bbCtx
     parenIf (b || b') $ parens (string t) <> parens (int start <+> "downto" <+> int end)

@@ -74,21 +74,6 @@ mkBlackBoxContext resId args = do
     unVar (Var _ v, False) = Left v
     unVar t                = Right t
 
--- -- | Instantiate a BlackBox template according to the given context
--- mkBlackBox :: Backend backend
---            => Text -- ^ Template to instantiate
---            -> BlackBoxContext -- ^ Context to instantiate template with
---            -> NetlistMonad backend Text
--- mkBlackBox templ bbCtx =
---   let (l,err) = runParse templ
---   in if null err && verifyBlackBoxContext l bbCtx
---     then do
---       l'        <- instantiateSym l
---       (bb,clks) <- liftState hdlMState $ state $ renderBlackBox l' bbCtx
---       tell clks
---       return $! bb
---     else error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++ "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++ show err
-
 prepareBlackBox :: Text
                 -> BlackBoxContext
                 -> NetlistMonad BlackBoxTemplate
@@ -188,40 +173,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
                 netDecl   = NetDecl tmpS Integer Nothing
                 netAssign = Assignment tmpS (DataTag scrutHTy (Right scrutExpr))
             return ((Identifier tmpS Nothing,Integer),netDecl:netAssign:scrutDecls)
-          _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
-      | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#" -> case lefts args of
-          largs@[C.Literal (IntegerLiteral i),arg] ->
-            let sz = fromInteger i
-            in case arg of
-              C.Literal (IntegerLiteral j) ->
-                return ((N.Literal (Just (BitVector sz,sz)) (NumLit $ fromInteger j), BitVector sz),[])
-              _ -> do
-                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
-                bb <- prepareBlackBox (pack "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))") bbCtx
-                return ((BlackBoxE pNm bb bbCtx False Nothing,BitVector sz),ctxDcls)
-          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
-      | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#" -> case lefts args of
-          largs@[C.Literal (IntegerLiteral i),arg] ->
-            let sz = fromInteger i
-            in case arg of
-              C.Literal (IntegerLiteral j)
-                | i > 32 -> return ((N.Literal (Just (Signed sz,sz)) (NumLit $ fromInteger j), Signed sz),[])
-              _ -> do
-                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
-                bb <- prepareBlackBox (pack "to_signed(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE pNm bb bbCtx False Nothing,Signed sz),ctxDcls)
-          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Signed.fromInteger#: " ++ show (map (either showDoc showDoc) args)
-      | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#" -> case lefts args of
-          largs@[C.Literal (IntegerLiteral i),arg] ->
-            let sz = fromInteger i
-            in case arg of
-              C.Literal (IntegerLiteral j)
-                | i > 31 -> return ((N.Literal (Just (Unsigned sz,sz)) (NumLit $ fromInteger j), Unsigned sz),[])
-              _ -> do
-                (bbCtx,ctxDcls) <- mkBlackBoxContext (Id (string2Name "_ERROR_") (embed ty)) largs
-                bb <- prepareBlackBox (pack "to_unsigned(~ARG[1],~LIT[0])") bbCtx
-                return ((BlackBoxE pNm bb bbCtx False Nothing,Unsigned sz),ctxDcls)
-          _ -> error $ $(curLoc) ++ "CLaSH.Sized.Internal.Unsigned.fromInteger#: " ++ show (map (either showDoc showDoc) args)
+          _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
       | otherwise -> return ((BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False Nothing,Void),[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
 
@@ -252,11 +204,7 @@ mkFunInput resId e = do
             Prim nm _ -> do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               let templ = case bbM of
-                            Just p@(P.BlackBox {}) -> Left (template p)
-                            Just (P.Primitive pNm _)
-                              | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#" -> Left $ Left "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
-                              | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"    -> Left $ Left "to_signed(~ARG[1],~LIT[0])"
-                              | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"  -> Left $ Left "to_unsigned(~ARG[1],~LIT[0])"
+                            Just p@(P.BlackBox {}) -> Left (name p, template p)
                             _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
               return templ
             Data dc -> do
@@ -293,14 +241,16 @@ mkFunInput resId e = do
                 Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left templ' -> do let (l,err) = either runParse (first (([O,C " <= "] ++) . (++ [C ";"])) . runParse) templ'
-                      if null err
-                         then do
-                           l' <- lift $ instantiateSym l
-                           l'' <- setClocks bbCtx l'
-                           return ((Left l'',bbCtx),dcls)
-                         else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
-    Right templ' -> return ((Right templ',bbCtx),dcls)
+    Left (nm, Left templ') -> let (l,err) = runParse templ'
+                              in  if null err
+                                     then do
+                                       l'  <- lift $ instantiateSym l
+                                       l'' <- setClocks bbCtx l'
+                                       return ((Left l'',bbCtx),dcls)
+                                     else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
+    Left (nm, Right templ') -> let ass = Assignment (pack "~RESULT") (Identifier templ' Nothing)
+                               in  return ((Right ass, bbCtx),dcls)
+    Right decl -> return ((Right decl,bbCtx),dcls)
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
 instantiateSym :: BlackBoxTemplate

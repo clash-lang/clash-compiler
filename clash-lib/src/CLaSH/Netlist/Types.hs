@@ -185,5 +185,4 @@ emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) []
 type SyncIdentifier = Either Identifier (Identifier,(Identifier,Int))
 type SyncExpr       = Either Expr       (Expr,(Identifier,Int))
 
-
 makeLenses ''NetlistState
