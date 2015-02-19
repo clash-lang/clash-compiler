@@ -72,7 +72,7 @@ Executable clash
 
                       clash-lib            >= 0.4.1,
                       clash-vhdl           >= 0.4.1,
-                      clash-verilog        >= 0.4.1,
+                      clash-systemverilog  >= 0.4.1,
                       clash-prelude        >= 0.6
 
   if os(windows)

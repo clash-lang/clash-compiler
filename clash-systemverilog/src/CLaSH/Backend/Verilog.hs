@@ -30,7 +30,7 @@ import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
 
 #ifdef CABAL
-import qualified Paths_clash_vhdl
+import qualified Paths_clash_systemverilog
 #else
 import qualified System.FilePath
 #endif
@@ -48,7 +48,7 @@ makeLenses ''VerilogState
 instance Backend VerilogState where
   initBackend     = VerilogState HashSet.empty 0 HashMap.empty
 #ifdef CABAL
-  primDir         = const (Paths_clash_verilog.getDataFileName "primitives")
+  primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
   primDir _       = return ("clash-verilog_alt" System.FilePath.</> "primitives")
 #endif
