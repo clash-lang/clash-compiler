@@ -5,7 +5,7 @@ import CLaSH.Prelude
 type Inp   = (Signed 4,Outp)
 type Outp  = (Maybe (Signed 8,Bool),Bit)
 
-topEntity :: SWrapped Inp -> SWrapped Outp
+topEntity :: Unbundled' Inp -> Unbundled' Outp
 topEntity = transfer <^> initS
 
 transfer s i = (i,o)

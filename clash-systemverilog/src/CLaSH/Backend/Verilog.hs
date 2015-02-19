@@ -50,7 +50,7 @@ instance Backend VerilogState where
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
-  primDir _       = return ("clash-verilog_alt" System.FilePath.</> "primitives")
+  primDir _       = return ("clash-systemverilog" System.FilePath.</> "primitives")
 #endif
   extractTypes    = _tyCache
   name            = const "systemverilog"
@@ -223,10 +223,14 @@ vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0
 
 verilogType :: HWType -> VerilogM Doc
 verilogType Bool       = "logic"
+verilogType (Clock _)  = "logic"
+verilogType (Reset _)  = "logic"
 verilogType Integer    = "logic signed [31:0]"
 verilogType (BitVector 1)   = "logic"
 verilogType (BitVector n)   = "logic" <+> brackets (int (n-1) <> colon <> int 0)
 verilogType (Signed n)      = "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
+verilogType (Unsigned n)    = "logic" <+> brackets (int (n-1) <> colon <> int 0)
+verilogType (Index n)       = "logic" <+> brackets (int (clog2 (max 2 n) - 1) <> colon <> int 0)
 verilogType t@(SP _ _) = brackets (int (typeSize t - 1) <> colon <> int 0)
 verilogType t@(Sum _ _) = case typeSize t of
                             0 -> empty
@@ -297,6 +301,7 @@ verilogTypeErrValue :: HWType -> VHDLM Doc
 verilogTypeErrValue Bool                = "1'bx"
 verilogTypeErrValue Integer         = "{32 {1'bx}}"
 verilogTypeErrValue (Unsigned n)    = braces (int n <+> braces "1'bx")
+verilogTypeErrValue (Signed n)      = braces (int n <+> braces "1'bx")
 verilogTypeErrValue (Vector n elTy) = braces (int n <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue t@(Sum _ _)     = braces (int (typeSize t) <+> braces "1'bx")
 verilogTypeErrValue (Product _ elTys)   = "'" <> listBraces (mapM verilogTypeErrValue elTys)
@@ -485,7 +490,7 @@ bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VerilogM Doc
 toSLV Integer e = expr_ False e
--- toSLV Bool         e = "toSLV" <> parens (expr_ False e)
+toSLV Bool         e = expr_ False e
 -- toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr_ False e,int 32]))
 -- toSLV (BitVector _) e = expr_ False e
 toSLV (Signed _)   e = expr_ False e
@@ -498,7 +503,7 @@ toSLV (Signed _)   e = expr_ False e
 --     tName    = tyName t
 --     selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
 --     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
--- toSLV (Product _ tys) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV tys es)
+toSLV (Product _ tys) (DataCon _ _ es) = listBraces (zipWithM toSLV tys es)
 -- toSLV (SP _ _) e = expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence (reverse selIds)
