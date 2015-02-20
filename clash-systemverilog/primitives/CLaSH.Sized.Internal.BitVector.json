@@ -228,9 +228,9 @@ assign ~RESULT = ~SYM[0][0];"
     , "templateE" : "-~ARG[1]"
     }
   }
-, { "Primitive" :
-    { "name"     : "CLaSH.Sized.Internal.BitVector.fromInteger#"
-    , "primType" : "Function"
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.fromInteger#"
+    , "templateE" : "$unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :
