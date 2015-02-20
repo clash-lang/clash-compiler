@@ -61,6 +61,7 @@ instance Backend VHDLState where
   hdlType         = vhdlType
   hdlTypeErrValue = vhdlTypeErrValue
   hdlTypeMark     = vhdlTypeMark
+  hdlSig t ty     = sigDecl (text t) ty
   inst            = inst_
   expr            = expr_
 
@@ -329,6 +330,9 @@ vhdlType' t@(Sum _ _)     = case typeSize t of
 vhdlType' t@(Product _ _) = tyName t
 vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
 
+sigDecl :: VHDLM Doc -> HWType -> VHDLM Doc
+sigDecl d t = d <+> colon <+> vhdlType t
+
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
 vhdlTypeMark hwty = do
@@ -468,17 +472,17 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
   where
     tName = tyName ty
 
-expr_ b (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
@@ -504,7 +508,7 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_))  = "to_integer" <> parens
 expr_ _ (DataTag (Vector 0 _) (Right _)) = int 0
 expr_ _ (DataTag (Vector _ _) (Right _)) = int 1
 
-expr_ _ _ = empty
+expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
 otherSize :: [HWType] -> Int -> Int
 otherSize _ n | n < 0 = 0
