@@ -1,6 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.TypeLits.natVal"
-    , "templateE" : "~LIT[0]"
-    }
-  }
-]
