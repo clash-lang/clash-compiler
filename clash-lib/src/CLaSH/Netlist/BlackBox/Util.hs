@@ -78,7 +78,7 @@ setSym i l
                                                           return (Sym k)
                                             Just k  -> return (Sym k)
                       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
-                      SigD e m      -> SigD <$> (head <$> setSym' [e]) <*> pure m
+                      SigD e' m     -> SigD <$> (head <$> setSym' [e']) <*> pure m
                       _             -> pure e
               )
 
@@ -194,5 +194,6 @@ renderTag b (Err Nothing)   = fmap (displayT . renderOneLine) . hdlTypeErrValue 
 renderTag b (Err (Just n))  = fmap (displayT . renderOneLine) . hdlTypeErrValue . snd $ bbInputs b !! n
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"
+renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
 renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"

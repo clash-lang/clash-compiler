@@ -244,15 +244,15 @@ mkFunInput resId e = do
                 Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (nm, Left templ') -> let (l,err) = runParse templ'
-                              in  if null err
-                                     then do
-                                       l'  <- lift $ instantiateSym l
-                                       l'' <- setClocks bbCtx l'
-                                       return ((Left l'',bbCtx),dcls)
-                                     else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
-    Left (nm, Right templ') -> let ass = Assignment (pack "~RESULT") (Identifier templ' Nothing)
-                               in  return ((Right ass, bbCtx),dcls)
+    Left (_, Left templ') -> let (l,err) = runParse templ'
+                             in  if null err
+                                    then do
+                                      l'  <- lift $ instantiateSym l
+                                      l'' <- setClocks bbCtx l'
+                                      return ((Left l'',bbCtx),dcls)
+                                    else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
+    Left (_, Right templ') -> let ass = Assignment (pack "~RESULT") (Identifier templ' Nothing)
+                              in  return ((Right ass, bbCtx),dcls)
     Right decl -> return ((Right decl,bbCtx),dcls)
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
