@@ -1,2 +1,2 @@
 #!/bin/sh
-cabal exec ghci -- -iclash-lib/src -iclash-vhdl/src -iclash-systemverilog/src -iclash-ghc/src-ghc -package ghc CLaSH.hs
+cabal exec ghci -- -iclash-lib/src -iclash-vhdl/src -iclash-systemverilog/src -iclash-ghc/src-ghc -package ghc -Wall -Werror CLaSH.hs
