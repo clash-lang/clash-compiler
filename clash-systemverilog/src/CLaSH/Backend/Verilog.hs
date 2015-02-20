@@ -10,8 +10,8 @@ module CLaSH.Backend.Verilog (VerilogState) where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (forM,join,liftM,when,zipWithM)
-import           Control.Monad.State                  (State,get)
+import           Control.Monad                        (join,liftM,zipWithM)
+import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -20,14 +20,13 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
-import qualified Data.Text.Lazy                       as T
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Util          (renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
-import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
+import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
 #ifdef CABAL
 import qualified Paths_clash_systemverilog
@@ -61,7 +60,7 @@ instance Backend VerilogState where
   hdlType         = verilogType
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
-  hdlSig t ty     = sigType (text t) ty
+  hdlSig t ty     = sigDecl (text t) ty
   inst            = inst_
   expr            = expr_
 
@@ -85,20 +84,27 @@ mkTyPackage_ hwtys =
       indent 2 (packageDec) <$>
     "endpackage : types"
   where
-    usedTys     = nubBy eqHWTy $ concatMap mkUsedTys hwtys
-    needsDec    = nubBy eqHWTy $ (hwtys ++ filter needsTyDec usedTys)
+    usedTys     = nubBy eqReprTy $ concatMap mkUsedTys hwtys
+    needsDec    = nubBy eqReprTy $ (hwtys ++ filter needsTyDec usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
 
-    eqHWTy :: HWType -> HWType -> Bool
-    eqHWTy (Vector _ elTy1) (Vector _ elTy2) = case (elTy1,elTy2) of
-      (Sum _ _,Sum _ _)    -> typeSize elTy1 == typeSize elTy2
-      (Unsigned n,Sum _ _) -> n == typeSize elTy2
-      (Sum _ _,Unsigned n) -> typeSize elTy1 == n
-      (Index u,Unsigned n) -> clog2 (max 2 u) == n
-      (Unsigned n,Index u) -> clog2 (max 2 u) == n
-      _ -> elTy1 == elTy2
-    eqHWTy ty1 ty2 = ty1 == ty2
+    eqReprTy :: HWType -> HWType -> Bool
+    eqReprTy (Vector n ty1) (Vector m ty2)
+      | m == n    = eqReprTy ty1 ty2
+      | otherwise = False
+    eqReprTy ty1 ty2
+      | isUnsigned ty1 && isUnsigned ty2 = typeSize ty1 == typeSize ty2
+      | otherwise                        = ty1 == ty2
+
+    isUnsigned :: HWType -> Bool
+    isUnsigned Bool          = True
+    isUnsigned (Unsigned _)  = True
+    isUnsigned (BitVector _) = True
+    isUnsigned (Index _)     = True
+    isUnsigned (Sum _ _)     = True
+    isUnsigned (SP _ _)      = True
+    isUnsigned _             = False
 
 mkUsedTys :: HWType
         -> [HWType]
@@ -135,7 +141,7 @@ tyDec (Vector n elTy) = "typedef" <+> verilogType elTy <+>  "array_of_" <> int n
 tyDec ty@(Product _ tys) = prodDec
   where
     prodDec = "typedef struct {" <$>
-                indent 2 (vcat $ zipWithM (\x y -> sigType x y <> semi) selNames tys) <$>
+                indent 2 (vcat $ zipWithM (\x y -> sigDecl x y <> semi) selNames tys) <$>
               "}" <+> tName <> semi
 
     tName    = tyName ty
@@ -159,114 +165,25 @@ module_ c =
 
     inputPorts = case (inputs c ++ hiddenPorts c) of
                    [] -> empty
-                   p  -> vcat (punctuate semi (sequence [ "input" <+> sigType (text i) ty | (i,ty) <- p ])) <> semi
+                   p  -> vcat (punctuate semi (sequence [ "input" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
-    outputPort = "output" <+> sigType (text (fst $ output c)) (snd $ output c) <> semi
-
-
-entity :: Component -> VHDLM Doc
-entity c = do
-    rec (p,ls) <- fmap unzip (ports (maximum ls))
-    "entity" <+> text (componentName c) <+> "is" <$>
-      (case p of
-         [] -> empty
-         _  -> indent 2 ("port" <>
-                         parens (align $ vcat $ punctuate semi (A.pure p)) <>
-                         semi)
-      ) <$>
-      "end" <> semi
-  where
-    ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
-              | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
-              | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c))
-              ]
-
-architecture :: Component -> VHDLM Doc
-architecture c =
-  nest 2
-    ("architecture structural of" <+> text (componentName c) <+> "is" <$$>
-     decls (declarations c)) <$$>
-  nest 2
-    ("begin" <$$>
-     insts (declarations c)) <$$>
-    "end" <> semi
-
--- | Convert a Netlist HWType to a VHDL type
-vhdlType :: HWType -> VHDLM Doc
-vhdlType hwty = do
-  when (needsTyDec hwty) (undefined %= HashSet.insert hwty)
-  vhdlType' hwty
-
-vhdlType' :: HWType -> VHDLM Doc
-vhdlType' Bool            = "boolean"
-vhdlType' (Clock _)       = "std_logic"
-vhdlType' (Reset _)       = "std_logic"
-vhdlType' Integer         = "integer"
-vhdlType' (BitVector n)   = case n of
-                              0 -> "std_logic_vector (0 downto 1)"
-                              _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
-vhdlType' (Index u)       = "unsigned" <> parens (int (clog2 (max 2 u) - 1) <+> "downto 0")
-vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
-                                      else "signed" <> parens (int (n-1) <+> "downto 0")
-vhdlType' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
-                                      else "unsigned" <> parens ( int (n-1) <+> "downto 0")
-vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
-vhdlType' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
-vhdlType' t@(Sum _ _)     = case typeSize t of
-                              0 -> "unsigned (0 downto 1)"
-                              n -> "unsigned" <> parens (int (n -1) <+> "downto 0")
-vhdlType' t@(Product _ _) = tyName t
-vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+    outputPort = "output" <+> sigDecl (text (fst $ output c)) (snd $ output c) <> semi
 
 verilogType :: HWType -> VerilogM Doc
-verilogType Bool       = "logic"
-verilogType (Clock _)  = "logic"
-verilogType (Reset _)  = "logic"
-verilogType Integer    = "logic signed [31:0]"
-verilogType (BitVector 1)   = "logic"
-verilogType (BitVector n)   = "logic" <+> brackets (int (n-1) <> colon <> int 0)
-verilogType (Signed n)      = "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
-verilogType (Unsigned n)    = "logic" <+> brackets (int (n-1) <> colon <> int 0)
-verilogType (Index n)       = "logic" <+> brackets (int (clog2 (max 2 n) - 1) <> colon <> int 0)
-verilogType t@(SP _ _) = brackets (int (typeSize t - 1) <> colon <> int 0)
-verilogType t@(Sum _ _) = case typeSize t of
-                            0 -> empty
-                            n -> brackets (int (n - 1) <> colon <> int 0)
-verilogType t@(Vector n elTy) = do
+verilogType t@(Vector _ _) = do
   tyCache %= HashSet.insert t
   tyName t
 verilogType t@(Product _ _) = do
   tyCache %= HashSet.insert t
   tyName t
-verilogType x = error ($(curLoc) ++ show x ++ "not supported")
+verilogType Integer     = verilogType (Signed 32)
+verilogType (Signed n)  = "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
+verilogType (Clock _)   = "logic"
+verilogType (Reset _)   = "logic"
+verilogType t           = "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
-
-
-sigType :: VerilogM Doc -> HWType -> VerilogM Doc
-sigType d t = verilogType t <+> d
-
-
--- sigType d Bool            = "logic" <+> d
--- sigType d (Clock _)       = "logic" <+> d
--- sigType d (Reset _)       = "logic" <+> d
--- sigType d Integer         = "logic signed [31:0]" <+> d
--- sigType d (Unsigned n)    = "logic" <+> brackets (int (n-1) <> colon <> int 0) <+> d
--- sigType d (Signed n)      = "logic signed" <+> brackets (int (n-1) <> colon <> int 0) <+> d
--- sigType d t@(Vector n elTy) = do
---   tyCache %= HashSet.insert t
---   tyName t <+> d
--- sigType d t@(SP _ _) = brackets (int (typeSize t - 1) <> colon <> int 0) <+> d
--- sigType d t@(Sum _ _) = case typeSize t of
---                           0 -> d
---                           n -> brackets (int (n - 1) <> colon <> int 0) <+> d
--- sigType d t@(Product _ _) = do tyCache %= HashSet.insert t
---                                tyName t <+> d
--- sigType d (BitVector 1)   = "logic"
--- sigType d (BitVector n)   = "logic" <+> brackets (int (n-1) <> colon <> int 0) <+> d
--- sigType _ x = error ($(curLoc) ++ show x ++ "not supported")
+sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
+sigDecl d t = verilogType t <+> d
 
 -- | Convert a Netlist HWType to the root of a Verilog type
 verilogTypeMark :: HWType -> VHDLM Doc
@@ -279,21 +196,19 @@ verilogTypeMark t@(Vector _ _) = do
 verilogTypeMark t               = error $ $(curLoc) ++ "verilogTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
--- tyName Integer           = "integer"
--- tyName Bool              = "boolean"
+tyName Integer           = "integer_32"
+tyName Bool              = "logic_vector_1"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (BitVector 1)     = "logic"
-tyName (BitVector _)     = "logic_vector"
--- tyName (BitVector n)     = "std_logic_vector_" <> int n
--- tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
+tyName (BitVector n)     = "logic_vector_" <> int n
+tyName t@(Index _)       = "logic_vector_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
--- tyName (Unsigned n)      = "unsigned_" <> int n
--- tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
+tyName (Unsigned n)      = "logic_vector_" <> int n
+tyName t@(Sum _ _)       = "logic_vector_" <> int (typeSize t)
 tyName t@(Product _ _)   = makeCached t nameCache prodName
   where
     prodName = do i <- tyCount <<%= (+1)
                   "product" <> int i
--- tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
+tyName t@(SP _ _)        = "logic_vector_" <> int (typeSize t)
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
@@ -310,19 +225,6 @@ verilogTypeErrValue (BitVector n)   = braces (int n <+> braces "1'bx")
 verilogTypeErrValue t@(SP _ _)      = braces (int (typeSize t) <+> braces "1'bx")
 verilogTypeErrValue e = error $ $(curLoc) ++ "no error value defined for: " ++ show e
 
--- vhdlTypeErrValue Integer             = "integer'high"
--- vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
--- vhdlTypeErrValue (Index _)           = "(others => 'X')"
--- vhdlTypeErrValue (Signed _)          = "(others => 'X')"
--- vhdlTypeErrValue (Unsigned _)        = "(others => 'X')"
--- vhdlTypeErrValue (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeErrValue elTy)
--- vhdlTypeErrValue (SP _ _)            = "(others => 'X')"
-
--- vhdlTypeErrValue (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue elTys
--- vhdlTypeErrValue (Reset _)           = "'X'"
--- vhdlTypeErrValue (Clock _)           = "'X'"
--- vhdlTypeErrValue Void                = "(0 downto 1 => 'X')"
-
 decls :: [Declaration] -> VerilogM Doc
 decls [] = empty
 decls ds = do
@@ -332,7 +234,7 @@ decls ds = do
       _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
 
 decl :: Declaration -> VHDLM (Maybe Doc)
-decl (NetDecl id_ ty _) = Just A.<$> sigType (text id_) ty
+decl (NetDecl id_ ty _) = Just A.<$> sigDecl (text id_) ty
 
 decl _ = return Nothing
 
@@ -391,7 +293,7 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
 expr_ _ (Identifier id_ (Just _))                      = text id_
 
 expr_ _ (DataCon ty@(Vector 1 _) _ [e]) = verilogTypeMark ty <> "'" <> braces (expr_ False e)
-expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = verilogTypeMark ty <> "'" <> case vectorChain e of
+expr_ _ e@(DataCon ty@(Vector _ _) _ [e1,e2]) = verilogTypeMark ty <> "'" <> case vectorChain e of
                                                      Just es -> listBraces (mapM (expr_ False) es)
                                                      Nothing -> braces (expr_ False e1 <+> comma <+> expr_ False e2)
 
@@ -409,17 +311,17 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> verilogTypeMark ty <> "_sel" <> int i <> colon <+> expr_ False e) [0..] es)
 
-expr_ b (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
@@ -431,7 +333,7 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
 expr_ _ (DataTag Bool (Left e))           = parens (expr_ False e <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
 expr_ _ (DataTag Bool (Right id_))        = parens (text id_ <+> "== 1'b0") <+> "? 32'sd0 : 31'sd1"
 
-expr_ _ (DataTag hty@(Sum _ _) (Left e))  = "$unsigned" <> parens (expr_ False e)
+expr_ _ (DataTag (Sum _ _) (Left e))  = "$unsigned" <> parens (expr_ False e)
 expr_ _ (DataTag (Sum _ _) (Right id_))     = "$unsigned" <> parens (text id_)
 
 expr_ _ (DataTag (Product _ _) (Right _)) = "32'sd0"
@@ -469,7 +371,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
   where
     blit = bits (toBits sz i)
 exprLit _             (BoolLit t)  = if t then "1'b1" else "1'b0"
--- exprLit _             (BitLit b)   = squotes $ bit_char b
+exprLit _             (BitLit b)   = "1'b" <> bit_char b
 exprLit _             l            = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 toBits :: Integral a => Int -> a -> [Bit]
@@ -489,72 +391,53 @@ bit_char U = char 'U'
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VerilogM Doc
-toSLV Integer e = expr_ False e
-toSLV Bool         e = expr_ False e
--- toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr_ False e,int 32]))
--- toSLV (BitVector _) e = expr_ False e
-toSLV (Signed _)   e = expr_ False e
--- toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
--- toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr_ False e)
--- toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
---     selIds' <- sequence selIds
---     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
---   where
---     tName    = tyName t
---     selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
---     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
+toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
+    selIds' <- sequence selIds
+    listBraces (zipWithM toSLV tys selIds')
+  where
+    tName    = verilogTypeMark t
+    selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
+    selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ tys) (DataCon _ _ es) = listBraces (zipWithM toSLV tys es)
--- toSLV (SP _ _) e = expr_ False e
+
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence (reverse selIds)
     listBraces (mapM (toSLV elTy) selIds')
   where
     selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> brackets (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
--- toSLV (Vector n elTy) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
-toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
+toSLV (Vector n elTy) (DataCon _ _ es) = listBraces (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
+
+toSLV _ e = expr_ False e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
--- fromSLV Bool              id_ start _   = "fromSL" <> parens (text id_ <> parens (int start))
-fromSLV Integer           id_ start end = fromSLV (Signed 32) id_ start end
--- fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
--- fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
-fromSLV (Signed _)        id_ start end = text id_ <> brackets (int start <> colon <> int end)
--- fromSLV (Unsigned _)      id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
--- fromSLV (Sum _ _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
--- fromSLV t@(Product _ tys) id_ start _   = tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
---   where
---     tName      = tyName t
---     selNames   = [tName <> "_sel" <> int i | i <- [0..]]
---     argLengths = map typeSize tys
---     starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
---     ends       = map (+1) (tail starts)
---     args       = zipWith3 (`fromSLV` id_) tys starts ends
+fromSLV t@(Product _ tys) id_ start _ = "'" <> listBraces (zipWithM (\s e -> s <> colon <+> e) selNames args)
+  where
+    tName      = tyName t
+    selNames   = [tName <> "_sel" <> int i | i <- [0..]]
+    argLengths = map typeSize tys
+    starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
+    ends       = map (+1) (tail starts)
+    args       = zipWith3 (`fromSLV` id_) tys starts ends
 
--- fromSLV (SP _ _)          id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
--- fromSLV (Vector n elTy)   id_ start _   = tupled (fmap reverse args)
---   where
---     argLength = typeSize elTy
---     starts    = take (n + 1) $ iterate (subtract argLength) start
---     ends      = map (+1) (tail starts)
---     args      = zipWithM (fromSLV elTy id_) starts ends
-fromSLV hty               _   _     _   = error $ $(curLoc) ++ "fromSLV: " ++ show hty
+fromSLV t@(Vector n elTy) id_ start _ = verilogTypeMark t <> "'" <> listBraces (fmap reverse args)
+  where
+    argLength = typeSize elTy
+    starts    = take (n + 1) $ iterate (subtract argLength) start
+    ends      = map (+1) (tail starts)
+    args      = zipWithM (fromSLV elTy id_) starts ends
+
+fromSLV Integer    id_ start end = fromSLV (Signed 32) id_ start end
+fromSLV (Signed _) id_ start end = "$signed" <> parens (text id_ <> brackets (int start <> colon <> int end))
+
+fromSLV _ id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 
-larrow :: VHDLM Doc
-larrow = "<="
-
-rarrow :: VHDLM Doc
-rarrow = "=>"
+listBraces :: Monad m => m [Doc] -> m Doc
+listBraces = encloseSep lbrace rbrace comma
 
 parenIf :: Monad m => Bool -> m Doc -> m Doc
 parenIf True  = parens
 parenIf False = id
-
-punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
-punctuate' s d = vcat (punctuate s d) <> s
-
-listBraces :: Monad m => m [Doc] -> m Doc
-listBraces = encloseSep lbrace rbrace comma
