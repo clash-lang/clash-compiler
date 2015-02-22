@@ -101,6 +101,11 @@ eq# v1 v2  = foldr (&&) True (zipWith (==) v1 v2)
 neq# :: Eq a => Vec n a -> Vec n a -> Bool
 neq# v1 v2 = not (eq# v1 v2)
 
+instance Ord a => Ord (Vec n a) where
+  compare x y = foldr f EQ $ zipWith compare x y
+    where f EQ   keepGoing = keepGoing
+          f done _         = done
+
 -- | __NB__: Not synthesisable
 instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
