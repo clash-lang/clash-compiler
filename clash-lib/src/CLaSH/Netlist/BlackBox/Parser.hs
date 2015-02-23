@@ -57,7 +57,7 @@ pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS 
 pTagE :: Parser Element
 pTagE =  O                 <$  pToken "~RESULT"
      <|> I                 <$> (pToken "~ARG" *> pBrackets pNatural)
-     <|> I                 <$> (pToken "~LIT" *> pBrackets pNatural)
+     <|> L                 <$> (pToken "~LIT" *> pBrackets pNatural)
      <|> (Clk . Just)      <$> (pToken "~CLK" *> pBrackets pNatural)
      <|> Clk Nothing       <$  pToken "~CLKO"
      <|> (Rst . Just)      <$> (pToken "~RST" *> pBrackets pNatural)
