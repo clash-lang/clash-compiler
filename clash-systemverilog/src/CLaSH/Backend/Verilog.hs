@@ -231,10 +231,11 @@ decls ds = do
     dsDoc <- catMaybes A.<$> mapM decl ds
     case dsDoc of
       [] -> empty
-      _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
+      _  -> vcat (A.pure dsDoc)
 
 decl :: Declaration -> VHDLM (Maybe Doc)
-decl (NetDecl id_ ty _) = Just A.<$> sigDecl (text id_) ty
+decl (NetDecl id_ ty netInit) = Just A.<$> sigDecl (text id_) ty <> semi <$>
+  maybe empty (\e -> "initial begin" <$> indent 2 (text id_ <+> "=" <+> expr_ False e <> semi) <$> "end") netInit
 
 decl _ = return Nothing
 

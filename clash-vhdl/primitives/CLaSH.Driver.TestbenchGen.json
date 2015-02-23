@@ -1,0 +1,43 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.clockGen"
+    , "templateD" :
+"-- pragma translate_off
+process is
+begin
+  wait for ~LIT[0] ns;
+  while (not finished) loop
+    ~RESULT <= not ~RESULT;
+    wait for ~LIT[1] ns;
+    ~RESULT <= not ~RESULT;
+    wait for ~LIT[2] ns;
+  end loop;
+  wait;
+end process;
+-- pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.resetGen"
+    , "templateD" :
+"-- pragma translate_off
+~RESULT <= '0' after 0 ns,
+           '1' after ~LIT[0] ns;
+-- pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.doneGen"
+    , "templateD" : "~RESULT <= ~ARG[0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
+    , "templateD" :
+"~RESULT <= ~LIT[0]
+-- pragma translate_off
+            after ~LIT[1] ns
+-- pragma translate_on
+            ;"
+    }
+  }
+]

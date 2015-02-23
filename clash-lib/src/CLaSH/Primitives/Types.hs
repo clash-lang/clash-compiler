@@ -25,6 +25,7 @@ data Primitive
   { name     :: S.Text -- ^ Name of the primitive
   , primType :: Text -- ^ Additional information
   }
+  deriving Show
 
 instance FromJSON Primitive where
   parseJSON (Object v) = case H.toList v of

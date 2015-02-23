@@ -11,13 +11,10 @@ where
 
 import           Control.Concurrent.Supply        (Supply)
 import           Data.HashMap.Lazy                (HashMap)
+import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (mapMaybe)
 import           Data.Text.Lazy                   (isPrefixOf,pack,splitOn)
-import qualified Data.Text.Lazy.Builder           as Builder
-import qualified Data.Text.Lazy.Builder.RealFloat as Builder
-import           Text.PrettyPrint.Leijen.Text     ((<+>), (<>))
-import qualified Text.PrettyPrint.Leijen.Text     as PP
 import           Unbound.LocallyNameless          (name2String)
 
 import           CLaSH.Core.Term
@@ -60,17 +57,16 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
                                                  stimuliNmM
 
   let finDecl = [ NetDecl "finished" Bool (Just (N.Literal Nothing (BoolLit False)))
-                , Assignment "done" (Identifier "finished" Nothing)
+                , genDone primMap
                 ]
-      finAssg = "true after 100 ns"
-      finExpr = Assignment "finished" (BlackBoxE "" (parseFail . PP.displayT $ PP.renderCompact finAssg) emptyBBContext False)
+      finExpr = genFinish primMap
   (expInst,expComps,hidden'') <- maybe (return (finExpr,[],hidden'))
                                                  (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
                                                  expectedNmM
   let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden
-      clks   = mapMaybe genClock hidden''
-      rsts   = mapMaybe genReset hidden''
+      clks   = mapMaybe (genClock primMap) hidden''
+      rsts   = mapMaybe (genReset primMap) hidden''
 
   let instDecl = InstDecl cName "totest"
                    (map (\i -> (i,Identifier i Nothing))
@@ -95,57 +91,69 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
 
 genTestBench dbgLvl _ _ _ _ _ _ _ _ _ c = traceIf (dbgLvl > DebugNone) ("Can't make testbench for: " ++ show c) $ return []
 
-genClock :: (Identifier,HWType)
+genClock :: PrimMap
+         -> (Identifier,HWType)
          -> Maybe [Declaration]
-genClock (clkName,Clock rate) = Just clkDecls
+genClock primMap (clkName,Clock rate) = Just clkDecls
   where
-    clkGenDecl = PP.vsep
-                  [ "-- pragma translate_off"
-                  , "process is"
-                  , "begin"
-                  , PP.indent 2
-                      (PP.vsep [ "wait for 2 ns;"
-                               , "while (not finished) loop"
-                               , PP.indent 2
-                                  (PP.vsep [PP.text clkName <+> "<= not" <+> PP.text clkName <> PP.semi
-                                           ,"wait for" <+> renderFloat2Dec (fromIntegral rate * 0.5) <+> "ns;"
-                                           ,PP.text clkName <+> "<= not" <+> PP.text clkName <> PP.semi
-                                           ,"wait for" <+> renderFloat2Dec (fromIntegral rate * 0.5) <+> "ns;"
-                                           ])
-                               , "end loop;"
-                               , "wait;"
-                               ])
-                  , "end process;"
-                  , "-- pragma translate_on"
-                  ]
+    clkGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.clockGen" primMap of
+      Just (BlackBox _ (Left templ)) -> let (rising,rest) = divMod (toInteger rate) 2
+                                            falling       = rising + rest
+                                            ctx = emptyBBContext
+                                                    { bbResult    = (Left (Identifier clkName Nothing), Clock rate)
+                                                    , bbInputs    = [error $ "clockGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ | i <- [0..] ]
+                                                    , bbLitInputs = [N.Literal Nothing (NumLit 2), N.Literal Nothing (NumLit rising), N.Literal Nothing (NumLit falling)] ++ [ (error $ "resetGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [2..] ]
+                                                    }
+                                        in  BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" (parseFail templ) ctx
+      pM -> error $ $(curLoc) ++ ("Can't make clock declaration for: " ++ show pM)
 
-    clkDecls = [ NetDecl clkName (Clock rate) (Just (N.Literal Nothing (BitLit L)))
-               , BlackBoxD "" (parseFail . PP.displayT $ PP.renderPretty 0.4 80 clkGenDecl) emptyBBContext
-               ]
+    clkDecls   = [ NetDecl clkName (Clock rate) (Just (N.Literal Nothing (BitLit L)))
+                 , clkGenDecl
+                 ]
 
-genClock _ = Nothing
+genClock _ _ = Nothing
 
-genReset :: (Identifier,HWType)
+genReset :: PrimMap
+         -> (Identifier,HWType)
          -> Maybe [Declaration]
-genReset (rstName,Reset clk) = Just rstDecls
+genReset primMap (rstName,Reset clk) = Just rstDecls
   where
-    rstExpr = PP.vsep
-                [ "-- pragma translate_off"
-                , PP.text rstName <+> "<=" <+> PP.align (PP.vsep (PP.punctuate PP.comma
-                                                  [ "'0' after 0 ns"
-                                                  , "'1' after 1 ns;"
-                                                  ]))
-                , "-- pragma translate_on"
-                ]
+    resetGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.resetGen" primMap of
+      Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
+                                                    { bbResult    = (Left (Identifier rstName Nothing), Reset clk)
+                                                    , bbInputs    = [error $ "resetGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ | i <- [0..] ]
+                                                    , bbLitInputs = (N.Literal Nothing (NumLit 1)) : [ (error $ "resetGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [1..] ]
+                                                    }
+                                        in  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" (parseFail templ) ctx
+      pM -> error $ $(curLoc) ++ ("Can't make reset declaration for: " ++ show pM)
 
     rstDecls = [ NetDecl rstName (Reset clk) Nothing
-               , BlackBoxD "" (parseFail . PP.displayT $ PP.renderCompact rstExpr) emptyBBContext
+               , resetGenDecl
                ]
 
-genReset _ = Nothing
+genReset _ _ = Nothing
 
-renderFloat2Dec :: Float -> PP.Doc
-renderFloat2Dec = PP.text . Builder.toLazyText . Builder.formatRealFloat Builder.Fixed (Just 2)
+genFinish :: PrimMap
+          -> Declaration
+genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" primMap of
+  Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
+                                                { bbResult    = (Left (Identifier "finished" Nothing), Bool)
+                                                , bbInputs    = [ (error $ "finishedGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [0..] ]
+                                                , bbLitInputs = (N.Literal Nothing (BoolLit True)) : (N.Literal Nothing (NumLit 100)) : [ (error $ "resetGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [1..] ]
+                                                }
+                                    in  BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" (parseFail templ) ctx
+  pM -> error $ $(curLoc) ++ ("Can't make finish declaration for: " ++ show pM)
+
+genDone :: PrimMap
+        -> Declaration
+genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMap of
+  Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
+                                                { bbResult    = (Left (Identifier "done" Nothing), Bool)
+                                                , bbInputs    = (Left (Identifier "finished" Nothing),Bool) : [ (error $ "doneGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [0..] ]
+                                                , bbLitInputs = [ (error $ "doneGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [0..] ]
+                                                }
+                                    in  BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" (parseFail templ) ctx
+  pM -> error $ $(curLoc) ++ ("Can't make done declaration for: " ++ show pM)
 
 genStimuli :: Int
            -> PrimMap
