@@ -81,13 +81,15 @@ mkTyPackage_ :: [HWType]
              -> VerilogM Doc
 mkTyPackage_ hwtys =
     "package types ;" <$>
-      indent 2 (packageDec) <$>
+      indent 2 packageDec <$>
+      indent 2 funDecs <$>
     "endpackage : types"
   where
-    usedTys     = nubBy eqReprTy $ concatMap mkUsedTys hwtys
-    needsDec    = nubBy eqReprTy $ (hwtys ++ filter needsTyDec usedTys)
+    usedTys     = concatMap mkUsedTys hwtys
+    needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
+    funDecs     = vcat $ mapM funDec hwTysSorted
 
     eqReprTy :: HWType -> HWType -> Bool
     eqReprTy (Vector n ty1) (Vector m ty2)
@@ -131,10 +133,6 @@ topSortHWTys hwtys = sorted
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
-needsTyDec :: HWType -> Bool
-needsTyDec (Product _ _)  = True
-needsTyDec _              = False
-
 tyDec :: HWType -> VHDLM Doc
 tyDec (Vector n elTy) = "typedef" <+> verilogType elTy <+>  "array_of_" <> int n <> "_" <> tyName elTy <+> brackets (int 0 <> colon <> int (n-1)) <> semi
 
@@ -148,6 +146,19 @@ tyDec ty@(Product _ tys) = prodDec
     selNames = map (\i -> tName <> "_sel" <> int i) [0..]
 
 tyDec _ = empty
+
+funDec :: HWType -> VHDLM Doc
+funDec (Clock _) = empty
+funDec (Reset _) = empty
+funDec t =
+  "function logic" <+> brackets (int (typeSize t - 1) <> colon <> int 0)  <+> verilogTypeMark t <> "_to_lv" <> parens (sigDecl "i" t) <> semi <$>
+  indent 2 (verilogTypeMark t <> "_to_lv" <+> "=" <+>
+    (case t of
+       Vector n elTy -> listBraces (sequence [verilogTypeMark elTy <> "_to_lv" <> parens ("i" <> brackets (int i)) | i <- [0..(n-1)]])
+       Product _ tys -> listBraces (zipWithM (\elTy i -> verilogTypeMark elTy <> "_to_lv" <> parens ("i" <> dot <> verilogTypeMark t <> "_sel" <> int i)) tys [0..])
+       _             -> "i")
+       <> semi) <$>
+  "endfunction"
 
 tyImports :: VHDLM Doc
 tyImports = "import types:: * ;"
@@ -170,30 +181,25 @@ module_ c =
     outputPort = "output" <+> sigDecl (text (fst $ output c)) (snd $ output c) <> semi
 
 verilogType :: HWType -> VerilogM Doc
-verilogType t@(Vector _ _) = do
+verilogType t = do
   tyCache %= HashSet.insert t
-  tyName t
-verilogType t@(Product _ _) = do
-  tyCache %= HashSet.insert t
-  tyName t
-verilogType Integer     = verilogType (Signed 32)
-verilogType (Signed n)  = "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
-verilogType (Clock _)   = "logic"
-verilogType (Reset _)   = "logic"
-verilogType t           = "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
+  case t of
+    (Vector _ _)  -> tyName t
+    (Product _ _) -> tyName t
+    Integer       -> verilogType (Signed 32)
+    (Signed n)    -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
+    (Clock _)     -> "logic"
+    (Reset _)     -> "logic"
+    _             -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
 
 -- | Convert a Netlist HWType to the root of a Verilog type
 verilogTypeMark :: HWType -> VHDLM Doc
-verilogTypeMark t@(Product _ _) = do
+verilogTypeMark t = do
   tyCache %= HashSet.insert t
   tyName t
-verilogTypeMark t@(Vector _ _) = do
-  tyCache %= HashSet.insert t
-  tyName t
-verilogTypeMark t               = error $ $(curLoc) ++ "verilogTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer_32"
@@ -209,6 +215,8 @@ tyName t@(Product _ _)   = makeCached t nameCache prodName
     prodName = do i <- tyCount <<%= (+1)
                   "product" <> int i
 tyName t@(SP _ _)        = "logic_vector_" <> int (typeSize t)
+tyName (Clock _) = "logic"
+tyName (Reset _) = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
