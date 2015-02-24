@@ -32,8 +32,8 @@ end
 
 // pragma translate_off
 always @(*) begin
-  if ~ARG[0] == 1 begin
-    $finish
+  if (~ARG[0] == 1'b1) begin
+    $finish;
   end
 end
 // pragma translate_on
