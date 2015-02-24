@@ -136,7 +136,7 @@ needsTyDec (Product _ _)  = True
 needsTyDec _              = False
 
 tyDec :: HWType -> VHDLM Doc
-tyDec (Vector n elTy) = "typedef" <+> verilogType elTy <+>  "array_of_" <> int n <> "_" <> tyName elTy <+> brackets (int (n-1) <> colon <> int 0) <> semi
+tyDec (Vector n elTy) = "typedef" <+> verilogType elTy <+>  "array_of_" <> int n <> "_" <> tyName elTy <+> brackets (int 0 <> colon <> int (n-1)) <> semi
 
 tyDec ty@(Product _ tys) = prodDec
   where
