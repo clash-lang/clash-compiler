@@ -257,7 +257,7 @@ inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ scrut es) = fmap Just $
-    "always @(*)" <$>
+    "always_comb" <$>
     "case" <> parens (expr_ True scrut) <$>
       (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
     "endcase"
