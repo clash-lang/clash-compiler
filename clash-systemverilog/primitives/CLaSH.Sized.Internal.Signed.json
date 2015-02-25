@@ -203,7 +203,17 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.resize#"
-    , "templateE" : "$signed(~ARG[2])"
+    , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
+    , "templateD" :
+"// truncate, sign preserving
+~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
+assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
+    , "templateE" : "$signed(~ARG[1])"
     }
   }
 ]
