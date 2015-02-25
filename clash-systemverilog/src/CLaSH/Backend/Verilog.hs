@@ -383,9 +383,11 @@ vectorChain _                                       = Nothing
 exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
 exprLit Nothing         (NumLit i) = integer i
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
-                                       Unsigned _  -> int sz <> "'d" <> integer i
-                                       Signed _    -> int sz <> "'sd" <> integer i
-                                       _           -> int sz <> "'b" <> blit
+                                       Unsigned _   -> int sz <> "'d" <> integer i
+                                       Signed _
+                                        | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
+                                        | otherwise -> int sz <> "'sd" <> integer i
+                                       _            -> int sz <> "'b" <> blit
 
   where
     blit = bits (toBits sz i)
