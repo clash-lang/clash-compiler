@@ -311,10 +311,11 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
 
 expr_ _ (Identifier id_ (Just _))                      = text id_
 
-expr_ _ (DataCon ty@(Vector 1 _) _ [e]) = verilogTypeMark ty <> "'" <> braces (expr_ False e)
-expr_ _ e@(DataCon ty@(Vector _ _) _ [e1,e2]) = verilogTypeMark ty <> "'" <> case vectorChain e of
+expr_ _ (DataCon (Vector 1 _) _ [e]) = "'" <> braces (expr_ False e)
+expr_ _ e@(DataCon (Vector n _) _ [e1,e2]) = "'" <> case vectorChain e of
                                                      Just es -> listBraces (mapM (expr_ False) es)
-                                                     Nothing -> braces (expr_ False e1 <+> comma <+> expr_ False e2)
+                                                     Nothing -> let e2' = expr_ False e2
+                                                                in  listBraces $ sequence ((expr_ False e1):[e2' <> brackets (int i) | i <- [0..(n-2)] ])
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
@@ -441,7 +442,7 @@ fromSLV t@(Product _ tys) id_ start _ = "'" <> listBraces (zipWithM (\s e -> s <
     ends       = map (+1) (tail starts)
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
-fromSLV t@(Vector n elTy) id_ start _ = verilogTypeMark t <> "'" <> listBraces (fmap reverse args)
+fromSLV t@(Vector n elTy) id_ start _ = verilogTypeMark t <> "'" <> parens ("'" <> listBraces (fmap reverse args))
   where
     argLength = typeSize elTy
     starts    = take (n + 1) $ iterate (subtract argLength) start

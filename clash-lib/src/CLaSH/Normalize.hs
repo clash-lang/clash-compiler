@@ -91,7 +91,7 @@ normalize' nm = do
                   return (ty',tm')
       let usedBndrs = termFreeIds (snd tmNorm)
       if nm `elem` usedBndrs
-        then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " remains recursive after normalization."
+        then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm)
         else do
           prevNorm <- fmap HashMap.keys $ liftRS $ Lens.use normalized
           let toNormalize = filter (`notElem` prevNorm) usedBndrs

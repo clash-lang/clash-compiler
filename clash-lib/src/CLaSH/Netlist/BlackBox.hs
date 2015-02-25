@@ -74,10 +74,11 @@ mkBlackBoxContext resId args = do
     unVar (Var _ v, False) = Left v
     unVar t                = Right t
 
-prepareBlackBox :: Text
+prepareBlackBox :: TextS.Text
+                -> Text
                 -> BlackBoxContext
                 -> NetlistMonad BlackBoxTemplate
-prepareBlackBox t bbCtx =
+prepareBlackBox pNm t bbCtx =
   let (templ,err) = runParse t
   in  if null err && verifyBlackBoxContext templ bbCtx
          then do
@@ -85,7 +86,7 @@ prepareBlackBox t bbCtx =
            templ'' <- setClocks bbCtx templ'
            return $! templ''
          else
-           error $ $(curLoc) ++ "\nCan't match template:\n" ++ show templ ++
+           error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show t ++
                    "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++
                    show err
 
@@ -130,15 +131,17 @@ mkPrimitive bbEParen bbEasD nm args ty = do
       case template p of
         (Left tempD) -> do
           let tmpDecl = NetDecl tmpNmT hwTy Nothing
-          bbDecl <- N.BlackBoxD (name p) <$> prepareBlackBox tempD bbCtx <*> pure bbCtx
+              pNm     = name p
+          bbDecl <- N.BlackBoxD pNm <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
           return ((Identifier tmpNmT Nothing,hwTy),ctxDcls ++ [tmpDecl,bbDecl])
         (Right tempE) -> do
-          bbTempl <- prepareBlackBox tempE bbCtx
+          let pNm = name p
+          bbTempl <- prepareBlackBox pNm tempE bbCtx
           if bbEasD
             then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
-                     tmpAssgn = Assignment tmpNmT (BlackBoxE (name p) bbTempl bbCtx bbEParen)
+                     tmpAssgn = Assignment tmpNmT (BlackBoxE pNm bbTempl bbCtx bbEParen)
                  in  return ((Identifier tmpNmT Nothing, hwTy), ctxDcls ++ [tmpDecl,tmpAssgn])
-            else return ((BlackBoxE (name p) bbTempl bbCtx bbEParen,hwTy),ctxDcls)
+            else return ((BlackBoxE pNm bbTempl bbCtx bbEParen,hwTy),ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -192,6 +195,14 @@ mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
   hwTy  <- N.termHWType $(curLoc) e
   (exprN,dcDecls) <- mkDcApplication hwTy dc args'
   return ((exprN,hwTy),dcDecls)
+mkLitInput e@(collectArgs -> (Prim pNm _, args)) = do
+  tcm <- lift $ Lens.use tcCache
+  ty  <- lift $ termType tcm e
+  r@((e',_),_) <- lift $ mkPrimitive False False pNm args ty
+  case e' of
+    (Identifier _ _) -> error $ showDoc e
+    _                -> return r
+
 mkLitInput _ = mzero
 
 -- | Create an template instantiation text and a partial blackbox content for an
