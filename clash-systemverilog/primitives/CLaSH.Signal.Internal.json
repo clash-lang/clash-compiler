@@ -8,7 +8,7 @@
     , "templateD" :
 "~SIGD[~SYM[0]][2];
 
-always_ff @ (posedge ~CLK[0] or negedge ~RST[0])
+always_ff @(posedge ~CLK[0] or negedge ~RST[0])
 if (~ ~RST[0]) begin
   ~SYM[0] <= ~ARG[1];
 end else begin
@@ -29,7 +29,7 @@ assign ~RESULT = ~SYM[0];"
     , "templateD" :
 "~SIGD[~SYM[0]][3];
 
-always_ff @ (posedge ~CLK[0] or negedge ~RST[0])
+always_ff @(posedge ~CLK[0] or negedge ~RST[0])
 if (~ ~RST[0]) begin
   ~SYM[1] <= ~ARG[1];
 end else begin

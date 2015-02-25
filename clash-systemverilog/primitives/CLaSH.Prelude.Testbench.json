@@ -9,7 +9,7 @@
     , "templateD" :
 "// assert
 // pragma translate_off
-always @ (posedge ~CLK[2] or negedge ~RST[2]) begin
+always @(posedge ~CLK[2] or negedge ~RST[2]) begin
   if (~ARG[2] != ~ARG[3]) begin
     $display(\"expected: %b, actual: %b\", ~TYPM[3]_to_lv(~ARG[3]), ~TYPM[2]_to_lv(~ARG[2]));
     $stop;
