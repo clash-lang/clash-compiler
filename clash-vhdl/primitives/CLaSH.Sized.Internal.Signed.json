@@ -183,4 +183,15 @@ end block;"
     , "templateE" : "resize(~ARG[2],~LIT[1])"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
+    , "templateD" :
+"truncateB_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[1];
+begin
+  ~SYM[1] <= ~ARG[1];
+  ~RESULT <= ~SYM[1](~LIT[0]-1 downto 0);
+end block;"
+    }
+  }
 ]
