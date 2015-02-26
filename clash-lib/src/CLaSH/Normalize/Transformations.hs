@@ -574,7 +574,7 @@ etaExpansionTL ctx e
       then do
         argTy <- ( return
                  . fst
-                 . Maybe.fromMaybe (error "etaExpansion splitFunTy")
+                 . Maybe.fromMaybe (error $ $(curLoc) ++ "etaExpansion splitFunTy")
                  . splitFunTy tcm
                  <=< termType tcm
                  ) e

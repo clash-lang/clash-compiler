@@ -208,7 +208,7 @@ termHWType loc e = do
 varToExpr :: Term
           -> Expr
 varToExpr (Var _ var) = Identifier (mkBasicId . pack $ name2String var) Nothing
-varToExpr _           = error "not a var"
+varToExpr _           = error $ $(curLoc) ++ "not a var"
 
 -- | Uniquely rename all the variables and their references in a normalized
 -- term

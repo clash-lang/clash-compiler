@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -fcontext-stack=21 #-}
@@ -24,6 +25,7 @@ import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.Util         (collectArgs, isPolyFun)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Util      (specialise)
+import           CLaSH.Util              (curLoc)
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
 alreadyInlined :: TmName
@@ -103,7 +105,7 @@ lambdaDrop bndrs depGraph cyc@(root:_) = block
     doms  = dominator depGraph cyc
     block = blockSink bndrs doms (0,root)
 
-lambdaDrop _ _ [] = error "Can't lambdadrop empty cycle"
+lambdaDrop _ _ [] = error $ $(curLoc) ++ "Can't lambdadrop empty cycle"
 
 dominator :: HashMap TmName [TmName] -- ^ Dependency Graph
           -> [TmName]                -- ^ Recursive block

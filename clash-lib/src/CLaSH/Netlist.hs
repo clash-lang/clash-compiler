@@ -114,7 +114,7 @@ genComponentT compName componentExpr mStart = do
   (arguments,binders,result) <- do { normalizedM <- splitNormalized tcm componentExpr
                                    ; case normalizedM of
                                        Right normalized -> mkUniqueNormalized normalized
-                                       Left err         -> error err
+                                       Left err         -> error $ $(curLoc) ++ err
                                    }
 
   let ids = HashMap.fromList

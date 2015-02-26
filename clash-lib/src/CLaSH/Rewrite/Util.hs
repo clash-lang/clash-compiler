@@ -102,7 +102,7 @@ apply name rewrite ctx expr = R $ do
             ) (return ())
 
   Monad.when (lvl >= DebugApplied && not hasChanged && expr /= expr') $
-    error $ "Expression changed without notice(" ++ name ++  "): before" ++ before ++ "\nafter:\n" ++ after
+    error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before" ++ before ++ "\nafter:\n" ++ after
 
   traceIf (lvl >= DebugName && hasChanged) name $
     traceIf (lvl >= DebugApplied && hasChanged) ("Changes when applying rewrite to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n") $

@@ -65,7 +65,7 @@ runNormalization lvl supply globals typeTrans tcm eval
                   100
                   HashMap.empty
                   100
-                  (error "Report as bug: no curFun")
+                  (error $ $(curLoc) ++ "Report as bug: no curFun")
 
 
 normalize :: [TmName]
@@ -124,7 +124,7 @@ checkNonRecursive topEntity norm =
   let cg = callGraph [] norm topEntity
   in  case recursiveComponents cg of
        []  -> norm
-       rcs -> error $ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs
+       rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs
 
 -- | Perform general \"clean up\" of the normalized (non-recursive) function
 -- hierarchy. This includes:
@@ -150,7 +150,7 @@ mkCallTree visited bindingMap root = case used of
                             [] -> CLeaf   (root,rootTm)
                             _  -> CBranch (root,rootTm) other
   where
-    rootTm = Maybe.fromMaybe (error $ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
+    rootTm = Maybe.fromMaybe (error $ $(curLoc) ++ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
     used   = Set.toList $ termFreeIds $ snd rootTm
     other  = map (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
 
