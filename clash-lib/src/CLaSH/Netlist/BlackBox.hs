@@ -200,7 +200,7 @@ mkLitInput e@(collectArgs -> (Prim pNm _, args)) = do
   ty  <- lift $ termType tcm e
   r@((e',_),_) <- lift $ mkPrimitive False False pNm args ty
   case e' of
-    (Identifier _ _) -> error $ showDoc e
+    (Identifier _ _) -> mzero
     _                -> return r
 
 mkLitInput _ = mzero
