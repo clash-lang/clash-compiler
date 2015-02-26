@@ -5,6 +5,16 @@ cabal clean
 cabal install
 cd ..
 
+cd clash-systemverilog
+cabal clean
+cabal install
+cd ..
+
+cd clash-vhdl
+cabal clean
+cabal install
+cd ..
+
 cd clash-ghc
 cabal clean
 cabal install
