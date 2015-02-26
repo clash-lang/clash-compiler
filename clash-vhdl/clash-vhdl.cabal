@@ -25,29 +25,30 @@ Build-type:           Simple
 Extra-source-files:   README.md,
                       CHANGELOG.md
 
-Data-files:           primitives/CLaSH.GHC.GHC2Core.json,
-                      primitives/CLaSH.Prelude.BlockRam.json,
-                      primitives/CLaSH.Prelude.Testbench.json,
-                      primitives/CLaSH.Promoted.Nat.json,
-                      primitives/CLaSH.Promoted.Symbol.json,
-                      primitives/CLaSH.Signal.Bundle.json,
-                      primitives/CLaSH.Signal.Explicit.json,
-                      primitives/CLaSH.Signal.Internal.json,
-                      primitives/CLaSH.Sized.Internal.BitVector.json,
-                      primitives/CLaSH.Sized.Internal.Index.json,
-                      primitives/CLaSH.Sized.Internal.Signed.json,
-                      primitives/CLaSH.Sized.Internal.Unsigned.json,
-                      primitives/CLaSH.Sized.Vector.json,
-                      primitives/Control.Exception.Base.json,
-                      primitives/GHC.Base.json,
-                      primitives/GHC.Classes.json,
-                      primitives/GHC.CString.json,
-                      primitives/GHC.Err.json,
-                      primitives/GHC.Integer.Type.json,
-                      primitives/GHC.Prim.json,
-                      primitives/GHC.Real.json,
-                      primitives/GHC.Typelits.json,
-                      primitives/GHC.Types.json,
+Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
+                      primitives/CLaSH.GHC.GHC2Core.json
+                      primitives/CLaSH.Prelude.BlockRam.json
+                      primitives/CLaSH.Prelude.Testbench.json
+                      primitives/CLaSH.Promoted.Nat.json
+                      primitives/CLaSH.Promoted.Symbol.json
+                      primitives/CLaSH.Signal.Bundle.json
+                      primitives/CLaSH.Signal.Explicit.json
+                      primitives/CLaSH.Signal.Internal.json
+                      primitives/CLaSH.Sized.Internal.BitVector.json
+                      primitives/CLaSH.Sized.Internal.Index.json
+                      primitives/CLaSH.Sized.Internal.Signed.json
+                      primitives/CLaSH.Sized.Internal.Unsigned.json
+                      primitives/CLaSH.Sized.Vector.json
+                      primitives/Control.Exception.Base.json
+                      primitives/GHC.Base.json
+                      primitives/GHC.Classes.json
+                      primitives/GHC.CString.json
+                      primitives/GHC.Err.json
+                      primitives/GHC.Integer.Type.json
+                      primitives/GHC.Prim.json
+                      primitives/GHC.Real.json
+                      primitives/GHC.Typelits.json
+                      primitives/GHC.Types.json
                       primitives/Unsafe.Coerce.json
 
 Cabal-version:        >=1.10
