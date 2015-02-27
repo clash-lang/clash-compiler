@@ -31,7 +31,7 @@ end
 "assign ~RESULT = ~ARG[0];
 
 // pragma translate_off
-always @(*) begin
+always_comb begin
   if (~ARG[0] == 1'b1) begin
     $finish;
   end
@@ -43,9 +43,9 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
     , "templateD" :
-"always @(*) begin
+"always_comb begin
 // pragma translate_off
-  #~LIT[1];
+  #~LIT[1]
 // pragma translate_on
   ~RESULT = ~LIT[0];
 end"
