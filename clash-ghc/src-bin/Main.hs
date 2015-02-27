@@ -73,7 +73,7 @@ import           Control.Exception (ErrorCall (..))
 
 import qualified CLaSH.Backend
 import           CLaSH.Backend.VHDL    (VHDLState)
-import           CLaSH.Backend.Verilog (VerilogState)
+import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
 import qualified CLaSH.Driver
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
@@ -193,7 +193,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                DoVHDL          -> (CompManager, dflt_target,    LinkInMemory)
-               DoVerilog       -> (CompManager, dflt_target,    LinkInMemory)
+               DoSystemVerilog -> (CompManager, dflt_target,    LinkInMemory)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = case lang of
@@ -285,7 +285,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash srcs
        DoVHDL                 -> clash makeVHDL
-       DoVerilog              -> clash makeVerilog
+       DoSystemVerilog        -> clash makeSystemVerilog
 
   liftIO $ dumpFinalStats dflags6
 
@@ -485,15 +485,15 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | DoVHDL                  -- ghc --vhdl
-  | DoVerilog               -- ghc --verilog
+  | DoSystemVerilog         -- ghc --systemverilog
 
-doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode, doVHDLMode, doVerilogMode :: Mode
+doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode, doVHDLMode, doSystemVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
 doVHDLMode = mkPostLoadMode DoVHDL
-doVerilogMode = mkPostLoadMode DoVerilog
+doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -536,7 +536,7 @@ needsInputsMode DoMkDependHS    = True
 needsInputsMode (StopBefore _)  = True
 needsInputsMode DoMake          = True
 needsInputsMode DoVHDL          = True
-needsInputsMode DoVerilog       = True
+needsInputsMode DoSystemVerilog = True
 needsInputsMode _               = False
 
 -- True if we are going to attempt to link in this mode.
@@ -547,16 +547,16 @@ isLinkMode DoMake              = True
 isLinkMode DoInteractive       = True
 isLinkMode (DoEval _)          = True
 isLinkMode DoVHDL              = True
-isLinkMode DoVerilog           = True
+isLinkMode DoSystemVerilog     = True
 isLinkMode _                   = False
 
 isCompManagerMode :: PostLoadMode -> Bool
-isCompManagerMode DoMake        = True
-isCompManagerMode DoInteractive = True
-isCompManagerMode (DoEval _)    = True
-isCompManagerMode DoVHDL        = True
-isCompManagerMode DoVerilog     = True
-isCompManagerMode _             = False
+isCompManagerMode DoMake          = True
+isCompManagerMode DoInteractive   = True
+isCompManagerMode (DoEval _)      = True
+isCompManagerMode DoVHDL          = True
+isCompManagerMode DoSystemVerilog = True
+isCompManagerMode _               = False
 
 -- -----------------------------------------------------------------------------
 -- Parsing the mode flag
@@ -619,26 +619,26 @@ mode_flags =
         replaceSpace c   = c
   ] ++
       ------- interfaces ----------------------------------------------------
-  [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
+  [ Flag "-show-iface"    (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  , Flag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
-                                            addFlag "-no-link" f))
-  , Flag "M"            (PassFlag (setMode doMkDependHSMode))
-  , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , Flag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
+  , Flag "c"              (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+                                              addFlag "-no-link" f))
+  , Flag "M"              (PassFlag (setMode doMkDependHSMode))
+  , Flag "E"              (PassFlag (setMode (stopBeforeMode anyHsc)))
+  , Flag "C"              (PassFlag (setMode (stopBeforeMode HCc)))
 #if MIN_VERSION_ghc(7,8,3)
-  , Flag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
+  , Flag "S"              (PassFlag (setMode (stopBeforeMode (As False))))
 #else
-  , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
+  , Flag "S"              (PassFlag (setMode (stopBeforeMode As)))
 #endif
-  , Flag "-make"        (PassFlag (setMode doMakeMode))
-  , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
-  , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
-  , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
-  , Flag "-vhdl"        (PassFlag (setMode doVHDLMode))
-  , Flag "-verilog"     (PassFlag (setMode doVerilogMode))
+  , Flag "-make"          (PassFlag (setMode doMakeMode))
+  , Flag "-interactive"   (PassFlag (setMode doInteractiveMode))
+  , Flag "-abi-hash"      (PassFlag (setMode doAbiHashMode))
+  , Flag "e"              (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , Flag "-vhdl"          (PassFlag (setMode doVHDLMode))
+  , Flag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -901,8 +901,8 @@ makeHDL' backend srcs = makeHDL backend $ fmap fst srcs
 makeVHDL :: [(String, Maybe Phase)] -> Ghc ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
 
-makeVerilog :: [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: VerilogState)
+makeSystemVerilog :: [(String, Maybe Phase)] -> Ghc ()
+makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

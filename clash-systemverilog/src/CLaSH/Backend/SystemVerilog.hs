@@ -5,8 +5,8 @@
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Generate VHDL for assorted Netlist datatypes
-module CLaSH.Backend.Verilog (VerilogState) where
+-- | Generate SystemVerilog for assorted Netlist datatypes
+module CLaSH.Backend.SystemVerilog (SystemVerilogState) where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
@@ -34,18 +34,18 @@ import qualified Paths_clash_systemverilog
 import qualified System.FilePath
 #endif
 
--- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
-data VerilogState =
-  VerilogState
+-- | State for the 'CLaSH.Backend.SystemVerilog.SystemVerilogM' monad:
+data SystemVerilogState =
+  SystemVerilogState
     { _tyCache   :: HashSet HWType -- ^ Previously encountered  HWTypes
     , _tyCount   :: Int -- ^ Product type counter
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     }
 
-makeLenses ''VerilogState
+makeLenses ''SystemVerilogState
 
-instance Backend VerilogState where
-  initBackend     = VerilogState HashSet.empty 0 HashMap.empty
+instance Backend SystemVerilogState where
+  initBackend     = SystemVerilogState HashSet.empty 0 HashMap.empty
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -64,11 +64,10 @@ instance Backend VerilogState where
   inst            = inst_
   expr            = expr_
 
-type VHDLM a = State VerilogState a
-type VerilogM a = State VerilogState a
+type SystemVerilogM a = State SystemVerilogState a
 
 -- | Generate VHDL for a Netlist component
-genVerilog :: Component -> VerilogM (String,Doc)
+genVerilog :: Component -> SystemVerilogM (String,Doc)
 genVerilog c = (unpack cName,) A.<$> verilog
   where
     cName   = componentName c
@@ -78,7 +77,7 @@ genVerilog c = (unpack cName,) A.<$> verilog
 
 -- | Generate a SystemVerilog package containing type definitions for the given HWTypes
 mkTyPackage_ :: [HWType]
-             -> VerilogM Doc
+             -> SystemVerilogM Doc
 mkTyPackage_ hwtys =
     "package types ;" <$>
       indent 2 packageDec <$>
@@ -133,7 +132,7 @@ topSortHWTys hwtys = sorted
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
-tyDec :: HWType -> VHDLM Doc
+tyDec :: HWType -> SystemVerilogM Doc
 tyDec (Vector n elTy) = "typedef" <+> verilogType elTy <+>  "array_of_" <> int n <> "_" <> tyName elTy <+> brackets (int 0 <> colon <> int (n-1)) <> semi
 
 tyDec ty@(Product _ tys) = prodDec
@@ -147,7 +146,7 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
-funDec :: HWType -> VHDLM Doc
+funDec :: HWType -> SystemVerilogM Doc
 funDec (Clock _) = empty
 funDec (Reset _) = empty
 funDec t =
@@ -160,10 +159,10 @@ funDec t =
        <> semi) <$>
   "endfunction"
 
-tyImports :: VHDLM Doc
+tyImports :: SystemVerilogM Doc
 tyImports = "import types:: * ;"
 
-module_ :: Component -> VerilogM Doc
+module_ :: Component -> SystemVerilogM Doc
 module_ c =
     "module" <+> text (componentName c) <> tupled ports <> semi <$>
     indent 2 (inputPorts <$> outputPort <$$> decls (declarations c)) <$$> insts (declarations c) <$>
@@ -180,7 +179,7 @@ module_ c =
 
     outputPort = "output" <+> sigDecl (text (fst $ output c)) (snd $ output c) <> semi
 
-verilogType :: HWType -> VerilogM Doc
+verilogType :: HWType -> SystemVerilogM Doc
 verilogType t = do
   tyCache %= HashSet.insert t
   case t of
@@ -192,16 +191,16 @@ verilogType t = do
     (Reset _)     -> "logic"
     _             -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
-sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
+sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
 sigDecl d t = verilogType t <+> d
 
 -- | Convert a Netlist HWType to the root of a Verilog type
-verilogTypeMark :: HWType -> VHDLM Doc
+verilogTypeMark :: HWType -> SystemVerilogM Doc
 verilogTypeMark t = do
   tyCache %= HashSet.insert t
   tyName t
 
-tyName :: HWType -> VHDLM Doc
+tyName :: HWType -> SystemVerilogM Doc
 tyName Integer           = "integer_32"
 tyName Bool              = "logic_vector_1"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
@@ -220,7 +219,7 @@ tyName (Reset _) = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
-verilogTypeErrValue :: HWType -> VHDLM Doc
+verilogTypeErrValue :: HWType -> SystemVerilogM Doc
 verilogTypeErrValue Bool                = "1'bx"
 verilogTypeErrValue Integer         = "{32 {1'bx}}"
 verilogTypeErrValue (Unsigned n)    = braces (int n <+> braces "1'bx")
@@ -233,7 +232,7 @@ verilogTypeErrValue (BitVector n)   = braces (int n <+> braces "1'bx")
 verilogTypeErrValue t@(SP _ _)      = braces (int (typeSize t) <+> braces "1'bx")
 verilogTypeErrValue e = error $ $(curLoc) ++ "no error value defined for: " ++ show e
 
-decls :: [Declaration] -> VerilogM Doc
+decls :: [Declaration] -> SystemVerilogM Doc
 decls [] = empty
 decls ds = do
     dsDoc <- catMaybes A.<$> mapM decl ds
@@ -241,18 +240,18 @@ decls ds = do
       [] -> empty
       _  -> vcat (A.pure dsDoc)
 
-decl :: Declaration -> VHDLM (Maybe Doc)
+decl :: Declaration -> SystemVerilogM (Maybe Doc)
 decl (NetDecl id_ ty netInit) = Just A.<$> sigDecl (text id_) ty <> semi <$>
   maybe empty (\e -> "// pragma translate_off" <$> "initial begin" <$> indent 2 (text id_ <+> "=" <+> expr_ False e <> semi) <$> "end" <$> "// pragma translate_on") netInit
 
 decl _ = return Nothing
 
-insts :: [Declaration] -> VerilogM Doc
+insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = empty
 insts is = indent 2 . vcat . punctuate linebreak . fmap catMaybes $ mapM inst_ is
 
--- | Turn a Netlist Declaration to a VHDL concurrent block
-inst_ :: Declaration -> VerilogM (Maybe Doc)
+-- | Turn a Netlist Declaration to a SystemVerilog concurrent block
+inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
@@ -262,7 +261,7 @@ inst_ (CondAssignment id_ scrut es) = fmap Just $
       (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
     "endcase"
   where
-    conds :: [(Maybe Expr,Expr)] -> VerilogM [Doc]
+    conds :: [(Maybe Expr,Expr)] -> SystemVerilogM [Doc]
     conds []                = return []
     conds [(_,e)]           = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
     conds ((Nothing,e):_)   = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
@@ -288,10 +287,10 @@ inst_ (BlackBoxD _ bs bbCtx) = do
 
 inst_ (NetDecl _ _ _) = return Nothing
 
--- | Turn a Netlist expression into a VHDL expression
+-- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
       -> Expr -- ^ Expr to convert
-      -> VerilogM Doc
+      -> SystemVerilogM Doc
 expr_ _ (Literal sizeM lit)                           = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing)                      = text id_
 expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy id_ start end
@@ -381,7 +380,7 @@ vectorChain (DataCon (Vector 1 _) _ [e])     = Just [e]
 vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
-exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
+exprLit :: Maybe (HWType,Size) -> Literal -> SystemVerilogM Doc
 exprLit Nothing         (NumLit i) = integer i
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Unsigned _   -> int sz <> "'d" <> integer i
@@ -403,16 +402,16 @@ toBits size val = map (\x -> if odd x then H else L)
                 $ map (`mod` 2)
                 $ iterate (`div` 2) val
 
-bits :: [Bit] -> VerilogM Doc
+bits :: [Bit] -> SystemVerilogM Doc
 bits = hcat . mapM bit_char
 
-bit_char :: Bit -> VerilogM Doc
+bit_char :: Bit -> SystemVerilogM Doc
 bit_char H = char '1'
 bit_char L = char '0'
 bit_char U = char 'U'
 bit_char Z = char 'Z'
 
-toSLV :: HWType -> Expr -> VerilogM Doc
+toSLV :: HWType -> Expr -> SystemVerilogM Doc
 toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     listBraces (zipWithM toSLV tys selIds')
@@ -432,7 +431,7 @@ toSLV (Vector n elTy) (DataCon _ _ es) = listBraces (zipWithM toSLV [elTy,Vector
 
 toSLV _ e = expr_ False e
 
-fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
+fromSLV :: HWType -> Identifier -> Int -> Int -> SystemVerilogM Doc
 fromSLV t@(Product _ tys) id_ start _ = "'" <> listBraces (zipWithM (\s e -> s <> colon <+> e) selNames args)
   where
     tName      = tyName t

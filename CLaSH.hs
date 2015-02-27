@@ -6,15 +6,15 @@ import CLaSH.GHC.NetlistTypes
 import CLaSH.Primitives.Util
 import CLaSH.Backend
 import CLaSH.Backend.VHDL
-import CLaSH.Backend.Verilog
+import CLaSH.Backend.SystemVerilog
 
 genVHDL :: String
         -> IO ()
 genVHDL = doHDL (initBackend :: VHDLState)
 
-genVerilog :: String
+genSystemVerilog :: String
            -> IO ()
-genVerilog = doHDL (initBackend :: VerilogState)
+genSystemVerilog = doHDL (initBackend :: SystemVerilogState)
 
 doHDL :: Backend s
        => s

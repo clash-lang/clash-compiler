@@ -61,26 +61,17 @@ Library
   HS-Source-Dirs:     src
 
   default-language:   Haskell2010
-  ghc-options:        -O2 -Wall -fwarn-tabs
+  ghc-options:        -Wall -fwarn-tabs
   CPP-Options:        -DCABAL
 
-  Build-depends:      aeson                   >= 0.6.2.0,
-                      attoparsec              >= 0.10.4.0,
-                      base                    >= 4.6.0.1 && < 5,
-                      concurrent-supply       >= 0.1.7,
-                      containers              >= 0.5.0.0,
+  Build-depends:      base                    >= 4.6.0.1 && < 5,
+                      clash-lib               >= 0.4.1,
                       fgl                     >= 5.4.2.4,
-                      hashable                >= 1.2.1.0,
                       lens                    >= 3.9.2,
                       mtl                     >= 2.1.2,
-                      pretty                  >= 1.1.1.0,
-                      template-haskell        >= 2.8.0.0,
                       text                    >= 0.11.3.1,
-                      transformers            >= 0.3.0.0,
                       unordered-containers    >= 0.2.3.3,
-                      wl-pprint-text          >= 1.1.0.0,
-
-                      clash-lib               >= 0.4.1
+                      wl-pprint-text          >= 1.1.0.0
 
   Exposed-modules:    CLaSH.Backend.VHDL
 
