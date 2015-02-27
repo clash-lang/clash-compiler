@@ -243,7 +243,7 @@ decls ds = do
 
 decl :: Declaration -> VHDLM (Maybe Doc)
 decl (NetDecl id_ ty netInit) = Just A.<$> sigDecl (text id_) ty <> semi <$>
-  maybe empty (\e -> "initial begin" <$> indent 2 (text id_ <+> "=" <+> expr_ False e <> semi) <$> "end") netInit
+  maybe empty (\e -> "// pragma translate_off" <$> "initial begin" <$> indent 2 (text id_ <+> "=" <+> expr_ False e <> semi) <$> "end" <$> "// pragma translate_on") netInit
 
 decl _ = return Nothing
 
