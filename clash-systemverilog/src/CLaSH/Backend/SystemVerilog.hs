@@ -256,10 +256,11 @@ inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ scrut es) = fmap Just $
-    "always_comb" <$>
-    "case" <> parens (expr_ True scrut) <$>
-      (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
-    "endcase"
+    "always_comb begin" <$>
+    indent 2 ("case" <> parens (expr_ True scrut) <$>
+                (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
+              "endcase") <$>
+    "end"
   where
     conds :: [(Maybe Expr,Expr)] -> SystemVerilogM [Doc]
     conds []                = return []
