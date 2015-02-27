@@ -452,7 +452,7 @@ fromSLV t@(Vector n elTy) id_ start _ = verilogTypeMark t <> "'" <> parens ("'" 
 fromSLV Integer    id_ start end = fromSLV (Signed 32) id_ start end
 fromSLV (Signed _) id_ start end = "$signed" <> parens (text id_ <> brackets (int start <> colon <> int end))
 
-fromSLV _ id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV _ id_ start end = text id_ <> brackets (int start <> colon <> int end)
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
