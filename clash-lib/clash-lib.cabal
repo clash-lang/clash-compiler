@@ -37,7 +37,7 @@ Copyright:            Copyright © 2012-2014 University of Twente
 Category:             Hardware
 Build-type:           Simple
 
-Extra-source-files:   ../README.md,
+Extra-source-files:   README.md,
                       CHANGELOG.md
 
 Cabal-version:        >=1.10
