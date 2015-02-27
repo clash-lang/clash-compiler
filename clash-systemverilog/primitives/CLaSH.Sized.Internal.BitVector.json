@@ -54,7 +54,7 @@ assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
 // pragma translate_off
-always @(*) begin
+always_comb begin
   if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
     $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
     ~RESULT = ~ERRORO;
@@ -75,12 +75,12 @@ end
 assign ~SYM[0] = ~ARG[2];
 
 ~SIGD[~SYM[1]][1];
-always @(*) begin
-  ~SYM[1] <= ~ARG[1];
+always_comb begin
+  ~SYM[1] = ~ARG[1];
   // pragma translate_off
-  if ~SYM[0] < $low(~SYM[2]) || ~SYM[0] > $high(~SYM[2]) begin
+  if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
     $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
-    ~SYM[1] <= ~ERROR[1];
+    ~SYM[1] = ~ERROR[1];
   end else begin
     // pragma translate_on
     ~SYM[1][~SYM[0]] = ~ARG[3];
@@ -104,9 +104,9 @@ assign ~RESULT = ~SYM[1];"
 "// setSlice
 ~SIGD[~SYM[0]][0];
 
-always @(*) begin
-  ~SYM[0] <= ~ARG[0];
-  ~SYM[0][~LIT[1] : ~LIT[2]] <= ~ARG[3];
+always_comb begin
+  ~SYM[0] = ~ARG[0];
+  ~SYM[0][~LIT[1] : ~LIT[2]] = ~ARG[3];
 end
 
 assign ~RESULT = ~SYM[0];"
