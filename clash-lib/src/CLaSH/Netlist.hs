@@ -174,7 +174,9 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
       altVarId = mkBasicId . Text.pack $ name2String varTm
       modifier = case pat of
-        DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
+        DataPat (Embed dc) ids -> let tms = case unrebind ids of
+                                              ([],tms') -> tms'
+                                              _         -> error $ $(curLoc) ++ "Not in normal form: Pattern binds existential variables: " ++ showDoc e
                                   in case elemIndex (Id varTm (Embed varTy)) tms of
                                        Nothing -> Nothing
                                        Just fI
