@@ -156,7 +156,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               i <- varCount <<%= (+1)
               tcm     <- Lens.use tcCache
               scrutTy <- termType tcm scrut
-              (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
+              (scrutExpr,scrutDecls) <- mkExpr True scrutTy scrut
               let tmpNm     = "tmp_tte_" ++ show i
                   tmpS      = pack tmpNm
                   netDecl   = NetDecl tmpS hwTy Nothing
@@ -171,7 +171,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
             tcm      <- Lens.use tcCache
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-            (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
+            (scrutExpr,scrutDecls) <- mkExpr True scrutTy scrut
             let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
                 tmpS         = pack ("tmp_dtt_" ++ show j)
                 netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
