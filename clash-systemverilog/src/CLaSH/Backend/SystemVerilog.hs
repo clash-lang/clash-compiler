@@ -350,15 +350,15 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
-expr_ _ (DataTag Bool (Left id_))          = parens (text id_ <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
-expr_ _ (DataTag Bool (Right id_))         = parens (text id_ <+> "== 1'b0") <+> "? 32'sd0 : 31'sd1"
+expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)
+expr_ _ (DataTag Bool (Right id_))         = "$signed" <> parens (listBraces (sequence [braces (int 31 <+> braces "1'b0"),text id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
-expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (text id_)
+expr_ _ (DataTag (Sum _ _) (Right id_))    = "$signed" <> parens (text id_)
 
 expr_ _ (DataTag (Product _ _) (Right _))  = "32'sd0"
 
-expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
                                                (text id_ <> brackets
                                                (int start <> colon <> int end))
   where
