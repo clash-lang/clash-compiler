@@ -1070,3 +1070,7 @@ ucBV :: forall n m . KnownNat m
 ucBV UZero     _  = Nil
 ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# (unsafeCoerce bv)
                     in  x :> ucBV n bv'
+
+instance Lift a => Lift (Vec n a) where
+  lift Nil     = [| Nil |]
+  lift (x:>xs) = [| x :> $(lift xs) |]
