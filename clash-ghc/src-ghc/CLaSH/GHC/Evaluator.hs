@@ -26,13 +26,13 @@ reduceConstant tcm e@(collectArgs -> (Prim nm _, args))
         | i == j    -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
       _ -> e
-  | nm == "GHC.Integer.Type.gtInteger#"
+  | nm == "GHC.Prim.>#" || nm == "GHC.Integer.Type.gtInteger#"
   = case (map (reduceConstant tcm) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i > j     -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
       _ -> e
-  | nm == "GHC.Integer.Type.ltInteger#"
+  | nm == "GHC.Prim.<#" || nm == "GHC.Integer.Type.ltInteger#"
   = case (map (reduceConstant tcm) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i < j     -> Literal (IntegerLiteral 1)
