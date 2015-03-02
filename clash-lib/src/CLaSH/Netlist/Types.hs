@@ -143,7 +143,7 @@ data Expr
   = Literal    (Maybe (HWType,Size)) Literal -- ^ Literal expression
   | DataCon    HWType       Modifier  [Expr] -- ^ DataCon application
   | Identifier Identifier   (Maybe Modifier) -- ^ Signal reference
-  | DataTag    HWType       (Either Expr Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
+  | DataTag    HWType       (Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
   | BlackBoxE S.Text BlackBoxTemplate BlackBoxContext Bool -- ^ Instantiation of a BlackBox expression
   deriving Show
 

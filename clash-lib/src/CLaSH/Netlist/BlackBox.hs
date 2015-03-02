@@ -156,12 +156,15 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               i <- varCount <<%= (+1)
               tcm     <- Lens.use tcCache
               scrutTy <- termType tcm scrut
-              (scrutExpr,scrutDecls) <- mkExpr True scrutTy scrut
-              let tmpNm     = "tmp_tte_" ++ show i
-                  tmpS      = pack tmpNm
-                  netDecl   = NetDecl tmpS hwTy Nothing
-                  netAssign = Assignment tmpS (DataTag hwTy (Left scrutExpr))
-              return ((Identifier tmpS Nothing,hwTy),netDecl:netAssign:scrutDecls)
+              scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+              (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
+              let tmpRhs       = pack ("tmp_tte_rhs_" ++ show i)
+                  tmpS         = pack ("tmp_tte_" ++ show i)
+                  netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
+                  netDeclS     = NetDecl tmpS hwTy Nothing
+                  netAssignRhs = Assignment tmpRhs scrutExpr
+                  netAssignS   = Assignment tmpS (DataTag hwTy (Left tmpRhs))
+              return ((Identifier tmpS Nothing,hwTy),[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
       | pNm == "GHC.Prim.dataToTag#" -> case args of
           [Right _,Left (Data dc)] -> return ((N.Literal Nothing (NumLit $ toInteger $ dcTag dc - 1),Integer),[])
@@ -171,7 +174,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
             tcm      <- Lens.use tcCache
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-            (scrutExpr,scrutDecls) <- mkExpr True scrutTy scrut
+            (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
             let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
                 tmpS         = pack ("tmp_dtt_" ++ show j)
                 netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing

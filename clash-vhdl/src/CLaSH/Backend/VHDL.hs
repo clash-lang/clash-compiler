@@ -491,16 +491,16 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
-expr_ _ (DataTag Bool (Left e))           = "false when" <+> expr_ False e <+> "= 0 else true"
-expr_ _ (DataTag Bool (Right id_))          = "1 when" <+> text id_ <+> "else 0"
-expr_ _ (DataTag hty@(Sum _ _) (Left e))  = "to_unsigned" <> tupled (sequence [expr_ False e,int (typeSize hty)])
-expr_ _ (DataTag (Sum _ _) (Right id_))     = "to_integer" <> parens (text id_)
+expr_ _ (DataTag Bool (Left id_))          = "false when" <+> text id_ <+> "= 0 else true"
+expr_ _ (DataTag Bool (Right id_))         = "1 when" <+> text id_ <+> "else 0"
+expr_ _ (DataTag hty@(Sum _ _) (Left id_)) = "to_unsigned" <> tupled (sequence [text id_,int (typeSize hty)])
+expr_ _ (DataTag (Sum _ _) (Right id_))    = "to_integer" <> parens (text id_)
 
-expr_ _ (DataTag (Product _ _) (Right _)) = int 0
-expr_ _ (DataTag hty@(SP _ _) (Right id_))  = "to_integer" <> parens
-                                                ("unsigned" <> parens
-                                                (text id_ <> parens
-                                                (int start <+> "downto" <+> int end)))
+expr_ _ (DataTag (Product _ _) (Right _))  = int 0
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "to_integer" <> parens
+                                               ("unsigned" <> parens
+                                               (text id_ <> parens
+                                               (int start <+> "downto" <+> int end)))
   where
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty

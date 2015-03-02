@@ -350,17 +350,17 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
-expr_ _ (DataTag Bool (Left e))           = parens (expr_ False e <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
-expr_ _ (DataTag Bool (Right id_))        = parens (text id_ <+> "== 1'b0") <+> "? 32'sd0 : 31'sd1"
+expr_ _ (DataTag Bool (Left id_))          = parens (text id_ <+> "== 32'sd0") <+> "? 1'b0 : 1'b1"
+expr_ _ (DataTag Bool (Right id_))         = parens (text id_ <+> "== 1'b0") <+> "? 32'sd0 : 31'sd1"
 
-expr_ _ (DataTag (Sum _ _) (Left e))  = "$unsigned" <> parens (expr_ False e)
-expr_ _ (DataTag (Sum _ _) (Right id_))     = "$unsigned" <> parens (text id_)
+expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
+expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (text id_)
 
-expr_ _ (DataTag (Product _ _) (Right _)) = "32'sd0"
+expr_ _ (DataTag (Product _ _) (Right _))  = "32'sd0"
 
-expr_ _ (DataTag hty@(SP _ _) (Right id_))  = "$unsigned" <> parens
-                                                (text id_ <> brackets
-                                                (int start <> colon <> int end))
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
+                                               (text id_ <> brackets
+                                               (int start <> colon <> int end))
   where
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
