@@ -160,6 +160,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   tcm          <- Lens.use tcCache
   scrutTy      <- termType tcm scrut
   let sHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy
+      vHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm varTy
   (selId,decls) <- case scrut of
                      (Var _ scrutNm) -> return (mkBasicId . Text.pack $ name2String scrutNm,[])
                      _ -> do
@@ -176,7 +177,11 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
         DataPat (Embed dc) ids -> let (_,tms) = unrebind ids
                                   in case elemIndex (Id varTm (Embed varTy)) tms of
                                        Nothing -> Nothing
-                                       Just fI -> Just (Indexed (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy,dcTag dc - 1,fI))
+                                       Just fI
+                                        | sHwTy /= vHwTy -> Just (Indexed (sHwTy,dcTag dc - 1,fI))
+                                        -- When element and subject have the same HW-type,
+                                        -- then the projections is just the identity
+                                        | otherwise      -> Just (DC (Void,0))
         _                      -> error $ $(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection: " ++ showDoc e
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return (decls ++ [Assignment dstId extractExpr])
