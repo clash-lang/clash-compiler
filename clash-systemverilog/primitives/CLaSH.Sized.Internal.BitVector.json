@@ -1,0 +1,324 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.size#"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.maxIndex#"
+    , "templateE" : "~LIT[0] - 1"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.high"
+    , "templateE" : "1'b1"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.low"
+    , "templateE" : "1'b0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.++#"
+    , "templateE" : "{~ARG[1],~ARG[2]}"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.reduceAnd#"
+    , "templateE" : "& (~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.reduceOr#"
+    , "templateE" : "| (~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.reduceXor#"
+    , "templateE" : "^ (~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.index#"
+    , "comment"   :
+    "index# :: KnownNat n  -- ARG[0]
+            => BitVector n -- ARG[1]
+            -> Int         -- ARG[2]
+            -> Bit"
+    , "templateD" :
+"// index
+~SIGD[~SYM[0]][1];
+~SIGD[~SYM[1]][2];
+
+assign ~SYM[0] = ~ARG[1];
+assign ~SYM[1] = ~ARG[2];
+
+// pragma translate_off
+always_comb begin
+  if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
+    ~RESULT = ~ERRORO;
+  end else begin
+  // pragma translate_on
+    ~RESULT = ~SYM[0][~SYM[1]];
+  // pragma translate_off
+  end
+end
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.replaceBit#"
+    , "templateD" :
+"// replaceBit
+~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
+
+~SIGD[~SYM[1]][1];
+always_comb begin
+  ~SYM[1] = ~ARG[1];
+  // pragma translate_off
+  if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
+    ~SYM[1] = ~ERROR[1];
+  end else begin
+    // pragma translate_on
+    ~SYM[1][~SYM[0]] = ~ARG[3];
+    // pragma translate_off
+  end
+  // pragma translate_on
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.setSlice#"
+    , "comment"   :
+    "setSlice# :: BitVector (m + 1 + i) -- ARG[0]
+               -> SNat m                -- ARG[1]
+               -> SNat n                -- ARG[2]
+               -> BitVector (m + 1 - n) -- ARG[3]
+               -> BitVector (m + 1 + i)"
+    , "templateD" :
+"// setSlice
+~SIGD[~SYM[0]][0];
+
+always_comb begin
+  ~SYM[0] = ~ARG[0];
+  ~SYM[0][~LIT[1] : ~LIT[2]] = ~ARG[3];
+end
+
+assign ~RESULT = ~SYM[0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.slice#"
+    , "comment"   :
+    "slice# :: BitVector (m + 1 + i) -- ARG[0]
+            -> SNat m                -- ARG[1]
+            -> SNat n                -- ARG[2]
+            -> BitVector (m + 1 - n)"
+    , "templateD" :
+"// slice
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.split#"
+    , "comment"   :
+    "split# :: KnownNat n        -- ARG[0]
+            => BitVector (m + n) -- ARG[1]
+            -> (BitVector m, BitVector n)"
+    , "templateD" :
+"// split
+~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
+                  , ~SYM[0][(~LIT[0]-1) : 0]
+                  };"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.msb#"
+    , "comment"   :
+    "msb# :: KnownNat n  -- ARG[0]
+          => BitVector n -- ARG[1]
+          -> Bit"
+    , "templateD" :
+"// msb
+~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+assign ~RESULT = ~SYM[0][~LIT[0]-1];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.lsb#"
+    , "comment"   :
+    "lsb# :: BitVector n -- ARG[0]
+          -> Bit"
+    , "templateD" :
+"// lsb
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+assign ~RESULT = ~SYM[0][0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.eq#"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.neq#"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.lt#"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.ge#"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.gt#"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.le#"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "~LIT[0]'d0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.maxBound#"
+    , "comment"   : "Generates incorrect VDHL for n=0"
+    , "templateE" : "{~LIT[0] {1'b1}}"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.+#"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.-#"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.*#"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.negate#"
+    , "templateE" : "-~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.fromInteger#"
+    , "templateE" : "$unsigned(~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.plus#"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.minus#"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.times#"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.quot#"
+    , "templateE" : "~ARG[1]) / ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.rem#"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.mod#"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.toInteger#"
+    , "templateE" : "$unsigned(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.and#"
+    , "templateE" : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.or#"
+    , "templateE" : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.xor#"
+    , "templateE" : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.complement#"
+    , "templateE" : "~ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.shiftL#"
+    , "templateE" : "~ARG[1] << ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.shiftR#"
+    , "templateE" : "~ARG[1] >> ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.rotateL#"
+    , "templateD" :
+"// rotateL
+logic [2*~LIT[0]-1:0] ~SYM[0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
+assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.rotateR#"
+    , "templateD" :
+"// rotateR
+logic [2*~LIT[0]-1:0] ~SYM[0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
+assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.BitVector.resize#"
+    , "templateE" : "$unsigned(~ARG[1])"
+    }
+  }
+]

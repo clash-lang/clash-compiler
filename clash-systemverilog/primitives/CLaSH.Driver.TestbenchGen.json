@@ -1,0 +1,54 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.clockGen"
+    , "templateD" :
+"// pragma translate_off
+always begin
+  ~RESULT = 0;
+  #~LIT[0] forever begin
+    ~RESULT = ~ ~RESULT;
+    #~LIT[1];
+    ~RESULT = ~ ~RESULT;
+    #~LIT[2];
+  end
+end
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.resetGen"
+    , "templateD" :
+"// pragma translate_off
+initial begin
+  ~RESULT = 0;
+  #~LIT[0] ~RESULT = 1;
+end
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.doneGen"
+    , "templateD" :
+"assign ~RESULT = ~ARG[0];
+
+// pragma translate_off
+always_comb begin
+  if (~ARG[0] == 1'b1) begin
+    $finish;
+  end
+end
+// pragma translate_on
+"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
+    , "templateD" :
+"always_comb begin
+// pragma translate_off
+  #~LIT[1]
+// pragma translate_on
+  ~RESULT = ~LIT[0];
+end"
+    }
+  }
+]

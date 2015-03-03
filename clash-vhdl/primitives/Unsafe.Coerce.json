@@ -1,0 +1,6 @@
+[ { "BlackBox" :
+    { "name"      : "Unsafe.Coerce.unsafeCoerce"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]

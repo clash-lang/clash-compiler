@@ -1,0 +1,16 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Real.divZeroError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Real.ratioZeroDenominatorError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Real.overflowError"
+    , "templateE" : "~ERRORO"
+    }
+  }
+]

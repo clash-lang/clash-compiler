@@ -52,7 +52,8 @@ c_frm (ws,ts,hist) vs = ((ws',ts',hist'),y)
     ws' = vs
     y   = hist'
 
-topEntity = c_frm <^> (c_ws0,c_ts0,c_hist0)
+topEntity :: Signal (Vec 6 Integer) -> Signal (Vec 12 Integer)
+topEntity = c_frm `mealy` (c_ws0,c_ts0,c_hist0)
 
 -- Haskell
 sim f s [] = []
@@ -60,9 +61,8 @@ sim f s (x:xs) = y : sim f s' xs
 	where
 	  (s',y) = f s x
 -- CLaSH
-c_sim f i = L.take (L.length i) $ simulateB f c_vss
+c_sim f i = L.take (L.length i) $ simulate f c_vss
 
-c_outp :: [Vec 12 Integer]
 c_outp = c_sim topEntity c_vss
 
 -- ===============================================

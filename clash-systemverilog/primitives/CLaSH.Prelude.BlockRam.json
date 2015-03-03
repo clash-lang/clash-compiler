@@ -1,0 +1,31 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Prelude.BlockRam.cblockRam"
+    , "comment"   :
+    "cblockRam :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
+          => SClock clk                    -- clk,  ARG[2]
+          -> Vec n a                       -- init, ARG[3]
+          -> CSignal clk (Unsigned m)      -- wr,   ARG[4]
+          -> CSignal clk (Unsigned m)      -- rd,   ARG[5]
+          -> CSignal clk Bool              -- wren, ARG[6]
+          -> CSignal clk a                 -- din,  ARG[7]
+          -> CSignal clk a"
+    , "templateD" :
+"// blockRam
+~SIGD[~SYM[0]][3];
+~SIGD[~SYM[1]][7];
+
+initial begin
+  ~SYM[0] = ~LIT[3];
+end
+
+always @ (posedge ~CLK[2]) begin
+  if (~ARG[6]) begin
+    ~SYM[0][~ARG[4]] <= ~ARG[7];
+  end
+  ~SYM[1] <= ~SYM[0][~ARG[5]];
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+]

@@ -1,0 +1,76 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Prim.+#"
+    , "templateE" : "~ARG[0] + ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.-#"
+    , "templateE" : "~ARG[0] - ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.*#"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.quotInt#"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.remInt#"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.negateInt#"
+    , "templateE" : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>#"
+    , "templateE" : "(~ARG[0] > ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>=#"
+    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.==#"
+    , "templateE" : "(~ARG[0] == ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim./=#"
+    , "templateE" : "(~ARG[0] != ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<#"
+    , "templateE" : "(~ARG[0] < ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<=#"
+    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "GHC.Prim.dataToTag#"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "GHC.Prim.tagToEnum#"
+    , "primType" : "Function"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.unsafeCoerce#"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]

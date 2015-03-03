@@ -1,0 +1,22 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Prelude.Testbench.csassert"
+    , "comment"   :
+    "csassert :: (Eq a,Show a) -- (ARG[0],ARG[1])
+         => CSignal t a -- ^ Checked value (ARG[2])
+         -> CSignal t a -- ^ Expected value (ARG[3])
+         -> CSignal t b -- ^ Return valued (ARG[4])
+         -> CSignal t b"
+    , "templateD" :
+"// assert
+// pragma translate_off
+always @(posedge ~CLK[2] or negedge ~RST[2]) begin
+  if (~ARG[2] != ~ARG[3]) begin
+    $display(\"expected: %b, actual: %b\", ~TYPM[3]_to_lv(~ARG[3]), ~TYPM[2]_to_lv(~ARG[2]));
+    $stop;
+  end
+end
+// pragma translate_on
+assign ~RESULT = ~ARG[4];"
+    }
+  }
+]

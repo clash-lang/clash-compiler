@@ -1,0 +1,82 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Classes.eqInt"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.neInt"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.gtInt"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.geInt"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.ltInt"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.leInt"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.&&"
+    , "templateE" : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.||"
+    , "templateE" : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.not"
+    , "templateE" : "~ ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.divInt#"
+    , "templateD" :
+"// divInt
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
+
+// divide (rounds towards zero)
+assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+
+// round toward minus infinity
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Classes.modInt#"
+    , "templateD" :
+"// modInt
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
+
+// remainder
+assign ~SYM[0] = ~ARG[0] % ~ARG[1];
+
+// modulo
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ?
+                 ~SYM[0] :
+                 (~ARG[1] == 32'sd0 ? 32'sd0 : ~SYM[0] + ~ARG[1]);"
+    }
+  }
+]

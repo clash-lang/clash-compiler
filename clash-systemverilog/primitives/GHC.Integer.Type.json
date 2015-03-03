@@ -1,0 +1,152 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.smallInteger"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToInt"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.plusInteger"
+    , "templateE" : "~ARG[0] + ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.minusInteger"
+    , "templateE" : "~ARG[0] - ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.timesInteger"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.negateInteger"
+    , "templateE" : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.absInteger"
+    , "templateE" : "~ARG[0] < 32'sd0 ? -~ARG[0] : ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.divInteger"
+    , "templateD" :
+"// divInteger
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
+
+// divide (rounds towards zero)
+assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+
+// round toward minus infinity
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.modInteger"
+    , "templateD" :
+"// modInteger
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
+
+// remainder
+assign ~SYM[0] = ~ARG[0] % ~ARG[1];
+
+// modulo
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ?
+                 ~SYM[0] :
+                 (~ARG[1] == 32'sd0 ? 32'sd0 : ~SYM[0] + ~ARG[1]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.quotInteger"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.remInteger"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger#"
+    , "templateE" : "(~ARG[0] == ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger#"
+    , "templateE" : "(~ARG[0] != ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger#"
+    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger#"
+    , "templateE" : "(~ARG[0] > ~ARG[1] ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger#"
+    , "templateE" : "(~ARG[0] < ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger#"
+    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.shiftRInteger"
+    , "templateE" : "~ARG[0] >>> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.shiftLInteger"
+    , "templateE" : "~ARG[0] <<< ~ARG[1]"
+    }
+  }
+]

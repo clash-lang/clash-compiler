@@ -1,0 +1,70 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.register#"
+    , "comment"   :
+    "register# :: SClock clk     -- ARG[0]
+               -> a              -- ARG[1]
+               -> CSignal clk a  -- ARG[2]
+               -> CSignal clk a"
+    , "templateD" :
+"~SIGD[~SYM[0]][2];
+
+always_ff @(posedge ~CLK[0] or negedge ~RST[0])
+if (~ ~RST[0]) begin
+  ~SYM[0] <= ~ARG[1];
+end else begin
+  ~SYM[0] <= ~ARG[2];
+end
+
+assign ~RESULT = ~SYM[0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.regEn#"
+    , "comment"   :
+    "regEn# :: SClock clk       -- ARG[0]
+            -> a                -- ARG[1]
+            -> CSignal clk Bool -- ARG[2]
+            -> CSignal clk a    -- ARG[3]
+            -> CSignal clk a"
+    , "templateD" :
+"~SIGD[~SYM[0]][3];
+
+always_ff @(posedge ~CLK[0] or negedge ~RST[0])
+if (~ ~RST[0]) begin
+  ~SYM[1] <= ~ARG[1];
+end else begin
+  if (~ARG[2]) begin
+    ~SYM[1] <= ~ARG[3];
+  end
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.signal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.mapSignal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.appSignal#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.foldr#"
+    , "primType"  : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.traverse#"
+    , "primType"  : "Function"
+    }
+  }
+]

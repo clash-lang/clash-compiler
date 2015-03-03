@@ -1,0 +1,16 @@
+[ { "BlackBox" :
+    { "name"      : "EmptyCase"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "_CO_"
+    , "primType" : "Constructor"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "_TY_"
+    , "primType" : "Constructor"
+    }
+  }
+]
