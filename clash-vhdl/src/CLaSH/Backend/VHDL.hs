@@ -24,7 +24,7 @@ import qualified Data.Text.Lazy                       as T
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
-import           CLaSH.Netlist.BlackBox.Util          (renderBlackBox)
+import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
@@ -474,17 +474,17 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ bs bbCtx b') = do

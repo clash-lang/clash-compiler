@@ -100,9 +100,11 @@ genClock primMap (clkName,Clock rate) = Just clkDecls
       Just (BlackBox _ (Left templ)) -> let (rising,rest) = divMod (toInteger rate) 2
                                             falling       = rising + rest
                                             ctx = emptyBBContext
-                                                    { bbResult    = (Left (Identifier clkName Nothing), Clock rate)
-                                                    , bbInputs    = [error $ "clockGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ | i <- [0..] ]
-                                                    , bbLitInputs = [N.Literal Nothing (NumLit 2), N.Literal Nothing (NumLit rising), N.Literal Nothing (NumLit falling)] ++ [ (error $ "resetGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [2..] ]
+                                                    { bbResult = (Left (Identifier clkName Nothing), Clock rate)
+                                                    , bbInputs = [ (Left (N.Literal Nothing (NumLit 2)),Integer,True)
+                                                                 , (Left (N.Literal Nothing (NumLit rising)),Integer,True)
+                                                                 , (Left (N.Literal Nothing (NumLit falling)),Integer,True)
+                                                                 ]
                                                     }
                                         in  BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" (parseFail templ) ctx
       pM -> error $ $(curLoc) ++ ("Can't make clock declaration for: " ++ show pM)
@@ -120,9 +122,8 @@ genReset primMap (rstName,Reset clk) = Just rstDecls
   where
     resetGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.resetGen" primMap of
       Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
-                                                    { bbResult    = (Left (Identifier rstName Nothing), Reset clk)
-                                                    , bbInputs    = [error $ "resetGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ | i <- [0..] ]
-                                                    , bbLitInputs = (N.Literal Nothing (NumLit 1)) : [ (error $ "resetGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [1..] ]
+                                                    { bbResult = (Left (Identifier rstName Nothing), Reset clk)
+                                                    , bbInputs = [(Left (N.Literal Nothing (NumLit 1)),Integer,True)]
                                                     }
                                         in  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" (parseFail templ) ctx
       pM -> error $ $(curLoc) ++ ("Can't make reset declaration for: " ++ show pM)
@@ -137,9 +138,10 @@ genFinish :: PrimMap
           -> Declaration
 genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" primMap of
   Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
-                                                { bbResult    = (Left (Identifier "finished" Nothing), Bool)
-                                                , bbInputs    = [ (error $ "finishedGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [0..] ]
-                                                , bbLitInputs = (N.Literal Nothing (BoolLit True)) : (N.Literal Nothing (NumLit 100)) : [ (error $ "resetGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [1..] ]
+                                                { bbResult = (Left (Identifier "finished" Nothing), Bool)
+                                                , bbInputs = [ (Left (N.Literal Nothing (BoolLit True)),Bool,True)
+                                                             , (Left (N.Literal Nothing (NumLit 100)),Integer,True)
+                                                             ]
                                                 }
                                     in  BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" (parseFail templ) ctx
   pM -> error $ $(curLoc) ++ ("Can't make finish declaration for: " ++ show pM)
@@ -149,8 +151,7 @@ genDone :: PrimMap
 genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMap of
   Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
                                                 { bbResult    = (Left (Identifier "done" Nothing), Bool)
-                                                , bbInputs    = (Left (Identifier "finished" Nothing),Bool) : [ (error $ "doneGen input " ++ show i ++ " must be accessed with ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [0..] ]
-                                                , bbLitInputs = [ (error $ "doneGen has no ~LIT[" ++ show (i :: Integer) ++ "]\n" ++ show templ) | i <- [0..] ]
+                                                , bbInputs    = [(Left (Identifier "finished" Nothing),Bool,False)]
                                                 }
                                     in  BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" (parseFail templ) ctx
   pM -> error $ $(curLoc) ++ ("Can't make done declaration for: " ++ show pM)

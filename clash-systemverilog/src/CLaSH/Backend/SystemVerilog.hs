@@ -23,7 +23,7 @@ import           Data.Text.Lazy                       (unpack)
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
-import           CLaSH.Netlist.BlackBox.Util          (parseFail, renderBlackBox)
+import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, parseFail, renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
@@ -275,7 +275,7 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
 
 inst_ (BlackBoxD pNm _ bbCtx)
   | pNm == "CLaSH.Sized.Internal.Signed.resize#"
-  , ((Literal _ (NumLit n)):(Literal _ (NumLit m)):_) <- bbLitInputs bbCtx
+  , ((Literal _ (NumLit n)):(Literal _ (NumLit m)):_) <- extractLiterals bbCtx
   , n < m
   = do
     let bs = parseFail "assign ~RESULT = $signed(~ARG[2]);"
@@ -333,17 +333,17 @@ expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> v
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ bs bbCtx b') = do

@@ -167,9 +167,8 @@ data Bit
 data BlackBoxContext
   = Context
   { bbResult    :: (SyncExpr,HWType) -- ^ Result name and type
-  , bbInputs    :: [(SyncExpr,HWType)] -- ^ Argument names and types
-  , bbLitInputs :: [Expr] -- ^ Literal arguments (subset of inputs)
-  , bbFunInputs :: [(Either BlackBoxTemplate Declaration,BlackBoxContext)]
+  , bbInputs    :: [(SyncExpr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
+  , bbFunctions :: [Maybe (Either BlackBoxTemplate Declaration,BlackBoxContext)]
   -- ^ Function arguments (subset of inputs):
   --
   -- * (Blackbox Template,Partial Blackbox Concext)
@@ -177,7 +176,7 @@ data BlackBoxContext
   deriving Show
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) [] [] []
+emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) [] []
 
 -- | Either the name of the identifier, or a tuple of the identifier and the
 -- corresponding clock

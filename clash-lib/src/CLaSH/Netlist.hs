@@ -274,7 +274,7 @@ mkExpr bbEasD ty app = do
     Data dc
       | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy dc tmArgs
       | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim nm _ -> first fst <$> mkPrimitive False bbEasD nm args ty
+    Prim nm _ -> mkPrimitive False bbEasD nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
