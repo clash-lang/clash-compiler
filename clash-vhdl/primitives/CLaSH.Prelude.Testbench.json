@@ -1,11 +1,11 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Prelude.Testbench.csassert"
-    , "comment"   :
-    "csassert :: (Eq a,Show a) -- (ARG[0],ARG[1])
-         => CSignal t a -- ^ Checked value (ARG[2])
-         -> CSignal t a -- ^ Expected value (ARG[3])
-         -> CSignal t b -- ^ Return valued (ARG[4])
-         -> CSignal t b"
+    { "name" : "CLaSH.Prelude.Testbench.csassert"
+    , "type" :
+"csassert :: (Eq a,Show a) -- (ARG[0],ARG[1])
+          => CSignal t a   -- ^ Checked value (ARG[2])
+          -> CSignal t a   -- ^ Expected value (ARG[3])
+          -> CSignal t b   -- ^ Return valued (ARG[4])
+          -> CSignal t b"
     , "templateD" :
 "assert_~SYM[0] : block
 begin

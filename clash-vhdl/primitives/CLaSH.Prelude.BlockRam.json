@@ -1,14 +1,14 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Prelude.BlockRam.cblockRam"
-    , "comment"   :
-    "cblockRam :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
-          => SClock clk                    -- clk,  ARG[2]
-          -> Vec n a                       -- init, ARG[3]
-          -> CSignal clk (Unsigned m)      -- wr,   ARG[4]
-          -> CSignal clk (Unsigned m)      -- rd,   ARG[5]
-          -> CSignal clk Bool              -- wren, ARG[6]
-          -> CSignal clk a                 -- din,  ARG[7]
-          -> CSignal clk a"
+    { "name" : "CLaSH.Prelude.BlockRam.cblockRam"
+    , "type" :
+"cblockRam :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
+           => SClock clk               -- clk,  ARG[2]
+           -> Vec n a                  -- init, ARG[3]
+           -> CSignal clk (Unsigned m) -- wr,   ARG[4]
+           -> CSignal clk (Unsigned m) -- rd,   ARG[5]
+           -> CSignal clk Bool         -- wren, ARG[6]
+           -> CSignal clk a            -- din,  ARG[7]
+           -> CSignal clk a"
     , "templateD" :
 "blockram_~SYM[0] : block
   signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram

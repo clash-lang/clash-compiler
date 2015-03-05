@@ -1,10 +1,12 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Err.error"
+    , "type"      : "error :: [Char] -> a"
     , "templateE" : "~ERRORO"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Err.undefined"
+    , "type"      : "undefined :: a"
     , "templateE" : "~ERRORO"
     }
   }

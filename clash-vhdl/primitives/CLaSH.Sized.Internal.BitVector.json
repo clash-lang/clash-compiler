@@ -1,31 +1,37 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.size#"
+    , "type"      : "size# :: KnownNat n => BitVector n -> Int"
     , "templateE" : "~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.maxIndex#"
+    , "type"      : "maxIndex# :: KnownNat n => BitVector n -> Int"
     , "templateE" : "~LIT[0] - 1"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.high"
+    , "type"      : "high :: Bit"
     , "templateE" : "\"1\""
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.low"
+    , "type"      : "low :: Bit"
     , "templateE" : "\"0\""
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.++#"
+    , "type"      : "(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)"
     , "templateE" : "std_logic_vector'(~ARG[1]) & std_logic_vector'(~ARG[2])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceAnd#"
-    , "templateD"  :
+    , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> BitVector 1"
+    , "templateD" :
 "reduceAnd_~SYM[0] : block
   function and_reduce (arg : std_logic_vector) return std_logic is
     variable upper, lower : std_logic;
@@ -55,7 +61,8 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceOr#"
-    , "templateD"  :
+    , "type"      : "reduceOr# :: BitVector n -> BitVector 1"
+    , "templateD" :
 "reduceOr_~SYM[0] : block
   function or_reduce (arg : std_logic_vector) return std_logic is
     variable upper, lower : std_logic;
@@ -85,7 +92,8 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.reduceXor#"
-    , "templateD"  :
+    , "type"      : "reduceXor# :: BitVector n -> BitVector 1"
+    , "templateD" :
 "reduceXor_~SYM[0] : block
   function xor_reduce (arg : std_logic_vector) return std_logic is
     variable upper, lower : std_logic;
@@ -114,12 +122,12 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.index#"
-    , "comment"   :
-    "index# :: KnownNat n  -- ARG[0]
-            => BitVector n -- ARG[1]
-            -> Int         -- ARG[2]
-            -> Bit"
+    { "name" : "CLaSH.Sized.Internal.BitVector.index#"
+    , "type" :
+"index# :: KnownNat n  -- ARG[0]
+        => BitVector n -- ARG[1]
+        -> Int         -- ARG[2]
+        -> Bit"
     , "templateD" :
 "indexBit_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -144,13 +152,13 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.replaceBit#"
-    , "comment"   :
-    "replaceBit# :: KnownNat n  -- ARG[0]
-                 => BitVector n -- ARG[1]
-                 -> Int         -- ARG[2]
-                 -> Bit         -- ARG[3]
-                 -> BitVector n"
+    { "name" : "CLaSH.Sized.Internal.BitVector.replaceBit#"
+    , "type" :
+"replaceBit# :: KnownNat n  -- ARG[0]
+             => BitVector n -- ARG[1]
+             -> Int         -- ARG[2]
+             -> Bit         -- ARG[3]
+             -> BitVector n"
     , "templateD" :
 "replaceBit_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -180,13 +188,13 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.setSlice#"
-    , "comment"   :
-    "setSlice# :: BitVector (m + 1 + i) -- ARG[0]
-               -> SNat m                -- ARG[1]
-               -> SNat n                -- ARG[2]
-               -> BitVector (m + 1 - n) -- ARG[3]
-               -> BitVector (m + 1 + i)"
+    { "name" : "CLaSH.Sized.Internal.BitVector.setSlice#"
+    , "type" :
+"setSlice# :: BitVector (m + 1 + i) -- ARG[0]
+           -> SNat m                -- ARG[1]
+           -> SNat n                -- ARG[2]
+           -> BitVector (m + 1 - n) -- ARG[3]
+           -> BitVector (m + 1 + i)"
     , "templateD" :
 "setSlice_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -205,12 +213,12 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.slice#"
-    , "comment"   :
-    "slice# :: BitVector (m + 1 + i) -- ARG[0]
-            -> SNat m                -- ARG[1]
-            -> SNat n                -- ARG[2]
-            -> BitVector (m + 1 - n)"
+    { "name" : "CLaSH.Sized.Internal.BitVector.slice#"
+    , "type" :
+"slice# :: BitVector (m + 1 + i) -- ARG[0]
+        -> SNat m                -- ARG[1]
+        -> SNat n                -- ARG[2]
+        -> BitVector (m + 1 - n)"
     , "templateD" :
 "slice_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -221,11 +229,11 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.split#"
-    , "comment"   :
-    "split# :: KnownNat n        -- ARG[0]
-            => BitVector (m + n) -- ARG[1]
-            -> (BitVector m, BitVector n)"
+    { "name" : "CLaSH.Sized.Internal.BitVector.split#"
+    , "type" :
+"split# :: KnownNat n        -- ARG[0]
+        => BitVector (m + n) -- ARG[1]
+        -> (BitVector m, BitVector n)"
     , "templateD" :
 "split_~SYM[0]: block
   signal ~SYM[1] : ~TYP[1];
@@ -239,11 +247,11 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.msb#"
-    , "comment"   :
-    "msb# :: KnownNat n  -- ARG[0]
-          => BitVector n -- ARG[1]
-          -> Bit"
+    { "name" : "CLaSH.Sized.Internal.BitVector.msb#"
+    , "type" :
+"msb# :: KnownNat n  -- ARG[0]
+      => BitVector n -- ARG[1]
+      -> Bit"
     , "templateD" :
 "msb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -261,10 +269,10 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.lsb#"
-    , "comment"   :
-    "lsb# :: BitVector n -- ARG[0]
-          -> Bit"
+    { "name" : "CLaSH.Sized.Internal.BitVector.lsb#"
+    , "type" :
+"lsb# :: BitVector n -- ARG[0]
+      -> Bit"
     , "templateD" :
 "lsb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -284,148 +292,177 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.eq#"
+    , "type"      : "eq# :: BitVector n -> BitVector n -> Bool"
     , "templateE" : "~ARG[0] = ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.neq#"
+    , "type"      : "neq# :: BitVector n -> BitVector n -> Bool"
     , "templateE" : "~ARG[0] /= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.lt#"
+    , "type"      : "lt# :: BitVector n -> BitVector n -> Bool"
     , "templateE" : "~ARG[0] < ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.ge#"
+    , "type"      : "ge# :: BitVector n -> BitVector n -> Bool"
     , "templateE" : "~ARG[0] >= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.gt#"
+    , "type"      : "gt# :: BitVector n -> BitVector n -> Bool"
     , "templateE" : "~ARG[0] > ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.le#"
+    , "type"      : "le# :: BitVector n -> BitVector n -> Bool"
     , "templateE" : "~ARG[0] <= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
+    , "type"      : "minBound# :: KnownNat n => BitVector n"
     , "comment"   : "Generates incorrect VDHL for n=0"
     , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '0');"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.maxBound#"
+    , "type"      : "maxBound# :: KnownNat n => BitVector n"
     , "comment"   : "Generates incorrect VDHL for n=0"
     , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '1');"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.+#"
+    , "type"      : "(+#) :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "std_logic_vector(unsigned(~ARG[1]) + unsigned(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.-#"
+    , "type"      : "(-#) :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "std_logic_vector(unsigned(~ARG[1]) - unsigned(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.*#"
+    , "type"      : "(*#) :: KnownNat n => BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]) * unsigned(~ARG[2]), ~LIT[0]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.negate#"
+    , "type"      : "negate# :: KnownNat n => BitVector n -> BitVector n"
     , "templateE" : "std_logic_vector(-(signed(~ARG[1])))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.fromInteger#"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> BitVector n"
     , "templateE" : "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.plus#"
+    , "type"      : "plus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
     , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]) + resize(unsigned(~ARG[2]),~LIT[0]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minus#"
+    , "type"      : "minus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
     , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]) - resize(unsigned(~ARG[2]),~LIT[0]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.times#"
+    , "type"      : "times# :: KnownNat (m + n) => BitVector m -> BitVector n -> BitVector (m + n)"
     , "templateE" : "std_logic_vector(unsigned(~ARG[1]) * unsigned(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.quot#"
+    , "type"      : "quot# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "std_logic_vector(unsigned(~ARG[1]) / unsigned(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rem#"
+    , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[1] rem ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.mod#"
+    , "type"      : "mod# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[1] mod ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.toInteger#"
+    , "type"      : "toInteger# :: BitVector n -> Integer"
     , "templateE" : "to_integer(unsigned(~ARG[0]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.and#"
+    , "type"      : "and# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[0] and ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.or#"
+    , "type"      : "or# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[0] or ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.xor#"
+    , "type"      : "xor# :: BitVector n -> BitVector n -> BitVector n"
     , "templateE" : "~ARG[0] xor ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.complement#"
+    , "type"      : "complement# :: KnownNat n => BitVector n -> BitVector n"
     , "templateE" : "not ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.shiftL#"
+    , "type"      : "shiftL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateE" : "std_logic_vector(shift_left(unsigned(~ARG[1]),~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.shiftR#"
+    , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateE" : "std_logic_vector(shift_right(unsigned(~ARG[1]),~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateL#"
+    , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateE" : "std_logic_vector(rotate_left(unsigned(~ARG[1]),~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateR#"
+    , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateE" : "std_logic_vector(rotate_right(unsigned(~ARG[1]),~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.resize#"
+    , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
     , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]))"
     }
   }
