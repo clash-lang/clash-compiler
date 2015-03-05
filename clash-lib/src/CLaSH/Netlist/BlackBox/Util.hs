@@ -43,7 +43,7 @@ verifyBlackBoxContext bbCtx = all verify'
     verify' (Typ (Just n))  = n < length (bbInputs bbCtx)
     verify' (TypM (Just n)) = n < length (bbInputs bbCtx)
     verify' (Err (Just n))  = n < length (bbInputs bbCtx)
-    verify' (D (Decl n l')) = case indexMaybe (bbFunctions bbCtx) n of
+    verify' (D (Decl n l')) = case IntMap.lookup n (bbFunctions bbCtx) of
                                 Just _ -> all (\(x,y) -> verifyBlackBoxContext bbCtx x &&
                                                          verifyBlackBoxContext bbCtx y) l'
                                 _      -> False
@@ -125,7 +125,7 @@ renderElem :: Backend backend
 renderElem b (D (Decl n (l:ls))) = do
     (o,oTy,_) <- syncIdToSyncExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
     is <- mapM (fmap syncIdToSyncExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
-    let Just (Just (templ,pCtx)) = indexMaybe (bbFunctions b) n
+    let Just (templ,pCtx)    = IntMap.lookup n (bbFunctions b)
         b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
     templ' <- case templ of
                 Left t  -> return t

@@ -12,6 +12,7 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (filterM)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
+import qualified Data.IntMap                   as IntMap
 import           Data.Monoid                   (mconcat)
 import           Data.Text.Lazy                (Text, fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
@@ -48,13 +49,9 @@ mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox applicati
                   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
     -- Make context inputs
-    tcm                   <- Lens.use tcCache
-    (imps,impDecls)       <- unzip <$> mapM mkArgument args
-    (funs,funDecls)       <- unzip <$> mapM (\a -> do isF <- isFun tcm a
-                                                      if isF
-                                                         then first Just <$> mkFunInput resId a
-                                                         else return (Nothing,[])
-                                            ) args
+    tcm             <- Lens.use tcCache
+    (imps,impDecls) <- unzip <$> mapM mkArgument args
+    (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
     let res = case synchronizedClk tcm (unembed $ V.varType resId) of
@@ -65,6 +62,14 @@ mkBlackBoxContext resId args = do
     return ( Context (res,resTy) imps funs
            , concat impDecls ++ concat funDecls
            )
+  where
+    addFunction tcm im (arg,i) = do
+      isF <- isFun tcm arg
+      if isF
+         then do (f,d) <- mkFunInput resId arg
+                 let im' = IntMap.insert i f im
+                 return (im',d)
+         else return (im,[])
 
 prepareBlackBox :: TextS.Text
                 -> Text
