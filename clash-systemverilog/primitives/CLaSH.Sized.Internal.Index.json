@@ -1,75 +1,90 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.eq#"
+    , "type"      : "eq# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] == ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.neq#"
+    , "type"      : "neq# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] != ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.lt#"
+    , "type"      : "lt# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] < ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.ge#"
+    , "type"      : "ge# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] >= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.gt#"
+    , "type"      : "gt# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] > ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.le#"
+    , "type"      : "le# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] <= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.maxBound#"
+    , "type"      : "maxBound# :: KnownNat n => Index n"
     , "templateE" : "~LIT[0]-1"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.+#"
+    , "type"      : "(+#) :: KnownNat n => Index n -> Index n -> Index n"
     , "templateE" : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.-#"
+    , "type"      : "(-#) :: KnownNat n => Index n -> Index n -> Index n"
     , "templateE" : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.*#"
+    , "type"      : "(*#) :: KnownNat n => Index n -> Index n -> Index n"
     , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.fromInteger#"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> Index n"
     , "templateE" : "$unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.quot#"
+    , "type"      : "quot# :: KnownNat n => Index n -> Index n -> Index n"
     , "templateE" : "~ARG[1] / ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.rem#"
+    , "type"      : "rem# :: KnownNat n => Index n -> Index n -> Index n"
     , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.mod#"
+    , "type"      : "mod# :: KnownNat n => Index n -> Index n -> Index n"
     , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.toInteger#"
+    , "type"      : "toInteger# :: Index n -> Integer"
     , "templateE" : "$unsigned(~ARG[0])"
     }
   }

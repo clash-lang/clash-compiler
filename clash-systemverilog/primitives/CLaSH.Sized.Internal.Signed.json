@@ -1,119 +1,140 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Internal.Signed.size#"
+    , "type"      : "size# :: KnownNat n => Signed n -> Int"
     , "templateE" : "~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.pack#"
+    , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
     , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.unpack#"
+    , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
     , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.eq#"
+    , "type"      : "eq# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] == ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.neq#"
+    , "type"      : "neq# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] != ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.lt#"
+    , "type"      : "lt# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] < ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.ge#"
+    , "type"      : "ge# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] >= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.gt#"
+    , "type"      : "gt# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] > ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.le#"
+    , "type"      : "le# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] <= ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minBound#"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "comment2"  : "the quantification with signed gives the array an ascending index"
+    , "type"      : "minBound# :: KnownNat n => Signed n"
+    , "comment"   : "Generates incorrect SV for n=0"
     , "templateE" : "{1'b1, {(~LIT[0]-1) {1'b0}}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.maxBound#"
-    , "comment"   : "Generates incorrect VDHL for n=0"
-    , "comment2"  : "the quantification with signed gives the array an ascending index"
+    , "type"      : "maxBound# :: KnownNat n => Signed n"
+    , "comment"   : "Generates incorrect SV for n=0"
     , "templateE" : "{1'b0, {(~LIT[0]-1) {1'b1}}}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.+#"
+    , "type"      : "(+#) :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.-#"
+    , "type"      : "(-#) :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.*#"
+    , "type"      : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.negate#"
+    , "type"      : "negate# :: KnownNat n => Signed n -> Signed n"
     , "templateE" : "-~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.abs#"
+    , "type"      : "abs# :: KnownNat n => Signed n -> Signed n"
     , "templateE" : "(~ARG[1] < ~LIT[0]'sd0) ? -~ARG[1] : ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.fromInteger#"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
     , "templateE" : "$signed(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.plus#"
+    , "type"      : "plus# :: KnownNat (1 + Max m n) => Signed m -> Signed n -> Signed (1 + Max m n)"
     , "templateE" : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minus#"
+    , "type"      : "minus# :: KnownNat (1 + Max m n) => Signed m -> Signed n -> Signed (1 + Max m n)"
     , "templateE" : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.times#"
+    , "type"      : "times# :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)"
     , "templateE" : "~ARG[1] * ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.quot#"
+    , "type"      : "quot# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] / ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rem#"
+    , "type"      : "rem# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] % ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
+    , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
 "// divInt
 ~SIGD[~SYM[0]][1];
@@ -131,6 +152,7 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] 
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
+    , "type"      : "mod# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
 "// modSigned
 ~SIGD[~SYM[0]][1];
@@ -150,41 +172,49 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.toInteger#"
+    , "type"      : "toInteger# :: Signed n -> Integer"
     , "templateE" : "$signed(~ARG[0])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.and#"
+    , "type"      : "and# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] & ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.or#"
+    , "type"      : "or# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] | ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.xor#"
+    , "type"      : "xor# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] ^ ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.complement#"
+    , "type"      : "complement# :: KnownNat n => Signed n -> Signed n"
     , "templateE" : "~ ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.shiftL#"
+    , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateE" : "~ARG[1] <<< ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.shiftR#"
+    , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateE" : "~ARG[1] >>> ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateL#"
+    , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateD" :
 "// rotateL
 logic [2*~LIT[0]-1:0] ~SYM[0];
@@ -194,6 +224,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateR#"
+    , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateD" :
 "// rotateR
 logic [2*~LIT[0]-1:0] ~SYM[0];
@@ -203,6 +234,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.resize#"
+    , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
     , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
     , "templateD" :
 "// truncate, sign preserving
@@ -213,6 +245,7 @@ assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
+    , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
     , "templateE" : "$signed(~ARG[1])"
     }
   }

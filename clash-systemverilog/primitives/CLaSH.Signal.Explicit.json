@@ -1,5 +1,10 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Signal.Explicit.veryUnsafeSynchronizer"
+    , "type" :
+"veryUnsafeSynchronizer :: SClock clk1
+                        -> SClock clk2
+                        -> CSignal clk1 a -- ARG[2]
+                        -> CSignal clk2 a"
     , "templateE" : "~ARG[2]"
     }
   }

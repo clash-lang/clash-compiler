@@ -1,10 +1,10 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.register#"
-    , "comment"   :
-    "register# :: SClock clk     -- ARG[0]
-               -> a              -- ARG[1]
-               -> CSignal clk a  -- ARG[2]
-               -> CSignal clk a"
+    { "name" : "CLaSH.Signal.Internal.register#"
+    , "type" :
+"register# :: SClock clk     -- ARG[0]
+           -> a              -- ARG[1]
+           -> CSignal clk a  -- ARG[2]
+           -> CSignal clk a"
     , "templateD" :
 "~SIGD[~SYM[0]][2];
 
@@ -19,13 +19,13 @@ assign ~RESULT = ~SYM[0];"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.regEn#"
-    , "comment"   :
-    "regEn# :: SClock clk       -- ARG[0]
-            -> a                -- ARG[1]
-            -> CSignal clk Bool -- ARG[2]
-            -> CSignal clk a    -- ARG[3]
-            -> CSignal clk a"
+    { "name" : "CLaSH.Signal.Internal.regEn#"
+    , "type" :
+"regEn# :: SClock clk       -- ARG[0]
+        -> a                -- ARG[1]
+        -> CSignal clk Bool -- ARG[2]
+        -> CSignal clk a    -- ARG[3]
+        -> CSignal clk a"
     , "templateD" :
 "~SIGD[~SYM[0]][3];
 

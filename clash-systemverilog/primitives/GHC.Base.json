@@ -5,16 +5,19 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Base.quotInt"
+    , "type"      : "quotInt :: Int -> Int -> Int"
     , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Base.remInt"
+    , "type"      : "remInt :: Int -> Int -> Int"
     , "templateE" : "~ARG[0] % ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Base.divInt"
+    , "type"      : "divInt :: Int -> Int -> Int"
     , "templateD" :
 "// divInt
 ~SIGD[~SYM[0]][0];
@@ -32,6 +35,7 @@ assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
   }
 , { "BlackBox" :
     { "name"      : "GHC.Base.modInt"
+    , "type"      : "modInt :: Int -> Int -> Int"
     , "templateD" :
 "// modInt
 ~SIGD[~SYM[0]][0];
