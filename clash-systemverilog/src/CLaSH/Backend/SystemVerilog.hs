@@ -23,7 +23,7 @@ import           Data.Text.Lazy                       (unpack)
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
-import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, parseFail, renderBlackBox)
+import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
@@ -272,15 +272,6 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
   where
     pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,e) <- pms]
-
-inst_ (BlackBoxD pNm _ bbCtx)
-  | pNm == "CLaSH.Sized.Internal.Signed.resize#"
-  , ((Literal _ (NumLit n)):(Literal _ (NumLit m)):_) <- extractLiterals bbCtx
-  , n < m
-  = do
-    let bs = parseFail "assign ~RESULT = $signed(~ARG[2]);"
-    t <- renderBlackBox bs bbCtx
-    fmap Just (string t)
 
 inst_ (BlackBoxD _ bs bbCtx) = do
   t <- renderBlackBox bs bbCtx

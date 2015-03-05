@@ -237,10 +237,18 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
     , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
     , "templateD" :
-"// truncate, sign preserving
-~SIGD[~SYM[0]][2];
-assign ~SYM[0] = ~ARG[2];
-assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});"
+"// resize
+generate
+  if (~LIT[1] < ~LIT[0]) begin
+    // truncate, sign preserving
+    ~SIGD[~SYM[0]][2];
+    assign ~SYM[0] = ~ARG[2];
+    assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});
+  end else begin
+    // sign-extend
+    assign ~RESULT = $signed(~ARG[2]);
+  end
+endgenerate"
     }
   }
 , { "BlackBox" :
