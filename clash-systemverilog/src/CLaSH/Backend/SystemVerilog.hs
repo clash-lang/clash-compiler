@@ -238,11 +238,10 @@ decls ds = do
     dsDoc <- catMaybes A.<$> mapM decl ds
     case dsDoc of
       [] -> empty
-      _  -> vcat (A.pure dsDoc)
+      _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl id_ ty netInit) = Just A.<$> sigDecl (text id_) ty <> semi <$>
-  maybe empty (\e -> "// pragma translate_off" <$> "initial begin" <$> indent 2 (text id_ <+> "=" <+> expr_ False e <> semi) <$> "end" <$> "// pragma translate_on") netInit
+decl (NetDecl id_ ty) = Just A.<$> sigDecl (text id_) ty
 
 decl _ = return Nothing
 
@@ -277,7 +276,7 @@ inst_ (BlackBoxD _ bs bbCtx) = do
   t <- renderBlackBox bs bbCtx
   fmap Just (string t)
 
-inst_ (NetDecl _ _ _) = return Nothing
+inst_ (NetDecl _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
@@ -454,3 +453,6 @@ listBraces = encloseSep lbrace rbrace comma
 parenIf :: Monad m => Bool -> m Doc -> m Doc
 parenIf True  = parens
 parenIf False = id
+
+punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
+punctuate' s d = vcat (punctuate s d) <> s

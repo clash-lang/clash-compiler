@@ -126,7 +126,7 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl Identifier Identifier [(Identifier,Expr)] -- ^ Instantiation of another component
   | BlackBoxD S.Text BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl Identifier HWType (Maybe Expr) -- ^ Signal declaration
+  | NetDecl Identifier HWType -- ^ Signal declaration
   deriving Show
 
 instance NFData Declaration where

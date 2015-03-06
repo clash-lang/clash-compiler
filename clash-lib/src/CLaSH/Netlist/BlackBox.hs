@@ -136,7 +136,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
       let hwTy    = snd $ bbResult bbCtx
       case template p of
         (Left tempD) -> do
-          let tmpDecl = NetDecl tmpNmT hwTy Nothing
+          let tmpDecl = NetDecl tmpNmT hwTy
               pNm     = name p
           bbDecl <- N.BlackBoxD pNm <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
           return (Identifier tmpNmT Nothing,ctxDcls ++ [tmpDecl,bbDecl])
@@ -144,7 +144,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
           let pNm = name p
           bbTempl <- prepareBlackBox pNm tempE bbCtx
           if bbEasD
-            then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
+            then let tmpDecl  = NetDecl tmpNmT hwTy
                      tmpAssgn = Assignment tmpNmT (BlackBoxE pNm bbTempl bbCtx bbEParen)
                  in  return (Identifier tmpNmT Nothing, ctxDcls ++ [tmpDecl,tmpAssgn])
             else return (BlackBoxE pNm bbTempl bbCtx bbEParen,ctxDcls)
@@ -166,8 +166,8 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
               let tmpRhs       = pack ("tmp_tte_rhs_" ++ show i)
                   tmpS         = pack ("tmp_tte_" ++ show i)
-                  netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
-                  netDeclS     = NetDecl tmpS hwTy Nothing
+                  netDeclRhs   = NetDecl tmpRhs scrutHTy
+                  netDeclS     = NetDecl tmpS hwTy
                   netAssignRhs = Assignment tmpRhs scrutExpr
                   netAssignS   = Assignment tmpS (DataTag hwTy (Left tmpRhs))
               return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
@@ -183,8 +183,8 @@ mkPrimitive bbEParen bbEasD nm args ty = do
             (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
             let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
                 tmpS         = pack ("tmp_dtt_" ++ show j)
-                netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
-                netDeclS     = NetDecl tmpS Integer  Nothing
+                netDeclRhs   = NetDecl tmpRhs scrutHTy
+                netDeclS     = NetDecl tmpS Integer
                 netAssignRhs = Assignment tmpRhs scrutExpr
                 netAssignS   = Assignment tmpS   (DataTag scrutHTy (Right tmpRhs))
             return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)

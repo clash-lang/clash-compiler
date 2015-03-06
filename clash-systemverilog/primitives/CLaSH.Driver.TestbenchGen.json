@@ -45,9 +45,13 @@ end
     , "templateD" :
 "always_comb begin
 // pragma translate_off
-  #~LIT[1]
+  ~RESULT = 1'b0;
+  #~LIT[0] forever begin
 // pragma translate_on
-  ~RESULT = ~LIT[0];
+    ~RESULT = 1'b1;
+// pragma translate_off
+  end
+// pragma translate_on
 end"
     }
   }

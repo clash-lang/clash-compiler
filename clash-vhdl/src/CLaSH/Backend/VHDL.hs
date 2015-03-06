@@ -391,11 +391,11 @@ decls ds = do
     rec (dsDoc,ls) <- fmap (unzip . catMaybes) $ mapM (decl (maximum ls)) ds
     case dsDoc of
       [] -> empty
-      _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
+      _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
-  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr_ False e) netInit)
+decl l (NetDecl id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty
 
 decl _ _ = return Nothing
 

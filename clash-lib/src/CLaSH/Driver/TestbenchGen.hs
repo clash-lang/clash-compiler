@@ -48,15 +48,15 @@ genTestBench :: DebugLevel
              -> IO ([Component])
 genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
   (Component cName hidden [inp] outp _) = do
-  let ioDecl  = [ uncurry NetDecl inp  Nothing
-                , uncurry NetDecl outp Nothing
+  let ioDecl  = [ uncurry NetDecl inp
+                , uncurry NetDecl outp
                 ]
       inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
   (inpInst,inpComps,cmpCnt',hidden') <- maybe (return (inpExpr,[],cmpCnt,hidden))
                                                  (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
                                                  stimuliNmM
 
-  let finDecl = [ NetDecl "finished" Bool (Just (N.Literal Nothing (BoolLit False)))
+  let finDecl = [ NetDecl "finished" Bool
                 , genDone primMap
                 ]
       finExpr = genFinish primMap
@@ -109,7 +109,7 @@ genClock primMap (clkName,Clock rate) = Just clkDecls
                                         in  BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" (parseFail templ) ctx
       pM -> error $ $(curLoc) ++ ("Can't make clock declaration for: " ++ show pM)
 
-    clkDecls   = [ NetDecl clkName (Clock rate) (Just (N.Literal Nothing (BitLit L)))
+    clkDecls   = [ NetDecl clkName (Clock rate)
                  , clkGenDecl
                  ]
 
@@ -128,7 +128,7 @@ genReset primMap (rstName,Reset clk) = Just rstDecls
                                         in  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" (parseFail templ) ctx
       pM -> error $ $(curLoc) ++ ("Can't make reset declaration for: " ++ show pM)
 
-    rstDecls = [ NetDecl rstName (Reset clk) Nothing
+    rstDecls = [ NetDecl rstName (Reset clk)
                , resetGenDecl
                ]
 
@@ -139,9 +139,7 @@ genFinish :: PrimMap
 genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" primMap of
   Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
                                                 { bbResult = (Left (Identifier "finished" Nothing), Bool)
-                                                , bbInputs = [ (Left (N.Literal Nothing (BoolLit True)),Bool,True)
-                                                             , (Left (N.Literal Nothing (NumLit 100)),Integer,True)
-                                                             ]
+                                                , bbInputs = [ (Left (N.Literal Nothing (NumLit 100)),Integer,True) ]
                                                 }
                                     in  BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" (parseFail templ) ctx
   pM -> error $ $(curLoc) ++ ("Can't make finish declaration for: " ++ show pM)
