@@ -16,7 +16,7 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (pack)
-import           Unbound.LocallyNameless (Embed, Fresh, bind, embed, makeName,
+import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed, makeName,
                                           name2Integer, name2String, unbind,
                                           unembed, unrec)
 

@@ -7,7 +7,7 @@ import           Data.Bits           (shiftL,shiftR)
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
-import           Unbound.LocallyNameless (bind, embed, string2Name)
+import           Unbound.Generics.LocallyNameless (bind, embed, string2Name)
 
 import           CLaSH.Core.DataCon  (dcTag)
 import           CLaSH.Core.Literal  (Literal (..))

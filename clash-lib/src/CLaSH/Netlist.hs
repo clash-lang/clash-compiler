@@ -15,7 +15,7 @@ import qualified Data.HashMap.Lazy          as HashMap
 import           Data.List                  (elemIndex, nub)
 import           Data.Maybe                 (fromMaybe)
 import qualified Data.Text.Lazy             as Text
-import           Unbound.LocallyNameless    (Embed (..), name2String,
+import           Unbound.Generics.LocallyNameless    (Embed (..), name2String,
                                              runFreshMT, unbind, unembed,
                                              unrebind)
 

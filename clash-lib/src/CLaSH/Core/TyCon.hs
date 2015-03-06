@@ -1,8 +1,9 @@
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternGuards         #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
@@ -20,8 +21,11 @@ where
 
 -- External Import
 import                Control.DeepSeq
-import                Unbound.LocallyNameless as Unbound hiding (rnf)
-import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
+import                Data.Monoid                           (mempty)
+import                Data.Typeable                         hiding (TyCon,tyConName)
+import                GHC.Generics
+import                Unbound.Generics.LocallyNameless
+import                Unbound.Generics.LocallyNameless.Name (Name(..))
 
 -- Internal Imports
 import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
@@ -55,6 +59,7 @@ data TyCon
   | SuperKindTyCon
   { tyConName :: TyConName     -- ^ Name of the TyCon
   }
+  deriving (Generic,Typeable)
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
@@ -84,24 +89,26 @@ data AlgTyConRhs
                                  -- The TyName's are the type-variables from
                                  -- the corresponding TyCon.
   }
-  deriving Show
-
-Unbound.derive [''TyCon,''AlgTyConRhs]
+  deriving (Show,Generic)
 
 instance Alpha TyCon where
-  swaps' _ _ d    = d
-  fv' _ _         = emptyC
-  lfreshen' _ a f = f a empty
-  freshen' _ a    = return (a,empty)
-  aeq' _ tc1 tc2  = aeq (tyConName tc1) (tyConName tc2)
-  acompare' _ tc1 tc2 = acompare (tyConName tc1) (tyConName tc2)
-  open _ _ d      = d
-  close _ _ d     = d
-  isPat _         = error "isPat TyCon"
-  isTerm _        = error "isTerm TyCon"
-  isEmbed _       = error "isEmbed TyCon"
-  nthpatrec _     = error "nthpatrec TyCon"
-  findpatrec _ _  = error "findpatrec TyCon"
+  aeq' _ tc1 tc2      = aeq (tyConName tc1) (tyConName tc2)
+
+  fvAny' _ _ tc       = pure tc
+
+  close _ _ tc        = tc
+  open _ _ tc         = tc
+
+  isPat _             = mempty
+  isTerm _            = True
+
+  nthPatFind _        = Left
+  namePatFind _ _     = Left 0
+
+  swaps' _ _ tc       = tc
+  lfreshen' _ tc cont = cont tc mempty
+  freshen' _ tc       = return (tc,mempty)
+
 
 instance Alpha AlgTyConRhs
 
@@ -120,8 +127,8 @@ instance NFData TyCon where
 
 instance NFData (Name TyCon) where
   rnf nm = case nm of
-    (Nm _ s)   -> rnf s
-    (Bn _ l r) -> rnf l `seq` rnf r
+    (Fn s i) -> rnf s `seq` rnf i
+    (Bn l r) -> rnf l `seq` rnf r
 
 instance NFData AlgTyConRhs where
   rnf rhs = case rhs of

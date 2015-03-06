@@ -13,7 +13,7 @@ import Control.Monad.State       (MonadState, StateT)
 import Control.Monad.Writer      (MonadWriter, WriterT)
 import Data.HashMap.Strict       (HashMap)
 import Data.Monoid               (Any)
-import Unbound.LocallyNameless   (Fresh, FreshMT)
+import Unbound.Generics.LocallyNameless   (Fresh, FreshMT)
 
 import CLaSH.Core.Term           (Term, TmName)
 import CLaSH.Core.Type           (Type)

@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -17,11 +19,10 @@ where
 
 -- External Modules
 import                Control.DeepSeq
-import                Unbound.LocallyNameless       as Unbound hiding (Data,rnf)
-import                Unbound.LocallyNameless.Alpha (acompareR1, aeqR1, fvR1)
-import                Unbound.LocallyNameless.Name  (Name(Nm,Bn),isFree)
-import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
 import                Data.Text                     (Text)
+import                Data.Typeable
+import                GHC.Generics
+import                Unbound.Generics.LocallyNameless
 
 -- Internal Modules
 import                CLaSH.Core.DataCon            (DataCon)
@@ -43,7 +44,7 @@ data Term
   | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
   | Case    Term Type [Bind Pat Term]      -- ^ Case-expression: subject, type of
                                            -- alternatives, list of alternatives
-  deriving Show
+  deriving (Show,Typeable,Generic)
 
 -- | Term reference
 type TmName     = Name Term
@@ -61,10 +62,8 @@ data Pat
   -- ^ Default pattern
   deriving (Show)
 
-Unbound.derive_abstract [''Text]
 instance Alpha Text
 
-Unbound.derive [''Term,''Pat]
 
 instance Eq Term where
   (==) = aeq

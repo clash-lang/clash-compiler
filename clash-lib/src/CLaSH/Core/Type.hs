@@ -48,10 +48,10 @@ import                Control.Monad                 (zipWithM)
 import                Data.HashMap.Strict           (HashMap)
 import qualified      Data.HashMap.Strict           as HashMap
 import                Data.Maybe                    (isJust)
-import                Unbound.LocallyNameless       as Unbound hiding (Arrow,rnf)
-import                Unbound.LocallyNameless.Alpha (aeqR1,fvR1)
-import                Unbound.LocallyNameless.Name  (Name(Nm,Bn))
-import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
+import                Unbound.Generics.LocallyNameless       as Unbound -- hiding (Arrow,rnf)
+-- import                Unbound.LocallyNameless.Alpha (aeqR1,fvR1)
+-- import                Unbound.LocallyNameless.Name  (Name(Nm,Bn))
+-- import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
 
 -- Local imports
 import                CLaSH.Core.Subst

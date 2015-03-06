@@ -26,12 +26,12 @@ import qualified Data.HashMap.Strict         as HMS
 import qualified Data.Map                    as Map
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
-import           Unbound.LocallyNameless     (Collection (..), Fresh, bind,
+import           Unbound.Generics.LocallyNameless     (Collection (..), Fresh, bind,
                                               embed, makeName, name2String,
                                               rebind, rec, string2Name, unbind,
                                               unembed, unrec)
-import qualified Unbound.LocallyNameless     as Unbound
-import           Unbound.Util                (filterC)
+import qualified Unbound.Generics.LocallyNameless     as Unbound
+-- import           Unbound.Util                (filterC)
 
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
 import           CLaSH.Core.FreeVars         (termFreeVars, typeFreeVars)

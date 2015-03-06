@@ -16,7 +16,7 @@ import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import GHC.Generics                         (Generic)
-import Unbound.LocallyNameless              (Fresh, FreshMT)
+import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 
 import CLaSH.Core.Term                      (Term, TmName)
 import CLaSH.Core.Type                      (Type)

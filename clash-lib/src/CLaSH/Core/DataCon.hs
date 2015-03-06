@@ -16,8 +16,8 @@ module CLaSH.Core.DataCon
 where
 
 import                Control.DeepSeq
-import                Unbound.LocallyNameless as Unbound hiding (rnf)
-import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
+import                Unbound.Generics.LocallyNameless as Unbound -- hiding (rnf)
+-- import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
 
 import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)

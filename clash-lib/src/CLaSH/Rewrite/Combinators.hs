@@ -5,9 +5,9 @@ module CLaSH.Rewrite.Combinators where
 import           Control.Monad               ((<=<), (>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
-import           Unbound.LocallyNameless     (Embed, Fresh, bind, embed, rec,
+import           Unbound.Generics.LocallyNameless     (Embed, Fresh, bind, embed, rec,
                                               unbind, unembed, unrec)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+-- import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           CLaSH.Core.Term             (Pat, Term (..))
 import           CLaSH.Core.Util             (patIds)

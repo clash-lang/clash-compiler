@@ -26,10 +26,10 @@ import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (isInfixOf,pack)
 import qualified Data.Traversable            as T
-import           Unbound.LocallyNameless     (Rep, bind, embed, rebind, rec,
+import           Unbound.Generics.LocallyNameless     (Rep, bind, embed, rebind, rec,
                                               runFreshM, string2Name, unbind,
                                               unembed)
-import qualified Unbound.LocallyNameless     as Unbound
+import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
 import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)

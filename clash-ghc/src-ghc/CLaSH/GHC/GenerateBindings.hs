@@ -9,7 +9,7 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (isSuffixOf)
 import qualified Data.Set                as Set
-import           Unbound.LocallyNameless (name2String, runFreshM, unembed)
+import           Unbound.Generics.LocallyNameless (name2String, runFreshM, unembed)
 
 import qualified CoreSyn                 as GHC
 import qualified DynFlags                as GHC

@@ -14,8 +14,8 @@ module CLaSH.Core.Literal
 where
 
 import                Control.DeepSeq
-import                Unbound.LocallyNameless       as Unbound hiding (rnf)
-import                Unbound.LocallyNameless.Alpha
+import                Unbound.Generics.LocallyNameless       as Unbound
+import                Unbound.Generics.LocallyNameless.Alpha
 
 import {-# SOURCE #-} CLaSH.Core.Term               (Term)
 import {-# SOURCE #-} CLaSH.Core.Type               (Type)

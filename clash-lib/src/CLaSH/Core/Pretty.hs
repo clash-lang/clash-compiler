@@ -17,7 +17,7 @@ import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
                                           hsep, int, integer, parens, punctuate,
                                           render, sep, text, vcat, ($$), ($+$),
                                           (<+>), (<>), rational, nest)
-import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
+import           Unbound.Generics.LocallyNameless (Embed (..), LFresh, Name, lunbind,
                                           name2String, runLFreshM, unembed,
                                           unrebind, unrec)
 

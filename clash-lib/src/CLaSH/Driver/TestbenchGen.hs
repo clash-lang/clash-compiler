@@ -15,7 +15,7 @@ import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (mapMaybe)
 import           Data.Text.Lazy                   (isPrefixOf,pack,splitOn)
-import           Unbound.LocallyNameless          (name2String)
+import           Unbound.Generics.LocallyNameless          (name2String)
 
 import           CLaSH.Core.Term
 import           CLaSH.Core.TyCon

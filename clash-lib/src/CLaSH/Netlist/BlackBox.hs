@@ -18,7 +18,7 @@ import           Data.Text.Lazy                (Text, fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
-import           Unbound.LocallyNameless       (embed, name2String, string2Name,
+import           Unbound.Generics.LocallyNameless       (embed, name2String, string2Name,
                                                 unembed)
 
 -- import           CLaSH.Backend                 as N

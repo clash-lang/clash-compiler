@@ -38,10 +38,10 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
-import           Unbound.LocallyNameless     (Bind, Embed (..), bind, embed,
+import           Unbound.Generics.LocallyNameless     (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
                                               unrec, name2String)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+-- import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           CLaSH.Core.DataCon          (DataCon, dcName, dcTag,
                                               dcUnivTyVars)

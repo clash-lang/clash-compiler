@@ -14,7 +14,7 @@ import           Data.List                 (mapAccumL)
 import qualified Data.Map                  as Map
 import qualified Data.Maybe                as Maybe
 import qualified Data.Set                  as Set
-import           Unbound.LocallyNameless   (unembed)
+import           Unbound.Generics.LocallyNameless   (unembed)
 
 import           CLaSH.Core.FreeVars       (termFreeIds)
 import           CLaSH.Core.Pretty         (showDoc)

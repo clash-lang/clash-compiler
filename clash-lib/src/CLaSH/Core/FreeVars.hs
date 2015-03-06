@@ -1,7 +1,7 @@
 -- | Free variable calculations
 module CLaSH.Core.FreeVars where
 
-import Unbound.LocallyNameless (Collection, fv)
+import Unbound.Generics.LocallyNameless (Collection, fv)
 
 import CLaSH.Core.Term         (Term, TmName)
 import CLaSH.Core.Type         (TyName, Type)

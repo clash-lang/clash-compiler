@@ -17,7 +17,7 @@ import qualified System.Directory             as Directory
 import qualified System.FilePath              as FilePath
 import qualified System.IO                    as IO
 import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
-import           Unbound.LocallyNameless      (name2String)
+import           Unbound.Generics.LocallyNameless      (name2String)
 
 import           CLaSH.Backend
 import           CLaSH.Core.Term              (Term)

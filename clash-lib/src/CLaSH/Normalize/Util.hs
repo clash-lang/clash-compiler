@@ -15,7 +15,7 @@ import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
-import           Unbound.LocallyNameless (Fresh, bind, embed, rec)
+import           Unbound.Generics.LocallyNameless (Fresh, bind, embed, rec)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Var          (Var (Id))

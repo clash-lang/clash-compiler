@@ -6,9 +6,9 @@
 module CLaSH.Core.Util where
 
 import           Data.HashMap.Lazy       (HashMap)
-import           Unbound.LocallyNameless (Fresh, bind, embed, unbind, unembed,
+import           Unbound.Generics.LocallyNameless (Fresh, bind, embed, unbind, unembed,
                                           unrebind, unrec)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+-- import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           CLaSH.Core.DataCon      (dcType)
 import           CLaSH.Core.Literal      (literalType)

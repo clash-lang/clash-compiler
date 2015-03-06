@@ -1,7 +1,7 @@
 -- | Capture-free substitution function for CoreHW
 module CLaSH.Core.Subst where
 
-import                Unbound.LocallyNameless (subst, substs)
+import                Unbound.Generics.LocallyNameless (subst, substs)
 
 import                CLaSH.Core.Term         (Term, TmName)
 import {-# SOURCE #-} CLaSH.Core.Type         (KiName, Kind, TyName, Type)
