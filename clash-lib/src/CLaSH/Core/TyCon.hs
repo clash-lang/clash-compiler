@@ -6,8 +6,6 @@
 {-# LANGUAGE PatternGuards         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-
 -- | Type Constructors in CoreHW
 module CLaSH.Core.TyCon
   ( TyCon (..)
@@ -120,10 +118,10 @@ instance Subst Term AlgTyConRhs
 
 instance NFData TyCon where
   rnf tc = case tc of
-    AlgTyCon nm ki ar rhs   -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
-    FunTyCon nm ki ar subst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf subst
-    PrimTyCon nm ki ar      -> rnf nm `seq` rnf ki `seq` rnf ar
-    SuperKindTyCon nm       -> rnf nm
+    AlgTyCon nm ki ar rhs     -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
+    FunTyCon nm ki ar tcSubst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf tcSubst
+    PrimTyCon nm ki ar        -> rnf nm `seq` rnf ki `seq` rnf ar
+    SuperKindTyCon nm         -> rnf nm
 
 instance NFData (Name TyCon) where
   rnf nm = case nm of
@@ -146,10 +144,10 @@ mkKindTyCon name kind
 isTupleTyConLike :: TyConName -> Bool
 isTupleTyConLike nm = tupleName (name2String nm)
   where
-    tupleName nm
-      | '(' <- head nm
-      , ')' <- last nm
-      = all (== ',') (init $ tail nm)
+    tupleName nm'
+      | '(' <- head nm'
+      , ')' <- last nm'
+      = all (== ',') (init $ tail nm')
     tupleName _ = False
 
 -- | Get the DataCons belonging to a TyCon

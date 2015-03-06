@@ -1,10 +1,11 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Term Literal
 module CLaSH.Core.Literal
@@ -14,31 +15,27 @@ module CLaSH.Core.Literal
 where
 
 import                Control.DeepSeq
-import                Unbound.Generics.LocallyNameless       as Unbound
-import                Unbound.Generics.LocallyNameless.Alpha
+import                GHC.Generics
+import                GHC.Real (Ratio (..))
+import                Unbound.Generics.LocallyNameless
 
 import {-# SOURCE #-} CLaSH.Core.Term               (Term)
 import {-# SOURCE #-} CLaSH.Core.Type               (Type)
 import                CLaSH.Core.TysPrim            (intPrimTy, voidPrimTy)
+import                CLaSH.Util
 
 -- | Term Literal
 data Literal
   = IntegerLiteral  Integer
   | StringLiteral   String
   | RationalLiteral Rational
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,Generic)
 
-Unbound.derive [''Literal]
-
-instance Alpha Rational
+deriving instance Generic (Ratio a)
 instance Subst b Rational
 
 instance Alpha Literal where
-  fv' _ _ = emptyC
-
-  acompare' _ (IntegerLiteral i) (IntegerLiteral j)   = compare i j
-  acompare' _ (RationalLiteral i) (RationalLiteral j) = compare i j
-  acompare' c l1                 l2                   = acompareR1 rep1 c l1 l2
+  fvAny' _ _ l = pure l
 
 instance Subst Type Literal
 instance Subst Term Literal
