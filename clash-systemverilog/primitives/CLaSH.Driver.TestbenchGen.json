@@ -43,15 +43,12 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
     , "templateD" :
-"always_comb begin
+"always begin
 // pragma translate_off
-  ~RESULT = 1'b0;
-  #~LIT[0] forever begin
+  ~RESULT <= 1'b0;
+  #~LIT[0]
 // pragma translate_on
-    ~RESULT = 1'b1;
-// pragma translate_off
-  end
-// pragma translate_on
+  ~RESULT = 1'b1;
 end"
     }
   }
