@@ -17,7 +17,7 @@ import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (mapAccumL,nub,nubBy)
+import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
@@ -94,7 +94,7 @@ mkTyPackage_ hwtys =
     needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nub (map mkZero needsDec)))
+    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nubBy eqTypM needsDec))
 
     packageBodyDec :: VHDLM Doc
     packageBodyDec = case funBodies of
@@ -104,19 +104,18 @@ mkTyPackage_ hwtys =
                 indent 2 (vcat (sequence funBodies)) <$>
               "end" <> semi
 
-    mkZero :: HWType -> HWType
-    mkZero (Index _)    = Index 0
-    mkZero (Signed _)   = Signed 0
-    mkZero (Unsigned _) = Unsigned 0
-    mkZero (Vector _ t) = Vector 0 t
-    mkZero t            = t
-
     eqReprTy :: HWType -> HWType -> Bool
     eqReprTy (Vector _ ty1) (Vector _ ty2) = eqReprTy ty1 ty2
     eqReprTy ty1 ty2
       | isUnsigned ty1 && isUnsigned ty2 ||
         isSLV ty1 && isSLV ty2              = typeSize ty1 == typeSize ty2
       | otherwise                           = ty1 == ty2
+
+    eqTypM (Vector _ ty1) (Vector _ ty2) = eqReprTy ty1 ty2
+    eqTypM (Signed _) (Signed _) = True
+    eqTypM ty1 ty2 = isUnsigned ty1 && isUnsigned ty2 ||
+                     isSLV      ty1 && isSLV      ty2 ||
+                     ty1 == ty2
 
     isUnsigned :: HWType -> Bool
     isUnsigned (Unsigned _)  = True
