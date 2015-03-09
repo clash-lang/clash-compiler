@@ -275,7 +275,7 @@ substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others
 --               -> RewriteMonad m (c TmName)
 localFreeVars to term = do
   globalBndrs <- Lens.use bindings
-  return (to (termFreeIds . Lens.filtered (`HML.member` globalBndrs)) term)
+  return (to (termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))) term)
 
   -- let (tyFVs,tmFVs) = termFreeVars term
   -- return ( tyFVs
