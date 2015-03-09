@@ -439,14 +439,24 @@ inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr_ False e <> semi
 
+-- inst_ (CondAssignment id_ scrut es) = fmap Just $
+--   text id_ <+> larrow <+> align (vcat (conds es)) <> semi
+--     where
+--       conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
+--       conds []                = return []
+--       conds [(_,e)]           = expr_ False e <:> return []
+--       conds ((Nothing,e):_)   = expr_ False e <:> return []
+--       conds ((Just c ,e):es') = (expr_ False e <+> "when" <+> parens (expr_ True scrut <+> "=" <+> expr_ True c) <+> "else") <:> conds es'
+
 inst_ (CondAssignment id_ scrut es) = fmap Just $
-  text id_ <+> larrow <+> align (vcat (conds es)) <> semi
-    where
-      conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
-      conds []                = return []
-      conds [(_,e)]           = expr_ False e <:> return []
-      conds ((Nothing,e):_)   = expr_ False e <:> return []
-      conds ((Just c ,e):es') = (expr_ False e <+> "when" <+> parens (expr_ True scrut <+> "=" <+> expr_ True c) <+> "else") <:> conds es'
+    "with" <+> parens (expr_ True scrut) <+> "select" <$>
+      indent 2 (text id_ <+> larrow <+> vcat (punctuate comma (conds es)) <> semi)
+  where
+    conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
+    conds []                = return []
+    conds [(_,e)]           = expr_ False e <+> "when" <+> "others" <:> return []
+    conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
+    conds ((Just c ,e):es') = expr_ False e <+> "when" <+> parens (expr_ True c) <:> conds es'
 
 inst_ (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <+> colon <+> "entity"
