@@ -203,6 +203,15 @@ termHWType loc e = do
   ty <- termType m e
   unsafeCoreTypeToHWTypeM loc ty
 
+-- | Gives the HWType corresponding to a term. Returns 'Nothing' if the term has
+-- a Core type that is not translatable to a HWType.
+termHWTypeM :: Term
+            -> NetlistMonad (Maybe HWType)
+termHWTypeM e = do
+  m  <- Lens.use tcCache
+  ty <- termType m e
+  coreTypeToHWTypeM ty
+
 -- | Turns a Core variable reference to a Netlist expression. Errors if the term
 -- is not a variable.
 varToExpr :: Term

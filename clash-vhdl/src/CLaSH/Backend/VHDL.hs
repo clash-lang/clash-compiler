@@ -10,7 +10,7 @@ module CLaSH.Backend.VHDL (VHDLState) where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (forM,join,liftM,when,zipWithM)
+import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
@@ -24,7 +24,7 @@ import qualified Data.Text.Lazy                       as T
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
-import           CLaSH.Netlist.BlackBox.Util          (renderBlackBox)
+import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
@@ -87,48 +87,46 @@ mkTyPackage_ hwtys =
    "package" <+> "types" <+> "is" <$>
       indent 2 ( packageDec <$>
                  vcat (sequence funDecs)
-               ) <>
-      (case showDecs of
-         [] -> empty
-         _  -> linebreak <$>
-               "-- pragma translate_off" <$>
-               indent 2 (vcat (sequence showDecs)) <$>
-               "-- pragma translate_on"
-      ) <$>
+               ) <$>
    "end" <> semi <> packageBodyDec
   where
-    usedTys     = nubBy eqHWTy $ concatMap mkUsedTys hwtys
-    needsDec    = nubBy eqHWTy (hwtys ++ filter needsTyDec usedTys)
+    usedTys     = concatMap mkUsedTys hwtys
+    needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodies) = unzip . catMaybes $ map funDec (nubBy eqIndexTy usedTys)
-    (showDecs,showBodies) = unzip $ map mkToStringDecls hwTysSorted
+    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nubBy eqTypM needsDec))
 
     packageBodyDec :: VHDLM Doc
-    packageBodyDec = case (funBodies,showBodies) of
-        ([],[]) -> empty
+    packageBodyDec = case funBodies of
+        [] -> empty
         _  -> linebreak <$>
               "package" <+> "body" <+> "types" <+> "is" <$>
                 indent 2 (vcat (sequence funBodies)) <$>
-                linebreak <>
-                "-- pragma translate_off" <$>
-                indent 2 (vcat (sequence showBodies)) <$>
-                "-- pragma translate_on" <$>
               "end" <> semi
 
-    eqIndexTy :: HWType -> HWType -> Bool
-    eqIndexTy (Index _) (Index _) = True
-    eqIndexTy _ _ = False
+    eqReprTy :: HWType -> HWType -> Bool
+    eqReprTy (Vector _ ty1) (Vector _ ty2) = eqReprTy ty1 ty2
+    eqReprTy ty1 ty2
+      | isUnsigned ty1 && isUnsigned ty2 ||
+        isSLV ty1 && isSLV ty2              = typeSize ty1 == typeSize ty2
+      | otherwise                           = ty1 == ty2
 
-    eqHWTy :: HWType -> HWType -> Bool
-    eqHWTy (Vector _ elTy1) (Vector _ elTy2) = case (elTy1,elTy2) of
-      (Sum _ _,Sum _ _)    -> typeSize elTy1 == typeSize elTy2
-      (Unsigned n,Sum _ _) -> n == typeSize elTy2
-      (Sum _ _,Unsigned n) -> typeSize elTy1 == n
-      (Index u,Unsigned n) -> clog2 (max 2 u) == n
-      (Unsigned n,Index u) -> clog2 (max 2 u) == n
-      _ -> elTy1 == elTy2
-    eqHWTy ty1 ty2 = ty1 == ty2
+    eqTypM (Vector _ ty1) (Vector _ ty2) = eqReprTy ty1 ty2
+    eqTypM (Signed _) (Signed _) = True
+    eqTypM ty1 ty2 = isUnsigned ty1 && isUnsigned ty2 ||
+                     isSLV      ty1 && isSLV      ty2 ||
+                     ty1 == ty2
+
+    isUnsigned :: HWType -> Bool
+    isUnsigned (Unsigned _)  = True
+    isUnsigned (Index _)     = True
+    isUnsigned (Sum _ _)     = True
+    isUnsigned _             = False
+
+    isSLV :: HWType -> Bool
+    isSLV (BitVector _) = True
+    isSLV (SP _ _)      = True
+    isSLV _             = False
 
 mkUsedTys :: HWType
         -> [HWType]
@@ -159,14 +157,6 @@ mkVecZ :: HWType -> HWType
 mkVecZ (Vector _ elTy) = Vector 0 elTy
 mkVecZ t               = t
 
-needsTyDec :: HWType -> Bool
-needsTyDec (Vector _ _)   = True
-needsTyDec (Product _ _)  = True
-needsTyDec (SP _ _)       = True
-needsTyDec Bool           = True
-needsTyDec Integer        = True
-needsTyDec _              = False
-
 tyDec :: HWType -> VHDLM Doc
 tyDec (Vector _ elTy) = "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of" <+> vhdlType elTy <> semi
 
@@ -182,10 +172,23 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
+
+maxDec :: (VHDLM Doc, VHDLM Doc)
+maxDec =
+  ( "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <> semi
+  , "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence [ "if" <+> "left > right" <+> "then return left" <> semi
+                                , "else return right" <> semi
+                                , "end if" <> semi
+                                ]) <$>
+    "end" <> semi
+  )
+
 funDec :: HWType -> Maybe (VHDLM Doc,VHDLM Doc)
 funDec Bool = Just
   ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
-    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi
+    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi
   , "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
     "begin" <$>
       indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
@@ -195,7 +198,7 @@ funDec Bool = Just
                                 ,"end" <+> "if" <> semi
                                 ]) <$>
     "end" <> semi <$>
-    "function" <+> "fromSL" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <+> "is" <$>
+    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <+> "is" <$>
     "begin" <$>
       indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> dquotes (int 1) <+> "then"
                                 ,   indent 2 ("return" <+> "true" <> semi)
@@ -207,44 +210,50 @@ funDec Bool = Just
   )
 
 funDec Integer = Just
-  ( "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi
+  ( "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi <$>
+    "function" <+> "toSLV" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "std_logic_vector" <> semi
   , "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
     "begin" <$>
       indent 2 ("return" <+> "i" <> semi) <$>
-    "end" <> semi
-  )
-
-funDec (Index _) =  Just
-  ( "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <> semi
-  , "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <+> "is" <$>
+    "end" <> semi <$>
+    "function" <+> "toSLV" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "std_logic_vector" <+> "is" <$>
     "begin" <$>
-      indent 2 (vcat $ sequence [ "if" <+> "left > right" <+> "then return left" <> semi
-                                , "else return right" <> semi
-                                , "end if" <> semi
-                                ]) <$>
+      indent 2 ("return" <+> "std_logic_vector" <> parens ("to_signed" <> parens ("i" <> comma <> int 32)) <> semi) <$>
     "end" <> semi
   )
 
-funDec _ = Nothing
+funDec (Index _) = Just unsignedToSlvDec
 
-mkToStringDecls :: HWType -> (VHDLM Doc, VHDLM Doc)
-mkToStringDecls t@(Product _ elTys) =
-  ( "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING" <> semi
-  , "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING is" <$>
+funDec (Signed _) = Just
+  ( "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+    "begin" <$>
+      indent 2 ("return" <+> "std_logic_vector" <> parens ("s") <> semi) <$>
+    "end" <> semi
+  )
+
+funDec (Unsigned _) = Just unsignedToSlvDec
+
+funDec (Sum _ _) = Just unsignedToSlvDec
+
+funDec t@(Product _ elTys) = Just
+  ( "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <+> "is" <$>
     "begin" <$>
     indent 2 ("return" <+> parens (hcat (punctuate " & " elTyPrint)) <> semi) <$>
-    "end function to_string;"
+    "end" <> semi
   )
   where
     elTyPrint = forM [0..(length elTys - 1)]
-                     (\i -> "to_string" <>
-                            parens ("value." <> vhdlType t <> "_sel" <> int i))
-mkToStringDecls t@(Vector _ elTy) =
-  ( "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING" <> semi
-  , "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING is" <$>
+                     (\i -> "toSLV" <>
+                            parens ("p." <> vhdlType t <> "_sel" <> int i))
+
+funDec t@(Vector _ elTy) = Just
+  ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <+> "is" <$>
       indent 2
-        ( "alias ivalue    : " <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
-          "variable result : STRING" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
+        ( "alias ivalue    :" <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
+          "variable result :" <+> "std_logic_vector" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
         ) <$>
     "begin" <$>
       indent 2
@@ -252,14 +261,36 @@ mkToStringDecls t@(Vector _ elTy) =
             indent 2
               (  "result" <> parens (parens ("(i - 1) * " <> int (typeSize elTy)) <+> "+ 1" <+>
                                              "to i*" <> int (typeSize elTy)) <+>
-                          ":= to_string" <> parens (if elTy == Bool then "toSLV(ivalue(i))" else "ivalue(i)") <> semi
+                          ":=" <+> "toSLV" <> parens ("ivalue" <> parens ("i")) <> semi
               ) <$>
-         "end loop;" <$>
-         "return result;"
+         "end" <+> "loop" <> semi <$>
+         "return" <+> "result" <> semi
         ) <$>
-    "end function to_string;"
+    "end" <> semi
   )
-mkToStringDecls _ = (empty,empty)
+
+funDec (BitVector _) = Just slvToSlvDec
+funDec (SP _ _)      = Just slvToSlvDec
+
+funDec _ = Nothing
+
+unsignedToSlvDec :: (VHDLM Doc, VHDLM Doc)
+unsignedToSlvDec =
+  ( "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <$>
+    "begin" <$>
+      indent 2 ("return" <+> "std_logic_vector" <> parens ("u") <> semi) <$>
+    "end" <> semi
+  )
+
+slvToSlvDec :: (VHDLM Doc, VHDLM Doc)
+slvToSlvDec =
+  ( "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+    "begin" <$>
+      indent 2 ("return" <+> "slv" <> semi) <$>
+    "end" <> semi
+  )
 
 tyImports :: VHDLM Doc
 tyImports =
@@ -306,7 +337,7 @@ architecture c =
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
 vhdlType hwty = do
-  when (needsTyDec hwty) (tyCache %= HashSet.insert (mkVecZ hwty))
+  tyCache %= HashSet.insert (mkVecZ hwty)
   vhdlType' hwty
 
 vhdlType' :: HWType -> VHDLM Doc
@@ -336,7 +367,7 @@ sigDecl d t = d <+> colon <+> vhdlType t
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
 vhdlTypeMark hwty = do
-  when (needsTyDec hwty) (tyCache %= HashSet.insert (mkVecZ hwty))
+  tyCache %= HashSet.insert (mkVecZ hwty)
   vhdlTypeMark' hwty
   where
     vhdlTypeMark' Bool            = "boolean"
@@ -391,11 +422,11 @@ decls ds = do
     rec (dsDoc,ls) <- fmap (unzip . catMaybes) $ mapM (decl (maximum ls)) ds
     case dsDoc of
       [] -> empty
-      _  -> vcat (punctuate semi (A.pure dsDoc)) <> semi
+      _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl id_ ty netInit) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
-  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty <> (maybe empty (\e -> " :=" <+> expr_ False e) netInit)
+decl l (NetDecl id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+  "signal" <+> fill l (text id_) <+> colon <+> vhdlType ty
 
 decl _ _ = return Nothing
 
@@ -409,13 +440,14 @@ inst_ (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ scrut es) = fmap Just $
-  text id_ <+> larrow <+> align (vcat (conds es)) <> semi
-    where
-      conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
-      conds []                = return []
-      conds [(_,e)]           = expr_ False e <:> return []
-      conds ((Nothing,e):_)   = expr_ False e <:> return []
-      conds ((Just c ,e):es') = (expr_ False e <+> "when" <+> parens (expr_ True scrut <+> "=" <+> expr_ True c) <+> "else") <:> conds es'
+    "with" <+> parens (expr_ True scrut) <+> "select" <$>
+      indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds es)) <> semi))
+  where
+    conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
+    conds []                = return []
+    conds [(_,e)]           = expr_ False e <+> "when" <+> "others" <:> return []
+    conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
+    conds ((Just c ,e):es') = expr_ False e <+> "when" <+> parens (expr_ True c) <:> conds es'
 
 inst_ (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <+> colon <+> "entity"
@@ -474,17 +506,17 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
-  , [Literal _ (NumLit n), Literal _ i] <- bbLitInputs bbCtx
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ bs bbCtx b') = do
@@ -577,7 +609,7 @@ toSLV (Vector n elTy) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWith
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
-fromSLV Bool              id_ start _   = "fromSL" <> parens (text id_ <> parens (int start))
+fromSLV Bool              id_ start _   = "fromSLV" <> parens (text id_ <> parens (int start))
 fromSLV Integer           id_ start end = "to_integer" <> parens (fromSLV (Signed 32) id_ start end)
 fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))

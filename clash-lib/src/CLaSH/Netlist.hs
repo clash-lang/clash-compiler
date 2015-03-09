@@ -133,7 +133,6 @@ genComponentT compName componentExpr mStart = do
   let netDecls = map (\(id_,_) ->
                         NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
                                 (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
-                                Nothing
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
@@ -168,7 +167,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
                         i   <- varCount <<%= (+1)
                         let tmpNm   = "tmp_" ++ show i
                             tmpNmT  = Text.pack tmpNm
-                            tmpDecl = NetDecl tmpNmT sHwTy Nothing
+                            tmpDecl = NetDecl tmpNmT sHwTy
                             tmpAssn = Assignment tmpNmT newExpr
                         return (tmpNmT,newDecls ++ [tmpDecl,tmpAssn])
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
@@ -274,7 +273,7 @@ mkExpr bbEasD ty app = do
     Data dc
       | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy dc tmArgs
       | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
-    Prim nm _ -> first fst <$> mkPrimitive False bbEasD nm args ty
+    Prim nm _ -> mkPrimitive False bbEasD nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app

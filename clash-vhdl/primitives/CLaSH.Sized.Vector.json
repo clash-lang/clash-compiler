@@ -1,15 +1,18 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.eq#"
-    , "templateE" : "~ARG[0] = ~ARG[1]"
+    , "type"      : "eq# :: Eq a => Vec n a -> Vec n a -> Bool"
+    , "templateE" : "~ARG[1] = ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.neq#"
-    , "templateE" : "~ARG[0] /= ~ARG[1]"
+    , "type"      : "neq# :: Eq a => Vec n a -> Vec n a -> Bool"
+    , "templateE" : "~ARG[1] /= ~ARG[2]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.head"
+    , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateD" :
 "head_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -21,6 +24,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.tail"
+    , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "templateD" :
 "tail_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -32,6 +36,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.last"
+    , "type"      : "Vec (n + 1) a -> a"
     , "templateD" :
 "last_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -43,6 +48,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.init"
+    , "type"      : "Vec (n + 1) a -> Vec n a"
     , "templateD" :
 "init_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -53,14 +59,14 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.select"
-    , "comment"   :
-    "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
-            => SNat f                        -- ARG[1]
-            -> SNat s                        -- ARG[2]
-            -> SNat n                        -- ARG[3]
-            -> Vec i a                       -- ARG[4]
-            -> Vec n a"
+    { "name" : "CLaSH.Sized.Vector.select"
+    , "type" :
+"select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
+        => SNat f                        -- ARG[1]
+        -> SNat s                        -- ARG[2]
+        -> SNat n                        -- ARG[3]
+        -> Vec i a                       -- ARG[4]
+        -> Vec n a"
     , "templateD" :
 "select_~SYM[0] : block
   signal ~SYM[1] : ~TYP[4];
@@ -82,11 +88,13 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
+    , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
     , "templateE" : "~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.concat"
+    , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "templateD" :
 "concat_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -108,6 +116,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.splitAt"
+    , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateD" :
 "splitAt_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -119,12 +128,12 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.unconcat"
-    , "comment"   :
-    "unconcat :: KnownNat n     -- ARG[0]
-              => SNat m         -- ARG[1]
-              -> Vec (n * m) a  -- ARG[2]
-              -> Vec n (Vec m a)"
+    { "name" : "CLaSH.Sized.Vector.unconcat"
+    , "type" :
+"unconcat :: KnownNat n     -- ARG[0]
+          => SNat m         -- ARG[1]
+          -> Vec (n * m) a  -- ARG[2]
+          -> Vec n (Vec m a)"
     , "templateD" :
 "unconcat_~SYM[0] : block
   signal ~SYM[1] : ~TYP[2];
@@ -146,6 +155,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.merge"
+    , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
     , "templateD" :
 "merge_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -170,6 +180,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
+    , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "map_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -194,6 +205,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.zipWith"
+    , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
 "zipWith_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -221,6 +233,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_integer"
+    , "type"      : "index_integer :: KnownNat n => Vec n a -> Integer -> a"
     , "templateD" :
 "indexVec_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -246,6 +259,7 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replace_integer"
+    , "type"      : "replace_integer :: KnownNat n => Vec n a -> Integer -> a -> Vec n a"
     , "templateD" :
 "replaceVec_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -276,21 +290,25 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.maxIndex"
+    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Integer"
     , "templateE" : "~LIT[0] - 1"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.length"
+    , "type"      : "length :: KnownNat n => Vec n a -> Integer"
     , "templateE" : "~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
+    , "type"      : "replicate :: SNat n -> a -> Vec n a"
     , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.reverse"
+    , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
 "reverse_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
@@ -311,15 +329,16 @@ end block;"
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.lazyV"
+    , "type"      : "lazyV :: KnownNat n => Vec n a -> Vec n a"
     , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.concatBitVector#"
-    , "comment"   :
-      "concatBitVector# :: KnownNat m           -- ARG[0]
-                        => Vec n (BitVector m)  -- ARG[1]
-                        -> BitVector (n * m)"
+    { "name" : "CLaSH.Sized.Vector.concatBitVector#"
+    , "type" :
+"concatBitVector# :: KnownNat m           -- ARG[0]
+                  => Vec n (BitVector m)  -- ARG[1]
+                  -> BitVector (n * m)"
     , "templateD" :
 "concatBitVector_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
@@ -339,11 +358,11 @@ end block;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.unconcatBitVector#"
-    , "comment"   :
-      "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
-                          => BitVector (n * m)        -- ARG[2]
-                          -> Vec n (BitVector m)"
+    { "name" : "CLaSH.Sized.Vector.unconcatBitVector#"
+    , "type" :
+"unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
+                    => BitVector (n * m)        -- ARG[2]
+                    -> Vec n (BitVector m)"
     , "templateD" :
 "unconcatBitVector_~SYM[0] : block
   signal ~SYM[1] : ~TYP[2];

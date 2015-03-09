@@ -9,13 +9,10 @@ module CLaSH.Netlist.BlackBox where
 
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
-import           Control.Monad                 (filterM, mzero)
-import           Control.Monad.Trans.Class     (lift)
-import           Control.Monad.Trans.Maybe     (MaybeT (..))
-import           Data.Either                   (lefts, partitionEithers)
+import           Control.Monad                 (filterM)
+import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
-import           Data.List                     (partition)
-import           Data.Maybe                    (catMaybes)
+import qualified Data.IntMap                   as IntMap
 import           Data.Monoid                   (mconcat)
 import           Data.Text.Lazy                (Text, fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
@@ -28,7 +25,7 @@ import           Unbound.LocallyNameless       (embed, name2String, string2Name,
 import           CLaSH.Core.DataCon            as D (dcTag)
 import           CLaSH.Core.Literal            as L (Literal (..))
 import           CLaSH.Core.Pretty             (showDoc)
-import           CLaSH.Core.Term               as C (Term (..), TmName)
+import           CLaSH.Core.Term               as C (Term (..))
 import           CLaSH.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys)
 import           CLaSH.Core.TyCon              as C (tyConDataCons)
@@ -52,27 +49,27 @@ mkBlackBoxContext :: Id -- ^ Identifier binding the primitive/blackbox applicati
                   -> NetlistMonad (BlackBoxContext,[Declaration])
 mkBlackBoxContext resId args = do
     -- Make context inputs
-    tcm                   <- Lens.use tcCache
-    args'                 <- fmap (zip args) $ mapM (isFun tcm) args
-    (varInps,declssV)     <- fmap (unzip . catMaybes)  $ mapM (runMaybeT . mkInput) args'
-    let (_,otherArgs)     = partitionEithers $ map unVar args'
-        (litArgs,funArgs) = partition (\(t,b) -> not b && isConstant t) otherArgs
-    (litInps,declssL)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkLitInput . fst) litArgs
-    (funInps,declssF)     <- fmap (unzip . catMaybes) $ mapM (runMaybeT . mkFunInput resId . fst) funArgs
+    tcm             <- Lens.use tcCache
+    (imps,impDecls) <- unzip <$> mapM mkArgument args
+    (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
     let res = case synchronizedClk tcm (unembed $ V.varType resId) of
                 Just clk -> Right . (,clk) . (`N.Identifier` Nothing) . mkBasicId . pack $ name2String (V.varName resId)
                 Nothing  -> Left . (`N.Identifier` Nothing) . mkBasicId . pack $ name2String (V.varName resId)
-    resTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
+    resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
-    return ( Context (res,resTy) varInps (map fst litInps) funInps
-           , concat declssV ++ concat declssL ++ concat declssF
+    return ( Context (res,resTy) imps funs
+           , concat impDecls ++ concat funDecls
            )
   where
-    unVar :: (Term, Bool) -> Either TmName (Term, Bool)
-    unVar (Var _ v, False) = Left v
-    unVar t                = Right t
+    addFunction tcm im (arg,i) = do
+      isF <- isFun tcm arg
+      if isF
+         then do (f,d) <- mkFunInput resId arg
+                 let im' = IntMap.insert i f im
+                 return (im',d)
+         else return (im,[])
 
 prepareBlackBox :: TextS.Text
                 -> Text
@@ -80,7 +77,7 @@ prepareBlackBox :: TextS.Text
                 -> NetlistMonad BlackBoxTemplate
 prepareBlackBox pNm t bbCtx =
   let (templ,err) = runParse t
-  in  if null err && verifyBlackBoxContext templ bbCtx
+  in  if null err && verifyBlackBoxContext bbCtx templ
          then do
            templ'  <- instantiateSym templ
            templ'' <- setClocks bbCtx templ'
@@ -90,34 +87,43 @@ prepareBlackBox pNm t bbCtx =
                    "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++
                    show err
 
-
--- | Create an template instantiation text for an argument term
-mkInput :: (Term, Bool)
-        -> MaybeT NetlistMonad ((SyncExpr,HWType),[Declaration])
-mkInput (_, True) = return ((Left $ Identifier (pack "__FUN__") Nothing, Void),[])
-
-mkInput (Var ty v, False) = do
-  let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
-  tcm <- Lens.use tcCache
-  hwTy <- lift $ N.unsafeCoreTypeToHWTypeM $(curLoc) ty
-  return $ case synchronizedClk tcm ty of
-    Just clk -> ((Right (vT,clk), hwTy), [])
-    Nothing  -> ((Left  vT,       hwTy), [])
-
-mkInput (e, False) = case collectArgs e of
-  (Prim f _, args) -> do
-    tcm <- Lens.use tcCache
-    ty  <- termType tcm e
-    ((exprN,hwTy),decls) <- lift $ mkPrimitive True False f args ty
-    return ((Left exprN,hwTy),decls)
-  _ -> fmap (first (first Left)) $ mkLitInput e
+mkArgument :: Term
+           -> NetlistMonad ( (SyncExpr,HWType,Bool)
+                           , [Declaration]
+                           )
+mkArgument e = do
+    tcm   <- Lens.use tcCache
+    ty    <- termType tcm e
+    hwTyM <- N.termHWTypeM e
+    ((e',t,l),d) <- case hwTyM of
+      Nothing   -> return ((Identifier "__VOID__" Nothing,Void,False),[])
+      Just hwTy -> case collectArgs e of
+        (Var _ v,[]) -> let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
+                        in  return ((vT,hwTy,False),[])
+        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal Nothing (N.NumLit i),hwTy,True),[])
+        (Prim f _,args) -> do
+          (e',d) <- mkPrimitive True False f args ty
+          case e' of
+            (Identifier _ _) -> return ((e',hwTy,False), d)
+            _                -> return ((e',hwTy,isConstant e), d)
+        (Data dc, args) -> do
+            typeTrans <- Lens.use typeTranslator
+            args' <- filterM (fmap (representableType typeTrans tcm) . termType tcm) (lefts args)
+            (exprN,dcDecls) <- mkDcApplication hwTy dc args'
+            return ((exprN,hwTy,isConstant e),dcDecls)
+        _ -> return ((Identifier "__VOID__" Nothing,hwTy,False),[])
+    return ((addClock tcm ty e',t,l),d)
+  where
+    addClock tcm ty e' = case synchronizedClk tcm ty of
+                           Just clk -> Right (e',clk)
+                           _        -> Left  e'
 
 mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
             -> Bool -- ^ Treat BlackBox expression as declaration
             -> TextS.Text
             -> [Either Term Type]
             -> Type
-            -> NetlistMonad ((Expr,HWType),[Declaration])
+            -> NetlistMonad (Expr,[Declaration])
 mkPrimitive bbEParen bbEasD nm args ty = do
   bbM <- HashMap.lookup nm <$> Lens.use primitives
   case bbM of
@@ -130,18 +136,18 @@ mkPrimitive bbEParen bbEasD nm args ty = do
       let hwTy    = snd $ bbResult bbCtx
       case template p of
         (Left tempD) -> do
-          let tmpDecl = NetDecl tmpNmT hwTy Nothing
+          let tmpDecl = NetDecl tmpNmT hwTy
               pNm     = name p
           bbDecl <- N.BlackBoxD pNm <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
-          return ((Identifier tmpNmT Nothing,hwTy),ctxDcls ++ [tmpDecl,bbDecl])
+          return (Identifier tmpNmT Nothing,ctxDcls ++ [tmpDecl,bbDecl])
         (Right tempE) -> do
           let pNm = name p
           bbTempl <- prepareBlackBox pNm tempE bbCtx
           if bbEasD
-            then let tmpDecl  = NetDecl tmpNmT hwTy Nothing
+            then let tmpDecl  = NetDecl tmpNmT hwTy
                      tmpAssgn = Assignment tmpNmT (BlackBoxE pNm bbTempl bbCtx bbEParen)
-                 in  return ((Identifier tmpNmT Nothing, hwTy), ctxDcls ++ [tmpDecl,tmpAssgn])
-            else return ((BlackBoxE pNm bbTempl bbCtx bbEParen,hwTy),ctxDcls)
+                 in  return (Identifier tmpNmT Nothing, ctxDcls ++ [tmpDecl,tmpAssgn])
+            else return (BlackBoxE pNm bbTempl bbCtx bbEParen,ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -151,7 +157,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               let dcs = tyConDataCons (tcm HashMap.! tcN)
                   dc  = dcs !! fromInteger i
               (exprN,dcDecls) <- mkDcApplication hwTy dc []
-              return ((exprN,hwTy),dcDecls)
+              return (exprN,dcDecls)
             [Right _, Left scrut] -> do
               i <- varCount <<%= (+1)
               tcm     <- Lens.use tcCache
@@ -160,14 +166,14 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
               let tmpRhs       = pack ("tmp_tte_rhs_" ++ show i)
                   tmpS         = pack ("tmp_tte_" ++ show i)
-                  netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
-                  netDeclS     = NetDecl tmpS hwTy Nothing
+                  netDeclRhs   = NetDecl tmpRhs scrutHTy
+                  netDeclS     = NetDecl tmpS hwTy
                   netAssignRhs = Assignment tmpRhs scrutExpr
                   netAssignS   = Assignment tmpS (DataTag hwTy (Left tmpRhs))
-              return ((Identifier tmpS Nothing,hwTy),[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++scrutDecls)
+              return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
       | pNm == "GHC.Prim.dataToTag#" -> case args of
-          [Right _,Left (Data dc)] -> return ((N.Literal Nothing (NumLit $ toInteger $ dcTag dc - 1),Integer),[])
+          [Right _,Left (Data dc)] -> return (N.Literal Nothing (NumLit $ toInteger $ dcTag dc - 1),[])
           [Right _,Left scrut] -> do
             i <- varCount <<%= (+1)
             j <- varCount <<%= (+1)
@@ -177,46 +183,24 @@ mkPrimitive bbEParen bbEasD nm args ty = do
             (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
             let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
                 tmpS         = pack ("tmp_dtt_" ++ show j)
-                netDeclRhs   = NetDecl tmpRhs scrutHTy Nothing
-                netDeclS     = NetDecl tmpS Integer  Nothing
+                netDeclRhs   = NetDecl tmpRhs scrutHTy
+                netDeclS     = NetDecl tmpS Integer
                 netAssignRhs = Assignment tmpRhs scrutExpr
                 netAssignS   = Assignment tmpS   (DataTag scrutHTy (Right tmpRhs))
-            return ((Identifier tmpS Nothing,Integer),[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
+            return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return ((BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,Void),[])
+      | otherwise -> return (BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
-
--- | Create an template instantiation text for an argument term, given that
--- the term is a literal. Returns 'Nothing' if the term is not a literal.
-mkLitInput :: Term -- ^ The literal argument term
-           -> MaybeT NetlistMonad ((Expr,HWType),[Declaration])
-mkLitInput (C.Literal (IntegerLiteral i))     = return ((N.Literal Nothing (N.NumLit i),Integer),[])
-mkLitInput e@(collectArgs -> (Data dc, args)) = lift $ do
-  typeTrans <- Lens.use typeTranslator
-  tcm   <- Lens.use tcCache
-  args' <- filterM (fmap (representableType typeTrans tcm) . termType tcm) (lefts args)
-  hwTy  <- N.termHWType $(curLoc) e
-  (exprN,dcDecls) <- mkDcApplication hwTy dc args'
-  return ((exprN,hwTy),dcDecls)
-mkLitInput e@(collectArgs -> (Prim pNm _, args)) = do
-  tcm <- lift $ Lens.use tcCache
-  ty  <- lift $ termType tcm e
-  r@((e',_),_) <- lift $ mkPrimitive False False pNm args ty
-  case e' of
-    (Identifier _ _) -> mzero
-    _                -> return r
-
-mkLitInput _ = mzero
 
 -- | Create an template instantiation text and a partial blackbox content for an
 -- argument term, given that the term is a function. Errors if the term is not
 -- a function
-mkFunInput :: Id -- ^ Identifier binding the encompassing primitive/blackbox application
+mkFunInput :: Id   -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
-           -> MaybeT NetlistMonad ((Either BlackBoxTemplate Declaration,BlackBoxContext),[Declaration])
+           -> NetlistMonad ((Either BlackBoxTemplate Declaration,BlackBoxContext),[Declaration])
 mkFunInput resId e = do
   let (appE,args) = collectArgs e
-  (bbCtx,dcls) <- lift $ mkBlackBoxContext resId (lefts args)
+  (bbCtx,dcls) <- mkBlackBoxContext resId (lefts args)
   templ <- case appE of
             Prim nm _ -> do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
@@ -228,7 +212,7 @@ mkFunInput resId e = do
               tcm <- Lens.use tcCache
               eTy <- termType tcm e
               let (_,resTy) = splitFunTys tcm eTy
-              resHTyM <- lift $ coreTypeToHWTypeM resTy
+              resHTyM <- coreTypeToHWTypeM resTy
               case resHTyM of
                 Just resHTy@(SP _ dcArgPairs) -> do
                   let dcI      = dcTag dc - 1
@@ -247,7 +231,7 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (Component compName hidden compInps compOutp _) <- lift $ preserveVarEnv $ genComponent fun Nothing
+                  (Component compName hidden compInps compOutp _) <- preserveVarEnv $ genComponent fun Nothing
                   let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
                       inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
@@ -255,13 +239,13 @@ mkFunInput resId e = do
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
                       instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
                   return (Right instDecl)
-                Nothing -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-            _ -> return $ error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+                Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+            _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
     Left (_, Left templ') -> let (l,err) = runParse templ'
                              in  if null err
                                     then do
-                                      l'  <- lift $ instantiateSym l
+                                      l'  <- instantiateSym l
                                       l'' <- setClocks bbCtx l'
                                       return ((Left l'',bbCtx),dcls)
                                     else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err

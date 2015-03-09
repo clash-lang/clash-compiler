@@ -1,10 +1,12 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.SNat"
+    , "type"      : "SNat :: KnownNat n => Proxy n -> SNat n"
     , "templateE" : "~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.snatToInteger"
+    , "type"      : "snatToInteger :: SNat n -> Integer"
     , "templateE" : "~LIT[0]"
     }
   }

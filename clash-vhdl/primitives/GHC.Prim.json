@@ -1,61 +1,73 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Prim.+#"
+    , "type"      : "(+#) :: Int# -> Int# -> Int#"
     , "templateE" : "~ARG[0] + ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.-#"
+    , "type"      : "(-#) :: Int# -> Int# -> Int#"
     , "templateE" : "~ARG[0] - ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.*#"
+    , "type"      : "(*#) :: Int# -> Int# -> Int#"
     , "templateE" : "~ARG[0] * ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.quotInt#"
-    , "templateE" : "~ARG[0] div ~ARG[1]"
+    , "type"      : "quotInt# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.remInt#"
+    , "type"      : "remInt# :: Int# -> Int# -> Int#"
     , "templateE" : "~ARG[0] rem ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.negateInt#"
+    , "type"      : "negateInt# :: Int# -> Int#"
     , "templateE" : "-~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.>#"
-    , "templateE" : "1 when ~ARG[0] > ~ARG[1] else 0"
+    , "type"      : "(>#) :: Int# -> Int# -> Bool"
+    , "templateD" : "~RESULT <= 1 when ~ARG[0] > ~ARG[1] else 0;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.>=#"
-    , "templateE" : "1 when ~ARG[0] >= ~ARG[1] else 0"
+    , "type"      : "(>=#) :: Int# -> Int# -> Bool"
+    , "templateD" : "~RESULT <= 1 when ~ARG[0] >= ~ARG[1] else 0;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.==#"
-    , "templateE" : "1 when ~ARG[0] = ~ARG[1] else 0"
+    , "type"      : "(==) :: Int# -> Int# -> Bool"
+    , "templateD" : "~RESULT <= 1 when ~ARG[0] = ~ARG[1] else 0;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim./=#"
-    , "templateE" : "1 when ~ARG[0] /= ~ARG[1] else 0"
+    , "type"      : "(/=#) :: Int# -> Int# -> Bool"
+    , "templateD" : "~RESULT <= 1 when ~ARG[0] /= ~ARG[1] else 0;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.<#"
-    , "templateE" : "1 when ~ARG[0] < ~ARG[1] else 0"
+    , "type"      : "(<#) :: Int# -> Int# -> Bool"
+    , "templateD" : "~RESULT <= 1 when ~ARG[0] < ~ARG[1] else 0;"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.<=#"
-    , "templateE" : "1 when ~ARG[0] <= ~ARG[1] else 0"
+    , "type"      : "(<=#) :: Int# -> Int# -> Bool"
+    , "templateD" : "~RESULT <= 1 when ~ARG[0] <= ~ARG[1] else 0;"
     }
   }
 , { "Primitive" :
@@ -70,6 +82,7 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.unsafeCoerce#"
+    , "type"      : "unsafeCoerce# :: a -> b"
     , "templateE" : "~ARG[0]"
     }
   }

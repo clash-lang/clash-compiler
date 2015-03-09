@@ -12,6 +12,7 @@ import Control.Monad.State                  (MonadIO, MonadState, StateT)
 import Control.Monad.Writer                 (MonadWriter, WriterT)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
+import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import GHC.Generics                         (Generic)
@@ -125,7 +126,7 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl Identifier Identifier [(Identifier,Expr)] -- ^ Instantiation of another component
   | BlackBoxD S.Text BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl Identifier HWType (Maybe Expr) -- ^ Signal declaration
+  | NetDecl Identifier HWType -- ^ Signal declaration
   deriving Show
 
 instance NFData Declaration where
@@ -167,9 +168,8 @@ data Bit
 data BlackBoxContext
   = Context
   { bbResult    :: (SyncExpr,HWType) -- ^ Result name and type
-  , bbInputs    :: [(SyncExpr,HWType)] -- ^ Argument names and types
-  , bbLitInputs :: [Expr] -- ^ Literal arguments (subset of inputs)
-  , bbFunInputs :: [(Either BlackBoxTemplate Declaration,BlackBoxContext)]
+  , bbInputs    :: [(SyncExpr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
+  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
   -- * (Blackbox Template,Partial Blackbox Concext)
@@ -177,7 +177,7 @@ data BlackBoxContext
   deriving Show
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) [] [] []
+emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) [] empty
 
 -- | Either the name of the identifier, or a tuple of the identifier and the
 -- corresponding clock

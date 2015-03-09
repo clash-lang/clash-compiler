@@ -4,6 +4,7 @@
 "-- pragma translate_off
 process is
 begin
+  ~RESULT <= '0';
   wait for ~LIT[0] ns;
   while (not finished) loop
     ~RESULT <= not ~RESULT;
@@ -20,7 +21,7 @@ end process;
     { "name"      : "CLaSH.Driver.TestbenchGen.resetGen"
     , "templateD" :
 "-- pragma translate_off
-~RESULT <= '0' after 0 ns,
+~RESULT <= '0',
            '1' after ~LIT[0] ns;
 -- pragma translate_on"
     }
@@ -33,9 +34,13 @@ end process;
 , { "BlackBox" :
     { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
     , "templateD" :
-"~RESULT <= ~LIT[0]
+"~RESULT <=
 -- pragma translate_off
-            after ~LIT[1] ns
+            false,
+-- pragma translate_on
+            true
+-- pragma translate_off
+            after ~LIT[0] ns
 -- pragma translate_on
             ;"
     }

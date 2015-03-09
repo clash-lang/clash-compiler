@@ -1,19 +1,32 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Prelude.Testbench.csassert"
-    , "comment"   :
-    "csassert :: (Eq a,Show a) -- (ARG[0],ARG[1])
-         => CSignal t a -- ^ Checked value (ARG[2])
-         -> CSignal t a -- ^ Expected value (ARG[3])
-         -> CSignal t b -- ^ Return valued (ARG[4])
-         -> CSignal t b"
+    { "name" : "CLaSH.Prelude.Testbench.csassert"
+    , "type" :
+"csassert :: (Eq a,Show a) -- (ARG[0],ARG[1])
+          => CSignal t a   -- ^ Checked value (ARG[2])
+          -> CSignal t a   -- ^ Expected value (ARG[3])
+          -> CSignal t b   -- ^ Return valued (ARG[4])
+          -> CSignal t b"
     , "templateD" :
 "assert_~SYM[0] : block
+  -- pragma translate_off
+  function slv2string (slv : std_logic_vector) return STRING is
+     variable result : string (1 to slv'length);
+     variable r : integer;
+   begin
+     r := 1;
+     for i in slv'range loop
+        result(r) := std_logic'image(slv(i))(2);
+        r := r + 1;
+     end loop;
+     return result;
+  end;
+  -- pragma translate_on
 begin
   -- pragma translate_off
   process(~CLK[2],~RST[2],~ARG[2],~ARG[3]) is
   begin
     if (rising_edge(~CLK[2]) or rising_edge(~RST[2])) then
-      assert (~ARG[2] = ~ARG[3]) report (\"expected: \" & to_string (~ARG[3]) & \", actual: \" & to_string (~ARG[2])) severity error;
+      assert (~ARG[2] = ~ARG[3]) report (\"expected: \" & slv2string(toSLV(~ARG[3])) & \", actual: \" & slv2string(toSLV(~ARG[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
