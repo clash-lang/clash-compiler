@@ -9,6 +9,7 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.List               (isSuffixOf)
 import qualified Data.Set                as Set
+import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (name2String, runFreshM, unembed)
 
 import qualified CoreSyn                 as GHC
@@ -58,7 +59,7 @@ retype :: HashMap TyConName TyCon
 retype tcm (visited,bindings) current = (visited', HashMap.insert current (ty',tm') bindings')
   where
     (_,tm)               = bindings HashMap.! current
-    used                 = Set.toList $ termFreeIds tm
+    used                 = Set.toList $ Lens.setOf termFreeIds tm
     (visited',bindings') = foldl (retype tcm) (current:visited,bindings) (filter (`notElem` visited) used)
     usedTys              = map (fst . (bindings' HashMap.!)) used
     usedVars             = zipWith Var usedTys used

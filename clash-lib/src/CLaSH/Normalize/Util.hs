@@ -15,6 +15,7 @@ import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
+import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (Fresh, bind, embed, rec)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
@@ -73,7 +74,7 @@ callGraph :: [TmName] -- ^ List of functions that should not be inspected
 callGraph visited bindingMap root = node:other
   where
     rootTm = Maybe.fromMaybe (error $ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ termFreeIds (snd rootTm)
+    used   = Set.toList $ Lens.setOf termFreeIds (snd rootTm)
     node   = (root,used)
     other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
 

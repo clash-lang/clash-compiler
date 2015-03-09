@@ -26,7 +26,8 @@ import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (isInfixOf,pack)
 import qualified Data.Traversable            as T
-import           Unbound.Generics.LocallyNameless     (Rep, bind, embed, rebind, rec,
+import           Data.Typeable               (Typeable)
+import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
                                               runFreshM, string2Name, unbind,
                                               unembed)
 import qualified Unbound.Generics.LocallyNameless     as Unbound
@@ -378,7 +379,7 @@ coreToId :: Id
 coreToId i =
   C.Id <$> (coreToVar i) <*> (embed <$> coreToType (varType i))
 
-coreToVar :: Rep a
+coreToVar :: Typeable a
           => Var
           -> State GHC2CoreState (Unbound.Name a)
 coreToVar = coreToName varName varUnique qualfiedNameStringM
@@ -387,7 +388,7 @@ coreToPrimVar :: Var
               -> State GHC2CoreState (Unbound.Name C.Term)
 coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
-coreToName :: Rep a
+coreToName :: Typeable a
            => (b -> Name)
            -> (b -> Unique)
            -> (Name -> State GHC2CoreState String)

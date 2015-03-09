@@ -105,6 +105,9 @@ instance Alpha Type where
   aeq' c (VarTy _ n) (VarTy _ m) = aeq' c n m
   aeq' c t1          t2          = gaeq c (from t1) (from t2)
 
+  acompare' c (VarTy _ n) (VarTy _ m) = acompare' c n m
+  acompare' c t1          t2          = gacompare c (from t1) (from t2)
+
 instance Alpha ConstTy
 instance Alpha LitTy
 
@@ -119,6 +122,9 @@ instance Subst Type Type where
 
 instance Eq Type where
   (==) = aeq
+
+instance Ord Type where
+  compare = acompare
 
 instance NFData Type where
   rnf ty = case ty of

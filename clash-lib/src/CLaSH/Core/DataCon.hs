@@ -73,6 +73,8 @@ instance Alpha DataCon where
   lfreshen' _ dc cont = cont dc mempty
   freshen' _ dc       = return (dc,mempty)
 
+  acompare' c dc1 dc2 = acompare' c (dcName dc1) (dcName dc2)
+
 instance Subst Type DataCon
 instance Subst Term DataCon
 

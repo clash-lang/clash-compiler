@@ -14,6 +14,7 @@ import           Data.List                 (mapAccumL)
 import qualified Data.Map                  as Map
 import qualified Data.Maybe                as Maybe
 import qualified Data.Set                  as Set
+import qualified Data.Set.Lens             as Lens
 import           Unbound.Generics.LocallyNameless   (unembed)
 
 import           CLaSH.Core.FreeVars       (termFreeIds)
@@ -89,7 +90,7 @@ normalize' nm = do
                   tcm <- Lens.use tcCache
                   ty' <- termType tcm tm'
                   return (ty',tm')
-      let usedBndrs = termFreeIds (snd tmNorm)
+      let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
       if nm `elem` usedBndrs
         then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm)
         else do
@@ -151,7 +152,7 @@ mkCallTree visited bindingMap root = case used of
                             _  -> CBranch (root,rootTm) other
   where
     rootTm = Maybe.fromMaybe (error $ $(curLoc) ++ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ termFreeIds $ snd rootTm
+    used   = Set.toList $ Lens.setOf termFreeIds $ snd rootTm
     other  = map (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
 
 stripArgs :: [TmName]

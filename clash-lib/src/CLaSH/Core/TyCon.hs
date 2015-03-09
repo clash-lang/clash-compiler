@@ -107,6 +107,8 @@ instance Alpha TyCon where
   lfreshen' _ tc cont = cont tc mempty
   freshen' _ tc       = return (tc,mempty)
 
+  acompare' c tc1 tc2 = acompare' c (tyConName tc1) (tyConName tc2)
+
 
 instance Alpha AlgTyConRhs
 

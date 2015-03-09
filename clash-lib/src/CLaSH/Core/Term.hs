@@ -79,12 +79,13 @@ instance Alpha Text where
   swaps' _ctx _p = id
   freshen' _ctx i = return (i, mempty)
   lfreshen' _ctx i cont = cont i mempty
+  acompare' _ctx = compare
 
 instance Eq Term where
   (==) = aeq
 
--- instance Ord Term where
---   compare = acompare
+instance Ord Term where
+  compare = acompare
 
 instance Alpha Term where
   fvAny' c nfn (Var t n)  = fmap (Var t) $ fvAny' c nfn n
@@ -93,6 +94,10 @@ instance Alpha Term where
   aeq' c (Var _ n)   (Var _ m)   = aeq' c n m
   aeq' _ (Prim t1 _) (Prim t2 _) = t1 == t2
   aeq' c t1          t2          = gaeq c (from t1) (from t2)
+
+  acompare' c (Var _ n)   (Var _ m)   = acompare' c n m
+  acompare' _ (Prim t1 _) (Prim t2 _) = compare t1 t2
+  acompare' c t1          t2          = gacompare c (from t1) (from t2)
 
 instance Alpha Pat
 
