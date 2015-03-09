@@ -441,7 +441,7 @@ inst_ (Assignment id_ e) = fmap Just $
 
 inst_ (CondAssignment id_ scrut es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <$>
-      indent 2 (text id_ <+> larrow <+> vcat (punctuate comma (conds es)) <> semi)
+      indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds es)) <> semi))
   where
     conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
     conds []                = return []
