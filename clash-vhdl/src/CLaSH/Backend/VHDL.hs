@@ -10,7 +10,7 @@ module CLaSH.Backend.VHDL (VHDLState) where
 
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
-import           Control.Monad                        (join,liftM,zipWithM)
+import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
@@ -94,7 +94,7 @@ mkTyPackage_ hwtys =
     needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodies) = unzip . catMaybes $ map funDec (nub ((Index 0) : map mkZero needsDec))
+    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nub (map mkZero needsDec)))
 
     packageBodyDec :: VHDLM Doc
     packageBodyDec = case funBodies of
@@ -108,7 +108,7 @@ mkTyPackage_ hwtys =
     mkZero (Index _)    = Index 0
     mkZero (Signed _)   = Signed 0
     mkZero (Unsigned _) = Unsigned 0
-    mkZero (Vector _ t)    = Vector 0 (mkZero t)
+    mkZero (Vector _ t) = Vector 0 t
     mkZero t            = t
 
     eqReprTy :: HWType -> HWType -> Bool
@@ -173,6 +173,19 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
+
+maxDec :: (VHDLM Doc, VHDLM Doc)
+maxDec =
+  ( "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <> semi
+  , "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence [ "if" <+> "left > right" <+> "then return left" <> semi
+                                , "else return right" <> semi
+                                , "end if" <> semi
+                                ]) <$>
+    "end" <> semi
+  )
+
 funDec :: HWType -> Maybe (VHDLM Doc,VHDLM Doc)
 funDec Bool = Just
   ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
@@ -210,52 +223,75 @@ funDec Integer = Just
     "end" <> semi
   )
 
-funDec (Index _) =  Just
-  ( "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <> semi
-  , "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <+> "is" <$>
+funDec (Index _) = Just unsignedToSlvDec
+
+funDec (Signed _) = Just
+  ( "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <+> "is" <$>
     "begin" <$>
-      indent 2 (vcat $ sequence [ "if" <+> "left > right" <+> "then return left" <> semi
-                                , "else return right" <> semi
-                                , "end if" <> semi
-                                ]) <$>
+      indent 2 ("return" <+> "std_logic_vector" <> parens ("s") <> semi) <$>
     "end" <> semi
   )
 
+funDec (Unsigned _) = Just unsignedToSlvDec
+
+funDec (Sum _ _) = Just unsignedToSlvDec
+
+funDec t@(Product _ elTys) = Just
+  ( "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <+> "is" <$>
+    "begin" <$>
+    indent 2 ("return" <+> parens (hcat (punctuate " & " elTyPrint)) <> semi) <$>
+    "end" <> semi
+  )
+  where
+    elTyPrint = forM [0..(length elTys - 1)]
+                     (\i -> "toSLV" <>
+                            parens ("p." <> vhdlType t <> "_sel" <> int i))
+
+funDec t@(Vector _ elTy) = Just
+  ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <+> "is" <$>
+      indent 2
+        ( "alias ivalue    :" <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
+          "variable result :" <+> "std_logic_vector" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
+        ) <$>
+    "begin" <$>
+      indent 2
+        ("for i in ivalue'range loop" <$>
+            indent 2
+              (  "result" <> parens (parens ("(i - 1) * " <> int (typeSize elTy)) <+> "+ 1" <+>
+                                             "to i*" <> int (typeSize elTy)) <+>
+                          ":=" <+> "toSLV" <> parens ("ivalue" <> parens ("i")) <> semi
+              ) <$>
+         "end" <+> "loop" <> semi <$>
+         "return" <+> "result" <> semi
+        ) <$>
+    "end" <> semi
+  )
+
+funDec (BitVector _) = Just slvToSlvDec
+funDec (SP _ _)      = Just slvToSlvDec
+
 funDec _ = Nothing
 
--- mkToStringDecls :: HWType -> (VHDLM Doc, VHDLM Doc)
--- mkToStringDecls t@(Product _ elTys) =
---   ( "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING" <> semi
---   , "function to_string" <+> parens ("value :" <+> vhdlType t) <+> "return STRING is" <$>
---     "begin" <$>
---     indent 2 ("return" <+> parens (hcat (punctuate " & " elTyPrint)) <> semi) <$>
---     "end function to_string;"
---   )
---   where
---     elTyPrint = forM [0..(length elTys - 1)]
---                      (\i -> "to_string" <>
---                             parens ("value." <> vhdlType t <> "_sel" <> int i))
--- mkToStringDecls t@(Vector _ elTy) =
---   ( "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING" <> semi
---   , "function to_string" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return STRING is" <$>
---       indent 2
---         ( "alias ivalue    : " <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
---           "variable result : STRING" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
---         ) <$>
---     "begin" <$>
---       indent 2
---         ("for i in ivalue'range loop" <$>
---             indent 2
---               (  "result" <> parens (parens ("(i - 1) * " <> int (typeSize elTy)) <+> "+ 1" <+>
---                                              "to i*" <> int (typeSize elTy)) <+>
---                           ":= to_string" <> parens (if elTy == Bool then "toSLV(ivalue(i))" else "ivalue(i)") <> semi
---               ) <$>
---          "end loop;" <$>
---          "return result;"
---         ) <$>
---     "end function to_string;"
---   )
--- mkToStringDecls _ = (empty,empty)
+unsignedToSlvDec :: (VHDLM Doc, VHDLM Doc)
+unsignedToSlvDec =
+  ( "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <$>
+    "begin" <$>
+      indent 2 ("return" <+> "std_logic_vector" <> parens ("u") <> semi) <$>
+    "end" <> semi
+  )
+
+slvToSlvDec :: (VHDLM Doc, VHDLM Doc)
+slvToSlvDec =
+  ( "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+    "begin" <$>
+      indent 2 ("return" <+> "slv" <> semi) <$>
+    "end" <> semi
+  )
 
 tyImports :: VHDLM Doc
 tyImports =
