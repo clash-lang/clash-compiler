@@ -8,6 +8,7 @@
           -> CSignal t b"
     , "templateD" :
 "assert_~SYM[0] : block
+  -- pragma translate_off
   function slv2string (slv : std_logic_vector) return STRING is
      variable result : string (1 to slv'length);
      variable r : integer;
@@ -19,6 +20,7 @@
      end loop;
      return result;
   end;
+  -- pragma translate_on
 begin
   -- pragma translate_off
   process(~CLK[2],~RST[2],~ARG[2],~ARG[3]) is
