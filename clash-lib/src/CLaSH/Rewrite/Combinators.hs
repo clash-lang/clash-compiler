@@ -7,7 +7,7 @@ import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 import           Unbound.Generics.LocallyNameless     (Embed, Fresh, bind, embed, rec,
                                               unbind, unembed, unrec)
--- import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.Term             (Pat, Term (..))
 import           CLaSH.Core.Util             (patIds)

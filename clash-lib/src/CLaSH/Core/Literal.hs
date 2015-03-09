@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -16,7 +15,6 @@ where
 
 import                Control.DeepSeq
 import                GHC.Generics
-import                GHC.Real (Ratio (..))
 import                Unbound.Generics.LocallyNameless
 
 import {-# SOURCE #-} CLaSH.Core.Term               (Term)
@@ -31,8 +29,10 @@ data Literal
   | RationalLiteral Rational
   deriving (Eq,Ord,Show,Generic)
 
-deriving instance Generic (Ratio a)
-instance Subst b Rational
+instance Subst b Rational where
+  subst  _ _ = id
+  substs _   = id
+
 
 instance Alpha Literal where
   fvAny' _ _ l = pure l

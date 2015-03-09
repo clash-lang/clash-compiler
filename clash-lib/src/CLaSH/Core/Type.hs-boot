@@ -20,7 +20,6 @@ type TyName = Name Type
 type KiName = Name Kind
 
 instance Eq    Type
-instance Ord   Type
 instance Generic   Type
 instance Show  Type
 instance Alpha Type

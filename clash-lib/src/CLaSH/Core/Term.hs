@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
@@ -19,7 +20,8 @@ where
 
 -- External Modules
 import                Control.DeepSeq
-import                Data.Text                     (Text)
+import                Data.Monoid                             (mempty)
+import                Data.Text                               (Text)
 import                Data.Typeable
 import                GHC.Generics
 import                Unbound.Generics.LocallyNameless
@@ -62,9 +64,21 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Show)
+  deriving (Show,Typeable,Generic)
 
-instance Alpha Text
+
+instance Alpha Text where
+  aeq' _ctx = (==)
+  fvAny' _ctx _nfn i = pure i
+  close _ctx _b = id
+  open _ctx _b = id
+  isPat _ = mempty
+  isTerm _ = True
+  nthPatFind _ = Left
+  namePatFind _ _ = Left 0
+  swaps' _ctx _p = id
+  freshen' _ctx i = return (i, mempty)
+  lfreshen' _ctx i cont = cont i mempty
 
 instance Eq Term where
   (==) = aeq
@@ -73,12 +87,12 @@ instance Eq Term where
 --   compare = acompare
 
 instance Alpha Term where
-  fvAny' c (Var _ n)  = fvAny' c n
-  fvAny' c t          = fvR1 rep1 c t
+  fvAny' c nfn (Var t n)  = fmap (Var t) $ fvAny' c nfn n
+  fvAny' c nfn t          = fmap to . gfvAny c nfn $ from t
 
   aeq' c (Var _ n)   (Var _ m)   = aeq' c n m
   aeq' _ (Prim t1 _) (Prim t2 _) = t1 == t2
-  aeq' c t1          t2          = aeqR1 rep1 c t1 t2
+  aeq' c t1          t2          = gaeq c (from t1) (from t2)
 
 instance Alpha Pat
 
@@ -103,8 +117,12 @@ instance Subst Type Term where
     e                -> e
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
 
-instance Subst Term Text
-instance Subst Type Text
+instance Subst Term Text where
+  subst  _ _ = id
+  substs _   = id
+instance Subst Type Text where
+  subst  _ _ = id
+  substs _   = id
 
 instance NFData Term where
   rnf tm = case tm of
@@ -113,11 +131,11 @@ instance NFData Term where
     Literal l     -> rnf l
     Prim    nm ty -> rnf nm `seq` rnf ty
     Lam     b     -> case unsafeUnbind b of
-                       (id_,tm) -> rnf id_ `seq` rnf tm
+                       (id_,tm') -> rnf id_ `seq` rnf tm'
     TyLam   b       -> case unsafeUnbind b of
-                         (tv,tm) -> rnf tv `seq` rnf tm
+                         (tv,tm') -> rnf tv `seq` rnf tm'
     App     tmL tmR -> rnf tmL `seq` rnf tmR
-    TyApp   tm ty   -> rnf tm `seq` rnf ty
+    TyApp   tm' ty  -> rnf tm' `seq` rnf ty
     Letrec  b       -> case unsafeUnbind b of
                         (bs,e) -> rnf (map (second unembed) (unrec bs)) `seq` rnf e
     Case    sc ty alts -> rnf sc `seq` rnf ty `seq` rnf (map unsafeUnbind alts)
