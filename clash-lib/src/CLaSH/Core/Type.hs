@@ -6,10 +6,6 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
-{-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
-#endif
-
 -- | Types in CoreHW
 module CLaSH.Core.Type
   ( Type (..)

@@ -8,11 +8,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
-{-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
-#endif
-
 -- | Variables in CoreHW
 module CLaSH.Core.Var
   ( Var (..)

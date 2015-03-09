@@ -1,10 +1,10 @@
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
-
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- | Data Constructors in CoreHW
 module CLaSH.Core.DataCon
@@ -15,9 +15,12 @@ module CLaSH.Core.DataCon
   )
 where
 
+import                Data.Monoid                           (mempty)
+import                Data.Typeable
 import                Control.DeepSeq
-import                Unbound.Generics.LocallyNameless as Unbound -- hiding (rnf)
--- import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
+import                GHC.Generics
+import                Unbound.Generics.LocallyNameless      as Unbound
+import                Unbound.Generics.LocallyNameless.Name (Name(..))
 
 import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
@@ -36,7 +39,7 @@ data DataCon
                              -- these type variables are not part of the result
                              -- of the DataCon, but only of the arguments.
   , dcArgTys     :: [Type]   -- ^ Argument types
-  }
+  } deriving (Generic,Typeable)
 
 instance Show DataCon where
   show = show . dcName
@@ -52,22 +55,23 @@ type ConTag = Int
 -- | DataCon reference
 type DcName = Name DataCon
 
-Unbound.derive [''DataCon]
-
 instance Alpha DataCon where
-  swaps' _ _ d    = d
-  fv' _ _         = emptyC
-  lfreshen' _ a f = f a empty
-  freshen' _ a    = return (a,empty)
-  aeq' c dc1 dc2  = aeq' c (dcName dc1) (dcName dc2)
-  acompare' c dc1 dc2 = acompare' c (dcName dc1) (dcName dc2)
-  open _ _ d      = d
-  close _ _ d     = d
-  isPat _         = error "isPat DataCon"
-  isTerm _        = error "isTerm DataCon"
-  isEmbed _       = error "isEmbed DataCon"
-  nthpatrec _     = error "nthpatrec DataCon"
-  findpatrec _ _  = error "findpatrec DataCon"
+  aeq' c dc1 dc2      = aeq' c (dcName dc1) (dcName dc2)
+
+  fvAny' _ _ dc       = pure dc
+
+  close _ _ dc        = dc
+  open _ _ dc         = dc
+
+  isPat _             = mempty
+  isTerm _            = True
+
+  nthPatFind _        = Left
+  namePatFind _ _     = Left 0
+
+  swaps' _ _ dc       = dc
+  lfreshen' _ dc cont = cont dc mempty
+  freshen' _ dc       = return (dc,mempty)
 
 instance Subst Type DataCon
 instance Subst Term DataCon
@@ -79,8 +83,8 @@ instance NFData DataCon where
 
 instance NFData (Name DataCon) where
   rnf nm = case nm of
-    (Nm _ s)   -> rnf s
-    (Bn _ l r) -> rnf l `seq` rnf r
+    (Fn s i) -> rnf s `seq` rnf i
+    (Bn l r) -> rnf l `seq` rnf r
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.

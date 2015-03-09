@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
@@ -23,6 +23,8 @@ import                Data.Text                     (Text)
 import                Data.Typeable
 import                GHC.Generics
 import                Unbound.Generics.LocallyNameless
+import                Unbound.Generics.LocallyNameless.Name   (Name(..))
+import                Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 -- Internal Modules
 import                CLaSH.Core.DataCon            (DataCon)
@@ -64,20 +66,15 @@ data Pat
 
 instance Alpha Text
 
-
 instance Eq Term where
   (==) = aeq
 
-instance Ord Term where
-  compare = acompare
+-- instance Ord Term where
+--   compare = acompare
 
 instance Alpha Term where
-  fv' c (Var _ n)  = fv' c n
-  fv' c t          = fvR1 rep1 c t
-
-  acompare' c (Var _ n)   (Var _ m)   = acompare' c n m
-  acompare' _ (Prim t1 _) (Prim t2 _) = compare t1 t2
-  acompare' c t1          t2          = acompareR1 rep1 c t1 t2
+  fvAny' c (Var _ n)  = fvAny' c n
+  fvAny' c t          = fvR1 rep1 c t
 
   aeq' c (Var _ n)   (Var _ m)   = aeq' c n m
   aeq' _ (Prim t1 _) (Prim t2 _) = t1 == t2
@@ -92,7 +89,7 @@ instance Subst Term Term where
 
 instance Subst Type Pat
 instance Subst Type Term where
-  subst tvN u x | isFree tvN = case x of
+  subst tvN u x | isFreeName tvN = case x of
     Lam    b         -> Lam    (subst tvN u b  )
     TyLam  b         -> TyLam  (subst tvN u b  )
     App    fun arg   -> App    (subst tvN u fun) (subst tvN u arg)
@@ -133,5 +130,5 @@ instance NFData Pat where
 
 instance NFData (Name Term) where
   rnf nm = case nm of
-    (Nm _ s)   -> rnf s
-    (Bn _ l r) -> rnf l `seq` rnf r
+    (Fn s i) -> rnf s `seq` rnf i
+    (Bn l r) -> rnf l `seq` rnf r

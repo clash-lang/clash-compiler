@@ -90,7 +90,7 @@ data AlgTyConRhs
   deriving (Show,Generic)
 
 instance Alpha TyCon where
-  aeq' _ tc1 tc2      = aeq (tyConName tc1) (tyConName tc2)
+  aeq' c tc1 tc2      = aeq' c (tyConName tc1) (tyConName tc2)
 
   fvAny' _ _ tc       = pure tc
 
