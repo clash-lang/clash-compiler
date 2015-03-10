@@ -23,8 +23,8 @@ import qualified Control.Monad.Writer        as Writer
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
+import qualified Data.List                   as List
 import qualified Data.Map                    as Map
-import           Data.Monoid                 (Monoid)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -79,10 +79,10 @@ apply name rewrite ctx expr = R $ do
     tcm                  <- Lens.use tcCache
     beforeTy             <- fmap transparentTy $ termType tcm expr
     let beforeFTV        = Lens.setOf termFreeTyVars expr
-    beforeFV             <- localFreeVars Lens.setOf expr
+    beforeFV             <- Lens.setOf <$> localFreeIds <*> pure expr
     afterTy              <- fmap transparentTy $ termType tcm expr'
     let afterFTV         = Lens.setOf termFreeTyVars expr
-    afterFV              <- localFreeVars Lens.setOf expr'
+    afterFV              <- Lens.setOf <$> localFreeIds <*> pure expr'
     let newFV = Set.size afterFTV > Set.size beforeFTV ||
                 Set.size afterFV > Set.size beforeFV
     Monad.when newFV $
@@ -269,22 +269,11 @@ substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others
 
 -- | Calculate the /local/ free variable of an expression: the free variables
 -- that are not bound in the global environment.
--- localFreeVars :: (Functor m, Monad m, Monoid (p TmName))
---               => (Lens.Getting (f TmName) Term TmName -> Term -> c TmName)
---               -> Term
---               -> RewriteMonad m (c TmName)
-localFreeVars to term = do
+localFreeIds :: (Applicative f, Lens.Contravariant f, Monad m)
+             => RewriteMonad m ((TmName -> f TmName) -> Term -> f Term)
+localFreeIds = do
   globalBndrs <- Lens.use bindings
-  return (to (termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))) term)
-
-  -- let (tyFVs,tmFVs) = termFreeVars term
-  -- return ( tyFVs
-  --        , filterC
-  --        $ cmap (\v -> if v `HML.member` globalBndrs
-  --                      then Nothing
-  --                      else Just v
-  --               ) tmFVs
-  --        )
+  return ((termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))))
 
 -- | Lift the binders in a let-binding to a global function that have a certain
 -- property
@@ -319,8 +308,8 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   let ty = unembed tyE
       e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  let localFTVs = Set.toList $ Lens.setOf termFreeTyVars e
-  localFVs <- fmap Set.toList $ localFreeVars Lens.setOf e
+  let localFTVs = List.nub $ Lens.toListOf termFreeTyVars e
+  localFVs <- List.nub <$> (Lens.toListOf <$> localFreeIds <*> pure e)
   let localFTVkinds = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k delta) localFTVs
       localFVs'     = filter (/= idName) localFVs
       localFVtys'   = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k gamma) localFVs'
@@ -524,10 +513,8 @@ specArgBndrsAndVars :: (Functor m, Monad m)
                     -> Either Term Type
                     -> RewriteMonad m ([Either Id TyVar],[Either Term Type])
 specArgBndrsAndVars ctx specArg = do
-  let specFTVs = Set.toList $ either (Lens.setOf termFreeTyVars) (Lens.setOf typeFreeVars) specArg
-  specFVs <- fmap Set.toList $ either (localFreeVars Lens.setOf) (const (pure Set.empty)) specArg
-  -- (specFTVs,specFVs) <- fmap (Set.toList *** Set.toList) $
-  --                       either localFreeVars (pure . (,Set.empty) . typeFreeVars) specArg
+  let specFTVs = List.nub $ either (Lens.toListOf termFreeTyVars) (Lens.toListOf typeFreeVars) specArg
+  specFVs <- List.nub <$> either ((Lens.toListOf <$> localFreeIds <*>) . pure) (const (pure [])) specArg
   (gamma,delta) <- mkEnv ctx
   let (specTyBndrs,specTyVars) = unzip
                  $ map (\tv -> let ki = HML.lookupDefault (error $ $(curLoc) ++ show tv ++ " not found") tv delta

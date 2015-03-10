@@ -73,7 +73,7 @@ bindNonRep = inlineBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> (notElem idName <$> localFreeVars Lens.toListOf (unembed exprE))
+             <*> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
 
     nonRepTest _ = return False
 
@@ -83,7 +83,7 @@ liftNonRep = liftBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> (elem idName <$> localFreeVars Lens.toListOf (unembed exprE))
+             <*> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
 
     nonRepTest _ = return False
 
