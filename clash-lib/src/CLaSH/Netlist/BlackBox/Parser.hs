@@ -3,7 +3,6 @@ module CLaSH.Netlist.BlackBox.Parser
   (runParse)
 where
 
-import           Data.ListLike.Text.TextLazy              ()
 import           Data.Text.Lazy                           (Text, pack)
 import           Text.ParserCombinators.UU
 import           Text.ParserCombinators.UU.BasicInstances hiding (Parser)

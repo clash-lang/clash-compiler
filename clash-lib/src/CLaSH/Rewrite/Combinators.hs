@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+
 -- | Rewriting combinators and traversals
 module CLaSH.Rewrite.Combinators where
 

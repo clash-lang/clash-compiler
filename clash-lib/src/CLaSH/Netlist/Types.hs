@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -36,8 +34,6 @@ newtype NetlistMonad a =
                }
   deriving (Functor, Monad, Applicative, MonadWriter [(Identifier,HWType)],
             MonadState NetlistState, Fresh, MonadIO)
-
--- deriving instance MonadState (NetlistState backend) (NetlistMonad backend)
 
 -- | State of the NetlistMonad
 data NetlistState

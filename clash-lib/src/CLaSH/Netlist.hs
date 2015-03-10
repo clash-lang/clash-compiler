@@ -1,39 +1,38 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 
 -- | Create Netlists out of normalized CoreHW Terms
 module CLaSH.Netlist where
 
-import           Control.Lens               ((.=), (<<%=))
-import qualified Control.Lens               as Lens
-import           Control.Monad.State        (runStateT)
-import           Control.Monad.Writer       (listen, runWriterT)
-import           Data.Either                (lefts,partitionEithers)
-import           Data.HashMap.Lazy          (HashMap)
-import qualified Data.HashMap.Lazy          as HashMap
-import           Data.List                  (elemIndex, nub)
-import           Data.Maybe                 (fromMaybe)
-import qualified Data.Text.Lazy             as Text
-import           Unbound.Generics.LocallyNameless    (Embed (..), name2String,
-                                             runFreshMT, unbind, unembed,
-                                             unrebind)
+import           Control.Lens                     ((.=), (<<%=))
+import qualified Control.Lens                     as Lens
+import           Control.Monad.State              (runStateT)
+import           Control.Monad.Writer             (listen, runWriterT)
+import           Data.Either                      (lefts,partitionEithers)
+import           Data.HashMap.Lazy                (HashMap)
+import qualified Data.HashMap.Lazy                as HashMap
+import           Data.List                        (elemIndex, nub)
+import           Data.Maybe                       (fromMaybe)
+import qualified Data.Text.Lazy                   as Text
+import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
+                                                  runFreshMT, unbind, unembed,
+                                                  unrebind)
 
-import           CLaSH.Core.DataCon         (DataCon (..))
-import           CLaSH.Core.Literal         (Literal (..))
-import           CLaSH.Core.Pretty          (showDoc)
-import           CLaSH.Core.Term            (Pat (..), Term (..), TmName)
-import qualified CLaSH.Core.Term            as Core
-import           CLaSH.Core.Type            (Type (..))
-import           CLaSH.Core.TyCon           (TyConName, TyCon)
-import           CLaSH.Core.Util            (collectArgs, isVar, termType)
-import           CLaSH.Core.Var             (Id, Var (..))
+import           CLaSH.Core.DataCon               (DataCon (..))
+import           CLaSH.Core.Literal               (Literal (..))
+import           CLaSH.Core.Pretty                (showDoc)
+import           CLaSH.Core.Term                  (Pat (..), Term (..), TmName)
+import qualified CLaSH.Core.Term                  as Core
+import           CLaSH.Core.Type                  (Type (..))
+import           CLaSH.Core.TyCon                 (TyConName, TyCon)
+import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
+import           CLaSH.Core.Var                   (Id, Var (..))
 import           CLaSH.Netlist.BlackBox
 import           CLaSH.Netlist.Id
-import           CLaSH.Netlist.Types        as HW
+import           CLaSH.Netlist.Types              as HW
 import           CLaSH.Netlist.Util
 import           CLaSH.Normalize.Util
-import           CLaSH.Primitives.Types     as P
+import           CLaSH.Primitives.Types           as P
 import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with

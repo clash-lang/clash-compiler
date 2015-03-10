@@ -3,39 +3,40 @@
 -- | Turn CoreHW terms into normalized CoreHW Terms
 module CLaSH.Normalize where
 
-import           Control.Concurrent.Supply (Supply)
-import           Control.Lens              ((.=))
-import qualified Control.Lens              as Lens
-import qualified Control.Monad.State       as State
-import           Data.Either               (partitionEithers)
-import           Data.HashMap.Strict       (HashMap)
-import qualified Data.HashMap.Strict       as HashMap
-import           Data.List                 (mapAccumL)
-import qualified Data.Map                  as Map
-import qualified Data.Maybe                as Maybe
-import qualified Data.Set                  as Set
-import qualified Data.Set.Lens             as Lens
-import           Unbound.Generics.LocallyNameless   (unembed)
+import           Control.Concurrent.Supply        (Supply)
+import           Control.Lens                     ((.=))
+import qualified Control.Lens                     as Lens
+import qualified Control.Monad.State              as State
+import           Data.Either                      (partitionEithers)
+import           Data.HashMap.Strict              (HashMap)
+import qualified Data.HashMap.Strict              as HashMap
+import           Data.List                        (mapAccumL)
+import qualified Data.Map                         as Map
+import qualified Data.Maybe                       as Maybe
+import qualified Data.Set                         as Set
+import qualified Data.Set.Lens                    as Lens
+import           Unbound.Generics.LocallyNameless (unembed)
 
-import           CLaSH.Core.FreeVars       (termFreeIds)
-import           CLaSH.Core.Pretty         (showDoc)
-import           CLaSH.Core.Subst          (substTms)
-import           CLaSH.Core.Term           (Term (..), TmName)
-import           CLaSH.Core.Type           (Type)
-import           CLaSH.Core.TyCon          (TyCon, TyConName)
-import           CLaSH.Core.Util           (collectArgs, mkApps, termType)
-import           CLaSH.Core.Var            (Id,varName)
-import           CLaSH.Netlist.Types       (HWType)
-import           CLaSH.Netlist.Util        (splitNormalized)
+import           CLaSH.Core.FreeVars              (termFreeIds)
+import           CLaSH.Core.Pretty                (showDoc)
+import           CLaSH.Core.Subst                 (substTms)
+import           CLaSH.Core.Term                  (Term (..), TmName)
+import           CLaSH.Core.Type                  (Type)
+import           CLaSH.Core.TyCon                 (TyCon, TyConName)
+import           CLaSH.Core.Util                  (collectArgs, mkApps, termType)
+import           CLaSH.Core.Var                   (Id,varName)
+import           CLaSH.Netlist.Types              (HWType)
+import           CLaSH.Netlist.Util               (splitNormalized)
 import           CLaSH.Normalize.Strategy
-import           CLaSH.Normalize.Transformations ( bindConstantVar, caseCon, reduceConst, topLet )
+import           CLaSH.Normalize.Transformations  (bindConstantVar, caseCon,
+                                                   reduceConst, topLet )
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
-import           CLaSH.Rewrite.Combinators ((>->),(!->),repeatR,topdownR)
-import           CLaSH.Rewrite.Types       (DebugLevel (..), RewriteState (..),
-                                            bindings, dbgLevel, tcCache)
-import           CLaSH.Rewrite.Util        (liftRS, runRewrite,
-                                            runRewriteSession)
+import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
+import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteState (..),
+                                                   bindings, dbgLevel, tcCache)
+import           CLaSH.Rewrite.Util               (liftRS, runRewrite,
+                                                   runRewriteSession)
 import           CLaSH.Util
 
 -- | Run a NormalizeSession in a given environment

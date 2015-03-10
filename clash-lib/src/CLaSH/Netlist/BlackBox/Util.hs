@@ -181,9 +181,9 @@ lineToType _ _ = error $ $(curLoc) ++ "Unexpected type manipulation"
 -- | Give a context and a tagged hole (of a template), returns part of the
 -- context that matches the tag of the hole.
 renderTag :: Backend backend
-                 => BlackBoxContext
-                 -> Element
-                 -> State backend Text
+          => BlackBoxContext
+          -> Element
+          -> State backend Text
 renderTag _ (C t)           = return t
 renderTag b O               = fmap (displayT . renderOneLine) . expr False . either id fst . fst $ bbResult b
 renderTag b (I n)           = let (s,_,_) = bbInputs b !! n
