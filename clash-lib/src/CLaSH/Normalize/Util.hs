@@ -1,8 +1,6 @@
-{-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns #-}
-
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 -- | Utility functions used by the normalisation transformations
 module CLaSH.Normalize.Util where

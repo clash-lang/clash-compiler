@@ -1,8 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
-
 -- | Generate a HDL testbench for a component given a set of stimuli and a
 -- set of matching expected outputs
 module CLaSH.Driver.TestbenchGen

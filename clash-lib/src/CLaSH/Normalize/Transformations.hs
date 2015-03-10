@@ -2,8 +2,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
-
 -- | Transformations of the Normalization process
 module CLaSH.Normalize.Transformations
   ( appProp
