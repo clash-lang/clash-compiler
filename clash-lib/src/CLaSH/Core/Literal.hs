@@ -1,10 +1,8 @@
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
-{-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Term Literal
 module CLaSH.Core.Literal
@@ -13,32 +11,28 @@ module CLaSH.Core.Literal
   )
 where
 
-import                Control.DeepSeq
-import                Unbound.LocallyNameless       as Unbound hiding (rnf)
-import                Unbound.LocallyNameless.Alpha
+import Control.DeepSeq                  (NFData (..))
+import GHC.Generics                     (Generic)
+import Unbound.Generics.LocallyNameless (Alpha (..), Subst (..))
 
-import {-# SOURCE #-} CLaSH.Core.Term               (Term)
-import {-# SOURCE #-} CLaSH.Core.Type               (Type)
-import                CLaSH.Core.TysPrim            (intPrimTy, voidPrimTy)
+import {-# SOURCE #-} CLaSH.Core.Term   (Term)
+import {-# SOURCE #-} CLaSH.Core.Type   (Type)
+import CLaSH.Core.TysPrim               (intPrimTy, voidPrimTy)
+import CLaSH.Util
 
 -- | Term Literal
 data Literal
   = IntegerLiteral  Integer
   | StringLiteral   String
   | RationalLiteral Rational
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,Generic)
 
-Unbound.derive [''Literal]
-
-instance Alpha Rational
-instance Subst b Rational
+instance Subst b Rational where
+  subst  _ _ = id
+  substs _   = id
 
 instance Alpha Literal where
-  fv' _ _ = emptyC
-
-  acompare' _ (IntegerLiteral i) (IntegerLiteral j)   = compare i j
-  acompare' _ (RationalLiteral i) (RationalLiteral j) = compare i j
-  acompare' c l1                 l2                   = acompareR1 rep1 c l1 l2
+  fvAny' _ _ l = pure l
 
 instance Subst Type Literal
 instance Subst Term Literal

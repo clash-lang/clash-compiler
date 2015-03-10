@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -16,7 +14,7 @@ import Data.IntMap.Lazy                     (IntMap, empty)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import GHC.Generics                         (Generic)
-import Unbound.LocallyNameless              (Fresh, FreshMT)
+import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 
 import CLaSH.Core.Term                      (Term, TmName)
 import CLaSH.Core.Type                      (Type)
@@ -36,8 +34,6 @@ newtype NetlistMonad a =
                }
   deriving (Functor, Monad, Applicative, MonadWriter [(Identifier,HWType)],
             MonadState NetlistState, Fresh, MonadIO)
-
--- deriving instance MonadState (NetlistState backend) (NetlistMonad backend)
 
 -- | State of the NetlistMonad
 data NetlistState

@@ -1,7 +1,7 @@
 module CLaSH.Backend where
 
-import           Data.HashSet               (HashSet)
-import           Data.Text.Lazy                       (Text)
+import Data.HashSet                         (HashSet)
+import Data.Text.Lazy                       (Text)
 import Control.Monad.State                  (State)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 

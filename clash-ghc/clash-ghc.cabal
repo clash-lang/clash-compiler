@@ -67,7 +67,7 @@ Executable clash
                       mtl                  >= 2.1.1,
                       text                 >= 0.11.3.1,
                       transformers         >= 0.3,
-                      unbound              >= 0.4.0.2,
+                      unbound-generics     >= 0.1,
                       unordered-containers >= 0.2.1.0,
 
                       clash-lib            >= 0.4.1,

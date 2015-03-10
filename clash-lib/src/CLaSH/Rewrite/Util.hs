@@ -1,13 +1,5 @@
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE Rank2Types        #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE TypeOperators     #-}
-{-# LANGUAGE ViewPatterns      #-}
-
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
 
 -- | Utilities for rewriting: e.g. inlining, specialisation, etc.
 module CLaSH.Rewrite.Util where
@@ -23,24 +15,25 @@ import qualified Control.Monad.Writer        as Writer
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
+import qualified Data.List                   as List
 import qualified Data.Map                    as Map
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
-import           Unbound.LocallyNameless     (Collection (..), Fresh, bind,
+import qualified Data.Set.Lens               as Lens
+import           Unbound.Generics.LocallyNameless     (Fresh, bind,
                                               embed, makeName, name2String,
                                               rebind, rec, string2Name, unbind,
                                               unembed, unrec)
-import qualified Unbound.LocallyNameless     as Unbound
-import           Unbound.Util                (filterC)
+import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
-import           CLaSH.Core.FreeVars         (termFreeVars, typeFreeVars)
+import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars, typeFreeVars)
 import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
                                               TmName)
 import           CLaSH.Core.TyCon            (TyCon, TyConName, tyConDataCons)
-import           CLaSH.Core.Type             (KindOrType, TyName, Type (..),
+import           CLaSH.Core.Type             (KindOrType, Type (..),
                                               TypeView (..), transparentTy,
                                               typeKind, coreView)
 import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
@@ -77,9 +70,11 @@ apply name rewrite ctx expr = R $ do
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.use tcCache
     beforeTy             <- fmap transparentTy $ termType tcm expr
-    (beforeFTV,beforeFV) <- localFreeVars expr
+    let beforeFTV        = Lens.setOf termFreeTyVars expr
+    beforeFV             <- Lens.setOf <$> localFreeIds <*> pure expr
     afterTy              <- fmap transparentTy $ termType tcm expr'
-    (afterFTV,afterFV)   <- localFreeVars expr'
+    let afterFTV         = Lens.setOf termFreeTyVars expr
+    afterFV              <- Lens.setOf <$> localFreeIds <*> pure expr'
     let newFV = Set.size afterFTV > Set.size beforeFTV ||
                 Set.size afterFV > Set.size beforeFV
     Monad.when newFV $
@@ -250,7 +245,7 @@ substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others
   where
     val      = unembed valE
     bndrName = varName bndr
-    selfRef  = (bndrName `elem`) . snd $ termFreeVars val
+    selfRef  = bndrName `elem` Lens.toListOf termFreeIds val
     (res',rest',others') = if selfRef
       then (res,rest,(bndr,valE):others)
       else ( substTm (varName bndr) val res
@@ -266,19 +261,11 @@ substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others
 
 -- | Calculate the /local/ free variable of an expression: the free variables
 -- that are not bound in the global environment.
-localFreeVars :: (Functor m, Monad m, Collection c)
-              => Term
-              -> RewriteMonad m (c TyName,c TmName)
-localFreeVars term = do
+localFreeIds :: (Applicative f, Lens.Contravariant f, Monad m)
+             => RewriteMonad m ((TmName -> f TmName) -> Term -> f Term)
+localFreeIds = do
   globalBndrs <- Lens.use bindings
-  let (tyFVs,tmFVs) = termFreeVars term
-  return ( tyFVs
-         , filterC
-         $ cmap (\v -> if v `HML.member` globalBndrs
-                       then Nothing
-                       else Just v
-                ) tmFVs
-         )
+  return ((termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))))
 
 -- | Lift the binders in a let-binding to a global function that have a certain
 -- property
@@ -313,7 +300,8 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   let ty = unembed tyE
       e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  (localFTVs,localFVs) <- fmap (Set.toList *** Set.toList) $ localFreeVars e
+  let localFTVs = List.nub $ Lens.toListOf termFreeTyVars e
+  localFVs <- List.nub <$> (Lens.toListOf <$> localFreeIds <*> pure e)
   let localFTVkinds = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k delta) localFTVs
       localFVs'     = filter (/= idName) localFVs
       localFVtys'   = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k gamma) localFVs'
@@ -517,8 +505,8 @@ specArgBndrsAndVars :: (Functor m, Monad m)
                     -> Either Term Type
                     -> RewriteMonad m ([Either Id TyVar],[Either Term Type])
 specArgBndrsAndVars ctx specArg = do
-  (specFTVs,specFVs) <- fmap (Set.toList *** Set.toList) $
-                        either localFreeVars (pure . (,emptyC) . typeFreeVars) specArg
+  let specFTVs = List.nub $ either (Lens.toListOf termFreeTyVars) (Lens.toListOf typeFreeVars) specArg
+  specFVs <- List.nub <$> either ((Lens.toListOf <$> localFreeIds <*>) . pure) (const (pure [])) specArg
   (gamma,delta) <- mkEnv ctx
   let (specTyBndrs,specTyVars) = unzip
                  $ map (\tv -> let ki = HML.lookupDefault (error $ $(curLoc) ++ show tv ++ " not found") tv delta

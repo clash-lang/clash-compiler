@@ -6,7 +6,7 @@ where
 
 import Data.HashMap.Strict       (HashMap,(!))
 import Control.Monad.Trans.Error (ErrorT(..))
-import Unbound.LocallyNameless   (name2String)
+import Unbound.Generics.LocallyNameless   (name2String)
 
 import CLaSH.Core.Pretty         (showDoc)
 import CLaSH.Core.TyCon          (TyCon (..), TyConName)

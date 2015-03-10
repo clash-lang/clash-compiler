@@ -1,25 +1,23 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
-
 -- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
-import           Data.HashMap.Lazy       (HashMap)
-import           Unbound.LocallyNameless (Fresh, bind, embed, unbind, unembed,
-                                          unrebind, unrec)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+import Data.HashMap.Lazy                       (HashMap)
+import Unbound.Generics.LocallyNameless        (Fresh, bind, embed, unbind, unembed,
+                                                unrebind, unrec)
+import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           CLaSH.Core.DataCon      (dcType)
-import           CLaSH.Core.Literal      (literalType)
-import           CLaSH.Core.Pretty       (showDoc)
-import           CLaSH.Core.Term         (Pat (..), Term (..), TmName)
-import           CLaSH.Core.Type         (Kind, TyName, Type (..), applyTy,
-                                          isFunTy, isPolyFunCoreTy, mkFunTy,
-                                          splitFunTy)
-import           CLaSH.Core.TyCon        (TyCon, TyConName)
-import           CLaSH.Core.Var          (Id, TyVar, Var (..), varType)
-import           CLaSH.Util
+import CLaSH.Core.DataCon                      (dcType)
+import CLaSH.Core.Literal                      (literalType)
+import CLaSH.Core.Pretty                       (showDoc)
+import CLaSH.Core.Term                         (Pat (..), Term (..), TmName)
+import CLaSH.Core.Type                         (Kind, TyName, Type (..), applyTy,
+                                                isFunTy, isPolyFunCoreTy, mkFunTy,
+                                                splitFunTy)
+import CLaSH.Core.TyCon                        (TyCon, TyConName)
+import CLaSH.Core.Var                          (Id, TyVar, Var (..), varType)
+import CLaSH.Util
 
 -- | Type environment/context
 type Gamma = HashMap TmName Type

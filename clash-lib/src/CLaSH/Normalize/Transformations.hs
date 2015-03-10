@@ -1,8 +1,5 @@
-{-# LANGUAGE PatternGuards   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
-
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
 
 -- | Transformations of the Normalization process
 module CLaSH.Normalize.Transformations
@@ -38,15 +35,15 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
-import           Unbound.LocallyNameless     (Bind, Embed (..), bind, embed,
+import           Unbound.Generics.LocallyNameless     (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
                                               unrec, name2String)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.DataCon          (DataCon, dcName, dcTag,
                                               dcUnivTyVars)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
-                                              termFreeVars, typeFreeVars)
+                                              typeFreeVars)
 import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
@@ -73,7 +70,7 @@ bindNonRep = inlineBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> ((notElem idName . snd) <$> localFreeVars (unembed exprE))
+             <*> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
 
     nonRepTest _ = return False
 
@@ -83,7 +80,7 @@ liftNonRep = liftBinders nonRepTest
   where
     nonRepTest (Id idName tyE, exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> ((elem idName . snd) <$> localFreeVars (unembed exprE))
+             <*> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
 
     nonRepTest _ = return False
 
@@ -91,7 +88,7 @@ liftNonRep = liftBinders nonRepTest
 typeSpec :: NormRewrite
 typeSpec ctx e@(TyApp e1 ty)
   | (Var _ _,  args) <- collectArgs e1
-  , null $ typeFreeVars ty
+  , null $ Lens.toListOf typeFreeVars ty
   , (_, []) <- Either.partitionEithers args
   = specializeNorm False ctx e
 
@@ -102,7 +99,7 @@ nonRepSpec :: NormRewrite
 nonRepSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
-  , null $ termFreeTyVars e2
+  , null $ Lens.toListOf termFreeTyVars e2
   = R $ do tcm <- Lens.use tcCache
            e2Ty <- termType tcm e2
            localVar <- isLocalVar e2
@@ -179,7 +176,7 @@ caseCon _ c@(Case scrut _ alts)
     case dcAltM of
       Just (DataPat _ pxs, e) ->
         let (tvs,xs) = unrebind pxs
-            fvs = termFreeIds e
+            fvs = Lens.toListOf termFreeIds e
             (binds,_) = List.partition ((`elem` fvs) . varName . fst)
                       $ zip xs (Either.lefts args)
             e' = case binds of
@@ -212,7 +209,8 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
     DefaultPat    -> changed altE
     LitPat _      -> changed altE
     DataPat _ pxs -> let (tvs,xs)   = unrebind pxs
-                         (ftvs,fvs) = termFreeVars altE
+                         ftvs       = Lens.toListOf termFreeTyVars altE
+                         fvs        = Lens.toListOf termFreeIds altE
                          usedTvs    = filter ((`elem` ftvs) . varName) tvs
                          usedXs     = filter ((`elem` fvs) . varName) xs
                      in  case (usedTvs,usedXs) of
@@ -281,7 +279,7 @@ topLet _ e = return e
 deadCode :: NormRewrite
 deadCode _ e@(Letrec binds) = R $ do
     (xes, body) <- fmap (first unrec) $ unbind binds
-    let bodyFVs = termFreeIds body
+    let bodyFVs = Lens.toListOf termFreeIds body
         (xesUsed,xesOther) = List.partition
                                ( (`elem` bodyFVs )
                                . varName
@@ -294,7 +292,7 @@ deadCode _ e@(Letrec binds) = R $ do
   where
     findUsedBndrs used []      _     = used
     findUsedBndrs used explore other =
-      let fvsUsed = concatMap (termFreeIds . unembed . snd) explore
+      let fvsUsed = concatMap (Lens.toListOf termFreeIds . unembed . snd) explore
           (explore',other') = List.partition
                                 ( (`elem` fvsUsed)
                                 . varName
@@ -323,7 +321,7 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
         bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
         case bodyMaybe of
           -- Don't inline recursive expressions
-          Just (_,body) -> if f `elem` (termFreeIds body)
+          Just (_,body) -> if f `elem` (Lens.toListOf termFreeIds body)
                               then return e
                               else changed (mkApps body args)
           _ -> return e
@@ -337,7 +335,7 @@ inlineClosed _ e@(Var _ f) = R $ do
       bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
       case bodyMaybe of
         -- Don't inline recursive expressions
-        Just (_,body) -> if f `elem` (termFreeIds body)
+        Just (_,body) -> if f `elem` (Lens.toListOf termFreeIds body)
                             then return e
                             else changed body
         _ -> return e
@@ -373,7 +371,7 @@ constantSpec :: NormRewrite
 constantSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
-  , null $ termFreeTyVars e2
+  , null $ Lens.toListOf termFreeTyVars e2
   , isConstant e2
   = specializeNorm False ctx e
 

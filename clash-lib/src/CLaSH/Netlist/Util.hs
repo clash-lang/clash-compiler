@@ -1,8 +1,5 @@
-{-# LANGUAGE PatternGuards   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
-
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
 
 -- | Utilities for converting Core Type/Term to Netlist datatypes
 module CLaSH.Netlist.Util where
@@ -16,7 +13,7 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (pack)
-import           Unbound.LocallyNameless (Embed, Fresh, bind, embed, makeName,
+import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed, makeName,
                                           name2Integer, name2String, unbind,
                                           unembed, unrec)
 
@@ -80,7 +77,7 @@ synchronizedClk :: HashMap TyConName TyCon -- ^ TyCon cache
                 -> Type
                 -> Maybe (Identifier,Int)
 synchronizedClk tcm ty
-  | not . null . typeFreeVars $ ty = Nothing
+  | not . null . Lens.toListOf typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
   = case name2String tyCon of
       "CLaSH.Sized.Vector.Vec"        -> synchronizedClk tcm (args!!1)
@@ -229,7 +226,7 @@ mkUniqueNormalized (args,binds,res) = do
   let res1  = appendToName (varName res) "_o"
   let bndrs = map fst binds
   let exprs = map (unembed . snd) binds
-  let usesOutput = concatMap (filter (== varName res) . termFreeIds) exprs
+  let usesOutput = concatMap (filter (== varName res) . Lens.toListOf termFreeIds) exprs
   let (res2,extraBndr) = case usesOutput of
                             [] -> (res1,[] :: [(Id, Embed Term)])
                             _  -> let res3 = appendToName (varName res) "_o_sig"

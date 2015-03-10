@@ -2,8 +2,6 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE TupleSections        #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -32,8 +30,8 @@ import Data.Version                   (Version)
 import Control.Lens
 import Debug.Trace                    (trace)
 import qualified Language.Haskell.TH  as TH
-import Unbound.LocallyNameless        (Embed(..))
-import Unbound.LocallyNameless.Name   (Name(..))
+import Unbound.Generics.LocallyNameless        (Embed(..))
+import Unbound.Generics.LocallyNameless.Name   (Name(..))
 
 #ifdef CABAL
 import qualified Paths_clash_lib      (version)
@@ -51,8 +49,8 @@ instance Monad m => MonadUnique (StateT Int m) where
     return supply
 
 instance Hashable (Name a) where
-  hashWithSalt salt (Nm _ (str,int)) = hashWithSalt salt (hashWithSalt (hash int) str)
-  hashWithSalt salt (Bn _ i0 i1)     = hashWithSalt salt (hash i0 `hashWithSalt` i1)
+  hashWithSalt salt (Fn str int) = hashWithSalt salt (hashWithSalt (hash int) str)
+  hashWithSalt salt (Bn i0  i1)  = hashWithSalt salt (hash i0 `hashWithSalt` i1)
 
 instance (Ord a) => Ord (Embed a) where
   compare (Embed a) (Embed b) = compare a b

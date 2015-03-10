@@ -4,36 +4,35 @@
 -- | Module that connects all the parts of the CLaSH compiler library
 module CLaSH.Driver where
 
-import qualified Control.Concurrent.Supply    as Supply
+import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Monad.State          (evalState, get)
-import           Data.HashMap.Strict          (HashMap)
-import qualified Data.HashMap.Strict          as HashMap
-import qualified Data.HashSet                 as HashSet
-import           Data.List                    (isSuffixOf)
-import           Data.Maybe                   (fromMaybe, listToMaybe)
-import qualified Data.Text.Lazy               as Text
-import qualified System.Directory             as Directory
-import qualified System.FilePath              as FilePath
-import qualified System.IO                    as IO
-import           Text.PrettyPrint.Leijen.Text (Doc, hPutDoc)
-import           Unbound.LocallyNameless      (name2String)
+import           Control.Monad.State              (evalState, get)
+import           Data.HashMap.Strict              (HashMap)
+import qualified Data.HashMap.Strict              as HashMap
+import qualified Data.HashSet                     as HashSet
+import           Data.List                        (isSuffixOf)
+import           Data.Maybe                       (fromMaybe, listToMaybe)
+import qualified Data.Text.Lazy                   as Text
+import qualified Data.Time.Clock                  as Clock
+import qualified System.Directory                 as Directory
+import qualified System.FilePath                  as FilePath
+import qualified System.IO                        as IO
+import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc)
+import           Unbound.Generics.LocallyNameless (name2String)
 
 import           CLaSH.Backend
-import           CLaSH.Core.Term              (Term)
-import           CLaSH.Core.Type              (Type)
-import           CLaSH.Core.TyCon             (TyCon, TyConName)
+import           CLaSH.Core.Term                  (Term)
+import           CLaSH.Core.Type                  (Type)
+import           CLaSH.Core.TyCon                 (TyCon, TyConName)
 import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.Types
-import           CLaSH.Netlist                (genNetlist)
-import           CLaSH.Netlist.Types          (Component (..), HWType)
-import           CLaSH.Normalize              (checkNonRecursive, cleanupGraph,
-                                               normalize, runNormalization)
+import           CLaSH.Netlist                    (genNetlist)
+import           CLaSH.Netlist.Types              (Component (..), HWType)
+import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
+                                                   normalize, runNormalization)
 import           CLaSH.Primitives.Types
-import           CLaSH.Rewrite.Types          (DebugLevel (..))
+import           CLaSH.Rewrite.Types              (DebugLevel (..))
 import           CLaSH.Util
-
-import qualified Data.Time.Clock              as Clock
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL :: forall backend . Backend backend

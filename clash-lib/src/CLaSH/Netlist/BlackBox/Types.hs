@@ -1,8 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -- | Types used in BlackBox modules
 module CLaSH.Netlist.BlackBox.Types where
 
-import Data.Text.Lazy       (Text)
+import Data.Text.Lazy (Text)
 
 -- | A BlackBox Template is a List of Elements
 type BlackBoxTemplate = [Element]

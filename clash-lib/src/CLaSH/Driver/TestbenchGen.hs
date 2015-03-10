@@ -1,8 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-{-# OPTIONS_GHC -fcontext-stack=21 #-}
-
 -- | Generate a HDL testbench for a component given a set of stimuli and a
 -- set of matching expected outputs
 module CLaSH.Driver.TestbenchGen
@@ -15,7 +13,7 @@ import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (mapMaybe)
 import           Data.Text.Lazy                   (isPrefixOf,pack,splitOn)
-import           Unbound.LocallyNameless          (name2String)
+import           Unbound.Generics.LocallyNameless          (name2String)
 
 import           CLaSH.Core.Term
 import           CLaSH.Core.TyCon

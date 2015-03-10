@@ -1,15 +1,12 @@
 {-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
-
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
-{-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
-#endif
 
 -- | Variables in CoreHW
 module CLaSH.Core.Var
@@ -20,13 +17,15 @@ module CLaSH.Core.Var
   )
 where
 
-import                Control.DeepSeq              as DS
-import                Unbound.LocallyNameless      as Unbound hiding (rnf)
-import                Unbound.LocallyNameless.Name (isFree)
+import Control.DeepSeq                  (NFData (..))
+import Data.Typeable                    (Typeable)
+import GHC.Generics                     (Generic)
+import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..),isFreeName,
+                                         unembed)
 
-import {-# SOURCE #-} CLaSH.Core.Term              (Term)
-import {-# SOURCE #-} CLaSH.Core.Type              (Kind, Type)
-import                CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.Term   (Term)
+import {-# SOURCE #-} CLaSH.Core.Type   (Kind, Type)
+import CLaSH.Util
 
 -- | Variables in CoreHW
 data Var a
@@ -40,23 +39,21 @@ data Var a
   { varName :: Name a
   , varType :: Embed Type
   }
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Show,Generic,Typeable)
 
 -- | Term variable
 type Id    = Var Term
 -- | Type variable
 type TyVar = Var Type
 
-Unbound.derive [''Var]
-
-instance Alpha a => Alpha (Var a)
+instance (Typeable a, Alpha a) => Alpha (Var a)
 
 instance Subst Term Id
 instance Subst Term TyVar
 
 instance Subst Type TyVar
 instance Subst Type Id where
-  subst tvN u (Id idN ty) | isFree tvN = Id idN (subst tvN u ty)
+  subst tvN u (Id idN ty) | isFreeName tvN = Id idN (subst tvN u ty)
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
 
 instance NFData (Name a) => NFData (Var a) where

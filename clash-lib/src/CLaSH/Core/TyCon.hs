@@ -1,11 +1,7 @@
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternGuards         #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
-
-{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- | Type Constructors in CoreHW
 module CLaSH.Core.TyCon
@@ -19,15 +15,18 @@ module CLaSH.Core.TyCon
 where
 
 -- External Import
-import                Control.DeepSeq
-import                Unbound.LocallyNameless as Unbound hiding (rnf)
-import                Unbound.LocallyNameless.Name (Name(Nm,Bn))
+import Control.DeepSeq
+import Data.Monoid                           (mempty)
+import Data.Typeable                         hiding (TyCon,tyConName)
+import GHC.Generics
+import Unbound.Generics.LocallyNameless      (Alpha(..),Subst(..))
+import Unbound.Generics.LocallyNameless.Name (Name(..),name2String)
 
 -- Internal Imports
-import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
-import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
-import                CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.DataCon     (DataCon)
+import {-# SOURCE #-} CLaSH.Core.Term        (Term)
+import {-# SOURCE #-} CLaSH.Core.Type        (Kind, TyName, Type)
+import CLaSH.Util
 
 -- | Type Constructor
 data TyCon
@@ -55,6 +54,7 @@ data TyCon
   | SuperKindTyCon
   { tyConName :: TyConName     -- ^ Name of the TyCon
   }
+  deriving (Generic,Typeable)
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
@@ -84,24 +84,28 @@ data AlgTyConRhs
                                  -- The TyName's are the type-variables from
                                  -- the corresponding TyCon.
   }
-  deriving Show
-
-Unbound.derive [''TyCon,''AlgTyConRhs]
+  deriving (Show,Generic)
 
 instance Alpha TyCon where
-  swaps' _ _ d    = d
-  fv' _ _         = emptyC
-  lfreshen' _ a f = f a empty
-  freshen' _ a    = return (a,empty)
-  aeq' _ tc1 tc2  = aeq (tyConName tc1) (tyConName tc2)
-  acompare' _ tc1 tc2 = acompare (tyConName tc1) (tyConName tc2)
-  open _ _ d      = d
-  close _ _ d     = d
-  isPat _         = error "isPat TyCon"
-  isTerm _        = error "isTerm TyCon"
-  isEmbed _       = error "isEmbed TyCon"
-  nthpatrec _     = error "nthpatrec TyCon"
-  findpatrec _ _  = error "findpatrec TyCon"
+  aeq' c tc1 tc2      = aeq' c (tyConName tc1) (tyConName tc2)
+
+  fvAny' _ _ tc       = pure tc
+
+  close _ _ tc        = tc
+  open _ _ tc         = tc
+
+  isPat _             = mempty
+  isTerm _            = True
+
+  nthPatFind _        = Left
+  namePatFind _ _     = Left 0
+
+  swaps' _ _ tc       = tc
+  lfreshen' _ tc cont = cont tc mempty
+  freshen' _ tc       = return (tc,mempty)
+
+  acompare' c tc1 tc2 = acompare' c (tyConName tc1) (tyConName tc2)
+
 
 instance Alpha AlgTyConRhs
 
@@ -113,15 +117,15 @@ instance Subst Term AlgTyConRhs
 
 instance NFData TyCon where
   rnf tc = case tc of
-    AlgTyCon nm ki ar rhs   -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
-    FunTyCon nm ki ar subst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf subst
-    PrimTyCon nm ki ar      -> rnf nm `seq` rnf ki `seq` rnf ar
-    SuperKindTyCon nm       -> rnf nm
+    AlgTyCon nm ki ar rhs     -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
+    FunTyCon nm ki ar tcSubst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf tcSubst
+    PrimTyCon nm ki ar        -> rnf nm `seq` rnf ki `seq` rnf ar
+    SuperKindTyCon nm         -> rnf nm
 
 instance NFData (Name TyCon) where
   rnf nm = case nm of
-    (Nm _ s)   -> rnf s
-    (Bn _ l r) -> rnf l `seq` rnf r
+    (Fn s i) -> rnf s `seq` rnf i
+    (Bn l r) -> rnf l `seq` rnf r
 
 instance NFData AlgTyConRhs where
   rnf rhs = case rhs of
@@ -139,10 +143,10 @@ mkKindTyCon name kind
 isTupleTyConLike :: TyConName -> Bool
 isTupleTyConLike nm = tupleName (name2String nm)
   where
-    tupleName nm
-      | '(' <- head nm
-      , ')' <- last nm
-      = all (== ',') (init $ tail nm)
+    tupleName nm'
+      | '(' <- head nm'
+      , ')' <- last nm'
+      = all (== ',') (init $ tail nm')
     tupleName _ = False
 
 -- | Get the DataCons belonging to a TyCon

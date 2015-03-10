@@ -9,27 +9,27 @@ module CLaSH.Core.Pretty
   )
 where
 
-import           Data.Char               (isSymbol, isUpper, ord)
-import           Data.Traversable        (sequenceA)
-import           Data.Text               (unpack)
-import           GHC.Show                (showMultiLineString)
-import           Text.PrettyPrint        (Doc, char, comma, empty, equals, hang,
-                                          hsep, int, integer, parens, punctuate,
-                                          render, sep, text, vcat, ($$), ($+$),
-                                          (<+>), (<>), rational, nest)
-import           Unbound.LocallyNameless (Embed (..), LFresh, Name, lunbind,
-                                          name2String, runLFreshM, unembed,
-                                          unrebind, unrec)
+import Data.Char                        (isSymbol, isUpper, ord)
+import Data.Traversable                 (sequenceA)
+import Data.Text                        (unpack)
+import GHC.Show                         (showMultiLineString)
+import Text.PrettyPrint                 (Doc, char, comma, empty, equals, hang,
+                                         hsep, int, integer, parens, punctuate,
+                                         render, sep, text, vcat, ($$), ($+$),
+                                         (<+>), (<>), rational, nest)
+import Unbound.Generics.LocallyNameless (Embed (..), LFresh, Name, lunbind,
+                                         name2String, runLFreshM, unembed,
+                                         unrebind, unrec)
 
-import           CLaSH.Core.DataCon      (DataCon (..))
-import           CLaSH.Core.Literal      (Literal (..))
-import           CLaSH.Core.Term         (Pat (..), Term (..))
-import           CLaSH.Core.TyCon        (TyCon (..), TyConName, isTupleTyConLike)
-import           CLaSH.Core.Type         (ConstTy (..), Kind, LitTy (..),
-                                          Type (..), TypeView (..), tyView)
-import           CLaSH.Core.Var          (Id, TyVar, Var, varKind, varName,
-                                          varType)
-import           CLaSH.Util
+import CLaSH.Core.DataCon               (DataCon (..))
+import CLaSH.Core.Literal               (Literal (..))
+import CLaSH.Core.Term                  (Pat (..), Term (..))
+import CLaSH.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
+import CLaSH.Core.Type                  (ConstTy (..), Kind, LitTy (..),
+                                         Type (..), TypeView (..), tyView)
+import CLaSH.Core.Var                   (Id, TyVar, Var, varKind, varName,
+                                         varType)
+import CLaSH.Util
 
 -- | Pretty printing Show-like typeclass
 class Pretty p where

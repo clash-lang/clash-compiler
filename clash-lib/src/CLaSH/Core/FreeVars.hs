@@ -1,31 +1,20 @@
 -- | Free variable calculations
 module CLaSH.Core.FreeVars where
 
-import Unbound.LocallyNameless (Collection, fv)
+import Control.Lens.Fold                (Fold)
+import Unbound.Generics.LocallyNameless (fv)
 
-import CLaSH.Core.Term         (Term, TmName)
-import CLaSH.Core.Type         (TyName, Type)
+import CLaSH.Core.Term                  (Term, TmName)
+import CLaSH.Core.Type                  (TyName, Type)
 
 -- | Gives the free type-variables in a Type
-typeFreeVars :: Collection c
-             => Type
-             -> c TyName
+typeFreeVars :: Fold Type TyName
 typeFreeVars = fv
 
--- | Gives the free type-variables and free term-variables of a Term
-termFreeVars :: Collection c
-             => Term
-             -> (c TyName, c TmName)
-termFreeVars tm = (termFreeTyVars tm, termFreeIds tm)
-
 -- | Gives the free term-variables of a Term
-termFreeIds :: Collection c
-            => Term
-            -> c TmName
+termFreeIds :: Fold Term TmName
 termFreeIds = fv
 
 -- | Gives the free type-variables of a Term
-termFreeTyVars :: Collection c
-               => Term
-               -> c TyName
+termFreeTyVars :: Fold Term TyName
 termFreeTyVars = fv

@@ -1,14 +1,9 @@
-{-# LANGUAGE CPP                   #-}
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 707
-{-# OPTIONS_GHC -fno-warn-duplicate-constraints #-}
-#endif
 
 -- | Types in CoreHW
 module CLaSH.Core.Type
@@ -43,23 +38,29 @@ module CLaSH.Core.Type
 where
 
 -- External import
-import                Control.DeepSeq               as DS
-import                Control.Monad                 (zipWithM)
-import                Data.HashMap.Strict           (HashMap)
-import qualified      Data.HashMap.Strict           as HashMap
-import                Data.Maybe                    (isJust)
-import                Unbound.LocallyNameless       as Unbound hiding (Arrow,rnf)
-import                Unbound.LocallyNameless.Alpha (aeqR1,fvR1)
-import                Unbound.LocallyNameless.Name  (Name(Nm,Bn))
-import                Unbound.LocallyNameless.Ops   (unsafeUnbind)
+import           Control.DeepSeq                         as DS
+import           Control.Monad                           (zipWithM)
+import           Data.HashMap.Strict                     (HashMap)
+import qualified Data.HashMap.Strict                     as HashMap
+import           Data.Maybe                              (isJust)
+import           Data.Typeable                           hiding (TyCon,mkFunTy,
+                                                          mkTyConApp)
+import           GHC.Generics                            (Generic(..))
+import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
+                                                          Subst(..),SubstName(..),
+                                                          acompare,aeq,bind,
+                                                          gacompare,gaeq,gfvAny,
+                                                          runFreshM,unbind)
+import           Unbound.Generics.LocallyNameless.Name   (Name(..), name2String)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 -- Local imports
-import                CLaSH.Core.Subst
+import           CLaSH.Core.Subst
 import {-# SOURCE #-} CLaSH.Core.Term
-import                CLaSH.Core.TyCon
-import                CLaSH.Core.TysPrim
-import                CLaSH.Core.Var
-import                CLaSH.Util
+import           CLaSH.Core.TyCon
+import           CLaSH.Core.TysPrim
+import           CLaSH.Core.Var
+import           CLaSH.Util
 
 -- | Types in CoreHW: function and polymorphic types
 data Type
@@ -68,7 +69,7 @@ data Type
   | ForAllTy (Bind TyVar Type) -- ^ Polymorphic Type
   | AppTy    Type Type         -- ^ Type Application
   | LitTy    LitTy             -- ^ Type literal
-  deriving Show
+  deriving (Show,Generic,Typeable)
 
 -- | An easier view on types
 data TypeView
@@ -81,13 +82,13 @@ data TypeView
 data ConstTy
   = TyCon TyConName -- ^ TyCon type
   | Arrow           -- ^ Function type
-  deriving Show
+  deriving (Show,Generic,Typeable)
 
 -- | Literal Types
 data LitTy
   = NumTy Int
   | SymTy String
-  deriving Show
+  deriving (Show,Generic,Typeable)
 
 -- | The level above types
 type Kind       = Type
@@ -99,14 +100,15 @@ type TyName     = Name Type
 -- | Reference to a Kind
 type KiName     = Name Kind
 
-Unbound.derive [''Type,''LitTy,''ConstTy]
-
 instance Alpha Type where
-  fv' c (VarTy _ n) = fv' c n
-  fv' c t           = fvR1 rep1 c t
+  fvAny' c nfn (VarTy t n) = fmap (VarTy t) $ fvAny' c nfn n
+  fvAny' c nfn t           = fmap to . gfvAny c nfn $ from t
 
   aeq' c (VarTy _ n) (VarTy _ m) = aeq' c n m
-  aeq' c t1          t2          = aeqR1 rep1 c t1 t2
+  aeq' c t1          t2          = gaeq c (from t1) (from t2)
+
+  acompare' c (VarTy _ n) (VarTy _ m) = acompare' c n m
+  acompare' c t1          t2          = gacompare c (from t1) (from t2)
 
 instance Alpha ConstTy
 instance Alpha LitTy
@@ -137,8 +139,8 @@ instance NFData Type where
 
 instance NFData (Name Type) where
   rnf nm = case nm of
-    (Nm _ s)   -> rnf s
-    (Bn _ l r) -> rnf l `seq` rnf r
+    (Fn s i) -> rnf s `seq` rnf i
+    (Bn l r) -> rnf l `seq` rnf r
 
 instance NFData ConstTy where
   rnf cty = case cty of

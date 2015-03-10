@@ -64,7 +64,6 @@ import Data.Maybe
 
 -- clash additions
 import           System.Process (runInteractiveCommand, waitForProcess)
-import qualified Control.Exception as Exception
 import           Paths_clash_ghc
 import           InteractiveUI (makeHDL)
 import           Exception (gcatch)
@@ -74,12 +73,6 @@ import           Control.Exception (ErrorCall (..))
 import qualified CLaSH.Backend
 import           CLaSH.Backend.VHDL    (VHDLState)
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
-import qualified CLaSH.Driver
-import           CLaSH.GHC.Evaluator
-import           CLaSH.GHC.GenerateBindings
-import           CLaSH.GHC.NetlistTypes
-import qualified CLaSH.Primitives.Util
-import           CLaSH.Rewrite.Types (DebugLevel(..))
 import           CLaSH.Util (clashLibVersion)
 
 ghcLibDir :: IO FilePath
