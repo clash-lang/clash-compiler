@@ -1,10 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 -- | Data Constructors in CoreHW
 module CLaSH.Core.DataCon
@@ -15,16 +13,16 @@ module CLaSH.Core.DataCon
   )
 where
 
-import                Data.Monoid                           (mempty)
-import                Data.Typeable
-import                Control.DeepSeq
-import                GHC.Generics
-import                Unbound.Generics.LocallyNameless      as Unbound
-import                Unbound.Generics.LocallyNameless.Name (Name(..))
+import Data.Monoid                           (mempty)
+import Data.Typeable                         (Typeable)
+import Control.DeepSeq                       (NFData(..))
+import GHC.Generics                          (Generic)
+import Unbound.Generics.LocallyNameless      (Alpha(..),Subst,substs)
+import Unbound.Generics.LocallyNameless.Name (Name(..))
 
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
-import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
-import                CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.Term        (Term)
+import {-# SOURCE #-} CLaSH.Core.Type        (TyName, Type)
+import CLaSH.Util
 
 -- | Data Constructor
 data DataCon

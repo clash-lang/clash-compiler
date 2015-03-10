@@ -1,11 +1,8 @@
-{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
 
 -- | Types in CoreHW
@@ -41,24 +38,29 @@ module CLaSH.Core.Type
 where
 
 -- External import
-import                Control.DeepSeq                   as DS
-import                Control.Monad                     (zipWithM)
-import                Data.HashMap.Strict               (HashMap)
-import qualified      Data.HashMap.Strict               as HashMap
-import                Data.Maybe                        (isJust)
-import                Data.Typeable                     hiding (TyCon,mkFunTy,mkTyConApp)
-import                GHC.Generics
-import                Unbound.Generics.LocallyNameless
-import                Unbound.Generics.LocallyNameless.Name   (Name(..))
-import                Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import           Control.DeepSeq                         as DS
+import           Control.Monad                           (zipWithM)
+import           Data.HashMap.Strict                     (HashMap)
+import qualified Data.HashMap.Strict                     as HashMap
+import           Data.Maybe                              (isJust)
+import           Data.Typeable                           hiding (TyCon,mkFunTy,
+                                                          mkTyConApp)
+import           GHC.Generics                            (Generic(..))
+import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
+                                                          Subst(..),SubstName(..),
+                                                          acompare,aeq,bind,
+                                                          gacompare,gaeq,gfvAny,
+                                                          runFreshM,unbind)
+import           Unbound.Generics.LocallyNameless.Name   (Name(..), name2String)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 -- Local imports
-import                CLaSH.Core.Subst
+import           CLaSH.Core.Subst
 import {-# SOURCE #-} CLaSH.Core.Term
-import                CLaSH.Core.TyCon
-import                CLaSH.Core.TysPrim
-import                CLaSH.Core.Var
-import                CLaSH.Util
+import           CLaSH.Core.TyCon
+import           CLaSH.Core.TysPrim
+import           CLaSH.Core.Var
+import           CLaSH.Util
 
 -- | Types in CoreHW: function and polymorphic types
 data Type

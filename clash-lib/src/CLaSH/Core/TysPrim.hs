@@ -9,11 +9,11 @@ module CLaSH.Core.TysPrim
   )
 where
 
-import                Data.HashMap.Strict     (HashMap)
-import qualified      Data.HashMap.Strict     as HashMap
-import                Unbound.Generics.LocallyNameless (string2Name)
+import           Data.HashMap.Strict              (HashMap)
+import qualified Data.HashMap.Strict              as HashMap
+import           Unbound.Generics.LocallyNameless (string2Name)
 
-import                CLaSH.Core.TyCon
+import           CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
 
 -- | Builtin Name

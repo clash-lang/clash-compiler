@@ -1,11 +1,8 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -19,21 +16,21 @@ module CLaSH.Core.Term
 where
 
 -- External Modules
-import                Control.DeepSeq
-import                Data.Monoid                             (mempty)
-import                Data.Text                               (Text)
-import                Data.Typeable
-import                GHC.Generics
-import                Unbound.Generics.LocallyNameless
-import                Unbound.Generics.LocallyNameless.Name   (Name(..))
-import                Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import Control.DeepSeq
+import Data.Monoid                             (mempty)
+import Data.Text                               (Text)
+import Data.Typeable
+import GHC.Generics
+import Unbound.Generics.LocallyNameless
+import Unbound.Generics.LocallyNameless.Name   (Name(..))
+import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 -- Internal Modules
-import                CLaSH.Core.DataCon            (DataCon)
-import                CLaSH.Core.Literal            (Literal)
-import {-# SOURCE #-} CLaSH.Core.Type               (Type)
-import                CLaSH.Core.Var                (Id, TyVar)
-import                CLaSH.Util
+import CLaSH.Core.DataCon                      (DataCon)
+import CLaSH.Core.Literal                      (Literal)
+import {-# SOURCE #-} CLaSH.Core.Type          (Type)
+import CLaSH.Core.Var                          (Id, TyVar)
+import CLaSH.Util
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -66,20 +63,19 @@ data Pat
   -- ^ Default pattern
   deriving (Show,Typeable,Generic)
 
-
 instance Alpha Text where
-  aeq' _ctx = (==)
-  fvAny' _ctx _nfn i = pure i
-  close _ctx _b = id
-  open _ctx _b = id
-  isPat _ = mempty
-  isTerm _ = True
-  nthPatFind _ = Left
-  namePatFind _ _ = Left 0
-  swaps' _ctx _p = id
-  freshen' _ctx i = return (i, mempty)
+  aeq' _ctx             = (==)
+  fvAny' _ctx _nfn i    = pure i
+  close _ctx _b         = id
+  open _ctx _b          = id
+  isPat _               = mempty
+  isTerm _              = True
+  nthPatFind _          = Left
+  namePatFind _ _       = Left 0
+  swaps' _ctx _p        = id
+  freshen' _ctx i       = return (i, mempty)
   lfreshen' _ctx i cont = cont i mempty
-  acompare' _ctx = compare
+  acompare' _ctx        = compare
 
 instance Eq Term where
   (==) = aeq

@@ -1,10 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternGuards         #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 -- | Type Constructors in CoreHW
 module CLaSH.Core.TyCon
@@ -18,18 +15,18 @@ module CLaSH.Core.TyCon
 where
 
 -- External Import
-import                Control.DeepSeq
-import                Data.Monoid                           (mempty)
-import                Data.Typeable                         hiding (TyCon,tyConName)
-import                GHC.Generics
-import                Unbound.Generics.LocallyNameless
-import                Unbound.Generics.LocallyNameless.Name (Name(..))
+import Control.DeepSeq
+import Data.Monoid                           (mempty)
+import Data.Typeable                         hiding (TyCon,tyConName)
+import GHC.Generics
+import Unbound.Generics.LocallyNameless      (Alpha(..),Subst(..))
+import Unbound.Generics.LocallyNameless.Name (Name(..),name2String)
 
 -- Internal Imports
-import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
-import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
-import                CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.DataCon     (DataCon)
+import {-# SOURCE #-} CLaSH.Core.Term        (Term)
+import {-# SOURCE #-} CLaSH.Core.Type        (Kind, TyName, Type)
+import CLaSH.Util
 
 -- | Type Constructor
 data TyCon

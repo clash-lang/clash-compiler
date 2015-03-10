@@ -4,12 +4,12 @@
 
 module CLaSH.Core.DataCon where
 
-import                Control.DeepSeq
-import                GHC.Generics
-import                Unbound.Generics.LocallyNameless
+import Control.DeepSeq                  (NFData)
+import GHC.Generics                     (Generic)
+import Unbound.Generics.LocallyNameless (Alpha,Subst)
 
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
-import {-# SOURCE #-} CLaSH.Core.Type         (Type)
+import {-# SOURCE #-} CLaSH.Core.Term   (Term)
+import {-# SOURCE #-} CLaSH.Core.Type   (Type)
 
 data DataCon
 

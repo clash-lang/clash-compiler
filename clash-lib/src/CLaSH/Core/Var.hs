@@ -17,14 +17,15 @@ module CLaSH.Core.Var
   )
 where
 
-import                Control.DeepSeq
-import                Data.Typeable
-import                GHC.Generics
-import                Unbound.Generics.LocallyNameless
+import Control.DeepSeq                  (NFData (..))
+import Data.Typeable                    (Typeable)
+import GHC.Generics                     (Generic)
+import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..),isFreeName,
+                                         unembed)
 
-import {-# SOURCE #-} CLaSH.Core.Term                  (Term)
-import {-# SOURCE #-} CLaSH.Core.Type                  (Kind, Type)
-import                CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.Term   (Term)
+import {-# SOURCE #-} CLaSH.Core.Type   (Kind, Type)
+import CLaSH.Util
 
 -- | Variables in CoreHW
 data Var a
