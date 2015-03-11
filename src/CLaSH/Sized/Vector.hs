@@ -51,6 +51,8 @@ import Data.Singletons.Prelude    (TyFun,Apply,type ($))
 import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
                                    natVal)
+import GHC.Base                   (Int(I#),Int#,isTrue#)
+import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Prelude                    hiding ((++), (!!), concat, drop, foldl,
@@ -615,21 +617,21 @@ zip = zipWith (,)
 unzip :: Vec n (a,b) -> (Vec n a, Vec n b)
 unzip xs = (map fst xs, map snd xs)
 
-indexM_integer :: Vec n a -> Integer -> Maybe a
-indexM_integer Nil       _ = Nothing
-indexM_integer (x :> _)  0 = Just x
-indexM_integer (_ :> xs) n = indexM_integer xs (n-1)
-
-{-# NOINLINE index_integer #-}
-index_integer :: KnownNat n => Vec n a -> Integer -> a
-index_integer xs i = case indexM_integer xs i of
-    Just a  -> a
-    Nothing -> error (P.concat [ "(!!): Index "
-                               , show i
-                               , " is out of bounds [0.."
-                               , show (maxIndex xs)
-                               , "]"
-                               ])
+{-# NOINLINE index_int #-}
+index_int :: KnownNat n => Vec n a -> Int -> a
+index_int xs i@(I# n0)
+  | isTrue# (n0 <# 0#) = error "CLaSH.Sized.Vector.(!!): negative index"
+  | otherwise          = sub xs n0
+  where
+    sub :: Vec m a -> Int# -> a
+    sub Nil     _ = error (P.concat [ "CLaSH.Sized.Vector.(!!): index "
+                                    , show i
+                                    , " is larger than maximum index "
+                                    , show (maxIndex xs)
+                                    ])
+    sub (y:>ys) n = if isTrue# (n ==# 0#)
+                    then y
+                    else sub ys (n -# 1#)
 
 {-# INLINE (!!) #-}
 -- | Vector index (subscript) operator.
@@ -644,9 +646,9 @@ index_integer xs i = case indexM_integer xs i of
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 1
 -- 2
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 14
--- *** Exception: (!!): Index 14 is out of bounds [0..4]
+-- *** Exception: CLaSH.Sized.Vector.(!!): index 14 is larger than maximum index 4
 (!!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
-xs !! i = index_integer xs (toInteger i)
+xs !! i = index_int xs (fromIntegral i)
 
 {-# NOINLINE maxIndex #-}
 -- | Index (subscript) of the last element in a 'Vec'tor
@@ -664,23 +666,21 @@ maxIndex = subtract 1 . length
 length :: KnownNat n => Vec n a -> Integer
 length = natVal . asNatProxy
 
-replaceM_integer :: Vec n a -> Integer -> a -> Maybe (Vec n a)
-replaceM_integer Nil       _ _ = Nothing
-replaceM_integer (_ :> xs) 0 y = Just (y :> xs)
-replaceM_integer (x :> xs) n y = case replaceM_integer xs (n-1) y of
-                                    Just xs' -> Just (x :> xs')
-                                    Nothing  -> Nothing
-
-{-# NOINLINE replace_integer #-}
-replace_integer :: KnownNat n => Vec n a -> Integer -> a -> Vec n a
-replace_integer xs i a = case replaceM_integer xs i a of
-  Just ys -> ys
-  Nothing -> error (P.concat [ "replace: Index "
-                             , show i
-                             , " is out of bounds [0.."
-                             , show (maxIndex xs)
-                             , "]"
-                             ])
+{-# NOINLINE replace_int #-}
+replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
+replace_int xs i@(I# n0) a
+  | isTrue# (n0 <# 0#) = error "CLaSH.Sized.Vector.replace: negative index"
+  | otherwise          = sub xs n0 a
+  where
+    sub :: Vec m b -> Int# -> b -> Vec m b
+    sub Nil     _ _ = error (P.concat [ "CLaSH.Sized.Vector.replace: index "
+                                      , show i
+                                      , " is larger than maximum index "
+                                      , show (maxIndex xs)
+                                      ])
+    sub (y:>ys) n b = if isTrue# (n ==# 0#)
+                      then b :> ys
+                      else y :> sub ys (n -# 1#) b
 
 {-# INLINE replace #-}
 -- | Replace an element of a vector at the given index (subscript).
@@ -693,9 +693,9 @@ replace_integer xs i a = case replaceM_integer xs i a of
 -- >>> replace (1:>2:>3:>4:>5:>Nil) 0 7
 -- <7,2,3,4,5>
 -- >>> replace (1:>2:>3:>4:>5:>Nil) 9 7
--- <*** Exception: replace: Index 9 is out of bounds [0..4]
+-- <1,2,3,4,*** Exception: CLaSH.Sized.Vector.replace: index 9 is larger than maximum index 4
 replace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
-replace xs i y = replace_integer xs (toInteger i) y
+replace xs i y = replace_int xs (fromIntegral i) y
 
 {-# INLINABLE take #-}
 -- | 'take' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
