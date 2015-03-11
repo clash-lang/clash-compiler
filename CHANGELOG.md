@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.6.1 *March 11th 2015*
+* Fixes bugs:
+  * Faster versions of Vector.(!!) and Vector.replace
+
 ## 0.6.0.1 *November 17th 2014*
 * Fixes bugs:
   * Add missing 'CLaSH.Sized.BitVector' module to .cabal file.
