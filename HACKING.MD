@@ -1,12 +1,12 @@
 Download sources:
 ```
-git clone git@github.com:christiaanb/clash2.git
-git clone git@github.com:christiaanb/clash-prelude.git
+git clone git@github.com:clash-lang/clash-compiler.git
+git clone git@github.com:clash-lang/clash-prelude.git
 ```
 
-Go to clash2 dir:
+Go to clash-compiler dir:
 ```
-cd clash2
+cd clash-compiler
 ```
 
 Run:
