@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5 *March 11th 2015*
+* New features:
+  * SystemVerilog backend. [#45](https://github.com/clash-lang/clash-compiler/issues/45)
+
 ## 0.4.1 *February 4th 2015*
 * Include bug fixes from clash-lib 0.4.1
 

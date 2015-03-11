@@ -1,5 +1,13 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5 *March 11th 2015*
+* New features:
+  * Simplify BlackBox handling, and improve VHDL generation. [#47](https://github.com/clash-lang/clash-compiler/issues/47)
+  * Use unbound-generics. [#48](https://github.com/clash-lang/clash-compiler/issues/48)
+
+* Fixes bugs:
+  * VHDL generation error: wrapper for sum-of-products type. [#44](https://github.com/clash-lang/clash-compiler/issues/44)
+
 ## 0.4.1 *February 4th 2015*
 * Fixes bugs:
   * Treat BlackBox expressions as declarations when DC args. [#37](https://github.com/christiaanb/clash2/issues/33)
