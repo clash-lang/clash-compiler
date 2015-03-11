@@ -209,8 +209,8 @@ endgenerate"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.index_integer"
-    , "type"      : "index_integer :: KnownNat n => Vec n a -> Integer -> a"
+    { "name"      : "CLaSH.Sized.Vector.index_int"
+    , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
 "// index_integer
 ~SIGD[~SYM[0]][1];
@@ -235,8 +235,8 @@ end"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.replace_integer"
-    , "type"      : "replace_integer :: KnownNat n => Vec n a -> Integer -> a -> Vec n a"
+    { "name"      : "CLaSH.Sized.Vector.replace_int"
+    , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
 "// replace_integer
 ~SIGD[~SYM[0]][2];

@@ -73,7 +73,7 @@ Executable clash
                       clash-lib            >= 0.5,
                       clash-vhdl           >= 0.5,
                       clash-systemverilog  >= 0.5,
-                      clash-prelude        >= 0.6
+                      clash-prelude        >= 0.6.1
 
   if os(windows)
     Build-Depends:    Win32
