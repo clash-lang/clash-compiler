@@ -24,7 +24,7 @@ Description:
   general overview of the library you should however check out "CLaSH.Prelude".
 Homepage:             http://christiaanb.github.io/clash2/
 bug-reports:          http://github.com/christiaanb/clash-prelude/issues
-License:              BSD3
+License:              BSD2
 License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
