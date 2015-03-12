@@ -1,6 +1,13 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.6.1 *March 11th 2015*
+## 0.7 *March 12th 2015*
+* New features:
+  * Switch types of 'bundle' and 'bundle'', and 'unbundle' and 'unbundle''.
+  * Rename all explicitly clocked versions of Signal functions, to the primed
+    name of the implicitly clocked Signal functions. E.g. 'cregister' is now
+    called 'register'' (where the implicitly clocked function is callled 'register')
+  * Add new instances for 'DSignal'
+
 * Fixes bugs:
   * Faster versions of Vector.(!!) and Vector.replace
 
