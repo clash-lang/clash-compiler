@@ -29,22 +29,7 @@ import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 -- function simply returns the third argument unaltered as its result. This
 -- function is used by 'outputVerifier'.
 --
--- This function is translated to the following VHDL:
---
--- > assert_block : block
--- > begin
--- >   -- pragma translate_off
--- >   process(clk_1000,reset_1000,arg0,arg1) is
--- >   begin
--- >     if (rising_edge(clk_1000) or rising_edge(reset_1000)) then
--- >       assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
--- >     end if;
--- >   end process;
--- >   -- pragma translate_on
--- >   result <= arg2;
--- > end block;
---
--- And can, due to the pragmas, be used in synthesizable designs
+-- __NB__: This function is /can/ be used in synthesizable designs.
 assert :: (Eq a, Show a)
        => Signal a -- ^ Checked value
        -> Signal a -- ^ Expected value
@@ -106,22 +91,7 @@ outputVerifier = outputVerifier' systemClock
 -- function is used by 'coutputVerifier'.
 --
 --
--- This function is translated to the following VHDL:
---
--- > assert_block : block
--- > begin
--- >   -- pragma translate_off
--- >   process(clk_t,reset_t,arg0,arg1) is
--- >   begin
--- >     if (rising_edge(clk_t) or rising_edge(reset_t)) then
--- >       assert (arg0 = arg1) report ("expected: " & to_string (arg1) & \", actual: \" & to_string (arg0)) severity error;
--- >     end if;
--- >   end process;
--- >   -- pragma translate_on
--- >   result <= arg2;
--- > end block;
---
--- And can, due to the pragmas, be used in synthesizable designs
+-- __NB__: This function is /can/ be used in synthesizable designs.
 assert' :: (Eq a,Show a)
         => Signal' t a -- ^ Checked value
         -> Signal' t a -- ^ Expected value
