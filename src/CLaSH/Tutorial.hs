@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 {-|
-Copyright : © Christiaan Baaij, 2014
+Copyright : © Christiaan Baaij, 2014-2015
 Licence   : Creative Commons 4.0 (CC BY-NC 4.0) (http://creativecommons.org/licenses/by-nc/4.0/)
 -}
 module CLaSH.Tutorial (
@@ -20,14 +20,17 @@ module CLaSH.Tutorial (
   -- *** Sequential circuit
   -- $mac2
 
-  -- *** Creating VHDL
+  -- *** Generating VHDL
   -- $mac3
 
   -- *** Circuit testbench
   -- $mac4
 
-  -- *** Alternative specifications
+  -- *** Generating SystemVerilog
   -- $mac5
+
+  -- *** Alternative specifications
+  -- $mac6
 
   -- * Higher-order functions
   -- $higher_order
@@ -35,8 +38,11 @@ module CLaSH.Tutorial (
   -- * Composition of sequential circuits
   -- $composition_sequential
 
-  -- * Advanced: VHDL primitives
-  -- $vhdlprimitives
+  -- * Advanced: Primitives
+  -- $primitives
+
+  -- *** SystemVerilog primitives
+  -- $svprimitives
 
   -- * Conclusion
   -- $conclusion
@@ -66,7 +72,8 @@ Haskell. The merits of using a functional language to describe hardware comes
 from the fact that combinational circuits can be directly modeled as
 mathematical functions and that functional languages lend themselves very well
 at describing and (de-)composing mathematical functions. The CλaSH compiler
-transforms these high-level descriptions to low-level synthesizable VHDL.
+transforms these high-level descriptions to low-level synthesizable VHDL or
+SystemVerilog.
 
 Although we say that CλaSH borrows the semantics of Haskell, that statement
 should be taken with a grain of salt. What we mean to say is that the CλaSH
@@ -89,7 +96,7 @@ value-recursion corresponds directly to a feedback loop:
 @
 counter = s
   where
-    s = register 0 (s + 1)
+    s = 'register' 0 (s + 1)
 @
 
 Over time, you will get a better feeling for the consequences of taking a
@@ -133,6 +140,10 @@ The CλaSH compiler and Prelude library for circuit design only work with the
   (2) Install __CλaSH__
 
       * Run @cabal install clash-ghc@
+      * Add @cabal@'s @bin@ directory to our @PATH@:
+
+          * Windows: @%appdata%\\cabal\\bin@
+          * Unix: @$HOME\/.cabal\/bin$
 
   (4) Verify that everything is working by:
 
@@ -307,77 +318,31 @@ macT :: Num t => t -> (t, t) -> (t, t)
 
 The "CLaSH.Prelude" library contains a function that creates a sequential
 circuit from a combinational circuit that has the same Mealy machine type /
-shape of 'macT':
+shape of @macT@:
 
 @
-(\<^\>) :: (Bundle i, Bundle o)
-      => (s -> i -> (s,o))
+mealy :: (s -> i -> (s,o))
       -> s
-      -> (Unbudled' i -> Unbundled' o)
-f \<^\> initS = ...
+      -> (Signal i -> Signal o)
+mealy f initS = ...
 @
 
 The complete sequential MAC circuit can now be specified as:
 
 @
-mac = macT \<^\> 0
+mac = 'mealy' macT 0
 @
 
-Where the LHS of '<^>' is our 'macT' function, and the RHS is the initial state,
-in this case 0. We can see it is functioning correctly in our interpreter:
+Where the first argument of @'mealy'@ is our @macT@ function, and the second
+argument is the initial state, in this case 0. We can see it is functioning
+correctly in our interpreter:
 
->>> Data.List.take 4 $ simulateB mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
+>>> Data.List.take 4 $ simulate mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
 [0,1,5,14]
 
 Where we simulate our sequential circuit over a list of input samples and take
 the first 4 output samples. We have now completed our first sequential circuit
 and have made an initial confirmation that it is working as expected.
-
-The observant reader already saw that the '<^>' operator does not create a
-function that works on 'Signal's, but on on 'SignalP's. Indeed, when we look at
-the type of our 'mac' circuit:
-
->>> :t mac
-mac :: (Bundle o, Num o) => Unbundled' (o, o) -> Unbundled o
-
-We see that our 'mac' function work on a two-tuple of 'Signal's and not on a
-'Signal' of a two-tuple. Indeed, the CλaSH prelude library defines that:
-
-@
-type instance Unbundled (a,b) = (Signal a, Signal b)
-@
-
-'Unbundled' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
-belonging to the 'Bundle' <http://en.wikipedia.org/wiki/Type_class type class>,
-which, together with 'bundle' and 'unbundle' defines the isomorphism between a
-product type of 'Signal's and a 'Signal' of a product type. That is, while
-@(Signal a, Signal b)@ and @Signal (a,b)@ are not equal, they are /isomorphic/
-and can be converted from on to the other using 'bundle' and 'unbundle'. Instances
-of this 'Bundle' type-class are defined as /isomorphisms/ for:
-
-  * All tuples until and including 8-tuples
-  * The 'Vec'tor type
-
-But they are defined as /identities/ for:
-
-  * All elementary / primitive types such as: 'Bit', 'Bool', @'Signed' n@, etc.
-
-That is:
-
-@
-instance Bundle Bool where
-  type Unbundled Bool = Signal Bool
-  bundle :: Unbundled Bool -> Signal Bool
-  bundle = 'id'
-  unpack :: Signal Bool -> Unbundled Bool
-  unpack = 'id'
-@
-
-We will see later why this 'Bundle' type class is so convenient, for now, you just
-have to remember that it exists. And more importantly, that you understand that
-a product type of 'Signal's is not equal to a 'Signal' of a product type, but
-that the functions of the 'Bunlde' type class allow easy conversion between the
-two.
 -}
 
 {- $mac3
@@ -390,7 +355,7 @@ always be needed, you can always check the type with the @:t@ command and see
 if the function is monomorphic:
 
 @
-topEntity :: (Signal (Signed 9),Signal (Signed 9)) -> Signal (Signed 9)
+topEntity :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
 topEntity = mac
 @
 
@@ -409,9 +374,9 @@ macT acc (x,y) = (acc',o)
     acc' = ma acc (x,y)
     o    = acc
 
-mac = macT \<^\> 0
+mac = 'mealy' macT 0
 
-topEntity :: (Signal (Signed 9),Signal (Signed 9)) -> Signal (Signed 9)
+topEntity :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
 topEntity = mac
 @
 
@@ -426,8 +391,8 @@ Our 'topEntity' meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
 a directory called 'vhdl', which contains a directory called @MAC@, which
 ultimately contains all the generated VHDL files. You can now load these files
-(except @testbench.vhdl@) into your favourite VHDL synthesis tool, marking
-@topEntity_0.vhdl@ as the file containing the top level entity.
+into your favourite VHDL synthesis tool, marking @topEntity_0.vhdl@ as the file
+containing the top level entity.
 -}
 
 {- $mac4
@@ -450,7 +415,7 @@ CλaSH compiler looks for the following functions to generate these to aspects:
 Given a 'topEntity' with the type:
 
 @
-topEntity :: SignalP a -> SignalP b
+topEntity :: Signal a -> Signal b
 @
 
 Where @a@ and @b@ are placeholders for monomorphic types: the 'topEntity' is
@@ -471,15 +436,15 @@ Where the 'expectedOutput' function should assert to 'True' once it has verified
 all expected values. The "CLaSH.Prelude" module contains two standard functions
 to serve the above purpose, but a user is free to use any CλaSH specification
 to describe these two functions. For this tutorial we will be using the
-functions specified in the "CLaSH.Prelude" module, which are 'stimuliGenerator'
-and 'outputVerifier':
+functions specified in the "CLaSH.Prelude" module, which are @'stimuliGenerator'@
+and @'outputVerifier'@:
 
 @
 testInput :: Signal (Signed 9,Signed 9)
-testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+testInput = 'stimuliGenerator' $('v' [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
 
 expectedOutput :: Signal (Signed 9) -> Signal Bool
-expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
+expectedOutput = 'outputVerifier' $('v' [0 :: Signed 9,1,5,14])
 @
 
 This will create a stimulus generator that creates the same inputs as we used
@@ -504,15 +469,22 @@ show, as the the global clock will be stopped after 4 ticks.
 
 You should now again run @:vhdl@ in the interpreter; this time the compiler
 will take a bit longer to generate all the circuits. After it is finished you
-can load all the files in your favourite VHDL simulation tool that has support
-for VHDL-2008. VHDL-2008 support is required because the output verifier will
-use the VHDL-2008-only @to_string@ function. Once all files are loaded into
-the VHDL simulator, run the simulation on the @testbench@ entity. On questasim /
-modelsim: doing a @run -all@ will finish once the output verifier will assert
-its output to @true@. The generated testbench, modulo the clock signal
-generator(s), is completely synthesizable. This means that if you want to test
-your circuit on an FPGA, you will only have to replace the clock signal
+can load all the files in your favourite VHDL simulation tool. Once all files
+are loaded into the VHDL simulator, run the simulation on the @testbench@ entity.
+On questasim / modelsim: doing a @run -all@ will finish once the output verifier
+will assert its output to @true@. The generated testbench, modulo the clock
+signal generator(s), is completely synthesizable. This means that if you want to
+test your circuit on an FPGA, you will only have to replace the clock signal
 generator(s) by actual clock sources, such as an onboard PLL.
+-}
+
+{- $mac5
+Aside from being to generate VHDL, the CλaSH compiler can also generate
+SystemVerilog. You can repeat the previous two parts of the tutorial, but
+instead of executing the @:vhdl@ command, you execute the @:sytemverilog@
+command in the interpreter. This will create a directory called 'systemverilog',
+which contains a directory called @MAC@, which ultimately contains all the
+generated SystemVerilog files. SystemVerilog files end in the extension @sv@.
 
 This concludes the main part of this section on \"Your first circuit\", read on
 for alternative specifications for the same 'mac' circuit, or just skip to the
@@ -520,7 +492,7 @@ next section where we will describe another DSP classic: an FIR filter
 structure.
 -}
 
-{- $mac5
+{- $mac6
 * __'Num' instance for 'Signal'__:
 
     @'Signal' a@ is also also considered a 'Num'eric type as long as the value
@@ -532,7 +504,7 @@ structure.
     @
     macN (x,y) = acc
       where
-        acc = register 0 (acc + x * y)
+        acc = 'register' 0 (acc + x * y)
     @
 
 * __'Applicative' instance for 'Signal'__:
@@ -545,13 +517,13 @@ structure.
     @
     macA (x,y) = acc
       where
-        acc  = register 0 acc'
+        acc  = 'register' 0 acc'
         acc' = ma \<$\> acc \<*\> pack (x,y)
     @
 
 * __<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State> Monad__
 
-    We can also implement the original 'macT' function as a
+    We can also implement the original @macT@ function as a
     @<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>@
     monadic computation. First we must an extra import statement, right after
     the import of "CLaSH.Prelude":
@@ -569,15 +541,14 @@ structure.
       return acc
     @
 
-    We can use the '<^>' operator again, although we will have to change
+    We can use the 'mealy' function again, although we will have to change
     position of the arguments and result:
 
     @
-    asStateM :: (Bundle o, Bundle i)
-             => (i -> State s o)
+    asStateM :: (i -> State s o)
              -> s
-             -> (Unbundled i -> Unbundled o)
-    asStateM f i = g \<^\> i
+             -> (Signal i -> Signal o)
+    asStateM f i = 'mealy' g i
       where
         g s x = let (o,s') = runState (f x) s
                 in  (s',o)
@@ -596,15 +567,15 @@ a window over the input, where the size of the window matches the number
 of coefficients.
 
 @
-dotp as bs = foldl (+) 0 (zipWith (*) as bs)
+dotp as bs = 'foldl' (+) 0 ('zipWith' (*) as bs)
 
 fir coeffs x_t = y_t
   where
     y_t = dotp coeffs xs
-    xs  = window x_t
+    xs  = 'window' x_t
 
 topEntity :: Signal (Signed 16) -> Signal (Signed 16)
-topEntity = fir $(v [0::Signal (Signed 16),1,2,3])
+topEntity = fir $('v' [0::Signal (Signed 16),1,2,3])
 @
 
 Here we can see that, although the CλaSH compiler does not support recursion,
@@ -614,75 +585,119 @@ type.
 -}
 
 {- $composition_sequential
-
-First we define some types:
-
-@
-module CalculatorTypes where
-
-import CLaSH.Prelude
-
-type Word = Signed 4
-data OPC a = ADD | MUL | Imm a | Pop | Push
-
-deriveLift ''OPC
-@
-
-Now we define the actual calculator:
+Given a function @f@ of type:
 
 @
-module Calculator where
+f :: Int -> (Bool, Int) -> (Int, (Int, Bool))
+@
 
-import CLaSH.Prelude
-import CalculatorTypes
+When we want to make compositions of @f@ in @g@ using 'mealy', we have to
+write:
 
-(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
-(f .: g) a b = f (g a b)
-
-infixr 9 .:
-
-alu :: Num a => OPC a -> a -> a -> Maybe a
-alu ADD     = Just .: (+)
-alu MUL     = Just .: (*)
-alu (Imm i) = const . const (Just i)
-alu _       = const . const Nothing
-
-pu :: (Num a, Num b)
-   => (OPC a -> a -> a -> Maybe a)
-   -> (a, a, b)       -- Current state
-   -> (a, OPC a)      -- Input
-   -> ( (a, a, b)     -- New state
-      , (b, Maybe a)  -- Output
-      )
-pu alu (op1,op2,cnt) (dmem,Pop)  = ((dmem,op1,cnt-1),(cnt,Nothing))
-pu alu (op1,op2,cnt) (dmem,Push) = ((op1,op2,cnt+1) ,(cnt,Nothing))
-pu alu (op1,op2,cnt) (dmem,opc)  = ((op1,op2,cnt)   ,(cnt,alu opc op1 op2))
-
-datamem :: (KnownNat n, Integral i)
-        => Vec n a       -- Current state
-        -> (i, Maybe a)  -- Input
-        -> (Vec n a, a)  -- (New state, Output)
-datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
-datamem mem (addr,Just val) = (replace mem addr val,mem !! addr)
-
-topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
-topEntity i = val
+@
+g a b c = (b1,b2,i2)
   where
-    (addr,val) = (pu alu \<^\> (0,0,0 :: Unsigned 3)) (mem,i)
-    mem        = (datamem \<^\> initMem) (addr,val)
-    initMem    = replicate d8 0
+    (i1,b1) = 'unbundle' ('mealy' f 0 ('bundle' (a,b)))
+    (i2,b2) = 'unbundle' ('mealy' f 3 ('bundle' (i1,c)))
 @
 
-Here we can finally see the advantage of having the '<^>' return a function
-of type: @('Unbundled' i -> 'Unbundled' o)@ (instead of:
-@('Signal' i -> 'Signal' o)@):
+Why do we need these 'bundle', and 'unbundle' functions you might ask? When we
+look at the type of 'mealy':
 
-  * We can use normal pattern matching to get parts of the result, and,
-  * We can use normal tuple-constructors to build the input values for the
-    circuits.
+@
+mealy :: (s -> i -> (s,o))
+      -> s
+      -> (Signal i -> Signal o)
+@
+
+we see that the resulting function has an input of type @Signal i@, and an
+output of @Signal o@. However, the type of @(a,b)@ in the definition of @g@ is:
+@(Signal Bool, Signal Int)@. And the type of @(i1,b1)@ is of type
+@(Signal Int, Signal Bool)@.
+
+Syntactically, @Signal (Bool,Int)@ and @(Signal Bool, Signal Int)@ are /unequal/.
+So we need to make a conversion between the two, that is what 'bundle' and
+'unbundle' are for. In the above case 'bundle' gets the type:
+
+@
+bundle :: (Signal Bool, Signal Int) -> Signal (Bool,Int)
+@
+
+and 'unbundle':
+
+@
+unbundle :: Signal (Int,Bool) -> (Signal Int, Signal Bool)
+@
+
+The /true/ types of these two functions are, however:
+
+@
+bundle   :: Bundle a => Unbundled a -> Signal a
+unbundle :: Bundle a => Signal a -> Unbundled a
+@
+
+'Unbundled' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
+belonging to the 'Bundle' <http://en.wikipedia.org/wiki/Type_class type class>,
+which, together with 'bundle' and 'unbundle' defines the isomorphism between a
+product type of 'Signal's and a 'Signal' of a product type. That is, while
+@(Signal a, Signal b)@ and @Signal (a,b)@ are not equal, they are /isomorphic/
+and can be converted from on to the other using 'bundle' and 'unbundle'.
+
+Instances of this 'Bundle' type-class are defined as /isomorphisms/ for:
+
+  * All tuples until and including 8-tuples
+  * The 'Vec'tor type
+
+But they are defined as /identities/ for:
+
+  * All elementary / primitive types such as: 'Bit', 'Bool', @'Signed' n@, etc.
+
+That is:
+
+@
+instance Bundle (a,b) where
+  type Unbundled' clk (a,b) = (Signal' clk a, Signal' clk b)
+  bundle'   _ (a,b) = (,) '<$>' a '<*>' b
+  unbundle' _ tup   = (fst '<$>' tup, snd '<*>' tup)
+@
+
+but,
+
+@
+instance Bundle Bool where
+  type Unbundled' clk Bool = Signal' clk Bool
+  bundle' _ s = s
+  unpack' _ s = s
+@
+
+What you need take away from the above is that a product type (e.g. a tuple) of
+'Signal's is not syntactically equal to a 'Signal' of a product type, but that
+the functions of the 'Bundle' type class allow easy conversion between the two.
+
+As a final note on this section we also want to mention the 'mealyB' function,
+which does the bundling and unbundling for us:
+
+@
+mealyB :: (Bundle i, Bundle o)
+       => (s -> i -> (s,o))
+       -> s
+       -> (Unbundled i -> Unbundled o)
+@
+
+Using 'mealyB' we can define @g@ as:
+
+@
+g a b c = (b1,b2,i2)
+  where
+    (i1,b1) = 'mealyB' f 0 (a,b)
+    (i2,b2) = 'mealyB' f 3 (i1,c)
+@
+
+The general rule of thumb is: always use 'mealy', unless you do pattern matching
+or construction of product types, then use 'mealyB'.
 -}
 
-{- $vhdlprimitives
+{- $primitives
 There are times when you already have an existing piece of IP, or there are
 times where you need the VHDL to have a specific shape so that the VHDL
 synthesis tool can infer a specific component. In these specific cases you can
@@ -690,9 +705,10 @@ resort to defining your own VHDL primitives. Actually, most of the primitives
 in CλaSH are specified in the same way as you will read about in this section.
 There are perhaps 10 (at most) functions which are truly hard-coded into the
 CλaSH compiler. You can take a look at the files in
-<http://github.com/christiaanb/clash2/tree/master/primitives>
-if you want to know which functions are defined as \"regular\" primitives. The
-compiler looks for primitives in two locations:
+<https://github.com/clash-lang/clash-compiler/tree/master/clash-vhdl/primitives>
+(or <https://github.com/clash-lang/clash-compiler/tree/master/clash-systemverilog/primitives>
+for the SystemVerilog primitives) if you want to know which functions are defined
+as \"regular\" primitives. The compiler looks for primitives in two locations:
 
 * The official install location: e.g.
   @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-ghc\-<VERSION\>\/primitives@
@@ -714,7 +730,7 @@ primitives, using 'Signed' multiplication ('*') as an example. The
 (S a) *# (S b) = fromInteger_INLINE (a * b)
 @
 
-For which the /expression/ primitive is:
+For which the VHDL /expression/ primitive is:
 
 @
 { \"BlackBox\" :
@@ -751,35 +767,37 @@ The second kind of primitive that we will explore is the /declaration/ primitive
 We will use 'cblockRam' as an example, for which the Haskell/CλaSH code is:
 
 @
-{\-\# NOINLINE cblockRam \#-\}
+{\-\# NOINLINE blockRam' \#-\}
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * \_\_NB\_\_: Read value is delayed by 1 cycle
 -- * \_\_NB\_\_: Initial output value is \'undefined\'
 --
--- > type ClkA = Clk \"A\" 100
--- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
--- >
--- > bram40 :: CSignal ClkA (Unsigned 6) -> CSignal ClkA (Unsigned 6)
--- >        -> CSignal ClkA Bool -> CSignal ClkA Bit -> ClkA CSignal Bit
--- > bram40 = cblockRam clkA100 (replicate d40 H)
-cblockRam :: (KnownNat n, KnownNat m)
+-- @
+-- type ClkA = Clk \\\"A\\\" 100
+--
+-- clkA100 :: SClock ClkA
+-- clkA100 = sclock
+--
+-- bram40 :: Signal' ClkA (Unsigned 6) -> Signal' ClkA (Unsigned 6)
+--        -> Signal' ClkA Bool -> Signal' ClkA Bit -> Signal' ClkA Bit
+-- bram40 = \'blockRam'' clkA100 (\'CLaSH.Sized.Vector.replicate\' d40 1)
+-- @
+blockRam' :: (KnownNat n, KnownNat m)
           => SClock clk               -- ^ \'Clock\' to synchronize to
           -> Vec n a                  -- ^ Initial content of the BRAM, also
                                       -- determines the size, \@n\@, of the BRAM.
                                       --
                                       -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
-          -> CSignal clk (Unsigned m) -- ^ Write address \@w\@
-          -> CSignal clk (Unsigned m) -- ^ Read address \@r\@
-          -> CSignal clk Bool         -- ^ Write enable
-          -> CSignal clk a            -- ^ Value to write (at address \@w\@)
-          -> CSignal clk a
-          -- ^ Value of the \'blockRAM\' at address \@r\@ from the previous clock
+          -> Signal' clk (Unsigned m) -- ^ Write address \@w\@
+          -> Signal' clk (Unsigned m) -- ^ Read address \@r\@
+          -> Signal' clk Bool         -- ^ Write enable
+          -> Signal' clk a            -- ^ Value to write (at address \@w\@)
+          -> Signal' clk a
+          -- ^ Value of the \@blockRAM\@ at address \@r\@ from the previous clock
           -- cycle
-cblockRam clk binit wr rd en din =
-    cmealy clk bram' (binit,undefined) (bundle clk (wr,rd,en,din))
+blockRam' clk binit wr rd en din =
+    mealy clk bram' (binit,undefined) (bundle' clk (wr,rd,en,din))
   where
     bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
       where
@@ -792,7 +810,7 @@ And for which the /definition/ primitive is:
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.cblockRam"
+    { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
     , "templateD" :
 "blockram_~SYM[0] : block
   signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram
@@ -844,6 +862,13 @@ a general listing of the available template holes:
 * @~SYM[N]@: Randomly generated, but unique, symbol. Multiple occurrences of
   @~SYM[N]@ in the same primitive definition all refer to the same random, but
   unique, symbol.
+* @~SIGD[\<HOLE\>][N]@: Create a signal declaration, using @\<HOLE\>@ as the name
+  of the signal, and the type of the @(N+1)@'th argument.
+* @~SIGDO[\<HOLE\>]@: Create a signal declaration, using @\<HOLE\>@ as the name
+  of the signal, and the type of the result.
+* @~TYPELEM[\<HOLE\>]@: The element type of the vector type represented by @\<HOLE\>@.
+  The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
+
 
 Some final remarks to end this section: VHDL primitives are there to instruct the
 CλaSH compiler to use the given VHDL template, instead of trying to do normal
@@ -857,6 +882,45 @@ to include in your design.
 
 Perhaps in the future, someone will figure out how to connect the two simulation
 worlds, using e.g. VHDL's foreign function interface VHPI.
+-}
+
+{- $svprimitives
+For those who are interested, the equivalent SystemVerilog primitives are:
+
+@
+{ \"BlackBox\" :
+  { "name"      : "CLaSH.Sized.Internal.Signed.*#"
+  , "templateE" : "~ARG[1] * ~ARG[2]"
+  }
+}
+@
+
+and
+
+@
+{ \"BlackBox\" :
+    { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
+    , "templateD" :
+"// blockRam
+~SIGD[~SYM[0]][3];
+~SIGD[~SYM[1]][7];
+
+initial begin
+  ~SYM[0] = ~LIT[3];
+end
+
+always @(posedge ~CLK[2]) begin
+  if (~ARG[6]) begin
+    ~SYM[0][~ARG[4]] <= ~ARG[7];
+  end
+  ~SYM[1] <= ~SYM[0][~ARG[5]];
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+@
+
 -}
 
 {- $conclusion
@@ -884,15 +948,15 @@ A list of often encountered errors and their solutions:
     add the 'bundle'' function like so:
 
     @
-    ... = f a b (bundle' (c,d))
+    ... = f a b ('bundle' (c,d))
     @
 
-    Product types supported by 'bundle'' are:
+    Product types supported by 'bundle are:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'bundle' when you are using explicitly clocked 'CSignal's
+    NB: Use 'bundle'' when you are using explicitly clocked 'CLaSH.Signal.Explicit.Signal''s
 
 * __Type error: Couldn't match expected type ‘(Signal a, Signal b)’ with__
   __ actual type ‘Signal (a,b)’__:
@@ -906,18 +970,18 @@ A list of often encountered errors and their solutions:
     (c,d) = f a b
     @
 
-    add the 'unbundle'' function like so:
+    add the 'unbundle' function like so:
 
     @
-    (c,d) = unbundle' (f a b)
+    (c,d) = 'unbundle' (f a b)
     @
 
-    Product types supported by 'unbundle'' are:
+    Product types supported by 'unbundle are:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'unbundle' when you are using explicitly clocked 'CSignal's
+    NB: Use 'unbundle'' when you are using explicitly clocked 'CLaSH.Signal.Explicit.Signal''s
 
 * __CLaSH.Netlist(..): Not in normal form: \<REASON\>: \<EXPR\>__:
 
@@ -945,7 +1009,7 @@ A list of often encountered errors and their solutions:
     @
     topEntity x y = acc
       where
-        acc = register 3 (acc + x * y)
+        acc = 'register' 3 (acc + x * y)
     @
 
     The above function, works for any number-like type. This means that @acc@ is
@@ -956,7 +1020,7 @@ A list of often encountered errors and their solutions:
     topEntity :: Signal (Signed 8) -> Signal (Signed 8) -> Signal (Signed 8)
     topEntity x y = acc
       where
-        acc = register 3 (acc + x * y)
+        acc = 'register' 3 (acc + x * y)
     @
 
     Or, alternatively:
@@ -964,7 +1028,7 @@ A list of often encountered errors and their solutions:
     @
     topEntity x y = acc
       where
-        acc = register (3 :: Signed 8) (acc + x * y)
+        acc = 'register' (3 :: Signed 8) (acc + x * y)
     @
 
 * __CLaSH.Normalize.Transformations(155): InlineNonRep: \<FUNCTION\> already__
