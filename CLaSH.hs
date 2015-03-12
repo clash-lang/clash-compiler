@@ -27,4 +27,4 @@ doHDL b src = do
   generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant DebugNone
 
 main :: IO ()
-main = genVHDL "./examples/CalculatorArrow.hs"
+main = genVHDL "./examples/FIR.hs"
