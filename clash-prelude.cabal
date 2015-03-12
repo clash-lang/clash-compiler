@@ -41,7 +41,7 @@ Cabal-version:        >=1.10
 
 source-repository head
   type: git
-  location: https://github.com/christiaanb/clash-prelude.git
+  location: https://github.com/clash-lang/clash-prelude.git
 
 Library
   HS-Source-Dirs:     src
