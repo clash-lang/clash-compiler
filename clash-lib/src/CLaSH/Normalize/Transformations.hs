@@ -510,7 +510,7 @@ collectANF _ (Letrec b) = do
 -- recursive functions involved, hence the need for special-casing code. After
 -- everything is done properly, we should remove the two lines below.
 collectANF _ e@(Case _ _ [unsafeUnbind -> (DataPat dc _,_)])
-  | name2String (dcName $ unembed dc) == "CLaSH.Signal.Types.:-" = return e
+  | name2String (dcName $ unembed dc) == "CLaSH.Signal.Internal.:-" = return e
 
 collectANF ctx (Case subj ty alts) = do
     localVar     <- liftNormR $ isLocalVar subj

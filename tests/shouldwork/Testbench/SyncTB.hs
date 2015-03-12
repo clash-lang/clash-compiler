@@ -16,11 +16,11 @@ clk7 = sclock
 clk9 :: SClock Clk9
 clk9 = sclock
 
-topEntity :: CSignal Clk7 Int -> CSignal Clk9 Int
-topEntity i = cregister clk9 70 (veryUnsafeSynchronizer clk2 clk9 (cregister clk2 99 (veryUnsafeSynchronizer clk7 clk2 (cregister clk7 50 i))))
+topEntity :: Signal' Clk7 Integer -> Signal' Clk9 Integer
+topEntity i = register' clk9 70 (unsafeSynchronizer clk2 clk9 (register' clk2 99 (unsafeSynchronizer clk7 clk2 (register' clk7 50 i))))
 
-testInput :: CSignal Clk7 Int
-testInput = cstimuliGenerator clk7 $(v [(1::Int)..10])
+testInput :: Signal' Clk7 Integer
+testInput = stimuliGenerator' clk7 $(v [(1::Integer)..10])
 
-expectedOutput :: CSignal Clk9 Int -> CSignal Clk9 Bool
-expectedOutput = coutputVerifier clk9 $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+expectedOutput :: Signal' Clk9 Integer -> Signal' Clk9 Bool
+expectedOutput = outputVerifier' clk9 $(v ([70,99,2,3,4,5,7,8,9,10]::[Integer]))

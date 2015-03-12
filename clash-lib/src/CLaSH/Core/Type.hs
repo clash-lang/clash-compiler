@@ -165,7 +165,7 @@ tyView t = OtherType t
 transparentTy :: Type -> Type
 transparentTy ty@(AppTy (AppTy (ConstTy (TyCon tc)) _) elTy)
   = case name2String tc of
-      "CLaSH.Signal.Internal.CSignal" -> transparentTy elTy
+      "CLaSH.Signal.Internal.Signal'" -> transparentTy elTy
       _ -> ty
 transparentTy (AppTy ty1 ty2) = AppTy (transparentTy ty1) (transparentTy ty2)
 transparentTy (ForAllTy b)    = ForAllTy (uncurry bind $ second transparentTy $ unsafeUnbind b)
@@ -178,7 +178,7 @@ coreView tcMap ty =
   let tView = tyView ty
   in case tView of
        TyConApp tc args -> case name2String tc of
-         "CLaSH.Signal.Internal.CSignal" -> coreView tcMap (args !! 1)
+         "CLaSH.Signal.Internal.Signal'" -> coreView tcMap (args !! 1)
          _ -> case (tcMap HashMap.! tc) of
                 (AlgTyCon {algTcRhs = (NewTyCon _ nt)})
                   | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)

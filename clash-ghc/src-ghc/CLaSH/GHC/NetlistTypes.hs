@@ -32,7 +32,7 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runErrorT $
     "GHC.Prim.~#"                   ->
       fail $ "Can't translate type: " ++ showDoc ty
 
-    "CLaSH.Signal.Internal.CSignal" ->
+    "CLaSH.Signal.Internal.Signal'" ->
       ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m (args !! 1)
 
     "CLaSH.Sized.Internal.BitVector.BitVector" ->

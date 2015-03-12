@@ -84,7 +84,7 @@ synchronizedClk tcm ty
       "CLaSH.Signal.Internal.SClock" -> case splitTyConAppM (head args) of
                                           Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack (s ++ show i),i)
                                           _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
-      "CLaSH.Signal.Internal.CSignal" -> case splitTyConAppM (head args) of
+      "CLaSH.Signal.Internal.Signal'" -> case splitTyConAppM (head args) of
                                            Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack (s ++ show i),i)
                                            _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       _                               -> case tyConDataCons (tcm HashMap.! tyCon) of

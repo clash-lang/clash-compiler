@@ -421,13 +421,13 @@ modNameM n = do
 
 -- | Given the type:
 --
--- @forall a. forall b. forall clk. (a -> b) -> CSignal clk a -> CSignal clk b@
+-- @forall a. forall b. forall clk. (a -> b) -> Signal' clk a -> Signal' clk b@
 --
 -- Generate the term:
 --
 -- @
--- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (CSignal clk a -> CSignal clk b)).
--- \(x : CSignal clk a).f x
+-- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (Signal' clk a -> Signal' clk b)).
+-- \(x : Signal' clk a).f x
 -- @
 mapSignalTerm :: C.Type
               -> C.Term
@@ -457,11 +457,11 @@ mapSignalTerm ty = error $ $(curLoc) ++ show ty
 
 -- | Given the type:
 --
--- @forall a. forall clk. a -> CSignal clk a@
+-- @forall a. forall clk. a -> Signal' clk a@
 --
 -- Generate the term
 --
--- @/\(a:*)./\(clk:Clock).\(x:CSignal clk a).x@
+-- @/\(a:*)./\(clk:Clock).\(x:Signal' clk a).x@
 signalTerm :: C.Type
            -> C.Term
 signalTerm (C.ForAllTy tvATy) =
@@ -484,15 +484,15 @@ signalTerm ty = error $ $(curLoc) ++ show ty
 -- | Given the type:
 --
 -- @
--- forall clk. forall a. forall b. CSignal clk (a -> b) -> CSignal clk a ->
--- CSignal clk b
+-- forall clk. forall a. forall b. Signal' clk (a -> b) -> Signal' clk a ->
+-- Signal' clk b
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(clk:Clock)./\(a:*)./\(b:*).\(f : (CSignal clk a -> CSignal clk b)).
--- \(x : CSignal clk a).f x
+-- /\(clk:Clock)./\(a:*)./\(b:*).\(f : (Signal' clk a -> Signal' clk b)).
+-- \(x : Signal' clk a).f x
 -- @
 appSignalTerm :: C.Type
               -> C.Term
@@ -523,14 +523,14 @@ appSignalTerm ty = error $ $(curLoc) ++ show ty
 -- | Given the type:
 --
 -- @
--- forall t.forall n.forall a.SClock t -> Vec n (CSignal t a) ->
--- CSignal t (Vec n a)
+-- forall t.forall n.forall a.SClock t -> Vec n (Signal' t a) ->
+-- Signal' t (Vec n a)
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(t:Clock)./\(n:Nat)./\(a:*).\(sclk:SClock t).\(vs:CSignal (Vec n a)).vs
+-- /\(t:Clock)./\(n:Nat)./\(a:*).\(sclk:SClock t).\(vs:Signal' (Vec n a)).vs
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
@@ -561,14 +561,14 @@ vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 --
 -- @
 -- forall f.forall a.forall b.forall clk.Applicative f => (a -> f b) ->
--- CSignal clk a -> f (CSignal clk b)
+-- CSignal clk a -> f (Signal' clk b)
 -- @
 --
 -- Generate the term:
 --
 -- @
 -- /\(f:* -> *)./\(a:*)./\(b:*)./\(clk:Clock).\(dict:Applicative f).
--- \(g:a -> f b).\(x:CSignal clk a).g x
+-- \(g:a -> f b).\(x:Signal' clk a).g x
 -- @
 traverseTerm :: C.Type
              -> C.Term

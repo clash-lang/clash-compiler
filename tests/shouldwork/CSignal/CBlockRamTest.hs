@@ -9,9 +9,9 @@ clk10 :: SClock Clk10
 clk10 = sclock
 
 
-topEntity :: CSignal Clk10 (Unsigned 7)
-          -> CSignal Clk10 (Unsigned 7)
-          -> CSignal Clk10 (Bool)
-          -> CSignal Clk10 (Vec 4 Bit)
-          -> CSignal Clk10 (Vec 4 Bit)
-topEntity = cblockRam clk10 (replicate d128 (repeat high))
+topEntity :: Signal' Clk10 (Unsigned 7)
+          -> Signal' Clk10 (Unsigned 7)
+          -> Signal' Clk10 (Bool)
+          -> Signal' Clk10 (Vec 4 Bit)
+          -> Signal' Clk10 (Vec 4 Bit)
+topEntity = blockRam' clk10 (replicate d128 (repeat high))
