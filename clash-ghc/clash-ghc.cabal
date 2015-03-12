@@ -35,7 +35,7 @@ Cabal-version:        >=1.10
 
 source-repository head
   type: git
-  location: https://github.com/christiaanb/clash2.git
+  location: https://github.com/clash-lang/clash-compiler.git
 
 Executable clash
   HS-Source-Dirs:     src-ghc src-bin
