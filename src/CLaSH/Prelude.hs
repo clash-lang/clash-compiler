@@ -38,7 +38,7 @@ module CLaSH.Prelude
   , isRising
   , isFalling
     -- * Testbench functions
-  , sassert
+  , assert
   , stimuliGenerator
   , outputVerifier
     -- * Exported modules
@@ -78,6 +78,7 @@ module CLaSH.Prelude
   , module Control.Applicative
   , module Data.Bits
   , module Data.Default
+    -- ** Haskell Prelude
   , module Prelude
   )
 where
@@ -100,11 +101,11 @@ import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
-import CLaSH.Prelude.Explicit      (cregisterB, cwindow, cwindowD, cisRising,
-                                    cisFalling)
+import CLaSH.Prelude.Explicit      (registerB', window', windowD', isRising',
+                                    isFalling')
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.DataFlow
-import CLaSH.Prelude.Testbench     (sassert, stimuliGenerator, outputVerifier)
+import CLaSH.Prelude.Testbench     (assert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
@@ -130,7 +131,7 @@ import CLaSH.Signal.Explicit       (systemClock)
 window :: (KnownNat n, Default a)
        => Signal a                -- ^ Signal to create a window over
        -> Vec (n + 1) (Signal a)  -- ^ Window of at least size 1
-window = cwindow systemClock
+window = window' systemClock
 
 {-# INLINE windowD #-}
 -- | Give a delayed window over a 'Signal'
@@ -143,7 +144,7 @@ window = cwindow systemClock
 windowD :: (KnownNat (n + 1), Default a)
         => Signal a               -- ^ Signal to create a window over
         -> Vec (n + 1) (Signal a) -- ^ Window of at least size 1
-windowD = cwindowD systemClock
+windowD = windowD' systemClock
 
 {-# INLINE registerB #-}
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
@@ -153,8 +154,8 @@ windowD = cwindowD systemClock
 --
 -- >>> simulateB rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
-registerB :: Bundle a => a -> Unbundled' a -> Unbundled' a
-registerB = cregisterB systemClock
+registerB :: Bundle a => a -> Unbundled a -> Unbundled a
+registerB = registerB' systemClock
 
 {-# INLINE isRising #-}
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
@@ -162,7 +163,7 @@ isRising :: (Bounded a, Eq a)
          => a -- ^ Starting value
          -> Signal a
          -> Signal Bool
-isRising = cisRising systemClock
+isRising = isRising' systemClock
 
 {-# INLINE isFalling #-}
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
@@ -170,4 +171,4 @@ isFalling :: (Bounded a, Eq a)
           => a -- ^ Starting value
           -> Signal a
           -> Signal Bool
-isFalling = cisFalling systemClock
+isFalling = isFalling' systemClock

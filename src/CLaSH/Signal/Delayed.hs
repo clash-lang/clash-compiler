@@ -1,9 +1,11 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
 module CLaSH.Signal.Delayed
@@ -24,18 +26,21 @@ module CLaSH.Signal.Delayed
   )
 where
 
+import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
-import Control.Applicative        (Applicative (..))
+import Control.Applicative        (Applicative (..), liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
+
+import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum)
 
 import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
 
 import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
-                                   bundle', unbundle')
+                                   bundle, unbundle)
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), that has accumulated @delay@ amount of samples delay
@@ -44,7 +49,15 @@ newtype DSignal (delay :: Nat) a =
     DSignal { -- | Strip a 'DSignal' from its delay information.
               toSignal :: Signal a
             }
-  deriving (Show,Default,Lift,Functor,Applicative,Num)
+  deriving (Show,Default,Lift,Functor,Applicative,Num,Bounded,Fractional,
+            Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits)
+
+instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
+  type AResult (DSignal n a) (DSignal n b) = DSignal n (AResult a b)
+  plus  = liftA2 plus
+  minus = liftA2 minus
+  type MResult (DSignal n a) (DSignal n b) = DSignal n (MResult a b)
+  times = liftA2 times
 
 -- | Create a 'DSignal' from a list
 --
@@ -104,8 +117,8 @@ delay m ds = coerce (delay' (coerce ds))
     delay' :: Signal a -> Signal a
     delay' s = case length m of
       0 -> s
-      _ -> let (r',o) = shiftInAt0 (unbundle' r) (singleton s)
-               r      = register m (bundle' r')
+      _ -> let (r',o) = shiftInAt0 (unbundle r) (singleton s)
+               r      = register m (bundle r')
            in  head o
 
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.

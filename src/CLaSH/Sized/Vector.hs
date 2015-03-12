@@ -344,7 +344,7 @@ splitAtI = withSNat splitAt
 {-# NOINLINE concat #-}
 -- | Concatenate a vector of vectors
 --
--- >>> vconcat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
+-- >>> concat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
 -- <1,2,3,4,5,6,7,8,9,10,11,12>
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil       = Nil
@@ -354,7 +354,7 @@ concat (x :> xs) = unsafeCoerce (x ++ (concat xs))
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
 -- where m is given
 --
--- >>> vunconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
+-- >>> unconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
 -- <<1,2,3,4>,<5,6,7,8>,<9,10,11,12>>
 unconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
@@ -368,7 +368,7 @@ unconcatU (USucc n') m ys = let (as,bs) = splitAtU m (unsafeCoerce ys)
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
 -- where m is determined by the context
 --
--- >>> vunconcatI (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil) :: Vec 2 (Vec 6 Int)
+-- >>> unconcatI (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil) :: Vec 2 (Vec 6 Int)
 -- <<1,2,3,4,5,6>,<7,8,9,10,11,12>>
 unconcatI :: (KnownNat n, KnownNat m) => Vec (n * m) a -> Vec n (Vec m a)
 unconcatI = withSNat unconcat
@@ -901,16 +901,18 @@ asNatProxy _ = Proxy
 --
 -- For example:
 --
--- > -- Bubble sort for 1 iteration
--- > sortV xs = map fst sorted <: (snd (last sorted))
--- >  where
--- >    lefts  = head xs :> map snd (init sorted)
--- >    rights = tail xs
--- >    sorted = zipWith compareSwapL lefts rights
--- >
--- > -- Compare and swap
--- > compareSwapL a b = if a < b then (a,b)
--- >                             else (b,a)
+-- @
+-- -- Bubble sort for 1 iteration
+-- sortV xs = map fst sorted <: (snd (last sorted))
+--  where
+--    lefts  = head xs :> map snd (init sorted)
+--    rights = tail xs
+--    sorted = zipWith compareSwapL lefts rights
+--
+-- -- Compare and swap
+-- compareSwapL a b = if a < b then (a,b)
+--                             else (b,a)
+-- @
 --
 -- Will not terminate because 'zipWith' is too strict in its second argument:
 --
