@@ -157,7 +157,6 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
              , Opt_ForceRecomp -- Force recompilation: never bad
              , Opt_EnableRewriteRules -- Reduce number of functions
              , Opt_SimplPreInlining -- Inlines simple functions, we only care about the major first-order structure
-             , Opt_Strictness -- Strictness analysis helps with dead-code analysis
              , Opt_StaticArgumentTransformation -- Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop.
              , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
              , Opt_DictsStrict -- Hopefully helps remove class method selectors
@@ -183,4 +182,23 @@ wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwante
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
                , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
                , Opt_Loopification -- STG pass, don't care
+               -- TODO: Enable this optimization again. At the moment we disable
+               -- it because it causes GHC to do the so-called "Constructed
+               -- Product Result" (CPR) analysis, which in turn creates an
+               -- annoying worker/wrapper which does the following:
+               --
+               --   * Scrutinise a Signal, and pack the head and tail of the
+               --     Signal in an unboxed tuple.
+               --   * Scrutinise on the unboxed tuple, and recreate the Signal.
+               --
+               -- This is problematic because the 'Signal' type is essentially treated as a "transparent"
+               -- type by the CLaSH compiler, so observing its constructor leads to all kinds
+               -- of problems.
+               --
+               -- Ultimately we should stop treating Signal as a "transparent" type and deal
+               -- handling of the Signal type, and the involved co-recursive functions,
+               -- properly. At the moment, CLaSH cannot deal with this recursive type and the
+               -- recursive functions involved, and hence we need to disable this useful transformation. After
+               -- everything is done properly, we should enable it again.
+               , Opt_Strictness -- Strictness analysis helps with dead-code analysis... but,see TODO above
                ]
