@@ -15,9 +15,9 @@ data I2CIPair
 makeLenses ''I2CIPair
 
 instance Bundle I2CIPair where
-  type Unbundled clk I2CIPair = (CSignal clk Bit, CSignal clk Bit)
-  unbundle _ i2ci    = (_scli <$> i2ci, _sdai <$> i2ci)
-  bundle _ (a,b) = I2CIPair <$> a <*> b
+  type Unbundled' clk I2CIPair = (Signal' clk Bit, Signal' clk Bit)
+  unbundle' _ i2ci  = (_scli <$> i2ci, _sdai <$> i2ci)
+  bundle'   _ (a,b) = I2CIPair <$> a <*> b
 
 data I2COPair
   = I2COPair
@@ -30,6 +30,6 @@ data I2COPair
 makeLenses ''I2COPair
 
 instance Bundle I2COPair where
-  type Unbundled clk I2COPair = (CSignal clk Bit, CSignal clk Bool, CSignal clk Bit, CSignal clk Bool)
-  unbundle _ i2co        = (_sclo <$> i2co, _scloEn <$> i2co, _sdao <$> i2co, _sdaoEn <$> i2co)
-  bundle _ (a,b,c,d) = I2COPair <$> a <*> b <*> c <*> d
+  type Unbundled' clk I2COPair = (Signal' clk Bit, Signal' clk Bool, Signal' clk Bit, Signal' clk Bool)
+  unbundle' _ i2co      = (_sclo <$> i2co, _scloEn <$> i2co, _sdao <$> i2co, _sdaoEn <$> i2co)
+  bundle'   _ (a,b,c,d) = I2COPair <$> a <*> b <*> c <*> d

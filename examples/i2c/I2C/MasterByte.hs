@@ -43,12 +43,12 @@ masterByteCtrl :: Signal Bool
                   , Signal (BitVector 8)
                   )
 masterByteCtrl startCmd stopCmd readCmd writeCmd ackIn dIn coreAck coreRxd =
-    unbundle' o
+    unbundle o
   where
     s      = register startState s'
-    (o,s') = unbundle' (masterByteCtrlT <$> startCmd <*> stopCmd <*> readCmd
-                                        <*> writeCmd <*> ackIn   <*> dIn
-                                        <*> coreAck  <*> coreRxd <*> s)
+    (o,s') = unbundle (masterByteCtrlT <$> startCmd <*> stopCmd <*> readCmd
+                                       <*> writeCmd <*> ackIn   <*> dIn
+                                       <*> coreAck  <*> coreRxd <*> s)
 
 {-# INLINE startState #-}
 startState :: MachineState

@@ -15,7 +15,7 @@ i2c clkCnt startCmd stopCmd readCmd writeCmd ackIn dIn i2ci =
     (cmd,coreTxd,cmdAck,ackOut,dOut) = masterByteCtrl startCmd stopCmd readCmd
                                         writeCmd ackIn dIn coreAck coreRxd
     (bitOut,i2co)                    = masterBitCtrl clkCnt cmd coreTxd i2ci
-    (coreAck,al,busy,coreRxd)        = unbundle' bitOut
+    (coreAck,al,busy,coreRxd)        = unbundle bitOut
 
 
 topEntity = i2c

@@ -32,10 +32,10 @@ masterBitCtrl :: Unsigned 16
               -> Signal Bit
               -> Signal I2CIPair
               -> (Signal (Bool,Bool,Bool,Bit), Signal I2COPair)
-masterBitCtrl clkCnt cmd dIn i2ci = unbundle' o
+masterBitCtrl clkCnt cmd dIn i2ci = unbundle o
   where
     s      = register masterStartState s'
-    (o,s') = unbundle' (masterBitCtrlT clkCnt <$> cmd <*> dIn <*> i2ci <*> s)
+    (o,s') = unbundle (masterBitCtrlT clkCnt <$> cmd <*> dIn <*> i2ci <*> s)
 
 
 {-# INLINE masterStartState #-}
