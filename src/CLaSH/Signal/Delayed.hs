@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -8,39 +9,45 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 module CLaSH.Signal.Delayed
   ( -- * Delay-annotated synchronous signals
     DSignal
-  , dsignal
   , delay
   , delayI
   , feedback
     -- * Signal \<-\> DSignal conversion
   , fromSignal
   , toSignal
-  , unsafeFromSignal
     -- * List \<-\> DSignal conversion (not synthesisable)
-  , dsample
-  , dsampleN
   , dfromList
+    -- * Experimental
+  , unsafeFromSignal
+  , antiDelay
   )
 where
 
 import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
+import Data.Foldable              (Foldable)
+import Data.Traversable           (Traversable)
 import Control.Applicative        (Applicative (..), liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum)
-
+import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
-
-import CLaSH.Signal               (Signal, fromList, register, sample, sampleN,
-                                   bundle, unbundle)
+import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), that has accumulated @delay@ amount of samples delay
@@ -50,7 +57,8 @@ newtype DSignal (delay :: Nat) a =
               toSignal :: Signal a
             }
   deriving (Show,Default,Lift,Functor,Applicative,Num,Bounded,Fractional,
-            Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits)
+            Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits,Foldable,
+            Traversable)
 
 instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
   type AResult (DSignal n a) (DSignal n b) = DSignal n (AResult a b)
@@ -64,49 +72,21 @@ instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
 --
--- >>> dsampleN 2 (fromList [1,2,3,4,5])
+-- >>> sampleN 2 (dfromList [1,2,3,4,5])
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
 dfromList :: [a] -> DSignal 0 a
 dfromList = coerce . fromList
 
--- | Get an infinite list of samples from a 'DSignal'
---
--- The elements in the list correspond to the values of the 'DSignal' at
--- consecutive clock cycles
---
--- > dsample s == [s0, s1, s2, s3, ...
---
--- __NB__: This function is not synthesisable
-dsample :: DSignal t a -> [a]
-dsample = sample . coerce
-
--- | Get a list of @n@ samples from a 'DSignal'
---
--- The elements in the list correspond to the values of the 'DSignal' at
--- consecutive clock cycles
---
--- > dsampleN 3 s == [s0, s1, s2]
---
--- __NB__: This function is not synthesisable
-dsampleN :: Int -> DSignal t a -> [a]
-dsampleN n = sampleN n . coerce
-
-
--- | Create a constant 'DSignal' from a combinational value
---
--- >>> dsample (dsignal 4)
--- [4, 4, 4, 4, ...
-dsignal :: a -> DSignal n a
-dsignal = pure
-
 -- | Delay a 'DSignal' for @m@ periods.
 --
--- > delay3 :: DSignal (n - 3) Int -> DSignal n Int
--- > delay3 = delay (0 :> 0 :> 0 :> Nil)
+-- @
+-- delay3 :: 'DSignal' (n - 3) Int -> 'DSignal' n Int
+-- delay3 = 'delay' (0 ':>' 0 ':>' 0 ':>' 'Nil')
+-- @
 --
--- >>> dsampleN 6 (delay3 (dfromList [1..]))
+-- >>> sampleN 6 (delay3 (dfromList [1..]))
 -- [0,0,0,1,2,3]
 delay :: forall a n m . KnownNat m
       => Vec m a
@@ -123,10 +103,12 @@ delay m ds = coerce (delay' (coerce ds))
 
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
 --
--- > delay2 :: DSignal (n - 2) Int -> DSignal n Int
--- > delay2 = delayI
+-- @
+-- delay2 :: 'DSignal' (n - 2) Int -> 'DSignal' n Int
+-- delay2 = 'delayI'
+-- @
 --
--- >>> dsampleN 6 (delay2 (dfromList [1..])
+-- >>> sampleN 6 (delay2 (dfromList [1..])
 -- [0,0,1,2,3,4]
 delayI :: (Default a, KnownNat m)
        => DSignal (n - m) a
@@ -136,16 +118,16 @@ delayI = delay (repeat def)
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
--- mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+-- mac :: 'DSignal' 0 Int -> 'DSignal' 0 Int -> 'DSignal' 0 Int
 -- mac x y = 'feedback' (mac' x y)
 --   where
---     mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---          -> (DSignal 0 Int, DSignal 1 Int)
+--     mac' :: 'DSignal' 0 Int -> 'DSignal' 0 Int -> 'DSignal' 0 Int
+--          -> ('DSignal' 0 Int, 'DSignal' 1 Int)
 --     mac' a b acc = let acc' = a * b + acc
---                    in  (acc, delay ('singleton' 0) acc')
+--                    in  (acc, 'delay' ('singleton' 0) acc')
 -- @
 --
--- >>> dsampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
+-- >>> sampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
 feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
          -> DSignal (n - m - 1) a
@@ -157,10 +139,25 @@ feedback f = let (o,r) = f (coerce r) in o
 fromSignal :: Signal a -> DSignal 0 a
 fromSignal = coerce
 
-
--- | __Unsafely__ convert a 'Signal' to /any/ 'DSignal'.
+-- | __EXPERIMENTAL__
+--
+-- __Unsafely__ convert a 'Signal' to /any/ 'DSignal'.
 --
 -- __NB__: Should only be used to interface with functions specified in terms of
 -- 'Signal'.
 unsafeFromSignal :: Signal a -> DSignal n a
 unsafeFromSignal = DSignal
+
+-- | __EXPERIMENTAL__
+--
+-- Access a /delayed/ signal in the present.
+--
+-- @
+-- mac :: 'DSignal' 0 Int -> 'DSignal' 0 Int -> 'DSignal' 0 Int
+-- mac x y = acc'
+--   where
+--     acc' = (x * y) + 'antiDelay' d1 acc
+--     acc  = 'delay' ('singleton' 0) acc'
+-- @
+antiDelay :: SNat d -> DSignal n a -> DSignal (n - d) a
+antiDelay _ = coerce
