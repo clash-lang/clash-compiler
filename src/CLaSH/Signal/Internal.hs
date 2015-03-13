@@ -159,17 +159,35 @@ traverse# :: Applicative f => (a -> f b) -> Signal' clk a -> f (Signal' clk b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
 
 infixr 2 .||.
--- | Version of ('||') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.||.) :: Signal' clk Bool -> Signal' clk Bool -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.||.)__ :: 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('||') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.||.) :: Applicative f => f Bool -> f Bool -> f Bool
 (.||.) = liftA2 (||)
 
 infixr 3 .&&.
--- | Version of ('&&') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.&&.) :: Signal' clk Bool -> Signal' clk Bool -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.&&.)__ :: 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('&&') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.&&.) :: Applicative f => f Bool -> f Bool -> f Bool
 (.&&.) = liftA2 (&&)
 
--- | Version of 'not' that operates on 'CLaSH.Signal.Signal's of 'Bool'
-not1 :: Signal' clk Bool -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __not1__ :: 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of 'not' that operates on 'CLaSH.Signal.Signal's of 'Bool'
+not1 :: Functor f => f Bool -> f Bool
 not1 = fmap not
 
 {-# NOINLINE register# #-}
@@ -190,12 +208,18 @@ mux :: Signal' clk Bool -> Signal' clk a -> Signal' clk a -> Signal' clk a
 mux = liftA3 (\b t f -> if b then t else f)
 
 {-# INLINE signal #-}
--- | Create a constant 'CLaSH.Signal.Signal' from a combinational value
+-- | The above type is a generalisation for:
+--
+-- @
+-- __signal__ :: a -> 'CLaSH.Signal.Signal' a
+-- @
+--
+-- Create a constant 'CLaSH.Signal.Signal' from a combinational value
 --
 -- >>> sample (signal 4)
 -- [4, 4, 4, 4, ...
-signal :: a -> Signal' clk a
-signal = signal#
+signal :: Applicative f => a -> f a
+signal = pure
 
 instance Bounded a => Bounded (Signal' clk a) where
   minBound = signal# minBound
@@ -220,13 +244,25 @@ instance Eq (Signal' clk a) where
   (/=) = error "(/=)' undefined for 'Signal'', use '(./=.)' instead"
 
 infix 4 .==.
--- | Version of ('==') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.==.) :: Eq a => Signal' clk a -> Signal' clk a -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.==.)__ :: 'Eq' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('==') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.==.) :: (Eq a, Applicative f) => f a -> f a -> f Bool
 (.==.) = liftA2 (==)
 
 infix 4 ./=.
--- | Version of ('/=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(./=.) :: Eq a => Signal' clk a -> Signal' clk a -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(./=.)__ :: 'Eq' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('/=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(./=.) :: (Eq a, Applicative f) => f a -> f a -> f Bool
 (./=.) = liftA2 (/=)
 
 -- | __WARNING__: 'compare', ('<'), ('>='), ('>'), and ('<=') are
@@ -240,28 +276,58 @@ instance Ord a => Ord (Signal' clk a) where
   max     = liftA2 max
   min     = liftA2 min
 
--- | Version of 'compare' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
-compare1 :: Ord a => Signal' clk a -> Signal' clk a -> Signal' clk Ordering
+-- | The above type is a generalisation for:
+--
+-- @
+-- __compare__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Ordering'
+-- @
+--
+-- It is a version of 'compare' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
+compare1 :: (Ord a, Applicative f) => f a -> f a -> f Ordering
 compare1 = liftA2 compare
 
 infix 4 .<.
--- | Version of ('<') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.<.) :: Ord a => Signal' clk a -> Signal' clk a -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.<.)__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('<') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.<.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.<.) = liftA2 (<)
 
 infix 4 .<=.
--- | Version of ('<=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.<=.) :: Ord a => Signal' clk a -> Signal' clk a -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.<=.)__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('<=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.<=.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.<=.) = liftA2 (<=)
 
 infix 4 .>.
--- | Version of ('>') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.>.) :: Ord a => Signal' clk a -> Signal' clk a -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.>.)__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of ('>') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.>.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.>.) = liftA2 (>)
 
 infix 4 .>=.
--- | Version of ('>=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
-(.>=.) :: Ord a => Signal' clk a -> Signal' clk a -> Signal' clk Bool
+-- | The above type is a generalisation for:
+--
+-- @
+-- __(.>=.)__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+--  It is a version of ('>=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
+(.>=.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.>=.) = liftA2 (>=)
 
 -- | __WARNING__: 'fromEnum' is undefined, use 'fromEnum1' instead
@@ -275,16 +341,28 @@ instance Enum a => Enum (Signal' clk a) where
   enumFromTo     = (sequenceA .) . liftA2 enumFromTo
   enumFromThenTo = ((sequenceA .) .) . liftA3 enumFromThenTo
 
--- | Version of 'fromEnum' that returns a CLaSH.Signal.Signal' of 'Int'
-fromEnum1 :: Enum a => Signal' clk a -> Signal' clk Int
+-- | The above type is a generalisation for:
+--
+-- @
+-- __fromEnum1__ :: 'Enum' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int'
+-- @
+--
+-- It is a version of 'fromEnum' that returns a CLaSH.Signal.Signal' of 'Int'
+fromEnum1 :: (Enum a, Functor f) => f a -> f Int
 fromEnum1 = fmap fromEnum
 
 -- | __WARNING__: 'toRational' is undefined, use 'toRational1' instead
 instance (Num a, Ord a) => Real (Signal' clk a) where
   toRational = error "'toRational' undefined for 'Signal'', use 'toRational1'"
 
--- | Version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
-toRational1 :: Real a => Signal' clk a -> Signal' clk Rational
+-- | The above type is a generalisation for:
+--
+-- @
+-- __fromEnum1__ :: 'Real' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Rational'
+-- @
+--
+-- | It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
+toRational1 :: (Real a, Functor f) => f a -> f Rational
 toRational1 = fmap toRational
 
 -- | __WARNING__: 'toInteger' is undefined, use 'toInteger1' instead
@@ -297,8 +375,14 @@ instance Integral a => Integral (Signal' clk a) where
   divMod a b  = (div a b, mod a b)
   toInteger   = error "'toInteger' undefined for 'Signal'', use 'toInteger1'"
 
--- | Version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Integer'
-toInteger1 :: Integral a => Signal' clk a -> Signal' clk Integer
+-- | The above type is a generalisation for:
+--
+-- @
+-- __toInteger1__ :: 'Integral' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Integer'
+-- @
+--
+-- It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Integer'
+toInteger1 :: (Integral a, Functor f) => f a -> f Integer
 toInteger1 = fmap toInteger
 
 -- | __WARNING__: 'testBit' and 'popCount' are undefined, use 'testBit1' and
@@ -329,53 +413,125 @@ instance Bits a => Bits (Signal' clk a) where
 instance FiniteBits a => FiniteBits (Signal' clk a) where
   finiteBitSize _ = finiteBitSize (undefined :: a)
 
--- | Version of 'testBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing
+-- | The above type is a generalisation for:
+--
+-- @
+-- __testBit1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'Bool'
+-- @
+--
+-- It is a version of 'testBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing
 -- argument, and a result of 'CLaSH.Signal.Signal' of 'Bool'
-testBit1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk Bool
+testBit1 :: (Bits a, Applicative f) => f a -> f Int -> f Bool
 testBit1 = liftA2 testBit
 
--- | Version of 'popCount' that returns a 'CLaSH.Signal.Signal' of 'Int'
-popCount1 :: Bits a => Signal' clk a -> Signal' clk Int
+-- | The above type is a generalisation for:
+--
+-- @
+-- __popCount1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int'
+-- @
+--
+--  It is a version of 'popCount' that returns a 'CLaSH.Signal.Signal' of 'Int'
+popCount1 :: (Bits a, Functor f) => f a -> f Int
 popCount1 = fmap popCount
 
--- | Version of 'shift' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-shift1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __shift1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'shift' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+shift1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 shift1 = liftA2 shift
 
--- | Version of 'rotate' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-rotate1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __rotate1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'rotate' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+rotate1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 rotate1 = liftA2 rotate
 
--- | Version of 'setBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-setBit1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __setBit1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'setBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+setBit1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 setBit1 = liftA2 setBit
 
--- | Version of 'clearBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-clearBit1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __clearBit1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'clearBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+clearBit1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 clearBit1 = liftA2 clearBit
 
--- | Version of 'shiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-shiftL1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __shiftL1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'shiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+shiftL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 shiftL1 = liftA2 shiftL
 
--- | Version of 'unsafeShiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-unsafeShiftL1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __unsafeShiftL1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'unsafeShiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+unsafeShiftL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 unsafeShiftL1 = liftA2 unsafeShiftL
 
--- | Version of 'shiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-shiftR1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __shiftR1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'shiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+shiftR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 shiftR1 = liftA2 shiftR
 
--- | Version of 'unsafeShiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-unsafeShiftR1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __unsafeShiftR1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'unsafeShiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+unsafeShiftR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 unsafeShiftR1 = liftA2 unsafeShiftR
 
--- | Version of 'rotateL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-rotateL1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __rotateL1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'rotateL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+rotateL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 rotateL1 = liftA2 rotateL
 
--- | Version of 'rotateR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-rotateR1 :: Bits a => Signal' clk a -> Signal' clk Int -> Signal' clk a
+-- | The above type is a generalisation for:
+--
+-- @
+-- __rotateR1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
+-- @
+--
+-- It is a version of 'rotateR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
+rotateR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 rotateR1 = liftA2 rotateR
 
 instance Fractional a => Fractional (Signal' clk a) where
@@ -385,7 +541,13 @@ instance Fractional a => Fractional (Signal' clk a) where
 
 -- * List \<-\> Signal conversion (not synthesisable)
 
--- | Get an infinite list of samples from a 'CLaSH.Signal.Signal'
+-- | The above type is a generalisation for:
+--
+-- @
+-- __sample__ :: 'CLaSH.Signal.Signal' a -> [a]
+-- @
+--
+-- Get an infinite list of samples from a 'CLaSH.Signal.Signal'
 --
 -- The elements in the list correspond to the values of the 'CLaSH.Signal.Signal'
 -- at consecutive clock cycles
@@ -393,10 +555,16 @@ instance Fractional a => Fractional (Signal' clk a) where
 -- > sample s == [s0, s1, s2, s3, ...
 --
 -- __NB__: This function is not synthesisable
-sample :: Signal' clk a -> [a]
+sample :: Foldable f => f a -> [a]
 sample = F.foldr (:) []
 
--- | Get a list of @n@ samples from a 'CLaSH.Signal.Signal'
+-- | The above type is a generalisation for:
+--
+-- @
+-- __sampleN__ :: Int -> 'CLaSH.Signal.Signal' a -> [a]
+-- @
+--
+-- Get a list of @n@ samples from a 'CLaSH.Signal.Signal'
 --
 -- The elements in the list correspond to the values of the 'CLaSH.Signal.Signal'
 -- at consecutive clock cycles
@@ -404,7 +572,7 @@ sample = F.foldr (:) []
 -- > sampleN 3 s == [s0, s1, s2]
 --
 -- __NB__: This function is not synthesisable
-sampleN :: Int -> Signal' clk a -> [a]
+sampleN :: Foldable f => Int -> f a -> [a]
 sampleN n = take n . sample
 
 -- | Create a 'CLaSH.Signal.Signal' from a list
