@@ -143,15 +143,17 @@ The CλaSH compiler and Prelude library for circuit design only work with the
       * Add @cabal@'s @bin@ directory to our @PATH@:
 
           * Windows: @%appdata%\\cabal\\bin@
-          * Unix: @$HOME\/.cabal\/bin$
+          * Unix: @\$HOME\/.cabal\/bin@
 
   (4) Verify that everything is working by:
 
       * Downloading the <https://raw.github.com/clash-lang/clash-compiler/master/examples/FIR.hs Fir.hs> example
       * Run @clash --interactive FIR.hs@
-      * Execute, in the interpreter, the @:vhdl@ command.
+      * Execute, in the interpreter, the @:vhdl@ command
+      * Execute, in the interpreter, the @:systemverilog@ command
       * Exit the interpreter using @:q@
       * Examine the VHDL code in the @vhdl@ directory
+      * Examine the SystemVerilog code in the @systemverilog@ directory
 
 -}
 
@@ -164,10 +166,10 @@ know how to start the CλaSH compiler in interpretive mode:
 clash --interactive
 @
 
-For those familiar with Haskell/GHC, this is indeed just @GHCi@, with one added
-command (@:vhdl@). You can load files into the interpreter using the
-@:l \<FILENAME\>@ command. Now, depending on your choice in editor, the following
-@edit-load-run@ cycle probably work best for you:
+For those familiar with Haskell/GHC, this is indeed just @GHCi@, with two added
+command (@:vhdl@ and @:systemverilog@). You can load files into the interpreter
+using the @:l \<FILENAME\>@ command. Now, depending on your choice in editor,
+the following @edit-load-run@ cycle probably work best for you:
 
   * __Commandline (e.g. emacs, vim):__
 
