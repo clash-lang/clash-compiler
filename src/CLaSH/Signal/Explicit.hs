@@ -2,6 +2,13 @@
 {-# LANGUAGE GADTs     #-}
 {-# LANGUAGE MagicHash #-}
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 module CLaSH.Signal.Explicit
   ( -- * Explicitly clocked synchronous signal
     -- $relativeclocks
@@ -90,9 +97,9 @@ never create a clock that faster!
 -- | Create a singleton clock
 --
 -- @
--- type ClkA = Clk \"A\" 100
+-- type ClkA = 'Clk' \"A\" 100
 --
--- clkA :: SClock ClkA
+-- clkA :: 'SClock' ClkA
 -- clkA = 'sclock'
 -- @
 sclock :: (KnownSymbol name, KnownNat period)
@@ -131,18 +138,18 @@ systemClock = sclock
 -- The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
 --
 -- @
--- type Clk7 = Clk \"clk7\" 7
+-- type Clk7 = 'Clk' \"clk7\" 7
 --
--- clk7 :: SClock Clk7
+-- clk7 :: 'SClock' Clk7
 -- clk7 = 'sclock'
 -- @
 --
 -- and
 --
 -- @
--- type Clk2 = Clk \"clk2\" 2
+-- type Clk2 = 'Clk' \"clk2\" 2
 --
--- clk2 :: SClock Clk2
+-- clk2 :: 'SClock' Clk2
 -- clk2 = 'sclock'
 -- @
 --
@@ -228,13 +235,13 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- and sets the value at time 0 to @i@
 --
 -- @
--- type ClkA = Clk \"A\" 100
+-- type ClkA = 'Clk' \"A\" 100
 --
--- clkA :: SClock ClkA
+-- clkA :: 'SClock' ClkA
 -- clkA = 'sclock'
 -- @
 --
--- >>> sampleN 3 (register' clkA 8 (fromList' [1,2,3,4]))
+-- >>> sampleN 3 (register' clkA 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register' :: SClock clk -> a -> Signal' clk a -> Signal' clk a
 register' = register#
@@ -244,8 +251,8 @@ register' = register#
 -- argument is asserted. So given:
 --
 -- @
--- type ClkA = Clk \"A\" 100
--- clkA :: SClock ClkA
+-- type ClkA = 'Clk' \"A\" 100
+-- clkA :: 'SClock' ClkA
 -- clkA = 'sclock'
 --
 -- oscillate = 'register'' clkA False ('CLaSH.Signal.not1' oscillate)
@@ -267,9 +274,9 @@ regEn' = regEn#
 -- list of samples of type @a@
 --
 -- @
--- type ClkA = Clk \"A\" 100
+-- type ClkA = 'Clk' \"A\" 100
 --
--- clkA :: SClock ClkA
+-- clkA :: 'SClock' ClkA
 -- clkA = 'sclock'
 -- @
 --

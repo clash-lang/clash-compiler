@@ -2,14 +2,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 
-{- |
-  This module defines the explicitly clocked counterparts of the functions
-  defined in "CLaSH.Prelude".
+{-# OPTIONS_HADDOCK show-extensions #-}
 
-  This module uses the explicitly clocked 'Signal''s synchronous signals, as
-  opposed to the implicitly clocked 'Signal's used in "CLaSH.Prelude". Take a
-  look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
-  using explicitly clocked signals.
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+This module defines the explicitly clocked counterparts of the functions
+defined in "CLaSH.Prelude".
+
+This module uses the explicitly clocked 'Signal'' synchronous signals, as
+opposed to the implicitly clocked 'Signal' used in "CLaSH.Prelude". Take a
+look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
+using explicitly clocked signals.
 -}
 module CLaSH.Prelude.Explicit
   ( -- * Creating synchronous sequential circuits
@@ -41,21 +47,23 @@ import Prelude                 hiding (repeat)
 
 import CLaSH.Prelude.BlockRam  (blockRam', blockRamPow2')
 import CLaSH.Prelude.Mealy     (mealy', mealyB')
-import CLaSH.Prelude.Testbench (assert', stimuliGenerator', outputVerifier')
+import CLaSH.Prelude.Testbench (stimuliGenerator', outputVerifier')
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 
 {-# INLINE registerB' #-}
 -- | Create a 'register' function for product-type like signals (e.g.
--- '(Signal a, Signal b)')
+-- @('Signal' a, 'Signal' b)@)
 --
--- > type ClkA = Clk "A" 100
--- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
--- >
--- > rP :: (Signal' ClkA Int, Signal' ClkA Int) -> (Signal' ClkA Int, Signal' ClkA Int)
--- > rP = registerB' clkA100 (8,8)
+-- @
+-- type ClkA = 'Clk' \"A\" 100
+--
+-- clkA100 :: 'SClock' ClkA
+-- clkA100 = 'sclock'
+--
+-- rP :: ('Signal'' ClkA Int, 'Signal'' ClkA Int) -> ('Signal'' ClkA Int, 'Signal'' ClkA Int)
+-- rP = 'registerB'' clkA100 (8,8)
+-- @
 --
 -- >>> simulateB' rP [(1,1),(2,2),(3,3),...
 -- [(8,8),(1,1),(2,2),(3,3),...
@@ -65,13 +73,15 @@ registerB' clk i = unbundle' clk Prelude.. register' clk i Prelude.. bundle' clk
 {-# INLINABLE window' #-}
 -- | Give a window over a 'Signal''
 --
--- > type ClkA = Clk "A" 100
--- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
--- >
--- > window4 :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
--- > window4 = window' clkA100
+-- @
+-- type ClkA = 'Clk' \"A\" 100
+--
+-- clkA100 :: 'SClock' ClkA
+-- clkA100 = 'sclock'
+--
+-- window4 :: 'Signal'' ClkA Int -> 'Vec' 4 ('Signal'' ClkA Int)
+-- window4 = 'window'' clkA100
+-- @
 --
 -- >>> simulateB' clkA100 clkA100 window4 [1,2,3,4,5,...
 -- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
@@ -91,13 +101,15 @@ window' clk x = res
 {-# INLINABLE windowD' #-}
 -- | Give a delayed window over a 'Signal''
 --
--- > type ClkA = Clk "A" 100
--- >
--- > clkA100 :: SClock ClkA
--- > clkA100 = sclock
--- >
--- > windowD3 :: Signal' ClkA Int -> Vec 3 (Signal' ClkA Int)
--- > windowD3 = windowD
+-- @
+-- type ClkA = 'Clk' \"A\" 100
+--
+-- clkA100 :: 'SClock' ClkA
+-- clkA100 = 'sclock'
+--
+-- windowD3 :: 'Signal'' ClkA Int -> 'Vec' 3 ('Signal'' ClkA Int)
+-- windowD3 = 'windowD'
+-- @
 --
 -- >>> simulateB' clkA100 clkA100 windowD3 [1,2,3,4,...
 -- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...

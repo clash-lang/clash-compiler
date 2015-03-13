@@ -11,23 +11,31 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
--- | Fixed point numbers
---
--- * The 'Num' operators for the given types saturate on overflow,
---   and use truncation as the rounding method.
--- * 'Fixed' has an instance for 'Fractional' meaning you use fractional
---   literals @(3.75 :: 'SFixed' 4 18)@.
--- * Both integer literals and fractional literals are clipped to 'minBound' and
---  'maxBound'.
--- * There is no 'Floating' instance for 'Fixed', but you can use @$$('fLit' d)@
---   to create 'Fixed' point literal from 'Double' constant at compile-time.
--- * Use <#constraintsynonyms Constraint synonyms> when writing type signatures
---   for polymorphic functions that use 'Fixed' point numbers.
---
--- BEWARE: rounding by truncation introduces a sign bias!
---
--- * Truncation for positive numbers effectively results in: round towards zero.
--- * Truncation for negative numbers effectively results in: round towards -infinity.
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Fixed point numbers
+
+* The 'Num' operators for the given types saturate on overflow,
+  and use truncation as the rounding method.
+* 'Fixed' has an instance for 'Fractional' meaning you use fractional
+  literals @(3.75 :: 'SFixed' 4 18)@.
+* Both integer literals and fractional literals are clipped to 'minBound' and
+ 'maxBound'.
+* There is no 'Floating' instance for 'Fixed', but you can use @$$('fLit' d)@
+  to create 'Fixed' point literal from 'Double' constant at compile-time.
+* Use <#constraintsynonyms Constraint synonyms> when writing type signatures
+  for polymorphic functions that use 'Fixed' point numbers.
+
+BEWARE: rounding by truncation introduces a sign bias!
+
+* Truncation for positive numbers effectively results in: round towards zero.
+* Truncation for negative numbers effectively results in: round towards -infinity.
+-}
 module CLaSH.Sized.Fixed
   ( -- * 'SFixed': 'Signed' 'Fixed' point numbers
     SFixed, sf, unSF
@@ -233,17 +241,17 @@ Writing a simple multiply-and-accumulate function can already give rise to many
 lines of constraints:
 
 @
-mac :: ( KnownNat frac
-       , KnownNat (frac + frac)
-       , KnownNat (int + frac)
-       , KnownNat (1 + (int + frac))
-       , KnownNat ((int + frac) + (int + frac))
+mac :: ( 'GHC.TypeLits.KnownNat' frac
+       , 'GHC.TypeLits.KnownNat' (frac + frac)
+       , 'GHC.TypeLits.KnownNat' (int + frac)
+       , 'GHC.TypeLits.KnownNat' (1 + (int + frac))
+       , 'GHC.TypeLits.KnownNat' ((int + frac) + (int + frac))
        , ((int + int) + (frac + frac)) ~ ((int + frac) + (int + frac))
        )
-    => SFixed int frac
-    -> SFixed int frac
-    -> SFixed int frac
-    -> SFixed int frac
+    => 'SFixed' int frac
+    -> 'SFixed' int frac
+    -> 'SFixed' int frac
+    -> 'SFixed' int frac
 mac s x y = s + (x * y)
 @
 
@@ -251,10 +259,10 @@ But with constraint synonyms, you can write the type signature like this:
 
 @
 mac1 :: 'NumSFixedC' int frac
-    => SFixed int frac
-    -> SFixed int frac
-    -> SFixed int frac
-    -> SFixed int frac
+    => 'SFixed' int frac
+    -> 'SFixed' int frac
+    -> 'SFixed' int frac
+    -> 'SFixed' int frac
 mac1 s x y = s + (x * y)
 @
 
@@ -266,28 +274,28 @@ be considered small, here is an \"this way lies madness\" example where you
 really want to use constraint kinds:
 
 @
-mac2 :: ( KnownNat frac1
-        , KnownNat frac2
-        , KnownNat frac3
-        , KnownNat (Max frac1 frac2)
-        , KnownNat (int1 + frac1)
-        , KnownNat (int2 + frac2)
-        , KnownNat (int3 + frac3)
-        , KnownNat (frac1 + frac2)
-        , KnownNat (Max (frac1 + frac2) frac3)
-        , KnownNat (((int1 + int2) + (frac1 + frac2)) + (int3 + frac3))
-        , KnownNat ((int1 + int2) + (frac1 + frac2))
-        , KnownNat (1 + Max (int1 + frac1) (int2 + frac2))
-        , KnownNat (1 + Max (int1 + int2) int3 + Max (frac1 + frac2) frac3)
-        , KnownNat ((1 + Max int1 int2) + Max frac1 frac2)
-        , KnownNat ((1 + Max ((int1 + int2) + (frac1 + frac2)) (int3 + frac3)))
+mac2 :: ( 'GHC.TypeLits.KnownNat' frac1
+        , 'GHC.TypeLits.KnownNat' frac2
+        , 'GHC.TypeLits.KnownNat' frac3
+        , 'GHC.TypeLits.KnownNat' (Max frac1 frac2)
+        , 'GHC.TypeLits.KnownNat' (int1 + frac1)
+        , 'GHC.TypeLits.KnownNat' (int2 + frac2)
+        , 'GHC.TypeLits.KnownNat' (int3 + frac3)
+        , 'GHC.TypeLits.KnownNat' (frac1 + frac2)
+        , 'GHC.TypeLits.KnownNat' (Max (frac1 + frac2) frac3)
+        , 'GHC.TypeLits.KnownNat' (((int1 + int2) + (frac1 + frac2)) + (int3 + frac3))
+        , 'GHC.TypeLits.KnownNat' ((int1 + int2) + (frac1 + frac2))
+        , 'GHC.TypeLits.KnownNat' (1 + Max (int1 + frac1) (int2 + frac2))
+        , 'GHC.TypeLits.KnownNat' (1 + Max (int1 + int2) int3 + Max (frac1 + frac2) frac3)
+        , 'GHC.TypeLits.KnownNat' ((1 + Max int1 int2) + Max frac1 frac2)
+        , 'GHC.TypeLits.KnownNat' ((1 + Max ((int1 + int2) + (frac1 + frac2)) (int3 + frac3)))
         , ((int1 + frac1) + (int2 + frac2)) ~ ((int1 + int2) + (frac1 + frac2))
         , (((int1 + int2) + int3) + ((frac1 + frac2) + frac3)) ~ (((int1 + int2) + (frac1 + frac2)) + (int3 + frac3))
         )
-     => SFixed int1 frac1
-     -> SFixed int2 frac2
-     -> SFixed int3 frac3
-     -> SFixed (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
+     => 'SFixed' int1 frac1
+     -> 'SFixed' int2 frac2
+     -> 'SFixed' int3 frac3
+     -> 'SFixed' (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
 mac2 x y s = (x \`times\` y) \`plus\` s
 @
 
@@ -297,10 +305,10 @@ Which, with the proper constraint kinds can be reduced to:
 mac3 :: ( 'ENumSFixedC' int1 frac1 int2 frac2
         , 'ENumSFixedC' (int1 + int2) (frac1 + frac2) int3 frac3
         )
-     => SFixed int1 frac1
-     -> SFixed int2 frac2
-     -> SFixed int3 frac3
-     -> SFixed (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
+     => 'SFixed' int1 frac1
+     -> 'SFixed' int2 frac2
+     -> 'SFixed' int3 frac3
+     -> 'SFixed' (1 + Max (int1 + int2) int3) (Max (frac1 + frac2) frac3)
 mac3 x y s = (x \`times\` y) \`plus\` s
 @
 -}
@@ -526,11 +534,15 @@ resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
 --
 -- So when you type:
 --
--- > n = $$(fLit pi) :: SFixed 4 4
+-- @
+-- n = $$('fLit' pi) :: 'SFixed' 4 4
+-- @
 --
 -- The compiler sees:
 --
--- > n = Fixed (fromInteger 50) :: SFixed 4 4
+-- @
+-- n = 'Fixed' (fromInteger 50) :: 'SFixed' 4 4
+-- @
 --
 -- Upon evaluation you see that the value is rounded / truncated in accordance
 -- to the fixed point representation:

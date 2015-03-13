@@ -2,7 +2,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 
-{- |
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+  Copyright   :  (C) 2013-2015, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
   borrows both its syntax and semantics from the functional programming language
   Haskell. The merits of using a functional language to describe hardware comes

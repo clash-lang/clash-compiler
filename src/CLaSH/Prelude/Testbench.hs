@@ -44,8 +44,10 @@ assert = assert'
 --
 -- Example:
 --
--- > testInput :: Signal Int
--- > testInput = stimuliGenerator $(v [(1::Int),3..21])
+-- @
+-- testInput :: 'Signal' Int
+-- testInput = 'stimuliGenerator' $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
+-- @
 --
 -- >>> sample testInput
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21,...
@@ -61,8 +63,10 @@ stimuliGenerator = stimuliGenerator' systemClock
 --
 -- Example:
 --
--- > expectedOutput :: Signal Int -> Signal Bool
--- > expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- @
+-- expectedOutput :: 'Signal' Int -> 'Signal' Bool
+-- expectedOutput = 'outputVerifier' $('CLaSH.Sized.Vector.v' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- @
 --
 -- >>> sample (expectedOutput (fromList ([0..10] ++ [10,10,10])))
 -- [
@@ -112,13 +116,15 @@ assert' = liftA3
 --
 -- Example:
 --
--- > type ClkA = Clk "A" 100
--- >
--- > clkA :: SClock ClkA
--- > clkA = sclock
--- >
--- > testInput :: Signal' clkA Int
--- > testInput = stimuliGenerator' clkA $(v [(1::Int),3..21])
+-- @
+-- type ClkA = 'CLaSH.Signal.Explicit.Clk' \"A\" 100
+--
+-- clkA :: 'SClock' ClkA
+-- clkA = 'CLaSH.Signal.Explicit.sclock'
+--
+-- testInput :: 'Signal'' clkA Int
+-- testInput = 'stimuliGenerator'' clkA $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
+-- @
 --
 -- >>> sample testInput
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21,...
@@ -147,13 +153,15 @@ stimuliGenerator' clk samples =
 --
 -- Example:
 --
--- > type ClkA = Clk "A" 100
--- >
--- > clkA :: SClock ClkA
--- > clkA = sclock
--- >
--- > expectedOutput :: Signal' ClkA Int -> Signal' ClkA Bool
--- > expectedOutput = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- @
+-- type ClkA = 'CLaSH.Signal.Explicit.Clk' \"A\" 100
+--
+-- clkA :: 'SClock' ClkA
+-- clkA = 'CLaSH.Signal.Explicit.sclock'
+--
+-- expectedOutput :: 'Signal'' ClkA Int -> 'Signal'' ClkA Bool
+-- expectedOutput = 'outputVerifier'' clkA $('CLaSH.Sized.Vector.v' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- @
 --
 -- >>> sample (expectedOutput (fromList ([0..10] ++ [10,10,10])))
 -- [

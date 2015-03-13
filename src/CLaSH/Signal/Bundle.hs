@@ -4,7 +4,15 @@
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE TypeFamilies      #-}
 
--- | The Product/Signal isomorphism
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+The Product/Signal isomorphism
+-}
 module CLaSH.Signal.Bundle
   ( Bundle (..)
   )
@@ -39,7 +47,7 @@ import CLaSH.Sized.Vector    (Vec)
 -- @
 -- data D = A | B
 --
--- instance Bundle D
+-- instance 'Bundle' D
 -- @
 --
 -- is the same as:
@@ -47,10 +55,10 @@ import CLaSH.Sized.Vector    (Vec)
 -- @
 -- data D = A | B
 --
--- instance Bundle D where
---   type Unbundled' clk D = Signal' clk D
---   bundle   _ s = s
---   unbundle _ s = s
+-- instance 'Bundle' D where
+--   type 'Unbundled'' clk D = 'Signal'' clk D
+--   'bundle''   _ s = s
+--   'unbundle'' _ s = s
 -- @
 --
 class Bundle a where
@@ -58,11 +66,15 @@ class Bundle a where
   type Unbundled' clk a = Signal' clk a
   -- | Example:
   --
-  -- > bundle' :: (Signal' clk a, Signal' clk b) -> Signal' clk (a,b)
+  -- @
+  -- __bundle'__ :: ('Signal'' clk a, 'Signal'' clk b) -> 'Signal'' clk (a,b)
+  -- @
   --
   -- However:
   --
-  -- > bundle' :: Signal' clk Bit -> Signal' clk Bit
+  -- @
+  -- __bundle'__ :: 'Signal'' clk 'CLaSH.Sized.BitVector.Bit' -> 'Signal'' clk 'CLaSH.Sized.BitVector.Bit'
+  -- @
   bundle' :: SClock clk -> Unbundled' clk a -> Signal' clk a
 
   {-# INLINE bundle' #-}
@@ -70,11 +82,15 @@ class Bundle a where
   bundle' _ s = s
   -- | Example:
   --
-  -- > unbundle' :: Signal' clk (a,b) -> (Signal' clk a, Signal' clk b)
+  -- @
+  -- __unbundle'__ :: 'Signal'' clk (a,b) -> ('Signal'' clk a, 'Signal'' clk b)
+  -- @
   --
   -- However:
   --
-  -- > unbundle' :: Signal' clk Bit -> Signal' clk Bit
+  -- @
+  -- __unbundle'__ :: 'Signal'' clk 'CLaSH.Sized.BitVector.Bit' -> 'Signal'' clk 'CLaSH.Sized.BitVector.Bit'
+  -- @
   unbundle' :: SClock clk -> Signal' clk a -> Unbundled' clk a
 
   {-# INLINE unbundle' #-}

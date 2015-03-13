@@ -3,7 +3,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
--- | Self-synchronising circuits based on data-flow principles.
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Self-synchronising circuits based on data-flow principles.
+-}
 module CLaSH.Prelude.DataFlow
   ( -- * Data types
     DataFlow
@@ -48,12 +56,12 @@ The 'DataFlow'' type is defined as:
 @
 newtype DataFlow' clk iEn oEn i o
   = DF
-  { df :: Signal' clk i     -- Incoming data
-       -> Signal' clk iEn   -- Flagged with /valid/ bits @iEn@.
-       -> Signal' clk oEn   -- Incoming back-pressure, /ready/ edge.
-       -> ( Signal' clk o   -- Outgoing data.
-          , Signal' clk oEn -- Flagged with /valid/ bits @oEn@.
-          , Signal' clk iEn -- Outgoing back-pressure, /ready/ edge.
+  { df :: 'Signal'' clk i     -- Incoming data
+       -> 'Signal'' clk iEn   -- Flagged with /valid/ bits @iEn@.
+       -> 'Signal'' clk oEn   -- Incoming back-pressure, /ready/ edge.
+       -> ( 'Signal'' clk o   -- Outgoing data.
+          , 'Signal'' clk oEn -- Flagged with /valid/ bits @oEn@.
+          , 'Signal'' clk iEn -- Outgoing back-pressure, /ready/ edge.
           )
   }
 @
@@ -94,13 +102,15 @@ type DataFlow iEn oEn i o = DataFlow' SystemClock iEn oEn i o
 -- | Create a 'DataFlow' circuit from a circuit description with the appropriate
 -- type:
 --
--- > Signal' clk i        -- Incoming data.
--- > -> Signal' clk Bool  -- Flagged with a single /valid/ bit.
--- > -> Signal' clk Bool  -- Incoming back-pressure, /ready/ bit.
--- > -> ( Signal' clk o   -- Outgoing data.
--- >    , Signal' clk oEn -- Flagged with a single /valid/ bit.
--- >    , Signal' clk iEn -- Outgoing back-pressure, /ready/ bit.
--- >    )
+-- @
+-- 'Signal'' clk i        -- Incoming data.
+-- -> 'Signal'' clk Bool  -- Flagged with a single /valid/ bit.
+-- -> 'Signal'' clk Bool  -- Incoming back-pressure, /ready/ bit.
+-- -> ( 'Signal'' clk o   -- Outgoing data.
+--    , 'Signal'' clk oEn -- Flagged with a single /valid/ bit.
+--    , 'Signal'' clk iEn -- Outgoing back-pressure, /ready/ bit.
+--    )
+-- @
 --
 -- A circuit adhering to the 'DataFlow' type should:
 --
@@ -186,7 +196,9 @@ f `parDF` g = firstDF f `seqDF` secondDF g
 --
 -- Given:
 --
--- > f `seqDF` (loopDF h) `seqDF` g
+-- @
+-- f \`@'seqDF'@\` ('loopDF' h) \`@'seqDF'@\` g
+-- @
 --
 -- The circuits @f@, @h@, and @g@, will operate in /lock-step/. Which means that
 -- there it only progress when all three circuits are producing /valid/ data
@@ -222,19 +234,25 @@ class LockStep a b where
   --
   -- Given:
   --
-  -- > f :: DataFlow Bool Bool a b
-  -- > g :: DataFlow Bool Bool c d
-  -- > h :: DataFlow Bool Bool (b,d) (p,q)
+  -- @
+  -- __f__ :: 'DataFlow' Bool Bool a b
+  -- __g__ :: 'DataFlow' Bool Bool c d
+  -- __h__ :: 'DataFlow' Bool Bool (b,d) (p,q)
+  -- @
   --
   -- We /cannot/ simply write:
   --
-  -- > (f `parDF` g) `seqDF` h
+  -- @
+  -- (f \`@'parDF'@\` g) \`@'seqDF'@\` h
+  -- @
   --
-  -- because, @f \`parDF\` g@, has type, @DataFlow' (Bool,Bool) (Bool,Bool) (a,c) (b,d)@,
+  -- because, @f \`parDF\` g@, has type, @'DataFlow' (Bool,Bool) (Bool,Bool) (a,c) (b,d)@,
   -- which does not match the expected synchronisation granularity of @h@. We
   -- need a circuit in between that has the type:
   --
-  -- > DataFlow (Bool,Bool) Bool (b,d) (b,d)
+  -- @
+  -- 'DataFlow' (Bool,Bool) Bool (b,d) (b,d)
+  -- @
   --
   -- Simply '&&'-ing the /valid/ signals in the forward direction, and
   -- duplicating the /ready/ signal in the backward direction is however not
@@ -248,18 +266,22 @@ class LockStep a b where
   -- The 'lockStep' function ensures that all synchronisation signals are
   -- properly connected:
   --
-  -- > (f `parDF` g) `seqDF` lockStep `seqDF` h
+  -- @
+  -- (f \`@'parDF'@\` g) \`@'seqDF'@\` 'lockStep' \`@'seqDF'@\` h
+  -- @
   --
   -- <<doc/lockStep.svg>>
   --
   -- Note that 'lockStep' works for arbitrarily nested tuples. That is:
   --
-  -- > p :: DataFlow Bool Bool ((b,d),d) z
-  -- >
-  -- > q :: Dataflow ((Bool,Bool),Bool) ((Bool,Bool),Bool) ((a,c),c) ((b,d),d)
-  -- > q = f `parDF` g `parDf` g
-  -- >
-  -- > r = q `seqDF` lockStep `seqDF` p
+  -- @
+  -- p :: 'DataFlow' Bool Bool ((b,d),d) z
+  --
+  -- q :: 'DataFlow' ((Bool,Bool),Bool) ((Bool,Bool),Bool) ((a,c),c) ((b,d),d)
+  -- q = f \`@'parDF'@\` g \`@'parDF'@\` g
+  --
+  -- r = q \`@'seqDF'@\` 'lockStep' \`@'seqDF'@\` p
+  -- @
   --
   -- Does the right thing.
   lockStep :: (KnownNat rate,KnownSymbol nm)
@@ -269,19 +291,25 @@ class LockStep a b where
   --
   -- Given:
   --
-  -- > f :: DataFlow Bool Bool a b
-  -- > g :: DataFlow Bool Bool c d
-  -- > h :: DataFlow Bool Bool (p,q) (a,c)
+  -- @
+  -- __f__ :: 'DataFlow' Bool Bool a b
+  -- __g__ :: 'DataFlow' Bool Bool c d
+  -- __h__ :: 'DataFlow' Bool Bool (p,q) (a,c)
+  -- @
   --
   -- We /cannot/ simply write:
   --
-  -- > h `seqDF` (f `parDF` g)
+  -- @
+  -- h \`@'seqDF'@\` (f \`@'parDF'@\` g)
+  -- @
   --
-  -- because, @f \`parDF\` g@, has type, @DataFlow' (Bool,Bool) (Bool,Bool) (a,c) (b,d)@,
+  -- because, @f \`parDF\` g@, has type, @'DataFlow' (Bool,Bool) (Bool,Bool) (a,c) (b,d)@,
   -- which does not match the expected synchronisation granularity of @h@. We
   -- need a circuit in between that has the type:
   --
-  -- > DataFlow Bool (Bool,Bool) (a,c) (a,c)
+  -- @
+  -- 'DataFlow' Bool (Bool,Bool) (a,c) (a,c)
+  -- @
   --
   -- Simply '&&'-ing the /ready/ signals in the backward direction, and
   -- duplicating the /valid/ signal in the forward direction is however not
@@ -295,18 +323,22 @@ class LockStep a b where
   -- The 'stepLock' function ensures that all synchronisation signals are
   -- properly connected:
   --
-  -- > h `seqDF` stepLock `seqDF` (f `parDF` g)
+  -- @
+  -- h \`@'seqDF'@\` 'stepLock' \`@'seqDF'@\` (f \`@'parDF'@\` g)
+  -- @
   --
   -- <<doc/stepLock.svg>>
   --
   -- Note that 'stepLock' works for arbitrarily nested tuples. That is:
   --
-  -- > p :: DataFlow Bool Bool z ((a,c),c)
-  -- >
-  -- > q :: Dataflow ((Bool,Bool),Bool) ((Bool,Bool),Bool) ((a,c),c) ((b,d),d)
-  -- > q = f `parDF` g `parDf` g
-  -- >
-  -- > r = p `seqDF` lockStep` `seqDF` q
+  -- @
+  -- p :: 'DataFlow' Bool Bool z ((a,c),c)
+  --
+  -- q :: 'DataFlow' ((Bool,Bool),Bool) ((Bool,Bool),Bool) ((a,c),c) ((b,d),d)
+  -- q = f \`@'parDF'@\` g \`@'parDF'@\` g
+  --
+  -- r = p \`@'seqDF'@\` 'lockStep' \`@'seqDF'@\` q
+  -- @
   --
   -- Does the right thing.
   stepLock :: (KnownNat rate,KnownSymbol nm)

@@ -11,7 +11,13 @@
 {-# LANGUAGE TypeOperators       #-}
 
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 module CLaSH.Sized.Vector
   ( -- * 'Vec'tor constructors
     Vec(..), (<:), singleton
@@ -903,11 +909,11 @@ asNatProxy _ = Proxy
 --
 -- @
 -- -- Bubble sort for 1 iteration
--- sortV xs = map fst sorted <: (snd (last sorted))
+-- sortV xs = 'map' fst sorted '<:' (snd ('last' sorted))
 --  where
---    lefts  = head xs :> map snd (init sorted)
---    rights = tail xs
---    sorted = zipWith compareSwapL lefts rights
+--    lefts  = 'head' xs :> 'map' snd ('init' sorted)
+--    rights = 'tail' xs
+--    sorted = 'zipWith' compareSwapL lefts rights
 --
 -- -- Compare and swap
 -- compareSwapL a b = if a < b then (a,b)
@@ -922,11 +928,11 @@ asNatProxy _ = Proxy
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
 --
 -- @
--- sortVL xs = map fst sorted <: (snd (last sorted))
+-- sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
 --  where
---    lefts  = head xs :> map snd (init sorted)
---    rights = tail xs
---    sorted = zipWith compareSwapL ('lazyV' lefts) rights
+--    lefts  = 'head' xs :> map snd ('init' sorted)
+--    rights = 'tail' xs
+--    sorted = 'zipWith' compareSwapL ('lazyV' lefts) rights
 -- @
 --
 -- Results in a successful computation:
@@ -938,11 +944,11 @@ asNatProxy _ = Proxy
 -- meaning of the code:
 --
 -- @
--- sortV_flip xs = map fst sorted <: (snd (last sorted))
+-- sortV_flip xs = 'map' fst sorted '<:' (snd ('last' sorted))
 --  where
---    lefts  = head xs :> map snd (init sorted)
---    rights = tail xs
---    sorted = zipWith ('flip' compareSwapL) rights lefts
+--    lefts  = 'head' xs :> 'map' snd ('init' sorted)
+--    rights = 'tail' xs
+--    sorted = 'zipWith' ('flip' compareSwapL) rights lefts
 -- @
 --
 -- >>> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
@@ -1009,10 +1015,10 @@ lazyV = lazyV' (repeat undefined)
 -- now correctly define ('++'):
 --
 -- @
--- data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
--- type instance Apply (Append m a) l = Vec (l + m) a
+-- data Append (m :: Nat) (a :: *) (f :: 'TyFun' Nat *) :: *
+-- type instance 'Apply' (Append m a) l = 'Vec' (l + m) a
 --
--- xs ++ ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+-- xs ++ ys = dfold (Proxy :: Proxy (Append m a)) (const (':>')) ys xs
 -- @
 --
 -- We now see that ('++') has the appropriate type:

@@ -1,5 +1,13 @@
 {-# LANGUAGE MagicHash #-}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 module CLaSH.Signal
   ( -- * Implicitly clocked synchronous signal
     Signal
@@ -49,15 +57,17 @@ module CLaSH.Signal
   )
 where
 
-import CLaSH.Signal.Internal  (Signal', register#, regEn#, (.==.), (./=.),
-                               compare1, (.<.), (.<=.), (.>=.), (.>.), fromEnum1,
-                               toRational1, toInteger1, testBit1, popCount1,
-                               shift1, rotate1, setBit1, clearBit1, shiftL1,
-                               unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
-                               rotateR1, (.||.), (.&&.), not1, mux, sample,
-                               sampleN, fromList, simulate, signal)
-import CLaSH.Signal.Explicit  (SystemClock, systemClock, simulateB')
-import CLaSH.Signal.Bundle    (Bundle (..), Unbundled')
+import Data.Bits             (Bits) -- Haddock only
+
+import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
+                              compare1, (.<.), (.<=.), (.>=.), (.>.), fromEnum1,
+                              toRational1, toInteger1, testBit1, popCount1,
+                              shift1, rotate1, setBit1, clearBit1, shiftL1,
+                              unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
+                              rotateR1, (.||.), (.&&.), not1, mux, sample,
+                              sampleN, fromList, simulate, signal)
+import CLaSH.Signal.Explicit (SystemClock, systemClock, simulateB')
+import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
 -- * Implicitly clocked synchronous signal
 
@@ -102,22 +112,30 @@ type Unbundled a = Unbundled' SystemClock a
 {-# INLINE unbundle #-}
 -- | Example:
 --
--- > unbundle :: Signal (a,b) -> (Signal a, Signal b)
+-- @
+-- __unbundle__ :: 'Signal' (a,b) -> ('Signal' a, 'Signal' b)
+-- @
 --
 -- However:
 --
--- > unbundle :: Signal Bit -> Signal Bit
+-- @
+-- __unbundle__ :: 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
+-- @
 unbundle :: Bundle a => Signal a -> Unbundled a
 unbundle = unbundle' systemClock
 
 {-# INLINE bundle #-}
 -- | Example:
 --
--- > bundle :: (Signal a, Signal b) -> Signal (a,b)
+-- @
+-- __bundle__ :: ('Signal' a, 'Signal' b) -> 'Signal' (a,b)
+-- @
 --
 -- However:
 --
--- > bundle :: Signal Bit -> Signal Bit
+-- @
+-- __bundle__ :: 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
+-- @
 bundle :: Bundle a => Unbundled a -> Signal a
 bundle = bundle' systemClock
 

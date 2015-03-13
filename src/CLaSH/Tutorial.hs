@@ -147,7 +147,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
   (4) Verify that everything is working by:
 
-      * Downloading the <https://raw.github.com/christiaanb/clash2/master/examples/FIR.hs Fir.hs> example
+      * Downloading the <https://raw.github.com/clash-lang/clash-compiler/master/examples/FIR.hs Fir.hs> example
       * Run @clash --interactive FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command.
       * Exit the interpreter using @:q@
@@ -242,11 +242,11 @@ Talking about /types/ also brings us to one of the most important parts of this
 tutorial: /types/ and /synchronous sequential logic/. Especially how we can
 always determine, through the types of a specification, if it describes
 combinational logic or (synchronous) sequential logic. We do this by examining
-the type of one of the sequential primitives, the @register@ function:
+the type of one of the sequential primitives, the @'register'@ function:
 
 @
-register :: a -> Signal a -> Signal a
-regiser i s = ...
+register :: a -> 'Signal' a -> 'Signal' a
+register i s = ...
 @
 
 Where we see that the second argument and the result are not just of the
@@ -323,7 +323,7 @@ shape of @macT@:
 @
 mealy :: (s -> i -> (s,o))
       -> s
-      -> (Signal i -> Signal o)
+      -> ('Signal' i -> 'Signal' o)
 mealy f initS = ...
 @
 
@@ -337,6 +337,7 @@ Where the first argument of @'mealy'@ is our @macT@ function, and the second
 argument is the initial state, in this case 0. We can see it is functioning
 correctly in our interpreter:
 
+>>> import qualified Data.List
 >>> Data.List.take 4 $ simulate mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
 [0,1,5,14]
 
@@ -355,7 +356,7 @@ always be needed, you can always check the type with the @:t@ command and see
 if the function is monomorphic:
 
 @
-topEntity :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
+topEntity :: 'Signal' ('Signed' 9, 'Signed' 9) -> 'Signal' ('Signed' 9)
 topEntity = mac
 @
 
@@ -376,7 +377,7 @@ macT acc (x,y) = (acc',o)
 
 mac = 'mealy' macT 0
 
-topEntity :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
+topEntity :: 'Signal' ('Signed' 9, 'Signed' 9) -> 'Signal' ('Signed' 9)
 topEntity = mac
 @
 
@@ -412,10 +413,10 @@ CλaSH compiler looks for the following functions to generate these to aspects:
   1. @testInput@ for the stimulus generator.
   2. @expectedOutput@ for the output verification.
 
-Given a 'topEntity' with the type:
+Given a @topEntity@ with the type:
 
 @
-topEntity :: Signal a -> Signal b
+__topEntity__ :: 'Signal' a -> 'Signal' b
 @
 
 Where @a@ and @b@ are placeholders for monomorphic types: the 'topEntity' is
@@ -423,13 +424,13 @@ not allowed to be polymorphic. So given the above type for the 'topEntity', the
 type of 'testInput' should be:
 
 @
-testInput :: Signal a
+__testInput__ :: 'Signal' a
 @
 
-And the type of 'expectedOutput' should be:
+And the type of @expectedOutput@ should be:
 
 @
-expectedOutput :: Signal b -> Signal Bool
+__expectedOutput__ :: 'Signal' b -> 'Signal' Bool
 @
 
 Where the 'expectedOutput' function should assert to 'True' once it has verified
@@ -440,11 +441,11 @@ functions specified in the "CLaSH.Prelude" module, which are @'stimuliGenerator'
 and @'outputVerifier'@:
 
 @
-testInput :: Signal (Signed 9,Signed 9)
-testInput = 'stimuliGenerator' $('v' [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+testInput :: 'Signal' ('Signed' 9,'Signed' 9)
+testInput = 'stimuliGenerator' $('v' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
 
-expectedOutput :: Signal (Signed 9) -> Signal Bool
-expectedOutput = 'outputVerifier' $('v' [0 :: Signed 9,1,5,14])
+expectedOutput :: 'Signal' ('Signed' 9) -> 'Signal' Bool
+expectedOutput = 'outputVerifier' $('v' [0 :: 'Signed' 9,1,5,14])
 @
 
 This will create a stimulus generator that creates the same inputs as we used
@@ -518,13 +519,13 @@ structure.
     macA (x,y) = acc
       where
         acc  = 'register' 0 acc'
-        acc' = ma \<$\> acc \<*\> pack (x,y)
+        acc' = ma '<$>' acc '<*>' 'bundle' (x,y)
     @
 
-* __<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State> Monad__
+* __'Control.Monad.State.Lazy.State' Monad__
 
     We can also implement the original @macT@ function as a
-    @<http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>@
+    @'Control.Monad.State.Lazy.State'@
     monadic computation. First we must an extra import statement, right after
     the import of "CLaSH.Prelude":
 
@@ -536,8 +537,8 @@ structure.
 
     @
     macTS (x,y) = do
-      acc <- get
-      put (acc + x * y)
+      acc <- 'Control.Monad.State.Lazy.get'
+      'Control.Monad.State.Lazy.put' (acc + x * y)
       return acc
     @
 
@@ -545,12 +546,12 @@ structure.
     position of the arguments and result:
 
     @
-    asStateM :: (i -> State s o)
+    asStateM :: (i -> 'Control.Monad.State.Lazy.State' s o)
              -> s
-             -> (Signal i -> Signal o)
+             -> ('Signal' i -> 'Signal' o)
     asStateM f i = 'mealy' g i
       where
-        g s x = let (o,s') = runState (f x) s
+        g s x = let (o,s') = 'Control.Monad.State.Lazy.runState' (f x) s
                 in  (s',o)
     @
 
@@ -574,8 +575,8 @@ fir coeffs x_t = y_t
     y_t = dotp coeffs xs
     xs  = 'window' x_t
 
-topEntity :: Signal (Signed 16) -> Signal (Signed 16)
-topEntity = fir $('v' [0::Signal (Signed 16),1,2,3])
+topEntity :: 'Signal' ('Signed' 16) -> 'Signal' ('Signed' 16)
+topEntity = fir $('v' [0::'Signal' ('Signed' 16),1,2,3])
 @
 
 Here we can see that, although the CλaSH compiler does not support recursion,
@@ -588,7 +589,7 @@ type.
 Given a function @f@ of type:
 
 @
-f :: Int -> (Bool, Int) -> (Int, (Int, Bool))
+__f__ :: Int -> (Bool, Int) -> (Int, (Int, Bool))
 @
 
 When we want to make compositions of @f@ in @g@ using 'mealy', we have to
@@ -605,35 +606,35 @@ Why do we need these 'bundle', and 'unbundle' functions you might ask? When we
 look at the type of 'mealy':
 
 @
-mealy :: (s -> i -> (s,o))
+__mealy__ :: (s -> i -> (s,o))
       -> s
-      -> (Signal i -> Signal o)
+      -> ('Signal' i -> 'Signal' o)
 @
 
-we see that the resulting function has an input of type @Signal i@, and an
-output of @Signal o@. However, the type of @(a,b)@ in the definition of @g@ is:
-@(Signal Bool, Signal Int)@. And the type of @(i1,b1)@ is of type
-@(Signal Int, Signal Bool)@.
+we see that the resulting function has an input of type @'Signal' i@, and an
+output of @'Signal' o@. However, the type of @(a,b)@ in the definition of @g@ is:
+@('Signal' Bool, 'Signal' Int)@. And the type of @(i1,b1)@ is of type
+@('Signal' Int, 'Signal' Bool)@.
 
-Syntactically, @Signal (Bool,Int)@ and @(Signal Bool, Signal Int)@ are /unequal/.
+Syntactically, @'Signal' (Bool,Int)@ and @('Signal' Bool, 'Signal' Int)@ are /unequal/.
 So we need to make a conversion between the two, that is what 'bundle' and
 'unbundle' are for. In the above case 'bundle' gets the type:
 
 @
-bundle :: (Signal Bool, Signal Int) -> Signal (Bool,Int)
+__bundle__ :: ('Signal' Bool, 'Signal' Int) -> 'Signal' (Bool,Int)
 @
 
 and 'unbundle':
 
 @
-unbundle :: Signal (Int,Bool) -> (Signal Int, Signal Bool)
+__unbundle__ :: 'Signal' (Int,Bool) -> ('Signal' Int, 'Signal' Bool)
 @
 
 The /true/ types of these two functions are, however:
 
 @
-bundle   :: Bundle a => Unbundled a -> Signal a
-unbundle :: Bundle a => Signal a -> Unbundled a
+__bundle__   :: 'Bundle' a => 'Unbundled' a -> 'Signal' a
+__unbundle__ :: 'Bundle' a => 'Signal' a -> 'Unbundled' a
 @
 
 'Unbundled' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
@@ -655,8 +656,8 @@ But they are defined as /identities/ for:
 That is:
 
 @
-instance Bundle (a,b) where
-  type Unbundled' clk (a,b) = (Signal' clk a, Signal' clk b)
+instance 'Bundle' (a,b) where
+  type 'Unbundled'' clk (a,b) = ('Signal'' clk a, 'Signal'' clk b)
   bundle'   _ (a,b) = (,) '<$>' a '<*>' b
   unbundle' _ tup   = (fst '<$>' tup, snd '<*>' tup)
 @
@@ -664,8 +665,8 @@ instance Bundle (a,b) where
 but,
 
 @
-instance Bundle Bool where
-  type Unbundled' clk Bool = Signal' clk Bool
+instance 'Bundle' Bool where
+  type 'Unbundled'' clk Bool = 'Signal'' clk Bool
   bundle' _ s = s
   unpack' _ s = s
 @
@@ -678,10 +679,10 @@ As a final note on this section we also want to mention the 'mealyB' function,
 which does the bundling and unbundling for us:
 
 @
-mealyB :: (Bundle i, Bundle o)
+mealyB :: ('Bundle' i, 'Bundle' o)
        => (s -> i -> (s,o))
        -> s
-       -> (Unbundled i -> Unbundled o)
+       -> ('Unbundled' i -> 'Unbundled' o)
 @
 
 Using 'mealyB' we can define @g@ as:
@@ -726,7 +727,7 @@ primitives, using 'Signed' multiplication ('*') as an example. The
 
 @
 {\-\# NOINLINE (*#) \#-\}
-(*#) :: KnownNat n => Signed n -> Signed n -> Signed n
+(*#) :: 'GHC.TypeLits.KnownNat' n => 'Signed' n -> 'Signed' n -> 'Signed' n
 (S a) *# (S b) = fromInteger_INLINE (a * b)
 @
 
@@ -773,7 +774,7 @@ We will use 'cblockRam' as an example, for which the Haskell/CλaSH code is:
 -- * \_\_NB\_\_: Read value is delayed by 1 cycle
 -- * \_\_NB\_\_: Initial output value is \'undefined\'
 --
--- @
+-- \@
 -- type ClkA = Clk \\\"A\\\" 100
 --
 -- clkA100 :: SClock ClkA
@@ -782,28 +783,28 @@ We will use 'cblockRam' as an example, for which the Haskell/CλaSH code is:
 -- bram40 :: Signal' ClkA (Unsigned 6) -> Signal' ClkA (Unsigned 6)
 --        -> Signal' ClkA Bool -> Signal' ClkA Bit -> Signal' ClkA Bit
 -- bram40 = \'blockRam'' clkA100 (\'CLaSH.Sized.Vector.replicate\' d40 1)
--- @
-blockRam' :: (KnownNat n, KnownNat m)
-          => SClock clk               -- ^ \'Clock\' to synchronize to
-          -> Vec n a                  -- ^ Initial content of the BRAM, also
+-- \@
+blockRam' :: ('GHC.TypeLits.KnownNat' n, 'GHC.TypeLits.KnownNat' m)
+          => 'SClock' clk               -- ^ \'Clock\' to synchronize to
+          -> 'Vec' n a                  -- ^ Initial content of the BRAM, also
                                       -- determines the size, \@n\@, of the BRAM.
                                       --
                                       -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
-          -> Signal' clk (Unsigned m) -- ^ Write address \@w\@
-          -> Signal' clk (Unsigned m) -- ^ Read address \@r\@
-          -> Signal' clk Bool         -- ^ Write enable
-          -> Signal' clk a            -- ^ Value to write (at address \@w\@)
-          -> Signal' clk a
+          -> 'Signal'' clk ('Unsigned' m) -- ^ Write address \@w\@
+          -> 'Signal'' clk ('Unsigned' m) -- ^ Read address \@r\@
+          -> 'Signal'' clk Bool         -- ^ Write enable
+          -> 'Signal'' clk a            -- ^ Value to write (at address \@w\@)
+          -> 'Signal'' clk a
           -- ^ Value of the \@blockRAM\@ at address \@r\@ from the previous clock
           -- cycle
 blockRam' clk binit wr rd en din =
-    mealy clk bram' (binit,undefined) (bundle' clk (wr,rd,en,din))
+    'mealy'' clk bram' (binit,undefined) ('bundle'' clk (wr,rd,en,din))
   where
     bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
       where
-        ram' | e         = replace ram w d
+        ram' | e         = 'replace' ram w d
              | otherwise = ram
-        o'               = ram !! r
+        o'               = ram '!!' r
 @
 
 And for which the /definition/ primitive is:
@@ -933,8 +934,8 @@ capabilities of CλaSH in the process.
 {- $errorsandsolutions
 A list of often encountered errors and their solutions:
 
-* __Type error: Couldn't match expected type ‘Signal (a,b)’ with actual type__
-  __‘(Signal a, Signal b)’__:
+* __Type error: Couldn't match expected type @'Signal' (a,b)@ with actual type__
+  __@('Signal' a, 'Signal' b)@__:
 
     Signals of product types and product types (to which tuples belong) of
     signals are __isomorphic__ due to synchronisity principle, but are not
@@ -958,8 +959,8 @@ A list of often encountered errors and their solutions:
 
     NB: Use 'bundle'' when you are using explicitly clocked 'CLaSH.Signal.Explicit.Signal''s
 
-* __Type error: Couldn't match expected type ‘(Signal a, Signal b)’ with__
-  __ actual type ‘Signal (a,b)’__:
+* __Type error: Couldn't match expected type @('Signal' a, 'Signal' b)@ with__
+  __ actual type @'Signal' (a,b)@__:
 
     Product types (to which tuples belong) of signals and signals of product
     types are __isomorphic__ due to synchronicity principle, but are not
@@ -1017,7 +1018,7 @@ A list of often encountered errors and their solutions:
     annotation makes the error go away:
 
     @
-    topEntity :: Signal (Signed 8) -> Signal (Signed 8) -> Signal (Signed 8)
+    topEntity :: 'Signal' ('Signed' 8) -> 'Signal' ('Signed' 8) -> 'Signal' ('Signed' 8)
     topEntity x y = acc
       where
         acc = 'register' 3 (acc + x * y)
@@ -1028,7 +1029,7 @@ A list of often encountered errors and their solutions:
     @
     topEntity x y = acc
       where
-        acc = 'register' (3 :: Signed 8) (acc + x * y)
+        acc = 'register' (3 :: 'Signed' 8) (acc + x * y)
     @
 
 * __CLaSH.Normalize.Transformations(155): InlineNonRep: \<FUNCTION\> already__
@@ -1054,11 +1055,11 @@ A list of often encountered errors and their solutions:
 
     @
     -- Bubble sort for 1 iteration
-    sortV xs = map fst sorted <: (snd (last sorted))
+    sortV xs = 'map' fst sorted '<:' (snd ('last' sorted))
      where
-       lefts  = head xs :> map snd (init sorted)
-       rights = tail xs
-       sorted = zipWith compareSwapL lefts rights
+       lefts  = 'head' xs :> 'map' snd ('init' sorted)
+       rights = 'tail' xs
+       sorted = 'zipWith' compareSwapL lefts rights
 
     -- Compare and swap
     compareSwapL a b = if a < b then (a,b)
@@ -1073,11 +1074,11 @@ A list of often encountered errors and their solutions:
     In this case, adding 'lazyV' on 'zipWith's second argument:
 
     @
-    sortVL xs = map fst sorted <: (snd (last sorted))
+    sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
      where
-       lefts  = head xs :> map snd (init sorted)
-       rights = tail xs
-       sorted = zipWith compareSwapL ('lazyV' lefts) rights
+       lefts  = 'head' xs :> map snd ('init' sorted)
+       rights = 'tail' xs
+       sorted = 'zipWith' compareSwapL ('lazyV' lefts) rights
     @
 
     Results in a successful computation:
@@ -1088,7 +1089,7 @@ A list of often encountered errors and their solutions:
 
 {- $unsupported #unsupported#
 Here is a list of Haskell features which the CλaSH compiler cannot synthesize
-to VHDL (for now):
+to VHDL/SystemVerilog (for now):
 
   [@Recursive functions@]
 
@@ -1105,11 +1106,11 @@ to VHDL (for now):
     is the following function that performs one iteration of bubble sort:
 
     @
-    sortV xs = map fst sorted <: (snd (last sorted))
+    sortV xs = 'map' fst sorted <: (snd ('last' sorted))
      where
-       lefts  = head xs :> map snd (init sorted)
-       rights = tail xs
-       sorted = zipWith compareSwapL lefts rights
+       lefts  = 'head' xs :> 'map' snd ('init' sorted)
+       rights = 'tail' xs
+       sorted = 'zipWith' compareSwapL lefts rights
     @
 
     Where we can clearly see that 'lefts' and 'sorted' are defined in terms of
@@ -1153,14 +1154,13 @@ to VHDL (for now):
     The translations of 'Int',
     @<http://hackage.haskell.org/package/ghc-prim/docs/GHC-Prim.html#t:Int-35- Int#>@,
     and 'Integer' are also incorrect: they are translated to the VHDL @integer@
-    type, which can only represent 32-bit integer values. Use these types with
-    due diligence.
+    type, or the SystemVerilog @signed logic [31:0]@ type, which can only
+    represent 32-bit integer values. Use these types with due diligence.
 
-  [@Side-effects: 'IO', <http://hackage.haskell.org/package/base/docs/Control-Monad-ST.html#t:ST ST>, etc.@]
+  [@Side-effects: 'IO', 'Control.Monad.ST.ST', etc.@]
 
     There is no support for side-effecting computations such as those in the
-    'IO' or @<http://hackage.haskell.org/package/base/docs/Control-Monad-ST.html#t:ST ST>@
-    monad. There is also no support for Haskell's
+    'IO' or 'Control.Monad.ST.ST' monad. There is also no support for Haskell's
     <http://www.haskell.org/haskellwiki/Foreign_Function_Interface FFI>.
 -}
 

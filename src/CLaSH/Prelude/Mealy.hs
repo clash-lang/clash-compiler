@@ -1,3 +1,8 @@
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 module CLaSH.Prelude.Mealy
   ( -- * Mealy machine synchronised to the system clock
     mealy
@@ -27,7 +32,7 @@ import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 --   where
 --     s' = x * y + s
 --
--- topEntity :: Signal (Int, Int) -> Signal Int
+-- topEntity :: 'Signal' (Int, Int) -> 'Signal' Int
 -- topEntity = 'mealy' mac 0
 -- @
 --
@@ -38,9 +43,9 @@ import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 -- combinational counterpart:
 --
 -- @
--- dualMac :: (Signal Int, Signal Int)
---         -> (Signal Int, Signal Int)
---         -> Signal Int
+-- dualMac :: ('Signal' Int, 'Signal' Int)
+--         -> ('Signal' Int, 'Signal' Int)
+--         -> 'Signal' Int
 -- dualMac (a,b) (x,y) = s1 + s2
 --   where
 --     s1 = 'mealy' mac 0 ('CLaSH.Signal.bundle' (a,x))
@@ -59,7 +64,9 @@ mealy = mealy' systemClock
 --
 -- Given a function @f@ of type:
 --
--- > f :: Int -> (Bool, Int) -> (Int, (Int, Bool))
+-- @
+-- __f__ :: Int -> (Bool, Int) -> (Int, (Int, Bool))
+-- @
 --
 -- When we want to make compositions of @f@ in @g@ using 'mealy', we have to
 -- write:
@@ -111,12 +118,12 @@ mealyB = mealyB' systemClock
 --   where
 --     s' = x * y + s
 --
--- type ClkA = Clk \"A\" 100
+-- type ClkA = 'CLaSH.Signal.Explicit.Clk' \"A\" 100
 --
--- clkA100 :: SClock ClkA
+-- clkA100 :: 'SClock' ClkA
 -- clkA100 = 'CLaSH.Signal.Explicit.sclock'
 --
--- topEntity :: Signal' ClkA (Int, Int) -> Signal' ClkA Int
+-- topEntity :: 'Signal'' ClkA (Int, Int) -> 'Signal'' ClkA Int
 -- topEntity = 'mealy'' clkA100 mac 0
 -- @
 --
@@ -127,9 +134,9 @@ mealyB = mealyB' systemClock
 -- combinational counterpart:
 --
 -- @
--- dualMac :: (Signal' clkA100 Int, Signal' clkA100 Int)
---         -> (Signal' clkA100 Int, Signal' clkA100 Int)
---         -> Signal' clkA100 Int
+-- dualMac :: ('Signal'' clkA100 Int, 'Signal'' clkA100 Int)
+--         -> ('Signal'' clkA100 Int, 'Signal'' clkA100 Int)
+--         -> 'Signal'' clkA100 Int
 -- dualMac (a,b) (x,y) = s1 + s2
 --   where
 --     s1 = 'mealy'' clkA100 mac 0 ('CLaSH.Signal.Explicit.bundle'' clkA100 (a,x))
@@ -151,7 +158,9 @@ mealy' clk f iS = \i -> let (s',o) = unbundle' clk $ f <$> s <*> i
 --
 -- Given a function @f@ of type:
 --
--- > f :: Int -> (Bool,Int) -> (Int,(Int,Bool))
+-- @
+-- __f__ :: Int -> (Bool,Int) -> (Int,(Int,Bool))
+-- @
 --
 -- When we want to make compositions of @f@ in @g@ using 'mealy'', we have to
 -- write:

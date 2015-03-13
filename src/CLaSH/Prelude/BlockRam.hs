@@ -20,8 +20,8 @@ import CLaSH.Sized.Vector     (Vec, (!!), replace)
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- bram40 :: Signal (Unsigned 6) -> Signal (Unsigned 6) -> Signal Bool
---        -> Signal Bit -> Signal Bit
+-- bram40 :: 'Signal' ('Unsigned' 6) -> Signal ('Unsigned' 6) -> 'Signal' Bool
+--        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> Signal 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
 blockRam :: (KnownNat n, KnownNat m)
@@ -45,8 +45,8 @@ blockRam = blockRam' systemClock
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- bram32 :: Signal (Unsigned 5) -> Signal (Unsigned 5) -> Signal Bool
---        -> Signal Bit -> Signal Bit
+-- bram32 :: 'Signal' ('Unsigned' 5) -> Signal ('Unsigned' 5) -> 'Signal' Bool
+--        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2' ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
 blockRamPow2 :: (KnownNat (2^n), KnownNat n)
@@ -75,8 +75,8 @@ blockRamPow2 = blockRam
 -- clkA100 :: SClock ClkA
 -- clkA100 = 'CLaSH.Signal.Explicit.sclock'
 --
--- bram40 :: Signal' ClkA (Unsigned 6) -> Signal' ClkA (Unsigned 6)
---        -> Signal' ClkA Bool -> Signal' ClkA Bit -> ClkA Signal' Bit
+-- bram40 :: 'Signal'' ClkA ('Unsigned' 6) -> 'Signal'' ClkA ('Unsigned' 6)
+--        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> ClkA 'Signal'' 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam'' clkA100 ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
 blockRam' :: (KnownNat n, KnownNat m)
@@ -113,8 +113,8 @@ blockRam' clk binit wr rd en din =
 -- clkA100 :: SClock ClkA
 -- clkA100 = 'CLaSH.Signal.Explicit.sclock'
 --
--- bram32 :: Signal' ClkA (Unsigned 5) -> Signal' ClkA (Unsigned 5)
---        -> Signal' ClkA Bool -> Signal' ClkA Bit -> Signal' ClkA Bit
+-- bram32 :: 'Signal'' ClkA ('Unsigned' 5) -> Signal' ClkA ('Unsigned' 5)
+--        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> Signal' ClkA 'CLaSH.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2'' clkA100 ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
 blockRamPow2' :: (KnownNat n, KnownNat (2^n))
