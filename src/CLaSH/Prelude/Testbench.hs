@@ -1,12 +1,18 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
+{-|
+Copyright  :  (C) 2013-2015, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
 module CLaSH.Prelude.Testbench
   ( -- * Testbench functions for circuits synchronised to the system slock
     assert
   , stimuliGenerator
   , outputVerifier
     -- * Testbench functions for circuits synchronised to arbitrary clocks
-  , assert'
   , stimuliGenerator'
   , outputVerifier'
   )
@@ -22,20 +28,6 @@ import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle   (unbundle')
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
-
-{-# INLINE assert #-}
--- | Compares the first two arguments for equality and logs a warning when they
--- are not equal. The second argument is considered the expected value. This
--- function simply returns the third argument unaltered as its result. This
--- function is used by 'outputVerifier'.
---
--- __NB__: This function is /can/ be used in synthesizable designs.
-assert :: (Eq a, Show a)
-       => Signal a -- ^ Checked value
-       -> Signal a -- ^ Expected value
-       -> Signal b -- ^ Returned value
-       -> Signal b
-assert = assert'
 
 {-# INLINE stimuliGenerator #-}
 -- | To be used as a one of the functions to create the \"magical\" 'testInput'
@@ -88,7 +80,7 @@ outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
                -> Signal Bool -- ^ Indicator that all samples are verified
 outputVerifier = outputVerifier' systemClock
 
-{-# NOINLINE assert' #-}
+{-# NOINLINE assert #-}
 -- | Compares the first two arguments for equality and logs a warning when they
 -- are not equal. The second argument is considered the expected value. This
 -- function simply returns the third argument unaltered as its result. This
@@ -96,12 +88,12 @@ outputVerifier = outputVerifier' systemClock
 --
 --
 -- __NB__: This function is /can/ be used in synthesizable designs.
-assert' :: (Eq a,Show a)
-        => Signal' t a -- ^ Checked value
-        -> Signal' t a -- ^ Expected value
-        -> Signal' t b -- ^ Return valued
-        -> Signal' t b
-assert' = liftA3
+assert :: (Eq a,Show a)
+       => Signal' t a -- ^ Checked value
+       -> Signal' t a -- ^ Expected value
+       -> Signal' t b -- ^ Return valued
+       -> Signal' t b
+assert = liftA3
   (\a' b' c' -> if a' == b' then c'
                             else trace (concat [ "\nexpected value: "
                                                , show b'
@@ -186,7 +178,7 @@ outputVerifier' :: forall l clk a . (KnownNat l, Eq a, Show a)
 outputVerifier' clk samples i =
     let (s,o) = unbundle' clk (genT <$> register' clk 0 s)
         (e,f) = unbundle' clk o
-    in  assert' i e (register' clk False f)
+    in  assert i e (register' clk False f)
   where
     genT :: Index l -> (Index l,(a,Bool))
     genT s = (s',(samples !! s,finished))

@@ -31,7 +31,6 @@ module CLaSH.Prelude.Explicit
   , isRising'
   , isFalling'
     -- * Testbench functions
-  , assert'
   , stimuliGenerator'
   , outputVerifier'
     -- * Exported modules
