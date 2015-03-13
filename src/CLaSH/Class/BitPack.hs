@@ -18,13 +18,11 @@ module CLaSH.Class.BitPack
   )
 where
 
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (*))
+import GHC.TypeLits                   (KnownNat, Nat, type (+))
 import Prelude                        hiding (map)
 
 import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
 import CLaSH.Sized.Internal.BitVector (split#)
-import CLaSH.Sized.Vector             (Vec, concatBitVector#, map,
-                                       unconcatBitVector#)
 
 -- | Convert to and from a 'BitVector'
 class BitPack a where
@@ -78,8 +76,3 @@ instance (KnownNat (BitSize a), KnownNat (BitSize b), BitPack a, BitPack b) =>
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
-
-instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
-  type BitSize (Vec n a) = n * (BitSize a)
-  pack   = concatBitVector# . map pack
-  unpack = map unpack . unconcatBitVector#

@@ -1,14 +1,15 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE KindSignatures       #-}
+{-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE Rank2Types           #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -43,7 +44,7 @@ module CLaSH.Sized.Vector
   , replicate, repeat, iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
-    -- ** Functions for the 'CLaSH.Class.BitPack.BitPack' instance
+    -- ** Functions for the 'BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
   )
@@ -72,6 +73,8 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat         (SNat (..), UNat (..), withSNat, toUNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
+
+import CLaSH.Class.BitPack (BitPack (..))
 
 -- | Fixed size vectors
 --
@@ -1063,6 +1066,12 @@ vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
 vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
+
+
+instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
+  type BitSize (Vec n a) = n * (BitSize a)
+  pack   = concatBitVector# . map pack
+  unpack = map unpack . unconcatBitVector#
 
 {-# NOINLINE concatBitVector# #-}
 concatBitVector# :: KnownNat m
