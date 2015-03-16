@@ -426,7 +426,7 @@ zipWith _ Nil       _  = Nil
 zipWith f (x :> xs) ys = f x (head ys) :> zipWith f xs (tail ys)
 
 {-# INLINABLE foldr #-}
--- | 'vfoldr', applied to a binary operator, a starting value (typically
+-- | 'foldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from right to left:
 --
