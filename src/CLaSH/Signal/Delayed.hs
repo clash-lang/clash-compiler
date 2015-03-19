@@ -21,7 +21,7 @@ module CLaSH.Signal.Delayed
     DSignal
   , delay
   , delayI
-  , feedback
+  -- , feedback
     -- * Signal \<-\> DSignal conversion
   , fromSignal
   , toSignal
