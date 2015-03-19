@@ -68,11 +68,9 @@ module CLaSH.Signal.Internal
   )
 where
 
-import Control.Applicative        (Applicative (..), (<$>), liftA2, liftA3)
+import Control.Applicative        (liftA2, liftA3)
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Default               (Default (..))
-import Data.Foldable              as F (Foldable (..))
-import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 
@@ -95,7 +93,7 @@ data Clock = Clk Symbol Nat
 -- | Singleton value for a type-level 'Clock' with the given @name@ and @period@
 data SClock (clk :: Clock)
   where
-    SClock :: SSymbol name -> SNat period -> SClock (Clk name period)
+    SClock :: SSymbol name -> SNat period -> SClock ('Clk name period)
 
 infixr 5 :-
 -- | A synchronized signal with samples of type @a@, explicitly synchronized to
@@ -566,7 +564,7 @@ instance Fractional a => Fractional (Signal' clk a) where
 --
 -- __NB__: This function is not synthesisable
 sample :: Foldable f => f a -> [a]
-sample = F.foldr (:) []
+sample = foldr (:) []
 
 -- | The above type is a generalisation for:
 --

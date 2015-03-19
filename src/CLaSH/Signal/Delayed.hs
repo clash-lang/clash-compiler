@@ -36,9 +36,7 @@ where
 import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
-import Data.Foldable              (Foldable)
-import Data.Traversable           (Traversable)
-import Control.Applicative        (Applicative (..), liftA2)
+import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
@@ -145,9 +143,9 @@ delayI = delay (repeat def)
 --
 -- >>> sampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
-feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
-         -> DSignal (n - m - 1) a
-feedback f = let (o,r) = f (coerce r) in o
+-- feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
+--          -> DSignal (n - m - 1) a
+-- feedback f = let (o,r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
 --

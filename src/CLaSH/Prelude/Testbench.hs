@@ -18,7 +18,7 @@ module CLaSH.Prelude.Testbench
   )
 where
 
-import Control.Applicative   ((<$>), liftA3)
+import Control.Applicative   (liftA3)
 import Debug.Trace           (trace)
 import GHC.TypeLits          (KnownNat)
 import Prelude               hiding ((!!))

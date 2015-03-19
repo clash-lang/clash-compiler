@@ -52,12 +52,10 @@ module CLaSH.Sized.Vector
   )
 where
 
-import Control.Applicative        (Applicative (..), (<$>))
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type ($))
-import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
                                    natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
@@ -823,7 +821,7 @@ at n xs = head $ snd $ splitAt n xs
 -- <2,4,6>
 -- >>> select d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
 -- <2,4,6>
-select :: (CmpNat (i + s) (s * n) ~ GT)
+select :: (CmpNat (i + s) (s * n) ~ 'GT)
        => SNat f
        -> SNat s
        -> SNat n
@@ -841,7 +839,7 @@ select f s n xs = select' (toUNat n) $ drop f xs
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
 -- <2,4>
-selectI :: (CmpNat (i + s) (s * n) ~ GT, KnownNat n)
+selectI :: (CmpNat (i + s) (s * n) ~ 'GT, KnownNat n)
         => SNat f
         -> SNat s
         -> Vec (f + i) a

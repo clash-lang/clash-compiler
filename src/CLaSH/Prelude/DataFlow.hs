@@ -34,8 +34,6 @@ module CLaSH.Prelude.DataFlow
   )
 where
 
-import Data.Functor          ((<$>))
-import Control.Applicative   (Applicative (..))
 import GHC.TypeLits          (KnownNat, KnownSymbol)
 
 import CLaSH.Signal          ((.&&.), regEn, unbundle)
@@ -152,8 +150,8 @@ seqDF :: DataFlow' clk aEn bEn a b
 --
 -- <<doc/firstDF.svg>>
 firstDF :: (KnownSymbol nm, KnownNat rate)
-        => DataFlow' (Clk nm rate) aEn bEn a b
-        -> DataFlow' (Clk nm rate) (aEn,cEn) (bEn,cEn) (a,c) (b,c)
+        => DataFlow' ('Clk nm rate) aEn bEn a b
+        -> DataFlow' ('Clk nm rate) (aEn,cEn) (bEn,cEn) (a,c) (b,c)
 firstDF (DF f) = DF (\ac acV bcR -> let clk       = sclock
                                         (a,c)     = unbundle' clk ac
                                         (aV,cV)   = unbundle' clk acV
@@ -169,7 +167,7 @@ firstDF (DF f) = DF (\ac acV bcR -> let clk       = sclock
 --
 -- <<doc/swapDF.svg>>
 swapDF :: (KnownSymbol nm, KnownNat rate)
-       => DataFlow' (Clk nm rate) (aEn,bEn) (bEn,aEn) (a,b) (b,a)
+       => DataFlow' ('Clk nm rate) (aEn,bEn) (bEn,aEn) (a,b) (b,a)
 swapDF = DF (\ab abV baR -> (swap <$> ab, swap <$> abV, swap <$> baR))
   where
     swap ~(a,b) = (b,a)
@@ -179,17 +177,17 @@ swapDF = DF (\ab abV baR -> (swap <$> ab, swap <$> abV, swap <$> baR))
 --
 -- <<doc/secondDF.svg>>
 secondDF :: (KnownSymbol nm, KnownNat rate)
-         => DataFlow' (Clk nm rate) aEn bEn a b
-         -> DataFlow' (Clk nm rate) (cEn,aEn) (cEn,bEn) (c,a) (c,b)
+         => DataFlow' ('Clk nm rate) aEn bEn a b
+         -> DataFlow' ('Clk nm rate) (cEn,aEn) (cEn,bEn) (c,a) (c,b)
 secondDF f = swapDF `seqDF` firstDF f `seqDF` swapDF
 
 -- | Compose two 'DataFlow' circuits in parallel.
 --
 -- <<doc/parDF.svg>>
 parDF :: (KnownSymbol nm, KnownNat rate)
-      => DataFlow' (Clk nm rate) aEn bEn a b
-      -> DataFlow' (Clk nm rate) cEn dEn c d
-      -> DataFlow' (Clk nm rate) (aEn,cEn) (bEn,dEn) (a,c) (b,d)
+      => DataFlow' ('Clk nm rate) aEn bEn a b
+      -> DataFlow' ('Clk nm rate) cEn dEn c d
+      -> DataFlow' ('Clk nm rate) (aEn,cEn) (bEn,dEn) (a,c) (b,d)
 f `parDF` g = firstDF f `seqDF` secondDF g
 
 -- | Feed back the second halve of the communication channel.
@@ -208,15 +206,15 @@ f `parDF` g = firstDF f `seqDF` secondDF g
 --
 -- <<doc/loopDF.svg>>
 loopDF :: forall nm rate a b d . (KnownSymbol nm, KnownNat rate)
-       => DataFlow' (Clk nm rate) Bool Bool (a,d) (b,d)
-       -> DataFlow' (Clk nm rate) Bool Bool a     b
+       => DataFlow' ('Clk nm rate) Bool Bool (a,d) (b,d)
+       -> DataFlow' ('Clk nm rate) Bool Bool a     b
 loopDF f = loopDF' h
   where
-    h :: DataFlow' (Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
+    h :: DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
     h = lockStep `seqDF` f `seqDF` stepLock
 
-    loopDF' :: DataFlow' (Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
-            -> DataFlow' (Clk nm rate) Bool Bool   a           b
+    loopDF' :: DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
+            -> DataFlow' ('Clk nm rate) Bool Bool   a           b
     loopDF' (DF f') = DF (\a aV bR -> let clk          = sclock
                                           (bd,bdV,adR) = f' ad adV bdR
                                           (b,d)        = unbundle' clk bd
@@ -285,7 +283,7 @@ class LockStep a b where
   --
   -- Does the right thing.
   lockStep :: (KnownNat rate,KnownSymbol nm)
-           => DataFlow' (Clk nm rate) a Bool b b
+           => DataFlow' ('Clk nm rate) a Bool b b
 
   -- | Extend the synchronisation granularity from a single 'Bool'ean value.
   --
@@ -342,7 +340,7 @@ class LockStep a b where
   --
   -- Does the right thing.
   stepLock :: (KnownNat rate,KnownSymbol nm)
-           => DataFlow' (Clk nm rate) Bool a b b
+           => DataFlow' ('Clk nm rate) Bool a b b
 
 instance LockStep Bool c where
   lockStep = idDF
