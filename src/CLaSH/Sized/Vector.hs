@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -213,7 +214,7 @@ head (x :> _) = x
 --     In the first argument of ‘tail’, namely ‘Nil’
 --     In the expression: tail Nil
 tail :: Vec (n + 1) a -> Vec n a
-tail (_ :> xs) = unsafeCoerce xs
+tail (_ :> xs) = xs
 
 {-# NOINLINE last #-}
 -- | Extract the last element of a vector
@@ -246,8 +247,8 @@ last (_ :> y :> ys) = last (y :> ys)
 --     In the first argument of ‘init’, namely ‘Nil’
 --     In the expression: init Nil
 init :: Vec (n + 1) a -> Vec n a
-init (_ :> Nil)     = unsafeCoerce Nil
-init (x :> y :> ys) = unsafeCoerce (x :> init (y :> ys))
+init (_ :> Nil)     = Nil
+init (x :> y :> ys) = x :> init (y :> ys)
 
 {-# INLINE shiftInAt0 #-}
 -- | Shift in elements to the head of a vector, bumping out elements at the
@@ -264,7 +265,7 @@ shiftInAt0 :: KnownNat n
            => Vec n a -- ^ The old vector
            -> Vec m a -- ^ The elements to shift in at the head
            -> (Vec n a, Vec m a) -- ^ (The new vector, shifted out elements)
-shiftInAt0 xs ys = splitAtI (unsafeCoerce zs)
+shiftInAt0 xs ys = splitAtI zs
   where
     zs = ys ++ xs
 
@@ -286,7 +287,7 @@ shiftInAtN :: KnownNat m
 shiftInAtN xs ys = (zsR, zsL)
   where
     zs        = xs ++ ys
-    (zsL,zsR) = splitAtI (unsafeCoerce zs)
+    (zsL,zsR) = splitAtI zs
 
 infixl 5 <:
 {-# INLINE (<:) #-}
@@ -363,7 +364,7 @@ infixr 5 ++
 -- <1,2,3,7,8>
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
 Nil       ++ ys = ys
-(x :> xs) ++ ys = unsafeCoerce (x :> (xs ++ ys))
+(x :> xs) ++ ys = x :> xs ++ ys
 
 {-# NOINLINE splitAt #-}
 -- | Split a vector into two vectors at the given point
@@ -377,7 +378,7 @@ splitAt n xs = splitAtU (toUNat n) xs
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtU UZero     ys        = (Nil,ys)
-splitAtU (USucc s) (y :> ys) = let (as,bs) = splitAtU s (unsafeCoerce ys)
+splitAtU (USucc s) (y :> ys) = let (as,bs) = splitAtU s ys
                                in  (y :> as, bs)
 
 {-# INLINE splitAtI #-}
@@ -396,7 +397,7 @@ splitAtI = withSNat splitAt
 -- <1,2,3,4,5,6,7,8,9,10,11,12>
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil       = Nil
-concat (x :> xs) = unsafeCoerce (x ++ (concat xs))
+concat (x :> xs) = x ++ concat xs
 
 {-# NOINLINE unconcat #-}
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
@@ -409,7 +410,7 @@ unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcatU UZero      _ _  = Nil
-unconcatU (USucc n') m ys = let (as,bs) = splitAtU m (unsafeCoerce ys)
+unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
                             in  as :> unconcatU n' m bs
 
 {-# INLINE unconcatI #-}
@@ -428,8 +429,7 @@ unconcatI = withSNat unconcat
 -- <1,5,2,6,3,7,4,8>
 merge :: Vec n a -> Vec n a -> Vec (n + n) a
 merge Nil       Nil       = Nil
-merge (x :> xs) (y :> ys) = unsafeCoerce
-                              (x :> y :> (merge xs (unsafeCoerce ys)))
+merge (x :> xs) (y :> ys) = x :> y :> merge xs ys
 
 {-# NOINLINE reverse #-}
 -- | Returns the elements in a vector in reverse order
@@ -1131,7 +1131,7 @@ concatBitVector# :: KnownNat m
                  => Vec n (BitVector m)
                  -> BitVector (n * m)
 concatBitVector# Nil       = 0
-concatBitVector# (x :> xs) = unsafeCoerce (concatBitVector# xs ++# x)
+concatBitVector# (x :> xs) = concatBitVector# xs ++# x
 
 {-# NOINLINE unconcatBitVector# #-}
 unconcatBitVector# :: (KnownNat n, KnownNat m)
@@ -1143,7 +1143,7 @@ unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
 ucBV :: forall n m . KnownNat m
      => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
 ucBV UZero     _  = Nil
-ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# (unsafeCoerce bv)
+ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
                     in  x :> ucBV n bv'
 
 instance Lift a => Lift (Vec n a) where

@@ -111,13 +111,14 @@ Library
                       TypeOperators
                       UndecidableInstances
 
-  Build-depends:      base                 >= 4.7.0.0 && < 5,
-                      data-default         >= 0.5.3,
-                      integer-gmp          >= 0.5.1.0,
-                      ghc-prim             >= 0.3.1.0,
-                      singletons           >= 1.0,
-                      template-haskell     >= 2.9.0.0,
-                      th-lift              >= 0.5.6
+  Build-depends:      base                      >= 4.7.0.0 && < 5,
+                      data-default              >= 0.5.3,
+                      integer-gmp               >= 0.5.1.0,
+                      ghc-prim                  >= 0.3.1.0,
+                      ghc-typelits-natnormalise >= 0.1,
+                      singletons                >= 1.0,
+                      template-haskell          >= 2.9.0.0,
+                      th-lift                   >= 0.5.6
 
 test-suite doctests
   type:             exitcode-stdio-1.0
