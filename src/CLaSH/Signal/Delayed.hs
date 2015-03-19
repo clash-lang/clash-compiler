@@ -22,7 +22,7 @@ module CLaSH.Signal.Delayed
     DSignal
   , delay
   , delayI
-  -- , feedback
+  , feedback
     -- * Signal \<-\> DSignal conversion
   , fromSignal
   , toSignal
@@ -144,9 +144,9 @@ delayI = delay (repeat def)
 --
 -- >>> sampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
--- feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
---          -> DSignal (n - m - 1) a
--- feedback f = let (o,r) = f (coerce r) in o
+feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
+         -> DSignal (n - m - 1) a
+feedback f = let (o,r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
 --
