@@ -5,9 +5,9 @@
 
 module CLaSH.Core.Type where
 
-import Control.DeepSeq
-import GHC.Generics
-import Unbound.Generics.LocallyNameless
+import Control.DeepSeq                  (NFData)
+import GHC.Generics                     (Generic)
+import Unbound.Generics.LocallyNameless (Alpha,Name,Subst)
 
 import {-# SOURCE #-} CLaSH.Core.Term
 import {-# SOURCE #-} CLaSH.Core.TyCon
