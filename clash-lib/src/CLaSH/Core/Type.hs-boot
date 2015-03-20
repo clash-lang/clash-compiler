@@ -6,7 +6,6 @@
 module CLaSH.Core.Type where
 
 import Control.DeepSeq
-import Data.Typeable
 import GHC.Generics
 import Unbound.Generics.LocallyNameless
 
@@ -26,6 +25,5 @@ instance Alpha    Type
 instance Subst    Type Type
 instance Subst    Term Type
 instance NFData   Type
-instance Typeable Type
 
 mkTyConTy :: TyConName -> Type
