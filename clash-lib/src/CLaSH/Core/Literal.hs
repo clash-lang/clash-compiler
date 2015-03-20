@@ -1,8 +1,7 @@
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Term Literal
 module CLaSH.Core.Literal
@@ -11,37 +10,27 @@ module CLaSH.Core.Literal
   )
 where
 
-import Control.DeepSeq                  (NFData (..))
-import GHC.Generics                     (Generic)
-import Unbound.Generics.LocallyNameless (Alpha (..), Subst (..))
+import Control.DeepSeq                        (NFData (..))
+import GHC.Generics                           (Generic)
+import Unbound.Generics.LocallyNameless.Extra ()
+import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 
-import {-# SOURCE #-} CLaSH.Core.Term   (Term)
-import {-# SOURCE #-} CLaSH.Core.Type   (Type)
-import CLaSH.Core.TysPrim               (intPrimTy, voidPrimTy)
-import CLaSH.Util
+import {-# SOURCE #-} CLaSH.Core.Term         (Term)
+import {-# SOURCE #-} CLaSH.Core.Type         (Type)
+import CLaSH.Core.TysPrim                     (intPrimTy, voidPrimTy)
 
 -- | Term Literal
 data Literal
   = IntegerLiteral  Integer
   | StringLiteral   String
   | RationalLiteral Rational
-  deriving (Eq,Ord,Show,Generic)
-
-instance Subst b Rational where
-  subst  _ _ = id
-  substs _   = id
+  deriving (Eq,Ord,Show,Generic,NFData)
 
 instance Alpha Literal where
   fvAny' _ _ l = pure l
 
 instance Subst Type Literal
 instance Subst Term Literal
-
-instance NFData Literal where
-  rnf l = case l of
-    IntegerLiteral i  -> rnf i
-    StringLiteral s   -> rnf s
-    RationalLiteral r -> rnf r
 
 -- | Determines the Type of a Literal
 literalType :: Literal

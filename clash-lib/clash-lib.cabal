@@ -55,7 +55,7 @@ Library
 
   Build-depends:      aeson                   >= 0.6.2.0,
                       attoparsec              >= 0.10.4.0,
-                      base                    >= 4.6.0.1 && < 5,
+                      base                    >= 4.8 && < 5,
                       bytestring              >= 0.10.0.2,
                       concurrent-supply       >= 0.1.7,
                       containers              >= 0.5.0.0,
@@ -121,3 +121,4 @@ Library
                       CLaSH.Util
 
   Other-Modules:      Paths_clash_lib
+                      Unbound.Generics.LocallyNameless.Extra

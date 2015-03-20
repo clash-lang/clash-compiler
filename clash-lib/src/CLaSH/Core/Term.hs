@@ -1,10 +1,8 @@
-{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
@@ -17,13 +15,11 @@ where
 
 -- External Modules
 import Control.DeepSeq
-import Data.Monoid                             (mempty)
 import Data.Text                               (Text)
 import Data.Typeable
 import GHC.Generics
 import Unbound.Generics.LocallyNameless
-import Unbound.Generics.LocallyNameless.Name   (Name(..))
-import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import Unbound.Generics.LocallyNameless.Extra  ()
 
 -- Internal Modules
 import CLaSH.Core.DataCon                      (DataCon)
@@ -45,7 +41,7 @@ data Term
   | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
   | Case    Term Type [Bind Pat Term]      -- ^ Case-expression: subject, type of
                                            -- alternatives, list of alternatives
-  deriving (Show,Typeable,Generic)
+  deriving (Show,Typeable,Generic,NFData)
 
 -- | Term reference
 type TmName     = Name Term
@@ -61,21 +57,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Show,Typeable,Generic)
-
-instance Alpha Text where
-  aeq' _ctx             = (==)
-  fvAny' _ctx _nfn i    = pure i
-  close _ctx _b         = id
-  open _ctx _b          = id
-  isPat _               = mempty
-  isTerm _              = True
-  nthPatFind _          = Left
-  namePatFind _ _       = Left 0
-  swaps' _ctx _p        = id
-  freshen' _ctx i       = return (i, mempty)
-  lfreshen' _ctx i cont = cont i mempty
-  acompare' _ctx        = compare
+  deriving (Show,Typeable,Generic,NFData)
 
 instance Eq Term where
   (==) = aeq
@@ -117,37 +99,3 @@ instance Subst Type Term where
     Prim nm ty       -> Prim   nm (subst tvN u ty)
     e                -> e
   subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
-
-instance Subst Term Text where
-  subst  _ _ = id
-  substs _   = id
-instance Subst Type Text where
-  subst  _ _ = id
-  substs _   = id
-
-instance NFData Term where
-  rnf tm = case tm of
-    Var     ty nm -> rnf ty `seq` rnf nm
-    Data    dc    -> rnf dc
-    Literal l     -> rnf l
-    Prim    nm ty -> rnf nm `seq` rnf ty
-    Lam     b     -> case unsafeUnbind b of
-                       (id_,tm') -> rnf id_ `seq` rnf tm'
-    TyLam   b       -> case unsafeUnbind b of
-                         (tv,tm') -> rnf tv `seq` rnf tm'
-    App     tmL tmR -> rnf tmL `seq` rnf tmR
-    TyApp   tm' ty  -> rnf tm' `seq` rnf ty
-    Letrec  b       -> case unsafeUnbind b of
-                        (bs,e) -> rnf (map (second unembed) (unrec bs)) `seq` rnf e
-    Case    sc ty alts -> rnf sc `seq` rnf ty `seq` rnf (map unsafeUnbind alts)
-
-instance NFData Pat where
-  rnf p = case p of
-    DataPat dcE xs -> rnf (unembed dcE) `seq` rnf (unrebind xs)
-    LitPat  lE     -> rnf (unembed lE)
-    DefaultPat     -> ()
-
-instance NFData (Name Term) where
-  rnf nm = case nm of
-    (Fn s i) -> rnf s `seq` rnf i
-    (Bn l r) -> rnf l `seq` rnf r

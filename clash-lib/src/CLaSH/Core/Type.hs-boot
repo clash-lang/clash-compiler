@@ -26,7 +26,6 @@ instance Alpha    Type
 instance Subst    Type Type
 instance Subst    Term Type
 instance NFData   Type
-instance NFData   (Name Type)
 instance Typeable Type
 
 mkTyConTy :: TyConName -> Type
