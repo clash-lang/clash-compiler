@@ -23,7 +23,7 @@ import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless.Name  (Name,name2String)
 
 -- Internal Imports
-import {-# SOURCE #-} CLaSH.Core.DataCon      (DataCon)
+import CLaSH.Core.DataCon                     (DataCon)
 import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import CLaSH.Util
