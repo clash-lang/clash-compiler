@@ -66,7 +66,7 @@ Executable clash
                       lens                 >= 4.0.5,
                       mtl                  >= 2.1.1,
                       text                 >= 0.11.3.1,
-                      transformers         >= 0.3,
+                      transformers         >= 0.4.2,
                       unbound-generics     >= 0.1,
                       unordered-containers >= 0.2.1.0,
 
@@ -86,12 +86,6 @@ Executable clash
                       GhciMonad
                       GhciTags
 
-                      CLaSH.GHC.Compat.DynFlags
-                      CLaSH.GHC.Compat.FastString
-                      CLaSH.GHC.Compat.GHC
-                      CLaSH.GHC.Compat.Outputable
-                      CLaSH.GHC.Compat.PrelNames
-                      CLaSH.GHC.Compat.TyCon
                       CLaSH.GHC.Evaluator
                       CLaSH.GHC.GenerateBindings
                       CLaSH.GHC.GHC2Core

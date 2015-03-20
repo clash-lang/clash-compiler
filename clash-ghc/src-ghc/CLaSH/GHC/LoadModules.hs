@@ -14,8 +14,6 @@ import           System.Process               (runInteractiveCommand,
                                                waitForProcess)
 
 -- GHC API
-import           CLaSH.GHC.Compat.DynFlags    (dopt_set, dopt_unset)
-import           CLaSH.GHC.Compat.GHC         (defaultErrorHandler)
 import qualified CoreSyn
 import           DynFlags                     (GeneralFlag (..))
 import qualified DynFlags
@@ -61,7 +59,8 @@ loadModules ::
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
         )
-loadModules modName dflagsM = defaultErrorHandler $ do
+loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessager
+                              DynFlags.defaultFlushOut $ do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -130,11 +129,11 @@ loadModules modName dflagsM = defaultErrorHandler $ do
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do
-  (GHC.ParsedModule pmModSum pmParsedSource extraSrc) <-
+  (GHC.ParsedModule pmModSum pmParsedSource extraSrc anns) <-
     GHC.parseModule modSum
   return (GHC.ParsedModule
             (disableOptimizationsFlags pmModSum)
-            pmParsedSource extraSrc)
+            pmParsedSource extraSrc anns)
 
 disableOptimizationsFlags :: GHC.ModSummary -> GHC.ModSummary
 disableOptimizationsFlags ms@(GHC.ModSummary {..})
@@ -144,7 +143,7 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
               {DynFlags.optLevel = 2, DynFlags.ctxtStkDepth = 1000})
 
 wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
-wantedOptimizationFlags df = foldl dopt_unset (foldl dopt_set df wanted) unwanted
+wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set df wanted) unwanted
   where
     wanted = [ Opt_CSE -- CSE
              , Opt_FullLaziness -- Floats let-bindings outside enclosing lambdas
