@@ -16,10 +16,9 @@ where
 import Data.Typeable                          (Typeable)
 import Control.DeepSeq                        (NFData(..))
 import GHC.Generics                           (Generic)
-import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst,substs)
+import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst(..))
 import Unbound.Generics.LocallyNameless.Extra ()
 
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
 import CLaSH.Util
 
@@ -72,8 +71,9 @@ instance Alpha DataCon where
 
   acompare' c dc1 dc2 = acompare' c (dcName dc1) (dcName dc2)
 
-instance Subst Type DataCon
-instance Subst Term DataCon
+instance Subst a DataCon where
+  subst _ _ dc = dc
+  substs _ dc  = dc
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.

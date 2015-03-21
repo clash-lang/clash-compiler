@@ -26,7 +26,6 @@ import CLaSH.Core.DataCon                      (DataCon)
 import CLaSH.Core.Literal                      (Literal)
 import {-# SOURCE #-} CLaSH.Core.Type          (Type)
 import CLaSH.Core.Var                          (Id, TyVar)
-import CLaSH.Util
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -79,23 +78,11 @@ instance Alpha Term where
 
 instance Alpha Pat
 
+instance Subst Type Pat
 instance Subst Term Pat
+
 instance Subst Term Term where
   isvar (Var _ x) = Just (SubstName x)
   isvar _         = Nothing
 
-instance Subst Type Pat
-instance Subst Type Term where
-  subst tvN u x | isFreeName tvN = case x of
-    Lam    b         -> Lam    (subst tvN u b  )
-    TyLam  b         -> TyLam  (subst tvN u b  )
-    App    fun arg   -> App    (subst tvN u fun) (subst tvN u arg)
-    TyApp  e   ty    -> TyApp  (subst tvN u e  ) (subst tvN u ty )
-    Letrec b         -> Letrec (subst tvN u b  )
-    Case   e ty alts -> Case   (subst tvN u e  )
-                               (subst tvN u ty )
-                               (subst tvN u alts )
-    Var ty nm        -> Var    (subst tvN u ty ) nm
-    Prim nm ty       -> Prim   nm (subst tvN u ty)
-    e                -> e
-  subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
+instance Subst Type Term

@@ -18,13 +18,13 @@ where
 import Control.DeepSeq
 import Data.Typeable                          hiding (TyCon,tyConName)
 import GHC.Generics
-import Unbound.Generics.LocallyNameless       (Alpha(..),Subst(..))
+import Unbound.Generics.LocallyNameless       (Alpha(..))
 import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless.Name  (Name,name2String)
 
 -- Internal Imports
 import CLaSH.Core.DataCon                     (DataCon)
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
+-- import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import CLaSH.Util
 
@@ -106,14 +106,7 @@ instance Alpha TyCon where
 
   acompare' c tc1 tc2 = acompare' c (tyConName tc1) (tyConName tc2)
 
-
 instance Alpha AlgTyConRhs
-
-instance Subst Type TyCon
-instance Subst Type AlgTyConRhs
-
-instance Subst Term TyCon
-instance Subst Term AlgTyConRhs
 
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName

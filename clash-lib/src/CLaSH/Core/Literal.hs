@@ -15,7 +15,6 @@ import GHC.Generics                           (Generic)
 import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 
-import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (Type)
 import CLaSH.Core.TysPrim                     (intPrimTy, voidPrimTy)
 
@@ -29,8 +28,9 @@ data Literal
 instance Alpha Literal where
   fvAny' _ _ l = pure l
 
-instance Subst Type Literal
-instance Subst Term Literal
+instance Subst a Literal where
+  subst _ _ l = l
+  substs _ l  = l
 
 -- | Determines the Type of a Literal
 literalType :: Literal

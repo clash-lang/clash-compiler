@@ -114,10 +114,14 @@ instance Alpha Type where
 instance Alpha ConstTy
 instance Alpha LitTy
 
-instance Subst Type LitTy
-instance Subst Term LitTy
-instance Subst Type ConstTy
-instance Subst Term ConstTy
+instance Subst a LitTy where
+  subst _ _ lt = lt
+  substs _ lt  = lt
+
+instance Subst a ConstTy where
+  subst _ _ ct = ct
+  substs _ ct  = ct
+
 instance Subst Term Type
 instance Subst Type Type where
   isvar (VarTy _ v) = Just (SubstName v)

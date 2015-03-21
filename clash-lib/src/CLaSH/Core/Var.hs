@@ -20,12 +20,11 @@ where
 import Control.DeepSeq                  (NFData (..))
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
-import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..),isFreeName)
+import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..))
 import Unbound.Generics.LocallyNameless.Extra ()
 
 import {-# SOURCE #-} CLaSH.Core.Term   (Term)
 import {-# SOURCE #-} CLaSH.Core.Type   (Kind, Type)
-import CLaSH.Util
 
 -- | Variables in CoreHW
 data Var a
@@ -47,14 +46,8 @@ type Id    = Var Term
 type TyVar = Var Type
 
 instance (Typeable a, Alpha a) => Alpha (Var a)
-
-instance Subst Term Id
-instance Subst Term TyVar
-
-instance Subst Type TyVar
-instance Subst Type Id where
-  subst tvN u (Id idN ty) | isFreeName tvN = Id idN (subst tvN u ty)
-  subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
+instance Generic b => Subst Term (Var b)
+instance Generic b => Subst Type (Var b)
 
 -- | Change the name of a variable
 modifyVarName ::
