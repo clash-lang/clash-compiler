@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE GADTs                #-}
@@ -638,9 +639,9 @@ index_int xs i@(I# n0)
                                     , " is larger than maximum index "
                                     , show (maxIndex xs)
                                     ])
-    sub (y:>ys) n = if isTrue# (n ==# 0#)
-                    then y
-                    else sub ys (n -# 1#)
+    sub (y:>(!ys)) n = if isTrue# (n ==# 0#)
+                       then y
+                       else sub ys (n -# 1#)
 
 {-# INLINE (!!) #-}
 -- | Vector index (subscript) operator.
@@ -687,9 +688,9 @@ replace_int xs i@(I# n0) a
                                       , " is larger than maximum index "
                                       , show (maxIndex xs)
                                       ])
-    sub (y:>ys) n b = if isTrue# (n ==# 0#)
-                      then b :> ys
-                      else y :> sub ys (n -# 1#) b
+    sub (y:>(!ys)) n b = if isTrue# (n ==# 0#)
+                         then b :> ys
+                         else y :> sub ys (n -# 1#) b
 
 {-# INLINE replace #-}
 -- | Replace an element of a vector at the given index (subscript).
