@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.7.1 *March 25th 2015*
+* Fixes bugs:
+  * Fix laziness bug in Vector.(!!) and Vector.replace
+
 ## 0.7 *March 13th 2015*
 * New features:
   * Switch types of 'bundle' and 'bundle'', and 'unbundle' and 'unbundle''.
