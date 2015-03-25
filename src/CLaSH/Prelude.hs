@@ -85,6 +85,7 @@ module CLaSH.Prelude
   , module Data.Bits
   , module Data.Default
     -- ** Haskell Prelude
+    -- $hiding
   , module Prelude
   )
 where
@@ -125,6 +126,16 @@ import CLaSH.Sized.Vector
 import CLaSH.Signal
 import CLaSH.Signal.Delayed
 import CLaSH.Signal.Explicit       (systemClock)
+
+{- $hiding
+"CLaSH.Prelude" re-exports most of the Haskell "Prelude" with the exception of
+the following: (++), (!!), concat, drop, foldl, foldl1, foldr, foldr1, head,
+init, iterate, last, length, map, repeat, replicate, reverse, scanl, scanr,
+splitAt, tail, take, unzip, zip, zipWith.
+
+It instead exports the identically named functions defined in terms of
+'CLaSH.Sized.Vector.Vec' at "CLaSH.Sized.Vector".
+-}
 
 {-# INLINE window #-}
 -- | Give a window over a 'Signal'
