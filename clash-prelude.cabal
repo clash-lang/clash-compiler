@@ -94,7 +94,9 @@ Library
 
                       CLaSH.Tutorial
 
-  other-extensions:   DataKinds
+  other-extensions:   BangPatterns
+                      DataKinds
+                      ConstraintKinds
                       DefaultSignatures
                       DeriveDataTypeable
                       FlexibleContexts
@@ -103,6 +105,7 @@ Library
                       KindSignatures
                       MagicHash
                       MultiParamTypeClasses
+                      Rank2Types
                       ScopedTypeVariables
                       StandaloneDeriving
                       TemplateHaskell
