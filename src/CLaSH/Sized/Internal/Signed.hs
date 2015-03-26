@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -79,7 +78,6 @@ where
 
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
-import Data.Typeable                  (Typeable)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
@@ -106,7 +104,6 @@ newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     S { unsafeToInteger :: Integer}
-  deriving Typeable
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Signed n -> Int

@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -94,7 +93,6 @@ import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Char                  (digitToInt)
 import Data.Default               (Default (..))
 import Data.Maybe                 (listToMaybe)
-import Data.Typeable              (Typeable)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
@@ -121,7 +119,6 @@ newtype BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.
     BV { unsafeToInteger :: Integer}
-  deriving Typeable
 
 type Bit = BitVector 1
 

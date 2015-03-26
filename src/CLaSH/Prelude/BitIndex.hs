@@ -1,8 +1,8 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
