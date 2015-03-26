@@ -51,7 +51,6 @@ import Outputable hiding ( printForUser, printForUserPartWay, bold )
 
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )
-import Config
 import Digraph
 import Encoding
 import FastString
