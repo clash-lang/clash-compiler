@@ -23,7 +23,6 @@ import Unbound.Generics.LocallyNameless.Name  (Name,name2String)
 
 -- Internal Imports
 import CLaSH.Core.DataCon                     (DataCon)
--- import {-# SOURCE #-} CLaSH.Core.Term         (Term)
 import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import CLaSH.Util
 
@@ -83,7 +82,7 @@ data AlgTyConRhs
                                  -- The TyName's are the type-variables from
                                  -- the corresponding TyCon.
   }
-  deriving (Show,Generic,NFData)
+  deriving (Show,Generic,NFData,Alpha)
 
 instance Alpha TyCon where
   aeq' c tc1 tc2      = aeq' c (tyConName tc1) (tyConName tc2)
@@ -104,8 +103,6 @@ instance Alpha TyCon where
   freshen' _ tc       = return (tc,mempty)
 
   acompare' c tc1 tc2 = acompare' c (tyConName tc1) (tyConName tc2)
-
-instance Alpha AlgTyConRhs
 
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName

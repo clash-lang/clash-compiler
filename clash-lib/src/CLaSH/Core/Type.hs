@@ -83,13 +83,13 @@ data TypeView
 data ConstTy
   = TyCon TyConName -- ^ TyCon type
   | Arrow           -- ^ Function type
-  deriving (Show,Generic,NFData)
+  deriving (Show,Generic,NFData,Alpha)
 
 -- | Literal Types
 data LitTy
   = NumTy Int
   | SymTy String
-  deriving (Show,Generic,NFData)
+  deriving (Show,Generic,NFData,Alpha)
 
 -- | The level above types
 type Kind       = Type
@@ -110,9 +110,6 @@ instance Alpha Type where
 
   acompare' c (VarTy _ n) (VarTy _ m) = acompare' c n m
   acompare' c t1          t2          = gacompare c (from t1) (from t2)
-
-instance Alpha ConstTy
-instance Alpha LitTy
 
 instance Subst a LitTy where
   subst _ _ lt = lt

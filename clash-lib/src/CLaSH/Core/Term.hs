@@ -55,7 +55,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Show,Generic,NFData)
+  deriving (Show,Generic,NFData,Alpha)
 
 instance Eq Term where
   (==) = aeq
@@ -74,8 +74,6 @@ instance Alpha Term where
   acompare' c (Var _ n)   (Var _ m)   = acompare' c n m
   acompare' _ (Prim t1 _) (Prim t2 _) = compare t1 t2
   acompare' c t1          t2          = gacompare c (from t1) (from t2)
-
-instance Alpha Pat
 
 instance Subst Type Pat
 instance Subst Term Pat
