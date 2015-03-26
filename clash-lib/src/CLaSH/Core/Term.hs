@@ -16,7 +16,6 @@ where
 -- External Modules
 import Control.DeepSeq
 import Data.Text                               (Text)
-import Data.Typeable
 import GHC.Generics
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Extra  ()
@@ -40,7 +39,7 @@ data Term
   | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
   | Case    Term Type [Bind Pat Term]      -- ^ Case-expression: subject, type of
                                            -- alternatives, list of alternatives
-  deriving (Show,Typeable,Generic,NFData)
+  deriving (Show,Generic,NFData)
 
 -- | Term reference
 type TmName     = Name Term
@@ -56,7 +55,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Show,Typeable,Generic,NFData)
+  deriving (Show,Generic,NFData)
 
 instance Eq Term where
   (==) = aeq

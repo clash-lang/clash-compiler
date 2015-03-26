@@ -16,7 +16,6 @@ where
 
 -- External Import
 import Control.DeepSeq
-import Data.Typeable                          hiding (TyCon,tyConName)
 import GHC.Generics
 import Unbound.Generics.LocallyNameless       (Alpha(..))
 import Unbound.Generics.LocallyNameless.Extra ()
@@ -54,7 +53,7 @@ data TyCon
   | SuperKindTyCon
   { tyConName :: TyConName     -- ^ Name of the TyCon
   }
-  deriving (Generic,Typeable,NFData)
+  deriving (Generic,NFData)
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n

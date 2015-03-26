@@ -5,6 +5,8 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
 
+{-# OPTIONS_GHC -fno-specialise #-}
+
 -- | Types in CoreHW
 module CLaSH.Core.Type
   ( Type (..)
@@ -43,8 +45,6 @@ import           Control.Monad                           (zipWithM)
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.Maybe                              (isJust)
-import           Data.Typeable                           hiding (TyCon,mkFunTy,
-                                                          mkTyConApp)
 import           GHC.Generics                            (Generic(..))
 import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           Subst(..),SubstName(..),
@@ -70,7 +70,7 @@ data Type
   | ForAllTy (Bind TyVar Type) -- ^ Polymorphic Type
   | AppTy    Type Type         -- ^ Type Application
   | LitTy    LitTy             -- ^ Type literal
-  deriving (Show,Generic,Typeable,NFData)
+  deriving (Show,Generic,NFData)
 
 -- | An easier view on types
 data TypeView
@@ -83,13 +83,13 @@ data TypeView
 data ConstTy
   = TyCon TyConName -- ^ TyCon type
   | Arrow           -- ^ Function type
-  deriving (Show,Generic,Typeable,NFData)
+  deriving (Show,Generic,NFData)
 
 -- | Literal Types
 data LitTy
   = NumTy Int
   | SymTy String
-  deriving (Show,Generic,Typeable,NFData)
+  deriving (Show,Generic,NFData)
 
 -- | The level above types
 type Kind       = Type

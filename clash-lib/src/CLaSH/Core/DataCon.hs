@@ -13,7 +13,6 @@ module CLaSH.Core.DataCon
   )
 where
 
-import Data.Typeable                          (Typeable)
 import Control.DeepSeq                        (NFData(..))
 import GHC.Generics                           (Generic)
 import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst(..))
@@ -35,7 +34,7 @@ data DataCon
                              -- these type variables are not part of the result
                              -- of the DataCon, but only of the arguments.
   , dcArgTys     :: [Type]   -- ^ Argument types
-  } deriving (Generic,Typeable,NFData)
+  } deriving (Generic,NFData)
 
 instance Show DataCon where
   show = show . dcName
