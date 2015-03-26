@@ -4,6 +4,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
+{-# OPTIONS_GHC -fno-specialise #-}
+
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
   ( Term (..)
