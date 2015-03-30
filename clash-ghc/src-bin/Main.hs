@@ -153,22 +153,28 @@ main = do
                                     , DynFlags.Opt_ConstraintKinds
                                     , DynFlags.Opt_TypeFamilies
                                     ]
-                dflagsExtra' = foldl DynFlags.xopt_unset dflagsExtra
+                dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
                                      [ DynFlags.Opt_ImplicitPrelude
                                      , DynFlags.Opt_MonomorphismRestriction
                                      ]
+
+                ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+                dflagsExtra2 = dflagsExtra1
+                                  { DynFlags.pluginModNames =
+                                      ghcTyLitNormPlugin : DynFlags.pluginModNames dflagsExtra1
+                                  }
 
 
             case postStartupMode of
                 Left preLoadMode ->
                     liftIO $ do
                         case preLoadMode of
-                            ShowInfo               -> showInfo dflagsExtra'
-                            ShowGhcUsage           -> showGhcUsage  dflagsExtra'
-                            ShowGhciUsage          -> showGhciUsage dflagsExtra'
-                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra')
+                            ShowInfo               -> showInfo dflagsExtra2
+                            ShowGhcUsage           -> showGhcUsage  dflagsExtra2
+                            ShowGhciUsage          -> showGhciUsage dflagsExtra2
+                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra2)
                 Right postLoadMode ->
-                    main' postLoadMode dflagsExtra' argv3 flagWarnings
+                    main' postLoadMode dflagsExtra2 argv3 flagWarnings
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
       -> Ghc ()

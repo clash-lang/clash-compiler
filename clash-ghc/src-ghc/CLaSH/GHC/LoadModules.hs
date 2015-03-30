@@ -80,7 +80,12 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                 [ DynFlags.Opt_ImplicitPrelude
                                 , DynFlags.Opt_MonomorphismRestriction
                                 ]
-                  return dfDis
+                  let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+                  let dfPlug = dfDis { DynFlags.pluginModNames =
+                                          ghcTyLitNormPlugin : DynFlags.pluginModNames dfDis
+                                     }
+                  return dfPlug
+
     let dflags1 = dflags { DynFlags.ctxtStkDepth = 1000
                          , DynFlags.optLevel = 2
                          , DynFlags.ghcMode  = GHC.CompManager
