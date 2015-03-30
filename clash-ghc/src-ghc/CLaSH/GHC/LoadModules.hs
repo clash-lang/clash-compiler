@@ -12,6 +12,7 @@ import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
 import           System.Process               (runInteractiveCommand,
                                                waitForProcess)
+import           Data.List                    (nub)
 
 -- GHC API
 import qualified CoreSyn
@@ -81,7 +82,7 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                 , DynFlags.Opt_MonomorphismRestriction
                                 ]
                   let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
-                  let dfPlug = dfDis { DynFlags.pluginModNames =
+                  let dfPlug = dfDis { DynFlags.pluginModNames = nub $
                                           ghcTyLitNormPlugin : DynFlags.pluginModNames dfDis
                                      }
                   return dfPlug
