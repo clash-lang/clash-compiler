@@ -50,7 +50,7 @@ Library
   HS-Source-Dirs:     src
 
   default-language:   Haskell2010
-  ghc-options:        -Wall -fwarn-tabs
+  ghc-options:        -Wall
   CPP-Options:        -DCABAL
 
   Build-depends:      aeson                   >= 0.6.2.0,
