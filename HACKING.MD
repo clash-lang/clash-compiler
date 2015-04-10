@@ -24,3 +24,15 @@ Then to work interactively with the CLaSH compiler, run:
 ```
 ./clash-dev
 ```
+
+Once loaded in GHCi, use the functions:
+
+```
+genVHDL <FILENAME>
+genSystemVerilog <FILENAME>
+```
+
+To generate VHDL and SystemVerilog respectively.
+__NB:__ Only works for single module designs.
+
+Run VHDL and SystemVerilog generation on files in the `tests/shouldwork` directory.
