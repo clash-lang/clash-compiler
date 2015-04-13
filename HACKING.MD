@@ -13,7 +13,7 @@ Run:
 ```
 cabal sandbox init
 cabal sandbox add-source clash-lib
-cabal sandbox add-soruce clash-vhdl
+cabal sandbox add-source clash-vhdl
 cabal sandbox add-source clash-systemverilog
 cabal sandbox add-source clash-ghc
 cabal sandbox add-source ../clash-prelude
