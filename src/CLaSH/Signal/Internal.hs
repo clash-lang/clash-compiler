@@ -80,6 +80,15 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
 import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Promoted.Symbol      (SSymbol)
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> :set -XMagicHash
+-- >>> import CLaSH.Promoted.Nat
+-- >>> import CLaSH.Promoted.Symbol
+-- >>> type SystemClock = Clk "System" 1000
+-- >>> type Signal a = Signal' SystemClock a
+-- >>> let register = register# (SClock ssymbol snat :: SClock SystemClock)
+
 -- | A clock with a name ('Symbol') and period ('Nat')
 data Clock = Clk Symbol Nat
 
@@ -216,8 +225,9 @@ mux = liftA3 (\b t f -> if b then t else f)
 --
 -- Create a constant 'CLaSH.Signal.Signal' from a combinational value
 --
--- >>> sample (signal 4)
--- [4, 4, 4, 4, ...
+-- >>> import qualified Data.List as List
+-- >>> List.take 5 (sample (signal 4 :: Signal Int))
+-- [4,4,4,4,4]
 signal :: Applicative f => a -> f a
 signal = pure
 
@@ -592,8 +602,8 @@ fromList = Prelude.foldr (:-) (error "finite list")
 -- | Simulate a (@'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register 8) [1, 2, 3, ...
--- [8, 1, 2, 3, ...
+-- >>> simulate (register 8) [1, 2, 3]
+-- [8,1,2,3...
 --
 -- __NB__: This function is not synthesisable
 simulate :: (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]

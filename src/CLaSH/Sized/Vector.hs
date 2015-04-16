@@ -77,6 +77,15 @@ import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
 
 import CLaSH.Class.BitPack (BitPack (..))
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> :set -XTypeFamilies
+-- >>> :set -XKindSignatures
+-- >>> :set -XTypeOperators
+-- >>> :set -XTemplateHaskell
+-- >>> :set -XNoImplicitPrelude
+-- >>> import CLaSH.Prelude
+
 -- | Fixed size vectors
 --
 -- * Lists with their length encoded in their type
@@ -155,12 +164,13 @@ singleton = (:> Nil)
 -- >>> head (1:>2:>3:>Nil)
 -- 1
 -- >>> head Nil
---   <interactive>
---       Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---       In the first argument of ‘vhead’, namely ‘Nil’
---       In the expression: vhead Nil
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘1’ with ‘0’
+--     Expected type: Vec (0 + 1) a
+--       Actual type: Vec 0 a
+--     In the first argument of ‘head’, namely ‘Nil’
+--     In the expression: head Nil
 head :: Vec (n + 1) a -> a
 head (x :> _) = x
 
@@ -170,12 +180,13 @@ head (x :> _) = x
 -- >>> tail (1:>2:>3:>Nil)
 -- <2,3>
 -- >>> tail Nil
---   <interactive>
---       Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---       In the first argument of ‘vtail’, namely ‘Nil’
---       In the expression: vtail Nil
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘1’ with ‘0’
+--     Expected type: Vec (0 + 1) a
+--       Actual type: Vec 0 a
+--     In the first argument of ‘tail’, namely ‘Nil’
+--     In the expression: tail Nil
 tail :: Vec (n + 1) a -> Vec n a
 tail (_ :> xs) = unsafeCoerce xs
 
@@ -185,12 +196,13 @@ tail (_ :> xs) = unsafeCoerce xs
 -- >>> last (1:>2:>3:>Nil)
 -- 3
 -- >>> last Nil
---   <interactive>
---       Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---       In the first argument of ‘vlast’, namely ‘Nil’
---       In the expression: vlast Nil
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘1’ with ‘0’
+--     Expected type: Vec (0 + 1) a
+--       Actual type: Vec 0 a
+--     In the first argument of ‘last’, namely ‘Nil’
+--     In the expression: last Nil
 last :: Vec (n + 1) a -> a
 last (x :> Nil)     = x
 last (_ :> y :> ys) = last (y :> ys)
@@ -201,12 +213,13 @@ last (_ :> y :> ys) = last (y :> ys)
 -- >>> init (1:>2:>3:>Nil)
 -- <1,2>
 -- >>> init Nil
---   <interactive>
---       Couldn't match type ‘1’ with ‘0’
---       Expected type: Vec (0 + 1) a
---         Actual type: Vec 0 a
---       In the first argument of ‘vinit’, namely ‘Nil’
---       In the expression: vinit Nil
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘1’ with ‘0’
+--     Expected type: Vec (0 + 1) a
+--       Actual type: Vec 0 a
+--     In the first argument of ‘init’, namely ‘Nil’
+--     In the expression: init Nil
 init :: Vec (n + 1) a -> Vec n a
 init (_ :> Nil)     = unsafeCoerce Nil
 init (x :> y :> ys) = unsafeCoerce (x :> init (y :> ys))
@@ -219,7 +232,7 @@ init (x :> y :> ys) = unsafeCoerce (x :> init (y :> ys))
 -- * The shifted out elements
 --
 -- >>> shiftInAt0 (1 :> 2 :> 3 :> 4 :> Nil) ((-1) :> 0 :> Nil)
--- (<-1,0,1,2,>,<3,4>)
+-- (<-1,0,1,2>,<3,4>)
 -- >>> shiftInAt0 (1 :> Nil) ((-1) :> 0 :> Nil)
 -- (<-1>,<0,1>)
 shiftInAt0 :: KnownNat n
@@ -331,9 +344,9 @@ Nil       ++ ys = ys
 -- | Split a vector into two vectors at the given point
 --
 -- >>> splitAt (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
--- (<1,2,3>, <7,8>)
+-- (<1,2,3>,<7,8>)
 -- >>> splitAt d3 (1:>2:>3:>7:>8:>Nil)
--- (<1,2,3>, <7,8>)
+-- (<1,2,3>,<7,8>)
 splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAt n xs = splitAtU (toUNat n) xs
 
@@ -717,14 +730,15 @@ replace xs i y = replace_int xs (fromIntegral i) y
 -- >>> take d0               (1:>2:>Nil)
 -- <>
 -- >>> take d4               (1:>2:>Nil)
---   <interactive>
---       Couldn't match type ‘4 + n0’ with ‘2’
---       The type variable ‘n0’ is ambiguous
---       Expected type: Vec (4 + n0) a
---         Actual type: Vec (1 + 1) a
---       In the second argument of ‘vtake’, namely ‘(1 :> 2 :> Nil)’
---       In the expression: vtake d4 (1 :> 2 :> Nil)
---       In an equation for ‘it’: it = vtake d4 (1 :> 2 :> Nil)
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘4 + n0’ with ‘2’
+--     The type variable ‘n0’ is ambiguous
+--     Expected type: Vec (4 + n0) a
+--       Actual type: Vec (1 + 1) a
+--     In the second argument of ‘take’, namely ‘(1 :> 2 :> Nil)’
+--     In the expression: take d4 (1 :> 2 :> Nil)
+--     In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
 take :: SNat m -> Vec (m + n) a -> Vec m a
 take n = fst . splitAt n
 
@@ -746,11 +760,12 @@ takeI = withSNat take
 -- >>> drop d0               (1:>2:>Nil)
 -- <1,2>
 -- >>> drop d4               (1:>2:>Nil)
---   <interactive>
---       Couldn't match expected type ‘2’ with actual type ‘4 + n0’
---       The type variable ‘n0’ is ambiguous
---       In the first argument of ‘print’, namely ‘it’
---       In a stmt of an interactive GHCi command: print it
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match expected type ‘2’ with actual type ‘4 + n0’
+--     The type variable ‘n0’ is ambiguous
+--     In the first argument of ‘print’, namely ‘it’
+--     In a stmt of an interactive GHCi command: print it
 drop :: SNat m -> Vec (m + n) a -> Vec n a
 drop n = snd . splitAt n
 
@@ -926,7 +941,15 @@ asNatProxy _ = Proxy
 --
 -- Will not terminate because 'zipWith' is too strict in its second argument:
 --
--- >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
+-- >>> :{
+-- let compareSwapL a b = if a < b then (a,b) else (b,a)
+--     sortV xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL lefts rights
+-- in sortV (4 :> 1 :> 2 :> 3 :> Nil)
+-- :}
 -- <*** Exception: <<loop>>
 --
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
@@ -941,7 +964,15 @@ asNatProxy _ = Proxy
 --
 -- Results in a successful computation:
 --
--- >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
+-- >>> :{
+-- let compareSwapL a b = if a < b then (a,b) else (b,a)
+--     sortVL xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL (lazyV lefts) rights
+-- in sortVL (4 :> 1 :> 2 :> 3 :> Nil)
+-- :}
 -- <1,2,3,4>
 --
 -- __NB__: There is also a solution using 'flip', but it slightly obfuscates the
@@ -955,7 +986,15 @@ asNatProxy _ = Proxy
 --    sorted = 'zipWith' ('flip' compareSwapL) rights lefts
 -- @
 --
--- >>> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
+-- >>> :{
+-- let compareSwapL a b = if a < b then (a,b) else (b,a)
+--     sortV_flip xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith (flip compareSwapL) rights lefts
+-- in sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
+-- :}
 -- <1,2,3,4>
 lazyV :: KnownNat n
       => Vec n a
@@ -971,41 +1010,46 @@ lazyV = lazyV' (repeat undefined)
 --
 --  __NB__: Not synthesisable
 --
--- Using lists, we can define append ('Prelude.++') using 'Prelude.foldr':
+-- Using lists, we can define @append@ ('Prelude.++') using 'Prelude.foldr':
 --
 -- @
--- xs ++ ys = 'Prelude.foldr' (':') ys xs
+-- append xs ys = 'Prelude.foldr' (':') ys xs
 -- @
 --
--- >>> [1,2] ++ [3,4]
+-- >>> import qualified Prelude
+-- >>> let append xs ys = Prelude.foldr (:) ys xs
+-- >>> append [1,2] [3,4]
 -- [1,2,3,4]
 --
 -- However, when we try to do the same for 'Vec':
 --
 -- @
--- xs ++ ys = 'foldr' (:>) ys xs
+-- append xs ys = 'foldr' (:>) ys xs
 -- @
 --
 -- We get a function with a very strange type:
 --
--- >>> :t (++)
--- (++) :: (m + 1) ~ m => Vec n a -> Vec m a -> Vec m a
+-- >>> let append xs ys = foldr (:>) ys xs
+-- >>> :t append
+-- append :: (n1 + 1) ~ n1 => Vec n a -> Vec n1 a -> Vec n1 a
 --
 -- Which has an insoluble constraint @(m + 1) ~ m@. This becomes obvious when
 -- we try to use it:
 --
--- >>> (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
--- <interactive>:7:1:
+-- >>> append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
+-- <BLANKLINE>
+-- <interactive>:...
 --     Couldn't match type ‘2’ with ‘1’
 --     Expected type: 1
 --       Actual type: 1 + 1
---     In the expression: (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
---     In an equation for ‘it’: it = (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
+--     In the expression: append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
+--     In an equation for ‘it’:
+--         it = append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
 --
 -- The reason is that the type of 'foldr' is:
 --
 -- >>> :t foldr
--- (a -> b -> b) -> b -> Vec n a -> b
+-- foldr :: (a -> b -> b) -> b -> Vec n a -> b
 --
 -- While the type of (':>') is:
 --
@@ -1022,13 +1066,17 @@ lazyV = lazyV' (repeat undefined)
 -- data Append (m :: Nat) (a :: *) (f :: 'TyFun' Nat *) :: *
 -- type instance 'Apply' (Append m a) l = 'Vec' (l + m) a
 --
--- xs ++ ys = dfold (Proxy :: Proxy (Append m a)) (const (':>')) ys xs
+-- append xs ys = dfold (Proxy :: Proxy (Append m a)) (const (':>')) ys xs
 -- @
 --
--- We now see that ('++') has the appropriate type:
+-- We now see that @append@ has the appropriate type:
 --
--- >>> :t (++)
--- (++) :: Vec k a -> Vec m a -> Vec (k + m) a
+-- >>> import Data.Singletons.Prelude
+-- >>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
+-- >>> type instance Apply (Append m a) l = Vec (l + m) a
+-- >>> let append xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+-- >>> :t append
+-- append :: Vec k a -> Vec m a -> Vec (k + m) a
 --
 -- And that it works:
 --
@@ -1061,6 +1109,9 @@ type instance Apply (V a) l = Vec l a
 --
 -- Builds a triangular structure of compare and swaps to sort a row.
 --
+-- >>> let cs a b     = if a > b then (a,b) else (b,a)
+-- >>> let csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' <: y'
+-- >>> let csSort     = vfold csRow
 -- >>> csSort (7 :> 3 :> 9 :> 1 :> Nil)
 -- <1,3,7,9>
 vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)

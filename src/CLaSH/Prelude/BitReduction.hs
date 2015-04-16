@@ -15,6 +15,10 @@ import GHC.TypeLits                   (KnownNat)
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> import CLaSH.Prelude
+
 {-# INLINE reduceAnd #-}
 -- | Are all bits set to '1'?
 --

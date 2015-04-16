@@ -20,6 +20,10 @@ import CLaSH.Promoted.Nat             (SNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
                                        replaceBit#, setSlice#, slice#, split#)
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> import CLaSH.Prelude
+
 {-# INLINE (!) #-}
 -- | Get the bit at the specified bit index.
 --
@@ -46,13 +50,14 @@ import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 -- >>> slice (7 :: Unsigned 6) d4 d2
 -- 001
 -- >>> slice (7 :: Unsigned 6) d6 d4
---   <interactive>
---       Couldn't match type ‘7 + i0’ with ‘6’
---       The type variable ‘i0’ is ambiguous
---       Expected type: (6 + 1) + i0
---         Actual type: BitSize (Unsigned 6)
---       In the expression: slice (7 :: Unsigned 6) d6 d4
---       In an equation for ‘it’: it = slice (7 :: Unsigned 6) d6 d4
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘7 + i0’ with ‘6’
+--     The type variable ‘i0’ is ambiguous
+--     Expected type: (6 + 1) + i0
+--       Actual type: BitSize (Unsigned 6)
+--     In the expression: slice (7 :: Unsigned 6) d6 d4
+--     In an equation for ‘it’: it = slice (7 :: Unsigned 6) d6 d4
 slice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => a -> SNat m -> SNat n
       -> BitVector (m + 1 - n)
 slice v m n = slice# (pack v) m n
@@ -102,13 +107,14 @@ replaceBit v i b = unpack (replaceBit# (pack v) (fromIntegral i) b)
 -- >>> pack (-29 :: Signed 6)
 -- 100011
 -- >>> setSlice (-5 :: Signed 6) d6 d5 0
---   <interactive>:25:1:
---       Couldn't match type ‘7 + i0’ with ‘6’
---       The type variable ‘i0’ is ambiguous
---       Expected type: (6 + 1) + i0
---         Actual type: BitSize (Signed 6)
---       In the expression: setSlice (- 5 :: Signed 6) d6 d5 0
---       In an equation for ‘it’: it = setSlice (- 5 :: Signed 6) d6 d5 0
+-- <BLANKLINE>
+-- <interactive>:...
+--     Couldn't match type ‘7 + i0’ with ‘6’
+--     The type variable ‘i0’ is ambiguous
+--     Expected type: (6 + 1) + i0
+--       Actual type: BitSize (Signed 6)
+--     In the expression: setSlice (- 5 :: Signed 6) d6 d5 0
+--     In an equation for ‘it’: it = setSlice (- 5 :: Signed 6) d6 d5 0
 setSlice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => a -> SNat m -> SNat n
          -> BitVector (m + 1 - n) -> a
 setSlice v m n w = unpack (setSlice# (pack v) m n w)

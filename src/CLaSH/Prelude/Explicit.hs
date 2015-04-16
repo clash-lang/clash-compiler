@@ -50,6 +50,9 @@ import CLaSH.Prelude.Testbench (stimuliGenerator', outputVerifier')
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 
+-- $setup
+-- >>> :set -XDataKinds
+
 {-# INLINE registerB' #-}
 -- | Create a 'register' function for product-type like signals (e.g.
 -- @('Signal' a, 'Signal' b)@)
@@ -57,15 +60,18 @@ import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 -- @
 -- type ClkA = 'Clk' \"A\" 100
 --
--- clkA100 :: 'SClock' ClkA
--- clkA100 = 'sclock'
+-- clkA :: 'SClock' ClkA
+-- clkA = 'sclock'
 --
 -- rP :: ('Signal'' ClkA Int, 'Signal'' ClkA Int) -> ('Signal'' ClkA Int, 'Signal'' ClkA Int)
--- rP = 'registerB'' clkA100 (8,8)
+-- rP = 'registerB'' clkA (8,8)
 -- @
 --
--- >>> simulateB' rP [(1,1),(2,2),(3,3),...
--- [(8,8),(1,1),(2,2),(3,3),...
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> let rP = registerB' clkA (8::Int,8::Int)
+-- >>> simulateB' clkA clkA rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
+-- [(8,8),(1,1),(2,2),(3,3)...
 registerB' :: Bundle a => SClock clk -> a -> Unbundled' clk a -> Unbundled' clk a
 registerB' clk i = unbundle' clk Prelude.. register' clk i Prelude.. bundle' clk
 
@@ -75,15 +81,18 @@ registerB' clk i = unbundle' clk Prelude.. register' clk i Prelude.. bundle' clk
 -- @
 -- type ClkA = 'Clk' \"A\" 100
 --
--- clkA100 :: 'SClock' ClkA
--- clkA100 = 'sclock'
+-- clkA :: 'SClock' ClkA
+-- clkA = 'sclock'
 --
 -- window4 :: 'Signal'' ClkA Int -> 'Vec' 4 ('Signal'' ClkA Int)
--- window4 = 'window'' clkA100
+-- window4 = 'window'' clkA
 -- @
 --
--- >>> simulateB' clkA100 clkA100 window4 [1,2,3,4,5,...
--- [<1,0,0,0>, <2,1,0,0>, <3,2,1,0>, <4,3,2,1>, <5,4,3,2>,...
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> let window4 = window' clkA :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
+-- >>> simulateB' clkA clkA window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
+-- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 window' :: (KnownNat n, Default a)
         => SClock clk                  -- ^ Clock to which the incoming
                                        -- signal is synchronized
@@ -103,15 +112,18 @@ window' clk x = res
 -- @
 -- type ClkA = 'Clk' \"A\" 100
 --
--- clkA100 :: 'SClock' ClkA
--- clkA100 = 'sclock'
+-- clkA :: 'SClock' ClkA
+-- clkA = 'sclock'
 --
 -- windowD3 :: 'Signal'' ClkA Int -> 'Vec' 3 ('Signal'' ClkA Int)
--- windowD3 = 'windowD'
+-- windowD3 = 'windowD'' clkA
 -- @
 --
--- >>> simulateB' clkA100 clkA100 windowD3 [1,2,3,4,...
--- [<0,0,0>, <1,0,0>, <2,1,0>, <3,2,1>, <4,3,2>,...
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> let windowD3 = windowD' clkA :: Signal' ClkA Int -> Vec 3 (Signal' ClkA Int)
+-- >>> simulateB' clkA clkA windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
+-- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 windowD' :: (KnownNat (n + 1), Default a)
          => SClock clk                   -- ^ Clock to which the incoming signal
                                          -- is synchronized

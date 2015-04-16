@@ -108,6 +108,9 @@ import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
 
+-- $setup
+-- >>> :set -XTemplateHaskell
+
 -- * Type definitions
 
 -- | A vector of bits.

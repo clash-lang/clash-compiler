@@ -96,8 +96,10 @@ register = register# systemClock
 --
 -- We get:
 --
+-- >>> let oscillate = register False (not1 oscillate)
 -- >>> sampleN 8 oscillate
 -- [False,True,False,True,False,True,False,True]
+-- >>> let count = regEn 0 oscillate (count + 1)
 -- >>> sampleN 8 count
 -- [0,0,1,1,2,2,3,3]
 regEn :: a -> Signal Bool -> Signal a -> Signal a
@@ -143,7 +145,7 @@ bundle = bundle' systemClock
 -- samples of type @a@
 --
 -- >>> simulateB (unbundle . register (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8), (1,1), (2,2), (3,3),*** Exception: finite list
+-- [(8,8),(1,1),(2,2),(3,3)...
 --
 -- __NB__: This function is not synthesisable
 simulateB :: (Bundle a, Bundle b) => (Unbundled a -> Unbundled b) -> [a] -> [b]

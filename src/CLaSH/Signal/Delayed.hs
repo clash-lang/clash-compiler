@@ -49,6 +49,11 @@ import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
 import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> :set -XTypeOperators
+-- >>> import CLaSH.Prelude
+
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), that has accumulated @delay@ amount of samples delay
 -- along its path.
@@ -86,6 +91,7 @@ dfromList = coerce . fromList
 -- delay3 = 'delay' (0 ':>' 0 ':>' 0 ':>' 'Nil')
 -- @
 --
+-- >>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
 -- >>> sampleN 6 (delay3 (dfromList [1..]))
 -- [0,0,0,1,2,3]
 delay :: forall a n m . KnownNat m
@@ -108,7 +114,8 @@ delay m ds = coerce (delay' (coerce ds))
 -- delay2 = 'delayI'
 -- @
 --
--- >>> sampleN 6 (delay2 (dfromList [1..])
+-- >>> let delay2 = delayI :: DSignal (n - 2) Int -> DSignal n Int
+-- >>> sampleN 6 (delay2 (dfromList [1..]))
 -- [0,0,1,2,3,4]
 delayI :: (Default a, KnownNat m)
        => DSignal (n - m) a
@@ -127,7 +134,15 @@ delayI = delay (repeat def)
 --                    in  (acc, 'delay' ('singleton' 0) acc')
 -- @
 --
--- >>> sampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
+-- >>> :{
+-- let mac x y = feedback (mac' x y)
+--       where
+--         mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+--              -> (DSignal 0 Int, DSignal 1 Int)
+--         mac' a b acc = let acc' = a * b + acc
+--                        in  (acc, delay (singleton 0) acc')
+-- in sampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
+-- :}
 -- [0,1,5,14,30,55]
 feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
          -> DSignal (n - m - 1) a

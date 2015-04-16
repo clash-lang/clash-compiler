@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 {-|
@@ -123,12 +124,16 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
   (2) Install __Cabal__
 
-      * Windows and OS X Mavericks:
+      * Binary, when available:
 
           * Download the binary for <http://www.haskell.org/cabal/download.html cabal-install>
           * Put the binary in a location mentioned in your @PATH@
+          * Add @cabal@'s @bin@ directory to your @PATH@:
 
-      * Other Unix systems:
+              * Windows: @%appdata%\\cabal\\bin@
+              * Unix: @\$HOME\/.cabal\/bin@
+
+      * Source:
 
           * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
           * Unpack (@tar xf@) the archive and @cd@ to the directory
@@ -139,11 +144,8 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
   (2) Install __CλaSH__
 
-      * Run @cabal install clash-ghc@
-      * Add @cabal@'s @bin@ directory to our @PATH@:
-
-          * Windows: @%appdata%\\cabal\\bin@
-          * Unix: @\$HOME\/.cabal\/bin@
+      * Run @cabal install clash-ghc --enable-documentation --enable-profiling@
+      * /This is going to take awhile, so have a refreshment/
 
   (4) Verify that everything is working by:
 
@@ -1070,7 +1072,15 @@ A list of often encountered errors and their solutions:
 
     Will not terminate because 'zipWith' is too strict in its second argument:
 
-    >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
+    >>> :{
+    let compareSwapL a b = if a < b then (a,b) else (b,a)
+        sortV xs = map fst sorted <: (snd (last sorted))
+          where
+            lefts  = head xs :> map snd (init sorted)
+            rights = tail xs
+            sorted = zipWith compareSwapL lefts rights
+    in sortV (4 :> 1 :> 2 :> 3 :> Nil)
+    :}
     <*** Exception: <<loop>>
 
     In this case, adding 'lazyV' on 'zipWith's second argument:
@@ -1085,7 +1095,15 @@ A list of often encountered errors and their solutions:
 
     Results in a successful computation:
 
-    >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
+    >>> :{
+    let compareSwapL a b = if a < b then (a,b) else (b,a)
+        sortVL xs = map fst sorted <: (snd (last sorted))
+          where
+            lefts  = head xs :> map snd (init sorted)
+            rights = tail xs
+            sorted = zipWith compareSwapL (lazyV lefts) rights
+    in sortVL (4 :> 1 :> 2 :> 3 :> Nil)
+    :}
     <1,2,3,4>
 -}
 

@@ -41,6 +41,10 @@ import CLaSH.Signal.Internal  (Signal' (..), Clock (..), SClock (..), register#,
                                regEn#, simulate)
 import CLaSH.Signal.Bundle    (Bundle (..), Unbundled')
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> import CLaSH.Prelude
+
 {- $relativeclocks #relativeclocks#
 CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:
 
@@ -178,10 +182,16 @@ systemClock = sclock
 --              . 'register'' clk7 50
 -- @
 --
--- >>> sample (oversampling (fromList [1..10]))
--- [99, 50,1,1,1,2,2,2,2, 3,3,3,4,4,4,4, 5,5,5,6,6,6,6, 7,7,7,8,8,8,8, 9,9,9,10,10,10,10, ...
--- >>> sample (almostId (fromList [1..10]))
--- [70, 99,1,2,3,4,5,6,7,8,9,10,...
+-- >>> type Clk2 = Clk "clk2" 2
+-- >>> type Clk7 = Clk "clk7" 7
+-- >>> let clk2 = sclock :: SClock Clk2
+-- >>> let clk7 = sclock :: SClock Clk7
+-- >>> let oversampling = register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
+-- >>> let almostId = register' clk7 70 . unsafeSynchronizer clk2 clk7 . register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
+-- >>> sampleN 37 (oversampling (fromList [1..10]))
+-- [99,50,1,1,1,2,2,2,2,3,3,3,4,4,4,4,5,5,5,6,6,6,6,7,7,7,8,8,8,8,9,9,9,10,10,10,10]
+-- >>> sampleN 12 (almostId (fromList [1..10]))
+-- [70,99,1,2,3,4,5,6,7,8,9,10]
 unsafeSynchronizer :: SClock clk1 -- ^ 'Clock' of the incoming signal
                    -> SClock clk2 -- ^ 'Clock' of the outgoing signal
                    -> Signal' clk1 a
@@ -241,6 +251,8 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- clkA = 'sclock'
 -- @
 --
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
 -- >>> sampleN 3 (register' clkA 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register' :: SClock clk -> a -> Signal' clk a -> Signal' clk a
@@ -261,8 +273,12 @@ register' = register#
 --
 -- We get:
 --
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> let oscillate = register' clkA False (CLaSH.Signal.not1 oscillate)
 -- >>> sampleN 8 oscillate
 -- [False,True,False,True,False,True,False,True]
+-- >>> let count = regEn' clkA 0 oscillate (count + 1)
 -- >>> sampleN 8 count
 -- [0,0,1,1,2,2,3,3]
 regEn' :: SClock clk -> a -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
@@ -273,15 +289,10 @@ regEn' = regEn#
 -- | Simulate a (@'Unbundled'' clk1 a -> 'Unbundled'' clk2 b@) function given a
 -- list of samples of type @a@
 --
--- @
--- type ClkA = 'Clk' \"A\" 100
---
--- clkA :: 'SClock' ClkA
--- clkA = 'sclock'
--- @
---
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
 -- >>> simulateB' clkA clkA (unbundle' clkA . register' clkA (8,8) . bundle' clkA) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8), (1,1), (2,2), (3,3), *** Exception: finite list
+-- [(8,8),(1,1),(2,2),(3,3)...
 --
 -- __NB__: This function is not synthesisable
 simulateB' :: (Bundle a, Bundle b)

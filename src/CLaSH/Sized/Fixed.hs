@@ -84,6 +84,11 @@ import CLaSH.Promoted.Ord         (Max)
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 
+-- $setup
+-- >>> :set -XDataKinds
+-- >>> :set -XTemplateHaskell
+-- >>> import CLaSH.Prelude
+
 -- | 'Fixed'-point number
 --
 -- Where:
@@ -547,6 +552,7 @@ resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
 -- Upon evaluation you see that the value is rounded / truncated in accordance
 -- to the fixed point representation:
 --
+-- >>> let n = $$(fLit pi) :: SFixed 4 4
 -- >>> n
 -- 3.125
 --
