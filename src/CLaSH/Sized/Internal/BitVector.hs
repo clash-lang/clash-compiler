@@ -139,8 +139,7 @@ instance KnownNat n => Show (BitVector n) where
 -- >>> $$(bLit "1001") :: BitVector 3
 -- 001
 --
--- __NB__: Will be removed once GHC 7.10 is released which has support for
--- binary literals. Once GHC 7.10 is released you can just write:
+-- __NB__: You can also just write:
 --
 -- >>> 0b1001 :: BitVector 4
 -- 1001
