@@ -137,9 +137,9 @@ our first circuit.
 
 {- $installation
 The CλaSH compiler and Prelude library for circuit design only work with the
-<http://haskell.org/ghc GHC> Haskell compiler version 7.8.* and up.
+<http://haskell.org/ghc GHC> Haskell compiler version 7.10.* and up.
 
-  (1) Install __GHC (version 7.8.* or higher)__
+  (1) Install __GHC (version 7.10.* or higher)__
 
       * Download and install <http://www.haskell.org/ghc/download GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
@@ -147,7 +147,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-  (2) Install __Cabal__
+  (2) Install __Cabal (version 1.22.* or higher)__
 
       * Binary, when available:
 
