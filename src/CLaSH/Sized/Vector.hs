@@ -85,6 +85,31 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> :set -XTemplateHaskell
 -- >>> :set -XNoImplicitPrelude
 -- >>> import CLaSH.Prelude
+-- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
+-- >>> :{
+-- let sortV xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL lefts rights
+-- :}
+--
+-- >>> :{
+-- let sortVL xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL (lazyV lefts) rights
+-- :}
+--
+-- >>> :{
+-- let sortV_flip xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith (flip compareSwapL) rights lefts
+-- :}
+--
 
 -- | Fixed size vectors
 --
@@ -941,15 +966,7 @@ asNatProxy _ = Proxy
 --
 -- Will not terminate because 'zipWith' is too strict in its second argument:
 --
--- >>> :{
--- let compareSwapL a b = if a < b then (a,b) else (b,a)
---     sortV xs = map fst sorted <: (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith compareSwapL lefts rights
--- in sortV (4 :> 1 :> 2 :> 3 :> Nil)
--- :}
+-- >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
 -- <*** Exception: <<loop>>
 --
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
@@ -964,15 +981,7 @@ asNatProxy _ = Proxy
 --
 -- Results in a successful computation:
 --
--- >>> :{
--- let compareSwapL a b = if a < b then (a,b) else (b,a)
---     sortVL xs = map fst sorted <: (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith compareSwapL (lazyV lefts) rights
--- in sortVL (4 :> 1 :> 2 :> 3 :> Nil)
--- :}
+-- >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
 -- <1,2,3,4>
 --
 -- __NB__: There is also a solution using 'flip', but it slightly obfuscates the
@@ -986,15 +995,7 @@ asNatProxy _ = Proxy
 --    sorted = 'zipWith' ('flip' compareSwapL) rights lefts
 -- @
 --
--- >>> :{
--- let compareSwapL a b = if a < b then (a,b) else (b,a)
---     sortV_flip xs = map fst sorted <: (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith (flip compareSwapL) rights lefts
--- in sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
--- :}
+-- >>> sortV_flip (4 :> 1 :> 2 :> 3 :> Nil)
 -- <1,2,3,4>
 lazyV :: KnownNat n
       => Vec n a

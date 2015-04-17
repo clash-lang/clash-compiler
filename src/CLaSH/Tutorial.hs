@@ -65,6 +65,31 @@ import Data.Char
 import Data.Int
 import GHC.Word
 
+-- $setup
+-- >>> :set -XTemplateHaskell
+-- >>> :set -XDataKinds
+-- >>> let ma acc (x,y) = acc + x * y
+-- >>> :{
+-- let macT acc (x,y) = (acc',o)
+--        where
+--          acc' = ma acc (x,y)
+--          o    = acc
+-- :}
+--
+-- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
+-- >>> :{
+-- let sortVL xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL (lazyV lefts) rights
+-- :}
+--
+-- >>> let mac = mealy macT 0
+-- >>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
+-- >>> let testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+-- >>> let expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
+
 
 {- $introduction
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -457,7 +482,7 @@ earlier for the simulation of the circuit, and creates an output verifier that
 compares against the results we got from our earlier simulation. We can even
 simulate the behaviour of the /testbench/:
 
->>> sampleN 7 $ expectedOutput (topEntity $ unpack testInput)
+>>> sampleN 7 $ expectedOutput (topEntity testInput)
 [False,False,False,False,
 expected value: 14, not equal to actual value: 30
 True,
@@ -1095,15 +1120,7 @@ A list of often encountered errors and their solutions:
 
     Results in a successful computation:
 
-    >>> :{
-    let compareSwapL a b = if a < b then (a,b) else (b,a)
-        sortVL xs = map fst sorted <: (snd (last sorted))
-          where
-            lefts  = head xs :> map snd (init sorted)
-            rights = tail xs
-            sorted = zipWith compareSwapL (lazyV lefts) rights
-    in sortVL (4 :> 1 :> 2 :> 3 :> Nil)
-    :}
+    >>> sortVL (4 :> 1 :> 2 :> 3 :> Nil)
     <1,2,3,4>
 -}
 

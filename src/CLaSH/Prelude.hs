@@ -129,6 +129,9 @@ import CLaSH.Signal.Explicit       (systemClock)
 
 -- $setup
 -- >>> :set -XDataKinds
+-- >>> let window4 = window :: Signal Int -> Vec 4 (Signal Int)
+-- >>> let windowD3 = windowD :: Signal Int -> Vec 3 (Signal Int)
+-- >>> let rP = registerB (8,8)
 
 {- $hiding
 "CLaSH.Prelude" re-exports most of the Haskell "Prelude" with the exception of
@@ -146,7 +149,6 @@ It instead exports the identically named functions defined in terms of
 -- > window4 :: Signal Int -> Vec 4 (Signal Int)
 -- > window4 = window
 --
--- >>> let window4 = window :: Signal Int -> Vec 4 (Signal Int)
 -- >>> simulateB window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 window :: (KnownNat n, Default a)
@@ -160,7 +162,6 @@ window = window' systemClock
 -- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
 -- > windowD3 = windowD
 --
--- >>> let windowD3 = windowD :: Signal Int -> Vec 3 (Signal Int)
 -- >>> simulateB windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 windowD :: (KnownNat (n + 1), Default a)
@@ -174,7 +175,6 @@ windowD = windowD' systemClock
 -- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
 -- > rP = registerB (8,8)
 --
--- >>> let rP = registerB (8,8)
 -- >>> simulateB rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 registerB :: Bundle a => a -> Unbundled a -> Unbundled a

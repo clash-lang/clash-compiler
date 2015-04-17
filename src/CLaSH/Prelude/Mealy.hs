@@ -23,6 +23,23 @@ import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 -- $setup
 -- >>> :set -XDataKinds
 -- >>> import CLaSH.Prelude
+-- >>> :{
+-- let mac s (x,y) = (s',s)
+--       where
+--         s' = x * y + s
+--     topEntity = mealy mac 0
+-- :}
+--
+-- >>> import CLaSH.Prelude.Explicit
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> :{
+-- let mac s (x,y) = (s',s)
+--       where
+--         s' = x * y + s
+-- :}
+--
+-- >>> let topEntity = mealy' clkA mac 0
 
 {-# INLINE mealy #-}
 -- | Create a synchronous function from a combinational function describing
@@ -40,13 +57,7 @@ import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 -- topEntity = 'mealy' mac 0
 -- @
 --
--- >>> :{
--- let mac s (x,y) = (s',s)
---       where
---         s' = x * y + s
---     topEntity = mealy mac 0
--- in simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
--- :}
+-- >>> simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 --
 -- Synchronous sequential functions can be composed just like their
@@ -130,24 +141,14 @@ mealyB = mealyB' systemClock
 --
 -- type ClkA = 'CLaSH.Signal.Explicit.Clk' \"A\" 100
 --
--- clkA100 :: 'SClock' ClkA
--- clkA100 = 'CLaSH.Signal.Explicit.sclock'
+-- clkA :: 'SClock' ClkA
+-- clkA = 'CLaSH.Signal.Explicit.sclock'
 --
 -- topEntity :: 'Signal'' ClkA (Int, Int) -> 'Signal'' ClkA Int
--- topEntity = 'mealy'' clkA100 mac 0
+-- topEntity = 'mealy'' clkA mac 0
 -- @
 --
-
--- >>> import CLaSH.Prelude.Explicit
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA100 = sclock :: SClock ClkA
--- >>> :{
--- let mac s (x,y) = (s',s)
---       where
---         s' = x * y + s
---     topEntity = mealy' clkA100 mac 0
--- in simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
--- :}
+-- >>> simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 --
 -- Synchronous sequential functions can be composed just like their

@@ -52,6 +52,11 @@ import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 
 -- $setup
 -- >>> :set -XDataKinds
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> let rP = registerB' clkA (8::Int,8::Int)
+-- >>> let window4 = window' clkA :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
+-- >>> let windowD3 = windowD' clkA :: Signal' ClkA Int -> Vec 3 (Signal' ClkA Int)
 
 {-# INLINE registerB' #-}
 -- | Create a 'register' function for product-type like signals (e.g.
@@ -67,9 +72,6 @@ import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)
 -- rP = 'registerB'' clkA (8,8)
 -- @
 --
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let rP = registerB' clkA (8::Int,8::Int)
 -- >>> simulateB' clkA clkA rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 registerB' :: Bundle a => SClock clk -> a -> Unbundled' clk a -> Unbundled' clk a
@@ -88,9 +90,6 @@ registerB' clk i = unbundle' clk Prelude.. register' clk i Prelude.. bundle' clk
 -- window4 = 'window'' clkA
 -- @
 --
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let window4 = window' clkA :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
 -- >>> simulateB' clkA clkA window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 window' :: (KnownNat n, Default a)
@@ -119,9 +118,6 @@ window' clk x = res
 -- windowD3 = 'windowD'' clkA
 -- @
 --
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let windowD3 = windowD' clkA :: Signal' ClkA Int -> Vec 3 (Signal' ClkA Int)
 -- >>> simulateB' clkA clkA windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 windowD' :: (KnownNat (n + 1), Default a)

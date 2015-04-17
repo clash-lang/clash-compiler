@@ -33,6 +33,13 @@ import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 -- >>> :set -XTemplateHaskell
 -- >>> :set -XDataKinds
 -- >>> import CLaSH.Prelude
+-- >>> let testInput = stimuliGenerator $(v [(1::Int),3..21])
+-- >>> let expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- >>> import CLaSH.Prelude.Explicit
+-- >>> type ClkA = Clk "A" 100
+-- >>> let clkA = sclock :: SClock ClkA
+-- >>> let testInput' = stimuliGenerator' clkA $(v [(1::Int),3..21])
+-- >>> let expectedOutput' = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 
 {-# INLINE stimuliGenerator #-}
 -- | To be used as a one of the functions to create the \"magical\" 'testInput'
@@ -46,7 +53,6 @@ import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 -- testInput = 'stimuliGenerator' $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
 -- @
 --
--- >>> let testInput = stimuliGenerator $(v [(1::Int),3..21])
 -- >>> sampleN 13 testInput
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator :: forall l a . KnownNat l
@@ -67,7 +73,6 @@ stimuliGenerator = stimuliGenerator' systemClock
 -- @
 --
 -- >>> import qualified Data.List as List
--- >>> let expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- >>> sampleN 12 (expectedOutput (fromList ([0..10] List.++ [10,10,10])))
 -- [
 -- expected value: 70, not equal to actual value: 0
@@ -122,15 +127,11 @@ assert = liftA3
 -- clkA :: 'SClock' ClkA
 -- clkA = 'CLaSH.Signal.Explicit.sclock'
 --
--- testInput :: 'Signal'' clkA Int
--- testInput = 'stimuliGenerator'' clkA $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
+-- testInput' :: 'Signal'' clkA Int
+-- testInput' = 'stimuliGenerator'' clkA $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
 -- @
 --
--- >>> import CLaSH.Prelude.Explicit
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let testInput = stimuliGenerator' clkA $(v [(1::Int),3..21])
--- >>> sampleN 13 testInput
+-- >>> sampleN 13 testInput'
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator' :: forall l clk a . KnownNat l
                   => SClock clk     -- ^ Clock to which to synchronize the
@@ -163,16 +164,12 @@ stimuliGenerator' clk samples =
 -- clkA :: 'SClock' ClkA
 -- clkA = 'CLaSH.Signal.Explicit.sclock'
 --
--- expectedOutput :: 'Signal'' ClkA Int -> 'Signal'' ClkA Bool
--- expectedOutput = 'outputVerifier'' clkA $('CLaSH.Sized.Vector.v' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- expectedOutput' :: 'Signal'' ClkA Int -> 'Signal'' ClkA Bool
+-- expectedOutput' = 'outputVerifier'' clkA $('CLaSH.Sized.Vector.v' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- @
 --
--- >>> import CLaSH.Prelude.Explicit
 -- >>> import qualified Data.List as List
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let expectedOutput = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
--- >>> sampleN 12 (expectedOutput (fromList ([0..10] List.++ [10,10,10])))
+-- >>> sampleN 12 (expectedOutput' (fromList ([0..10] List.++ [10,10,10])))
 -- [
 -- expected value: 70, not equal to actual value: 0
 -- False,

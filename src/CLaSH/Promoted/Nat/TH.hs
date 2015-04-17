@@ -7,7 +7,13 @@ Copyright  :  (C) 2013-2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-module CLaSH.Promoted.Nat.TH where
+module CLaSH.Promoted.Nat.TH
+  ( -- * Declare a single @d\<N\>@ literal
+    decLiteralD
+    -- * Declare ranges of @d\<N\>@ literals
+  , decLiteralsD
+  )
+where
 
 import Language.Haskell.TH
 import CLaSH.Promoted.Nat
@@ -25,6 +31,7 @@ import CLaSH.Promoted.Nat
 --
 -- >>> :t d1111
 -- d1111 :: SNat 1111
+--
 decLiteralD :: Integer
             -> Q [Dec]
 decLiteralD n = do
@@ -44,6 +51,7 @@ decLiteralD n = do
 -- d1201 :: SNat 1201
 -- >>> :t d1202
 -- d1202 :: SNat 1202
+--
 decLiteralsD :: Integer
              -> Integer
              -> Q [Dec]
