@@ -108,6 +108,7 @@ import CLaSH.Promoted.Ord         (Max)
 
 -- $setup
 -- >>> :set -XTemplateHaskell
+-- >>> :set -XBinaryLiterals
 
 -- * Type definitions
 
@@ -143,6 +144,13 @@ instance KnownNat n => Show (BitVector n) where
 --
 -- >>> 0b1001 :: BitVector 4
 -- 1001
+--
+-- The advantage of 'bLit' is that you can use computations to create the
+-- string literal:
+--
+-- >>> import qualified Data.List as List
+-- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
+-- 1111
 bLit :: KnownNat n => String -> Q (TExp (BitVector n))
 bLit s = [|| fromInteger# i' ||]
   where

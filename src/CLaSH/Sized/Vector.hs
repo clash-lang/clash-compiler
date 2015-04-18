@@ -82,7 +82,8 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> :set -XKindSignatures
 -- >>> :set -XTypeOperators
 -- >>> :set -XTemplateHaskell
--- >>> :set -XNoImplicitPrelude
+-- >>> :set -XFlexibleContexts
+-- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> import CLaSH.Prelude
 -- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 -- >>> :{
@@ -94,10 +95,12 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- :}
 --
 -- >>> :{
--- let sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortVL :: forall n a . (Ord a, KnownNat (n+1)) => Vec ((n + 1) + 1) a -> Vec ((n + 1) + 1) a
+--     sortVL xs = map fst sorted <: (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
+--         sorted :: Vec (n + 1) (a,a)
 --         sorted = zipWith compareSwapL (lazyV lefts) rights
 -- :}
 --
@@ -119,7 +122,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> (3:>4:>5:>Nil)
 -- <3,4,5>
 -- >>> :t (3:>4:>5:>Nil)
--- (3:>4:>5:>Nil) :: Num a => Vec 3 a
+-- (3:>4:>5:>Nil) :: Num a => Vec (2 + 1) a
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   (:>) :: a -> Vec n a -> Vec (n + 1) a
@@ -294,7 +297,7 @@ infixl 5 <:
 -- >>> (3:>4:>5:>Nil) <: 1
 -- <3,4,5,1>
 -- >>> :t (3:>4:>5:>Nil) <: 1
--- (3:>4:>5:>Nil) <: 1 :: Num a => Vec 4 a
+-- (3:>4:>5:>Nil) <: 1 :: Num a => Vec (3 + 1) a
 (<:) :: Vec n a -> a -> Vec (n + 1) a
 xs <: x = xs ++ singleton x
 
@@ -806,9 +809,9 @@ dropI = withSNat drop
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
 --
--- >>> at (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
+-- >>> at (snat :: SNat 1) ((1:>2:>3:>4:>5:>Nil) :: Vec 5 Int)
 -- 2
--- >>> at d1               (1:>2:>3:>4:>5:>Nil)
+-- >>> at d1               ((1:>2:>3:>4:>5:>Nil) :: Vec 5 Int)
 -- 2
 at :: SNat m -> Vec (m + (n + 1)) a -> a
 at n xs = head $ snd $ splitAt n xs
@@ -1026,24 +1029,20 @@ lazyV = lazyV' (repeat undefined)
 -- append xs ys = 'foldr' (:>) ys xs
 -- @
 --
--- We get a function with a very strange type:
+-- We get a type error
 --
 -- >>> let append xs ys = foldr (:>) ys xs
--- >>> :t append
--- append :: (n1 + 1) ~ n1 => Vec n a -> Vec n1 a -> Vec n1 a
---
--- Which has an insoluble constraint @(m + 1) ~ m@. This becomes obvious when
--- we try to use it:
---
--- >>> append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
 -- <BLANKLINE>
 -- <interactive>:...
---     Couldn't match type ‘2’ with ‘1’
---     Expected type: 1
---       Actual type: 1 + 1
---     In the expression: append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
---     In an equation for ‘it’:
---         it = append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
+--     Occurs check: cannot construct the infinite type: n1 ~ n1 + 1
+--     Expected type: a -> Vec n1 a -> Vec n1 a
+--       Actual type: a -> Vec n1 a -> Vec (n1 + 1) a
+--     Relevant bindings include
+--       ys :: Vec n1 a (bound at ...)
+--       append :: Vec n a -> Vec n1 a -> Vec n1 a
+--         (bound at ...)
+--     In the first argument of ‘foldr’, namely ‘(:>)’
+--     In the expression: foldr (:>) ys xs
 --
 -- The reason is that the type of 'foldr' is:
 --

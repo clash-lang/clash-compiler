@@ -76,9 +76,24 @@ import GHC.Word
 --          o    = acc
 -- :}
 --
+-- >>> :set -XFlexibleContexts
+-- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 -- >>> :{
--- let sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortV xs = map fst sorted <: (snd (last sorted))
+--       where
+--         lefts  = head xs :> map snd (init sorted)
+--         rights = tail xs
+--         sorted = zipWith compareSwapL lefts rights
+-- :}
+--
+-- >>> :set -XScopedTypeVariables
+-- >>> :set -XAllowAmbiguousTypes
+-- >>> :set -XTypeOperators
+-- >>> :set -XDataKinds
+-- >>> :{
+-- let sortVL :: forall n a . (Ord a, KnownNat (n+1)) => Vec ((n + 1) + 1) a -> Vec ((n + 1) + 1) a
+--     sortVL xs = map fst sorted <: (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -89,7 +104,6 @@ import GHC.Word
 -- >>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
 -- >>> let testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
 -- >>> let expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
-
 
 {- $introduction
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -1097,15 +1111,7 @@ A list of often encountered errors and their solutions:
 
     Will not terminate because 'zipWith' is too strict in its second argument:
 
-    >>> :{
-    let compareSwapL a b = if a < b then (a,b) else (b,a)
-        sortV xs = map fst sorted <: (snd (last sorted))
-          where
-            lefts  = head xs :> map snd (init sorted)
-            rights = tail xs
-            sorted = zipWith compareSwapL lefts rights
-    in sortV (4 :> 1 :> 2 :> 3 :> Nil)
-    :}
+    >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
     <*** Exception: <<loop>>
 
     In this case, adding 'lazyV' on 'zipWith's second argument:
