@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -73,7 +72,6 @@ where
 
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
-import Data.Typeable                  (Typeable)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
@@ -98,7 +96,6 @@ newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToBitVector', are not
     -- synthesisable.
     U { unsafeToBitVector :: Integer }
-  deriving Typeable
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int

@@ -53,7 +53,7 @@ Library
   HS-Source-Dirs:     src
 
   default-language:   Haskell2010
-  ghc-options:        -Wall -fwarn-tabs -fexpose-all-unfoldings
+  ghc-options:        -Wall -fexpose-all-unfoldings
 
   Exposed-modules:    CLaSH.Class.BitPack
                       CLaSH.Class.Num
@@ -94,7 +94,9 @@ Library
 
                       CLaSH.Tutorial
 
-  other-extensions:   DataKinds
+  other-extensions:   BangPatterns
+                      DataKinds
+                      ConstraintKinds
                       DefaultSignatures
                       DeriveDataTypeable
                       FlexibleContexts
@@ -103,6 +105,7 @@ Library
                       KindSignatures
                       MagicHash
                       MultiParamTypeClasses
+                      Rank2Types
                       ScopedTypeVariables
                       StandaloneDeriving
                       TemplateHaskell
@@ -111,13 +114,14 @@ Library
                       TypeOperators
                       UndecidableInstances
 
-  Build-depends:      base                 >= 4.7.0.0 && < 5,
-                      data-default         >= 0.5.3,
-                      integer-gmp          >= 0.5.1.0,
-                      ghc-prim             >= 0.3.1.0,
-                      singletons           >= 1.0,
-                      template-haskell     >= 2.9.0.0,
-                      th-lift              >= 0.5.6
+  Build-depends:      base                      >= 4.7.0.0 && < 5,
+                      data-default              >= 0.5.3,
+                      integer-gmp               >= 0.5.1.0,
+                      ghc-prim                  >= 0.3.1.0,
+                      ghc-typelits-natnormalise >= 0.1.1,
+                      singletons                >= 1.0,
+                      template-haskell          >= 2.9.0.0,
+                      th-lift                   >= 0.5.6
 
 test-suite doctests
   type:             exitcode-stdio-1.0

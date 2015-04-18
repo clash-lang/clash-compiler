@@ -117,17 +117,17 @@ never create a clock that faster!
 -- clkA = 'sclock'
 -- @
 sclock :: (KnownSymbol name, KnownNat period)
-       => SClock (Clk name period)
+       => SClock ('Clk name period)
 sclock = SClock ssymbol snat
 
 {-# INLINE withSClock #-}
 withSClock :: (KnownSymbol name, KnownNat period)
-           => (SClock (Clk name period) -> a)
+           => (SClock ('Clk name period) -> a)
            -> a
 withSClock f = f (SClock ssymbol snat)
 
 -- | The standard system clock with a period of 1000
-type SystemClock = Clk "system" 1000
+type SystemClock = 'Clk "system" 1000
 
 {-# INLINE systemClock #-}
 -- | The singleton clock for 'SystemClock'

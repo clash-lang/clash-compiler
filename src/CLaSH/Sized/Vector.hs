@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -51,12 +52,10 @@ module CLaSH.Sized.Vector
   )
 where
 
-import Control.Applicative        (Applicative (..), (<$>))
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type ($))
-import Data.Traversable           (Traversable (..))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
                                    natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
@@ -83,7 +82,8 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> :set -XKindSignatures
 -- >>> :set -XTypeOperators
 -- >>> :set -XTemplateHaskell
--- >>> :set -XNoImplicitPrelude
+-- >>> :set -XFlexibleContexts
+-- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> import CLaSH.Prelude
 -- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 -- >>> :{
@@ -95,10 +95,12 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- :}
 --
 -- >>> :{
--- let sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortVL :: forall n a . (Ord a, KnownNat (n+1)) => Vec ((n + 1) + 1) a -> Vec ((n + 1) + 1) a
+--     sortVL xs = map fst sorted <: (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
+--         sorted :: Vec (n + 1) (a,a)
 --         sorted = zipWith compareSwapL (lazyV lefts) rights
 -- :}
 --
@@ -120,7 +122,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> (3:>4:>5:>Nil)
 -- <3,4,5>
 -- >>> :t (3:>4:>5:>Nil)
--- (3:>4:>5:>Nil) :: Num a => Vec 3 a
+-- (3:>4:>5:>Nil) :: Num a => Vec (2 + 1) a
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   (:>) :: a -> Vec n a -> Vec (n + 1) a
@@ -213,7 +215,7 @@ head (x :> _) = x
 --     In the first argument of ‘tail’, namely ‘Nil’
 --     In the expression: tail Nil
 tail :: Vec (n + 1) a -> Vec n a
-tail (_ :> xs) = unsafeCoerce xs
+tail (_ :> xs) = xs
 
 {-# NOINLINE last #-}
 -- | Extract the last element of a vector
@@ -246,8 +248,8 @@ last (_ :> y :> ys) = last (y :> ys)
 --     In the first argument of ‘init’, namely ‘Nil’
 --     In the expression: init Nil
 init :: Vec (n + 1) a -> Vec n a
-init (_ :> Nil)     = unsafeCoerce Nil
-init (x :> y :> ys) = unsafeCoerce (x :> init (y :> ys))
+init (_ :> Nil)     = Nil
+init (x :> y :> ys) = x :> init (y :> ys)
 
 {-# INLINE shiftInAt0 #-}
 -- | Shift in elements to the head of a vector, bumping out elements at the
@@ -264,7 +266,7 @@ shiftInAt0 :: KnownNat n
            => Vec n a -- ^ The old vector
            -> Vec m a -- ^ The elements to shift in at the head
            -> (Vec n a, Vec m a) -- ^ (The new vector, shifted out elements)
-shiftInAt0 xs ys = splitAtI (unsafeCoerce zs)
+shiftInAt0 xs ys = splitAtI zs
   where
     zs = ys ++ xs
 
@@ -286,7 +288,7 @@ shiftInAtN :: KnownNat m
 shiftInAtN xs ys = (zsR, zsL)
   where
     zs        = xs ++ ys
-    (zsL,zsR) = splitAtI (unsafeCoerce zs)
+    (zsL,zsR) = splitAtI zs
 
 infixl 5 <:
 {-# INLINE (<:) #-}
@@ -295,7 +297,7 @@ infixl 5 <:
 -- >>> (3:>4:>5:>Nil) <: 1
 -- <3,4,5,1>
 -- >>> :t (3:>4:>5:>Nil) <: 1
--- (3:>4:>5:>Nil) <: 1 :: Num a => Vec 4 a
+-- (3:>4:>5:>Nil) <: 1 :: Num a => Vec (3 + 1) a
 (<:) :: Vec n a -> a -> Vec (n + 1) a
 xs <: x = xs ++ singleton x
 
@@ -363,7 +365,7 @@ infixr 5 ++
 -- <1,2,3,7,8>
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
 Nil       ++ ys = ys
-(x :> xs) ++ ys = unsafeCoerce (x :> (xs ++ ys))
+(x :> xs) ++ ys = x :> xs ++ ys
 
 {-# NOINLINE splitAt #-}
 -- | Split a vector into two vectors at the given point
@@ -377,7 +379,7 @@ splitAt n xs = splitAtU (toUNat n) xs
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtU UZero     ys        = (Nil,ys)
-splitAtU (USucc s) (y :> ys) = let (as,bs) = splitAtU s (unsafeCoerce ys)
+splitAtU (USucc s) (y :> ys) = let (as,bs) = splitAtU s ys
                                in  (y :> as, bs)
 
 {-# INLINE splitAtI #-}
@@ -396,7 +398,7 @@ splitAtI = withSNat splitAt
 -- <1,2,3,4,5,6,7,8,9,10,11,12>
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil       = Nil
-concat (x :> xs) = unsafeCoerce (x ++ (concat xs))
+concat (x :> xs) = x ++ concat xs
 
 {-# NOINLINE unconcat #-}
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
@@ -409,7 +411,7 @@ unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcatU UZero      _ _  = Nil
-unconcatU (USucc n') m ys = let (as,bs) = splitAtU m (unsafeCoerce ys)
+unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
                             in  as :> unconcatU n' m bs
 
 {-# INLINE unconcatI #-}
@@ -428,8 +430,7 @@ unconcatI = withSNat unconcat
 -- <1,5,2,6,3,7,4,8>
 merge :: Vec n a -> Vec n a -> Vec (n + n) a
 merge Nil       Nil       = Nil
-merge (x :> xs) (y :> ys) = unsafeCoerce
-                              (x :> y :> (merge xs (unsafeCoerce ys)))
+merge (x :> xs) (y :> ys) = x :> y :> merge xs ys
 
 {-# NOINLINE reverse #-}
 -- | Returns the elements in a vector in reverse order
@@ -808,9 +809,9 @@ dropI = withSNat drop
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
 --
--- >>> at (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
+-- >>> at (snat :: SNat 1) ((1:>2:>3:>4:>5:>Nil) :: Vec 5 Int)
 -- 2
--- >>> at d1               (1:>2:>3:>4:>5:>Nil)
+-- >>> at d1               ((1:>2:>3:>4:>5:>Nil) :: Vec 5 Int)
 -- 2
 at :: SNat m -> Vec (m + (n + 1)) a -> a
 at n xs = head $ snd $ splitAt n xs
@@ -823,7 +824,7 @@ at n xs = head $ snd $ splitAt n xs
 -- <2,4,6>
 -- >>> select d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
 -- <2,4,6>
-select :: (CmpNat (i + s) (s * n) ~ GT)
+select :: (CmpNat (i + s) (s * n) ~ 'GT)
        => SNat f
        -> SNat s
        -> SNat n
@@ -841,7 +842,7 @@ select f s n xs = select' (toUNat n) $ drop f xs
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
 -- <2,4>
-selectI :: (CmpNat (i + s) (s * n) ~ GT, KnownNat n)
+selectI :: (CmpNat (i + s) (s * n) ~ 'GT, KnownNat n)
         => SNat f
         -> SNat s
         -> Vec (f + i) a
@@ -1028,24 +1029,20 @@ lazyV = lazyV' (repeat undefined)
 -- append xs ys = 'foldr' (:>) ys xs
 -- @
 --
--- We get a function with a very strange type:
+-- We get a type error
 --
 -- >>> let append xs ys = foldr (:>) ys xs
--- >>> :t append
--- append :: (n1 + 1) ~ n1 => Vec n a -> Vec n1 a -> Vec n1 a
---
--- Which has an insoluble constraint @(m + 1) ~ m@. This becomes obvious when
--- we try to use it:
---
--- >>> append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
 -- <BLANKLINE>
 -- <interactive>:...
---     Couldn't match type ‘2’ with ‘1’
---     Expected type: 1
---       Actual type: 1 + 1
---     In the expression: append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
---     In an equation for ‘it’:
---         it = append (1 :> 2 :> Nil) (3 :> 4 :> Nil)
+--     Occurs check: cannot construct the infinite type: n1 ~ n1 + 1
+--     Expected type: a -> Vec n1 a -> Vec n1 a
+--       Actual type: a -> Vec n1 a -> Vec (n1 + 1) a
+--     Relevant bindings include
+--       ys :: Vec n1 a (bound at ...)
+--       append :: Vec n a -> Vec n1 a -> Vec n1 a
+--         (bound at ...)
+--     In the first argument of ‘foldr’, namely ‘(:>)’
+--     In the expression: foldr (:>) ys xs
 --
 -- The reason is that the type of 'foldr' is:
 --
@@ -1131,7 +1128,7 @@ concatBitVector# :: KnownNat m
                  => Vec n (BitVector m)
                  -> BitVector (n * m)
 concatBitVector# Nil       = 0
-concatBitVector# (x :> xs) = unsafeCoerce (concatBitVector# xs ++# x)
+concatBitVector# (x :> xs) = concatBitVector# xs ++# x
 
 {-# NOINLINE unconcatBitVector# #-}
 unconcatBitVector# :: (KnownNat n, KnownNat m)
@@ -1143,7 +1140,7 @@ unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
 ucBV :: forall n m . KnownNat m
      => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
 ucBV UZero     _  = Nil
-ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# (unsafeCoerce bv)
+ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
                     in  x :> ucBV n bv'
 
 instance Lift a => Lift (Vec n a) where

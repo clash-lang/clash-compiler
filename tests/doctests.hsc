@@ -3,7 +3,6 @@
 module Main where
 
 import Build_doctests (deps)
-import Control.Applicative
 import Control.Monad
 import Data.List
 import System.Directory

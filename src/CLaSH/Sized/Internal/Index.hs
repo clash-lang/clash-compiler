@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -45,7 +44,6 @@ module CLaSH.Sized.Internal.Index
 where
 
 import Data.Default               (Default (..))
-import Data.Typeable              (Typeable)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, natVal)
@@ -57,7 +55,6 @@ newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     I { unsafeToInteger :: Integer }
-  deriving Typeable
 
 instance Eq (Index n) where
   (==) = eq#

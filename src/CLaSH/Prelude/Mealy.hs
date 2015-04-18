@@ -14,8 +14,6 @@ module CLaSH.Prelude.Mealy
   )
 where
 
-import Control.Applicative   ((<$>), (<*>))
-
 import CLaSH.Signal          (Signal, Unbundled)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')

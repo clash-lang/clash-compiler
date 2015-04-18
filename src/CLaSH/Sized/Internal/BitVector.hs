@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -94,7 +93,6 @@ import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Char                  (digitToInt)
 import Data.Default               (Default (..))
 import Data.Maybe                 (listToMaybe)
-import Data.Typeable              (Typeable)
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
@@ -110,6 +108,7 @@ import CLaSH.Promoted.Ord         (Max)
 
 -- $setup
 -- >>> :set -XTemplateHaskell
+-- >>> :set -XBinaryLiterals
 
 -- * Type definitions
 
@@ -121,7 +120,6 @@ newtype BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.
     BV { unsafeToInteger :: Integer}
-  deriving Typeable
 
 type Bit = BitVector 1
 
@@ -142,11 +140,17 @@ instance KnownNat n => Show (BitVector n) where
 -- >>> $$(bLit "1001") :: BitVector 3
 -- 001
 --
--- __NB__: Will be removed once GHC 7.10 is released which has support for
--- binary literals. Once GHC 7.10 is released you can just write:
+-- __NB__: You can also just write:
 --
 -- >>> 0b1001 :: BitVector 4
 -- 1001
+--
+-- The advantage of 'bLit' is that you can use computations to create the
+-- string literal:
+--
+-- >>> import qualified Data.List as List
+-- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
+-- 1111
 bLit :: KnownNat n => String -> Q (TExp (BitVector n))
 bLit s = [|| fromInteger# i' ||]
   where

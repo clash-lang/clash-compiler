@@ -1,5 +1,4 @@
 env:
-  - GHCVER=7.8.4 CABALVER=1.18
   - GHCVER=7.10.1 CABALVER=1.22
   - GHCVER=head CABALVER=1.22
 
@@ -43,4 +42,4 @@ notifications:
       - "irc.freenode.org#clash-lang"
     skip_join: true
     template:
-      - "\x0313ghc-typelits-natnormalise\x03/\x0306%{branch}\x03 \x0314%{commit}\x03 %{build_url} %{message}"
+      - "\x0313clash-prelude\x03/\x0306%{branch}\x03 \x0314%{commit}\x03 %{build_url} %{message}"

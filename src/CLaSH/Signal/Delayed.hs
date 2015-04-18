@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|
@@ -36,9 +37,7 @@ where
 import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
-import Data.Foldable              (Foldable)
-import Data.Traversable           (Traversable)
-import Control.Applicative        (Applicative (..), liftA2)
+import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
@@ -56,12 +55,10 @@ import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 -- >>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
 -- >>> let delay2 = delayI :: DSignal (n - 2) Int -> DSignal n Int
 -- >>> :{
--- let mac x y = feedback (mac' x y)
+-- let mac x y = acc
 --       where
---         mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---              -> (DSignal 0 Int, DSignal 1 Int)
---         mac' a b acc = let acc' = a * b + acc
---                        in  (acc, delay (singleton 0) acc')
+--         acc' = (x * y) + antiDelay d1 acc
+--         acc  = delay (singleton 0) acc'
 -- :}
 --
 
@@ -131,6 +128,7 @@ delayI :: (Default a, KnownNat m)
        -> DSignal n a
 delayI = delay (repeat def)
 
+{-# WARNING feedback "This function does not work in GHC 7.10.1, use 'antiDelay' instead" #-}
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
