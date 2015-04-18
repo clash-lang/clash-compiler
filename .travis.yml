@@ -17,8 +17,10 @@ before_install:
   - cabal --version
 
 install:
+  - git clone https://github.com/clash-lang/clash-prelude.git
   - travis_retry cabal update
   - cabal sandbox init
+  - cabal sandbox add-source clash-prelude
   - cabal sandbox add-source clash-ghc
   - cabal sandbox add-source clash-lib
   - cabal sandbox add-source clash-systemverilog
@@ -41,7 +43,7 @@ script:
        exit 1;
     fi
 
-  - cd ../clash-vhdl
+  - cd ../../clash-vhdl
   - cabal sdist
 
   # check that the generated source-distribution can be built & installed
@@ -54,7 +56,7 @@ script:
        exit 1;
     fi
 
-  - cd ../clash-systemverilog
+  - cd ../../clash-systemverilog
   - cabal sdist
 
   # check that the generated source-distribution can be built & installed
@@ -67,7 +69,7 @@ script:
        exit 1;
     fi
 
-  - cd ../clash-ghc
+  - cd ../../clash-ghc
   - cabal sdist
 
   # check that the generated source-distribution can be built & installed
