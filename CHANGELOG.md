@@ -1,5 +1,10 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.7.2
+* New features:
+  * Support for GHC 7.10 => only works with GHC 7.10 and higher
+  * Use http://hackage.haskell.org/package/ghc-typelits-natnormalise typechecker plugin for better type-level natural number handling
+
 ## 0.7.1 *March 25th 2015*
 * Fixes bugs:
   * Fix laziness bug in Vector.(!!) and Vector.replace
