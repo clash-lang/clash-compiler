@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.5
+Version:              0.5.1
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -52,28 +52,29 @@ Executable clash
                       PatternGuards
                       NondecreasingIndentation
 
-  Build-Depends:      array                >= 0.4,
-                      base                 >= 4.3.1.0 && < 5,
-                      bifunctors           >= 4.1.1,
-                      bytestring           >= 0.9,
-                      containers           >= 0.5.4.0,
-                      directory            >= 1.2,
-                      filepath             >= 1.3,
-                      ghc                  >= 7.8,
-                      process              >= 1.2,
-                      hashable             >= 1.1.2.3,
-                      haskeline            >= 0.7.0.3,
-                      lens                 >= 4.0.5,
-                      mtl                  >= 2.1.1,
-                      text                 >= 0.11.3.1,
-                      transformers         >= 0.3,
-                      unbound-generics     >= 0.1,
-                      unordered-containers >= 0.2.1.0,
+  Build-Depends:      array                     >= 0.4,
+                      base                      >= 4.3.1.0 && < 5,
+                      bifunctors                >= 4.1.1,
+                      bytestring                >= 0.9,
+                      containers                >= 0.5.4.0,
+                      directory                 >= 1.2,
+                      filepath                  >= 1.3,
+                      ghc                       >= 7.10.1,
+                      process                   >= 1.2,
+                      hashable                  >= 1.1.2.3,
+                      haskeline                 >= 0.7.0.3,
+                      lens                      >= 4.0.5,
+                      mtl                       >= 2.1.1,
+                      text                      >= 0.11.3.1,
+                      transformers              >= 0.4.2,
+                      unbound-generics          >= 0.1,
+                      unordered-containers      >= 0.2.1.0,
 
-                      clash-lib            >= 0.5,
-                      clash-vhdl           >= 0.5,
-                      clash-systemverilog  >= 0.5,
-                      clash-prelude        >= 0.7
+                      clash-lib                 >= 0.5,
+                      clash-vhdl                >= 0.5,
+                      clash-systemverilog       >= 0.5,
+                      clash-prelude             >= 0.7.2,
+                      ghc-typelits-natnormalise >= 0.1.1
 
   if os(windows)
     Build-Depends:    Win32
@@ -86,12 +87,6 @@ Executable clash
                       GhciMonad
                       GhciTags
 
-                      CLaSH.GHC.Compat.DynFlags
-                      CLaSH.GHC.Compat.FastString
-                      CLaSH.GHC.Compat.GHC
-                      CLaSH.GHC.Compat.Outputable
-                      CLaSH.GHC.Compat.PrelNames
-                      CLaSH.GHC.Compat.TyCon
                       CLaSH.GHC.Evaluator
                       CLaSH.GHC.GenerateBindings
                       CLaSH.GHC.GHC2Core

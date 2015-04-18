@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP                   #-}
-{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -20,12 +20,11 @@ where
 import Control.DeepSeq                  (NFData (..))
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
-import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..),isFreeName,
-                                         unembed)
+import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..))
+import Unbound.Generics.LocallyNameless.Extra ()
 
 import {-# SOURCE #-} CLaSH.Core.Term   (Term)
 import {-# SOURCE #-} CLaSH.Core.Type   (Kind, Type)
-import CLaSH.Util
 
 -- | Variables in CoreHW
 data Var a
@@ -39,7 +38,7 @@ data Var a
   { varName :: Name a
   , varType :: Embed Type
   }
-  deriving (Eq,Show,Generic,Typeable)
+  deriving (Eq,Show,Generic,NFData)
 
 -- | Term variable
 type Id    = Var Term
@@ -47,19 +46,8 @@ type Id    = Var Term
 type TyVar = Var Type
 
 instance (Typeable a, Alpha a) => Alpha (Var a)
-
-instance Subst Term Id
-instance Subst Term TyVar
-
-instance Subst Type TyVar
-instance Subst Type Id where
-  subst tvN u (Id idN ty) | isFreeName tvN = Id idN (subst tvN u ty)
-  subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
-
-instance NFData (Name a) => NFData (Var a) where
-  rnf v = case v of
-    TyVar nm ki -> rnf nm `seq` rnf (unembed ki)
-    Id    nm ty -> rnf nm `seq` rnf (unembed ty)
+instance Generic b => Subst Term (Var b)
+instance Generic b => Subst Type (Var b)
 
 -- | Change the name of a variable
 modifyVarName ::

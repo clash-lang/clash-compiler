@@ -10,7 +10,6 @@ module CLaSH.Core.Pretty
 where
 
 import Data.Char                        (isSymbol, isUpper, ord)
-import Data.Traversable                 (sequenceA)
 import Data.Text                        (unpack)
 import GHC.Show                         (showMultiLineString)
 import Text.PrettyPrint                 (Doc, char, comma, empty, equals, hang,

@@ -1,10 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -fno-specialise #-}
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
@@ -17,20 +17,16 @@ where
 
 -- External Modules
 import Control.DeepSeq
-import Data.Monoid                             (mempty)
 import Data.Text                               (Text)
-import Data.Typeable
 import GHC.Generics
 import Unbound.Generics.LocallyNameless
-import Unbound.Generics.LocallyNameless.Name   (Name(..))
-import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import Unbound.Generics.LocallyNameless.Extra  ()
 
 -- Internal Modules
 import CLaSH.Core.DataCon                      (DataCon)
 import CLaSH.Core.Literal                      (Literal)
 import {-# SOURCE #-} CLaSH.Core.Type          (Type)
 import CLaSH.Core.Var                          (Id, TyVar)
-import CLaSH.Util
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
@@ -45,7 +41,7 @@ data Term
   | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
   | Case    Term Type [Bind Pat Term]      -- ^ Case-expression: subject, type of
                                            -- alternatives, list of alternatives
-  deriving (Show,Typeable,Generic)
+  deriving (Show,Generic,NFData)
 
 -- | Term reference
 type TmName     = Name Term
@@ -61,21 +57,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Show,Typeable,Generic)
-
-instance Alpha Text where
-  aeq' _ctx             = (==)
-  fvAny' _ctx _nfn i    = pure i
-  close _ctx _b         = id
-  open _ctx _b          = id
-  isPat _               = mempty
-  isTerm _              = True
-  nthPatFind _          = Left
-  namePatFind _ _       = Left 0
-  swaps' _ctx _p        = id
-  freshen' _ctx i       = return (i, mempty)
-  lfreshen' _ctx i cont = cont i mempty
-  acompare' _ctx        = compare
+  deriving (Show,Generic,NFData,Alpha)
 
 instance Eq Term where
   (==) = aeq
@@ -95,59 +77,11 @@ instance Alpha Term where
   acompare' _ (Prim t1 _) (Prim t2 _) = compare t1 t2
   acompare' c t1          t2          = gacompare c (from t1) (from t2)
 
-instance Alpha Pat
-
+instance Subst Type Pat
 instance Subst Term Pat
+
 instance Subst Term Term where
   isvar (Var _ x) = Just (SubstName x)
   isvar _         = Nothing
 
-instance Subst Type Pat
-instance Subst Type Term where
-  subst tvN u x | isFreeName tvN = case x of
-    Lam    b         -> Lam    (subst tvN u b  )
-    TyLam  b         -> TyLam  (subst tvN u b  )
-    App    fun arg   -> App    (subst tvN u fun) (subst tvN u arg)
-    TyApp  e   ty    -> TyApp  (subst tvN u e  ) (subst tvN u ty )
-    Letrec b         -> Letrec (subst tvN u b  )
-    Case   e ty alts -> Case   (subst tvN u e  )
-                               (subst tvN u ty )
-                               (subst tvN u alts )
-    Var ty nm        -> Var    (subst tvN u ty ) nm
-    Prim nm ty       -> Prim   nm (subst tvN u ty)
-    e                -> e
-  subst m _ _ = error $ $(curLoc) ++ "Cannot substitute for bound variable: " ++ show m
-
-instance Subst Term Text where
-  subst  _ _ = id
-  substs _   = id
-instance Subst Type Text where
-  subst  _ _ = id
-  substs _   = id
-
-instance NFData Term where
-  rnf tm = case tm of
-    Var     ty nm -> rnf ty `seq` rnf nm
-    Data    dc    -> rnf dc
-    Literal l     -> rnf l
-    Prim    nm ty -> rnf nm `seq` rnf ty
-    Lam     b     -> case unsafeUnbind b of
-                       (id_,tm') -> rnf id_ `seq` rnf tm'
-    TyLam   b       -> case unsafeUnbind b of
-                         (tv,tm') -> rnf tv `seq` rnf tm'
-    App     tmL tmR -> rnf tmL `seq` rnf tmR
-    TyApp   tm' ty  -> rnf tm' `seq` rnf ty
-    Letrec  b       -> case unsafeUnbind b of
-                        (bs,e) -> rnf (map (second unembed) (unrec bs)) `seq` rnf e
-    Case    sc ty alts -> rnf sc `seq` rnf ty `seq` rnf (map unsafeUnbind alts)
-
-instance NFData Pat where
-  rnf p = case p of
-    DataPat dcE xs -> rnf (unembed dcE) `seq` rnf (unrebind xs)
-    LitPat  lE     -> rnf (unembed lE)
-    DefaultPat     -> ()
-
-instance NFData (Name Term) where
-  rnf nm = case nm of
-    (Fn s i) -> rnf s `seq` rnf i
-    (Bn l r) -> rnf l `seq` rnf r
+instance Subst Type Term

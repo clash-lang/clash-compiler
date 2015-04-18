@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
@@ -32,7 +33,7 @@ import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 import Config
 import Constants
 import HscTypes
-import Packages         ( dumpPackages )
+import Packages         ( pprPackages, pprPackagesSimple, pprModuleMap )
 import DriverPhases
 import BasicTypes       ( failed )
 import StaticFlags
@@ -106,9 +107,7 @@ getProcessOutput command =
 
 main :: IO ()
 main = do
-#if MIN_VERSION_ghc(7,8,3)
-   initGCStatistics
-#endif
+   initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -135,10 +134,10 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedExtensions -> showSupportedExtensions
-                   ShowVersion             -> showVersion
-                   ShowNumVersion          -> putStrLn (Data.Version.showVersion Paths_clash_ghc.version)
-                   ShowOptions             -> showOptions
+                   ShowSupportedExtensions   -> showSupportedExtensions
+                   ShowVersion               -> showVersion
+                   ShowNumVersion            -> putStrLn (Data.Version.showVersion Paths_clash_ghc.version)
+                   ShowOptions isInteractive -> showOptions isInteractive
         Right postStartupMode ->
             -- start our GHC session
             GHC.runGhc (Just libDir) $ do
@@ -154,21 +153,28 @@ main = do
                                     , DynFlags.Opt_ConstraintKinds
                                     , DynFlags.Opt_TypeFamilies
                                     ]
-                dflagsExtra' = foldl DynFlags.xopt_unset dflagsExtra
+                dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
                                      [ DynFlags.Opt_ImplicitPrelude
                                      , DynFlags.Opt_MonomorphismRestriction
                                      ]
+
+                ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+                dflagsExtra2 = dflagsExtra1
+                                  { DynFlags.pluginModNames = nub $
+                                      ghcTyLitNormPlugin : DynFlags.pluginModNames dflagsExtra1
+                                  }
+
 
             case postStartupMode of
                 Left preLoadMode ->
                     liftIO $ do
                         case preLoadMode of
-                            ShowInfo               -> showInfo dflags
-                            ShowGhcUsage           -> showGhcUsage  dflags
-                            ShowGhciUsage          -> showGhciUsage dflags
-                            PrintWithDynFlags f    -> putStrLn (f dflags)
+                            ShowInfo               -> showInfo dflagsExtra2
+                            ShowGhcUsage           -> showGhcUsage  dflagsExtra2
+                            ShowGhciUsage          -> showGhciUsage dflagsExtra2
+                            PrintWithDynFlags f    -> putStrLn (f dflagsExtra2)
                 Right postLoadMode ->
-                    main' postLoadMode dflagsExtra' argv3 flagWarnings
+                    main' postLoadMode dflagsExtra2 argv3 flagWarnings
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
       -> Ghc ()
@@ -253,30 +259,36 @@ main' postLoadMode dflags0 args flagWarnings = do
   hsc_env <- GHC.getSession
 
         ---------------- Display configuration -----------
-  when (verbosity dflags6 >= 4) $
-        liftIO $ dumpPackages dflags6
+  case verbosity dflags6 of
+    v | v == 4 -> liftIO $ dumpPackagesSimple dflags6
+      | v >= 5 -> liftIO $ dumpPackages dflags6
+      | otherwise -> return ()
 
   when (verbosity dflags6 >= 3) $ do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
+
+
+  when (dopt Opt_D_dump_mod_map dflags6) . liftIO $
+    printInfoForUser (dflags6 { pprCols = 200 })
+                     (pkgQual dflags6) (pprModuleMap dflags6)
 
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
 
   ---------------- Do the business -----------
-  handleSourceError
-    (\e -> do
-        GHC.printException e
-        liftIO $ exitWith (ExitFailure 1))
-    $ do
-      let clash fun = gcatch (fun srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
-      case postLoadMode of
+  handleSourceError (\e -> do
+       GHC.printException e
+       liftIO $ exitWith (ExitFailure 1)) $ do
+    let clash fun = gcatch (fun srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
+    case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
        DoInteractive          -> ghciUI srcs Nothing
        DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
-       DoAbiHash              -> abiHash srcs
+       DoAbiHash              -> abiHash (map fst srcs)
+       ShowPackages           -> liftIO $ showPackages dflags6
        DoVHDL                 -> clash makeVHDL
        DoSystemVerilog        -> clash makeSystemVerilog
 
@@ -386,16 +398,16 @@ checkOptions mode dflags srcs objs = do
 
 -- Compiler output options
 
--- called to verify that the output files & directories
--- point somewhere valid.
+-- Called to verify that the output files point somewhere valid.
 --
 -- The assumption is that the directory portion of these output
 -- options will have to exist by the time 'verifyOutputFiles'
 -- is invoked.
 --
+-- We create the directories for -odir, -hidir, -outputdir etc. ourselves if
+-- they don't exist, so don't check for those here (#2278).
 verifyOutputFiles :: DynFlags -> IO ()
 verifyOutputFiles dflags = do
-  -- not -odir: we create the directory for -odir if it doesn't exist (#2278).
   let ofile = outputFile dflags
   when (isJust ofile) $ do
      let fn = fromJust ofile
@@ -419,16 +431,16 @@ type Mode = Either PreStartupMode PostStartupMode
 type PostStartupMode = Either PreLoadMode PostLoadMode
 
 data PreStartupMode
-  = ShowVersion             -- ghc -V/--version
-  | ShowNumVersion          -- ghc --numeric-version
-  | ShowSupportedExtensions -- ghc --supported-extensions
-  | ShowOptions             -- ghc --show-options
+  = ShowVersion                          -- ghc -V/--version
+  | ShowNumVersion                       -- ghc --numeric-version
+  | ShowSupportedExtensions              -- ghc --supported-extensions
+  | ShowOptions Bool {- isInteractive -} -- ghc --show-options
 
 showVersionMode, showNumVersionMode, showSupportedExtensionsMode, showOptionsMode :: Mode
 showVersionMode             = mkPreStartupMode ShowVersion
 showNumVersionMode          = mkPreStartupMode ShowNumVersion
 showSupportedExtensionsMode = mkPreStartupMode ShowSupportedExtensions
-showOptionsMode             = mkPreStartupMode ShowOptions
+showOptionsMode             = mkPreStartupMode (ShowOptions False)
 
 mkPreStartupMode :: PreStartupMode -> Mode
 mkPreStartupMode = Left
@@ -477,14 +489,17 @@ data PostLoadMode
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
+  | ShowPackages            -- ghc --show-packages
   | DoVHDL                  -- ghc --vhdl
   | DoSystemVerilog         -- ghc --systemverilog
 
-doMkDependHSMode, doMakeMode, doInteractiveMode, doAbiHashMode, doVHDLMode, doSystemVerilogMode :: Mode
+doMkDependHSMode, doMakeMode, doInteractiveMode,
+  doAbiHashMode, showPackagesMode, doVHDLMode, doSystemVerilogMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
+showPackagesMode = mkPostLoadMode ShowPackages
 doVHDLMode = mkPostLoadMode DoVHDL
 doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
 
@@ -544,12 +559,12 @@ isLinkMode DoSystemVerilog     = True
 isLinkMode _                   = False
 
 isCompManagerMode :: PostLoadMode -> Bool
-isCompManagerMode DoMake          = True
-isCompManagerMode DoInteractive   = True
-isCompManagerMode (DoEval _)      = True
+isCompManagerMode DoMake        = True
+isCompManagerMode DoInteractive = True
+isCompManagerMode (DoEval _)    = True
 isCompManagerMode DoVHDL          = True
 isCompManagerMode DoSystemVerilog = True
-isCompManagerMode _               = False
+isCompManagerMode _             = False
 
 -- -----------------------------------------------------------------------------
 -- Parsing the mode flag
@@ -565,8 +580,11 @@ parseModeFlags args = do
       mode = case mModeFlag of
              Nothing     -> doMakeMode
              Just (m, _) -> m
-      errs = errs1 ++ map (mkGeneralLocated "on the commandline") errs2
-  when (not (null errs)) $ throwGhcException $ errorsToGhcException errs
+
+  -- See Note [Handling errors when parsing commandline flags]
+  unless (null errs1 && null errs2) $ throwGhcException $ errorsToGhcException $
+      map (("on the commandline", )) $ map unLoc errs1 ++ errs2
+
   return (mode, flags' ++ leftover, warns)
 
 type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
@@ -576,18 +594,20 @@ type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    Flag "?"                     (PassFlag (setMode showGhcUsageMode))
-  , Flag "-help"                 (PassFlag (setMode showGhcUsageMode))
-  , Flag "V"                     (PassFlag (setMode showVersionMode))
-  , Flag "-version"              (PassFlag (setMode showVersionMode))
-  , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
-  , Flag "-info"                 (PassFlag (setMode showInfoMode))
-  , Flag "-show-options"         (PassFlag (setMode showOptionsMode))
-  , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
-  , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+    defFlag "?"                     (PassFlag (setMode showGhcUsageMode))
+  , defFlag "-help"                 (PassFlag (setMode showGhcUsageMode))
+  , defFlag "V"                     (PassFlag (setMode showVersionMode))
+  , defFlag "-version"              (PassFlag (setMode showVersionMode))
+  , defFlag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
+  , defFlag "-info"                 (PassFlag (setMode showInfoMode))
+  , defFlag "-show-options"         (PassFlag (setMode showOptionsMode))
+  , defFlag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
+  , defFlag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+  , defFlag "-show-packages"        (PassFlag (setMode showPackagesMode))
   ] ++
-  [ Flag k'                      (PassFlag (setMode (printSetting k)))
+  [ defFlag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
+          "Project Git commit id",
           "Booter version",
           "Stage",
           "Build platform",
@@ -612,26 +632,22 @@ mode_flags =
         replaceSpace c   = c
   ] ++
       ------- interfaces ----------------------------------------------------
-  [ Flag "-show-iface"    (HasArg (\f -> setMode (showInterfaceMode f)
+  [ defFlag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  , Flag "c"              (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
-                                              addFlag "-no-link" f))
-  , Flag "M"              (PassFlag (setMode doMkDependHSMode))
-  , Flag "E"              (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , Flag "C"              (PassFlag (setMode (stopBeforeMode HCc)))
-#if MIN_VERSION_ghc(7,8,3)
-  , Flag "S"              (PassFlag (setMode (stopBeforeMode (As False))))
-#else
-  , Flag "S"              (PassFlag (setMode (stopBeforeMode As)))
-#endif
-  , Flag "-make"          (PassFlag (setMode doMakeMode))
-  , Flag "-interactive"   (PassFlag (setMode doInteractiveMode))
-  , Flag "-abi-hash"      (PassFlag (setMode doAbiHashMode))
-  , Flag "e"              (SepArg   (\s -> setMode (doEvalMode s) "-e"))
-  , Flag "-vhdl"          (PassFlag (setMode doVHDLMode))
-  , Flag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
+  , defFlag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+                                               addFlag "-no-link" f))
+  , defFlag "M"            (PassFlag (setMode doMkDependHSMode))
+  , defFlag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
+  , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
+  , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
+  , defFlag "-make"        (PassFlag (setMode doMakeMode))
+  , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
+  , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
+  , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , defFlag "-vhdl"          (PassFlag (setMode doVHDLMode))
+  , defFlag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -665,6 +681,14 @@ setMode newMode newFlag = liftEwM $ do
                          errs)
                     -- Saying e.g. --interactive --interactive is OK
                     _ | oldFlag == newFlag -> ((oldMode, oldFlag), errs)
+
+                    -- --interactive and --show-options are used together
+                    (Right (Right DoInteractive), Left (ShowOptions _)) ->
+                      ((Left (ShowOptions True),
+                        "--interactive --show-options"), errs)
+                    (Left (ShowOptions _), (Right (Right DoInteractive))) ->
+                      ((Left (ShowOptions True),
+                        "--show-options --interactive"), errs)
                     -- Otherwise, complain
                     _ -> let err = flagMismatchErr oldFlag newFlag
                          in ((oldMode, oldFlag), err : errs)
@@ -694,12 +718,8 @@ doMake srcs  = do
         haskellish (f,Nothing) =
           looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
         haskellish (_,Just phase) =
-#if MIN_VERSION_ghc(7,8,3)
           phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm
                           , StopLn]
-#else
-          phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
-#endif
 
     hsc_env <- GHC.getSession
 
@@ -773,20 +793,22 @@ showVersion = putStrLn $ concat [ "CAES Language for Synchronous Hardware, versi
                                 , ")"
                                 ]
 
-showOptions :: IO ()
-showOptions = putStr (unlines availableOptions)
+showOptions :: Bool -> IO ()
+showOptions isInteractive = putStr (unlines availableOptions)
     where
-      availableOptions     = map ((:) '-') $
-                             getFlagNames mode_flags   ++
-                             getFlagNames flagsDynamic ++
-                             (filterUnwantedStatic . getFlagNames $ flagsStatic) ++
-                             flagsStaticNames
-      getFlagNames opts         = map getFlagName opts
-      getFlagName (Flag name _) = name
+      availableOptions = concat [
+        flagsForCompletion isInteractive,
+        map ('-':) (concat [
+            getFlagNames mode_flags
+          , (filterUnwantedStatic . getFlagNames $ flagsStatic)
+          , flagsStaticNames
+          ])
+        ]
+      getFlagNames opts         = map flagName opts
       -- this is a hack to get rid of two unwanted entries that get listed
       -- as static flags. Hopefully this hack will disappear one day together
       -- with static flags
-      filterUnwantedStatic      = filter (\x -> not (x `elem` ["f", "fno-"]))
+      filterUnwantedStatic      = filter (`notElem`["f", "fno-"])
 
 showGhcUsage :: DynFlags -> IO ()
 showGhcUsage = showUsage False
@@ -839,6 +861,11 @@ countFS entries longest has_z (b:bs) =
   in
         countFS entries' longest' (has_z + has_zs) bs
 
+showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
+showPackages       dflags = putStrLn (showSDoc dflags (pprPackages dflags))
+dumpPackages       dflags = putMsg dflags (pprPackages dflags)
+dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
+
 -- -----------------------------------------------------------------------------
 -- ABI hash support
 
@@ -855,7 +882,13 @@ the package chagnes, so during registration Cabal calls ghc --abi-hash
 to get a hash of the package's ABI.
 -}
 
-abiHash :: [(String, Maybe Phase)] -> Ghc ()
+-- | Print ABI hash of input modules.
+--
+-- The resulting hash is the MD5 of the GHC version used (Trac #5328,
+-- see 'hiVersion') and of the existing ABI hash from each module (see
+-- 'mi_mod_hash').
+abiHash :: [String] -- ^ List of module names
+        -> Ghc ()
 abiHash strs = do
   hsc_env <- getSession
   let dflags = hsc_dflags hsc_env
@@ -870,7 +903,7 @@ abiHash strs = do
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
                           cannotFindInterface dflags modname r
 
-  mods <- mapM find_it (map fst strs)
+  mods <- mapM find_it strs
 
   let get_iface modl = loadUserInterface False (text "abiHash") modl
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
@@ -916,17 +949,18 @@ symbols to symbols outside the shared library being compiled (see `man
 ld`). When dynamically linking, we don't use -Bsymbolic on the RTS
 package: that is because we want hooks to be overridden by the user,
 we don't want to constrain them to the RTS package.
+
 Unfortunately this seems to have broken somehow on OS X: as a result,
 defaultHooks (in hschooks.c) is not called, which does not initialize
 the GC stats. As a result, this breaks things like `:set +s` in GHCi
 (#8754). As a hacky workaround, we instead call 'defaultHooks'
 directly to initalize the flags in the RTS.
-A biproduct of this, I believe, is that hooks are likely broken on OS
+
+A byproduct of this, I believe, is that hooks are likely broken on OS
 X when dynamically linking. But this probably doesn't affect most
 people since we're linking GHC dynamically, but most things themselves
 link statically.
 -}
-#if MIN_VERSION_ghc(7,8,3)
+
 foreign import ccall safe "initGCStatistics"
   initGCStatistics :: IO ()
-#endif

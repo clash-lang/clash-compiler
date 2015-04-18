@@ -4,22 +4,22 @@ module CLaSH.GHC.NetlistTypes
   (ghcTypeToHWType)
 where
 
-import Data.HashMap.Strict       (HashMap,(!))
-import Control.Monad.Trans.Error (ErrorT(..))
-import Unbound.Generics.LocallyNameless   (name2String)
+import Data.HashMap.Strict              (HashMap,(!))
+import Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
+import Unbound.Generics.LocallyNameless (name2String)
 
-import CLaSH.Core.Pretty         (showDoc)
-import CLaSH.Core.TyCon          (TyCon (..), TyConName)
-import CLaSH.Core.Type           (LitTy (..), Type (..), TypeView (..),
-                                  findFunSubst, tyView)
-import CLaSH.Netlist.Util        (coreTypeToHWType)
-import CLaSH.Netlist.Types       (HWType(..))
+import CLaSH.Core.Pretty                (showDoc)
+import CLaSH.Core.TyCon                 (TyCon (..), TyConName)
+import CLaSH.Core.Type                  (LitTy (..), Type (..), TypeView (..),
+                                         findFunSubst, tyView)
+import CLaSH.Netlist.Util               (coreTypeToHWType)
+import CLaSH.Netlist.Types              (HWType(..))
 import CLaSH.Util
 
 ghcTypeToHWType :: HashMap TyConName TyCon
                 -> Type
                 -> Maybe (Either String HWType)
-ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runErrorT $
+ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runExceptT $
   case name2String tc of
     "Int"                           -> return Integer
     "GHC.Integer.Type.Integer"      -> return Integer
@@ -33,7 +33,7 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runErrorT $
       fail $ "Can't translate type: " ++ showDoc ty
 
     "CLaSH.Signal.Internal.Signal'" ->
-      ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m (args !! 1)
+      ExceptT $ return $ coreTypeToHWType ghcTypeToHWType m (args !! 1)
 
     "CLaSH.Sized.Internal.BitVector.BitVector" ->
       BitVector <$> tyNatSize m (head args)
@@ -50,7 +50,7 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runErrorT $
     "CLaSH.Sized.Vector.Vec" -> do
       let [szTy,elTy] = args
       sz     <- tyNatSize m szTy
-      elHWTy <- ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m elTy
+      elHWTy <- ExceptT $ return $ coreTypeToHWType ghcTypeToHWType m elTy
       return $ Vector sz elHWTy
     _ -> case m ! tc of
            -- TODO: Remove this conversion
@@ -58,15 +58,15 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runErrorT $
            -- transformation process, and so end up here. Once a fix has been found for
            -- this problem remove this dirty hack.
            FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst args of
-             Just ty' -> ErrorT $ return $ coreTypeToHWType ghcTypeToHWType m ty'
-             _ -> ErrorT Nothing
-           _ -> ErrorT Nothing
+             Just ty' -> ExceptT $ return $ coreTypeToHWType ghcTypeToHWType m ty'
+             _ -> ExceptT Nothing
+           _ -> ExceptT Nothing
 
 ghcTypeToHWType _ _ = Nothing
 
 tyNatSize :: HashMap TyConName TyCon
           -> Type
-          -> ErrorT String Maybe Int
+          -> ExceptT String Maybe Int
 tyNatSize _ (LitTy (NumTy i)) = return i
 tyNatSize m (tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
   "GHC.TypeLits.+" -> (+) <$> tyNatSize m ty1 <*> tyNatSize m ty2

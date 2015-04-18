@@ -4,7 +4,7 @@
 -- | Type and instance definitions for Primitive
 module CLaSH.Primitives.Types where
 
-import           Control.Applicative  ((<$>), (<*>), (<|>))
+import           Control.Applicative  ((<|>))
 import           Data.Aeson           (FromJSON (..), Value (..), (.:))
 import           Data.HashMap.Lazy    (HashMap)
 import qualified Data.HashMap.Strict  as H

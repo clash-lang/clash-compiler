@@ -20,6 +20,7 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
+import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend

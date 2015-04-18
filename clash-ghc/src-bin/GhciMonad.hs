@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, FlexibleInstances, UnboxedTuples, MagicHash #-}
 {-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -32,6 +33,7 @@ import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
 import Util
 import DynFlags
+import FastString
 import HscTypes
 import SrcLoc
 import Module
@@ -46,7 +48,6 @@ import Data.IORef
 import System.CPUTime
 import System.Environment
 import System.IO
-import Control.Applicative (Applicative(..))
 import Control.Monad
 import GHC.Exts
 
@@ -55,9 +56,14 @@ import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative (Applicative(..))
+#endif
+
 -----------------------------------------------------------------------------
 -- GHCi monad
 
+-- the Bool means: True = we should exit GHCi (:quit)
 type Command = (String, String -> InputT GHCi Bool, CompletionFunc GHCi)
 
 data GHCiState = GHCiState
@@ -104,7 +110,8 @@ data GHCiState = GHCiState
 
         -- help text to display to a user
         short_help :: String,
-        long_help  :: String
+        long_help  :: String,
+        lastErrorLocations :: IORef [(FastString, Int)]
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
@@ -135,7 +142,7 @@ prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ 
 instance Outputable BreakLocation where
    ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+>
                 if null (onBreakCmd loc)
-                   then empty
+                   then Outputable.empty
                    else doubleQuotes (text (onBreakCmd loc))
 
 recordBreak :: BreakLocation -> GHCi (Bool{- was already present -}, Int)
@@ -316,7 +323,12 @@ printTimes dflags allocs psecs
             secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
-                         text (show allocs) <+> text "bytes")))
+                         text (separateThousands allocs) <+> text "bytes")))
+  where
+    separateThousands n = reverse . sep . reverse . show $ n
+      where sep n'
+              | length n' <= 3 = n'
+              | otherwise = take 3 n' ++ "," ++ sep (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs

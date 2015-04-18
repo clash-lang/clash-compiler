@@ -19,6 +19,7 @@ where
 import           Control.Lens                ((^.), (%~), (&), (%=))
 import           Control.Monad.State         (State)
 import qualified Control.Monad.State.Lazy    as State
+import qualified Data.ByteString.Char8       as Char8
 import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
@@ -33,46 +34,43 @@ import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
 import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
-import           CLaSH.GHC.Compat.FastString (unpackFB, unpackFS)
-import           CLaSH.GHC.Compat.Outputable (showPpr)
-import           CLaSH.GHC.Compat.TyCon      (isSuperKindTyCon)
-#if __GLASGOW_HASKELL__ < 710
-import           Coercion                    (Coercion(..), coercionType)
-#else
-import           Coercion                    (coercionType)
-#endif
-import           CoreFVs                     (exprSomeFreeVars)
-import           CoreSyn                     (AltCon (..), Bind (..), CoreExpr,
-                                              Expr (..), rhssOfAlts)
-import           DataCon                     (DataCon, dataConExTyVars,
-                                              dataConName, dataConRepArgTys,
-                                              dataConTag, dataConTyCon,
-                                              dataConUnivTyVars, dataConWorkId,
-                                              dataConWrapId_maybe)
-import           FamInstEnv                  (FamInst (..), FamInstEnvs,
-                                              familyInstances)
-import           Id                          (isDataConId_maybe)
-import           IdInfo                      (IdDetails (..))
-import           Literal                     (Literal (..))
-import           Module                      (moduleName, moduleNameString)
-import           Name                        (Name, nameModule_maybe,
-                                              nameOccName, nameUnique)
-import           OccName                     (occNameString)
-import           TyCon                       (AlgTyConRhs (..), TyCon,
-                                              algTyConRhs, isAlgTyCon,
-                                              isFunTyCon, isNewTyCon,
-                                              isPrimTyCon,
-                                              isSynTyCon, isTupleTyCon,
-                                              tcExpandTyCon_maybe, tyConArity,
-                                              tyConDataCons, tyConKind,
-                                              tyConName, tyConUnique)
-import           Type                        (mkTopTvSubst, substTy, tcView)
-import           TypeRep                     (TyLit (..), Type (..))
-import           Unique                      (Uniquable (..), Unique, getKey)
-import           Var                         (Id, TyVar, Var, idDetails,
-                                              isTyVar, varName, varType,
-                                              varUnique)
-import           VarSet                      (isEmptyVarSet)
+import Coercion   (coercionType)
+import CoreFVs    (exprSomeFreeVars)
+import CoreSyn    (AltCon (..), Bind (..), CoreExpr,
+                   Expr (..), rhssOfAlts)
+import DataCon    (DataCon, dataConExTyVars,
+                   dataConName, dataConRepArgTys,
+                   dataConTag, dataConTyCon,
+                   dataConUnivTyVars, dataConWorkId,
+                   dataConWrapId_maybe)
+import DynFlags   (unsafeGlobalDynFlags)
+import FamInstEnv (FamInst (..), FamInstEnvs,
+                   familyInstances)
+import FastString (unpackFS)
+import Id         (isDataConId_maybe)
+import IdInfo     (IdDetails (..))
+import Kind       (isSuperKindTyCon)
+import Literal    (Literal (..))
+import Module     (moduleName, moduleNameString)
+import Name       (Name, nameModule_maybe,
+                   nameOccName, nameUnique)
+import OccName    (occNameString)
+import Outputable (showPpr, showSDoc)
+import PprCore    (pprCoreExpr)
+import TyCon      (AlgTyConRhs (..), TyCon,
+                   algTyConRhs, isAlgTyCon, isFamilyTyCon,
+                   isFunTyCon, isNewTyCon,
+                   isPrimTyCon, isTupleTyCon,
+                   tcExpandTyCon_maybe, tyConArity,
+                   tyConDataCons, tyConKind,
+                   tyConName, tyConUnique)
+import Type       (mkTopTvSubst, substTy, tcView)
+import TypeRep    (TyLit (..), Type (..))
+import Unique     (Uniquable (..), Unique, getKey)
+import Var        (Id, TyVar, Var, idDetails,
+                   isTyVar, varName, varType,
+                   varUnique)
+import VarSet     (isEmptyVarSet)
 
 -- Local imports
 import qualified CLaSH.Core.DataCon          as C
@@ -119,9 +117,9 @@ makeTyCon :: FamInstEnvs
 makeTyCon fiEnvs tc = tycon
   where
     tycon
+      | isFamilyTyCon tc    = mkFunTyCon
       | isTupleTyCon tc     = mkTupleTyCon
       | isAlgTyCon tc       = mkAlgTyCon
-      | isSynTyCon tc       = mkFunTyCon
       | isPrimTyCon tc      = mkPrimTyCon
       | isSuperKindTyCon tc = mkSuperKindTyCon
       | otherwise           = mkVoidTyCon
@@ -303,7 +301,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
     coreToLiteral :: Literal
                   -> C.Literal
     coreToLiteral l = case l of
-      MachStr    fs  -> C.StringLiteral (unpackFB fs)
+      MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
       MachChar   c   -> C.StringLiteral [c]
       MachInt    i   -> C.IntegerLiteral i
       MachInt64  i   -> C.IntegerLiteral i
@@ -313,7 +311,13 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
       MachFloat r    -> C.RationalLiteral r
       MachDouble r   -> C.RationalLiteral r
       MachNullAddr   -> C.StringLiteral []
-      _              -> error $ $(curLoc) ++ "Can't convert literal: " ++ showPpr l ++ " in expression: " ++ showPpr coreExpr
+      _              -> error $ concat [ $(curLoc)
+                                       , "Can't convert literal: "
+                                       , showPpr unsafeGlobalDynFlags l
+                                       , " in expression: "
+                                       , showSDoc unsafeGlobalDynFlags
+                                                  (pprCoreExpr coreExpr)
+                                       ]
 
 coreToDataCon :: Bool
               -> DataCon
@@ -323,7 +327,11 @@ coreToDataCon mkWrap dc = do
     dcTy   <- if mkWrap
                 then case dataConWrapId_maybe dc of
                         Just wrapId -> coreToType (varType wrapId)
-                        Nothing     -> error $ $(curLoc) ++ "DataCon Wrapper: " ++ showPpr dc ++ " not found"
+                        Nothing     -> error $ concat [ $(curLoc)
+                                                      , "DataCon Wrapper: "
+                                                      , showPpr unsafeGlobalDynFlags dc
+                                                      , " not found"
+                                                      ]
                 else coreToType (varType $ dataConWorkId dc)
     mkDc dcTy repTys
   where

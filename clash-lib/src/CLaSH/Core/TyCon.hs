@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -16,16 +16,14 @@ where
 
 -- External Import
 import Control.DeepSeq
-import Data.Monoid                           (mempty)
-import Data.Typeable                         hiding (TyCon,tyConName)
 import GHC.Generics
-import Unbound.Generics.LocallyNameless      (Alpha(..),Subst(..))
-import Unbound.Generics.LocallyNameless.Name (Name(..),name2String)
+import Unbound.Generics.LocallyNameless       (Alpha(..))
+import Unbound.Generics.LocallyNameless.Extra ()
+import Unbound.Generics.LocallyNameless.Name  (Name,name2String)
 
 -- Internal Imports
-import {-# SOURCE #-} CLaSH.Core.DataCon     (DataCon)
-import {-# SOURCE #-} CLaSH.Core.Term        (Term)
-import {-# SOURCE #-} CLaSH.Core.Type        (Kind, TyName, Type)
+import CLaSH.Core.DataCon                     (DataCon)
+import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import CLaSH.Util
 
 -- | Type Constructor
@@ -54,7 +52,7 @@ data TyCon
   | SuperKindTyCon
   { tyConName :: TyConName     -- ^ Name of the TyCon
   }
-  deriving (Generic,Typeable)
+  deriving (Generic,NFData)
 
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
@@ -84,7 +82,7 @@ data AlgTyConRhs
                                  -- The TyName's are the type-variables from
                                  -- the corresponding TyCon.
   }
-  deriving (Show,Generic)
+  deriving (Show,Generic,NFData,Alpha)
 
 instance Alpha TyCon where
   aeq' c tc1 tc2      = aeq' c (tyConName tc1) (tyConName tc2)
@@ -105,32 +103,6 @@ instance Alpha TyCon where
   freshen' _ tc       = return (tc,mempty)
 
   acompare' c tc1 tc2 = acompare' c (tyConName tc1) (tyConName tc2)
-
-
-instance Alpha AlgTyConRhs
-
-instance Subst Type TyCon
-instance Subst Type AlgTyConRhs
-
-instance Subst Term TyCon
-instance Subst Term AlgTyConRhs
-
-instance NFData TyCon where
-  rnf tc = case tc of
-    AlgTyCon nm ki ar rhs     -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf rhs
-    FunTyCon nm ki ar tcSubst -> rnf nm `seq` rnf ki `seq` rnf ar `seq` rnf tcSubst
-    PrimTyCon nm ki ar        -> rnf nm `seq` rnf ki `seq` rnf ar
-    SuperKindTyCon nm         -> rnf nm
-
-instance NFData (Name TyCon) where
-  rnf nm = case nm of
-    (Fn s i) -> rnf s `seq` rnf i
-    (Bn l r) -> rnf l `seq` rnf r
-
-instance NFData AlgTyConRhs where
-  rnf rhs = case rhs of
-    DataTyCon dcs   -> rnf dcs
-    NewTyCon dc eta -> rnf dc `seq` rnf eta
 
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName

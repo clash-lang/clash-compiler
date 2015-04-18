@@ -1,5 +1,8 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.1
+* GHC 7.10 support
+
 ## 0.5 *March 11th 2015*
 * New features:
   * Simplify BlackBox handling, and improve VHDL generation. [#47](https://github.com/clash-lang/clash-compiler/issues/47)

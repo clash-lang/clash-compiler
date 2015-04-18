@@ -1,5 +1,11 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.1
+* New features
+  * GHC 7.10 support
+  * Update to clash-prelude 0.7.2
+  * Use http://hackage.haskell.org/package/ghc-typelits-natnormalise typechecker plugin for better type-level natural number handling
+
 ## 0.5 *March 11th 2015*
 * New features:
   * SystemVerilog backend. [#45](https://github.com/clash-lang/clash-compiler/issues/45)

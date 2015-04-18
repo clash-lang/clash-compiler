@@ -7,16 +7,16 @@ module CLaSH.GHC.LoadInterfaceFiles
 where
 
 -- External Modules
-import           Data.Either                 (partitionEithers)
-import           Data.List                   (elemIndex, partition)
-import           Data.Maybe                  (isJust, isNothing)
+import           Data.Either (partitionEithers)
+import           Data.List   (elemIndex, partition)
+import           Data.Maybe  (isJust, isNothing)
 
 -- GHC API
 import qualified BasicTypes
-import           CLaSH.GHC.Compat.Outputable (showPpr, showSDoc)
 import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
+import           DynFlags    (unsafeGlobalDynFlags)
 import qualified GHC
 import qualified Id
 import qualified IdInfo
@@ -26,7 +26,7 @@ import qualified Maybes
 import qualified MkCore
 import qualified MonadUtils
 import qualified Name
-import           Outputable                  (text)
+import           Outputable  (showPpr, showSDoc, text)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -35,7 +35,7 @@ import qualified Var
 import qualified VarSet
 
 -- Internal Modules
-import           CLaSH.Util                  (curLoc, traceIf)
+import           CLaSH.Util  (curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
@@ -54,7 +54,13 @@ loadIface foundMod = do
   ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface") foundMod False
   case ifaceFailM of
     Maybes.Succeeded (modInfo,_) -> return (Just modInfo)
-    Maybes.Failed msg -> traceIf True ($(curLoc) ++ "Failed to load interface for module: " ++ showPpr foundMod ++ "\nReason: " ++ showSDoc msg) $ return Nothing
+    Maybes.Failed msg -> let msg' = concat [ $(curLoc)
+                                           , "Failed to load interface for module: "
+                                           , showPpr unsafeGlobalDynFlags foundMod
+                                           , "\nReason: "
+                                           , showSDoc unsafeGlobalDynFlags msg
+                                           ]
+                         in traceIf True msg' (return Nothing)
 
 loadExternalExprs ::
   GHC.GhcMonad m

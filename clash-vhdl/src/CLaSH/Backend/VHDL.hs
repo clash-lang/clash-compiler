@@ -21,6 +21,7 @@ import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
+import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -13,15 +13,12 @@ module CLaSH.Core.DataCon
   )
 where
 
-import Data.Monoid                           (mempty)
-import Data.Typeable                         (Typeable)
-import Control.DeepSeq                       (NFData(..))
-import GHC.Generics                          (Generic)
-import Unbound.Generics.LocallyNameless      (Alpha(..),Subst,substs)
-import Unbound.Generics.LocallyNameless.Name (Name(..))
+import Control.DeepSeq                        (NFData(..))
+import GHC.Generics                           (Generic)
+import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst(..))
+import Unbound.Generics.LocallyNameless.Extra ()
 
-import {-# SOURCE #-} CLaSH.Core.Term        (Term)
-import {-# SOURCE #-} CLaSH.Core.Type        (TyName, Type)
+import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
 import CLaSH.Util
 
 -- | Data Constructor
@@ -37,7 +34,7 @@ data DataCon
                              -- these type variables are not part of the result
                              -- of the DataCon, but only of the arguments.
   , dcArgTys     :: [Type]   -- ^ Argument types
-  } deriving (Generic,Typeable)
+  } deriving (Generic,NFData)
 
 instance Show DataCon where
   show = show . dcName
@@ -73,18 +70,9 @@ instance Alpha DataCon where
 
   acompare' c dc1 dc2 = acompare' c (dcName dc1) (dcName dc2)
 
-instance Subst Type DataCon
-instance Subst Term DataCon
-
-instance NFData DataCon where
-  rnf dc = case dc of
-    MkData nm tag ty uv ev args -> rnf nm `seq` rnf tag `seq` rnf ty `seq`
-                                   rnf uv `seq` rnf ev `seq` rnf args
-
-instance NFData (Name DataCon) where
-  rnf nm = case nm of
-    (Fn s i) -> rnf s `seq` rnf i
-    (Bn l r) -> rnf l `seq` rnf r
+instance Subst a DataCon where
+  subst _ _ dc = dc
+  substs _ dc  = dc
 
 -- | Given a DataCon and a list of types, the type variables of the DataCon
 -- type are substituted for the list of types. The argument types are returned.

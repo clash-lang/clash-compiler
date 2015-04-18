@@ -1,11 +1,9 @@
 env:
-  - GHCVER=7.8.4 CABALVER=1.18
   - GHCVER=7.10.1 CABALVER=1.22
   - GHCVER=head CABALVER=1.22
 
 matrix:
   allow_failures:
-    - env: GHCVER=7.10.1 CABALVER=1.22
     - env: GHCVER=head CABALVER=1.22
 
 before_install:
@@ -17,8 +15,10 @@ before_install:
   - cabal --version
 
 install:
+  - git clone https://github.com/clash-lang/clash-prelude.git
   - travis_retry cabal update
   - cabal sandbox init
+  - cabal sandbox add-source clash-prelude
   - cabal sandbox add-source clash-ghc
   - cabal sandbox add-source clash-lib
   - cabal sandbox add-source clash-systemverilog
@@ -26,59 +26,6 @@ install:
 
 script:
   - cabal install clash-ghc
-
-  # tests that a source-distributions can be generated
-  - cd clash-lib
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
-  - cd ../clash-vhdl
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
-  - cd ../clash-systemverilog
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
-  - cd ../clash-ghc
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
 
 notifications:
   irc:

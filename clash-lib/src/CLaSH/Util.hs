@@ -21,7 +21,7 @@ import Control.Monad.State            (MonadState,State,StateT,runState)
 import qualified Control.Monad.State  as State
 import Control.Monad.Trans.Class      (MonadTrans,lift)
 import Data.Function                  as X (on)
-import Data.Hashable                  (Hashable(..),hash)
+import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
 import qualified Data.HashMap.Strict  as HashMapS
@@ -30,8 +30,6 @@ import Data.Version                   (Version)
 import Control.Lens
 import Debug.Trace                    (trace)
 import qualified Language.Haskell.TH  as TH
-import Unbound.Generics.LocallyNameless        (Embed(..))
-import Unbound.Generics.LocallyNameless.Name   (Name(..))
 
 #ifdef CABAL
 import qualified Paths_clash_lib      (version)
@@ -47,13 +45,6 @@ instance Monad m => MonadUnique (StateT Int m) where
     supply <- State.get
     State.modify (+1)
     return supply
-
-instance Hashable (Name a) where
-  hashWithSalt salt (Fn str int) = hashWithSalt salt (hashWithSalt (hash int) str)
-  hashWithSalt salt (Bn i0  i1)  = hashWithSalt salt (hash i0 `hashWithSalt` i1)
-
-instance (Ord a) => Ord (Embed a) where
-  compare (Embed a) (Embed b) = compare a b
 
 -- | Create a TH expression that returns the a formatted string containing the
 -- name of the module 'curLoc' is spliced into, and the line where it was spliced.

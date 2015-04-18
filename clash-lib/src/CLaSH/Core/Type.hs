@@ -1,9 +1,11 @@
-{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
+
+{-# OPTIONS_GHC -fno-specialise #-}
 
 -- | Types in CoreHW
 module CLaSH.Core.Type
@@ -43,15 +45,14 @@ import           Control.Monad                           (zipWithM)
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.Maybe                              (isJust)
-import           Data.Typeable                           hiding (TyCon,mkFunTy,
-                                                          mkTyConApp)
 import           GHC.Generics                            (Generic(..))
 import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           Subst(..),SubstName(..),
                                                           acompare,aeq,bind,
                                                           gacompare,gaeq,gfvAny,
                                                           runFreshM,unbind)
-import           Unbound.Generics.LocallyNameless.Name   (Name(..), name2String)
+import           Unbound.Generics.LocallyNameless.Name   (Name,name2String)
+import           Unbound.Generics.LocallyNameless.Extra  ()
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 -- Local imports
@@ -69,7 +70,7 @@ data Type
   | ForAllTy (Bind TyVar Type) -- ^ Polymorphic Type
   | AppTy    Type Type         -- ^ Type Application
   | LitTy    LitTy             -- ^ Type literal
-  deriving (Show,Generic,Typeable)
+  deriving (Show,Generic,NFData)
 
 -- | An easier view on types
 data TypeView
@@ -82,13 +83,13 @@ data TypeView
 data ConstTy
   = TyCon TyConName -- ^ TyCon type
   | Arrow           -- ^ Function type
-  deriving (Show,Generic,Typeable)
+  deriving (Show,Generic,NFData,Alpha)
 
 -- | Literal Types
 data LitTy
   = NumTy Int
   | SymTy String
-  deriving (Show,Generic,Typeable)
+  deriving (Show,Generic,NFData,Alpha)
 
 -- | The level above types
 type Kind       = Type
@@ -110,13 +111,14 @@ instance Alpha Type where
   acompare' c (VarTy _ n) (VarTy _ m) = acompare' c n m
   acompare' c t1          t2          = gacompare c (from t1) (from t2)
 
-instance Alpha ConstTy
-instance Alpha LitTy
+instance Subst a LitTy where
+  subst _ _ lt = lt
+  substs _ lt  = lt
 
-instance Subst Type LitTy
-instance Subst Term LitTy
-instance Subst Type ConstTy
-instance Subst Term ConstTy
+instance Subst a ConstTy where
+  subst _ _ ct = ct
+  substs _ ct  = ct
+
 instance Subst Term Type
 instance Subst Type Type where
   isvar (VarTy _ v) = Just (SubstName v)
@@ -127,30 +129,6 @@ instance Eq Type where
 
 instance Ord Type where
   compare = acompare
-
-instance NFData Type where
-  rnf ty = case ty of
-    VarTy    ki nm   -> rnf ki `seq` rnf nm
-    ConstTy  c       -> rnf c
-    ForAllTy b       -> case unsafeUnbind b of
-                          (tv,ty') -> rnf tv `seq` rnf ty'
-    AppTy    tyL tyR -> rnf tyL `seq` rnf tyR
-    LitTy    l       -> rnf l
-
-instance NFData (Name Type) where
-  rnf nm = case nm of
-    (Fn s i) -> rnf s `seq` rnf i
-    (Bn l r) -> rnf l `seq` rnf r
-
-instance NFData ConstTy where
-  rnf cty = case cty of
-    TyCon nm -> rnf nm
-    Arrow    -> ()
-
-instance NFData LitTy where
-  rnf lty = case lty of
-    NumTy i -> rnf i
-    SymTy s -> rnf s
 
 -- | An easier view on types
 tyView :: Type -> TypeView
