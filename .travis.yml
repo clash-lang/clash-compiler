@@ -27,59 +27,6 @@ install:
 script:
   - cabal install clash-ghc
 
-  # tests that a source-distributions can be generated
-  - cd clash-lib
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
-  - cd ../../clash-vhdl
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
-  - cd ../../clash-systemverilog
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
-  - cd ../../clash-ghc
-  - cabal sdist
-
-  # check that the generated source-distribution can be built & installed
-  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
-    else
-       echo "expected '$SRC_TGZ' not found";
-       exit 1;
-    fi
-
 notifications:
   irc:
     channels:
