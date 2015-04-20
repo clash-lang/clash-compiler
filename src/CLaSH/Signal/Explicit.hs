@@ -121,6 +121,7 @@ sclock :: (KnownSymbol name, KnownNat period)
 sclock = SClock ssymbol snat
 
 {-# INLINE withSClock #-}
+-- | Supply a function with a singleton clock @clk@ according to the context
 withSClock :: (KnownSymbol name, KnownNat period)
            => (SClock ('Clk name period) -> a)
            -> a

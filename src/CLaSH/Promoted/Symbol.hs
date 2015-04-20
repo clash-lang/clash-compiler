@@ -26,5 +26,7 @@ ssymbol :: KnownSymbol s => SSymbol s
 ssymbol = SSymbol Proxy
 
 {-# INLINE ssymbolToString #-}
+-- | Reify the type-level 'Symbol' @s@ to it's term-level 'String'
+-- representation.
 ssymbolToString :: SSymbol s -> String
 ssymbolToString (SSymbol s) = symbolVal s

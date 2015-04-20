@@ -208,10 +208,12 @@ unUF :: UFixed int frac
 unUF (Fixed fRep) = fRep
 
 {-# INLINE asRepProxy #-}
+-- | 'Fixed' as a 'Proxy' for it's representation type @rep@
 asRepProxy :: Fixed rep int frac -> Proxy rep
 asRepProxy _ = Proxy
 
 {-# INLINE asIntProxy #-}
+-- | 'Fixed' as a 'Proxy' for the number of integer bits @int@
 asIntProxy :: Fixed rep int frac -> Proxy int
 asIntProxy _ = Proxy
 

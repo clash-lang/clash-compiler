@@ -43,6 +43,7 @@ withSNat :: KnownNat n => (SNat n -> a) -> a
 withSNat f = f (SNat Proxy)
 
 {-# INLINE snatToInteger #-}
+-- | Reify the type-level 'Nat' @n@ to it's term-level 'Integer' representation.
 snatToInteger :: SNat n -> Integer
 snatToInteger (SNat p) = natVal p
 

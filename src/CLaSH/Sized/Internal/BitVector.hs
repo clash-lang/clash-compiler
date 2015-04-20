@@ -121,6 +121,7 @@ newtype BitVector (n :: Nat) =
     -- synthesisable.
     BV { unsafeToInteger :: Integer}
 
+-- | 'Bit': a 'BitVector' of length 1
 type Bit = BitVector 1
 
 -- * Instances
