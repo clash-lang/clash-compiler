@@ -79,7 +79,6 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- $setup
 -- >>> :set -XDataKinds
 -- >>> :set -XTypeFamilies
--- >>> :set -XKindSignatures
 -- >>> :set -XTypeOperators
 -- >>> :set -XTemplateHaskell
 -- >>> :set -XFlexibleContexts
@@ -95,12 +94,11 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- :}
 --
 -- >>> :{
--- let sortVL :: forall n a . (Ord a, KnownNat (n+1)) => Vec ((n + 1) + 1) a -> Vec ((n + 1) + 1) a
+-- let sortVL :: (Ord a, KnownNat (n+1)) => Vec (n + 2)  a -> Vec (n + 2) a
 --     sortVL xs = map fst sorted <: (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
---         sorted :: Vec (n + 1) (a,a)
 --         sorted = zipWith compareSwapL (lazyV lefts) rights
 -- :}
 --
@@ -112,6 +110,13 @@ import CLaSH.Class.BitPack (BitPack (..))
 --         sorted = zipWith (flip compareSwapL) rights lefts
 -- :}
 --
+-- >>> import Data.Singletons.Prelude
+-- >>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
+-- >>> type instance Apply (Append m a) l = Vec (l + m) a
+-- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+-- >>> let cs a b     = if a > b then (a,b) else (b,a)
+-- >>> let csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' <: y'
+-- >>> let csSort     = vfold csRow
 
 -- | Fixed size vectors
 --
@@ -973,6 +978,7 @@ asNatProxy _ = Proxy
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
 --
 -- @
+-- sortVL :: (Ord a, KnownNat (n+1)) => Vec (n + 2)  a -> Vec (n + 2) a
 -- sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
 --  where
 --    lefts  = 'head' xs :> map snd ('init' sorted)
@@ -1014,10 +1020,6 @@ lazyV = lazyV' (repeat undefined)
 --
 -- Using lists, we can define @append@ ('Prelude.++') using 'Prelude.foldr':
 --
--- @
--- append xs ys = 'Prelude.foldr' (':') ys xs
--- @
---
 -- >>> import qualified Prelude
 -- >>> let append xs ys = Prelude.foldr (:) ys xs
 -- >>> append [1,2] [3,4]
@@ -1031,7 +1033,7 @@ lazyV = lazyV' (repeat undefined)
 --
 -- We get a type error
 --
--- >>> let append xs ys = foldr (:>) ys xs
+-- >>> let append' xs ys = foldr (:>) ys xs
 -- <BLANKLINE>
 -- <interactive>:...
 --     Occurs check: cannot construct the infinite type: n1 ~ n1 + 1
@@ -1039,7 +1041,7 @@ lazyV = lazyV' (repeat undefined)
 --       Actual type: a -> Vec n1 a -> Vec (n1 + 1) a
 --     Relevant bindings include
 --       ys :: Vec n1 a (bound at ...)
---       append :: Vec n a -> Vec n1 a -> Vec n1 a
+--       append' :: Vec n a -> Vec n1 a -> Vec n1 a
 --         (bound at ...)
 --     In the first argument of ‘foldr’, namely ‘(:>)’
 --     In the expression: foldr (:>) ys xs
@@ -1061,24 +1063,23 @@ lazyV = lazyV' (repeat undefined)
 -- now correctly define ('++'):
 --
 -- @
+-- import Data.Singletons.Prelude
+-- import Data.Proxy
+--
 -- data Append (m :: Nat) (a :: *) (f :: 'TyFun' Nat *) :: *
 -- type instance 'Apply' (Append m a) l = 'Vec' (l + m) a
 --
--- append xs ys = dfold (Proxy :: Proxy (Append m a)) (const (':>')) ys xs
+-- append' xs ys = 'dfold' (Proxy :: Proxy (Append m a)) (const (':>')) ys xs
 -- @
 --
 -- We now see that @append@ has the appropriate type:
 --
--- >>> import Data.Singletons.Prelude
--- >>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
--- >>> type instance Apply (Append m a) l = Vec (l + m) a
--- >>> let append xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
--- >>> :t append
--- append :: Vec k a -> Vec m a -> Vec (k + m) a
+-- >>> :t append'
+-- append' :: Vec k a -> Vec m a -> Vec (k + m) a
 --
 -- And that it works:
 --
--- >>> (1 :> 2 :> Nil) ++ (3 :> 4 :> Nil)
+-- >>> append' (1 :> 2 :> Nil) (3 :> 4 :> Nil)
 -- <1,2,3,4>
 dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
       -> (forall l . Proxy l -> a -> p $ l -> p $ (l + 1)) -- ^ Function to fold
@@ -1107,9 +1108,6 @@ type instance Apply (V a) l = Vec l a
 --
 -- Builds a triangular structure of compare and swaps to sort a row.
 --
--- >>> let cs a b     = if a > b then (a,b) else (b,a)
--- >>> let csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' <: y'
--- >>> let csSort     = vfold csRow
 -- >>> csSort (7 :> 3 :> 9 :> 1 :> Nil)
 -- <1,3,7,9>
 vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
