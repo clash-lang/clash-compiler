@@ -1,5 +1,8 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.2 *April 21st 2015*
+* Use latest ghc-typelits-natnormalise
+
 ## 0.5.1 *April 20th 2015*
 * New features
   * GHC 7.10 support

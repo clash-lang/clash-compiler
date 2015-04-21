@@ -16,8 +16,10 @@ before_install:
 
 install:
   - git clone https://github.com/clash-lang/clash-prelude.git
+  - git clone https://github.com/christiaanb/ghc-typelits-natnormalise.git
   - travis_retry cabal update
   - cabal sandbox init
+  - cabal sandbox add-source ghc-typelits-natnormalise
   - cabal sandbox add-source clash-prelude
   - cabal sandbox add-source clash-ghc
   - cabal sandbox add-source clash-lib
