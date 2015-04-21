@@ -814,9 +814,9 @@ dropI = withSNat drop
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
 --
--- >>> at (snat :: SNat 1) ((1:>2:>3:>4:>5:>Nil) :: Vec 5 Int)
+-- >>> at (snat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
 -- 2
--- >>> at d1               ((1:>2:>3:>4:>5:>Nil) :: Vec 5 Int)
+-- >>> at d1               (1:>2:>3:>4:>5:>Nil)
 -- 2
 at :: SNat m -> Vec (m + (n + 1)) a -> a
 at n xs = head $ snd $ splitAt n xs
