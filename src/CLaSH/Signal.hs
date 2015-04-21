@@ -69,6 +69,10 @@ import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
 import CLaSH.Signal.Explicit (SystemClock, systemClock, simulateB')
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
+-- $setup
+-- >>> let oscillate = register False (not1 oscillate)
+-- >>> let count = regEn 0 oscillate (count + 1)
+
 -- * Implicitly clocked synchronous signal
 
 -- | Signal synchronised to the \"system\" clock, which has a period of 1000.
@@ -96,10 +100,8 @@ register = register# systemClock
 --
 -- We get:
 --
--- >>> let oscillate = register False (not1 oscillate)
 -- >>> sampleN 8 oscillate
 -- [False,True,False,True,False,True,False,True]
--- >>> let count = regEn 0 oscillate (count + 1)
 -- >>> sampleN 8 count
 -- [0,0,1,1,2,2,3,3]
 regEn :: a -> Signal Bool -> Signal a -> Signal a
