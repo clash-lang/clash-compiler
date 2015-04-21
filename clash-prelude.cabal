@@ -118,7 +118,7 @@ Library
                       data-default              >= 0.5.3,
                       integer-gmp               >= 0.5.1.0,
                       ghc-prim                  >= 0.3.1.0,
-                      ghc-typelits-natnormalise >= 0.1.1,
+                      ghc-typelits-natnormalise >= 0.1.2,
                       singletons                >= 1.0,
                       template-haskell          >= 2.9.0.0,
                       th-lift                   >= 0.5.6

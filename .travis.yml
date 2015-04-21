@@ -16,6 +16,9 @@ before_install:
 
 install:
   - travis_retry cabal update
+  - git clone https://github.com/christiaanb/ghc-typelits-natnormalise.git
+  - cabal sandbox init
+  - cabal sandbox add-source ghc-typelits-natnormalise
   - cabal install --dependencies-only --enable-tests
   - cabal configure --enable-tests
 
@@ -28,11 +31,10 @@ script:
 
   # check that the generated source-distribution can be built & installed
   - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
-    cd dist/;
-    if [ -f "$SRC_TGZ" ]; then
-       cabal install --force-reinstalls "$SRC_TGZ";
+    if [ -f "dist/$SRC_TGZ" ]; then
+       cabal install --force-reinstalls "dist/$SRC_TGZ";
     else
-       echo "expected '$SRC_TGZ' not found";
+       echo "expected 'dist/$SRC_TGZ' not found";
        exit 1;
     fi
 
