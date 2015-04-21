@@ -131,7 +131,6 @@ delayI :: (Default a, KnownNat m)
        -> DSignal n a
 delayI = delay (repeat def)
 
-{-# WARNING feedback "This function does not work in GHC 7.10.1, use 'antiDelay' instead" #-}
 -- | Feed the delayed result of a function back to its input:
 --
 -- @
