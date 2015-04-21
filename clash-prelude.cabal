@@ -30,7 +30,7 @@ Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
 Copyright:            Copyright © 2013-2015 University of Twente
 Category:             Hardware
-Build-type:           Custom
+Build-type:           Simple
 
 Extra-source-files:   README.md
                       CHANGELOG.md
@@ -134,7 +134,6 @@ test-suite doctests
     buildable: False
   else
     build-depends:
-      base      >= 4     && < 5,
-      directory >= 1.0,
-      doctest   >= 0.9.1 && < 0.10,
-      filepath
+      base    >= 4     && < 5,
+      doctest >= 0.9.1 && < 0.10,
+      Glob    >= 0.7   && < 0.8
