@@ -55,10 +55,13 @@ import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 -- >>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
 -- >>> let delay2 = delayI :: DSignal (n - 2) Int -> DSignal n Int
 -- >>> :{
--- let mac x y = acc
+-- let mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+--     mac x y = feedback (mac' x y)
 --       where
---         acc' = (x * y) + antiDelay d1 acc
---         acc  = delay (singleton 0) acc'
+--         mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+--              -> (DSignal 0 Int, DSignal 1 Int)
+--         mac' a b acc = let acc' = a * b + acc
+--                        in  (acc, delay (singleton 0) acc')
 -- :}
 --
 

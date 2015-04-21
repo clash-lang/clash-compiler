@@ -1,5 +1,8 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.7.3
+* Use version 0.2 of the [`ghc-typelits-natnormalise` package](http://hackage.haskell.org/package/ghc-typelits-natnormalise)
+
 ## 0.7.2 *April 20th 2015*
 * New features:
   * Support for GHC 7.10 => only works with GHC 7.10 and higher
