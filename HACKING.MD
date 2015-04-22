@@ -2,6 +2,7 @@ Download sources:
 ```
 git clone git@github.com:clash-lang/clash-compiler.git
 git clone git@github.com:clash-lang/clash-prelude.git
+git clone git@github.com:christiaanb/ghc-typelits-natnormalise.git
 ```
 
 Go to clash-compiler dir:
@@ -17,6 +18,7 @@ cabal sandbox add-source clash-vhdl
 cabal sandbox add-source clash-systemverilog
 cabal sandbox add-source clash-ghc
 cabal sandbox add-source ../clash-prelude
+cabal sandbox add-source ../ghc-typelits-natnormalise
 cabal install clash-ghc --dependencies-only
 ```
 
