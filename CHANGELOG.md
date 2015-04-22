@@ -1,7 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.7.3
-* Use version 0.2 of the [`ghc-typelits-natnormalise` package](http://hackage.haskell.org/package/ghc-typelits-natnormalise)
+## 0.7.3 *April 22nd 2015*
+* New features:
+  * Add the vector functions: `zip3`, `unzip3`, and `zipWith3`
+  * Use version 0.2 of the [`ghc-typelits-natnormalise` package](http://hackage.haskell.org/package/ghc-typelits-natnormalise)
 
 ## 0.7.2 *April 20th 2015*
 * New features:
