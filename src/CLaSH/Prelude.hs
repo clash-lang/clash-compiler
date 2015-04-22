@@ -99,8 +99,8 @@ import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            foldl1, foldr, foldr1, head, init,
                                            iterate, last, length, map, repeat,
                                            replicate, reverse, scanl, scanr,
-                                           splitAt, tail, take, unzip, zip,
-                                           zipWith)
+                                           splitAt, tail, take, unzip, unzip3,
+                                           zip, zip3, zipWith, zipWith3)
 
 import CLaSH.Class.BitPack
 import CLaSH.Class.Num

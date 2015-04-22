@@ -29,12 +29,12 @@ module CLaSH.Sized.Vector
   , head, tail, last, init
   , take, takeI, drop, dropI, at, select, selectI
     -- ** Combining 'Vec'tors
-  , (++), (+>>), (<<+), concat, zip, unzip, shiftInAt0, shiftInAtN
+  , (++), (+>>), (<<+), concat, zip, unzip, zip3, unzip3, shiftInAt0, shiftInAtN
   , shiftOutFrom0, shiftOutFromN
     -- ** Splitting 'Vec'tors
   , splitAt, splitAtI, unconcat, unconcatI, merge
     -- ** Applying functions to 'Vec'tor elements
-  , map, zipWith
+  , map, zipWith, zipWith3
   , foldr, foldl, foldr1, foldl1, fold
   , scanl, scanr, sscanl, sscanr
   , mapAccumL, mapAccumR
@@ -66,8 +66,8 @@ import Prelude                    hiding ((++), (!!), concat, drop, foldl,
                                           foldl1, foldr, foldr1, head, init,
                                           iterate, last, length, map, repeat,
                                           replicate, reverse, scanl, scanr,
-                                          splitAt, tail, take, unzip, zip,
-                                          zipWith)
+                                          splitAt, tail, take, unzip, unzip3,
+                                          zip, zip3, zipWith, zipWith3)
 import qualified Prelude          as P
 import Unsafe.Coerce              (unsafeCoerce)
 
@@ -470,6 +470,18 @@ zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil       _  = Nil
 zipWith f (x :> xs) ys = f x (head ys) :> zipWith f xs (tail ys)
 
+{-# INLINE zipWith3 #-}
+-- | 'zipWith3' generalises 'zip3' by zipping with the function given
+-- as the first argument, instead of a tupling function.
+--
+-- > zipWith3 f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) (z1 :> z2 :> ... :> zn :> Nil) == (f x1 y1 z1 :> f x2 y2 z2 :> ... :> f xn yn zn :> Nil)
+--
+-- __NB:__ 'zipWith3' is /strict/ in its second argument, and /lazy/ in its
+-- third and fourth. This matters when 'zipWith3' is used in a recursive setting.
+-- See 'lazyV' for more information.
+zipWith3 :: (a -> b -> c -> d) -> Vec n a -> Vec n b -> Vec n c -> Vec n d
+zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
+
 {-# INLINABLE foldr #-}
 -- | 'foldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a vector, reduces the vector
@@ -662,6 +674,14 @@ mapAccumR f acc xs = (acc',ys)
 zip :: Vec n a -> Vec n b -> Vec n (a,b)
 zip = zipWith (,)
 
+{-# INLINE zip3 #-}
+-- | 'zip' takes three vectors and returns a vector of corresponding triplets.
+--
+-- >>> zip3 (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil) (5:>6:>7:>8:>Nil)
+-- <(1,4,5),(2,3,6),(3,2,7),(4,1,8)>
+zip3 :: Vec n a -> Vec n b -> Vec n c -> Vec n (a,b,c)
+zip3 = zipWith3 (,,)
+
 {-# INLINE unzip #-}
 -- | 'unzip' transforms a vector of pairs into a vector of first components
 -- and a vector of second components.
@@ -670,6 +690,18 @@ zip = zipWith (,)
 -- (<1,2,3,4>,<4,3,2,1>)
 unzip :: Vec n (a,b) -> (Vec n a, Vec n b)
 unzip xs = (map fst xs, map snd xs)
+
+{-# INLINE unzip3 #-}
+-- | 'unzip3' transforms a vector of triplets into a vector of first components,
+-- a vector of second components, and a vector of third components.
+--
+-- >>> unzip3 ((1,4,5):>(2,3,6):>(3,2,7):>(4,1,8):>Nil)
+-- (<1,2,3,4>,<4,3,2,1>,<5,6,7,8>)
+unzip3 :: Vec n (a,b,c) -> (Vec n a, Vec n b, Vec n c)
+unzip3 xs = ( map (\(x,_,_) -> x) xs
+            , map (\(_,y,_) -> y) xs
+            , map (\(_,_,z) -> z) xs
+            )
 
 {-# NOINLINE index_int #-}
 index_int :: KnownNat n => Vec n a -> Int -> a
