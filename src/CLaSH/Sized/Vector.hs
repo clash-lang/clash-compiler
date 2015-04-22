@@ -94,8 +94,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- :}
 --
 -- >>> :{
--- let sortVL :: (Ord a, KnownNat (n+1)) => Vec (n + 2)  a -> Vec (n + 2) a
---     sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortVL xs = map fst sorted <: (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -1010,7 +1009,6 @@ asNatProxy _ = Proxy
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
 --
 -- @
--- sortVL :: (Ord a, KnownNat (n+1)) => Vec (n + 2)  a -> Vec (n + 2) a
 -- sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
 --  where
 --    lefts  = 'head' xs :> map snd ('init' sorted)

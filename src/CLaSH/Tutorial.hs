@@ -87,12 +87,8 @@ import GHC.Word
 --         sorted = zipWith compareSwapL lefts rights
 -- :}
 --
--- >>> :set -XMonoLocalBinds
--- >>> :set -XTypeOperators
--- >>> :set -XDataKinds
 -- >>> :{
--- let sortVL :: (Ord a, KnownNat (n+1)) => Vec (n + 2) a -> Vec (n + 2) a
---     sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortVL xs = map fst sorted <: (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -1116,7 +1112,6 @@ A list of often encountered errors and their solutions:
     In this case, adding 'lazyV' on 'zipWith's second argument:
 
     @
-    sortVL :: (Ord a, KnownNat (n+1)) => Vec (n + 2)  a -> Vec (n + 2) a
     sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
      where
        lefts  = 'head' xs :> map snd ('init' sorted)
