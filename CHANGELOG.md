@@ -14,12 +14,12 @@
 
 ## 0.7 *March 13th 2015*
 * New features:
-  * Switch types of 'bundle' and 'bundle'', and 'unbundle' and 'unbundle''.
+  * Switch types of `bundle` and `bundle'`, and `unbundle` and `unbundle'`.
   * Rename all explicitly clocked versions of Signal functions, to the primed
-    name of the implicitly clocked Signal functions. E.g. 'cregister' is now
-    called 'register'' (where the implicitly clocked function is callled 'register')
-  * Add new instances for 'DSignal'
-  * Add experimental 'antiDelay' function for 'DSignal'
+    name of the implicitly clocked Signal functions. E.g. `cregister` is now
+    called `register'` (where the implicitly clocked function is callled `register`)
+  * Add new instances for `DSignal`
+  * Add experimental `antiDelay` function for `DSignal`
   * Generalize lifted functions over Signals (e.g. (.==.))
 
 * Fixes bugs:
