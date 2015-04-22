@@ -137,7 +137,7 @@ import CLaSH.Signal.Explicit       (systemClock)
 "CLaSH.Prelude" re-exports most of the Haskell "Prelude" with the exception of
 the following: (++), (!!), concat, drop, foldl, foldl1, foldr, foldr1, head,
 init, iterate, last, length, map, repeat, replicate, reverse, scanl, scanr,
-splitAt, tail, take, unzip, zip, zipWith.
+splitAt, tail, take, unzip, unzip3, zip, zip3, zipWith, zipWith3.
 
 It instead exports the identically named functions defined in terms of
 'CLaSH.Sized.Vector.Vec' at "CLaSH.Sized.Vector".
