@@ -70,10 +70,17 @@ Executable clash
                       unbound-generics          >= 0.1,
                       unordered-containers      >= 0.2.1.0,
 
+<<<<<<< HEAD
                       clash-lib                 >= 0.5.1,
                       clash-vhdl                >= 0.5.2,
                       clash-systemverilog       >= 0.5.1,
                       clash-prelude             >= 0.7.3,
+=======
+                      clash-lib                 >= 0.5.2,
+                      clash-vhdl                >= 0.5.3,
+                      clash-systemverilog       >= 0.5.3,
+                      clash-prelude             >= 0.7.2,
+>>>>>>> Up version numbers
                       ghc-typelits-natnormalise >= 0.2
 
   if os(windows)
