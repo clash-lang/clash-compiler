@@ -42,7 +42,7 @@ mkInput (i,hwty) cnt = case hwty of
                               $ map (mkInput (iName,hwty')) [0..(sz-1)]
         netdecl  = NetDecl iName hwty
         netassgn = Assignment iName (mkVectorChain sz hwty' ids)
-    in  (ports',(netdecl:netassgn:decls',iName))
+    in  (ports',(netdecl:decls' ++ [netassgn],iName))
   Product _ hwtys ->
     let (ports',(decls',ids)) = (concat *** (first concat . unzip))
                               . unzip
@@ -51,7 +51,7 @@ mkInput (i,hwty) cnt = case hwty of
         netdecl  = NetDecl iName hwty
         ids'     = map (`Identifier` Nothing) ids
         netassgn = Assignment iName (DataCon hwty (DC (hwty,0)) ids')
-    in  (ports',(netdecl:netassgn:decls',iName))
+    in  (ports',(netdecl:decls' ++ [netassgn],iName))
   _               -> ([(iName,hwty)],([],iName))
   where
     iName = append i (pack ("_" ++ show cnt))
