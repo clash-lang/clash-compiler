@@ -92,7 +92,7 @@ mkOutput (i,hwty) cnt = case hwty of
   Vector sz hwty' ->
     let (ports',(decls',ids)) = (concat *** (first concat . unzip))
                               . unzip
-                              $ map (mkInput (iName,hwty')) [0..(sz-1)]
+                              $ map (mkOutput (iName,hwty')) [0..(sz-1)]
         netdecl  = NetDecl iName hwty
         assigns  = zipWith
                      (\id_ n -> Assignment id_
@@ -103,7 +103,7 @@ mkOutput (i,hwty) cnt = case hwty of
   Product _ hwtys ->
     let (ports',(decls',ids)) = (concat *** (first concat . unzip))
                               . unzip
-                              $ zipWith mkInput (map (iName,) hwtys)
+                              $ zipWith mkOutput (map (iName,) hwtys)
                                                 [0..]
         netdecl  = NetDecl iName hwty
         assigns  = zipWith
