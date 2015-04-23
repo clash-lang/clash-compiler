@@ -12,7 +12,7 @@ mkTopWrapper topComponent
   = topComponent
   { componentName = "topEntity"
   , inputs        = inputs''
-  , output        = ("output",Integer)
+  , outputs       = [("output",Integer)]
   , declarations  = wrappers
   }
   where

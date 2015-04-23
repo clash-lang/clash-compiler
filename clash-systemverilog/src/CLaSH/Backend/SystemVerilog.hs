@@ -166,19 +166,21 @@ tyImports = "import types:: * ;"
 module_ :: Component -> SystemVerilogM Doc
 module_ c =
     "module" <+> text (componentName c) <> tupled ports <> semi <$>
-    indent 2 (inputPorts <$> outputPort <$$> decls (declarations c)) <$$> insts (declarations c) <$>
+    indent 2 (inputPorts <$> outputPorts <$$> decls (declarations c)) <$$> insts (declarations c) <$>
     "endmodule"
   where
     ports = sequence
           $ [ text i | (i,_) <- inputs c ] ++
             [ text i | (i,_) <- hiddenPorts c] ++
-            [ text (fst $ output c) ]
+            [ text i | (i,_) <- outputs c]
 
     inputPorts = case (inputs c ++ hiddenPorts c) of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "input" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
-    outputPort = "output" <+> sigDecl (text (fst $ output c)) (snd $ output c) <> semi
+    outputPorts = case (outputs c) of
+                   [] -> empty
+                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t = do

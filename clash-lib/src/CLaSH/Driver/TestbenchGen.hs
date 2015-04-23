@@ -45,7 +45,7 @@ genTestBench :: DebugLevel
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component])
 genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
-  (Component cName hidden [inp] outp _) = do
+  (Component cName hidden [inp] [outp] _) = do
   let ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
                 ]
@@ -71,7 +71,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
                         (concat [ clkNms, rstNms, [fst inp], [fst outp] ])
                    )
 
-      tbComp = Component "testbench" [] [] ("done",Bool)
+      tbComp = Component "testbench" [] [] [("done",Bool)]
                   (concat [ finDecl
                           , concat clks
                           , concat rsts
@@ -173,8 +173,8 @@ genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signa
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
 
       (cName,hidden',outp) = case sigComp of
-                               (Component a b [] (c,_) _) -> (a,b,c)
-                               (Component a _ is _ _)     -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
+                               (Component a b [] [(c,_)] _) -> (a,b,c)
+                               (Component a _ is _ _)       -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
       clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden'
       rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden'
@@ -205,8 +205,8 @@ genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp sig
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
       (cName,hidden',inp,fin) = case sigComp of
-        (Component a b [(c,_)] (d,_) _) -> (a,b,c,d)
-        (Component a _ is _ _)     -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
+        (Component a b [(c,_)] [(d,_)] _) -> (a,b,c,d)
+        (Component a _ is _ _)            -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
       clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden'
       rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden'

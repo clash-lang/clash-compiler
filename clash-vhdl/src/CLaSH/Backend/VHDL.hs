@@ -322,8 +322,8 @@ entity c = do
               | (i,ty) <- inputs c ] ++
               [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c))
-              ]
+              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
+              | (i,ty) <- outputs c ]
 
 architecture :: Component -> VHDLM Doc
 architecture c =

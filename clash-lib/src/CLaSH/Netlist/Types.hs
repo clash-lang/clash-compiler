@@ -57,7 +57,7 @@ data Component
   { componentName :: Identifier -- ^ Name of the component
   , hiddenPorts   :: [(Identifier,HWType)] -- ^ Ports that have no correspondence the original function definition
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , output        :: (Identifier,HWType) -- ^ Output port
+  , outputs       :: [(Identifier,HWType)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving Show
