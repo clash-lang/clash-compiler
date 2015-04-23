@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.2
+* New features:
+  * Generate wrappers around `topEntity` that have constant names and types
+
 ## 0.5.1 *April 20th 2015*
 * GHC 7.10 support
 
