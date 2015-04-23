@@ -25,6 +25,7 @@ import           CLaSH.Core.Term                  (Term)
 import           CLaSH.Core.Type                  (Type)
 import           CLaSH.Core.TyCon                 (TyCon, TyConName)
 import           CLaSH.Driver.TestbenchGen
+import           CLaSH.Driver.TopWrapper
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                    (genNetlist)
 import           CLaSH.Netlist.Types              (Component (..), HWType)
@@ -105,7 +106,8 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
       let hdlState' = fromMaybe (initBackend :: backend) hdlState
-          hdlDocs = createHDL hdlState' (netlist ++ testBench)
+          topWrapper = mkTopWrapper topComponent
+          hdlDocs = createHDL hdlState' (topWrapper : netlist ++ testBench)
           dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
@@ -122,8 +124,8 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
 
 -- | Pretty print Components to HDL Documents
 createHDL :: Backend backend
-           => backend
-           -> [Component]
+           => backend     -- ^ Backend
+           -> [Component] -- ^ List of components
            -> [(String,Doc)]
 createHDL backend components = flip evalState backend $ do
   (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
