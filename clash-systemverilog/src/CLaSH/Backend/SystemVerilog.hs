@@ -170,9 +170,9 @@ module_ c =
     "endmodule"
   where
     ports = sequence
-          $ [ encodingNote hwty (text i) | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty (text i) | (i,hwty) <- hiddenPorts c] ++
-            [ encodingNote hwty (text i) | (i,hwty) <- outputs c]
+          $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
+            [ encodingNote hwty <$> text i | (i,hwty) <- hiddenPorts c] ++
+            [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
 
     inputPorts = case (inputs c ++ hiddenPorts c) of
                    [] -> empty
@@ -461,15 +461,13 @@ parenIf False = id
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
-encodingNote :: HWType -> SystemVerilogM Doc -> SystemVerilogM Doc
-encodingNote (Clock _) d = "// clock" <$> indent 1 d
-encodingNote (Reset _) d = "// reset: active low" <$> indent 1 d
-encodingNote t@(Sum n cs) d = "// encoding for" <+> text n <> colon <$>
-                              indent 1 (
-                              vcat (zipWithM
-                                       (\c i -> "//" <+> text c <> colon <+>
-                                                exprLit (Just (t,typeSize t))
-                                                        (NumLit i)
-                                       ) cs [0..]) <$>
-                              d)
-encodingNote _         d = d
+encodingNote :: HWType -> SystemVerilogM Doc
+encodingNote (Clock _)    = "// clock"
+encodingNote (Reset _)    = "// reset: active low"
+encodingNote t@(Sum n cs) = "// encoding for" <+> text n <> colon <$>
+                            vcat (zipWithM
+                                     (\c i -> "//" <+> text c <> colon <+>
+                                              exprLit (Just (t,typeSize t))
+                                                      (NumLit i)
+                                     ) cs [0..])
+encodingNote _            = empty
