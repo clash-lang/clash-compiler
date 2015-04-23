@@ -13,20 +13,33 @@ mkTopWrapper topComponent
   { componentName = "topEntity"
   , inputs        = inputs''
   , outputs       = outputs''
-  , declarations  = wrappers ++ unwrappers
+  , declarations  = wrappers ++ instDecl:unwrappers
   }
   where
     inputs'                    = map (first (const "input"))
                                      (inputs topComponent)
-    (inputs'',(wrappers,_idsI)) = (concat *** (first concat . unzip))
+    (inputs'',(wrappers,idsI)) = (concat *** (first concat . unzip))
                                 . unzip
                                 $ zipWith mkInput inputs' [0..]
 
     outputs'                       = map (first (const "output"))
                                          (outputs topComponent)
-    (outputs'',(unwrappers,_idsO)) = (concat *** (first concat . unzip))
+    (outputs'',(unwrappers,idsO)) = (concat *** (first concat . unzip))
                                    . unzip
                                    $ zipWith mkOutput outputs' [0..]
+
+    instDecl = InstDecl (componentName topComponent)
+                        (append (componentName topComponent) (pack "_inst"))
+                        (zipWith (\(p,_) i -> (p,Identifier i Nothing))
+                                 (inputs topComponent)
+                                 idsI
+                         ++
+                         map (\(p,_) -> (p,Identifier p Nothing))
+                             (hiddenPorts topComponent)
+                         ++
+                         zipWith (\(p,_) i -> (p,Identifier i Nothing))
+                                 (outputs topComponent)
+                                 idsO)
 
 mkInput :: (Identifier,HWType)
         -> Int
