@@ -318,11 +318,11 @@ entity c = do
       "end" <> semi
   where
     ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
+            $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
+              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
+              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
               | (i,ty) <- outputs c ]
 
 architecture :: Component -> VHDLM Doc
@@ -651,3 +651,14 @@ parenIf False = id
 
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
+
+encodingNote :: HWType -> VHDLM Doc
+encodingNote (Clock _)    = "-- clock"
+encodingNote (Reset _)    = "-- reset: active low"
+encodingNote t@(Sum n cs) = "-- encoding for" <+> text n <> colon <$>
+                            vcat (zipWithM
+                                     (\c i -> "--" <+> text c <> colon <+>
+                                              exprLit (Just (t,typeSize t))
+                                                      (NumLit i)
+                                     ) cs [0..])
+encodingNote _              = empty
