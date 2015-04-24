@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.3 *April 24th 2015*
+* Fixes bugs:
+  * Fix bug where not enough array type definitions were created by the VHDL backend
+
 ## 0.5.2 *April 21st 2015*
 * Use latest ghc-typelits-natnormalise
 
