@@ -1,5 +1,5 @@
 Name:                 clash-vhdl
-Version:              0.5.2
+Version:              0.5.3
 Synopsis:             CAES Language for Synchronous Hardware - VHDL backend
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
