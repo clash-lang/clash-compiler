@@ -654,5 +654,5 @@ punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VHDLM Doc
 encodingNote (Clock _) = "-- clock"
-encodingNote (Reset _) = "-- reset: active low"
+encodingNote (Reset _) = "-- asynchronous reset: active low"
 encodingNote _         = empty
