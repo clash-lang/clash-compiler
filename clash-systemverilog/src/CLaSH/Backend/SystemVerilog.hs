@@ -462,12 +462,6 @@ punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> SystemVerilogM Doc
-encodingNote (Clock _)    = "// clock"
-encodingNote (Reset _)    = "// reset: active low"
-encodingNote t@(Sum n cs) = "// encoding for" <+> text n <> colon <$>
-                            vcat (zipWithM
-                                     (\c i -> "//" <+> text c <> colon <+>
-                                              exprLit (Just (t,typeSize t))
-                                                      (NumLit i)
-                                     ) cs [0..])
-encodingNote _            = empty
+encodingNote (Clock _) = "// clock"
+encodingNote (Reset _) = "// reset: active low"
+encodingNote _         = empty
