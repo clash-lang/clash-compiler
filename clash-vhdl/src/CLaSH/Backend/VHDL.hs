@@ -92,10 +92,10 @@ mkTyPackage_ hwtys =
    "end" <> semi <> packageBodyDec
   where
     usedTys     = concatMap mkUsedTys hwtys
-    needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
+    needsDec    = nubBy eqReprTy . map mkVecZ $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nubBy eqTypM needsDec))
+    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nubBy eqTypM hwTysSorted))
 
     packageBodyDec :: VHDLM Doc
     packageBodyDec = case funBodies of
@@ -106,13 +106,13 @@ mkTyPackage_ hwtys =
               "end" <> semi
 
     eqReprTy :: HWType -> HWType -> Bool
-    eqReprTy (Vector _ ty1) (Vector _ ty2) = eqReprTy ty1 ty2
+    eqReprTy (Vector n ty1) (Vector m ty2) = n == m && eqReprTy ty1 ty2
     eqReprTy ty1 ty2
       | isUnsigned ty1 && isUnsigned ty2 ||
         isSLV ty1 && isSLV ty2              = typeSize ty1 == typeSize ty2
       | otherwise                           = ty1 == ty2
 
-    eqTypM (Vector _ ty1) (Vector _ ty2) = eqReprTy ty1 ty2
+    eqTypM (Vector n ty1) (Vector m ty2) = n == m && eqReprTy ty1 ty2
     eqTypM (Signed _) (Signed _) = True
     eqTypM ty1 ty2 = isUnsigned ty1 && isUnsigned ty2 ||
                      isSLV      ty1 && isSLV      ty2 ||
@@ -338,7 +338,7 @@ architecture c =
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
 vhdlType hwty = do
-  tyCache %= HashSet.insert (mkVecZ hwty)
+  tyCache %= HashSet.insert hwty
   vhdlType' hwty
 
 vhdlType' :: HWType -> VHDLM Doc
@@ -368,7 +368,7 @@ sigDecl d t = d <+> colon <+> vhdlType t
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
 vhdlTypeMark hwty = do
-  tyCache %= HashSet.insert (mkVecZ hwty)
+  tyCache %= HashSet.insert hwty
   vhdlTypeMark' hwty
   where
     vhdlTypeMark' Bool            = "boolean"
