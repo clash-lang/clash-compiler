@@ -2,14 +2,34 @@
 {-# LANGUAGE TupleSections     #-}
 module CLaSH.Driver.TopWrapper where
 
-import Data.Text.Lazy      (append, pack)
+import           Data.Aeson          (FromJSON (..), Value (..), (.:))
+import qualified Data.HashMap.Strict as H
+import           Data.Text.Lazy      (Text, append, pack)
 
 import CLaSH.Netlist.Types (Component (..), Declaration (..), Expr (..), Identifier, HWType (..), Modifier (..))
 import CLaSH.Util
 
-mkTopWrapper :: Component -> Component
-mkTopWrapper topComponent
-  = topComponent
+import Debug.Trace
+
+data TopEntity
+  = TopEntity
+  { t_name    :: Text
+  , t_inputs  :: [Text]
+  , t_outputs :: [Text]
+  }
+  deriving Show
+
+instance FromJSON TopEntity where
+  parseJSON (Object v) = case H.toList v of
+    [(conKey,Object conVal)] -> case conKey of
+      "TopEntity"  -> TopEntity <$> conVal .: "name" <*> (conVal .: "inputs") <*> (conVal .: "outputs")
+      _ -> error "Expected: TopEntity"
+    _ -> error "Expected: TopEntity object"
+  parseJSON _ = error "Expected: TopEntity object"
+
+mkTopWrapper :: Maybe TopEntity -> Component -> Component
+mkTopWrapper _te topComponent
+  = trace (show _te) $ topComponent
   { componentName = "topEntity"
   , inputs        = inputs''
   , outputs       = outputs''

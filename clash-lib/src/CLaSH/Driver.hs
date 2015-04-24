@@ -43,9 +43,10 @@ generateHDL :: forall backend . Backend backend
             -> HashMap TyConName TyCon -- ^ TyCon cache
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
             -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
+            -> Maybe TopEntity
             -> DebugLevel -- ^ Debug information level for the normalization process
             -> IO ()
-generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
+generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -106,7 +107,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval dbgLevel = do
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
       let hdlState' = fromMaybe (initBackend :: backend) hdlState
-          topWrapper = mkTopWrapper topComponent
+          topWrapper = mkTopWrapper teM topComponent
           hdlDocs = createHDL hdlState' (topWrapper : netlist ++ testBench)
           dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
