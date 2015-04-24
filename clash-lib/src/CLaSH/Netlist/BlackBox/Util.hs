@@ -93,11 +93,11 @@ setClocks bc bt = mapM setClocks' bt
                                     (clk,rate) = clkSyncId e
                                 in  tell [(clk,Clock rate)] >> return (C clk)
 
-    setClocks' (Rst Nothing)  = let (rst,rate) = (first (`Text.append` "_rst")) . clkSyncId $ fst $ bbResult bc
+    setClocks' (Rst Nothing)  = let (rst,rate) = (first (`Text.append` "_rstn")) . clkSyncId $ fst $ bbResult bc
                                 in  tell [(rst,Reset rate)] >> return (C rst)
     setClocks' (Rst (Just n)) = let (e,_,_)    = bbInputs bc !! n
                                     (rst,rate) = clkSyncId e
-                                    rst'       = Text.append rst "_rst"
+                                    rst'       = Text.append rst "_rstn"
                                 in  tell [(rst',Reset rate)] >> return (C rst')
 
     setClocks' e = return e
