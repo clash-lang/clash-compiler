@@ -13,8 +13,6 @@ import           System.Directory     (doesFileExist)
 import CLaSH.Netlist.Types (Component (..), Declaration (..), Expr (..), Identifier, HWType (..), Modifier (..))
 import CLaSH.Util
 
-import Debug.Trace
-
 data TopEntity
   = TopEntity
   { t_name    :: Text
@@ -33,7 +31,7 @@ instance FromJSON TopEntity where
 
 mkTopWrapper :: Maybe TopEntity -> Component -> Component
 mkTopWrapper teM topComponent
-  = trace (show teM) $ topComponent
+  = topComponent
   { componentName = maybe "topEntity" t_name teM
   , inputs        = inputs''
   , outputs       = outputs''
