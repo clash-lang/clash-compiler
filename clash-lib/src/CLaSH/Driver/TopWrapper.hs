@@ -167,9 +167,10 @@ mkOutput nms (i,hwty) cnt = case hwty of
   where
     iName = append i (pack ("_" ++ show cnt))
 
-generateTopEnt :: FilePath
+generateTopEnt :: String
                -> IO (Maybe TopEntity)
-generateTopEnt topEntityFile = do
+generateTopEnt modName = do
+  let topEntityFile = modName ++ ".topentity"
   exists <- doesFileExist topEntityFile
   if exists
     then return . decodeAndReport <=< B.readFile $ topEntityFile

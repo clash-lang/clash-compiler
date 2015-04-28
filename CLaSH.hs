@@ -1,3 +1,5 @@
+import System.FilePath
+
 import CLaSH.Driver
 import CLaSH.Driver.TopWrapper
 import CLaSH.Rewrite.Types
@@ -24,7 +26,7 @@ doHDL :: Backend s
 doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
-  topEntM <- generateTopEnt "./fir.topentity"
+  topEntM <- generateTopEnt (dropExtensions $ takeFileName src)
   (bindingsMap,tcm) <- generateBindings primMap src Nothing
   generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant topEntM DebugNone
 
