@@ -6,6 +6,7 @@ import           Data.Aeson           (FromJSON (..), Value (..), (.:))
 import           Data.Aeson.Extra     (decodeAndReport)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.HashMap.Strict  as H
+import           Data.List            (mapAccumL)
 import           Data.Text.Lazy       (Text, append, pack)
 import           System.Directory     (doesFileExist)
 
@@ -39,17 +40,25 @@ mkTopWrapper teM topComponent
   , declarations  = wrappers ++ instDecl:unwrappers
   }
   where
+    iNameSupply                = maybe [] t_inputs teM
     inputs'                    = map (first (const "input"))
                                      (inputs topComponent)
     (inputs'',(wrappers,idsI)) = (concat *** (first concat . unzip))
-                                . unzip
-                                $ zipWith mkInput inputs' [0..]
+                               . unzip
+                               . snd
+                               $ mapAccumL (\nm (i,c) -> mkInput nm i c)
+                                            iNameSupply
+                                            (zip inputs' [0..])
 
-    outputs'                       = map (first (const "output"))
-                                         (outputs topComponent)
+    oNameSupply                   = maybe [] t_outputs teM
+    outputs'                      = map (first (const "output"))
+                                        (outputs topComponent)
     (outputs'',(unwrappers,idsO)) = (concat *** (first concat . unzip))
-                                   . unzip
-                                   $ zipWith mkOutput outputs' [0..]
+                                  . unzip
+                                  . snd
+                                  $ mapAccumL (\nm (o,c) -> mkOutput nm o c)
+                                              oNameSupply
+                                              (zip outputs' [0..])
 
     instDecl = InstDecl (componentName topComponent)
                         (append (componentName topComponent) (pack "_inst"))
@@ -64,32 +73,43 @@ mkTopWrapper teM topComponent
                                  (outputs topComponent)
                                  idsO)
 
-mkInput :: (Identifier,HWType)
+mkInput :: [Identifier]
+        -> (Identifier,HWType)
         -> Int
-        -> ( [(Identifier,HWType)]
-           , ( [Declaration]
-             , Identifier
+        -> ( [Identifier]
+           , ( [(Identifier,HWType)]
+             , ( [Declaration]
+               , Identifier
+               )
              )
            )
-mkInput (i,hwty) cnt = case hwty of
+mkInput nms (i,hwty) cnt = case hwty of
   Vector sz hwty' ->
-    let (ports',(decls',ids)) = (concat *** (first concat . unzip))
-                              . unzip
-                              $ map (mkInput (iName,hwty')) [0..(sz-1)]
+    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
+                                              . unzip
+                                              )
+                                     $ mapAccumL
+                                        (\nm c -> mkInput nm (iName,hwty') c)
+                                        nms [0..(sz-1)]
         netdecl  = NetDecl iName hwty
         netassgn = Assignment iName (mkVectorChain sz hwty' ids)
-    in  (ports',(netdecl:decls' ++ [netassgn],iName))
+    in  (nms',(ports',(netdecl:decls' ++ [netassgn],iName)))
   Product _ hwtys ->
-    let (ports',(decls',ids)) = (concat *** (first concat . unzip))
-                              . unzip
-                              $ zipWith mkInput (map (iName,) hwtys)
-                                                [0..]
+    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
+                                              . unzip
+                                              )
+                                     $ mapAccumL
+                                        (\nm (inp,c) -> mkInput nm inp c)
+                                        nms (zip (map (iName,) hwtys) [0..])
         netdecl  = NetDecl iName hwty
         ids'     = map (`Identifier` Nothing) ids
         netassgn = Assignment iName (DataCon hwty (DC (hwty,0)) ids')
-    in  (ports',(netdecl:decls' ++ [netassgn],iName))
-  _               -> ([(iName,hwty)],([],iName))
+    in  (nms',(ports',(netdecl:decls' ++ [netassgn],iName)))
+  _ -> case nms of
+         []       -> (nms,([(iName,hwty)],([],iName)))
+         (n:nms') -> (nms',([(n,hwty)],([],n)))
   where
+
     iName = append i (pack ("_" ++ show cnt))
 
 mkVectorChain :: Int
@@ -104,38 +124,48 @@ mkVectorChain sz elTy (i:is) = DataCon (Vector sz elTy) VecAppend
                                 , mkVectorChain (sz-1) elTy is
                                 ]
 
-mkOutput :: (Identifier,HWType)
+mkOutput :: [Identifier]
+         -> (Identifier,HWType)
          -> Int
-         -> ( [(Identifier,HWType)]
-            , ( [Declaration]
-              , Identifier
+         -> ( [Identifier]
+            , ( [(Identifier,HWType)]
+              , ( [Declaration]
+                , Identifier
+                )
               )
             )
-mkOutput (i,hwty) cnt = case hwty of
+mkOutput nms (i,hwty) cnt = case hwty of
   Vector sz hwty' ->
-    let (ports',(decls',ids)) = (concat *** (first concat . unzip))
-                              . unzip
-                              $ map (mkOutput (iName,hwty')) [0..(sz-1)]
+    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
+                                              . unzip
+                                              )
+                                     $ mapAccumL
+                                        (\nm c -> mkOutput nm (iName,hwty') c)
+                                        nms [0..(sz-1)]
         netdecl  = NetDecl iName hwty
         assigns  = zipWith
                      (\id_ n -> Assignment id_
                                   (Identifier iName (Just (Indexed (hwty,1,n)))))
                      ids
                      [0..]
-    in  (ports',(netdecl:assigns ++ decls',iName))
+    in  (nms',(ports',(netdecl:assigns ++ decls',iName)))
   Product _ hwtys ->
-    let (ports',(decls',ids)) = (concat *** (first concat . unzip))
-                              . unzip
-                              $ zipWith mkOutput (map (iName,) hwtys)
-                                                [0..]
+    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
+                                              . unzip
+                                              )
+                                     $ mapAccumL
+                                        (\nm (inp,c) -> mkOutput nm inp c)
+                                        nms (zip (map (iName,) hwtys) [0..])
         netdecl  = NetDecl iName hwty
         assigns  = zipWith
                      (\id_ n -> Assignment id_
                                   (Identifier iName (Just (Indexed (hwty,0,n)))))
                      ids
                      [0..]
-    in  (ports',(netdecl:assigns ++ decls',iName))
-  _               -> ([(iName,hwty)],([],iName))
+    in  (nms',(ports',(netdecl:assigns ++ decls',iName)))
+  _ -> case nms of
+         []       -> (nms,([(iName,hwty)],([],iName)))
+         (n:nms') -> (nms',([(n,hwty)],([],n)))
   where
     iName = append i (pack ("_" ++ show cnt))
 
