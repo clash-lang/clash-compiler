@@ -2,9 +2,12 @@
 {-# LANGUAGE TupleSections     #-}
 module CLaSH.Driver.TopWrapper where
 
-import           Data.Aeson          (FromJSON (..), Value (..), (.:))
-import qualified Data.HashMap.Strict as H
-import           Data.Text.Lazy      (Text, append, pack)
+import           Data.Aeson           (FromJSON (..), Value (..), (.:))
+import           Data.Aeson.Extra     (decodeAndReport)
+import qualified Data.ByteString.Lazy as B
+import qualified Data.HashMap.Strict  as H
+import           Data.Text.Lazy       (Text, append, pack)
+import           System.Directory     (doesFileExist)
 
 import CLaSH.Netlist.Types (Component (..), Declaration (..), Expr (..), Identifier, HWType (..), Modifier (..))
 import CLaSH.Util
@@ -28,9 +31,9 @@ instance FromJSON TopEntity where
   parseJSON _ = error "Expected: TopEntity object"
 
 mkTopWrapper :: Maybe TopEntity -> Component -> Component
-mkTopWrapper _te topComponent
-  = trace (show _te) $ topComponent
-  { componentName = "topEntity"
+mkTopWrapper teM topComponent
+  = trace (show teM) $ topComponent
+  { componentName = maybe "topEntity" t_name teM
   , inputs        = inputs''
   , outputs       = outputs''
   , declarations  = wrappers ++ instDecl:unwrappers
@@ -135,3 +138,11 @@ mkOutput (i,hwty) cnt = case hwty of
   _               -> ([(iName,hwty)],([],iName))
   where
     iName = append i (pack ("_" ++ show cnt))
+
+generateTopEnt :: FilePath
+               -> IO (Maybe TopEntity)
+generateTopEnt topEntityFile = do
+  exists <- doesFileExist topEntityFile
+  if exists
+    then return . decodeAndReport <=< B.readFile $ topEntityFile
+    else return Nothing
