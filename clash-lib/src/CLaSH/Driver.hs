@@ -94,13 +94,12 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
                                     Text.isSuffixOf (Text.pack "topEntity_0")
                                       cName)
                                 netlist
-          topWrapper = mkTopWrapper teM topComponent
 
       testBench <- genTestBench dbgLevel supplyTB primMap
                                  typeTrans tcm eval cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
-                                 topWrapper
+                                 topComponent
 
 
       testBenchTime <- testBench `seq` Clock.getCurrentTime
@@ -108,6 +107,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
       let hdlState' = fromMaybe (initBackend :: backend) hdlState
+          topWrapper = mkTopWrapper teM topComponent
           hdlDocs = createHDL hdlState' (topWrapper : netlist ++ testBench)
           dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
