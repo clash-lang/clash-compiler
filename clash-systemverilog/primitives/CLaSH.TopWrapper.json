@@ -1,7 +1,8 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.TopWrapper.syncReset"
     , "templateD" :
-"~SIGD[~SYM[0]][0];
+"// reset ~RESULT is asynchronously asserted, but synchronously de-asserted
+~SIGD[~SYM[0]][0];
 ~SIGD[~SYM[1]][0];
 
 always_ff @(posedge ~CLKO or negedge ~ARG[0])
