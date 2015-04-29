@@ -148,8 +148,8 @@ tyDec ty@(Product _ tys) = prodDec
 tyDec _ = empty
 
 funDec :: HWType -> SystemVerilogM Doc
-funDec (Clock _) = empty
-funDec (Reset _) = empty
+funDec (Clock _ _) = empty
+funDec (Reset _ _) = empty
 funDec t =
   "function logic" <+> brackets (int (typeSize t - 1) <> colon <> int 0)  <+> verilogTypeMark t <> "_to_lv" <> parens (sigDecl "i" t) <> semi <$>
   indent 2 (verilogTypeMark t <> "_to_lv" <+> "=" <+>
@@ -190,8 +190,8 @@ verilogType t = do
     (Product _ _) -> tyName t
     Integer       -> verilogType (Signed 32)
     (Signed n)    -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
-    (Clock _)     -> "logic"
-    (Reset _)     -> "logic"
+    (Clock _ _)   -> "logic"
+    (Reset _ _)   -> "logic"
     _             -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
@@ -217,8 +217,8 @@ tyName t@(Product _ _)   = makeCached t nameCache prodName
     prodName = do i <- tyCount <<%= (+1)
                   "product" <> int i
 tyName t@(SP _ _)        = "logic_vector_" <> int (typeSize t)
-tyName (Clock _) = "logic"
-tyName (Reset _) = "logic"
+tyName (Clock _ _) = "logic"
+tyName (Reset _ _) = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
@@ -462,6 +462,6 @@ punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> SystemVerilogM Doc
-encodingNote (Clock _) = "// clock"
-encodingNote (Reset _) = "// asynchronous reset: active low"
-encodingNote _         = empty
+encodingNote (Clock _ _) = "// clock"
+encodingNote (Reset _ _) = "// asynchronous reset: active low"
+encodingNote _           = empty

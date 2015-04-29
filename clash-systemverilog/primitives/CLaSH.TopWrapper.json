@@ -1,0 +1,19 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.TopWrapper.syncReset"
+    , "templateD" :
+"~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+
+always_ff @(posedge ~CLKO or negedge ~ARG[0])
+if (~ ~ARG[0]) begin
+  ~SYM[0] <= 1'b0;
+  ~SYM[1] <= 1'b0;
+end else begin
+  ~SYM[0] <= 1'b1;
+  ~SYM[1] <= ~SYM[0];
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+]

@@ -1,44 +1,105 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module CLaSH.Driver.TopWrapper where
 
-import           Data.Aeson           (FromJSON (..), Value (..), (.:))
+import           Data.Aeson           (FromJSON (..), Value (..), (.:), (.:?), (.!=))
 import           Data.Aeson.Extra     (decodeAndReport)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.HashMap.Strict  as H
+import qualified Data.HashMap.Lazy    as HashMap
 import           Data.List            (mapAccumL)
 import           Data.Text.Lazy       (Text, append, pack)
 import           System.Directory     (doesFileExist)
+import           System.IO.Unsafe     (unsafePerformIO)
 
-import CLaSH.Netlist.Types (Component (..), Declaration (..), Expr (..), Identifier, HWType (..), Modifier (..))
+import CLaSH.Netlist (runNetlistMonad)
+import CLaSH.Netlist.BlackBox (prepareBlackBox)
+import CLaSH.Netlist.Types (BlackBoxContext (..), Component (..), Declaration (..), Expr (..), Identifier, HWType (..), Modifier (..), NetlistMonad, emptyBBContext)
+import CLaSH.Primitives.Types (PrimMap, Primitive (..))
 import CLaSH.Util
 
 data TopEntity
   = TopEntity
-  { t_name    :: Text
-  , t_inputs  :: [Text]
-  , t_outputs :: [Text]
+  { t_name     :: Text
+  , t_inputs   :: [Text]
+  , t_outputs  :: [Text]
+  , t_extraIn  :: [(Text,Int)]
+  , t_extraOut :: [(Text,Int)]
+  , t_clocks   :: [ClockSource]
   }
   deriving Show
+
+data ClockSource
+  = ClockSource
+  { c_name  :: Text
+  , c_paths :: [ClockPath]
+  , c_clear :: Maybe (Text,Text)
+  , c_lock  :: Text
+  , c_sync  :: Bool
+  }
+  deriving Show
+
+data ClockPath
+  = ClockPath
+  { cp_inp   :: Maybe (Text,Text)
+  , cp_outp  :: [(Text,Clock)]
+  }
+  deriving Show
+
+data Clock
+  = Clk { clk_name :: Text, clk_rate :: Int }
+  deriving (Eq,Show)
 
 instance FromJSON TopEntity where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
-      "TopEntity"  -> TopEntity <$> conVal .: "name" <*> (conVal .: "inputs") <*> (conVal .: "outputs")
+      "TopEntity"  -> TopEntity <$> conVal .: "name" <*> (conVal .:? "inputs" .!= []) <*> (conVal .:? "outputs" .!= []) <*> (conVal .:? "extra_in" .!= []) <*> (conVal .:? "extra_out" .!= []) <*> (conVal .:? "clocks" .!= [])
       _ -> error "Expected: TopEntity"
     _ -> error "Expected: TopEntity object"
   parseJSON _ = error "Expected: TopEntity object"
 
-mkTopWrapper :: Maybe TopEntity -> Component -> Component
-mkTopWrapper teM topComponent
-  = topComponent
+instance FromJSON ClockSource where
+  parseJSON (Object v) = case H.toList v of
+    [(conKey,Object conVal)] -> case conKey of
+      "Source" -> ClockSource <$> conVal .: "name" <*> conVal .: "paths" <*> conVal .:? "clear" <*> conVal .: "lock" <*> (conVal .:? "sync" .!= False)
+      _ -> error "Expected: Source"
+    _ -> error "Expected: Source object"
+  parseJSON _ = error "Expected: Source object"
+
+instance FromJSON ClockPath where
+  parseJSON (Object v) = case H.toList v of
+    [(conKey,Object conVal)] -> case conKey of
+      "Path" -> ClockPath <$> conVal .:? "inp" <*> conVal .: "outp"
+      _ -> error "Expected: Path"
+    _ -> error "Expected: Path object"
+  parseJSON _ = error "Expected: Path object"
+
+instance FromJSON Clock where
+  parseJSON (Object v) = case H.toList v of
+    [(conKey,Object conVal)] -> case conKey of
+      "Clk" -> Clk <$> conVal .: "name" <*> conVal .: "rate"
+      _ -> error "Expected: Clk"
+    _ -> error "Expected: Clk object"
+  parseJSON (String "System") = pure (Clk "system" 1000)
+  parseJSON _ = error "Expected: System, or, Clk object"
+
+mkTopWrapper :: PrimMap -> Maybe TopEntity -> Component -> Component
+mkTopWrapper primMap teM topComponent
+  = Component
   { componentName = maybe "topEntity" t_name teM
-  , inputs        = inputs''
-  , outputs       = outputs''
-  , declarations  = wrappers ++ instDecl:unwrappers
+  , inputs        = inputs'' ++ extraIn teM
+  , outputs       = outputs'' ++ extraOut teM
+  , hiddenPorts   = case maybe [] t_clocks teM of
+                      [] -> originalHidden
+                      _  -> []
+  , declarations  = mkClocks primMap originalHidden teM ++ wrappers ++ instDecl:unwrappers
   }
   where
     iNameSupply                = maybe [] t_inputs teM
+    originalHidden             = hiddenPorts topComponent
+
     inputs'                    = map (first (const "input"))
                                      (inputs topComponent)
     (inputs'',(wrappers,idsI)) = (concat *** (first concat . unzip))
@@ -70,6 +131,12 @@ mkTopWrapper teM topComponent
                          zipWith (\(p,_) i -> (p,Identifier i Nothing))
                                  (outputs topComponent)
                                  idsO)
+
+extraIn :: Maybe TopEntity -> [(Identifier,HWType)]
+extraIn = maybe [] ((map (second BitVector)) . t_extraIn)
+
+extraOut :: Maybe TopEntity -> [(Identifier,HWType)]
+extraOut = maybe [] ((map (second BitVector)) . t_extraOut)
 
 mkInput :: [Identifier]
         -> (Identifier,HWType)
@@ -175,3 +242,83 @@ generateTopEnt modName = do
   if exists
     then return . decodeAndReport <=< B.readFile $ topEntityFile
     else return Nothing
+
+mkClocks :: PrimMap -> [(Identifier,HWType)] -> Maybe TopEntity -> [Declaration]
+mkClocks primMap hidden teM = concat
+    [ hiddenSigDecs
+    , clockGens
+    , resets
+    ]
+  where
+    hiddenSigDecs        = map (uncurry NetDecl) hidden
+    (clockGens,clkLocks) = maybe ([],[]) (first concat . unzip . map mkClock . t_clocks) teM
+    resets               = mkResets primMap hidden clkLocks
+
+mkClock :: ClockSource -> ([Declaration],(Identifier,[Clock],Bool))
+mkClock (ClockSource {..}) = ([lockedDecl,instDecl],(lockedName,clks,c_sync))
+  where
+    lockedName   = append c_name "_locked"
+    lockedDecl   = NetDecl lockedName (Reset lockedName 0)
+    (ports,clks) = (concat *** concat) . unzip $ map clockPorts c_paths
+    instDecl     = InstDecl c_name (append c_name "_inst") $
+                     concat [ ports
+                            , maybe [] ((:[]) . second (`Identifier` Nothing)) c_clear
+                            , [(c_lock,Identifier lockedName Nothing)]
+                            ]
+
+clockPorts :: ClockPath -> ([(Identifier,Expr)],[Clock])
+clockPorts (ClockPath {..}) = (inp ++ outp,clks)
+  where
+    inp  = maybe [] ((:[]) . second (`Identifier` Nothing)) cp_inp
+    outp = map (second ((`Identifier` Nothing) . clkToId)) cp_outp
+    clks = map snd cp_outp
+
+    clkToId (Clk nm r) = append nm (pack (show r))
+
+mkResets :: PrimMap
+         -> [(Identifier,HWType)]
+         -> [(Identifier,[Clock],Bool)]
+         -> [Declaration]
+mkResets primMap hidden = unsafeRunNetlist . fmap concat . mapM assingReset
+  where
+    assingReset (lock,clks,doSync) = concat <$> mapM connectReset matched
+      where
+        matched = filter match hidden
+        match (_,(Reset nm r)) = elem (Clk nm r) clks
+        match _                = False
+
+        connectReset (rst,(Reset nm r)) = if doSync
+            then return [Assignment rst (Identifier lock Nothing)]
+            else do (syncDecls,sync) <- genSyncReset primMap lock (Clk nm r)
+                    return (syncDecls ++ [Assignment rst (Identifier sync Nothing)])
+        connectReset _ = return []
+
+genSyncReset :: PrimMap
+             -> Identifier
+             -> Clock
+             -> NetlistMonad ([Declaration], Identifier)
+genSyncReset primMap lock (Clk nm r) = do
+  let resetSync    = append lock "_sync"
+      resetType    = Reset resetSync 0
+      ctx          = emptyBBContext
+                       { bbResult = (Right ((Identifier resetSync Nothing),(nm,r)), resetType)
+                       , bbInputs = [(Left (Identifier lock Nothing),resetType,False)]
+                       }
+      bbName       = "CLaSH.TopWrapper.syncReset"
+  resetGenDecl <- case HashMap.lookup bbName primMap of
+        Just (BlackBox _ (Left templ)) -> do templ' <- prepareBlackBox bbName templ ctx
+                                             return (BlackBoxD bbName templ' ctx)
+        pM -> error $ $(curLoc) ++ ("Can't make reset sync for: " ++ show pM)
+
+  let rstDecls = [ NetDecl resetSync resetType
+                 , resetGenDecl
+                 ]
+
+  return (rstDecls,resetSync)
+
+unsafeRunNetlist :: NetlistMonad a
+                 -> a
+unsafeRunNetlist = unsafePerformIO
+                 . fmap fst
+                 . runNetlistMonad Nothing HashMap.empty HashMap.empty
+                     HashMap.empty (\_ _ -> Nothing)

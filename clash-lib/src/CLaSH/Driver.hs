@@ -107,7 +107,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
       let hdlState' = fromMaybe (initBackend :: backend) hdlState
-          topWrapper = mkTopWrapper teM topComponent
+          topWrapper = mkTopWrapper primMap teM topComponent
           hdlDocs = createHDL hdlState' (topWrapper : netlist ++ testBench)
           dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
