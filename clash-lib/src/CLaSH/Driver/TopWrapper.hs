@@ -289,19 +289,18 @@ mkResets primMap hidden = unsafeRunNetlist . fmap concat . mapM assingReset
 
         connectReset (rst,(Reset nm r)) = if doSync
             then return [Assignment rst (Identifier lock Nothing)]
-            else do (syncDecls,sync) <- genSyncReset primMap lock (Clk nm r)
-                    return (syncDecls ++ [Assignment rst (Identifier sync Nothing)])
+            else genSyncReset primMap lock rst (Clk nm r)
         connectReset _ = return []
 
 genSyncReset :: PrimMap
              -> Identifier
+             -> Identifier
              -> Clock
-             -> NetlistMonad ([Declaration], Identifier)
-genSyncReset primMap lock (Clk nm r) = do
-  let resetSync    = append lock "_sync"
-      resetType    = Reset resetSync 0
+             -> NetlistMonad [Declaration]
+genSyncReset primMap lock rst (Clk nm r) = do
+  let resetType    = Reset rst 0
       ctx          = emptyBBContext
-                       { bbResult = (Right ((Identifier resetSync Nothing),(nm,r)), resetType)
+                       { bbResult = (Right ((Identifier rst Nothing),(nm,r)), resetType)
                        , bbInputs = [(Left (Identifier lock Nothing),resetType,False)]
                        }
       bbName       = "CLaSH.TopWrapper.syncReset"
@@ -310,11 +309,7 @@ genSyncReset primMap lock (Clk nm r) = do
                                              return (BlackBoxD bbName templ' ctx)
         pM -> error $ $(curLoc) ++ ("Can't make reset sync for: " ++ show pM)
 
-  let rstDecls = [ NetDecl resetSync resetType
-                 , resetGenDecl
-                 ]
-
-  return (rstDecls,resetSync)
+  return [resetGenDecl]
 
 unsafeRunNetlist :: NetlistMonad a
                  -> a
