@@ -4,7 +4,8 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module CLaSH.Driver.TopWrapper where
 
-import           Data.Aeson           (FromJSON (..), Value (..), (.:), (.:?), (.!=))
+import           Data.Aeson           (FromJSON (..), Value (..), (.:), (.:?),
+                                       (.!=))
 import           Data.Aeson.Extra     (decodeAndReport)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.HashMap.Strict  as H
@@ -14,10 +15,13 @@ import           Data.Text.Lazy       (Text, append, pack)
 import           System.Directory     (doesFileExist)
 import           System.IO.Unsafe     (unsafePerformIO)
 
-import CLaSH.Netlist (runNetlistMonad)
-import CLaSH.Netlist.BlackBox (prepareBlackBox)
-import CLaSH.Netlist.Types (BlackBoxContext (..), Component (..), Declaration (..), Expr (..), Identifier, HWType (..), Modifier (..), NetlistMonad, emptyBBContext)
-import CLaSH.Primitives.Types (PrimMap, Primitive (..))
+import CLaSH.Netlist                  (runNetlistMonad)
+import CLaSH.Netlist.BlackBox         (prepareBlackBox)
+import CLaSH.Netlist.Types            (BlackBoxContext (..), Component (..),
+                                       Declaration (..), Expr (..), Identifier,
+                                       HWType (..), Modifier (..), NetlistMonad,
+                                       emptyBBContext)
+import CLaSH.Primitives.Types         (PrimMap, Primitive (..))
 import CLaSH.Util
 
 data TopEntity
@@ -55,7 +59,12 @@ data Clock
 instance FromJSON TopEntity where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
-      "TopEntity"  -> TopEntity <$> conVal .: "name" <*> (conVal .:? "inputs" .!= []) <*> (conVal .:? "outputs" .!= []) <*> (conVal .:? "extra_in" .!= []) <*> (conVal .:? "extra_out" .!= []) <*> (conVal .:? "clocks" .!= [])
+      "TopEntity"  -> TopEntity <$> conVal .: "name"
+                                <*> (conVal .:? "inputs" .!= [])
+                                <*> (conVal .:? "outputs" .!= [])
+                                <*> (conVal .:? "extra_in" .!= [])
+                                <*> (conVal .:? "extra_out" .!= [])
+                                <*> (conVal .:? "clocks" .!= [])
       _ -> error "Expected: TopEntity"
     _ -> error "Expected: TopEntity object"
   parseJSON _ = error "Expected: TopEntity object"
@@ -63,7 +72,9 @@ instance FromJSON TopEntity where
 instance FromJSON ClockSource where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
-      "Source" -> ClockSource <$> conVal .: "name" <*> conVal .: "paths" <*> conVal .:? "clear" <*> conVal .: "lock" <*> (conVal .:? "sync" .!= False)
+      "Source" -> ClockSource <$> conVal .: "name" <*> conVal .: "paths"
+                              <*> conVal .:? "clear" <*> conVal .: "lock"
+                              <*> (conVal .:? "sync" .!= False)
       _ -> error "Expected: Source"
     _ -> error "Expected: Source object"
   parseJSON _ = error "Expected: Source object"
@@ -94,7 +105,10 @@ mkTopWrapper primMap teM topComponent
   , hiddenPorts   = case maybe [] t_clocks teM of
                       [] -> originalHidden
                       _  -> []
-  , declarations  = mkClocks primMap originalHidden teM ++ wrappers ++ instDecl:unwrappers
+  , declarations  = concat [ mkClocks primMap originalHidden teM
+                           , wrappers
+                           , instDecl:unwrappers
+                           ]
   }
   where
     iNameSupply                = maybe [] t_inputs teM
@@ -150,22 +164,24 @@ mkInput :: [Identifier]
            )
 mkInput nms (i,hwty) cnt = case hwty of
   Vector sz hwty' ->
-    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
-                                              . unzip
-                                              )
-                                     $ mapAccumL
-                                        (\nm c -> mkInput nm (iName,hwty') c)
-                                        nms [0..(sz-1)]
+    let (nms',(ports',(decls',ids)))
+                 = second ( (concat *** (first concat . unzip))
+                          . unzip
+                          )
+                 $ mapAccumL
+                    (\nm c -> mkInput nm (iName,hwty') c)
+                    nms [0..(sz-1)]
         netdecl  = NetDecl iName hwty
         netassgn = Assignment iName (mkVectorChain sz hwty' ids)
     in  (nms',(ports',(netdecl:decls' ++ [netassgn],iName)))
   Product _ hwtys ->
-    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
-                                              . unzip
-                                              )
-                                     $ mapAccumL
-                                        (\nm (inp,c) -> mkInput nm inp c)
-                                        nms (zip (map (iName,) hwtys) [0..])
+    let (nms',(ports',(decls',ids)))
+                 = second ( (concat *** (first concat . unzip))
+                          . unzip
+                          )
+                 $ mapAccumL
+                    (\nm (inp,c) -> mkInput nm inp c)
+                    nms (zip (map (iName,) hwtys) [0..])
         netdecl  = NetDecl iName hwty
         ids'     = map (`Identifier` Nothing) ids
         netassgn = Assignment iName (DataCon hwty (DC (hwty,0)) ids')
@@ -201,32 +217,34 @@ mkOutput :: [Identifier]
             )
 mkOutput nms (i,hwty) cnt = case hwty of
   Vector sz hwty' ->
-    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
-                                              . unzip
-                                              )
-                                     $ mapAccumL
-                                        (\nm c -> mkOutput nm (iName,hwty') c)
-                                        nms [0..(sz-1)]
-        netdecl  = NetDecl iName hwty
-        assigns  = zipWith
-                     (\id_ n -> Assignment id_
-                                  (Identifier iName (Just (Indexed (hwty,1,n)))))
-                     ids
-                     [0..]
+    let (nms',(ports',(decls',ids)))
+                = second ( (concat *** (first concat . unzip))
+                         . unzip
+                         )
+                $ mapAccumL
+                   (\nm c -> mkOutput nm (iName,hwty') c)
+                   nms [0..(sz-1)]
+        netdecl = NetDecl iName hwty
+        assigns = zipWith
+                    (\id_ n -> Assignment id_
+                                 (Identifier iName (Just (Indexed (hwty,1,n)))))
+                    ids
+                    [0..]
     in  (nms',(ports',(netdecl:assigns ++ decls',iName)))
   Product _ hwtys ->
-    let (nms',(ports',(decls',ids))) = second ( (concat *** (first concat . unzip))
-                                              . unzip
-                                              )
-                                     $ mapAccumL
-                                        (\nm (inp,c) -> mkOutput nm inp c)
-                                        nms (zip (map (iName,) hwtys) [0..])
-        netdecl  = NetDecl iName hwty
-        assigns  = zipWith
-                     (\id_ n -> Assignment id_
-                                  (Identifier iName (Just (Indexed (hwty,0,n)))))
-                     ids
-                     [0..]
+    let (nms',(ports',(decls',ids)))
+                = second ( (concat *** (first concat . unzip))
+                         . unzip
+                         )
+                $ mapAccumL
+                   (\nm (inp,c) -> mkOutput nm inp c)
+                   nms (zip (map (iName,) hwtys) [0..])
+        netdecl = NetDecl iName hwty
+        assigns = zipWith
+                    (\id_ n -> Assignment id_
+                                (Identifier iName (Just (Indexed (hwty,0,n)))))
+                    ids
+                    [0..]
     in  (nms',(ports',(netdecl:assigns ++ decls',iName)))
   _ -> case nms of
          []       -> (nms,([(iName,hwty)],([],iName)))
@@ -251,7 +269,9 @@ mkClocks primMap hidden teM = concat
     ]
   where
     hiddenSigDecs        = map (uncurry NetDecl) hidden
-    (clockGens,clkLocks) = maybe ([],[]) (first concat . unzip . map mkClock . t_clocks) teM
+    (clockGens,clkLocks) = maybe ([],[])
+                                 (first concat . unzip . map mkClock . t_clocks)
+                                 teM
     resets               = mkResets primMap hidden clkLocks
 
 mkClock :: ClockSource -> ([Declaration],(Identifier,[Clock],Bool))
@@ -260,11 +280,12 @@ mkClock (ClockSource {..}) = ([lockedDecl,instDecl],(lockedName,clks,c_sync))
     lockedName   = append c_name "_locked"
     lockedDecl   = NetDecl lockedName (Reset lockedName 0)
     (ports,clks) = (concat *** concat) . unzip $ map clockPorts c_paths
-    instDecl     = InstDecl c_name (append c_name "_inst") $
-                     concat [ ports
-                            , maybe [] ((:[]) . second (`Identifier` Nothing)) c_clear
-                            , [(c_lock,Identifier lockedName Nothing)]
-                            ]
+    instDecl     = InstDecl c_name (append c_name "_inst")
+                 $ concat [ ports
+                          , maybe [] ((:[]) . second (`Identifier` Nothing))
+                                  c_clear
+                          , [(c_lock,Identifier lockedName Nothing)]
+                          ]
 
 clockPorts :: ClockPath -> ([(Identifier,Expr)],[Clock])
 clockPorts (ClockPath {..}) = (inp ++ outp,clks)
@@ -298,15 +319,16 @@ genSyncReset :: PrimMap
              -> Clock
              -> NetlistMonad [Declaration]
 genSyncReset primMap lock rst (Clk nm r) = do
-  let resetType    = Reset rst 0
-      ctx          = emptyBBContext
-                       { bbResult = (Right ((Identifier rst Nothing),(nm,r)), resetType)
-                       , bbInputs = [(Left (Identifier lock Nothing),resetType,False)]
-                       }
-      bbName       = "CLaSH.TopWrapper.syncReset"
+  let resetType = Reset rst 0
+      ctx = emptyBBContext
+              { bbResult = (Right ((Identifier rst Nothing),(nm,r)), resetType)
+              , bbInputs = [(Left (Identifier lock Nothing),resetType,False)]
+              }
+      bbName = "CLaSH.TopWrapper.syncReset"
   resetGenDecl <- case HashMap.lookup bbName primMap of
-        Just (BlackBox _ (Left templ)) -> do templ' <- prepareBlackBox bbName templ ctx
-                                             return (BlackBoxD bbName templ' ctx)
+        Just (BlackBox _ (Left templ)) -> do
+          templ' <- prepareBlackBox bbName templ ctx
+          return (BlackBoxD bbName templ' ctx)
         pM -> error $ $(curLoc) ++ ("Can't make reset sync for: " ++ show pM)
 
   return [resetGenDecl]
