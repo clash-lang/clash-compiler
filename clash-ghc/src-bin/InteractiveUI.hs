@@ -113,6 +113,7 @@ import qualified CLaSH.Backend
 import           CLaSH.Backend.VHDL (VHDLState)
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
 import qualified CLaSH.Driver
+import           CLaSH.Driver.TopWrapper (generateTopEnt)
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
@@ -1578,8 +1579,9 @@ makeHDL backend srcs = do
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm) <- generateBindings primMap src (Just dflags)
+                topEntM           <- generateTopEnt (dropExtensions $ takeFileName src)
                 CLaSH.Driver.generateHDL bindingsMap (Just backend) primMap tcm
-                  ghcTypeToHWType reduceConstant DebugNone
+                  ghcTypeToHWType reduceConstant topEntM DebugNone
 
 makeVHDL :: [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
