@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.5.2
+* New features:
+  * Support wrapper generation
+
 ## 0.5.1 *April 20th 2015*
 * Update to clash-prelude 0.7.2
 

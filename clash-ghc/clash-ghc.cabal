@@ -70,9 +70,9 @@ Executable clash
                       unbound-generics          >= 0.1,
                       unordered-containers      >= 0.2.1.0,
 
-                      clash-lib                 >= 0.5.1,
-                      clash-vhdl                >= 0.5.2,
-                      clash-systemverilog       >= 0.5.1,
+                      clash-lib                 >= 0.5.2,
+                      clash-vhdl                >= 0.5.3,
+                      clash-systemverilog       >= 0.5.2,
                       clash-prelude             >= 0.7.3,
                       ghc-typelits-natnormalise >= 0.2
 

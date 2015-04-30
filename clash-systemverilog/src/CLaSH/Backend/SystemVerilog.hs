@@ -148,8 +148,8 @@ tyDec ty@(Product _ tys) = prodDec
 tyDec _ = empty
 
 funDec :: HWType -> SystemVerilogM Doc
-funDec (Clock _) = empty
-funDec (Reset _) = empty
+funDec (Clock _ _) = empty
+funDec (Reset _ _) = empty
 funDec t =
   "function logic" <+> brackets (int (typeSize t - 1) <> colon <> int 0)  <+> verilogTypeMark t <> "_to_lv" <> parens (sigDecl "i" t) <> semi <$>
   indent 2 (verilogTypeMark t <> "_to_lv" <+> "=" <+>
@@ -166,19 +166,21 @@ tyImports = "import types:: * ;"
 module_ :: Component -> SystemVerilogM Doc
 module_ c =
     "module" <+> text (componentName c) <> tupled ports <> semi <$>
-    indent 2 (inputPorts <$> outputPort <$$> decls (declarations c)) <$$> insts (declarations c) <$>
+    indent 2 (inputPorts <$> outputPorts <$$> decls (declarations c)) <$$> insts (declarations c) <$>
     "endmodule"
   where
     ports = sequence
-          $ [ text i | (i,_) <- inputs c ] ++
-            [ text i | (i,_) <- hiddenPorts c] ++
-            [ text (fst $ output c) ]
+          $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
+            [ encodingNote hwty <$> text i | (i,hwty) <- hiddenPorts c] ++
+            [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
 
     inputPorts = case (inputs c ++ hiddenPorts c) of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "input" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
-    outputPort = "output" <+> sigDecl (text (fst $ output c)) (snd $ output c) <> semi
+    outputPorts = case (outputs c) of
+                   [] -> empty
+                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t = do
@@ -188,8 +190,8 @@ verilogType t = do
     (Product _ _) -> tyName t
     Integer       -> verilogType (Signed 32)
     (Signed n)    -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
-    (Clock _)     -> "logic"
-    (Reset _)     -> "logic"
+    (Clock _ _)   -> "logic"
+    (Reset _ _)   -> "logic"
     _             -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
@@ -215,8 +217,8 @@ tyName t@(Product _ _)   = makeCached t nameCache prodName
     prodName = do i <- tyCount <<%= (+1)
                   "product" <> int i
 tyName t@(SP _ _)        = "logic_vector_" <> int (typeSize t)
-tyName (Clock _) = "logic"
-tyName (Reset _) = "logic"
+tyName (Clock _ _) = "logic"
+tyName (Reset _ _) = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
@@ -295,6 +297,7 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argT
     end      = start - argSize + 1
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> verilogTypeMark ty <> "_sel" <> int fI
+expr_ _ (Identifier id_ (Just (Indexed ((Vector _ _),_,fI)))) = text id_ <> parens (int fI)
 expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int start <> colon <> int end)
   where
     start = typeSize ty - 1
@@ -457,3 +460,8 @@ parenIf False = id
 
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
+
+encodingNote :: HWType -> SystemVerilogM Doc
+encodingNote (Clock _ _) = "// clock"
+encodingNote (Reset _ _) = "// asynchronous reset: active low"
+encodingNote _           = empty

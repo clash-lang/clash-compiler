@@ -45,7 +45,7 @@ genTestBench :: DebugLevel
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component])
 genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
-  (Component cName hidden [inp] outp _) = do
+  (Component cName hidden [inp] [outp] _) = do
   let ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
                 ]
@@ -61,8 +61,8 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
   (expInst,expComps,hidden'') <- maybe (return (finExpr,[],hidden'))
                                                  (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
                                                  expectedNmM
-  let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden
-      rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden
+  let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden
+      rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden
       clks   = mapMaybe (genClock primMap) hidden''
       rsts   = mapMaybe (genReset primMap) hidden''
 
@@ -71,7 +71,7 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
                         (concat [ clkNms, rstNms, [fst inp], [fst outp] ])
                    )
 
-      tbComp = Component "testbench" [] [] ("done",Bool)
+      tbComp = Component "testbench" [] [] [("done",Bool)]
                   (concat [ finDecl
                           , concat clks
                           , concat rsts
@@ -92,13 +92,13 @@ genTestBench dbgLvl _ _ _ _ _ _ _ _ _ c = traceIf (dbgLvl > DebugNone) ("Can't m
 genClock :: PrimMap
          -> (Identifier,HWType)
          -> Maybe [Declaration]
-genClock primMap (clkName,Clock rate) = Just clkDecls
+genClock primMap (clkName,Clock clkSym rate) = Just clkDecls
   where
     clkGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.clockGen" primMap of
       Just (BlackBox _ (Left templ)) -> let (rising,rest) = divMod (toInteger rate) 2
                                             falling       = rising + rest
                                             ctx = emptyBBContext
-                                                    { bbResult = (Left (Identifier clkName Nothing), Clock rate)
+                                                    { bbResult = (Left (Identifier clkName Nothing), Clock clkSym rate)
                                                     , bbInputs = [ (Left (N.Literal Nothing (NumLit 2)),Integer,True)
                                                                  , (Left (N.Literal Nothing (NumLit rising)),Integer,True)
                                                                  , (Left (N.Literal Nothing (NumLit falling)),Integer,True)
@@ -107,7 +107,7 @@ genClock primMap (clkName,Clock rate) = Just clkDecls
                                         in  BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" (parseFail templ) ctx
       pM -> error $ $(curLoc) ++ ("Can't make clock declaration for: " ++ show pM)
 
-    clkDecls   = [ NetDecl clkName (Clock rate)
+    clkDecls   = [ NetDecl clkName (Clock clkSym rate)
                  , clkGenDecl
                  ]
 
@@ -116,17 +116,17 @@ genClock _ _ = Nothing
 genReset :: PrimMap
          -> (Identifier,HWType)
          -> Maybe [Declaration]
-genReset primMap (rstName,Reset clk) = Just rstDecls
+genReset primMap (rstName,Reset clkSym rate) = Just rstDecls
   where
     resetGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.resetGen" primMap of
       Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
-                                                    { bbResult = (Left (Identifier rstName Nothing), Reset clk)
+                                                    { bbResult = (Left (Identifier rstName Nothing), Reset clkSym rate)
                                                     , bbInputs = [(Left (N.Literal Nothing (NumLit 1)),Integer,True)]
                                                     }
                                         in  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" (parseFail templ) ctx
       pM -> error $ $(curLoc) ++ ("Can't make reset declaration for: " ++ show pM)
 
-    rstDecls = [ NetDecl rstName (Reset clk)
+    rstDecls = [ NetDecl rstName (Reset clkSym rate)
                , resetGenDecl
                ]
 
@@ -173,11 +173,11 @@ genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signa
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
 
       (cName,hidden',outp) = case sigComp of
-                               (Component a b [] (c,_) _) -> (a,b,c)
-                               (Component a _ is _ _)     -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
+                               (Component a b [] [(c,_)] _) -> (a,b,c)
+                               (Component a _ is _ _)       -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
-      clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden'
-      rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden'
+      clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden'
+      rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden'
       decl     = InstDecl cName "stimuli"
                    (map (\i -> (i,Identifier i Nothing))
                         (concat [ clkNms, rstNms ]) ++
@@ -205,11 +205,11 @@ genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp sig
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
       (cName,hidden',inp,fin) = case sigComp of
-        (Component a b [(c,_)] (d,_) _) -> (a,b,c,d)
-        (Component a _ is _ _)     -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
+        (Component a b [(c,_)] [(d,_)] _) -> (a,b,c,d)
+        (Component a _ is _ _)            -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
-      clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _) -> Just clkNm ; _ -> Nothing) hidden'
-      rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _) -> Just clkNm ; _ -> Nothing) hidden'
+      clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden'
+      rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden'
       decl     = InstDecl cName "verify"
                    (map (\i -> (i,Identifier i Nothing))
                         (concat [ clkNms, rstNms ]) ++

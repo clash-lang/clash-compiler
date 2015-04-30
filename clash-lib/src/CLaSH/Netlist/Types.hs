@@ -57,7 +57,7 @@ data Component
   { componentName :: Identifier -- ^ Name of the component
   , hiddenPorts   :: [(Identifier,HWType)] -- ^ Ports that have no correspondence the original function definition
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , output        :: (Identifier,HWType) -- ^ Output port
+  , outputs       :: [(Identifier,HWType)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving Show
@@ -83,26 +83,12 @@ data HWType
   | Sum      Identifier [Identifier] -- ^ Sum type: Name and Constructor names
   | Product  Identifier [HWType] -- ^ Product type: Name and field types
   | SP       Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock    Int -- ^ Clock type with specified period
-  | Reset    Int -- ^ Reset type corresponding to clock with a specified period
+  | Clock    Identifier Int -- ^ Clock type with specified name and period
+  | Reset    Identifier Int -- ^ Reset type corresponding to clock with a specified name and period
   deriving (Eq,Show,Generic)
 
 instance Hashable HWType
-instance NFData HWType where
-  rnf hwty = case hwty of
-    Void -> ()
-    Bool -> ()
-    Integer -> ()
-    BitVector s -> rnf s
-    Index u -> rnf u
-    Signed s -> rnf s
-    Unsigned s -> rnf s
-    Vector s el -> rnf s `seq` rnf el
-    Sum i ids -> rnf i `seq` rnf ids
-    Product i ids -> rnf i `seq` rnf ids
-    SP i ids -> rnf i `seq` rnf ids
-    Clock i -> rnf i
-    Reset i -> rnf i
+instance NFData HWType
 
 -- | Internals of a Component
 data Declaration

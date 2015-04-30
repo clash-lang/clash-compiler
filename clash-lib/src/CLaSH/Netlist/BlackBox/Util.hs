@@ -88,17 +88,20 @@ setClocks bc bt = mapM setClocks' bt
     setClocks' (SigD e m)     = SigD <$> (head <$> setClocks bc [e]) <*> pure m
 
     setClocks' (Clk Nothing)  = let (clk,rate) = clkSyncId $ fst $ bbResult bc
-                                in  tell [(clk,Clock rate)] >> return (C clk)
+                                    clkName    = Text.append clk (Text.pack (show rate))
+                                in  tell [(clkName,Clock clk rate)] >> return (C clkName)
     setClocks' (Clk (Just n)) = let (e,_,_)    = bbInputs bc !! n
                                     (clk,rate) = clkSyncId e
-                                in  tell [(clk,Clock rate)] >> return (C clk)
+                                    clkName    = Text.append clk (Text.pack (show rate))
+                                in  tell [(clkName,Clock clk rate)] >> return (C clkName)
 
-    setClocks' (Rst Nothing)  = let (rst,rate) = (first (`Text.append` "_rst")) . clkSyncId $ fst $ bbResult bc
-                                in  tell [(rst,Reset rate)] >> return (C rst)
+    setClocks' (Rst Nothing)  = let (rst,rate) = clkSyncId $ fst $ bbResult bc
+                                    rstName    = Text.concat [rst,Text.pack (show rate),"_rstn"]
+                                in  tell [(rstName,Reset rst rate)] >> return (C rstName)
     setClocks' (Rst (Just n)) = let (e,_,_)    = bbInputs bc !! n
                                     (rst,rate) = clkSyncId e
-                                    rst'       = Text.append rst "_rst"
-                                in  tell [(rst',Reset rate)] >> return (C rst')
+                                    rstName    = Text.concat [rst,Text.pack (show rate),"_rstn"]
+                                in  tell [(rstName,Reset rst rate)] >> return (C rstName)
 
     setClocks' e = return e
 

@@ -228,7 +228,7 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (Component compName hidden compInps compOutp _) <- preserveVarEnv $ genComponent fun Nothing
+                  (Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
                   let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
                       inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)

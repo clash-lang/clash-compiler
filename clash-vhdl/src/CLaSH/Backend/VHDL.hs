@@ -318,12 +318,12 @@ entity c = do
       "end" <> semi
   where
     ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
+            $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
+              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- hiddenPorts c ] ++
-              [ (,fromIntegral $ T.length (fst $ output c)) A.<$> (fill l (text (fst $ output c)) <+> colon <+> "out" <+> vhdlType (snd $ output c))
-              ]
+              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
+              | (i,ty) <- outputs c ]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -343,8 +343,8 @@ vhdlType hwty = do
 
 vhdlType' :: HWType -> VHDLM Doc
 vhdlType' Bool            = "boolean"
-vhdlType' (Clock _)       = "std_logic"
-vhdlType' (Reset _)       = "std_logic"
+vhdlType' (Clock _ _)     = "std_logic"
+vhdlType' (Reset _ _)     = "std_logic"
 vhdlType' Integer         = "integer"
 vhdlType' (BitVector n)   = case n of
                               0 -> "std_logic_vector (0 downto 1)"
@@ -372,8 +372,8 @@ vhdlTypeMark hwty = do
   vhdlTypeMark' hwty
   where
     vhdlTypeMark' Bool            = "boolean"
-    vhdlTypeMark' (Clock _)       = "std_logic"
-    vhdlTypeMark' (Reset _)       = "std_logic"
+    vhdlTypeMark' (Clock _ _)     = "std_logic"
+    vhdlTypeMark' (Reset _ _)     = "std_logic"
     vhdlTypeMark' Integer         = "integer"
     vhdlTypeMark' (BitVector _)   = "std_logic_vector"
     vhdlTypeMark' (Index _)       = "unsigned"
@@ -388,6 +388,8 @@ vhdlTypeMark hwty = do
 tyName :: HWType -> VHDLM Doc
 tyName Integer           = "integer"
 tyName Bool              = "boolean"
+tyName (Clock _ _)       = "std_logic"
+tyName (Reset _ _)       = "std_logic"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)     = "std_logic_vector_" <> int n
 tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
@@ -413,8 +415,8 @@ vhdlTypeErrValue (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeE
 vhdlTypeErrValue (SP _ _)            = "(others => 'X')"
 vhdlTypeErrValue (Sum _ _)           = "(others => 'X')"
 vhdlTypeErrValue (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue elTys
-vhdlTypeErrValue (Reset _)           = "'X'"
-vhdlTypeErrValue (Clock _)           = "'X'"
+vhdlTypeErrValue (Reset _ _)         = "'X'"
+vhdlTypeErrValue (Clock _ _)         = "'X'"
 vhdlTypeErrValue Void                = "(0 downto 1 => 'X')"
 
 decls :: [Declaration] -> VHDLM Doc
@@ -479,6 +481,7 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argT
     end      = start - argSize + 1
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) = text id_ <> dot <> tyName ty <> "_sel" <> int fI
+expr_ _ (Identifier id_ (Just (Indexed ((Vector _ _),_,fI)))) = text id_ <> parens (int fI)
 expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
   where
     start = typeSize ty - 1
@@ -650,3 +653,8 @@ parenIf False = id
 
 punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
+
+encodingNote :: HWType -> VHDLM Doc
+encodingNote (Clock _ _) = "-- clock"
+encodingNote (Reset _ _) = "-- asynchronous reset: active low"
+encodingNote _           = empty

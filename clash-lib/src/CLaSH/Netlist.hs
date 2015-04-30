@@ -137,7 +137,7 @@ genComponentT compName componentExpr mStart = do
 
   let compInps       = zip (map (mkBasicId . Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
-      component      = Component componentName' (nub clks) compInps compOutp (netDecls ++ decls)
+      component      = Component componentName' (nub clks) compInps [compOutp] (netDecls ++ decls)
   return component
 
 -- | Generate a list of Declarations for a let-binder
@@ -234,7 +234,7 @@ mkFunApp dst fun args = do
   normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
     Just _ -> do
-      (Component compName hidden compInps compOutp _) <- preserveVarEnv $ genComponent fun Nothing
+      (Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
       if length args == length compInps
         then do tcm <- Lens.use tcCache
                 argTys              <- mapM (termType tcm) args

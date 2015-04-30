@@ -82,10 +82,10 @@ synchronizedClk tcm ty
   = case name2String tyCon of
       "CLaSH.Sized.Vector.Vec"        -> synchronizedClk tcm (args!!1)
       "CLaSH.Signal.Internal.SClock" -> case splitTyConAppM (head args) of
-                                          Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack (s ++ show i),i)
+                                          Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack s,i)
                                           _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       "CLaSH.Signal.Internal.Signal'" -> case splitTyConAppM (head args) of
-                                           Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack (s ++ show i),i)
+                                           Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack s,i)
                                            _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       _                               -> case tyConDataCons (tcm HashMap.! tyCon) of
                                            [dc] -> let argTys   = dcArgTys dc
@@ -165,8 +165,8 @@ typeSize :: HWType
          -> Int
 typeSize Void = 1
 typeSize Bool = 1
-typeSize (Clock _) = 1
-typeSize (Reset _) = 1
+typeSize (Clock _ _) = 1
+typeSize (Reset _ _) = 1
 typeSize Integer = 32
 typeSize (BitVector i) = i
 typeSize (Index u) = clog2 (max 2 u)

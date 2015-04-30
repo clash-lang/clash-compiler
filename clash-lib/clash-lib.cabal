@@ -1,5 +1,5 @@
 Name:                 clash-lib
-Version:              0.5.1
+Version:              0.5.2
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -94,6 +94,7 @@ Library
 
                       CLaSH.Driver
                       CLaSH.Driver.TestbenchGen
+                      CLaSH.Driver.TopWrapper
                       CLaSH.Driver.Types
 
                       CLaSH.Netlist
@@ -120,5 +121,6 @@ Library
 
                       CLaSH.Util
 
-  Other-Modules:      Paths_clash_lib
+  Other-Modules:      Data.Aeson.Extra
+                      Paths_clash_lib
                       Unbound.Generics.LocallyNameless.Extra
