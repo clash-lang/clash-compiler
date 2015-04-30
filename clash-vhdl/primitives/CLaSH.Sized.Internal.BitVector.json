@@ -330,14 +330,14 @@ end block;"
     { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
     , "type"      : "minBound# :: KnownNat n => BitVector n"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '0');"
+    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '0')"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => BitVector n"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '1');"
+    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '1')"
     }
   }
 , { "BlackBox" :
