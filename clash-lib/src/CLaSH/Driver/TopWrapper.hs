@@ -49,7 +49,7 @@ data ClockSource
   = ClockSource
   { c_name  :: Text              -- ^ Component name
   , c_paths :: [ClockPath]       -- ^ Number of clock paths
-  , c_clear :: Maybe (Text,Text) -- ^ optional: Asynchronous clear input
+  , c_reset :: Maybe (Text,Text) -- ^ optional: Asynchronous reset input
   , c_lock  :: Text              -- ^ Port name that indicates clock is stable
   , c_sync  :: Bool              -- ^ optional: devices connected this clock
                                  -- source should be pulled out of reset in-sync
@@ -86,7 +86,7 @@ instance FromJSON ClockSource where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
       "Source" -> ClockSource <$> conVal .: "name" <*> conVal .: "paths"
-                              <*> conVal .:? "clear" <*> conVal .: "lock"
+                              <*> conVal .:? "reset" <*> conVal .: "lock"
                               <*> (conVal .:? "sync" .!= False)
       _ -> error "Expected: Source"
     _ -> error "Expected: Source object"
@@ -308,7 +308,7 @@ mkClock (ClockSource {..}) = ([lockedDecl,instDecl],(lockedName,clks,c_sync))
     instDecl     = InstDecl c_name (append c_name "_inst")
                  $ concat [ ports
                           , maybe [] ((:[]) . second (`Identifier` Nothing))
-                                  c_clear
+                                  c_reset
                           , [(c_lock,Identifier lockedName Nothing)]
                           ]
 
