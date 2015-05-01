@@ -1,8 +1,11 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.5.3
+## 0.5.3 *May 1st 2015*
 * New features:
   * Support wrapper generation
+
+* Fixes bugs:
+  * Incorrect primitives for BitVector `minBound` and `maxBound`
 
 ## 0.5.2 *April 24th 2015*
 * Fixes bugs:

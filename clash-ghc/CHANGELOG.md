@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.4 *May 1st 2015*
+* New features:
+  * Generate wrappers around `topEntity` that have constant names and types
+
 ## 0.5.3 *April 24th 2015*
 * Fixes bugs:
   * Fix bug where not enough array type definitions were created by the VHDL backend
@@ -8,7 +12,7 @@
 * Use latest ghc-typelits-natnormalise
 
 ## 0.5.1 *April 20th 2015*
-* New features
+* New features:
   * GHC 7.10 support
   * Update to clash-prelude 0.7.2
   * Use http://hackage.haskell.org/package/ghc-typelits-natnormalise typechecker plugin for better type-level natural number handling
