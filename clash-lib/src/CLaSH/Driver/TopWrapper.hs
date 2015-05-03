@@ -292,7 +292,7 @@ mkClocks primMap hidden teM = concat
     , resets
     ]
   where
-    hiddenSigDecs        = map (uncurry NetDecl) hidden
+    hiddenSigDecs        = maybe [] (const (map (uncurry NetDecl) hidden)) teM
     (clockGens,clkLocks) = maybe ([],[])
                                  (first concat . unzip . map mkClock . t_clocks)
                                  teM
