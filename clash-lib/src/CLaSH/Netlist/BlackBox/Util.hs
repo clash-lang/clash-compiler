@@ -13,6 +13,7 @@ import           Control.Monad.State                  (State, runState)
 import           Control.Monad.Writer                 (MonadWriter, tell)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
+import           Data.Set                             (Set,singleton)
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
@@ -76,7 +77,7 @@ setSym i l
                       _             -> pure e
               )
 
-setClocks :: ( MonadWriter [(Identifier,HWType)] m
+setClocks :: ( MonadWriter (Set (Identifier,HWType)) m
              , Applicative m
              )
           => BlackBoxContext
@@ -89,19 +90,19 @@ setClocks bc bt = mapM setClocks' bt
 
     setClocks' (Clk Nothing)  = let (clk,rate) = clkSyncId $ fst $ bbResult bc
                                     clkName    = Text.append clk (Text.pack (show rate))
-                                in  tell [(clkName,Clock clk rate)] >> return (C clkName)
+                                in  tell (singleton (clkName,Clock clk rate)) >> return (C clkName)
     setClocks' (Clk (Just n)) = let (e,_,_)    = bbInputs bc !! n
                                     (clk,rate) = clkSyncId e
                                     clkName    = Text.append clk (Text.pack (show rate))
-                                in  tell [(clkName,Clock clk rate)] >> return (C clkName)
+                                in  tell (singleton (clkName,Clock clk rate)) >> return (C clkName)
 
     setClocks' (Rst Nothing)  = let (rst,rate) = clkSyncId $ fst $ bbResult bc
                                     rstName    = Text.concat [rst,Text.pack (show rate),"_rstn"]
-                                in  tell [(rstName,Reset rst rate)] >> return (C rstName)
+                                in  tell (singleton (rstName,Reset rst rate)) >> return (C rstName)
     setClocks' (Rst (Just n)) = let (e,_,_)    = bbInputs bc !! n
                                     (rst,rate) = clkSyncId e
                                     rstName    = Text.concat [rst,Text.pack (show rate),"_rstn"]
-                                in  tell [(rstName,Reset rst rate)] >> return (C rstName)
+                                in  tell (singleton (rstName,Reset rst rate)) >> return (C rstName)
 
     setClocks' e = return e
 

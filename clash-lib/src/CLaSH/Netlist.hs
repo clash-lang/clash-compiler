@@ -7,12 +7,13 @@ module CLaSH.Netlist where
 import           Control.Lens                     ((.=), (<<%=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State              (runStateT)
-import           Control.Monad.Writer             (listen, runWriterT)
+import           Control.Monad.Writer             (listen, runWriterT, tell)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
-import           Data.List                        (elemIndex, nub)
+import           Data.List                        (elemIndex)
 import           Data.Maybe                       (fromMaybe)
+import           Data.Set                         (toList,fromList)
 import qualified Data.Text.Lazy                   as Text
 import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
                                                   runFreshMT, unbind, unembed,
@@ -137,7 +138,7 @@ genComponentT compName componentExpr mStart = do
 
   let compInps       = zip (map (mkBasicId . Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
-      component      = Component componentName' (nub clks) compInps [compOutp] (netDecls ++ decls)
+      component      = Component componentName' (toList clks) compInps [compOutp] (netDecls ++ decls)
   return component
 
 -- | Generate a list of Declarations for a let-binder
@@ -245,6 +246,7 @@ mkFunApp dst fun args = do
                     outpAssign    = (fst compOutp,Identifier dstId Nothing)
                     instLabel     = Text.concat [compName, Text.pack "_", dstId]
                     instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
+                tell (fromList hidden)
                 return (argDecls ++ [instDecl])
         else error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of

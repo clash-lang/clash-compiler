@@ -11,6 +11,7 @@ import Control.Monad.Writer                 (MonadWriter, WriterT)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
+import Data.Set                             (Set)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import GHC.Generics                         (Generic)
@@ -28,11 +29,11 @@ import CLaSH.Util
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
   NetlistMonad { runNetlist :: WriterT
-                               [(Identifier,HWType)]
+                               (Set (Identifier,HWType))
                                (StateT NetlistState (FreshMT IO))
                                a
                }
-  deriving (Functor, Monad, Applicative, MonadWriter [(Identifier,HWType)],
+  deriving (Functor, Monad, Applicative, MonadWriter (Set (Identifier,HWType)),
             MonadState NetlistState, Fresh, MonadIO)
 
 -- | State of the NetlistMonad
@@ -85,7 +86,7 @@ data HWType
   | SP       Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
   | Clock    Identifier Int -- ^ Clock type with specified name and period
   | Reset    Identifier Int -- ^ Reset type corresponding to clock with a specified name and period
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Ord,Show,Generic)
 
 instance Hashable HWType
 instance NFData HWType
