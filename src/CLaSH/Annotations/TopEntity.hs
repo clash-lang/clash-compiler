@@ -17,8 +17,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
     , t_extraIn  = [ (\"CLOCK_50\", 1)
                    , (\"KEY0\"    , 1)
                    ]
-    , t_clocks   = [ defClkAltera "CLOCK_50(0)" "not KEY0(0)"
-                   ]
+    , t_clocks   = [ defClkAltera "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) \#-\}
 topEntity :: Signal Bit -> Signal (BitVector 8)
 topEntity key1 = leds
@@ -94,6 +93,8 @@ aclkConstr = mkConstr aclkDataType "AClk" [] Prefix
 aclkDataType :: DataType
 aclkDataType = mkDataType "CLaSH.Annotations.TopEntity.AClk" [aclkConstr]
 
+-- | Default 'TopEntity' which has no clocks, and no specified names for the
+-- input and output ports. Also has no clock sources.
 defTop :: TopEntity
 defTop = TopEntity
   { t_name     = "topentity"
@@ -104,9 +105,14 @@ defTop = TopEntity
   , t_clocks   = []
   }
 
-defClkAltera :: String -> String -> ClockSource
-defClkAltera clkExpr resExpr = ClockSource
-  { c_name  = "systempll"
+-- | A clock source that corresponds to the Altera PLL component with default
+-- settings connected to the the system clock.
+defClkAltera :: String -- ^ Name of the component
+             -> String -- ^ Clock Pin/Expression
+             -> String -- ^ Reset Pin/Expression
+             -> ClockSource
+defClkAltera pllName clkExpr resExpr = ClockSource
+  { c_name  = pllName
   , c_inp   = Just ("inclk0",clkExpr)
   , c_outp  = [("c0",AClk systemClock)]
   , c_reset = Just ("areset",resExpr)
@@ -114,9 +120,14 @@ defClkAltera clkExpr resExpr = ClockSource
   , c_sync  = False
   }
 
-defClkXilinx :: String -> String -> ClockSource
-defClkXilinx clkExpr resExpr = ClockSource
-  { c_name  = "systempll"
+-- | A clock source that corresponds to the Xilinx PLL/MMCM component with
+-- default settings connected to the the system clock.
+defClkXilinx :: String -- ^ Name of the component
+             -> String -- ^ Clock Pin/Expression
+             -> String -- ^ Reset Pin/Expression
+             -> ClockSource
+defClkXilinx pllName clkExpr resExpr = ClockSource
+  { c_name  = pllName
   , c_inp   = Just ("CLK_IN1",clkExpr)
   , c_outp  = [("CLK_OUT1",AClk systemClock)]
   , c_reset = Just ("RESET",resExpr)
