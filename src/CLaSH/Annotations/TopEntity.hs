@@ -80,6 +80,9 @@ data ClockSource
 
 data AClk = forall clk . AClk (SClock clk)
 
+instance Eq AClk where
+  (AClk sclk1) == (AClk sclk2) = show sclk1 == show sclk2
+
 instance Show AClk where
   show (AClk sclk) = show sclk
 
