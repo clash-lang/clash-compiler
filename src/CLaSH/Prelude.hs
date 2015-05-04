@@ -66,6 +66,8 @@ module CLaSH.Prelude
   , module CLaSH.Sized.Fixed
     -- *** Fixed size vectors
   , module CLaSH.Sized.Vector
+    -- ** Annotations
+  , module CLaSH.Annotations.TopEntity
     -- ** Type-level natural numbers
   , module GHC.TypeLits
   , module CLaSH.Promoted.Nat
@@ -102,6 +104,7 @@ import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            splitAt, tail, take, unzip, unzip3,
                                            zip, zip3, zipWith, zipWith3)
 
+import CLaSH.Annotations.TopEntity
 import CLaSH.Class.BitPack
 import CLaSH.Class.Num
 import CLaSH.Class.Resize

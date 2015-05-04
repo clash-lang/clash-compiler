@@ -55,7 +55,9 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fexpose-all-unfoldings
 
-  Exposed-modules:    CLaSH.Class.BitPack
+  Exposed-modules:    CLaSH.Annotations.TopEntity
+
+                      CLaSH.Class.BitPack
                       CLaSH.Class.Num
                       CLaSH.Class.Resize
 
