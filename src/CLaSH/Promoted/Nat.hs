@@ -18,7 +18,7 @@ module CLaSH.Promoted.Nat
   )
 where
 
-import Data.Proxy
+import Data.Data
 import GHC.TypeLits
 import Unsafe.Coerce
 
@@ -28,6 +28,20 @@ import Unsafe.Coerce
 -- * "CLaSH.Promoted.Nat.TH" has functions to easily create large ranges of new
 --   'SNat' literals
 data SNat (n :: Nat) = KnownNat n => SNat (Proxy n)
+
+instance (Typeable n,KnownNat n) => Data (SNat n) where
+  gfoldl _ z (SNat n) = z (SNat n)
+  toConstr (SNat _)   = snatConstr
+  gunfold _ z c       = case constrIndex c of
+                          1 -> z (SNat Proxy)
+                          _ -> error "Data.Data.gunfold(SNat n)"
+  dataTypeOf _        = snatDataType
+
+snatConstr :: Constr
+snatConstr = mkConstr snatDataType "SNat" [] Prefix
+
+snatDataType :: DataType
+snatDataType = mkDataType "CLaSH.Promoted.Nat.SNat" [snatConstr]
 
 instance Show (SNat n) where
   show (SNat p) = 'd' : show (natVal p)
