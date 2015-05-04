@@ -97,7 +97,7 @@ data SClock (clk :: Clock)
     SClock :: SSymbol name -> SNat period -> SClock ('Clk name period)
 
 instance Show (SClock clk) where
-  show (SClock nm r) = ssymbolToString nm ++ "_" ++ show (snatToInteger r)
+  show (SClock nm r) = ssymbolToString nm ++ show (snatToInteger r)
 
 infixr 5 :-
 -- | A synchronized signal with samples of type @a@, explicitly synchronized to
