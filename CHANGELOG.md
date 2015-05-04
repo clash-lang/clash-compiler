@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.7.4
+* New features:
+  * Add `TopEntity` annotations
+
 ## 0.7.3 *April 22nd 2015*
 * New features:
   * Add the vector functions: `zip3`, `unzip3`, and `zipWith3`
