@@ -44,14 +44,10 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
 @
 
 -}
-module CLaSH.Annotations.TopEntity
-  ( module CLaSH.Annotations.TopEntity
-  , SClock, sclock, systemClock
-  )
-where
+module CLaSH.Annotations.TopEntity where
 
 import Data.Data
-import CLaSH.Signal.Explicit (SClock, sclock, systemClock)
+import CLaSH.Signal.Explicit (SClock, systemClock)
 
 -- | TopEntity specifications, fields are self-explanatory
 data TopEntity
