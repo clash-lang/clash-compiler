@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable        #-}
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -46,7 +45,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
 module CLaSH.Annotations.TopEntity where
 
 import Data.Data
-import CLaSH.Signal.Explicit (SClock, systemClock)
+import CLaSH.Signal.Explicit (systemClock)
 
 -- | TopEntity specifications, fields are self-explanatory
 data TopEntity
@@ -65,33 +64,13 @@ data ClockSource
   = ClockSource
   { c_name  :: String                -- ^ Component name
   , c_inp   :: Maybe (String,String) -- ^ optional: (Input port, clock pin)
-  , c_outp  :: [(String,AClk)]       -- ^ [(output port,clock signal)]
+  , c_outp  :: [(String,String)]     -- ^ [(output port,clock signal)]
   , c_reset :: Maybe (String,String) -- ^ optional: Asynchronous reset input
   , c_lock  :: String                -- ^ Port name that indicates clock is stable
   , c_sync  :: Bool                  -- ^ optional: devices connected this clock
                                      -- source should be pulled out of reset in-sync
   }
   deriving (Data,Show)
-
-data AClk = forall clk . AClk (SClock clk)
-
-instance Eq AClk where
-  (AClk sclk1) == (AClk sclk2) = show sclk1 == show sclk2
-
-instance Show AClk where
-  show (AClk sclk) = show sclk
-
-instance Data AClk where
-  gfoldl _ z (AClk clk) = z (AClk clk)
-  toConstr (AClk _)     = aclkConstr
-  gunfold _ _ _         = error "Data.Data.gunfold(AClk)"
-  dataTypeOf _          = aclkDataType
-
-aclkConstr :: Constr
-aclkConstr = mkConstr aclkDataType "AClk" [] Prefix
-
-aclkDataType :: DataType
-aclkDataType = mkDataType "CLaSH.Annotations.TopEntity.AClk" [aclkConstr]
 
 -- | Default 'TopEntity' which has no clocks, and no specified names for the
 -- input and output ports. Also has no clock sources.
@@ -114,7 +93,7 @@ defClkAltera :: String -- ^ Name of the component
 defClkAltera pllName clkExpr resExpr = ClockSource
   { c_name  = pllName
   , c_inp   = Just ("inclk0",clkExpr)
-  , c_outp  = [("c0",AClk systemClock)]
+  , c_outp  = [("c0",show systemClock)]
   , c_reset = Just ("areset",resExpr)
   , c_lock  = "locked"
   , c_sync  = False
@@ -129,7 +108,7 @@ defClkXilinx :: String -- ^ Name of the component
 defClkXilinx pllName clkExpr resExpr = ClockSource
   { c_name  = pllName
   , c_inp   = Just ("CLK_IN1",clkExpr)
-  , c_outp  = [("CLK_OUT1",AClk systemClock)]
+  , c_outp  = [("CLK_OUT1",show systemClock)]
   , c_reset = Just ("RESET",resExpr)
   , c_lock  = "LOCKED"
   , c_sync  = False

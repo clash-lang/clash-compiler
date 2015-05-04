@@ -13,7 +13,7 @@ module CLaSH.Promoted.Symbol
   (SSymbol (..), ssymbol, ssymbolToString)
 where
 
-import Data.Data
+import Data.Proxy
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 
 -- | Singleton value for a type-level string @s@
@@ -21,20 +21,6 @@ data SSymbol (s :: Symbol) = KnownSymbol s => SSymbol (Proxy s)
 
 instance Show (SSymbol s) where
   show (SSymbol s) = symbolVal s
-
-instance (Typeable n,KnownSymbol n) => Data (SSymbol n) where
-  gfoldl _ z (SSymbol n) = z (SSymbol n)
-  toConstr (SSymbol _)   = ssymbolConstr
-  gunfold _ z c          = case constrIndex c of
-                             1 -> z (SSymbol Proxy)
-                             _ -> error "Data.Data.gunfold(SSymbol n)"
-  dataTypeOf _           = ssymbolDataType
-
-ssymbolConstr :: Constr
-ssymbolConstr = mkConstr ssymbolDataType "SSymbol" [] Prefix
-
-ssymbolDataType :: DataType
-ssymbolDataType = mkDataType "CLaSH.Promoted.Symbol.SSymbol" [ssymbolConstr]
 
 {-# INLINE ssymbol #-}
 -- | Create a singleton literal for a type-level natural number

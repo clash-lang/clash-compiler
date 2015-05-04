@@ -76,11 +76,8 @@ import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
-import CLaSH.Promoted.Nat         (SNat, snat, snatToInteger)
-import CLaSH.Promoted.Symbol      (SSymbol, ssymbol, ssymbolToString)
-
-import Data.Data
-import GHC.TypeLits (KnownNat,KnownSymbol)
+import CLaSH.Promoted.Nat         (SNat, snatToInteger)
+import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
 
 -- $setup
 -- >>> :set -XDataKinds
@@ -100,22 +97,7 @@ data SClock (clk :: Clock)
     SClock :: SSymbol name -> SNat period -> SClock ('Clk name period)
 
 instance Show (SClock clk) where
-  show (SClock nm r) = ssymbolToString nm ++ show (snatToInteger r)
-
-instance (KnownSymbol nm, KnownNat r, Typeable nm, Typeable r) =>
-  Data (SClock ('Clk nm r)) where
-  gfoldl _ z (SClock nm r) = z (SClock nm r)
-  toConstr (SClock _ _)    = sclockConstr
-  gunfold _ z c            = case constrIndex c of
-                               1 -> z (SClock ssymbol snat)
-                               _ -> error "Data.Data.gunfold(SClock clk)"
-  dataTypeOf _             = sclockDataType
-
-sclockConstr :: Constr
-sclockConstr = mkConstr sclockDataType "SClock" [] Prefix
-
-sclockDataType :: DataType
-sclockDataType = mkDataType "CLaSH.Signal.Internal.SClock" [sclockConstr]
+  show (SClock nm r) = ssymbolToString nm ++ "_" ++ show (snatToInteger r)
 
 infixr 5 :-
 -- | A synchronized signal with samples of type @a@, explicitly synchronized to
