@@ -8,13 +8,16 @@ module CLaSH.GHC.LoadModules
 where
 
 -- External Modules
+import           Data.List                    (nub)
+import           Data.Maybe                   (listToMaybe)
+import           CLaSH.Annotations.TopEntity  (TopEntity)
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
 import           System.Process               (runInteractiveCommand,
                                                waitForProcess)
-import           Data.List                    (nub)
 
 -- GHC API
+import qualified Annotations
 import qualified CoreSyn
 import           DynFlags                     (GeneralFlag (..))
 import qualified DynFlags
@@ -23,11 +26,13 @@ import qualified HscMain
 import qualified HscTypes
 import qualified MonadUtils
 import qualified Panic
+import qualified Serialized
 import qualified TidyPgm
 
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
+import qualified Var
 import qualified FamInst
 import qualified FamInstEnv
 
@@ -59,6 +64,7 @@ loadModules ::
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
+        , Maybe TopEntity
         )
 loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessager
                               DynFlags.defaultFlushOut $ do
@@ -129,9 +135,19 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
 
         hscEnv <- GHC.getSession
         famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
+        topEntityAnnotations <- findCLaSHAnnotations (map fst binders)
+        let topEntM = listToMaybe topEntityAnnotations
 
-        return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'))
+        return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntM)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
+
+findCLaSHAnnotations :: GHC.GhcMonad m
+                     => [CoreSyn.CoreBndr]
+                     -> m [TopEntity]
+findCLaSHAnnotations bndrs = do
+  let deserializer = Serialized.deserializeWithData
+      targets      = map (Annotations.NamedTarget . Var.varName) bndrs
+  concat <$> mapM (GHC.findGlobalAnns deserializer) targets
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do

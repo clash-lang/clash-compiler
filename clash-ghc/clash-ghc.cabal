@@ -71,6 +71,7 @@ Executable clash
                       unordered-containers      >= 0.2.1.0,
 
                       clash-lib                 >= 0.5.2,
+                      clash-prelude             >= 0.7.4,
                       clash-vhdl                >= 0.5.3,
                       clash-systemverilog       >= 0.5.2,
                       clash-prelude             >= 0.7.3,

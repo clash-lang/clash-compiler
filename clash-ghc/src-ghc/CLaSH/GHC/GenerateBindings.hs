@@ -15,6 +15,7 @@ import           Unbound.Generics.LocallyNameless (name2String, runFreshM, unemb
 import qualified CoreSyn                 as GHC
 import qualified DynFlags                as GHC
 
+import           CLaSH.Annotations.TopEntity (TopEntity)
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
 import           CLaSH.Core.Type         (Type, TypeView (..), coreView, mkFunTy, splitFunForallTy)
@@ -36,9 +37,9 @@ generateBindings ::
   PrimMap
   -> String
   -> Maybe  (GHC.DynFlags)
-  -> IO (BindingMap,HashMap TyConName TyCon)
+  -> IO (BindingMap,HashMap TyConName TyCon,Maybe TopEntity)
 generateBindings primMap modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs) <- loadModules modName dflagsM
+  (bindings,clsOps,unlocatable,fiEnvs,topEntM) <- loadModules modName dflagsM
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       tcCache                       = makeAllTyCons tcMap fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
@@ -49,7 +50,7 @@ generateBindings primMap modName dflagsM = do
                                         [topEntity] -> let droppedBindings = lambdaDropPrep allBindings (fst topEntity)
                                                        in  snd $ retype allTcCache ([],droppedBindings) (fst topEntity)
                                         _           -> allBindings
-  return (retypedBindings,allTcCache)
+  return (retypedBindings,allTcCache,topEntM)
 
 -- | clean up cast-removal mess
 retype :: HashMap TyConName TyCon

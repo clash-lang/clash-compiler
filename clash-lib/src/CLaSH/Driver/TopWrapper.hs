@@ -12,16 +12,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 module CLaSH.Driver.TopWrapper where
 
-import           Data.Aeson           (FromJSON (..), Value (..), (.:), (.:?),
-                                       (.!=))
-import           Data.Aeson.Extra     (decodeAndReport)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.HashMap.Strict  as H
+
 import qualified Data.HashMap.Lazy    as HashMap
 import           Data.List            (mapAccumL)
-import           Data.Text.Lazy       (Text, append, pack)
-import           System.Directory     (doesFileExist)
+import           Data.Text.Lazy       (Text, append, pack, unpack)
 import           System.IO.Unsafe     (unsafePerformIO)
+
+import CLaSH.Annotations.TopEntity    (TopEntity (..), ClockSource (..))
 
 import CLaSH.Netlist                  (runNetlistMonad)
 import CLaSH.Netlist.BlackBox         (prepareBlackBox)
@@ -32,93 +29,6 @@ import CLaSH.Netlist.Types            (BlackBoxContext (..), Component (..),
 import CLaSH.Primitives.Types         (PrimMap, Primitive (..))
 import CLaSH.Util
 
--- | TopEntity specifications, fields are self-explanatory
-data TopEntity
-  = TopEntity
-  { t_name     :: Text
-  , t_inputs   :: [Text]        -- optional
-  , t_outputs  :: [Text]        -- optional
-  , t_extraIn  :: [(Text,Int)]  -- optional
-  , t_extraOut :: [(Text,Int)]  -- optional
-  , t_clocks   :: [ClockSource] -- optional
-  }
-  deriving Show
-
--- | A clock source
-data ClockSource
-  = ClockSource
-  { c_name  :: Text              -- ^ Component name
-  , c_paths :: [ClockPath]       -- ^ Number of clock paths
-  , c_reset :: Maybe (Text,Text) -- ^ optional: Asynchronous reset input
-  , c_lock  :: Text              -- ^ Port name that indicates clock is stable
-  , c_sync  :: Bool              -- ^ optional: devices connected this clock
-                                 -- source should be pulled out of reset in-sync
-  }
-  deriving Show
-
--- | A clock path
-data ClockPath
-  = ClockPath
-  { cp_inp   :: Maybe (Text,Text) -- optional: (Input port, clock pin)
-  , cp_outp  :: [(Text,Clock)]    -- [(output port,clock signal)]
-  }
-  deriving Show
-
--- | A clock
-data Clock
-  = Clk { clk_name :: Text, clk_rate :: Int }
-  deriving (Eq,Show)
-
-instance FromJSON TopEntity where
-  parseJSON (Object v) = case H.toList v of
-    [(conKey,Object conVal)] -> case conKey of
-      "TopEntity"  -> TopEntity <$> conVal .: "name"
-                                <*> (conVal .:? "inputs" .!= [])
-                                <*> (conVal .:? "outputs" .!= [])
-                                <*> (conVal .:? "extra_in" .!= [])
-                                <*> (conVal .:? "extra_out" .!= [])
-                                <*> (conVal .:? "clocks" .!= [])
-      _ -> error "Expected: TopEntity"
-    _ -> error "Expected: TopEntity object"
-  parseJSON _ = error "Expected: TopEntity object"
-
-instance FromJSON ClockSource where
-  parseJSON (Object v) = case H.toList v of
-    [(conKey,Object conVal)] -> case conKey of
-      "Source" -> ClockSource <$> conVal .: "name" <*> conVal .: "paths"
-                              <*> conVal .:? "reset" <*> conVal .: "lock"
-                              <*> (conVal .:? "sync" .!= False)
-      _ -> error "Expected: Source"
-    _ -> error "Expected: Source object"
-  parseJSON _ = error "Expected: Source object"
-
-instance FromJSON ClockPath where
-  parseJSON (Object v) = case H.toList v of
-    [(conKey,Object conVal)] -> case conKey of
-      "Path" -> ClockPath <$> conVal .:? "inp" <*> conVal .: "outp"
-      _ -> error "Expected: Path"
-    _ -> error "Expected: Path object"
-  parseJSON _ = error "Expected: Path object"
-
-instance FromJSON Clock where
-  parseJSON (Object v) = case H.toList v of
-    [(conKey,Object conVal)] -> case conKey of
-      "Clk" -> Clk <$> conVal .: "name" <*> conVal .: "rate"
-      _ -> error "Expected: Clk"
-    _ -> error "Expected: Clk object"
-  parseJSON (String "System") = pure (Clk "system" 1000)
-  parseJSON _ = error "Expected: System, or, Clk object"
-
--- | Create a 'TopEntity' data type from the JSON encoded @.topentity@ file.
-generateTopEnt :: String
-               -> IO (Maybe TopEntity)
-generateTopEnt modName = do
-  let topEntityFile = modName ++ ".topentity"
-  exists <- doesFileExist topEntityFile
-  if exists
-    then return . decodeAndReport <=< B.readFile $ topEntityFile
-    else return Nothing
-
 -- | Create a wrapper around a component, potentially initiating clock sources
 mkTopWrapper :: PrimMap
              -> Maybe TopEntity -- ^ TopEntity specifications
@@ -126,7 +36,7 @@ mkTopWrapper :: PrimMap
              -> Component
 mkTopWrapper primMap teM topComponent
   = Component
-  { componentName = maybe "topEntity" t_name teM
+  { componentName = maybe "topEntity" (pack . t_name) teM
   , inputs        = inputs'' ++ extraIn teM
   , outputs       = outputs'' ++ extraOut teM
   , hiddenPorts   = case maybe [] t_clocks teM of
@@ -138,7 +48,7 @@ mkTopWrapper primMap teM topComponent
                            ]
   }
   where
-    iNameSupply                = maybe [] t_inputs teM
+    iNameSupply                = maybe [] (map pack . t_inputs) teM
     originalHidden             = hiddenPorts topComponent
 
     inputs'                    = map (first (const "input"))
@@ -150,7 +60,7 @@ mkTopWrapper primMap teM topComponent
                                             iNameSupply
                                             (zip inputs' [0..])
 
-    oNameSupply                   = maybe [] t_outputs teM
+    oNameSupply                   = maybe [] (map pack . t_outputs) teM
     outputs'                      = map (first (const "output"))
                                         (outputs topComponent)
     (outputs'',(unwrappers,idsO)) = (concat *** (first concat . unzip))
@@ -175,11 +85,11 @@ mkTopWrapper primMap teM topComponent
 
 -- | Create extra input ports for the wrapper
 extraIn :: Maybe TopEntity -> [(Identifier,HWType)]
-extraIn = maybe [] ((map (second BitVector)) . t_extraIn)
+extraIn = maybe [] ((map (pack *** BitVector)) . t_extraIn)
 
 -- | Create extra output ports for the wrapper
 extraOut :: Maybe TopEntity -> [(Identifier,HWType)]
-extraOut = maybe [] ((map (second BitVector)) . t_extraOut)
+extraOut = maybe [] ((map (pack *** BitVector)) . t_extraOut)
 
 -- | Generate input port mappings
 mkInput :: [Identifier]
@@ -298,46 +208,49 @@ mkClocks primMap hidden teM = concat
                                  teM
     resets               = mkResets primMap hidden clkLocks
 
+stringToVar :: String -> Expr
+stringToVar = (`Identifier` Nothing) . pack
+
 -- | Create a single clock generator
-mkClock :: ClockSource -> ([Declaration],(Identifier,[Clock],Bool))
+mkClock :: ClockSource -> ([Declaration],(Identifier,[String],Bool))
 mkClock (ClockSource {..}) = ([lockedDecl,instDecl],(lockedName,clks,c_sync))
   where
-    lockedName   = append c_name "_locked"
+    c_nameT      = pack c_name
+    lockedName   = append c_nameT "_locked"
     lockedDecl   = NetDecl lockedName (Reset lockedName 0)
-    (ports,clks) = (concat *** concat) . unzip $ map clockPorts c_paths
-    instDecl     = InstDecl c_name (append c_name "_inst")
+    (ports,clks) = clockPorts c_inp c_outp
+    instDecl     = InstDecl c_nameT (append c_nameT "_inst")
                  $ concat [ ports
-                          , maybe [] ((:[]) . second (`Identifier` Nothing))
+                          , maybe [] ((:[]) . (pack *** stringToVar))
                                   c_reset
-                          , [(c_lock,Identifier lockedName Nothing)]
+                          , [(pack c_lock,Identifier lockedName Nothing)]
                           ]
 
 -- | Create a single clock path
-clockPorts :: ClockPath -> ([(Identifier,Expr)],[Clock])
-clockPorts (ClockPath {..}) = (inp ++ outp,clks)
+clockPorts :: Maybe (String,String) -> [(String,String)]
+           -> ([(Identifier,Expr)],[String])
+clockPorts inp outp = (inp' ++ outp',clks)
   where
-    inp  = maybe [] ((:[]) . second (`Identifier` Nothing)) cp_inp
-    outp = map (second ((`Identifier` Nothing) . clkToId)) cp_outp
-    clks = map snd cp_outp
-
-    clkToId (Clk nm r) = append nm (pack (show r))
+    inp'  = maybe [] ((:[]) . (pack *** stringToVar)) inp
+    outp' = map (pack *** stringToVar) outp
+    clks  = map snd outp
 
 -- | Generate resets
 mkResets :: PrimMap
          -> [(Identifier,HWType)]
-         -> [(Identifier,[Clock],Bool)]
+         -> [(Identifier,[String],Bool)]
          -> [Declaration]
 mkResets primMap hidden = unsafeRunNetlist . fmap concat . mapM assingReset
   where
     assingReset (lock,clks,doSync) = concat <$> mapM connectReset matched
       where
         matched = filter match hidden
-        match (_,(Reset nm r)) = elem (Clk nm r) clks
+        match (_,(Reset nm r)) = elem (unpack nm ++ show r) clks
         match _                = False
 
         connectReset (rst,(Reset nm r)) = if doSync
             then return [Assignment rst (Identifier lock Nothing)]
-            else genSyncReset primMap lock rst (Clk nm r)
+            else genSyncReset primMap lock rst nm r
         connectReset _ = return []
 
 -- | Generate a reset synchroniser that synchronously de-asserts an
@@ -345,9 +258,10 @@ mkResets primMap hidden = unsafeRunNetlist . fmap concat . mapM assingReset
 genSyncReset :: PrimMap
              -> Identifier
              -> Identifier
-             -> Clock
+             -> Text
+             -> Int
              -> NetlistMonad [Declaration]
-genSyncReset primMap lock rst (Clk nm r) = do
+genSyncReset primMap lock rst nm r = do
   let resetType = Reset rst 0
       ctx = emptyBBContext
               { bbResult = (Right ((Identifier rst Nothing),(nm,r)), resetType)
