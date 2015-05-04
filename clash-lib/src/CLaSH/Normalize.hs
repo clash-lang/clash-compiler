@@ -10,7 +10,7 @@ import qualified Control.Monad.State              as State
 import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
-import           Data.List                        (mapAccumL)
+import           Data.List                        (mapAccumL,intersect)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
@@ -165,9 +165,9 @@ stripArgs allIds []    args = if any mentionsId args
                                 then Nothing
                                 else Just args
   where
-    mentionsId t = case t of
-                     (Left (Var _ nm)) | nm `elem` allIds -> True
-                     _ -> False
+    mentionsId t = not $ null (either (Lens.toListOf termFreeIds) (const []) t
+                              `intersect`
+                              allIds)
 
 stripArgs allIds (id_:ids) (Left (Var _ nm):args)
       | varName id_ == nm = stripArgs allIds ids args
