@@ -82,6 +82,7 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                 , DynFlags.Opt_FlexibleContexts
                                 , DynFlags.Opt_ConstraintKinds
                                 , DynFlags.Opt_TypeFamilies
+                                , DynFlags.Opt_BinaryLiterals
                                 ]
                   let dfDis = foldl DynFlags.xopt_unset dfEn
                                 [ DynFlags.Opt_ImplicitPrelude

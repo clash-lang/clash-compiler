@@ -152,6 +152,7 @@ main = do
                                     , DynFlags.Opt_FlexibleContexts
                                     , DynFlags.Opt_ConstraintKinds
                                     , DynFlags.Opt_TypeFamilies
+                                    , DynFlags.Opt_BinaryLiterals
                                     ]
                 dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
                                      [ DynFlags.Opt_ImplicitPrelude
