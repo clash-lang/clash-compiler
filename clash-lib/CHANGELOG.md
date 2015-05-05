@@ -1,5 +1,12 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.3 *May 5th 2015*
+* New features:
+  * `TopEntity` wrappers are now specified as `ANN` annotation pragmas
+* Fixes bugs:
+  * Lost system1000 clock in VHDL generation... [#53](https://github.com/clash-lang/clash-compiler/issues/53)
+  * `flattenCallTree` sometimes introduces free variables
+
 ## 0.5.2 *May 1st 2015*
 * New features:
   * Generate wrappers around `topEntity` that have constant names and types
