@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.5 *May 5th 2015*
+* New features:
+  * `TopEntity` wrappers are now specified as `ANN` annotation pragmas [#42](https://github.com/clash-lang/clash-compiler/issues/42)
+
 ## 0.5.4 *May 1st 2015*
 * New features:
   * Generate wrappers around `topEntity` that have constant names and types
