@@ -1058,7 +1058,7 @@ lazyV = lazyV' (repeat undefined)
 -- However, when we try to do the same for 'Vec':
 --
 -- @
--- append xs ys = 'foldr' (:>) ys xs
+-- append' xs ys = 'foldr' (:>) ys xs
 -- @
 --
 -- We get a type error
