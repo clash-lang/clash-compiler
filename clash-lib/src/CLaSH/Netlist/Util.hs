@@ -272,11 +272,16 @@ appendToName n s = makeName (name2String n ++ s) (name2Integer n)
 preserveVarEnv :: NetlistMonad a
                -> NetlistMonad a
 preserveVarEnv action = do
-  vCnt <- Lens.use varCount
-  vEnv <- Lens.use varEnv
-  val  <- action
-  varCount .= vCnt
-  varEnv   .= vEnv
+  -- store state
+  vCnt  <- Lens.use varCount
+  vEnv  <- Lens.use varEnv
+  vComp <- Lens.use curCompNm
+  -- perform action
+  val <- action
+  -- restore state
+  varCount  .= vCnt
+  varEnv    .= vEnv
+  curCompNm .= vComp
   return val
 
 dcToLiteral :: HWType -> Int -> Expr

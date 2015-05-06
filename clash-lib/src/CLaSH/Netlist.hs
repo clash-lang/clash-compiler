@@ -77,7 +77,7 @@ runNetlistMonad compCntM s p tcm typeTrans
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm Text.empty
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -109,6 +109,7 @@ genComponentT compName componentExpr mStart = do
                      . Text.splitOn (Text.pack ".")
                      . Text.pack
                      $ name2String compName
+  curCompNm .= componentName'
 
   tcm <- Lens.use tcCache
   (arguments,binders,result) <- do { normalizedM <- splitNormalized tcm componentExpr

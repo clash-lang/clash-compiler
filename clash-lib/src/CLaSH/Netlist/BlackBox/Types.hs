@@ -20,6 +20,8 @@ data Element = C   Text          -- ^ Constant
              | TypM (Maybe Int)  -- ^ Type root hole
              | Err (Maybe Int)   -- ^ Error value hole
              | TypElem Element   -- ^ Select element type from a vector type
+             | CompName          -- ^ Hole for the name of the component in which
+                                 -- the blackbox is instantiated
              | SigD Element (Maybe Int)
   deriving Show
 

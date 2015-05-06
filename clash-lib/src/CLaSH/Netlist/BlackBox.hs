@@ -78,7 +78,8 @@ prepareBlackBox pNm t bbCtx =
          then do
            templ'  <- instantiateSym templ
            templ'' <- setClocks bbCtx templ'
-           return $! templ''
+           templ3  <- instantiateCompName templ''
+           return $! templ3
          else
            error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show t ++
                    "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++
@@ -258,3 +259,9 @@ instantiateSym l = do
   let (l',i') = setSym i l
   varCount .= i'
   return l'
+
+instantiateCompName :: BlackBoxTemplate
+                    -> NetlistMonad BlackBoxTemplate
+instantiateCompName l = do
+  nm <- Lens.use curCompNm
+  return (setCompName nm l)

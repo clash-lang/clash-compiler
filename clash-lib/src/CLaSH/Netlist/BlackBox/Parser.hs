@@ -69,6 +69,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> Err Nothing       <$  pToken "~ERRORO"
      <|> (Err . Just)      <$> (pToken "~ERROR" *> pBrackets pNatural)
      <|> TypElem           <$> (pToken "~TYPEL" *> pBrackets pTagE)
+     <|> CompName          <$  pToken "~COMPNAME"
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pTagE) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pTagE)
 

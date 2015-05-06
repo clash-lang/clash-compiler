@@ -47,6 +47,7 @@ data NetlistState
   , _primitives     :: PrimMap -- ^ Primitive Definitions
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
+  , _curCompNm      :: Identifier
   }
 
 -- | Signal reference

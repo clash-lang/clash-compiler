@@ -77,6 +77,12 @@ setSym i l
                       _             -> pure e
               )
 
+setCompName :: Identifier -> BlackBoxTemplate -> BlackBoxTemplate
+setCompName nm = map setCompName'
+  where
+    setCompName' CompName = C nm
+    setCompName' e        = e
+
 setClocks :: ( MonadWriter (Set (Identifier,HWType)) m
              , Applicative m
              )
@@ -211,3 +217,4 @@ renderTag _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element sele
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
 renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
+renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
