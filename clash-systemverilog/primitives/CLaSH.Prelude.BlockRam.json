@@ -18,7 +18,7 @@ initial begin
   ~SYM[0] = ~LIT[3];
 end
 
-always @(posedge ~CLK[2]) begin
+always @(posedge ~CLK[2]) begin : blockRam_~COMPNAME_~SYM[3]
   if (~ARG[6]) begin
     ~SYM[0][~ARG[4]] <= ~ARG[7];
   end
