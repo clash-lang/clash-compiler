@@ -221,8 +221,7 @@ asIntProxy _ = Proxy
 fracShift :: KnownNat frac => Fixed rep int frac -> Int
 fracShift fx = fromInteger (natVal fx)
 
-instance ( size ~ (int + frac), Show (rep size), Bits (rep size), KnownNat frac
-         , Integral (rep size)
+instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
          ) => Show (Fixed rep int frac) where
   show f@(Fixed fRep) =
       i ++ "." ++ (uncurry pad . second (show . numerator) .
@@ -571,7 +570,7 @@ resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
 -- >>> $$(fLit (atan 0.2)) :: SFixed 1 20
 -- 0.19739532470703125
 fLit :: forall rep int frac size .
-        ( size ~ (int + frac), KnownNat frac, Num (rep size), Bounded (rep size)
+        ( size ~ (int + frac), KnownNat frac, Bounded (rep size)
         , Integral (rep size))
      => Double
      -> Q (TExp (Fixed rep int frac))

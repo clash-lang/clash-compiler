@@ -267,11 +267,13 @@ instance KnownNat n => Integral (Signed n) where
   divMod  n d = (n `div#`  d,n `mod#` d)
   toInteger   = toInteger#
 
-quot#,rem#,div#,mod# :: KnownNat n => Signed n -> Signed n -> Signed n
+quot#,rem# :: Signed n -> Signed n -> Signed n
 {-# NOINLINE quot# #-}
 quot# (S a) (S b) = S (a `quot` b)
 {-# NOINLINE rem# #-}
 rem# (S a) (S b) = S (a `rem` b)
+
+div#,mod# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE div# #-}
 div# (S a) (S b) = S (a `div` b)
 {-# NOINLINE mod# #-}

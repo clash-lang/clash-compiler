@@ -136,7 +136,7 @@ infixr 5 :>
 instance Show a => Show (Vec n a) where
   show vs = "<" P.++ punc vs P.++ ">"
     where
-      punc :: Show a => Vec m a -> String
+      punc :: Vec m a -> String
       punc Nil        = ""
       punc (x :> Nil) = show x
       punc (x :> xs)  = show x P.++ "," P.++ punc xs
@@ -326,7 +326,7 @@ infixl 4 <<+
 -- <4,5,1>
 -- >>> Nil <<+ 1
 -- <>
-(<<+) :: KnownNat n => Vec n a -> a -> Vec n a
+(<<+) :: Vec n a -> a -> Vec n a
 xs <<+ s = fst (shiftInAtN xs (singleton s))
 
 {-# INLINE shiftOutFrom0 #-}

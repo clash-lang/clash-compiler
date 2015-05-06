@@ -166,8 +166,7 @@ firstDF (DF f) = DF (\ac acV bcR -> let clk       = sclock
 -- | Swap the two communication channels.
 --
 -- <<doc/swapDF.svg>>
-swapDF :: (KnownSymbol nm, KnownNat rate)
-       => DataFlow' ('Clk nm rate) (aEn,bEn) (bEn,aEn) (a,b) (b,a)
+swapDF :: DataFlow' ('Clk nm rate) (aEn,bEn) (bEn,aEn) (a,b) (b,a)
 swapDF = DF (\ab abV baR -> (swap <$> ab, swap <$> abV, swap <$> baR))
   where
     swap ~(a,b) = (b,a)

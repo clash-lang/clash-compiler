@@ -160,7 +160,7 @@ instance KnownNat n => Integral (Index n) where
   divMod  n d = (n `quot#` d,n `mod#` d)
   toInteger   = toInteger#
 
-quot#,rem#,mod# :: KnownNat n => Index n -> Index n -> Index n
+quot#,rem#,mod# :: Index n -> Index n -> Index n
 {-# NOINLINE quot# #-}
 (I a) `quot#` (I b) = I (a `div` b)
 {-# NOINLINE rem# #-}

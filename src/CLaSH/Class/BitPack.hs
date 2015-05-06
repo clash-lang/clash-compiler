@@ -75,7 +75,7 @@ instance BitPack (BitVector n) where
   pack   v = v
   unpack v = v
 
-instance (KnownNat (BitSize a), KnownNat (BitSize b), BitPack a, BitPack b) =>
+instance (KnownNat (BitSize b), BitPack a, BitPack b) =>
     BitPack (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
