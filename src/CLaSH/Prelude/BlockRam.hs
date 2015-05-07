@@ -12,7 +12,7 @@ module CLaSH.Prelude.BlockRam where
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding ((!!))
 
-import CLaSH.Prelude.Mealy    (mealy')
+import CLaSH.Prelude.Moore    (moore')
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock)
 import CLaSH.Signal.Bundle    (bundle')
@@ -99,9 +99,9 @@ blockRam' :: (KnownNat n, KnownNat m)
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
 blockRam' clk binit wr rd en din =
-    mealy' clk bram' (binit,undefined) (bundle' clk (wr,rd,en,din))
+    moore' clk bram' snd (binit,undefined) (bundle' clk (wr,rd,en,din))
   where
-    bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
+    bram' (ram,_) (w,r,e,d) = (ram',o')
       where
         ram' | e         = replace ram w d
              | otherwise = ram
