@@ -452,6 +452,10 @@ reverse (x :> xs)  = reverse xs <: x
 -- of @xs@, i.e.,
 --
 -- > map f (x1 :> x2 :>  ... :> xn :> Nil) == (f x1 :> f x2 :> ... :> f xn :> Nil)
+--
+-- and corresponds to the following circuit layout:
+--
+-- <<doc/map.svg>>
 map :: (a -> b) -> Vec n a -> Vec n b
 map _ Nil       = Nil
 map f (x :> xs) = f x :> map f xs
@@ -463,6 +467,10 @@ map f (x :> xs) = f x :> map f xs
 -- vector of corresponding sums.
 --
 -- > zipWith f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) == (f x1 y1 :> f x2 y2 :> ... :> f xn yn :> Nil)
+--
+-- @zipWith f xs ys@ corresponds to the following circuit layout:
+--
+-- <<doc/zipWith.svg>>
 --
 -- __NB:__ 'zipWith' is /strict/ in its second argument, and /lazy/ in its
 -- third. This matters when 'zipWith' is used in a recursive setting. See
@@ -476,6 +484,10 @@ zipWith f (x :> xs) ys = f x (head ys) :> zipWith f xs (tail ys)
 -- as the first argument, instead of a tupling function.
 --
 -- > zipWith3 f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) (z1 :> z2 :> ... :> zn :> Nil) == (f x1 y1 z1 :> f x2 y2 z2 :> ... :> f xn yn zn :> Nil)
+--
+-- @zipWith3 f xs ys zs@ corresponds to the following circuit layout:
+--
+-- <<doc/zipWith3.svg>>
 --
 -- __NB:__ 'zipWith3' is /strict/ in its second argument, and /lazy/ in its
 -- third and fourth. This matters when 'zipWith3' is used in a recursive setting.
@@ -493,6 +505,10 @@ zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 --
 -- >>> foldr (/) 1 (5 :> 4 :> 3 :> 2 :> Nil)
 -- 1.875
+--
+-- @foldr f z xs@ corresponds to the following circuit layout:
+--
+-- <<doc/foldr.svg>>
 --
 -- __NB__: @"'foldr' f z xs"@ produces a linear structure, which has a depth, or
 -- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
@@ -512,6 +528,10 @@ foldr f z xs = head (scanr f z xs)
 -- >>> foldl (/) 1 (5 :> 4 :> 3 :> 2 :> Nil)
 -- 8.333333333333333e-3
 --
+-- @foldl f z xs@ corresponds to the following circuit layout:
+--
+-- <<doc/foldl.svg>>
+--
 -- __NB__: @"'foldl' f z xs"@ produces a linear structure, which has a depth, or
 -- delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
@@ -530,6 +550,10 @@ foldl f z xs = last (scanl f z xs)
 -- >>> foldr1 (/) (5 :> 4 :> 3 :> 2 :> 1 :> Nil)
 -- 1.875
 --
+-- @foldr1 f xs@ corresponds to the following circuit layout:
+--
+-- <<doc/foldr1.svg>>
+--
 -- __NB__: @"'foldr1' f z xs"@ produces a linear structure, which has a depth,
 -- or delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
@@ -547,6 +571,10 @@ foldr1 f xs = foldr f (last xs) (init xs)
 --
 -- >>> foldl1 (/) (1 :> 5 :> 4 :> 3 :> 2 :> Nil)
 -- 8.333333333333333e-3
+--
+-- @foldl1 f xs@ corresponds to the following circuit layout:
+--
+-- <<doc/foldl1.svg>>
 --
 -- __NB__: @"'foldl1' f z xs"@ produces a linear structure, which has a depth,
 -- or delay, of O(@'length' xs@). Use 'fold' if your binary operator @f@ is
@@ -588,6 +616,10 @@ fold f vs = fold' (toList vs)
 -- >>> scanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <0,5,9,12,14>
 --
+-- @scanl f z xs@ corresponds to the following circuit layout:
+--
+-- <<doc/scanl.svg>>
+--
 -- __NB__:
 --
 -- > last (scanl f z xs) == foldl f z xs
@@ -603,6 +635,10 @@ scanl f z xs = ws
 --
 -- >>> sscanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <5,9,12,14>
+--
+-- @sscanl f z xs@ corresponds to the following circuit layout:
+--
+-- <<doc/sscanl.svg>>
 sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec n b
 sscanl f z xs = tail (scanl f z xs)
 
@@ -614,6 +650,10 @@ sscanl f z xs = tail (scanl f z xs)
 --
 -- >>> scanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <14,9,5,2,0>
+--
+-- @scanr f z xs@ corresponds to the following circuit layout:
+--
+-- <<doc/scanr.svg>>
 --
 -- __NB__:
 --
@@ -630,6 +670,10 @@ scanr f z xs = ws
 --
 -- >>> sscanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <14,9,5,2>
+--
+-- @sscanr f z xs@ corresponds to the following circuit layout:
+--
+-- <<doc/sscanr.svg>>
 sscanr :: (a -> b -> b) -> b -> Vec n a -> Vec n b
 sscanr f z xs = init (scanr f z xs)
 
@@ -641,6 +685,10 @@ sscanr f z xs = init (scanr f z xs)
 --
 -- >>> mapAccumL (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
 -- (10,<1,2,4,7>)
+--
+-- @mapAccumL f acc xs@ corresponds to the following circuit layout:
+--
+-- <<doc/mapAccumL.svg>>
 mapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
 mapAccumL f acc xs = (acc',ys)
   where
@@ -658,6 +706,10 @@ mapAccumL f acc xs = (acc',ys)
 --
 -- >>> mapAccumR (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
 -- (10,<10,8,5,1>)
+--
+-- @mapAccumR f acc xs@ corresponds to the following circuit layout:
+--
+-- <<doc/mapAccumR.svg>>
 mapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
 mapAccumR f acc xs = (acc',ys)
   where
@@ -919,6 +971,10 @@ repeat = withSNat replicate
 --
 -- >>> iterate d4 (+1) 1
 -- <1,2,3,4>
+--
+-- @interate n f z@ corresponds to the following circuit layout:
+--
+-- <<doc/iterate.svg>>
 iterate :: SNat n -> (a -> a) -> a -> Vec n a
 iterate (SNat _) = iterateI
 
@@ -930,6 +986,10 @@ iterate (SNat _) = iterateI
 --
 -- >>> iterateI (+1) 1 :: Vec 3 Int
 -- <1,2,3>
+--
+-- @interateI f z@ corresponds to the following circuit layout:
+--
+-- <<doc/iterate.svg>>
 iterateI :: KnownNat n => (a -> a) -> a -> Vec n a
 iterateI f a = xs
   where
@@ -945,6 +1005,10 @@ iterateI f a = xs
 --
 -- >>> generate d4 (+1) 1
 -- <2,3,4,5>
+--
+-- @generate n f z@ corresponds to the following circuit layout:
+--
+-- <<doc/generate.svg>>
 generate :: SNat n -> (a -> a) -> a -> Vec n a
 generate (SNat _) f a = iterateI f (f a)
 
@@ -956,6 +1020,10 @@ generate (SNat _) f a = iterateI f (f a)
 --
 -- >>> generateI (+1) 1 :: Vec 3 Int
 -- <2,3,4>
+--
+-- @generateI f z@ corresponds to the following circuit layout:
+--
+-- <<doc/generate.svg>>
 generateI :: KnownNat n => (a -> a) -> a -> Vec n a
 generateI f a = iterateI f (f a)
 
