@@ -128,7 +128,7 @@ deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 -- 3.9375
 -- >>> minBound :: SFixed 3 4
 -- -4.0
--- >>> 1  + 2 :: SFixed 3 4
+-- >>> 1 + 2 :: SFixed 3 4
 -- 3.0
 -- >>> 2 + 3 :: SFixed 3 4
 -- 3.9375
