@@ -1,6 +1,6 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.7.5
+## 0.7.5 **May 7th 2015**
 * New features:
   * Moore machine combinators
 
