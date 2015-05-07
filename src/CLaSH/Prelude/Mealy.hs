@@ -1,7 +1,13 @@
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Copyright  :  (C) 2013-2015, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Whereas the output of a Moore machine depends on the /previous state/, the
+  outputof a Mealy machine depends on /current transition/.
+
+  Mealy machines are strictly more expressive, but may impose stricter timing
+  requirements.
 -}
 module CLaSH.Prelude.Mealy
   ( -- * Mealy machine synchronised to the system clock

@@ -21,6 +21,8 @@ module CLaSH.Prelude.Explicit
   ( -- * Creating synchronous sequential circuits
     mealy'
   , mealyB'
+  , moore'
+  , mooreB'
   , registerB'
     -- * BlockRAM primitives
   , blockRam'
@@ -46,6 +48,7 @@ import Prelude                 hiding (repeat)
 
 import CLaSH.Prelude.BlockRam  (blockRam', blockRamPow2')
 import CLaSH.Prelude.Mealy     (mealy', mealyB')
+import CLaSH.Prelude.Moore     (moore', mooreB')
 import CLaSH.Prelude.Testbench (stimuliGenerator', outputVerifier')
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)

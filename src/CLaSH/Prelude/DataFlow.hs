@@ -20,6 +20,7 @@ module CLaSH.Prelude.DataFlow
     -- * Creating DataFlow circuits
   , liftDF
   , mealyDF
+  , mooreDF
     -- * Composition combinators
   , idDF
   , seqDF
@@ -128,6 +129,19 @@ mealyDF f iS = DF (\i iV oR -> let en     = iV .&&. oR
                                    (s',o) = unbundle (f <$> s <*> i)
                                    s      = regEn iS en s'
                                in  (o,iV,oR))
+
+-- | Create a 'DataFlow' circuit from a Moore machine description as those of
+-- "CLaSH.Prelude.Moore"
+mooreDF :: (s -> i -> s)
+        -> (s -> o)
+        -> s
+        -> DataFlow Bool Bool i o
+mooreDF ft fo iS = DF (\i iV oR -> let en  = iV .&&. oR
+                                       s'  = ft <$> s <*> i
+                                       s   = regEn iS en s'
+                                       o   = fo <$> s
+                                   in  (o,iV,oR))
+
 
 -- | Identity circuit
 --
