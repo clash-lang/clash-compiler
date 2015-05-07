@@ -68,6 +68,7 @@ Library
                       CLaSH.Prelude.DataFlow
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Mealy
+                      CLaSH.Prelude.Moore
                       CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat
