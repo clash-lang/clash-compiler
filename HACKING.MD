@@ -103,3 +103,13 @@ Patches are only accepted through GitHub pull requests.
    * Click the __Create pull request__ button.
 
      <img src=https://help.github.com/assets/images/help/pull_requests/pull-request-review-page.png width=600 />
+13. Updating the pull request:
+
+   * Once you've created a pull request, any changes to your branch will automatically be added to the pull request.
+   * To push your updated changes to your branch, always do:
+   
+   ```
+   $ git pull --rebase origin master
+   ... fix any conflicts ...
+   $ git push --force
+   ```
