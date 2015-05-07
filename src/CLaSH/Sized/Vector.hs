@@ -123,10 +123,11 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
 --   ending at 'maxIndex' (== 'length' - 1).
 --
--- >>> (3:>4:>5:>Nil)
+-- >>> 3:>4:>5:>Nil
 -- <3,4,5>
--- >>> :t (3:>4:>5:>Nil)
--- (3:>4:>5:>Nil) :: Num a => Vec (2 + 1) a
+-- >>> let x = 3:>4:>5:>Nil
+-- >>> :t x
+-- x :: Num a => Vec 3 a
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   (:>) :: a -> Vec n a -> Vec (n + 1) a
@@ -197,8 +198,8 @@ singleton = (:> Nil)
 -- >>> head Nil
 -- <BLANKLINE>
 -- <interactive>:...
---     Couldn't match type ‘1’ with ‘0’
---     Expected type: Vec (0 + 1) a
+--     Couldn't match type ‘...’ with ‘0’
+--     Expected type: Vec ... a
 --       Actual type: Vec 0 a
 --     In the first argument of ‘head’, namely ‘Nil’
 --     In the expression: head Nil
@@ -213,8 +214,8 @@ head (x :> _) = x
 -- >>> tail Nil
 -- <BLANKLINE>
 -- <interactive>:...
---     Couldn't match type ‘1’ with ‘0’
---     Expected type: Vec (0 + 1) a
+--     Couldn't match type ‘...’ with ‘0’
+--     Expected type: Vec ... a
 --       Actual type: Vec 0 a
 --     In the first argument of ‘tail’, namely ‘Nil’
 --     In the expression: tail Nil
@@ -229,8 +230,8 @@ tail (_ :> xs) = xs
 -- >>> last Nil
 -- <BLANKLINE>
 -- <interactive>:...
---     Couldn't match type ‘1’ with ‘0’
---     Expected type: Vec (0 + 1) a
+--     Couldn't match type ‘...’ with ‘0’
+--     Expected type: Vec ... a
 --       Actual type: Vec 0 a
 --     In the first argument of ‘last’, namely ‘Nil’
 --     In the expression: last Nil
@@ -246,8 +247,8 @@ last (_ :> y :> ys) = last (y :> ys)
 -- >>> init Nil
 -- <BLANKLINE>
 -- <interactive>:...
---     Couldn't match type ‘1’ with ‘0’
---     Expected type: Vec (0 + 1) a
+--     Couldn't match type ‘...’ with ‘0’
+--     Expected type: Vec ... a
 --       Actual type: Vec 0 a
 --     In the first argument of ‘init’, namely ‘Nil’
 --     In the expression: init Nil
@@ -300,8 +301,9 @@ infixl 5 <:
 --
 -- >>> (3:>4:>5:>Nil) <: 1
 -- <3,4,5,1>
--- >>> :t (3:>4:>5:>Nil) <: 1
--- (3:>4:>5:>Nil) <: 1 :: Num a => Vec (3 + 1) a
+-- >>> let x = (3:>4:>5:>Nil) <: 1
+-- >>> :t x
+-- x :: Num a => Vec 4 a
 (<:) :: Vec n a -> a -> Vec (n + 1) a
 xs <: x = xs ++ singleton x
 
