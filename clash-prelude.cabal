@@ -34,6 +34,7 @@ Build-type:           Simple
 
 Extra-source-files:   README.md
                       CHANGELOG.md
+                      AUTHORS.md
 
 extra-doc-files:      doc/*.svg
 
