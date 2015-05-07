@@ -92,6 +92,29 @@ import qualified CLaSH.Sized.Internal.BitVector as BV
 --
 -- __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
 -- saturation on overflow, check out the 'SaturatingNum' class.
+--
+-- >>> maxBound :: Unsigned 3
+-- 7
+-- >>> minBound :: Unsigned 3
+-- 0
+-- >>> 1 + 2 :: Unsigned 3
+-- 3
+-- >>> 2 + 6 :: Unsigned 3
+-- 0
+-- >>> 1 - 3 :: Unsigned 3
+-- 6
+-- >>> 2 * 3 :: Unsigned 3
+-- 6
+-- >>> 2 * 4 :: Unsigned 3
+-- 0
+-- >>> (2 :: Unsigned 3) `times` (4 :: Unsigned 3) :: Unsigned 6
+-- 8
+-- >>> (2 :: Unsigned 3) `plus` (6 :: Unsigned 3) :: Unsigned 4
+-- 8
+-- >>> satPlus SatSymmetric 2 6 :: Unsigned 3
+-- 7
+-- >>> satMin SatSymmetric 2 3 :: Unsigned 3
+-- 0
 newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToBitVector', are not
     -- synthesisable.
