@@ -28,17 +28,15 @@ import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 -- >>> import CLaSH.Prelude
 -- >>> :{
 -- let mac s (x,y) = x * y + s
---     topEntity = moore mac 0
+--     topEntity = moore mac id 0
 -- :}
 --
 -- >>> import CLaSH.Prelude.Explicit
 -- >>> type ClkA = Clk "A" 100
 -- >>> let clkA = sclock :: SClock ClkA
--- >>> :{
--- let mac s (x,y) = x * y + s
--- :}
+-- >>> let mac s (x,y) = x * y + s
 --
--- >>> let topEntity = moore' clkA mac 0
+-- >>> let topEntity = moore' clkA mac id 0
 
 {-# INLINE moore #-}
 -- | Create a synchronous function from a combinational function describing
