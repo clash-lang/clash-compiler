@@ -34,6 +34,8 @@ module CLaSH.Prelude
     mealy
   , mealyB
   , (<^>)
+  , moore
+  , mooreB
   , registerB
     -- * BlockRAM primitives
   , blockRam
@@ -114,6 +116,7 @@ import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
 import CLaSH.Prelude.Explicit      (registerB', window', windowD', isRising',
                                     isFalling')
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
+import CLaSH.Prelude.Moore         (moore, mooreB)
 import CLaSH.Prelude.DataFlow
 import CLaSH.Prelude.Testbench     (assert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat
