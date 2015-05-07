@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.7.5
+* New features:
+  * Moore machine combinators
+
 ## 0.7.4 **May 5th 2015*
 * New features:
   * Add `TopEntity` annotations
