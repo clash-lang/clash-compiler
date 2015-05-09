@@ -1,5 +1,13 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.5.4
+* New features:
+  * Make VHDL 'assert' primitive GHDL friendly
+  * Generate smarter labels for `register` and `blockRam` blackboxes to make finding longest paths easier
+
+* Fixes bugs:
+  * Incorrect primitives for BitVector `minBound` and `maxBound`
+
 ## 0.5.3 *May 1st 2015*
 * New features:
   * Support wrapper generation
