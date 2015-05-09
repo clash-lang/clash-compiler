@@ -56,14 +56,14 @@
     { "name"      : "CLaSH.Sized.Internal.Unsigned.minBound#"
     , "type"      : "minBound# :: KnownNat n => Unsigned n"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '0');"
+    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '0')"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => Unsigned n"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '1');"
+    , "templateE" : "unsigned'(~LIT[0]-1 downto 0 => '1')"
     }
   }
 , { "BlackBox" :
