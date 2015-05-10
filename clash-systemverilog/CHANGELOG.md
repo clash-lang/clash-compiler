@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.5.4
+* New features:
+  * Generate smarter labels for `register` and `blockRam` blackboxes to make finding longest paths easier
+
 ## 0.5.3 *May 5th 2015*
 * Fixes bugs:
   * Incorrect implementation of rotateL and rotateR blackbox for BitVector

@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.4
+* New features:
+  * Add `~COMPNAME` tag: primitives get access to the component name in which they are instantiated
+
 ## 0.5.3 *May 5th 2015*
 * New features:
   * `TopEntity` wrappers are now specified as `ANN` annotation pragmas
