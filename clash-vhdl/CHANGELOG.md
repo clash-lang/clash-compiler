@@ -1,6 +1,6 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.5.4
+## 0.5.4 *May 10th 2015*
 * New features:
   * Make VHDL 'assert' primitive GHDL friendly
   * Generate smarter labels for `register` and `blockRam` blackboxes to make finding longest paths easier

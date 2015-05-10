@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.5.4
+## 0.5.4 *May 10th 2015*
 * New features:
   * Add `~COMPNAME` tag: primitives get access to the component name in which they are instantiated
 
