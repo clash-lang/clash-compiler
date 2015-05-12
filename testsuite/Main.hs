@@ -7,41 +7,159 @@ import Test.Tasty.Program
 
 import qualified System.Directory   as Directory
 import qualified System.Environment as Environment
-import           System.FilePath    ((</>))
+import           System.FilePath    ((</>),(<.>))
 -- import System.Exit                (ExitCode(..))
 import qualified System.IO          as IO
 import qualified System.Process     as Process
 
 import qualified Paths_clash_testsuite
 
-data TestRun
-  = Compile
-  | CompileBuild    [BuildTarget]
-  | CompileBuildRun [BuildTarget]
+-- data TestRun
+--   = Compile
+--   | CompileBuild    [BuildTarget]
+--   | CompileBuildRun [BuildTarget]
 
 data BuildTarget
-  = VHDL | Verilog
+  = VHDL | SystemVerilog
+  deriving Show
 
-aq :: IO FilePath
-aq = do
+main :: IO ()
+main = do
+  -- Add ghdl_import.sh to the PATH
   ddir <- Paths_clash_testsuite.getDataDir
   ghdl_import_prm <- Directory.getPermissions (ddir </> "ghdl_import.sh")
   Directory.setPermissions (ddir </> "ghdl_import.sh") (Directory.setOwnerExecutable True ghdl_import_prm)
   path <- Environment.getEnv "PATH"
   let path' = ddir ++ ":" ++ path
   Environment.setEnv "PATH" path'
-  Directory.createDirectoryIfMissing True "examples/vhdl/FIR/work"
-  return path
 
-rel :: FilePath -> IO ()
-rel path = do
-  Directory.removeDirectoryRecursive "examples/vhdl"
-  Environment.setEnv "PATH" path
+  -- Start the test
+  defaultMain $ testGroup "tests"
+    [ testGroup "examples"
+      -- [runTest "examples"             VHDL "CochleaPlus"  (Just ("topEntity",False))
+      -- ])
+      [runTest "examples"             VHDL "ALU"          (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "Blinker"      (Just ("topEntity_0",False))
+      ,runTest "examples"             VHDL "BlockRamTest" (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "Calculator"   (Just ("testbench",True ))
+      ,runTest "examples"             VHDL "CochleaPlus"  (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "FIR"          (Just ("testbench",True ))
+      ,runTest "examples"             VHDL "Fifo"         (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "MAC"          (Just ("testbench",True))
+      ,runTest "examples"             VHDL "MatrixVect"   (Just ("testbench",True))
+      ,runTest "examples"             VHDL "Queens"       (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "Reducer"      (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "Sprockell"     (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "Windows"      (Just ("topEntity",False))
+      -- ,runTest ("examples" </> "i2c") VHDL "I2C"     (Just ("topEntity_0",False))
+      ]
+    , testGroup "unit-tests"
+        [ testGroup "Basic"
+            [ runTest ("tests" </> "shouldwork" </> "Basic") VHDL "ClassOps" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "IrrefError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "NestedPrimitives" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "NestedPrimitives2" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "PatError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "RecordSumOfProducts" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "Shift" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "SimpleConstructor" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "TagToEnum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL "TwoFunctions" (Just ("topEntity",False))
+            ]
+        , testGroup "BitVector"
+            [ runTest ("tests" </> "shouldwork" </> "BitVector") VHDL "Box" (Just ("topEntity",False))
+            ]
+        , testGroup "BoxedFunctions"
+            [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") VHDL "DeadRecursiveBoxed" (Just ("topEntity",False))
+            ]
+        , testGroup "CSignal"
+            [ runTest ("tests" </> "shouldwork" </> "CSignal") VHDL "CBlockRamTest" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "CSignal") VHDL "MAC" (Just ("topEntity",False))
+            ]
+        , testGroup "Fixed"
+            [ runTest ("tests" </> "shouldwork" </> "Fixed") VHDL "SFixedTest" (Just ("testbench",True))
+            ]
+        , testGroup "Numbers"
+            [ runTest ("tests" </> "shouldwork" </> "Numbers") VHDL "Resize" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") VHDL "Resize2" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") VHDL "SatMult" (Just ("topEntity",False))
+            ]
+        , testGroup "Polymorphism"
+            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") VHDL "ExistentialBoxed" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") VHDL "LocalPoly" (Just ("topEntity",False))
+            ]
+        , testGroup "Signal"
+            [ runTest ("tests" </> "shouldwork" </> "Signal") VHDL "AlwaysHigh" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") VHDL "BlockRamTest" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") VHDL "MAC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") VHDL "SigP" (Just ("topEntity",False))
+            ]
+        , testGroup "Testbench"
+            [ runTest ("tests" </> "shouldwork" </> "Testbench") VHDL "SyncTB" (Just ("testbench",True))
+            ]
+        --     [ runTest ("tests" </> "shouldwork" </> "Testbench") VHDL "TB" (Just ("testbench",True))
+        --     , runTest ("tests" </> "shouldwork" </> "Testbench") VHDL "SyncTB" (Just ("testbench",True))
+        --     ]
+        , testGroup "Vector"
+            [ runTest ("tests" </> "shouldwork" </> "Vector") VHDL "EnumTypes" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "HOClock" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "HOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "HOPrim" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "PatHOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "Split" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VACC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VIndex" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VMapAccum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VReplace" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VScan" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VZip" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VecConst" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL "VecOfSum" (Just ("topEntity",False))
+            ]
+        ]
+    ]
 
-main :: IO ()
-main = defaultMain $ withResource aq rel $ const (testGroup "examples/FIR.hs"
-  [ testProgram "CLaSH" "cabal" ["exec","clash","--","--vhdl","FIR.hs"] (Just "examples")
-  , testProgram "GHDL (import)" "ghdl_import.sh" ["examples/vhdl/FIR"] Nothing
-  , testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work","testbench"] (Just "examples/vhdl/FIR")
-  , testProgram "GHDL (sim)" "ghdl" ["-r","testbench","--assert-level=error"] (Just "examples/vhdl/FIR")
-  ])
+
+clashHDL :: BuildTarget -> FilePath -> String -> TestTree
+clashHDL t env modName = testProgram ("CLaSH(" ++ show t ++ ")")
+                                     "cabal"
+                                     ["exec","clash","--"
+                                     ,case t of { VHDL -> "--vhdl"
+                                                ; SystemVerilog -> "--systemverilog"
+                                                }
+                                     ,modName <.> "hs"
+                                     ]
+                                     (Just env)
+
+ghdlImport :: FilePath -> TestTree
+ghdlImport dir = testProgram "GHDL (import)" "ghdl_import.sh" [dir] Nothing
+
+ghdlMake :: String -> FilePath -> TestTree
+ghdlMake entity env = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",entity] (Just env)
+
+ghdlSim :: FilePath -> TestTree
+ghdlSim env = testProgram "GHDL (sim)" "ghdl" ["-r","testbench","--assert-level=error"] (Just env)
+
+runTest :: FilePath
+        -> BuildTarget
+        -> String
+        -> Maybe (String,Bool)
+        -> TestTree
+runTest env VHDL    modName entNameM = withResource aquire release (const grp)
+  where
+    vhdlDir   = env </> "vhdl"
+    modDir    = vhdlDir </> modName
+    workdir   = modDir </> "work"
+    aquire    = Directory.createDirectoryIfMissing True workdir
+    release _ = return ()
+
+    grp       = testGroup modName
+                ( clashHDL VHDL env modName
+                : maybe [] doMakeAndRun entNameM
+                )
+
+    doMakeAndRun (entName,doRun) = [ ghdlImport modDir
+                                   , ghdlMake entName modDir
+                                   ] ++ if doRun then [ghdlSim modDir] else []
+
+runTest env SystemVerilog modName _ = clashHDL SystemVerilog env modName

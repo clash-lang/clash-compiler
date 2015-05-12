@@ -1,6 +1,6 @@
 module Calculator where
 
-import CLaSH.Prelude
+import CLaSH.Prelude hiding (Word)
 import CalculatorTypes
 
 (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d

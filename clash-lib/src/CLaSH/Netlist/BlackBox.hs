@@ -245,7 +245,8 @@ mkFunInput resId e = do
                                     then do
                                       l'  <- instantiateSym l
                                       l'' <- setClocks bbCtx l'
-                                      return ((Left l'',bbCtx),dcls)
+                                      l3  <- instantiateCompName l''
+                                      return ((Left l3,bbCtx),dcls)
                                     else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
     Left (_, Right templ') -> let ass = Assignment (pack "~RESULT") (Identifier templ' Nothing)
                               in  return ((Right ass, bbCtx),dcls)

@@ -16,11 +16,8 @@ matrixVector m v = map (`dotProduct` v) m
 topEntity :: Vec 3 (Signal (Signed 16)) -> Vec 3 (Signal (Signed 16))
 topEntity = (\s i -> ((),matrixVector matrix i)) <^> ()
 
-testInput :: [Vec 3 (Signed 16)]
-testInput = [2 :> 3 :> 4 :> Nil]
+testInput :: Signal (Vec 3 (Signed 16))
+testInput = stimuliGenerator ((2 :> 3 :> 4 :> Nil) :> Nil)
 
-expectedOutput :: [Vec 3 (Signed 16)]
-expectedOutput = [20 :> 47 :> 74 :> Nil]
-
-test = matrixVector matrix vector
-test2 = L.take (L.length testInput) (simulateB topEntity testInput) == expectedOutput
+expectedOutput :: Signal (Vec 3 (Signed 16)) -> Signal Bool
+expectedOutput = outputVerifier ((20 :> 47 :> 74 :> Nil) :> Nil)

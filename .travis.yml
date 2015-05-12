@@ -34,7 +34,7 @@ install:
 script:
   - cabal install clash-ghc
   - cabal install clash-testsuite
-  - cabal exec clash-testsuite
+  - cabal exec clash-testsuite -- -e
 
 notifications:
   irc:

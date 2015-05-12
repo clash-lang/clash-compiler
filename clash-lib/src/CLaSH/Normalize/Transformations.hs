@@ -204,7 +204,34 @@ caseCon _ c@(Case (Literal l) _ alts) = R $ do
     equalLit (LitPat l')     = l == (unembed l')
     equalLit _               = False
 
-caseCon _ e@(Case _ _ [alt]) = R $ do
+-- caseCon _ e@(Case _ _ [alt]) = R $ do
+--   (pat,altE) <- unbind alt
+--   case pat of
+--     DefaultPat    -> changed altE
+--     LitPat _      -> changed altE
+--     DataPat _ pxs -> let (tvs,xs)   = unrebind pxs
+--                          ftvs       = Lens.toListOf termFreeTyVars altE
+--                          fvs        = Lens.toListOf termFreeIds altE
+--                          usedTvs    = filter ((`elem` ftvs) . varName) tvs
+--                          usedXs     = filter ((`elem` fvs) . varName) xs
+--                      in  case (usedTvs,usedXs) of
+--                            ([],[]) -> changed altE
+--                            _       -> return e
+
+caseCon ctx e@(Case subj ty alts)
+  | isConstant subj = do
+    tcm <- Lens.use tcCache
+    lvl <- Lens.view dbgLevel
+    reduceConstant <- Lens.use evaluator
+    case reduceConstant tcm subj of
+      Literal l -> caseCon ctx (Case (Literal l) ty alts)
+      subj'@(collectArgs -> (Data _,_)) -> caseCon ctx (Case subj' ty alts)
+      subj' -> traceIf (lvl > DebugNone) ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj') (caseOneAlt e)
+
+caseCon _ e = caseOneAlt e
+
+caseOneAlt :: Monad m => Term -> R m Term
+caseOneAlt e@(Case _ _ [alt]) = R $ do
   (pat,altE) <- unbind alt
   case pat of
     DefaultPat    -> changed altE
@@ -218,17 +245,7 @@ caseCon _ e@(Case _ _ [alt]) = R $ do
                            ([],[]) -> changed altE
                            _       -> return e
 
-caseCon ctx e@(Case subj ty alts)
-  | isConstant subj = do
-    tcm <- Lens.use tcCache
-    lvl <- Lens.view dbgLevel
-    reduceConstant <- Lens.use evaluator
-    case reduceConstant tcm subj of
-      Data dc   -> caseCon ctx (Case (Data dc) ty alts)
-      Literal l -> caseCon ctx (Case (Literal l) ty alts)
-      subj' -> traceIf (lvl > DebugNone) ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj') (return e)
-
-caseCon _ e = return e
+caseOneAlt e = return e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable

@@ -167,7 +167,7 @@ reducer (dataIn,index) = redOut
 
 topEntity = reducer
 
-fmapB f = unbundle' . fmap f . bundle'
+fmapB f = unbundle . fmap f . bundle
 
 initDiscrState :: DiscrState
 initDiscrState = Discr { prevIndex = 255

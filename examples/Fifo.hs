@@ -36,6 +36,8 @@ fifo (rpntr, wpntr, elms) (datain,wrt,rd) = ((rpntr',wpntr',elms'),(full,empty,d
 fifoL :: Signal (Elm,Bool,Bool) -> Signal (Bool,Bool,Elm)
 fifoL = fifo `mealy` (0,0,replicate d4 0)
 
+topEntity = fifoL
+
 testdatas :: [[(Elm,Bool,Bool)]]
 testdatas = [
   -- write an element, wait one cycle, write and read, wait a cycle ->

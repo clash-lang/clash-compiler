@@ -239,22 +239,35 @@ mkFunApp dst fun args = do
       (Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
       if length args == length compInps
         then do tcm <- Lens.use tcCache
-                argTys              <- mapM (termType tcm) args
-                (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False t e) (zip args argTys)
+                argTys                <- mapM (termType tcm) args
+                (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False t e) (zip args argTys)
+                (argExprs',argDecls') <- (second concat . unzip) <$> mapM toSimpleVar (zip argExprs argTys)
                 let dstId         = mkBasicId . Text.pack . name2String $ varName dst
                     hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-                    inpAssigns    = zip (map fst compInps) argExprs
+                    inpAssigns    = zip (map fst compInps) argExprs'
                     outpAssign    = (fst compOutp,Identifier dstId Nothing)
                     instLabel     = Text.concat [compName, Text.pack "_", dstId]
                     instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
                 tell (fromList hidden)
-                return (argDecls ++ [instDecl])
+                return (argDecls ++ argDecls' ++ [instDecl])
         else error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of
       [] -> do
         let dstId = mkBasicId . Text.pack . name2String $ varName dst
         return [Assignment dstId (Identifier (mkBasicId . Text.pack $ name2String fun) Nothing)]
       _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
+
+toSimpleVar :: (Expr,Type)
+            -> NetlistMonad (Expr,[Declaration])
+toSimpleVar (e@(Identifier _ _),_) = return (e,[])
+toSimpleVar (e,ty) = do
+  i   <- varCount <<%= (+1)
+  hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  let tmpNm   = "tmp_" ++ show i
+      tmpNmT  = Text.pack tmpNm
+      tmpDecl = NetDecl tmpNmT hTy
+      tmpAssn = Assignment tmpNmT e
+  return (Identifier tmpNmT Nothing,[tmpDecl,tmpAssn])
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
 mkExpr :: Bool -- ^ Treat BlackBox expression as declaration

@@ -9,7 +9,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
 import           Unbound.Generics.LocallyNameless (bind, embed, string2Name)
 
-import           CLaSH.Core.DataCon  (dcTag)
+import           CLaSH.Core.DataCon  (DataCon (..))
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Term     (Term (..))
 import           CLaSH.Core.Type     (Type (..), ConstTy (..), mkFunTy)
@@ -68,6 +68,11 @@ reduceConstant tcm e@(collectArgs -> (Prim nm _, args))
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         -> Literal (IntegerLiteral (i * j))
       _ -> e
+  | nm == "GHC.Integer.Type.minusInteger"
+  = case (map (reduceConstant tcm) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+        -> Literal (IntegerLiteral (i - j))
+      _ -> e
   | nm == "GHC.Integer.Type.divInteger"
   = case (map (reduceConstant tcm) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
@@ -119,6 +124,10 @@ reduceConstant tcm e@(collectArgs -> (Prim nm _, args))
   = case (map (reduceConstant tcm) . Either.lefts) args of
       [Literal (IntegerLiteral i), _] -> Literal (IntegerLiteral i)
       _ -> e
+  | nm == "CLaSH.Promoted.Nat.SNat"
+  = case (map collectArgs . Either.lefts) args of
+      [(Literal (IntegerLiteral _),[]), (Data _,_)] -> mkApps snatCon args
+      _ -> e
 
 reduceConstant _ e = e
 
@@ -141,3 +150,18 @@ unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.U" (ForAllTy (bind nTV fun
     nName      = string2Name "n"
     nVar       = VarTy typeNatKind nName
     nTV        = TyVar nName (embed typeNatKind)
+
+snatCon :: Term
+snatCon = Data (MkData snanNm 1 snatTy [nName] [] argTys)
+  where
+    snanNm = string2Name "CLaSH.Promoted.Nat.SNat"
+    snatTy = ForAllTy (bind nTV funTy)
+    argTys = [ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
+             ,AppTy (AppTy (ConstTy (TyCon (string2Name "Data.Proxy.Proxy"))) typeNatKind)
+                    nVar
+             ]
+    funTy  = foldr mkFunTy (ConstTy (TyCon (string2Name "CLaSH.Promoted.Nat.SNat"))) argTys
+    nName  = string2Name "n"
+    nVar   = VarTy typeNatKind nName
+    nTV    = TyVar nName (embed typeNatKind)
+
