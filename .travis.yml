@@ -14,6 +14,7 @@ before_install:
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
   - ghc --version
   - cabal --version
+  - ghdl --version
 
 install:
   - git clone https://github.com/clash-lang/clash-prelude.git
