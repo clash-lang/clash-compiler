@@ -214,20 +214,6 @@ caseCon _ c@(Case (Literal l) _ alts) = R $ do
     equalLit (LitPat l')     = l == (unembed l')
     equalLit _               = False
 
--- caseCon _ e@(Case _ _ [alt]) = R $ do
---   (pat,altE) <- unbind alt
---   case pat of
---     DefaultPat    -> changed altE
---     LitPat _      -> changed altE
---     DataPat _ pxs -> let (tvs,xs)   = unrebind pxs
---                          ftvs       = Lens.toListOf termFreeTyVars altE
---                          fvs        = Lens.toListOf termFreeIds altE
---                          usedTvs    = filter ((`elem` ftvs) . varName) tvs
---                          usedXs     = filter ((`elem` fvs) . varName) xs
---                      in  case (usedTvs,usedXs) of
---                            ([],[]) -> changed altE
---                            _       -> return e
-
 caseCon ctx e@(Case subj ty alts)
   | isConstant subj = do
     tcm <- Lens.use tcCache
