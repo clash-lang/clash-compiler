@@ -19,7 +19,6 @@ before_install:
 install:
   - git clone https://github.com/clash-lang/clash-prelude.git
   - git clone https://github.com/christiaanb/ghc-typelits-natnormalise.git
-  - git clone https://github.com/christiaanb/tasty-program.git
   - travis_retry cabal update
   - cabal sandbox init
   - cabal sandbox add-source ghc-typelits-natnormalise
@@ -28,7 +27,6 @@ install:
   - cabal sandbox add-source clash-lib
   - cabal sandbox add-source clash-systemverilog
   - cabal sandbox add-source clash-vhdl
-  - cabal sandbox add-source tasty-program
   - cabal sandbox add-source testsuite
 
 script:
