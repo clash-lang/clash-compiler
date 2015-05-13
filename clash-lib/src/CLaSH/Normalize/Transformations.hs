@@ -150,7 +150,17 @@ inlineNonRep _ e@(Case scrut altsTy alts)
       then do
         cf <- liftR $ Lens.use curFun
         ty <- termType tcm scrut
-        error $ $(curLoc) ++ "InlineNonRep: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf ++ ", " ++ showDoc ty
+        traceIf True (concat [$(curLoc) ++ "InlineNonRep: " ++ show f
+                             ," already inlined " ++ show limit ++ " times in:"
+                             , show cf
+                             , "\nType of the subject is: " ++ showDoc ty
+                             , "\nFunction " ++ show cf
+                             , "will not reach a normal form, and compilation"
+                             , "might fail."
+                             , "\nRun with '-clash-inline-limit=N' to increase"
+                             , "the inlining limit to N."
+                             ])
+                     (return e)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure scrutTy)
