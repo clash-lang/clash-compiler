@@ -5,8 +5,8 @@ import CLaSH.Prelude
 type Inp   = (Signed 4,Outp)
 type Outp  = (Maybe (Signed 8,Bool),Bit)
 
-topEntity :: Unbundled Inp -> Unbundled Outp
-topEntity = transfer <^> initS
+topEntity :: Signal Inp -> Signal Outp
+topEntity = transfer `mealy` initS
 
 transfer s i = (i,o)
   where
@@ -21,6 +21,6 @@ testInput = stimuliGenerator $(v ([ (1,(Just (4,True), 0))
 
 expectedOutput :: Signal Outp -> Signal Bool
 expectedOutput = outputVerifier $(v ([(Nothing,0)
-                                      ,(Just (4,False), 1)
+                                      ,(Just (4,True), 0)
                                       ]::[(Maybe (Signed 8,Bool),Bit)]))
 
