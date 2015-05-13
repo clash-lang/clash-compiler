@@ -93,12 +93,12 @@ normalize' nm = do
                   ty' <- termType tcm tm'
                   return (ty',tm')
       let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
-      if nm `elem` usedBndrs
-        then error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm)
-        else do
-          prevNorm <- fmap HashMap.keys $ liftRS $ Lens.use normalized
-          let toNormalize = filter (`notElem` prevNorm) usedBndrs
-          return (toNormalize,(nm,tmNorm))
+      traceIf (nm `elem` usedBndrs)
+              ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm))
+              (return ())
+      prevNorm <- fmap HashMap.keys $ liftRS $ Lens.use normalized
+      let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
+      return (toNormalize,(nm,tmNorm))
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
 -- | Rewrite a term according to the provided transformation
