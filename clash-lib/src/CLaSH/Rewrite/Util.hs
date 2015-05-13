@@ -464,10 +464,11 @@ specialise' specMapLbl specHistLbl specLimitLbl doCheck ctx e (Var _ f, args) sp
           specHistM <- liftR $ fmap (HML.lookup f) (Lens.use specHistLbl)
           specLim   <- liftR $ Lens.use specLimitLbl
           if doCheck && maybe False (> specLim) specHistM
-            then fail $ unlines [ "Hit specialisation limit on function `" ++ showDoc f ++ "'.\n"
+            then fail $ unlines [ "Hit specialisation limit " ++ show specLim ++ " on function `" ++ showDoc f ++ "'.\n"
                                 , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
                                 , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
                                 , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showDoc showDoc) specArg
+                                , "Run with '-clash-spec-limit=N' to increase the specialisation limit to N."
                                 ]
             else do
               -- Make new binders for existing arguments
