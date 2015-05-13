@@ -14,19 +14,19 @@ copyright:           Copyright © 2015 University of Twente
 category:            Testing
 build-type:          Simple
 -- extra-source-files:
-data-files:          ghdl_import.sh
 cabal-version:       >=1.10
 
 executable clash-testsuite
   main-is:             Main.hs
-  other-modules:       Paths_clash_testsuite
+  ghc-options:         -Wall
+  -- other-modules:
   -- other-extensions:
   build-depends:       base          >=4.8 && <5,
                        deepseq       >=1.4 && <1.5,
                        directory     >=1.2 && <1.3,
                        filepath      >=1.4 && <1.5,
                        process       >=1.2 && <1.3,
-                       tasty         >=0.10.1.2,
-                       tasty-program >=1.0.3
+                       tasty         >=0.10.1.2
+
   -- hs-source-dirs:
   default-language:    Haskell2010

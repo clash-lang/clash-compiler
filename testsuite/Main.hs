@@ -1,43 +1,21 @@
 module Main (main) where
 
-import Control.DeepSeq            (deepseq)
-
 import Test.Tasty
 import Test.Tasty.Program
 
+import qualified Data.List          as List
 import qualified System.Directory   as Directory
-import qualified System.Environment as Environment
 import           System.FilePath    ((</>),(<.>))
--- import System.Exit                (ExitCode(..))
-import qualified System.IO          as IO
-import qualified System.Process     as Process
-
-import qualified Paths_clash_testsuite
-
--- data TestRun
---   = Compile
---   | CompileBuild    [BuildTarget]
---   | CompileBuildRun [BuildTarget]
+import qualified System.IO.Unsafe   as Unsafe
 
 data BuildTarget
   = VHDL | SystemVerilog
   deriving Show
 
 main :: IO ()
-main = do
-  -- Add ghdl_import.sh to the PATH
-  ddir <- Paths_clash_testsuite.getDataDir
-  ghdl_import_prm <- Directory.getPermissions (ddir </> "ghdl_import.sh")
-  Directory.setPermissions (ddir </> "ghdl_import.sh") (Directory.setOwnerExecutable True ghdl_import_prm)
-  path <- Environment.getEnv "PATH"
-  let path' = ddir ++ ":" ++ path
-  Environment.setEnv "PATH" path'
-
-  -- Start the test
+main =
   defaultMain $ testGroup "tests"
     [ testGroup "examples"
-      -- [runTest "examples"             VHDL "CochleaPlus"  (Just ("topEntity",False))
-      -- ])
       [runTest "examples"             VHDL "ALU"          (Just ("topEntity",False))
       ,runTest "examples"             VHDL "Blinker"      (Just ("topEntity_0",False))
       ,runTest "examples"             VHDL "BlockRamTest" (Just ("topEntity",False))
@@ -130,15 +108,22 @@ clashHDL t env modName = testProgram ("CLaSH(" ++ show t ++ ")")
                                      ,modName <.> "hs"
                                      ]
                                      (Just env)
+                                     True
 
 ghdlImport :: FilePath -> TestTree
-ghdlImport dir = testProgram "GHDL (import)" "ghdl_import.sh" [dir] Nothing
+ghdlImport dir = withResource (return dir) (const (return ()))
+    (\d -> testProgram "GHDL (import)" "ghdl" ("-i":"--workdir=work":vhdlFiles d) (Just dir) False)
+  where
+    vhdlFiles :: IO FilePath -> [FilePath]
+    vhdlFiles d =  Unsafe.unsafePerformIO
+                $  filter (List.isSuffixOf "vhdl")
+               <$> (Directory.getDirectoryContents =<< d)
 
 ghdlMake :: String -> FilePath -> TestTree
-ghdlMake entity env = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",entity] (Just env)
+ghdlMake entity env = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",entity] (Just env) False
 
 ghdlSim :: FilePath -> TestTree
-ghdlSim env = testProgram "GHDL (sim)" "ghdl" ["-r","testbench","--assert-level=error"] (Just env)
+ghdlSim env = testProgram "GHDL (sim)" "ghdl" ["-r","testbench","--assert-level=error"] (Just env) False
 
 runTest :: FilePath
         -> BuildTarget
@@ -151,7 +136,7 @@ runTest env VHDL    modName entNameM = withResource aquire release (const grp)
     modDir    = vhdlDir </> modName
     workdir   = modDir </> "work"
     aquire    = Directory.createDirectoryIfMissing True workdir
-    release _ = return ()
+    release _ = Directory.removeDirectoryRecursive vhdlDir
 
     grp       = testGroup modName
                 ( clashHDL VHDL env modName
