@@ -7,8 +7,8 @@ import CLaSH.Prelude as C
 import qualified Data.List as L
 
 replaceL xs i x = as L.++ [x] L.++ bs
-		where
-		  (as,b:bs) = L.splitAt i xs
+    where
+      (as,b:bs) = L.splitAt i xs
 
 True  % t = 1
 False % t = t
@@ -28,17 +28,17 @@ c_upd' hist (False,t) = hist
 -- Haskell
 frm (ws,ts,hist) vs = ((ws',ts',hist') , y)
 
-	where
-	  zcs = L.zipWith (/=) (L.map (>=0) ws) (L.map (>=0) vs)
-	  ts' = L.zipWith  (%) zcs (L.map (+1) ts)
+  where
+    zcs = L.zipWith (/=) (L.map (>=0) ws) (L.map (>=0) vs)
+    ts' = L.zipWith  (%) zcs (L.map (+1) ts)
 
-	  -- zts = map snd $ filter fst $ zip zcs ts
-	  zts = L.zip zcs ts
+    -- zts = map snd $ filter fst $ zip zcs ts
+    zts = L.zip zcs ts
 
-	  hist' = L.foldl upd' hist zts
+    hist' = L.foldl upd' hist zts
 
-	  ws' = vs
-	  y   = hist'
+    ws' = vs
+    y   = hist'
 -- CLaSH
 c_frm (ws,ts,hist) vs = ((ws',ts',hist'),y)
   where
@@ -58,8 +58,8 @@ topEntity = c_frm `mealy` (c_ws0,c_ts0,c_hist0)
 -- Haskell
 sim f s [] = []
 sim f s (x:xs) = y : sim f s' xs
-	where
-	  (s',y) = f s x
+  where
+    (s',y) = f s x
 -- CLaSH
 c_sim f i = L.take (L.length i) $ simulate f c_vss
 
