@@ -25,6 +25,7 @@ import           CLaSH.Core.Type                  (Type)
 import           CLaSH.Core.TyCon                 (TyCon, TyConName)
 import           CLaSH.Core.Util                  (collectArgs, mkApps, termType)
 import           CLaSH.Core.Var                   (Id,varName)
+import           CLaSH.Driver.Types               (CLaSHOpts (..))
 import           CLaSH.Netlist.Types              (HWType)
 import           CLaSH.Netlist.Util               (splitNormalized)
 import           CLaSH.Normalize.Strategy
@@ -40,7 +41,7 @@ import           CLaSH.Rewrite.Util               (liftRS, runRewrite,
 import           CLaSH.Util
 
 -- | Run a NormalizeSession in a given environment
-runNormalization :: DebugLevel
+runNormalization :: CLaSHOpts
                  -- ^ Level of debug messages to print
                  -> Supply
                  -- ^ UniqueSupply
@@ -55,18 +56,18 @@ runNormalization :: DebugLevel
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization lvl supply globals typeTrans tcm eval
+runNormalization opts supply globals typeTrans tcm eval
   = flip State.evalState normState
-  . runRewriteSession lvl rwState
+  . runRewriteSession (opt_dbgLevel opts) rwState
   where
     rwState   = RewriteState 0 globals supply typeTrans tcm eval
     normState = NormalizeState
                   HashMap.empty
                   Map.empty
                   HashMap.empty
-                  100
+                  (opt_specLimit opts)
                   HashMap.empty
-                  100
+                  (opt_inlineLimit opts)
                   (error $ $(curLoc) ++ "Report as bug: no curFun")
 
 

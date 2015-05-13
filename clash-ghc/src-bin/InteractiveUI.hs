@@ -113,11 +113,11 @@ import qualified CLaSH.Backend
 import           CLaSH.Backend.VHDL (VHDLState)
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
 import qualified CLaSH.Driver
+import           CLaSH.Driver.Types (CLaSHOpts)
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
 import qualified CLaSH.Primitives.Util
-import           CLaSH.Rewrite.Types (DebugLevel(..))
 import           CLaSH.Util (clashLibVersion)
 import qualified Data.Version as Data.Version
 import qualified Paths_clash_ghc
@@ -132,10 +132,10 @@ data GhciSettings = GhciSettings {
         defPrompt2        :: String
     }
 
-defaultGhciSettings :: GhciSettings
-defaultGhciSettings =
+defaultGhciSettings :: IORef CLaSHOpts -> GhciSettings
+defaultGhciSettings opts =
     GhciSettings {
-        availableCommands = ghciCommands,
+        availableCommands = ghciCommands opts,
         shortHelpText     = defShortHelpText,
         fullHelpText      = defFullHelpText,
         defPrompt         = default_prompt,
@@ -152,8 +152,8 @@ cmdName (n,_,_) = n
 
 GLOBAL_VAR(macros_ref, [], [Command])
 
-ghciCommands :: [Command]
-ghciCommands = [
+ghciCommands :: IORef CLaSHOpts -> [Command]
+ghciCommands opts = [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
@@ -204,8 +204,8 @@ ghciCommands = [
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
-  ("vhdl",      keepGoingPaths makeVHDL,        completeHomeModuleOrFile),
-  ("systemverilog",   keepGoingPaths makeSystemVerilog,     completeHomeModuleOrFile)
+  ("vhdl",      keepGoingPaths (makeVHDL opts),        completeHomeModuleOrFile),
+  ("systemverilog",   keepGoingPaths (makeSystemVerilog opts),     completeHomeModuleOrFile)
   ]
 
 
@@ -1556,9 +1556,10 @@ modulesLoadedMsg ok mods = do
 
 makeHDL' :: CLaSH.Backend.Backend backend
          => backend
+         -> IORef CLaSHOpts
          -> [FilePath]
          -> InputT GHCi ()
-makeHDL' backend lst = makeHDL backend =<< case lst of
+makeHDL' backend opts lst = makeHDL backend opts =<< case lst of
   srcs@(_:_) -> return srcs
   []         -> do
     modGraph <- GHC.getModuleGraph
@@ -1570,21 +1571,23 @@ makeHDL' backend lst = makeHDL backend =<< case lst of
 makeHDL :: GHC.GhcMonad m
         => CLaSH.Backend.Backend backend
         => backend
+        -> IORef CLaSHOpts
         -> [FilePath]
         -> m ()
-makeHDL backend srcs = do
+makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
-  liftIO $ do primDir <- CLaSH.Backend.primDir backend
+  liftIO $ do opts  <- readIORef optsRef
+              primDir <- CLaSH.Backend.primDir backend
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,topEntM) <- generateBindings primMap src (Just dflags)
                 CLaSH.Driver.generateHDL bindingsMap (Just backend) primMap tcm
-                  ghcTypeToHWType reduceConstant topEntM DebugNone
+                  ghcTypeToHWType reduceConstant topEntM opts
 
-makeVHDL :: [FilePath] -> InputT GHCi ()
+makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
 
-makeSystemVerilog :: [FilePath] -> InputT GHCi ()
+makeSystemVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: SystemVerilogState)
 
 -----------------------------------------------------------------------------

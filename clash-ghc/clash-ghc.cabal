@@ -88,6 +88,7 @@ Executable clash
                       GhciMonad
                       GhciTags
 
+                      CLaSH.GHC.CLaSHFlags
                       CLaSH.GHC.Evaluator
                       CLaSH.GHC.GenerateBindings
                       CLaSH.GHC.GHC2Core

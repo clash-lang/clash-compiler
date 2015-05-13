@@ -1,4 +1,5 @@
 import CLaSH.Driver
+import CLaSH.Driver.Types
 import CLaSH.Rewrite.Types
 import CLaSH.GHC.Evaluator
 import CLaSH.GHC.GenerateBindings
@@ -24,7 +25,7 @@ doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
   (bindingsMap,tcm,topEntM) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant topEntM DebugName
+  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant topEntM (CLaSHOpts 20 20 DebugFinal)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

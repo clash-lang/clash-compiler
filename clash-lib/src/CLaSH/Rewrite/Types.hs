@@ -53,7 +53,7 @@ data DebugLevel
   | DebugName -- ^ Names of applied transformations
   | DebugApplied -- ^ Show sub-expressions after a successful rewrite
   | DebugAll -- ^ Show all sub-expressions on which a rewrite is attempted
-  deriving (Eq,Ord)
+  deriving (Eq,Ord,Read)
 
 -- | Read-only environment of a rewriting session
 newtype RewriteEnv = RE { _dbgLevel :: DebugLevel }

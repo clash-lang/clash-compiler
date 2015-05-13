@@ -33,7 +33,6 @@ import           CLaSH.Netlist.Types              (Component (..), HWType)
 import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           CLaSH.Primitives.Types
-import           CLaSH.Rewrite.Types              (DebugLevel (..))
 import           CLaSH.Util
 
 -- | Create a set of target HDL files for a set of functions
@@ -45,9 +44,9 @@ generateHDL :: forall backend . Backend backend
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
             -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
             -> Maybe TopEntity
-            -> DebugLevel -- ^ Debug information level for the normalization process
+            -> CLaSHOpts -- ^ Debug information level for the normalization process
             -> IO ()
-generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
+generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -76,7 +75,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
       let doNorm     = do norm <- normalize [fst topEntity]
                           let normChecked = checkNonRecursive (fst topEntity) norm
                           cleanupGraph (fst topEntity) normChecked
-          transformedBindings = runNormalization dbgLevel supplyN bindingsMap typeTrans tcm eval doNorm
+          transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm eval doNorm
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -96,7 +95,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM dbgLevel = do
                                       cName)
                                 netlist
 
-      testBench <- genTestBench dbgLevel supplyTB primMap
+      testBench <- genTestBench opts supplyTB primMap
                                  typeTrans tcm eval cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)

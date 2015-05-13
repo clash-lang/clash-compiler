@@ -68,12 +68,16 @@ import           System.Process (runInteractiveCommand, waitForProcess)
 import           Paths_clash_ghc
 import           InteractiveUI (makeHDL)
 import           Exception (gcatch)
+import           Data.IORef (IORef, newIORef)
 import qualified Data.Version (showVersion)
 import           Control.Exception (ErrorCall (..))
 
 import qualified CLaSH.Backend
 import           CLaSH.Backend.VHDL    (VHDLState)
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
+import           CLaSH.Driver.Types (CLaSHOpts (..))
+import           CLaSH.GHC.CLaSHFlags
+import           CLaSH.Rewrite.Types (DebugLevel (..))
 import           CLaSH.Util (clashLibVersion)
 
 ghcLibDir :: IO FilePath
@@ -118,10 +122,16 @@ main = do
     let argv1 = map (mkGeneralLocated "on the commandline") argv0
     (argv2, staticFlagWarnings) <- parseStaticFlags argv1
 
-    -- 2. Parse the "mode" flags (--make, --interactive etc.)
-    (mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
+    r <- newIORef (CLaSHOpts { opt_dbgLevel    = DebugNone
+                             , opt_inlineLimit = 20
+                             , opt_specLimit   = 20
+                             })
+    (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 
-    let flagWarnings = staticFlagWarnings ++ modeFlagWarnings
+    -- 2. Parse the "mode" flags (--make, --interactive etc.)
+    (mode, argv4, modeFlagWarnings) <- parseModeFlags argv3
+
+    let flagWarnings = staticFlagWarnings ++ modeFlagWarnings ++ clashFlagWarnings
 
     -- If all we want to do is something like showing the version number
     -- then do it now, before we start a GHC session etc. This makes
@@ -175,11 +185,12 @@ main = do
                             ShowGhciUsage          -> showGhciUsage dflagsExtra2
                             PrintWithDynFlags f    -> putStrLn (f dflagsExtra2)
                 Right postLoadMode ->
-                    main' postLoadMode dflagsExtra2 argv3 flagWarnings
+                    main' postLoadMode dflagsExtra2 argv4 flagWarnings r
 
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Located String]
+      -> IORef CLaSHOpts
       -> Ghc ()
-main' postLoadMode dflags0 args flagWarnings = do
+main' postLoadMode dflags0 args flagWarnings clashOpts = do
   -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
   -- can be further adjusted on a module by module basis, using only
   -- the -fvia-C and -fasm flags.  If the default HscTarget is not
@@ -280,14 +291,14 @@ main' postLoadMode dflags0 args flagWarnings = do
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-    let clash fun = gcatch (fun srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
+    let clash fun = gcatch (fun clashOpts srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
     case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs
        DoMkDependHS           -> doMkDependHS (map fst srcs)
        StopBefore p           -> liftIO (oneShot hsc_env p srcs)
-       DoInteractive          -> ghciUI srcs Nothing
-       DoEval exprs           -> ghciUI srcs $ Just $ reverse exprs
+       DoInteractive          -> ghciUI clashOpts srcs Nothing
+       DoEval exprs           -> ghciUI clashOpts srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
        DoVHDL                 -> clash makeVHDL
@@ -295,11 +306,11 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   liftIO $ dumpFinalStats dflags6
 
-ghciUI :: [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
+ghciUI :: IORef CLaSHOpts -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #ifndef GHCI
-ghciUI _ _ = throwGhcException (CmdLineError "not built for interactive use")
+ghciUI _ _ _ = throwGhcException (CmdLineError "not built for interactive use")
 #else
-ghciUI     = interactiveUI defaultGhciSettings
+ghciUI opts  = interactiveUI (defaultGhciSettings opts)
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -921,14 +932,14 @@ abiHash strs = do
 -- -----------------------------------------------------------------------------
 -- VHDL Generation
 
-makeHDL' :: CLaSH.Backend.Backend backend => backend -> [(String,Maybe Phase)] -> Ghc ()
-makeHDL' _       []   = throwGhcException (CmdLineError "No input files")
-makeHDL' backend srcs = makeHDL backend $ fmap fst srcs
+makeHDL' :: CLaSH.Backend.Backend backend => backend ->  IORef CLaSHOpts -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
+makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
 
-makeVHDL :: [(String, Maybe Phase)] -> Ghc ()
+makeVHDL :: IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
 
-makeSystemVerilog :: [(String, Maybe Phase)] -> Ghc ()
+makeSystemVerilog ::  IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
 makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: SystemVerilogState)
 
 -- -----------------------------------------------------------------------------

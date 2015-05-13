@@ -19,6 +19,8 @@ import           CLaSH.Core.Term
 import           CLaSH.Core.TyCon
 import           CLaSH.Core.Type
 
+import           CLaSH.Driver.Types
+
 import           CLaSH.Netlist
 import           CLaSH.Netlist.BlackBox.Types     (Element (Err))
 import           CLaSH.Netlist.BlackBox.Util      (parseFail)
@@ -32,7 +34,7 @@ import           CLaSH.Util
 
 -- | Generate a HDL testbench for a component given a set of stimuli and a
 -- set of matching expected outputs
-genTestBench :: DebugLevel
+genTestBench :: CLaSHOpts
              -> Supply
              -> PrimMap                      -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
@@ -44,7 +46,7 @@ genTestBench :: DebugLevel
              -> Maybe TmName                 -- ^ Expected output
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component])
-genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
+genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
   (Component cName hidden [inp] [outp] _) = do
   let ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
@@ -85,9 +87,9 @@ genTestBench dbgLvl supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM 
                     -> TmName
                     -> HashMap TmName (Type,Term)
     normalizeSignal glbls bndr =
-      runNormalization dbgLvl supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
+      runNormalization opts supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench dbgLvl _ _ _ _ _ _ _ _ _ c = traceIf (dbgLvl > DebugNone) ("Can't make testbench for: " ++ show c) $ return []
+genTestBench opts _ _ _ _ _ _ _ _ _ c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return []
 
 genClock :: PrimMap
          -> (Identifier,HWType)
