@@ -27,9 +27,9 @@ main =
       ,runTest "examples"             VHDL "MatrixVect"   (Just ("testbench",True))
       ,runTest "examples"             VHDL "Queens"       (Just ("topEntity",False))
       ,runTest "examples"             VHDL "Reducer"      (Just ("topEntity",False))
-      ,runTest "examples"             VHDL "Sprockell"     (Just ("topEntity",False))
+      ,runTest "examples"             VHDL "Sprockell"    (Just ("topEntity",False))
       ,runTest "examples"             VHDL "Windows"      (Just ("topEntity",False))
-      -- ,runTest ("examples" </> "i2c") VHDL "I2C"     (Just ("topEntity_0",False))
+      ,runTest ("examples" </> "i2c") VHDL "I2C"          (Just ("topEntity",False))
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
