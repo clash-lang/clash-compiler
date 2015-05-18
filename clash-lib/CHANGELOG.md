@@ -10,6 +10,7 @@
   * CaseCon transformation: ensure that we run the compile-time evaluator on the subject before handling the one-alternative case
   * Emit a warning if a function remains recursive, instead of producing an error: compilation can still be successful if the function is an argument to a higher-order blackbox that doesn't use the function.
   * Emit a warning if inlining limit is reached, instead of producing an error: compilation can still be successful if the function is an argument to a higher-order blackbox that doesn't use the function.
+  * Always inline terms that have a type of kind `Constraint`
 
 ## 0.5.4 *May 10th 2015*
 * New features:
