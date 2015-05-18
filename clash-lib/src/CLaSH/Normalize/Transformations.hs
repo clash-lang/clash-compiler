@@ -50,7 +50,7 @@ import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
 import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
-                                              applyTy, splitFunTy, tyView)
+                                              applyTy, splitFunTy, typeKind, tyView)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isVar, mkApps, mkLams, mkTmApps,
@@ -145,7 +145,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
     limit     <- liftR $ Lens.use inlineLimit
     tcm       <- Lens.use tcCache
     scrutTy   <- termType tcm scrut
-    let noException = not (exception scrutTy)
+    let noException = not (exception tcm scrutTy)
     if noException && (Maybe.fromMaybe 0 isInlined) > limit
       then do
         cf <- liftR $ Lens.use curFun
@@ -170,8 +170,8 @@ inlineNonRep _ e@(Case scrut altsTy alts)
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
   where
-    exception (tyView -> TyConApp (name2String -> "GHC.Num.Num") _) = True
-    exception _ = False
+    exception tcm ((tyView . typeKind tcm) -> TyConApp (name2String -> "GHC.Prim.Constraint") _) = True
+    exception _ _ = False
 
 inlineNonRep _ e = return e
 
