@@ -1,5 +1,16 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.5
+* New features:
+  * Make inlining and specialisation limit configurable
+  * Make debug message level configurable
+
+* Fixes bugs:
+  * Netlist: ensure that the arguments of a component instantiation are always simple variables
+  * CaseCon transformation: ensure that we run the compile-time evaluator on the subject before handling the one-alternative case
+  * Emit a warning if a function remains recursive, instead of producing an error: compilation can still be successful if the function is an argument to a higher-order blackbox that doesn't use the function.
+  * Emit a warning if inlining limit is reached, instead of producing an error: compilation can still be successful if the function is an argument to a higher-order blackbox that doesn't use the function.
+
 ## 0.5.4 *May 10th 2015*
 * New features:
   * Add `~COMPNAME` tag: primitives get access to the component name in which they are instantiated
@@ -62,4 +73,3 @@
 * Code improvements:
   * Refactor Netlist/BlackBox [#10](https://github.com/christiaanb/clash2/issues/10)
   * CPP special-case conversion of `Control.Exception.Base.irrefutPatError` [#11](https://github.com/christiaanb/clash2/issues/11)
-

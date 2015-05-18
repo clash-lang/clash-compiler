@@ -1,5 +1,14 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.6
+* New features:
+  * Inlining limit is configurable, run with `-clash-inline-limit=N` to set the inlining limit to `N`
+  * Specialisation limit is configurable, run with `clash-spec-limit=N` to set the inline limit to `N`
+  * Debug level is configurable, run with `-clash-debug <LEVEL>` where `<LEVEL>` can be: `DebugNone, DebugFinal, DebugName, DebugApplied, DebugAll`. Be default, `clash` runs with `DebugNone`.
+
+* Fixes bugs:
+  * Extend evaluator for `GHC.Integer.Type.minusInteger` and `CLaSH.Promoted.Nat.SNat`.
+
 ## 0.5.5 *May 5th 2015*
 * New features:
   * `TopEntity` wrappers are now specified as `ANN` annotation pragmas [#42](https://github.com/clash-lang/clash-compiler/issues/42)
