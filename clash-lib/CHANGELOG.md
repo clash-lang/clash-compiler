@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.5.5
+## 0.5.5 *May 18th 2015*
 * New features:
   * Make inlining and specialisation limit configurable
   * Make debug message level configurable
