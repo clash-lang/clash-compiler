@@ -2,8 +2,9 @@
 
 Download sources:
 ```
-git clone git@github.com:clash-lang/clash-prelude.git
-git clone git@github.com:christiaanb/ghc-typelits-natnormalise.git
+git clone https://github.com/clash-lang/clash-prelude.git
+git clone https://github.com/clash-lang/ghc-tcplugins-extra.git
+git clone https://github.com/clash-lang/ghc-typelits-natnormalise.git
 ```
 
 Go to clash-prelude dir:
@@ -14,6 +15,7 @@ cd clash-prelude
 Run:
 ```
 cabal sandbox init
+cabal sandbox add-source ../ghc-tcplugins-extra
 cabal sandbox add-source ../ghc-typelits-natnormalise
 cabal install --dependencies-only --enable-tests
 ```
