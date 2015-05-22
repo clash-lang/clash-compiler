@@ -22,6 +22,8 @@ data Element = C   Text          -- ^ Constant
              | TypElem Element   -- ^ Select element type from a vector type
              | CompName          -- ^ Hole for the name of the component in which
                                  -- the blackbox is instantiated
+             | Size Element      -- ^ Size of a type hole
+             | Length Element    -- ^ Length of a vector hole
              | SigD Element (Maybe Int)
   deriving Show
 

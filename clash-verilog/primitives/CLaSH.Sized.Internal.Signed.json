@@ -137,9 +137,9 @@
     , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
 "// divInt
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][1];
-~SIGD[~SYM[2]][2];
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[2]][2];
 
 // divide (rounds towards zero)
 assign ~SYM[0] = ~ARG[1] / ~ARG[2];
@@ -155,9 +155,9 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] 
     , "type"      : "mod# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
 "// modSigned
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][1];
-~SIGD[~SYM[2]][2];
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[2]][2];
 
 // remainder
 assign ~SYM[0] = ~ARG[1] % ~ARG[2];
@@ -217,7 +217,7 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateD" :
 "// rotateL
-logic [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
 assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     }
@@ -227,7 +227,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateD" :
 "// rotateR
-logic [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     }
@@ -241,7 +241,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
 generate
   if (~LIT[1] < ~LIT[0]) begin
     // truncate, sign preserving
-    ~SIGD[~SYM[0]][2];
+    wire ~SIGD[~SYM[0]][2];
     assign ~SYM[0] = ~ARG[2];
     assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});
   end else begin

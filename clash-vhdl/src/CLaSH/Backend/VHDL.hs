@@ -80,8 +80,8 @@ genVHDL c = (unpack cName,) A.<$> vhdl
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage_ :: [HWType]
-             -> VHDLM Doc
-mkTyPackage_ hwtys =
+             -> VHDLM [(String,Doc)]
+mkTyPackage_ hwtys = (:[]) A.<$> ("types",) A.<$>
    "library IEEE;" <$>
    "use IEEE.STD_LOGIC_1164.ALL;" <$>
    "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>

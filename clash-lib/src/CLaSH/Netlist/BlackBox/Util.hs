@@ -25,6 +25,7 @@ import           CLaSH.Netlist.BlackBox.Types
 import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
                                                        BlackBoxContext (..),
                                                        SyncExpr, Expr(Identifier))
+import           CLaSH.Netlist.Util                   (typeSize)
 import           CLaSH.Util
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
@@ -212,6 +213,12 @@ renderTag b (TypM (Just n)) = let (_,ty,_) = bbInputs b !! n
 renderTag b (Err Nothing)   = fmap (displayT . renderOneLine) . hdlTypeErrValue . snd $ bbResult b
 renderTag b (Err (Just n))  = let (_,ty,_) = bbInputs b !! n
                               in  (displayT . renderOneLine) <$> hdlTypeErrValue ty
+renderTag b (Size e)        = return . Text.pack . show . typeSize $ lineToType b [e]
+renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b [e]
+  where
+    vecLen (Vector n _) = n
+    vecLen _            = error $ $(curLoc) ++ "vecLen of a non-vector type"
+
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"

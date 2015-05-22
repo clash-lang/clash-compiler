@@ -11,8 +11,8 @@
            -> Signal' clk a"
     , "templateD" :
 "// blockRam
-~SIGD[~SYM[0]][3];
-~SIGD[~SYM[1]][7];
+reg ~SIGD[~SYM[0]][3];
+reg ~SIGD[~SYM[1]][7];
 
 initial begin
   ~SYM[0] = ~LIT[3];

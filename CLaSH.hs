@@ -7,15 +7,15 @@ import CLaSH.GHC.NetlistTypes
 import CLaSH.Primitives.Util
 import CLaSH.Backend
 import CLaSH.Backend.VHDL
-import CLaSH.Backend.SystemVerilog
+import CLaSH.Backend.Verilog
 
 genVHDL :: String
         -> IO ()
 genVHDL = doHDL (initBackend :: VHDLState)
 
-genSystemVerilog :: String
+genVerilog :: String
            -> IO ()
-genSystemVerilog = doHDL (initBackend :: SystemVerilogState)
+genVerilog = doHDL (initBackend :: VerilogState)
 
 doHDL :: Backend s
        => s
@@ -25,7 +25,7 @@ doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
   (bindingsMap,tcm,topEntM) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant topEntM (CLaSHOpts 20 20 DebugFinal)
+  generateHDL bindingsMap (Just b) primMap tcm ghcTypeToHWType reduceConstant topEntM (CLaSHOpts 20 20 DebugNone)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

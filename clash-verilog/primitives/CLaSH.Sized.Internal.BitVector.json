@@ -55,14 +55,14 @@
         -> Bit"
     , "templateD" :
 "// index
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][2];
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][2];
 
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
 // pragma translate_off
-always_comb begin
+always @(*) begin
   if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
     $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
     ~RESULT = ~ERRORO;
@@ -85,11 +85,11 @@ end
              -> BitVector n"
     , "templateD" :
 "// replaceBit
-~SIGD[~SYM[0]][2];
+wire ~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-~SIGD[~SYM[1]][1];
-always_comb begin
+wire ~SIGD[~SYM[1]][1];
+always @(*) begin
   ~SYM[1] = ~ARG[1];
   // pragma translate_off
   if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
@@ -116,9 +116,9 @@ assign ~RESULT = ~SYM[1];"
            -> BitVector (m + 1 + i)"
     , "templateD" :
 "// setSlice
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 
-always_comb begin
+always @(*) begin
   ~SYM[0] = ~ARG[0];
   ~SYM[0][~LIT[1] : ~LIT[2]] = ~ARG[3];
 end
@@ -135,7 +135,7 @@ assign ~RESULT = ~SYM[0];"
         -> BitVector (m + 1 - n)"
     , "templateD" :
 "// slice
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
     }
@@ -148,7 +148,7 @@ assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
         -> (BitVector m, BitVector n)"
     , "templateD" :
 "// split
-~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
                   , ~SYM[0][(~LIT[0]-1) : 0]
@@ -163,7 +163,7 @@ assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
       -> Bit"
     , "templateD" :
 "// msb
-~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 assign ~RESULT = ~SYM[0][~LIT[0]-1];"
     }
@@ -175,7 +175,7 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1];"
       -> Bit"
     , "templateD" :
 "// lsb
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 assign ~RESULT = ~SYM[0][0];"
     }
@@ -341,7 +341,7 @@ assign ~RESULT = ~SYM[0][0];"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
 "// rotateL
-logic [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
 assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];"
     }
@@ -351,7 +351,7 @@ assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
 "// rotateR
-logic [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];"
     }

@@ -15,10 +15,10 @@
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateD" :
 "// head
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][0];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1:~SIZE[~TYP[0]]-~SIZE[~TYPO]];"
     }
   }
 , { "BlackBox" :
@@ -26,10 +26,10 @@ assign ~RESULT = ~SYM[0][0];"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "templateD" :
 "// tail
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];"
     }
   }
 , { "BlackBox" :
@@ -37,10 +37,10 @@ assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];"
     , "type"      : "Vec (n + 1) a -> a"
     , "templateD" :
 "// last
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][$high(~SYM[0])];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1:0];"
     }
   }
 , { "BlackBox" :
@@ -48,10 +48,10 @@ assign ~RESULT = ~SYM[0][$high(~SYM[0])];"
     , "type"      : "Vec (n + 1) a -> Vec n a"
     , "templateD" :
 "// init
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]];"
     }
   }
 , { "BlackBox" :
@@ -65,7 +65,7 @@ assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];"
         -> Vec n a"
     , "templateD" :
 "// select
-~SIGD[~SYM[0]][4];
+wire ~SIGD[~SYM[0]][4];
 assign ~SYM[0] = ~ARG[4];
 
 genvar ~SYM[1];
@@ -81,16 +81,16 @@ endgenerate"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
     , "templateD" :
 "// (++)
-~SIGD[~SYM[0]][0];
-~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[1]][1];
 
 assign ~SYM[0] = ~ARG[0];
 assign ~SYM[1] = ~ARG[1];
 
 genvar ~SYM[2];
 generate
-  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : append_~SYM[3]
-    if (~SYM[2] < $size(~SYM[0])) begin
+  for (~SYM[2]=0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : append_~SYM[3]
+    if (~SYM[2] < ~LENGTH[~TYP[0]]) begin
       assign ~RESULT[~SYM[2]] = ~SYM[0][~SYM[2]];
     end else begin
       assign ~RESULT[~SYM[2]] = ~SYM[1][~SYM[2]-$size(~SYM[0])];
@@ -104,7 +104,7 @@ endgenerate"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "templateD" :
 "// concat
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
@@ -120,7 +120,7 @@ endgenerate"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateD" :
 "// splitAt
-~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0)]
@@ -137,7 +137,7 @@ assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_se
            -> Vec n (Vec m a)"
     , "templateD" :
 "// unconcat
-~SIGD[~SYM[0]][2];
+wire ~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
 genvar ~SYM[1];
@@ -153,8 +153,8 @@ endgenerate"
     , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
     , "templateD" :
 "// merge
-~SIGD[~SYM[0]][0];
-~SIGD[~SYM[1]][1];
+wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[1]][1];
 assign ~SYM[0] = ~ARG[0];
 assign ~SYM[1] = ~ARG[1];
 
@@ -172,7 +172,7 @@ endgenerate"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "// map
-~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 genvar ~SYM[1];
@@ -191,8 +191,8 @@ endgenerate"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
 "// zipWith
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][2];
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][2];
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
@@ -213,14 +213,14 @@ endgenerate"
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
 "// index_integer
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][2];
+wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[1]][2];
 
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
 
-always_comb begin
+always @(*) begin
 // pragma translate_off
   if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
     $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
@@ -239,11 +239,11 @@ end"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
 "// replace_integer
-~SIGD[~SYM[0]][2];
+wire ~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-~SIGD[~SYM[1]][1];
-always_comb begin
+wire ~SIGD[~SYM[1]][1];
+always @(*) begin
   ~SYM[1] = ~ARG[1];
   // pragma translate_off
   if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
@@ -283,7 +283,7 @@ assign ~RESULT = ~SYM[1];"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
 "// reverse
-~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
@@ -308,7 +308,7 @@ endgenerate"
                   -> BitVector (n * m)"
     , "templateD" :
 "// concatBitVector
-~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 genvar ~SYM[1];
@@ -327,7 +327,7 @@ endgenerate"
                     -> Vec n (BitVector m)"
     , "templateD" :
 "// unconcatBitVector
-~SIGD[~SYM[0]][2];
+wire ~SIGD[~SYM[0]][2];
 assign ~SYM[0] = ~ARG[2];
 
 genvar ~SYM[1];

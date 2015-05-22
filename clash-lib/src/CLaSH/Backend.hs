@@ -27,7 +27,7 @@ class Backend state where
   -- | Generate HDL for a Netlist component
   genHDL           :: Component    -> State state (String, Doc)
   -- | Generate a HDL package containing type definitions for the given HWTypes
-  mkTyPackage      :: [HWType]     -> State state Doc
+  mkTyPackage      :: [HWType]     -> State state [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
   hdlType          :: HWType       -> State state Doc
   -- | Convert a Netlist HWType to an HDL error value for that type

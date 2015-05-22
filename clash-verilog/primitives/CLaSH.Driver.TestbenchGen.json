@@ -31,7 +31,7 @@ end
 "assign ~RESULT = ~ARG[0];
 
 // pragma translate_off
-always_comb begin
+always @(*) begin
   if (~ARG[0] == 1'b1) begin
     $finish;
   end
