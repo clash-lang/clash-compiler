@@ -131,18 +131,22 @@ inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ scrut es) = fmap Just $
+inst_ (CondAssignment id_ ty scrut es) = fmap Just $
+    "reg" <+> verilogType ty <+> regId <> semi <$>
     "always @(*) begin" <$>
     indent 2 ("case" <> parens (expr_ True scrut) <$>
                 (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
               "endcase") <$>
-    "end"
+    "end" <$>
+    "assign" <+> text id_ <+> equals <+> regId <> semi
   where
+    regId = text id_ <> "_reg"
+
     conds :: [(Maybe Expr,Expr)] -> VerilogM [Doc]
     conds []                = return []
-    conds [(_,e)]           = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
-    conds ((Nothing,e):_)   = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
-    conds ((Just c ,e):es') = (expr_ True c <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> conds es'
+    conds [(_,e)]           = ("default" <+> colon <+> regId <+> equals <+> expr_ False e) <:> return []
+    conds ((Nothing,e):_)   = ("default" <+> colon <+> regId <+> equals <+> expr_ False e) <:> return []
+    conds ((Just c ,e):es') = (expr_ True c <+> colon <+> regId <+> equals <+> expr_ False e) <:> conds es'
 
 inst_ (InstDecl nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
@@ -197,11 +201,10 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
 expr_ _ (Identifier id_ (Just _))                      = text id_
 
 expr_ _ (DataCon (Vector 1 _) _ [e]) = expr_ False e
-expr_ _ e@(DataCon (Vector n _) _ [e1,e2]) =
+expr_ _ e@(DataCon (Vector _ _) _ es@[_,_]) =
   case vectorChain e of
-    Just es -> listBraces (mapM (expr_ False) es)
-    Nothing -> let e2' = expr_ False e2
-               in  listBraces $ sequence ((expr_ False e1):[e2' <> brackets (int i) | i <- [0..(n-2)] ])
+    Just es' -> listBraces (mapM (expr_ False) es')
+    Nothing  -> listBraces (mapM (expr_ False) es)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where

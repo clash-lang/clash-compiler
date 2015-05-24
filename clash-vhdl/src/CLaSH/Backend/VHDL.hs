@@ -442,7 +442,7 @@ inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ scrut es) = fmap Just $
+inst_ (CondAssignment id_ _ scrut es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <$>
       indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds es)) <> semi))
   where

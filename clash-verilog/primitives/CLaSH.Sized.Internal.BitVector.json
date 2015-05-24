@@ -146,13 +146,7 @@ assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
 "split# :: KnownNat n        -- ARG[0]
         => BitVector (m + n) -- ARG[1]
         -> (BitVector m, BitVector n)"
-    , "templateD" :
-"// split
-wire ~SIGD[~SYM[0]][1];
-assign ~SYM[0] = ~ARG[1];
-assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
-                  , ~SYM[0][(~LIT[0]-1) : 0]
-                  };"
+    , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :

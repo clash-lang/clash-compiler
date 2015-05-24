@@ -79,53 +79,19 @@ endgenerate"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
-    , "templateD" :
-"// (++)
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][1];
-
-assign ~SYM[0] = ~ARG[0];
-assign ~SYM[1] = ~ARG[1];
-
-genvar ~SYM[2];
-generate
-  for (~SYM[2]=0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : append_~SYM[3]
-    if (~SYM[2] < ~LENGTH[~TYP[0]]) begin
-      assign ~RESULT[~SYM[2]] = ~SYM[0][~SYM[2]];
-    end else begin
-      assign ~RESULT[~SYM[2]] = ~SYM[1][~SYM[2]-$size(~SYM[0])];
-    end
-  end
-endgenerate"
+    , "templateE" : "{~ARG[0],~ARG[1]}"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.concat"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
-    , "templateD" :
-"// concat
-wire ~SIGD[~SYM[0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-genvar ~SYM[1];
-generate
-  for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concat_~SYM[2]
-    assign ~RESULT[(~SYM[5] * $size(~SYM[0][0])) : ((~SYM[5] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
-  end
-endgenerate"
+    , "templateD" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.splitAt"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
-    , "templateD" :
-"// splitAt
-wire ~SIGD[~SYM[0]][1];
-assign ~SYM[0] = ~ARG[1];
-
-assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0)]
-                  ,~SYM[0][($left(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0)) : ($right(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0))]
-                  };"
+    , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
@@ -135,17 +101,7 @@ assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_se
            => SNat m         -- ARG[1]
            -> Vec (n * m) a  -- ARG[2]
            -> Vec n (Vec m a)"
-    , "templateD" :
-"// unconcat
-wire ~SIGD[~SYM[0]][2];
-assign ~SYM[0] = ~ARG[2];
-
-genvar ~SYM[1];
-generate
-  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcat_~SYM[2]
-    assign ~RESULT[~SYM[1]] = ~SYM[0][(~SYM[1] * ~LIT[1]) : ((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1)];
-  end
-endgenerate"
+    , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
@@ -177,10 +133,10 @@ assign ~SYM[0] = ~ARG[1];
 
 genvar ~SYM[1];
 generate
-  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
+  for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
     ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[1]]~
+      ~OUTPUT <= ~RESULT[~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYP[1]]~
     ~INST
   end
 endgenerate"
@@ -190,7 +146,7 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.zipWith"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
-"// zipWith
+"// zipWith start
 wire ~SIGD[~SYM[0]][1];
 wire ~SIGD[~SYM[1]][2];
 assign ~SYM[0] = ~ARG[1];
@@ -198,40 +154,50 @@ assign ~SYM[1] = ~ARG[2];
 
 genvar ~SYM[2];
 generate
-  for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
+  for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
     ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[2]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[2]]~ ~TYPEL[~TYP[1]]~
-      ~INPUT  <= ~SYM[1][~SYM[2]]~ ~TYPEL[~TYP[2]]~
+      ~OUTPUT <= ~RESULT[~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYP[2]]~
     ~INST
   end
-endgenerate"
+endgenerate
+// zipWith end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_int"
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
-"// index_integer
-wire ~SIGD[~SYM[0]][1];
-wire ~SIGD[~SYM[1]][2];
+"// index_integer start
+wire ~TYPO ~SYM[0] [0:~LIT[0]-1];
+wire ~TYP[1] ~SYM[1];
+wire ~TYP[2] ~SYM[2];
 
-assign ~SYM[0] = ~ARG[1];
-assign ~SYM[1] = ~ARG[2];
+assign ~SYM[1] = ~ARG[1];
+genvar ~SYM[3];
+generate
+  for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3]=~SYM[3]+1) begin : array_~SYM[4]
+    assign ~SYM[0][(~LIT[0]-1)-~SYM[3]] = ~SYM[1][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  end
+endgenerate
 
-
+assign ~SYM[2] = ~ARG[2];
+reg ~TYPO ~SYM[5];
 always @(*) begin
 // pragma translate_off
-  if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
-    ~RESULT = ~ERRORO;
+  if (~SYM[2] < 0 || ~SYM[2] >= ~LIT[0]) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[2], 0, ~LIT[0]-1);
+    ~SYM[5] = ~ERRORO;
   end else begin
   // pragma translate_on
-    ~RESULT = ~SYM[0][~SYM[1]];
+    ~SYM[5] = ~SYM[0][~SYM[2]];
   // pragma translate_off
   end
 // pragma translate_on
-end"
+end
+assign ~RESULT = ~SYM[5];
+// index_integer end"
     }
   }
 , { "BlackBox" :
@@ -275,7 +241,7 @@ assign ~RESULT = ~SYM[1];"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
     , "type"      : "replicate :: SNat n -> a -> Vec n a"
-    , "templateE" : "'{~LIT[0] {~ARG[1]}}"
+    , "templateE" : "{~LIT[0] {~ARG[1]}}"
     }
   }
 , { "BlackBox" :
@@ -306,17 +272,7 @@ endgenerate"
 "concatBitVector# :: KnownNat m           -- ARG[0]
                   => Vec n (BitVector m)  -- ARG[1]
                   -> BitVector (n * m)"
-    , "templateD" :
-"// concatBitVector
-wire ~SIGD[~SYM[0]][1];
-assign ~SYM[0] = ~ARG[1];
-
-genvar ~SYM[1];
-generate
-  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concatBitVector_~SYM[2]
-    assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][~SYM[1]];
-  end
-endgenerate"
+    , "templateD" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
@@ -325,17 +281,7 @@ endgenerate"
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                     => BitVector (n * m)        -- ARG[2]
                     -> Vec n (BitVector m)"
-    , "templateD" :
-"// unconcatBitVector
-wire ~SIGD[~SYM[0]][2];
-assign ~SYM[0] = ~ARG[2];
-
-genvar ~SYM[1];
-generate
-  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcatBitVector_~SYM[2]
-    assign ~RESULT[~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
-  end
-endgenerate"
+    , "templateE" : "~ARG[1]"
     }
   }
 ]
