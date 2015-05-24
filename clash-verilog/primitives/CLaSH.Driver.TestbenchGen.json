@@ -2,15 +2,17 @@
     { "name"      : "CLaSH.Driver.TestbenchGen.clockGen"
     , "templateD" :
 "// pragma translate_off
+reg ~TYPO ~SYM[0];
 always begin
-  ~RESULT = 0;
+  ~SYM[0] = 0;
   #~LIT[0] forever begin
-    ~RESULT = ~ ~RESULT;
+    ~SYM[0] = ~ ~SYM[0];
     #~LIT[1];
-    ~RESULT = ~ ~RESULT;
+    ~SYM[0] = ~ ~SYM[0];
     #~LIT[2];
   end
 end
+assign ~RESULT = ~SYM[0];
 // pragma translate_on"
     }
   }
@@ -18,10 +20,12 @@ end
     { "name"      : "CLaSH.Driver.TestbenchGen.resetGen"
     , "templateD" :
 "// pragma translate_off
+reg ~TYPO ~SYM[1];
 initial begin
-  ~RESULT = 0;
-  #~LIT[0] ~RESULT = 1;
+  ~SYM[1] = 0;
+  #~LIT[0] ~SYM[1] = 1;
 end
+assign ~RESULT = ~SYM[1];
 // pragma translate_on"
     }
   }
@@ -43,13 +47,15 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
     , "templateD" :
-"always begin
+"reg ~TYPO ~SYM[2];
+always begin
 // pragma translate_off
-  ~RESULT <= 1'b0;
+  ~SYM[2] <= 1'b0;
   #~LIT[0]
 // pragma translate_on
-  ~RESULT = 1'b1;
-end"
+  ~SYM[2] = 1'b1;
+end
+assign ~RESULT = ~SYM[2]"
     }
   }
 ]
