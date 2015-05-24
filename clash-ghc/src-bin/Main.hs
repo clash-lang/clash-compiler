@@ -302,7 +302,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
        DoVHDL                 -> clash makeVHDL
-       DoVerilog              -> clash makeSystemVerilog
+       DoVerilog              -> clash makeVerilog
 
   liftIO $ dumpFinalStats dflags6
 
@@ -513,7 +513,7 @@ doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
 showPackagesMode = mkPostLoadMode ShowPackages
 doVHDLMode = mkPostLoadMode DoVHDL
-doVerilogMode = mkPostLoadMode DoSystemVerilog
+doVerilogMode = mkPostLoadMode DoVerilog
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -659,7 +659,7 @@ mode_flags =
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   , defFlag "-vhdl"        (PassFlag (setMode doVHDLMode))
-  , defFlag "-verilog"     (PassFlag (setMode doSystemVerilogMode))
+  , defFlag "-verilog"     (PassFlag (setMode doVerilogMode))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
