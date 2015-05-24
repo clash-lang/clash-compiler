@@ -10,7 +10,7 @@ import           System.FilePath  ((</>),(<.>))
 import qualified System.IO.Unsafe as Unsafe
 
 data BuildTarget
-  = VHDL | SystemVerilog
+  = VHDL | Verilog | Both
   deriving Show
 
 main :: IO ()
