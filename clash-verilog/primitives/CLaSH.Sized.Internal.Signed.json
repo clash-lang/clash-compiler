@@ -238,17 +238,16 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
     , "templateD" :
 "// resize
-generate
-  if (~LIT[1] < ~LIT[0]) begin
-    // truncate, sign preserving
-    wire ~SIGD[~SYM[0]][2];
-    assign ~SYM[0] = ~ARG[2];
-    assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});
-  end else begin
-    // sign-extend
-    assign ~RESULT = $signed(~ARG[2]);
-  end
-endgenerate"
+if (~LIT[1] < ~LIT[0]) begin
+  // truncate, sign preserving
+  wire ~SIGD[~SYM[0]][2];
+  assign ~SYM[0] = ~ARG[2];
+  assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});
+end else begin
+  // sign-extend
+  assign ~RESULT = $signed(~ARG[2]);
+end
+"
     }
   }
 , { "BlackBox" :

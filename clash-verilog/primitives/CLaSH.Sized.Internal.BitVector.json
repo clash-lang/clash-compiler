@@ -61,17 +61,19 @@ wire ~SIGD[~SYM[1]][2];
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
+reg ~TYPO ~SYM[2];
 // pragma translate_off
 always @(*) begin
   if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
-    ~RESULT = ~ERRORO;
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], 0, ~LIT[0]-1);
+    ~SYM[2] = ~ERRORO;
   end else begin
   // pragma translate_on
-    ~RESULT = ~SYM[0][~SYM[1]];
+    ~SYM[2] = ~SYM[0][~SYM[1]];
   // pragma translate_off
   end
 end
+assign ~RESULT = ~SYM[2];
 // pragma translate_on"
     }
   }
@@ -84,26 +86,29 @@ end
              -> Bit         -- ARG[3]
              -> BitVector n"
     , "templateD" :
-"// replaceBit
-wire ~SIGD[~SYM[0]][2];
-assign ~SYM[0] = ~ARG[2];
+"// replaceBit start
+reg ~TYPO ~SYM[0];
+wire ~TYPO ~SYM[1];
+wire ~TYP[2] ~SYM[2];
+wire ~TYP[3] ~SYM[3];
 
-wire ~SIGD[~SYM[1]][1];
-always @(*) begin
-  ~SYM[1] = ~ARG[1];
-  // pragma translate_off
-  if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
-    ~SYM[1] = ~ERROR[1];
-  end else begin
-    // pragma translate_on
-    ~SYM[1][~SYM[0]] = ~ARG[3];
-    // pragma translate_off
+assign ~SYM[1] = ~ARG[1];
+assign ~SYM[2] = ~ARG[2];
+assign ~SYM[3] = ~ARG[3];
+
+genvar ~SYM[4];
+for (~SYM[4]=0; ~SYM[4] < ~LIT[0]; ~SYM[4] = ~SYM[4] + 1) begin : replace_int_~SYM[5]
+  always @(*) begin
+    if (~SYM[2] == (~LIT[0] - 1 - ~SYM[4])) begin
+      ~SYM[0][~SYM[4]] = ~SYM[3];
+    end else begin
+      ~SYM[0][~SYM[4]] = ~SYM[1][~SYM[4]];
+    end
   end
-  // pragma translate_on
 end
 
-assign ~RESULT = ~SYM[1];"
+assign ~RESULT = ~SYM[0];
+// replaceBit end"
     }
   }
 , { "BlackBox" :

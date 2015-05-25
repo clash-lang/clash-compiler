@@ -69,11 +69,10 @@ wire ~SIGD[~SYM[0]][4];
 assign ~SYM[0] = ~ARG[4];
 
 genvar ~SYM[1];
-generate
-  for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : select_~SYM[2]
-    assign ~RESULT[~SYM[1]] = ~SYM[0][~LIT[1] + (~LIT[2] * ~SYM[1])];
-  end
-endgenerate"
+for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : select_~SYM[2]
+  assign ~RESULT[~SYM[1]] = ~SYM[0][~LIT[1] + (~LIT[2] * ~SYM[1])];
+end
+"
     }
   }
 , { "BlackBox" :
@@ -115,31 +114,28 @@ assign ~SYM[0] = ~ARG[0];
 assign ~SYM[1] = ~ARG[1];
 
 genvar ~SYM[2];
-generate
-  for (~SYM[2] = 0; ~SYM[2] < $size(~SYM[0]); ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
-    assign ~RESULT[2*~SYM[2]]   = ~SYM[0][~SYM[2]];
-    assign ~RESULT[2*~SYM[2]+1] = ~SYM[1][~SYM[2]];
-  end
-endgenerate"
+for (~SYM[2] = 0; ~SYM[2] < $size(~SYM[0]); ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
+  assign ~RESULT[2*~SYM[2]]   = ~SYM[0][~SYM[2]];
+  assign ~RESULT[2*~SYM[2]+1] = ~SYM[1][~SYM[2]];
+end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
-"// map
+"// map begin
 wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 genvar ~SYM[1];
-generate
-  for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
-    ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]]~ ~TYPEL[~TYP[1]]~
-    ~INST
-  end
-endgenerate"
+for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
+  ~INST 0
+    ~OUTPUT <= ~RESULT[~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
+    ~INPUT  <= ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]]~ ~TYPEL[~TYP[1]]~
+  ~INST
+end
+// map end"
     }
   }
 , { "BlackBox" :
@@ -153,15 +149,13 @@ assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
 genvar ~SYM[2];
-generate
-  for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
-    ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]]~ ~TYPEL[~TYP[1]]~
-      ~INPUT  <= ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]]~ ~TYPEL[~TYP[2]]~
-    ~INST
-  end
-endgenerate
+for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
+  ~INST 0
+    ~OUTPUT <= ~RESULT[~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
+    ~INPUT  <= ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]]~ ~TYPEL[~TYP[1]]~
+    ~INPUT  <= ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]]~ ~TYPEL[~TYP[2]]~
+  ~INST
+end
 // zipWith end"
     }
   }
@@ -174,11 +168,9 @@ wire ~TYPO ~SYM[0] [0:~LIT[0]-1];
 wire ~TYP[1] ~SYM[1];
 assign ~SYM[1] = ~ARG[1];
 genvar ~SYM[3];
-generate
-  for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3]=~SYM[3]+1) begin : array_~SYM[4]
-    assign ~SYM[0][(~LIT[0]-1)-~SYM[3]] = ~SYM[1][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
-  end
-endgenerate
+for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3]=~SYM[3]+1) begin : array_~SYM[4]
+  assign ~SYM[0][(~LIT[0]-1)-~SYM[3]] = ~SYM[1][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+end
 
 wire ~TYP[2] ~SYM[2];
 assign ~SYM[2] = ~ARG[2];
@@ -215,17 +207,15 @@ assign ~SYM[2] = ~ARG[2];
 assign ~SYM[3] = ~ARG[3];
 
 genvar ~SYM[4];
-generate
-  for (~SYM[4]=0; ~SYM[4] < ~LIT[0]; ~SYM[4] = ~SYM[4] + 1) begin : replace_int_~SYM[5]
-    always @(*) begin
-      if (~SYM[2] == (~LIT[0] - 1 - ~SYM[4])) begin
-        ~SYM[0][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[3];
-      end else begin
-        ~SYM[0][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[1][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
-      end
+for (~SYM[4]=0; ~SYM[4] < ~LIT[0]; ~SYM[4] = ~SYM[4] + 1) begin : replace_int_~SYM[5]
+  always @(*) begin
+    if (~SYM[2] == (~LIT[0] - 1 - ~SYM[4])) begin
+      ~SYM[0][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[3];
+    end else begin
+      ~SYM[0][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[1][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
     end
   end
-endgenerate
+end
 
 assign ~RESULT = ~SYM[0];
 // replace_integer end"
@@ -258,11 +248,9 @@ wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
-generate
-  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
-    assign ~RESULT[$high(~SYM[0]) - ~SYM[1]] = ~SYM[0][~SYM[1]];
-  end
-endgenerate"
+for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
+  assign ~RESULT[$high(~SYM[0]) - ~SYM[1]] = ~SYM[0][~SYM[1]];
+end"
     }
   }
 , { "BlackBox" :
@@ -277,7 +265,7 @@ endgenerate"
 "concatBitVector# :: KnownNat m           -- ARG[0]
                   => Vec n (BitVector m)  -- ARG[1]
                   -> BitVector (n * m)"
-    , "templateD" : "~ARG[1]"
+    , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
