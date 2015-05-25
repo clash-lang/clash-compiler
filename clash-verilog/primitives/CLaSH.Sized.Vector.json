@@ -136,7 +136,7 @@ generate
   for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
     ~INST 0
       ~OUTPUT <= ~RESULT[~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]]~ ~TYPEL[~TYP[1]]~
     ~INST
   end
 endgenerate"
@@ -157,8 +157,8 @@ generate
   for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
     ~INST 0
       ~OUTPUT <= ~RESULT[~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYP[1]]~
-      ~INPUT  <= ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]~ ~TYPEL[~TYP[2]]~
+      ~INPUT  <= ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]]~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]]~ ~TYPEL[~TYP[2]]~
     ~INST
   end
 endgenerate
@@ -172,8 +172,6 @@ endgenerate
 "// index_integer start
 wire ~TYPO ~SYM[0] [0:~LIT[0]-1];
 wire ~TYP[1] ~SYM[1];
-wire ~TYP[2] ~SYM[2];
-
 assign ~SYM[1] = ~ARG[1];
 genvar ~SYM[3];
 generate
@@ -182,7 +180,9 @@ generate
   end
 endgenerate
 
+wire ~TYP[2] ~SYM[2];
 assign ~SYM[2] = ~ARG[2];
+
 reg ~TYPO ~SYM[5];
 always @(*) begin
 // pragma translate_off

@@ -55,7 +55,7 @@ always begin
 // pragma translate_on
   ~SYM[2] = 1'b1;
 end
-assign ~RESULT = ~SYM[2]"
+assign ~RESULT = ~SYM[2];"
     }
   }
 ]
