@@ -73,7 +73,7 @@ genVHDL :: Component -> VHDLM (String,Doc)
 genVHDL c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdl    = "-- Automatically generated VHDL" <$$>
+    vhdl    = "-- Automatically generated VHDL-2002" <$$>
               tyImports <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c

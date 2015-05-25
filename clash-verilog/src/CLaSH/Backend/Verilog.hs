@@ -58,7 +58,7 @@ genVerilog :: Component -> VerilogM (String,Doc)
 genVerilog c = (unpack cName,) A.<$> verilog
   where
     cName   = componentName c
-    verilog = "// Automatically generated Verilog" <$$>
+    verilog = "// Automatically generated Verilog-2005" <$$>
               module_ c
 
 module_ :: Component -> VerilogM Doc
