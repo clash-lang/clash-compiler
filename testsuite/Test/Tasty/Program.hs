@@ -80,7 +80,7 @@ runProgram program args workingDir stdO = do
 
   case ecode of
     ExitSuccess      -> return (testPassed (if stdO then stdout else stderr))
-    ExitFailure code -> return $ exitFailure program code stderr
+    ExitFailure code -> return $ exitFailure program code stderr stdout
 
 -- | Indicates that program does not exist in the path
 execNotFoundFailure :: String -> Result
@@ -88,7 +88,8 @@ execNotFoundFailure file =
   testFailed $ "Cannot locate program " ++ file ++ " in the PATH"
 
 -- | Indicates that program failed with an error code
-exitFailure :: String -> Int -> String -> Result
-exitFailure file code stderr =
+exitFailure :: String -> Int -> String -> String -> Result
+exitFailure file code stderr stdout =
   testFailed $ "Program " ++ file ++ " failed with code " ++ show code
                ++ "\n Stderr was: \n" ++ stderr
+               ++ "\n Stdout was: \n" ++ stdout

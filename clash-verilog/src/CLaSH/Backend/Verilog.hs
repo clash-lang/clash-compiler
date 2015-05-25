@@ -278,6 +278,9 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Signed _
                                         | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
                                         | otherwise -> int sz <> "'sd" <> integer i
+                                       Integer
+                                        | i < 0     -> "-" <> int 32 <> "'sd" <> integer (abs i)
+                                        | otherwise -> int 32 <> "'sd" <> integer i
                                        _            -> int sz <> "'b" <> blit
 
   where

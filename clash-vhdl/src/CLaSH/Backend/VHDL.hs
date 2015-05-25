@@ -563,6 +563,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Unsigned _  -> "unsigned'" <> parens blit
                                        Signed   _  -> "signed'" <> parens blit
                                        BitVector _ -> "std_logic_vector'" <> parens blit
+                                       Integer     -> integer i
                                        _           -> blit
 
   where
