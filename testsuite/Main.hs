@@ -10,88 +10,88 @@ import           System.FilePath  ((</>),(<.>))
 import qualified System.IO.Unsafe as Unsafe
 
 data BuildTarget
-  = VHDL | Verilog | Both
+  = VHDL | Verilog
   deriving Show
 
 main :: IO ()
 main =
   defaultMain $ testGroup "tests"
     [ testGroup "examples"
-      [runTest "examples"             VHDL [] "ALU"          (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "Blinker"      (Just ("topEntity_0",False))
-      ,runTest "examples"             VHDL [] "BlockRamTest" (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "Calculator"   (Just ("testbench",True ))
-      ,runTest "examples"             VHDL [] "CochleaPlus"  (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "FIR"          (Just ("testbench",True ))
-      ,runTest "examples"             VHDL [] "Fifo"         (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "MAC"          (Just ("testbench",True))
-      ,runTest "examples"             VHDL [] "MatrixVect"   (Just ("testbench",True))
-      ,runTest "examples"             VHDL [] "Queens"       (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "Reducer"      (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "Sprockell"    (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "Windows"      (Just ("topEntity",False))
-      ,runTest ("examples" </> "i2c") VHDL [] "I2C"          (Just ("topEntity",False))
+      [runTest "examples"             Verilog [] "ALU"          (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "Blinker_v"    (Just ("topEntity_0",False))
+      ,runTest "examples"             Verilog [] "BlockRamTest" (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "Calculator"   (Just ("testbench",True ))
+      ,runTest "examples"             Verilog [] "CochleaPlus"  (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "FIR"          (Just ("testbench",True ))
+      ,runTest "examples"             Verilog [] "Fifo"         (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "MAC"          (Just ("testbench",True))
+      ,runTest "examples"             Verilog [] "MatrixVect"   (Just ("testbench",True))
+      ,runTest "examples"             Verilog [] "Queens"       (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "Reducer"      (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "Sprockell"    (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "Windows"      (Just ("topEntity",False))
+      ,runTest ("examples" </> "i2c") Verilog [] "I2C"          (Just ("topEntity",False))
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
-            [ runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "ClassOps" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "IrrefError" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "NestedPrimitives" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "NestedPrimitives2" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "PatError" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "RecordSumOfProducts" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "Shift" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "SimpleConstructor" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "TagToEnum" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") VHDL [] "TwoFunctions" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "ClassOps" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "IrrefError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "NestedPrimitives" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "NestedPrimitives2" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "PatError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "RecordSumOfProducts" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "Shift" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "SimpleConstructor" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "TagToEnum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Verilog [] "TwoFunctions" (Just ("topEntity",False))
             ]
         , testGroup "BitVector"
-            [ runTest ("tests" </> "shouldwork" </> "BitVector") VHDL [] "Box" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "BitVector") Verilog [] "Box" (Just ("topEntity",False))
             ]
         , testGroup "BoxedFunctions"
-            [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") VHDL [] "DeadRecursiveBoxed" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") Verilog [] "DeadRecursiveBoxed" (Just ("topEntity",False))
             ]
         , testGroup "CSignal"
-            [ runTest ("tests" </> "shouldwork" </> "CSignal") VHDL [] "CBlockRamTest" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "CSignal") VHDL [] "MAC" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "CSignal") Verilog [] "CBlockRamTest" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "CSignal") Verilog [] "MAC" (Just ("topEntity",False))
             ]
         , testGroup "Fixed"
-            [ runTest ("tests" </> "shouldwork" </> "Fixed") VHDL [] "SFixedTest" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Fixed") Verilog [] "SFixedTest" (Just ("testbench",True))
             ]
         , testGroup "Numbers"
-            [ runTest ("tests" </> "shouldwork" </> "Numbers") VHDL [] "Resize" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Numbers") VHDL [] "Resize2" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Numbers") VHDL [] "SatMult" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Numbers") Verilog [] "Resize" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") Verilog [] "Resize2" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") Verilog [] "SatMult" (Just ("topEntity",False))
             ]
         , testGroup "Polymorphism"
-            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") VHDL [] "ExistentialBoxed" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Polymorphism") VHDL [] "LocalPoly" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") Verilog [] "ExistentialBoxed" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") Verilog [] "LocalPoly" (Just ("topEntity",False))
             ]
         , testGroup "Signal"
-            [ runTest ("tests" </> "shouldwork" </> "Signal") VHDL [] "AlwaysHigh" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") VHDL [] "BlockRamTest" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") VHDL [] "MAC" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") VHDL [] "SigP" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Signal") Verilog [] "AlwaysHigh" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Verilog [] "BlockRamTest" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Verilog [] "MAC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Verilog [] "SigP" (Just ("topEntity",False))
             ]
         , testGroup "Testbench"
-            [ runTest ("tests" </> "shouldwork" </> "Testbench") VHDL ["-clash-inline-limit=0"] "TB" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Testbench") VHDL [] "SyncTB" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Testbench") Verilog ["-clash-inline-limit=0"] "TB" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Testbench") Verilog [] "SyncTB" (Just ("testbench",True))
             ]
         , testGroup "Vector"
-            [ runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "EnumTypes" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "HOClock" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "HOCon" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "HOPrim" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "PatHOCon" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "Split" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VACC" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VIndex" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VMapAccum" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VReplace" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VScan" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VZip" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VecConst" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") VHDL [] "VecOfSum" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "EnumTypes" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "HOClock" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "HOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "HOPrim" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "PatHOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "Split" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VACC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VIndex" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VMapAccum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VReplace" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VScan" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VZip" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VecConst" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Verilog [] "VecOfSum" (Just ("topEntity",False))
             ]
         ]
     ]
