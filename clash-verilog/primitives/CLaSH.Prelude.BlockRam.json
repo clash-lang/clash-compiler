@@ -11,14 +11,19 @@
            -> Signal' clk a"
     , "templateD" :
 "// blockRam
-reg ~SIGD[~SYM[0]][3];
+reg ~TYPO ~SYM[0] [0:~LIT[0]-1];
 reg ~SIGD[~SYM[1]][7];
 
+reg ~TYP[3] ~SYM[2];
+integer ~SYM[3];
 initial begin
-  ~SYM[0] = ~LIT[3];
+  ~SYM[2] = ~ARG[3];
+  for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
+    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  end
 end
 
-always @(posedge ~CLK[2]) begin : blockRam_~COMPNAME_~SYM[3]
+always @(posedge ~CLK[2]) begin : blockRam_~COMPNAME_~SYM[4]
   if (~ARG[6]) begin
     ~SYM[0][~ARG[4]] <= ~ARG[7];
   end
