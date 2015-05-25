@@ -1,4 +1,4 @@
-Name:                 clash-systemverilog
+Name:                 clash-verilog
 Version:              0.5.4
 Synopsis:             CAES Language for Synchronous Hardware - SystemVerilog backend
 Description:
@@ -75,6 +75,6 @@ Library
                       unordered-containers    >= 0.2.3.3,
                       wl-pprint-text          >= 1.1.0.0
 
-  Exposed-modules:    CLaSH.Backend.SystemVerilog
+  Exposed-modules:    CLaSH.Backend.Verilog
 
-  other-modules:      Paths_clash_systemverilog
+  other-modules:      Paths_clash_verilog

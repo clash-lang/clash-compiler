@@ -102,7 +102,7 @@ clashHDL t env extraArgs modName =
               "cabal"
               (concat [["exec","clash","--"
                        ,case t of { VHDL -> "--vhdl"
-                                  ; SystemVerilog -> "--systemverilog"
+                                  ; Verilog -> "--verilog"
                                   }
                        ]
                       ,extraArgs
@@ -125,6 +125,18 @@ ghdlMake entity env = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",en
 
 ghdlSim :: FilePath -> TestTree
 ghdlSim env = testProgram "GHDL (sim)" "ghdl" ["-r","testbench","--assert-level=error"] (Just env) False
+
+iverilog :: FilePath -> String -> TestTree
+iverilog dir entity = withResource (return dir) (const (return ()))
+    (\d -> testProgram "iverilog" "iverilog" ("-o":entity:verilogFiles d) (Just dir) False)
+  where
+    verilogFiles :: IO FilePath -> [FilePath]
+    verilogFiles d =  Unsafe.unsafePerformIO
+                   $  filter (List.isSuffixOf "v")
+                  <$> (Directory.getDirectoryContents =<< d)
+
+vvp :: FilePath -> TestTree
+vvp env = testProgram "vvp" "vvp" ["-N","testbench"] (Just env) False
 
 runTest :: FilePath
         -> BuildTarget
@@ -149,4 +161,18 @@ runTest env VHDL extraArgs modName entNameM = withResource aquire release (const
                                    , ghdlMake entName modDir
                                    ] ++ if doRun then [ghdlSim modDir] else []
 
-runTest env SystemVerilog extraArgs modName _ = clashHDL SystemVerilog env extraArgs modName
+runTest env Verilog extraArgs modName entNameM =
+    withResource (return ()) release (const grp)
+  where
+    verilogDir = env </> "verilog"
+    modDir     = verilogDir </> modName
+    release _  = Directory.removeDirectoryRecursive verilogDir
+
+
+    grp        = testGroup modName
+                    ( clashHDL Verilog env extraArgs modName
+                    : maybe [] doMakeAndRun entNameM
+                    )
+
+    doMakeAndRun (entName,doRun) = [ iverilog modDir entName
+                                   ] ++ if doRun then [vvp modDir] else []

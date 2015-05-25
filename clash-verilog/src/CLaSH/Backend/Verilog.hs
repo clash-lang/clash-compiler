@@ -34,7 +34,7 @@ data VerilogState = VerilogState
 instance Backend VerilogState where
   initBackend     = VerilogState
 #ifdef CABAL
-  primDir         = const (Paths_clash_sverilog.getDataFileName "primitives")
+  primDir         = const (Paths_clash_verilog.getDataFileName "primitives")
 #else
   primDir _       = return ("clash-verilog" System.FilePath.</> "primitives")
 #endif

@@ -275,7 +275,7 @@ mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
+mkExpr _ _ (Core.Literal lit) = return (HW.Literal (Just (Integer,32)) . NumLit $ fromInteger  $! i,[])
   where
     i = case lit of
           (IntegerLiteral i') -> i'
