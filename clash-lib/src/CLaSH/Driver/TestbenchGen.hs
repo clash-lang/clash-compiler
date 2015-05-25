@@ -8,12 +8,13 @@ module CLaSH.Driver.TestbenchGen
 where
 
 import           Control.Concurrent.Supply        (Supply)
+import           Control.Lens                     ((.=))
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (find,nub)
-import           Data.Maybe                       (mapMaybe)
+import           Data.Maybe                       (catMaybes,mapMaybe)
 import           Data.Text.Lazy                   (isPrefixOf,pack,splitOn)
-import           Unbound.Generics.LocallyNameless          (name2String)
+import           Unbound.Generics.LocallyNameless (name2String)
 
 import           CLaSH.Core.Term
 import           CLaSH.Core.TyCon
@@ -22,8 +23,8 @@ import           CLaSH.Core.Type
 import           CLaSH.Driver.Types
 
 import           CLaSH.Netlist
+import           CLaSH.Netlist.BlackBox           (prepareBlackBox)
 import           CLaSH.Netlist.BlackBox.Types     (Element (Err))
-import           CLaSH.Netlist.BlackBox.Util      (parseFail)
 import           CLaSH.Netlist.Types              as N
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
@@ -56,17 +57,26 @@ genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM ex
                                                  (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
                                                  stimuliNmM
 
-  let finDecl = [ NetDecl "finished" Bool
-                , genDone primMap
-                ]
-      finExpr = genFinish primMap
-  (expInst,expComps,hidden'') <- maybe (return (finExpr,[],hidden'))
+  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans $ do
+      done    <- genDone primMap
+      let finDecl' = [ NetDecl "finished" Bool
+                     , done
+                     ]
+      finExpr' <- genFinish primMap
+      return (finDecl',finExpr')
+
+  (expInst,expComps,cmpCnt'',hidden'') <- maybe (return (finExpr,[],cmpCnt',hidden'))
                                                  (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
                                                  expectedNmM
+
   let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden
-      clks   = mapMaybe (genClock primMap) hidden''
-      rsts   = mapMaybe (genReset primMap) hidden''
+
+  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans $ do
+      varCount .= (_varCount s)
+      clks' <- catMaybes <$> mapM (genClock primMap) hidden''
+      rsts' <- catMaybes <$> mapM (genReset primMap) hidden''
+      return (clks',rsts')
 
   let instDecl = InstDecl cName "totest"
                    (map (\i -> (i,Identifier i Nothing))
@@ -93,65 +103,72 @@ genTestBench opts _ _ _ _ _ _ _ _ _ c = traceIf (opt_dbgLevel opts > DebugNone) 
 
 genClock :: PrimMap
          -> (Identifier,HWType)
-         -> Maybe [Declaration]
-genClock primMap (clkName,Clock clkSym rate) = Just clkDecls
-  where
-    clkGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.clockGen" primMap of
-      Just (BlackBox _ (Left templ)) -> let (rising,rest) = divMod (toInteger rate) 2
-                                            falling       = rising + rest
-                                            ctx = emptyBBContext
-                                                    { bbResult = (Left (Identifier clkName Nothing), Clock clkSym rate)
-                                                    , bbInputs = [ (Left (N.Literal Nothing (NumLit 2)),Integer,True)
-                                                                 , (Left (N.Literal Nothing (NumLit rising)),Integer,True)
-                                                                 , (Left (N.Literal Nothing (NumLit falling)),Integer,True)
-                                                                 ]
-                                                    }
-                                        in  BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" (parseFail templ) ctx
-      pM -> error $ $(curLoc) ++ ("Can't make clock declaration for: " ++ show pM)
+         -> NetlistMonad (Maybe [Declaration])
+genClock primMap (clkName,Clock clkSym rate) =
+  case HashMap.lookup "CLaSH.Driver.TestbenchGen.clockGen" primMap of
+    Just (BlackBox _ (Left templ)) -> do
+      let (rising,rest) = divMod (toInteger rate) 2
+          falling       = rising + rest
+          ctx = emptyBBContext
+                  { bbResult = (Left (Identifier clkName Nothing), Clock clkSym rate)
+                  , bbInputs = [ (Left (N.Literal Nothing (NumLit 2)),Integer,True)
+                               , (Left (N.Literal Nothing (NumLit rising)),Integer,True)
+                               , (Left (N.Literal Nothing (NumLit falling)),Integer,True)
+                               ]
+                  }
+      templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.clockGen" templ ctx
+      let clkGenDecl = BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" templ' ctx
+          clkDecls   = [ NetDecl clkName (Clock clkSym rate)
+                       , clkGenDecl
+                       ]
+      return (Just clkDecls)
+    pM -> error $ $(curLoc) ++ ("Can't make clock declaration for: " ++ show pM)
 
-    clkDecls   = [ NetDecl clkName (Clock clkSym rate)
-                 , clkGenDecl
-                 ]
-
-genClock _ _ = Nothing
+genClock _ _ = return Nothing
 
 genReset :: PrimMap
          -> (Identifier,HWType)
-         -> Maybe [Declaration]
-genReset primMap (rstName,Reset clkSym rate) = Just rstDecls
-  where
-    resetGenDecl = case HashMap.lookup "CLaSH.Driver.TestbenchGen.resetGen" primMap of
-      Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
-                                                    { bbResult = (Left (Identifier rstName Nothing), Reset clkSym rate)
-                                                    , bbInputs = [(Left (N.Literal Nothing (NumLit 1)),Integer,True)]
-                                                    }
-                                        in  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" (parseFail templ) ctx
-      pM -> error $ $(curLoc) ++ ("Can't make reset declaration for: " ++ show pM)
+         -> NetlistMonad (Maybe [Declaration])
+genReset primMap (rstName,Reset clkSym rate) =
+  case HashMap.lookup "CLaSH.Driver.TestbenchGen.resetGen" primMap of
+    Just (BlackBox _ (Left templ)) -> do
+      let ctx = emptyBBContext
+                  { bbResult = (Left (Identifier rstName Nothing), Reset clkSym rate)
+                  , bbInputs = [(Left (N.Literal Nothing (NumLit 1)),Integer,True)]
+                  }
+      templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.resetGen" templ ctx
+      let resetGenDecl =  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" templ' ctx
+          rstDecls     = [ NetDecl rstName (Reset clkSym rate)
+                       , resetGenDecl
+                       ]
+      return (Just rstDecls)
 
-    rstDecls = [ NetDecl rstName (Reset clkSym rate)
-               , resetGenDecl
-               ]
+    pM -> error $ $(curLoc) ++ ("Can't make reset declaration for: " ++ show pM)
 
-genReset _ _ = Nothing
+genReset _ _ =  return Nothing
 
 genFinish :: PrimMap
-          -> Declaration
+          -> NetlistMonad Declaration
 genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" primMap of
-  Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
-                                                { bbResult = (Left (Identifier "finished" Nothing), Bool)
-                                                , bbInputs = [ (Left (N.Literal Nothing (NumLit 100)),Integer,True) ]
-                                                }
-                                    in  BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" (parseFail templ) ctx
+  Just (BlackBox _ (Left templ)) -> do
+    let ctx = emptyBBContext
+                { bbResult = (Left (Identifier "finished" Nothing), Bool)
+                , bbInputs = [ (Left (N.Literal Nothing (NumLit 100)),Integer,True) ]
+                }
+    templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.finishGen" templ ctx
+    return $ BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" templ' ctx
   pM -> error $ $(curLoc) ++ ("Can't make finish declaration for: " ++ show pM)
 
 genDone :: PrimMap
-        -> Declaration
+        -> NetlistMonad Declaration
 genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMap of
-  Just (BlackBox _ (Left templ)) -> let ctx = emptyBBContext
-                                                { bbResult    = (Left (Identifier "done" Nothing), Bool)
-                                                , bbInputs    = [(Left (Identifier "finished" Nothing),Bool,False)]
-                                                }
-                                    in  BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" (parseFail templ) ctx
+  Just (BlackBox _ (Left templ)) -> do
+    let ctx = emptyBBContext
+                { bbResult    = (Left (Identifier "done" Nothing), Bool)
+                , bbInputs    = [(Left (Identifier "finished" Nothing),Bool,False)]
+                }
+    templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.doneGen" templ ctx
+    return $ BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" templ' ctx
   pM -> error $ $(curLoc) ++ ("Can't make done declaration for: " ++ show pM)
 
 genStimuli :: Int
@@ -198,10 +215,10 @@ genVerifier :: Int
             -> [(Identifier,HWType)]
             -> (Identifier,HWType)
             -> TmName
-            -> IO (Declaration,[Component],[(Identifier,HWType)])
+            -> IO (Declaration,[Component],Int,[(Identifier,HWType)])
 genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,_) <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
+  (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
   let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm)))
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
@@ -217,4 +234,4 @@ genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp sig
                         (concat [ clkNms, rstNms ]) ++
                         [(inp,Identifier (fst outp) Nothing),(fin,Identifier "finished" Nothing)]
                    )
-  return (decl,comps,hidden'')
+  return (decl,comps,cmpCnt',hidden'')

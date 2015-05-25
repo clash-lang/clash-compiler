@@ -20,12 +20,12 @@ assign ~RESULT = ~SYM[0];
     { "name"      : "CLaSH.Driver.TestbenchGen.resetGen"
     , "templateD" :
 "// pragma translate_off
-reg ~TYPO ~SYM[1];
+reg ~TYPO ~SYM[0];
 initial begin
-  ~SYM[1] = 0;
-  #~LIT[0] ~SYM[1] = 1;
+  ~SYM[0] = 0;
+  #~LIT[0] ~SYM[0] = 1;
 end
-assign ~RESULT = ~SYM[1];
+assign ~RESULT = ~SYM[0];
 // pragma translate_on"
     }
   }
@@ -47,15 +47,15 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
     , "templateD" :
-"reg ~TYPO ~SYM[2];
+"reg ~TYPO ~SYM[0];
 always begin
 // pragma translate_off
-  ~SYM[2] <= 1'b0;
+  ~SYM[0] <= 1'b0;
   #~LIT[0]
 // pragma translate_on
-  ~SYM[2] = 1'b1;
+  ~SYM[0] = 1'b1;
 end
-assign ~RESULT = ~SYM[2];"
+assign ~RESULT = ~SYM[0];"
     }
   }
 ]
