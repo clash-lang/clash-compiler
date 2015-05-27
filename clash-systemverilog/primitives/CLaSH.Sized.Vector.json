@@ -1,0 +1,341 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.eq#"
+    , "type"      : "eq# :: Eq a => Vec n a -> Vec n a -> Bool"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.neq#"
+    , "type"      : "neq# :: Eq a => Vec n a -> Vec n a -> Bool"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.head"
+    , "type"      : "head :: Vec (n + 1) a -> a"
+    , "templateD" :
+"// head
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.tail"
+    , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
+    , "templateD" :
+"// tail
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.last"
+    , "type"      : "Vec (n + 1) a -> a"
+    , "templateD" :
+"// last
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][$high(~SYM[0])];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.init"
+    , "type"      : "Vec (n + 1) a -> Vec n a"
+    , "templateD" :
+"// init
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Sized.Vector.select"
+    , "type" :
+"select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
+        => SNat f                        -- ARG[1]
+        -> SNat s                        -- ARG[2]
+        -> SNat n                        -- ARG[3]
+        -> Vec i a                       -- ARG[4]
+        -> Vec n a"
+    , "templateD" :
+"// select
+~SIGD[~SYM[0]][4];
+assign ~SYM[0] = ~ARG[4];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : select_~SYM[2]
+    assign ~RESULT[~SYM[1]] = ~SYM[0][~LIT[1] + (~LIT[2] * ~SYM[1])];
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.++"
+    , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
+    , "templateD" :
+"// (++)
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][1];
+
+assign ~SYM[0] = ~ARG[0];
+assign ~SYM[1] = ~ARG[1];
+
+genvar ~SYM[2];
+generate
+  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : append_~SYM[3]
+    if (~SYM[2] < $size(~SYM[0])) begin
+      assign ~RESULT[~SYM[2]] = ~SYM[0][~SYM[2]];
+    end else begin
+      assign ~RESULT[~SYM[2]] = ~SYM[1][~SYM[2]-$size(~SYM[0])];
+    end
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.concat"
+    , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
+    , "templateD" :
+"// concat
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concat_~SYM[2]
+    assign ~RESULT[(~SYM[5] * $size(~SYM[0][0])) : ((~SYM[5] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.splitAt"
+    , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
+    , "templateD" :
+"// splitAt
+~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+
+assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0)]
+                  ,~SYM[0][($left(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0)) : ($right(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0))]
+                  };"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Sized.Vector.unconcat"
+    , "type" :
+ "unconcat :: KnownNat n     -- ARG[0]
+           => SNat m         -- ARG[1]
+           -> Vec (n * m) a  -- ARG[2]
+           -> Vec n (Vec m a)"
+    , "templateD" :
+"// unconcat
+~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcat_~SYM[2]
+    assign ~RESULT[~SYM[1]] = ~SYM[0][(~SYM[1] * ~LIT[1]) : ((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1)];
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.merge"
+    , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
+    , "templateD" :
+"// merge
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][1];
+assign ~SYM[0] = ~ARG[0];
+assign ~SYM[1] = ~ARG[1];
+
+genvar ~SYM[2];
+generate
+  for (~SYM[2] = 0; ~SYM[2] < $size(~SYM[0]); ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
+    assign ~RESULT[2*~SYM[2]]   = ~SYM[0][~SYM[2]];
+    assign ~RESULT[2*~SYM[2]+1] = ~SYM[1][~SYM[2]];
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.map"
+    , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
+    , "templateD" :
+"// map
+~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
+    ~INST 0
+      ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[1]]~
+    ~INST
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.zipWith"
+    , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
+    , "templateD" :
+"// zipWith
+~SIGD[~SYM[0]][1];
+~SIGD[~SYM[1]][2];
+assign ~SYM[0] = ~ARG[1];
+assign ~SYM[1] = ~ARG[2];
+
+genvar ~SYM[2];
+generate
+  for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
+    ~INST 0
+      ~OUTPUT <= ~RESULT[~SYM[2]]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[0][~SYM[2]]~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[1][~SYM[2]]~ ~TYPEL[~TYP[2]]~
+    ~INST
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.index_int"
+    , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
+    , "templateD" :
+"// index_integer
+~SIGD[~SYM[0]][1];
+~SIGD[~SYM[1]][2];
+
+assign ~SYM[0] = ~ARG[1];
+assign ~SYM[1] = ~ARG[2];
+
+
+always_comb begin
+// pragma translate_off
+  if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
+    ~RESULT = ~ERRORO;
+  end else begin
+  // pragma translate_on
+    ~RESULT = ~SYM[0][~SYM[1]];
+  // pragma translate_off
+  end
+// pragma translate_on
+end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.replace_int"
+    , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
+    , "templateD" :
+"// replace_integer
+~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
+
+~SIGD[~SYM[1]][1];
+always_comb begin
+  ~SYM[1] = ~ARG[1];
+  // pragma translate_off
+  if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
+    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
+    ~SYM[1] = ~ERROR[1];
+  end else begin
+    // pragma translate_on
+    ~SYM[1][~SYM[0]] = ~ARG[3];
+    // pragma translate_off
+  end
+  // pragma translate_on
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.maxIndex"
+    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Integer"
+    , "templateE" : "~LIT[0] - 1"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.length"
+    , "type"      : "length :: KnownNat n => Vec n a -> Integer"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.replicate"
+    , "type"      : "replicate :: SNat n -> a -> Vec n a"
+    , "templateE" : "'{~LIT[0] {~ARG[1]}}"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.reverse"
+    , "type"      : "reverse :: Vec n a -> Vec n a"
+    , "templateD" :
+"// reverse
+~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
+    assign ~RESULT[$high(~SYM[0]) - ~SYM[1]] = ~SYM[0][~SYM[1]];
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.lazyV"
+    , "type"      : "lazyV :: KnownNat n => Vec n a -> Vec n a"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Sized.Vector.concatBitVector#"
+    , "type" :
+"concatBitVector# :: KnownNat m           -- ARG[0]
+                  => Vec n (BitVector m)  -- ARG[1]
+                  -> BitVector (n * m)"
+    , "templateD" :
+"// concatBitVector
+~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concatBitVector_~SYM[2]
+    assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][~SYM[1]];
+  end
+endgenerate"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Sized.Vector.unconcatBitVector#"
+    , "type" :
+"unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
+                    => BitVector (n * m)        -- ARG[2]
+                    -> Vec n (BitVector m)"
+    , "templateD" :
+"// unconcatBitVector
+~SIGD[~SYM[0]][2];
+assign ~SYM[0] = ~ARG[2];
+
+genvar ~SYM[1];
+generate
+  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcatBitVector_~SYM[2]
+    assign ~RESULT[~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
+  end
+endgenerate"
+    }
+  }
+]

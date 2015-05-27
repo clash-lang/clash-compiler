@@ -1,0 +1,11 @@
+[ { "Primitive" :
+    { "name"      : "GHC.Types.Eq#"
+    , "primType"  : "Constructor"
+    }
+  }
+, { "Primitive" :
+    { "name"      : "GHC.Types.MkCoercible"
+    , "primType"  : "Constructor"
+    }
+  }
+]

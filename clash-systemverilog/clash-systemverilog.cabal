@@ -1,0 +1,80 @@
+Name:                 clash-systemverilog
+Version:              0.5.4
+Synopsis:             CAES Language for Synchronous Hardware - SystemVerilog backend
+Description:
+  CλaSH (pronounced ‘clash’) is a functional hardware description language that
+  borrows both its syntax and semantics from the functional programming language
+  Haskell. The merits of using a functional language to describe hardware comes
+  from the fact that combinational circuits can be directly modelled as
+  mathematical functions and that functional languages lend themselves very well
+  at describing and (de-)composing mathematical functions.
+  .
+  This package provides:
+  .
+  * SystemVerilog Backend
+Homepage:             http://www.clash-lang.org/
+bug-reports:          http://github.com/clash-lang/clash-compiler/issues
+License:              BSD2
+License-file:         LICENSE
+Author:               Christiaan Baaij
+Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
+Copyright:            Copyright © 2015 University of Twente
+Category:             Hardware
+Build-type:           Simple
+
+Extra-source-files:   README.md,
+                      CHANGELOG.md
+
+Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
+                      primitives/CLaSH.Driver.TopWrapper.json
+                      primitives/CLaSH.GHC.GHC2Core.json
+                      primitives/CLaSH.Prelude.BlockRam.json
+                      primitives/CLaSH.Prelude.Testbench.json
+                      primitives/CLaSH.Promoted.Nat.json
+                      primitives/CLaSH.Promoted.Symbol.json
+                      primitives/CLaSH.Signal.Bundle.json
+                      primitives/CLaSH.Signal.Explicit.json
+                      primitives/CLaSH.Signal.Internal.json
+                      primitives/CLaSH.Sized.Internal.BitVector.json
+                      primitives/CLaSH.Sized.Internal.Index.json
+                      primitives/CLaSH.Sized.Internal.Signed.json
+                      primitives/CLaSH.Sized.Internal.Unsigned.json
+                      primitives/CLaSH.Sized.Vector.json
+                      primitives/Control.Exception.Base.json
+                      primitives/GHC.Base.json
+                      primitives/GHC.Classes.json
+                      primitives/GHC.CString.json
+                      primitives/GHC.Err.json
+                      primitives/GHC.Integer.Type.json
+                      primitives/GHC.Prim.json
+                      primitives/GHC.Real.json
+                      primitives/GHC.Typelits.json
+                      primitives/GHC.Types.json
+                      primitives/Unsafe.Coerce.json
+
+Cabal-version:        >=1.10
+
+source-repository head
+  type: git
+  location: https://github.com/clash-lang/clash-compiler.git
+
+Library
+  HS-Source-Dirs:     src
+
+  default-language:   Haskell2010
+  ghc-options:        -Wall
+  CPP-Options:        -DCABAL
+
+  Build-depends:      base                    >= 4.6.0.1 && < 5,
+                      clash-lib               >= 0.5.4,
+                      clash-prelude           >= 0.7.2,
+                      fgl                     >= 5.4.2.4,
+                      lens                    >= 3.9.2,
+                      mtl                     >= 2.1.2,
+                      text                    >= 0.11.3.1,
+                      unordered-containers    >= 0.2.3.3,
+                      wl-pprint-text          >= 1.1.0.0
+
+  Exposed-modules:    CLaSH.Backend.SystemVerilog
+
+  other-modules:      Paths_clash_systemverilog

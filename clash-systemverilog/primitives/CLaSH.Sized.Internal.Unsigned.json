@@ -1,0 +1,201 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.size#"
+    , "type"      : "size# :: KnownNat n => Unsigned n -> Int"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.pack#"
+    , "type"      : "pack# :: Unsigned n -> BitVector n"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.unpack#"
+    , "type"      : "unpack# :: BitVector n -> Unsigned n"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.eq#"
+    , "type"      : "eq# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.neq#"
+    , "type"      : "neq# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.lt#"
+    , "type"      : "lt# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.ge#"
+    , "type"      : "ge# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.gt#"
+    , "type"      : "gt# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.le#"
+    , "type"      : "le# :: Unsigned n -> Unsigned n -> Bool"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.minBound#"
+    , "type"      : "minBound# :: KnownNat n => Unsigned n"
+    , "templateE" : "~LIT[0]'d0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.maxBound#"
+    , "type"      : "maxBound# :: KnownNat n => Unsigned n"
+    , "templateE" : "{~LIT[0] {1'b1}}"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.+#"
+    , "type"      : "(+#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.-#"
+    , "type"      : "(-#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.*#"
+    , "type"      : "(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.negate#"
+    , "type"      : "negate# :: KnownNat n => Unsigned n -> Unsigned n"
+    , "templateE" : "- ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+    , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
+    , "templateE" : "$unsigned(~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.plus#"
+    , "type"      : "plus# :: KnownNat (1 + Max m n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
+    , "templateE" : "~ARG[1] + ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.minus#"
+    , "type"      : "minus# :: KnownNat (1 + Max m n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
+    , "templateE" : "~ARG[1] - ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.times#"
+    , "type"      : "times# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)"
+    , "templateE" : "~ARG[1] * ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.quot#"
+    , "type"      : "quot# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[1] / ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.rem#"
+    , "type"      : "rem# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.mod#"
+    , "type"      : "mod# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[1] % ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.toInteger#"
+    , "type"      : "toInteger# :: Unsigned n -> Integer"
+    , "templateE" : "$unsigned(~ARG[0])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.and#"
+    , "type"      : "and# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[0] & ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.or#"
+    , "type"      : "or# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[0] | ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.xor#"
+    , "type"      : "xor# :: Unsigned n -> Unsigned n -> Unsigned n"
+    , "templateE" : "~ARG[0] ^ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.complement#"
+    , "type"      : "complement# :: KnownNat n => Unsigned n -> Unsigned n"
+    , "templateE" : "~ ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.shiftL#"
+    , "type"      : "shiftL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
+    , "templateE" : "~ARG[1] << ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.shiftR#"
+    , "type"      : "shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
+    , "templateE" : "~ARG[1] >> ~ARG[2]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.rotateL#"
+    , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
+    , "templateD" :
+"// rotateL
+logic [2*~LIT[0]-1:0] ~SYM[0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
+assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.rotateR#"
+    , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
+    , "templateD" :
+"// rotateR
+logic [2*~LIT[0]-1:0] ~SYM[0];
+assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
+assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Unsigned.resize#"
+    , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
+    , "templateE" : "$unsigned(~ARG[1])"
+    }
+  }
+]
