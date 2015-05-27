@@ -257,6 +257,16 @@ inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
+inst_ (CondAssignment id_ _ scrut [(Just (Literal _ (BoolLit b)), l),(_,r)]) = fmap Just $
+    "always_comb begin" <$>
+    indent 2 ("if" <> parens (expr_ True scrut) <$>
+                (indent 2 $ text id_ <+> equals <+> expr_ False t <> semi) <$>
+             "else" <$>
+                (indent 2 $ text id_ <+> equals <+> expr_ False f <> semi)) <$>
+    "end"
+  where
+    (t,f) = if b then (l,r) else (r,l)
+
 inst_ (CondAssignment id_ _ scrut es) = fmap Just $
     "always_comb begin" <$>
     indent 2 ("case" <> parens (expr_ True scrut) <$>

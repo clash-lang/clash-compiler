@@ -131,6 +131,20 @@ inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
+inst_ (CondAssignment id_ ty scrut [(Just (Literal _ (BoolLit b)), l),(_,r)]) = fmap Just $
+    "reg" <+> verilogType ty <+> regId <> semi <$>
+    "always @(*) begin" <$>
+    indent 2 ("if" <> parens (expr_ True scrut) <$>
+                (indent 2 $ regId <+> equals <+> expr_ False t <> semi) <$>
+             "else" <$>
+                (indent 2 $ regId <+> equals <+> expr_ False f <> semi)) <$>
+    "end" <$>
+    "assign" <+> text id_ <+> equals <+> regId <> semi
+  where
+    (t,f) = if b then (l,r) else (r,l)
+    regId = text id_ <> "_reg"
+
+
 inst_ (CondAssignment id_ ty scrut es) = fmap Just $
     "reg" <+> verilogType ty <+> regId <> semi <$>
     "always @(*) begin" <$>
