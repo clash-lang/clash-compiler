@@ -6,8 +6,13 @@ import CLaSH.GHC.GenerateBindings
 import CLaSH.GHC.NetlistTypes
 import CLaSH.Primitives.Util
 import CLaSH.Backend
+import CLaSH.Backend.SystemVerilog
 import CLaSH.Backend.VHDL
 import CLaSH.Backend.Verilog
+
+genSystemVerilog :: String
+                 -> IO ()
+genSystemVerilog = doHDL (initBackend :: SystemVerilogState)
 
 genVHDL :: String
         -> IO ()

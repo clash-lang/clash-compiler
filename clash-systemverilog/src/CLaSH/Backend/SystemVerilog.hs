@@ -78,8 +78,8 @@ genVerilog c = (unpack cName,) A.<$> verilog
 
 -- | Generate a SystemVerilog package containing type definitions for the given HWTypes
 mkTyPackage_ :: [HWType]
-             -> SystemVerilogM Doc
-mkTyPackage_ hwtys =
+             -> SystemVerilogM [(String,Doc)]
+mkTyPackage_ hwtys = (:[]) A.<$> ("types",) A.<$>
     "package types ;" <$>
       indent 2 packageDec <$>
       indent 2 funDecs <$>
@@ -257,7 +257,7 @@ inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ scrut es) = fmap Just $
+inst_ (CondAssignment id_ _ scrut es) = fmap Just $
     "always_comb begin" <$>
     indent 2 ("case" <> parens (expr_ True scrut) <$>
                 (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
@@ -382,6 +382,9 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Signed _
                                         | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
                                         | otherwise -> int sz <> "'sd" <> integer i
+                                       Integer
+                                        | i < 0     -> "-" <> int 32 <> "'sd" <> integer (abs i)
+                                        | otherwise -> int 32 <> "'sd" <> integer i
                                        _            -> int sz <> "'b" <> blit
 
   where
