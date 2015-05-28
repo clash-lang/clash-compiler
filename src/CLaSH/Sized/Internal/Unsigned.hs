@@ -75,6 +75,9 @@ import Data.Default                   (Default (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
+import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
+                                       arbitrarySizedBoundedIntegral,
+                                       coarbitraryIntegral, shrinkIntegral)
 
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
@@ -408,3 +411,10 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
     where
       r       = times# a b
       (rL,rR) = split r
+
+instance KnownNat n => Arbitrary (Unsigned n) where
+  arbitrary = arbitrarySizedBoundedIntegral
+  shrink    = shrinkIntegral
+
+instance KnownNat n => CoArbitrary (Unsigned n) where
+  coarbitrary = coarbitraryIntegral

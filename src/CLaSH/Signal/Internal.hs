@@ -74,6 +74,7 @@ import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Default               (Default (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
+import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..))
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
@@ -550,6 +551,14 @@ instance Fractional a => Fractional (Signal' clk a) where
   (/)          = liftA2 (/)
   recip        = fmap recip
   fromRational = signal# . fromRational
+
+instance Arbitrary a => Arbitrary (Signal' clk a) where
+  arbitrary = liftA2 (:-) arbitrary arbitrary
+
+instance CoArbitrary a => CoArbitrary (Signal' clk a) where
+  coarbitrary xs gen = do
+    n <- arbitrary
+    coarbitrary (take (abs n) (sample xs)) gen
 
 -- * List \<-\> Signal conversion (not synthesisable)
 

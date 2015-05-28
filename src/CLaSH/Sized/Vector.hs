@@ -69,6 +69,7 @@ import Prelude                    hiding ((++), (!!), concat, drop, foldl,
                                           splitAt, tail, take, unzip, unzip3,
                                           zip, zip3, zipWith, zipWith3)
 import qualified Prelude          as P
+import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat         (SNat (..), UNat (..), withSNat, toUNat)
@@ -1244,3 +1245,10 @@ ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
 instance Lift a => Lift (Vec n a) where
   lift Nil     = [| Nil |]
   lift (x:>xs) = [| x :> $(lift xs) |]
+
+instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
+  arbitrary = sequence $ repeat arbitrary
+  shrink    = sequence . fmap shrink
+
+instance CoArbitrary a => CoArbitrary (Vec n a) where
+  coarbitrary = coarbitrary . toList

@@ -81,6 +81,9 @@ import Data.Default                   (Default (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
+import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
+                                       arbitrarySizedBoundedIntegral,
+                                       coarbitraryIntegral, shrinkIntegral)
 
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
@@ -470,3 +473,10 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
 
 minBoundSym# :: KnownNat n => Signed n
 minBoundSym# = minBound# +# fromInteger# 1
+
+instance KnownNat n => Arbitrary (Signed n) where
+  arbitrary = arbitrarySizedBoundedIntegral
+  shrink    = shrinkIntegral
+
+instance KnownNat n => CoArbitrary (Signed n) where
+  coarbitrary = coarbitraryIntegral

@@ -123,6 +123,7 @@ Library
                       integer-gmp               >= 0.5.1.0,
                       ghc-prim                  >= 0.3.1.0,
                       ghc-typelits-natnormalise >= 0.2.1,
+                      QuickCheck                >= 2.7 && <2.9,
                       singletons                >= 1.0,
                       template-haskell          >= 2.9.0.0,
                       th-lift                   >= 0.5.6

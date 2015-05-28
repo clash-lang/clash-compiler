@@ -47,6 +47,9 @@ import Data.Default               (Default (..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, natVal)
+import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
+                                   arbitrarySizedBoundedIntegral,
+                                   coarbitraryIntegral, shrinkIntegral)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -198,3 +201,10 @@ instance Show (Index n) where
 
 instance KnownNat n => Default (Index n) where
   def = fromInteger# 0
+
+instance KnownNat n => Arbitrary (Index n) where
+  arbitrary = arbitrarySizedBoundedIntegral
+  shrink    = shrinkIntegral
+
+instance KnownNat n => CoArbitrary (Index n) where
+  coarbitrary = coarbitraryIntegral

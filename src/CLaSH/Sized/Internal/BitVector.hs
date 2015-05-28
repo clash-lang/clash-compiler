@@ -99,6 +99,9 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric                    (readInt)
+import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
+                                   arbitrarySizedBoundedIntegral,
+                                   coarbitraryIntegral, shrinkIntegral)
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
@@ -555,3 +558,10 @@ instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
     where
       r       = times# a b
       (rL,rR) = split# r
+
+instance KnownNat n => Arbitrary (BitVector n) where
+  arbitrary = arbitrarySizedBoundedIntegral
+  shrink    = shrinkIntegral
+
+instance KnownNat n => CoArbitrary (BitVector n) where
+  coarbitrary = coarbitraryIntegral
