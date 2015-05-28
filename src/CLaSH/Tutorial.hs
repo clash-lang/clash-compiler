@@ -3,7 +3,7 @@
 
 {-|
 Copyright : © Christiaan Baaij, 2014-2015
-Licence   : Creative Commons 4.0 (CC BY-NC 4.0) (http://creativecommons.org/licenses/by-nc/4.0/)
+Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
 -}
 module CLaSH.Tutorial (
   -- * Introduction
