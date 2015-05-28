@@ -23,11 +23,11 @@ import CLaSH.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 -- | Are all bits set to '1'?
 --
 -- >>> pack (-2 :: Signed 6)
--- 111110
+-- 11_1110
 -- >>> reduceAnd (-2 :: Signed 6)
 -- 0
 -- >>> pack (-1 :: Signed 6)
--- 111111
+-- 11_1111
 -- >>> reduceAnd (-1 :: Signed 6)
 -- 1
 reduceAnd :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
@@ -37,11 +37,11 @@ reduceAnd v = reduceAnd# (pack v)
 -- | Is there at least one bit set to '1'?
 --
 -- >>> pack (5 :: Signed 6)
--- 000101
+-- 00_0101
 -- >>> reduceOr (5 :: Signed 6)
 -- 1
 -- >>> pack (0 :: Signed 6)
--- 000000
+-- 00_0000
 -- >>> reduceOr (0 :: Signed 6)
 -- 0
 reduceOr :: BitPack a => a -> Bit
@@ -51,15 +51,15 @@ reduceOr v = reduceOr# (pack v)
 -- | Is the number of bits set to '1' uneven?
 --
 -- >>> pack (5 :: Signed 6)
--- 000101
+-- 00_0101
 -- >>> reduceXor (5 :: Signed 6)
 -- 0
 -- >>> pack (28 :: Signed 6)
--- 011100
+-- 01_1100
 -- >>> reduceXor (28 :: Signed 6)
 -- 1
 -- >>> pack (-5 :: Signed 6)
--- 111011
+-- 11_1011
 -- >>> reduceXor (-5 :: Signed 6)
 -- 1
 reduceXor :: BitPack a => a -> Bit

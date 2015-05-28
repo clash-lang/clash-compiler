@@ -126,13 +126,17 @@ type Bit = BitVector 1
 
 -- * Instances
 instance KnownNat n => Show (BitVector n) where
-  show bv@(BV i) = showBV (natVal bv) i []
+  show bv@(BV i) = reverse . underScore . reverse $ showBV (natVal bv) i []
     where
       showBV 0 _ s = s
       showBV n v s = let (a,b) = divMod v 2
                      in  case b of
                            1 -> showBV (n - 1) a ('1':s)
                            _ -> showBV (n - 1) a ('0':s)
+
+      underScore xs = case splitAt 5 xs of
+                        ([a,b,c,d,e],rest) -> [a,b,c,d,'_'] ++ underScore (e:rest)
+                        (rest,_)               -> rest
 
 -- | Create a binary literal
 --
@@ -156,7 +160,7 @@ bLit :: KnownNat n => String -> Q (TExp (BitVector n))
 bLit s = [|| fromInteger# i' ||]
   where
     i :: Maybe Integer
-    i = fmap fst . listToMaybe $ (readInt 2 (`elem` "01") digitToInt) s
+    i = fmap fst . listToMaybe . (readInt 2 (`elem` "01") digitToInt) $ filter (/= '_') s
 
     i' :: Integer
     i' = case i of

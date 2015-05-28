@@ -30,7 +30,7 @@ import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 -- __NB:__ Bit indices are __DESCENDING__.
 --
 -- >>> pack (7 :: Unsigned 6)
--- 000111
+-- 00_0111
 -- >>> (7 :: Unsigned 6) ! 1
 -- 1
 -- >>> (7 :: Unsigned 6) ! 5
@@ -46,7 +46,7 @@ import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 -- __NB:__ Bit indices are __DESCENDING__.
 --
 -- >>> pack (7 :: Unsigned 6)
--- 000111
+-- 00_0111
 -- >>> slice (7 :: Unsigned 6) d4 d2
 -- 001
 -- >>> slice (7 :: Unsigned 6) d6 d4
@@ -67,7 +67,7 @@ slice v m n = slice# (pack v) m n
 -- and size @n@.
 --
 -- >>> pack (7 :: Unsigned 6)
--- 000111
+-- 00_0111
 -- >>> split (7 :: Unsigned 6) :: (BitVector 2, BitVector 4)
 -- (00,0111)
 split :: (BitPack a, BitSize a ~ (m + n), KnownNat n) => a
@@ -80,15 +80,15 @@ split v = split# (pack v)
 -- __NB:__ Bit indices are __DESCENDING__.
 --
 -- >>> pack (-5 :: Signed 6)
--- 111011
+-- 11_1011
 -- >>> replaceBit (-5 :: Signed 6) 4 0
 -- -21
 -- >>> pack (-21 :: Signed 6)
--- 101011
+-- 10_1011
 -- >>> replaceBit (-5 :: Signed 6) 5 0
 -- 27
 -- >>> pack (27 :: Signed 6)
--- 011011
+-- 01_1011
 -- >>> replaceBit (-5 :: Signed 6) 6 0
 -- *** Exception: replaceBit: 6 is out of range [5..0]
 replaceBit :: (BitPack a, KnownNat (BitSize a), Integral i) => a -> i -> Bit
@@ -101,11 +101,11 @@ replaceBit v i b = unpack (replaceBit# (pack v) (fromIntegral i) b)
 -- __NB:__ Bit indices are __DESCENDING__.
 --
 -- >>> pack (-5 :: Signed 6)
--- 111011
+-- 11_1011
 -- >>> setSlice (-5 :: Signed 6) d4 d3 0
 -- -29
 -- >>> pack (-29 :: Signed 6)
--- 100011
+-- 10_0011
 -- >>> setSlice (-5 :: Signed 6) d6 d5 0
 -- <BLANKLINE>
 -- <interactive>:...
@@ -123,11 +123,11 @@ setSlice v m n w = unpack (setSlice# (pack v) m n w)
 -- | Get the most significant bit.
 --
 -- >>> pack (-4 :: Signed 6)
--- 111100
+-- 11_1100
 -- >>> msb (-4 :: Signed 6)
 -- 1
 -- >>> pack (4 :: Signed 6)
--- 000100
+-- 00_0100
 -- >>> msb (4 :: Signed 6)
 -- 0
 msb :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
@@ -137,11 +137,11 @@ msb v = msb# (pack v)
 -- | Get the least significant bit.
 --
 -- >>> pack (-9 :: Signed 6)
--- 110111
+-- 11_0111
 -- >>> lsb (-9 :: Signed 6)
 -- 1
 -- >>> pack (-8 :: Signed 6)
--- 111000
+-- 11_1000
 -- >>> lsb (-8 :: Signed 6)
 -- 0
 lsb :: BitPack a => a -> Bit

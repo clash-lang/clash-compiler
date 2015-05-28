@@ -36,28 +36,28 @@ class BitPack a where
   -- | Convert element of type @a@ to a 'BitVector'
   --
   -- >>> pack (-5 :: Signed 6)
-  -- 111011
+  -- 11_1011
   pack   :: a -> BitVector (BitSize a)
   -- | Convert a 'BitVector' to an element of type @a@
   --
   -- >>> pack (-5 :: Signed 6)
-  -- 111011
+  -- 11_1011
   -- >>> let x = pack (-5 :: Signed 6)
   -- >>> unpack x :: Unsigned 6
   -- 59
   -- >>> pack (59 :: Unsigned 6)
-  -- 111011
+  -- 11_1011
   unpack :: BitVector (BitSize a) -> a
 
 {-# INLINE bitCoerce #-}
 -- | Coerce a value from one type to another through its bit representation.
 --
 -- >>> pack (-5 :: Signed 6)
--- 111011
+-- 11_1011
 -- >>> bitCoerce (-5 :: Signed 6) :: Unsigned 6
 -- 59
 -- >>> pack (59 :: Unsigned 6)
--- 111011
+-- 11_1011
 bitCoerce :: (BitPack a, BitPack b, BitSize a ~ BitSize b)
           => a
           -> b
