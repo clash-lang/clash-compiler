@@ -110,8 +110,9 @@ import GHC.IO.Handle ( hFlushAll )
 import GHC.TopHandler ( topHandler )
 
 import qualified CLaSH.Backend
-import           CLaSH.Backend.VHDL (VHDLState)
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
+import           CLaSH.Backend.VHDL (VHDLState)
+import           CLaSH.Backend.Verilog (VerilogState)
 import qualified CLaSH.Driver
 import           CLaSH.Driver.Types (CLaSHOpts)
 import           CLaSH.GHC.Evaluator
@@ -205,6 +206,7 @@ ghciCommands opts = [
   ("undef",     keepGoing undefineMacro,        completeMacro),
   ("unset",     keepGoing unsetOptions,         completeSetOptions),
   ("vhdl",      keepGoingPaths (makeVHDL opts),        completeHomeModuleOrFile),
+  ("verilog",   keepGoingPaths (makeVerilog opts),     completeHomeModuleOrFile),
   ("systemverilog",   keepGoingPaths (makeSystemVerilog opts),     completeHomeModuleOrFile)
   ]
 
@@ -281,6 +283,8 @@ defFullHelpText =
   "   :!<command>                 run the shell command <command>\n" ++
   "   :vhdl                       synthesize currently loaded module to vhdl\n" ++
   "   :vhdl [<module>]            synthesize specified modules/files to vhdl\n" ++
+  "   :verilog                    synthesize currently loaded module to verilog\n" ++
+  "   :verilog [<module>]         synthesize specified modules/files to verilog\n" ++
   "   :systemverilog              synthesize currently loaded module to systemverilog\n" ++
   "   :systemverilog [<module>]   synthesize specified modules/files to systemverilog\n" ++
   "\n" ++
@@ -1586,6 +1590,9 @@ makeHDL backend optsRef srcs = do
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
+
+makeVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: VerilogState)
 
 makeSystemVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: SystemVerilogState)

@@ -1,0 +1,25 @@
+[ { "BlackBox" :
+    { "name"      : "Control.Exception.Base.patError"
+    , "type"      : "patError :: Addr# -> a"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.irrefutPatError"
+    , "type"      : "irrefutPatError :: Addr# -> a"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.recSelError"
+    , "type"      : "recSelError :: Addr# -> a"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "Control.Exception.Base.absentError"
+    , "type"      : "absentError :: Addr# -> a"
+    , "templateE" : "~ERRORO"
+    }
+  }
+]

@@ -1,0 +1,89 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Prim.+#"
+    , "type"      : "(+#) :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] + ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.-#"
+    , "type"      : "(-#) :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] - ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.*#"
+    , "type"      : "(*#) :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.quotInt#"
+    , "type"      : "quotInt# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.remInt#"
+    , "type"      : "remInt# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.negateInt#"
+    , "type"      : "negateInt# :: Int# -> Int#"
+    , "templateE" : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>#"
+     , "type"      : "(>#) :: Int# -> Int# -> Bool"
+    , "templateE" : "(~ARG[0] > ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.>=#"
+    , "type"      : "(>=#) :: Int# -> Int# -> Bool"
+    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.==#"
+    , "type"      : "(==) :: Int# -> Int# -> Bool"
+    , "templateE" : "(~ARG[0] == ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim./=#"
+    , "type"      : "(/=#) :: Int# -> Int# -> Bool"
+    , "templateE" : "(~ARG[0] != ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<#"
+    , "type"      : "(<#) :: Int# -> Int# -> Bool"
+    , "templateE" : "(~ARG[0] < ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.<=#"
+    , "type"      : "(<=#) :: Int# -> Int# -> Bool"
+    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "GHC.Prim.dataToTag#"
+    , "primType" : "Function"
+    }
+  }
+, { "Primitive" :
+    { "name"     : "GHC.Prim.tagToEnum#"
+    , "primType" : "Function"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.unsafeCoerce#"
+    , "type"      : "unsafeCoerce# :: a -> b"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]

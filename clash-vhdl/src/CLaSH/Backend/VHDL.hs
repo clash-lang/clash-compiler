@@ -73,15 +73,15 @@ genVHDL :: Component -> VHDLM (String,Doc)
 genVHDL c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdl    = "-- Automatically generated VHDL" <$$>
+    vhdl    = "-- Automatically generated VHDL-2002" <$$>
               tyImports <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage_ :: [HWType]
-             -> VHDLM Doc
-mkTyPackage_ hwtys =
+             -> VHDLM [(String,Doc)]
+mkTyPackage_ hwtys = (:[]) A.<$> ("types",) A.<$>
    "library IEEE;" <$>
    "use IEEE.STD_LOGIC_1164.ALL;" <$>
    "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>
@@ -442,7 +442,7 @@ inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ scrut es) = fmap Just $
+inst_ (CondAssignment id_ _ scrut es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <$>
       indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds es)) <> semi))
   where
@@ -563,6 +563,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Unsigned _  -> "unsigned'" <> parens blit
                                        Signed   _  -> "signed'" <> parens blit
                                        BitVector _ -> "std_logic_vector'" <> parens blit
+                                       Integer     -> integer i
                                        _           -> blit
 
   where

@@ -70,6 +70,8 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> (Err . Just)      <$> (pToken "~ERROR" *> pBrackets pNatural)
      <|> TypElem           <$> (pToken "~TYPEL" *> pBrackets pTagE)
      <|> CompName          <$  pToken "~COMPNAME"
+     <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
+     <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pTagE) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pTagE)
 

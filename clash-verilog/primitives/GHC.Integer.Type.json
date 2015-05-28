@@ -1,0 +1,177 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.smallInteger"
+    , "type"      : "smallInteger :: Int# -> Integer"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToInt"
+    , "type"      : "integerToInt :: Integer -> Int#"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.plusInteger"
+    , "type"      : "plusInteger :: Integer -> Integer -> Integer"
+    , "templateE" : "~ARG[0] + ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.minusInteger"
+    , "type"      : "minusInteger :: Integer -> Integer -> Integer"
+    , "templateE" : "~ARG[0] - ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.timesInteger"
+    , "type"      : "timesInteger :: Integer -> Integer -> Integer"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.negateInteger"
+    , "type"      : "negateInteger :: Integer -> Integer"
+    , "templateE" : "-~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.absInteger"
+    , "type"      : "absInteger :: Integer -> Integer"
+    , "templateE" : "~ARG[0] < 32'sd0 ? -~ARG[0] : ~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.divInteger"
+    , "type"      : "divInteger :: Integer -> Integer -> Integer"
+    , "templateD" :
+"// divInteger
+wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[1]][0];
+wire ~SIGD[~SYM[2]][1];
+
+// divide (rounds towards zero)
+assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+
+// round toward minus infinity
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.modInteger"
+    , "type"      : "modInteger :: Integer -> Integer -> Integer"
+    , "templateD" :
+"// modInteger
+wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~SYM[1]][0];
+wire ~SIGD[~SYM[2]][1];
+
+// remainder
+assign ~SYM[0] = ~ARG[0] % ~ARG[1];
+
+// modulo
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ?
+                 ~SYM[0] :
+                 (~ARG[1] == 32'sd0 ? 32'sd0 : ~SYM[0] + ~ARG[1]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.quotInteger"
+    , "type"      : "quotInteger :: Integer -> Integer -> Integer"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.remInteger"
+    , "type"      : "remInteger :: Integer -> Integer -> Integer"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger"
+    , "type"      : "eqInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "~ARG[0] == ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger"
+    , "type"      : "neqInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "~ARG[0] != ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger"
+    , "type"      : "leInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "~ARG[0] <= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger"
+    , "type"      : "gtInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "~ARG[0] > ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger"
+    , "type"      : "ltInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "~ARG[0] < ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger"
+    , "type"      : "geInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "~ARG[0] >= ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.eqInteger#"
+    , "type"      : "eqInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "(~ARG[0] == ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.neqInteger#"
+    , "type"      : "neqInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "(~ARG[0] != ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.leInteger#"
+    , "type"      : "leInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "(~ARG[0] <= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.gtInteger#"
+    , "type"      : "gtInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "(~ARG[0] > ~ARG[1] ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.ltInteger#"
+    , "type"      : "ltInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "(~ARG[0] < ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.geInteger#"
+    , "type"      : "geInteger :: Integer -> Integer -> Bool"
+    , "templateE" : "(~ARG[0] >= ~ARG[1]) ? 32'sd1 : 32'sd0"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.shiftRInteger"
+    , "type"      : "shiftRInteger :: Integer -> Int# -> Integer"
+    , "templateE" : "~ARG[0] >>> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.shiftLInteger"
+    , "type"      : "shiftLInteger :: Integer -> Int# -> Integer"
+    , "templateE" : "~ARG[0] <<< ~ARG[1]"
+    }
+  }
+]

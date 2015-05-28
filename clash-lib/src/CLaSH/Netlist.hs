@@ -193,11 +193,12 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+  altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
   (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr True scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId scrutExpr (reverse exprs)]
+  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr (reverse exprs)]
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
@@ -274,7 +275,7 @@ mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ _ (Core.Literal lit) = return (HW.Literal Nothing . NumLit $ fromInteger  $! i,[])
+mkExpr _ _ (Core.Literal lit) = return (HW.Literal (Just (Integer,32)) . NumLit $ fromInteger  $! i,[])
   where
     i = case lit of
           (IntegerLiteral i') -> i'

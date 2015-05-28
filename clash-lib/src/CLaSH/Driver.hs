@@ -133,7 +133,7 @@ createHDL backend components = flip evalState backend $ do
   let hdlNmDocs = zip hdlNms hdlDocs
   hwtys <- HashSet.toList <$> extractTypes <$> get
   typesPkg <- mkTyPackage hwtys
-  return (("types",typesPkg):hdlNmDocs)
+  return (typesPkg ++ hdlNmDocs)
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.

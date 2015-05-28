@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.7
+* New features:
+  * New Verilog backend, run `:verilog` in interactive mode, or `--verilog` for batch mode
+
 ## 0.5.6 *May 18th 2015*
 * New features:
   * Inlining limit is configurable, run with `-clash-inline-limit=N` to set the inlining limit to `N`

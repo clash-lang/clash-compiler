@@ -1,5 +1,8 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.5.5
+* Compile against `clash-lib-0.5.6`
+
 ## 0.5.4 *May 10th 2015*
 * New features:
   * Make VHDL 'assert' primitive GHDL friendly

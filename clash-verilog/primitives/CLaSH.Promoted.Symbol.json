@@ -1,0 +1,13 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Symbol.SSymbol"
+    , "type"      : "SSymbol :: KnownNat n => Proxy n -> SSymbol n"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Symbol.symbolToString"
+    , "type"      : "symbolToString :: SSymbol n -> String"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+]

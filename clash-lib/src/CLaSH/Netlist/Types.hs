@@ -100,10 +100,12 @@ data Declaration
   -- * Signal to assign
   --
   -- * Assigned expression
-  | CondAssignment Identifier Expr [(Maybe Expr,Expr)]
+  | CondAssignment Identifier HWType Expr [(Maybe Expr,Expr)]
   -- ^ Conditional signal assignment:
   --
   -- * Signal to assign
+  --
+  -- * Type of the result/alternatives
   --
   -- * Scrutinized expression
   --
