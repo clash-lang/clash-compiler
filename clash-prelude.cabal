@@ -97,6 +97,7 @@ Library
                       CLaSH.Sized.Internal.Unsigned
 
                       CLaSH.Tutorial
+                      CLaSH.Examples
 
   other-extensions:   BangPatterns
                       DataKinds
