@@ -113,17 +113,18 @@ end
     { "name"      : "CLaSH.Sized.Vector.merge"
     , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
     , "templateD" :
-"// merge
+"// merge begin
 wire ~SIGD[~SYM[0]][0];
 wire ~SIGD[~SYM[1]][1];
 assign ~SYM[0] = ~ARG[0];
 assign ~SYM[1] = ~ARG[1];
 
 genvar ~SYM[2];
-for (~SYM[2] = 0; ~SYM[2] < $size(~SYM[0]); ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
-  assign ~RESULT[2*~SYM[2]]   = ~SYM[0][~SYM[2]];
-  assign ~RESULT[2*~SYM[2]+1] = ~SYM[1][~SYM[2]];
-end"
+for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYP[0]]; ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
+  assign ~RESULT[(2*~SYM[2]+1)*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
+  assign ~RESULT[(2*~SYM[2])*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]]   = ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
+end
+// merge end"
     }
   }
 , { "BlackBox" :
