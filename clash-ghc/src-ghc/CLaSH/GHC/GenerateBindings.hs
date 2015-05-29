@@ -46,11 +46,6 @@ generateBindings primMap modName dflagsM = do
       clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
       droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings
-      -- topEntities                   = HashMap.filterWithKey (\var _ -> isSuffixOf "topEntity" $ name2String var) allBindings
-      -- retypedBindings               = case HashMap.toList topEntities of
-      --                                   [topEntity] -> let droppedBindings = lambdaDropPrep allBindings (fst topEntity)
-      --                                                  in  snd $ retype allTcCache ([],droppedBindings) (fst topEntity)
-      --                                   _           -> allBindings
   return (droppedAndRetypedBindings,allTcCache,topEntM)
 
 dropAndRetypeBindings :: HashMap TyConName TyCon -> BindingMap -> BindingMap
@@ -79,7 +74,7 @@ dropAndRetypeBindings allTcCache allBindings = oBindings
                   _             -> allBindings
 
     iBindings = case testInputs of
-                  (testInput:_) -> traceIf True (show testInput) $ dropAndRetype tBindings testInput
+                  (testInput:_) -> dropAndRetype tBindings testInput
                   _             -> tBindings
 
     oBindings = case expectedOutputs of
