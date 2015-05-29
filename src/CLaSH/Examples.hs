@@ -8,6 +8,9 @@ Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/license
 module CLaSH.Examples (
   -- * Decoders and Encoders
   -- $decoders_and_encoders
+
+  -- * Counters
+  -- $counters
   )
 where
 
@@ -71,6 +74,34 @@ import Test.QuickCheck
 --         0x8000 -> 0xF
 --     encoderCase _ _ = 0
 -- :}
+--
+-- >>> :{
+-- let upCounter :: Signal Bool -> Signal (Unsigned 8)
+--     upCounter enable = s
+--       where
+--         s = regEn 0 enable (s + 1)
+-- :}
+--
+-- >>> :{
+-- let upCounterLdT s (ld,en,dIn) = (s',s)
+--       where
+--         s' | ld        = dIn
+--            | en        = s + 1
+--            | otherwise = s
+-- :}
+--
+-- >>> :{
+-- let upCounterLd :: Signal (Bool,Bool,Unsigned 8) -> Signal (Unsigned 8)
+--     upCounterLd = mealy upCounterLdT 0
+-- :}
+--
+-- >>> :{
+-- let upDownCounter :: Signal Bool -> Signal (Unsigned 8)
+--     upDownCounter upDown = s
+--       where
+--         s = register 0 (mux upDown (s + 1) (s - 1))
+-- :}
+--
 
 {- $decoders_and_encoders
 = Decoder
@@ -151,4 +182,44 @@ encoderCase _ _ = 0
 The following property holds:
 
 prop> en ==> (encoderCase en (decoderCase en decIn) === decIn)
+-}
+
+{- $counters
+= 8-bit Simple Up Counter
+
+Using `regEn`:
+
+@
+upCounter :: Signal Bool -> Signal (Unsigned 8)
+upCounter enable = s
+  where
+    s = `regEn` 0 enable (s + 1)
+@
+
+= 8-bit Up Counter With Load
+
+Using `mealy`:
+
+@
+upCounterLd :: Signal (Bool,Bool,Unsigned 8) -> Unsigned 8
+upCounterLd = `mealy` upCounterLdT 0
+
+upCounterLdT s (ld,en,dIn) = (s',s)
+  where
+    s' | ld        = dIn
+       | en        = s + 1
+       | otherwise = s
+@
+
+= 8-bit Up-Down counter
+
+Using `register` and `mux`:
+
+@
+upDownCounter :: Signal Bool -> Signal (Unsigned 8)
+upDownCounter upDown = s
+  where
+    s = `register` 0 (`mux` upDown (s + 1) (s - 1))
+@
+
 -}
