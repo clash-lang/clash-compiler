@@ -73,6 +73,7 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
                                    numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
+import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import CLaSH.Class.BitPack        (BitPack (..))
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
@@ -110,6 +111,8 @@ deriving instance Ord (rep (int + frac))     => Ord (Fixed rep int frac)
 deriving instance Enum (rep (int + frac))    => Enum (Fixed rep int frac)
 deriving instance Bounded (rep (int + frac)) => Bounded (Fixed rep int frac)
 deriving instance Default (rep (int + frac)) => Default (Fixed rep int frac)
+deriving instance Arbitrary (rep (int + frac)) => Arbitrary (Fixed rep int frac)
+deriving instance CoArbitrary (rep (int + frac)) => CoArbitrary (Fixed rep int frac)
 
 -- | Instance functions do not saturate.
 -- Meaning that \"@`'shiftL'` 1 == 'satMult' 'SatWrap' 2'@\""

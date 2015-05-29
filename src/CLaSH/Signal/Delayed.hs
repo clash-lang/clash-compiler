@@ -41,6 +41,7 @@ import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (-))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
+import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum)
 import CLaSH.Promoted.Nat         (SNat)
@@ -74,7 +75,7 @@ newtype DSignal (delay :: Nat) a =
             }
   deriving (Show,Default,Lift,Functor,Applicative,Num,Bounded,Fractional,
             Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits,Foldable,
-            Traversable)
+            Traversable,Arbitrary,CoArbitrary)
 
 instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
   type AResult (DSignal n a) (DSignal n b) = DSignal n (AResult a b)
