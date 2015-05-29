@@ -13,7 +13,7 @@ import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (catMaybes,mapMaybe)
-import           Data.Text.Lazy                   (isPrefixOf,pack,splitOn)
+import           Data.Text.Lazy                   (append,isPrefixOf,pack,splitOn)
 import           Unbound.Generics.LocallyNameless (name2String)
 
 import           CLaSH.Core.Term
@@ -186,7 +186,7 @@ genStimuli :: Int
 genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
   (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
-  let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm)))
+  let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm))) `append` pack "_"
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
@@ -219,7 +219,7 @@ genVerifier :: Int
 genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp signalNm = do
   let stimNormal = normalizeSignal globals signalNm
   (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
-  let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm)))
+  let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm))) `append` "_"
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
