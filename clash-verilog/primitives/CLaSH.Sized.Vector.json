@@ -64,15 +64,21 @@ assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]];"
         -> Vec i a                       -- ARG[4]
         -> Vec n a"
     , "templateD" :
-"// select
+"// select begin
 wire ~SIGD[~SYM[0]][4];
 assign ~SYM[0] = ~ARG[4];
 
-genvar ~SYM[1];
-for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : select_~SYM[2]
-  assign ~RESULT[~SYM[1]] = ~SYM[0][~LIT[1] + (~LIT[2] * ~SYM[1])];
+wire ~TYPEL[~TYPO] ~SYM[1] [0:~LENGTH[~TYP[4]]-1];
+genvar ~SYM[2];
+for (~SYM[2]=0; ~SYM[2] < ~LENGTH[~TYP[4]]; ~SYM[2]=~SYM[2]+1) begin : array_~SYM[3]
+  assign ~SYM[1][(~LENGTH[~TYP[4]]-1)-~SYM[2]] = ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
 end
-"
+
+genvar ~SYM[4];
+for (~SYM[4]=0; ~SYM[4] < ~LIT[3]; ~SYM[4] = ~SYM[4] + 1) begin : select_~SYM[5]
+  assign ~RESULT[(~LIT[3]-1-~SYM[4])*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[1][~LIT[1] + (~LIT[2] * ~SYM[4])];
+end
+// select end"
     }
   }
 , { "BlackBox" :

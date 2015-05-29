@@ -218,9 +218,10 @@ renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b 
   where
     vecLen (Vector n _) = n
     vecLen _            = error $ $(curLoc) ++ "vecLen of a non-vector type"
+renderTag b e@(TypElem _)   = let ty = lineToType b [e]
+                              in  (displayT . renderOneLine) <$> hdlType ty
 
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
-renderTag _ (TypElem _)     = error $ $(curLoc) ++ "Unexpected type element selector"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
 renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
