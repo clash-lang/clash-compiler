@@ -97,17 +97,7 @@ verilogTypeMark = const empty
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 verilogTypeErrValue :: HWType -> VerilogM Doc
-verilogTypeErrValue Bool              = "1'bx"
-verilogTypeErrValue Integer           = "{32 {1'bx}}"
-verilogTypeErrValue (Unsigned n)      = braces (int n <+> braces "1'bx")
-verilogTypeErrValue (Signed n)        = braces (int n <+> braces "1'bx")
-verilogTypeErrValue (Vector n elTy)   = braces (int n <+> braces (verilogTypeErrValue elTy))
-verilogTypeErrValue t@(Sum _ _)       = braces (int (typeSize t) <+> braces "1'bx")
-verilogTypeErrValue (Product _ elTys) = listBraces (mapM verilogTypeErrValue elTys)
-verilogTypeErrValue (BitVector 1)     = "1'bx"
-verilogTypeErrValue (BitVector n)     = braces (int n <+> braces "1'bx")
-verilogTypeErrValue t@(SP _ _)        = braces (int (typeSize t) <+> braces "1'bx")
-verilogTypeErrValue e = error $ $(curLoc) ++ "no error value defined for: " ++ show e
+verilogTypeErrValue ty = braces (int (typeSize ty) <+> braces "1'bx")
 
 decls :: [Declaration] -> VerilogM Doc
 decls [] = empty
