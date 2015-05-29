@@ -316,8 +316,8 @@ bits = hcat . mapM bit_char
 bit_char :: Bit -> VerilogM Doc
 bit_char H = char '1'
 bit_char L = char '0'
-bit_char U = char 'U'
-bit_char Z = char 'Z'
+bit_char U = char 'x'
+bit_char Z = char 'z'
 
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
