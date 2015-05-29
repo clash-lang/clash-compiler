@@ -45,12 +45,46 @@ generateBindings primMap modName dflagsM = do
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
       clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
-      topEntities                   = HashMap.filterWithKey (\var _ -> isSuffixOf "topEntity" $ name2String var) allBindings
-      retypedBindings               = case HashMap.toList topEntities of
-                                        [topEntity] -> let droppedBindings = lambdaDropPrep allBindings (fst topEntity)
-                                                       in  snd $ retype allTcCache ([],droppedBindings) (fst topEntity)
-                                        _           -> allBindings
-  return (retypedBindings,allTcCache,topEntM)
+      droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings
+      -- topEntities                   = HashMap.filterWithKey (\var _ -> isSuffixOf "topEntity" $ name2String var) allBindings
+      -- retypedBindings               = case HashMap.toList topEntities of
+      --                                   [topEntity] -> let droppedBindings = lambdaDropPrep allBindings (fst topEntity)
+      --                                                  in  snd $ retype allTcCache ([],droppedBindings) (fst topEntity)
+      --                                   _           -> allBindings
+  return (droppedAndRetypedBindings,allTcCache,topEntM)
+
+dropAndRetypeBindings :: HashMap TyConName TyCon -> BindingMap -> BindingMap
+dropAndRetypeBindings allTcCache allBindings = oBindings
+  where
+    topEntities     = HashMap.toList
+                    $ HashMap.filterWithKey
+                        (\var _ -> isSuffixOf ".topEntity" $ name2String var)
+                        allBindings
+    testInputs      = HashMap.toList
+                    $ HashMap.filterWithKey
+                        (\var _ -> isSuffixOf ".testInput" $ name2String var)
+                        allBindings
+    expectedOutputs = HashMap.toList
+                    $ HashMap.filterWithKey
+                        (\var _ -> isSuffixOf ".expectedOutput" $ name2String var)
+                        allBindings
+
+    dropAndRetype d (t,_) = snd
+                          $ retype allTcCache
+                                   ([],lambdaDropPrep d t)
+                                   t
+
+    tBindings = case topEntities of
+                  (topEntity:_) -> dropAndRetype allBindings topEntity
+                  _             -> allBindings
+
+    iBindings = case testInputs of
+                  (testInput:_) -> traceIf True (show testInput) $ dropAndRetype tBindings testInput
+                  _             -> tBindings
+
+    oBindings = case expectedOutputs of
+                  (expectedOutput:_) -> dropAndRetype iBindings expectedOutput
+                  _                  -> iBindings
 
 -- | clean up cast-removal mess
 retype :: HashMap TyConName TyCon
