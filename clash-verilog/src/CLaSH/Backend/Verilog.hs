@@ -319,48 +319,6 @@ bit_char L = char '0'
 bit_char U = char 'U'
 bit_char Z = char 'Z'
 
--- toSLV :: HWType -> Expr -> VerilogM Doc
--- toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
---     selIds' <- sequence selIds
---     listBraces (zipWithM toSLV tys selIds')
---   where
---     tName    = verilogTypeMark t
---     selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
---     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
--- toSLV (Product _ tys) (DataCon _ _ es) = listBraces (zipWithM toSLV tys es)
-
--- toSLV (Vector n elTy) (Identifier id_ Nothing) = do
---     selIds' <- sequence (reverse selIds)
---     listBraces (mapM (toSLV elTy) selIds')
---   where
---     selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> brackets (int i) | i <- [0 .. (n-1)]]
---     selIds   = map (fmap (`Identifier` Nothing)) selNames
--- toSLV (Vector n elTy) (DataCon _ _ es) = listBraces (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
-
--- toSLV _ e = expr_ False e
-
--- fromSLV :: HWType -> Identifier -> Int -> Int -> VerilogM Doc
--- fromSLV _t@(Product _ tys) id_ start _ = "'" <> listBraces (zipWithM (\s e -> s <> colon <+> e) selNames args)
---   where
---     tName      = empty -- tyName t
---     selNames   = [tName <> "_sel" <> int i | i <- [0..]]
---     argLengths = map typeSize tys
---     starts     = start : snd (mapAccumL ((join (,) .) . (-)) start argLengths)
---     ends       = map (+1) (tail starts)
---     args       = zipWith3 (`fromSLV` id_) tys starts ends
-
--- fromSLV t@(Vector n elTy) id_ start _ = verilogTypeMark t <> "'" <> parens ("'" <> listBraces (fmap reverse args))
---   where
---     argLength = typeSize elTy
---     starts    = take (n + 1) $ iterate (subtract argLength) start
---     ends      = map (+1) (tail starts)
---     args      = zipWithM (fromSLV elTy id_) starts ends
-
--- fromSLV Integer    id_ start end = fromSLV (Signed 32) id_ start end
--- fromSLV (Signed _) id_ start end = "$signed" <> parens (text id_ <> brackets (int start <> colon <> int end))
-
--- fromSLV _ id_ start end = text id_ <> brackets (int start <> colon <> int end)
-
 dcToExpr :: HWType -> Int -> Expr
 dcToExpr ty i = Literal (Just (ty,conSize ty)) (NumLit (toInteger i))
 
