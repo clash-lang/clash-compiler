@@ -87,12 +87,13 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Split" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VACC" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VIndex" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecConst" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecOfSum" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VMapAccum" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VReplace" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VScan" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VSelect" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VZip" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecConst" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecOfSum" (Just ("topEntity",False))
             ]
         ]
     ]
