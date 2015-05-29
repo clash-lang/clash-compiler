@@ -255,8 +255,8 @@ wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
-for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
-  assign ~RESULT[$high(~SYM[0]) - ~SYM[1]] = ~SYM[0][~SYM[1]];
+for (~SYM[1] = 0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
+  assign ~RESULT[(~LENGTH[~TYPO] - 1 - ~SYM[1])*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
 end"
     }
   }
