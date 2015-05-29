@@ -281,7 +281,7 @@ end"
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                     => BitVector (n * m)        -- ARG[2]
                     -> Vec n (BitVector m)"
-    , "templateE" : "~ARG[1]"
+    , "templateE" : "~ARG[2]"
     }
   }
 ]
