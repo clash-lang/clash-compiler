@@ -375,7 +375,8 @@ inlineSmall _ e@(collectArgs -> (Var _ f,args)) = R $ do
           bodyMaybe <- HashMap.lookup f <$> Lens.use bindings
           case bodyMaybe of
             (Just (_,body))
-              | termSize body < 5 -> changed (mkApps body args)
+              | termSize body < 5 -> do liftR $ addNewInline f
+                                        changed (mkApps body args)
             _ -> return e
 
 inlineSmall _ e = return e
