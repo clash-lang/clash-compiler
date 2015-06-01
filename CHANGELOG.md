@@ -1,5 +1,12 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.8
+* New features:
+  * Before, given `x :: Vec 8 Bit` and `y :: BitVector 8`, it used to be `last x == msb y`.
+    This is quite confusing when printing converted values.
+    So as of version 0.8, we now have `head x == msb y`.
+    So converting for `Vec`tors of `Bit`s to `BitVector`s is no longer index-preserving.
+
 ## 0.7.5 **May 7th 2015**
 * New features:
   * Moore machine combinators

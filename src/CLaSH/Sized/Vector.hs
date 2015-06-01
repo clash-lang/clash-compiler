@@ -1219,7 +1219,7 @@ vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
-  pack   = concatBitVector# . map pack
+  pack   = concatBitVector# . reverse . map pack
   unpack = map unpack . unconcatBitVector#
 
 {-# NOINLINE concatBitVector# #-}
@@ -1240,7 +1240,7 @@ ucBV :: forall n m . KnownNat m
      => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
 ucBV UZero     _  = Nil
 ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
-                    in  x :> ucBV n bv'
+                    in  ucBV n bv' <: x
 
 instance Lift a => Lift (Vec n a) where
   lift Nil     = [| Nil |]
