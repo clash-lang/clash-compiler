@@ -30,6 +30,8 @@ module CLaSH.Signal
   , sample
   , sampleN
   , fromList
+    -- * QuickCheck combinators
+  , testFor
     -- * Type classes
     -- ** 'Eq'-like
   , (.==.), (./=.)
@@ -65,7 +67,7 @@ import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
                               shift1, rotate1, setBit1, clearBit1, shiftL1,
                               unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
                               rotateR1, (.||.), (.&&.), not1, mux, sample,
-                              sampleN, fromList, simulate, signal)
+                              sampleN, fromList, simulate, signal, testFor)
 import CLaSH.Signal.Explicit (SystemClock, systemClock, simulateB')
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 

@@ -33,6 +33,8 @@ module CLaSH.Signal.Internal
   , sample
   , sampleN
   , fromList
+    -- * QuickCheck combinators
+  , testFor
     -- * Type classes
     -- ** 'Eq'-like
   , (.==.), (./=.)
@@ -74,7 +76,8 @@ import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Default               (Default (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
-import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..))
+import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
+                                   property)
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
@@ -559,6 +562,16 @@ instance CoArbitrary a => CoArbitrary (Signal' clk a) where
   coarbitrary xs gen = do
     n <- arbitrary
     coarbitrary (take (abs n) (sample xs)) gen
+
+-- | The above type is a generalisation for:
+--
+-- @
+-- __testFor__ :: 'Int' -> 'CLaSH.Signal.Signal' Bool -> 'Property'
+-- @
+--
+-- @testFor n s@ tests the signal @s@ for @n@ cycles.
+testFor :: Foldable f => Int -> f Bool -> Property
+testFor n = property . and . take n . sample
 
 -- * List \<-\> Signal conversion (not synthesisable)
 
