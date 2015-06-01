@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, DataKinds #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 {-|
@@ -18,7 +18,8 @@ import CLaSH.Prelude
 import Test.QuickCheck
 
 -- $setup
--- >>> :set -XDataKinds
+-- >>> :set -XDataKinds -XFlexibleContexts -XBinaryLiterals -XTypeFamilies
+-- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> import CLaSH.Prelude
 -- >>> import Test.QuickCheck
 -- >>> :{
@@ -100,6 +101,33 @@ import Test.QuickCheck
 --     upDownCounter upDown = s
 --       where
 --         s = register 0 (mux upDown (s + 1) (s - 1))
+-- :}
+--
+-- >>> :{
+-- let lfsrF' :: BitVector 16 -> BitVector 16
+--     lfsrF' s = feedback ++# slice s d15 d1
+--       where
+--         feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
+-- :}
+--
+-- >>> :{
+-- let lfsrF :: BitVector 16 -> Signal Bit
+--     lfsrF seed = msb <$> r
+--       where r = register seed (lfsrF' <$> r)
+-- :}
+--
+-- >>> :{
+-- let lfsrGP taps regs = zipWith xorM taps (fb +>> regs)
+--       where
+--         fb = last regs
+--         xorM i x | i         =  x `xor` fb
+--                  | otherwise = x
+-- :}
+--
+-- >>> :{
+-- let lfsrG :: BitVector 16 -> Signal Bit
+--     lfsrG seed = last (unbundle r)
+--       where r = register (unpack seed) (lfsrGP (unpack 0b0011010000000000) <$> r)
 -- :}
 --
 
@@ -221,5 +249,48 @@ upDownCounter upDown = s
   where
     s = `register` 0 (`mux` upDown (s + 1) (s - 1))
 @
+
+The following property holds:
+
+prop> en ==> testFor 1000 (upCounter (signal en) .==. upDownCounter (signal en))
+
+= LFSR
+
+External/Fibonacci LFSR, for @n=16@ and using the primitive polynominal @1 + x^11 + x^13 + x^14 + x^16@
+
+@
+lfsrF' :: BitVector 16 -> BitVector 16
+lfsrF' s = feedback '++#' 'slice' s d15 d1
+  where
+    feedback = s'!'5 ``xor`` s'!'3 ``xor`` s'!'2 ``xor`` s'!'0
+
+lfsrF :: BitVector 16 -> Signal Bit
+lfsrF seed = 'msb' '<$>' r
+  where r = 'register' seed (lfsrF' '<$>' r)
+@
+
+We can also build a internal/Galois LFSR which has better timing characteristics.
+We first define a Galois LFSR parametrizable in its filter taps:
+
+@
+lfsrGP taps regs = 'zipWith' xorM taps (fb '+>>' regs)
+  where
+    fb  = 'last' regs
+    xorM i x | i         = x ``xor`` fb
+             | otherwise = x
+@
+
+Then we can instance a 16-bit LFSR as follows:
+
+@
+lfsrG :: BitVector 16 -> Signal Bit
+lfsrG seed = 'last' ('unbundle' r)
+  where r = 'register' ('unpack' seed) (lfsrGP ('unpack' 0b0011010000000000) '<$>' r)
+@
+
+The following property holds:
+
+prop> testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645)
+
 
 -}
