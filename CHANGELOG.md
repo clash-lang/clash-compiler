@@ -6,6 +6,7 @@
     This is quite confusing when printing converted values.
     So as of version 0.8, we now have `head x == msb y`.
     So converting for `Vec`tors of `Bit`s to `BitVector`s is no longer index-preserving.
+  * Add [QuickCheck](http://hackage.haskell.org/package/QuickCheck) 'Arbitary' and 'CoArbitary' instances for all data types
 
 ## 0.7.5 **May 7th 2015**
 * New features:
