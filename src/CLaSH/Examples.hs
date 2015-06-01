@@ -292,5 +292,25 @@ The following property holds:
 
 prop> testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645)
 
+= Gray counter
+
+Using the previously defined @upCounter@:
+
+@
+grayCounter :: Signal Bool -> Signal (BitVector 8)
+grayCounter en = gray '<$>' upCounter en
+  where gray xs = 'msb' xs '++#' 'xor' ('slice' xs d7 d1) ('slice' xs d6 d0)
+@
+
+= One-hot counter
+
+Basically a barrel-shifter:
+
+@
+oneHotCounter :: Signal Bool -> Signal (BitVector 8)
+oneHotCounter enable = s
+  where
+    s = 'regEn' 1 enable ('rotateL' s 1)
+@
 
 -}
