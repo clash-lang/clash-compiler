@@ -50,6 +50,12 @@ flag doctests
   default: True
   manual: True
 
+flag doclinks
+  description:
+    Create hyperlinks to non-dependent packages using `-fdoclinks`.
+  default: False
+  manual: True
+
 Library
   HS-Source-Dirs:     src
 
@@ -128,6 +134,11 @@ Library
                       singletons                >= 1.0,
                       template-haskell          >= 2.9.0.0,
                       th-lift                   >= 0.5.6
+
+  if flag(doclinks)
+    CPP-Options:      -DDOCLINKS
+    build-depends:    lens                      >= 4.11,
+                      transformers              >= 0.4.2.0
 
 test-suite doctests
   type:             exitcode-stdio-1.0
