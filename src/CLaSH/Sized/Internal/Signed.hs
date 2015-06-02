@@ -317,10 +317,10 @@ instance KnownNat n => Bits (Signed n) where
   xor               = xor#
   complement        = complement#
   zeroBits          = 0
-  bit i             = replaceBit 0 i high
-  setBit v i        = replaceBit v i high
-  clearBit v i      = replaceBit v i low
-  complementBit v i = replaceBit v i (BV.complement# (v ! i))
+  bit i             = replaceBit i high 0
+  setBit v i        = replaceBit i high v
+  clearBit v i      = replaceBit i low  v
+  complementBit v i = replaceBit i (BV.complement# (v ! i)) v
   testBit v i       = v ! i == 1
   bitSizeMaybe v    = Just (size# v)
   bitSize           = size#

@@ -105,7 +105,7 @@ import Test.QuickCheck
 --
 -- >>> :{
 -- let lfsrF' :: BitVector 16 -> BitVector 16
---     lfsrF' s = feedback ++# slice s d15 d1
+--     lfsrF' s = feedback ++# slice d15 d1 s
 --       where
 --         feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
 -- :}
@@ -260,7 +260,7 @@ External/Fibonacci LFSR, for @n=16@ and using the primitive polynominal @1 + x^1
 
 @
 lfsrF' :: BitVector 16 -> BitVector 16
-lfsrF' s = feedback '++#' 'slice' s d15 d1
+lfsrF' s = feedback '++#' 'slice' d15 d1 s
   where
     feedback = s'!'5 ``xor`` s'!'3 ``xor`` s'!'2 ``xor`` s'!'0
 
@@ -299,7 +299,7 @@ Using the previously defined @upCounter@:
 @
 grayCounter :: Signal Bool -> Signal (BitVector 8)
 grayCounter en = gray '<$>' upCounter en
-  where gray xs = 'msb' xs '++#' 'xor' ('slice' xs d7 d1) ('slice' xs d6 d0)
+  where gray xs = 'msb' xs '++#' 'xor' ('slice' d7 d1 xs) ('slice' d6 d0 xs)
 @
 
 = One-hot counter

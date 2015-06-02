@@ -47,20 +47,20 @@ import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 --
 -- >>> pack (7 :: Unsigned 6)
 -- 00_0111
--- >>> slice (7 :: Unsigned 6) d4 d2
+-- >>> slice d4 d2 (7 :: Unsigned 6)
 -- 001
--- >>> slice (7 :: Unsigned 6) d6 d4
+-- >>> slice d6 d4 (7 :: Unsigned 6)
 -- <BLANKLINE>
 -- <interactive>:...
 --     Couldn't match type ‘7 + i0’ with ‘6’
 --     The type variable ‘i0’ is ambiguous
 --     Expected type: (6 + 1) + i0
 --       Actual type: BitSize (Unsigned 6)
---     In the expression: slice (7 :: Unsigned 6) d6 d4
---     In an equation for ‘it’: it = slice (7 :: Unsigned 6) d6 d4
-slice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => a -> SNat m -> SNat n
+--     In the expression: slice d6 d4 (7 :: Unsigned 6)
+--     In an equation for ‘it’: it = slice d6 d4 (7 :: Unsigned 6)
+slice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => SNat m -> SNat n -> a
       -> BitVector (m + 1 - n)
-slice v m n = slice# (pack v) m n
+slice m n v = slice# (pack v) m n
 
 {-# INLINE split #-}
 -- | Split a value of a bit size @m + n@ into a tuple of values with size @m@
@@ -81,19 +81,19 @@ split v = split# (pack v)
 --
 -- >>> pack (-5 :: Signed 6)
 -- 11_1011
--- >>> replaceBit (-5 :: Signed 6) 4 0
+-- >>> replaceBit 4 0 (-5 :: Signed 6)
 -- -21
 -- >>> pack (-21 :: Signed 6)
 -- 10_1011
--- >>> replaceBit (-5 :: Signed 6) 5 0
+-- >>> replaceBit 5 0 (-5 :: Signed 6)
 -- 27
 -- >>> pack (27 :: Signed 6)
 -- 01_1011
--- >>> replaceBit (-5 :: Signed 6) 6 0
+-- >>> replaceBit 6 0 (-5 :: Signed 6)
 -- *** Exception: replaceBit: 6 is out of range [5..0]
-replaceBit :: (BitPack a, KnownNat (BitSize a), Integral i) => a -> i -> Bit
+replaceBit :: (BitPack a, KnownNat (BitSize a), Integral i) => i -> Bit -> a
            -> a
-replaceBit v i b = unpack (replaceBit# (pack v) (fromIntegral i) b)
+replaceBit i b v = unpack (replaceBit# (pack v) (fromIntegral i) b)
 
 {-# INLINE setSlice #-}
 -- | Set the bits between bit index @m@ and bit index @n@.
@@ -102,22 +102,22 @@ replaceBit v i b = unpack (replaceBit# (pack v) (fromIntegral i) b)
 --
 -- >>> pack (-5 :: Signed 6)
 -- 11_1011
--- >>> setSlice (-5 :: Signed 6) d4 d3 0
+-- >>> setSlice d4 d3 0 (-5 :: Signed 6)
 -- -29
 -- >>> pack (-29 :: Signed 6)
 -- 10_0011
--- >>> setSlice (-5 :: Signed 6) d6 d5 0
+-- >>> setSlice d6 d5 0 (-5 :: Signed 6)
 -- <BLANKLINE>
 -- <interactive>:...
 --     Couldn't match type ‘7 + i0’ with ‘6’
 --     The type variable ‘i0’ is ambiguous
 --     Expected type: (6 + 1) + i0
 --       Actual type: BitSize (Signed 6)
---     In the expression: setSlice (- 5 :: Signed 6) d6 d5 0
---     In an equation for ‘it’: it = setSlice (- 5 :: Signed 6) d6 d5 0
-setSlice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => a -> SNat m -> SNat n
-         -> BitVector (m + 1 - n) -> a
-setSlice v m n w = unpack (setSlice# (pack v) m n w)
+--     In the expression: setSlice d6 d5 0 (- 5 :: Signed 6)
+--     In an equation for ‘it’: it = setSlice d6 d5 0 (- 5 :: Signed 6)
+setSlice :: (BitPack a, BitSize a ~ ((m + 1) + i)) => SNat m -> SNat n
+         -> BitVector (m + 1 - n) -> a -> a
+setSlice m n w v = unpack (setSlice# (pack v) m n w)
 
 {-# INLINE msb #-}
 -- | Get the most significant bit.

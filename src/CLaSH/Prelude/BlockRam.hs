@@ -103,7 +103,7 @@ blockRam' clk binit wr rd en din =
   where
     bram' (ram,_) (w,r,e,d) = (ram',o')
       where
-        ram' | e         = replace ram w d
+        ram' | e         = replace w d ram
              | otherwise = ram
         o'               = ram !! r
 

@@ -828,14 +828,14 @@ replace_int xs i@(I# n0) a
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
 --
--- >>> replace (1:>2:>3:>4:>5:>Nil) 3 7
+-- >>> replace 3 7 (1:>2:>3:>4:>5:>Nil)
 -- <1,2,3,7,5>
--- >>> replace (1:>2:>3:>4:>5:>Nil) 0 7
+-- >>> replace 0 7 (1:>2:>3:>4:>5:>Nil)
 -- <7,2,3,4,5>
--- >>> replace (1:>2:>3:>4:>5:>Nil) 9 7
+-- >>> replace 9 7 (1:>2:>3:>4:>5:>Nil)
 -- <1,2,3,4,*** Exception: CLaSH.Sized.Vector.replace: index 9 is larger than maximum index 4
-replace :: (KnownNat n, Integral i) => Vec n a -> i -> a -> Vec n a
-replace xs i y = replace_int xs (fromIntegral i) y
+replace :: (KnownNat n, Integral i) => i -> a -> Vec n a -> Vec n a
+replace i y xs = replace_int xs (fromIntegral i) y
 
 {-# INLINABLE take #-}
 -- | 'take' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
