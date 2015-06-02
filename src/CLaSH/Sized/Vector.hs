@@ -1220,15 +1220,20 @@ vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
-  pack   = concatBitVector# . reverse . map pack
+  pack   = concatBitVector# . map pack
   unpack = map unpack . unconcatBitVector#
 
 {-# NOINLINE concatBitVector# #-}
 concatBitVector# :: KnownNat m
                  => Vec n (BitVector m)
                  -> BitVector (n * m)
-concatBitVector# Nil       = 0
-concatBitVector# (x :> xs) = concatBitVector# xs ++# x
+concatBitVector# = concatBitVector' . reverse
+  where
+    concatBitVector' :: KnownNat m
+                     => Vec n (BitVector m)
+                     -> BitVector (n * m)
+    concatBitVector' Nil       = 0
+    concatBitVector' (x :> xs) = concatBitVector' xs ++# x
 
 {-# NOINLINE unconcatBitVector# #-}
 unconcatBitVector# :: (KnownNat n, KnownNat m)
