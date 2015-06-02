@@ -11,6 +11,9 @@ module CLaSH.Examples (
 
   -- * Counters
   -- $counters
+
+  -- * Parity and CRC
+  -- $parity_and_crc
   )
 where
 
@@ -130,6 +133,41 @@ import Test.QuickCheck
 --       where r = register (unpack seed) (lfsrGP (unpack 0b0011010000000000) <$> r)
 -- :}
 --
+-- >>> :{
+-- let grayCounter :: Signal Bool -> Signal (BitVector 8)
+--     grayCounter en = gray <$> upCounter en
+--       where gray xs = msb xs ++# xor (slice d7 d1 xs) (slice d6 d0 xs)
+-- :}
+--
+-- >>> :{
+-- let oneHotCounter :: Signal Bool -> Signal (BitVector 8)
+--     oneHotCounter enable = s
+--       where
+--         s = regEn 1 enable (rotateL s 1)
+-- :}
+--
+-- >>> :{
+-- let parity :: Unsigned 8 -> Bit
+--     parity data_in = reduceXor data_in
+-- :}
+--
+-- >>> :{
+-- let crcT bv dIn = replaceBit 0  dInXor
+--                 $ replaceBit 5  (bv!4  `xor` dInXor)
+--                 $ replaceBit 12 (bv!11 `xor` dInXor)
+--                   rotated
+--       where
+--         dInXor  = dIn `xor` fb
+--         rotated = rotateL bv 1
+--         fb      = msb bv
+-- :}
+--
+-- >>> :{
+-- let crc :: Signal Bool -> Signal Bool -> Signal Bit -> Signal (BitVector 16)
+--     crc enable ld dIn = s
+--       where
+--         s = regEn 0xFFFF enable (mux ld 0xFFFF (crcT <$> s <*> dIn))
+-- :}
 
 {- $decoders_and_encoders
 = Decoder
@@ -312,5 +350,40 @@ oneHotCounter enable = s
   where
     s = 'regEn' 1 enable ('rotateL' s 1)
 @
+-}
 
+{- $parity_and_crc
+= Parity
+
+Just 'reduceXor':
+
+@
+parity :: Unsigned 8 -> Bit
+parity data_in = `reduceXor` data_in
+@
+
+= Serial CRC
+
+* Width = 16 bits
+* Truncated polynomial = 0x1021
+* Initial value = 0xFFFF
+* Input date is NOT reflected
+* Output CRC is NOT reflected
+* No XOR is performed on the output CRC
+
+@
+crcT bv dIn = 'replaceBit' 0  dInXor
+            $ 'replaceBit' 5  (bv'!'4  ``xor`` dInXor)
+            $ 'replaceBit' 12 (bv'!'11 ``xor`` dInXor)
+              rotated
+  where
+    dInXor  = dIn ``xor`` fb
+    rotated = 'rotateL' bv 1
+    fb      = 'msb' bv
+
+crc :: Signal Bool -> Signal Bool -> Signal Bit -> Signal (BitVector 16)
+crc enable ld dIn = s
+  where
+    s = 'regEn' 0xFFFF enable ('mux' ld 0xFFFF (crcT '<$>' s '<*>' dIn))
+@
 -}
