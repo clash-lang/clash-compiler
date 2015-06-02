@@ -52,6 +52,7 @@ module CLaSH.Sized.Vector
   )
 where
 
+import Control.Lens               (Index, Ixed (..), IxValue)
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
@@ -1252,3 +1253,8 @@ instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
 
 instance CoArbitrary a => CoArbitrary (Vec n a) where
   coarbitrary = coarbitrary . toList
+
+type instance Index   (Vec n a) = Int
+type instance IxValue (Vec n a) = a
+instance KnownNat n => Ixed (Vec n a) where
+  ix i f xs = replace_int xs i <$> f (index_int xs i)

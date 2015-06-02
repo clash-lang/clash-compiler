@@ -76,6 +76,7 @@ module CLaSH.Sized.Internal.Signed
   )
 where
 
+import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
@@ -92,7 +93,7 @@ import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), (++#), high, low)
+import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
@@ -480,3 +481,9 @@ instance KnownNat n => Arbitrary (Signed n) where
 
 instance KnownNat n => CoArbitrary (Signed n) where
   coarbitrary = coarbitraryIntegral
+
+type instance Index   (Signed n) = Int
+type instance IxValue (Signed n) = Bit
+instance KnownNat n => Ixed (Signed n) where
+  ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
+                     <$> f (BV.index# (pack# s) i)

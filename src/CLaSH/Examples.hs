@@ -21,11 +21,11 @@ module CLaSH.Examples (
 where
 
 import CLaSH.Prelude
+import Control.Lens
 import Control.Monad
 import Test.QuickCheck
 
 #ifdef DOCLINKS
-import Control.Lens
 import Control.Monad.Trans.State
 #endif
 
@@ -403,7 +403,7 @@ crc enable ld dIn = s
 module UART (uart) where
 
 import CLaSH.Prelude
-import Control.Lens -- requires the \'lens\' package: $ cabal install lens
+import Control.Lens
 import Control.Monad.Trans.State
 
 -- UART RX Logic

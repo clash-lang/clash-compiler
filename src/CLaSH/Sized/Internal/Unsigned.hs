@@ -70,6 +70,7 @@ module CLaSH.Sized.Internal.Unsigned
   )
 where
 
+import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
@@ -86,7 +87,7 @@ import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), high, low)
+import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
@@ -418,3 +419,9 @@ instance KnownNat n => Arbitrary (Unsigned n) where
 
 instance KnownNat n => CoArbitrary (Unsigned n) where
   coarbitrary = coarbitraryIntegral
+
+type instance Index   (Unsigned n) = Int
+type instance IxValue (Unsigned n) = Bit
+instance KnownNat n => Ixed (Unsigned n) where
+  ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
+                     <$> f (BV.index# (pack# s) i)

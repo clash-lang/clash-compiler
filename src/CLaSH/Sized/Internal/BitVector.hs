@@ -89,6 +89,7 @@ module CLaSH.Sized.Internal.BitVector
   )
 where
 
+import Control.Lens               (Index, Ixed (..), IxValue)
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Char                  (digitToInt)
 import Data.Default               (Default (..))
@@ -565,3 +566,8 @@ instance KnownNat n => Arbitrary (BitVector n) where
 
 instance KnownNat n => CoArbitrary (BitVector n) where
   coarbitrary = coarbitraryIntegral
+
+type instance Index   (BitVector n) = Int
+type instance IxValue (BitVector n) = Bit
+instance KnownNat n => Ixed (BitVector n) where
+  ix i f bv = replaceBit# bv i <$> f (index# bv i)

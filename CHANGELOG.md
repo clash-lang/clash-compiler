@@ -8,6 +8,7 @@
     So converting for `Vec`tors of `Bit`s to `BitVector`s is no longer index-preserving.
   * Add [QuickCheck](http://hackage.haskell.org/package/QuickCheck) 'Arbitary' and 'CoArbitary' instances for all data types
   * Make the (Bit)Vector argument the _last_ argument for the following functions: `slice`, `setSlice`, `replaceBit`, `replace`.
+  * Add [lens](http://hackage.haskell.org/package/lens) `Ixed` instances for `BitVector`, `Signed`, `Unsigned`, and `Vec`
 
 ## 0.7.5 **May 7th 2015**
 * New features:
