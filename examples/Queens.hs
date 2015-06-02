@@ -3,7 +3,7 @@ module Queens where
 import CLaSH.Prelude
 import Data.Maybe
 
-mem <~ (i,x)    = replace mem i x
+mem <~ (i,x)    = replace i x mem
 
 type Word3 = Unsigned 3
 

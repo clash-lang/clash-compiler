@@ -124,12 +124,12 @@ resBuffer (Res {..}) (newDiscr, newDiscrVal, index, pipeCell, newCell) = ( Res {
                                                                          )
   where
     -- Purge completely reduced results from the system
-    cleanMem  | newDiscr                      = replace cellMem newDiscrVal Nothing
+    cleanMem  | newDiscr                      = replace newDiscrVal Nothing cellMem
               | otherwise                     = cellMem
     -- If a partial is fed  back to the pipeline, make its location invalid
-    cellMem'                                  = replace cleanMem (discr pipeCell) newCell
+    cellMem'                                  = replace (discr pipeCell) newCell cleanMem
     -- Update Index LUT when new Discr enters circuit
-    indexMem' | newDiscr                      = replace indexMem newDiscrVal index
+    indexMem' | newDiscr                      = replace newDiscrVal index indexMem
               | otherwise                     = indexMem
     -- Value fed back into circuit
     resMemOut | valid pipeCell                = cellMem !! (discr pipeCell)

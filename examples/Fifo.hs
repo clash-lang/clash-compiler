@@ -22,7 +22,7 @@ fifo (rpntr, wpntr, elms) (datain,wrt,rd) = ((rpntr',wpntr',elms'),(full,empty,d
     wind  = wpntr .&. mask
     rind  = rpntr .&. mask
 
-    elms' | wrt       = replace elms wind datain
+    elms' | wrt       = replace wind datain elms
           | otherwise = elms
 
     n = fromInteger $ snatToInteger (snat :: SNat n)

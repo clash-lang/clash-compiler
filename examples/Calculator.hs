@@ -30,7 +30,7 @@ datamem :: (KnownNat n, Integral i)
         -> (i, Maybe a)  -- Input
         -> (Vec n a, a)  -- (New state, Output)
 datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
-datamem mem (addr,Just val) = (replace mem addr val,mem !! addr)
+datamem mem (addr,Just val) = (replace addr val mem,mem !! addr)
 
 topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
 topEntity i = val

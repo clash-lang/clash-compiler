@@ -16,7 +16,7 @@ False % t = t
 -- Haskell
 upd hist t = replaceL hist t (hist L.!! t + 1)
 -- CLaSH
-c_upd hist t = replace hist t (hist !! t + 1)
+c_upd hist t = replace t (hist !! t + 1) hist
 
 -- Haskell
 upd' hist (True,t)  = upd hist t
