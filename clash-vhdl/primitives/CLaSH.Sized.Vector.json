@@ -351,7 +351,7 @@ begin
 
   concatBitVectorSN_~SYM[3] : if ~RESULT'length /= 0 generate
     concatBitVectorIter_~SYM[4] : for ~SYM[5] in ~SYM[1]'range generate
-      ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[5]));
+      ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[1]'high - ~SYM[5]));
     end generate;
   end generate;
 end block;"
@@ -375,7 +375,7 @@ begin
 
   unconcatBitVectorSN_~SYM[3] : if ~SYM[1]'length /= 0 generate
     unconcatBitVectorIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
-      ~RESULT(~SYM[5]) <= ~SYM[1](((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[5] * ~LIT[1]));
+      ~RESULT(~RESULT'high - ~SYM[5]) <= ~SYM[1](((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[5] * ~LIT[1]));
     end generate;
   end generate;
 end block;"

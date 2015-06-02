@@ -314,7 +314,7 @@ assign ~SYM[0] = ~ARG[1];
 genvar ~SYM[1];
 generate
   for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concatBitVector_~SYM[2]
-    assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][~SYM[1]];
+    assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][$high(~SYM[0]) - ~SYM[1]];
   end
 endgenerate"
     }
@@ -333,7 +333,7 @@ assign ~SYM[0] = ~ARG[2];
 genvar ~SYM[1];
 generate
   for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcatBitVector_~SYM[2]
-    assign ~RESULT[~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
+    assign ~RESULT[$high(~RESULT) - ~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
   end
 endgenerate"
     }

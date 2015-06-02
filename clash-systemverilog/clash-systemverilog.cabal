@@ -67,7 +67,7 @@ Library
 
   Build-depends:      base                    >= 4.6.0.1 && < 5,
                       clash-lib               >= 0.5.6,
-                      clash-prelude           >= 0.7.2,
+                      clash-prelude           >= 0.8,
                       fgl                     >= 5.4.2.4,
                       lens                    >= 3.9.2,
                       mtl                     >= 2.1.2,
