@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
+{-# LANGUAGE Safe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

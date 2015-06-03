@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MagicHash        #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

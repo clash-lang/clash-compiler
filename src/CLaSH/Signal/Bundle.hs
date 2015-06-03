@@ -4,6 +4,8 @@
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE TypeFamilies      #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

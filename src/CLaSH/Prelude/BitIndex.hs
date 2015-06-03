@@ -4,6 +4,8 @@
 {-# LANGUAGE TypeOperators    #-}
 {-# LANGUAGE TypeFamilies     #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

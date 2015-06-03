@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 
+{-# LANGUAGE Safe #-}
+
 {-|
 Copyright  :  (C) 2013-2015, University of Twente
 License    :  BSD2 (see the file LICENSE)

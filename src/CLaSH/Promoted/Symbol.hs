@@ -2,6 +2,8 @@
 {-# LANGUAGE GADTs          #-}
 {-# LANGUAGE KindSignatures #-}
 
+{-# LANGUAGE Safe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

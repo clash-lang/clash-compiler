@@ -2,6 +2,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies          #-}
 
+{-# LANGUAGE Safe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

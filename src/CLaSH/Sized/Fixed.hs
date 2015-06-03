@@ -11,6 +11,8 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

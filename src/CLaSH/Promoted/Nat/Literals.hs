@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DataKinds       #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# LANGUAGE Unsafe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

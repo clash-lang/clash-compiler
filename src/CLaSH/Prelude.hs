@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 
+{-# LANGUAGE Unsafe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

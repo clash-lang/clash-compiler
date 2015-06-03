@@ -1,5 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 

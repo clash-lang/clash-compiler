@@ -8,6 +8,8 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 
+{-# LANGUAGE Unsafe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|

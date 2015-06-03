@@ -8,6 +8,8 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
+{-# LANGUAGE Unsafe #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|
