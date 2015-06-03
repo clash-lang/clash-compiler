@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.5.7
+## 0.5.7 *June 3rd 2015*
 * New features:
   * New Verilog backend, run `:verilog` in interactive mode, or `--verilog` for batch mode
   * Generated component names are prefixed by the name of the module containing the `topEntity`
