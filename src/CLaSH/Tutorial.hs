@@ -39,11 +39,14 @@ module CLaSH.Tutorial (
   -- * Composition of sequential circuits
   -- $composition_sequential
 
-  -- * TopEntity annotations: controlling the VHDL/Verilog generation.
+  -- * TopEntity annotations: controlling the VHDL\/Verilog\/SystemVerilog generation.
   -- $annotations
 
   -- * Advanced: Primitives
   -- $primitives
+
+  -- *** Verilog primitives
+  -- $vprimitives
 
   -- *** SystemVerilog primitives
   -- $svprimitives
@@ -110,8 +113,8 @@ Haskell. The merits of using a functional language to describe hardware comes
 from the fact that combinational circuits can be directly modeled as
 mathematical functions and that functional languages lend themselves very well
 at describing and (de-)composing mathematical functions. The CλaSH compiler
-transforms these high-level descriptions to low-level synthesizable VHDL or
-SystemVerilog.
+transforms these high-level descriptions to low-level synthesizable VHDL,
+Verilog, or SystemVerilog.
 
 Although we say that CλaSH borrows the semantics of Haskell, that statement
 should be taken with a grain of salt. What we mean to say is that the CλaSH
@@ -159,6 +162,29 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
+    The following are alternative options, if the cannot find what you are looking for on <http://www.haskell.org/ghc/download>
+
+      * Ubuntu:
+
+          * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
+          * Run: @sudo apt-get update@
+          * Run: @sudo apt-get install cabal-install-1.22 ghc-7.10.1 libtinfo-dev@
+          * Update your @PATH@ with: @\/opt\/ghc\/7.10.1\/bin@, @\/opt\/cabal\/1.22/bin@, and @\$HOME\/.cabal\/bin@
+          * Run: @cabal update@
+          * Skip step 2.
+
+      * OS X:
+
+          * Follow the instructions on: <https://ghcformacosx.github.io/ Haskell for Max OS X>
+          * Run: @cabal update@
+          * Skip step 2.
+
+      * Windows:
+
+          * Follow the instructions on: <https://github.com/fpco/minghc MinGHC>
+          * Run: @cabal update@
+          * Skip step 2.
+
   (2) Install __Cabal (version 1.22.* or higher)__
 
       * Binary, when available:
@@ -174,7 +200,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
           * Download the sources for <http://hackage.haskell.org/package/cabal-install cabal-install>
           * Unpack (@tar xf@) the archive and @cd@ to the directory
-          * Run @sh bootstrap.sh@
+          * Run: @sh bootstrap.sh@
           * Follow the instructions to add @cabal@ to your @PATH@
 
       * Run @cabal update@
@@ -187,11 +213,13 @@ The CλaSH compiler and Prelude library for circuit design only work with the
   (4) Verify that everything is working by:
 
       * Downloading the <https://raw.github.com/clash-lang/clash-compiler/master/examples/FIR.hs Fir.hs> example
-      * Run @clash --interactive FIR.hs@
+      * Run: @clash --interactive FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command
+      * Execute, in the interpreter, the @:verilog@ command
       * Execute, in the interpreter, the @:systemverilog@ command
       * Exit the interpreter using @:q@
       * Examine the VHDL code in the @vhdl@ directory
+      * Examine the Verilog code in the @verilog@ directory
       * Examine the SystemVerilog code in the @systemverilog@ directory
 
 -}
@@ -205,10 +233,10 @@ know how to start the CλaSH compiler in interpretive mode:
 clash --interactive
 @
 
-For those familiar with Haskell/GHC, this is indeed just @GHCi@, with two added
-command (@:vhdl@ and @:systemverilog@). You can load files into the interpreter
-using the @:l \<FILENAME\>@ command. Now, depending on your choice in editor,
-the following @edit-load-run@ cycle probably work best for you:
+For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
+added command (@:vhdl@, @:verilog@, and @:systemverilog@). You can load files
+into the interpreter using the @:l \<FILENAME\>@ command. Now, depending on your
+choice in editor, the following @edit-load-run@ cycle probably work best for you:
 
   * __Commandline (e.g. emacs, vim):__
 
@@ -433,7 +461,7 @@ Our 'topEntity' meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
 a directory called 'vhdl', which contains a directory called @MAC@, which
 ultimately contains all the generated VHDL files. You can now load these files
-into your favourite VHDL synthesis tool, marking @topEntity_0.vhdl@ as the file
+into your favourite VHDL synthesis tool, marking @MAC_topEntity.vhdl@ as the file
 containing the top level entity.
 -}
 
@@ -447,7 +475,7 @@ There are multiple reasons as to why might you want to create a so-called
   * Verify that the VHDL output of the CλaSH compiler has the same behaviour as
     the Haskell / CλaSH specification.
 
-For these purposes, you can have CλaSH compiler generate a @testbench.vhdl@
+For these purposes, you can have CλaSH compiler generate a @MAC_testbench.vhdl@
 file which contains a stimulus generator and an expected output verifier. The
 CλaSH compiler looks for the following functions to generate these to aspects:
 
@@ -521,12 +549,14 @@ generator(s) by actual clock sources, such as an onboard PLL.
 -}
 
 {- $mac5
-Aside from being to generate VHDL, the CλaSH compiler can also generate
-SystemVerilog. You can repeat the previous two parts of the tutorial, but
-instead of executing the @:vhdl@ command, you execute the @:sytemverilog@
-command in the interpreter. This will create a directory called 'systemverilog',
-which contains a directory called @MAC@, which ultimately contains all the
-generated SystemVerilog files. SystemVerilog files end in the extension @sv@.
+Aside from being to generate VHDL, the CλaSH compiler can also generate Verilog
+and SystemVerilog. You can repeat the previous two parts of the tutorial, but
+instead of executing the @:vhdl@ command, you execute the @:verilog@ or
+@:sytemverilog@ command in the interpreter. This will create a directory called
+@verilog@, respectively @systemverilog@, which contains a directory called @MAC@,
+which ultimately contains all the generated Verilog and SystemVerilog files.
+Verilog files end in the file extension @v@, while SystemVerilog files end in
+the file extension @sv@.
 
 This concludes the main part of this section on \"Your first circuit\", read on
 for alternative specifications for the same 'mac' circuit, or just skip to the
@@ -778,7 +808,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The CλaSH compiler will normally generate the following @topEntity.vhdl@ file:
+The CλaSH compiler will normally generate the following @Blinker_topEntity.vhdl@ file:
 
 @
 -- Automatically generated VHDL
@@ -787,9 +817,9 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
 use work.all;
-use work.types.all;
+use work.Blinker_types.all;
 
-entity topEntity is
+entity Blinker_topEntity is
   port(input_0         : in std_logic_vector(0 downto 0);
        -- clock
        system1000      : in std_logic;
@@ -798,9 +828,9 @@ entity topEntity is
        output_0        : out std_logic_vector(7 downto 0));
 end;
 
-architecture structural of topEntity is
+architecture structural of Blinker_topEntity is
 begin
-  topEntity_0_inst : entity topEntity_0
+  Blinker_topEntity_0_inst : entity Blinker_topEntity_0
     port map
       (key1_i1         => input_0
       ,system1000      => system1000
@@ -833,7 +863,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
 use work.all;
-use work.types.all;
+use work.Blinker_types.all;
 
 entity blinker is
   port(KEY1     : in std_logic_vector(0 downto 0);
@@ -873,7 +903,7 @@ begin
     system1000_rstn <= n_2;
   end block;
 
-  topEntity_0_inst : entity topEntity_0
+  Blinker_topEntity_0_inst : entity Blinker_topEntity_0
     port map
       (key1_i1         => KEY1
       ,system1000      => system1000
@@ -908,12 +938,15 @@ in CλaSH are specified in the same way as you will read about in this section.
 There are perhaps 10 (at most) functions which are truly hard-coded into the
 CλaSH compiler. You can take a look at the files in
 <https://github.com/clash-lang/clash-compiler/tree/master/clash-vhdl/primitives>
-(or <https://github.com/clash-lang/clash-compiler/tree/master/clash-systemverilog/primitives>
+(or <https://github.com/clash-lang/clash-compiler/tree/master/clash-verilog/primitives>
+for the Verilog primitives or <https://github.com/clash-lang/clash-compiler/tree/master/clash-systemverilog/primitives>
 for the SystemVerilog primitives) if you want to know which functions are defined
 as \"regular\" primitives. The compiler looks for primitives in two locations:
 
 * The official install location: e.g.
-  @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-ghc\-<VERSION\>\/primitives@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-vhdl\-<VERSION\>\/primitives@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-verilog\-<VERSION\>\/primitives@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-systemverilog\-<VERSION\>\/primitives@
 * The current directory (the location given by @pwd@)
 
 Where redefined primitives in the current directory will overwrite those in
@@ -1014,7 +1047,7 @@ And for which the /definition/ primitive is:
 { \"BlackBox\" :
     { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
     , "templateD" :
-"blockram_~SYM[0] : block
+"blockRam_~COMPNAME_~SYM[0] : block
   signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram
   signal ~SYM[2] : ~TYP[7]; -- inp
   signal ~SYM[3] : ~TYP[7]; -- outp
@@ -1070,7 +1103,11 @@ a general listing of the available template holes:
   of the signal, and the type of the result.
 * @~TYPELEM[\<HOLE\>]@: The element type of the vector type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
-
+* @~COMPNAME@: The name of the component in which the primitive is instantiated.
+* @~LENGHT[\<HOLE\>]@: The vector length of the type represented by @\<HOLE\>@.
+  The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
+* @~SIZE[\<HOLE\>]@: The number of bits needed to encode the type represented by @\<HOLE\>@.
+  The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 
 Some final remarks to end this section: VHDL primitives are there to instruct the
 CλaSH compiler to use the given VHDL template, instead of trying to do normal
@@ -1086,8 +1123,51 @@ Perhaps in the future, someone will figure out how to connect the two simulation
 worlds, using e.g. VHDL's foreign function interface VHPI.
 -}
 
+{- $vprimitives
+For those who are interested, the equivalent Verilog primitives are:
+
+@
+{ \"BlackBox\" :
+  { "name"      : "CLaSH.Sized.Internal.Signed.*#"
+  , "templateE" : "~ARG[1] * ~ARG[2]"
+  }
+}
+@
+
+and
+
+@
+{ \"BlackBox\" :
+    { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
+    , "templateD" :
+"// blockRam
+reg ~TYPO ~SYM[0] [0:~LIT[0]-1];
+reg ~SIGD[~SYM[1]][7];
+
+reg ~TYP[3] ~SYM[2];
+integer ~SYM[3];
+initial begin
+  ~SYM[2] = ~ARG[3];
+  for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
+    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  end
+end
+
+always @(posedge ~CLK[2]) begin : blockRam_~COMPNAME_~SYM[4]
+  if (~ARG[6]) begin
+    ~SYM[0][~ARG[4]] <= ~ARG[7];
+  end
+  ~SYM[1] <= ~SYM[0][~ARG[5]];
+end
+
+assign ~RESULT = ~SYM[1];"
+    }
+  }
+@
+-}
+
 {- $svprimitives
-For those who are interested, the equivalent SystemVerilog primitives are:
+And the equivalent SystemVerilog primitives are:
 
 @
 { \"BlackBox\" :
@@ -1290,7 +1370,7 @@ A list of often encountered errors and their solutions:
 
 {- $unsupported #unsupported#
 Here is a list of Haskell features which the CλaSH compiler cannot synthesize
-to VHDL/SystemVerilog (for now):
+to VHDL/Verilog/SystemVerilog (for now):
 
   [@Recursive functions@]
 
@@ -1355,8 +1435,9 @@ to VHDL/SystemVerilog (for now):
     The translations of 'Int',
     @<http://hackage.haskell.org/package/ghc-prim/docs/GHC-Prim.html#t:Int-35- Int#>@,
     and 'Integer' are also incorrect: they are translated to the VHDL @integer@
-    type, or the SystemVerilog @signed logic [31:0]@ type, which can only
-    represent 32-bit integer values. Use these types with due diligence.
+    type, the Verilog @signed [31:0], or the SystemVerilog @signed logic [31:0]@
+    type, which can only represent 32-bit integer values. Use these types with
+    due diligence.
 
   [@Side-effects: 'IO', 'Control.Monad.ST.ST', etc.@]
 
