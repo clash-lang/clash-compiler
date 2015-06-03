@@ -75,7 +75,7 @@ Executable clash
                       clash-vhdl                >= 0.5.5,
                       clash-verilog             >= 0.5.5,
                       clash-prelude             >= 0.8,
-                      ghc-typelits-natnormalise >= 0.2.1
+                      ghc-typelits-natnormalise >= 0.3
 
   if os(windows)
     Build-Depends:    Win32
