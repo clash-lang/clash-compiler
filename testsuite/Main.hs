@@ -124,23 +124,25 @@ ghdlImport dir = withResource (return dir) (const (return ()))
                 $  filter (List.isSuffixOf "vhdl")
                <$> (Directory.getDirectoryContents =<< d)
 
-ghdlMake :: String -> FilePath -> TestTree
-ghdlMake entity env = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",entity] (Just env) False
+ghdlMake :: FilePath -> String -> String -> TestTree
+ghdlMake env modName entity = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",modName ++ "_" ++ entity] (Just env) False
 
-ghdlSim :: FilePath -> TestTree
-ghdlSim env = testProgram "GHDL (sim)" "ghdl" ["-r","testbench","--assert-level=error"] (Just env) False
+ghdlSim :: FilePath -> String -> TestTree
+ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r",modName ++ "_testbench","--assert-level=error"] (Just env) False
 
-iverilog :: FilePath -> String -> TestTree
-iverilog dir entity = withResource (return dir) (const (return ()))
-    (\d -> testProgram "iverilog" "iverilog" ("-g2005":"-s":entity:"-o":entity:verilogFiles d) (Just dir) False)
+iverilog :: FilePath -> String -> String -> TestTree
+iverilog dir modName entity = withResource (return dir) (const (return ()))
+    (\d -> testProgram "iverilog" "iverilog" ("-g2005":"-s":modEntity:"-o":modEntity:verilogFiles d) (Just dir) False)
   where
     verilogFiles :: IO FilePath -> [FilePath]
     verilogFiles d =  Unsafe.unsafePerformIO
                    $  filter (List.isSuffixOf "v")
                   <$> (Directory.getDirectoryContents =<< d)
 
-vvp :: FilePath -> TestTree
-vvp env = testProgram "vvp" "vvp" ["-N","testbench"] (Just env) False
+    modEntity = modName ++ "_" ++ entity
+
+vvp :: FilePath -> String -> TestTree
+vvp env modName = testProgram "vvp" "vvp" ["-N",modName ++ "_testbench"] (Just env) False
 
 runTest :: FilePath
         -> BuildTarget
@@ -162,8 +164,8 @@ runTest env VHDL extraArgs modName entNameM = withResource aquire release (const
                 )
 
     doMakeAndRun (entName,doRun) = [ ghdlImport modDir
-                                   , ghdlMake entName modDir
-                                   ] ++ if doRun then [ghdlSim modDir] else []
+                                   , ghdlMake modDir modName entName
+                                   ] ++ if doRun then [ghdlSim modDir modName] else []
 
 runTest env Verilog extraArgs modName entNameM =
     withResource (return ()) release (const grp)
@@ -178,8 +180,8 @@ runTest env Verilog extraArgs modName entNameM =
                     : maybe [] doMakeAndRun entNameM
                     )
 
-    doMakeAndRun (entName,doRun) = [ iverilog modDir entName
-                                   ] ++ if doRun then [vvp modDir] else []
+    doMakeAndRun (entName,doRun) = [ iverilog modDir modName entName
+                                   ] ++ if doRun then [vvp modDir modName] else []
 
 runTest env Both extraArgs modName entNameM = testGroup "VHDL & Verilog"
   [ runTest env VHDL extraArgs modName entNameM
