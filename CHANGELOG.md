@@ -1,13 +1,45 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.8
+## 0.8 *June 3rd 2015*
 * New features:
-  * Before, given `x :: Vec 8 Bit` and `y :: BitVector 8`, it used to be `last x == msb y`.
+  * Make the (Bit)Vector argument the _last_ argument for the following functions: `slice`, `setSlice`, `replaceBit`, `replace`. The signatures for the above functions are now:
+    
+    ```
+    slice      :: BitPack a => SNat m -> SNat n -> a -> BitVector (m + 1 - n)
+    setSlice   :: BitPack a => SNat m -> SNat n -> BitVector (m + 1 - n) -> a -> a
+    replaceBit :: Integral i => i -> Bit -> a -> a
+    replace    :: Integral i => i -> a -> Vec n a -> Vec n a
+    ```
+    
+    This allows for easier chaining, e.g.:
+    
+    ```
+    replaceBit 0 1 $
+    repleceBit 4 0 $
+    replaceBit 6 1 bv
+    ```
+  * Until version 0.7.5, given `x :: Vec 8 Bit` and `y :: BitVector 8`, it used to be `last x == msb y`.
     This is quite confusing when printing converted values.
-    So as of version 0.8, we now have `head x == msb y`.
-    So converting for `Vec`tors of `Bit`s to `BitVector`s is no longer index-preserving.
-  * Add [QuickCheck](http://hackage.haskell.org/package/QuickCheck) 'Arbitary' and 'CoArbitary' instances for all data types
-  * Make the (Bit)Vector argument the _last_ argument for the following functions: `slice`, `setSlice`, `replaceBit`, `replace`.
+    Until version 0.7.5 we would get:
+
+    ```
+    > 0x0F :: BitVector 8
+    0000_1111
+    > unpack 0x0F :: Vec 8 Bit
+    <1,1,1,1,0,0,0,0>
+    ```
+    
+    As of version 0.8, we have `head x == msb y`:
+    
+    ```
+    > 0x0F :: BitVector 8
+    0000_1111
+    > unpack 0x0F :: Vec 8 Bit
+    <0,0,0,0,1,1,1,1>
+    ```
+    
+    So converting for `Vec`tors of `Bit`s to `BitVector`s is no longer _index_-preserving, but it is _order_-preserving.
+  * Add [QuickCheck](http://hackage.haskell.org/package/QuickCheck) `Arbitary` and `CoArbitary` instances for all data types
   * Add [lens](http://hackage.haskell.org/package/lens) `Ixed` instances for `BitVector`, `Signed`, `Unsigned`, and `Vec`
 
 ## 0.7.5 **May 7th 2015**
