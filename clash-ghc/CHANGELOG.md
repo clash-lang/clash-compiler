@@ -3,6 +3,7 @@
 ## 0.5.7
 * New features:
   * New Verilog backend, run `:verilog` in interactive mode, or `--verilog` for batch mode
+  * Generated component names are prefixed by the name of the module containing the `topEntity`
 
 ## 0.5.6 *May 18th 2015*
 * New features:

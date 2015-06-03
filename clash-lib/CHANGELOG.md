@@ -3,6 +3,7 @@
 ## 0.5.6
 * New features:
   * Support Verilog backend
+  * Generated component names are prefixed by the name of the module containing the `topEntity`
 
 ## 0.5.5 *May 18th 2015*
 * New features:

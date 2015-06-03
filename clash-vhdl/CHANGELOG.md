@@ -1,7 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
 ## 0.5.5
-* Compile against `clash-lib-0.5.6`
+* New features:
+  * Compile against `clash-lib-0.5.6`
+  * Generated component names are prefixed by the name of the module containing the `topEntity`
 
 ## 0.5.4 *May 10th 2015*
 * New features:
