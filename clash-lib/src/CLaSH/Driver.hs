@@ -81,9 +81,9 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
-      (netlist,cmpCnt) <- genNetlist Nothing
-                               transformedBindings
-                               primMap tcm typeTrans Nothing (fst topEntity)
+      let modName = takeWhile (/= '.') (name2String $ fst topEntity)
+      (netlist,cmpCnt) <- genNetlist Nothing transformedBindings primMap tcm
+                                     typeTrans Nothing modName (fst topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -99,6 +99,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
                                  typeTrans tcm eval cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
+                                 modName
                                  topComponent
 
 
@@ -107,8 +108,8 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
       putStrLn $ "Testbench generation took " ++ show netTBDiff
 
       let hdlState' = fromMaybe (initBackend :: backend) hdlState
-          topWrapper = mkTopWrapper primMap teM topComponent
-          hdlDocs = createHDL hdlState' (topWrapper : netlist ++ testBench)
+          topWrapper = mkTopWrapper primMap teM modName topComponent
+          hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
           dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
@@ -126,13 +127,15 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
 -- | Pretty print Components to HDL Documents
 createHDL :: Backend backend
            => backend     -- ^ Backend
+           -> String
            -> [Component] -- ^ List of components
            -> [(String,Doc)]
-createHDL backend components = flip evalState backend $ do
-  (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
-  let hdlNmDocs = zip hdlNms hdlDocs
+createHDL backend modName components = flip evalState backend $ do
+  -- (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
+  -- let hdlNmDocs = zip hdlNms hdlDocs
+  hdlNmDocs <- mapM (genHDL modName) components
   hwtys <- HashSet.toList <$> extractTypes <$> get
-  typesPkg <- mkTyPackage hwtys
+  typesPkg <- mkTyPackage modName hwtys
   return (typesPkg ++ hdlNmDocs)
 
 -- | Prepares the directory for writing HDL files. This means creating the

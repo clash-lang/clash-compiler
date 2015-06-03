@@ -45,19 +45,20 @@ genTestBench :: CLaSHOpts
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
+             -> String                       -- ^ Name of the module containing the @topEntity@
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component])
-genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM
+genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM modName
   (Component cName hidden [inp] [outp] _) = do
   let ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
                 ]
       inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
   (inpInst,inpComps,cmpCnt',hidden') <- maybe (return (inpExpr,[],cmpCnt,hidden))
-                                                 (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp)
+                                                 (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName)
                                                  stimuliNmM
 
-  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans $ do
+  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans modName $ do
       done    <- genDone primMap
       let finDecl' = [ NetDecl "finished" Bool
                      , done
@@ -66,13 +67,13 @@ genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM ex
       return (finDecl',finExpr')
 
   (expInst,expComps,cmpCnt'',hidden'') <- maybe (return (finExpr,[],cmpCnt',hidden'))
-                                                 (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp)
+                                                 (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp modName)
                                                  expectedNmM
 
   let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden
 
-  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans $ do
+  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName $ do
       varCount .= (_varCount s)
       clks' <- catMaybes <$> mapM (genClock primMap) hidden''
       rsts' <- catMaybes <$> mapM (genReset primMap) hidden''
@@ -83,7 +84,7 @@ genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM ex
                         (concat [ clkNms, rstNms, [fst inp], [fst outp] ])
                    )
 
-      tbComp = Component "testbench" [] [] [("done",Bool)]
+      tbComp = Component (pack modName `append` "_testbench") [] [] [("done",Bool)]
                   (concat [ finDecl
                           , concat clks
                           , concat rsts
@@ -99,7 +100,7 @@ genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM ex
     normalizeSignal glbls bndr =
       runNormalization opts supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench opts _ _ _ _ _ _ _ _ _ c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return []
+genTestBench opts _ _ _ _ _ _ _ _ _ _ c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return []
 
 genClock :: PrimMap
          -> (Identifier,HWType)
@@ -181,12 +182,13 @@ genStimuli :: Int
                 -> HashMap TmName (Type,Term) )
            -> [(Identifier,HWType)]
            -> (Identifier,HWType)
+           -> String
            -> TmName
            -> IO (Declaration,[Component],Int,[(Identifier,HWType)])
-genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp signalNm = do
+genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
-  let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm))) `append` pack "_"
+  (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName signalNm
+  let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` pack "_"
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
@@ -214,12 +216,13 @@ genVerifier :: Int
                  -> HashMap TmName (Type,Term) )
             -> [(Identifier,HWType)]
             -> (Identifier,HWType)
+            -> String
             -> TmName
             -> IO (Declaration,[Component],Int,[(Identifier,HWType)])
-genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp signalNm = do
+genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp modName signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing signalNm
-  let sigNm   = last (splitOn (pack ".") (pack (name2String signalNm))) `append` "_"
+  (comps,cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName signalNm
+  let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` "_"
       sigComp = case find ((isPrefixOf sigNm) . componentName) comps of
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)

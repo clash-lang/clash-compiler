@@ -50,11 +50,13 @@ genNetlist :: Maybe Int
            -- ^ Hardcoded Type -> HWType translator
            -> Maybe Int
            -- ^ Symbol count
+           -> String
+           -- ^ Name of the module containing the @topEntity@
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([Component],Int)
-genNetlist compCntM globals primMap tcm typeTrans mStart topEntity = do
-  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans $ genComponent topEntity mStart
+genNetlist compCntM globals primMap tcm typeTrans mStart modName topEntity = do
+  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName $ genComponent topEntity mStart
   return (HashMap.elems $ _components s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
@@ -68,16 +70,18 @@ runNetlistMonad :: Maybe Int
                 -- ^ TyCon cache
                 -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
+                -> String
+                -- ^ Name of the module containing the @topEntity@
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad compCntM s p tcm typeTrans
+runNetlistMonad compCntM s p tcm typeTrans modName
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm Text.empty
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -98,8 +102,10 @@ genComponentT :: TmName -- ^ Name of the function
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
   componentNumber <- cmpCount <<%= (+1)
+  modName <- Lens.use modNm
 
-  let componentName' = (`Text.append` (Text.pack $ show componentNumber))
+  let componentName' = (Text.pack (modName ++ "_") `Text.append`)
+                     . (`Text.append` (Text.pack $ show componentNumber))
                      . ifThenElse Text.null
                           (`Text.append` Text.pack "Component_")
                           (`Text.append` Text.pack "_")

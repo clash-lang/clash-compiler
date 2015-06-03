@@ -42,8 +42,8 @@ instance Backend VerilogState where
   name            = const "verilog"
   extension       = const ".v"
 
-  genHDL          = genVerilog
-  mkTyPackage     = const (return [])
+  genHDL          = const genVerilog
+  mkTyPackage _ _ = return []
   hdlType         = verilogType
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark

@@ -19,7 +19,7 @@ import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
-import           Data.Text.Lazy                       (unpack)
+import           Data.Text.Lazy                       (pack,unpack)
 import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -68,23 +68,25 @@ instance Backend SystemVerilogState where
 type SystemVerilogM a = State SystemVerilogState a
 
 -- | Generate VHDL for a Netlist component
-genVerilog :: Component -> SystemVerilogM (String,Doc)
-genVerilog c = (unpack cName,) A.<$> verilog
+genVerilog :: String -> Component -> SystemVerilogM (String,Doc)
+genVerilog modName c = (unpack cName,) A.<$> verilog
   where
     cName   = componentName c
     verilog = "// Automatically generated SystemVerilog" <$$>
-              tyImports <$$>
+              tyImports modName <$$>
               module_ c
 
 -- | Generate a SystemVerilog package containing type definitions for the given HWTypes
-mkTyPackage_ :: [HWType]
+mkTyPackage_ :: String
+             -> [HWType]
              -> SystemVerilogM [(String,Doc)]
-mkTyPackage_ hwtys = (:[]) A.<$> ("types",) A.<$>
-    "package types ;" <$>
+mkTyPackage_ modName hwtys = (:[]) A.<$> (modName ++ "_types",) A.<$>
+    "package" <+> modNameD <> "_types" <+> semi <$>
       indent 2 packageDec <$>
       indent 2 funDecs <$>
-    "endpackage : types"
+    "endpackage" <+> colon <+> modNameD <> "_types"
   where
+    modNameD    = text (pack modName)
     usedTys     = concatMap mkUsedTys hwtys
     needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
@@ -160,8 +162,8 @@ funDec t =
        <> semi) <$>
   "endfunction"
 
-tyImports :: SystemVerilogM Doc
-tyImports = "import types:: * ;"
+tyImports :: String -> SystemVerilogM Doc
+tyImports modName = "import" <+> text (pack modName) <> "_types::*;"
 
 module_ :: Component -> SystemVerilogM Doc
 module_ c =

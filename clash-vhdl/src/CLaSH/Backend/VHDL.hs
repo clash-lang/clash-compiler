@@ -69,28 +69,30 @@ instance Backend VHDLState where
 type VHDLM a = State VHDLState a
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: Component -> VHDLM (String,Doc)
-genVHDL c = (unpack cName,) A.<$> vhdl
+genVHDL :: String -> Component -> VHDLM (String,Doc)
+genVHDL modName c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
     vhdl    = "-- Automatically generated VHDL-2002" <$$>
-              tyImports <$$> linebreak <>
+              tyImports modName <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
-mkTyPackage_ :: [HWType]
+mkTyPackage_ :: String
+             -> [HWType]
              -> VHDLM [(String,Doc)]
-mkTyPackage_ hwtys = (:[]) A.<$> ("types",) A.<$>
+mkTyPackage_ modName hwtys = (:[]) A.<$> (modName ++ "_types",) A.<$>
    "library IEEE;" <$>
    "use IEEE.STD_LOGIC_1164.ALL;" <$>
    "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>
-   "package" <+> "types" <+> "is" <$>
+   "package" <+> modNameD <> "_types" <+> "is" <$>
       indent 2 ( packageDec <$>
                  vcat (sequence funDecs)
                ) <$>
    "end" <> semi <> packageBodyDec
   where
+    modNameD    = text (T.pack modName)
     usedTys     = concatMap mkUsedTys hwtys
     needsDec    = nubBy eqReprTy . map mkVecZ $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
@@ -101,7 +103,7 @@ mkTyPackage_ hwtys = (:[]) A.<$> ("types",) A.<$>
     packageBodyDec = case funBodies of
         [] -> empty
         _  -> linebreak <$>
-              "package" <+> "body" <+> "types" <+> "is" <$>
+              "package" <+> "body" <+> modNameD <> "_types" <+> "is" <$>
                 indent 2 (vcat (sequence funBodies)) <$>
               "end" <> semi
 
@@ -293,15 +295,15 @@ slvToSlvDec =
     "end" <> semi
   )
 
-tyImports :: VHDLM Doc
-tyImports =
+tyImports :: String -> VHDLM Doc
+tyImports modName =
   punctuate' semi $ sequence
     [ "library IEEE"
     , "use IEEE.STD_LOGIC_1164.ALL"
     , "use IEEE.NUMERIC_STD.ALL"
     , "use IEEE.MATH_REAL.ALL"
     , "use work.all"
-    , "use work.types.all"
+    , "use work." <> text (T.pack modName) <> "_types.all"
     ]
 
 
