@@ -30,6 +30,7 @@
 
   For now, "CLaSH.Prelude" is also the best starting point for exploring the
   library. A preliminary version of a tutorial can be found in "CLaSH.Tutorial".
+  Some circuit examples can be found in "CLaSH.Examples".
 -}
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits

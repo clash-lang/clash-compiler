@@ -22,6 +22,7 @@ Description:
   .
   A preliminary version of a tutorial can be found in "CLaSH.Tutorial", for a
   general overview of the library you should however check out "CLaSH.Prelude".
+  Some circuit examples can be found in "CLaSH.Examples".
 Homepage:             http://www.clash-lang.org/
 bug-reports:          http://github.com/clash-lang/clash-prelude/issues
 License:              BSD2
