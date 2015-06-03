@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
 
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
