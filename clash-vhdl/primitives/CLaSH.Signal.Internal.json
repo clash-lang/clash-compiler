@@ -83,4 +83,9 @@ end block;"
     , "primType"  : "Function"
     }
   }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.joinSignal#"
+    , "primType"  : "Function"
+    }
+  }
 ]

@@ -278,6 +278,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
               | f == pack "CLaSH.Signal.Internal.signal#"    -> return (signalTerm xType)
               | f == pack "CLaSH.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
               | f == pack "CLaSH.Signal.Internal.traverse#"  -> return (traverseTerm xType)
+              | f == pack "CLaSH.Signal.Internal.joinSignal#" -> return (joinTerm xType)
               | f == pack "CLaSH.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
               | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
@@ -638,6 +639,18 @@ dollarTerm (C.ForAllTy tvATy) =
     xId   = C.Id xName (embed aTy)
 
 dollarTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @forall a. forall clk. Signal' clk (Signal' clk a) -> Signal' clk a@
+--
+-- Generate the term
+--
+-- @/\(a:*)./\(clk:Clock).\(x:Signal' clk a).x@
+joinTerm :: C.Type
+         -> C.Term
+joinTerm ty@(C.ForAllTy _) = signalTerm ty
+joinTerm ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of

@@ -71,4 +71,9 @@ assign ~RESULT = ~SYM[0];"
     , "primType"  : "Function"
     }
   }
+, { "Primitive" :
+    { "name"      : "CLaSH.Signal.Internal.joinSignal#"
+    , "primType"  : "Function"
+    }
+  }
 ]
