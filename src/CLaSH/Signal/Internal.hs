@@ -70,6 +70,8 @@ module CLaSH.Signal.Internal
   , unsafeShiftR1
   , rotateL1
   , rotateR1
+  -- * EXTREMELY EXPERIMENTAL
+  , joinSignal#
   )
 where
 
@@ -139,6 +141,19 @@ signal# a = let s = a :- s in s
 {-# NOINLINE appSignal# #-}
 appSignal# :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
 appSignal# (f :- fs) ~(a :- as) = f a :- appSignal# fs as
+
+{-# NOINLINE joinSignal# #-}
+-- | __WARNING: EXTREMELY EXPERIMENTAL__
+--
+-- The circuit semantics of this operation are unclear and/or non-existent.
+-- There is a good reason there is no 'Monad' instance for 'Signal''.
+--
+-- Is currently treated as 'id' by the CLaSH compiler.
+joinSignal# :: Signal' clk (Signal' clk a) -> Signal' clk a
+joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
+  where
+    head# (x' :- _ )  = x'
+    tail# (_  :- xs') = xs'
 
 instance Num a => Num (Signal' clk a) where
   (+)         = liftA2 (+)
