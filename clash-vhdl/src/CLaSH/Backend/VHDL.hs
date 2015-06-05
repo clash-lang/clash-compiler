@@ -616,7 +616,7 @@ toSLV (Vector n elTy) (DataCon _ _ es) = encloseSep lparen rparen " & " (zipWith
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
-fromSLV Bool              id_ start _   = "fromSLV" <> parens (text id_ <> parens (int start))
+fromSLV Bool              id_ start _   = "fromSLV" <> parens (text id_ <> parens (int start <+> "downto" <+> int start))
 fromSLV Integer           id_ start end = "to_integer" <> parens (fromSLV (Signed 32) id_ start end)
 fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
