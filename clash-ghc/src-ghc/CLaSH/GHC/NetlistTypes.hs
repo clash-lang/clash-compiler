@@ -52,6 +52,12 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runExceptT $
       sz     <- tyNatSize m szTy
       elHWTy <- ExceptT $ return $ coreTypeToHWType ghcTypeToHWType m elTy
       return $ Vector sz elHWTy
+
+    "String" -> return Void
+    "GHC.Types.[]" -> case tyView (head args) of
+      (TyConApp (name2String -> "GHC.Types.Char") []) -> return Void
+      _ -> fail $ "Can't translate type: " ++ showDoc ty
+
     _ -> case m ! tc of
            -- TODO: Remove this conversion
            -- The current problem is that type-functions are not reduced by the GHC -> Core

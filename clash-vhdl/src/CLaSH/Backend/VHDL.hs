@@ -570,9 +570,10 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
 
   where
     blit = bits (toBits sz i)
-exprLit _             (BoolLit t)  = if t then "true" else "false"
-exprLit _             (BitLit b)   = squotes $ bit_char b
-exprLit _             l            = error $ $(curLoc) ++ "exprLit: " ++ show l
+exprLit _             (BoolLit t)   = if t then "true" else "false"
+exprLit _             (BitLit b)    = squotes $ bit_char b
+exprLit _             (StringLit s) = text . T.pack $ show s
+exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)

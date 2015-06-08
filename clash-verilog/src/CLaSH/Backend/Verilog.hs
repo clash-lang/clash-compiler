@@ -12,7 +12,7 @@ import qualified Control.Applicative                  as A
 import           Control.Monad.State                  (State)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes)
-import           Data.Text.Lazy                       (unpack)
+import           Data.Text.Lazy                       (pack, unpack)
 import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -289,9 +289,10 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
 
   where
     blit = bits (toBits sz i)
-exprLit _             (BoolLit t)  = if t then "1'b1" else "1'b0"
-exprLit _             (BitLit b)   = "1'b" <> bit_char b
-exprLit _             l            = error $ $(curLoc) ++ "exprLit: " ++ show l
+exprLit _             (BoolLit t)   = if t then "1'b1" else "1'b0"
+exprLit _             (BitLit b)    = "1'b" <> bit_char b
+exprLit _             (StringLit s) = text . pack $ show s
+exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)

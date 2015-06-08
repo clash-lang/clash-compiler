@@ -137,10 +137,11 @@ data Expr
 
 -- | Literals used in an expression
 data Literal
-  = NumLit  Integer -- ^ Number literal
-  | BitLit  Bit -- ^ Bit literal
-  | BoolLit Bool -- ^ Boolean literal
-  | VecLit  [Literal] -- ^ Vector literal
+  = NumLit    Integer   -- ^ Number literal
+  | BitLit    Bit       -- ^ Bit literal
+  | BoolLit   Bool      -- ^ Boolean literal
+  | VecLit    [Literal] -- ^ Vector literal
+  | StringLit String    -- ^ String literal
   deriving Show
 
 -- | Bit literal

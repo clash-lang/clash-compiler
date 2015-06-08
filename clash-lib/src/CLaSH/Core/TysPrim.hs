@@ -4,6 +4,7 @@ module CLaSH.Core.TysPrim
   , typeNatKind
   , typeSymbolKind
   , intPrimTy
+  , stringPrimTy
   , voidPrimTy
   , tysPrimMap
   )
@@ -37,22 +38,25 @@ typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
 
-intPrimTyConName, voidPrimTyConName :: TyConName
-intPrimTyConName  = string2Name "Int"
-voidPrimTyConName = string2Name "VOID"
+intPrimTyConName, stringPrimTyConName, voidPrimTyConName :: TyConName
+intPrimTyConName    = string2Name "Int"
+stringPrimTyConName = string2Name "String"
+voidPrimTyConName   = string2Name "VOID"
 
 liftedPrimTC :: TyConName
              -> TyCon
 liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
-intPrimTc, voidPrimTc :: TyCon
-intPrimTc  = (liftedPrimTC intPrimTyConName )
-voidPrimTc = (liftedPrimTC voidPrimTyConName)
+intPrimTc, stringPrimTc, voidPrimTc :: TyCon
+intPrimTc    = (liftedPrimTC intPrimTyConName )
+stringPrimTc = (liftedPrimTC stringPrimTyConName)
+voidPrimTc   = (liftedPrimTC voidPrimTyConName)
 
-intPrimTy, voidPrimTy :: Type
-intPrimTy  = mkTyConTy intPrimTyConName
-voidPrimTy = mkTyConTy voidPrimTyConName
+intPrimTy, stringPrimTy, voidPrimTy :: Type
+intPrimTy    = mkTyConTy intPrimTyConName
+stringPrimTy = mkTyConTy stringPrimTyConName
+voidPrimTy   = mkTyConTy voidPrimTyConName
 
 tysPrimMap :: HashMap TyConName TyCon
 tysPrimMap = HashMap.fromList
@@ -61,5 +65,6 @@ tysPrimMap = HashMap.fromList
   , (typeNatKindTyConName,typeNatKindtc)
   , (typeSymbolKindTyConName,typeSymbolKindtc)
   , (intPrimTyConName,intPrimTc)
+  , (stringPrimTyConName,stringPrimTc)
   , (voidPrimTyConName,voidPrimTc)
   ]

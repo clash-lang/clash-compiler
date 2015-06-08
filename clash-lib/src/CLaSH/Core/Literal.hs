@@ -16,7 +16,7 @@ import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 
 import {-# SOURCE #-} CLaSH.Core.Type         (Type)
-import CLaSH.Core.TysPrim                     (intPrimTy, voidPrimTy)
+import CLaSH.Core.TysPrim                     (intPrimTy, stringPrimTy, voidPrimTy)
 
 -- | Term Literal
 data Literal
@@ -37,4 +37,4 @@ literalType :: Literal
             -> Type
 literalType (IntegerLiteral  _) = intPrimTy
 literalType (RationalLiteral _) = voidPrimTy
-literalType (StringLiteral   _) = voidPrimTy
+literalType (StringLiteral   _) = stringPrimTy
