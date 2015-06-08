@@ -81,7 +81,7 @@ mkTyPackage_ :: String
              -> [HWType]
              -> SystemVerilogM [(String,Doc)]
 mkTyPackage_ modName hwtys = (:[]) A.<$> (modName ++ "_types",) A.<$>
-    "package" <+> modNameD <> "_types" <+> semi <$>
+    "package" <+> modNameD <> "_types" <> semi <$>
       indent 2 packageDec <$>
       indent 2 funDecs <$>
     "endpackage" <+> colon <+> modNameD <> "_types"
