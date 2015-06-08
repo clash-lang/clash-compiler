@@ -26,9 +26,18 @@ module CLaSH.Prelude.Explicit
   , moore'
   , mooreB'
   , registerB'
+    -- * ROMs
+  , rom'
+  , romPow2'
+    -- ** ROMs initialised with a data file
+  , romFile'
+  , romFilePow2'
     -- * BlockRAM primitives
   , blockRam'
   , blockRamPow2'
+    -- ** BlockRAM primitives initialised with a data file
+  , blockRamFile'
+  , blockRamFilePow2'
     -- * Utility functions
   , window'
   , windowD'
@@ -49,8 +58,11 @@ import GHC.TypeLits            (KnownNat, type (+), natVal)
 import Prelude                 hiding (repeat)
 
 import CLaSH.Prelude.BlockRam  (blockRam', blockRamPow2')
+import CLaSH.Prelude.BlockRam.File (blockRamFile', blockRamFilePow2')
 import CLaSH.Prelude.Mealy     (mealy', mealyB')
 import CLaSH.Prelude.Moore     (moore', mooreB')
+import CLaSH.Prelude.ROM       (rom', romPow2')
+import CLaSH.Prelude.ROM.File  (romFile', romFilePow2')
 import CLaSH.Prelude.Testbench (stimuliGenerator', outputVerifier')
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector      (Vec (..), (+>>), asNatProxy, repeat)

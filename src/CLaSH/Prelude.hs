@@ -40,9 +40,22 @@ module CLaSH.Prelude
   , moore
   , mooreB
   , registerB
+    -- * ROMs
+  , asyncROM
+  , asyncROMPow2
+  , rom
+  , romPow2
+    -- ** ROMs initialised with a data file
+  , asyncROMFile
+  , asyncROMFilePow2
+  , romFile
+  , romFilePow2
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+    -- ** BlockRAM primitives initialised with a data file
+  , blockRamFile
+  , blockRamFilePow2
     -- * Utility functions
   , window
   , windowD
@@ -116,10 +129,14 @@ import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
+import CLaSH.Prelude.BlockRam.File (blockRamFile, blockRamFilePow2)
 import CLaSH.Prelude.Explicit      (registerB', window', windowD', isRising',
                                     isFalling')
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.Moore         (moore, mooreB)
+import CLaSH.Prelude.ROM           (asyncROM,asyncROMPow2,rom,romPow2)
+import CLaSH.Prelude.ROM.File      (asyncROMFile,asyncROMFilePow2,romFile,
+                                    romFilePow2)
 import CLaSH.Prelude.DataFlow
 import CLaSH.Prelude.Testbench     (assert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat

@@ -8,8 +8,18 @@
 Copyright  :  (C) 2013-2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+BlockRAM primitives
 -}
-module CLaSH.Prelude.BlockRam where
+module CLaSH.Prelude.BlockRam
+  ( -- * BlockRAM synchronised to the system clock
+    blockRam
+  , blockRamPow2
+    -- * BlockRAM synchronised to an arbitrary clock
+  , blockRam'
+  , blockRamPow2'
+  )
+where
 
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding ((!!))
