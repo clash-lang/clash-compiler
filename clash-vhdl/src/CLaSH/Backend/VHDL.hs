@@ -302,6 +302,7 @@ tyImports modName =
     , "use IEEE.STD_LOGIC_1164.ALL"
     , "use IEEE.NUMERIC_STD.ALL"
     , "use IEEE.MATH_REAL.ALL"
+    , "use std.textio.all"
     , "use work.all"
     , "use work." <> text (T.pack modName) <> "_types.all"
     ]
