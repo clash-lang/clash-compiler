@@ -1,0 +1,29 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Prelude.ROM.rom'"
+    , "type" :
+"rom' :: (KnownNat n, KnownNat m)  -- (ARG[0],ARG[1])
+      => SClock clk                -- clk,  ARG[2]
+      -> Vec n a                   -- init, ARG[3]
+      -> Signal' clk (Unsigned m)  -- rd,   ARG[4]
+      -> Signal' clk a"
+    , "templateD" :
+"// rom begin
+wire ~TYP[3] ~SYM[0];
+assign ~SYM[0] = ~ARG[3];
+
+wire ~TYPO ~SYM[1] [0:~LIT[0]-1];
+genvar ~SYM[2];
+for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : array_~SYM[3]
+  assign ~SYM[1][(~LIT[0]-1)-~SYM[2]] = ~SYM[0][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]]
+end
+
+reg ~TYPO ~SYM[4];
+always @(posedge ~CLK[2]) begin : rom_~COMPNAME_~SYM[5]
+  ~SYM[4] <= ~SYM[1][~ARG[4]];
+end
+
+assign ~RESULT = ~SYM[4];
+// rom end"
+    }
+  }
+]

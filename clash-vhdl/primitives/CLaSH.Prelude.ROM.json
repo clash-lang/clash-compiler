@@ -1,0 +1,12 @@
+[ { "Primitive" :
+    { "name" : "CLaSH.Prelude.ROM.rom'"
+    , "type" :
+"rom' :: (KnownNat n, KnownNat m)  -- (ARG[0],ARG[1])
+      => SClock clk                -- clk,  ARG[2]
+      -> Vec n a                   -- init, ARG[3]
+      -> Signal' clk (Unsigned m)  -- rd,   ARG[4]
+      -> Signal' clk a"
+    , "primType" : "Function"
+    }
+  }
+]

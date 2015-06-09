@@ -29,6 +29,9 @@ Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
                       primitives/CLaSH.Driver.TopWrapper.json
                       primitives/CLaSH.GHC.GHC2Core.json
                       primitives/CLaSH.Prelude.BlockRam.json
+                      primitives/CLaSH.Prelude.BlockRam.File.json
+                      primitives/CLaSH.Prelude.ROM.json
+                      primitives/CLaSH.Prelude.ROM.File.json
                       primitives/CLaSH.Prelude.Testbench.json
                       primitives/CLaSH.Promoted.Nat.json
                       primitives/CLaSH.Promoted.Symbol.json

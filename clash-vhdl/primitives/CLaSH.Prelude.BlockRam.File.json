@@ -1,0 +1,16 @@
+[ { "Primitive" :
+    { "name" : "CLaSH.Prelude.BlockRam.File.blockRamFile'"
+    , "type" :
+"blockRamFile' :: (KnownNat m, KnownNat k)   -- (ARG[0],ARG[1])
+               => SClock clk                 -- clk,  ARG[2]
+               -> SNat n                     -- sz,   ARG[3]
+               -> FilePath                   -- file, ARG[4]
+               -> Signal' clk (Unsigned k)   -- wr,   ARG[5]
+               -> Signal' clk (Unsigned k)   -- rd,   ARG[6]
+               -> Signal' clk Bool           -- wren, ARG[7]
+               -> Signal' clk (BitVector m)  -- din,  ARG[8]
+               -> Signal' clk (BitVector m)"
+    , "primType" : "Function"
+    }
+  }
+]

@@ -1,0 +1,12 @@
+[ { "Primitive" :
+    { "name" : "CLaSH.Prelude.ROM.File.asyncROMFile"
+    , "type" :
+"asyncROMFile :: (KnownNat k, KnownNat m) -- (ARG[0],ARG[1])
+              => SNat n                   -- sz,   ARG[2]
+              -> FilePath                 -- file, ARG[3]
+              -> Unsigned k               -- rd,   ARG[4]
+              -> BitVector m"
+    , "primType" : "Function"
+    }
+  }
+]
