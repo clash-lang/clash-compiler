@@ -75,11 +75,10 @@ prepareBlackBox :: TextS.Text
 prepareBlackBox pNm t bbCtx =
   let (templ,err) = runParse t
   in  if null err && verifyBlackBoxContext bbCtx templ
-         then do
-           templ'  <- instantiateSym templ
-           templ'' <- setClocks bbCtx templ'
-           templ3  <- instantiateCompName templ''
-           return $! templ3
+         then instantiateSym >=>
+              setClocks bbCtx >=>
+              collectFilePaths bbCtx >=>
+              instantiateCompName $ templ
          else
            error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show t ++
                    "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++
@@ -267,3 +266,12 @@ instantiateCompName :: BlackBoxTemplate
 instantiateCompName l = do
   nm <- Lens.use curCompNm
   return (setCompName nm l)
+
+collectFilePaths :: BlackBoxContext
+                 -> BlackBoxTemplate
+                 -> NetlistMonad BlackBoxTemplate
+collectFilePaths bbCtx l = do
+  fs <- Lens.use dataFiles
+  let (fs',l') = findAndSetDataFiles bbCtx fs l
+  dataFiles .= fs'
+  return l'

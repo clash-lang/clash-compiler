@@ -24,6 +24,7 @@ data Element = C   Text          -- ^ Constant
                                  -- the blackbox is instantiated
              | Size Element      -- ^ Size of a type hole
              | Length Element    -- ^ Length of a vector hole
+             | FilePath Element  -- ^ Hole containing a filepath for a data file
              | SigD Element (Maybe Int)
   deriving Show
 

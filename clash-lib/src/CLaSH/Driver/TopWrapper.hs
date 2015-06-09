@@ -284,4 +284,4 @@ unsafeRunNetlist :: NetlistMonad a
 unsafeRunNetlist = unsafePerformIO
                  . fmap fst
                  . runNetlistMonad Nothing HashMap.empty HashMap.empty
-                     HashMap.empty (\_ _ -> Nothing) ""
+                     HashMap.empty (\_ _ -> Nothing) "" []

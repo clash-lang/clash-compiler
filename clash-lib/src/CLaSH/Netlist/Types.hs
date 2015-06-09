@@ -49,6 +49,7 @@ data NetlistState
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
   , _modNm          :: String -- ^ Name of the module containing the @topEntity@
   , _curCompNm      :: Identifier
+  , _dataFiles      :: [(String,FilePath)]
   }
 
 -- | Signal reference

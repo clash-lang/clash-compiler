@@ -13,9 +13,13 @@ import           Control.Monad.State                  (State, runState)
 import           Control.Monad.Writer                 (MonadWriter, tell)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
+import           Data.List                            (mapAccumL)
 import           Data.Set                             (Set,singleton)
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
+import           System.FilePath                      (replaceBaseName,
+                                                       takeBaseName,
+                                                       takeFileName)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
                                                        renderOneLine)
 
@@ -24,7 +28,8 @@ import           CLaSH.Netlist.BlackBox.Parser
 import           CLaSH.Netlist.BlackBox.Types
 import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
                                                        BlackBoxContext (..),
-                                                       SyncExpr, Expr(Identifier))
+                                                       SyncExpr, Expr (..),
+                                                       Literal (..))
 import           CLaSH.Netlist.Util                   (typeSize)
 import           CLaSH.Util
 
@@ -112,6 +117,32 @@ setClocks bc bt = mapM setClocks' bt
                                 in  tell (singleton (rstName,Reset rst rate)) >> return (C rstName)
 
     setClocks' e = return e
+
+findAndSetDataFiles :: BlackBoxContext -> [(String,FilePath)] -> BlackBoxTemplate -> ([(String,FilePath)],BlackBoxTemplate)
+findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
+  where
+    findAndSet fs' (FilePath e) = case e of
+      (L n) ->
+        let (s,_,_) = bbInputs bbCtx !! n
+            e'      = either id fst s
+        in case e' of
+          BlackBoxE "GHC.CString.unpackCString#" _ bbCtx' _ -> case bbInputs bbCtx' of
+            [(Left (Literal Nothing (StringLit s')),_,_)] -> renderFilePath fs s'
+            _ -> (fs',FilePath e)
+          _ -> (fs',FilePath e)
+      _ -> (fs',FilePath e)
+    findAndSet fs' l = (fs',l)
+
+renderFilePath :: [(String,FilePath)] -> String -> ([(String,FilePath)],Element)
+renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
+  where
+    f'  = takeFileName f
+    f'' = selectNewName (map fst fs) f'
+
+    selectNewName as a
+      | elem a as = selectNewName as (replaceBaseName a (takeBaseName a ++ "_"))
+      | otherwise = a
+
 
 -- | Get the name of the clock of an identifier
 clkSyncId :: SyncExpr -> (Identifier,Int)
@@ -226,3 +257,4 @@ renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaratio
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
 renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
 renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
+renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"

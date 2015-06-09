@@ -72,6 +72,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> CompName          <$  pToken "~COMPNAME"
      <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
      <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
+     <|> FilePath          <$> (pToken "~FILE" *> pBrackets pTagE)
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pTagE) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pTagE)
 

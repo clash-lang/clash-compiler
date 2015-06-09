@@ -52,12 +52,14 @@ genNetlist :: Maybe Int
            -- ^ Symbol count
            -> String
            -- ^ Name of the module containing the @topEntity@
+           -> [(String,FilePath)]
+           -- ^ Set of collected data-files
            -> TmName
            -- ^ Name of the @topEntity@
-           -> IO ([Component],Int)
-genNetlist compCntM globals primMap tcm typeTrans mStart modName topEntity = do
-  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName $ genComponent topEntity mStart
-  return (HashMap.elems $ _components s, _cmpCount s)
+           -> IO ([Component],[(String,FilePath)],Int)
+genNetlist compCntM globals primMap tcm typeTrans mStart modName dfiles topEntity = do
+  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName dfiles $ genComponent topEntity mStart
+  return (HashMap.elems $ _components s, _dataFiles s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad :: Maybe Int
@@ -72,16 +74,18 @@ runNetlistMonad :: Maybe Int
                 -- ^ Hardcode Type -> HWType translator
                 -> String
                 -- ^ Name of the module containing the @topEntity@
+                -> [(String,FilePath)]
+                -- ^ Set of collected data-files
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad compCntM s p tcm typeTrans modName
+runNetlistMonad compCntM s p tcm typeTrans modName dfiles
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty dfiles
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function

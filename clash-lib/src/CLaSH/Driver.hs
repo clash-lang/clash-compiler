@@ -82,8 +82,8 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       let modName = takeWhile (/= '.') (name2String $ fst topEntity)
-      (netlist,cmpCnt) <- genNetlist Nothing transformedBindings primMap tcm
-                                     typeTrans Nothing modName (fst topEntity)
+      (netlist,dfiles,cmpCnt) <- genNetlist Nothing transformedBindings primMap tcm
+                                     typeTrans Nothing modName [] (fst topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -95,11 +95,12 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
                                       cName)
                                 netlist
 
-      testBench <- genTestBench opts supplyTB primMap
+      (testBench,dfiles') <- genTestBench opts supplyTB primMap
                                  typeTrans tcm eval cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                  modName
+                                 dfiles
                                  topComponent
 
 
@@ -116,6 +117,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
                        ]
       prepareDir dir
       mapM_ (writeHDL hdlState' dir) hdlDocs
+      copyDataFiles dir dfiles'
 
       end <- hdlDocs `seq` Clock.getCurrentTime
       let startEndDiff = Clock.diffUTCTime end start
@@ -159,3 +161,8 @@ writeHDL backend dir (cname, hdl) = do
   hPutDoc handle hdl
   IO.hPutStr handle "\n"
   IO.hClose handle
+
+copyDataFiles :: FilePath -> [(String,FilePath)] -> IO ()
+copyDataFiles dir = mapM_ copyFile'
+  where
+    copyFile' (nm,old) = Directory.copyFile old (dir FilePath.</> nm)
