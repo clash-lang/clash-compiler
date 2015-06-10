@@ -61,7 +61,12 @@ import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
                    isPrimTyCon, isTupleTyCon,
-                   tcExpandTyCon_maybe, tyConArity,
+#if __GLASGOW_HASKELL__ >= 711
+                   expandSynTyCon_maybe,
+#else
+                   tcExpandTyCon_maybe,
+#endif
+                   tyConArity,
                    tyConDataCons, tyConKind,
                    tyConName, tyConUnique)
 import Type       (mkTopTvSubst, substTy, tcView)
@@ -358,7 +363,11 @@ coreToType' :: Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> (coreToVar tv)
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
+#if __GLASGOW_HASKELL__ >= 711
+  | otherwise     = case expandSynTyCon_maybe tc args of
+#else
   | otherwise     = case tcExpandTyCon_maybe tc args of
+#endif
                       Just (substs,synTy,remArgs) -> do
                         let substs' = mkTopTvSubst substs
                             synTy'  = substTy substs' synTy
