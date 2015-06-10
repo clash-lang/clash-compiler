@@ -94,13 +94,18 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                      }
                   return dfPlug
 
-    let dflags1 = dflags { DynFlags.ctxtStkDepth = 1000
-                         , DynFlags.optLevel = 2
-                         , DynFlags.ghcMode  = GHC.CompManager
-                         , DynFlags.ghcLink  = GHC.LinkInMemory
-                         , DynFlags.hscTarget = DynFlags.defaultObjectTarget
-                                                  (DynFlags.targetPlatform dflags)
-                         }
+    let dflags1 = dflags
+#if __GLASGOW_HASKELL__ >= 711
+                    { DynFlags.reductionDepth = 1000
+#else
+                    { DynFlags.ctxtStkDepth = 1000
+#endif
+                    , DynFlags.optLevel = 2
+                    , DynFlags.ghcMode  = GHC.CompManager
+                    , DynFlags.ghcLink  = GHC.LinkInMemory
+                    , DynFlags.hscTarget = DynFlags.defaultObjectTarget
+                                             (DynFlags.targetPlatform dflags)
+                    }
     let dflags2 = wantedOptimizationFlags dflags1
     let ghcDynamic = case lookup "GHC Dynamic" (DynFlags.compilerInfo dflags) of
                       Just "YES" -> True
