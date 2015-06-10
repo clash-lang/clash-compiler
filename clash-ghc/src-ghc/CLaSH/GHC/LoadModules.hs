@@ -168,7 +168,13 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
   = ms {GHC.ms_hspp_opts = dflags}
   where
     dflags = wantedOptimizationFlags (ms_hspp_opts
-              {DynFlags.optLevel = 2, DynFlags.ctxtStkDepth = 1000})
+              { DynFlags.optLevel = 2
+#if __GLASGOW_HASKELL__ >= 711
+              , DynFlags.reductionDepth = 1000
+#else
+              , DynFlags.ctxtStkDepth = 1000
+#endif
+              })
 
 wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
 wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set df wanted) unwanted
