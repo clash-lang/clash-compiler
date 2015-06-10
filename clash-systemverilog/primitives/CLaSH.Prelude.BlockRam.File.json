@@ -1,4 +1,4 @@
-[ { "Primitive" :
+[ { "BlackBox" :
     { "name" : "CLaSH.Prelude.BlockRam.File.blockRamFile'"
     , "type" :
 "blockRamFile' :: (KnownNat m, KnownNat k)   -- (ARG[0],ARG[1])
@@ -10,7 +10,23 @@
                -> Signal' clk Bool           -- wren, ARG[7]
                -> Signal' clk (BitVector m)  -- din,  ARG[8]
                -> Signal' clk (BitVector m)"
-    , "primType" : "Function"
+"// blockRamFile begin
+~TYPO ~SYM[0] [0:~LIT[3]-1];
+~TYPO ~SYM[1];
+
+initial begin
+  $readmemb(~FILE[~LIT[4]],~SYM[0]);
+end
+
+always @(posedge ~CLK[2]) begin : blockRamFile_~COMPNAME_~SYM[2]
+  if (~ARG[7]) begin
+    ~SYM[0][~ARG[5]] <= ~ARG[8];
+  end
+  ~SYM[1] <= ~SYM[0][~ARG[6]];
+end
+
+assign ~RESULT = ~SYM[1];
+// blockRamFile end"
     }
   }
 ]
