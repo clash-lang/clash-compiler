@@ -38,6 +38,19 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 
 {-# NOINLINE asyncROMFile #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
+--
+-- __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 asyncROMFile :: (KnownNat k, KnownNat m)
              => SNat n      -- ^ Size of the ROM
              -> FilePath    -- ^ File describing the content of the ROM
@@ -51,6 +64,19 @@ asyncROMFile sz file rd = binit ! (toInteger rd)
 
 {-# INLINE asyncROMFilePow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
+--
+-- __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 asyncROMFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
@@ -62,6 +88,18 @@ asyncROMFilePow2 = asyncROMFile (snat :: SNat (2^n))
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 romFile :: (KnownNat m, KnownNat k)
         => SNat n               -- ^ Size of the ROM
         -> FilePath             -- ^ File describing the content of the ROM
@@ -74,6 +112,18 @@ romFile = romFile' systemClock
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 romFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
             => FilePath             -- ^ File describing the content of the ROM
             -> Signal (Unsigned n)  -- ^ Read address @rd@
@@ -85,6 +135,18 @@ romFilePow2 = romFile' systemClock (snat :: SNat (2^n))
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
              => SClock clk                -- ^ 'Clock' to synchronize to
              -> FilePath                  -- ^ File describing the content of the ROM
@@ -97,6 +159,18 @@ romFilePow2' clk = romFile' clk (snat :: SNat (2^n))
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 romFile' :: (KnownNat m, KnownNat k)
          => SClock clk                -- ^ 'Clock' to synchronize to
          -> SNat n                    -- ^ Size of the ROM

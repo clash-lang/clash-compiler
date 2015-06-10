@@ -45,6 +45,18 @@ import CLaSH.Sized.Unsigned  (Unsigned)
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 blockRamFile :: (KnownNat m, KnownNat k)
              => SNat n               -- ^ Size of the blockRAM
              -> FilePath             -- ^ File describing the initial content
@@ -63,6 +75,18 @@ blockRamFile = blockRamFile' systemClock
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath             -- ^ File describing the initial
                                          -- content of the blockRAM
@@ -80,6 +104,18 @@ blockRamFilePow2 = blockRamFile' systemClock (snat :: SNat (2^n))
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                   => SClock clk                -- ^ 'Clock' to synchronize to
                   -> FilePath                  -- ^ File describing the initial
@@ -98,6 +134,18 @@ blockRamFilePow2' clk = blockRamFile' clk (snat :: SNat (2^n))
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+-- * __NB__: This function might not work for specific combinations of
+-- code-generation backends and hardware targets. Please check the support table
+-- below:
+--
+-- @
+--                | VHDL     | Verilog  | SystemVerilog |
+-- ===============+==========+==========+===============+
+-- Altera/Quartus | Broken   | Works    | Works         |
+-- Xilinx/ISE     | Works    | Works    | Works         |
+-- ASIC           | Untested | Untested | Untested      |
+-- ===============+==========+==========+===============+
+-- @
 blockRamFile' :: (KnownNat m, KnownNat k)
               => SClock clk                -- ^ 'Clock' to synchronize to
               -> SNat n                    -- ^ Size of the blockRAM
