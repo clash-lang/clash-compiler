@@ -39,8 +39,8 @@ import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
 -- 0
 -- >>> (7 :: Unsigned 6) ! 6
 -- *** Exception: (!): 6 is out of range [5..0]
-(!) :: (BitPack a, KnownNat (BitSize a), Integral i) => a -> i -> Bit
-(!) v i = index# (pack v) (fromIntegral i)
+(!) :: (BitPack a, KnownNat (BitSize a), Enum i) => a -> i -> Bit
+(!) v i = index# (pack v) (fromEnum i)
 
 {-# INLINE slice #-}
 -- | Get a slice between bit index @m@ and and bit index @n@.
@@ -93,9 +93,9 @@ split v = split# (pack v)
 -- 01_1011
 -- >>> replaceBit 6 0 (-5 :: Signed 6)
 -- *** Exception: replaceBit: 6 is out of range [5..0]
-replaceBit :: (BitPack a, KnownNat (BitSize a), Integral i) => i -> Bit -> a
+replaceBit :: (BitPack a, KnownNat (BitSize a), Enum i) => i -> Bit -> a
            -> a
-replaceBit i b v = unpack (replaceBit# (pack v) (fromIntegral i) b)
+replaceBit i b v = unpack (replaceBit# (pack v) (fromEnum i) b)
 
 {-# INLINE setSlice #-}
 -- | Set the bits between bit index @m@ and bit index @n@.

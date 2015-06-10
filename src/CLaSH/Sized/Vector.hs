@@ -790,8 +790,8 @@ index_int xs i@(I# n0)
 -- 2
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 14
 -- *** Exception: CLaSH.Sized.Vector.(!!): index 14 is larger than maximum index 4
-(!!) :: (KnownNat n, Integral i) => Vec n a -> i -> a
-xs !! i = index_int xs (fromIntegral i)
+(!!) :: (KnownNat n, Enum i) => Vec n a -> i -> a
+xs !! i = index_int xs (fromEnum i)
 
 {-# NOINLINE maxIndex #-}
 -- | Index (subscript) of the last element in a 'Vec'tor
@@ -837,8 +837,8 @@ replace_int xs i@(I# n0) a
 -- <7,2,3,4,5>
 -- >>> replace 9 7 (1:>2:>3:>4:>5:>Nil)
 -- <1,2,3,4,*** Exception: CLaSH.Sized.Vector.replace: index 9 is larger than maximum index 4
-replace :: (KnownNat n, Integral i) => i -> a -> Vec n a -> Vec n a
-replace i y xs = replace_int xs (fromIntegral i) y
+replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
+replace i y xs = replace_int xs (fromEnum i) y
 
 {-# INLINABLE take #-}
 -- | 'take' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
