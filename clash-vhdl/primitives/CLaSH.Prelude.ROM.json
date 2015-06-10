@@ -1,4 +1,4 @@
-[ { "Primitive" :
+[ { "BlackBox" :
     { "name" : "CLaSH.Prelude.ROM.rom'"
     , "type" :
 "rom' :: (KnownNat n, KnownNat m)  -- (ARG[0],ARG[1])
@@ -6,7 +6,20 @@
       -> Vec n a                   -- init, ARG[3]
       -> Signal' clk (Unsigned m)  -- rd,   ARG[4]
       -> Signal' clk a"
-    , "primType" : "Function"
+    , "templateD" :
+"rom_~COMPNAME_~SYM[0] : block
+  signal rom  : ~TYP[3];
+  signal rom_dout : ~TYPO;
+begin
+  rom <= ~ARG[3];
+  process (~CLK[2])
+  begin
+    if (rising_edge(~CLK[2])) then
+      rom_dout <= rom(to_integer(~ARG[4]));
+    end if;
+  end process;
+  ~RESULT <= rom_dout;
+end block;"
     }
   }
 ]

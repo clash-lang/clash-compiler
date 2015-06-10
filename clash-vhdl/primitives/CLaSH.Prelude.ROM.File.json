@@ -1,4 +1,4 @@
-[ { "Primitive" :
+[ { "BlackBox" :
     { "name" : "CLaSH.Prelude.ROM.File.asyncROMFile"
     , "type" :
 "asyncROMFile :: (KnownNat k, KnownNat m) -- (ARG[0],ARG[1])
@@ -6,7 +6,64 @@
               -> FilePath                 -- file, ARG[3]
               -> Unsigned k               -- rd,   ARG[4]
               -> BitVector m"
-    , "primType" : "Function"
+    , "templateD" :
+"asyncROMFile_~COMPNAME_~SYM[0] : block
+  type RomType is array(0 to ~LIT[3]-1) of bit_vector(~LIT[0]-1 downto 0);
+
+  impure function InitRomFromFile (RomFileName : in string) return RamType is
+    FILE RomFile : text open read_mode is RomFileName;
+    variable RomFileLine : line;
+    variable ROM : RomType;
+  begin
+    for i in RomType'range loop
+      readline(RomFile,RomFileLine);
+      read(RomFileLine,ROM(i));
+    end loop;
+    return ROM;
+  end function;
+
+  signal ROM : RomType := InitRomFromFile(~FILE[~LIT[4]]);
+begin
+  ~RESULT <= to_stdlogicvector(ROM(to_integer(~ARG[4])));
+end block;"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Prelude.ROM.File.romFile'"
+    , "type" :
+"romFile' :: (KnownNat m, KnownNat k)  -- (ARG[0],ARG[1])
+          => SClock clk                -- clk,  ARG[2]
+          -> SNat n                    -- sz,   ARG[3]
+          -> FilePath                  -- file, ARG[4]
+          -> Signal' clk (Unsigned k)  -- rd,   ARG[5]
+          -> Signal' clk (BitVector m)"
+    , "templateD" :
+"romFile_~COMPNAME_~SYM[0] : block
+  type RomType is array(0 to ~LIT[3]-1) of bit_vector(~LIT[0]-1 downto 0);
+
+  impure function InitRomFromFile (RomFileName : in string) return RamType is
+    FILE RomFile : text open read_mode is RomFileName;
+    variable RomFileLine : line;
+    variable ROM : RomType;
+  begin
+    for i in RomType'range loop
+      readline(RomFile,RomFileLine);
+      read(RomFileLine,ROM(i));
+    end loop;
+    return ROM;
+  end function;
+
+  signal ROM  : RomType := InitRomFromFile(~FILE[~LIT[4]]);
+  signal rom_dout : ~TYPO;
+begin
+  process (~CLK[2])
+  begin
+    if (rising_edge(~CLK[2])) then
+      rom_dout <= to_stdlogicvector(ROM(to_integer(~ARG[5])));
+    end if;
+  end process;
+  ~RESULT <= rom_dout;
+end block;"
     }
   }
 ]
