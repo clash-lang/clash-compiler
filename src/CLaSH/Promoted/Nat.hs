@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,7 +16,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 module CLaSH.Promoted.Nat
-  ( SNat (..), snat, withSNat, snatToInteger
+  ( SNat (..), snat, withSNat, snatToInteger, addSNat, subSNat, mulSNat, powSNat
   , UNat (..), toUNat, addUNat, multUNat, powUNat
   )
 where
@@ -66,7 +67,7 @@ toUNat (SNat p) = fromI (natVal p)
     fromI 0 = unsafeCoerce UZero
     fromI n = unsafeCoerce (USucc (fromI (n - 1)))
 
--- | Add two singleton natural numbers
+-- | Add two unary singleton natural numbers
 --
 -- __NB__: Not synthesisable
 addUNat :: UNat n -> UNat m -> UNat (n + m)
@@ -74,7 +75,7 @@ addUNat UZero     y     = y
 addUNat x         UZero = x
 addUNat (USucc x) y     = USucc (addUNat x y)
 
--- | Multiply two singleton natural numbers
+-- | Multiply two unary singleton natural numbers
 --
 -- __NB__: Not synthesisable
 multUNat :: UNat n -> UNat m -> UNat (n * m)
@@ -82,9 +83,25 @@ multUNat UZero      _     = UZero
 multUNat _          UZero = UZero
 multUNat (USucc x) y      = addUNat y (multUNat x y)
 
--- | Exponential of two singleton natural numbers
+-- | Exponential of two unary singleton natural numbers
 --
 -- __NB__: Not synthesisable
 powUNat :: UNat n -> UNat m -> UNat (n ^ m)
 powUNat _ UZero     = USucc UZero
 powUNat x (USucc y) = multUNat x (powUNat x y)
+
+-- | Add two singleton natural numbers
+addSNat :: KnownNat (a + b) => SNat a -> SNat b -> SNat (a+b)
+addSNat _ _ = snat
+
+-- | Subtract two singleton natural numbers
+subSNat :: KnownNat (a - b) => SNat a -> SNat b -> SNat (a-b)
+subSNat _ _ = snat
+
+-- | Multiply two singleton natural numbers
+mulSNat :: KnownNat (a * b) => SNat a -> SNat b -> SNat (a*b)
+mulSNat _ _ = snat
+
+-- | Power of two singleton natural numbers
+powSNat :: KnownNat (a ^ b) => SNat a -> SNat b -> SNat (a^b)
+powSNat _ _ = snat
