@@ -1,18 +1,24 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.8.1
+* New features:
+  * Add operations on singleton natural numbers: `addSNat`, `subSNat`, `mulSNat`, and `powSNat`.
+  * Add ROM functions in modules "CLaSH.Prelude.ROM" and "CLaSH.Prelude.ROM.File", where the latter module contains functions that instantiate a ROM from the content specified in an external data-file.
+  * Add BlockRam functions, in the "CLaSH.Prelude.BlockRam.File" module, whose content can be initialised with the content specified in an external data-file.
+
 ## 0.8 *June 3rd 2015*
 * New features:
   * Make the (Bit)Vector argument the _last_ argument for the following functions: `slice`, `setSlice`, `replaceBit`, `replace`. The signatures for the above functions are now:
-    
+
     ```
     slice      :: BitPack a => SNat m -> SNat n -> a -> BitVector (m + 1 - n)
     setSlice   :: BitPack a => SNat m -> SNat n -> BitVector (m + 1 - n) -> a -> a
     replaceBit :: Integral i => i -> Bit -> a -> a
     replace    :: Integral i => i -> a -> Vec n a -> Vec n a
     ```
-    
+
     This allows for easier chaining, e.g.:
-    
+
     ```
     replaceBit 0 1 $
     repleceBit 4 0 $
@@ -28,16 +34,16 @@
     > unpack 0x0F :: Vec 8 Bit
     <1,1,1,1,0,0,0,0>
     ```
-    
+
     As of version 0.8, we have `head x == msb y`:
-    
+
     ```
     > 0x0F :: BitVector 8
     0000_1111
     > unpack 0x0F :: Vec 8 Bit
     <0,0,0,0,1,1,1,1>
     ```
-    
+
     So converting for `Vec`tors of `Bit`s to `BitVector`s is no longer _index_-preserving, but it is _order_-preserving.
   * Add [QuickCheck](http://hackage.haskell.org/package/QuickCheck) `Arbitary` and `CoArbitary` instances for all data types
   * Add [lens](http://hackage.haskell.org/package/lens) `Ixed` instances for `BitVector`, `Signed`, `Unsigned`, and `Vec`
