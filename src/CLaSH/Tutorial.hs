@@ -51,7 +51,7 @@ module CLaSH.Tutorial (
   -- *** SystemVerilog primitives
   -- $svprimitives
 
-  -- * Multiple clock-domains
+  -- * Multiple clock domains
   -- $multiclock
 
   -- * Conclusion
@@ -1235,13 +1235,84 @@ be found in "CLaSH.Prelude.Explicit", which re-exports the functions in
 the read and write port are synchronised to different clocks:
 
 @
+{\-\# LANGUAGE PartialTypeSignatures \#-\}
+module MultiClockFifo where
+
+import CLaSH.Prelude
+import CLaSH.Prelude.Explicit
+import Data.Default
+
 fifoMem wclk rclk sz waddr raddr wclken wfull wdata = rdata
   where
-    mem   = unbundle' wclk
-          $ 'regEn'' wclk ('replicate' sz 'def') (wclken '.&&.' 'not1' wfull)
-          $ 'bundle'' wclk mem'
-    mem'  = 'replace' <$> waddr <*> wdata <*> mem
-    rdata = 'unsafeSynchronizer' wclk rclk (mem !! raddr)
+    mem   = regEn' wclk (replicate (powSNat d2 sz) def)
+                        (wclken .&&. not1 wfull) mem'
+    mem'  = replace \<$\> waddr \<*\> wdata \<*\> mem
+    rdata = ((!!) \<$\> unsafeSynchronizer wclk rclk mem \<*\> raddr)
+
+ptrSync clk1 clk2 ptr = last \<$\> s_ptr
+  where
+    s_ptr  = register' clk1 (replicate d2 0) s_ptr'
+    s_ptr' = (+>>) \<$\> unsafeSynchronizer clk2 clk1 ptr \<*\> s_ptr
+
+boolToBV = zeroExtend . pack
+
+ptrCompareT sz cmp (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
+                                                ,(flag,addr,ptr))
+  where
+    -- GRAYSTYLE2 pointer
+    bin' = bin + boolToBV (inc && not flag)
+    ptr' = (bin' ``shiftR`` 1) ``xor`` bin'
+    addr = slice (subSNat sz d1) d0 bin
+
+    flag' = cmp ptr' s_ptr
+
+-- FIFO empty: when next pntr == synchronized wptr or on reset
+isEmpty       = (==)
+rptrEmptyInit = (0,0,True)
+
+-- FIFO full: when next pntr == synchonized {~wptr[sz:sz-1],wptr[sz-1:0]}
+isFull sz ptr s_ptr = ptr == (complement (slice sz (subSNat sz d1) s_ptr) ++#
+                              slice (subSNat sz d2) d0 s_ptr)
+wptrFullInit        = (0,0,False)
+
+
+fifo :: _
+     => SNat addrSize -> SClock wclk -> SClock rclk
+     -> Signal' wclk a -> Signal' wclk Bool
+     -> Signal' rclk Bool
+     -> (Signal' rclk a,Signal' wclk Bool,Signal' rclk Bool)
+fifo szA wclk rclk wdata winc rinc = (rdata,wfull,rempty)
+  where
+    s_rptr = ptrSync wclk rclk rptr
+    s_wptr = ptrSync rclk wclk wptr
+
+    rdata = fifoMem wclk rclk szA waddr raddr winc wfull wdata
+
+    (rempty,raddr,rptr) = mealyB' rclk (ptrCompareT szA isEmpty) rptrEmptyInit
+                                  (s_wptr,rinc)
+
+    (wfull,waddr,wptr)  = mealyB' wclk (ptrCompareT szA (isFull szA))
+                                  wptrFullInit (s_rptr,winc)
+@
+
+Instantiate FIFO:
+
+@
+type ClkAudio = 'Clk \"audio\" 200
+type ClkFFT   = 'Clk \"FFT\"   850
+
+clkAudio :: SClock ClkAudio
+clkAudio = sclock
+
+clkFFT :: SClock ClkFFT
+clkFFT = sclock
+
+audioToFFT :: Signal' ClkAudio (SFixed 8 8)
+           -> Signal' ClkAudio Bool
+           -> Signal' ClkFFT Bool
+           -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkAudio Bool
+              ,Signal' ClkFFT Bool)
+audioToFFT = fifo d3 clkAudio clkFFT
 @
 
 -}
