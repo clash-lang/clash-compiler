@@ -51,6 +51,9 @@ module CLaSH.Tutorial (
   -- *** SystemVerilog primitives
   -- $svprimitives
 
+  -- * Multiple clock-domains
+  -- $multiclock
+
   -- * Conclusion
   -- $conclusion
 
@@ -70,6 +73,7 @@ import CLaSH.Prelude.Explicit
 import Data.Char
 import Data.Int
 import GHC.Word
+import Data.Default
 
 -- $setup
 -- >>> :set -XTemplateHaskell
@@ -1201,6 +1205,43 @@ end
 assign ~RESULT = ~SYM[1];"
     }
   }
+@
+
+-}
+
+{- $multiclock
+CλaSH supports multi-clock designs, though perhaps in a slightly limited form.
+What is possible is:
+
+* Explicitly assign clocks to memory primitives.
+* Synchronise between differently-clocked parts of your design in a type-safe
+  way.
+
+What is /not/ possible is:
+
+* Generate a clock signal in module A, and assign this clock signal to a memory
+  primitive in module B.
+
+What this means is that when CλaSH converts your design to VHDL/(System)Verilog,
+you end up with a top-level module/entity with multiple clock and reset ports
+for the different clock domains. If you're targeting an FPGA, you can use e.g. a
+<https://www.altera.com/literature/ug/ug_altpll.pdf PPL> or
+<http://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf MMCM>
+to provide the clock signals.
+
+The explicitly clocked versions of all synchronous functions and primitives can
+be found in "CLaSH.Prelude.Explicit", which re-exports the functions in
+"CLaSH.Signal.Explicit". We will use those functions to create a FIFO where
+the read and write port are synchronised to different clocks:
+
+@
+fifoMem wclk rclk sz waddr raddr wclken wfull wdata = rdata
+  where
+    mem   = unbundle' wclk
+          $ 'regEn'' wclk ('replicate' sz 'def') (wclken '.&&.' 'not1' wfull)
+          $ 'bundle'' wclk mem'
+    mem'  = 'replace' <$> waddr <*> wdata <*> mem
+    rdata = 'unsafeSynchronizer' wclk rclk (mem !! raddr)
 @
 
 -}
