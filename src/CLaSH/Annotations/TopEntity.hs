@@ -89,7 +89,7 @@ However, if we add the following 'TopEntity' annotation in the file:
     , t_extraIn  = [ (\"CLOCK_50\", 1)
                    , (\"KEY0\"    , 1)
                    ]
-    , t_clocks   = [ 'defClkAltera' "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
+    , t_clocks   = [ 'altpll' "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) \#-\}
 @
 
@@ -173,8 +173,11 @@ module CLaSH.Annotations.TopEntity
   , ClockSource (..)
     -- * Convenience functions
   , defTop
-  , defClkAltera
-  , defClkXilinx
+    -- ** Altera clock sources
+  , altpll
+  , alteraPll
+    -- ** Xilinx clock sources
+  , clockWizard
   )
 where
 
@@ -196,22 +199,18 @@ data TopEntity
   --
   -- So given a bit-width @n@, the port has type:
   --
-  -- @std_logic_vector (n-1 downto 0)@ in VHDL
-  --
-  -- and
-  --
-  -- @logic [n-1:0]@ in (System)Verilog.
+  -- * __VHDL__: @std_logic_vector (n-1 downto 0)@
+  -- * __Verilog__: @[n-1:0]@
+  -- * __SystemVerilog__: @logic [n-1:0]@
   , t_extraOut :: [(String,Int)]
   -- ^ Extra output ports, where every tuple holds the name of the input port
   -- and the number of bits are used for that input port.
   --
   -- So given a bit-width @n@, the port has type:
   --
-  -- @std_logic_vector (n-1 downto 0)@ in VHDL
-  --
-  -- and
-  --
-  -- @logic [n-1:0]@ in (System)Verilog.
+  -- * __VHDL__: @std_logic_vector (n-1 downto 0)@
+  -- * __Verilog__: @[n-1:0]@
+  -- * __SystemVerilog__: @logic [n-1:0]@
   , t_clocks   :: [ClockSource]  -- ^ List of clock sources
   }
   deriving (Data,Show)
@@ -275,10 +274,10 @@ defTop = TopEntity
   , t_clocks   = []
   }
 
--- | A clock source that corresponds to the Altera PLL component with default
--- settings to provide a stable 'systemClock'.
+-- | A clock source that corresponds to the Altera/Quartus \"ALTPLL\" component
+-- with default settings to provide a stable 'systemClock'.
 --
--- >>> defClkAltera "altpll50" "CLOCK(0)" "not KEY(0)"
+-- >>> altpll "altpll50" "CLOCK(0)" "not KEY(0)"
 -- ClockSource {c_name = "altpll50", c_inp = Just ("inclk0","CLOCK(0)"), c_outp = [("c0","system1000")], c_reset = Just ("areset","not KEY(0)"), c_lock = "locked", c_sync = False}
 --
 -- Will generate the following VHDL:
@@ -292,7 +291,7 @@ defTop = TopEntity
 --
 -- If you are however generating (System)Verilog you should write:
 --
--- >>> defClkAltera "altpll50" "CLOCK[0]" "~ KEY[0]"
+-- >>> altpll "altpll50" "CLOCK[0]" "~ KEY[0]"
 -- ClockSource {c_name = "altpll50", c_inp = Just ("inclk0","CLOCK[0]"), c_outp = [("c0","system1000")], c_reset = Just ("areset","~ KEY[0]"), c_lock = "locked", c_sync = False}
 --
 -- so that the following (System)Verilog is created:
@@ -302,11 +301,11 @@ defTop = TopEntity
 -- > ,.c0 (system1000)
 -- > ,.areset (~ KEY0[0])
 -- > ,.locked (altpll50_locked));
-defClkAltera :: String -- ^ Name of the component.
-             -> String -- ^ Clock Pin/Expression of the free running clock.
-             -> String -- ^ Reset Pin/Expression controlling the reset of the PLL.
-             -> ClockSource
-defClkAltera pllName clkExpr resExpr = ClockSource
+altpll :: String -- ^ Name of the component.
+       -> String -- ^ Clock Pin/Expression of the free running clock.
+       -> String -- ^ Reset Pin/Expression controlling the reset of the PLL.
+       -> ClockSource
+altpll pllName clkExpr resExpr = ClockSource
   { c_name  = pllName
   , c_inp   = Just ("inclk0",clkExpr)
   , c_outp  = [("c0",show systemClock)]
@@ -315,10 +314,50 @@ defClkAltera pllName clkExpr resExpr = ClockSource
   , c_sync  = False
   }
 
--- | A clock source that corresponds to the Xilinx PLL/MMCM component with
--- settings to provide a stable 'systemClock'.
+-- | A clock source that corresponds to the Altera \"Altera PLL\" component
+-- with default settings to provide a stable 'systemClock'.
 --
--- >>> defClkXilinx "clkwiz50" "CLOCK(0)" "not KEY(0)"
+-- >>> alteraPll "alteraPll50" "CLOCK(0)" "not KEY(0)"
+-- ClockSource {c_name = "alteraPll50", c_inp = Just ("refclk","CLOCK(0)"), c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","not KEY(0)"), c_lock = "locked", c_sync = False}
+--
+-- Will generate the following VHDL:
+--
+-- > alteraPll50_inst : entity alteraPll
+-- >   port map
+-- >     (refclk   => CLOCK_50(0)
+-- >     ,outclk_0 => system1000
+-- >     ,rst      => not KEY0(0)
+-- >     ,locked   => alteraPll50_locked);
+--
+-- If you are however generating (System)Verilog you should write:
+--
+-- >>> alteraPll "alteraPll50" "CLOCK[0]" "~ KEY[0]"
+-- ClockSource {c_name = "altpll50", c_inp = Just ("refclk","CLOCK[0]"), c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","~ KEY[0]"), c_lock = "locked", c_sync = False}
+--
+-- so that the following (System)Verilog is created:
+--
+-- > alteraPll50 alteraPll50_inst
+-- > (.refclk (CLOCK_50[0])
+-- > ,.outclk_0 (system1000)
+-- > ,.rst (~ KEY0[0])
+-- > ,.locked (alteraPll50_locked));
+alteraPll :: String -- ^ Name of the component.
+          -> String -- ^ Clock Pin/Expression of the free running clock.
+          -> String -- ^ Reset Pin/Expression controlling the reset of the PLL.
+          -> ClockSource
+alteraPll pllName clkExpr resExpr = ClockSource
+  { c_name  = pllName
+  , c_inp   = Just ("refclk",clkExpr)
+  , c_outp  = [("outclk_0",show systemClock)]
+  , c_reset = Just ("rst",resExpr)
+  , c_lock  = "locked"
+  , c_sync  = False
+  }
+
+-- | A clock source that corresponds to the Xilinx PLL/MMCM component created
+-- with the \"Clock Wizard\", with settings to provide a stable 'systemClock'.
+--
+-- >>> clockWizard "clkwiz50" "CLOCK(0)" "not KEY(0)"
 -- ClockSource {c_name = "clkwiz50", c_inp = Just ("CLK_IN1","CLOCK(0)"), c_outp = [("CLK_OUT1","system1000")], c_reset = Just ("RESET","not KEY(0)"), c_lock = "LOCKED", c_sync = False}
 --
 -- Will generate the following VHDL:
@@ -332,7 +371,7 @@ defClkAltera pllName clkExpr resExpr = ClockSource
 --
 -- If you are however generating (System)Verilog you should write:
 --
--- >>> defClkXilinx "clkwiz50" "CLOCK[0]" "~ KEY[0]"
+-- >>> clockWizard "clkwiz50" "CLOCK[0]" "~ KEY[0]"
 -- ClockSource {c_name = "clkwiz50", c_inp = Just ("CLK_IN1","CLOCK[0]"), c_outp = [("CLK_OUT1","system1000")], c_reset = Just ("RESET","~ KEY[0]"), c_lock = "LOCKED", c_sync = False}
 --
 -- so that the following (System)Verilog is created:
@@ -342,11 +381,11 @@ defClkAltera pllName clkExpr resExpr = ClockSource
 -- > ,.CLK_OUT1 (system1000)
 -- > ,.RESET (~ KEY0[0])
 -- > ,.LOCKED (altpll50_locked));
-defClkXilinx :: String -- ^ Name of the component.
-             -> String -- ^ Clock Pin/Expression of the free running clock.
-             -> String -- ^ Reset Pin/Expression controlling the reset of the PLL.
-             -> ClockSource
-defClkXilinx pllName clkExpr resExpr = ClockSource
+clockWizard :: String -- ^ Name of the component.
+            -> String -- ^ Clock Pin/Expression of the free running clock.
+            -> String -- ^ Reset Pin/Expression controlling the reset of the PLL.
+            -> ClockSource
+clockWizard pllName clkExpr resExpr = ClockSource
   { c_name  = pllName
   , c_inp   = Just ("CLK_IN1",clkExpr)
   , c_outp  = [("CLK_OUT1",show systemClock)]
