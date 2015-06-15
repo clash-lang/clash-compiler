@@ -78,6 +78,7 @@ Library
                       CLaSH.Prelude.Explicit
                       CLaSH.Prelude.Mealy
                       CLaSH.Prelude.Moore
+                      CLaSH.Prelude.RAM
                       CLaSH.Prelude.ROM
                       CLaSH.Prelude.ROM.File
                       CLaSH.Prelude.Testbench

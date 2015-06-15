@@ -50,6 +50,9 @@ module CLaSH.Prelude
   , asyncROMFilePow2
   , romFile
   , romFilePow2
+    -- * RAM primitives with a combinational read port
+  , asyncRam
+  , asyncRamPow2
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
@@ -134,6 +137,7 @@ import CLaSH.Prelude.Explicit      (registerB', window', windowD', isRising',
                                     isFalling')
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.Moore         (moore, mooreB)
+import CLaSH.Prelude.RAM           (asyncRam,asyncRamPow2)
 import CLaSH.Prelude.ROM           (asyncROM,asyncROMPow2,rom,romPow2)
 import CLaSH.Prelude.ROM.File      (asyncROMFile,asyncROMFilePow2,romFile,
                                     romFilePow2)

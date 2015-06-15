@@ -32,6 +32,9 @@ module CLaSH.Prelude.Explicit
     -- ** ROMs initialised with a data file
   , romFile'
   , romFilePow2'
+    -- * RAM primitives with a combinational read port
+  , asyncRam'
+  , asyncRamPow2'
     -- * BlockRAM primitives
   , blockRam'
   , blockRamPow2'
@@ -61,6 +64,7 @@ import CLaSH.Prelude.BlockRam  (blockRam', blockRamPow2')
 import CLaSH.Prelude.BlockRam.File (blockRamFile', blockRamFilePow2')
 import CLaSH.Prelude.Mealy     (mealy', mealyB')
 import CLaSH.Prelude.Moore     (moore', mooreB')
+import CLaSH.Prelude.RAM       (asyncRam',asyncRamPow2')
 import CLaSH.Prelude.ROM       (rom', romPow2')
 import CLaSH.Prelude.ROM.File  (romFile', romFilePow2')
 import CLaSH.Prelude.Testbench (stimuliGenerator', outputVerifier')
