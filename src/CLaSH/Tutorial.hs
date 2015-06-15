@@ -1236,31 +1236,34 @@ the read and write port are synchronised to different clocks:
 
 @
 {\-\# LANGUAGE PartialTypeSignatures \#-\}
+{\-\# OPTIONS_GHC -fno-warn-partial-type-signatures \#-\}
 module MultiClockFifo where
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 
-fifoMem wclk rclk sz waddr raddr wclken wfull wdata = rdata'
-  where
-    raddr' = 'unsafeSynchronizer' rclk wclk raddr
-    rdata  = 'asyncRam'' wclk sz waddr raddr' wclken wdata
-    rdata' = 'unsafeSynchronizer' wclk rclk rdata
+fifoMem wclk rclk sz waddr raddr wclken wfull wdata =
+  'asyncRam'' wclk rclk
+            ('powSNat' d2 sz)
+            waddr raddr
+            (wclken '.&&.' 'not1' wfull)
+            wdata
 
-ptrSync clk1 clk2 ptr = last \<$\> s_ptr
+ptrSync clk1 clk2 ptr = 'last' '<$>' s_ptr
   where
-    s_ptr  = register' clk1 (replicate d2 0) s_ptr'
-    s_ptr' = (+>>) \<$\> 'unsafeSynchronizer' clk2 clk1 ptr \<*\> s_ptr
+    s_ptr  = 'register'' clk1 (replicate d2 0) s_ptr'
+    s_ptr' = ('+>>') '<$>' 'unsafeSynchronizer' clk2 clk1 ptr '<*>' s_ptr
 
+boolToBV :: _ => Bool -> BitVector (n + 1)
 boolToBV = 'zeroExtend' . 'pack'
 
 ptrCompareT sz cmp (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
                                                 ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
-    bin' = bin + boolToBV (inc && not flag)
+    bin' = bin + boolToBV (inc '&&' 'not' flag)
     ptr' = (bin' ``shiftR`` 1) ``xor`` bin'
-    addr = 'unpack' ('slice' ('subSNat' sz d1) d0 bin)
+    addr = 'slice' ('subSNat' sz d1) d0 bin
 
     flag' = cmp ptr' s_ptr
 
@@ -1286,10 +1289,10 @@ fifo szA wclk rclk wdata winc rinc = (rdata,wfull,rempty)
 
     rdata = fifoMem wclk rclk szA waddr raddr winc wfull wdata
 
-    (rempty,raddr,rptr) = mealyB' rclk (ptrCompareT szA isEmpty) rptrEmptyInit
+    (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT szA isEmpty) rptrEmptyInit
                                   (s_wptr,rinc)
 
-    (wfull,waddr,wptr)  = mealyB' wclk (ptrCompareT szA (isFull szA))
+    (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT szA (isFull szA))
                                   wptrFullInit (s_rptr,winc)
 @
 
