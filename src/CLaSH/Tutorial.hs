@@ -1240,21 +1240,19 @@ module MultiClockFifo where
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
-import Data.Default
 
-fifoMem wclk rclk sz waddr raddr wclken wfull wdata = rdata
+fifoMem wclk rclk sz waddr raddr wclken wfull wdata = rdata'
   where
-    mem   = regEn' wclk (replicate (powSNat d2 sz) def)
-                        (wclken .&&. not1 wfull) mem'
-    mem'  = replace \<$\> waddr \<*\> wdata \<*\> mem
-    rdata = ((!!) \<$\> unsafeSynchronizer wclk rclk mem \<*\> raddr)
+    raddr' = 'unsafeSynchronizer' rclk wclk raddr
+    rdata  = 'asyncRam'' wclk sz waddr raddr' wclken wdata
+    rdata' = 'unsafeSynchronizer' wclk rclk rdata
 
 ptrSync clk1 clk2 ptr = last \<$\> s_ptr
   where
     s_ptr  = register' clk1 (replicate d2 0) s_ptr'
-    s_ptr' = (+>>) \<$\> unsafeSynchronizer clk2 clk1 ptr \<*\> s_ptr
+    s_ptr' = (+>>) \<$\> 'unsafeSynchronizer' clk2 clk1 ptr \<*\> s_ptr
 
-boolToBV = zeroExtend . pack
+boolToBV = 'zeroExtend' . 'pack'
 
 ptrCompareT sz cmp (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
                                                 ,(flag,addr,ptr))
@@ -1262,7 +1260,7 @@ ptrCompareT sz cmp (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
     -- GRAYSTYLE2 pointer
     bin' = bin + boolToBV (inc && not flag)
     ptr' = (bin' ``shiftR`` 1) ``xor`` bin'
-    addr = slice (subSNat sz d1) d0 bin
+    addr = 'unpack' ('slice' ('subSNat' sz d1) d0 bin)
 
     flag' = cmp ptr' s_ptr
 
@@ -1271,8 +1269,8 @@ isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
 -- FIFO full: when next pntr == synchonized {~wptr[sz:sz-1],wptr[sz-1:0]}
-isFull sz ptr s_ptr = ptr == (complement (slice sz (subSNat sz d1) s_ptr) ++#
-                              slice (subSNat sz d2) d0 s_ptr)
+isFull sz ptr s_ptr = ptr == ('complement' ('slice' sz ('subSNat' sz d1) s_ptr) '++#'
+                              'slice' ('subSNat' sz d2) d0 s_ptr)
 wptrFullInit        = (0,0,False)
 
 
