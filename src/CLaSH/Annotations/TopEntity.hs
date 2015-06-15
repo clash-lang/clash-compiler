@@ -332,7 +332,7 @@ altpll pllName clkExpr resExpr = ClockSource
 -- If you are however generating (System)Verilog you should write:
 --
 -- >>> alteraPll "alteraPll50" "CLOCK[0]" "~ KEY[0]"
--- ClockSource {c_name = "altpll50", c_inp = Just ("refclk","CLOCK[0]"), c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","~ KEY[0]"), c_lock = "locked", c_sync = False}
+-- ClockSource {c_name = "alteraPll50", c_inp = Just ("refclk","CLOCK[0]"), c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","~ KEY[0]"), c_lock = "locked", c_sync = False}
 --
 -- so that the following (System)Verilog is created:
 --
