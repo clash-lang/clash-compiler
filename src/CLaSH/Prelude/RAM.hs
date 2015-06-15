@@ -35,8 +35,7 @@ import GHC.TypeLits           (KnownNat, KnownSymbol, type (^))
 import CLaSH.Promoted.Nat     (SNat,snat,snatToInteger)
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Bundle    (bundle')
-import CLaSH.Signal.Explicit  (Clock (..), Signal', SClock, sclock, systemClock,
-                               unsafeSynchronizer)
+import CLaSH.Signal.Explicit  (Signal', SClock, systemClock, unsafeSynchronizer)
 import CLaSH.Sized.Unsigned   (Unsigned)
 
 {-# INLINE asyncRam #-}
@@ -51,7 +50,7 @@ asyncRam :: (KnownNat n, Enum addr)
          -> Signal a    -- ^ Value to write (at address @w@)
          -> Signal a
          -- ^ Value of the @AM@ at address @r@
-asyncRam = asyncRam' systemClock
+asyncRam = asyncRam' systemClock systemClock
 
 {-# INLINE asyncRamPow2 #-}
 -- | Create a RAM with space for 2^@n@ elements
@@ -64,54 +63,59 @@ asyncRamPow2 :: forall n a . (KnownNat (2^n), KnownNat n)
              -> Signal a            -- ^ Value to write (at address @w@)
              -> Signal a
              -- ^ Value of the @RAM@ at address @r@
-asyncRamPow2 = asyncRam' systemClock (snat :: SNat (2^n))
+asyncRamPow2 = asyncRam' systemClock systemClock (snat :: SNat (2^n))
 
 {-# INLINE asyncRamPow2' #-}
 -- | Create a RAM with space for 2^@n@ elements
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
-asyncRamPow2' :: forall wclk rclk name period n a .
-                 (KnownNat n, KnownNat (2^n), KnownSymbol name, KnownNat period
-                 ,'Clk name period ~ rclk)
-              => SClock wclk               -- ^ 'Clock' to synchronize to
+asyncRamPow2' :: forall wclk rclk n a .
+                 (KnownNat n, KnownNat (2^n))
+              => SClock wclk               -- ^ 'Clock' to synchronize to the
+                                           -- RAM to
+              -> SClock rclk               -- ^ 'Clock' to which the read
+                                           -- read address signal @r@ is
+                                           -- synchronised to
               -> Signal' wclk (Unsigned n) -- ^ Write address @w@
               -> Signal' rclk (Unsigned n) -- ^ Read address @r@
               -> Signal' wclk Bool         -- ^ Write enable
               -> Signal' wclk a            -- ^ Value to write (at address @w@)
               -> Signal' rclk a
               -- ^ Value of the @RAM@ at address @r@
-asyncRamPow2' wclk = asyncRam' wclk (snat :: SNat (2^n))
+asyncRamPow2' wclk rclk = asyncRam' wclk rclk (snat :: SNat (2^n))
 
 {-# INLINE asyncRam' #-}
 -- | Create a RAM with space for @n@ elements
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
-asyncRam' :: (KnownNat n, KnownSymbol name, KnownNat period
-             ,'Clk name period ~ rclk, Enum addr)
-          => SClock wclk       -- ^ 'Clock' to synchronize to
+asyncRam' :: (KnownNat n, Enum addr)
+          => SClock wclk       -- ^ 'Clock' to synchronize the RAM to
+          -> SClock rclk       -- ^ 'Clock' to which the read address signal @r@
+                               -- is synchronised to
           -> SNat n            -- ^ Size @n@ of the RAM
           -> Signal' wclk addr -- ^ Write address @w@
           -> Signal' rclk addr -- ^ Read address @r@
           -> Signal' wclk Bool -- ^ Write enable
           -> Signal' wclk a    -- ^ Value to write (at address @w@)
           -> Signal' rclk a    -- ^ Value of the @RAM@ at address @r@
-asyncRam' wclk sz wr rd en din = asyncRam# wclk sz (fromEnum <$> wr)
-                                           (fromEnum <$> rd) en din
+asyncRam' wclk rclk sz wr rd en din = asyncRam# wclk rclk sz (fromEnum <$> wr)
+                                                (fromEnum <$> rd) en din
 
 {-# NOINLINE asyncRam# #-}
 -- | RAM primitive
-asyncRam# :: (KnownSymbol name, KnownNat period ,'Clk name period ~ rclk)
-          => SClock wclk       -- ^ 'Clock' to synchronize to
+asyncRam# :: SClock wclk       -- ^ 'Clock' to synchronize the RAM to
+          -> SClock rclk       -- ^ 'Clock' to which the read address signal @r@
+                               -- is synchronised to
           -> SNat n            -- ^ Size @n@ of the RAM
           -> Signal' wclk Int  -- ^ Write address @w@
           -> Signal' rclk Int  -- ^ Read address @r@
           -> Signal' wclk Bool -- ^ Write enable
           -> Signal' wclk a    -- ^ Value to write (at address @w@)
           -> Signal' rclk a    -- ^ Value of the @RAM@ at address @r@
-asyncRam# wclk sz wr rd en din = unsafeSynchronizer wclk sclock dout
+asyncRam# wclk rclk sz wr rd en din = unsafeSynchronizer wclk rclk dout
   where
     szI  = fromInteger $ snatToInteger sz
-    rd'  = unsafeSynchronizer sclock wclk rd
+    rd'  = unsafeSynchronizer rclk wclk rd
     dout = runST $ do
       arr <- newArray_ (0,szI-1)
       traverse (ramT arr) (bundle' wclk (wr,rd',en,din))
