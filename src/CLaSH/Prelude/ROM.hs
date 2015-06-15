@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash        #-}
 {-# LANGUAGE TypeOperators    #-}
 
 {-# LANGUAGE Safe #-}
 
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
+Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -21,27 +22,32 @@ module CLaSH.Prelude.ROM
     -- * Synchronous ROM synchronised to an arbitrary clock
   , rom'
   , romPow2'
+    -- * Internal
+  , asyncROM#
+  , rom#
   )
 where
 
+import Data.Array             ((!),listArray)
 import GHC.TypeLits           (KnownNat, type (^))
-import Prelude                hiding ((!!))
 
-import CLaSH.Prelude.Moore    (moore')
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock)
 import CLaSH.Sized.Unsigned   (Unsigned)
-import CLaSH.Sized.Vector     (Vec, (!!))
+import CLaSH.Signal.Explicit  (register')
+import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
 
+{-# INLINE asyncROM #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
-asyncROM :: (KnownNat n, KnownNat m)
-         => Vec n a    -- ^ ROM content
-                       --
-                       -- __NB:__ must be a constant
-         -> Unsigned m -- ^ Read address @rd@
-         -> a          -- ^ The value of the ROM at address @rd@
-asyncROM = (!!)
+asyncROM :: (KnownNat n, Enum addr)
+         => Vec n a -- ^ ROM content
+                    --
+                    -- __NB:__ must be a constant
+         -> addr    -- ^ Read address @rd@
+         -> a       -- ^ The value of the ROM at address @rd@
+asyncROM content rd = asyncROM# content (fromEnum rd)
 
+{-# INLINE asyncROMPow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 asyncROMPow2 :: (KnownNat (2^n), KnownNat n)
              => Vec (2^n) a -- ^ ROM content
@@ -49,7 +55,20 @@ asyncROMPow2 :: (KnownNat (2^n), KnownNat n)
                             -- __NB:__ must be a constant
              -> Unsigned n  -- ^ Read address @rd@
              -> a           -- ^ The value of the ROM at address @rd@
-asyncROMPow2 = (!!)
+asyncROMPow2 = asyncROM
+
+{-# NOINLINE asyncROM# #-}
+-- | asyncROM primitive
+asyncROM# :: KnownNat n
+          => Vec n a  -- ^ ROM content
+                      --
+                      -- __NB:__ must be a constant
+          -> Int      -- ^ Read address @rd@
+          -> a        -- ^ The value of the ROM at address @rd@
+asyncROM# content rd = arr ! rd
+  where
+    szI = fromInteger (maxIndex content)
+    arr = listArray (0,szI - 1) (toList content)
 
 {-# INLINE rom #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
@@ -91,19 +110,32 @@ romPow2' :: (KnownNat (2^n), KnownNat n)
          -> Signal' clk a            -- ^ The value of the ROM at address @rd@
 romPow2' = rom'
 
-{-# NOINLINE rom' #-}
+{-# INLINE rom' #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
-rom' :: (KnownNat n, KnownNat m)
-     => SClock clk               -- ^ 'Clock' to synchronize to
-     -> Vec n a                  -- ^ ROM content
-                                 --
-                                 -- __NB:__ must be a constant
-     -> Signal' clk (Unsigned m) -- ^ Read address @rd@
-     -> Signal' clk a            -- ^ The value of the ROM at address @rd@
-rom' clk binit rd =
-    moore' clk rom'' id undefined rd
+rom' :: (KnownNat n, Enum addr)
+     => SClock clk       -- ^ 'Clock' to synchronize to
+     -> Vec n a          -- ^ ROM content
+                         --
+                         -- __NB:__ must be a constant
+     -> Signal' clk addr -- ^ Read address @rd@
+     -> Signal' clk a
+     -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+rom' clk content rd = rom# clk content (fromEnum <$> rd)
+
+{-# NOINLINE rom# #-}
+-- | ROM primitive
+rom# :: KnownNat n
+     => SClock clk      -- ^ 'Clock' to synchronize to
+     -> Vec n a         -- ^ ROM content
+                        --
+                        -- __NB:__ must be a constant
+     -> Signal' clk Int -- ^ Read address @rd@
+     -> Signal' clk a
+     -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+rom# clk content rd = register' clk undefined ((arr !) <$> rd)
   where
-    rom'' _ r = binit !! r
+    szI = fromInteger (maxIndex content)
+    arr = listArray (0,szI - 1) (toList content)

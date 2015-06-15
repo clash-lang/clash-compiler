@@ -1,8 +1,9 @@
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash        #-}
 {-# LANGUAGE TypeOperators    #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 {-|
 Copyright  :  (C) 2013-2015, University of Twente
@@ -18,18 +19,22 @@ module CLaSH.Prelude.BlockRam
     -- * BlockRAM synchronised to an arbitrary clock
   , blockRam'
   , blockRamPow2'
+    -- * Internal
+  , blockRam#
   )
 where
 
+import Control.Monad          (when)
+import Control.Monad.ST.Lazy  (ST,runST)
+import Data.Array.MArray      (newListArray,readArray,writeArray)
+import Data.Array.ST          (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
-import Prelude                hiding ((!!))
 
-import CLaSH.Prelude.Moore    (moore')
 import CLaSH.Signal           (Signal)
-import CLaSH.Signal.Explicit  (Signal', SClock, systemClock)
+import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle')
 import CLaSH.Sized.Unsigned   (Unsigned)
-import CLaSH.Sized.Vector     (Vec, (!!), replace)
+import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
 
 {-# INLINE blockRam #-}
 -- | Create a blockRAM with space for @n@ elements.
@@ -42,15 +47,15 @@ import CLaSH.Sized.Vector     (Vec, (!!), replace)
 --        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> Signal 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
-blockRam :: (KnownNat n, KnownNat m)
-         => Vec n a             -- ^ Initial content of the BRAM, also
-                                -- determines the size, @n@, of the BRAM.
-                                --
-                                -- __NB__: __MUST__ be a constant.
-         -> Signal (Unsigned m) -- ^ Write address @w@
-         -> Signal (Unsigned m) -- ^ Read address @r@
-         -> Signal Bool         -- ^ Write enable
-         -> Signal a            -- ^ Value to write (at address @w@)
+blockRam :: (KnownNat n, Enum addr)
+         => Vec n a     -- ^ Initial content of the BRAM, also
+                        -- determines the size, @n@, of the BRAM.
+                        --
+                        -- __NB__: __MUST__ be a constant.
+         -> Signal addr -- ^ Write address @w@
+         -> Signal addr -- ^ Read address @r@
+         -> Signal Bool -- ^ Write enable
+         -> Signal a    -- ^ Value to write (at address @w@)
          -> Signal a
          -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
          -- cycle
@@ -81,7 +86,7 @@ blockRamPow2 :: (KnownNat (2^n), KnownNat n)
              -- cycle
 blockRamPow2 = blockRam
 
-{-# NOINLINE blockRam' #-}
+{-# INLINE blockRam' #-}
 -- | Create a blockRAM with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
@@ -97,27 +102,21 @@ blockRamPow2 = blockRam
 --        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> ClkA 'Signal'' 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam'' clkA100 ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
-blockRam' :: (KnownNat n, KnownNat m)
-          => SClock clk               -- ^ 'Clock' to synchronize to
-          -> Vec n a                  -- ^ Initial content of the BRAM, also
-                                      -- determines the size, @n@, of the BRAM.
-                                      --
-                                      -- __NB__: __MUST__ be a constant.
-          -> Signal' clk (Unsigned m) -- ^ Write address @w@
-          -> Signal' clk (Unsigned m) -- ^ Read address @r@
-          -> Signal' clk Bool         -- ^ Write enable
-          -> Signal' clk a            -- ^ Value to write (at address @w@)
+blockRam' :: (KnownNat n, Enum addr)
+          => SClock clk       -- ^ 'Clock' to synchronize to
+          -> Vec n a          -- ^ Initial content of the BRAM, also
+                              -- determines the size, @n@, of the BRAM.
+                              --
+                              -- __NB__: __MUST__ be a constant.
+          -> Signal' clk addr -- ^ Write address @w@
+          -> Signal' clk addr -- ^ Read address @r@
+          -> Signal' clk Bool -- ^ Write enable
+          -> Signal' clk a    -- ^ Value to write (at address @w@)
           -> Signal' clk a
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam' clk binit wr rd en din =
-    moore' clk bram' snd (binit,undefined) (bundle' clk (wr,rd,en,din))
-  where
-    bram' (ram,_) (w,r,e,d) = (ram',o')
-      where
-        ram' | e         = replace w d ram
-             | otherwise = ram
-        o'               = ram !! r
+blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
+                                               (fromEnum <$> rd) en din
 
 {-# INLINE blockRamPow2' #-}
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -150,3 +149,30 @@ blockRamPow2' :: (KnownNat n, KnownNat (2^n))
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
 blockRamPow2' = blockRam'
+
+-- | blockRAM primitive
+blockRam# :: KnownNat n
+          => SClock clk       -- ^ 'Clock' to synchronize to
+          -> Vec n a          -- ^ Initial content of the BRAM, also
+                              -- determines the size, @n@, of the BRAM.
+                              --
+                              -- __NB__: __MUST__ be a constant.
+          -> Signal' clk Int  -- ^ Write address @w@
+          -> Signal' clk Int  -- ^ Read address @r@
+          -> Signal' clk Bool -- ^ Write enable
+          -> Signal' clk a    -- ^ Value to write (at address @w@)
+          -> Signal' clk a
+          -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
+          -- cycle
+blockRam# clk content wr rd en din = register' clk undefined dout
+  where
+    szI  = fromInteger $ maxIndex content
+    dout = runST $ do
+      arr <- newListArray (0,szI-1) (toList content)
+      mapM (ramT arr) (bundle' clk (wr,rd,en,din))
+
+    ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
+    ramT ram (w,r,e,d) = do
+      d' <- readArray ram r
+      when e (writeArray ram w d)
+      return d'

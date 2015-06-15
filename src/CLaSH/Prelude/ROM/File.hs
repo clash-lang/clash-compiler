@@ -1,12 +1,13 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Unsafe #-}
 
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
+Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -22,21 +23,23 @@ module CLaSH.Prelude.ROM.File
     -- * Synchronous ROM synchronised to an arbitrary clock
   , romFile'
   , romFilePow2'
+    -- * Internal
+  , asyncROMFile#
+  , romFile#
   )
 where
 
-import Data.Array                   (listArray,(!))
-import GHC.TypeLits                 (KnownNat, type (^))
+import Data.Array                  (listArray,(!))
+import GHC.TypeLits                (KnownNat, type (^))
 
-import CLaSH.Prelude.Moore          (moore')
 import CLaSH.Prelude.BlockRam.File (initMem)
 import CLaSH.Promoted.Nat          (SNat,snat,snatToInteger)
 import CLaSH.Sized.BitVector       (BitVector)
 import CLaSH.Signal                (Signal)
-import CLaSH.Signal.Explicit       (Signal', SClock, systemClock)
+import CLaSH.Signal.Explicit       (Signal', SClock, register', systemClock)
 import CLaSH.Sized.Unsigned        (Unsigned)
 
-{-# NOINLINE asyncROMFile #-}
+{-# INLINE asyncROMFile #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
 -- __NB__: This function might not work for specific combinations of
@@ -51,16 +54,12 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 -- ASIC           | Untested | Untested | Untested      |
 -- ===============+==========+==========+===============+
 -- @
-asyncROMFile :: (KnownNat k, KnownNat m)
+asyncROMFile :: (KnownNat m, Enum addr)
              => SNat n      -- ^ Size of the ROM
              -> FilePath    -- ^ File describing the content of the ROM
-             -> Unsigned k  -- ^ Read address @rd@
+             -> addr        -- ^ Read address @rd@
              -> BitVector m -- ^ The value of the ROM at address @rd@
-asyncROMFile sz file rd = binit ! (toInteger rd)
-  where
-    binit = listArray (0,szI-1) bvs
-    bvs   = initMem file
-    szI   = snatToInteger sz
+asyncROMFile sz file rd = asyncROMFile# sz file (fromEnum rd)
 
 {-# INLINE asyncROMFilePow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
@@ -83,6 +82,18 @@ asyncROMFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  -> BitVector m -- ^ The value of the ROM at address @rd@
 asyncROMFilePow2 = asyncROMFile (snat :: SNat (2^n))
 
+{-# NOINLINE asyncROMFile# #-}
+-- | asyncROMFile primitive
+asyncROMFile# :: KnownNat m
+              => SNat n       -- ^ Size of the ROM
+              -> FilePath     -- ^ File describing the content of the ROM
+              -> Int          -- ^ Read address @rd@
+              -> BitVector m  -- ^ The value of the ROM at address @rd@
+asyncROMFile# sz file rd = content ! rd
+  where
+    content = listArray (0,szI-1) (initMem file)
+    szI     = fromInteger (snatToInteger sz)
+
 {-# INLINE romFile #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
@@ -104,7 +115,8 @@ romFile :: (KnownNat m, KnownNat k)
         => SNat n               -- ^ Size of the ROM
         -> FilePath             -- ^ File describing the content of the ROM
         -> Signal (Unsigned k)  -- ^ Read address @rd@
-        -> Signal (BitVector m) -- ^ The value of the ROM at address @rd@
+        -> Signal (BitVector m)
+        -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile = romFile' systemClock
 
 {-# INLINE romFilePow2 #-}
@@ -127,7 +139,8 @@ romFile = romFile' systemClock
 romFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
             => FilePath             -- ^ File describing the content of the ROM
             -> Signal (Unsigned n)  -- ^ Read address @rd@
-            -> Signal (BitVector m) -- ^ The value of the ROM at address @rd@
+            -> Signal (BitVector m)
+            -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFilePow2 = romFile' systemClock (snat :: SNat (2^n))
 
 {-# INLINE romFilePow2' #-}
@@ -149,12 +162,15 @@ romFilePow2 = romFile' systemClock (snat :: SNat (2^n))
 -- @
 romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
              => SClock clk                -- ^ 'Clock' to synchronize to
-             -> FilePath                  -- ^ File describing the content of the ROM
+             -> FilePath                  -- ^ File describing the content of
+                                          -- the ROM
              -> Signal' clk (Unsigned n)  -- ^ Read address @rd@
-             -> Signal' clk (BitVector m) -- ^ The value of the ROM at address @rd@
+             -> Signal' clk (BitVector m)
+             -- ^ The value of the ROM at address @rd@ from the previous clock
+             -- cycle
 romFilePow2' clk = romFile' clk (snat :: SNat (2^n))
 
-{-# NOINLINE romFile' #-}
+{-# INLINE romFile' #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
 --
 -- * __NB__: Read value is delayed by 1 cycle
@@ -171,17 +187,27 @@ romFilePow2' clk = romFile' clk (snat :: SNat (2^n))
 -- ASIC           | Untested | Untested | Untested      |
 -- ===============+==========+==========+===============+
 -- @
-romFile' :: (KnownNat m, KnownNat k)
+romFile' :: (KnownNat m, Enum addr)
          => SClock clk                -- ^ 'Clock' to synchronize to
          -> SNat n                    -- ^ Size of the ROM
-         -> FilePath                  -- ^ File describing the content of the ROM
-         -> Signal' clk (Unsigned k)  -- ^ Read address @rd@
-         -> Signal' clk (BitVector m) -- ^ The value of the ROM at address @rd@
-romFile' clk sz file rd =
-    moore' clk rom'' id undefined rd
-  where
-    rom'' _ r = binit ! (toInteger r)
+         -> FilePath                  -- ^ File describing the content of the
+                                      -- ROM
+         -> Signal' clk addr          -- ^ Read address @rd@
+         -> Signal' clk (BitVector m)
+         -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+romFile' clk sz file rd = romFile# clk sz file (fromEnum <$> rd)
 
-    binit = listArray (0,szI-1) bvs
-    bvs   = initMem file
-    szI   = snatToInteger sz
+{-# NOINLINE romFile# #-}
+-- | romFile primitive
+romFile# :: KnownNat m
+         => SClock clk                -- ^ 'Clock' to synchronize to
+         -> SNat n                    -- ^ Size of the ROM
+         -> FilePath                  -- ^ File describing the content of the
+                                      -- ROM
+         -> Signal' clk Int           -- ^ Read address @rd@
+         -> Signal' clk (BitVector m)
+         -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+romFile# clk sz file rd = register' clk undefined ((content !) <$> rd)
+  where
+    content = listArray (0,szI-1) (initMem file)
+    szI     = fromInteger (snatToInteger sz)
