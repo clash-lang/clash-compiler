@@ -1249,10 +1249,9 @@ fifoMem wclk rclk sz waddr raddr wclken wfull wdata =
             (wclken '.&&.' 'not1' wfull)
             wdata
 
-ptrSync clk1 clk2 ptr = 'last' '<$>' s_ptr
-  where
-    s_ptr  = 'register'' clk1 (replicate d2 0) s_ptr'
-    s_ptr' = ('+>>') '<$>' 'unsafeSynchronizer' clk2 clk1 ptr '<*>' s_ptr
+ptrSync clk1 clk2 = 'register'' clk1 0
+                  . 'register'' clk1 0
+                  . 'unsafeSynchronizer' clk2 clk1
 
 boolToBV :: _ => Bool -> BitVector (n + 1)
 boolToBV = 'zeroExtend' . 'pack'
@@ -1261,8 +1260,8 @@ ptrCompareT sz cmp (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
                                                 ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
-    bin' = bin + boolToBV (inc '&&' 'not' flag)
-    ptr' = (bin' ``shiftR`` 1) ``xor`` bin'
+    bin' = bin + boolToBV (inc && not flag)
+    ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
     addr = 'slice' ('subSNat' sz d1) d0 bin
 
     flag' = cmp ptr' s_ptr
