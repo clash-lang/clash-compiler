@@ -30,7 +30,7 @@ import Control.Monad          (when)
 import Control.Monad.ST.Lazy  (ST,runST)
 import Data.Array.MArray      (newArray_,readArray,writeArray)
 import Data.Array.ST          (STArray)
-import GHC.TypeLits           (KnownNat, KnownSymbol, type (^))
+import GHC.TypeLits           (KnownNat, type (^))
 
 import CLaSH.Promoted.Nat     (SNat,snat,snatToInteger)
 import CLaSH.Signal           (Signal)
