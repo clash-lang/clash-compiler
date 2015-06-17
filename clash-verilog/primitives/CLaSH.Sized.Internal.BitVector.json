@@ -73,9 +73,12 @@ assign ~RESULT = vec_~SYM[0][~ARG[2]];
     , "templateD" :
 "// replaceBit start
 reg ~TYPO vec_~SYM[0];
+wire ~TYP[3] din_~SYM[1];
+assign din_~SYM[1] = ~ARG[3];
+
 always @(*) begin
   vec_~SYM[0] = ~ARG[1];
-  vec_~SYM[0][~ARG[2]:~ARG[2]] = ~ARG[3];
+  vec_~SYM[0][~ARG[2]] = din_~SYM[1];
 end
 
 assign ~RESULT = vec_~SYM[0];
@@ -93,10 +96,12 @@ assign ~RESULT = vec_~SYM[0];
     , "templateD" :
 "// setSlice
 reg ~SIGD[~SYM[0]][0];
+wire ~TYP[3] din_~SYM[1];
+assign din_~SYM[1] = ~ARG[3]
 
 always @(*) begin
   ~SYM[0] = ~ARG[0];
-  ~SYM[0][~LIT[1] : ~LIT[2]] = ~ARG[3];
+  ~SYM[0][~LIT[1] : ~LIT[2]] = din_~SYM[1];
 end
 
 assign ~RESULT = ~SYM[0];"
