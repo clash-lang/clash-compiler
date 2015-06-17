@@ -1,10 +1,16 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.8.1
+## 0.9
 * New features:
   * Add operations on singleton natural numbers: `addSNat`, `subSNat`, `mulSNat`, and `powSNat`.
-  * Add ROM functions in modules "CLaSH.Prelude.ROM" and "CLaSH.Prelude.ROM.File", where the latter module contains functions that instantiate a ROM from the content specified in an external data-file.
-  * Add BlockRam functions, in the "CLaSH.Prelude.BlockRam.File" module, whose content can be initialised with the content specified in an external data-file.
+  * Add asynchronous RAM functions in `CLaSH.Prelude.RAM`, which have an asynchronous/combinational read port.
+  * Add ROM functions in modules `CLaSH.Prelude.ROM` and `CLaSH.Prelude.ROM.File`, where the latter module contains functions that instantiate a ROM from the content specified in an external data-file.
+  * Add BlockRam functions, in the `CLaSH.Prelude.BlockRam.File` module, whose content can be initialised with the content specified in an external data-file.
+  * `assert` now takes an extra `String` argument so you can distinguish one `assert` from the others.
+  Additionally, `assert'` is added which takes an additional `SClock` argument.
+  This is needed, because `assert` now reports the clock cycle, and clock domain, when an assertion fails.
+  * `defClkAltera` and `defClkXilinx` are replaced by, `altpll` and `alteraPll` for Altera clock sources, and `clockWizard` for Xilinx clock sources.
+  These names correspond to the names of the generator utilities in Quartus and ISE/Vivado.
 
 ## 0.8 *June 3rd 2015*
 * New features:
