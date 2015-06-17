@@ -150,6 +150,7 @@ blockRamPow2' :: (KnownNat n, KnownNat (2^n))
               -- clock cycle
 blockRamPow2' = blockRam'
 
+{-# NOINLINE blockRam# #-}
 -- | blockRAM primitive
 blockRam# :: KnownNat n
           => SClock clk       -- ^ 'Clock' to synchronize to
