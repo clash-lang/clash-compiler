@@ -720,7 +720,7 @@ belonging to the 'Bundle' <http://en.wikipedia.org/wiki/Type_class type class>,
 which, together with 'bundle' and 'unbundle' defines the isomorphism between a
 product type of 'Signal's and a 'Signal' of a product type. That is, while
 @(Signal a, Signal b)@ and @Signal (a,b)@ are not equal, they are /isomorphic/
-and can be converted from on to the other using 'bundle' and 'unbundle'.
+and can be converted from, or to, the other using 'bundle' and 'unbundle'.
 
 Instances of this 'Bundle' type-class are defined as /isomorphisms/ for:
 
