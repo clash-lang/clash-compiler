@@ -10,7 +10,7 @@ import CLaSH.Prelude
     , t_extraIn  = [ ("CLOCK_50", 1)
                    , ("KEY0"    , 1)
                    ]
-    , t_clocks   = [ defClkAltera "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
+    , t_clocks   = [ altpll "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) #-}
 topEntity :: Signal Bit -> Signal (BitVector 8)
 topEntity key1 = leds
