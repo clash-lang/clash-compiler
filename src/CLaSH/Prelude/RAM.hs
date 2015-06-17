@@ -48,8 +48,7 @@ asyncRam :: (KnownNat n, Enum addr)
          -> Signal addr -- ^ Read address @r@
          -> Signal Bool -- ^ Write enable
          -> Signal a    -- ^ Value to write (at address @w@)
-         -> Signal a
-         -- ^ Value of the @AM@ at address @r@
+         -> Signal a    -- ^ Value of the @RAM@ at address @r@
 asyncRam = asyncRam' systemClock systemClock
 
 {-# INLINE asyncRamPow2 #-}
@@ -61,8 +60,7 @@ asyncRamPow2 :: forall n a . (KnownNat (2^n), KnownNat n)
              -> Signal (Unsigned n) -- ^ Read address @r@
              -> Signal Bool         -- ^ Write enable
              -> Signal a            -- ^ Value to write (at address @w@)
-             -> Signal a
-             -- ^ Value of the @RAM@ at address @r@
+             -> Signal a            -- ^ Value of the @RAM@ at address @r@
 asyncRamPow2 = asyncRam' systemClock systemClock (snat :: SNat (2^n))
 
 {-# INLINE asyncRamPow2' #-}
