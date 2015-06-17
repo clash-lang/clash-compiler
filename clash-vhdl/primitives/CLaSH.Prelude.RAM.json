@@ -1,0 +1,44 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Prelude.RAM.asyncRam#"
+    , "type" :
+"asyncRam# :: SClock wclk       -- ^ wclk, ARG[0]
+           -> SClock rclk       -- ^ rclk, ARG[1]
+           -> SNat n            -- ^ sz,   ARG[2]
+           -> Signal' wclk Int  -- ^ wr,   ARG[3]
+           -> Signal' rclk Int  -- ^ rd,   ARG[4]
+           -> Signal' wclk Bool -- ^ en,   ARG[5]
+           -> Signal' wclk a    -- ^ din,  ARG[6]
+           -> Signal' rclk a"
+    , "templateD" :
+"asyncRam_~COMPNAME_~SYM[0] : block
+  type RamType is array(0 to ~LIT[2]-1) of ~TYP[6];
+  signal RAM : RamType;
+  signal wr  : integer range 0 to ~LIT[2] - 1;
+  signal rd  : integer range 0 to ~LIT[2] - 1;
+begin
+  wr <= ~ARG[3]
+  -- pragma translate_off
+        mod ~LIT[2]
+  -- pragma translate_on
+        ;
+
+  rd <= ~ARG[4]
+  -- pragma translate_off
+        mod ~LIT[2]
+  -- pragma translate_on
+        ;
+
+  asyncRam_~SYM[1] : process(~CLK[0])
+  begin
+    if rising_edge(~CLK[0]) then
+      if ~ARG[5] then
+        RAM(wr) <= ~ARG[6];
+      end if;
+    end if;
+  end process;
+
+  ~RESULT <= RAM(rd);
+end block;"
+    }
+  }
+]
