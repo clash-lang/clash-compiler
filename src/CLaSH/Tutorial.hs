@@ -528,10 +528,13 @@ simulate the behaviour of the /testbench/:
 
 >>> sampleN 7 $ expectedOutput (topEntity testInput)
 [False,False,False,False,
+cycle(system1000): 4, outputVerifier
 expected value: 14, not equal to actual value: 30
 True,
+cycle(system1000): 5, outputVerifier
 expected value: 14, not equal to actual value: 46
 True,
+cycle(system1000): 6, outputVerifier
 expected value: 14, not equal to actual value: 62
 True]
 

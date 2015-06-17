@@ -15,17 +15,17 @@ module CLaSH.Prelude.Testbench
   , stimuliGenerator
   , outputVerifier
     -- * Testbench functions for circuits synchronised to arbitrary clocks
+  , assert'
   , stimuliGenerator'
   , outputVerifier'
   )
 where
 
-import Control.Applicative   (liftA3)
 import Debug.Trace           (trace)
 import GHC.TypeLits          (KnownNat)
 import Prelude               hiding ((!!))
 
-import CLaSH.Signal          (Signal)
+import CLaSH.Signal          (Signal, fromList)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle   (unbundle')
 import CLaSH.Sized.Index     (Index)
@@ -42,6 +42,22 @@ import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 -- >>> let clkA = sclock :: SClock ClkA
 -- >>> let testInput' = stimuliGenerator' clkA $(v [(1::Int),3..21])
 -- >>> let expectedOutput' = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+
+{-# INLINE assert #-}
+-- | Compares the first two 'Signal's for equality and logs a warning when they
+-- are not equal. The second 'Signal' is considered the expected value. This
+-- function simply returns the third 'Signal' unaltered as its result. This
+-- function is used by 'outputVerifier'.
+--
+--
+-- __NB__: This function is /can/ be used in synthesizable designs.
+assert :: (Eq a,Show a)
+       => String   -- ^ Additional message
+       -> Signal a -- ^ Checked value
+       -> Signal a -- ^ Expected value
+       -> Signal b -- ^ Return valued
+       -> Signal b
+assert = assert' systemClock
 
 {-# INLINE stimuliGenerator #-}
 -- | To be used as a one of the functions to create the \"magical\" 'testInput'
@@ -77,16 +93,22 @@ stimuliGenerator = stimuliGenerator' systemClock
 -- >>> import qualified Data.List as List
 -- >>> sampleN 12 (expectedOutput (fromList ([0..10] List.++ [10,10,10])))
 -- [
+-- cycle(system1000): 0, outputVerifier
 -- expected value: 70, not equal to actual value: 0
 -- False,
+-- cycle(system1000): 1, outputVerifier
 -- expected value: 99, not equal to actual value: 1
 -- False,False,False,False,False,
+-- cycle(system1000): 6, outputVerifier
 -- expected value: 7, not equal to actual value: 6
 -- False,
+-- cycle(system1000): 7, outputVerifier
 -- expected value: 8, not equal to actual value: 7
 -- False,
+-- cycle(system1000): 8, outputVerifier
 -- expected value: 9, not equal to actual value: 8
 -- False,
+-- cycle(system1000): 9, outputVerifier
 -- expected value: 10, not equal to actual value: 9
 -- False,True,True]
 outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
@@ -95,26 +117,34 @@ outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
                -> Signal Bool -- ^ Indicator that all samples are verified
 outputVerifier = outputVerifier' systemClock
 
-{-# NOINLINE assert #-}
--- | Compares the first two arguments for equality and logs a warning when they
--- are not equal. The second argument is considered the expected value. This
--- function simply returns the third argument unaltered as its result. This
--- function is used by 'coutputVerifier'.
+{-# NOINLINE assert' #-}
+-- | Compares the first two 'Signal''s for equality and logs a warning when they
+-- are not equal. The second 'Signal'' is considered the expected value. This
+-- function simply returns the third 'Signal'' unaltered as its result. This
+-- function is used by 'outputVerifier''.
 --
 --
 -- __NB__: This function is /can/ be used in synthesizable designs.
-assert :: (Eq a,Show a)
-       => Signal' t a -- ^ Checked value
-       -> Signal' t a -- ^ Expected value
-       -> Signal' t b -- ^ Return valued
-       -> Signal' t b
-assert = liftA3
-  (\a' b' c' -> if a' == b' then c'
-                            else trace (concat [ "\nexpected value: "
-                                               , show b'
-                                               , ", not equal to actual value: "
-                                               , show a'
-                                               ]) c')
+assert' :: (Eq a,Show a)
+        => SClock t
+        -> String      -- ^ Additional message
+        -> Signal' t a -- ^ Checked value
+        -> Signal' t a -- ^ Expected value
+        -> Signal' t b -- ^ Return valued
+        -> Signal' t b
+assert' clk msg checked expected returned =
+  (\c e cnt r ->
+      if c == e then r
+                else trace (concat [ "\ncycle(" ++ show clk ++ "): "
+                                   , show cnt
+                                   , ", "
+                                   , msg
+                                   , "\nexpected value: "
+                                   , show e
+                                   , ", not equal to actual value: "
+                                   , show c
+                                   ]) r)
+  <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
 
 {-# INLINABLE stimuliGenerator' #-}
 -- | To be used as a one of the functions to create the \"magical\" 'testInput'
@@ -173,16 +203,22 @@ stimuliGenerator' clk samples =
 -- >>> import qualified Data.List as List
 -- >>> sampleN 12 (expectedOutput' (fromList ([0..10] List.++ [10,10,10])))
 -- [
+-- cycle(A100): 0, outputVerifier
 -- expected value: 70, not equal to actual value: 0
 -- False,
+-- cycle(A100): 1, outputVerifier
 -- expected value: 99, not equal to actual value: 1
 -- False,False,False,False,False,
+-- cycle(A100): 6, outputVerifier
 -- expected value: 7, not equal to actual value: 6
 -- False,
+-- cycle(A100): 7, outputVerifier
 -- expected value: 8, not equal to actual value: 7
 -- False,
+-- cycle(A100): 8, outputVerifier
 -- expected value: 9, not equal to actual value: 8
 -- False,
+-- cycle(A100): 9, outputVerifier
 -- expected value: 10, not equal to actual value: 9
 -- False,True,True]
 outputVerifier' :: forall l clk a . (KnownNat l, Eq a, Show a)
@@ -194,7 +230,7 @@ outputVerifier' :: forall l clk a . (KnownNat l, Eq a, Show a)
 outputVerifier' clk samples i =
     let (s,o) = unbundle' clk (genT <$> register' clk 0 s)
         (e,f) = unbundle' clk o
-    in  assert i e (register' clk False f)
+    in  assert' clk "outputVerifier" i e (register' clk False f)
   where
     genT :: Index l -> (Index l,(a,Bool))
     genT s = (s',(samples !! s,finished))
