@@ -1,33 +1,44 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.BlockRam.blockRam'"
+    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
     , "type" :
-"blockRam' :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
-           => SClock clk               -- clk,  ARG[2]
-           -> Vec n a                  -- init, ARG[3]
-           -> Signal' clk (Unsigned m) -- wr,   ARG[4]
-           -> Signal' clk (Unsigned m) -- rd,   ARG[5]
-           -> Signal' clk Bool         -- wren, ARG[6]
-           -> Signal' clk a            -- din,  ARG[7]
+"blockRam# :: KnownNat n       -- ARG[0]
+           => SClock clk       -- clk,  ARG[1]
+           -> Vec n a          -- init, ARG[2]
+           -> Signal' clk Int  -- wr,   ARG[3]
+           -> Signal' clk Int  -- rd,   ARG[4]
+           -> Signal' clk Bool -- wren, ARG[5]
+           -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
 "blockRam_~COMPNAME_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram
-  signal ~SYM[2] : ~TYP[7]; -- inp
-  signal ~SYM[3] : ~TYP[7]; -- outp
+  signal RAM  : ~TYP[2] := ~LIT[2];
+  signal dout : ~TYP[6];
+  signal wr   : integer range 0 to ~LIT[0] - 1;
+  signal rd   : integer range 0 to ~LIT[0] - 1;
 begin
-  ~SYM[2] <= ~ARG[7];
+  wr <= ~ARG[3]
+  -- pragma translate_off
+        mod ~LIT[0]
+  -- pragma translate_on
+        ;
 
-  process(~CLK[2])
+  rd <= ~ARG[4]
+  -- pragma translate_off
+        mod ~LIT[0]
+  -- pragma translate_on
+        ;
+
+  blockRam_~SYM[1] : process(~CLK[1])
   begin
-    if rising_edge(~CLK[2]) then
-      if ~ARG[6] then
-        ~SYM[1](to_integer(~ARG[4])) <= ~SYM[2];
+    if rising_edge(~CLK[1]) then
+      if ~ARG[5] then
+        RAM(wr) <= ~ARG[6];
       end if;
-      ~SYM[3] <= ~SYM[1](to_integer(~ARG[5]));
+      dout <= RAM(rd);
     end if;
   end process;
 
-  ~RESULT <= ~SYM[3];
+  ~RESULT <= dout;
 end block;"
     }
   }

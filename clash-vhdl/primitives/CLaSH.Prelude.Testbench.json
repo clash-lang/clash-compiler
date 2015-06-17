@@ -1,11 +1,13 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.Testbench.assert"
+    { "name" : "CLaSH.Prelude.Testbench.assert'"
     , "type" :
-"assert :: (Eq a,Show a) -- (ARG[0],ARG[1])
-        => Signal' t a   -- ^ Checked value (ARG[2])
-        -> Signal' t a   -- ^ Expected value (ARG[3])
-        -> Signal' t b   -- ^ Return valued (ARG[4])
-        -> Signal' t b"
+"assert' :: (Eq a,Show a) -- (ARG[0],ARG[1])
+         => SClock t      -- ^ ARG[2]
+         -> String        -- ^ ARG[3]
+         -> Signal' t a   -- ^ Checked value (ARG[4])
+         -> Signal' t a   -- ^ Expected value (ARG[5])
+         -> Signal' t b   -- ^ Return valued (ARG[6])
+         -> Signal' t b"
     , "templateD" :
 "assert_~SYM[0] : block
   -- pragma translate_off
@@ -22,17 +24,21 @@
      end loop;
      return result;
   end;
+  signal actual   : ~TYP[4];
+  signal expected : ~TYP[5];
   -- pragma translate_on
 begin
   -- pragma translate_off
-  process(~CLK[2],~RST[2],~ARG[2],~ARG[3]) is
+  actual   <= ~ARG[4];
+  expected <= ~ARG[5];
+  process(~CLK[2],~RST[2]) is
   begin
     if (rising_edge(~CLK[2]) or rising_edge(~RST[2])) then
-      assert (~ARG[2] = ~ARG[3]) report (\"expected: \" & slv2string(toSLV(~ARG[3])) & \", actual: \" & slv2string(toSLV(~ARG[2]))) severity error;
+      assert (actual = expected) report (~LIT[3] & \", expected: \" & slv2string(toSLV(expected)) & \", actual: \" & slv2string(toSLV(actual))) severity error;
     end if;
   end process;
   -- pragma translate_on
-  ~RESULT <= ~ARG[4];
+  ~RESULT <= ~ARG[6];
 end block;"
     }
   }

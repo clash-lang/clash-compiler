@@ -1,22 +1,24 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.Testbench.assert"
+    { "name" : "CLaSH.Prelude.Testbench.assert'"
     , "type" :
 "assert :: (Eq a,Show a) -- (ARG[0],ARG[1])
-        => Signal' t a   -- ^ Checked value (ARG[2])
-        -> Signal' t a   -- ^ Expected value (ARG[3])
-        -> Signal' t b   -- ^ Return valued (ARG[4])
+        => SClock t      -- ^ ARG[2]
+        -> String        -- ^ ARG[3]
+        -> Signal' t a   -- ^ Checked value (ARG[4])
+        -> Signal' t a   -- ^ Expected value (ARG[5])
+        -> Signal' t b   -- ^ Return valued (ARG[6])
         -> Signal' t b"
     , "templateD" :
 "// assert
 // pragma translate_off
 always @(posedge ~CLK[2] or negedge ~RST[2]) begin
-  if (~ARG[2] != ~ARG[3]) begin
-    $display(\"expected: %b, actual: %b\", ~ARG[3], ~ARG[2]);
+  if (~ARG[4] != ~ARG[5]) begin
+    $display(\"%s, expected: %b, actual: %b\", ~LIT[3], ~ARG[5], ~ARG[4]);
     $stop;
   end
 end
 // pragma translate_on
-assign ~RESULT = ~ARG[4];"
+assign ~RESULT = ~ARG[6];"
     }
   }
 ]

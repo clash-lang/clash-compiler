@@ -129,25 +129,19 @@ end block;"
         -> Int         -- ARG[2]
         -> Bit"
     , "templateD" :
-"indexBit_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
+"indexBitVector_~SYM[0] : block
+  signal vec       : ~TYP[1];
+  signal vec_index : integer range 0 to ~LIT[0]-1;
 begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
+  vec <= ~ARG[1];
+
+  vec_index <= ~ARG[2]
   -- pragma translate_off
-  process (~SYM[1],~SYM[2])
-  begin
-    if ~SYM[2] < ~SYM[1]'low or ~SYM[2] > ~SYM[1]'high then
-      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
-      ~RESULT <= ~ERRORO;
-    else
-    -- pragma translate_on
-      ~RESULT <= ~SYM[1](~SYM[2] downto ~SYM[2]);
-    -- pragma translate_off
-    end if;
-  end process;
+               mod ~LIT[0]
   -- pragma translate_on
+               ;
+
+  ~RESULT <= vec(vec_index downto vec_index);
 end block;"
     }
   }
@@ -161,28 +155,24 @@ end block;"
              -> BitVector n"
     , "templateD" :
 "replaceBit_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-  signal ~SYM[3] : ~TYP[3];
+  signal vec       : ~TYP[1];
+  signal vec_index : integer range 0 to ~LIT[0]-1;
+  signal din       : ~TYP[3];
 begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
-  ~SYM[3] <= ~ARG[3];
-  process(~SYM[1],~SYM[2],~SYM[3])
-    variable ~SYM[4] : ~TYP[1];
+  vec <= ~ARG[1];
+  vec_index <= ~ARG[2]
+  -- pragma translate_off
+               mod ~LIT[0]
+  -- pragma translate_on
+               ;
+  din <= ~ARG[3];
+
+  process(vec,vec_index,din)
+    variable ivec : ~TYP[1];
   begin
-    ~SYM[4] := ~SYM[1];
-    -- pragma translate_off
-    if ~SYM[2] < ~SYM[4]'low or ~SYM[2] > ~SYM[4]'high then
-      assert false report (\"Index: \" & integer'image(~SYM[2]) & \", is out of bounds: \" & integer'image(~SYM[1]'low) & \" downto \" & integer'image(~SYM[1]'high)) severity warning;
-      ~SYM[4] := ~ERROR[1];
-    else
-      -- pragma translate_on
-      ~SYM[4](~SYM[2] downto ~SYM[2]) := ~SYM[3];
-      -- pragma translate_off
-    end if;
-    -- pragma translate_on
-    ~RESULT <= ~SYM[4];
+    ivec := vec;
+    ivec(vec_index downto vec_index) := din;
+    ~RESULT <= ivec;
   end process;
 end block;"
     }

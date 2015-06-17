@@ -1,46 +1,46 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.ROM.File.asyncROMFile"
+    { "name" : "CLaSH.Prelude.ROM.File.asyncRomFile#"
     , "type" :
-"asyncROMFile :: (KnownNat k, KnownNat m) -- (ARG[0],ARG[1])
-              => SNat n                   -- sz,   ARG[2]
-              -> FilePath                 -- file, ARG[3]
-              -> Unsigned k               -- rd,   ARG[4]
+"asyncRomFile :: KnownNat m -- ARG[0]
+              => SNat n     -- sz,   ARG[1]
+              -> FilePath   -- file, ARG[2]
+              -> Int        -- rd,   ARG[3]
               -> BitVector m"
     , "templateD" :
-"// asyncROMFile begin
-reg ~TYPO ~SYM[0] [0:~LIT[2]-1];
+"// asyncRomFile begin
+reg ~TYPO ROM_~SYM[0] [0:~LIT[1]-1];
 
 initial begin
-  $readmemb(~FILE[~LIT[3]],~SYM[0]);
+  $readmemb(~FILE[~LIT[2]],ROM_~SYM[0]);
 end
 
-assign ~RESULT = ~SYM[0][~ARG[4]];
-// asyncROMFile end"
+assign ~RESULT = ROM_~SYM[0][~ARG[3]];
+// asyncRomFile end"
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Prelude.ROM.File.romFile'"
+    { "name" : "CLaSH.Prelude.ROM.File.romFile#"
     , "type" :
-"romFile' :: (KnownNat m, KnownNat k)  -- (ARG[0],ARG[1])
-          => SClock clk                -- clk,  ARG[2]
-          -> SNat n                    -- sz,   ARG[3]
-          -> FilePath                  -- file, ARG[4]
-          -> Signal' clk (Unsigned k)  -- rd,   ARG[5]
+"romFile# :: KnownNat m      -- ARG[0]
+          => SClock clk      -- clk,  ARG[1]
+          -> SNat n          -- sz,   ARG[2]
+          -> FilePath        -- file, ARG[3]
+          -> Signal' clk Int -- rd,   ARG[4]
           -> Signal' clk (BitVector m)"
     , "templateD" :
 "// romFile begin
-reg ~TYPO ~SYM[0] [0:~LIT[3]-1];
+reg ~TYPO ROM_~SYM[0] [0:~LIT[2]-1];
 
 initial begin
-  $readmemb(~FILE[~LIT[4]],~SYM[0]);
+  $readmemb(~FILE[~LIT[3]],ROM_~SYM[0]);
 end
 
-reg ~TYPO ~SYM[1];
-always @(posedge ~CLK[2]) begin : romFile_~COMPNAME_~SYM[2]
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+reg ~TYPO dout_~SYM[1];
+always @(posedge ~CLK[1]) begin : romFile_~COMPNAME_~SYM[2]
+  dout_~SYM[1] <= ROM_~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = ~SYM[1];
+assign ~RESULT = dout_~SYM[1];
 // romFile end"
     }
   }

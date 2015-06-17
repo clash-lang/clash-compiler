@@ -54,27 +54,12 @@
         -> Int         -- ARG[2]
         -> Bit"
     , "templateD" :
-"// index
-wire ~SIGD[~SYM[0]][1];
-wire ~SIGD[~SYM[1]][2];
+"// indexBit begin
+wire ~TYP[1] vec_~SYM[0];
+assign vec_~SYM[0] = ~ARG[1];
 
-assign ~SYM[0] = ~ARG[1];
-assign ~SYM[1] = ~ARG[2];
-
-reg ~TYPO ~SYM[2];
-// pragma translate_off
-always @(*) begin
-  if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], 0, ~LIT[0]-1);
-    ~SYM[2] = ~ERRORO;
-  end else begin
-  // pragma translate_on
-    ~SYM[2] = ~SYM[0][~SYM[1]];
-  // pragma translate_off
-  end
-end
-assign ~RESULT = ~SYM[2];
-// pragma translate_on"
+assign ~RESULT = vec_~SYM[0][~ARG[2]];
+// indexBit end"
     }
   }
 , { "BlackBox" :
@@ -87,27 +72,13 @@ assign ~RESULT = ~SYM[2];
              -> BitVector n"
     , "templateD" :
 "// replaceBit start
-reg ~TYPO ~SYM[0];
-wire ~TYPO ~SYM[1];
-wire ~TYP[2] ~SYM[2];
-wire ~TYP[3] ~SYM[3];
-
-assign ~SYM[1] = ~ARG[1];
-assign ~SYM[2] = ~ARG[2];
-assign ~SYM[3] = ~ARG[3];
-
-genvar ~SYM[4];
-for (~SYM[4]=0; ~SYM[4] < ~LIT[0]; ~SYM[4] = ~SYM[4] + 1) begin : replace_int_~SYM[5]
-  always @(*) begin
-    if (~SYM[2] == (~LIT[0] - 1 - ~SYM[4])) begin
-      ~SYM[0][~SYM[4]] = ~SYM[3];
-    end else begin
-      ~SYM[0][~SYM[4]] = ~SYM[1][~SYM[4]];
-    end
-  end
+reg ~TYPO vec_~SYM[0];
+always @(*) begin
+  vec_~SYM[0] = ~ARG[1];
+  vec_~SYM[0][~ARG[2]:~ARG[2]] = ~ARG[3];
 end
 
-assign ~RESULT = ~SYM[0];
+assign ~RESULT = vec_~SYM[0];
 // replaceBit end"
     }
   }
@@ -121,7 +92,7 @@ assign ~RESULT = ~SYM[0];
            -> BitVector (m + 1 + i)"
     , "templateD" :
 "// setSlice
-wire ~SIGD[~SYM[0]][0];
+reg ~SIGD[~SYM[0]][0];
 
 always @(*) begin
   ~SYM[0] = ~ARG[0];

@@ -170,62 +170,42 @@ end
     { "name"      : "CLaSH.Sized.Vector.index_int"
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
-"// index_integer start
-wire ~TYPO ~SYM[0] [0:~LIT[0]-1];
-wire ~TYP[1] ~SYM[1];
-assign ~SYM[1] = ~ARG[1];
-genvar ~SYM[3];
-for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3]=~SYM[3]+1) begin : array_~SYM[4]
-  assign ~SYM[0][(~LIT[0]-1)-~SYM[3]] = ~SYM[1][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+"// indexVec begin
+wire ~TYPO vec_~SYM[0] [0:~LIT[0]-1];
+
+wire ~TYP[1] vecflat_~SYM[1];
+assign vecflat_~SYM[1] = ~ARG[1];
+genvar ~SYM[2];
+for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : array_~SYM[3]
+  assign vec_~SYM[0][(~LIT[0]-1)-~SYM[2]] = vecflat_~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
 end
 
-wire ~TYP[2] ~SYM[2];
-assign ~SYM[2] = ~ARG[2];
-
-reg ~TYPO ~SYM[5];
-always @(*) begin
-// pragma translate_off
-  if (~SYM[2] < 0 || ~SYM[2] >= ~LIT[0]) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[2], 0, ~LIT[0]-1);
-    ~SYM[5] = ~ERRORO;
-  end else begin
-  // pragma translate_on
-    ~SYM[5] = ~SYM[0][~SYM[2]];
-  // pragma translate_off
-  end
-// pragma translate_on
-end
-assign ~RESULT = ~SYM[5];
-// index_integer end"
+assign ~RESULT = vec_~SYM[0][~ARG[2]];
+// indexVec end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replace_int"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
-"// replace_integer start
-reg ~TYPO ~SYM[0];
-wire ~TYPO ~SYM[1];
-wire ~TYP[2] ~SYM[2];
-wire ~TYP[3] ~SYM[3];
+"// replaceVec start
+wire ~TYP[1] vecflat_~SYM[0];
+assign vecflat_~SYM[0] = ~ARG[1];
 
-assign ~SYM[1] = ~ARG[1];
-assign ~SYM[2] = ~ARG[2];
-assign ~SYM[3] = ~ARG[3];
-
-genvar ~SYM[4];
-for (~SYM[4]=0; ~SYM[4] < ~LIT[0]; ~SYM[4] = ~SYM[4] + 1) begin : replace_int_~SYM[5]
-  always @(*) begin
-    if (~SYM[2] == (~LIT[0] - 1 - ~SYM[4])) begin
-      ~SYM[0][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[3];
-    end else begin
-      ~SYM[0][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = ~SYM[1][~SYM[4]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
-    end
+reg ~TYP[3] vec_~SYM[1] [0:~LIT[0]-1];
+integer ~SYM[2];
+always @(*) begin
+  for (~SYM[2]=0;~SYM[2]<~LIT[0];~SYM[2]=~SYM[2]+1) begin
+    vec_~SYM[1][~LIT[0]-1-~SYM[2]] = vecflat_~SYM[0][~SYM[2]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
   end
+  vec_~SYM[1][~ARG[2]] = ~ARG[3];
 end
 
-assign ~RESULT = ~SYM[0];
-// replace_integer end"
+genvar ~SYM[3];
+for (~SYM[3]=0;~SYM[3]<~LIT[0];~SYM[3]=~SYM[3]+1) begin : vec_~SYM[4]
+  assign ~RESULT[~SYM[3]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]] = vec_~SYM[1][(~LIT[0]-1)-~SYM[3]];
+end
+// replaceVec end"
     }
   }
 , { "BlackBox" :
