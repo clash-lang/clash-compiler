@@ -14,8 +14,8 @@ ROMs
 -}
 module CLaSH.Prelude.ROM
   ( -- * Asynchronous ROM
-    asyncROM
-  , asyncROMPow2
+    asyncRom
+  , asyncRomPow2
     -- * Synchronous ROM synchronised to the system clock
   , rom
   , romPow2
@@ -23,7 +23,7 @@ module CLaSH.Prelude.ROM
   , rom'
   , romPow2'
     -- * Internal
-  , asyncROM#
+  , asyncRom#
   , rom#
   )
 where
@@ -37,35 +37,35 @@ import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Signal.Explicit  (register')
 import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
 
-{-# INLINE asyncROM #-}
+{-# INLINE asyncRom #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
-asyncROM :: (KnownNat n, Enum addr)
+asyncRom :: (KnownNat n, Enum addr)
          => Vec n a -- ^ ROM content
                     --
                     -- __NB:__ must be a constant
          -> addr    -- ^ Read address @rd@
          -> a       -- ^ The value of the ROM at address @rd@
-asyncROM content rd = asyncROM# content (fromEnum rd)
+asyncRom content rd = asyncRom# content (fromEnum rd)
 
-{-# INLINE asyncROMPow2 #-}
+{-# INLINE asyncRomPow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
-asyncROMPow2 :: (KnownNat (2^n), KnownNat n)
+asyncRomPow2 :: (KnownNat (2^n), KnownNat n)
              => Vec (2^n) a -- ^ ROM content
                             --
                             -- __NB:__ must be a constant
              -> Unsigned n  -- ^ Read address @rd@
              -> a           -- ^ The value of the ROM at address @rd@
-asyncROMPow2 = asyncROM
+asyncRomPow2 = asyncRom
 
-{-# NOINLINE asyncROM# #-}
+{-# NOINLINE asyncRom# #-}
 -- | asyncROM primitive
-asyncROM# :: KnownNat n
+asyncRom# :: KnownNat n
           => Vec n a  -- ^ ROM content
                       --
                       -- __NB:__ must be a constant
           -> Int      -- ^ Read address @rd@
           -> a        -- ^ The value of the ROM at address @rd@
-asyncROM# content rd = arr ! rd
+asyncRom# content rd = arr ! rd
   where
     szI = fromInteger (maxIndex content)
     arr = listArray (0,szI - 1) (toList content)

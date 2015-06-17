@@ -15,8 +15,8 @@ ROMs initialised with a data file
 -}
 module CLaSH.Prelude.ROM.File
   ( -- * Asynchronous ROM
-    asyncROMFile
-  , asyncROMFilePow2
+    asyncRomFile
+  , asyncRomFilePow2
     -- * Synchronous ROM synchronised to the system clock
   , romFile
   , romFilePow2
@@ -24,7 +24,7 @@ module CLaSH.Prelude.ROM.File
   , romFile'
   , romFilePow2'
     -- * Internal
-  , asyncROMFile#
+  , asyncRomFile#
   , romFile#
   )
 where
@@ -39,7 +39,7 @@ import CLaSH.Signal                (Signal)
 import CLaSH.Signal.Explicit       (Signal', SClock, register', systemClock)
 import CLaSH.Sized.Unsigned        (Unsigned)
 
-{-# INLINE asyncROMFile #-}
+{-# INLINE asyncRomFile #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
 -- __NB__: This function might not work for specific combinations of
@@ -54,14 +54,14 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 -- ASIC           | Untested | Untested | Untested      |
 -- ===============+==========+==========+===============+
 -- @
-asyncROMFile :: (KnownNat m, Enum addr)
+asyncRomFile :: (KnownNat m, Enum addr)
              => SNat n      -- ^ Size of the ROM
              -> FilePath    -- ^ File describing the content of the ROM
              -> addr        -- ^ Read address @rd@
              -> BitVector m -- ^ The value of the ROM at address @rd@
-asyncROMFile sz file rd = asyncROMFile# sz file (fromEnum rd)
+asyncRomFile sz file rd = asyncRomFile# sz file (fromEnum rd)
 
-{-# INLINE asyncROMFilePow2 #-}
+{-# INLINE asyncRomFilePow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 --
 -- __NB__: This function might not work for specific combinations of
@@ -76,20 +76,20 @@ asyncROMFile sz file rd = asyncROMFile# sz file (fromEnum rd)
 -- ASIC           | Untested | Untested | Untested      |
 -- ===============+==========+==========+===============+
 -- @
-asyncROMFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
+asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
                  -> BitVector m -- ^ The value of the ROM at address @rd@
-asyncROMFilePow2 = asyncROMFile (snat :: SNat (2^n))
+asyncRomFilePow2 = asyncRomFile (snat :: SNat (2^n))
 
-{-# NOINLINE asyncROMFile# #-}
+{-# NOINLINE asyncRomFile# #-}
 -- | asyncROMFile primitive
-asyncROMFile# :: KnownNat m
+asyncRomFile# :: KnownNat m
               => SNat n       -- ^ Size of the ROM
               -> FilePath     -- ^ File describing the content of the ROM
               -> Int          -- ^ Read address @rd@
               -> BitVector m  -- ^ The value of the ROM at address @rd@
-asyncROMFile# sz file rd = content ! rd
+asyncRomFile# sz file rd = content ! rd
   where
     content = listArray (0,szI-1) (initMem file)
     szI     = fromInteger (snatToInteger sz)

@@ -41,13 +41,13 @@ module CLaSH.Prelude
   , mooreB
   , registerB
     -- * ROMs
-  , asyncROM
-  , asyncROMPow2
+  , asyncRom
+  , asyncRomPow2
   , rom
   , romPow2
     -- ** ROMs initialised with a data file
-  , asyncROMFile
-  , asyncROMFilePow2
+  , asyncRomFile
+  , asyncRomFilePow2
   , romFile
   , romFilePow2
     -- * RAM primitives with a combinational read port
@@ -138,8 +138,8 @@ import CLaSH.Prelude.Explicit      (registerB', window', windowD', isRising',
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.Moore         (moore, mooreB)
 import CLaSH.Prelude.RAM           (asyncRam,asyncRamPow2)
-import CLaSH.Prelude.ROM           (asyncROM,asyncROMPow2,rom,romPow2)
-import CLaSH.Prelude.ROM.File      (asyncROMFile,asyncROMFilePow2,romFile,
+import CLaSH.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
+import CLaSH.Prelude.ROM.File      (asyncRomFile,asyncRomFilePow2,romFile,
                                     romFilePow2)
 import CLaSH.Prelude.DataFlow
 import CLaSH.Prelude.Testbench     (assert, stimuliGenerator, outputVerifier)
