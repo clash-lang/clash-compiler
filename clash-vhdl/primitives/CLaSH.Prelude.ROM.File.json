@@ -10,7 +10,7 @@
 "asyncROMFile_~SYM[0] : block
   type RomType is array(0 to ~LIT[1]-1) of bit_vector(~LIT[0]-1 downto 0);
 
-  impure function InitRomFromFile (RomFileName : in string) return RamType is
+  impure function InitRomFromFile (RomFileName : in string) return RomType is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
     variable ROM : RomType;
@@ -48,7 +48,7 @@ end block;"
 "romFile_~COMPNAME_~SYM[0] : block
   type RomType is array(0 to ~LIT[2]-1) of bit_vector(~LIT[0]-1 downto 0);
 
-  impure function InitRomFromFile (RomFileName : in string) return RamType is
+  impure function InitRomFromFile (RomFileName : in string) return RomType is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
     variable ROM : RomType;
