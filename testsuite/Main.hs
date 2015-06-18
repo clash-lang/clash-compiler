@@ -74,6 +74,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamTest" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "MAC" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "SigP" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "Ram" (Just ("testbench",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "RomFile" (Just ("testbench",False))
             ]
         , testGroup "Testbench"
