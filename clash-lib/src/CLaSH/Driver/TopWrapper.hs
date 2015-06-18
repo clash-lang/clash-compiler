@@ -12,9 +12,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 module CLaSH.Driver.TopWrapper where
 
-
+import           Data.Char            (isDigit)
 import qualified Data.HashMap.Lazy    as HashMap
 import           Data.List            (mapAccumL)
+import           Data.Maybe           (mapMaybe)
 import           Data.Text.Lazy       (Text, append, pack, unpack)
 import           System.IO.Unsafe     (unsafePerformIO)
 
@@ -42,8 +43,9 @@ mkTopWrapper primMap teM modName topComponent
   , outputs       = outputs'' ++ extraOut teM
   , hiddenPorts   = case maybe [] t_clocks teM of
                       [] -> originalHidden
-                      _  -> []
-  , declarations  = concat [ mkClocks primMap originalHidden teM
+                      _  -> filter (`notElem` (mapMaybe isNetDecl clkDecls))
+                                   originalHidden
+  , declarations  = concat [ clkDecls
                            , wrappers
                            , instDecl:unwrappers
                            ]
@@ -51,6 +53,8 @@ mkTopWrapper primMap teM modName topComponent
   where
     iNameSupply                = maybe [] (map pack . t_inputs) teM
     originalHidden             = hiddenPorts topComponent
+
+    clkDecls                   = mkClocks primMap originalHidden teM
 
     inputs'                    = map (first (const "input"))
                                      (inputs topComponent)
@@ -83,6 +87,9 @@ mkTopWrapper primMap teM modName topComponent
                          zipWith (\(p,_) i -> (p,Identifier i Nothing))
                                  (outputs topComponent)
                                  idsO)
+
+    isNetDecl (NetDecl nm ty) = Just (nm,ty)
+    isNetDecl _               = Nothing
 
 -- | Create extra input ports for the wrapper
 extraIn :: Maybe TopEntity -> [(Identifier,HWType)]
@@ -198,12 +205,10 @@ mkOutput nms (i,hwty) cnt = case hwty of
 -- | Create clock generators
 mkClocks :: PrimMap -> [(Identifier,HWType)] -> Maybe TopEntity -> [Declaration]
 mkClocks primMap hidden teM = concat
-    [ hiddenSigDecs
-    , clockGens
+    [ clockGens
     , resets
     ]
   where
-    hiddenSigDecs        = maybe [] (const (map (uncurry NetDecl) hidden)) teM
     (clockGens,clkLocks) = maybe ([],[])
                                  (first concat . unzip . map mkClock . t_clocks)
                                  teM
@@ -214,18 +219,25 @@ stringToVar = (`Identifier` Nothing) . pack
 
 -- | Create a single clock generator
 mkClock :: ClockSource -> ([Declaration],(Identifier,[String],Bool))
-mkClock (ClockSource {..}) = ([lockedDecl,instDecl],(lockedName,clks,c_sync))
+mkClock (ClockSource {..}) = (clkDecls ++ [lockedDecl,instDecl],(lockedName,clks,c_sync))
   where
     c_nameT      = pack c_name
     lockedName   = append c_nameT "_locked"
     lockedDecl   = NetDecl lockedName (Reset lockedName 0)
     (ports,clks) = clockPorts c_inp c_outp
+    clkDecls     = map mkClockDecl clks
     instDecl     = InstDecl c_nameT (append c_nameT "_inst")
                  $ concat [ ports
                           , maybe [] ((:[]) . (pack *** stringToVar))
                                   c_reset
                           , [(pack c_lock,Identifier lockedName Nothing)]
                           ]
+
+mkClockDecl :: String -> Declaration
+mkClockDecl s = NetDecl (pack s) (Clock (pack name) (read rate))
+  where
+    (name,rate) = span (not . isDigit) s
+
 
 -- | Create a single clock path
 clockPorts :: Maybe (String,String) -> [(String,String)]
@@ -250,7 +262,7 @@ mkResets primMap hidden = unsafeRunNetlist . fmap concat . mapM assingReset
         match _                = False
 
         connectReset (rst,(Reset nm r)) = if doSync
-            then return [Assignment rst (Identifier lock Nothing)]
+            then return [NetDecl rst (Reset nm r), Assignment rst (Identifier lock Nothing)]
             else genSyncReset primMap lock rst nm r
         connectReset _ = return []
 
@@ -275,7 +287,7 @@ genSyncReset primMap lock rst nm r = do
           return (BlackBoxD bbName templ' ctx)
         pM -> error $ $(curLoc) ++ ("Can't make reset sync for: " ++ show pM)
 
-  return [resetGenDecl]
+  return [NetDecl rst (Reset nm r),resetGenDecl]
 
 -- | The 'NetListMonad' is an transformer stack with 'IO' at the bottom.
 -- So we must use 'unsafePerformIO'.
