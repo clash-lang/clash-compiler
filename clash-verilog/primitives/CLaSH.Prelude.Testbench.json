@@ -11,7 +11,7 @@
     , "templateD" :
 "// assert
 // pragma translate_off
-always @(posedge ~CLK[2] or negedge ~RST[2]) begin
+always @(posedge ~CLK[2] or posedge ~RST[2]) begin
   if (~ARG[4] != ~ARG[5]) begin
     $display(\"%s, expected: %b, actual: %b\", ~LIT[3], ~ARG[5], ~ARG[4]);
     $stop;

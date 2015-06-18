@@ -20,7 +20,7 @@ initial begin
 end
 
 always @(posedge ~CLK[1]) begin : blockRamFile_~COMPNAME_~SYM[2]
-  if (~ARG[7]) begin
+  if (~ARG[6]) begin
     RAM_~SYM[0][~ARG[4]] <= ~ARG[7];
   end
   dout_~SYM[1] <= RAM_~SYM[0][~ARG[5]];
