@@ -70,9 +70,11 @@ main =
             ]
         , testGroup "Signal"
             [ runTest ("tests" </> "shouldwork" </> "Signal") Both [] "AlwaysHigh" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamFile" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamTest" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "MAC" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "SigP" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "RomFile" (Just ("testbench",False))
             ]
         , testGroup "Testbench"
             [ runTest ("tests" </> "shouldwork" </> "Testbench") Both ["-clash-inline-limit=0"] "TB" (Just ("testbench",True))
