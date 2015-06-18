@@ -1,5 +1,13 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.7
+* New features:
+  * Support for copying string literals from Haskell to generated code
+  * Collect and copy data-files
+
+* Fixes bugs:
+  * Signals declared twice when not using a clock-generating component [#60](https://github.com/clash-lang/clash-compiler/issues/60)
+
 ## 0.5.6 *June 3rd 2015*
 * New features:
   * Support Verilog backend

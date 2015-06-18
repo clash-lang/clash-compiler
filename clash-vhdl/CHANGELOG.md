@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.5.7
+* New features:
+  * Support `clash-prelude-0.9`
+
 ## 0.5.6 *June 5th 2015*
 * Fixes bugs:
   * Incorrect extraction of `Bool` value out of a Sum-of-Product type
