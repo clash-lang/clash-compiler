@@ -169,7 +169,7 @@ blockRam# clk content wr rd en din = register' clk undefined dout
   where
     szI  = fromInteger $ maxIndex content
     dout = runST $ do
-      arr <- newListArray (0,szI-1) (toList content)
+      arr <- newListArray (0,szI) (toList content)
       mapM (ramT arr) (bundle' clk (wr,rd,en,din))
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
