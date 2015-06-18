@@ -43,9 +43,9 @@ begin
   -- pragma translate_on
         ;
 
-  blockRamFile_~SYM[1] : process(~CLK[2])
+  blockRamFile_~SYM[1] : process(~CLK[1])
   begin
-    if (rising_edge(~CLK[2])) then
+    if (rising_edge(~CLK[1])) then
       if ~ARG[6] then
         RAM(to_integer(wr)) <= to_bitvector(~ARG[7]);
       end if;
