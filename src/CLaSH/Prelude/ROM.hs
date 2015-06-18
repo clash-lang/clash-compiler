@@ -68,7 +68,7 @@ asyncRom# :: KnownNat n
 asyncRom# content rd = arr ! rd
   where
     szI = fromInteger (maxIndex content)
-    arr = listArray (0,szI - 1) (toList content)
+    arr = listArray (0,szI) (toList content)
 
 {-# INLINE rom #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
@@ -138,4 +138,4 @@ rom# :: KnownNat n
 rom# clk content rd = register' clk undefined ((arr !) <$> rd)
   where
     szI = fromInteger (maxIndex content)
-    arr = listArray (0,szI - 1) (toList content)
+    arr = listArray (0,szI) (toList content)
