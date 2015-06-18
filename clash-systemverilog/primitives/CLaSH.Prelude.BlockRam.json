@@ -1,31 +1,31 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.BlockRam.blockRam'"
+    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
     , "type" :
-"blockRam' :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
-           => SClock clk               -- clk,  ARG[2]
-           -> Vec n a                  -- init, ARG[3]
-           -> Signal' clk (Unsigned m) -- wr,   ARG[4]
-           -> Signal' clk (Unsigned m) -- rd,   ARG[5]
-           -> Signal' clk Bool         -- wren, ARG[6]
-           -> Signal' clk a            -- din,  ARG[7]
+"blockRam# :: KnownNat n       -- ARG[0]
+           => SClock clk       -- clk,  ARG[1]
+           -> Vec n a          -- init, ARG[2]
+           -> Signal' clk Int  -- wr,   ARG[3]
+           -> Signal' clk Int  -- rd,   ARG[4]
+           -> Signal' clk Bool -- wren, ARG[5]
+           -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
 "// blockRam
-~SIGD[~SYM[0]][3];
-~SIGD[~SYM[1]][7];
+~SIGD[RAM_~SYM[0]][2];
+~SIGD[dout_~SYM[1]][6];
 
 initial begin
   ~SYM[0] = ~LIT[3];
 end
 
-always @(posedge ~CLK[2]) begin : blockRam_~COMPNAME_~SYM[3]
-  if (~ARG[6]) begin
-    ~SYM[0][~ARG[4]] <= ~ARG[7];
+always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[3]
+  if (~ARG[5]) begin
+    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = ~SYM[1];"
+assign ~RESULT = dout_~SYM[1];"
     }
   }
 ]

@@ -1,22 +1,38 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.ROM.rom'"
+    { "name" : "CLaSH.Prelude.ROM.asyncRom#"
     , "type" :
-"rom' :: (KnownNat n, KnownNat m)  -- (ARG[0],ARG[1])
-      => SClock clk                -- clk,  ARG[2]
-      -> Vec n a                   -- init, ARG[3]
-      -> Signal' clk (Unsigned m)  -- rd,   ARG[4]
+"asyncRom# :: KnownNat n -- ^ ARG[0]
+           => Vec n a    -- ^ ARG[1]
+           -> Int        -- ^ ARG[2]
+           -> a"
+    , "templateD" :
+"// asyncRom begin
+~SIGD[ROM_~SYM[0]][1];
+assign ROM_SYM[0] = ~ARG[1];
+
+assign ~RESULT = ROM_~SYM[0][~ARG[2]];
+// asyncRom end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Prelude.ROM.rom#"
+    , "type" :
+"rom# :: KnownNat n      -- ARG[0]
+      => SClock clk      -- clk,  ARG[1]
+      -> Vec n a         -- init, ARG[2]
+      -> Signal' clk Int -- rd,   ARG[3]
       -> Signal' clk a"
     , "templateD" :
 "// rom begin
-~TYP[3] ~SYM[0];
-assign ~SYM[0] = ~ARG[3];
+~SIGD[ROM_~SYM[0]][2];
+assign ROM_~SYM[0] = ~ARG[2];
 
-~TYPO ~SYM[1];
-always @(posedge ~CLK[2]) begin : rom_~COMPNAME_~SYM[2]
-  ~SYM[1] <= ~SYM[0][~ARG[4]];
+~SIGDO[dout_~SYM[1]];
+always @(posedge ~CLK[1]) begin : rom_~COMPNAME_~SYM[2]
+  dout_~SYM[1] <= ROM_~SYM[0][~ARG[3]];
 end
 
-assign ~RESULT = ~SYM[1];
+assign ~RESULT = dout_~SYM[1];
 // rom end"
     }
   }

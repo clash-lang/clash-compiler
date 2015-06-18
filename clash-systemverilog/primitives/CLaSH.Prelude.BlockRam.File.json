@@ -1,31 +1,32 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.BlockRam.File.blockRamFile'"
+    { "name" : "CLaSH.Prelude.BlockRam.File.blockRamFile#"
     , "type" :
-"blockRamFile' :: (KnownNat m, KnownNat k)   -- (ARG[0],ARG[1])
-               => SClock clk                 -- clk,  ARG[2]
-               -> SNat n                     -- sz,   ARG[3]
-               -> FilePath                   -- file, ARG[4]
-               -> Signal' clk (Unsigned k)   -- wr,   ARG[5]
-               -> Signal' clk (Unsigned k)   -- rd,   ARG[6]
-               -> Signal' clk Bool           -- wren, ARG[7]
-               -> Signal' clk (BitVector m)  -- din,  ARG[8]
+"blockRamFile# :: KnownNat m                 -- ARG[0]
+               => SClock clk                 -- clk,  ARG[1]
+               -> SNat n                     -- sz,   ARG[2]
+               -> FilePath                   -- file, ARG[3]
+               -> Signal' clk Int            -- wr,   ARG[4]
+               -> Signal' clk Int            -- rd,   ARG[5]
+               -> Signal' clk Bool           -- wren, ARG[6]
+               -> Signal' clk (BitVector m)  -- din,  ARG[7]
                -> Signal' clk (BitVector m)"
+    , "templateD" :
 "// blockRamFile begin
-~TYPO ~SYM[0] [0:~LIT[3]-1];
-~TYPO ~SYM[1];
+~TYPO RAM_~SYM[0] [0:~LIT[2]-1];
+~SIGD[dout_~SYM[1]][7];
 
 initial begin
-  $readmemb(~FILE[~LIT[4]],~SYM[0]);
+  $readmemb(~FILE[~LIT[3]],RAM_~SYM[0]);
 end
 
-always @(posedge ~CLK[2]) begin : blockRamFile_~COMPNAME_~SYM[2]
+always @(posedge ~CLK[1]) begin : blockRamFile_~COMPNAME_~SYM[2]
   if (~ARG[7]) begin
-    ~SYM[0][~ARG[5]] <= ~ARG[8];
+    RAM_~SYM[0][~ARG[4]] <= ~ARG[7];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[6]];
+  dout_~SYM[1] <= RAM_~SYM[0][~ARG[6]];
 end
 
-assign ~RESULT = ~SYM[1];
+assign ~RESULT = dout_~SYM[1];
 // blockRamFile end"
     }
   }

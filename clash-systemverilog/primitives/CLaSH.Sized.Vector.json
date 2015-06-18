@@ -212,52 +212,30 @@ endgenerate"
     { "name"      : "CLaSH.Sized.Vector.index_int"
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
-"// index_integer
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][2];
+"// indexVec begin
+~SIGD[vec_~SYM[0]][1];
+assign vec_SYM[0] = ~ARG[1];
 
-assign ~SYM[0] = ~ARG[1];
-assign ~SYM[1] = ~ARG[2];
-
-
-always_comb begin
-// pragma translate_off
-  if (~SYM[1] < $low(~SYM[0]) || ~SYM[1] > $high(~SYM[0])) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[1], $low(~SYM[0]), $high(~SYM[0]));
-    ~RESULT = ~ERRORO;
-  end else begin
-  // pragma translate_on
-    ~RESULT = ~SYM[0][~SYM[1]];
-  // pragma translate_off
-  end
-// pragma translate_on
-end"
+assign ~RESULT = vec_~SYM[0][~ARG[2]];
+// indexVec end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replace_int"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
-"// replace_integer
-~SIGD[~SYM[0]][2];
-assign ~SYM[0] = ~ARG[2];
+"// replaceVec start
+~SIGD[vec_~SYM[0]][1];
+~SIGD[din_~SYM[1]][3];
+assign din_~SYM[1] = ~ARG[3];
 
-~SIGD[~SYM[1]][1];
 always_comb begin
-  ~SYM[1] = ~ARG[1];
-  // pragma translate_off
-  if (~SYM[0] < $low(~SYM[1]) || ~SYM[0] > $high(~SYM[1])) begin
-    $display(\"Index: %d, is out of bounds: %d to %d\", ~SYM[0], $low(~SYM[1]), $high(~SYM[1]));
-    ~SYM[1] = ~ERROR[1];
-  end else begin
-    // pragma translate_on
-    ~SYM[1][~SYM[0]] = ~ARG[3];
-    // pragma translate_off
-  end
-  // pragma translate_on
+  vec_~SYM[0] = ~ARG[1];
+  vec_~SYM[0][~ARG[2]] = din_~SYM[1];
 end
 
-assign ~RESULT = ~SYM[1];"
+assign ~RESULT = vec_~SYM[0];
+// replaceVec end"
     }
   }
 , { "BlackBox" :
