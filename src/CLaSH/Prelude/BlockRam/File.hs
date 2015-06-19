@@ -186,7 +186,7 @@ blockRamFile# clk sz file wr rd en din = register' clk undefined dout
     szI  = fromInteger $ snatToInteger sz
     dout = runST $ do
       arr <- newListArray (0,szI-1) (initMem file)
-      mapM (ramT arr) (bundle' clk (wr,rd,en,din))
+      traverse (ramT arr) (bundle' clk (wr,rd,en,din))
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
     ramT ram (w,r,e,d) = do
