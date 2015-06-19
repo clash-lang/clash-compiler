@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 
 {-|
 Copyright  :  (C) 2015, University of Twente
@@ -28,8 +28,8 @@ where
 
 import Control.Monad          (when)
 import Control.Monad.ST.Lazy  (ST,runST)
-import Data.Array.MArray      (newArray_,readArray,writeArray)
-import Data.Array.ST          (STArray)
+import Data.Array.MArray.Safe (newArray_,readArray,writeArray)
+import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
 import CLaSH.Promoted.Nat     (SNat,snat,snatToInteger)

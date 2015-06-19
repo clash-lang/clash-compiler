@@ -76,11 +76,13 @@ Library
                       CLaSH.Prelude.BlockRam.File
                       CLaSH.Prelude.DataFlow
                       CLaSH.Prelude.Explicit
+                      CLaSH.Prelude.Explicit.Safe
                       CLaSH.Prelude.Mealy
                       CLaSH.Prelude.Moore
                       CLaSH.Prelude.RAM
                       CLaSH.Prelude.ROM
                       CLaSH.Prelude.ROM.File
+                      CLaSH.Prelude.Safe
                       CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat

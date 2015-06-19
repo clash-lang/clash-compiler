@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
 
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Safe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -10,6 +10,8 @@
   Copyright   :  (C) 2013-2015, University of Twente
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  __This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe-haskell.html Safe> API only of "CLaSH.Prelude"__
 
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
   borrows both its syntax and semantics from the functional programming language
@@ -32,7 +34,7 @@
   library. A preliminary version of a tutorial can be found in "CLaSH.Tutorial".
   Some circuit examples can be found in "CLaSH.Examples".
 -}
-module CLaSH.Prelude
+module CLaSH.Prelude.Safe
   ( -- * Creating synchronous sequential circuits
     mealy
   , mealyB
@@ -45,29 +47,15 @@ module CLaSH.Prelude
   , asyncRomPow2
   , rom
   , romPow2
-    -- ** ROMs initialised with a data file
-  , asyncRomFile
-  , asyncRomFilePow2
-  , romFile
-  , romFilePow2
     -- * RAM primitives with a combinational read port
   , asyncRam
   , asyncRamPow2
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
-    -- ** BlockRAM primitives initialised with a data file
-  , blockRamFile
-  , blockRamFilePow2
     -- * Utility functions
-  , window
-  , windowD
   , isRising
   , isFalling
-    -- * Testbench functions
-  , assert
-  , stimuliGenerator
-  , outputVerifier
     -- * Exported modules
     -- ** Synchronous signals
   , module CLaSH.Signal
@@ -96,8 +84,6 @@ module CLaSH.Prelude
   , module CLaSH.Promoted.Nat.TH
     -- ** Type-level functions
   , module CLaSH.Promoted.Ord
-    -- ** Template Haskell
-  , Lift (..), deriveLift
     -- ** Type classes
     -- *** CLaSH
   , module CLaSH.Class.BitPack
@@ -106,7 +92,6 @@ module CLaSH.Prelude
     -- *** Other
   , module Control.Applicative
   , module Data.Bits
-  , module Data.Default
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -115,9 +100,7 @@ where
 
 import Control.Applicative
 import Data.Bits
-import Data.Default
 import GHC.TypeLits
-import Language.Haskell.TH.Lift    (Lift(..),deriveLift)
 import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            foldl1, foldr, foldr1, head, init,
                                            iterate, last, length, map, repeat,
@@ -131,13 +114,13 @@ import CLaSH.Class.Num
 import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
-import CLaSH.Prelude.BlockRam.File (blockRamFile, blockRamFilePow2)
+import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
+import CLaSH.Prelude.Explicit.Safe (registerB', isRising', isFalling')
+import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
+import CLaSH.Prelude.Moore         (moore, mooreB)
+import CLaSH.Prelude.RAM           (asyncRam,asyncRamPow2)
+import CLaSH.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
 import CLaSH.Prelude.DataFlow
-import CLaSH.Prelude.Explicit      (window', windowD')
-import CLaSH.Prelude.ROM.File      (asyncRomFile,asyncRomFilePow2,romFile,
-                                    romFilePow2)
-import CLaSH.Prelude.Safe
-import CLaSH.Prelude.Testbench     (assert, stimuliGenerator, outputVerifier)
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
@@ -153,9 +136,6 @@ import CLaSH.Signal.Delayed
 import CLaSH.Signal.Explicit       (systemClock)
 
 -- $setup
--- >>> :set -XDataKinds
--- >>> let window4 = window :: Signal Int -> Vec 4 (Signal Int)
--- >>> let windowD3 = windowD :: Signal Int -> Vec 3 (Signal Int)
 -- >>> let rP = registerB (8,8)
 
 {- $hiding
@@ -168,28 +148,29 @@ It instead exports the identically named functions defined in terms of
 'CLaSH.Sized.Vector.Vec' at "CLaSH.Sized.Vector".
 -}
 
-{-# INLINE window #-}
--- | Give a window over a 'Signal'
+{-# INLINE registerB #-}
+-- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
--- > window4 :: Signal Int -> Vec 4 (Signal Int)
--- > window4 = window
+-- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
+-- > rP = registerB (8,8)
 --
--- >>> simulateB window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
--- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
-window :: (KnownNat n, Default a)
-       => Signal a                -- ^ Signal to create a window over
-       -> Vec (n + 1) (Signal a)  -- ^ Window of at least size 1
-window = window' systemClock
+-- >>> simulateB rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
+-- [(8,8),(1,1),(2,2),(3,3)...
+registerB :: Bundle a => a -> Unbundled a -> Unbundled a
+registerB = registerB' systemClock
 
-{-# INLINE windowD #-}
--- | Give a delayed window over a 'Signal'
---
--- > windowD3 :: Signal Int -> Vec 3 (Signal Int)
--- > windowD3 = windowD
---
--- >>> simulateB windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
--- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
-windowD :: (KnownNat (n + 1), Default a)
-        => Signal a               -- ^ Signal to create a window over
-        -> Vec (n + 1) (Signal a) -- ^ Window of at least size 1
-windowD = windowD' systemClock
+{-# INLINE isRising #-}
+-- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
+isRising :: (Bounded a, Eq a)
+         => a -- ^ Starting value
+         -> Signal a
+         -> Signal Bool
+isRising = isRising' systemClock
+
+{-# INLINE isFalling #-}
+-- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
+isFalling :: (Bounded a, Eq a)
+          => a -- ^ Starting value
+          -> Signal a
+          -> Signal Bool
+isFalling = isFalling' systemClock

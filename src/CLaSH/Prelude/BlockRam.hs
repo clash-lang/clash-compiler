@@ -3,7 +3,7 @@
 {-# LANGUAGE MagicHash        #-}
 {-# LANGUAGE TypeOperators    #-}
 
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 
 {-|
 Copyright  :  (C) 2013-2015, University of Twente
@@ -26,8 +26,8 @@ where
 
 import Control.Monad          (when)
 import Control.Monad.ST.Lazy  (ST,runST)
-import Data.Array.MArray      (newListArray,readArray,writeArray)
-import Data.Array.ST          (STArray)
+import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
+import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
 import CLaSH.Signal           (Signal)

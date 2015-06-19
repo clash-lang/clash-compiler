@@ -11,6 +11,7 @@
   This is needed, because `assert` now reports the clock cycle, and clock domain, when an assertion fails.
   * `defClkAltera` and `defClkXilinx` are replaced by, `altpll` and `alteraPll` for Altera clock sources, and `clockWizard` for Xilinx clock sources.
   These names correspond to the names of the generator utilities in Quartus and ISE/Vivado.
+  * Add [Safe](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe-haskell.html) versions of the prelude modules: `CLaSH.Prelude.Safe` and `CLaSH.Prelude.Explicit.Safe`
 
 ## 0.8 *June 3rd 2015*
 * New features:
