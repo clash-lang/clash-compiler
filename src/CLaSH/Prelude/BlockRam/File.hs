@@ -11,7 +11,62 @@ Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-BlockRAM primitives that can be initialised with a data file
+BlockRAM primitives that can be initialised with a data file. The BNF grammar
+for this data file is simple:
+
+@
+FILE = LINE+
+LINE = BIT+
+BIT  = '0'
+     | '1'
+@
+
+Consecutive @LINE@s correspond to consecutive memory addresses starting at @0@.
+For example, a data file @memory.bin@ containing the 9-bit unsigned number
+@7@ to @13@ looks like:
+
+@
+000000111
+000001000
+000001001
+000001010
+000001011
+000001100
+000001101
+@
+
+We can instantiate a BlockRAM using the content of the above file like so:
+
+@
+topEntity :: Signal (Unsigned 3) -> Signal (Unsigned 9)
+topEntity rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" 0 rd (signal False) 0
+@
+
+In the example above, we basically treat the BlockRAM as an synchronous ROM.
+We can see that it works as expected:
+
+@
+__>>> import qualified Data.List as L__
+__>>> L.tail $ sampleN 4 $ topEntity (fromList [3..5])__
+[10,11,12]
+@
+
+However, we can also interpret the same data as a tuple of a 6-bit unsigned
+number, and a 3-bit signed number:
+
+@
+topEntity2 :: Signal (Unsigned 3) -> Signal (Unsigned 6,Signed 3)
+topEntity2 rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" 0 rd (signal False) 0
+@
+
+And then we would see:
+
+@
+__>>> import qualified Data.List as L__
+__>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
+[(1,2),(1,3)(1,-4)]
+@
+
 -}
 module CLaSH.Prelude.BlockRam.File
   ( -- * BlockRAM synchronised to the system clock
