@@ -83,7 +83,7 @@ multUNat UZero      _     = UZero
 multUNat _          UZero = UZero
 multUNat (USucc x) y      = addUNat y (multUNat x y)
 
--- | Exponential of two unary singleton natural numbers
+-- | Power of two unary singleton natural numbers
 --
 -- __NB__: Not synthesisable
 powUNat :: UNat n -> UNat m -> UNat (n ^ m)
