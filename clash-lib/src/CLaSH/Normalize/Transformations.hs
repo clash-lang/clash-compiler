@@ -332,12 +332,13 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
     if untranslatable
       then return e
       else do
-        bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-        case bodyMaybe of
+        bndrs <- Lens.use bindings
+        case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,body) -> if f `elem` (Lens.toListOf termFreeIds body)
-                              then return e
-                              else changed (mkApps body args)
+          Just (_,body) -> let cg = callGraph [] bndrs f
+                           in if null (recursiveComponents cg)
+                              then changed (mkApps body args)
+                              else return e
           _ -> return e
 
 inlineClosed _ e@(Var _ f) = R $ do
@@ -346,12 +347,13 @@ inlineClosed _ e@(Var _ f) = R $ do
   untranslatable <- isUntranslatable e
   if closed && not untranslatable
     then do
-      bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
-      case bodyMaybe of
+      bndrs <- Lens.use bindings
+      case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,body) -> if f `elem` (Lens.toListOf termFreeIds body)
-                            then return e
-                            else changed body
+        Just (_,body) -> let cg = callGraph [] bndrs f
+                         in if null (recursiveComponents cg)
+                            then changed body
+                            else return e
         _ -> return e
     else return e
 
