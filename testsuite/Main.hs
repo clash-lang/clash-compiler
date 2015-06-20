@@ -56,6 +56,9 @@ main =
             [ runTest ("tests" </> "shouldwork" </> "CSignal") Both [] "CBlockRamTest" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "CSignal") Both [] "MAC" (Just ("topEntity",False))
             ]
+        , testGroup "Feedback"
+            [ runTest ("tests" </> "shouldwork" </> "Feedback") Both [] "Fib" (Just ("testbench",True))
+            ]
         , testGroup "Fixed"
             [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
             ]
