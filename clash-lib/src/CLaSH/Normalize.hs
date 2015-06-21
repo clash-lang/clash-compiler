@@ -68,6 +68,7 @@ runNormalization opts supply globals typeTrans tcm eval
                   (opt_specLimit opts)
                   HashMap.empty
                   (opt_inlineLimit opts)
+                  (opt_inlineBelow opts)
                   (error $ $(curLoc) ++ "Report as bug: no curFun")
 
 

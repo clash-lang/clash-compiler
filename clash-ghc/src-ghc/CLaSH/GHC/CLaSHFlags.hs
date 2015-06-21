@@ -31,6 +31,7 @@ flagsClash :: IORef CLaSHOpts -> [Flag IO]
 flagsClash r = [
     defFlag "clash-inline-limit" (IntSuffix (liftEwM . setInlineLimit r))
   , defFlag "clash-spec-limit" (IntSuffix (liftEwM . setSpecLimit r))
+  , defFlag "clash-inline-below" (IntSuffix (liftEwM . setInlineBelow r))
   , defFlag "clash-debug" (SepArg (setDebugLevel r))
   ]
 
@@ -38,6 +39,11 @@ setInlineLimit :: IORef CLaSHOpts
                -> Int
                -> IO ()
 setInlineLimit r n = modifyIORef r (\c -> c {opt_inlineLimit = n})
+
+setInlineBelow :: IORef CLaSHOpts
+               -> Int
+               -> IO ()
+setInlineBelow r n = modifyIORef r (\c -> c {opt_inlineBelow = n})
 
 setSpecLimit :: IORef CLaSHOpts
              -> Int

@@ -34,6 +34,9 @@ data NormalizeState
   -- * Elem: (functions which were inlined, number of times inlined)
   , _inlineLimit     :: Int
   -- ^ Number of times a function 'f' can be inlined in a function 'g'
+  , _inlineBelow     :: Int
+  -- ^ Size of a function below which it is always inlined if it is not
+  -- recursive
   , _curFun          :: TmName
   -- ^ Function which is currently normalized
   }

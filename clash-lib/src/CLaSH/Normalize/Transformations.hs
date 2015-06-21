@@ -366,20 +366,15 @@ inlineSmall _ e@(collectArgs -> (Var _ f,args)) = R $ do
   if untranslatable
     then return e
     else do
-      isInlined <- liftR $ alreadyInlined f
-      limit     <- liftR $ Lens.use inlineLimit
-      if (Maybe.fromMaybe 0 isInlined) > limit
-        then do
-          cf <- liftR $ Lens.use curFun
-          lvl <- Lens.view dbgLevel
-          traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineSmall: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
-        else do
-          bodyMaybe <- HashMap.lookup f <$> Lens.use bindings
-          case bodyMaybe of
-            (Just (_,body))
-              | termSize body < 5 -> do liftR $ addNewInline f
-                                        changed (mkApps body args)
-            _ -> return e
+      bndrs <- Lens.use bindings
+      limit <- liftR $ Lens.use inlineBelow
+      case HashMap.lookup f bndrs of
+        -- Don't inline recursive expressions
+        Just (_,body) -> let cg = callGraph [] bndrs f
+                         in if null (recursiveComponents cg) && termSize body < limit
+                            then changed (mkApps body args)
+                            else return e
+        _ -> return e
 
 inlineSmall _ e = return e
 
