@@ -4,6 +4,7 @@
 * New features:
   * Support for copying string literals from Haskell to generated code
   * Support `clash-prelude-0.9`
+  * Size at below which functions are always inlined is configurable, run with `-clash-inline-below=N` to set the size limit to `N`
 
 ## 0.5.7 *June 3rd 2015*
 * New features:

@@ -7,6 +7,7 @@
 
 * Fixes bugs:
   * Signals declared twice when not using a clock-generating component [#60](https://github.com/clash-lang/clash-compiler/issues/60)
+  * This piece of code eat up all CPU when generating verilog [#62](https://github.com/clash-lang/clash-compiler/issues/60)
 
 ## 0.5.6 *June 3rd 2015*
 * New features:
