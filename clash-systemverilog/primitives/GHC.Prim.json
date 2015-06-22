@@ -94,13 +94,13 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftRL#"
-    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "type"      : "uncheckedIShiftRL# :: Int# -> Int# -> Int#"
     , "templateE" : "~ARG[0] >> ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftL#"
-    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
     , "templateE" : "~ARG[0] <<< ~ARG[1]"
     }
   }
