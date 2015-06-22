@@ -6,10 +6,12 @@ module CLaSH.Normalize.Util where
 
 import           Control.Lens            ((%=))
 import qualified Control.Lens            as Lens
+import           Data.Function           (on)
 import qualified Data.Graph              as Graph
 import           Data.Graph.Inductive    (Gr,LNode,lsuc,mkGraph,iDom)
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
+import qualified Data.List               as List
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
@@ -78,10 +80,13 @@ callGraph visited bindingMap root = node:other
 -- | Determine the sets of recursive components given the edges of a callgraph
 recursiveComponents :: [(TmName,[TmName])] -- ^ [(calling function,[called function])]
                     -> [[TmName]]
-recursiveComponents = Maybe.catMaybes
-                    . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
-                    . Graph.stronglyConnComp
-                    . map (\(n,es) -> (n,n,es))
+recursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs)))
+                       . Maybe.catMaybes
+                       . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
+                       . Graph.stronglyConnComp
+                       $ map (\(n,es) -> (n,n,es)) cg
+  where
+    fs = map fst cg
 
 lambdaDropPrep :: HashMap TmName (Type,Term)
                -> TmName
