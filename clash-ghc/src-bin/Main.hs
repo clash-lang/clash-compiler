@@ -126,7 +126,7 @@ main = do
     r <- newIORef (CLaSHOpts { opt_dbgLevel    = DebugNone
                              , opt_inlineLimit = 20
                              , opt_specLimit   = 20
-                             , opt_inlineBelow = 5
+                             , opt_inlineBelow = 15
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 
