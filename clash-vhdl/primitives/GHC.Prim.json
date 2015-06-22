@@ -86,4 +86,22 @@
     , "templateE" : "~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftRA#"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "templateE" : "to_integer(shift_right(to_signed(~ARG[0],32),~ARG[1]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftRL#"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "templateE" : "to_integer(to_signed(~ARG[0],32) srl ~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftL#"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "templateE" : "to_integer(shift_left(to_signed(~ARG[0],32),~ARG[1]))"
+    }
+  }
 ]

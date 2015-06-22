@@ -86,4 +86,22 @@
     , "templateE" : "~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftRA#"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] >>> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftRL#"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] >> ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.uncheckedIShiftL#"
+    , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] <<< ~ARG[1]"
+    }
+  }
 ]
