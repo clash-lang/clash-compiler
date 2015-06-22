@@ -4,6 +4,9 @@
 * New features:
   * Support `clash-prelude-0.9`
 
+* Fixes bug:
+  * Can not operate "shiftR" on Int [#63](https://github.com/clash-lang/clash-compiler/issues/63)
+
 ## 0.5.6 *June 5th 2015*
 * Fixes bugs:
   * Incorrect extraction of `Bool` value out of a Sum-of-Product type

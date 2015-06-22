@@ -4,6 +4,9 @@
 * New features:
   * Support `clash-prelude-0.9`
 
+* Fixes bug:
+  * Can not operate "shiftR" on Int [#63](https://github.com/clash-lang/clash-compiler/issues/63)
+
 ## 0.5.5 *June 3rd 2015*
 * New features:
   * Compile against `clash-lib-0.5.6`
