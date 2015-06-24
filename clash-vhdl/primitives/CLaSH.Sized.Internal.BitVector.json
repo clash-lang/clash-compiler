@@ -387,13 +387,7 @@ end block;"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rem#"
     , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[1] rem ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.mod#"
-    , "type"      : "mod# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    , "templateE" : "std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))"
     }
   }
 , { "BlackBox" :

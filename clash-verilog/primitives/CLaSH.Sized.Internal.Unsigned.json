@@ -115,19 +115,13 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.quot#"
     , "type"      : "quot# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[1] / ~ARG[2]"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.rem#"
     , "type"      : "rem# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[1] % ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Unsigned.mod#"
-    , "type"      : "mod# :: Unsigned n -> Unsigned n -> Unsigned n"
-    , "templateE" : "~ARG[1] % ~ARG[2]"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
     }
   }
 , { "BlackBox" :

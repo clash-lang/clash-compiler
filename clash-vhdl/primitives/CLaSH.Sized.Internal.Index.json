@@ -66,20 +66,14 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.quot#"
-    , "type"      : "quot# :: KnownNat n => Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[1] / ~ARG[2]"
+    , "type"      : "quot# :: Index n -> Index n -> Index n"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.rem#"
-    , "type"      : "rem# :: KnownNat n => Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[1] rem ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Index.mod#"
-    , "type"      : "mod# :: KnownNat n => Index n -> Index n -> Index n"
-    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    , "type"      : "rem# :: Index n -> Index n -> Index n"
+    , "templateE" : "~ARG[0] rem ~ARG[1]"
     }
   }
 , { "BlackBox" :

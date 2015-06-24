@@ -254,19 +254,13 @@ assign ~RESULT = ~SYM[0][0];"
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.quot#"
     , "type"      : "quot# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[1]) / ~ARG[2]"
+    , "templateE" : "~ARG[0]) / ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rem#"
     , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[1] % ~ARG[2]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.BitVector.mod#"
-    , "type"      : "mod# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[1] % ~ARG[2]"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
     }
   }
 , { "BlackBox" :
