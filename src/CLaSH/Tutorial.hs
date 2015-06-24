@@ -42,6 +42,9 @@ module CLaSH.Tutorial (
   -- * TopEntity annotations: controlling the VHDL\/Verilog\/SystemVerilog generation.
   -- $annotations
 
+  -- * Multiple clock domains
+  -- $multiclock
+
   -- * Advanced: Primitives
   -- $primitives
 
@@ -50,9 +53,6 @@ module CLaSH.Tutorial (
 
   -- *** SystemVerilog primitives
   -- $svprimitives
-
-  -- * Multiple clock domains
-  -- $multiclock
 
   -- * Conclusion
   -- $conclusion
@@ -1235,10 +1235,147 @@ for the different clock domains. If you're targeting an FPGA, you can use e.g. a
 <http://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf MMCM>
 to provide the clock signals.
 
+This part of the tutorial assumes you know what <https://en.wikipedia.org/wiki/Metastability_in_electronics metastability>
+is, and how it can never truly be avoided in any asynchronous circuit. Also
+it assumes that you are familiar with the design of synchronizer circuits, and
+why a dual flip-flop synchroniser only works for bit-synchronisation and not
+word-synchronisation.
 The explicitly clocked versions of all synchronous functions and primitives can
-be found in "CLaSH.Prelude.Explicit", which re-exports the functions in
+be found in "CLaSH.Prelude.Explicit", which also re-exports the functions in
 "CLaSH.Signal.Explicit". We will use those functions to create a FIFO where
-the read and write port are synchronised to different clocks:
+the read and write port are synchronised to different clocks. Below you can find
+the code to build the FIFO synchroniser based on the design described in:
+<http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>
+
+We start with enable a few options that will make wring the type-signatures for
+our components a bit easier. We'll also import the standard "CLaSH.Prelude"
+module, and the "CLaSH.Prelude.Explicit" module for our explicitly clocked
+synchronous functions:
+
+@
+{\-\# LANGUAGE PartialTypeSignatures \#-\}
+{\-\# OPTIONS_GHC -fno-warn-partial-type-signatures \#-\}
+module MultiClockFifo where
+
+import CLaSH.Prelude
+import CLaSH.Prelude.Explicit
+@
+
+Then we'll start with the /hart/ of the FIFO synchroniser, an asynchronous RAM
+in the form of 'asyncRam''. It's called an asynchronous RAM because the read
+port is not synchronised to any clock (though the write port is). Note that in
+CλaSH we don't really have asynchronous logic, there is only combinational and
+synchronous logic. As a consequence, we see in the type signature of 'asyncRam'':
+
+    *
+
+    @
+    __asyncRam'__ :: _ => SClock wclk        -- ^ Clock to which to synchronise the write port of the RAM
+                   -> SClock rclk        -- ^ Clock to which the read address signal __r__ is synchronised
+                   -> SNat n             -- ^ Size __n__ of the RAM
+                   -> Signal' wclk addr  -- ^ Write address __w__
+                   -> Signal' rclk addr  -- ^ Read address __r__
+                   -> Signal' wclk Bool  -- ^ Write enable
+                   -> Signal' wclk a     -- ^ Value to write (at address __w__)
+                   -> Signal' rclk a     -- ^ Value of the RAM at address __r__
+    @
+
+that the signal containing the read address __r__ is synchronised to a different
+clock. That is, there is __no__ such thing as an @AsyncSignal@ in CλaSH.
+
+We continue by instantiating the 'asyncRam'':
+
+@
+fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
+  'asyncRam'' wclk rclk
+            (d2 `powSNat` addrSize)
+            waddr raddr
+            (winc '.&&.' 'not1' wfull)
+            wdata
+@
+
+We see that we give it @2^addrSize@ elements, where @addrSize@ is the bit-size
+of the address. Also, we only write new values to the ram when a new write is
+requested, indicated by @winc@, and the buffer is not full, indicated by
+@wfull@.
+
+The next part of the design calculates the read and write address for the
+asynchronous RAM, and creates the flags indicating whether the FIFO is full
+or empty. We start with a function that converts 'Bool'eans to @n + 1@ bit
+bitvectors:
+
+@
+boolToBV :: _ => Bool -> BitVector (n + 1)
+boolToBV = 'zeroExtend' . 'pack'
+@
+
+followed by the actual address and flag generator in 'mealy' machine style:
+
+@
+ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
+                                                          ,(flag,addr,ptr))
+  where
+    -- GRAYSTYLE2 pointer
+    bin' = bin + boolToBV (inc && not flag)
+    ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
+    addr = 'slice' (addrSize ``subSNat``  d1) d0 bin
+
+    flag' = flagGen ptr' s_ptr
+@
+
+It is parametrised in both address size, @addrSize@, and status flag generator,
+@flagGen@. It has two inputs, @s_ptr@, the synchronised pointer from the other
+clock domain, and @inc@, which indicates we want to perform a write or read of
+the FIFO. It creates three outputs: @flag@, the full or empty flag, @addr@, the
+read or write address into the RAM, and @ptr@, the Gray-encoded version of the
+read or write address which will be synchronised between the two clock domains.
+
+Next follow the initial states of address generators, and the flag generators
+for the empty and full flags:
+
+@
+-- FIFO empty: when next pntr == synchronized wptr or on reset
+isEmpty       = (==)
+rptrEmptyInit = (0,0,True)
+
+-- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
+isFull addrSize ptr s_ptr = ptr == ('complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
+                                   'slice' (addrSize ``subSNat`` d2) d0 s_ptr)
+wptrFullInit        = (0,0,False)
+@
+
+We create a dual flip-flop synchroniser to be used to synchronise the
+Gray-encoded pointers between the two clock domains:
+
+@
+ptrSync clk1 clk2 = 'register'' clk1 0
+                  . 'register'' clk1 0
+                  . 'unsafeSynchronizer' clk2 clk1
+@
+
+We then combine everything in:
+
+@
+fifo :: _
+     => SNat addrSize -> SClock wclk -> SClock rclk
+     -> Signal' wclk a -> Signal' wclk Bool
+     -> Signal' rclk Bool
+     -> (Signal' rclk a,Signal' wclk Bool,Signal' rclk Bool)
+fifo addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
+  where
+    s_rptr = ptrSync wclk rclk rptr
+    s_wptr = ptrSync rclk wclk wptr
+
+    rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
+
+    (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT addrSize isEmpty) rptrEmptyInit
+                                  (s_wptr,rinc)
+
+    (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT addrSize (isFull addrSize))
+                                  wptrFullInit (s_rptr,winc)
+@
+
+The whole file containing our FIFO design will look like this:
 
 @
 {\-\# LANGUAGE PartialTypeSignatures \#-\}
@@ -1248,56 +1385,57 @@ module MultiClockFifo where
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 
-fifoMem wclk rclk sz waddr raddr wclken wfull wdata =
+fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
   'asyncRam'' wclk rclk
-            ('powSNat' d2 sz)
+            (d2 `powSNat` addrSize)
             waddr raddr
-            (wclken '.&&.' 'not1' wfull)
+            (winc '.&&.' 'not1' wfull)
             wdata
-
-ptrSync clk1 clk2 = 'register'' clk1 0
-                  . 'register'' clk1 0
-                  . 'unsafeSynchronizer' clk2 clk1
 
 boolToBV :: _ => Bool -> BitVector (n + 1)
 boolToBV = 'zeroExtend' . 'pack'
 
-ptrCompareT sz cmp (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
-                                                ,(flag,addr,ptr))
+ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
+                                                          ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
     bin' = bin + boolToBV (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
-    addr = 'slice' ('subSNat' sz d1) d0 bin
+    addr = 'slice' (addrSize ``subSNat`` d1) d0 bin
 
-    flag' = cmp ptr' s_ptr
+    flag' = flagGen ptr' s_ptr
 
 -- FIFO empty: when next pntr == synchronized wptr or on reset
 isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
--- FIFO full: when next pntr == synchonized {~wptr[sz:sz-1],wptr[sz-1:0]}
-isFull sz ptr s_ptr = ptr == ('complement' ('slice' sz ('subSNat' sz d1) s_ptr) '++#'
-                              'slice' ('subSNat' sz d2) d0 s_ptr)
+-- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
+isFull addrSize ptr s_ptr = ptr == ('complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
+                                   'slice' (addrSize ``subSNat`` d2) d0 s_ptr)
 wptrFullInit        = (0,0,False)
 
+-- Dual flip-flip synchroniser
+ptrSync clk1 clk2 = 'register'' clk1 0
+                  . 'register'' clk1 0
+                  . 'unsafeSynchronizer' clk2 clk1
 
+-- Async FIFO synchroniser
 fifo :: _
      => SNat addrSize -> SClock wclk -> SClock rclk
      -> Signal' wclk a -> Signal' wclk Bool
      -> Signal' rclk Bool
      -> (Signal' rclk a,Signal' wclk Bool,Signal' rclk Bool)
-fifo szA wclk rclk wdata winc rinc = (rdata,wfull,rempty)
+fifo addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
   where
     s_rptr = ptrSync wclk rclk rptr
     s_wptr = ptrSync rclk wclk wptr
 
-    rdata = fifoMem wclk rclk szA waddr raddr winc wfull wdata
+    rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
 
-    (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT szA isEmpty) rptrEmptyInit
+    (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT addrSize isEmpty) rptrEmptyInit
                                   (s_wptr,rinc)
 
-    (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT szA (isFull szA))
+    (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT addrSize (isFull addrSize))
                                   wptrFullInit (s_rptr,winc)
 @
 
