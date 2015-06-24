@@ -121,9 +121,9 @@ import qualified CLaSH.Sized.Internal.BitVector as BV
 -- >>> satMin SatSymmetric 2 3 :: Unsigned 3
 -- 0
 newtype Unsigned (n :: Nat) =
-    -- | The constructor, 'U', and the field, 'unsafeToBitVector', are not
+    -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
     -- synthesisable.
-    U { unsafeToBitVector :: Integer }
+    U { unsafeToInteger :: Integer }
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int
