@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 {-|
@@ -27,7 +27,7 @@ module CLaSH.Tutorial (
   -- *** Circuit testbench
   -- $mac4
 
-  -- *** Generating SystemVerilog
+  -- *** Generating Verilog and SystemVerilog
   -- $mac5
 
   -- *** Alternative specifications
@@ -70,6 +70,7 @@ where
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
+import CLaSH.Prelude.BlockRam
 import Data.Char
 import Data.Int
 import GHC.Word
@@ -1006,72 +1007,73 @@ corresponding to the methods of the type class. In the above case, 'KnownNat'
 is actually just like a @newtype@ wrapper for 'Integer'.
 
 The second kind of primitive that we will explore is the /declaration/ primitive.
-We will use 'cblockRam' as an example, for which the Haskell/CλaSH code is:
+We will use 'blockRam#' as an example, for which the Haskell/CλaSH code is:
 
 @
-{\-\# NOINLINE blockRam' \#-\}
--- | Create a blockRAM with space for @n@ elements
---
--- * \_\_NB\_\_: Read value is delayed by 1 cycle
--- * \_\_NB\_\_: Initial output value is \'undefined\'
---
--- \@
--- type ClkA = Clk \\\"A\\\" 100
---
--- clkA100 :: SClock ClkA
--- clkA100 = sclock
---
--- bram40 :: Signal' ClkA (Unsigned 6) -> Signal' ClkA (Unsigned 6)
---        -> Signal' ClkA Bool -> Signal' ClkA Bit -> Signal' ClkA Bit
--- bram40 = \'blockRam'' clkA100 (\'CLaSH.Sized.Vector.replicate\' d40 1)
--- \@
-blockRam' :: ('GHC.TypeLits.KnownNat' n, 'GHC.TypeLits.KnownNat' m)
-          => 'SClock' clk               -- ^ \'Clock\' to synchronize to
-          -> 'Vec' n a                  -- ^ Initial content of the BRAM, also
-                                      -- determines the size, \@n\@, of the BRAM.
-                                      --
-                                      -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
-          -> 'Signal'' clk ('Unsigned' m) -- ^ Write address \@w\@
-          -> 'Signal'' clk ('Unsigned' m) -- ^ Read address \@r\@
-          -> 'Signal'' clk Bool         -- ^ Write enable
-          -> 'Signal'' clk a            -- ^ Value to write (at address \@w\@)
+{\-\# NOINLINE blockRam# \#-\}
+-- | blockRAM primitive
+blockRam' :: 'GHC.TypeLits.KnownNat' n
+          => 'SClock' clk       -- ^ \'Clock\' to synchronize to
+          -> 'Vec' n a          -- ^ Initial content of the BRAM, also
+                              -- determines the size, \@n\@, of the BRAM.
+                              --
+                              -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
+          -> 'Signal'' clk 'Int'  -- ^ Write address \@w\@
+          -> 'Signal'' clk 'Int'  -- ^ Read address \@r\@
+          -> 'Signal'' clk Bool -- ^ Write enable
+          -> 'Signal'' clk a    -- ^ Value to write (at address \@w\@)
           -> 'Signal'' clk a
           -- ^ Value of the \@blockRAM\@ at address \@r\@ from the previous clock
           -- cycle
-blockRam' clk binit wr rd en din =
-    'mealy'' clk bram' (binit,undefined) ('bundle'' clk (wr,rd,en,din))
+blockRam' clk binit wr rd en din = 'register'' clk undefined dout
   where
-    bram' (ram,o) (w,r,e,d) = ((ram',o'),o)
-      where
-        ram' | e         = 'replace' ram w d
-             | otherwise = ram
-        o'               = ram '!!' r
+    szI  = fromInteger $ 'maxIndex' content
+    dout = runST $ do
+      arr <- newListArray (0,szI) ('toList' content)
+      traverse (ramT arr) ('bundle'' clk (wr,rd,en,din))
+
+    ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
+    ramT ram (w,r,e,d) = do
+      d' <- readArray ram r
+      when e (writeArray ram w d)
+      return d'
 @
 
 And for which the /definition/ primitive is:
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
+    { "name"      : "CLaSH.Prelude.BlockRam.blockRam#"
     , "templateD" :
 "blockRam_~COMPNAME_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[3] := ~LIT[3]; -- ram
-  signal ~SYM[2] : ~TYP[7]; -- inp
-  signal ~SYM[3] : ~TYP[7]; -- outp
+  signal RAM  : ~TYP[2] := ~LIT[2];
+  signal dout : ~TYP[6];
+  signal wr   : integer range 0 to ~LIT[0] - 1;
+  signal rd   : integer range 0 to ~LIT[0] - 1;
 begin
-  ~SYM[2] <= ~ARG[7];
+  wr <= ~ARG[3]
+  -- pragma translate_off
+        mod ~LIT[0]
+  -- pragma translate_on
+        ;
 
-  process(~CLK[2])
+  rd <= ~ARG[4]
+  -- pragma translate_off
+        mod ~LIT[0]
+  -- pragma translate_on
+        ;
+
+  blockRam_~SYM[1] : process(~CLK[1])
   begin
-    if rising_edge(~CLK[2]) then
-      if ~ARG[6] then
-        ~SYM[1](to_integer(~ARG[4])) <= ~SYM[2];
+    if rising_edge(~CLK[1]) then
+      if ~ARG[5] then
+        RAM(wr) <= ~ARG[6];
       end if;
-      ~SYM[3] <= ~SYM[1](to_integer(~ARG[5]));
+      dout <= RAM(rd);
     end if;
   end process;
 
-  ~RESULT <= ~SYM[3];
+  ~RESULT <= dout;
 end block;"
     }
   }
@@ -1145,29 +1147,30 @@ and
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
+    { "name"      : "CLaSH.Prelude.BlockRam.blockRam#"
     , "templateD" :
-"// blockRam
-reg ~TYPO ~SYM[0] [0:~LIT[0]-1];
-reg ~SIGD[~SYM[1]][7];
+"// blockRam begin
+reg ~TYPO RAM_~SYM[0] [0:~LIT[0]-1];
+reg ~TYPO dout_~SYM[1];
 
-reg ~TYP[3] ~SYM[2];
+reg ~TYP[2] ram_init_~SYM[2];
 integer ~SYM[3];
 initial begin
-  ~SYM[2] = ~ARG[3];
+  ram_init_~SYM[2] = ~ARG[2];
   for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
-    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+    RAM_~SYM[0][~LIT[0]-1-~SYM[3]] = ram_init_~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
 
-always @(posedge ~CLK[2]) begin : blockRam_~COMPNAME_~SYM[4]
-  if (~ARG[6]) begin
-    ~SYM[0][~ARG[4]] <= ~ARG[7];
+always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[4]
+  if (~ARG[5]) begin
+    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = ~SYM[1];"
+assign ~RESULT = dout_~SYM[1];
+// blockRam end"
     }
   }
 @
@@ -1191,21 +1194,21 @@ and
     { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
     , "templateD" :
 "// blockRam
-~SIGD[~SYM[0]][3];
-~SIGD[~SYM[1]][7];
+~SIGD[RAM_~SYM[0]][2];
+~SIGD[dout_~SYM[1]][6];
 
 initial begin
   ~SYM[0] = ~LIT[3];
 end
 
-always @(posedge ~CLK[2]) begin
-  if (~ARG[6]) begin
-    ~SYM[0][~ARG[4]] <= ~ARG[7];
+always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[3]
+  if (~ARG[5]) begin
+    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = ~SYM[1];"
+assign ~RESULT = dout_~SYM[1];"
     }
   }
 @
