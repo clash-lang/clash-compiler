@@ -55,7 +55,6 @@ module CLaSH.Sized.Internal.Unsigned
     -- ** Integral
   , quot#
   , rem#
-  , mod#
   , toInteger#
     -- ** Bits
   , and#
@@ -272,18 +271,16 @@ instance KnownNat n => Integral (Unsigned n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
-  mod         = mod#
+  mod         = rem#
   quotRem n d = (n `quot#` d,n `rem#` d)
-  divMod  n d = (n `quot#` d,n `mod#` d)
+  divMod  n d = (n `quot#` d,n `rem#` d)
   toInteger   = toInteger#
 
-quot#,rem#,mod# :: Unsigned n -> Unsigned n -> Unsigned n
+quot#,rem# :: Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE quot# #-}
 quot# (U i) (U j) = U (i `quot` j)
 {-# NOINLINE rem# #-}
 rem# (U i) (U j) = U (i `rem` j)
-{-# NOINLINE mod# #-}
-mod# (U i) (U j) = U (i `mod` j)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: Unsigned n -> Integer

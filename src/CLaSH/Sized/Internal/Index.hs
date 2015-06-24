@@ -40,7 +40,6 @@ module CLaSH.Sized.Internal.Index
     -- ** Integral
   , quot#
   , rem#
-  , mod#
   , toInteger#
   )
 where
@@ -175,18 +174,16 @@ instance KnownNat n => Integral (Index n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
-  mod         = mod#
+  mod         = rem#
   quotRem n d = (n `quot#` d,n `rem#` d)
-  divMod  n d = (n `quot#` d,n `mod#` d)
+  divMod  n d = (n `quot#` d,n `rem#` d)
   toInteger   = toInteger#
 
-quot#,rem#,mod# :: Index n -> Index n -> Index n
+quot#,rem# :: Index n -> Index n -> Index n
 {-# NOINLINE quot# #-}
 (I a) `quot#` (I b) = I (a `div` b)
 {-# NOINLINE rem# #-}
 (I a) `rem#` (I b) = I (a `rem` b)
-{-# NOINLINE mod# #-}
-(I a) `mod#` (I b) = I (a `mod` b)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: Index n -> Integer

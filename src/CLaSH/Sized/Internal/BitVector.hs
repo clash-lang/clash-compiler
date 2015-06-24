@@ -74,7 +74,6 @@ module CLaSH.Sized.Internal.BitVector
     -- ** Integral
   , quot#
   , rem#
-  , mod#
   , toInteger#
     -- ** Bits
   , and#
@@ -299,18 +298,16 @@ instance KnownNat n => Integral (BitVector n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
-  mod         = mod#
+  mod         = rem#
   quotRem n d = (n `quot#` d,n `rem#` d)
-  divMod  n d = (n `quot#` d,n `mod#` d)
+  divMod  n d = (n `quot#` d,n `rem#` d)
   toInteger   = toInteger#
 
-quot#,rem#,mod# :: BitVector n -> BitVector n -> BitVector n
+quot#,rem# :: BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE quot# #-}
 quot# (BV i) (BV j) = BV (i `quot` j)
 {-# NOINLINE rem# #-}
 rem# (BV i) (BV j) = BV (i `rem` j)
-{-# NOINLINE mod# #-}
-mod# (BV i) (BV j) = BV (i `mod` j)
 
 {-# NOINLINE toInteger# #-}
 toInteger# :: BitVector n -> Integer
