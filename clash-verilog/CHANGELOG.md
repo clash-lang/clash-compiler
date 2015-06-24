@@ -6,6 +6,7 @@
 
 * Fixes bug:
   * Can not operate "shiftR" on Int [#63](https://github.com/clash-lang/clash-compiler/issues/63)
+  * Fail to generate verilog when using "quot" and "div" on Index [#64](https://github.com/clash-lang/clash-compiler/issues/64)
 
 ## 0.5.5 *June 3rd 2015*
 * Initial release
