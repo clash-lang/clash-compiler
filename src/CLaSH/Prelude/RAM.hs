@@ -69,11 +69,11 @@ asyncRamPow2 = asyncRam' systemClock systemClock (snat :: SNat (2^n))
 -- * __NB__: Initial content of the RAM is 'undefined'
 asyncRamPow2' :: forall wclk rclk n a .
                  (KnownNat n, KnownNat (2^n))
-              => SClock wclk               -- ^ 'Clock' to synchronize to the
-                                           -- RAM to
+              => SClock wclk               -- ^ 'Clock' to which to synchronise
+                                           -- the write port of the RAM
               -> SClock rclk               -- ^ 'Clock' to which the read
-                                           -- read address signal @r@ is
-                                           -- synchronised to
+                                           -- address signal, @r@, is
+                                           -- synchronised
               -> Signal' wclk (Unsigned n) -- ^ Write address @w@
               -> Signal' rclk (Unsigned n) -- ^ Read address @r@
               -> Signal' wclk Bool         -- ^ Write enable
@@ -87,9 +87,10 @@ asyncRamPow2' wclk rclk = asyncRam' wclk rclk (snat :: SNat (2^n))
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
 asyncRam' :: (KnownNat n, Enum addr)
-          => SClock wclk       -- ^ 'Clock' to synchronize the RAM to
-          -> SClock rclk       -- ^ 'Clock' to which the read address signal @r@
-                               -- is synchronised to
+          => SClock wclk       -- ^ 'Clock' to which to synchronise the write
+                               -- port of the RAM
+          -> SClock rclk       -- ^ 'Clock' to which the read address signal,
+                               -- @r@, is synchronised
           -> SNat n            -- ^ Size @n@ of the RAM
           -> Signal' wclk addr -- ^ Write address @w@
           -> Signal' rclk addr -- ^ Read address @r@
@@ -101,9 +102,10 @@ asyncRam' wclk rclk sz wr rd en din = asyncRam# wclk rclk sz (fromEnum <$> wr)
 
 {-# NOINLINE asyncRam# #-}
 -- | RAM primitive
-asyncRam# :: SClock wclk       -- ^ 'Clock' to synchronize the RAM to
-          -> SClock rclk       -- ^ 'Clock' to which the read address signal @r@
-                               -- is synchronised to
+asyncRam# :: SClock wclk       -- ^ 'Clock' to which to synchronise the write
+                               -- port of the RAM
+          -> SClock rclk       -- ^ 'Clock' to which the read address signal,
+                               -- @r@, is synchronised
           -> SNat n            -- ^ Size @n@ of the RAM
           -> Signal' wclk Int  -- ^ Write address @w@
           -> Signal' rclk Int  -- ^ Read address @r@
