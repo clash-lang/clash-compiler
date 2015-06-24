@@ -234,9 +234,15 @@ regEn# clk i b s = r
     s' = mux b s r
 
 {-# INLINE mux #-}
--- | A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
+-- | The above type is a generalisation for:
+--
+-- @
+-- __mux__ :: 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a
+-- @
+--
+-- A multiplexer. Given "@'mux' b t f@", output @t@ when @b@ is 'True', and @f@
 -- when @b@ is 'False'.
-mux :: Signal' clk Bool -> Signal' clk a -> Signal' clk a -> Signal' clk a
+mux :: Applicative f => f Bool -> f a -> f a -> f a
 mux = liftA3 (\b t f -> if b then t else f)
 
 {-# INLINE signal #-}
