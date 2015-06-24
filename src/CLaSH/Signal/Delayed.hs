@@ -40,7 +40,7 @@ import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (liftA2)
-import GHC.TypeLits               (KnownNat, Nat, type (-))
+import GHC.TypeLits               (KnownNat, Nat, type (+))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
@@ -56,7 +56,7 @@ import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 -- >>> :set -XTypeOperators
 -- >>> import CLaSH.Prelude
 -- >>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
--- >>> let delay2 = delayI :: DSignal (n - 2) Int -> DSignal n Int
+-- >>> let delay2 = delayI :: DSignal n Int -> DSignal (n + 2) Int
 -- >>> :{
 -- let mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
 --     mac x y = feedback (mac' x y)
@@ -98,19 +98,19 @@ instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
 dfromList :: [a] -> DSignal 0 a
 dfromList = coerce . fromList
 
--- | Delay a 'DSignal' for @m@ periods.
+-- | Delay a 'DSignal' for @d@ periods.
 --
 -- @
--- delay3 :: 'DSignal' (n - 3) Int -> 'DSignal' n Int
+-- delay3 :: 'DSignal' n Int -> 'DSignal' (n + 3) Int
 -- delay3 = 'delay' (0 ':>' 0 ':>' 0 ':>' 'Nil')
 -- @
 --
 -- >>> sampleN 6 (delay3 (dfromList [1..]))
 -- [0,0,0,1,2,3]
-delay :: forall a n m . KnownNat m
-      => Vec m a
-      -> DSignal (n - m) a
+delay :: forall a n d . KnownNat d
+      => Vec d a
       -> DSignal n a
+      -> DSignal (n + d) a
 delay m ds = coerce (delay' (coerce ds))
   where
     delay' :: Signal a -> Signal a
@@ -123,15 +123,15 @@ delay m ds = coerce (delay' (coerce ds))
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
 --
 -- @
--- delay2 :: 'DSignal' (n - 2) Int -> 'DSignal' n Int
+-- delay2 :: 'DSignal' n Int -> 'DSignal' (n + 2) Int
 -- delay2 = 'delayI'
 -- @
 --
 -- >>> sampleN 6 (delay2 (dfromList [1..]))
 -- [0,0,1,2,3,4]
-delayI :: (Default a, KnownNat m)
-       => DSignal (n - m) a
-       -> DSignal n a
+delayI :: (Default a, KnownNat d)
+       => DSignal n a
+       -> DSignal (n + d) a
 delayI = delay (repeat def)
 
 -- | Feed the delayed result of a function back to its input:
@@ -148,8 +148,8 @@ delayI = delay (repeat def)
 --
 -- >>> sampleN 6 (mac (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
-feedback :: (DSignal (n - m - 1) a -> (DSignal (n - m - 1) a,DSignal n a))
-         -> DSignal (n - m - 1) a
+feedback :: (DSignal n a -> (DSignal n a,DSignal (n + m + 1) a))
+         -> DSignal n a
 feedback f = let (o,r) = f (coerce r) in o
 
 -- | 'Signal's are not delayed
@@ -178,5 +178,5 @@ unsafeFromSignal = DSignal
 --     acc' = (x * y) + 'antiDelay' d1 acc
 --     acc  = 'delay' ('singleton' 0) acc'
 -- @
-antiDelay :: SNat d -> DSignal n a -> DSignal (n - d) a
+antiDelay :: SNat d -> DSignal (n + d) a -> DSignal n a
 antiDelay _ = coerce
