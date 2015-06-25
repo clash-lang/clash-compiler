@@ -1490,7 +1490,7 @@ domain and to the FFT clock domain:
 adcToFFT :: Signal' ClkADC (SFixed 8 8)
          -> Signal' ClkADC Bool
          -> Signal' ClkFFT Bool
-         -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkADC Bool, Signal' ClkFFT Bool)
+         -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkFFT Bool, Signal' ClkADC Bool)
 adcToFFT = fifo d8 clkADC clkFFT
 @
 
