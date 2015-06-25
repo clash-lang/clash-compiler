@@ -41,6 +41,11 @@ import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
 
 {-# INLINE asyncRom #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- for ideas on how to use ROMs and RAMs
 asyncRom :: (KnownNat n, Enum addr)
          => Vec n a -- ^ ROM content
                     --
@@ -51,6 +56,11 @@ asyncRom content rd = asyncRom# content (fromEnum rd)
 
 {-# INLINE asyncRomPow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- for ideas on how to use ROMs and RAMs
 asyncRomPow2 :: (KnownNat (2^n), KnownNat n)
              => Vec (2^n) a -- ^ ROM content
                             --
@@ -77,6 +87,11 @@ asyncRom# content rd = arr ! rd
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- for ideas on how to use ROMs and RAMs
 rom :: (KnownNat n, KnownNat m)
     => Vec n a               -- ^ ROM content
                              --
@@ -90,6 +105,11 @@ rom = rom' systemClock
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- for ideas on how to use ROMs and RAMs
 romPow2 :: (KnownNat (2^n), KnownNat n)
         => Vec (2^n) a         -- ^ ROM content
                                --
@@ -103,6 +123,11 @@ romPow2 = rom' systemClock
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- for ideas on how to use ROMs and RAMs
 romPow2' :: (KnownNat (2^n), KnownNat n)
          => SClock clk               -- ^ 'Clock' to synchronize to
          -> Vec (2^n) a              -- ^ ROM content
@@ -117,6 +142,11 @@ romPow2' = rom'
 --
 -- * __NB__: Read value is delayed by 1 cycle
 -- * __NB__: Initial output value is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- for ideas on how to use ROMs and RAMs
 rom' :: (KnownNat n, Enum addr)
      => SClock clk       -- ^ 'Clock' to synchronize to
      -> Vec n a          -- ^ ROM content

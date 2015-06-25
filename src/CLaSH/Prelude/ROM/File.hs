@@ -13,6 +13,8 @@ Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
+= Initialising a ROM with a data file #usingromfiles#
+
 ROMs initialised with a data file. The BNF grammar for this data file is simple:
 
 @
@@ -97,18 +99,25 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 {-# INLINE asyncRomFile #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
--- __NB__: This function might not work for specific combinations of
+-- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- to instantiate a ROM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 asyncRomFile :: (KnownNat m, Enum addr)
              => SNat n      -- ^ Size of the ROM
              -> FilePath    -- ^ File describing the content of the ROM
@@ -119,18 +128,25 @@ asyncRomFile sz file rd = asyncRomFile# sz file (fromEnum rd)
 {-# INLINE asyncRomFilePow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 --
--- __NB__: This function might not work for specific combinations of
+-- * __NB__: This function might not work for specific combinations of
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- to instantiate a ROM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
@@ -158,14 +174,21 @@ asyncRomFile# sz file rd = content ! rd
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- to instantiate a ROM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 romFile :: (KnownNat m, KnownNat k)
         => SNat n               -- ^ Size of the ROM
         -> FilePath             -- ^ File describing the content of the ROM
@@ -183,14 +206,21 @@ romFile = romFile' systemClock
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- to instantiate a ROM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 romFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
             => FilePath             -- ^ File describing the content of the ROM
             -> Signal (Unsigned n)  -- ^ Read address @rd@
@@ -207,14 +237,21 @@ romFilePow2 = romFile' systemClock (snat :: SNat (2^n))
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- to instantiate a ROM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
              => SClock clk                -- ^ 'Clock' to synchronize to
              -> FilePath                  -- ^ File describing the content of
@@ -234,14 +271,21 @@ romFilePow2' clk = romFile' clk (snat :: SNat (2^n))
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- to instantiate a ROM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 romFile' :: (KnownNat m, Enum addr)
          => SClock clk                -- ^ 'Clock' to synchronize to
          -> SNat n                    -- ^ Size of the ROM

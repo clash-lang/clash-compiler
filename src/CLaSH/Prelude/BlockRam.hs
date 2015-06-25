@@ -14,12 +14,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 BlockRAM primitives
 
-= Using BlockRAMs
+= Using RAMs #usingrams#
 
-We will show an rather elaborate example on how you can and want to use 'blockRam's.
-We will build a \"small\" CPU+Memory+Program ROM where we will slowly evolve to
-using blockRams. Note that the code is /not/ meant as a de-facto standard on how
-to do CPU design in CλaSH.
+We will show a rather elaborate example on how you can, and why you might want
+to use 'blockRam's. We will build a \"small\" CPU+Memory+Program ROM where we
+will slowly evolve to using blockRams. Note that the code is /not/ meant as a
+de-facto standard on how to do CPU design in CλaSH.
 
 We start with the definition of the Instructions, Register names and machine
 codes:
@@ -378,6 +378,11 @@ import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
 --        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> Signal 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
 blockRam :: (KnownNat n, Enum addr)
          => Vec n a     -- ^ Initial content of the BRAM, also
                         -- determines the size, @n@, of the BRAM.
@@ -403,6 +408,11 @@ blockRam = blockRam' systemClock
 --        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2' ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
 blockRamPow2 :: (KnownNat (2^n), KnownNat n)
              => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                                     -- determines the size, @2^n@, of the BRAM.
@@ -433,6 +443,11 @@ blockRamPow2 = blockRam
 --        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> ClkA 'Signal'' 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam'' clkA100 ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
 blockRam' :: (KnownNat n, Enum addr)
           => SClock clk       -- ^ 'Clock' to synchronize to
           -> Vec n a          -- ^ Initial content of the BRAM, also
@@ -465,6 +480,11 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 --        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> Signal' ClkA 'CLaSH.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2'' clkA100 ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
 blockRamPow2' :: (KnownNat n, KnownNat (2^n))
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also

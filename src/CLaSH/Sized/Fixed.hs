@@ -597,6 +597,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 --
 -- __NB__: this functions is /not/ synthesisable
 --
+-- = Creating data-files #creatingdatafiles#
 --
 -- An example usage of this function is for example to convert a data file
 -- containing 'Double's to a data file with ASCI-encoded binary numbers to be

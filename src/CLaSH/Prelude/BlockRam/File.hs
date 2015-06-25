@@ -13,6 +13,8 @@ Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
+= Initialising a BlockRAM with a data file #usingramfiles#
+
 BlockRAM primitives that can be initialised with a data file. The BNF grammar
 for this data file is simple:
 
@@ -110,14 +112,23 @@ import CLaSH.Sized.Unsigned  (Unsigned)
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
+-- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
+-- to instantiate a Block RAM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 blockRamFile :: (KnownNat m, Enum addr)
              => SNat n               -- ^ Size of the blockRAM
              -> FilePath             -- ^ File describing the initial content
@@ -140,14 +151,23 @@ blockRamFile = blockRamFile' systemClock
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
+-- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
+-- to instantiate a Block RAM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath             -- ^ File describing the initial
                                          -- content of the blockRAM
@@ -169,14 +189,23 @@ blockRamFilePow2 = blockRamFile' systemClock (snat :: SNat (2^n))
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
+-- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
+-- to instantiate a Block RAM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                   => SClock clk                -- ^ 'Clock' to synchronize to
                   -> FilePath                  -- ^ File describing the initial
@@ -199,14 +228,23 @@ blockRamFilePow2' clk = blockRamFile' clk (snat :: SNat (2^n))
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
--- @
---                | VHDL     | Verilog  | SystemVerilog |
--- ===============+==========+==========+===============+
--- Altera/Quartus | Broken   | Works    | Works         |
--- Xilinx/ISE     | Works    | Works    | Works         |
--- ASIC           | Untested | Untested | Untested      |
--- ===============+==========+==========+===============+
--- @
+--     @
+--                    | VHDL     | Verilog                 | SystemVerilog |
+--     ===============+==========+=========================+===============+
+--     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
+--     Xilinx/ISE     | Works    | Works                   | Works         |
+--     ASIC           | Untested | Untested                | Untested      |
+--     ===============+==========+=========================+===============+
+--     @
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- Block RAM.
+-- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
+-- to instantiate a Block RAM with the contents of a data file.
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- own data files.
 blockRamFile' :: (KnownNat m, Enum addr)
               => SClock clk                -- ^ 'Clock' to synchronize to
               -> SNat n                    -- ^ Size of the blockRAM

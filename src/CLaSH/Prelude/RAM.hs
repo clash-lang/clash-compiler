@@ -14,7 +14,7 @@ Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-RAM primitives with a combinational read port
+RAM primitives with a combinational read port.
 -}
 module CLaSH.Prelude.RAM
   ( -- * RAM synchronised to the system clock
@@ -44,6 +44,11 @@ import CLaSH.Sized.Unsigned   (Unsigned)
 -- | Create a RAM with space for @n@ elements.
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- RAM.
 asyncRam :: (KnownNat n, Enum addr)
          => SNat n      -- ^ Size @n@ of the RAM
          -> Signal addr -- ^ Write address @w@
@@ -57,6 +62,11 @@ asyncRam = asyncRam' systemClock systemClock
 -- | Create a RAM with space for 2^@n@ elements
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- RAM.
 asyncRamPow2 :: forall n a . (KnownNat (2^n), KnownNat n)
              => Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
@@ -69,6 +79,11 @@ asyncRamPow2 = asyncRam' systemClock systemClock (snat :: SNat (2^n))
 -- | Create a RAM with space for 2^@n@ elements
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- RAM.
 asyncRamPow2' :: forall wclk rclk n a .
                  (KnownNat n, KnownNat (2^n))
               => SClock wclk               -- ^ 'Clock' to which to synchronise
@@ -88,6 +103,11 @@ asyncRamPow2' wclk rclk = asyncRam' wclk rclk (snat :: SNat (2^n))
 -- | Create a RAM with space for @n@ elements
 --
 -- * __NB__: Initial content of the RAM is 'undefined'
+--
+-- Additional helpful information:
+--
+-- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- RAM.
 asyncRam' :: (KnownNat n, Enum addr)
           => SClock wclk       -- ^ 'Clock' to which to synchronise the write
                                -- port of the RAM
