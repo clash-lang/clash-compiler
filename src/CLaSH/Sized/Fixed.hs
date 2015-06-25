@@ -47,6 +47,8 @@ module CLaSH.Sized.Fixed
   , divide
     -- * Compile-time 'Double' conversion
   , fLit
+    -- * Run-time 'Double' conversion (not synthesisable)
+  , fLitR
     -- * 'Fixed' point wrapper
   , Fixed (..), resizeF, fracShift
     -- * Constraint synonyms
@@ -591,6 +593,111 @@ fLit a = [|| Fixed (fromInteger sat) ||]
     truncated = truncate shifted :: Integer
     shifted   = a * (2 ^ (natVal (Proxy :: Proxy frac)))
 
+-- | Convert, at run-time, a 'Double' /constant/ to a 'Fixed'-point /literal/.
+--
+-- __NB__: this functions is /not/ synthesisable
+--
+--
+-- An example usage of this function is for example to convert a data file
+-- containing 'Double's to a data file with ASCI-encoded binary numbers to be
+-- used by a synthesisable function like 'CLaSH.Prelude.ROM.File.asyncRomFile'.
+-- For example, given a file @Data.txt@ containing:
+--
+-- @
+-- 1.2 2.0 3.0 4.0
+-- -1.0 -2.0 -3.5 -4.0
+-- @
+--
+-- which we want to put in a ROM, interpreting them as @8.8@ signed fixed point
+-- numbers. What we do is that we first create a conversion utility,
+-- @createRomFile@, which uses 'fLitR':
+--
+-- @createRomFile.hs@:
+--
+-- @
+-- module Main where
+--
+-- import CLaSH.Prelude
+-- import System.Environment
+-- import qualified Data.List as L
+--
+-- createRomFile :: KnownNat n => (Double -> BitVector n)
+--               -> FilePath -> FilePath -> IO ()
+-- createRomFile convert fileR fileW = do
+--   f <- readFile fileR
+--   let ds :: [Double]
+--       ds = L.concat . (L.map . L.map) read . L.map words $ lines f
+--       bvs = L.map (filter (/= '_') . show . convert) ds
+--   writeFile fileW (unlines bvs)
+--
+-- toSFixed8_8 :: Double -> SFixed 8 8
+-- toSFixed8_8 = 'fLitR'
+--
+-- main :: IO ()
+-- main = do
+--   [fileR,fileW] <- getArgs
+--   createRomFile ('pack' . toSFixed8_8) fileR fileW
+-- @
+--
+-- We then compile this to an executable:
+--
+-- @
+-- $> clash --make createRomFile.hs
+-- @
+--
+-- We can then use this utility to convert our @Data.txt@ file which contains
+-- 'Double's to a @Data.bin@ file which will containing the desired ASCI-encoded
+-- binary data:
+--
+-- @
+-- $> ./createRomFile \"Data.txt\" \"Data.bin\"
+-- @
+--
+-- Which results in a @Data.bin@ file containing:
+--
+-- @
+-- 0000000100110011
+-- 0000001000000000
+-- 0000001100000000
+-- 0000010000000000
+-- 1111111100000000
+-- 1111111000000000
+-- 1111110010000000
+-- 1111110000000000
+-- @
+--
+-- We can then use this @Data.bin@ file in for our ROM:
+--
+-- @
+-- romF :: Unsigned 3 -> Unsigned 3 -> SFixed 8 8
+-- romF rowAddr colAddr = 'unpack'
+--                      $ 'CLaSH.Prelude.ROM.File.asyncRomFile' d8 "Data.bin" ((rowAddr * 4) + colAddr)
+-- @
+--
+-- And see that it works as expected:
+--
+-- @
+-- __>>> romF 1 2__
+-- -3.5
+-- __>>> romF 0 0__
+-- 1.19921875
+-- @
+fLitR :: forall rep int frac size .
+         ( size ~ (int + frac), KnownNat frac, Bounded (rep size)
+         , Integral (rep size))
+      => Double
+      -> Fixed rep int frac
+fLitR a = Fixed (fromInteger sat)
+  where
+    rMax      = toInteger (maxBound :: rep size)
+    rMin      = toInteger (minBound :: rep size)
+    sat       = if truncated > rMax
+                   then rMax
+                   else if truncated < rMin
+                           then rMin
+                           else truncated
+    truncated = truncate shifted :: Integer
+    shifted   = a * (2 ^ (natVal (Proxy :: Proxy frac)))
 
 instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
   satPlus w (Fixed a) (Fixed b) = Fixed (satPlus w a b)
