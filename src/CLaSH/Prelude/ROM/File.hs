@@ -6,6 +6,8 @@
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2015, University of Twente
 License    :  BSD2 (see the file LICENSE)
