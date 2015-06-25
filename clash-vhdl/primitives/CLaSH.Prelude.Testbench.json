@@ -9,7 +9,8 @@
          -> Signal' t b   -- ^ Return valued (ARG[6])
          -> Signal' t b"
     , "templateD" :
-"assert_~SYM[0] : block
+"-- assert begin
+assert_~SYM[0] : block
   -- pragma translate_off
   function slv2string (slv : std_logic_vector) return STRING is
      variable result : string (1 to slv'length);
@@ -39,7 +40,8 @@ begin
   end process;
   -- pragma translate_on
   ~RESULT <= ~ARG[6];
-end block;"
+end block;
+-- assert end"
     }
   }
 ]
