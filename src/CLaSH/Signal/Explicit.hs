@@ -23,6 +23,7 @@ module CLaSH.Signal.Explicit
   , withSClock
   , SystemClock
   , systemClock
+  , freqCalc
     -- ** Synchronisation primitive
   , unsafeSynchronizer
     -- * Basic circuit functions
@@ -136,6 +137,44 @@ type SystemClock = 'Clk "system" 1000
 -- | The singleton clock for 'SystemClock'
 systemClock :: SClock SystemClock
 systemClock = sclock
+
+-- | Calculate relative periods given a list of frequencies.
+--
+-- So for example, you have one part of your design connected to an ADC running
+-- at 20 MHz, one part of your design connected to a DAC running at 36 MHz, and
+-- the rest of your system is running at 50 MHz. What are the relative
+-- (integer) clock periods in CλaSH, such that their ratios correspond to the
+-- ratios between the actual clock frequencies.
+--
+-- For this we use 'freqCalc':
+--
+-- >>> freqCalc [20,36,50]
+-- [45,25,18]
+--
+-- So that we create the proper clocks:
+--
+-- @
+-- type ADC20 = 'Clk' \"ADC\" 45
+-- type DAC36 = 'Clk' \"DAC\" 25
+-- type Sys50 = 'Clk' \"Sys\" 18
+--
+-- sys50 :: SClock System50
+-- sys50 = 'sclock'
+--
+-- adc20 :: SClock ADC20
+-- adc20 = 'sclock'
+--
+-- dac36 :: SClock DAC36
+-- dac36 = 'sclock'
+-- @
+--
+-- __NB__: This function is /not/ synthesisable
+freqCalc :: [Integer] -> [Integer]
+freqCalc xs = map (`div` g) ys
+  where
+    p  = product xs
+    ys = map (p `div`) xs
+    g  = foldr1 gcd ys
 
 -- ** Synchronisation primitive
 {-# NOINLINE unsafeSynchronizer #-}
