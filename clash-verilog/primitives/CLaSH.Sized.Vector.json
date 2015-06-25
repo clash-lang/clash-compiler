@@ -94,7 +94,7 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.concat"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
-    , "templateD" : "~ARG[0]"
+    , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
