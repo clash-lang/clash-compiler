@@ -593,7 +593,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
     truncated = truncate shifted :: Integer
     shifted   = a * (2 ^ (natVal (Proxy :: Proxy frac)))
 
--- | Convert, at run-time, a 'Double' /constant/ to a 'Fixed'-point /literal/.
+-- | Convert, at run-time, a 'Double' to a 'Fixed'-point.
 --
 -- __NB__: this functions is /not/ synthesisable
 --
