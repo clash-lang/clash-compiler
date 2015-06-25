@@ -6,7 +6,8 @@
            -> Signal' clk a  -- ARG[2]
            -> Signal' clk a"
     , "templateD" :
-"register_~COMPNAME_~SYM[0] : block
+"-- register begin
+register_~COMPNAME_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
 begin
@@ -22,7 +23,8 @@ begin
   end process;
 
   ~RESULT <= ~SYM[2];
-end block;"
+end block;
+-- register end"
     }
   }
 , { "BlackBox" :
@@ -34,7 +36,8 @@ end block;"
         -> Signal' clk a    -- ARG[3]
         -> Signal' clk a"
     , "templateD" :
-"regEn_~COMPNAME_~SYM[0] : block
+"-- regEn begin
+regEn_~COMPNAME_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
   signal ~SYM[3] : ~TYP[3];
@@ -54,7 +57,8 @@ begin
   end process;
 
   ~RESULT <= ~SYM[3];
-end block;"
+end block;
+-- regEn end"
     }
   }
 

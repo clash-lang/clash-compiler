@@ -6,7 +6,8 @@
            -> Int        -- ^ ARG[2]
            -> a"
     , "templateD" :
-"asyncRom_~SYM[0] : block
+"-- asyncRom begin
+asyncRom_~SYM[0] : block
   signal ROM       : ~TYP[1];
   signal rom_index : integer range 0 to ~LIT[0]-1;
 begin
@@ -19,7 +20,8 @@ begin
                ;
 
   ~RESULT <= ROM(rom_index);
-end block;"
+end block;
+-- asyncRom end"
     }
   }
 , { "BlackBox" :
@@ -31,7 +33,8 @@ end block;"
       -> Signal' clk Int -- rd,   ARG[3]
       -> Signal' clk a"
     , "templateD" :
-"rom_~COMPNAME_~SYM[0] : block
+"-- rom begin
+rom_~COMPNAME_~SYM[0] : block
   signal ROM  : ~TYP[2];
   signal rd   : integer range 0 to ~LIT[0]-1;
   signal dout : ~TYPO;
@@ -52,7 +55,8 @@ begin
   end process;
 
   ~RESULT <= dout;
-end block;"
+end block;
+-- rom end"
     }
   }
 ]

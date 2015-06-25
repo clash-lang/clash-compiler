@@ -7,7 +7,8 @@
                -> Int        -- rd,   ARG[3]
                -> BitVector m"
     , "templateD" :
-"asyncROMFile_~SYM[0] : block
+"-- asyncRomFile begin
+asyncROMFile_~SYM[0] : block
   type RomType is array(0 to ~LIT[1]-1) of bit_vector(~LIT[0]-1 downto 0);
 
   impure function InitRomFromFile (RomFileName : in string) return RomType is
@@ -32,7 +33,8 @@ begin
         ;
 
   ~RESULT <= to_stdlogicvector(ROM(rd));
-end block;"
+end block;
+-- asyncRomFile end"
     }
   }
 , { "BlackBox" :
@@ -45,7 +47,8 @@ end block;"
           -> Signal' clk Int -- rd,   ARG[4]
           -> Signal' clk (BitVector m)"
     , "templateD" :
-"romFile_~COMPNAME_~SYM[0] : block
+"-- romFile begin
+romFile_~COMPNAME_~SYM[0] : block
   type RomType is array(0 to ~LIT[2]-1) of bit_vector(~LIT[0]-1 downto 0);
 
   impure function InitRomFromFile (RomFileName : in string) return RomType is
@@ -78,7 +81,8 @@ begin
   end process;
 
   ~RESULT <= dout;
-end block;"
+end block;
+-- romFile end"
     }
   }
 ]

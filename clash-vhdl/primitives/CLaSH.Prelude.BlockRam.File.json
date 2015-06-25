@@ -11,7 +11,8 @@
                -> Signal' clk (BitVector m) -- din,  ARG[7]
                -> Signal' clk (BitVector m)"
     , "templateD" :
-"blockRamFile_~COMPNAME_~SYM[0] : block
+"-- blockRamFile begin
+blockRamFile_~COMPNAME_~SYM[0] : block
   type RamType is array(0 to ~LIT[2]-1) of bit_vector(~LIT[0]-1 downto 0);
 
   impure function InitRamFromFile (RamFileName : in string) return RamType is
@@ -53,7 +54,8 @@ begin
       ~RESULT <= to_stdlogicvector(RAM(rd));
     end if;
   end process;
-end block;"
+end block;
+-- blockRamFile end"
     }
   }
 ]

@@ -138,7 +138,8 @@
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
     , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
-"divSigned_~SYM[0] : block
+"-- divSigned begin
+divSigned_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
   signal ~SYM[3] : ~TYP[1];
@@ -148,7 +149,8 @@ begin
   ~SYM[3] <= ~SYM[1] / ~SYM[2];
   ~RESULT <= ~SYM[3] - to_signed(1,~LIT[0]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
              ~SYM[3];
-end block;"
+end block;
+-- divSigned end"
     }
   }
 , { "BlackBox" :
@@ -221,12 +223,14 @@ end block;"
     { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
     , "templateD" :
-"truncateB_~SYM[0] : block
+"-- truncateB begin
+truncateB_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1](~LIT[0]-1 downto 0);
-end block;"
+end block;
+-- truncateB end"
     }
   }
 ]

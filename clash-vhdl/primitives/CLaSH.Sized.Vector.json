@@ -14,48 +14,56 @@
     { "name"      : "CLaSH.Sized.Vector.head"
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateD" :
-"head_~SYM[0] : block
+"-- head begin
+head_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= ~SYM[1](0);
-end block;"
+end block;
+-- head end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.tail"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "templateD" :
-"tail_~SYM[0] : block
+"-- tail begin
+tail_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= ~SYM[1](1 to ~SYM[1]'high);
-end block;"
+end block;
+-- tail end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.last"
     , "type"      : "Vec (n + 1) a -> a"
     , "templateD" :
-"last_~SYM[0] : block
+"-- last begin
+last_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= ~SYM[1](~SYM[1]'high);
-end block;"
+end block;
+-- last end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.init"
     , "type"      : "Vec (n + 1) a -> Vec n a"
     , "templateD" :
-"init_~SYM[0] : block
+"-- init begin
+init_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= ~SYM[1](0 to ~SYM[1]'high - 1);
-end block;"
+end block;
+-- init end"
     }
   }
 , { "BlackBox" :
@@ -68,7 +76,8 @@ end block;"
         -> Vec i a                       -- ARG[4]
         -> Vec n a"
     , "templateD" :
-"select_~SYM[0] : block
+"-- select begin
+select_~SYM[0] : block
   signal ~SYM[1] : ~TYP[4];
 begin
   ~SYM[1] <= ~ARG[4];
@@ -83,7 +92,8 @@ begin
       ~RESULT(~SYM[5]) <= ~SYM[1](~LIT[1]+(~LIT[2]*~SYM[5]));
     end generate;
   end generate;
-end block;"
+end block;
+-- select end"
     }
   }
 , { "BlackBox" :
@@ -96,7 +106,8 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.concat"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "templateD" :
-"concat_~SYM[0] : block
+"-- concat begin
+concat_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -111,20 +122,23 @@ begin
       ~RESULT((~SYM[5] * ~SYM[1](0)'length) to ((~SYM[5] * ~SYM[1](0)'length) + ~SYM[1](0)'high)) <= ~SYM[1](~SYM[5]);
     end generate;
   end generate;
-end block;"
+end block;
+-- concat end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.splitAt"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateD" :
-"splitAt_~SYM[0] : block
+"-- sliptAt begin
+splitAt_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
              ,~SYM[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));
-end block;"
+end block;
+-- splitAt end"
     }
   }
 , { "BlackBox" :
@@ -135,7 +149,8 @@ end block;"
           -> Vec (n * m) a  -- ARG[2]
           -> Vec n (Vec m a)"
     , "templateD" :
-"unconcat_~SYM[0] : block
+"-- unconcat begin
+unconcat_~SYM[0] : block
   signal ~SYM[1] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[2];
@@ -150,14 +165,16 @@ begin
       ~RESULT(~SYM[5]) <= ~SYM[1]((~SYM[5] * ~LIT[1]) to ((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1));
     end generate;
   end generate;
-end block;"
+end block;
+-- unconcat end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.merge"
     , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
     , "templateD" :
-"merge_~SYM[0] : block
+"-- merge begin
+merge_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
   signal ~SYM[2] : ~TYP[1];
 begin
@@ -175,14 +192,16 @@ begin
       ~RESULT(2*~SYM[6]+1) <= ~SYM[2](~SYM[6]);
     end generate;
   end generate;
-end block;"
+end block;
+-- merge end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
-"map_~SYM[0] : block
+"-- map begin
+map_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
@@ -200,14 +219,16 @@ begin
       ~INST
     end generate;
   end generate;
-end block;"
+end block;
+-- map end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.zipWith"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
-"zipWith_~SYM[0] : block
+"-- zipWith begin
+zipWith_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
   signal ~SYM[2] : ~TYP[2];
 begin
@@ -228,14 +249,16 @@ begin
       ~INST
     end generate;
   end generate;
-end block;"
+end block;
+-- zipWith end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_int"
     , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
-"indexVec_~SYM[0] : block
+"-- index begin
+indexVec_~SYM[0] : block
   signal vec       : ~TYP[1];
   signal vec_index : integer range 0 to ~LIT[0]-1;
 begin
@@ -248,14 +271,16 @@ begin
                ;
 
   ~RESULT <= vec(vec_index);
-end block;"
+end block;
+-- index end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replace_int"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
-"replaceVec_~SYM[0] : block
+"-- replace begin
+replaceVec_~SYM[0] : block
   signal vec       : ~TYP[1];
   signal vec_index : integer range 0 to ~LIT[0]-1;
   signal din       : ~TYP[3];
@@ -275,7 +300,8 @@ begin
     ivec(vec_index) := din;
     ~RESULT <= ivec;
   end process;
-end block;"
+end block;
+-- replace end"
     }
   }
 , { "BlackBox" :
@@ -300,7 +326,8 @@ end block;"
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
-"reverse_~SYM[0] : block
+"-- reverse begin
+reverse_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -314,7 +341,8 @@ begin
       ~RESULT(~SYM[1]'high - ~SYM[5]) <= ~SYM[1](~SYM[5]);
     end generate;
   end generate;
-end block;"
+end block;
+-- reverse end"
     }
   }
 , { "BlackBox" :
@@ -330,7 +358,8 @@ end block;"
                   => Vec n (BitVector m)  -- ARG[1]
                   -> BitVector (n * m)"
     , "templateD" :
-"concatBitVector_~SYM[0] : block
+"-- concatBitVector begin
+concatBitVector_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
@@ -344,7 +373,8 @@ begin
       ~RESULT(((~SYM[5] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[5] * ~LIT[0])) <= ~TYPMO(~SYM[1](~SYM[1]'high - ~SYM[5]));
     end generate;
   end generate;
-end block;"
+end block;
+-- concatBitVector end"
     }
   }
 , { "BlackBox" :
@@ -354,7 +384,8 @@ end block;"
                     => BitVector (n * m)        -- ARG[2]
                     -> Vec n (BitVector m)"
     , "templateD" :
-"unconcatBitVector_~SYM[0] : block
+"-- unconcatBitVector begin
+unconcatBitVector_~SYM[0] : block
   signal ~SYM[1] : ~TYP[2];
 begin
   ~SYM[1] <= ~ARG[2];
@@ -368,7 +399,8 @@ begin
       ~RESULT(~RESULT'high - ~SYM[5]) <= ~SYM[1](((~SYM[5] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[5] * ~LIT[1]));
     end generate;
   end generate;
-end block;"
+end block;
+-- unconcatBitVector end"
     }
   }
 ]

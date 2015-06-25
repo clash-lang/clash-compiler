@@ -10,7 +10,8 @@
            -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
-"blockRam_~COMPNAME_~SYM[0] : block
+"-- blockRam begin
+blockRam_~COMPNAME_~SYM[0] : block
   signal RAM  : ~TYP[2] := ~LIT[2];
   signal dout : ~TYP[6];
   signal wr   : integer range 0 to ~LIT[0] - 1;
@@ -39,7 +40,8 @@ begin
   end process;
 
   ~RESULT <= dout;
-end block;"
+end block;
+-- blockRam end"
     }
   }
 ]

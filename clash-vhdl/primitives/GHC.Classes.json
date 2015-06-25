@@ -56,13 +56,15 @@
     { "name"      : "GHC.Classes.divInt#"
     , "type"      : "divInt# :: Int# -> Int# -> Int#"
     , "templateD" :
-"divInt_~SYM[0] : block
+"-- divInt begin
+divInt_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[0] / ~ARG[1];
   ~RESULT <= ~SYM[1] - 1 when ((~ARG[0] = abs ~ARG[0]) /= (~ARG[1] = abs ~ARG[1])) else
              ~SYM[1];
-end block;"
+end block;
+-- divInt end"
     }
   }
 , { "BlackBox" :
