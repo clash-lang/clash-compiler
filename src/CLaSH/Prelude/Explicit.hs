@@ -26,6 +26,9 @@ module CLaSH.Prelude.Explicit
   , moore'
   , mooreB'
   , registerB'
+    -- * Synchroniser circuits
+  , dualFlipFlopSynchronizer
+  , asyncFIFOSynchronizer
     -- * ROMs
   , rom'
   , romPow2'

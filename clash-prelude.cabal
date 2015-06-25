@@ -83,6 +83,7 @@ Library
                       CLaSH.Prelude.ROM
                       CLaSH.Prelude.ROM.File
                       CLaSH.Prelude.Safe
+                      CLaSH.Prelude.Synchronizer
                       CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat

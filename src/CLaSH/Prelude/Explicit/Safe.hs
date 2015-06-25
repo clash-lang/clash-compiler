@@ -28,6 +28,9 @@ module CLaSH.Prelude.Explicit.Safe
   , moore'
   , mooreB'
   , registerB'
+    -- * Synchroniser circuits
+  , dualFlipFlopSynchronizer
+  , asyncFIFOSynchronizer
     -- * ROMs
   , rom'
   , romPow2'
@@ -46,14 +49,16 @@ module CLaSH.Prelude.Explicit.Safe
   )
 where
 
-import Control.Applicative     (liftA2)
-import Prelude                 hiding (repeat)
+import Control.Applicative        (liftA2)
+import Prelude                    hiding (repeat)
 
-import CLaSH.Prelude.BlockRam  (blockRam', blockRamPow2')
-import CLaSH.Prelude.Mealy     (mealy', mealyB')
-import CLaSH.Prelude.Moore     (moore', mooreB')
-import CLaSH.Prelude.RAM       (asyncRam',asyncRamPow2')
-import CLaSH.Prelude.ROM       (rom', romPow2')
+import CLaSH.Prelude.BlockRam     (blockRam', blockRamPow2')
+import CLaSH.Prelude.Mealy        (mealy', mealyB')
+import CLaSH.Prelude.Moore        (moore', mooreB')
+import CLaSH.Prelude.RAM          (asyncRam',asyncRamPow2')
+import CLaSH.Prelude.ROM          (rom', romPow2')
+import CLaSH.Prelude.Synchronizer (dualFlipFlopSynchronizer,
+                                   asyncFIFOSynchronizer)
 import CLaSH.Signal.Explicit
 
 -- $setup
