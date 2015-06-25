@@ -1,6 +1,6 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.5.7
+## 0.5.7 *June 25 2015*
 * New features:
   * Support `clash-prelude-0.9`
 

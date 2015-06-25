@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.5.8
+## 0.5.8 *June 25th 2015*
 * New features:
   * Support for copying string literals from Haskell to generated code
   * Support `clash-prelude-0.9`

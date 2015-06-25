@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.5.7
+## 0.5.7 *June 25th 2015*
 * New features:
   * Support for copying string literals from Haskell to generated code
   * Collect and copy data-files
