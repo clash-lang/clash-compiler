@@ -682,6 +682,64 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- __>>> romF 0 0__
 -- 1.19921875
 -- @
+--
+-- == Using Template Haskell
+--
+-- For those of us who like to live on the edge, another option is to convert
+-- our @Data.txt@ at compile-time using
+-- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/template-haskell.html Template Haskell>.
+-- For this we first create a module @CreateRomFileTH.hs@:
+--
+-- @
+-- module CreateRomFileTH (romDataFromFile) where
+--
+-- import CLaSH.Prelude
+-- import qualified Data.List        as L
+-- import Language.Haskell.TH        (ExpQ, litE, stringL)
+-- import Language.Haskell.TH.Syntax (qRunIO)
+--
+-- createRomFile :: KnownNat n => (Double -> BitVector n)
+--               -> FilePath -> FilePath -> IO ()
+-- createRomFile convert fileR fileW = do
+--   f <- readFile fileR
+--   let ds :: [Double]
+--       ds = L.concat . (L.map . L.map) read . L.map words $ lines f
+--       bvs = L.map (filter (/= '_') . show . convert) ds
+--   writeFile fileW (unlines bvs)
+--
+-- romDataFromFile :: KnownNat n => (Double -> BitVector n) -> String -> ExpQ
+-- romDataFromFile convert fileR = do
+--   let fileW = fileR L.++ ".bin"
+--   bvF <- qRunIO (createRomFile convert fileR fileW)
+--   litE (stringL fileW)
+-- @
+--
+-- Instead of first converting @Data.txt@ to @Data.bin@, we will now use the
+-- @romDataFromFile@ function to convert @Data.txt@ to a new file in the proper
+-- format at compile-time of our new @romF'@ function:
+--
+-- @
+-- import CLaSH.Prelude
+-- import CreateRomFileTH
+--
+-- toSFixed8_8 :: Double -> SFixed 8 8
+-- toSFixed8_8 = 'fLitR'
+--
+-- romF' :: Unsigned 3 -> Unsigned 3 -> SFixed 8 8
+-- romF' rowAddr colAddr = unpack $
+--   asyncRomFile d8
+--                $(romDataFromFile (pack . toSFixed8_8) "Data.txt") -- Template Haskell splice
+--                ((rowAddr * 4) + colAddr)
+-- @
+--
+-- And see that it works just like the @romF@ function from earlier:
+--
+-- @
+-- __>>> romF' 1 2__
+-- -3.5
+-- __>>> romF' 0 0__
+-- 1.19921875
+-- @
 fLitR :: forall rep int frac size .
          ( size ~ (int + frac), KnownNat frac, Bounded (rep size)
          , Integral (rep size))
