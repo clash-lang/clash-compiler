@@ -113,10 +113,11 @@ assign ~RESULT = ~SYM[0];"
         -> SNat n                -- ARG[2]
         -> BitVector (m + 1 - n)"
     , "templateD" :
-"// slice
+"// slice begin
 ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
-assign ~RESULT = ~SYM[1][~LIT[1] : ~LIT[2]];"
+assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
+// slice end"
     }
   }
 , { "BlackBox" :
