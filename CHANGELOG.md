@@ -1,6 +1,6 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.9
+## 0.9 *June 25th 2015*
 * New features:
   * Add operations on singleton natural numbers: `addSNat`, `subSNat`, `mulSNat`, and `powSNat`.
   * Add asynchronous RAM functions in `CLaSH.Prelude.RAM`, which have an asynchronous/combinational read port.
