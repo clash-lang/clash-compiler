@@ -1215,7 +1215,7 @@ assign ~RESULT = dout_~SYM[1];"
 
 -}
 
-{- $multiclock
+{- $multiclock #multiclock#
 CλaSH supports multi-clock designs, though perhaps in a slightly limited form.
 What is possible is:
 
@@ -1234,6 +1234,8 @@ for the different clock domains. If you're targeting an FPGA, you can use e.g. a
 <https://www.altera.com/literature/ug/ug_altpll.pdf PPL> or
 <http://www.xilinx.com/support/documentation/user_guides/ug472_7Series_Clocking.pdf MMCM>
 to provide the clock signals.
+
+== Building a FIFO synchroniser
 
 This part of the tutorial assumes you know what <https://en.wikipedia.org/wiki/Metastability_in_electronics metastability>
 is, and how it can never truly be avoided in any asynchronous circuit. Also
@@ -1288,7 +1290,7 @@ We continue by instantiating the 'asyncRam'':
 @
 fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
   'asyncRam'' wclk rclk
-            (d2 `powSNat` addrSize)
+            (d2 ``powSNat`` addrSize)
             waddr raddr
             (winc '.&&.' 'not1' wfull)
             wdata
@@ -1305,7 +1307,7 @@ or empty. We start with a function that converts 'Bool'eans to @n + 1@ bit
 bitvectors:
 
 @
-boolToBV :: _ => Bool -> BitVector (n + 1)
+boolToBV :: (KnownNat n, KnownNat (n+1)) => Bool -> BitVector (n + 1)
 boolToBV = 'zeroExtend' . 'pack'
 @
 
@@ -1353,7 +1355,14 @@ ptrSync clk1 clk2 = 'register'' clk1 0
                   . 'unsafeSynchronizer' clk2 clk1
 @
 
-We then combine everything in:
+It uses the 'unsafeSynchroniser' primitive, which is needed to go from one clock
+domain to the other. All synchronizers are specified in terms of
+'unsafeSynchronizer' (see for example the <src/CLaSH-Prelude-RAM.html#line-103 source of asyncRam#>).
+The 'unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
+CλaSH compiler, so developers must ensure that it is only used as part of a
+proper synchronizer.
+
+Finally we combine all the component in:
 
 @
 fifo :: _
@@ -1375,7 +1384,11 @@ fifo addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
                                   wptrFullInit (s_rptr,winc)
 @
 
-The whole file containing our FIFO design will look like this:
+where we first specify the synchronisation of the read and the write pointers,
+instantiate the asynchronous RAM, and instantiate the read address/pointer/flag
+generator and write address/pointer/flag generator.
+
+Ultimately, the whole file containing our FIFO design will look like this:
 
 @
 {\-\# LANGUAGE PartialTypeSignatures \#-\}
@@ -1387,12 +1400,12 @@ import CLaSH.Prelude.Explicit
 
 fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
   'asyncRam'' wclk rclk
-            (d2 `powSNat` addrSize)
+            (d2 ``powSNat`` addrSize)
             waddr raddr
             (winc '.&&.' 'not1' wfull)
             wdata
 
-boolToBV :: _ => Bool -> BitVector (n + 1)
+boolToBV :: (KnownNat n, KnownNat (n+1)) => Bool -> BitVector (n + 1)
 boolToBV = 'zeroExtend' . 'pack'
 
 ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
@@ -1439,24 +1452,46 @@ fifo addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
                                   wptrFullInit (s_rptr,winc)
 @
 
-Instantiate FIFO:
+== Instantiating a FIFO synchroniser
+
+Having finished our FIFO synchroniser it's time to instantiate with concrete
+clock domains. Let us assume we have part of our system connected to an ADC
+which runs at 20 MHz, and we have created an FFT component running at only 9 MHz,
+while the rest of our system runs at 50 MHz. What we want to do connect part
+of our design connected to the ADC, and running at 20 MHz, to part of our design
+connected to the FFT running at 9 MHz.
+
+First, we must calculate the relative clock periods using 'freqCalc':
+
+>>> freqCalc [20,9,50]
+[45,100,18]
+
+We can then create the clocks:
 
 @
-type ClkAudio = 'Clk \"audio\" 200
-type ClkFFT   = 'Clk \"FFT\"   850
+type ClkADC = 'Clk \"ADC\"    45
+type ClkFFT = 'Clk \"FFT\"    100
+type ClkSys = 'Clk \"System\" 18
 
-clkAudio :: SClock ClkAudio
-clkAudio = sclock
+clkADC :: SClock ClkADC
+clkADC = sclock
 
 clkFFT :: SClock ClkFFT
 clkFFT = sclock
 
-audioToFFT :: Signal' ClkAudio (SFixed 8 8)
-           -> Signal' ClkAudio Bool
-           -> Signal' ClkFFT Bool
-           -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkAudio Bool
-              ,Signal' ClkFFT Bool)
-audioToFFT = fifo d3 clkAudio clkFFT
+clkSys :: SClock ClkSys
+clkSys = sclock
+@
+
+and subsequently a 256-space FIFO synchroniser that safely bridges the ADC clock
+domain and to the FFT clock domain:
+
+@
+adcToFFT :: Signal' ClkADC (SFixed 8 8)
+         -> Signal' ClkADC Bool
+         -> Signal' ClkFFT Bool
+         -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkADC Bool, Signal' ClkFFT Bool)
+adcToFFT = fifo d8 clkADC clkFFT
 @
 
 -}
