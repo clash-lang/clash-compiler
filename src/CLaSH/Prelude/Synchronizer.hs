@@ -3,20 +3,23 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# OPTIONS_GHC -fno-warn-partial-type-signatures -fplugin GHC.TypeLits.Normalise #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
 
 {-# LANGUAGE Safe #-}
+
+{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|
 Copyright   :  (C) 2015, University of Twente
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-Safe synchronisers
+Synchronizer circuits for safe clock domain crossings
 -}
 module CLaSH.Prelude.Synchronizer
-  ( dualFlipFlopSynchronizer
+  ( -- * Bit-synchronizers
+    dualFlipFlopSynchronizer
+    -- * Word-synchronizers
   , asyncFIFOSynchronizer
   )
 where
@@ -59,7 +62,7 @@ import CLaSH.Sized.BitVector       (BitVector, (++#))
 --      change of the __lsb__s were.
 --
 --      If you want to have /safe/ __word__-synchronisation use
---      'asyncFIFOSynchroniser'.
+--      'asyncFIFOSynchronizer'.
 dualFlipFlopSynchronizer :: SClock clk1    -- ^ 'Clock' to which the incoming
                                            -- data is synchronised
                          -> SClock clk2    -- ^ 'Clock' to which the outgoing
@@ -122,8 +125,8 @@ isFull addrSize ptr s_ptr =
   ptr == (complement (slice addrSize (addrSize `subSNat` d1) s_ptr) ++#
          slice (addrSize `subSNat` d2) d0 s_ptr)
 
--- | Synchroniser based on a FIFO around an asynchronous RAM. Based on the
--- design described in "CLaSH.Tutorial#multiclock", which is again based on the
+-- | Synchroniser implemented as a FIFO around an asynchronous RAM. Based on the
+-- design described in "CLaSH.Tutorial#multiclock", which is itself based on the
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
 --
 -- __NB__: This synchroniser can be used for __word__-synchronization.
@@ -138,9 +141,9 @@ asyncFIFOSynchronizer :: _
                       -> Signal' wclk a    -- ^ Element to insert
                       -> Signal' wclk Bool -- ^ Write request
                       -> Signal' rclk Bool -- ^ Read request
-                      -> (Signal' rclk a,Signal' wclk Bool,Signal' rclk Bool)
-                      -- ^ (Oldest element in the FIFO, @full@ flag, @empty@ flag)
-asyncFIFOSynchronizer addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
+                      -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+                      -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
+asyncFIFOSynchronizer addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
   where
     s_rptr = dualFlipFlopSynchronizer rclk wclk 0 rptr
     s_wptr = dualFlipFlopSynchronizer wclk rclk 0 wptr

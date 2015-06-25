@@ -26,7 +26,7 @@ module CLaSH.Prelude.Explicit
   , moore'
   , mooreB'
   , registerB'
-    -- * Synchroniser circuits
+    -- * Synchronizer circuits for safe clock domain crossings
   , dualFlipFlopSynchronizer
   , asyncFIFOSynchronizer
     -- * ROMs

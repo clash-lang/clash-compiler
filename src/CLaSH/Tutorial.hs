@@ -1350,9 +1350,9 @@ We create a dual flip-flop synchroniser to be used to synchronise the
 Gray-encoded pointers between the two clock domains:
 
 @
-ptrSync clk1 clk2 = 'register'' clk1 0
-                  . 'register'' clk1 0
-                  . 'unsafeSynchronizer' clk2 clk1
+ptrSync clk1 clk2 = 'register'' clk2 0
+                  . 'register'' clk2 0
+                  . 'unsafeSynchronizer' clk1 clk2
 @
 
 It uses the 'unsafeSynchroniser' primitive, which is needed to go from one clock
@@ -1369,8 +1369,8 @@ fifo :: _
      => SNat addrSize -> SClock wclk -> SClock rclk
      -> Signal' wclk a -> Signal' wclk Bool
      -> Signal' rclk Bool
-     -> (Signal' rclk a,Signal' wclk Bool,Signal' rclk Bool)
-fifo addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
+     -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+fifo addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
   where
     s_rptr = ptrSync wclk rclk rptr
     s_wptr = ptrSync rclk wclk wptr
@@ -1428,20 +1428,20 @@ isFull addrSize ptr s_ptr = ptr == ('complement' ('slice' addrSize (addrSize ``s
 wptrFullInit        = (0,0,False)
 
 -- Dual flip-flip synchroniser
-ptrSync clk1 clk2 = 'register'' clk1 0
-                  . 'register'' clk1 0
-                  . 'unsafeSynchronizer' clk2 clk1
+ptrSync clk1 clk2 = 'register'' clk2 0
+                  . 'register'' clk2 0
+                  . 'unsafeSynchronizer' clk1 clk2
 
 -- Async FIFO synchroniser
 fifo :: _
      => SNat addrSize -> SClock wclk -> SClock rclk
      -> Signal' wclk a -> Signal' wclk Bool
      -> Signal' rclk Bool
-     -> (Signal' rclk a,Signal' wclk Bool,Signal' rclk Bool)
-fifo addrSize wclk rclk wdata winc rinc = (rdata,wfull,rempty)
+     -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+fifo addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
   where
-    s_rptr = ptrSync wclk rclk rptr
-    s_wptr = ptrSync rclk wclk wptr
+    s_rptr = ptrSync rclk wclk rptr
+    s_wptr = ptrSync wclk rclk wptr
 
     rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
 
