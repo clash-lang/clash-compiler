@@ -14,44 +14,48 @@
     { "name"      : "CLaSH.Sized.Vector.head"
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateD" :
-"// head
+"// head begin
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1:~SIZE[~TYP[0]]-~SIZE[~TYPO]];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1:~SIZE[~TYP[0]]-~SIZE[~TYPO]];
+// head end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.tail"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "templateD" :
-"// tail
+"// tail begin
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
+// tail end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.last"
     , "type"      : "Vec (n + 1) a -> a"
     , "templateD" :
-"// last
+"// last begin
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1:0];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1:0];
+// last end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.init"
     , "type"      : "Vec (n + 1) a -> Vec n a"
     , "templateD" :
-"// init
+"// init begin
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]];"
+assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]];
+// init end"
     }
   }
 , { "BlackBox" :
@@ -230,14 +234,15 @@ end
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
-"// reverse
+"// reverse begin
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 genvar ~SYM[1];
 for (~SYM[1] = 0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
   assign ~RESULT[(~LENGTH[~TYPO] - 1 - ~SYM[1])*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
-end"
+end
+// reverse end"
     }
   }
 , { "BlackBox" :

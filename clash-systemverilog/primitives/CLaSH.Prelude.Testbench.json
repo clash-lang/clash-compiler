@@ -9,7 +9,7 @@
         -> Signal' t b   -- ^ Return valued (ARG[6])
         -> Signal' t b"
     , "templateD" :
-"// assert
+"// assert begin
 // pragma translate_off
 always @(posedge ~CLK[2] or posedge ~RST[2]) begin
   if (~ARG[4] != ~ARG[5]) begin
@@ -18,7 +18,8 @@ always @(posedge ~CLK[2] or posedge ~RST[2]) begin
   end
 end
 // pragma translate_on
-assign ~RESULT = ~ARG[6];"
+assign ~RESULT = ~ARG[6];
+// assert end"
     }
   }
 ]

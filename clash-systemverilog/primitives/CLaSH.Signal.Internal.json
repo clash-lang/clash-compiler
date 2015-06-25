@@ -6,7 +6,8 @@
            -> Signal' clk a  -- ARG[2]
            -> Signal' clk a"
     , "templateD" :
-"~SIGD[~SYM[0]][2];
+"// register begin
+~SIGD[~SYM[0]][2];
 
 always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : register_~COMPNAME_~SYM[1]
   if (~ ~RST[0]) begin
@@ -16,7 +17,8 @@ always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : register_~COMPNAME_~SYM[
   end
 end
 
-assign ~RESULT = ~SYM[0];"
+assign ~RESULT = ~SYM[0];
+// register end"
     }
   }
 , { "BlackBox" :
@@ -28,7 +30,8 @@ assign ~RESULT = ~SYM[0];"
         -> Signal' clk a    -- ARG[3]
         -> Signal' clk a"
     , "templateD" :
-"~SIGD[~SYM[0]][3];
+"// regEn begin
+~SIGD[~SYM[0]][3];
 
 always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : regEn_~COMPNAME_~SYM[1]
   if (~ ~RST[0]) begin
@@ -40,7 +43,8 @@ always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : regEn_~COMPNAME_~SYM[1]
   end
 end
 
-assign ~RESULT = ~SYM[0];"
+assign ~RESULT = ~SYM[0];
+// regEn end"
     }
   }
 

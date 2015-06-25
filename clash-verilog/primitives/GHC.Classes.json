@@ -56,7 +56,7 @@
     { "name"      : "GHC.Classes.divInt#"
     , "type"      : "divInt# :: Int# -> Int# -> Int#"
     , "templateD" :
-"// divInt
+"// divInt begin
 wire ~SIGD[~SYM[0]][0];
 wire ~SIGD[~SYM[1]][0];
 wire ~SIGD[~SYM[2]][1];
@@ -67,14 +67,15 @@ assign ~SYM[0] = ~ARG[0] / ~ARG[1];
 // round toward minus infinity
 assign ~SYM[1] = ~ARG[0];
 assign ~SYM[2] = ~ARG[1];
-assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;"
+assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ? ~SYM[0] : ~SYM[0] - 32'sd1;
+// divInt end"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Classes.modInt#"
     , "type"      : "modInt# :: Int# -> Int# -> Int#"
     , "templateD" :
-"// modInt
+"// modInt begin
 wire ~SIGD[~SYM[0]][0];
 wire ~SIGD[~SYM[1]][0];
 wire ~SIGD[~SYM[2]][1];
@@ -87,7 +88,8 @@ assign ~SYM[1] = ~ARG[0];
 assign ~SYM[2] = ~ARG[1];
 assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ?
                  ~SYM[0] :
-                 (~ARG[1] == 32'sd0 ? 32'sd0 : ~SYM[0] + ~ARG[1]);"
+                 (~ARG[1] == 32'sd0 ? 32'sd0 : ~SYM[0] + ~ARG[1]);
+// modInt end"
     }
   }
 ]

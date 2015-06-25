@@ -94,7 +94,7 @@ assign ~RESULT = vec_~SYM[0];
            -> BitVector (m + 1 - n) -- ARG[3]
            -> BitVector (m + 1 + i)"
     , "templateD" :
-"// setSlice
+"// setSlice begin
 reg ~SIGD[~SYM[0]][0];
 wire ~TYP[3] din_~SYM[1];
 assign din_~SYM[1] = ~ARG[3]
@@ -104,7 +104,8 @@ always @(*) begin
   ~SYM[0][~LIT[1] : ~LIT[2]] = din_~SYM[1];
 end
 
-assign ~RESULT = ~SYM[0];"
+assign ~RESULT = ~SYM[0];
+// setSlice end"
     }
   }
 , { "BlackBox" :
@@ -138,10 +139,11 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
       => BitVector n -- ARG[1]
       -> Bit"
     , "templateD" :
-"// msb
+"// msb begin
 wire ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
-assign ~RESULT = ~SYM[0][~LIT[0]-1];"
+assign ~RESULT = ~SYM[0][~LIT[0]-1];
+// msb end"
     }
   }
 , { "BlackBox" :
@@ -150,10 +152,11 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1];"
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
     , "templateD" :
-"// lsb
+"// lsb begin
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
-assign ~RESULT = ~SYM[0][0];"
+assign ~RESULT = ~SYM[0][0];
+// msb end"
     }
   }
 , { "BlackBox" :
@@ -310,20 +313,22 @@ assign ~RESULT = ~SYM[0][0];"
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
-"// rotateL
+"// rotateL begin
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];"
+assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
+// rotateL end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
-"// rotateR
+"// rotateR begin
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];"
+assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
+// rotateR end"
     }
   }
 , { "BlackBox" :

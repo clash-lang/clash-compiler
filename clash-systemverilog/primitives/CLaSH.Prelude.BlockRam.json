@@ -10,7 +10,7 @@
            -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
-"// blockRam
+"// blockRam begin
 ~SIGD[RAM_~SYM[0]][2];
 ~SIGD[dout_~SYM[1]][6];
 
@@ -25,7 +25,8 @@ always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[3]
   dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = dout_~SYM[1];"
+assign ~RESULT = dout_~SYM[1];
+// blockRam end"
     }
   }
 ]

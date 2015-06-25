@@ -170,20 +170,22 @@
     { "name"      : "CLaSH.Sized.Internal.Unsigned.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "templateD" :
-"// rotateL
+"// rotateL begin
 logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
+assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
+// rotateL end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "templateD" :
-"// rotateR
+"// rotateR begin
 logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];"
+assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
+// rotateR end"
     }
   }
 , { "BlackBox" :

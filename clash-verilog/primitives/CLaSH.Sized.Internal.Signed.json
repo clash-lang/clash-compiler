@@ -136,7 +136,7 @@
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
     , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
-"// divInt
+"// divInt begin
 wire ~SIGD[~SYM[0]][1];
 wire ~SIGD[~SYM[1]][1];
 wire ~SIGD[~SYM[2]][2];
@@ -147,14 +147,15 @@ assign ~SYM[0] = ~ARG[1] / ~ARG[2];
 // round toward minus infinity
 assign ~SYM[1] = ~ARG[1];
 assign ~SYM[2] = ~ARG[2];
-assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] - ~LIT[0]'sd1;"
+assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] - ~LIT[0]'sd1;
+// divInt end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
     , "type"      : "mod# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateD" :
-"// modSigned
+"// modSigned begin
 wire ~SIGD[~SYM[0]][1];
 wire ~SIGD[~SYM[1]][1];
 wire ~SIGD[~SYM[2]][2];
@@ -167,7 +168,8 @@ assign ~SYM[1] = ~ARG[1];
 assign ~SYM[2] = ~ARG[2];
 assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
                  ~SYM[0] :
-                 (~ARG[1] == ~LIT[0]'sd0 ? ~LIT[0]'sd0 : ~SYM[0] + ~ARG[1]);"
+                 (~ARG[1] == ~LIT[0]'sd0 ? ~LIT[0]'sd0 : ~SYM[0] + ~ARG[1]);
+// modSigned end"
     }
   }
 , { "BlackBox" :
@@ -216,20 +218,22 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateD" :
-"// rotateL
+"// rotateL begin
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
+assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);
+// rotateL end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateD" :
-"// rotateR
+"// rotateR begin
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
+assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);
+// rotateR end"
     }
   }
 , { "BlackBox" :
@@ -237,7 +241,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
     , "comment"   : "Back-end should only use this code when the result is smaller than the argument"
     , "templateD" :
-"// resize
+"// resize begin
 if (~LIT[1] < ~LIT[0]) begin
   // truncate, sign preserving
   wire ~SIGD[~SYM[0]][2];
@@ -247,7 +251,7 @@ end else begin
   // sign-extend
   assign ~RESULT = $signed(~ARG[2]);
 end
-"
+// resize end"
     }
   }
 , { "BlackBox" :

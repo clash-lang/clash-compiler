@@ -94,7 +94,7 @@ assign ~RESULT = vec_~SYM[0];
            -> BitVector (m + 1 - n) -- ARG[3]
            -> BitVector (m + 1 + i)"
     , "templateD" :
-"// setSlice
+"// setSlice begin
 ~SIGD[~SYM[0]][0];
 
 always_comb begin
@@ -102,7 +102,8 @@ always_comb begin
   ~SYM[0][~LIT[1] : ~LIT[2]] = ~ARG[3];
 end
 
-assign ~RESULT = ~SYM[0];"
+assign ~RESULT = ~SYM[0];
+// setSlice end"
     }
   }
 , { "BlackBox" :
@@ -127,12 +128,13 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
         => BitVector (m + n) -- ARG[1]
         -> (BitVector m, BitVector n)"
     , "templateD" :
-"// split
+"// split begin
 ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
 assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
                   , ~SYM[0][(~LIT[0]-1) : 0]
-                  };"
+                  };
+// split end"
     }
   }
 , { "BlackBox" :
@@ -142,10 +144,11 @@ assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
       => BitVector n -- ARG[1]
       -> Bit"
     , "templateD" :
-"// msb
+"// msb begin
 ~SIGD[~SYM[0]][1];
 assign ~SYM[0] = ~ARG[1];
-assign ~RESULT = ~SYM[0][~LIT[0]-1];"
+assign ~RESULT = ~SYM[0][~LIT[0]-1];
+// msb end"
     }
   }
 , { "BlackBox" :
@@ -154,10 +157,11 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1];"
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
     , "templateD" :
-"// lsb
+"// lsb begin
 ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
-assign ~RESULT = ~SYM[0][0];"
+assign ~RESULT = ~SYM[0][0];
+// lsb end"
     }
   }
 , { "BlackBox" :
@@ -314,20 +318,22 @@ assign ~RESULT = ~SYM[0][0];"
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
-"// rotateL
+"// rotateL begin
 logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];"
+assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
+// rotateL end"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
-"// rotateR
+"// rotateR begin
 logic [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];"
+assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
+// rotateR end"
     }
   }
 , { "BlackBox" :
