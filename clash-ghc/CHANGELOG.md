@@ -2,10 +2,10 @@
 
 ## 0.5.9
 * New features:
-  * Use new verilog backend which outputs Verilog-2001 instead of Verilog-2005
+  * Use new verilog backend which outputs Verilog-2001 instead of Verilog-2005: generated Verilog is now accepted by Altera/Quartus
 
 * Fixes bugs:
-  * `--systemverilog` switch incorrectly generates verilog code
+  * `--systemverilog` switch incorrectly generates verilog code instead of systemverilog code
 
 ## 0.5.8 *June 25th 2015*
 * New features:

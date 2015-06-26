@@ -2,7 +2,7 @@
 
 ## 0.5.7
 * New features:
-  * Generate Verilog-2001 instead of Verilog-2005
+  * Generate Verilog-2001 instead of Verilog-2005: generated Verilog is now accepted by Altera/Quartus
 
 ## 0.5.6 *June 25th 2015*
 * New features:
