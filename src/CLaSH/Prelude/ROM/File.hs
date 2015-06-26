@@ -104,12 +104,12 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -133,12 +133,12 @@ asyncRomFile sz file rd = asyncRomFile# sz file (fromEnum rd)
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -175,12 +175,12 @@ asyncRomFile# sz file rd = content ! rd
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -207,12 +207,12 @@ romFile = romFile' systemClock
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -238,12 +238,12 @@ romFilePow2 = romFile' systemClock (snat :: SNat (2^n))
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -272,12 +272,12 @@ romFilePow2' clk = romFile' clk (snat :: SNat (2^n))
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:

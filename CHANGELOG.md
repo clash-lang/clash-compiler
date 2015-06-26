@@ -1,5 +1,8 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.9.1 *June 26th 2015*
+* Updated documentation on data-file support on Altera/Quartus
+
 ## 0.9 *June 25th 2015*
 * New features:
   * Add operations on singleton natural numbers: `addSNat`, `subSNat`, `mulSNat`, and `powSNat`.

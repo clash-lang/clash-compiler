@@ -113,12 +113,12 @@ import CLaSH.Sized.Unsigned  (Unsigned)
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -152,12 +152,12 @@ blockRamFile = blockRamFile' systemClock
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -190,12 +190,12 @@ blockRamFilePow2 = blockRamFile' systemClock (snat :: SNat (2^n))
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
@@ -229,12 +229,12 @@ blockRamFilePow2' clk = blockRamFile' clk (snat :: SNat (2^n))
 -- below:
 --
 --     @
---                    | VHDL     | Verilog                 | SystemVerilog |
---     ===============+==========+=========================+===============+
---     Altera/Quartus | Broken   | No Verilog-2005 support | Works         |
---     Xilinx/ISE     | Works    | Works                   | Works         |
---     ASIC           | Untested | Untested                | Untested      |
---     ===============+==========+=========================+===============+
+--                    | VHDL     | Verilog  | SystemVerilog |
+--     ===============+==========+==========+===============+
+--     Altera/Quartus | Broken   | Works    | Works         |
+--     Xilinx/ISE     | Works    | Works    | Works         |
+--     ASIC           | Untested | Untested | Untested      |
+--     ===============+==========+==========+===============+
 --     @
 --
 -- Additional helpful information:
