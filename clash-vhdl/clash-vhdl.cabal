@@ -70,7 +70,7 @@ Library
   CPP-Options:        -DCABAL
 
   Build-depends:      base                    >= 4.6.0.1 && < 5,
-                      clash-lib               >= 0.5.7,
+                      clash-lib               >= 0.5.8,
                       clash-prelude           >= 0.9,
                       fgl                     >= 5.4.2.4,
                       lens                    >= 3.9.2,
