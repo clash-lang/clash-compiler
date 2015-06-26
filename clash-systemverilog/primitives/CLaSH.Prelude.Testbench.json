@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.Testbench.assert"
+    { "name" : "CLaSH.Prelude.Testbench.assert'"
     , "type" :
 "assert :: (Eq a,Show a) -- (ARG[0],ARG[1])
         => SClock t      -- ^ ARG[2]
@@ -13,7 +13,7 @@
 // pragma translate_off
 always @(posedge ~CLK[2] or posedge ~RST[2]) begin
   if (~ARG[4] != ~ARG[5]) begin
-    $display(\"%s, expected: %b, actual: %b\", ~LIT[3], ~TYPM[3]_to_lv(~ARG[5]), ~TYPM[2]_to_lv(~ARG[4]));
+    $display(\"%s, expected: %b, actual: %b\", ~LIT[3], ~TYPM[5]_to_lv(~ARG[5]), ~TYPM[4]_to_lv(~ARG[4]));
     $stop;
   end
 end
