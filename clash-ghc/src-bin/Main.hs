@@ -520,7 +520,7 @@ doAbiHashMode = mkPostLoadMode DoAbiHash
 showPackagesMode = mkPostLoadMode ShowPackages
 doVHDLMode = mkPostLoadMode DoVHDL
 doVerilogMode = mkPostLoadMode DoVerilog
-doSystemVerilogMode = mkPostLoadMode DoVerilog
+doSystemVerilogMode = mkPostLoadMode DoSystemVerilog
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
