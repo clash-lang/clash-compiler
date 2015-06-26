@@ -138,7 +138,7 @@ ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r",modName ++ "_testben
 
 iverilog :: FilePath -> String -> String -> TestTree
 iverilog dir modName entity = withResource (return dir) (const (return ()))
-    (\d -> testProgram "iverilog" "iverilog" ("-g2005":"-s":modEntity:"-o":modEntity:verilogFiles d) (Just dir) False)
+    (\d -> testProgram "iverilog" "iverilog" ("-g2001":"-s":modEntity:"-o":modEntity:verilogFiles d) (Just dir) False)
   where
     verilogFiles :: IO FilePath -> [FilePath]
     verilogFiles d =  Unsafe.unsafePerformIO
