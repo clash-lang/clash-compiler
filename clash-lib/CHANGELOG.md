@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.5.8
+## 0.5.8 *June 26th 2015*
 * Fixes bugs:
   * Allow text and tags in ~SIGD black box construct
 

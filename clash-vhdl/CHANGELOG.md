@@ -1,9 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.5.7.1
+## 0.5.7.1 *June 26th 2015*
 * Support for `genStmt` backend method
 
-## 0.5.7 *June 25 2015*
+## 0.5.7 *June 25th 2015*
 * New features:
   * Support `clash-prelude-0.9`
 

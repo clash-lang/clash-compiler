@@ -1,7 +1,8 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.5.7
+## 0.5.7 *June 26th 2015*
 * Fixes bug:
+  * Incorrect primitive for `CLaSH.Prelude.Testbench.assert'`
   * Incorrect primitive for `CLaSH.Sized.Vec.index_int`
   * Sometimes created incorrect nested `generate` statements
 

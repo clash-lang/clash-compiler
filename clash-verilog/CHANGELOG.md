@@ -1,6 +1,6 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.5.7
+## 0.5.7 *June 26th 2015*
 * New features:
   * Generate Verilog-2001 instead of Verilog-2005: generated Verilog is now accepted by Altera/Quartus
 
