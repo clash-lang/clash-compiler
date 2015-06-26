@@ -79,7 +79,7 @@ setSym i l
                                                           return (Sym k)
                                             Just k  -> return (Sym k)
                       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
-                      SigD e' m     -> SigD <$> (head <$> setSym' [e']) <*> pure m
+                      SigD e' m     -> SigD <$> (setSym' e') <*> pure m
                       _             -> pure e
               )
 
@@ -98,7 +98,7 @@ setClocks :: ( MonadWriter (Set (Identifier,HWType)) m
 setClocks bc bt = mapM setClocks' bt
   where
     setClocks' (D (Decl n l)) = D <$> (Decl n <$> mapM (combineM (setClocks bc) (setClocks bc)) l)
-    setClocks' (SigD e m)     = SigD <$> (head <$> setClocks bc [e]) <*> pure m
+    setClocks' (SigD e m)     = SigD <$> (setClocks bc e) <*> pure m
 
     setClocks' (Clk Nothing)  = let (clk,rate) = clkSyncId $ fst $ bbResult bc
                                     clkName    = Text.append clk (Text.pack (show rate))
@@ -178,7 +178,7 @@ renderElem b (D (Decl n (l:ls))) = do
       else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ
 
 renderElem b (SigD e m) = do
-  e' <- renderElem b e
+  e' <- Text.concat <$> mapM (renderElem b) e
   let ty = case m of
              Nothing -> snd $ bbResult b
              Just n  -> let (_,ty',_) = bbInputs b !! n

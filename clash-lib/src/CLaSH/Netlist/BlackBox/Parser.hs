@@ -73,8 +73,8 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
      <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
      <|> FilePath          <$> (pToken "~FILE" *> pBrackets pTagE)
-     <|> SigD              <$> (pToken "~SIGD" *> pBrackets pTagE) <*> (Just <$> (pBrackets pNatural))
-     <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pTagE)
+     <|> SigD              <$> (pToken "~SIGD" *> pBrackets pSigD) <*> (Just <$> (pBrackets pNatural))
+     <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pSigD)
 
 -- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a
@@ -92,3 +92,11 @@ pBlackBoxE = pSome pElemE
 pElemE :: Parser Element
 pElemE = pTagE
       <|> C <$> pText
+
+-- | Parse SigD
+pSigD :: Parser [Element]
+pSigD = pSome (pTagE <|> pLimitedText)
+
+-- | Text excluding square brackets and tilde
+pLimitedText :: Parser Element
+pLimitedText = C <$> (pack <$> pList1 (pSatisfy (`notElem` "[]~") (Insertion (show "notElem \"[]~\"") '_' 5)))
