@@ -226,7 +226,7 @@ endgenerate
     , "templateD" :
 "// indexVec begin
 ~SIGD[vec_~SYM[0]][1];
-assign vec_SYM[0] = ~ARG[1];
+assign vec_~SYM[0] = ~ARG[1];
 
 assign ~RESULT = vec_~SYM[0][~ARG[2]];
 // indexVec end"
