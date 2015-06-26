@@ -83,7 +83,7 @@ genVerilog :: String -> Component -> SystemVerilogM (String,Doc)
 genVerilog modName c = (unpack cName,) A.<$> verilog
   where
     cName   = componentName c
-    verilog = "// Automatically generated SystemVerilog" <$$>
+    verilog = "// Automatically generated SystemVerilog-2005" <$$>
               tyImports modName <$$>
               module_ c
 
