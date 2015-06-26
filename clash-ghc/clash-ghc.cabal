@@ -72,7 +72,7 @@ Executable clash
 
                       clash-lib                 >= 0.5.8,
                       clash-systemverilog       >= 0.5.7,
-                      clash-vhdl                >= 0.5.7,
+                      clash-vhdl                >= 0.5.7.1,
                       clash-verilog             >= 0.5.7,
                       clash-prelude             >= 0.9,
                       ghc-typelits-natnormalise >= 0.3
