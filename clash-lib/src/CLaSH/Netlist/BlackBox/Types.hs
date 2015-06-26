@@ -25,6 +25,8 @@ data Element = C   Text          -- ^ Constant
              | Size Element      -- ^ Size of a type hole
              | Length Element    -- ^ Length of a vector hole
              | FilePath Element  -- ^ Hole containing a filepath for a data file
+             | Gen Bool          -- ^ Hole marking beginning (True) or end (False)
+                                 -- of a generative construct
              | SigD [Element] (Maybe Int)
   deriving Show
 

@@ -12,9 +12,11 @@ wire ~TYPO ROM_~SYM[0] [0:~LIT[0]-1];
 wire ~TYP[1] romflat_~SYM[1];
 assign romflat_~SYM[1] = ~ARG[1];
 genvar ~SYM[2];
+~GENERATE
 for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : array_~SYM[3]
   assign ROM_~SYM[0][(~LIT[0]-1)-~SYM[2]] = romflat_~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
 end
+~ENDGENERATE
 
 assign ~RESULT = ROM_~SYM[0][~ARG[2]];
 // asyncRom end"

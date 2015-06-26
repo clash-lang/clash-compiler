@@ -9,6 +9,7 @@
 module CLaSH.Backend.Verilog (VerilogState) where
 
 import qualified Control.Applicative                  as A
+import           Control.Lens                         ((+=),(-=), makeLenses, use)
 import           Control.Monad.State                  (State)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes)
@@ -29,10 +30,15 @@ import qualified System.FilePath
 #endif
 
 -- | State for the 'CLaSH.Backend.Verilog.VerilogM' monad:
-data VerilogState = VerilogState
+data VerilogState =
+  VerilogState
+    { _genDepth  :: Int -- ^ Depth of current generative block
+    }
+
+makeLenses ''VerilogState
 
 instance Backend VerilogState where
-  initBackend     = VerilogState
+  initBackend     = VerilogState 0
 #ifdef CABAL
   primDir         = const (Paths_clash_verilog.getDataFileName "primitives")
 #else
@@ -48,6 +54,16 @@ instance Backend VerilogState where
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
   hdlSig t ty     = sigDecl (text t) ty
+  genStmt True    = do cnt <- use genDepth
+                       genDepth += 1
+                       if cnt > 0
+                          then empty
+                          else "generate"
+  genStmt False   = do genDepth -= 1
+                       cnt <- use genDepth
+                       if cnt > 0
+                          then empty
+                          else "endgenerate"
   inst            = inst_
   expr            = expr_
 

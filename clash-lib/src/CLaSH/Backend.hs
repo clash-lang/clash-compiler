@@ -36,6 +36,8 @@ class Backend state where
   hdlTypeMark      :: HWType       -> State state Doc
   -- | Create a signal declaration from an identifier (Text) and Netlist HWType
   hdlSig           :: Text -> HWType -> State state Doc
+  -- | Create a generative block statement marker
+  genStmt          :: Bool -> State state Doc
   -- | Turn a Netlist Declaration to a HDL concurrent block
   inst             :: Declaration  -> State state (Maybe Doc)
   -- | Turn a Netlist expression into a HDL expression

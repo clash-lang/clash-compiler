@@ -41,12 +41,13 @@ data SystemVerilogState =
     { _tyCache   :: HashSet HWType -- ^ Previously encountered  HWTypes
     , _tyCount   :: Int -- ^ Product type counter
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
+    , _genDepth  :: Int -- ^ Depth of current generative block
     }
 
 makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty 0 HashMap.empty
+  initBackend     = SystemVerilogState HashSet.empty 0 HashMap.empty 0
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -62,6 +63,16 @@ instance Backend SystemVerilogState where
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
   hdlSig t ty     = sigDecl (text t) ty
+  genStmt True    = do cnt <- use genDepth
+                       genDepth += 1
+                       if cnt > 0
+                          then empty
+                          else "generate"
+  genStmt False   = do genDepth -= 1
+                       cnt <- use genDepth
+                       if cnt > 0
+                          then empty
+                          else "endgenerate"
   inst            = inst_
   expr            = expr_
 

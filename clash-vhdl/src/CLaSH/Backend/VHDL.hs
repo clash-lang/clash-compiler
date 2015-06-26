@@ -63,6 +63,7 @@ instance Backend VHDLState where
   hdlTypeErrValue = vhdlTypeErrValue
   hdlTypeMark     = vhdlTypeMark
   hdlSig t ty     = sigDecl (text t) ty
+  genStmt         = const empty
   inst            = inst_
   expr            = expr_
 

@@ -73,6 +73,8 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
      <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
      <|> FilePath          <$> (pToken "~FILE" *> pBrackets pTagE)
+     <|> Gen               <$> (True <$ pToken "~GENERATE")
+     <|> Gen               <$> (False <$ pToken "~ENDGENERATE")
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pSigD) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pSigD)
 
