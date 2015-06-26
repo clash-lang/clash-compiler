@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.5.7
+* New features:
+  * Generate Verilog-2001 instead of Verilog-2005
+
 ## 0.5.6 *June 25th 2015*
 * New features:
   * Support `clash-prelude-0.9`

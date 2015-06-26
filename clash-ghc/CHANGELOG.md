@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.9
+* New features:
+  * Use new verilog backend which outputs Verilog-2001 instead of Verilog-2005
+
+* Fixes bugs:
+  * `--systemverilog` switch incorrectly generates verilog code
+
 ## 0.5.8 *June 25th 2015*
 * New features:
   * Support for copying string literals from Haskell to generated code
