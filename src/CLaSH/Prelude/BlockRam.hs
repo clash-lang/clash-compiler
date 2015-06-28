@@ -84,7 +84,7 @@ cpu :: Vec 7 Value          -- ^ Register bank
     -> ( Vec 7 Value
        , (MemAddr,MemAddr,Bool,Value,InstrAddr)
        )
-cpu regbank (memOut,instr) = ((regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
+cpu regbank (memOut,instr) = (regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
   where
     -- Current instruction pointer
     ipntr = regbank '!!' PC
@@ -146,7 +146,7 @@ system :: KnownNat n => Vec n Instruction -> Signal Value
 system instrs = memOut
   where
     memOut = dataMem wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'CLaSH.Prelude.Mealy.mealyB' cpu (('replicate' d7 0),Zero) (memOut,instr)
+    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'CLaSH.Prelude.Mealy.mealyB' cpu ('replicate' d7 0) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -207,7 +207,7 @@ system2 :: KnownNat n => Vec n Instruction -> Signal Value
 system2 instrs = memOut
   where
     memOut = 'CLaSH.Prelude.RAM.asyncRam' d32 wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'mealyB' cpu (('replicate' d7 0),Zero) (memOut,instr)
+    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'mealyB' cpu ('replicate' d7 0) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -247,7 +247,7 @@ cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
      -> ( (Vec 7 Value,Reg)
         , (MemAddr,MemAddr,Bool,Value,InstrAddr)
         )
-cpu2 (regbank,ldRegD) (memOut,instr) = (((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
+cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
   where
     -- Current instruction pointer
     ipntr = regbank '!!' PC
@@ -287,7 +287,7 @@ system3 :: KnownNat n => Vec n Instruction -> Signal Value
 system3 instrs = memOut
   where
     memOut = 'blockRam' (replicate d32 0) wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'mealyB' cpu (('replicate' d7 0),Zero) (memOut,instr)
+    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'mealyB' cpu2 (('replicate' d7 0),Zero) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
