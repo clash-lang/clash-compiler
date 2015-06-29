@@ -336,7 +336,7 @@ we need to drop the first few sample, because the initial output of a
 also 'undefined'.
 
 @
-__>>> L.take 33 $ L.tail $ sample $ system3 prog2__
+__>>> L.take 32 $ L.tail $ sample $ system3 prog2__
 [4,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 @
 
