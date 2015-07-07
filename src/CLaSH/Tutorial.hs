@@ -39,7 +39,7 @@ module CLaSH.Tutorial (
   -- * Composition of sequential circuits
   -- $composition_sequential
 
-  -- * TopEntity annotations: controlling the VHDL\/Verilog\/SystemVerilog generation.
+  -- * TopEntity annotations: controlling the VHDL\/(System)Verilog generation.
   -- $annotations
 
   -- * Multiple clock domains
@@ -858,7 +858,7 @@ However, if we add the following 'TopEntity' annotation in the file:
     , t_extraIn  = [ (\"CLOCK_50\", 1)
                    , (\"KEY0\"    , 1)
                    ]
-    , t_clocks   = [ 'defClkAltera' "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
+    , t_clocks   = [ 'altpll' "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) \#-\}
 @
 
