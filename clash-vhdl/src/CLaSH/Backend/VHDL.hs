@@ -74,7 +74,7 @@ genVHDL :: String -> Component -> VHDLM (String,Doc)
 genVHDL modName c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdl    = "-- Automatically generated VHDL-2002" <$$>
+    vhdl    = "-- Automatically generated VHDL-93" <$$>
               tyImports modName <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c

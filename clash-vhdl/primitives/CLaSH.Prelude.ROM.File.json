@@ -9,21 +9,21 @@
     , "templateD" :
 "-- asyncRomFile begin
 asyncROMFile_~SYM[0] : block
-  type RomType is array(0 to ~LIT[1]-1) of bit_vector(~LIT[0]-1 downto 0);
+  type RomType is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
   impure function InitRomFromFile (RomFileName : in string) return RomType is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
-    variable ROM : RomType;
+    variable ROM : RomType(0 to ~LIT[1]-1);
   begin
-    for i in RomType'range loop
+    for i in ROM'range loop
       readline(RomFile,RomFileLine);
       read(RomFileLine,ROM(i));
     end loop;
     return ROM;
   end function;
 
-  signal ROM : RomType := InitRomFromFile(~FILE[~LIT[2]]);
+  signal ROM : RomType(0 to ~LIT[1]-1) := InitRomFromFile(~FILE[~LIT[2]]);
   signal rd  : integer range 0 to ~LIT[1]-1;
 begin
   rd <= ~ARG[3]
@@ -49,21 +49,21 @@ end block;
     , "templateD" :
 "-- romFile begin
 romFile_~COMPNAME_~SYM[0] : block
-  type RomType is array(0 to ~LIT[2]-1) of bit_vector(~LIT[0]-1 downto 0);
+  type RomType is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
   impure function InitRomFromFile (RomFileName : in string) return RomType is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
-    variable ROM : RomType;
+    variable ROM : RomType(0 to ~LIT[2]-1);
   begin
-    for i in RomType'range loop
+    for i in ROM'range loop
       readline(RomFile,RomFileLine);
       read(RomFileLine,ROM(i));
     end loop;
     return ROM;
   end function;
 
-  signal ROM  : RomType := InitRomFromFile(~FILE[~LIT[3]]);
+  signal ROM  : RomType(0 to ~LIT[2]-1) := InitRomFromFile(~FILE[~LIT[3]]);
   signal rd   : integer range 0 to ~LIT[2]-1;
   signal dout : ~TYPO;
 begin

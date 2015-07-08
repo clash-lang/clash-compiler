@@ -123,7 +123,7 @@ clashHDL t env extraArgs modName =
 
 ghdlImport :: FilePath -> TestTree
 ghdlImport dir = withResource (return dir) (const (return ()))
-    (\d -> testProgram "GHDL (import)" "ghdl" ("-i":"--workdir=work":vhdlFiles d) (Just dir) False)
+    (\d -> testProgram "GHDL (import)" "ghdl" ("-i":"--workdir=work":"--std=93":vhdlFiles d) (Just dir) False)
   where
     vhdlFiles :: IO FilePath -> [FilePath]
     vhdlFiles d =  Unsafe.unsafePerformIO
@@ -131,10 +131,10 @@ ghdlImport dir = withResource (return dir) (const (return ()))
                <$> (Directory.getDirectoryContents =<< d)
 
 ghdlMake :: FilePath -> String -> String -> TestTree
-ghdlMake env modName entity = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work",modName ++ "_" ++ entity] (Just env) False
+ghdlMake env modName entity = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work","--std=93",modName ++ "_" ++ entity] (Just env) False
 
 ghdlSim :: FilePath -> String -> TestTree
-ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r",modName ++ "_testbench","--assert-level=error"] (Just env) False
+ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r","--std=93",modName ++ "_testbench","--assert-level=error"] (Just env) False
 
 iverilog :: FilePath -> String -> String -> TestTree
 iverilog dir modName entity = withResource (return dir) (const (return ()))
