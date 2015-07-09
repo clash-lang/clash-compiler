@@ -156,6 +156,8 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         in Left (bndr,dfExpr)
       CoreSyn.NoUnfolding
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
-        -> Left (bndr,CoreSyn.Var MkCore.uNDEFINED_ID)
+        -> Left (bndr,CoreSyn.mkTyApps (CoreSyn.Var MkCore.uNDEFINED_ID)
+                                       [Var.varType _id]
+                )
       _ -> Right bndr
   _ -> Right bndr
