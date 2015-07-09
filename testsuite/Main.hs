@@ -89,6 +89,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOClock" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOCon" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOPrim" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Minimum" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "PatHOCon" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Split" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VACC" (Just ("topEntity",False))
