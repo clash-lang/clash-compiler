@@ -158,9 +158,8 @@ coreView tcMap ty =
        TyConApp tc args -> case name2String tc of
          "CLaSH.Signal.Internal.Signal'" -> coreView tcMap (args !! 1)
          _ -> case (tcMap HashMap.! tc) of
-                (AlgTyCon {algTcRhs = (NewTyCon _ nt)})
-                  | length (fst nt) == length args -> coreView tcMap (newTyConInstRhs nt args)
-                  | otherwise -> tView
+                AlgTyCon {algTcRhs = (NewTyCon _ nt)}
+                  -> coreView tcMap (newTyConInstRhs nt args)
                 FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst args of
                   Just ty' -> coreView tcMap ty'
                   _ -> tView
