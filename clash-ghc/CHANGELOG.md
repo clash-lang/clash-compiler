@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.10 *July 9th 2015*
+* New features:
+  * Use new VHDL backend which outputs VHDL-93 instead of VHDL-2002: generated VHDL is now accepted by a larger number of tools.
+  * Treat all so-called bottom values (`error "FOO"`, `let x = x in x`, etc.) occuring in installed libraries as `undefined`.
+    Before, there were (very) rare situations where we couldn't find the expressions belonging to a function and demanded a BlackBox, even though we knew the expression would be a bottom value.
+    Now, we stop demanding a BlackBox for such a function and simply treat it as `undefined`, thus allowing a greater range of circuit descriptions that we can compile.
+
 ## 0.5.9 *June 26th 2015*
 * New features:
   * Use new verilog backend which outputs Verilog-2001 instead of Verilog-2005: generated Verilog is now accepted by Altera/Quartus

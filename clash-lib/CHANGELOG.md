@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.9 *July 9th 2015*
+* Fixes bugs:
+  * `coreView` didn't look through newtypes of the form: `newtype Foo a = MkFoo (Maybe a)`
+
 ## 0.5.8 *June 26th 2015*
 * Fixes bugs:
   * Allow text and tags in ~SIGD black box construct

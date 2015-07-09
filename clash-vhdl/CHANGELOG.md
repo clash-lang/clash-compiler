@@ -1,6 +1,6 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.5.8
+## 0.5.8 *July 9th 2015*
 * New features:
   * Generate VHDL-93 instead of VHDL-2002, the VHDL-93 standard is supported by a larger range of tools
 
