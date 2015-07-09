@@ -16,6 +16,7 @@ import qualified BasicTypes
 import qualified Class
 import qualified CoreFVs
 import qualified CoreSyn
+import qualified Demand
 import           DynFlags    (unsafeGlobalDynFlags)
 import qualified GHC
 import qualified Id
@@ -139,8 +140,9 @@ loadExprFromTyThing :: CoreSyn.CoreBndr
                          CoreSyn.CoreBndr                     -- unlocatable Var
 loadExprFromTyThing bndr tyThing = case tyThing of
   GHC.AnId _id | Var.isId _id ->
-    let unfolding  = IdInfo.unfoldingInfo $ Var.idInfo _id
-        inlineInfo = IdInfo.inlinePragInfo $ Var.idInfo _id
+    let _idInfo    = Var.idInfo _id
+        unfolding  = IdInfo.unfoldingInfo _idInfo
+        inlineInfo = IdInfo.inlinePragInfo _idInfo
     in case unfolding of
       (CoreSyn.CoreUnfolding {}) ->
         case (BasicTypes.inl_inline inlineInfo,BasicTypes.inl_act inlineInfo) of
@@ -152,5 +154,8 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         let dcApp  = MkCore.mkCoreConApps dc es
             dfExpr = MkCore.mkCoreLams dfbndrs dcApp
         in Left (bndr,dfExpr)
+      CoreSyn.NoUnfolding
+        | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
+        -> Left (bndr,CoreSyn.Var MkCore.uNDEFINED_ID)
       _ -> Right bndr
   _ -> Right bndr
