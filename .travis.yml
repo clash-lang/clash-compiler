@@ -19,6 +19,16 @@ before_install:
   - travis_retry $CABAL update
 
 install:
+  # if we are building on head, test against development versions of
+  # relevant dependencies
+  - |
+    if [ $GHCVER = "head" ]; then
+      git clone https://github.com/clash-lang/ghc-tcplugins-extra.git
+      git clone https://github.com/clash-lang/ghc-typelits-natnormalise.git
+      $CABAL sandbox init
+      $CABAL sandbox add-source ghc-tcplugins-extra
+      $CABAL sandbox add-source ghc-typelits-natnormalise
+    fi
   - $CABAL install $JOPTS --enable-tests --dependencies-only
 
 script:
