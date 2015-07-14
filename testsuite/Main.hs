@@ -121,10 +121,11 @@ clashHDL t env extraArgs modName =
                       ])
               (Just env)
               False
+              False
 
 ghdlImport :: FilePath -> TestTree
 ghdlImport dir = withResource (return dir) (const (return ()))
-    (\d -> testProgram "GHDL (import)" "ghdl" ("-i":"--workdir=work":"--std=93":vhdlFiles d) (Just dir) False)
+    (\d -> testProgram "GHDL (import)" "ghdl" ("-i":"--workdir=work":"--std=93":vhdlFiles d) (Just dir) False False)
   where
     vhdlFiles :: IO FilePath -> [FilePath]
     vhdlFiles d =  Unsafe.unsafePerformIO
@@ -132,14 +133,14 @@ ghdlImport dir = withResource (return dir) (const (return ()))
                <$> (Directory.getDirectoryContents =<< d)
 
 ghdlMake :: FilePath -> String -> String -> TestTree
-ghdlMake env modName entity = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work","--std=93",modName ++ "_" ++ entity] (Just env) False
+ghdlMake env modName entity = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work","--std=93",modName ++ "_" ++ entity] (Just env) False False
 
 ghdlSim :: FilePath -> String -> TestTree
-ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r","--std=93",modName ++ "_testbench","--assert-level=error"] (Just env) False
+ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r","--std=93",modName ++ "_testbench","--assert-level=error"] (Just env) False False
 
 iverilog :: FilePath -> String -> String -> TestTree
 iverilog dir modName entity = withResource (return dir) (const (return ()))
-    (\d -> testProgram "iverilog" "iverilog" ("-g2001":"-s":modEntity:"-o":modEntity:verilogFiles d) (Just dir) False)
+    (\d -> testProgram "iverilog" "iverilog" ("-g2":"-s":modEntity:"-o":modEntity:verilogFiles d) (Just dir) False False)
   where
     verilogFiles :: IO FilePath -> [FilePath]
     verilogFiles d =  Unsafe.unsafePerformIO
@@ -149,7 +150,7 @@ iverilog dir modName entity = withResource (return dir) (const (return ()))
     modEntity = modName ++ "_" ++ entity
 
 vvp :: FilePath -> String -> TestTree
-vvp env modName = testProgram "vvp" "vvp" ["-N",modName ++ "_testbench"] (Just env) False
+vvp env modName = testProgram "vvp" "vvp" [modName ++ "_testbench"] (Just env) False True
 
 runTest :: FilePath
         -> BuildTarget

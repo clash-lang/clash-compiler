@@ -40,7 +40,7 @@ import Test.Tasty.Providers ( IsTest (..), Result, TestName, TestTree,
 import Test.Tasty.Options   ( IsOption (..), OptionDescription(..),
                               safeRead, lookupOption, flagCLParser     )
 
-data TestProgram = TestProgram String [String] (Maybe FilePath) Bool
+data TestProgram = TestProgram String [String] (Maybe FilePath) Bool Bool
      deriving (Typeable)
 
 -- | Create test that runs a program with given options. Test succeeds
@@ -50,17 +50,18 @@ testProgram :: TestName        -- ^ Test name
             -> [String]        -- ^ Program options
             -> Maybe FilePath  -- ^ Optional working directory
             -> Bool            -- ^ Whether to print stdout or stderr on success
+            -> Bool            -- ^ Whether a non-empty stdout means failure
             -> TestTree
-testProgram testName program opts workingDir stdO =
-    singleTest testName (TestProgram program opts workingDir stdO)
+testProgram testName program opts workingDir stdO stdF =
+    singleTest testName (TestProgram program opts workingDir stdO stdF)
 
 instance IsTest TestProgram where
-  run opts (TestProgram program args workingDir stdO) _ = do
+  run opts (TestProgram program args workingDir stdO stdF) _ = do
     execFound <- findExecutable program
 
     case execFound of
       Nothing       -> return $ execNotFoundFailure program
-      Just progPath -> runProgram progPath args workingDir stdO
+      Just progPath -> runProgram progPath args workingDir stdO stdF
 
   testOptions = return []
 
@@ -70,8 +71,9 @@ runProgram :: String          -- ^ Program name
            -> [String]        -- ^ Program options
            -> Maybe FilePath  -- ^ Optional working directory
            -> Bool            -- ^ Whether to print stdout or stderr on success
+           -> Bool            -- ^ Whether a non-empty stdout means failure
            -> IO Result
-runProgram program args workingDir stdO = do
+runProgram program args workingDir stdO stdF = do
   (_, stdoutH, stderrH, pid) <- runInteractiveProcess program args workingDir Nothing
 
   stderr <- hGetContents stderrH
@@ -79,7 +81,9 @@ runProgram program args workingDir stdO = do
   ecode  <- stdout `deepseq` stderr `deepseq` waitForProcess pid
 
   case ecode of
-    ExitSuccess      -> return (testPassed (if stdO then stdout else stderr))
+    ExitSuccess      -> if stdF && not (null stdout)
+                           then return (exitFailure program 1 stderr stdout)
+                           else return (testPassed (if stdO then stdout else stderr))
     ExitFailure code -> return $ exitFailure program code stderr stdout
 
 -- | Indicates that program does not exist in the path
