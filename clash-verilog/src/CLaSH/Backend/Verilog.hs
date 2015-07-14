@@ -256,6 +256,11 @@ expr_ _ (BlackBoxE pNm _ bbCtx _)
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
+expr_ _ (BlackBoxE pNm _ bbCtx _)
+  | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Index (fromInteger n),fromInteger n)) i
+
 expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
@@ -295,6 +300,7 @@ exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
 exprLit Nothing         (NumLit i) = integer i
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Unsigned _   -> int sz <> "'d" <> integer i
+                                       Index _      -> int (typeSize hty) <> "'d" <> integer i
                                        Signed _
                                         | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
                                         | otherwise -> int sz <> "'sd" <> integer i
