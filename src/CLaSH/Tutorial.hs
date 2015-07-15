@@ -212,7 +212,11 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
   (2) Install __CλaSH__
 
-      * Run @cabal install clash-ghc --enable-documentation@
+      * Run:
+
+          * /i386/ Linux: @cabal install clash-ghc --enable-documentation --enable-executable-dynamic@
+          * Other: @cabal install clash-ghc --enable-documentation@
+
       * /This is going to take awhile, so have a refreshment/
 
   (4) Verify that everything is working by:
