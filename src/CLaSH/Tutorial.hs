@@ -243,7 +243,7 @@ clash --interactive
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
-added command (@:vhdl@, @:verilog@, and @:systemverilog@). You can load files
+added commands (@:vhdl@, @:verilog@, and @:systemverilog@). You can load files
 into the interpreter using the @:l \<FILENAME\>@ command. Now, depending on your
 choice in editor, the following @edit-load-run@ cycle probably work best for you:
 
