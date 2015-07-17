@@ -167,7 +167,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-    The following are alternative options, if the cannot find what you are looking for on <http://www.haskell.org/ghc/download>
+    The following are alternative options, if you cannot find what you are looking for on <http://www.haskell.org/ghc/download>
 
       * Ubuntu:
 
