@@ -180,7 +180,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * OS X:
 
-          * Follow the instructions on: <https://ghcformacosx.github.io/ Haskell for Max OS X>
+          * Follow the instructions on: <https://ghcformacosx.github.io/ Haskell for Mac OS X>
           * Run: @cabal update@
           * Skip step 2.
 
@@ -243,7 +243,7 @@ clash --interactive
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
-added command (@:vhdl@, @:verilog@, and @:systemverilog@). You can load files
+added commands (@:vhdl@, @:verilog@, and @:systemverilog@). You can load files
 into the interpreter using the @:l \<FILENAME\>@ command. Now, depending on your
 choice in editor, the following @edit-load-run@ cycle probably work best for you:
 
@@ -787,7 +787,7 @@ CλaSH design on an FPGA.
 
 We can exert some control how the top level function is created by the CλaSH
 compiler by annotating the @topEntity@ function with a 'TopEntity' annotation.
-You apply these annotation using the @ANN@ pragma like so:
+You apply these annotations using the @ANN@ pragma like so:
 
 @
 {\-\# ANN topEntity (TopEntity {t_name = ..., ...  }) \#-\}
