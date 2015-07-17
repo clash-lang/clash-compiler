@@ -787,7 +787,7 @@ CλaSH design on an FPGA.
 
 We can exert some control how the top level function is created by the CλaSH
 compiler by annotating the @topEntity@ function with a 'TopEntity' annotation.
-You apply these annotation using the @ANN@ pragma like so:
+You apply these annotations using the @ANN@ pragma like so:
 
 @
 {\-\# ANN topEntity (TopEntity {t_name = ..., ...  }) \#-\}
