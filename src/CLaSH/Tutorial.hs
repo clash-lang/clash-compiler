@@ -180,7 +180,7 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * OS X:
 
-          * Follow the instructions on: <https://ghcformacosx.github.io/ Haskell for Max OS X>
+          * Follow the instructions on: <https://ghcformacosx.github.io/ Haskell for Mac OS X>
           * Run: @cabal update@
           * Skip step 2.
 
