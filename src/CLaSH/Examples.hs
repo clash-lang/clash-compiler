@@ -350,7 +350,7 @@ Examples:
 
 The following property holds:
 
-prop> decoderShift enable binaryIn === decoderCase enable binaryIn
+prop> \enable binaryIn -> decoderShift enable binaryIn === decoderCase enable binaryIn
 
 = Encoder
 
@@ -381,7 +381,7 @@ encoderCase _ _ = 0
 
 The following property holds:
 
-prop> en ==> (encoderCase en (decoderCase en decIn) === decIn)
+prop> \en decIn -> en ==> (encoderCase en (decoderCase en decIn) === decIn)
 -}
 
 {- $counters
@@ -424,7 +424,7 @@ upDownCounter upDown = s
 
 The following property holds:
 
-prop> en ==> testFor 1000 (upCounter (signal en) .==. upDownCounter (signal en))
+prop> \en -> en ==> testFor 1000 (upCounter (signal en) .==. upDownCounter (signal en))
 
 = LFSR
 

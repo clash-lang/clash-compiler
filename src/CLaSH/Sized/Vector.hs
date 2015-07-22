@@ -1140,12 +1140,12 @@ lazyV = lazyV' (repeat undefined)
 -- >>> let append' xs ys = foldr (:>) ys xs
 -- <BLANKLINE>
 -- <interactive>:...
---     Occurs check: cannot construct the infinite type: n1 ~ n1 + 1
---     Expected type: a -> Vec n1 a -> Vec n1 a
---       Actual type: a -> Vec n1 a -> Vec (n1 + 1) a
+--     Occurs check: cannot construct the infinite type: ... ~ ... + 1
+--     Expected type: a -> Vec ... a -> Vec ... a
+--       Actual type: a -> Vec ... a -> Vec (... + 1) a
 --     Relevant bindings include
---       ys :: Vec n1 a (bound at ...)
---       append' :: Vec n a -> Vec n1 a -> Vec n1 a
+--       ys :: Vec ... a (bound at ...)
+--       append' :: Vec n a -> Vec ... a -> Vec ... a
 --         (bound at ...)
 --     In the first argument of ‘foldr’, namely ‘(:>)’
 --     In the expression: foldr (:>) ys xs
