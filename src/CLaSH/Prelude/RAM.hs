@@ -49,7 +49,7 @@ import CLaSH.Sized.Unsigned   (Unsigned)
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
-asyncRam :: (KnownNat n, Enum addr)
+asyncRam :: Enum addr
          => SNat n      -- ^ Size @n@ of the RAM
          -> Signal addr -- ^ Write address @w@
          -> Signal addr -- ^ Read address @r@
@@ -108,7 +108,7 @@ asyncRamPow2' wclk rclk = asyncRam' wclk rclk (snat :: SNat (2^n))
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
-asyncRam' :: (KnownNat n, Enum addr)
+asyncRam' :: Enum addr
           => SClock wclk       -- ^ 'Clock' to which to synchronise the write
                                -- port of the RAM
           -> SClock rclk       -- ^ 'Clock' to which the read address signal,
