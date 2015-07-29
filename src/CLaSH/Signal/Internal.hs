@@ -10,6 +10,12 @@
 
 {-# LANGUAGE Unsafe #-}
 
+-- Until we have a -fcpr-off DynFlag (it currently exists only as a StaticFlag),
+-- we just disable strictness analysis for this module completely. See
+-- https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
+-- for more details
+{-# OPTIONS_GHC -fno-strictness #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|
