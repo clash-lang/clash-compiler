@@ -194,6 +194,7 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
              , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
              , Opt_DictsStrict -- Hopefully helps remove class method selectors
              , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
+             , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks CLaSH]
              ]
 
     unwanted = [ Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
@@ -215,23 +216,28 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
                , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
                , Opt_Loopification -- STG pass, don't care
-               -- TODO: Enable this optimization again. At the moment we disable
-               -- it because it causes GHC to do the so-called "Constructed
-               -- Product Result" (CPR) analysis, which in turn creates an
-               -- annoying worker/wrapper which does the following:
-               --
-               --   * Scrutinise a Signal, and pack the head and tail of the
-               --     Signal in an unboxed tuple.
-               --   * Scrutinise on the unboxed tuple, and recreate the Signal.
-               --
-               -- This is problematic because the 'Signal' type is essentially treated as a "transparent"
-               -- type by the CLaSH compiler, so observing its constructor leads to all kinds
-               -- of problems.
-               --
-               -- Ultimately we should stop treating Signal as a "transparent" type and deal
-               -- handling of the Signal type, and the involved co-recursive functions,
-               -- properly. At the moment, CLaSH cannot deal with this recursive type and the
-               -- recursive functions involved, and hence we need to disable this useful transformation. After
-               -- everything is done properly, we should enable it again.
-               , Opt_Strictness -- Strictness analysis helps with dead-code analysis... but,see TODO above
                ]
+
+-- [NOTE: CPR breaks CLaSH]
+-- We used to completely disable strictness analysis because it causes GHC to
+-- do the so-called "Constructed Product Result" (CPR) analysis, which in turn
+-- creates an annoying worker/wrapper which does the following:
+--
+--   * Scrutinise a Signal, and pack the head and tail of the
+--     Signal in an unboxed tuple.
+--   * Scrutinise on the unboxed tuple, and recreate the Signal.
+--
+-- This is problematic because the 'Signal' type is essentially treated as a "transparent"
+-- type by the CLaSH compiler, so observing its constructor leads to all kinds
+-- of problems.
+--
+-- The current solution is to disable strictness analysis in "CLaSH.Signal.Internal"
+-- so that functions manipulating 'Signal' constructor do not get a strictness/
+-- demand/CPR annotation, which in turn ensures GHC doesn't create worker/wrappers
+-- for when these functions are called in user code.
+--
+-- Ultimately we should stop treating Signal as a "transparent" type and deal
+-- handling of the Signal type, and the involved co-recursive functions,
+-- properly. At the moment, CLaSH cannot deal with this recursive type and the
+-- recursive functions involved, and hence we need to disable this useful transformation. After
+-- everything is done properly, we should enable it again.
