@@ -1,5 +1,8 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.9.2 *August 2nd 2015*
+* Disable strictness analysis in `CLaSH.Signal.Internal`, this allows turning on strictness analysis in the GHC front-end of the CLaSH compiler.
+
 ## 0.9.1 *June 26th 2015*
 * Updated documentation on data-file support on Altera/Quartus
 
