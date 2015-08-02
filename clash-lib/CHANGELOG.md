@@ -1,5 +1,10 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.10 *August 2nd 2015*
+* Fixes bugs:
+  * Make testbench generation deterministic
+  * Compile against unbound-generics-0.2
+
 ## 0.5.9 *July 9th 2015*
 * Fixes bugs:
   * `coreView` didn't look through newtypes of the form: `newtype Foo a = MkFoo (Maybe a)`

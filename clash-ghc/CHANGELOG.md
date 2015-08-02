@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.11 *August 2nd 2015*
+* New features:
+  * Re-enable GHC's strictness analysis pass, which improves dead-code removal, which hopefully leads to smaller circuits.
+
 ## 0.5.10 *July 9th 2015*
 * New features:
   * Use new VHDL backend which outputs VHDL-93 instead of VHDL-2002: generated VHDL is now accepted by a larger number of tools.
