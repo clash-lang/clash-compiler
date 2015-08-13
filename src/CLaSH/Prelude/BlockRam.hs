@@ -187,8 +187,8 @@ prog = -- 0 := 4
 And test our system:
 
 @
-__>>> L.take 31 $ sample $ system prog__
-[0,0,0,0,0,4,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
+__>>> sampleN 31 $ system prog__
+[0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 @
 
 to see that our system indeed calculates that the GCD of 6 and 4 is 2.
@@ -217,8 +217,8 @@ we need to drop the first few output samples, because the initial content of an
 output samples are also 'undefined'.
 
 @
-__>>> L.take 26 $ L.drop 5 $ sample $ system2 prog__
-[4,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
+__>>> L.drop 5 $ sampleN 31 $ system2 prog__
+[4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 @
 
 === Improvement 2: using @blockRam@
@@ -336,8 +336,8 @@ we need to drop the first few sample, because the initial output of a
 also 'undefined'.
 
 @
-__>>> L.take 32 $ L.tail $ sample $ system3 prog2__
-[4,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
+__>>> L.tail $ sampleN 33 $ system3 prog2__
+[0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 @
 
 This concludes the short introduction to using 'blockRam'.
