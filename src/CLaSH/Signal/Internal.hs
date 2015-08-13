@@ -260,8 +260,7 @@ mux = liftA3 (\b t f -> if b then t else f)
 --
 -- Create a constant 'CLaSH.Signal.Signal' from a combinational value
 --
--- >>> import qualified Data.List as List
--- >>> List.take 5 (sample (signal 4 :: Signal Int))
+-- >>> sampleN 5 (signal 4 :: Signal Int)
 -- [4,4,4,4,4]
 signal :: Applicative f => a -> f a
 signal = pure
