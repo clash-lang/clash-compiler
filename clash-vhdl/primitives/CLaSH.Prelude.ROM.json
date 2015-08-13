@@ -47,7 +47,7 @@ begin
   -- pragma translate_on
         ;
 
-  rom : process (~CLK[1])
+  romSync : process (~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
       dout <= ROM(rd);
