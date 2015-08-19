@@ -212,7 +212,7 @@ import Control.Monad.Trans.State
 --       when uld_rx_data $ do
 --         rx_data  .= _rx_reg
 --         rx_empty .= True
---       -- Recieve data only when rx is enabled
+--       -- Receive data only when rx is enabled
 --       if rx_enable then do
 --         -- Check if just received start of frame
 --         when (not _rx_busy && _rx_d2 == 0) $ do
@@ -452,7 +452,7 @@ lfsrGP taps regs = 'zipWith' xorM taps (fb '+>>' regs)
              | otherwise = x
 @
 
-Then we can instance a 16-bit LFSR as follows:
+Then we can instantiate a 16-bit LFSR as follows:
 
 @
 lfsrG :: BitVector 16 -> Signal Bit
@@ -501,7 +501,7 @@ parity data_in = `reduceXor` data_in
 * Width = 16 bits
 * Truncated polynomial = 0x1021
 * Initial value = 0xFFFF
-* Input date is NOT reflected
+* Input data is NOT reflected
 * Output CRC is NOT reflected
 * No XOR is performed on the output CRC
 
@@ -556,7 +556,7 @@ uartRX r\@(RxReg {..}) rx_in uld_rx_data rx_enable = 'flip' 'execState' r $ do
   'when' uld_rx_data $ do
     rx_data  '.=' _rx_reg
     rx_empty '.=' True
-  -- Recieve data only when rx is enabled
+  -- Receive data only when rx is enabled
   if rx_enable then do
     -- Check if just received start of frame
     'when' (not _rx_busy && _rx_d2 == 0) $ do
