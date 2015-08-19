@@ -750,8 +750,8 @@ but,
 @
 instance 'Bundle' Bool where
   type 'Unbundled'' clk Bool = 'Signal'' clk Bool
-  bundle' _ s = s
-  unpack' _ s = s
+  bundle'   _ s = s
+  unbundle' _ s = s
 @
 
 What you need take away from the above is that a product type (e.g. a tuple) of
@@ -1515,7 +1515,7 @@ A list of often encountered errors and their solutions:
 
     Signals of product types and product types (to which tuples belong) of
     signals are __isomorphic__ due to synchronisity principle, but are not
-    (structurally) equal. Use the 'pack' function to convert from a product type
+    (structurally) equal. Use the 'bundle' function to convert from a product type
     to the signal type. So if your code which gives the error looks like:
 
     @
@@ -1528,7 +1528,7 @@ A list of often encountered errors and their solutions:
     ... = f a b ('bundle' (c,d))
     @
 
-    Product types supported by 'bundle are:
+    Product types supported by 'bundle' are:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
@@ -1540,7 +1540,7 @@ A list of often encountered errors and their solutions:
 
     Product types (to which tuples belong) of signals and signals of product
     types are __isomorphic__ due to synchronicity principle, but are not
-    (structurally) equal. Use the 'unpack' function to convert from a signal
+    (structurally) equal. Use the 'unbundle' function to convert from a signal
     type to the product type. So if your code which gives the error looks like:
 
     @
@@ -1553,7 +1553,7 @@ A list of often encountered errors and their solutions:
     (c,d) = 'unbundle' (f a b)
     @
 
-    Product types supported by 'unbundle are:
+    Product types supported by 'unbundle' are:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
