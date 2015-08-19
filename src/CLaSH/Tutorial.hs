@@ -1534,7 +1534,7 @@ A list of often encountered errors and their solutions:
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'bundle'' when you are using explicitly clocked 'CLaSH.Signal.Explicit.Signal''s
+    NB: Use 'bundle'' when you are using explicitly clocked @'Signal''@s
 
 * __Type error: Couldn't match expected type @('Signal' a, 'Signal' b)@ with__
   __ actual type @'Signal' (a,b)@__:
@@ -1559,7 +1559,7 @@ A list of often encountered errors and their solutions:
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'unbundle'' when you are using explicitly clocked 'CLaSH.Signal.Explicit.Signal''s
+    NB: Use 'unbundle'' when you are using explicitly clocked @'Signal''@s
 
 * __CLaSH.Netlist(..): Not in normal form: \<REASON\>: \<EXPR\>__:
 
@@ -1732,7 +1732,7 @@ to VHDL/Verilog/SystemVerilog (for now):
             __plusFloat#__ :: 'Float#' -> 'Float#' -> 'Float#'
             @
 
-            which underlie 'Float''s 'Num' instance, must be implemented as
+            which underlie @'Float'@'s 'Num' instance, must be implemented as
             purely combinational circuits according to their type. Remember,
             sequential circuits operate on values of type \"@'Signal' a@\".
 
