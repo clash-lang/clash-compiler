@@ -158,7 +158,7 @@ systemClock = sclock
 -- type DAC36 = 'Clk' \"DAC\" 25
 -- type Sys50 = 'Clk' \"Sys\" 18
 --
--- sys50 :: SClock System50
+-- sys50 :: SClock Sys50
 -- sys50 = 'sclock'
 --
 -- adc20 :: SClock ADC20
