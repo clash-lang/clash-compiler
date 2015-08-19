@@ -71,8 +71,11 @@ where
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 import CLaSH.Prelude.BlockRam
+import Control.Monad.ST
+import Data.Array
 import Data.Char
 import Data.Int
+import GHC.Prim
 import GHC.Word
 import Data.Default
 
@@ -1665,7 +1668,7 @@ A list of often encountered errors and their solutions:
 Here is a list of Haskell features which the CλaSH compiler cannot synthesize
 to VHDL/Verilog/SystemVerilog (for now):
 
-  [@Recursive functions@]
+* __Recursive functions__
 
     Although it seems rather bad that a compiler for a
     functional language does not support recursion, this bug/feature of the
@@ -1690,7 +1693,7 @@ to VHDL/Verilog/SystemVerilog (for now):
     Where we can clearly see that 'lefts' and 'sorted' are defined in terms of
     each other.
 
-  [@Recursive datatypes@]
+* __Recursive datatypes__
 
     The CλaSH compiler needs to be able to determine a bit-size for any value
     that will be represented in the eventual circuit. More specifically, we need
@@ -1704,7 +1707,7 @@ to VHDL/Verilog/SystemVerilog (for now):
     For \"easy\" 'Vec'tor literals you should use Template Haskell splices and
     the 'v' /meta/-function that as we have seen earlier in this tutorial.
 
-  [@GADT pattern matching@]
+* __GADT pattern matching__
 
     While pattern matching for regular ADTs is supported, pattern matching for
     GADTs is __not__. The 'Vec'tor type, which is also a GADT, is __no__
@@ -1712,30 +1715,48 @@ to VHDL/Verilog/SystemVerilog (for now):
     "CLaSH.Sized.Vector" to get access to individual ranges / elements of a
     'Vec'tor.
 
-  [@Floating point types@]
+* __Floating point types__
 
     There is no support for the 'Float' and 'Double' types, if you need numbers
     with a /fractional/ part you can use the 'Fixed' point type.
 
-  [@Other primitive types@]
+    As to why there is no support for these floating point types:
 
-    Most primitive types are not supported, with the exception of 'Int',
-    @<http://hackage.haskell.org/package/ghc-prim/docs/GHC-Prim.html#t:Int-35- Int#>@,
-    and 'Integer'. This means that types such as: 'Word', 'Word8', 'Int8', 'Char',
-    @<http://hackage.haskell.org/package/array/docs/Data-Array.html#t:Array Array>@,
-    etc. cannot to translated to hardware.
+        1.  In order to achieve reasonable operating frequencies, arithmetic
+            circuits for floating point data types must be pipelined.
 
-    The translations of 'Int',
-    @<http://hackage.haskell.org/package/ghc-prim/docs/GHC-Prim.html#t:Int-35- Int#>@,
-    and 'Integer' are also incorrect: they are translated to the VHDL @integer@
-    type, the Verilog @signed [31:0], or the SystemVerilog @signed logic [31:0]@
-    type, which can only represent 32-bit integer values. Use these types with
-    due diligence.
+        2.  Haskell's primitive arithmetic operators on floating point data types,
+            such as 'plusFloat#'
 
-  [@Side-effects: 'IO', 'Control.Monad.ST.ST', etc.@]
+            @
+            __plusFloat#__ :: 'Float#' -> 'Float#' -> 'Float#'
+            @
+
+            which underlie 'Float''s 'Num' instance, must be implemented as
+            purely combinational circuits according to their type. Remember,
+            sequential circuits operate on values of type \"@'Signal' a@\".
+
+    Although it is possible to implement purely combinational (not pipelined)
+    arithmetic circuits for floating point data types, the circuit would be
+    unreasonable slow. And so, without synthesis possibilities for the basic
+    arithmetic operations, there is no point in supporting the floating point
+    data types.
+
+* __Other primitive types__
+
+    Most primitive types are not supported, with the exception of 'Int', 'Int#',
+    and 'Integer'. This means that types such as: 'Word', 'Word8', 'Int8',
+    'Char', 'Array', etc. cannot to translated to hardware.
+
+    The translations of 'Int', 'Int#', and 'Integer' are also incorrect: they
+    are translated to the VHDL @integer@ type, the Verilog @signed [31:0], or
+    the SystemVerilog @signed logic [31:0]@ type, which can only represent
+    32-bit integer values. Use these types with due diligence.
+
+* __Side-effects: 'IO', 'ST', etc.__
 
     There is no support for side-effecting computations such as those in the
-    'IO' or 'Control.Monad.ST.ST' monad. There is also no support for Haskell's
+    'IO' or 'ST' monad. There is also no support for Haskell's
     <http://www.haskell.org/haskellwiki/Foreign_Function_Interface FFI>.
 -}
 
@@ -1766,8 +1787,8 @@ function. This enables the following features not available to Lava:
 * Synthesis of all choice constructs (pattern matching, guards, etc.)
 * 'Applicative' instance for the 'Signal' type
 * Working with \"normal\" functions permits the use of e.g. the
-  <http://hackage.haskell.org/package/mtl/docs/Control-Monad-State-Lazy.html#t:State State>
-  monad to describe the functionality of a circuit.
+  'Control.Monad.State.Lazy.State' monad to describe the functionality of a
+  circuit.
 
 Although there are Lava alternatives to some of the above features (e.g.
 first-class patterns to replace pattern matching) they are not as \"beautiful\"
