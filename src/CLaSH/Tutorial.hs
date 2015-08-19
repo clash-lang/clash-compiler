@@ -1117,7 +1117,7 @@ a general listing of the available template holes:
 * @~TYPELEM[\<HOLE\>]@: The element type of the vector type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~COMPNAME@: The name of the component in which the primitive is instantiated.
-* @~LENGHT[\<HOLE\>]@: The vector length of the type represented by @\<HOLE\>@.
+* @~LENGTH[\<HOLE\>]@: The vector length of the type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~SIZE[\<HOLE\>]@: The number of bits needed to encode the type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
