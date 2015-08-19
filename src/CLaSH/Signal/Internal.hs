@@ -402,7 +402,7 @@ instance (Num a, Ord a) => Real (Signal' clk a) where
 -- | The above type is a generalisation for:
 --
 -- @
--- __fromEnum1__ :: 'Real' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Rational'
+-- __toRational1__ :: 'Real' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Rational'
 -- @
 --
 -- | It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
