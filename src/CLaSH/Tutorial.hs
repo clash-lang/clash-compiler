@@ -1273,18 +1273,16 @@ port is not synchronised to any clock (though the write port is). Note that in
 CλaSH we don't really have asynchronous logic, there is only combinational and
 synchronous logic. As a consequence, we see in the type signature of 'asyncRam'':
 
-    *
-
-    @
-    __asyncRam'__ :: _ => SClock wclk        -- ^ Clock to which to synchronise the write port of the RAM
-                   -> SClock rclk        -- ^ Clock to which the read address signal __r__ is synchronised
-                   -> SNat n             -- ^ Size __n__ of the RAM
-                   -> Signal' wclk addr  -- ^ Write address __w__
-                   -> Signal' rclk addr  -- ^ Read address __r__
-                   -> Signal' wclk Bool  -- ^ Write enable
-                   -> Signal' wclk a     -- ^ Value to write (at address __w__)
-                   -> Signal' rclk a     -- ^ Value of the RAM at address __r__
-    @
+@
+__asyncRam'__ :: _ => SClock wclk        -- ^ Clock to which to synchronise the write port of the RAM
+               -> SClock rclk        -- ^ Clock to which the read address signal __r__ is synchronised
+               -> SNat n             -- ^ Size __n__ of the RAM
+               -> Signal' wclk addr  -- ^ Write address __w__
+               -> Signal' rclk addr  -- ^ Read address __r__
+               -> Signal' wclk Bool  -- ^ Write enable
+               -> Signal' wclk a     -- ^ Value to write (at address __w__)
+               -> Signal' rclk a     -- ^ Value of the RAM at address __r__
+@
 
 that the signal containing the read address __r__ is synchronised to a different
 clock. That is, there is __no__ such thing as an @AsyncSignal@ in CλaSH.
