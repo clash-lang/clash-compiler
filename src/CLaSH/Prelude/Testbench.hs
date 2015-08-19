@@ -50,18 +50,18 @@ import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 -- function is used by 'outputVerifier'.
 --
 --
--- __NB__: This function is /can/ be used in synthesizable designs.
+-- __NB__: This function /can/ be used in synthesizable designs.
 assert :: (Eq a,Show a)
        => String   -- ^ Additional message
        -> Signal a -- ^ Checked value
        -> Signal a -- ^ Expected value
-       -> Signal b -- ^ Return valued
+       -> Signal b -- ^ Return value
        -> Signal b
 assert = assert' systemClock
 
 {-# INLINE stimuliGenerator #-}
--- | To be used as a one of the functions to create the \"magical\" 'testInput'
--- value, which the CλaSH compilers looks for to create the stimulus generator
+-- | To be used as one of the functions to create the \"magical\" 'testInput'
+-- value, which the CλaSH compiler looks for to create the stimulus generator
 -- for the generated VHDL testbench.
 --
 -- Example:
@@ -79,8 +79,8 @@ stimuliGenerator :: forall l a . KnownNat l
 stimuliGenerator = stimuliGenerator' systemClock
 
 {-# INLINE outputVerifier #-}
--- | To be used as a functions to generate the \"magical\" 'expectedOutput'
--- function, which the CλaSH compilers looks for to create the signal verifier
+-- | To be used as one of the functions to generate the \"magical\" 'expectedOutput'
+-- function, which the CλaSH compiler looks for to create the signal verifier
 -- for the generated VHDL testbench.
 --
 -- Example:
@@ -124,13 +124,13 @@ outputVerifier = outputVerifier' systemClock
 -- function is used by 'outputVerifier''.
 --
 --
--- __NB__: This function is /can/ be used in synthesizable designs.
+-- __NB__: This function /can/ be used in synthesizable designs.
 assert' :: (Eq a,Show a)
         => SClock t
         -> String      -- ^ Additional message
         -> Signal' t a -- ^ Checked value
         -> Signal' t a -- ^ Expected value
-        -> Signal' t b -- ^ Return valued
+        -> Signal' t b -- ^ Return value
         -> Signal' t b
 assert' clk msg checked expected returned =
   (\c e cnt r ->
@@ -147,8 +147,8 @@ assert' clk msg checked expected returned =
   <$> checked <*> expected <*> fromList [(0::Integer)..] <*> returned
 
 {-# INLINABLE stimuliGenerator' #-}
--- | To be used as a one of the functions to create the \"magical\" 'testInput'
--- value, which the CλaSH compilers looks for to create the stimulus generator
+-- | To be used as one of the functions to create the \"magical\" 'testInput'
+-- value, which the CλaSH compiler looks for to create the stimulus generator
 -- for the generated VHDL testbench.
 --
 -- Example:
@@ -184,8 +184,8 @@ stimuliGenerator' clk samples =
                 else s
 
 {-# INLINABLE outputVerifier' #-}
--- | To be used as a functions to generate the \"magical\" 'expectedOutput'
--- function, which the CλaSH compilers looks for to create the signal verifier
+-- | To be used as one of the functions to generate the \"magical\" 'expectedOutput'
+-- function, which the CλaSH compiler looks for to create the signal verifier
 -- for the generated VHDL testbench.
 --
 -- Example:
