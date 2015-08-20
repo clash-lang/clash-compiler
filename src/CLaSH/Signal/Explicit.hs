@@ -103,7 +103,7 @@ is synchronized to.
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
 so do __not__ do that!
 * __NB__: You should be judicious using a clock with period of @1@ as you can
-never create a clock that fast!
+never create a clock that goes any faster!
 -}
 
 -- * Clock domain crossing

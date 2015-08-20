@@ -323,10 +323,10 @@ instance Ord a => Ord (Signal' clk a) where
 -- | The above type is a generalisation for:
 --
 -- @
--- __compare__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Ordering'
+-- __compare1__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Ordering'
 -- @
 --
--- It is a version of 'compare1' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
+-- It is a version of 'compare' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
 compare1 :: (Ord a, Applicative f) => f a -> f a -> f Ordering
 compare1 = liftA2 compare
 
