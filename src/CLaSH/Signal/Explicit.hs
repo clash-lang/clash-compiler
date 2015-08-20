@@ -103,7 +103,7 @@ is synchronized to.
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
 so do __not__ do that!
 * __NB__: You should be judicious using a clock with period of @1@ as you can
-never create a clock that faster!
+never create a clock that goes any faster!
 -}
 
 -- * Clock domain crossing
@@ -158,7 +158,7 @@ systemClock = sclock
 -- type DAC36 = 'Clk' \"DAC\" 25
 -- type Sys50 = 'Clk' \"Sys\" 18
 --
--- sys50 :: SClock System50
+-- sys50 :: SClock Sys50
 -- sys50 = 'sclock'
 --
 -- adc20 :: SClock ADC20

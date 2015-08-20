@@ -323,7 +323,7 @@ instance Ord a => Ord (Signal' clk a) where
 -- | The above type is a generalisation for:
 --
 -- @
--- __compare__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Ordering'
+-- __compare1__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Ordering'
 -- @
 --
 -- It is a version of 'compare' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
@@ -402,10 +402,10 @@ instance (Num a, Ord a) => Real (Signal' clk a) where
 -- | The above type is a generalisation for:
 --
 -- @
--- __fromEnum1__ :: 'Real' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Rational'
+-- __toRational1__ :: 'Real' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Rational'
 -- @
 --
--- | It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
+-- It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
 toRational1 :: (Real a, Functor f) => f a -> f Rational
 toRational1 = fmap toRational
 
