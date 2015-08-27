@@ -1376,8 +1376,8 @@ fifo :: _
      -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
 fifo addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
   where
-    s_rptr = ptrSync wclk rclk rptr
-    s_wptr = ptrSync rclk wclk wptr
+    s_rptr = ptrSync rclk wclk rptr
+    s_wptr = ptrSync wclk rclk wptr
 
     rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
 
