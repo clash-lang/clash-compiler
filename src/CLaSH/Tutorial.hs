@@ -1253,7 +1253,7 @@ the read and write port are synchronised to different clocks. Below you can find
 the code to build the FIFO synchroniser based on the design described in:
 <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>
 
-We start with enable a few options that will make wring the type-signatures for
+We start with enable a few options that will make writing the type-signatures for
 our components a bit easier. We'll also import the standard "CLaSH.Prelude"
 module, and the "CLaSH.Prelude.Explicit" module for our explicitly clocked
 synchronous functions:
@@ -1267,7 +1267,7 @@ import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 @
 
-Then we'll start with the /hart/ of the FIFO synchroniser, an asynchronous RAM
+Then we'll start with the /heart/ of the FIFO synchroniser, an asynchronous RAM
 in the form of 'asyncRam''. It's called an asynchronous RAM because the read
 port is not synchronised to any clock (though the write port is). Note that in
 CλaSH we don't really have asynchronous logic, there is only combinational and
