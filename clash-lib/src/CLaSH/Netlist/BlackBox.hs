@@ -224,6 +224,11 @@ mkFunInput resId e = do
                       dcApp  = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
                   return (Right dcAss)
+                Just resHTy@(Vector _ _) -> do
+                  let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..1] ]
+                      dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
+                      dcAss  = Assignment (pack "~RESULT") dcApp
+                  return (Right dcAss)
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             Var _ fun -> do
               normalized <- Lens.use bindings
