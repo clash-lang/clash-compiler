@@ -11,7 +11,7 @@ asyncRom_~SYM[0] : block
   signal ROM       : ~TYP[1];
   signal rom_index : integer range 0 to ~LIT[0]-1;
 begin
-  ROM <= ARG[1];
+  ROM <= ~ARG[1];
 
   rom_index <= ~ARG[2]
   -- pragma translate_off
