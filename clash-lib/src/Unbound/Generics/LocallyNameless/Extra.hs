@@ -6,6 +6,10 @@
 
 module Unbound.Generics.LocallyNameless.Extra where
 
+#ifndef CABAL
+#define MIN_VERSION_unbound_generics(x,y,z)(1)
+#endif
+
 #if MIN_VERSION_unbound_generics(0,2,0)
 #else
 import Control.DeepSeq
