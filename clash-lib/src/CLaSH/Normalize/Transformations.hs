@@ -69,21 +69,23 @@ import           CLaSH.Util
 bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
-    nonRepTest (Id idName tyE, exprE)
+    nonRepTest e (id_@(Id idName tyE), exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
+             <*> ((&&) <$> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
+                       <*> (pure (not $ isJoinPointIn id_ e)))
 
-    nonRepTest _ = return False
+    nonRepTest _ _ = return False
 
 -- | Lift non-representable let-bindings
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
-    nonRepTest (Id idName tyE, exprE)
+    nonRepTest e (id_@(Id idName tyE), exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
+             <*> ((||) <$> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
+                       <*> (pure (isJoinPointIn id_ e)))
 
-    nonRepTest _ = return False
+    nonRepTest _ _ = return False
 
 -- | Specialize functions on their type
 typeSpec :: NormRewrite
@@ -321,7 +323,7 @@ deadCode _ e = return e
 bindConstantVar :: NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
+    test _ (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
 
 -- | Inline nullary/closed functions
 inlineClosed :: NormRewrite

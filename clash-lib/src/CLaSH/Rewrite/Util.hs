@@ -17,6 +17,7 @@ import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
 import qualified Data.List                   as List
 import qualified Data.Map                    as Map
+import           Data.Maybe                  (catMaybes)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -25,6 +26,7 @@ import           Unbound.Generics.LocallyNameless     (Fresh, bind,
                                               rebind, rec, string2Name, unbind,
                                               unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless     as Unbound
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars, typeFreeVars)
@@ -217,11 +219,12 @@ mkInternalVar name ty = do
 
 -- | Inline the binders in a let-binding that have a certain property
 inlineBinders :: Monad m
-              => (LetBinding -> RewriteMonad m Bool) -- ^ Property test
+              => (Term -> LetBinding -> RewriteMonad m Bool) -- ^ Property test
               -> Rewrite m
 inlineBinders condition _ expr@(Letrec b) = R $ do
   (xes,res)        <- unbind b
-  (replace,others) <- partitionM condition (unrec xes)
+  let expr' = Letrec (bind xes res)
+  (replace,others) <- partitionM (condition expr') (unrec xes)
   case replace of
     [] -> return expr
     _  -> do
@@ -229,9 +232,52 @@ inlineBinders condition _ expr@(Letrec b) = R $ do
           newExpr = case others' of
                           [] -> res'
                           _  -> Letrec (bind (rec others') res')
+
       changed newExpr
 
 inlineBinders _ _ e = return e
+
+-- | Determine whether a binder is a join-point created for a complex case
+-- expression.
+--
+-- A join-point is when a local function only occurs in tail-call positions,
+-- and when it does, more than once.
+isJoinPointIn :: Id   -- ^ 'Id' of the local binder
+              -> Term -- ^ Expression in which the binder is bound
+              -> Bool
+isJoinPointIn id_ e = case tailCalls id_ e of
+                      Just n | n > 1 -> True
+                      _              -> False
+
+-- | Count the number of (only) tail calls of a function in an expression.
+-- 'Nothing' indicates that the function was used in a non-tail call position.
+tailCalls :: Id   -- ^ Function to check
+          -> Term -- ^ Expression to check it in
+          -> Maybe Int
+tailCalls id_ expr = case expr of
+  Var _ nm | varName id_ == nm -> Just 1
+           | otherwise       -> Just 0
+  Lam b -> let (_,expr') = unsafeUnbind b
+           in  tailCalls id_ expr'
+  TyLam b -> let (_,expr') = unsafeUnbind b
+             in  tailCalls id_ expr'
+  App l r  -> case tailCalls id_ r of
+                Just 0 -> tailCalls id_ l
+                _      -> Nothing
+  TyApp l _ -> tailCalls id_ l
+  Letrec b -> let (bsR,expr') = unsafeUnbind b
+                  bs          = map (unembed . snd) (unrec bsR)
+                  bsTls       = map (tailCalls id_) bs
+              in  case all (== Just 0) bsTls of
+                    True -> tailCalls id_ expr'
+                    _    -> Nothing
+  Case scrut _ alts ->
+    let scrutTl = tailCalls id_ scrut
+        altsTl  = map (tailCalls id_ . snd . unsafeUnbind) alts
+    in  case scrutTl of
+          Just 0 | all (/= Nothing) altsTl -> Just (sum (catMaybes altsTl))
+          _ -> Nothing
+  _ -> Just 0
 
 -- | Substitute the RHS of the first set of Let-binders for references to the
 -- first set of Let-binders in: the second set of Let-binders and the additional
@@ -270,11 +316,12 @@ localFreeIds = do
 -- | Lift the binders in a let-binding to a global function that have a certain
 -- property
 liftBinders :: (Functor m, Monad m)
-            => (LetBinding -> RewriteMonad m Bool) -- ^ Property test
+            => (Term -> LetBinding -> RewriteMonad m Bool) -- ^ Property test
             -> Rewrite m
 liftBinders condition ctx expr@(Letrec b) = R $ do
   (xes,res)        <- unbind b
-  (replace,others) <- partitionM condition (unrec xes)
+  let expr' = Letrec (bind xes res)
+  (replace,others) <- partitionM (condition expr') (unrec xes)
   case replace of
     [] -> return expr
     _  -> do
