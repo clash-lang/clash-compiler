@@ -17,7 +17,7 @@ import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
 import qualified Data.List                   as List
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes)
+import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
@@ -265,12 +265,20 @@ tailCalls id_ expr = case expr of
                 Just 0 -> tailCalls id_ l
                 _      -> Nothing
   TyApp l _ -> tailCalls id_ l
-  Letrec b -> let (bsR,expr') = unsafeUnbind b
-                  bs          = map (unembed . snd) (unrec bsR)
-                  bsTls       = map (tailCalls id_) bs
-              in  case all (== Just 0) bsTls of
-                    True -> tailCalls id_ expr'
-                    _    -> Nothing
+  Letrec b ->
+    let (bsR,expr')     = unsafeUnbind b
+        (bsIds,bsExprs) = unzip (unrec bsR)
+        bsTls           = map (tailCalls id_ . unembed) bsExprs
+        bsIdsUsed       = mapMaybe (\(l,r) -> pure l <* r) (zip bsIds bsTls)
+        bsIdsTls        = map (`tailCalls` expr') bsIdsUsed
+        bsCount         = pure . sum $ catMaybes bsTls
+    in  case (all isJust bsTls) of
+          False -> Nothing
+          True  -> case (all (==0) $ catMaybes bsTls) of
+            False  -> case all isJust bsIdsTls of
+              False -> Nothing
+              True  -> (+) <$> bsCount <*> tailCalls id_ expr'
+            True -> tailCalls id_ expr'
   Case scrut _ alts ->
     let scrutTl = tailCalls id_ scrut
         altsTl  = map (tailCalls id_ . snd . unsafeUnbind) alts
