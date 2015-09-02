@@ -23,10 +23,8 @@ normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindCons
 constantPropgation :: NormRewrite
 constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> spec
   where
-    inlineAndPropagate = inlining >-> propagate
-    propagateAndInline = propagate >-> inlining
     propagate = innerMost (applyMany transInner)
-    inlining  = topdownR (applyMany transBUP !-> propagateAndInline)
+    inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
     lifting   = topdownR (apply "liftNonRep" liftNonRep) -- See: [Note] Topdown traversal for liftNonRep
     spec      = bottomupR (applyMany specRws)
 
