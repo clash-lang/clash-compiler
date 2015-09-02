@@ -3,6 +3,7 @@
 ## 0.5.9
 * Fixes bugs:
   * Bug in VHDL ROM generation [#69](https://github.com/clash-lang/clash-compiler/issues/69)
+  * Fix asyncRom VHDL primitive [#71](https://github.com/clash-lang/clash-compiler/pull/71)
 
 ## 0.5.8 *July 9th 2015*
 * New features:
