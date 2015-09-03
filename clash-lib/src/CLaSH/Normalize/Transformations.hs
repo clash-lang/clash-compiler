@@ -148,14 +148,14 @@ inlineNonRep :: NormRewrite
 inlineNonRep _ e@(Case scrut altsTy alts)
   | (Var _ f, args) <- collectArgs scrut
   = R $ do
-    isInlined <- liftR $ alreadyInlined f
+    cf        <- Lens.use curFun
+    isInlined <- liftR $ alreadyInlined f cf
     limit     <- liftR $ Lens.use inlineLimit
     tcm       <- Lens.use tcCache
     scrutTy   <- termType tcm scrut
     let noException = not (exception tcm scrutTy)
     if noException && (Maybe.fromMaybe 0 isInlined) > limit
       then do
-        cf <- liftR $ Lens.use curFun
         ty <- termType tcm scrut
         traceIf True (concat [$(curLoc) ++ "InlineNonRep: " ++ show f
                              ," already inlined " ++ show limit ++ " times in:"
@@ -173,7 +173,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
         nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
-            Monad.when noException (liftR $ addNewInline f)
+            Monad.when noException (liftR $ addNewInline f cf)
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
   where
@@ -607,7 +607,7 @@ etaExpansionTL ctx e
 -- found in the body of the top-level let-expression.
 recToLetRec :: NormRewrite
 recToLetRec [] e = R $ do
-  fn          <- liftR $ Lens.use curFun
+  fn          <- Lens.use curFun
   bodyM       <- fmap (HashMap.lookup fn) $ Lens.use bindings
   tcm         <- Lens.use tcCache
   normalizedE <- splitNormalized tcm e
@@ -634,18 +634,18 @@ inlineHO _ e@(App _ _)
     tcm <- Lens.use tcCache
     hasPolyFunArgs <- or <$> mapM (either (isPolyFun tcm) (const (return False))) args
     if hasPolyFunArgs
-      then do isInlined <- liftR $ alreadyInlined f
+      then do cf        <- Lens.use curFun
+              isInlined <- liftR $ alreadyInlined f cf
               limit     <- liftR $ Lens.use inlineLimit
               if (Maybe.fromMaybe 0 isInlined) > limit
                 then do
-                  cf  <- liftR $ Lens.use curFun
                   lvl <- Lens.view dbgLevel
                   traceIf (lvl > DebugNone) ($(curLoc) ++ "InlineHO: " ++ show f ++ " already inlined " ++ show limit ++ " times in:" ++ show cf) (return e)
                 else do
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
                     Just (_, body) -> do
-                      liftR $ addNewInline f
+                      liftR $ addNewInline f cf
                       changed $ mkApps body args
                     _ -> return e
       else return e

@@ -35,7 +35,8 @@ import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteState (..),
-                                                   bindings, dbgLevel, tcCache)
+                                                   bindings, curFun, dbgLevel,
+                                                   tcCache)
 import           CLaSH.Rewrite.Util               (liftRS, runRewrite,
                                                    runRewriteSession)
 import           CLaSH.Util
@@ -61,6 +62,7 @@ runNormalization opts supply globals typeTrans tcm eval
   . runRewriteSession (opt_dbgLevel opts) rwState
   where
     rwState   = RewriteState 0 globals supply typeTrans tcm eval
+                             (error $ $(curLoc) ++ "Report as bug: no curFun")
     normState = NormalizeState
                   HashMap.empty
                   Map.empty
@@ -69,7 +71,6 @@ runNormalization opts supply globals typeTrans tcm eval
                   HashMap.empty
                   (opt_inlineLimit opts)
                   (opt_inlineBelow opts)
-                  (error $ $(curLoc) ++ "Report as bug: no curFun")
 
 
 normalize :: [TmName]
@@ -88,7 +89,7 @@ normalize' nm = do
   case exprM of
     Just (_,tm) -> do
       tmNorm <- makeCachedT3S nm normalized $ do
-                  liftRS $ curFun .= nm
+                  curFun .= nm
                   tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
                   tcm <- Lens.use tcCache
                   ty' <- termType tcm tm'

@@ -28,19 +28,19 @@ import           CLaSH.Rewrite.Util      (specialise)
 import           CLaSH.Util              (curLoc)
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
-alreadyInlined :: TmName
+alreadyInlined :: TmName -- ^ Function we want to inline
+               -> TmName -- ^ Function in which we want to perform the inlining
                -> NormalizeMonad (Maybe Int)
-alreadyInlined f = do
-  cf <- Lens.use curFun
+alreadyInlined f cf = do
   inlinedHM <- Lens.use inlineHistory
   case HashMap.lookup cf inlinedHM of
     Nothing       -> return Nothing
     Just inlined' -> return (HashMap.lookup f inlined')
 
-addNewInline :: TmName
+addNewInline :: TmName -- ^ Function we want to inline
+             -> TmName -- ^ Function in which we want to perform the inlining
              -> NormalizeMonad ()
-addNewInline f = do
-  cf <- Lens.use curFun
+addNewInline f cf =
   inlineHistory %= HashMap.insertWith
                      (\_ hm -> HashMap.insertWith (+) f 1 hm)
                      cf

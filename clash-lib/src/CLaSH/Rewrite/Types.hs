@@ -42,6 +42,7 @@ data RewriteState
   , _typeTranslator   :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcode Type -> HWType translator
   , _tcCache          :: HashMap TyConName TyCon -- ^ TyCon cache
   , _evaluator        :: HashMap TyConName TyCon -> Term -> Term -- ^ Hardcoded evaluator (delta-reduction)
+  , _curFun           :: TmName -- ^ Function which is currently normalized
   }
 
 makeLenses ''RewriteState

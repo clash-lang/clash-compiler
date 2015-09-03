@@ -366,7 +366,8 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   -- Make a new global ID
   tcm       <- Lens.use tcCache
   newBodyTy <- termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
-  newBodyId <- fmap (makeName (name2String idName) . toInteger) getUniqueM
+  cf        <- Lens.use curFun
+  newBodyId <- fmap (makeName (name2String cf ++ "_" ++ name2String idName) . toInteger) getUniqueM
   -- Make a new expression, consisting of the the lifted function applied to
   -- its free variables
   let newExpr = mkTmApps

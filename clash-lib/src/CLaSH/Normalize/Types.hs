@@ -37,8 +37,6 @@ data NormalizeState
   , _inlineBelow     :: Int
   -- ^ Size of a function below which it is always inlined if it is not
   -- recursive
-  , _curFun          :: TmName
-  -- ^ Function which is currently normalized
   }
 
 makeLenses ''NormalizeState
