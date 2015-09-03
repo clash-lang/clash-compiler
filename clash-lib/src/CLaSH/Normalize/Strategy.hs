@@ -25,7 +25,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> sp
   where
     propagate = innerMost (applyMany transInner)
     inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
-    lifting   = topdownR (apply "liftNonRep" liftNonRep) -- See: [Note] Topdown traversal for liftNonRep
+    lifting   = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
     spec      = bottomupR (applyMany specRws)
 
     transInner :: [(String,NormRewrite)]
@@ -40,7 +40,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> sp
     transBUP = [ ("inlineClosed", inlineClosed)
                , ("inlineSmall" , inlineSmall)
                , ("inlineNonRep", inlineNonRep)
-               , ("bindNonRep"  , bindNonRep)
+               , ("bindNonRep"  , bindNonRep) -- See: [Note] bindNonRep before liftNonRep
                ]
 
     specRws :: [(String,NormRewrite)]
@@ -49,9 +49,11 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> sp
               , ("nonRepSpec"  , nonRepSpec)
               ]
 
-{- [Note] Topdown traversal for liftNonRep
-The liftNonRep transformation must be applied in a topDown traversal because
-of what CLaSH considers tail calls in its join-point analysis.
+{- [Note] bottom-up traversal for liftNonRep
+We used to say:
+
+"The liftNonRep transformation must be applied in a topDown traversal because
+of what CLaSH considers tail calls in its join-point analysis."
 
 Consider:
 
@@ -105,6 +107,77 @@ However, when we apply 'liftNonRep' in a top down traversal we end up with:
 >       B -> fail ...
 
 and all is well with the world.
+
+UPDATE:
+We can now just perform liftNonRep in a bottom-up traversal again, because
+liftNonRep no longer checks that if the binding that is lifted is a join-point.
+However, for this to work, bindNonRep must always have been exhaustively applied
+before liftNonRep. See also: [Note] bindNonRep before liftNonRep.
+-}
+
+{- [Note] bindNonRep before liftNonRep
+The combination of liftNonRep and nonRepSpec can lead to non-termination in an
+unchecked rewrite system (without termination measures in place) on the
+following:
+
+> main = f not
+> f    = \a x -> (a x) && (f a x)
+
+nonRepSpec will lead to:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = (\a x -> (a x) && (f a x)) not
+
+then lamApp leads to:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = let a = not in (\x -> (a x) && (f a x))
+
+then liftNonRep leads to:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = \x -> (g x) && (f g x)
+> g    = not
+
+and nonRepSepc leads to:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = \x -> (g x) && (f'' g x)
+> g    = not
+> f''  = (\a x -> (a x) && (f a x)) g
+
+This cycle continues indefinitely, as liftNonRep creates a new global variable,
+which is never alpha-equivalent to the previous global variable introduced by
+liftNonRep.
+
+That is why bindNonRep must always be applied before liftNonRep. When we end up
+in the situation after lamApp:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = let a = not in (\x -> (a x) && (f a x))
+
+bindNonRep will now lead to:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = \x -> (not x) && (f not x)
+
+Because f has already been specialised on the alpha-equivalent-to-itself not
+function, liftNonRep leads to:
+
+> main = f'
+> f    = \a x -> (a x) && (f a x)
+> f'   = \x -> (not x) && (f' x)
+
+And there is no non-terminating rewriting cycle.
+
+That is why bindNonRep must always be exhaustively applied before we apply
+liftNonRep.
 -}
 
 -- | Topdown traversal, stops upon first success

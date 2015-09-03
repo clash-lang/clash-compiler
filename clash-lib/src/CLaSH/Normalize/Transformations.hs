@@ -1,6 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies    #-}
-{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE ViewPatterns     #-}
 
 -- | Transformations of the Normalization process
 module CLaSH.Normalize.Transformations
@@ -65,7 +66,7 @@ import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
 import           CLaSH.Util
 
--- | Inline non-recursive, non-representable let-bindings
+-- | Inline non-recursive, non-representable, non-join-point, let-bindings
 bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
@@ -80,10 +81,14 @@ bindNonRep = inlineBinders nonRepTest
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
-    nonRepTest e (id_@(Id idName tyE), exprE)
-      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
-             <*> ((||) <$> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
-                       <*> (pure (isJoinPointIn id_ e)))
+    nonRepTest _ ((Id _ tyE), _)
+      -- We used to also check whether the binder we are lifting is either
+      -- recursive or a join-point. This is no longer needed because we apply
+      -- bindNonRep exhaustively before we apply liftNonRep. See also:
+      -- [Note] bindNonRep before liftNonRep
+      = not <$> (representableType <$> Lens.use typeTranslator
+                                   <*> Lens.use tcCache
+                                   <*> pure (unembed tyE))
 
     nonRepTest _ _ = return False
 
