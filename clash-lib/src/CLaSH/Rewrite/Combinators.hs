@@ -3,6 +3,7 @@
 -- | Rewriting combinators and traversals
 module CLaSH.Rewrite.Combinators where
 
+import           Control.DeepSeq             (deepseq)
 import           Control.Monad               ((<=<), (>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
@@ -72,6 +73,13 @@ infixr 6 >->
 -- | Apply two transformations in succession
 (>->) :: (Monad m) => Transform m -> Transform m -> Transform m
 (>->) r1 r2 c = r1 c >=> r2 c
+
+infixr 6 >-!->
+-- | Apply two transformations in succession, and perform a deepseq in between.
+(>-!->) :: (Monad m) => Transform m -> Transform m -> Transform m
+(>-!->) r1 r2 c e = do
+  e' <- r1 c e
+  deepseq e' (r2 c e')
 
 -- | Apply a transformation in a topdown traversal
 topdownR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m

@@ -9,7 +9,8 @@ import CLaSH.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = etaTL >-> constantPropgation >-> anf >-> rmDeadcode >-> bindConst >-> letTL >-> evalConst >-> cse >-> recLetRec
+normalization = etaTL >-> constantPropgation >-!-> anf >-!-> rmDeadcode >->
+                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec
   where
     etaTL      = apply "etaTL" etaExpansionTL
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
