@@ -30,17 +30,17 @@ import CLaSH.Core.Var                          (Id, TyVar)
 
 -- | Term representation in the CoreHW language: System F + LetRec + Case
 data Term
-  = Var     Type TmName                    -- ^ Variable reference
-  | Data    DataCon                        -- ^ Datatype constructor
-  | Literal Literal                        -- ^ Literal
-  | Prim    Text Type                      -- ^ Primitive
-  | Lam     (Bind Id Term)                 -- ^ Term-abstraction
-  | TyLam   (Bind TyVar Term)              -- ^ Type-abstraction
-  | App     Term Term                      -- ^ Application
-  | TyApp   Term Type                      -- ^ Type-application
-  | Letrec  (Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
-  | Case    Term Type [Bind Pat Term]      -- ^ Case-expression: subject, type of
-                                           -- alternatives, list of alternatives
+  = Var     !Type !TmName                   -- ^ Variable reference
+  | Data    !DataCon                        -- ^ Datatype constructor
+  | Literal !Literal                        -- ^ Literal
+  | Prim    !Text !Type                     -- ^ Primitive
+  | Lam     !(Bind Id Term)                 -- ^ Term-abstraction
+  | TyLam   !(Bind TyVar Term)              -- ^ Type-abstraction
+  | App     !Term !Term                     -- ^ Application
+  | TyApp   !Term !Type                     -- ^ Type-application
+  | Letrec  !(Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
+  | Case    !Term !Type [Bind Pat Term]     -- ^ Case-expression: subject, type of
+                                            -- alternatives, list of alternatives
   deriving (Show,Generic,NFData)
 
 -- | Term reference
@@ -50,10 +50,10 @@ type LetBinding = (Id, Embed Term)
 
 -- | Patterns in the LHS of a case-decomposition
 data Pat
-  = DataPat (Embed DataCon) (Rebind [TyVar] [Id])
+  = DataPat !(Embed DataCon) !(Rebind [TyVar] [Id])
   -- ^ Datatype pattern, '[TyVar]' bind existentially-quantified
   -- type-variables of a DataCon
-  | LitPat  (Embed Literal)
+  | LitPat  !(Embed Literal)
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern

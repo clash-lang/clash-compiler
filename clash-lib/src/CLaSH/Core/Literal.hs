@@ -20,9 +20,9 @@ import CLaSH.Core.TysPrim                     (intPrimTy, stringPrimTy, voidPrim
 
 -- | Term Literal
 data Literal
-  = IntegerLiteral  Integer
-  | StringLiteral   String
-  | RationalLiteral Rational
+  = IntegerLiteral  !Integer
+  | StringLiteral   !String
+  | RationalLiteral !Rational
   deriving (Eq,Ord,Show,Generic,NFData)
 
 instance Alpha Literal where

@@ -65,30 +65,30 @@ import           CLaSH.Util
 
 -- | Types in CoreHW: function and polymorphic types
 data Type
-  = VarTy    Kind TyName       -- ^ Type variable
-  | ConstTy  ConstTy           -- ^ Type constant
-  | ForAllTy (Bind TyVar Type) -- ^ Polymorphic Type
-  | AppTy    Type Type         -- ^ Type Application
-  | LitTy    LitTy             -- ^ Type literal
+  = VarTy    !Kind !TyName      -- ^ Type variable
+  | ConstTy  !ConstTy           -- ^ Type constant
+  | ForAllTy !(Bind TyVar Type) -- ^ Polymorphic Type
+  | AppTy    !Type !Type        -- ^ Type Application
+  | LitTy    !LitTy             -- ^ Type literal
   deriving (Show,Generic,NFData)
 
 -- | An easier view on types
 data TypeView
-  = FunTy    Type  Type       -- ^ Function type
-  | TyConApp TyConName [Type] -- ^ Applied TyCon
-  | OtherType Type            -- ^ Neither of the above
+  = FunTy    !Type  !Type      -- ^ Function type
+  | TyConApp !TyConName [Type] -- ^ Applied TyCon
+  | OtherType !Type            -- ^ Neither of the above
   deriving Show
 
 -- | Type Constants
 data ConstTy
-  = TyCon TyConName -- ^ TyCon type
-  | Arrow           -- ^ Function type
+  = TyCon !TyConName -- ^ TyCon type
+  | Arrow            -- ^ Function type
   deriving (Show,Generic,NFData,Alpha)
 
 -- | Literal Types
 data LitTy
-  = NumTy Int
-  | SymTy String
+  = NumTy !Int
+  | SymTy !String
   deriving (Show,Generic,NFData,Alpha)
 
 -- | The level above types

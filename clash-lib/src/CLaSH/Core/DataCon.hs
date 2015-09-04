@@ -24,9 +24,9 @@ import CLaSH.Util
 -- | Data Constructor
 data DataCon
   = MkData
-  { dcName       :: DcName   -- ^ Name of the DataCon
-  , dcTag        :: ConTag   -- ^ Syntactical position in the type definition
-  , dcType       :: Type     -- ^ Type of the 'DataCon
+  { dcName       :: !DcName  -- ^ Name of the DataCon
+  , dcTag        :: !ConTag  -- ^ Syntactical position in the type definition
+  , dcType       :: !Type    -- ^ Type of the 'DataCon
   , dcUnivTyVars :: [TyName] -- ^ Universally quantified type-variables,
                              -- these type variables are also part of the
                              -- result type of the DataCon

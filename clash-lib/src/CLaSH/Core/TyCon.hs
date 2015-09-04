@@ -30,27 +30,27 @@ import CLaSH.Util
 data TyCon
   -- | Algorithmic DataCons
   = AlgTyCon
-  { tyConName   :: TyConName   -- ^ Name of the TyCon
-  , tyConKind   :: Kind        -- ^ Kind of the TyCon
-  , tyConArity  :: Int         -- ^ Number of type arguments
-  , algTcRhs    :: AlgTyConRhs -- ^ DataCon definitions
+  { tyConName   :: !TyConName   -- ^ Name of the TyCon
+  , tyConKind   :: !Kind        -- ^ Kind of the TyCon
+  , tyConArity  :: !Int         -- ^ Number of type arguments
+  , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
   }
   -- | Function TyCons (e.g. type families)
   | FunTyCon
-  { tyConName   :: TyConName       -- ^ Name of the TyCon
-  , tyConKind   :: Kind            -- ^ Kind of the TyCon
-  , tyConArity  :: Int             -- ^ Number of type arguments
+  { tyConName   :: !TyConName      -- ^ Name of the TyCon
+  , tyConKind   :: !Kind           -- ^ Kind of the TyCon
+  , tyConArity  :: !Int            -- ^ Number of type arguments
   , tyConSubst  :: [([Type],Type)] -- ^ List of: ([LHS match types], RHS type)
   }
   -- | Primitive TyCons
   | PrimTyCon
-  { tyConName    :: TyConName  -- ^ Name of the TyCon
-  , tyConKind    :: Kind       -- ^ Kind of the TyCon
-  , tyConArity   :: Int        -- ^ Number of type arguments
+  { tyConName    :: !TyConName  -- ^ Name of the TyCon
+  , tyConKind    :: !Kind       -- ^ Kind of the TyCon
+  , tyConArity   :: !Int        -- ^ Number of type arguments
   }
   -- | To close the loop on the type hierarchy
   | SuperKindTyCon
-  { tyConName :: TyConName     -- ^ Name of the TyCon
+  { tyConName :: !TyConName     -- ^ Name of the TyCon
   }
   deriving (Generic,NFData)
 
@@ -75,7 +75,7 @@ data AlgTyConRhs
   { dataCons :: [DataCon]        -- ^ The DataCons of a TyCon
   }
   | NewTyCon
-  { dataCon   :: DataCon         -- ^ The newtype DataCon
+  { dataCon   :: !DataCon        -- ^ The newtype DataCon
   , ntEtadRhs :: ([TyName],Type) -- ^ The argument type of the newtype
                                  -- DataCon in eta-reduced form, which is
                                  -- just the representation of the TyCon.
