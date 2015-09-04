@@ -46,15 +46,15 @@ data RewriteState extra
   = RewriteState
   { _transformCounter :: {-# UNPACK #-} !Int
   -- ^ Number of applied transformations
-  , _bindings         :: HashMap TmName (Type,Term)
+  , _bindings         :: !(HashMap TmName (Type,Term))
   -- ^ Global binders
-  , _uniqSupply       :: Supply
+  , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: TmName
+  , _curFun           :: TmName -- Initially set to undefined: no strictness annotation
   -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'
-  , _extra            :: extra
+  , _extra            :: !extra
   -- ^ Additional state
   }
 
