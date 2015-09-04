@@ -71,7 +71,7 @@ bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
     nonRepTest e (id_@(Id idName tyE), exprE)
-      = (&&) <$> (not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure (unembed tyE)))
+      = (&&) <$> (not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure (unembed tyE)))
              <*> ((&&) <$> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
                        <*> (pure (not $ isJoinPointIn id_ e)))
 
@@ -86,8 +86,8 @@ liftNonRep = liftBinders nonRepTest
       -- recursive or a join-point. This is no longer needed because we apply
       -- bindNonRep exhaustively before we apply liftNonRep. See also:
       -- [Note] bindNonRep before liftNonRep
-      = not <$> (representableType <$> Lens.use typeTranslator
-                                   <*> Lens.use tcCache
+      = not <$> (representableType <$> Lens.view typeTranslator
+                                   <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
 
     nonRepTest _ _ = return False
@@ -108,29 +108,29 @@ nonRepSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
-  = R $ do tcm <- Lens.use tcCache
-           e2Ty <- termType tcm e2
-           localVar <- isLocalVar e2
-           nonRepE2 <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure e2Ty)
-           if nonRepE2 && not localVar
-             then runR $ specializeNorm True ctx e
-             else return e
+  = do tcm <- Lens.view tcCache
+       e2Ty <- termType tcm e2
+       localVar <- isLocalVar e2
+       nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure e2Ty)
+       if nonRepE2 && not localVar
+         then specializeNorm True ctx e
+         else return e
 
 nonRepSpec _ e = return e
 
 -- | Lift the let-bindings out of the subject of a Case-decomposition
 caseLet :: NormRewrite
-caseLet _ (Case (Letrec b) ty alts) = R $ do
+caseLet _ (Case (Letrec b) ty alts) = do
   (xes,e) <- unbind b
-  changed . Letrec $ bind xes (Case e ty alts)
+  changed (Letrec (bind xes (Case e ty alts)))
 
 caseLet _ e = return e
 
 -- | Move a Case-decomposition from the subject of a Case-decomposition to the alternatives
 caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
-  = R $ do
-    ty1Rep  <- representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure alts1Ty
+  = do
+    ty1Rep  <- representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure alts1Ty
     if not ty1Rep
       then do newAlts <- mapM ( return
                                   . uncurry bind
@@ -147,11 +147,11 @@ caseCase _ e = return e
 inlineNonRep :: NormRewrite
 inlineNonRep _ e@(Case scrut altsTy alts)
   | (Var _ f, args) <- collectArgs scrut
-  = R $ do
+  = do
     cf        <- Lens.use curFun
-    isInlined <- liftR $ alreadyInlined f cf
-    limit     <- liftR $ Lens.use inlineLimit
-    tcm       <- Lens.use tcCache
+    isInlined <- zoomExtra (alreadyInlined f cf)
+    limit     <- Lens.use (extra.inlineLimit)
+    tcm       <- Lens.view tcCache
     scrutTy   <- termType tcm scrut
     let noException = not (exception tcm scrutTy)
     if noException && (Maybe.fromMaybe 0 isInlined) > limit
@@ -170,10 +170,10 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                      (return e)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
-        nonRepScrut <- not <$> (representableType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure scrutTy)
+        nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_, scrutBody)) -> do
-            Monad.when noException (liftR $ addNewInline f cf)
+            Monad.when noException (zoomExtra (addNewInline f cf))
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
   where
@@ -188,7 +188,7 @@ inlineNonRep _ e = return e
 caseCon :: NormRewrite
 caseCon _ c@(Case scrut _ alts)
   | (Data dc, args) <- collectArgs scrut
-  = R $ do
+  = do
     alts' <- mapM unbind alts
     let dcAltM = List.find (equalCon dc . fst) alts'
     case dcAltM of
@@ -209,7 +209,7 @@ caseCon _ c@(Case scrut _ alts)
     equalCon dc (DataPat dc' _) = dcTag dc == dcTag (unembed dc')
     equalCon _  _               = False
 
-caseCon _ c@(Case (Literal l) _ alts) = R $ do
+caseCon _ c@(Case (Literal l) _ alts) = do
   alts' <- mapM unbind alts
   let ltAltsM = List.find (equalLit . fst) alts'
   case ltAltsM of
@@ -223,9 +223,9 @@ caseCon _ c@(Case (Literal l) _ alts) = R $ do
 
 caseCon ctx e@(Case subj ty alts)
   | isConstant subj = do
-    tcm <- Lens.use tcCache
+    tcm <- Lens.view tcCache
     lvl <- Lens.view dbgLevel
-    reduceConstant <- Lens.use evaluator
+    reduceConstant <- Lens.view evaluator
     case reduceConstant tcm subj of
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj'@(collectArgs -> (Data _,_)) -> caseCon ctx (Case subj' ty alts)
@@ -233,8 +233,8 @@ caseCon ctx e@(Case subj ty alts)
 
 caseCon _ e = caseOneAlt e
 
-caseOneAlt :: Monad m => Term -> R m Term
-caseOneAlt e@(Case _ _ [alt]) = R $ do
+caseOneAlt :: Term -> RewriteMonad extra Term
+caseOneAlt e@(Case _ _ [alt]) = do
   (pat,altE) <- unbind alt
   case pat of
     DefaultPat    -> changed altE
@@ -256,13 +256,13 @@ nonRepANF :: NormRewrite
 nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
-  = R $ do
+  = do
     untranslatable <- isUntranslatable arg
     case (untranslatable,arg) of
       (True,Letrec b) -> do (binds,body) <- unbind b
-                            changed . Letrec $ bind binds (App appConPrim body)
-      (True,Case {})  -> runR $ specializeNorm True ctx e
-      (True,Lam _)    -> runR $ specializeNorm True ctx e
+                            changed (Letrec (bind binds (App appConPrim body)))
+      (True,Case {})  -> specializeNorm True ctx e
+      (True,Lam _)    -> specializeNorm True ctx e
       _               -> return e
 
 nonRepANF _ e = return e
@@ -272,23 +272,23 @@ nonRepANF _ e = return e
 topLet :: NormRewrite
 topLet ctx e
   | all isLambdaBodyCtx ctx && not (isLet e)
-  = R $ do
+  = do
   untranslatable <- isUntranslatable e
   if untranslatable
     then return e
-    else do tcm <- Lens.use tcCache
+    else do tcm <- Lens.view tcCache
             (argId,argVar) <- mkTmBinderFor tcm "topLet" e
             changed . Letrec $ bind (rec [(argId,embed e)]) argVar
 
 topLet ctx e@(Letrec b)
   | all isLambdaBodyCtx ctx
-  = R $ do
+  = do
     (binds,body)   <- unbind b
     localVar       <- isLocalVar body
     untranslatable <- isUntranslatable body
     if localVar || untranslatable
       then return e
-      else do tcm <- Lens.use tcCache
+      else do tcm <- Lens.view tcCache
               (argId,argVar) <- mkTmBinderFor tcm "topLet" body
               changed . Letrec $ bind (rec $ unrec binds ++ [(argId,embed body)]) argVar
 
@@ -298,7 +298,7 @@ topLet _ e = return e
 
 -- | Remove unused let-bindings
 deadCode :: NormRewrite
-deadCode _ e@(Letrec binds) = R $ do
+deadCode _ e@(Letrec binds) = do
     (xes, body) <- fmap (first unrec) $ unbind binds
     let bodyFVs = Lens.toListOf termFreeIds body
         (xesUsed,xesOther) = List.partition
@@ -334,7 +334,7 @@ bindConstantVar = inlineBinders test
 inlineClosed :: NormRewrite
 inlineClosed _ e@(collectArgs -> (Var _ f,args))
   | all (either isConstant (const True)) args
-  = R $ do
+  = do
     untranslatable <- isUntranslatable e
     if untranslatable
       then return e
@@ -348,8 +348,8 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
                               else return e
           _ -> return e
 
-inlineClosed _ e@(Var _ f) = R $ do
-  tcm <- Lens.use tcCache
+inlineClosed _ e@(Var _ f) = do
+  tcm <- Lens.view tcCache
   closed <- isClosed tcm e
   untranslatable <- isUntranslatable e
   if closed && not untranslatable
@@ -368,13 +368,13 @@ inlineClosed _ e = return e
 
 -- | Inline small functions
 inlineSmall :: NormRewrite
-inlineSmall _ e@(collectArgs -> (Var _ f,args)) = R $ do
+inlineSmall _ e@(collectArgs -> (Var _ f,args)) = do
   untranslatable <- isUntranslatable e
   if untranslatable
     then return e
     else do
       bndrs <- Lens.use bindings
-      sizeLimit <- liftR $ Lens.use inlineBelow
+      sizeLimit <- Lens.use (extra.inlineBelow)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
         Just (_,body) -> let cg = callGraph [] bndrs f
@@ -403,18 +403,18 @@ constantSpec _ e = return e
 -- | Propagate arguments of application inwards; except for 'Lam' where the
 -- argument becomes let-bound.
 appProp :: NormRewrite
-appProp _ (App (Lam b) arg) = R $ do
+appProp _ (App (Lam b) arg) = do
   (v,e) <- unbind b
   if isConstant arg || isVar arg
     then changed $ substTm (varName v) arg e
     else changed . Letrec $ bind (rec [(v,embed arg)]) e
 
-appProp _ (App (Letrec b) arg) = R $ do
+appProp _ (App (Letrec b) arg) = do
   (v,e) <- unbind b
   changed . Letrec $ bind v (App e arg)
 
-appProp _ (App (Case scrut ty alts) arg) = R $ do
-  tcm <- Lens.use tcCache
+appProp _ (App (Case scrut ty alts) arg) = do
+  tcm <- Lens.view tcCache
   argTy <- termType tcm arg
   let ty' = applyFunTy tcm ty argTy
   if isConstant arg || isVar arg
@@ -434,31 +434,27 @@ appProp _ (App (Case scrut ty alts) arg) = R $ do
                     ) alts
       changed . Letrec $ bind (rec [(boundArg,embed arg)]) (Case scrut ty' alts')
 
-appProp _ (TyApp (TyLam b) t) = R $ do
+appProp _ (TyApp (TyLam b) t) = do
   (tv,e) <- unbind b
   changed $ substTyInTm (varName tv) t e
 
-appProp _ (TyApp (Letrec b) t) = R $ do
+appProp _ (TyApp (Letrec b) t) = do
   (v,e) <- unbind b
   changed . Letrec $ bind v (TyApp e t)
 
-appProp _ (TyApp (Case scrut altsTy alts) ty) = R $ do
+appProp _ (TyApp (Case scrut altsTy alts) ty) = do
   alts' <- mapM ( return
                 . uncurry bind
                 . second (`TyApp` ty)
                 <=< unbind
                 ) alts
-  tcm <- Lens.use tcCache
+  tcm <- Lens.view tcCache
   ty' <- applyTy tcm altsTy ty
   changed $ Case scrut ty' alts'
 
 appProp _ e = return e
 
-type NormRewriteW = Transform (WriterT [LetBinding] (R NormalizeMonad))
-
-liftNormR :: RewriteMonad NormalizeMonad a
-          -> WriterT [LetBinding] (R NormalizeMonad) a
-liftNormR = lift . R
+type NormRewriteW = Transform (WriterT [LetBinding] (RewriteMonad NormalizeState))
 
 -- NOTE [unsafeUnbind]: Use unsafeUnbind (which doesn't freshen pattern
 -- variables). Reason: previously collected expression still reference
@@ -476,8 +472,8 @@ makeANF ctx (Lam b) = do
 makeANF _ (TyLam b) = return (TyLam b)
 
 makeANF ctx e
-  = R $ do
-    (e',bndrs) <- runR $ runWriterT $ bottomupR collectANF ctx e
+  = do
+    (e',bndrs) <- runWriterT $ bottomupR collectANF ctx e
     case bndrs of
       [] -> return e
       _  -> changed . Letrec $ bind (rec bndrs) e'
@@ -487,11 +483,11 @@ collectANF _ e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
-    untranslatable <- liftNormR $ isUntranslatable arg
-    localVar       <- liftNormR $ isLocalVar arg
+    untranslatable <- lift (isUntranslatable arg)
+    localVar       <- lift (isLocalVar arg)
     case (untranslatable,localVar || isConstant arg,arg) of
-      (False,False,_) -> do tcm <- Lens.use tcCache
-                            (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "repANF" arg
+      (False,False,_) -> do tcm <- Lens.view tcCache
+                            (argId,argVar) <- lift (mkTmBinderFor tcm "repANF" arg)
                             tell [(argId,embed arg)]
                             return (App appf argVar)
       (True,False,Letrec b) -> do (binds,body) <- unbind b
@@ -503,13 +499,13 @@ collectANF _ (Letrec b) = do
   -- See NOTE [unsafeUnbind]
   let (binds,body) = unsafeUnbind b
   tell (unrec binds)
-  untranslatable <- liftNormR $ isUntranslatable body
-  localVar       <- liftNormR $ isLocalVar body
+  untranslatable <- lift (isUntranslatable body)
+  localVar       <- lift (isLocalVar body)
   if localVar || untranslatable
     then return body
     else do
-      tcm <- Lens.use tcCache
-      (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "bodyVar" body
+      tcm <- Lens.view tcCache
+      (argId,argVar) <- lift (mkTmBinderFor tcm "bodyVar" body)
       tell [(argId,embed body)]
       return argVar
 
@@ -533,23 +529,23 @@ collectANF _ e@(Case _ _ [unsafeUnbind -> (DataPat dc _,_)])
   | name2String (dcName $ unembed dc) == "CLaSH.Signal.Internal.:-" = return e
 
 collectANF ctx (Case subj ty alts) = do
-    localVar     <- liftNormR $ isLocalVar subj
+    localVar     <- lift (isLocalVar subj)
     (bndr,subj') <- if localVar || isConstant subj
       then return ([],subj)
-      else do tcm <- Lens.use tcCache
-              (argId,argVar) <- liftNormR $ mkTmBinderFor tcm "subjLet" subj
+      else do tcm <- Lens.view tcCache
+              (argId,argVar) <- lift (mkTmBinderFor tcm "subjLet" subj)
               return ([(argId,embed subj)],argVar)
 
-    (binds,alts') <- fmap (first concat . unzip) $ liftNormR $ mapM (doAlt subj') alts
+    (binds,alts') <- fmap (first concat . unzip) $ mapM (lift . doAlt subj') alts
 
     tell (bndr ++ binds)
     return (Case subj' ty alts')
   where
-    doAlt :: Term -> Bind Pat Term -> RewriteMonad NormalizeMonad ([LetBinding],Bind Pat Term)
+    doAlt :: Term -> Bind Pat Term -> RewriteMonad NormalizeState ([LetBinding],Bind Pat Term)
     -- See NOTE [unsafeUnbind]
     doAlt subj' = fmap (second (uncurry bind)) . doAlt' subj' . unsafeUnbind
 
-    doAlt' :: Term -> (Pat,Term) -> RewriteMonad NormalizeMonad ([LetBinding],(Pat,Term))
+    doAlt' :: Term -> (Pat,Term) -> RewriteMonad NormalizeState ([LetBinding],(Pat,Term))
     doAlt' subj' alt@(DataPat dc pxs@(unrebind -> ([],xs)),altExpr) = do
       lv      <- isLocalVar altExpr
       patSels <- Monad.zipWithM (doPatBndr subj' (unembed dc)) xs [0..]
@@ -557,7 +553,7 @@ collectANF ctx (Case subj ty alts) = do
           usesXs _         = False
       if (lv && not (usesXs altExpr)) || isConstant altExpr
         then return (patSels,alt)
-        else do tcm <- Lens.use tcCache
+        else do tcm <- Lens.view tcCache
                 (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
                 return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
     doAlt' _ alt@(DataPat _ _, _) = return ([],alt)
@@ -565,13 +561,13 @@ collectANF ctx (Case subj ty alts) = do
       lv <- isLocalVar altExpr
       if lv || isConstant altExpr
         then return ([],alt)
-        else do tcm <- Lens.use tcCache
+        else do tcm <- Lens.view tcCache
                 (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
                 return ([(altId,embed altExpr)],(pat,altVar))
 
-    doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeMonad LetBinding
+    doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeState LetBinding
     doPatBndr subj' dc pId i
-      = do tcm <- Lens.use tcCache
+      = do tcm <- Lens.view tcCache
            patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") tcm ctx subj' (dcTag dc) i
            return (pId,embed patExpr)
 
@@ -585,8 +581,8 @@ etaExpansionTL ctx (Lam b) = do
   return $ Lam (bind bndr e')
 
 etaExpansionTL ctx e
-  = R $ do
-    tcm <- Lens.use tcCache
+  = do
+    tcm <- Lens.view tcCache
     isF <- isFun tcm e
     if isF
       then do
@@ -597,7 +593,7 @@ etaExpansionTL ctx e
                  <=< termType tcm
                  ) e
         (newIdB,newIdV) <- mkInternalVar "eta" argTy
-        e' <- runR $ etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
+        e' <- etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
         changed . Lam $ bind newIdB e'
       else return e
 
@@ -606,10 +602,10 @@ etaExpansionTL ctx e
 -- means that all recursive calls are replaced by the same variable reference as
 -- found in the body of the top-level let-expression.
 recToLetRec :: NormRewrite
-recToLetRec [] e = R $ do
+recToLetRec [] e = do
   fn          <- Lens.use curFun
   bodyM       <- fmap (HashMap.lookup fn) $ Lens.use bindings
-  tcm         <- Lens.use tcCache
+  tcm         <- Lens.view tcCache
   normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
     (Right (args,bndrs,res), Just (bodyTy,_)) -> do
@@ -630,13 +626,13 @@ recToLetRec _ e = return e
 inlineHO :: NormRewrite
 inlineHO _ e@(App _ _)
   | (Var _ f, args) <- collectArgs e
-  = R $ do
-    tcm <- Lens.use tcCache
+  = do
+    tcm <- Lens.view tcCache
     hasPolyFunArgs <- or <$> mapM (either (isPolyFun tcm) (const (return False))) args
     if hasPolyFunArgs
       then do cf        <- Lens.use curFun
-              isInlined <- liftR $ alreadyInlined f cf
-              limit     <- liftR $ Lens.use inlineLimit
+              isInlined <- zoomExtra (alreadyInlined f cf)
+              limit     <- Lens.use (extra.inlineLimit)
               if (Maybe.fromMaybe 0 isInlined) > limit
                 then do
                   lvl <- Lens.view dbgLevel
@@ -645,8 +641,8 @@ inlineHO _ e@(App _ _)
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
                     Just (_, body) -> do
-                      liftR $ addNewInline f cf
-                      changed $ mkApps body args
+                      zoomExtra (addNewInline f cf)
+                      changed (mkApps body args)
                     _ -> return e
       else return e
 
@@ -654,7 +650,7 @@ inlineHO _ e = return e
 
 -- | Simplified CSE, only works on let-bindings, works from top to bottom
 simpleCSE :: NormRewrite
-simpleCSE _ e@(Letrec b) = R $ do
+simpleCSE _ e@(Letrec b) = do
   (binders,body) <- first unrec <$> unbind b
   let (reducedBindings,body') = reduceBindersFix binders body
   if length binders /= length reducedBindings
@@ -692,9 +688,9 @@ reduceConst _ e@(App _ _)
   | isConstant e
   , (conPrim, _) <- collectArgs e
   , isPrim conPrim
-  = R $ do
-    tcm <- Lens.use tcCache
-    reduceConstant <- Lens.use evaluator
+  = do
+    tcm <- Lens.view tcCache
+    reduceConstant <- Lens.view evaluator
     case reduceConstant tcm e of
       e'@(Data _)    -> changed e'
       e'@(Literal _) -> changed e'

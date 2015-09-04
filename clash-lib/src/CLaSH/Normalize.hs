@@ -6,7 +6,6 @@ module CLaSH.Normalize where
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=))
 import qualified Control.Lens                     as Lens
-import qualified Control.Monad.State              as State
 import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
@@ -34,10 +33,10 @@ import           CLaSH.Normalize.Transformations  (bindConstantVar, caseCon,
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
-import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteState (..),
+import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteEnv (..), RewriteState (..),
                                                    bindings, curFun, dbgLevel,
-                                                   tcCache)
-import           CLaSH.Rewrite.Util               (liftRS, runRewrite,
+                                                   tcCache, extra)
+import           CLaSH.Rewrite.Util               (runRewrite,
                                                    runRewriteSession)
 import           CLaSH.Util
 
@@ -58,11 +57,22 @@ runNormalization :: CLaSHOpts
                  -- ^ NormalizeSession to run
                  -> a
 runNormalization opts supply globals typeTrans tcm eval
-  = flip State.evalState normState
-  . runRewriteSession (opt_dbgLevel opts) rwState
+  = runRewriteSession rwEnv rwState
   where
-    rwState   = RewriteState 0 globals supply typeTrans tcm eval
-                             (error $ $(curLoc) ++ "Report as bug: no curFun")
+    rwEnv     = RewriteEnv
+                  (opt_dbgLevel opts)
+                  typeTrans
+                  tcm
+                  eval
+
+    rwState   = RewriteState
+                  0
+                  globals
+                  supply
+                  (error $ $(curLoc) ++ "Report as bug: no curFun")
+                  0
+                  normState
+
     normState = NormalizeState
                   HashMap.empty
                   Map.empty
@@ -88,17 +98,17 @@ normalize' nm = do
   let nmS = showDoc nm
   case exprM of
     Just (_,tm) -> do
-      tmNorm <- makeCachedT3S nm normalized $ do
+      tmNorm <- makeCached nm (extra.normalized) $ do
                   curFun .= nm
                   tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
-                  tcm <- Lens.use tcCache
+                  tcm <- Lens.view tcCache
                   ty' <- termType tcm tm'
                   return (ty',tm')
       let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
       traceIf (nm `elem` usedBndrs)
               ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm))
               (return ())
-      prevNorm <- fmap HashMap.keys $ liftRS $ Lens.use normalized
+      prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
       let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
       return (toNormalize,(nm,tmNorm))
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
@@ -180,7 +190,7 @@ stripArgs _ _ _ = Nothing
 flattenNode :: CallTree
             -> NormalizeSession (Either CallTree ((TmName,Term),[CallTree]))
 flattenNode c@(CLeaf (nm,(_,e))) = do
-  tcm  <- Lens.use tcCache
+  tcm  <- Lens.view tcCache
   norm <- splitNormalized tcm e
   case norm of
     Right (ids,[(_,bExpr)],_) -> do
@@ -190,7 +200,7 @@ flattenNode c@(CLeaf (nm,(_,e))) = do
         Nothing        -> return (Left c)
     _ -> return (Left c)
 flattenNode b@(CBranch (nm,(_,e)) us) = do
-  tcm  <- Lens.use tcCache
+  tcm  <- Lens.view tcCache
   norm <- splitNormalized tcm e
   case norm of
     Right (ids,[(_,bExpr)],_) -> do

@@ -7,8 +7,8 @@ import           Control.DeepSeq             (deepseq)
 import           Control.Monad               ((<=<), (>=>))
 import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
-import           Unbound.Generics.LocallyNameless     (Embed, Fresh, bind, embed, rec,
-                                              unbind, unembed, unrec)
+import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed,
+                                                   rec, unbind, unembed, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.Term             (Pat, Term (..))
@@ -101,24 +101,24 @@ unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 
 infixr 5 !->
 -- | Only apply the second transformation if the first one succeeds.
-(!->) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
-(!->) r1 r2 c expr = R $ do
-  (expr',changed) <- runR $ Writer.listen $ r1 c expr
+(!->) :: Rewrite m -> Rewrite m -> Rewrite m
+(!->) r1 r2 c expr = do
+  (expr',changed) <- Writer.listen $ r1 c expr
   if Monoid.getAny changed
-    then runR $ r2 c expr'
+    then r2 c expr'
     else return expr'
 
 infixr 5 >-!
 -- | Only apply the second transformation if the first one fails.
-(>-!) :: Monad m => Rewrite m -> Rewrite m -> Rewrite m
-(>-!) r1 r2 c expr = R $ do
-  (expr',changed) <- runR $ Writer.listen $ r1 c expr
+(>-!) :: Rewrite m -> Rewrite m -> Rewrite m
+(>-!) r1 r2 c expr = do
+  (expr',changed) <- Writer.listen $ r1 c expr
   if Monoid.getAny changed
     then return expr'
-    else runR $ r2 c expr'
+    else r2 c expr'
 
 -- | Keep applying a transformation until it fails.
-repeatR :: Monad m => Rewrite m -> Rewrite m
+repeatR :: Rewrite m -> Rewrite m
 repeatR r = r !-> repeatR r
 
 whenR :: Monad m

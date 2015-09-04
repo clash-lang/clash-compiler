@@ -182,11 +182,11 @@ liftNonRep.
 -}
 
 -- | Topdown traversal, stops upon first success
-topdownSucR :: (Functor m, Monad m) => Rewrite m -> Rewrite m
+topdownSucR :: Rewrite extra -> Rewrite extra
 topdownSucR r = r >-! (allR True (topdownSucR r))
 
-innerMost :: (Functor m, Monad m) => Rewrite m -> Rewrite m
+innerMost :: Rewrite extra -> Rewrite extra
 innerMost r = bottomupR (r !-> innerMost r)
 
-applyMany :: (Functor m, Monad m) => [(String,Rewrite m)] -> Rewrite m
+applyMany :: [(String,Rewrite extra)] -> Rewrite extra
 applyMany = foldr1 (>->) . map (uncurry apply)
