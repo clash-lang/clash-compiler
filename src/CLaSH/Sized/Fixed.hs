@@ -66,7 +66,7 @@ module CLaSH.Sized.Fixed
 where
 
 import Control.Arrow              ((***), second)
-import Data.Bits                  (Bits (..))
+import Data.Bits                  (Bits (..), FiniteBits)
 import Data.Default               (Default (..))
 import Data.List                  (find)
 import Data.Maybe                 (fromJust)
@@ -117,6 +117,7 @@ deriving instance Bounded (rep (int + frac)) => Bounded (Fixed rep int frac)
 deriving instance Default (rep (int + frac)) => Default (Fixed rep int frac)
 deriving instance Arbitrary (rep (int + frac)) => Arbitrary (Fixed rep int frac)
 deriving instance CoArbitrary (rep (int + frac)) => CoArbitrary (Fixed rep int frac)
+deriving instance FiniteBits (rep (int + frac)) => FiniteBits (Fixed rep int frac)
 
 -- | Instance functions do not saturate.
 -- Meaning that \"@`'shiftL'` 1 == 'satMult' 'SatWrap' 2'@\""
