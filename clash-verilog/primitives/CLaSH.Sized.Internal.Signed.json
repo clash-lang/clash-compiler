@@ -122,14 +122,14 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.quot#"
-    , "type"      : "quot# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] / ~ARG[2]"
+    , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rem#"
-    , "type"      : "rem# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] % ~ARG[2]"
+    , "type"      : "rem# :: Signed n -> Signed n -> Signed n"
+    , "templateE" : "~ARG[0] % ~ARG[1]"
     }
   }
 , { "BlackBox" :
