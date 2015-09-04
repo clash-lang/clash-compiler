@@ -18,13 +18,13 @@ type PrimMap = HashMap S.Text Primitive
 data Primitive
   -- | A primitive that has a template that can be filled out by the backend render
   = BlackBox
-  { name     :: S.Text -- ^ Name of the primitive
-  , template :: Either Text Text -- ^ Either a /declaration/ or an /expression/ template.
+  { name     :: !S.Text -- ^ Name of the primitive
+  , template :: !(Either Text Text) -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
   | Primitive
-  { name     :: S.Text -- ^ Name of the primitive
-  , primType :: Text -- ^ Additional information
+  { name     :: !S.Text -- ^ Name of the primitive
+  , primType :: !Text -- ^ Additional information
   }
   deriving Show
 

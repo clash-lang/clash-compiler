@@ -6,8 +6,8 @@ module CLaSH.Netlist where
 
 import           Control.Lens                     ((.=), (<<%=))
 import qualified Control.Lens                     as Lens
-import           Control.Monad.State              (runStateT)
-import           Control.Monad.Writer             (listen, runWriterT, tell)
+import           Control.Monad.State.Strict       (runStateT)
+import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap

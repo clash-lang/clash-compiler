@@ -6,8 +6,8 @@
 module CLaSH.Netlist.Types where
 
 import Control.DeepSeq
-import Control.Monad.State                  (MonadIO, MonadState, StateT)
-import Control.Monad.Writer                 (MonadWriter, WriterT)
+import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
+import Control.Monad.Writer.Strict          (MonadWriter, WriterT)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
@@ -41,14 +41,14 @@ data NetlistState
   = NetlistState
   { _bindings       :: HashMap TmName (Type,Term) -- ^ Global binders
   , _varEnv         :: Gamma -- ^ Type environment/context
-  , _varCount       :: Int -- ^ Number of signal declarations
-  , _cmpCount       :: Int -- ^ Number of create components
+  , _varCount       :: !Int -- ^ Number of signal declarations
+  , _cmpCount       :: !Int -- ^ Number of create components
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: PrimMap -- ^ Primitive Definitions
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
-  , _modNm          :: String -- ^ Name of the module containing the @topEntity@
-  , _curCompNm      :: Identifier
+  , _modNm          :: !String -- ^ Name of the module containing the @topEntity@
+  , _curCompNm      :: !Identifier
   , _dataFiles      :: [(String,FilePath)]
   }
 
@@ -58,7 +58,7 @@ type Identifier = Text
 -- | Component: base unit of a Netlist
 data Component
   = Component
-  { componentName :: Identifier -- ^ Name of the component
+  { componentName :: !Identifier -- ^ Name of the component
   , hiddenPorts   :: [(Identifier,HWType)] -- ^ Ports that have no correspondence the original function definition
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
   , outputs       :: [(Identifier,HWType)] -- ^ Output ports
@@ -79,16 +79,16 @@ data HWType
   = Void -- ^ Empty type
   | Bool -- ^ Boolean type
   | Integer -- ^ Integer type
-  | BitVector Size -- ^ BitVector of a specified size
-  | Index    Size -- ^ Unsigned integer with specified (exclusive) upper bounder
-  | Signed   Size -- ^ Signed integer of a specified size
-  | Unsigned Size -- ^ Unsigned integer of a specified size
-  | Vector   Size       HWType -- ^ Vector type
-  | Sum      Identifier [Identifier] -- ^ Sum type: Name and Constructor names
-  | Product  Identifier [HWType] -- ^ Product type: Name and field types
-  | SP       Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock    Identifier Int -- ^ Clock type with specified name and period
-  | Reset    Identifier Int -- ^ Reset type corresponding to clock with a specified name and period
+  | BitVector !Size -- ^ BitVector of a specified size
+  | Index    !Size -- ^ Unsigned integer with specified (exclusive) upper bounder
+  | Signed   !Size -- ^ Signed integer of a specified size
+  | Unsigned !Size -- ^ Unsigned integer of a specified size
+  | Vector   !Size       !HWType -- ^ Vector type
+  | Sum      !Identifier [Identifier] -- ^ Sum type: Name and Constructor names
+  | Product  !Identifier [HWType] -- ^ Product type: Name and field types
+  | SP       !Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
+  | Clock    !Identifier !Int -- ^ Clock type with specified name and period
+  | Reset    !Identifier !Int -- ^ Reset type corresponding to clock with a specified name and period
   deriving (Eq,Ord,Show,Generic)
 
 instance Hashable HWType
@@ -96,13 +96,13 @@ instance NFData HWType
 
 -- | Internals of a Component
 data Declaration
-  = Assignment Identifier Expr
+  = Assignment !Identifier !Expr
   -- ^ Signal assignment:
   --
   -- * Signal to assign
   --
   -- * Assigned expression
-  | CondAssignment Identifier HWType Expr [(Maybe Expr,Expr)]
+  | CondAssignment !Identifier !HWType !Expr [(Maybe Expr,Expr)]
   -- ^ Conditional signal assignment:
   --
   -- * Signal to assign
@@ -112,9 +112,9 @@ data Declaration
   -- * Scrutinized expression
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl Identifier Identifier [(Identifier,Expr)] -- ^ Instantiation of another component
-  | BlackBoxD S.Text BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl Identifier HWType -- ^ Signal declaration
+  | InstDecl !Identifier !Identifier [(Identifier,Expr)] -- ^ Instantiation of another component
+  | BlackBoxD !S.Text !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
+  | NetDecl !Identifier !HWType -- ^ Signal declaration
   deriving Show
 
 instance NFData Declaration where
@@ -129,20 +129,20 @@ data Modifier
 
 -- | Expression used in RHS of a declaration
 data Expr
-  = Literal    (Maybe (HWType,Size)) Literal -- ^ Literal expression
-  | DataCon    HWType       Modifier  [Expr] -- ^ DataCon application
-  | Identifier Identifier   (Maybe Modifier) -- ^ Signal reference
-  | DataTag    HWType       (Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE S.Text BlackBoxTemplate BlackBoxContext Bool -- ^ Instantiation of a BlackBox expression
+  = Literal    !(Maybe (HWType,Size)) !Literal -- ^ Literal expression
+  | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
+  | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
+  | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
+  | BlackBoxE !S.Text !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
   deriving Show
 
 -- | Literals used in an expression
 data Literal
-  = NumLit    Integer   -- ^ Number literal
-  | BitLit    Bit       -- ^ Bit literal
-  | BoolLit   Bool      -- ^ Boolean literal
+  = NumLit    !Integer   -- ^ Number literal
+  | BitLit    !Bit       -- ^ Bit literal
+  | BoolLit   !Bool      -- ^ Boolean literal
   | VecLit    [Literal] -- ^ Vector literal
-  | StringLit String    -- ^ String literal
+  | StringLit !String    -- ^ String literal
   deriving Show
 
 -- | Bit literal

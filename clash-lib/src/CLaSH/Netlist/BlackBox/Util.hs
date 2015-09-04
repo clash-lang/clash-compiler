@@ -10,7 +10,7 @@ module CLaSH.Netlist.BlackBox.Util where
 import           Control.Lens                         (at, use, (%=), (+=), _1,
                                                        _2)
 import           Control.Monad.State                  (State, runState)
-import           Control.Monad.Writer                 (MonadWriter, tell)
+import           Control.Monad.Writer.Strict          (MonadWriter, tell)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
 import           Data.List                            (mapAccumL)
