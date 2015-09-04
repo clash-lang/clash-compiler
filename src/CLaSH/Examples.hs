@@ -529,6 +529,7 @@ module UART (uart) where
 
 import CLaSH.Prelude
 import Control.Lens
+import Control.Monad
 import Control.Monad.Trans.State
 
 -- UART RX Logic
