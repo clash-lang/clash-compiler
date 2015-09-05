@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Internal.Signed.size#"
+    { "name"      : "CLaSH.Sized.Internal.Signed.size#"
     , "type"      : "size# :: KnownNat n => Signed n -> Int"
     , "templateE" : "~LIT[0]"
     }
