@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-# OPTIONS_GHC -fno-warn-missing-methods #-}

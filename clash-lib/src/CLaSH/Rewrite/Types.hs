@@ -3,8 +3,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
-{-# LANGUAGE MagicHash #-}
-
 -- | Type and instance definitions for Rewrite modules
 module CLaSH.Rewrite.Types where
 
