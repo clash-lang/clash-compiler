@@ -85,6 +85,13 @@ Library
   ghc-options:        -Wall
   CPP-Options:        -DCABAL
 
+  other-extensions:   CPP
+                      OverloadedStrings
+                      RecursiveDo
+                      TemplateHaskell
+                      TupleSections
+                      ViewPatterns
+
   Build-depends:      base                    >= 4.6.0.1 && < 5,
                       clash-lib               >= 0.5.8,
                       clash-prelude           >= 0.9,

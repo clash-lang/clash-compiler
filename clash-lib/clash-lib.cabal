@@ -69,6 +69,22 @@ Library
   ghc-options:        -Wall
   CPP-Options:        -DCABAL
 
+  other-extensions:   CPP
+                      DeriveAnyClass
+                      DeriveGeneric
+                      FlexibleContexts
+                      FlexibleInstances
+                      GeneralizedNewtypeDeriving
+                      LambdaCase
+                      MultiParamTypeClasses
+                      OverloadedStrings
+                      Rank2Types
+                      RecordWildCards
+                      ScopedTypeVariables
+                      TemplateHaskell
+                      TupleSections
+                      ViewPatterns
+
   Build-depends:      aeson                   >= 0.6.2.0,
                       attoparsec              >= 0.10.4.0,
                       base                    >= 4.8 && < 5,
