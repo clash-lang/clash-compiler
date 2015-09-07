@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
-{-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE ViewPatterns     #-}
 
 -- | Transformations of the Normalization process
@@ -70,6 +68,7 @@ import           CLaSH.Util
 bindNonRep :: NormRewrite
 bindNonRep = inlineBinders nonRepTest
   where
+    nonRepTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
     nonRepTest e (id_@(Id idName tyE), exprE)
       = (&&) <$> (not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure (unembed tyE)))
              <*> ((&&) <$> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
@@ -81,6 +80,7 @@ bindNonRep = inlineBinders nonRepTest
 liftNonRep :: NormRewrite
 liftNonRep = liftBinders nonRepTest
   where
+    nonRepTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
     nonRepTest _ ((Id _ tyE), _)
       -- We used to also check whether the binder we are lifting is either
       -- recursive or a join-point. This is no longer needed because we apply
@@ -311,6 +311,8 @@ deadCode _ e@(Letrec binds) = do
       then changed . Letrec $ bind (rec xesUsed') body
       else return e
   where
+    findUsedBndrs :: [(Var Term, Embed Term)] -> [(Var Term, Embed Term)]
+                  -> [(Var Term, Embed Term)] -> [(Var Term, Embed Term)]
     findUsedBndrs used []      _     = used
     findUsedBndrs used explore other =
       let fvsUsed = concatMap (Lens.toListOf termFreeIds . unembed . snd) explore
