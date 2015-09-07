@@ -4,10 +4,26 @@ Synopsis:             CAES Language for Synchronous Hardware - VHDL backend
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
   borrows both its syntax and semantics from the functional programming language
-  Haskell. The merits of using a functional language to describe hardware comes
-  from the fact that combinational circuits can be directly modelled as
-  mathematical functions and that functional languages lend themselves very well
-  at describing and (de-)composing mathematical functions.
+  Haskell. The CλaSH compiler transforms these high-level descriptions to
+  low-level synthesizable VHDL, Verilog, or SystemVerilog.
+  .
+  Features of CλaSH:
+  .
+  * Strongly typed (like VHDL), yet with a very high degree of type inference,
+    which enables both safe and fast prototying using consise descriptions (like
+    Verilog)
+  .
+  * Interactive REPL: load your designs in an interpreter and easily test all
+    your component without needing to setup a test bench.
+  .
+  * Higher-order functions, with type inference, result in designs that are
+    fully parametric by default.
+  .
+  * Synchronous sequential circuit design based on streams of values, called
+    @Signal@s.
+  .
+  * Support for multiple clock domains, with type safe clock domain crossing.
+  .
   .
   This package provides:
   .
