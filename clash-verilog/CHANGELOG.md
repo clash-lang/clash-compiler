@@ -1,5 +1,10 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.5.8 *September 7th 2015*
+* Fixes bugs:
+  * Fix primitive for CLaSH.Sized.Internal.Signed.size# [#72](https://github.com/clash-lang/clash-compiler/pull/72)
+  * rem and quot on Signed are broken [#73](https://github.com/clash-lang/clash-compiler/issues/73)
+
 ## 0.5.7 *June 26th 2015*
 * New features:
   * Generate Verilog-2001 instead of Verilog-2005: generated Verilog is now accepted by Altera/Quartus

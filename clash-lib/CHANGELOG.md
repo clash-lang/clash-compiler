@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.11
+* Fixes bugs:
+  * Clash running out of memory on Simple-ish project [#70](https://github.com/clash-lang/clash-compiler/issues/70)
+
 ## 0.5.10 *August 2nd 2015*
 * Fixes bugs:
   * Make testbench generation deterministic

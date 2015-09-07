@@ -1,5 +1,16 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.12 *September 7th 2015*
+* New features:
+  * Modest compilation time speed-up. Compilation time of the [I2C](https://github.com/clash-lang/clash-compiler/tree/master/examples/i2c) module on my machine went down from 43s to 24s, and maximum memory usage went down from 840 MB to 700 MB.
+
+* Fixes bugs:
+  * Bug in VHDL ROM generation [#69](https://github.com/clash-lang/clash-compiler/issues/69)
+  * Clash running out of memory on Simple-ish project [#70](https://github.com/clash-lang/clash-compiler/issues/70)
+  * Fix asyncRom VHDL primitive [#71](https://github.com/clash-lang/clash-compiler/pull/71)
+  * Fix primitive for CLaSH.Sized.Internal.Signed.size# [#72](https://github.com/clash-lang/clash-compiler/pull/72)
+  * rem and quot on Signed are broken [#73](https://github.com/clash-lang/clash-compiler/issues/73)
+
 ## 0.5.11 *August 2nd 2015*
 * New features:
   * Re-enable GHC's strictness analysis pass, which improves dead-code removal, which hopefully leads to smaller circuits.

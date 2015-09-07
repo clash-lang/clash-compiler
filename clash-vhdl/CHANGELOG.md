@@ -1,9 +1,11 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.5.9
+## 0.5.9 *September 7th 2015*
 * Fixes bugs:
   * Bug in VHDL ROM generation [#69](https://github.com/clash-lang/clash-compiler/issues/69)
   * Fix asyncRom VHDL primitive [#71](https://github.com/clash-lang/clash-compiler/pull/71)
+  * Fix primitive for CLaSH.Sized.Internal.Signed.size# [#72](https://github.com/clash-lang/clash-compiler/pull/72)
+  * rem and quot on Signed are broken [#73](https://github.com/clash-lang/clash-compiler/issues/73)
 
 ## 0.5.8 *July 9th 2015*
 * New features:
