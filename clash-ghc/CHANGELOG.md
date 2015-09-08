@@ -1,5 +1,10 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.13 *September 8th 2015*
+* Fixes bugs:
+  * Cannot translate GHC `MachLabel` literal
+  * Maybe (Index n) not translatable to VHDL [#75](https://github.com/clash-lang/clash-compiler/issues/75)
+
 ## 0.5.12 *September 7th 2015*
 * New features:
   * Modest compilation time speed-up. Compilation time of the [I2C](https://github.com/clash-lang/clash-compiler/tree/master/examples/i2c) module on my machine went down from 43s to 24s, and maximum memory usage went down from 840 MB to 700 MB.
