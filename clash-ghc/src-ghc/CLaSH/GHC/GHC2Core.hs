@@ -317,13 +317,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
       MachFloat r    -> C.RationalLiteral r
       MachDouble r   -> C.RationalLiteral r
       MachNullAddr   -> C.StringLiteral []
-      _              -> error $ concat [ $(curLoc)
-                                       , "Can't convert literal: "
-                                       , showPpr unsafeGlobalDynFlags l
-                                       , " in expression: "
-                                       , showSDoc unsafeGlobalDynFlags
-                                                  (pprCoreExpr coreExpr)
-                                       ]
+      MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 
 coreToDataCon :: Bool
               -> DataCon
