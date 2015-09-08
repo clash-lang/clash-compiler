@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.5.10
+* Fixes bugs:
+  * Maybe (Index n) not translatable to VHDL [#75](https://github.com/clash-lang/clash-compiler/issues/75)
+
 ## 0.5.9 *September 7th 2015*
 * Fixes bugs:
   * Bug in VHDL ROM generation [#69](https://github.com/clash-lang/clash-compiler/issues/69)

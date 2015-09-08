@@ -599,6 +599,7 @@ toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequ
 toSLV (BitVector _) e = expr_ False e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
+toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Sum _ _)    e = "std_logic_vector" <> parens (expr_ False e)
 toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds

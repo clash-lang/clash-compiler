@@ -44,6 +44,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "Shift" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "SimpleConstructor" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "TagToEnum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "TestIndex" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "TwoFunctions" (Just ("topEntity",False))
             ]
         , testGroup "BitVector"
