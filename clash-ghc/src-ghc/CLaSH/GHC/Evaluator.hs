@@ -78,6 +78,16 @@ reduceConstant tcm e@(collectArgs -> (Prim nm _, args))
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         -> Literal (IntegerLiteral (i `div` j))
       _ -> e
+  | nm == "GHC.Integer.Type.quotInteger"
+  = case (map (reduceConstant tcm) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+        -> Literal (IntegerLiteral (i `quot` j))
+      _ -> e
+  | nm == "GHC.Integer.Type.remInteger"
+  = case (map (reduceConstant tcm) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+        -> Literal (IntegerLiteral (i `rem` j))
+      _ -> e
   | nm == "GHC.Integer.Type.shiftLInteger"
   = case (map (reduceConstant tcm) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
