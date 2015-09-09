@@ -219,7 +219,7 @@ flattenCallTree (CBranch (nm,(ty,tm)) used) = do
   let (toInline,il_used) = unzip il_ct
   newExpr <- case toInline of
                [] -> return tm
-               _  -> rewriteExpr ("bindConstants",(repeatR (topdownR $ (bindConstantVar >-> caseCon >-> reduceConst))) !-> topLet) (showDoc nm, substTms toInline tm)
+               _  -> rewriteExpr ("bindConstants",(repeatR (topdownR $ (bindConstantVar >-> caseCon >-> reduceConst))) !-> topdownSucR topLet) (showDoc nm, substTms toInline tm)
   return (CBranch (nm,(ty,newExpr)) (newUsed ++ (concat il_used)))
 
 callTreeToList :: [TmName]
