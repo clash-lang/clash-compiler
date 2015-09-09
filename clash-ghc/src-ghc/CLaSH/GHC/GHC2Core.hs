@@ -55,8 +55,7 @@ import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique)
 import OccName    (occNameString)
-import Outputable (showPpr, showSDoc)
-import PprCore    (pprCoreExpr)
+import Outputable (showPpr)
 import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
