@@ -98,7 +98,7 @@ typeSpec ctx e@(TyApp e1 ty)
   | (Var _ _,  args) <- collectArgs e1
   , null $ Lens.toListOf typeFreeVars ty
   , (_, []) <- Either.partitionEithers args
-  = specializeNorm False ctx e
+  = specializeNorm ctx e
 
 typeSpec _ e = return e
 
@@ -113,7 +113,7 @@ nonRepSpec ctx e@(App e1 e2)
        localVar <- isLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure e2Ty)
        if nonRepE2 && not localVar
-         then specializeNorm True ctx e
+         then specializeNorm ctx e
          else return e
 
 nonRepSpec _ e = return e
@@ -261,8 +261,8 @@ nonRepANF ctx e@(App appConPrim arg)
     case (untranslatable,arg) of
       (True,Letrec b) -> do (binds,body) <- unbind b
                             changed (Letrec (bind binds (App appConPrim body)))
-      (True,Case {})  -> specializeNorm True ctx e
-      (True,Lam _)    -> specializeNorm True ctx e
+      (True,Case {})  -> specializeNorm ctx e
+      (True,Lam _)    -> specializeNorm ctx e
       _               -> return e
 
 nonRepANF _ e = return e
@@ -395,7 +395,7 @@ constantSpec ctx e@(App e1 e2)
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
   , isConstant e2
-  = specializeNorm False ctx e
+  = specializeNorm ctx e
 
 constantSpec _ e = return e
 
