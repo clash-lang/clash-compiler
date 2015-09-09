@@ -527,7 +527,8 @@ specialise' _ _ _ _ ctx _ (appE,args) (Left specArg) = do
   (specBndrs,specVars) <- specArgBndrsAndVars ctx (Left specArg)
   -- Create specialized function
   let newBody = mkAbstraction specArg specBndrs
-  newf <- mkFunction (string2Name "specF") newBody
+  cf   <- Lens.use curFun
+  newf <- mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
   -- Create specialized argument
   let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars
   -- Use specialized argument
