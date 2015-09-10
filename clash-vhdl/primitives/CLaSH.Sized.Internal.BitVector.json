@@ -13,13 +13,13 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.high"
     , "type"      : "high :: Bit"
-    , "templateE" : "\"1\""
+    , "templateE" : "std_logic_vector'(\"1\")"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.low"
     , "type"      : "low :: Bit"
-    , "templateE" : "\"0\""
+    , "templateE" : "std_logic_vector'(\"0\")"
     }
   }
 , { "BlackBox" :

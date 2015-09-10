@@ -50,6 +50,7 @@ main =
         , testGroup "BitVector"
             [ runTest ("tests" </> "shouldwork" </> "BitVector") Both [] "Box" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "BitVector") Both [] "BoxGrow" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "BitVector") Both [] "RePack" (Just ("topEntity",False))
             ]
         , testGroup "BoxedFunctions"
             [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") Both [] "DeadRecursiveBoxed" (Just ("topEntity",False))
