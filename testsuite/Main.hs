@@ -67,6 +67,7 @@ main =
             ]
         , testGroup "HOPrim"
             [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "Transpose" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "VecFun" (Just ("testbench",True))
             ]
         , testGroup "Numbers"

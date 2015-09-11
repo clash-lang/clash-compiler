@@ -77,7 +77,7 @@ data RewriteEnv
   -- ^ Hardcode Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon
   -- ^ TyCon cache
-  , _evaluator      :: HashMap TyConName TyCon -> Term -> Term
+  , _evaluator      :: HashMap TyConName TyCon -> Bool -> Term -> Term
   -- ^ Hardcoded evaluator (delta-reduction)}
   }
 

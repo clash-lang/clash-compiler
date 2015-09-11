@@ -53,13 +53,13 @@ import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
 import           CLaSH.Core.Type             (TypeView (..), Type (..),
                                               LitTy (..), applyFunTy,
                                               applyTy, splitFunTy, typeKind,
-                                              tyView)
-import           CLaSH.Core.TyCon            (tyConDataCons)
-import           CLaSH.Core.TysPrim          (typeNatKind)
-import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
+                                              tyView, mkTyConApp, mkFunTy)
+import           CLaSH.Core.TyCon            (TyConName, tyConDataCons)
+import           CLaSH.Core.Util             (collectArgs, extractElems,
+                                              idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isVar, mkApps, mkLams, mkTmApps,
-                                              termSize,termType)
+                                              mkVec, termSize,termType)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -232,7 +232,7 @@ caseCon ctx e@(Case subj ty alts)
     tcm <- Lens.view tcCache
     lvl <- Lens.view dbgLevel
     reduceConstant <- Lens.view evaluator
-    case reduceConstant tcm subj of
+    case reduceConstant tcm True subj of
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj'@(collectArgs -> (Data _,_)) -> caseCon ctx (Case subj' ty alts)
       subj' -> traceIf (lvl > DebugNone) ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj') (caseOneAlt e)
@@ -699,7 +699,7 @@ reduceConst _ e@(App _ _)
   = do
     tcm <- Lens.view tcCache
     reduceConstant <- Lens.view evaluator
-    case reduceConstant tcm e of
+    case reduceConstant tcm False e of
       e'@(Data _)    -> changed e'
       e'@(Literal _) -> changed e'
       _              -> return e
@@ -730,6 +730,7 @@ reduceConst _ e = return e
 --
 -- * CLaSH.Sized.Vector.map
 -- * CLaSH.Sized.Vector.zipWith
+-- * CLaSH.Sized.Vector.traverse#
 reduceNonRepPrim :: NormRewrite
 reduceNonRepPrim _ e@(App _ _)
   | (Prim f _, args) <- collectArgs e
@@ -753,6 +754,13 @@ reduceNonRepPrim _ e@(App _ _)
                then let [fun,arg] = Either.lefts args
                     in  reduceMap n argElTy resElTy fun arg
                else return e
+          _ -> return e
+      "CLaSH.Sized.Vector.traverse#" | length args == 7 ->
+        let [aTy,fTy,bTy,nTy] = Either.rights args
+        in  case nTy of
+          (LitTy (NumTy n)) ->
+            let [dict,fun,arg] = Either.lefts args
+            in  reduceTraverse n aTy fTy bTy dict fun arg
           _ -> return e
       _ -> return e
 
@@ -801,66 +809,119 @@ reduceMap n argElTy resElTy fun arg = do
       lb               = Letrec (bind (rec (init elems)) lbody)
   changed lb
 
--- | Create a vector of supplied elements
-mkVec :: DataCon -- ^ The Nil constructor
-      -> DataCon -- ^ The Cons (:>) constructor
-      -> Type    -- ^ Element type
-      -> Int     -- ^ Length of the vector
-      -> [Term]  -- ^ Elements to put in the vector
-      -> Term
-mkVec nilCon consCon resTy = go
+-- | Replace an application of @CLaSH.Sized.Vector.traverse#@ primitive on
+-- vectors of a known length @n@, by the fully unrolled recursive "definition"
+-- of @CLaSH.Sized.Vector.map@
+reduceTraverse :: Int  -- ^ Length of the vector
+               -> Type -- ^ Element type of the argument vector
+               -> Type -- ^ The type of the applicative
+               -> Type -- ^ Element type of the result vector
+               -> Term -- ^ The @Applicative@ dictionary
+               -> Term -- ^ The function to traverse with
+               -> Term -- ^ The argument vector
+               -> NormalizeSession Term
+reduceTraverse n aTy fTy bTy dict fun arg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm    _) <- tyView <$> termType tcm arg
+  (TyConApp apDictTcNm _) <- tyView <$> termType tcm dict
+  let (Just apDictTc)    = HashMap.lookup apDictTcNm tcm
+      [apDictCon]        = tyConDataCons apDictTc
+      apDictIdTys        = dataConInstArgTys apDictCon [fTy]
+      apDictIds          = zipWith Id (map string2Name ["functorDict"
+                                                       ,"pure"
+                                                       ,"ap"
+                                                       ,"apConstL"
+                                                       ,"apConstR"])
+                                      (map embed apDictIdTys)
+
+      (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
+      (Just funcDictTc) = HashMap.lookup funcDictTcNm tcm
+      [funcDictCon] = tyConDataCons funcDictTc
+      funcDictIdTys = dataConInstArgTys funcDictCon [fTy]
+      funcDicIds    = zipWith Id (map string2Name ["fmap","fmapConst"])
+                                 (map embed funcDictIdTys)
+
+      apPat    = DataPat (embed apDictCon) (rebind [] apDictIds)
+      fnPat    = DataPat (embed funcDictCon) (rebind [] funcDicIds)
+
+      -- Extract the 'pure' function from the Applicative dictionary
+      pureTy = apDictIdTys!!1
+      pureTm = Case dict pureTy [bind apPat (Var pureTy (string2Name "pure"))]
+
+      -- Extract the '<*>' function from the Applicative dictionary
+      apTy   = apDictIdTys!!2
+      apTm   = Case dict apTy [bind apPat (Var apTy (string2Name "ap"))]
+
+      -- Extract the Functor dictionary from the Applicative dictionary
+      funcTy = (head apDictIdTys)
+      funcTm = Case dict funcTy
+                         [bind apPat (Var funcTy (string2Name "functorDict"))]
+
+      -- Extract the 'fmap' function from the Functor dictionary
+      fmapTy = (head funcDictIdTys)
+      fmapTm = Case (Var funcTy (string2Name "functorDict")) fmapTy
+                    [bind fnPat (Var fmapTy (string2Name "fmap"))]
+
+      (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      (vars,elems)     = second concat . unzip
+                                       $ extractElems consCon aTy 'T' n arg
+
+      funApps = map (fun `App`) vars
+
+      lbody   = mkTravVec vecTcNm nilCon consCon (idToVar (apDictIds!!1))
+                                                 (idToVar (apDictIds!!2))
+                                                 (idToVar (funcDicIds!!0))
+                                                 bTy n funApps
+
+      lb      = Letrec (bind (rec ([((apDictIds!!0),embed funcTm)
+                                   ,((apDictIds!!1),embed pureTm)
+                                   ,((apDictIds!!2),embed apTm)
+                                   ,((funcDicIds!!0),embed fmapTm)
+                                   ] ++ init elems)) lbody)
+  changed lb
+
+-- | Create the traversable vector
+--
+-- e.g. for a length '2' input vector, we get
+--
+-- > (:>) <$> x0 <*> ((:>) <$> x1 <*> pure Nil)
+mkTravVec :: TyConName -- ^ Vec tcon
+          -> DataCon   -- ^ Nil con
+          -> DataCon   -- ^ Cons con
+          -> Term      -- ^ 'pure' term
+          -> Term      -- ^ '<*>' term
+          -> Term      -- ^ 'fmap' term
+          -> Type      -- ^ 'b' ty
+          -> Int       -- ^ Length of the vector
+          -> [Term]    -- ^ Elements of the vector
+          -> Term
+mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
   where
-    go _ [] = mkApps (Data nilCon) [Right (LitTy (NumTy 0))
-                                   ,Right resTy
-                                   ,Left  (Prim "_CO_" nilCoTy)
-                                   ]
+    go :: Int -> [Term] -> Term
+    go _ [] = mkApps pureTm [Right (mkTyConApp vecTc [LitTy (NumTy 0),bTy])
+                            ,Left  (mkApps (Data nilCon)
+                                           [Right (LitTy (NumTy 0))
+                                           ,Right bTy
+                                           ,Left  (Prim "_CO_" nilCoTy)])]
 
-    go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
-                                        ,Right resTy
-                                        ,Right (LitTy (NumTy (n-1)))
-                                        ,Left (Prim "_CO_" (consCoTy n))
-                                        ,Left x
-                                        ,Left (go (n-1) xs)]
+    go n (x:xs) = mkApps apTm
+      [Right (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
+      ,Right (mkTyConApp vecTc [LitTy (NumTy n),bTy])
+      ,Left (mkApps fmapTm [Right bTy
+                           ,Right (mkFunTy (mkTyConApp vecTc [LitTy (NumTy (n-1)),bTy])
+                                           (mkTyConApp vecTc [LitTy (NumTy n),bTy]))
+                           ,Left  (mkApps (Data consCon)
+                                          [Right (LitTy (NumTy n))
+                                          ,Right bTy
+                                          ,Right (LitTy (NumTy (n-1)))
+                                          ,Left  (Prim "_CO_" (consCoTy n))
+                                          ])
+                           ,Left  x])
+      ,Left (go (n-1) xs)]
 
-    nilCoTy    = head (dataConInstArgTys nilCon  [(LitTy (NumTy 0)),resTy])
+    nilCoTy = head (dataConInstArgTys nilCon [(LitTy (NumTy 0)),bTy])
+
     consCoTy n = head (dataConInstArgTys consCon [(LitTy (NumTy n))
-                                                 ,resTy
+                                                 ,bTy
                                                  ,(LitTy (NumTy (n-1)))])
-
--- | Create let-bindings with case-statements that select elements out of a
--- vector. Returns both the variables to which element-selections are bound
--- and the let-bindings
-extractElems :: DataCon -- ^ The Cons (:>) constructor
-             -> Type    -- ^ The element type
-             -> Char    -- ^ Char to append to the bound variable names
-             -> Int     -- ^ Length of the vector
-             -> Term    -- ^ The vector
-             -> [(Term,[LetBinding])]
-extractElems consCon resTy s maxN = go maxN
-  where
-    go :: Int -> Term -> [(Term,[LetBinding])]
-    go 0 _ = []
-    go n e = (elVar
-             ,[(Id elBNm (embed resTy) ,embed lhs)
-              ,(Id restBNm (embed restTy),embed rhs)
-              ]
-             ) :
-             go (n-1) (Var restTy restBNm)
-
-      where
-        elBNm     = string2Name ("el" ++ s:show (maxN-n))
-        restBNm   = string2Name ("rest" ++ s:show (maxN-n))
-        elVar     = Var resTy elBNm
-        pat       = DataPat (embed consCon) (rebind [mTV] [co,el,rest])
-        elPatNm   = string2Name "el"
-        restPatNm = string2Name "rest"
-        lhs       = Case e resTy  [bind pat (Var resTy  elPatNm)]
-        rhs       = Case e restTy [bind pat (Var restTy restPatNm)]
-
-        mName = string2Name "m"
-        mTV   = TyVar mName (embed typeNatKind)
-        tys   = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
-        idTys = dataConInstArgTys consCon tys
-        [co,el,rest] = zipWith Id [string2Name "_co_",elPatNm, restPatNm]
-                                  (map embed idTys)
-        restTy = last $ dataConInstArgTys consCon tys

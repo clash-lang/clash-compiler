@@ -42,7 +42,7 @@ generateHDL :: forall backend . Backend backend
             -> PrimMap -- ^ Primitive / BlackBox Definitions
             -> HashMap TyConName TyCon -- ^ TyCon cache
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
-            -> (HashMap TyConName TyCon -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
+            -> (HashMap TyConName TyCon -> Bool -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
             -> Maybe TopEntity
             -> CLaSHOpts -- ^ Debug information level for the normalization process
             -> IO ()

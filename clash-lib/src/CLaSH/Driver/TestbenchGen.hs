@@ -40,7 +40,7 @@ genTestBench :: CLaSHOpts
              -> PrimMap                      -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
-             -> (HashMap TyConName TyCon -> Term -> Term)
+             -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
              -> Int
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli

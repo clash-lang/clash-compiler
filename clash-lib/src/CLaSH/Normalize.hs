@@ -51,7 +51,7 @@ runNormalization :: CLaSHOpts
                  -- ^ Hardcoded Type -> HWType translator
                  -> HashMap TyConName TyCon
                  -- ^ TyCon cache
-                 -> (HashMap TyConName TyCon -> Term -> Term)
+                 -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
                  -- ^ Hardcoded evaluator (delta-reduction)
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run

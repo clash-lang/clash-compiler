@@ -1,21 +1,26 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 -- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
 import Data.HashMap.Lazy                       (HashMap)
-import Unbound.Generics.LocallyNameless        (Fresh, bind, embed, unbind, unembed,
+import Unbound.Generics.LocallyNameless        (Fresh, bind, embed, rebind,
+                                                string2Name, unbind, unembed,
                                                 unrebind, unrec)
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import CLaSH.Core.DataCon                      (dcType)
+import CLaSH.Core.DataCon                      (DataCon, dcType, dataConInstArgTys)
 import CLaSH.Core.Literal                      (literalType)
 import CLaSH.Core.Pretty                       (showDoc)
-import CLaSH.Core.Term                         (Pat (..), Term (..), TmName)
-import CLaSH.Core.Type                         (Kind, TyName, Type (..), applyTy,
+import CLaSH.Core.Term                         (LetBinding, Pat (..), Term (..),
+                                                TmName)
+import CLaSH.Core.Type                         (Kind, LitTy (..), TyName,
+                                                Type (..), applyTy,
                                                 isFunTy, isPolyFunCoreTy, mkFunTy,
                                                 splitFunTy)
 import CLaSH.Core.TyCon                        (TyCon, TyConName)
+import CLaSH.Core.TysPrim                      (typeNatKind)
 import CLaSH.Core.Var                          (Id, TyVar, Var (..), varType)
 import CLaSH.Util
 
@@ -219,3 +224,67 @@ termSize (Letrec b)  = let (bndrsR,body) = unsafeUnbind b
 termSize (Case subj _ alts) = let subjSz = termSize subj
                                   altSzs = map (termSize . snd . unsafeUnbind) alts
                               in  sum (subjSz:altSzs)
+
+-- | Create a vector of supplied elements
+mkVec :: DataCon -- ^ The Nil constructor
+      -> DataCon -- ^ The Cons (:>) constructor
+      -> Type    -- ^ Element type
+      -> Int     -- ^ Length of the vector
+      -> [Term]  -- ^ Elements to put in the vector
+      -> Term
+mkVec nilCon consCon resTy = go
+  where
+    go _ [] = mkApps (Data nilCon) [Right (LitTy (NumTy 0))
+                                   ,Right resTy
+                                   ,Left  (Prim "_CO_" nilCoTy)
+                                   ]
+
+    go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
+                                        ,Right resTy
+                                        ,Right (LitTy (NumTy (n-1)))
+                                        ,Left (Prim "_CO_" (consCoTy n))
+                                        ,Left x
+                                        ,Left (go (n-1) xs)]
+
+    nilCoTy    = head (dataConInstArgTys nilCon  [(LitTy (NumTy 0)),resTy])
+    consCoTy n = head (dataConInstArgTys consCon [(LitTy (NumTy n))
+                                                 ,resTy
+                                                 ,(LitTy (NumTy (n-1)))])
+
+-- | Create let-bindings with case-statements that select elements out of a
+-- vector. Returns both the variables to which element-selections are bound
+-- and the let-bindings
+extractElems :: DataCon -- ^ The Cons (:>) constructor
+             -> Type    -- ^ The element type
+             -> Char    -- ^ Char to append to the bound variable names
+             -> Int     -- ^ Length of the vector
+             -> Term    -- ^ The vector
+             -> [(Term,[LetBinding])]
+extractElems consCon resTy s maxN = go maxN
+  where
+    go :: Int -> Term -> [(Term,[LetBinding])]
+    go 0 _ = []
+    go n e = (elVar
+             ,[(Id elBNm (embed resTy) ,embed lhs)
+              ,(Id restBNm (embed restTy),embed rhs)
+              ]
+             ) :
+             go (n-1) (Var restTy restBNm)
+
+      where
+        elBNm     = string2Name ("el" ++ s:show (maxN-n))
+        restBNm   = string2Name ("rest" ++ s:show (maxN-n))
+        elVar     = Var resTy elBNm
+        pat       = DataPat (embed consCon) (rebind [mTV] [co,el,rest])
+        elPatNm   = string2Name "el"
+        restPatNm = string2Name "rest"
+        lhs       = Case e resTy  [bind pat (Var resTy  elPatNm)]
+        rhs       = Case e restTy [bind pat (Var restTy restPatNm)]
+
+        mName = string2Name "m"
+        mTV   = TyVar mName (embed typeNatKind)
+        tys   = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
+        idTys = dataConInstArgTys consCon tys
+        [co,el,rest] = zipWith Id [string2Name "_co_",elPatNm, restPatNm]
+                                  (map embed idTys)
+        restTy = last $ dataConInstArgTys consCon tys
