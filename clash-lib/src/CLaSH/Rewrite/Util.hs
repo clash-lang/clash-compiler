@@ -405,12 +405,24 @@ isLocalVar (Var _ name)
   $ Lens.use bindings
 isLocalVar _ = return False
 
+{-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
 isUntranslatable :: Term
                  -> RewriteMonad extra Bool
 isUntranslatable tm = do
   tcm <- Lens.view tcCache
-  not <$> (representableType <$> Lens.view typeTranslator <*> pure tcm <*> termType tcm tm)
+  not <$> (representableType <$> Lens.view typeTranslator
+                             <*> pure tcm
+                             <*> termType tcm tm)
+
+{-# INLINE isUntranslatableType #-}
+-- | Determine if a type cannot be represented in hardware
+isUntranslatableType :: Type
+                     -> RewriteMonad extra Bool
+isUntranslatableType ty =
+  not <$> (representableType <$> Lens.view typeTranslator
+                             <*> Lens.view tcCache
+                             <*> pure ty)
 
 -- | Is the Context a Lambda/Term-abstraction context?
 isLambdaBodyCtx :: CoreContext

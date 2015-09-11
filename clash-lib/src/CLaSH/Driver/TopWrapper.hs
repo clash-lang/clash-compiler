@@ -177,7 +177,7 @@ mkOutput nms (i,hwty) cnt = case hwty of
         netdecl = NetDecl iName hwty
         assigns = zipWith
                     (\id_ n -> Assignment id_
-                                 (Identifier iName (Just (Indexed (hwty,1,n)))))
+                                 (Identifier iName (Just (Indexed (hwty,10,n)))))
                     ids
                     [0..]
     in  (nms',(ports',(netdecl:assigns ++ decls',iName)))

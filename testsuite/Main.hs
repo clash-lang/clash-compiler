@@ -65,6 +65,10 @@ main =
         , testGroup "Fixed"
             [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
             ]
+        , testGroup "HOPrim"
+            [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "VecFun" (Just ("testbench",True))
+            ]
         , testGroup "Numbers"
             [ runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize2" (Just ("testbench",True))

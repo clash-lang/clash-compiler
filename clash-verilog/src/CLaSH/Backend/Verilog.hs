@@ -206,7 +206,23 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ argTys),_,fI)))) =
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),_,fI)))) =
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,1)))) =
+    text id_ <> brackets (int start <> colon <> int end)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - 1
+    end     = start - argSize + 1
+
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,2)))) =
+    text id_ <> brackets (int start <> colon <> int 0)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - argSize - 1
+
+-- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
+-- Vector's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),10,fI)))) =
     text id_ <> brackets (int start <> colon <> int end)
   where
     argSize = typeSize argTy

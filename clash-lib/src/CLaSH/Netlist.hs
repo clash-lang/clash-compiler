@@ -20,6 +20,7 @@ import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
                                                   unrebind)
 
 import           CLaSH.Core.DataCon               (DataCon (..))
+import           CLaSH.Core.FreeVars              (typeFreeVars)
 import           CLaSH.Core.Literal               (Literal (..))
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Term                  (Pat (..), Term (..), TmName)
@@ -184,10 +185,14 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
       altVarId = mkBasicId . Text.pack $ name2String varTm
       modifier = case pat of
-        DataPat (Embed dc) ids -> let tms = case unrebind ids of
-                                              ([],tms') -> tms'
-                                              _         -> error $ $(curLoc) ++ "Not in normal form: Pattern binds existential variables: " ++ showDoc e
-                                  in case elemIndex (Id varTm (Embed varTy)) tms of
+        DataPat (Embed dc) ids -> let (exts,tms) = unrebind ids
+                                      tmsTys     = map (unembed . varType) tms
+                                      tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
+                                      extNms     = map varName exts
+                                      tms'       = if any (`elem` tmsFVs) extNms
+                                                      then error $ $(curLoc) ++ "Not in normal form: Pattern binds existential variables: " ++ showDoc e
+                                                      else tms
+                                  in case elemIndex (Id varTm (Embed varTy)) tms' of
                                        Nothing -> Nothing
                                        Just fI
                                         | sHwTy /= vHwTy -> Just (Indexed (sHwTy,dcTag dc - 1,fI))

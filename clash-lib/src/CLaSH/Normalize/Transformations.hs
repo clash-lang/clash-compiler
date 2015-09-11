@@ -1,5 +1,6 @@
-{-# LANGUAGE TemplateHaskell  #-}
-{-# LANGUAGE ViewPatterns     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 -- | Transformations of the Normalization process
 module CLaSH.Normalize.Transformations
@@ -25,6 +26,7 @@ module CLaSH.Normalize.Transformations
   , inlineSmall
   , simpleCSE
   , reduceConst
+  , reduceNonRepPrim
   )
 where
 
@@ -37,19 +39,23 @@ import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
 import           Unbound.Generics.LocallyNameless     (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
-                                              unrec, name2String)
+                                              unrec, name2String, string2Name,
+                                              rebind)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           CLaSH.Core.DataCon          (DataCon, dcName, dcTag,
-                                              dcUnivTyVars)
+import           CLaSH.Core.DataCon          (DataCon (..), dataConInstArgTys)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               typeFreeVars)
 import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
-import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
-                                              applyTy, splitFunTy, typeKind, tyView)
+import           CLaSH.Core.Type             (TypeView (..), Type (..),
+                                              LitTy (..), applyFunTy,
+                                              applyTy, splitFunTy, typeKind,
+                                              tyView)
+import           CLaSH.Core.TyCon            (tyConDataCons)
+import           CLaSH.Core.TysPrim          (typeNatKind)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isVar, mkApps, mkLams, mkTmApps,
@@ -699,3 +705,162 @@ reduceConst _ e@(App _ _)
       _              -> return e
 
 reduceConst _ e = return e
+
+-- | Replace primitives by their "definition" if they would lead to let-bindings
+-- with a non-representable type when a function is in ANF. This happens for
+-- example when CLaSH.Size.Vector.map consumes or produces a vector of
+-- non-representable elements.
+--
+-- Basically what this transformation does is replace a primitive the completely
+-- unrolled recursive definition that it represents. e.g.
+--
+-- > zipWith ($) (xs :: Vec 2 (Int -> Int)) (ys :: Vec 2 Int)
+--
+-- is replaced by:
+--
+-- > let (x0  :: (Int -> Int))       = case xs  of (:>) _ x xr -> x
+-- >     (xr0 :: Vec 1 (Int -> Int)) = case xs  of (:>) _ x xr -> xr
+-- >     (x1  :: (Int -> Int)(       = case xr0 of (:>) _ x xr -> x
+-- >     (y0  :: Int)                = case ys  of (:>) _ y yr -> y
+-- >     (yr0 :: Vec 1 Int)          = case ys  of (:>) _ y yr -> xr
+-- >     (y1  :: Int                 = case yr0 of (:>) _ y yr -> y
+-- > in  (($) x0 y0 :> ($) x1 y1 :> Nil)
+--
+-- Currently, it only handles the following functions:
+--
+-- * CLaSH.Sized.Vector.map
+-- * CLaSH.Sized.Vector.zipWith
+reduceNonRepPrim :: NormRewrite
+reduceNonRepPrim _ e@(App _ _)
+  | (Prim f _, args) <- collectArgs e
+  = case f of
+      "CLaSH.Sized.Vector.zipWith" | length args == 7 -> do
+        let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
+        case nTy of
+          (LitTy (NumTy n)) -> do
+            untranslatableTys <- mapM isUntranslatableType [lhsElTy,rhsElty,resElTy]
+            if or untranslatableTys
+               then let [fun,lhsArg,rhsArg] = Either.lefts args
+                    in  reduceZipWith n lhsElTy rhsElty resElTy fun lhsArg rhsArg
+               else return e
+          _ -> return e
+      "CLaSH.Sized.Vector.map" | length args == 5 -> do
+        let [argElTy,resElTy,nTy] = Either.rights args
+        case nTy of
+          (LitTy (NumTy n)) -> do
+            untranslatableTys <- mapM isUntranslatableType [argElTy,resElTy]
+            if or untranslatableTys
+               then let [fun,arg] = Either.lefts args
+                    in  reduceMap n argElTy resElTy fun arg
+               else return e
+          _ -> return e
+      _ -> return e
+
+reduceNonRepPrim _ e = return e
+
+-- | Replace an application of @CLaSH.Sized.Vector.zipWith@ primitive on vectors
+-- of a known length @n@, by the fully unrolled recursive "definition" of of
+-- @CLaSH.Sized.Vector.zipWith@
+reduceZipWith :: Int  -- ^ Length of the vector(s)
+              -> Type -- ^ Type of the lhs of the function
+              -> Type -- ^ Type of the rhs of the function
+              -> Type -- ^ Type of the result of the function
+              -> Term -- ^ The zipWith'd functions
+              -> Term -- ^ The 1st vector argument
+              -> Term -- ^ The 2nd vector argument
+              -> NormalizeSession Term
+reduceZipWith n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm lhsArg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      (varsL,elemsL)   = second concat . unzip $ extractElems consCon lhsElTy 'L' n lhsArg
+      (varsR,elemsR)   = second concat . unzip $ extractElems consCon rhsElTy 'R' n rhsArg
+      funApps          = zipWith (\l r -> mkApps fun [Left l,Left r]) varsL varsR
+      lbody            = mkVec nilCon consCon resElTy n funApps
+      lb               = Letrec (bind (rec (init elemsL ++ init elemsR)) lbody)
+  changed lb
+
+-- | Replace an application of @CLaSH.Sized.Vector.map@ primitive on vectors
+-- of a known length @n@, by the fully unrolled recursive "definition" of of
+-- @CLaSH.Sized.Vector.map@
+reduceMap :: Int  -- ^ Length of the vector
+          -> Type -- ^ Argument type of the function
+          -> Type -- ^ Result type of the function
+          -> Term -- ^ The map'd function
+          -> Term -- ^ The map'd over vector
+          -> NormalizeSession Term
+reduceMap n argElTy resElTy fun arg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      (vars,elems)     = second concat . unzip $ extractElems consCon argElTy 'A' n arg
+      funApps          = map (fun `App`) vars
+      lbody            = mkVec nilCon consCon resElTy n funApps
+      lb               = Letrec (bind (rec (init elems)) lbody)
+  changed lb
+
+-- | Create a vector of supplied elements
+mkVec :: DataCon -- ^ The Nil constructor
+      -> DataCon -- ^ The Cons (:>) constructor
+      -> Type    -- ^ Element type
+      -> Int     -- ^ Length of the vector
+      -> [Term]  -- ^ Elements to put in the vector
+      -> Term
+mkVec nilCon consCon resTy = go
+  where
+    go _ [] = mkApps (Data nilCon) [Right (LitTy (NumTy 0))
+                                   ,Right resTy
+                                   ,Left  (Prim "_CO_" nilCoTy)
+                                   ]
+
+    go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
+                                        ,Right resTy
+                                        ,Right (LitTy (NumTy (n-1)))
+                                        ,Left (Prim "_CO_" (consCoTy n))
+                                        ,Left x
+                                        ,Left (go (n-1) xs)]
+
+    nilCoTy    = head (dataConInstArgTys nilCon  [(LitTy (NumTy 0)),resTy])
+    consCoTy n = head (dataConInstArgTys consCon [(LitTy (NumTy n))
+                                                 ,resTy
+                                                 ,(LitTy (NumTy (n-1)))])
+
+-- | Create let-bindings with case-statements that select elements out of a
+-- vector. Returns both the variables to which element-selections are bound
+-- and the let-bindings
+extractElems :: DataCon -- ^ The Cons (:>) constructor
+             -> Type    -- ^ The element type
+             -> Char    -- ^ Char to append to the bound variable names
+             -> Int     -- ^ Length of the vector
+             -> Term    -- ^ The vector
+             -> [(Term,[LetBinding])]
+extractElems consCon resTy s maxN = go maxN
+  where
+    go :: Int -> Term -> [(Term,[LetBinding])]
+    go 0 _ = []
+    go n e = (elVar
+             ,[(Id elBNm (embed resTy) ,embed lhs)
+              ,(Id restBNm (embed restTy),embed rhs)
+              ]
+             ) :
+             go (n-1) (Var restTy restBNm)
+
+      where
+        elBNm     = string2Name ("el" ++ s:show (maxN-n))
+        restBNm   = string2Name ("rest" ++ s:show (maxN-n))
+        elVar     = Var resTy elBNm
+        pat       = DataPat (embed consCon) (rebind [mTV] [co,el,rest])
+        elPatNm   = string2Name "el"
+        restPatNm = string2Name "rest"
+        lhs       = Case e resTy  [bind pat (Var resTy  elPatNm)]
+        rhs       = Case e restTy [bind pat (Var restTy restPatNm)]
+
+        mName = string2Name "m"
+        mTV   = TyVar mName (embed typeNatKind)
+        tys   = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
+        idTys = dataConInstArgTys consCon tys
+        [co,el,rest] = zipWith Id [string2Name "_co_",elPatNm, restPatNm]
+                                  (map embed idTys)
+        restTy = last $ dataConInstArgTys consCon tys

@@ -25,7 +25,7 @@ constantPropgation :: NormRewrite
 constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> spec
   where
     propagate = innerMost (applyMany transInner)
-    inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
+    inlineAndPropagate = (bottomupR (applyMany transBUP) >-> bottomupR (apply "reduceNonRepPrim" reduceNonRepPrim)) !-> propagate
     lifting   = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
     spec      = bottomupR (applyMany specRws)
 
