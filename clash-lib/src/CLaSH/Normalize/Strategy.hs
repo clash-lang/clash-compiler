@@ -25,7 +25,7 @@ constantPropgation :: NormRewrite
 constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> spec
   where
     propagate = innerMost (applyMany transInner)
-    inlineAndPropagate = (bottomupR (applyMany transBUP) >-> bottomupR (apply "reduceNonRepPrim" reduceNonRepPrim)) !-> propagate
+    inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
     lifting   = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
     spec      = bottomupR (applyMany specRws)
 
@@ -38,10 +38,11 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> sp
                  ]
 
     transBUP :: [(String,NormRewrite)]
-    transBUP = [ ("inlineClosed", inlineClosed)
-               , ("inlineSmall" , inlineSmall)
-               , ("inlineNonRep", inlineNonRep)
-               , ("bindNonRep"  , bindNonRep) -- See: [Note] bindNonRep before liftNonRep
+    transBUP = [ ("inlineClosed"    , inlineClosed)
+               , ("inlineSmall"     , inlineSmall)
+               , ("inlineNonRep"    , inlineNonRep)
+               , ("bindNonRep"      , bindNonRep) -- See: [Note] bindNonRep before liftNonRep
+               , ("reduceNonRepPrim", reduceNonRepPrim)
                ]
 
     specRws :: [(String,NormRewrite)]
