@@ -1,5 +1,10 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.5.11 *September 14th 2015*
+* Support for clash-lib-0.5.12
+* Fixes bugs:
+  * Converting Bool to Unsigned generates broken VHDL [#77](https://github.com/clash-lang/clash-compiler/issues/77)
+
 ## 0.5.10 *September 8th 2015*
 * Fixes bugs:
   * Maybe (Index n) not translatable to VHDL [#75](https://github.com/clash-lang/clash-compiler/issues/75)

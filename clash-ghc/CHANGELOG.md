@@ -1,5 +1,17 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.14 *September 14th 2015*
+* New features:
+  * Completely unroll "definitions" of some higher-order primitives with non-representable argument or result vectors:
+    It is now possible to translate e.g. `f xs ys = zipWith ($) (map (+) xs) ys :: Vec 4 Int -> Vec 4 Int -> Vec 4 Int`
+
+* Fixes bugs:
+  * Converting Bool to Unsigned generates broken VHDL [#77](https://github.com/clash-lang/clash-compiler/issues/77)
+  * `topLet` transformation erroneously not performed in a top-down traversal
+  * Specialisation limit unchecked on types and constants
+  * Vector of functions cannot be translated [#25](https://github.com/clash-lang/clash-compiler/issues/25 )
+  * CLaSH fails to generate VHDL when map is applied [#78](https://github.com/clash-lang/clash-compiler/issues/78)
+
 ## 0.5.13 *September 8th 2015*
 * Fixes bugs:
   * Cannot translate GHC `MachLabel` literal
