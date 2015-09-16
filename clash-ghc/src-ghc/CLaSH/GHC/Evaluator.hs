@@ -14,7 +14,8 @@ import           CLaSH.Core.DataCon  (DataCon (..))
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Term     (Term (..))
 import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
-                                      TypeView (..), tyView, mkFunTy)
+                                      TypeView (..), tyView, mkFunTy,
+                                      mkTyConApp)
 import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)
 import           CLaSH.Core.TysPrim  (typeNatKind)
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkVec,termType)
@@ -106,31 +107,32 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm _, args))
       _ -> e
   | nm == "CLaSH.Sized.Internal.Signed.minBound#"
   = case args of
-      [litTy,Left (Literal (IntegerLiteral mb))]
+      [litTy,kn@(Left (Literal (IntegerLiteral mb)))]
         -> let minB = negate (2 ^ (mb - 1))
-           in  mkApps signedConPrim [litTy,Left (Literal (IntegerLiteral minB))]
+           in  mkApps signedConPrim [litTy,kn,Left (Literal (IntegerLiteral minB))]
       _ -> e
   | nm == "CLaSH.Sized.Internal.Signed.maxBound#"
   = case args of
-      [litTy,Left (Literal (IntegerLiteral mb))]
+      [litTy,kn@(Left (Literal (IntegerLiteral mb)))]
         -> let maxB = (2 ^ (mb - 1)) - 1
-           in  mkApps signedConPrim [litTy,Left (Literal (IntegerLiteral maxB))]
+           in  mkApps signedConPrim [litTy,kn,Left (Literal (IntegerLiteral maxB))]
       _ -> e
   | nm == "CLaSH.Sized.Internal.Unsigned.minBound#"
   = case args of
-      [litTy]
-        -> mkApps unsignedConPrim [litTy,Left (Literal (IntegerLiteral 0))]
+      [litTy,kn@(Left (Literal (IntegerLiteral _)))]
+        -> mkApps unsignedConPrim [litTy,kn,Left (Literal (IntegerLiteral 0))]
       _ -> e
   | nm == "CLaSH.Sized.Internal.Unsigned.maxBound#"
   = case args of
-      [litTy,Left (Literal (IntegerLiteral mb))]
-        -> let maxB = 2 ^ mb
-           in  mkApps unsignedConPrim [litTy,Left (Literal (IntegerLiteral maxB))]
+      [litTy,kn@(Left (Literal (IntegerLiteral mb)))]
+        -> let maxB = (2 ^ mb) - 1
+           in  mkApps unsignedConPrim [litTy,kn,Left (Literal (IntegerLiteral maxB))]
       _ -> e
   | nm == "CLaSH.Sized.Internal.Signed.toInteger#" || nm == "CLaSH.Sized.Internal.Unsigned.toInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [App _ (Literal (IntegerLiteral i))]
-        -> Literal (IntegerLiteral i)
+      [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])]
+        | nm' == "CLaSH.Sized.Internal.Signed.fromInteger#" ||
+          nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#"-> Literal (IntegerLiteral i)
       _ -> e
   | nm == "GHC.TypeLits.natVal"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
@@ -152,24 +154,24 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm _, args))
 reduceConstant _ _ e = e
 
 signedConPrim :: Term
-signedConPrim = Prim "CLaSH.Sized.Internal.Signed.S" (ForAllTy (bind nTV funTy))
+signedConPrim = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind nTV funTy))
   where
-    funTy    = mkFunTy intTy (AppTy signedTy nVar)
-    intTy    = ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
-    signedTy = ConstTy (TyCon (string2Name "CLaSH.Sized.Internal.Signed.Signed"))
-    nName    = string2Name "n"
-    nVar     = VarTy typeNatKind nName
-    nTV      = TyVar nName (embed typeNatKind)
-
-unsignedConPrim :: Term
-unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.U" (ForAllTy (bind nTV funTy))
-  where
-    funTy      = mkFunTy intTy (AppTy unsignedTy nVar)
+    funTy      = foldr1 mkFunTy [intTy,intTy,mkTyConApp signedTcNm [nVar]]
     intTy      = ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
-    unsignedTy = ConstTy (TyCon (string2Name "CLaSH.Sized.Internal.Unsigned.Unsigned"))
+    signedTcNm = string2Name "CLaSH.Sized.Internal.Signed.Signed"
     nName      = string2Name "n"
     nVar       = VarTy typeNatKind nName
     nTV        = TyVar nName (embed typeNatKind)
+
+unsignedConPrim :: Term
+unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.fromInteger#" (ForAllTy (bind nTV funTy))
+  where
+    funTy        = foldr1 mkFunTy [intTy,intTy,mkTyConApp unsignedTcNm [nVar]]
+    intTy        = ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
+    unsignedTcNm = string2Name "CLaSH.Sized.Internal.Unsigned.Unsigned"
+    nName        = string2Name "n"
+    nVar         = VarTy typeNatKind nName
+    nTV          = TyVar nName (embed typeNatKind)
 
 snatCon :: Term
 snatCon = Data (MkData snanNm 1 snatTy [nName] [] argTys)
