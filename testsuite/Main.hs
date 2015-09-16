@@ -71,7 +71,8 @@ main =
             , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "VecFun" (Just ("testbench",True))
             ]
         , testGroup "Numbers"
-            [ runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Bounds"  (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize"  (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize2" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "SatMult" (Just ("topEntity",False))
             ]
