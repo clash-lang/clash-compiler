@@ -22,7 +22,7 @@ assign ~RESULT = ~SYM[0];
 "// pragma translate_off
 reg ~TYPO ~SYM[0];
 initial begin
-  ~SYM[0] = 0;
+  #1 ~SYM[0] = 0;
   #~LIT[0] ~SYM[0] = 1;
 end
 assign ~RESULT = ~SYM[0];

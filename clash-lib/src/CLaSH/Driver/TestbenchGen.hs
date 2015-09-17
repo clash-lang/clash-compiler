@@ -113,7 +113,7 @@ genClock primMap (clkName,Clock clkSym rate) =
           falling       = rising + rest
           ctx = emptyBBContext
                   { bbResult = (Left (Identifier clkName Nothing), Clock clkSym rate)
-                  , bbInputs = [ (Left (N.Literal Nothing (NumLit 2)),Integer,True)
+                  , bbInputs = [ (Left (N.Literal Nothing (NumLit 3)),Integer,True)
                                , (Left (N.Literal Nothing (NumLit rising)),Integer,True)
                                , (Left (N.Literal Nothing (NumLit falling)),Integer,True)
                                ]
@@ -136,7 +136,7 @@ genReset primMap (rstName,Reset clkSym rate) =
     Just (BlackBox _ (Left templ)) -> do
       let ctx = emptyBBContext
                   { bbResult = (Left (Identifier rstName Nothing), Reset clkSym rate)
-                  , bbInputs = [(Left (N.Literal Nothing (NumLit 1)),Integer,True)]
+                  , bbInputs = [(Left (N.Literal Nothing (NumLit 2)),Integer,True)]
                   }
       templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.resetGen" templ ctx
       let resetGenDecl =  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" templ' ctx
