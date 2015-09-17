@@ -15,14 +15,14 @@ import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Term     (Term (..))
 import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
                                       TypeView (..), tyView, mkFunTy,
-                                      mkTyConApp)
+                                      mkTyConApp, splitFunForallTy)
 import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)
 import           CLaSH.Core.TysPrim  (typeNatKind)
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkVec,termType)
 import           CLaSH.Core.Var      (Var (..))
 
 reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
-reduceConstant tcm isSubj e@(collectArgs -> (Prim nm _, args))
+reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
   | nm == "GHC.Prim.==#" || nm == "GHC.Integer.Type.eqInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
@@ -91,6 +91,16 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm _, args))
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         -> Literal (IntegerLiteral (i `rem` j))
       _ -> e
+  | nm == "GHC.Prim.quotRemInt#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+        -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+               (Just tupTc) = HashMap.lookup tupTcNm tcm
+               [tupDc] = tyConDataCons tupTc
+               (q,r)   = quotRem i j
+               ret     = mkApps (Data tupDc) (map Right tyArgs ++ [Left (Literal (IntegerLiteral q)), Left (Literal (IntegerLiteral r))])
+            in ret
+      _ -> e
   | nm == "GHC.Integer.Type.shiftLInteger"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
@@ -132,7 +142,16 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm _, args))
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])]
         | nm' == "CLaSH.Sized.Internal.Signed.fromInteger#" ||
-          nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#"-> Literal (IntegerLiteral i)
+          nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#" -> Literal (IntegerLiteral i)
+      _ -> e
+  | nm == "CLaSH.Sized.Internal.Signed.eq#" || nm == "CLaSH.Sized.Internal.Unsigned.eq#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+      [collectArgs -> (Prim _ _,[Right _, Left _, Left (Literal (IntegerLiteral i))]) ,collectArgs -> (Prim _ _,[Right _, Left _, Left (Literal (IntegerLiteral j))])] ->
+           let (_,tyView -> TyConApp boolTcNm []) = splitFunForallTy ty
+               (Just boolTc) = HashMap.lookup boolTcNm tcm
+               [falseDc,trueDc] = tyConDataCons boolTc
+               retDc = if i == j then trueDc else falseDc
+           in  Data retDc
       _ -> e
   | nm == "GHC.TypeLits.natVal"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
@@ -143,8 +162,8 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm _, args))
       [(Literal (IntegerLiteral _),[]), (Data _,_)] -> mkApps snatCon args
       _ -> e
   | isSubj && nm == "CLaSH.Sized.Vector.replicate"
-  = let ty = runFreshM (termType tcm e)
-    in  case tyView ty of
+  = let ty' = runFreshM (termType tcm e)
+    in  case tyView ty' of
           (TyConApp vecTcNm [LitTy (NumTy len),argTy]) ->
               let (Just vecTc) = HashMap.lookup vecTcNm tcm
                   [nilCon,consCon] = tyConDataCons vecTc
