@@ -116,8 +116,18 @@ main = do
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
    GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
-    -- 1. extract the -B flag from the args
+
+-- Disable CPR analysis in versions older than GHC 7.11 by always inserting the
+-- -fcpr-off flag. From GHC 7.11 and up, CPR analysis, specifically the
+-- worker/wrapper it creates, can be turned off with a DynFlag.
+--
+-- See [NOTE: CPR breaks CLaSH] why the worker/wrapper introduced by the CPR
+-- analysis is bad for CLaSH
+#if __GLASGOW_HASKELL__ >= 711
     argv0 <- getArgs
+#else
+    argv0 <- fmap ("-fcpr-off":) getArgs
+#endif
     libDir <- ghcLibDir
 
     let argv1 = map (mkGeneralLocated "on the commandline") argv0

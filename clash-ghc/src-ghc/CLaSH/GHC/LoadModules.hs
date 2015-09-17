@@ -216,6 +216,9 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
                , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
                , Opt_Loopification -- STG pass, don't care
+#if __GLASGOW_HASKELL__ >= 711
+               , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks CLaSH, see [NOTE: CPR breaks CLaSH]
+#endif
                ]
 
 -- [NOTE: CPR breaks CLaSH]
