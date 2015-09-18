@@ -180,7 +180,6 @@ wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
 wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set df wanted) unwanted
   where
     wanted = [ Opt_CSE -- CSE
-             , Opt_FullLaziness -- Floats let-bindings outside enclosing lambdas
              , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
              , Opt_DoLambdaEtaExpansion -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
              , Opt_CaseMerge -- We want fewer case-statements
