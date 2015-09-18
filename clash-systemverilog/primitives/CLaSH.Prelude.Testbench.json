@@ -13,7 +13,7 @@
 // pragma translate_off
 always @(posedge ~CLK[2] or posedge ~RST[2]) begin
   if (~ARG[4] != ~ARG[5]) begin
-    $display(\"%s, expected: %b, actual: %b\", ~LIT[3], ~TYPM[5]_to_lv(~ARG[5]), ~TYPM[4]_to_lv(~ARG[4]));
+    $display(\"@%0tns: %s, expected: %b, actual: %b\", $time, ~LIT[3], ~TYPM[5]_to_lv(~ARG[5]), ~TYPM[4]_to_lv(~ARG[4]));
     $stop;
   end
 end
