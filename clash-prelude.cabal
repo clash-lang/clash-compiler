@@ -141,7 +141,7 @@ Library
                       ghc-typelits-natnormalise >= 0.3,
                       lens                      >= 4.9,
                       QuickCheck                >= 2.7 && <2.9,
-                      singletons                >= 1.0,
+                      singletons                >= 1.0 && <2.0,
                       template-haskell          >= 2.9.0.0,
                       th-lift                   >= 0.5.6
 
