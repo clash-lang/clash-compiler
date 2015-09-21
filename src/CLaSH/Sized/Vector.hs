@@ -1186,10 +1186,10 @@ lazyV = lazyV' (repeat undefined)
 -- >>> append' (1 :> 2 :> Nil) (3 :> 4 :> Nil)
 -- <1,2,3,4>
 dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
-      -> (forall l . Proxy l -> a -> p $ l -> p $ (l + 1)) -- ^ Function to fold
+      -> (forall l . Proxy l -> a -> (p $ l) -> (p $ (l + 1))) -- ^ Function to fold
       -> (p $ 0) -- ^ Initial element
       -> Vec k a -- ^ Vector to fold over
-      -> p $ k
+      -> (p $ k)
 dfold _ _ z Nil                    = z
 dfold p f z (x :> (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
 
