@@ -163,7 +163,6 @@ instance Ord a => Ord (Vec n a) where
     where f EQ   keepGoing = keepGoing
           f done _         = done
 
--- | __NB__: Not synthesisable
 instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
   fs <*> xs = zipWith ($) fs xs
@@ -174,7 +173,6 @@ instance F.Foldable (Vec n) where
 instance Functor (Vec n) where
   fmap = map
 
--- | __NB__: Not synthesisable
 instance Traversable (Vec n) where
   traverse = traverse#
 
