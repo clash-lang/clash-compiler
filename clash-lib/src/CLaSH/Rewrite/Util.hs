@@ -455,7 +455,7 @@ mkSelectorCase caller tcm _ scrut dcI fieldI = do
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max"
             | otherwise -> do
           let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
-          let fieldTys = dataConInstArgTys dc args
+          let (Just fieldTys) = dataConInstArgTys dc args
           if fieldI >= length fieldTys
             then cantCreate $(curLoc) "Field index exceed max"
             else do

@@ -78,18 +78,18 @@ instance Subst a DataCon where
 -- type are substituted for the list of types. The argument types are returned.
 --
 -- The list of types should be equal to the number of type variables, otherwise
--- an error is reported.
-dataConInstArgTys :: DataCon -> [Type] -> [Type]
+-- @Nothing@ is returned.
+dataConInstArgTys :: DataCon -> [Type] -> Maybe [Type]
 dataConInstArgTys (MkData { dcArgTys     = arg_tys
                           , dcUnivTyVars = univ_tvs
                           , dcExtTyVars  = ex_tvs
                           })
                   inst_tys
   | length tyvars == length inst_tys
-  = map (substs (zip tyvars inst_tys)) arg_tys
+  = Just (map (substs (zip tyvars inst_tys)) arg_tys)
 
   | otherwise
-  = error $ $(curLoc) ++ "dataConInstArgTys: number of tyVars and Types differ"
+  = Nothing
 
   where
     tyvars = univ_tvs ++ ex_tvs

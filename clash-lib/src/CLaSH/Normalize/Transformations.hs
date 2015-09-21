@@ -52,14 +52,16 @@ import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
 import           CLaSH.Core.Type             (TypeView (..), Type (..),
                                               LitTy (..), applyFunTy,
-                                              applyTy, splitFunTy, typeKind,
+                                              applyTy, isPolyFunCoreTy,
+                                              splitFunTy, typeKind,
                                               tyView, mkTyConApp, mkFunTy)
 import           CLaSH.Core.TyCon            (TyConName, tyConDataCons)
 import           CLaSH.Core.Util             (collectArgs, extractElems,
                                               idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
-                                              isVar, mkApps, mkLams, mkTmApps,
-                                              mkVec, termSize,termType)
+                                              isSignalType, isVar, mkApps,
+                                              mkLams, mkTmApps, mkVec,
+                                              termSize, termType)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -343,8 +345,11 @@ inlineClosed :: NormRewrite
 inlineClosed _ e@(collectArgs -> (Var _ f,args))
   | all (either isConstant (const True)) args
   = do
-    untranslatable <- isUntranslatable e
-    if untranslatable
+    tcm <- Lens.view tcCache
+    eTy <- termType tcm e
+    untranslatable <- isUntranslatableType eTy
+    let isSignal = isSignalType tcm eTy
+    if untranslatable || isSignal
       then return e
       else do
         bndrs <- Lens.use bindings
@@ -356,11 +361,12 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
                               else return e
           _ -> return e
 
-inlineClosed _ e@(Var _ f) = do
+inlineClosed _ e@(Var fTy f) = do
   tcm <- Lens.view tcCache
-  closed <- isClosed tcm e
-  untranslatable <- isUntranslatable e
-  if closed && not untranslatable
+  let closed   = not (isPolyFunCoreTy tcm fTy)
+      isSignal = isSignalType tcm fTy
+  untranslatable <- isUntranslatableType fTy
+  if closed && not untranslatable && not isSignal
     then do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
@@ -826,7 +832,7 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
   (TyConApp apDictTcNm _) <- tyView <$> termType tcm dict
   let (Just apDictTc)    = HashMap.lookup apDictTcNm tcm
       [apDictCon]        = tyConDataCons apDictTc
-      apDictIdTys        = dataConInstArgTys apDictCon [fTy]
+      (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
       apDictIds          = zipWith Id (map string2Name ["functorDict"
                                                        ,"pure"
                                                        ,"ap"
@@ -837,7 +843,7 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
       (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
       (Just funcDictTc) = HashMap.lookup funcDictTcNm tcm
       [funcDictCon] = tyConDataCons funcDictTc
-      funcDictIdTys = dataConInstArgTys funcDictCon [fTy]
+      (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
       funcDicIds    = zipWith Id (map string2Name ["fmap","fmapConst"])
                                  (map embed funcDictIdTys)
 
@@ -920,8 +926,10 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
                            ,Left  x])
       ,Left (go (n-1) xs)]
 
-    nilCoTy = head (dataConInstArgTys nilCon [(LitTy (NumTy 0)),bTy])
+    nilCoTy = head (Maybe.fromJust (dataConInstArgTys nilCon [(LitTy (NumTy 0))
+                                                             ,bTy]))
 
-    consCoTy n = head (dataConInstArgTys consCon [(LitTy (NumTy n))
-                                                 ,bTy
-                                                 ,(LitTy (NumTy (n-1)))])
+    consCoTy n = head (Maybe.fromJust (dataConInstArgTys consCon
+                                                         [(LitTy (NumTy n))
+                                                         ,bTy
+                                                         ,(LitTy (NumTy (n-1)))]))

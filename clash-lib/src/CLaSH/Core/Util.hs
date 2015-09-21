@@ -1,13 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 -- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
+import qualified Data.HashMap.Lazy             as HashMap
 import Data.HashMap.Lazy                       (HashMap)
+import qualified Data.HashSet                  as HashSet
+import Data.Maybe                              (fromJust, mapMaybe)
 import Unbound.Generics.LocallyNameless        (Fresh, bind, embed, rebind,
                                                 string2Name, unbind, unembed,
                                                 unrebind, unrec)
+import Unbound.Generics.LocallyNameless.Name   (name2String)
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import CLaSH.Core.DataCon                      (DataCon, dcType, dataConInstArgTys)
@@ -16,10 +21,10 @@ import CLaSH.Core.Pretty                       (showDoc)
 import CLaSH.Core.Term                         (LetBinding, Pat (..), Term (..),
                                                 TmName)
 import CLaSH.Core.Type                         (Kind, LitTy (..), TyName,
-                                                Type (..), applyTy,
+                                                Type (..), TypeView (..), applyTy,
                                                 isFunTy, isPolyFunCoreTy, mkFunTy,
-                                                splitFunTy)
-import CLaSH.Core.TyCon                        (TyCon, TyConName)
+                                                splitFunTy, tyView)
+import CLaSH.Core.TyCon                        (TyCon, TyConName, tyConDataCons)
 import CLaSH.Core.TysPrim                      (typeNatKind)
 import CLaSH.Core.Var                          (Id, TyVar, Var (..), varType)
 import CLaSH.Util
@@ -246,10 +251,12 @@ mkVec nilCon consCon resTy = go
                                         ,Left x
                                         ,Left (go (n-1) xs)]
 
-    nilCoTy    = head (dataConInstArgTys nilCon  [(LitTy (NumTy 0)),resTy])
-    consCoTy n = head (dataConInstArgTys consCon [(LitTy (NumTy n))
-                                                 ,resTy
-                                                 ,(LitTy (NumTy (n-1)))])
+    nilCoTy    = head (fromJust $! dataConInstArgTys nilCon  [(LitTy (NumTy 0))
+                                                             ,resTy])
+    consCoTy n = head (fromJust $! dataConInstArgTys consCon
+                                                     [(LitTy (NumTy n))
+                                                     ,resTy
+                                                     ,(LitTy (NumTy (n-1)))])
 
 -- | Create let-bindings with case-statements that select elements out of a
 -- vector. Returns both the variables to which element-selections are bound
@@ -284,7 +291,33 @@ extractElems consCon resTy s maxN = go maxN
         mName = string2Name "m"
         mTV   = TyVar mName (embed typeNatKind)
         tys   = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
-        idTys = dataConInstArgTys consCon tys
+        (Just idTys) = dataConInstArgTys consCon tys
         [co,el,rest] = zipWith Id [string2Name "_co_",elPatNm, restPatNm]
                                   (map embed idTys)
-        restTy = last $ dataConInstArgTys consCon tys
+        restTy = last (fromJust (dataConInstArgTys consCon tys))
+
+-- | Determine whether a type is isomorphic to "CLaSH.Signal.Internal.Signal'"
+--
+-- It is i.e.:
+--
+--   * Signal' clk a
+--   * (Signal' clk a, Signal' clk b)
+--   * Vec n (Signal' clk a)
+--   * data Wrap = W (Signal clk' Int)
+--   * etc.
+isSignalType :: HashMap TyConName TyCon -> Type -> Bool
+isSignalType tcm ty = go HashSet.empty ty
+  where
+    go tcSeen (tyView -> TyConApp tcNm args) = case name2String tcNm of
+      "CLaSH.Signal.Internal.Signal'"  -> True
+      _ | tcNm `HashSet.member` tcSeen -> False -- Do not follow rec types
+        | otherwise -> case HashMap.lookup tcNm tcm of
+            Just tc -> let dcs         = tyConDataCons tc
+                           dcInsArgTys = concat
+                                       $ mapMaybe (`dataConInstArgTys` args) dcs
+                           tcSeen'     = HashSet.insert tcNm tcSeen
+                       in  any (go tcSeen') dcInsArgTys
+            Nothing -> traceIf True ($(curLoc) ++ "isSignalType: " ++ show tcNm
+                                     ++ " not found.") False
+
+    go _ _ = False
