@@ -61,7 +61,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Index n"
-    , "templateE" : "to_unsigned(~ARG[1],integer(ceil(log2(real(max(2,~LIT[0]))))))"
+    , "templateE" : "to_unsigned(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
