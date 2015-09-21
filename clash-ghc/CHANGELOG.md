@@ -1,5 +1,13 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.15 *September 21st 2015*
+* New features:
+  * Report simulation time in (System)Verilog assert messages
+
+* Fixes bugs:
+  * Performance bug: top-level definitions of type "Signal" erroneously inlined.
+  * Fix Index maxBound [#79](https://github.com/clash-lang/clash-compiler/pull/79)
+
 ## 0.5.14 *September 14th 2015*
 * New features:
   * Completely unroll "definitions" of some higher-order primitives with non-representable argument or result vectors:

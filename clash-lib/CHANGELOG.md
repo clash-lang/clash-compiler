@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.5.13 *September 21st 2015*
+* Fixes bugs:
+  * Performance bug: top-level definitions of type "Signal" erroneously inlined.
+
 ## 0.5.12 *September 14th 2015*
 * New features:
   * Completely unroll "definitions" of some higher-order primitives with non-representable argument or result vectors:

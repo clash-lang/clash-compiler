@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.5.10 *September 21st 2015*
+* New features:
+  * Report simulation time in assert messages
+
 ## 0.5.9 *September 14th 2015*
 * Support for clash-lib-0.5.12
 

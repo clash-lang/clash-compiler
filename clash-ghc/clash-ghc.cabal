@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.5.14
+Version:              0.5.15
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -94,11 +94,11 @@ Executable clash
                       unbound-generics          >= 0.1 && < 0.3,
                       unordered-containers      >= 0.2.1.0,
 
-                      clash-lib                 >= 0.5.12 && < 0.6,
-                      clash-systemverilog       >= 0.5.9,
-                      clash-vhdl                >= 0.5.11,
-                      clash-verilog             >= 0.5.9,
-                      clash-prelude             >= 0.9.2,
+                      clash-lib                 >= 0.5.13 && < 0.6,
+                      clash-systemverilog       >= 0.5.10,
+                      clash-vhdl                >= 0.5.12,
+                      clash-verilog             >= 0.5.10,
+                      clash-prelude             >= 0.9.3,
                       ghc-typelits-natnormalise >= 0.3
 
   if os(windows)
