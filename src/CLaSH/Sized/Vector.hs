@@ -92,7 +92,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> import CLaSH.Prelude
 -- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 -- >>> :{
--- let sortV xs = map fst sorted <: (snd (last sorted))
+-- let sortV xs = map fst sorted :< (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -100,7 +100,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- :}
 --
 -- >>> :{
--- let sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortVL xs = map fst sorted :< (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -108,7 +108,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- :}
 --
 -- >>> :{
--- let sortV_flip xs = map fst sorted <: (snd (last sorted))
+-- let sortV_flip xs = map fst sorted :< (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -120,7 +120,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> type instance Apply (Append m a) l = Vec (l + m) a
 -- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
 -- >>> let cs a b     = if a > b then (a,b) else (b,a)
--- >>> let csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' <: y'
+-- >>> let csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' :< y'
 -- >>> let csSort     = vfold csRow
 
 infixr 5 `Cons`
@@ -310,9 +310,9 @@ shiftInAtN xs ys = (zsR, zsL)
 infixl 5 :<
 -- | Add an element to the tail of a vector.
 --
--- >>> (3:>4:>5:>Nil) <: 1
+-- >>> (3:>4:>5:>Nil) :< 1
 -- <3,4,5,1>
--- >>> let x = (3:>4:>5:>Nil) <: 1
+-- >>> let x = (3:>4:>5:>Nil) :< 1
 -- >>> :t x
 -- x :: Num a => Vec 4 a
 pattern (:<) :: Vec n a -> a -> Vec (n+1) a
@@ -1074,7 +1074,7 @@ asNatProxy _ = Proxy
 --
 -- @
 -- -- Bubble sort for 1 iteration
--- sortV xs = 'map' fst sorted '<:' (snd ('last' sorted))
+-- sortV xs = 'map' fst sorted ':<' (snd ('last' sorted))
 --  where
 --    lefts  = 'head' xs :> 'map' snd ('init' sorted)
 --    rights = 'tail' xs
@@ -1093,7 +1093,7 @@ asNatProxy _ = Proxy
 -- In this case, adding 'lazyV' on 'zipWith's second argument:
 --
 -- @
--- sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
+-- sortVL xs = 'map' fst sorted ':<' (snd ('last' sorted))
 --  where
 --    lefts  = 'head' xs :> map snd ('init' sorted)
 --    rights = 'tail' xs
@@ -1109,7 +1109,7 @@ asNatProxy _ = Proxy
 -- meaning of the code:
 --
 -- @
--- sortV_flip xs = 'map' fst sorted '<:' (snd ('last' sorted))
+-- sortV_flip xs = 'map' fst sorted ':<' (snd ('last' sorted))
 --  where
 --    lefts  = 'head' xs :> 'map' snd ('init' sorted)
 --    rights = 'tail' xs
@@ -1213,7 +1213,7 @@ type instance Apply (V a) l = Vec l a
 --
 -- @
 -- cs a b     = if a > b then (a,b) else (b,a)
--- csRow y xs = let (y',xs') = 'mapAccumL' cs y xs in xs' '<:' y'
+-- csRow y xs = let (y',xs') = 'mapAccumL' cs y xs in xs' ':<' y'
 -- csSort     = 'vfold' csRow
 -- @
 --
