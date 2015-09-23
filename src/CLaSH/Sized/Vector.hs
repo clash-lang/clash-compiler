@@ -124,7 +124,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> let csSort     = vfold csRow
 
 infixr 5 `Cons`
--- | Fixed size vectors
+-- | Fixed size vectors.
 --
 -- * Lists with their length encoded in their type
 -- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
@@ -345,7 +345,7 @@ infixl 4 <<+
 xs <<+ s = fst (shiftInAtN xs (singleton s))
 {-# INLINE (<<+) #-}
 
--- | Shift @m@ elements out from the head of a vector, filling up the tail with
+-- | Shift /m/ elements out from the head of a vector, filling up the tail with
 -- 'Default' values. The result is a tuple containing:
 --
 -- * The new vector
@@ -361,7 +361,7 @@ shiftOutFrom0 :: (Default a, KnownNat m)
 shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
 {-# INLINE shiftOutFrom0 #-}
 
--- | Shift @m@ elements out from the tail of a vector, filling up the head with
+-- | Shift /m/ elements out from the tail of a vector, filling up the head with
 -- 'Default' values. The result is a tuple containing:
 --
 -- * The new vector
@@ -378,7 +378,7 @@ shiftOutFromN m xs = shiftInAt0 xs (replicate m def)
 {-# INLINE shiftOutFromN #-}
 
 infixr 5 ++
--- | Append two vectors
+-- | Append two vectors.
 --
 -- >>> (1:>2:>3:>Nil) ++ (7:>8:>Nil)
 -- <1,2,3,7,8>
@@ -387,7 +387,7 @@ Nil           ++ ys = ys
 (x `Cons` xs) ++ ys = x `Cons` xs ++ ys
 {-# NOINLINE (++) #-}
 
--- | Split a vector into two vectors at the given point
+-- | Split a vector into two vectors at the given point.
 --
 -- >>> splitAt (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
 -- (<1,2,3>,<7,8>)
@@ -403,7 +403,7 @@ splitAtU (USucc s) (y `Cons` ys) = let (as,bs) = splitAtU s ys
                                    in  (y `Cons` as, bs)
 
 -- | Split a vector into two vectors where the length of the two is determined
--- by the context
+-- by the context.
 --
 -- >>> splitAtI (1:>2:>3:>7:>8:>Nil) :: (Vec 2 Int, Vec 3 Int)
 -- (<1,2>,<3,7,8>)
@@ -411,7 +411,7 @@ splitAtI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtI = withSNat splitAt
 {-# INLINE splitAtI #-}
 
--- | Concatenate a vector of vectors
+-- | Concatenate a vector of vectors.
 --
 -- >>> concat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
 -- <1,2,3,4,5,6,7,8,9,10,11,12>
@@ -420,8 +420,8 @@ concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
 {-# NOINLINE concat #-}
 
--- | Split a vector of (n * m) elements into a vector of vectors with length m,
--- where m is given
+-- | Split a vector of \(n * m)\ elements into a vector of \"vectors of length
+-- /m/\", where the length /m/ is given.
 --
 -- >>> unconcat d4 (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil)
 -- <<1,2,3,4>,<5,6,7,8>,<9,10,11,12>>
@@ -434,8 +434,8 @@ unconcatU UZero      _ _  = Nil
 unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
                             in  as `Cons` unconcatU n' m bs
 
--- | Split a vector of (n * m) elements into a vector of vectors with length m,
--- where m is determined by the context
+-- | Split a vector of /(n * m)/ elements into a vector of \"vectors of length
+-- /m/\", where the length /m/ is determined by the context.
 --
 -- >>> unconcatI (1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>Nil) :: Vec 2 (Vec 6 Int)
 -- <<1,2,3,4,5,6>,<7,8,9,10,11,12>>
@@ -452,7 +452,7 @@ merge Nil           Nil           = Nil
 merge (x `Cons` xs) (y `Cons` ys) = x `Cons` y `Cons` merge xs ys
 {-# NOINLINE merge #-}
 
--- | Returns the elements in a vector in reverse order
+-- | The elements in a vector in reverse order.
 --
 -- >>> reverse (1:>2:>3:>4:>Nil)
 -- <4,3,2,1>
@@ -461,8 +461,8 @@ reverse Nil           = Nil
 reverse (x `Cons` xs) = reverse xs :< x
 {-# NOINLINE reverse #-}
 
--- | 'map' @f xs@ is the vector obtained by applying @f@ to each element
--- of @xs@, i.e.,
+-- | \"'map' @f xs@\" is the vector obtained by applying /f/ to each element
+-- of /xs/, i.e.,
 --
 -- > map f (x1 :> x2 :>  ... :> xn :> Nil) == (f x1 :> f x2 :> ... :> f xn :> Nil)
 --
@@ -476,12 +476,12 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 
 -- | 'zipWith' generalises 'zip' by zipping with the function given
 -- as the first argument, instead of a tupling function.
--- For example, @'zipWith' (+)@ is applied to two vectors to produce the
+-- For example, \"'zipWith' @(+)@\" applied to two vectors produces the
 -- vector of corresponding sums.
 --
 -- > zipWith f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) == (f x1 y1 :> f x2 y2 :> ... :> f xn yn :> Nil)
 --
--- @zipWith f xs ys@ corresponds to the following circuit layout:
+-- \"'zipWith' @f xs ys@\" corresponds to the following circuit layout:
 --
 -- <<doc/zipWith.svg>>
 --
@@ -498,7 +498,7 @@ zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 --
 -- > zipWith3 f (x1 :> x2 :> ... xn :> Nil) (y1 :> y2 :> ... :> yn :> Nil) (z1 :> z2 :> ... :> zn :> Nil) == (f x1 y1 z1 :> f x2 y2 z2 :> ... :> f xn yn zn :> Nil)
 --
--- @zipWith3 f xs ys zs@ corresponds to the following circuit layout:
+-- \"'zipWith3' @f xs ys zs@\" corresponds to the following circuit layout:
 --
 -- <<doc/zipWith3.svg>>
 --
@@ -519,7 +519,7 @@ zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 -- >>> foldr (/) 1 (5 :> 4 :> 3 :> 2 :> Nil)
 -- 1.875
 --
--- @foldr f z xs@ corresponds to the following circuit layout:
+-- \"'foldr' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/foldr.svg>>
 --
@@ -541,7 +541,7 @@ foldr f z xs = head (scanr f z xs)
 -- >>> foldl (/) 1 (5 :> 4 :> 3 :> 2 :> Nil)
 -- 8.333333333333333e-3
 --
--- @foldl f z xs@ corresponds to the following circuit layout:
+-- \"'foldl' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/foldl.svg>>
 --
@@ -563,7 +563,7 @@ foldl f z xs = last (scanl f z xs)
 -- >>> foldr1 (/) (5 :> 4 :> 3 :> 2 :> 1 :> Nil)
 -- 1.875
 --
--- @foldr1 f xs@ corresponds to the following circuit layout:
+-- \"'foldr1' @f xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/foldr1.svg>>
 --
@@ -585,7 +585,7 @@ foldr1 f xs = foldr f (last xs) (init xs)
 -- >>> foldl1 (/) (1 :> 5 :> 4 :> 3 :> 2 :> Nil)
 -- 8.333333333333333e-3
 --
--- @foldl1 f xs@ corresponds to the following circuit layout:
+-- \"'foldl1' @f xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/foldl1.svg>>
 --
@@ -619,7 +619,7 @@ fold f vs = fold' (toList vs)
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
 {-# NOINLINE fold #-}
-{-# WARNING fold "CLaSH.Sized.Vector.fold is not synthesisable" #-}
+{-# WARNING fold "CLaSH.Sized.Vector.fold is not synthesisable by the CLaSH compiler." #-}
 
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:
@@ -629,7 +629,7 @@ fold f vs = fold' (toList vs)
 -- >>> scanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <0,5,9,12,14>
 --
--- @scanl f z xs@ corresponds to the following circuit layout:
+-- \"'scanl' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/scanl.svg>>
 --
@@ -649,7 +649,7 @@ scanl f z xs = ws
 -- >>> sscanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <5,9,12,14>
 --
--- @sscanl f z xs@ corresponds to the following circuit layout:
+-- \"'sscanl' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/sscanl.svg>>
 sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec n b
@@ -664,7 +664,7 @@ sscanl f z xs = tail (scanl f z xs)
 -- >>> scanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <14,9,5,2,0>
 --
--- @scanr f z xs@ corresponds to the following circuit layout:
+-- \"'scanr' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/scanr.svg>>
 --
@@ -684,7 +684,7 @@ scanr f z xs = ws
 -- >>> sscanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <14,9,5,2>
 --
--- @sscanr f z xs@ corresponds to the following circuit layout:
+-- \"'sscanr' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/sscanr.svg>>
 sscanr :: (a -> b -> b) -> b -> Vec n a -> Vec n b
@@ -699,7 +699,7 @@ sscanr f z xs = init (scanr f z xs)
 -- >>> mapAccumL (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
 -- (10,<1,2,4,7>)
 --
--- @mapAccumL f acc xs@ corresponds to the following circuit layout:
+-- \"'mapAccumL' @f acc xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/mapAccumL.svg>>
 mapAccumL :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc,Vec n y)
@@ -720,7 +720,7 @@ mapAccumL f acc xs = (acc',ys)
 -- >>> mapAccumR (\acc x -> (acc + x,acc + 1)) 0 (1 :> 2 :> 3 :> 4 :> Nil)
 -- (10,<10,8,5,1>)
 --
--- @mapAccumR f acc xs@ corresponds to the following circuit layout:
+-- \"'mapAccumR' @f acc xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/mapAccumR.svg>>
 mapAccumR :: (acc -> x -> (acc,y)) -> acc -> Vec n x -> (acc, Vec n y)
@@ -786,7 +786,7 @@ index_int xs i@(I# n0)
                                 else sub ys (n -# 1#)
 {-# NOINLINE index_int #-}
 
--- | Vector index (subscript) operator.
+-- | \"@xs@ '!!' @n@\" returns the /n/'th element of /xs/.
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
@@ -803,7 +803,8 @@ index_int xs i@(I# n0)
 xs !! i = index_int xs (fromEnum i)
 {-# INLINE (!!) #-}
 
--- | Index (subscript) of the last element in a 'Vec'tor
+-- | The index (subscript) of the last element in a 'Vec'tor as an 'Integer'
+-- value.
 --
 -- >>> maxIndex (6 :> 7 :> 8 :> Nil)
 -- 2
@@ -811,7 +812,7 @@ maxIndex :: KnownNat n => Vec n a -> Integer
 maxIndex = subtract 1 . length
 {-# NOINLINE maxIndex #-}
 
--- | Length of a 'Vec'tor as an Integer
+-- | The length of a 'Vec'tor as an 'Integer' value.
 --
 -- >>> length (6 :> 7 :> 8 :> Nil)
 -- 3
@@ -835,7 +836,8 @@ replace_int xs i@(I# n0) a
                                  else y `Cons` sub ys (n -# 1#) b
 {-# NOINLINE replace_int #-}
 
--- | Replace an element of a vector at the given index (subscript).
+-- | \"'replace' @n a xs@\" returns the vector /xs/ where the /n/'th element is
+-- replaced by /a/.
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
@@ -850,7 +852,7 @@ replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
 replace i y xs = replace_int xs (fromEnum i) y
 {-# INLINE replace #-}
 
--- | 'take' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
+-- | \"'take' @n xs@\" returns the /n/-length prefix of /xs/.
 --
 -- >>> take (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
 -- <1,2,3>
@@ -872,7 +874,7 @@ take :: SNat m -> Vec (m + n) a -> Vec m a
 take n = fst . splitAt n
 {-# INLINE take #-}
 
--- | 'takeI' @xs@, returns the prefix of @xs@ as demanded by the context
+-- | \"'takeI' @xs@\" returns the prefix of /xs/ as demanded by the context.
 --
 -- >>> takeI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
 -- <1,2>
@@ -880,7 +882,7 @@ takeI :: KnownNat m => Vec (m + n) a -> Vec m a
 takeI = withSNat take
 {-# INLINE takeI #-}
 
--- | 'drop' @n xs@ returns the suffix of @xs@ after the first @n@ elements
+-- | \"'drop' @n xs@\" returns the suffix of /xs/ after the first /n/ elements.
 --
 -- >>> drop (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
 -- <4,5>
@@ -899,7 +901,7 @@ drop :: SNat m -> Vec (m + n) a -> Vec n a
 drop n = snd . splitAt n
 {-# INLINE drop #-}
 
--- | 'dropI' @xs@, returns the suffix of @xs@ as demanded by the context
+-- | \"'dropI' @xs@\" returns the suffix of /xs/ as demanded by the context.
 --
 -- >>> dropI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
 -- <4,5>
@@ -907,7 +909,7 @@ dropI :: KnownNat m => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
 {-# INLINE dropI #-}
 
--- | 'at' @n xs@ returns @n@'th element of @xs@
+-- | \"'at' @n xs@\" returns /n/'th element of /xs/
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
 -- ending at 'maxIndex'.
@@ -920,8 +922,8 @@ at :: SNat m -> Vec (m + (n + 1)) a -> a
 at n xs = head $ snd $ splitAt n xs
 {-# INLINE at #-}
 
--- | 'select' @f s n xs@ selects @n@ elements with stepsize @s@ and
--- offset @f@ from @xs@
+-- | \"'select' @f s n xs@\" selects /n/ elements with step-size /s/ and
+-- offset @f@ from /xs/.
 --
 -- >>> select (snat :: SNat 1) (snat :: SNat 2) (snat :: SNat 3) (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
 -- <2,4,6>
@@ -941,8 +943,8 @@ select f s n xs = select' (toUNat n) $ drop f xs
                                          select' n' (drop s (unsafeCoerce vs))
 {-# NOINLINE select #-}
 
--- | 'selectI' @f s xs@ selects as many elements as demanded by the context
--- with stepsize @s@ and offset @f@ from @xs@
+-- | \"'selectI' @f s xs@\" selects as many elements as demanded by the context
+-- with step-size /s/ and offset /f/ from /xs/.
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
 -- <2,4>
@@ -954,7 +956,7 @@ selectI :: (CmpNat (i + s) (s * n) ~ 'GT, KnownNat n)
 selectI f s xs = withSNat (\n -> select f s n xs)
 {-# INLINE selectI #-}
 
--- | 'replicate' @n a@ returns a vector that has @n@ copies of @a@
+-- | \"'replicate' @n a@\" returns a vector that has /n/ copies of /a/.
 --
 -- >>> replicate (snat :: SNat 3) 6
 -- <6,6,6>
@@ -968,8 +970,8 @@ replicateU :: UNat n -> a -> Vec n a
 replicateU UZero     _ = Nil
 replicateU (USucc s) x = x `Cons` replicateU s x
 
--- | \"'replicateI' @a@\" creates a vector with as many copies of @a@ as
--- demanded by the context
+-- | \"'replicateI' @a@\" creates a vector with as many copies of /a/ as
+-- demanded by the context.
 --
 -- >>> replicateI 6 :: Vec 5 Int
 -- <6,6,6,6,6>
@@ -978,8 +980,8 @@ replicateI = withSNat replicate
 {-# INLINE replicateI #-}
 {-# WARNING replicateI "Use 'repeat' instead of 'replicateI'" #-}
 
--- | 'repeat' @a@ creates a vector with as many copies of @a@ as demanded by the
--- context
+-- | \"'repeat' @a@\" creates a vector with as many copies of /a/ as demanded
+-- by the context.
 --
 -- >>> repeat 6 :: Vec 5 Int
 -- <6,6,6,6,6>
@@ -987,8 +989,8 @@ repeat :: KnownNat n => a -> Vec n a
 repeat = withSNat replicate
 {-# INLINE repeat #-}
 
--- | 'iterate' @n f x@ returns a vector starting with @x@ followed by @n@
--- repeated applications of @f@ to @x@
+-- | \"'iterate' @n f x@\" returns a vector starting with /x/ followed by
+-- /n/ repeated applications of /f/ to /x/.
 --
 -- > iterate (snat :: SNat 4) f x == (x :> f x :> f (f x) :> f (f (f x)) :> Nil)
 -- > iterate d4 f x               == (x :> f x :> f (f x) :> f (f (f x)) :> Nil)
@@ -996,22 +998,22 @@ repeat = withSNat replicate
 -- >>> iterate d4 (+1) 1
 -- <1,2,3,4>
 --
--- @interate n f z@ corresponds to the following circuit layout:
+-- \"'interate' @n f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/iterate.svg>>
 iterate :: SNat n -> (a -> a) -> a -> Vec n a
 iterate (SNat _) = iterateI
 {-# INLINE iterate #-}
 
--- | 'iterate' @f x@ returns a vector starting with @x@ followed by @n@
--- repeated applications of @f@ to @x@, where @n@ is determined by the context
+-- | \"'iterate' @f x@\" returns a vector starting with @x@ followed by @n@
+-- repeated applications of @f@ to @x@, where @n@ is determined by the context.
 --
 -- > iterateI f x :: Vec 3 a == (x :> f x :> f (f x) :> Nil)
 --
 -- >>> iterateI (+1) 1 :: Vec 3 Int
 -- <1,2,3>
 --
--- @interateI f z@ corresponds to the following circuit layout:
+-- \"'interateI' @f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/iterate.svg>>
 iterateI :: KnownNat n => (a -> a) -> a -> Vec n a
@@ -1021,8 +1023,8 @@ iterateI f a = xs
     ws = map f (lazyV xs)
 {-# INLINE iterateI #-}
 
--- | 'generate' @n f x@ returns a vector with @n@ repeated applications of @f@
--- to @x@
+-- | \"'generate' @n f x@\" returns a vector with @n@ repeated applications of
+-- @f@ to @x@.
 --
 -- > generate (snat :: SNat 4) f x == (f x :> f (f x) :> f (f (f x)) :> f (f (f (f x))) :> Nil)
 -- > generate d4 f x               == (f x :> f (f x) :> f (f (f x)) :> f (f (f (f x))) :> Nil)
@@ -1030,29 +1032,29 @@ iterateI f a = xs
 -- >>> generate d4 (+1) 1
 -- <2,3,4,5>
 --
--- @generate n f z@ corresponds to the following circuit layout:
+-- \"'generate' @n f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/generate.svg>>
 generate :: SNat n -> (a -> a) -> a -> Vec n a
 generate (SNat _) f a = iterateI f (f a)
 {-# INLINE generate #-}
 
--- | 'generate' @f x@ returns a vector with @n@ repeated applications of @f@
--- to @x@, where @n@ is determined by the context
+-- | \"'generateI' @f x@\" returns a vector with @n@ repeated applications of
+-- @f@ to @x@, where @n@ is determined by the context.
 --
 -- > generateI f x :: Vec 3 a == (f x :> f (f x) :> f (f (f x)) :> Nil)
 --
 -- >>> generateI (+1) 1 :: Vec 3 Int
 -- <2,3,4>
 --
--- @generateI f z@ corresponds to the following circuit layout:
+-- \"'generateI' @f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/generate.svg>>
 generateI :: KnownNat n => (a -> a) -> a -> Vec n a
 generateI f a = iterateI f (f a)
 {-# INLINE generateI #-}
 
--- | Convert a vector to a list
+-- | Convert a vector to a list.
 --
 -- >>> toList (1:>2:>3:>Nil)
 -- [1,2,3]
@@ -1062,7 +1064,7 @@ toList :: Vec n a -> [a]
 toList = foldr (:) []
 {-# INLINE toList #-}
 
--- | Create a vector literal from a list literal
+-- | Create a vector literal from a list literal.
 --
 -- > $(v [1::Signed 8,2,3,4,5]) == (8:>2:>3:>4:>5:>Nil) :: Vec 5 (Signed 8)
 --
@@ -1078,7 +1080,8 @@ v (x:xs) = [| x :> $(v xs) |]
 asNatProxy :: Vec n a -> Proxy n
 asNatProxy _ = Proxy
 
--- | For when your vector functions are too strict in their arguments
+-- | What you should use when your vector functions are too strict in their
+-- arguments.
 --
 -- For example:
 --
@@ -1211,7 +1214,7 @@ dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
 dfold _ _ z Nil                        = z
 dfold p f z (x `Cons` (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
 {-# NOINLINE dfold #-}
-{-# WARNING dfold "CLaSH.Sized.Vector.dfold is not synthesisable" #-}
+{-# WARNING dfold "CLaSH.Sized.Vector.dfold is not synthesisable by the CLaSH compiler." #-}
 
 data V (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (V a) l = Vec l a
@@ -1236,7 +1239,7 @@ vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k b
 vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
 {-# NOINLINE vfold #-}
-{-# WARNING vfold "CLaSH.Sized.Vector.vfold is not synthesisable" #-}
+{-# WARNING vfold "CLaSH.Sized.Vector.vfold is not synthesisable by the CLaSH compiler." #-}
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
