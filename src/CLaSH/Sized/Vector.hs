@@ -321,7 +321,6 @@ pattern (:<) xs x <- ((\ys -> (init ys,last ys)) -> (xs,x))
     (:<) xs x = xs ++ singleton x
 
 infixr 4 +>>
-{-# INLINE (+>>) #-}
 -- | Add an element to the head of a vector, and extract all but the last
 -- element.
 --
@@ -331,9 +330,10 @@ infixr 4 +>>
 -- <>
 (+>>) :: KnownNat n => a -> Vec n a -> Vec n a
 s +>> xs = fst (shiftInAt0 xs (singleton s))
+{-# INLINE (+>>) #-}
+
 
 infixl 4 <<+
-{-# INLINE (<<+) #-}
 -- | Add an element to the tail of a vector, and extract all but the first
 -- element.
 --
@@ -343,8 +343,8 @@ infixl 4 <<+
 -- <>
 (<<+) :: Vec n a -> a -> Vec n a
 xs <<+ s = fst (shiftInAtN xs (singleton s))
+{-# INLINE (<<+) #-}
 
-{-# INLINE shiftOutFrom0 #-}
 -- | Shift @m@ elements out from the head of a vector, filling up the tail with
 -- 'Default' values. The result is a tuple containing:
 --
@@ -359,8 +359,8 @@ shiftOutFrom0 :: (Default a, KnownNat m)
               -> (Vec (m + n) a, Vec m a)
               -- ^ (The new vector, shifted out elements)
 shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
+{-# INLINE shiftOutFrom0 #-}
 
-{-# INLINE shiftOutFromN #-}
 -- | Shift @m@ elements out from the tail of a vector, filling up the head with
 -- 'Default' values. The result is a tuple containing:
 --
@@ -375,9 +375,9 @@ shiftOutFromN :: (Default a, KnownNat (m + n))
               -> (Vec (m + n) a, Vec m a)
               -- ^ (The new vector, shifted out elements)
 shiftOutFromN m xs = shiftInAt0 xs (replicate m def)
+{-# INLINE shiftOutFromN #-}
 
 infixr 5 ++
-{-# NOINLINE (++) #-}
 -- | Append two vectors
 --
 -- >>> (1:>2:>3:>Nil) ++ (7:>8:>Nil)
@@ -385,8 +385,8 @@ infixr 5 ++
 (++) :: Vec n a -> Vec m a -> Vec (n + m) a
 Nil           ++ ys = ys
 (x `Cons` xs) ++ ys = x `Cons` xs ++ ys
+{-# NOINLINE (++) #-}
 
-{-# NOINLINE splitAt #-}
 -- | Split a vector into two vectors at the given point
 --
 -- >>> splitAt (snat :: SNat 3) (1:>2:>3:>7:>8:>Nil)
@@ -395,13 +395,13 @@ Nil           ++ ys = ys
 -- (<1,2,3>,<7,8>)
 splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAt n xs = splitAtU (toUNat n) xs
+{-# NOINLINE splitAt #-}
 
 splitAtU :: UNat m -> Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtU UZero     ys            = (Nil,ys)
 splitAtU (USucc s) (y `Cons` ys) = let (as,bs) = splitAtU s ys
                                    in  (y `Cons` as, bs)
 
-{-# INLINE splitAtI #-}
 -- | Split a vector into two vectors where the length of the two is determined
 -- by the context
 --
@@ -409,8 +409,8 @@ splitAtU (USucc s) (y `Cons` ys) = let (as,bs) = splitAtU s ys
 -- (<1,2>,<3,7,8>)
 splitAtI :: KnownNat m => Vec (m + n) a -> (Vec m a, Vec n a)
 splitAtI = withSNat splitAt
+{-# INLINE splitAtI #-}
 
-{-# NOINLINE concat #-}
 -- | Concatenate a vector of vectors
 --
 -- >>> concat ((1:>2:>3:>Nil) :> (4:>5:>6:>Nil) :> (7:>8:>9:>Nil) :> (10:>11:>12:>Nil) :> Nil)
@@ -418,8 +418,8 @@ splitAtI = withSNat splitAt
 concat :: Vec n (Vec m a) -> Vec (n * m) a
 concat Nil           = Nil
 concat (x `Cons` xs) = x ++ concat xs
+{-# NOINLINE concat #-}
 
-{-# NOINLINE unconcat #-}
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
 -- where m is given
 --
@@ -427,13 +427,13 @@ concat (x `Cons` xs) = x ++ concat xs
 -- <<1,2,3,4>,<5,6,7,8>,<9,10,11,12>>
 unconcat :: KnownNat n => SNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcat n xs = unconcatU (withSNat toUNat) (toUNat n) xs
+{-# NOINLINE unconcat #-}
 
 unconcatU :: UNat n -> UNat m -> Vec (n * m) a -> Vec n (Vec m a)
 unconcatU UZero      _ _  = Nil
 unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
                             in  as `Cons` unconcatU n' m bs
 
-{-# INLINE unconcatI #-}
 -- | Split a vector of (n * m) elements into a vector of vectors with length m,
 -- where m is determined by the context
 --
@@ -441,8 +441,8 @@ unconcatU (USucc n') m ys = let (as,bs) = splitAtU m ys
 -- <<1,2,3,4,5,6>,<7,8,9,10,11,12>>
 unconcatI :: (KnownNat n, KnownNat m) => Vec (n * m) a -> Vec n (Vec m a)
 unconcatI = withSNat unconcat
+{-# INLINE unconcatI #-}
 
-{-# NOINLINE merge #-}
 -- | Merge two vectors, alternating their elements, i.e.,
 --
 -- >>> merge (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> 7 :> 8 :> Nil)
@@ -450,8 +450,8 @@ unconcatI = withSNat unconcat
 merge :: Vec n a -> Vec n a -> Vec (n + n) a
 merge Nil           Nil           = Nil
 merge (x `Cons` xs) (y `Cons` ys) = x `Cons` y `Cons` merge xs ys
+{-# NOINLINE merge #-}
 
-{-# NOINLINE reverse #-}
 -- | Returns the elements in a vector in reverse order
 --
 -- >>> reverse (1:>2:>3:>4:>Nil)
@@ -459,8 +459,8 @@ merge (x `Cons` xs) (y `Cons` ys) = x `Cons` y `Cons` merge xs ys
 reverse :: Vec n a -> Vec n a
 reverse Nil           = Nil
 reverse (x `Cons` xs) = reverse xs :< x
+{-# NOINLINE reverse #-}
 
-{-# NOINLINE map #-}
 -- | 'map' @f xs@ is the vector obtained by applying @f@ to each element
 -- of @xs@, i.e.,
 --
@@ -472,8 +472,8 @@ reverse (x `Cons` xs) = reverse xs :< x
 map :: (a -> b) -> Vec n a -> Vec n b
 map _ Nil           = Nil
 map f (x `Cons` xs) = f x `Cons` map f xs
+{-# NOINLINE map #-}
 
-{-# NOINLINE zipWith #-}
 -- | 'zipWith' generalises 'zip' by zipping with the function given
 -- as the first argument, instead of a tupling function.
 -- For example, @'zipWith' (+)@ is applied to two vectors to produce the
@@ -491,8 +491,8 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith _ Nil           _  = Nil
 zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
+{-# NOINLINE zipWith #-}
 
-{-# INLINE zipWith3 #-}
 -- | 'zipWith3' generalises 'zip3' by zipping with the function given
 -- as the first argument, instead of a tupling function.
 --
@@ -507,8 +507,8 @@ zipWith f (x `Cons` xs) ys = f x (head ys) `Cons` zipWith f xs (tail ys)
 -- See 'lazyV' for more information.
 zipWith3 :: (a -> b -> c -> d) -> Vec n a -> Vec n b -> Vec n c -> Vec n d
 zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
+{-# INLINE zipWith3 #-}
 
-{-# INLINABLE foldr #-}
 -- | 'foldr', applied to a binary operator, a starting value (typically
 -- the right-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from right to left:
@@ -529,8 +529,8 @@ zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 -- O(log_2(@'length' xs@)).
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
 foldr f z xs = head (scanr f z xs)
+{-# INLINE foldr #-}
 
-{-# INLINABLE foldl #-}
 -- | 'foldl', applied to a binary operator, a starting value (typically
 -- the left-identity of the operator), and a vector, reduces the vector
 -- using the binary operator, from left to right:
@@ -551,8 +551,8 @@ foldr f z xs = head (scanr f z xs)
 -- O(log_2(@'length' xs@)).
 foldl :: (b -> a -> b) -> b -> Vec n a -> b
 foldl f z xs = last (scanl f z xs)
+{-# INLINE foldl #-}
 
-{-# INLINABLE foldr1 #-}
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
 -- and thus must be applied to non-empty vectors.
 --
@@ -573,8 +573,8 @@ foldl f z xs = last (scanl f z xs)
 -- O(log_2(@'length' xs@)).
 foldr1 :: (a -> a -> a) -> Vec (n + 1) a -> a
 foldr1 f xs = foldr f (last xs) (init xs)
+{-# INLINE foldr1 #-}
 
-{-# INLINE foldl1 #-}
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
 -- and thus must be applied to non-empty vectors.
 --
@@ -595,16 +595,15 @@ foldr1 f xs = foldr f (last xs) (init xs)
 -- O(log_2(@'length' xs@)).
 foldl1 :: (a -> a -> a) -> Vec (n + 1) a -> a
 foldl1 f xs = foldl f (head xs) (tail xs)
+{-# INLINE foldl1 #-}
 
-{-# NOINLINE fold #-}
 -- | 'fold' is a variant of 'foldr1' and 'foldl1', but instead of reducing from
 -- right to left, or left to right, it reduces a vector using a tree-like
 -- structure. The depth, or delay, of the structure produced by
 -- \"@'fold' f xs@\", is hence @O(log_2('length' xs))@, and not
 -- @O('length' xs)@.
 --
--- __NB__: The binary operator \"@f@ in @'fold' f xs@\" must be associative.
--- __NB__: Not synthesisable
+-- __NB__: The binary operator \"@f@\" in \"@'fold' f xs@\" must be associative.
 --
 -- > fold f (x1 :> x2 :> ... :> xn1 :> xn :> Nil) == ((x1 `f` x2) `f` ...) `f` (... `f` (xn1 `f` xn))
 -- > fold f (x1 :> Nil)                           == x1
@@ -619,8 +618,9 @@ fold f vs = fold' (toList vs)
     fold' xs  = fold' ys `f` fold' zs
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
+{-# NOINLINE fold #-}
+{-# WARNING fold "CLaSH.Sized.Vector.fold is not synthesisable" #-}
 
-{-# INLINE scanl #-}
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:
 --
@@ -640,8 +640,8 @@ scanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanl f z xs = ws
   where
     ws = z `Cons` zipWith (flip f) xs (init ws)
+{-# INLINE scanl #-}
 
-{-# INLINE sscanl #-}
 -- | 'sscanl' is a variant of 'scanl' where the first result is dropped:
 --
 -- > sscanl f z (x1 :> x2 :> ... :> Nil) == (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
@@ -654,8 +654,8 @@ scanl f z xs = ws
 -- <<doc/sscanl.svg>>
 sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec n b
 sscanl f z xs = tail (scanl f z xs)
+{-# INLINE sscanl #-}
 
-{-# INLINE scanr #-}
 -- | 'scanr' is similar to 'foldr', but returns a vector of successive reduced
 -- values from the right:
 --
@@ -675,8 +675,8 @@ scanr :: (a -> b -> b) -> b -> Vec n a -> Vec (n + 1) b
 scanr f z xs = ws
   where
     ws = zipWith f xs ((tail ws)) :< z
+{-# INLINE scanr #-}
 
-{-# INLINE sscanr #-}
 -- | 'sscanr' is a variant of 'scanr' that where the last result is dropped:
 --
 -- > sscanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> Nil
@@ -689,8 +689,8 @@ scanr f z xs = ws
 -- <<doc/sscanr.svg>>
 sscanr :: (a -> b -> b) -> b -> Vec n a -> Vec n b
 sscanr f z xs = init (scanr f z xs)
+{-# INLINE sscanr #-}
 
-{-# INLINE mapAccumL #-}
 -- | The 'mapAccumL' function behaves like a combination of 'map' and 'foldl';
 -- it applies a function to each element of a vector, passing an accumulating
 -- parameter from left to right, and returning a final value of this accumulator
@@ -710,8 +710,8 @@ mapAccumL f acc xs = (acc',ys)
     accs' = map fst ws
     ys    = map snd ws
     acc'  = last accs
+{-# INLINE mapAccumL #-}
 
-{-# INLINE mapAccumR #-}
 -- | The 'mapAccumR' function behaves like a combination of 'map' and 'foldr';
 -- it applies a function to each element of a vector, passing an accumulating
 -- parameter from right to left, and returning a final value of this accumulator
@@ -731,24 +731,24 @@ mapAccumR f acc xs = (acc',ys)
     accs' = map fst ws
     ys    = map snd ws
     acc'  = head accs
+{-# INLINE mapAccumR #-}
 
-{-# INLINE zip #-}
 -- | 'zip' takes two vectors and returns a vector of corresponding pairs.
 --
 -- >>> zip (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil)
 -- <(1,4),(2,3),(3,2),(4,1)>
 zip :: Vec n a -> Vec n b -> Vec n (a,b)
 zip = zipWith (,)
+{-# INLINE zip #-}
 
-{-# INLINE zip3 #-}
 -- | 'zip' takes three vectors and returns a vector of corresponding triplets.
 --
 -- >>> zip3 (1:>2:>3:>4:>Nil) (4:>3:>2:>1:>Nil) (5:>6:>7:>8:>Nil)
 -- <(1,4,5),(2,3,6),(3,2,7),(4,1,8)>
 zip3 :: Vec n a -> Vec n b -> Vec n c -> Vec n (a,b,c)
 zip3 = zipWith3 (,,)
+{-# INLINE zip3 #-}
 
-{-# INLINE unzip #-}
 -- | 'unzip' transforms a vector of pairs into a vector of first components
 -- and a vector of second components.
 --
@@ -756,8 +756,8 @@ zip3 = zipWith3 (,,)
 -- (<1,2,3,4>,<4,3,2,1>)
 unzip :: Vec n (a,b) -> (Vec n a, Vec n b)
 unzip xs = (map fst xs, map snd xs)
+{-# INLINE unzip #-}
 
-{-# INLINE unzip3 #-}
 -- | 'unzip3' transforms a vector of triplets into a vector of first components,
 -- a vector of second components, and a vector of third components.
 --
@@ -768,8 +768,8 @@ unzip3 xs = ( map (\(x,_,_) -> x) xs
             , map (\(_,y,_) -> y) xs
             , map (\(_,_,z) -> z) xs
             )
+{-# INLINE unzip3 #-}
 
-{-# NOINLINE index_int #-}
 index_int :: KnownNat n => Vec n a -> Int -> a
 index_int xs i@(I# n0)
   | isTrue# (n0 <# 0#) = error "CLaSH.Sized.Vector.(!!): negative index"
@@ -784,8 +784,8 @@ index_int xs i@(I# n0)
     sub (y `Cons` (!ys)) n = if isTrue# (n ==# 0#)
                                 then y
                                 else sub ys (n -# 1#)
+{-# NOINLINE index_int #-}
 
-{-# INLINE (!!) #-}
 -- | Vector index (subscript) operator.
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
@@ -801,24 +801,24 @@ index_int xs i@(I# n0)
 -- *** Exception: CLaSH.Sized.Vector.(!!): index 14 is larger than maximum index 4
 (!!) :: (KnownNat n, Enum i) => Vec n a -> i -> a
 xs !! i = index_int xs (fromEnum i)
+{-# INLINE (!!) #-}
 
-{-# NOINLINE maxIndex #-}
 -- | Index (subscript) of the last element in a 'Vec'tor
 --
 -- >>> maxIndex (6 :> 7 :> 8 :> Nil)
 -- 2
 maxIndex :: KnownNat n => Vec n a -> Integer
 maxIndex = subtract 1 . length
+{-# NOINLINE maxIndex #-}
 
-{-# NOINLINE length #-}
 -- | Length of a 'Vec'tor as an Integer
 --
 -- >>> length (6 :> 7 :> 8 :> Nil)
 -- 3
 length :: KnownNat n => Vec n a -> Integer
 length = natVal . asNatProxy
+{-# NOINLINE length #-}
 
-{-# NOINLINE replace_int #-}
 replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
 replace_int xs i@(I# n0) a
   | isTrue# (n0 <# 0#) = error "CLaSH.Sized.Vector.replace: negative index"
@@ -833,8 +833,8 @@ replace_int xs i@(I# n0) a
     sub (y `Cons` (!ys)) n b = if isTrue# (n ==# 0#)
                                  then b `Cons` ys
                                  else y `Cons` sub ys (n -# 1#) b
+{-# NOINLINE replace_int #-}
 
-{-# INLINE replace #-}
 -- | Replace an element of a vector at the given index (subscript).
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
@@ -848,8 +848,8 @@ replace_int xs i@(I# n0) a
 -- <1,2,3,4,*** Exception: CLaSH.Sized.Vector.replace: index 9 is larger than maximum index 4
 replace :: (KnownNat n, Enum i) => i -> a -> Vec n a -> Vec n a
 replace i y xs = replace_int xs (fromEnum i) y
+{-# INLINE replace #-}
 
-{-# INLINABLE take #-}
 -- | 'take' @n@, applied to a vector @xs@, returns the @n@-length prefix of @xs@
 --
 -- >>> take (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
@@ -870,16 +870,16 @@ replace i y xs = replace_int xs (fromEnum i) y
 --     In an equation for ‘it’: it = take d4 (1 :> 2 :> Nil)
 take :: SNat m -> Vec (m + n) a -> Vec m a
 take n = fst . splitAt n
+{-# INLINE take #-}
 
-{-# INLINE takeI #-}
 -- | 'takeI' @xs@, returns the prefix of @xs@ as demanded by the context
 --
 -- >>> takeI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
 -- <1,2>
 takeI :: KnownNat m => Vec (m + n) a -> Vec m a
 takeI = withSNat take
+{-# INLINE takeI #-}
 
-{-# INLINE drop #-}
 -- | 'drop' @n xs@ returns the suffix of @xs@ after the first @n@ elements
 --
 -- >>> drop (snat :: SNat 3) (1:>2:>3:>4:>5:>Nil)
@@ -897,16 +897,16 @@ takeI = withSNat take
 --     In a stmt of an interactive GHCi command: print it
 drop :: SNat m -> Vec (m + n) a -> Vec n a
 drop n = snd . splitAt n
+{-# INLINE drop #-}
 
-{-# INLINE dropI #-}
 -- | 'dropI' @xs@, returns the suffix of @xs@ as demanded by the context
 --
 -- >>> dropI (1:>2:>3:>4:>5:>Nil) :: Vec 2 Int
 -- <4,5>
 dropI :: KnownNat m => Vec (m + n) a -> Vec n a
 dropI = withSNat drop
+{-# INLINE dropI #-}
 
-{-# INLINE at #-}
 -- | 'at' @n xs@ returns @n@'th element of @xs@
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
@@ -918,8 +918,8 @@ dropI = withSNat drop
 -- 2
 at :: SNat m -> Vec (m + (n + 1)) a -> a
 at n xs = head $ snd $ splitAt n xs
+{-# INLINE at #-}
 
-{-# NOINLINE select #-}
 -- | 'select' @f s n xs@ selects @n@ elements with stepsize @s@ and
 -- offset @f@ from @xs@
 --
@@ -939,8 +939,8 @@ select f s n xs = select' (toUNat n) $ drop f xs
     select' UZero      _               = Nil
     select' (USucc n') vs@(x `Cons` _) = x `Cons`
                                          select' n' (drop s (unsafeCoerce vs))
+{-# NOINLINE select #-}
 
-{-# INLINE selectI #-}
 -- | 'selectI' @f s xs@ selects as many elements as demanded by the context
 -- with stepsize @s@ and offset @f@ from @xs@
 --
@@ -952,8 +952,8 @@ selectI :: (CmpNat (i + s) (s * n) ~ 'GT, KnownNat n)
         -> Vec (f + i) a
         -> Vec n a
 selectI f s xs = withSNat (\n -> select f s n xs)
+{-# INLINE selectI #-}
 
-{-# NOINLINE replicate #-}
 -- | 'replicate' @n a@ returns a vector that has @n@ copies of @a@
 --
 -- >>> replicate (snat :: SNat 3) 6
@@ -962,12 +962,12 @@ selectI f s xs = withSNat (\n -> select f s n xs)
 -- <6,6,6>
 replicate :: SNat n -> a -> Vec n a
 replicate n a = replicateU (toUNat n) a
+{-# NOINLINE replicate #-}
 
 replicateU :: UNat n -> a -> Vec n a
 replicateU UZero     _ = Nil
 replicateU (USucc s) x = x `Cons` replicateU s x
 
-{-# INLINE repeat #-}
 -- | 'repeat' @a@ creates a vector with as many copies of @a@ as demanded by the
 -- context
 --
@@ -975,8 +975,8 @@ replicateU (USucc s) x = x `Cons` replicateU s x
 -- <6,6,6,6,6>
 repeat :: KnownNat n => a -> Vec n a
 repeat = withSNat replicate
+{-# INLINE repeat #-}
 
-{-# INLINE iterate #-}
 -- | 'iterate' @n f x@ returns a vector starting with @x@ followed by @n@
 -- repeated applications of @f@ to @x@
 --
@@ -991,8 +991,8 @@ repeat = withSNat replicate
 -- <<doc/iterate.svg>>
 iterate :: SNat n -> (a -> a) -> a -> Vec n a
 iterate (SNat _) = iterateI
+{-# INLINE iterate #-}
 
-{-# INLINE iterateI #-}
 -- | 'iterate' @f x@ returns a vector starting with @x@ followed by @n@
 -- repeated applications of @f@ to @x@, where @n@ is determined by the context
 --
@@ -1009,8 +1009,8 @@ iterateI f a = xs
   where
     xs = init (a `Cons` ws)
     ws = map f (lazyV xs)
+{-# INLINE iterateI #-}
 
-{-# INLINE generate #-}
 -- | 'generate' @n f x@ returns a vector with @n@ repeated applications of @f@
 -- to @x@
 --
@@ -1025,8 +1025,8 @@ iterateI f a = xs
 -- <<doc/generate.svg>>
 generate :: SNat n -> (a -> a) -> a -> Vec n a
 generate (SNat _) f a = iterateI f (f a)
+{-# INLINE generate #-}
 
-{-# INLINE generateI #-}
 -- | 'generate' @f x@ returns a vector with @n@ repeated applications of @f@
 -- to @x@, where @n@ is determined by the context
 --
@@ -1040,8 +1040,8 @@ generate (SNat _) f a = iterateI f (f a)
 -- <<doc/generate.svg>>
 generateI :: KnownNat n => (a -> a) -> a -> Vec n a
 generateI f a = iterateI f (f a)
+{-# INLINE generateI #-}
 
-{-# INLINE toList #-}
 -- | Convert a vector to a list
 --
 -- >>> toList (1:>2:>3:>Nil)
@@ -1050,6 +1050,7 @@ generateI f a = iterateI f (f a)
 -- __NB__: Not synthesisable
 toList :: Vec n a -> [a]
 toList = foldr (:) []
+{-# INLINE toList #-}
 
 -- | Create a vector literal from a list literal
 --
@@ -1067,7 +1068,6 @@ v (x:xs) = [| x :> $(v xs) |]
 asNatProxy :: Vec n a -> Proxy n
 asNatProxy _ = Proxy
 
-{-# NOINLINE lazyV #-}
 -- | For when your vector functions are too strict in their arguments
 --
 -- For example:
@@ -1126,11 +1126,9 @@ lazyV = lazyV' (repeat undefined)
     lazyV' :: Vec n a -> Vec n a -> Vec n a
     lazyV' Nil           _  = Nil
     lazyV' (_ `Cons` xs) ys = head ys `Cons` lazyV' xs (tail ys)
+{-# NOINLINE lazyV #-}
 
-{-# NOINLINE dfold #-}
 -- | A /dependently/ typed fold.
---
---  __NB__: Not synthesisable
 --
 -- Using lists, we can define @append@ ('Prelude.++') using 'Prelude.foldr':
 --
@@ -1202,15 +1200,14 @@ dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
       -> (p $ k)
 dfold _ _ z Nil                        = z
 dfold p f z (x `Cons` (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
+{-# NOINLINE dfold #-}
+{-# WARNING dfold "CLaSH.Sized.Vector.dfold is not synthesisable" #-}
 
 data V (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (V a) l = Vec l a
 
-{-# NOINLINE vfold #-}
 -- | Specialised version of 'dfold' that builds a triangular computational
 -- structure.
---
--- __NB__: Not synthesisable
 --
 -- Example:
 --
@@ -1228,14 +1225,14 @@ vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
 vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
-
+{-# NOINLINE vfold #-}
+{-# WARNING vfold "CLaSH.Sized.Vector.vfold is not synthesisable" #-}
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
   pack   = concatBitVector# . map pack
   unpack = map unpack . unconcatBitVector#
 
-{-# NOINLINE concatBitVector# #-}
 concatBitVector# :: KnownNat m
                  => Vec n (BitVector m)
                  -> BitVector (n * m)
@@ -1246,19 +1243,20 @@ concatBitVector# = concatBitVector' . reverse
                      -> BitVector (n * m)
     concatBitVector' Nil           = 0
     concatBitVector' (x `Cons` xs) = concatBitVector' xs ++# x
+{-# NOINLINE concatBitVector# #-}
 
-{-# NOINLINE unconcatBitVector# #-}
 unconcatBitVector# :: (KnownNat n, KnownNat m)
                    => BitVector (n * m)
                    -> Vec n (BitVector m)
 unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
+{-# NOINLINE unconcatBitVector# #-}
 
-{-# INLINE ucBV #-}
 ucBV :: forall n m . KnownNat m
      => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
 ucBV UZero     _  = Nil
 ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
                     in  ucBV n bv' :< x
+{-# INLINE ucBV #-}
 
 instance Lift a => Lift (Vec n a) where
   lift Nil           = [| Nil |]
