@@ -47,7 +47,7 @@ module CLaSH.Sized.Vector
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
     -- ** Generating 'Vec'tors
-  , replicate, repeat, iterate, iterateI, generate, generateI
+  , replicate, replicateI, repeat, iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
     -- ** Functions for the 'BitPack' instance
@@ -967,6 +967,16 @@ replicate n a = replicateU (toUNat n) a
 replicateU :: UNat n -> a -> Vec n a
 replicateU UZero     _ = Nil
 replicateU (USucc s) x = x `Cons` replicateU s x
+
+-- | \"'replicateI' @a@\" creates a vector with as many copies of @a@ as
+-- demanded by the context
+--
+-- >>> replicateI 6 :: Vec 5 Int
+-- <6,6,6,6,6>
+replicateI :: KnownNat n => a -> Vec n a
+replicateI = withSNat replicate
+{-# INLINE replicateI #-}
+{-# WARNING replicateI "Use 'repeat' instead of 'replicateI'" #-}
 
 -- | 'repeat' @a@ creates a vector with as many copies of @a@ as demanded by the
 -- context
