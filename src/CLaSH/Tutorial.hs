@@ -94,7 +94,7 @@ import Data.Default
 -- >>> :set -fplugin GHC.TypeLits.Normalise
 -- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
 -- >>> :{
--- let sortV xs = map fst sorted <: (snd (last sorted))
+-- let sortV xs = map fst sorted :< (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -102,7 +102,7 @@ import Data.Default
 -- :}
 --
 -- >>> :{
--- let sortVL xs = map fst sorted <: (snd (last sorted))
+-- let sortVL xs = map fst sorted :< (snd (last sorted))
 --       where
 --         lefts  = head xs :> map snd (init sorted)
 --         rights = tail xs
@@ -1632,7 +1632,7 @@ A list of often encountered errors and their solutions:
 
     @
     -- Bubble sort for 1 iteration
-    sortV xs = 'map' fst sorted '<:' (snd ('last' sorted))
+    sortV xs = 'map' fst sorted ':<' (snd ('last' sorted))
      where
        lefts  = 'head' xs :> 'map' snd ('init' sorted)
        rights = 'tail' xs
@@ -1651,7 +1651,7 @@ A list of often encountered errors and their solutions:
     In this case, adding 'lazyV' on 'zipWith's second argument:
 
     @
-    sortVL xs = 'map' fst sorted '<:' (snd ('last' sorted))
+    sortVL xs = 'map' fst sorted ':<' (snd ('last' sorted))
      where
        lefts  = 'head' xs :> map snd ('init' sorted)
        rights = 'tail' xs
@@ -1683,7 +1683,7 @@ to VHDL/Verilog/SystemVerilog (for now):
     is the following function that performs one iteration of bubble sort:
 
     @
-    sortV xs = 'map' fst sorted <: (snd ('last' sorted))
+    sortV xs = 'map' fst sorted :< (snd ('last' sorted))
      where
        lefts  = 'head' xs :> 'map' snd ('init' sorted)
        rights = 'tail' xs
