@@ -4,6 +4,7 @@
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|
@@ -99,7 +100,7 @@ window' :: (KnownNat n, Default a)
         -> Vec (n + 1) (Signal' clk a) -- ^ Window of at least size 1
 window' clk x = res
   where
-    res  = x :> prev
+    res  = x `Cons` prev
     prev = case natVal (asNatProxy prev) of
              0 -> repeat def
              _ -> let next = x +>> prev

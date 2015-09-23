@@ -1,5 +1,13 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10
+* New features:
+  * The Vec constructor `:>` is now an explicitly bidirectional pattern synonym (the actual constructor has been renamed to Cons).
+    As a result, pattern matching on `:>` is now synthesisable by the CLaSH compiler.
+  * The function `<:` is replaced by the the explicitly bidirectional pattern synonym `:<`.
+    This allows you to pattern match on: "all but the last element of a vector" and "the last element" of the vector.
+    Because it is a bidirectional pattern, `:<` can also be used as an expression that appends an element to the tail of a vector.
+
 ## 0.9.3 *September 21st 2015*
 * Fixes bugs:
   * Cannot build against singletons-0.2
