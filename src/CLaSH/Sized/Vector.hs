@@ -1081,7 +1081,7 @@ transpose = sequenceA
 -- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
 -- >>> :t xs
 -- xs :: Num a => Vec 6 a
--- >>> :t
+-- >>> :t stencil1d d2 sum xs
 -- stencil1d d2 sum xs :: Num b => Vec 5 b
 -- >>> stencil1d d2 sum xs
 -- <3,5,7,9,11>
@@ -1124,7 +1124,7 @@ stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
 -- xs :: Num a => Vec 6 a
 -- >>> :t windows1d d2 xs
 -- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
--- >>> windows1d d2 (1:>2:>3:>4:>5:>6:>Nil)
+-- >>> windows1d d2 xs
 -- <<1,2>,<2,3>,<3,4>,<4,5>,<5,6>>
 windows1d :: KnownNat (n + 1)
           => SNat (stX + 1) -- ^ Length of the window, at least size 1
@@ -1146,7 +1146,7 @@ windows1d stX xs = map (take stX) (rotations xs)
 -- xss :: Num a => Vec 4 (Vec 4 a)
 -- >>> :t windows2d d2 d2 xss
 -- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
--- >>> windows1d d2 (1:>2:>3:>4:>5:>6:>Nil)
+-- >>> windows2d d2 d2 xss
 -- <<<<1,2>,<5,6>>,<<2,3>,<6,7>>,<<3,4>,<7,8>>>,<<<5,6>,<9,10>>,<<6,7>,<10,11>>,<<7,8>,<11,12>>>,<<<9,10>,<13,14>>,<<10,11>,<14,15>>,<<11,12>,<15,16>>>>
 windows2d :: (KnownNat (n+1),KnownNat (m+1))
           => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
