@@ -8,7 +8,7 @@ type Elm = Unsigned 16
 
 type Temp = Signed 32
 
-vrotate xs = tail xs <: head xs
+vrotate xs = tail xs :< head xs
 
 windowsI :: (KnownNat (n + 1), ((m + n) + 1) ~ ((m + 1) + n))
          => SNat (m + 1)

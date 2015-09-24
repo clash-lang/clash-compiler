@@ -22,7 +22,7 @@ topEntity :: Signal () -> Signal Integer
 topEntity = mealy loop actual
 
 loop :: Vec (n+2) a -> () -> (Vec (n+2) a, a)
---loop (x:>xs) _ = (xs <: last xs, x)
+--loop (x:>xs) _ = (xs :< last xs, x)
 loop xs _ = (xs <<+ last xs, head xs)
 
 
