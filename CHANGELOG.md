@@ -7,6 +7,8 @@
   * The function `<:` is replaced by the the explicitly bidirectional pattern synonym `:<`.
     This allows you to pattern match on: "all but the last element of a vector" and "the last element" of the vector.
     Because it is a bidirectional pattern, `:<` can also be used as an expression that appends an element to the tail of a vector.
+  * Add a `transpose` function in `CLaSH.Sized.Vector`.
+  * Add `stencil1d` and `stensil2d` stencil computation functions in `CLaSH.Sized.Vector`.
 
 ## 0.9.3 *September 21st 2015*
 * Fixes bugs:
