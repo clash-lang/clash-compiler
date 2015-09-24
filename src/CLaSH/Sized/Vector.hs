@@ -31,23 +31,33 @@ module CLaSH.Sized.Vector
     -- * Standard 'Vec'tor functions
     -- ** Extracting sub-'Vec'tors
   , head, tail, last, init
-  , take, takeI, drop, dropI, at, select, selectI
+  , take, takeI, drop, dropI
+  , at, select, selectI
     -- ** Combining 'Vec'tors
-  , (++), (+>>), (<<+), concat, zip, unzip, zip3, unzip3, shiftInAt0, shiftInAtN
-  , shiftOutFrom0, shiftOutFromN
+  , (++), (+>>), (<<+), concat
+  , zip, unzip, zip3, unzip3
+  , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
+  , merge
     -- ** Splitting 'Vec'tors
-  , splitAt, splitAtI, unconcat, unconcatI, merge
+  , splitAt, splitAtI
+  , unconcat, unconcatI
     -- ** Applying functions to 'Vec'tor elements
   , map, zipWith, zipWith3
   , foldr, foldl, foldr1, foldl1, fold
   , scanl, scanr, sscanl, sscanr
   , mapAccumL, mapAccumR
+    -- ** Matrix operations
+  , transpose
+    -- ** Stencil computations
+  , stencil1d, stencil2d
+  , windows1d, windows2d
     -- ** Special folds
   , dfold, vfold
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
     -- ** Generating 'Vec'tors
-  , replicate, replicateI, repeat, iterate, iterateI, generate, generateI
+  , replicate, replicateI, repeat
+  , iterate, iterateI, generate, generateI
     -- ** Misc
   , reverse, toList, v, lazyV, asNatProxy
     -- ** Functions for the 'BitPack' instance
@@ -1053,6 +1063,99 @@ generate (SNat _) f a = iterateI f (f a)
 generateI :: KnownNat n => (a -> a) -> a -> Vec n a
 generateI f a = iterateI f (f a)
 {-# INLINE generateI #-}
+
+-- | Transpose a matrix: go from row-major to column-major
+--
+-- >>> transpose ((1:>2:>Nil):>(3:>4:>Nil):>(5:>6:>Nil):>Nil)
+-- <<1,3,5>,<2,4,6>>
+transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
+transpose = sequenceA
+{-# NOINLINE transpose #-}
+
+-- | 1-dimensional stencil computations
+--
+-- \"'stencil1d' @stX f xs@\", where /xs/ has /stX + n/ elements, applies the
+-- stencil computation /f/ on: /n + 1/ overlapping (1D) windows of length /stX/,
+-- drawn from /xs/. The resulting vector has /n + 1/ elements.
+--
+-- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
+-- >>> :t xs
+-- xs :: Num a => Vec 6 a
+-- >>> :t
+-- stencil1d d2 sum xs :: Num b => Vec 5 b
+-- >>> stencil1d d2 sum xs
+-- <3,5,7,9,11>
+stencil1d :: KnownNat (n + 1)
+          => SNat (stX + 1) -- ^ Windows length /stX/, at least size 1
+          -> (Vec (stX + 1) a -> b) -- ^ The stencil (function)
+          -> Vec ((stX + n) + 1) a
+          -> Vec (n + 1) b
+stencil1d stX f xs = map f (windows1d stX xs)
+{-# INLINE stencil1d #-}
+
+-- | 2-dimensional stencil computations
+--
+-- \"'stencil2d' @stY stX f xss@\", where /xss/ is a matrix of /stY + m/ rows
+-- of /stX + n/ elements, applies the stencil computation /f/ on:
+-- /(m + 1) * (n + 1)/ overlapping (2D) windows of /stY/ rows of /stX/ elements,
+-- drawn from /xss/. The result matrix has /m + 1/ rows of /n + 1/ elements.
+--
+-- >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
+-- >>> :t xss
+-- xss :: Num a => Vec 4 (Vec 4 a)
+-- >>> :t stencil2d d2 d2 (sum . map sum) xss
+-- stencil2d d2 d2 (sum . map sum) xss :: Num a => Vec 3 (Vec 3 a)
+-- >>> stencil2d d2 d2 (sum . map sum) xss
+-- <<14,18,22>,<30,34,38>,<46,50,54>>
+stencil2d :: (KnownNat (n + 1), KnownNat (m+1))
+          => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
+          -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
+          -> (Vec (stY + 1) (Vec (stX + 1) a) -> b) -- ^ The stencil (function)
+          -> Vec ((stY + m) + 1) (Vec ((stX + n) + 1) a)
+          -> Vec (m + 1) (Vec (n + 1) b)
+stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
+{-# INLINE stencil2d #-}
+
+-- | \"'windows1d' @stX xs@\", where the vector /xs/ has /stX + n/ elements,
+-- returns a vector of /n + 1/ overlapping (1D) windows of /xs/ of length /stX/.
+--
+-- >>> let xs = (1:>2:>3:>4:>5:>6:>Nil)
+-- >>> :t xs
+-- xs :: Num a => Vec 6 a
+-- >>> :t windows1d d2 xs
+-- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
+-- >>> windows1d d2 (1:>2:>3:>4:>5:>6:>Nil)
+-- <<1,2>,<2,3>,<3,4>,<4,5>,<5,6>>
+windows1d :: KnownNat (n + 1)
+          => SNat (stX + 1) -- ^ Length of the window, at least size 1
+          -> Vec ((stX + n) + 1) a
+          -> Vec (n + 1) (Vec (stX + 1) a)
+windows1d stX xs = map (take stX) (rotations xs)
+  where
+    rotateL ys   = tail ys :< head ys
+    rotations ys = iterateI rotateL ys
+{-# INLINE windows1d #-}
+
+-- | \"'windows2d' @stY stX xss@\", where matrix /xss/ has /stY + m/ rows of
+-- /stX + n/, returns a matrix of /m+1/ rows of /n+1/ elements. The elements
+-- of this new matrix are the overlapping (2D) windows of /xss/, where every
+-- window has /stY/ rows of /stX/ elements.
+--
+-- >>> let xss = ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>(13:>14:>15:>16:>Nil):>Nil)
+-- >>> :t xss
+-- xss :: Num a => Vec 4 (Vec 4 a)
+-- >>> :t windows2d d2 d2 xss
+-- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
+-- >>> windows1d d2 (1:>2:>3:>4:>5:>6:>Nil)
+-- <<<<1,2>,<5,6>>,<<2,3>,<6,7>>,<<3,4>,<7,8>>>,<<<5,6>,<9,10>>,<<6,7>,<10,11>>,<<7,8>,<11,12>>>,<<<9,10>,<13,14>>,<<10,11>,<14,15>>,<<11,12>,<15,16>>>>
+windows2d :: (KnownNat (n+1),KnownNat (m+1))
+          => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
+          -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
+          -> Vec ((stY + m) + 1) (Vec (stX + n + 1) a)
+          -> Vec (m + 1) (Vec (n + 1) (Vec (stY + 1) (Vec (stX + 1) a)))
+windows2d stY stX xss = map (transpose . (map (windows1d stX)))
+                            (windows1d stY xss)
+{-# INLINE windows2d #-}
 
 -- | Convert a vector to a list.
 --
