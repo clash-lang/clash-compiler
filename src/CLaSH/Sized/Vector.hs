@@ -26,43 +26,60 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 module CLaSH.Sized.Vector
-  ( -- * 'Vec'tor constructors
-    Vec(..) , pattern (:>), pattern (:<), v, singleton
-    -- * Standard 'Vec'tor functions
-    -- ** Extracting sub-'Vec'tors
-  , head, tail, last, init
+  ( -- * 'Vec'tor data type
+    Vec(..)
+    -- * Accessors
+    -- ** Length information
+  , length, maxIndex, lengthS
+    -- ** Indexing
+  , (!!), head, last, at
+    -- ** Extracting subvectors (slicing)
+  , tail, init
   , take, takeI, drop, dropI
-  , at, select, selectI
-    -- ** Combining 'Vec'tors
-  , (++), (+>>), (<<+), concat
-  , zip, unzip, zip3, unzip3
-  , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
-  , merge
-    -- ** Splitting 'Vec'tors
+  , select, selectI
+    -- *** Splitting
   , splitAt, splitAtI
   , unconcat, unconcatI
-    -- ** Applying functions to 'Vec'tor elements
-  , map, zipWith, zipWith3
-  , foldr, foldl, foldr1, foldl1, fold
-  , scanl, scanr, sscanl, sscanr
-  , mapAccumL, mapAccumR
-    -- ** Permutations
-  , permute, backpermute
-    -- *** Specialised permutations
-  , reverse, transpose
-    -- ** Stencil computations
-  , stencil1d, stencil2d
-  , windows1d, windows2d
-    -- ** Indexing 'Vec'tors
-  , (!!), replace, maxIndex, length
-    -- ** Generating 'Vec'tors
+    -- * Construction
+    -- ** Initialisation
+  , singleton
   , replicate, replicateI, repeat
   , iterate, iterateI, generate, generateI
-    -- ** Special folds
+    -- *** Initialisation from a list
+  , v
+    -- ** Concatenation
+  , pattern (:>), pattern (:<)
+  , (++), (+>>), (<<+), concat
+  , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
+  , merge
+    -- * Modifying vectors
+  , replace
+    -- ** Permutations
+  , permute, backpermute, scatter, gather
+    -- *** Specialised permutations
+  , reverse, transpose, interleave
+  , rotateLeft, rotateRight, rotateLeftS, rotateRightS
+    -- * Element-wise operations
+    -- ** Mapping
+  , map
+    -- ** Zipping
+  , zipWith, zipWith3
+  , zip, zip3
+    -- ** Unzipping
+  , unzip, unzip3
+    -- * Folding
+  , foldr, foldl, foldr1, foldl1, fold
+    -- ** Specialised folds
   , dfold, vfold
-    -- ** Misc
+    -- * Prefix sums (scans)
+  , scanl, scanr, postscanl, postscanr
+  , mapAccumL, mapAccumR
+    -- * Stencil computations
+  , stencil1d, stencil2d
+  , windows1d, windows2d
+    -- * Misc
   , toList, lazyV, asNatProxy
-    -- ** Functions for the 'BitPack' instance
+    -- * Functions for the 'BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
   )
