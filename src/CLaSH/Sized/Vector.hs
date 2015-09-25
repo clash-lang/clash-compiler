@@ -27,7 +27,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 module CLaSH.Sized.Vector
   ( -- * 'Vec'tor constructors
-    Vec(..) , pattern (:>), pattern (:<), singleton
+    Vec(..) , pattern (:>), pattern (:<), v, singleton
     -- * Standard 'Vec'tor functions
     -- ** Extracting sub-'Vec'tors
   , head, tail, last, init
@@ -46,20 +46,22 @@ module CLaSH.Sized.Vector
   , foldr, foldl, foldr1, foldl1, fold
   , scanl, scanr, sscanl, sscanr
   , mapAccumL, mapAccumR
-    -- ** Matrix operations
-  , transpose
+    -- ** Permutations
+  , permute, backpermute
+    -- *** Specialised permutations
+  , reverse, transpose
     -- ** Stencil computations
   , stencil1d, stencil2d
   , windows1d, windows2d
-    -- ** Special folds
-  , dfold, vfold
     -- ** Indexing 'Vec'tors
   , (!!), replace, maxIndex, length
     -- ** Generating 'Vec'tors
   , replicate, replicateI, repeat
   , iterate, iterateI, generate, generateI
+    -- ** Special folds
+  , dfold, vfold
     -- ** Misc
-  , reverse, toList, v, lazyV, asNatProxy
+  , toList, lazyV, asNatProxy
     -- ** Functions for the 'BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
@@ -1156,6 +1158,34 @@ windows2d :: (KnownNat (n+1),KnownNat (m+1))
 windows2d stY stX xss = map (transpose . (map (windows1d stX)))
                             (windows1d stY xss)
 {-# INLINE windows2d #-}
+
+-- | Forward permutation specified by an index mapping, /ix/. The result vector
+-- is initialised by the given defaults, /def/, and an further values that are
+-- permuted into the result are added to the current value using the given
+-- combination function, /f/.
+--
+-- The combination function must be /associative/ and /commutative/.
+permute :: (Enum i, KnownNat n)
+        => (a -> a -> a) -- ^ Combination function, /f/
+        -> Vec n a       -- ^ Default values, /def/
+        -> Vec m i       -- ^ Index mapping, /is/
+        -> Vec m a       -- ^ Array to be permuted, /xs/
+        -> Vec n a
+permute f defs is xs = ys
+  where
+    ixs = zip is xs
+    ys  = foldr (\(i,x) ks -> let ki = ks!!i in replace i (f x ki) ks) defs ixs
+
+-- | Backwards permutation specified by an index mapping, /is/, from the
+-- destination vector specifying which element of the source vector /xs/ to
+-- read.
+--
+-- \"'backpermute' @xs is@\" is equivalent to \"'map' @(xs '!!') is@\".
+backpermute :: (Enum i, KnownNat n)
+            => Vec n a  -- ^ Source array, /xs/
+            -> Vec m i  -- ^ Index mapping, /is/
+            -> Vec m a
+backpermute xs = map (xs!!)
 
 -- | Convert a vector to a list.
 --
