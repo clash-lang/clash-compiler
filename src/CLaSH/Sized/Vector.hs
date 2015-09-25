@@ -459,10 +459,9 @@ unconcatI = withSNat unconcat
 --
 -- >>> merge (1 :> 2 :> 3 :> 4 :> Nil) (5 :> 6 :> 7 :> 8 :> Nil)
 -- <1,5,2,6,3,7,4,8>
-merge :: Vec n a -> Vec n a -> Vec (n + n) a
-merge Nil           Nil           = Nil
-merge (x `Cons` xs) (y `Cons` ys) = x `Cons` y `Cons` merge xs ys
-{-# NOINLINE merge #-}
+merge :: KnownNat n => Vec n a -> Vec n a -> Vec (2 * n) a
+merge x y = concat (transpose (x :> singleton y))
+{-# INLINE merge #-}
 
 -- | The elements in a vector in reverse order.
 --
