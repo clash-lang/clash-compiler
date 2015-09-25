@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.5.16
+* New features:
+  * Support `clash-prelude-0.10`
+
 ## 0.5.15 *September 21st 2015*
 * New features:
   * Report simulation time in (System)Verilog assert messages

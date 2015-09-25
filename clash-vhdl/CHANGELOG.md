@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.5.13
+* New features:
+  * Support `clash-prelude-0.10`
+
 ## 0.5.12 *September 21st 2015*
 * Fixes bugs:
   * Fix Index maxBound [#79](https://github.com/clash-lang/clash-compiler/pull/79)

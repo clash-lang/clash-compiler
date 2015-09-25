@@ -1,5 +1,5 @@
 Name:                 clash-verilog
-Version:              0.5.10
+Version:              0.5.11
 Synopsis:             CAES Language for Synchronous Hardware - Verilog backend
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -94,7 +94,7 @@ Library
 
   Build-depends:      base                    >= 4.6.0.1 && < 5,
                       clash-lib               >= 0.5.12,
-                      clash-prelude           >= 0.9,
+                      clash-prelude           >= 0.10,
                       fgl                     >= 5.4.2.4,
                       lens                    >= 3.9.2,
                       mtl                     >= 2.1.2,
