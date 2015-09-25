@@ -323,6 +323,31 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.transpose"
+    , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
+    , "templateD" :
+"-- transpose begin
+transpose_~SYM[0] : block
+  signal in_mat : ~TYP[1];
+begin
+  in_mat <= ~ARG[1];
+
+  transposeZ : if ~RESULT'length = 0 or in_mat'length = 0 generate
+    ~RESULT <= ~ERRORO;
+  end generate;
+
+  transposeS : if ~RESULT'length /= 0 and in_mat'length /= 0 generate
+    transposeS_outer : for row_index in in_mat'range generate
+      transposeS_inner : for col_index in ~RESULT'range generate
+        ~RESULT(col_index)(row_index) <= in_mat(row_index)(col_index);
+      end generate;
+    end generate;
+  end generate;
+end block;
+-- transpose end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :

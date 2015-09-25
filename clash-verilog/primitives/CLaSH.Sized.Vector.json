@@ -245,6 +245,26 @@ end
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.transpose"
+    , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
+    , "templateD" :
+"// transpose begin
+wire ~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+
+genvar ~SYM[1];
+genvar ~SYM[2];
+~GENERATE
+for (~SYM[1] = 0; ~SYM[1] < ~LENGTH[~TYP[1]]; ~SYM[1] = ~SYM[1] + 1) begin : transpose_outer_~SYM[3]
+  for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : transpose_inner_~SYM[4]
+    assign ~RESULT[((~SYM[2]*~SIZE[~TYPEL[~TYPO]])+(~SYM[1]*~SIZE[~TYPEL[~TYPEL[~TYPO]]]))+:~SIZE[~TYPEL[~TYPEL[~TYPO]]]] = ~SYM[0][((~SYM[1]*~SIZE[~TYPEL[~TYP[1]]])+(~SYM[2]*~SIZE[~TYPEL[~TYPEL[~TYPO]]]))+:~SIZE[~TYPEL[~TYPEL[~TYPO]]]];
+  end
+end
+~ENDGENERATE
+// transpose end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.reverse"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :

@@ -4,11 +4,11 @@ import CLaSH.Prelude
 
 topEntity = transposeV
 
-transposeV :: Vec 2 (Vec 3 Int) -> Vec 3 (Vec 2 Int)
+transposeV :: Vec 3 (Vec 4 Int) -> Vec 4 (Vec 3 Int)
 transposeV = sequenceA
 
-testInput :: Signal (Vec 2 (Vec 3 Int))
-testInput = pure ((1:>2:>3:>Nil):>(4:>5:>6:>Nil):>Nil)
+testInput :: Signal (Vec 3 (Vec 4 Int))
+testInput = pure ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>Nil)
 
-expectedOutput :: Signal (Vec 3 (Vec 2 Int)) -> Signal Bool
-expectedOutput = outputVerifier (((1:>4:>Nil):>(2:>5:>Nil):>(3:>6:>Nil):>Nil):>Nil)
+expectedOutput :: Signal (Vec 4 (Vec 3 Int)) -> Signal Bool
+expectedOutput = outputVerifier ((transpose ((1:>2:>3:>4:>Nil):>(5:>6:>7:>8:>Nil):>(9:>10:>11:>12:>Nil):>Nil)):>Nil)
