@@ -9,6 +9,9 @@
     Because it is a bidirectional pattern, `:<` can also be used as an expression that appends an element to the tail of a vector.
   * Add a `transpose` function in `CLaSH.Sized.Vector`.
   * Add `stencil1d` and `stensil2d` stencil computation functions in `CLaSH.Sized.Vector`.
+  * Add `permute`, `backpermute`, `scatter`, and `gather` permutation functions in `CLaSH.Sized.Vector`.
+  * Add specialised permutation functions `interleave`, `rotateLeft`, and `rotateRight` in `CLaSH.Sized.Vector`.
+  * `sscanl` and `sscanr` in `CLaSH.Sized.Vector` are renamed to `postscanl` and postscanr` to be more in line with existing Haskell packages such as `vector` and `accelerate`.
 
 ## 0.9.3 *September 21st 2015*
 * Fixes bugs:
