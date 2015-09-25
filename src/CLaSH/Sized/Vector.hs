@@ -1219,10 +1219,10 @@ backpermute xs = map (xs!!)
 --
 -- For example:
 --
--- >>> let default = 0:>0:>0:>0:>0:>0:>0:>0:>0:>Nil
+-- >>> let defVec = 0:>0:>0:>0:>0:>0:>0:>0:>0:>Nil
 -- >>> let to = 1:>3:>7:>2:>5:>8:>Nil
 -- >>> let input = 1:>9:>6:>4:>4:>2:>5:>Nil
--- >>> scatter default to input
+-- >>> scatter defVec to input
 -- <0,1,4,9,0,4,0,6,2>
 --
 -- __NB__: If the same index appears in the index mapping more than once, the
