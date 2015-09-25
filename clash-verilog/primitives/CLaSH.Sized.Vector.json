@@ -18,7 +18,7 @@
 wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1:~SIZE[~TYP[0]]-~SIZE[~TYPO]];
+assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]];
 // head end"
     }
   }
