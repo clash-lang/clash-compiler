@@ -1164,27 +1164,156 @@ windows2d stY stX xss = map (transpose . (map (windows1d stX)))
 -- combination function, /f/.
 --
 -- The combination function must be /associative/ and /commutative/.
-permute :: (Enum i, KnownNat n)
-        => (a -> a -> a) -- ^ Combination function, /f/
-        -> Vec n a       -- ^ Default values, /def/
-        -> Vec m i       -- ^ Index mapping, /is/
-        -> Vec m a       -- ^ Array to be permuted, /xs/
+permute :: (Enum i, KnownNat n, KnownNat m)
+        => (a -> a -> a)  -- ^ Combination function, /f/
+        -> Vec n a        -- ^ Default values, /def/
+        -> Vec m i        -- ^ Index mapping, /is/
+        -> Vec (m + k) a  -- ^ Vector to be permuted, /xs/
         -> Vec n a
 permute f defs is xs = ys
   where
-    ixs = zip is xs
-    ys  = foldr (\(i,x) ks -> let ki = ks!!i in replace i (f x ki) ks) defs ixs
+    ixs = zip is (takeI xs)
+    ys  = foldl (\ks (i,x) -> let ki = ks!!i in replace i (f x ki) ks) defs ixs
+{-# INLINE permute #-}
 
 -- | Backwards permutation specified by an index mapping, /is/, from the
 -- destination vector specifying which element of the source vector /xs/ to
 -- read.
 --
 -- \"'backpermute' @xs is@\" is equivalent to \"'map' @(xs '!!') is@\".
+--
+-- For example:
+--
+-- >>> let input = 1:>9:>6:>4:>4:>2:>0:>1:>2:>Nil
+-- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
+-- >>> backpermute input from
+-- <9,4,1,6,2,4>
 backpermute :: (Enum i, KnownNat n)
-            => Vec n a  -- ^ Source array, /xs/
+            => Vec n a  -- ^ Source vector, /xs/
             -> Vec m i  -- ^ Index mapping, /is/
             -> Vec m a
 backpermute xs = map (xs!!)
+{-# INLINE backpermute #-}
+
+-- | Copy elements from the source vector, /xs/, to the destination vector
+-- according to an index mapping /is/. This is a forward permute operation where
+-- a /to/ vector encodes an input to output index mapping. Output elements for
+-- indices that are not mapped assume the value in the default vector /def/.
+--
+-- For example:
+--
+-- >>> let default = 0:>0:>0:>0:>0:>0:>0:>0:>0:>Nil
+-- >>> let to = 1:>3:>7:>2:>5:>8:>Nil
+-- >>> let input = 1:>9:>6:>4:>4:>2:>5:>Nil
+-- >>> scatter default to input
+-- <0,1,4,9,0,4,0,6,2>
+--
+-- __NB__: If the same index appears in the index mapping more than once, the
+-- latest mapping is chosen.
+scatter :: (Enum i, KnownNat n, KnownNat m)
+        => Vec n a       -- ^ Default values, /def/
+        -> Vec m i       -- ^ Index mapping, /is/
+        -> Vec (m + k) a -- ^ Vector to be scattered, /xs/
+        -> Vec n a
+scatter = permute const
+{-# INLINE scatter #-}
+
+-- | Backwards permutation specified by an index mapping, /is/, from the
+-- destination vector specifying which element of the source vector /xs/ to
+-- read.
+--
+-- \"'gather' @xs is@\" is equivalent to \"'map' @(xs '!!') is@\".
+--
+-- For example:
+--
+-- >>> let input = 1:>9:>6:>4:>4:>2:>0:>1:>2:>Nil
+-- >>> let from  = 1:>3:>7:>2:>5:>3:>Nil
+-- >>> gather input from
+-- <9,4,1,6,2,4>
+gather :: (Enum i, KnownNat n)
+       => Vec n a  -- ^ Source vector, /xs/
+       -> Vec m i  -- ^ Index mapping, /is/
+       -> Vec m a
+gather xs = map (xs!!)
+{-# INLINE gather #-}
+
+-- | \"'interleave' @d xs@\" creates a vector:
+--
+-- @
+-- \<x_0,x_d,x_(2d),...,x_1,x_(d+1),x_(2d+1),...,x_(d-1),x_(2d-1),x_(3d-1)\>
+-- @
+--
+-- >>> let xs = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> Nil
+-- >>> interleave d3 xs
+-- <1,4,7,2,5,8,3,6,9>
+interleave :: (KnownNat n, KnownNat m)
+           => SNat n -- ^ Interleave step, /d/
+           -> Vec (m * n) a
+           -> Vec (n * m) a
+interleave d = concat . transpose . unconcat d
+{-# INLINE interleave #-}
+
+-- | /Dynamically/ rotate a 'Vec'tor to the left:
+--
+-- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
+-- >>> rotateLeft xs 1
+-- <2,3,4,1>
+-- >>> rotateLeft xs 2
+-- <3,4,1,2>
+-- >>> rotateLeft xs (-1)
+-- <4,1,2,3>
+rotateLeft :: (Integral i, KnownNat n)
+           => Vec n a
+           -> i
+           -> Vec n a
+rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
+  where
+    i'  = toInteger i
+    len = length xs
+{-# INLINE rotateLeft #-}
+
+-- | /Dynamically/ rotate a 'Vec'tor to the right:
+--
+-- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
+-- >>> rotateRight xs 1
+-- <4,1,2,3>
+-- >>> rotateRight xs 2
+-- <3,4,1,2>
+-- >>> rotateRight xs (-1)
+-- <2,3,4,1>
+rotateRight :: (Integral i, KnownNat n)
+            => Vec n a
+            -> i
+            -> Vec n a
+rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
+  where
+    i'  = negate (toInteger i)
+    len = length xs
+{-# INLINE rotateRight #-}
+
+-- | /Statically/ rotate a 'Vec'tor to the left:
+--
+-- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
+-- >>> rotateLeftS xs d1
+-- <2,3,4,1>
+rotateLeftS :: KnownNat (d + n)
+            => Vec (d + n) a
+            -> SNat d
+            -> Vec (n + d) a
+rotateLeftS xs d = let (l,r) = splitAt d xs in r ++ l
+{-# INLINE rotateLeftS #-}
+
+-- | /Statically/ rotate a 'Vec'tor to the right:
+--
+-- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
+-- >>> rotateRightS xs d1
+-- <4,1,2,3>
+rotateRightS :: forall n d a . (KnownNat n)
+             => Vec (n + d) a
+             -> SNat d
+             -> Vec (d + n) a
+rotateRightS xs _ = let (l,r) = splitAtI xs :: (Vec n a, Vec d a) in r ++ l
+{-# INLINE rotateRightS #-}
 
 -- | Convert a vector to a list.
 --
