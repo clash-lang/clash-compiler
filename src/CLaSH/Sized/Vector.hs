@@ -89,7 +89,7 @@ import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Promoted.Nat         (SNat (..), UNat (..), withSNat, toUNat)
+import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, withSNat, toUNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
 
 import CLaSH.Class.BitPack (BitPack (..))
@@ -1340,6 +1340,11 @@ v (x:xs) = [| x :> $(v xs) |]
 -- | 'Vec'tor as a 'Proxy' for 'Nat'
 asNatProxy :: Vec n a -> Proxy n
 asNatProxy _ = Proxy
+
+-- | Length of a 'Vec'tor as an 'SNat' value
+lengthS :: KnownNat n => Vec n a -> SNat n
+lengthS _ = snat
+{-# INLINE lengthS #-}
 
 -- | What you should use when your vector functions are too strict in their
 -- arguments.
