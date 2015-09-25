@@ -170,33 +170,6 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.merge"
-    , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
-    , "templateD" :
-"-- merge begin
-merge_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~SYM[2] <= ~ARG[1];
-
-  mergeZ_~SYM[3] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  mergeSN_~SYM[4] : if ~RESULT'length /= 0 generate
-    mergeIter_~SYM[5] : for ~SYM[6] in ~SYM[1]'range generate
-    begin
-      ~RESULT(2*~SYM[6])   <= ~SYM[1](~SYM[6]);
-      ~RESULT(2*~SYM[6]+1) <= ~SYM[2](~SYM[6]);
-    end generate;
-  end generate;
-end block;
--- merge end"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :

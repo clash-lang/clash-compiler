@@ -158,26 +158,6 @@ genvar ~SYM[1];
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.merge"
-    , "type"      : "merge :: Vec n a -> Vec n a -> Vec (n + n) a"
-    , "templateD" :
-"// merge begin
-~SIGD[~SYM[0]][0];
-~SIGD[~SYM[1]][1];
-assign ~SYM[0] = ~ARG[0];
-assign ~SYM[1] = ~ARG[1];
-
-genvar ~SYM[2];
-~GENERATE
-  for (~SYM[2] = 0; ~SYM[2] < $size(~SYM[0]); ~SYM[2] = ~SYM[2] + 1) begin : merge_~SYM[3]
-    assign ~RESULT[2*~SYM[2]]   = ~SYM[0][~SYM[2]];
-    assign ~RESULT[2*~SYM[2]+1] = ~SYM[1][~SYM[2]];
-  end
-~ENDGENERATE
-// merge end"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.map"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
