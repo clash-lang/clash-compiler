@@ -142,8 +142,11 @@ Library
                       lens                      >= 4.9,
                       QuickCheck                >= 2.7 && <2.9,
                       singletons                >= 1.0 && <3.0,
-                      template-haskell          >= 2.9.0.0,
-                      th-lift                   >= 0.5.6
+                      template-haskell          >= 2.9.0.0
+
+  -- Newer GHCs have -XDeriveLift
+  if impl(ghc<7.11)
+    Build-depends:    th-lift                   >= 0.5.6
 
   if flag(doclinks)
     CPP-Options:      -DDOCLINKS

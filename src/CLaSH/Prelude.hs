@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE DataKinds        #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators    #-}
@@ -97,7 +98,10 @@ module CLaSH.Prelude
     -- ** Type-level functions
   , module CLaSH.Promoted.Ord
     -- ** Template Haskell
-  , Lift (..), deriveLift
+  , Lift (..)
+#if __GLASGOW_HASKELL__ < 711
+  , deriveLift
+#endif
     -- ** Type classes
     -- *** CLaSH
   , module CLaSH.Class.BitPack
@@ -117,7 +121,10 @@ import Control.Applicative
 import Data.Bits
 import Data.Default
 import GHC.TypeLits
-import Language.Haskell.TH.Lift    (Lift(..),deriveLift)
+import Language.Haskell.TH.Syntax  (Lift(..))
+#if __GLASGOW_HASKELL__ < 711
+import Language.Haskell.TH.Lift    (deriveLift)
+#endif
 import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            foldl1, foldr, foldr1, head, init,
                                            iterate, last, length, map, repeat,
