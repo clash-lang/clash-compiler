@@ -653,19 +653,19 @@ scanl f z xs = ws
     ws = z `Cons` zipWith (flip f) xs (init ws)
 {-# INLINE scanl #-}
 
--- | 'sscanl' is a variant of 'scanl' where the first result is dropped:
+-- | 'postscanl' is a variant of 'scanl' where the first result is dropped:
 --
--- > sscanl f z (x1 :> x2 :> ... :> Nil) == (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
+-- > postscanl f z (x1 :> x2 :> ... :> Nil) == (z `f` x1) :> ((z `f` x1) `f` x2) :> ... :> Nil
 --
--- >>> sscanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
+-- >>> postscanl (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <5,9,12,14>
 --
--- \"'sscanl' @f z xs@\" corresponds to the following circuit layout:
+-- \"'postscanl' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/sscanl.svg>>
-sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec n b
-sscanl f z xs = tail (scanl f z xs)
-{-# INLINE sscanl #-}
+postscanl :: (b -> a -> b) -> b -> Vec n a -> Vec n b
+postscanl f z xs = tail (scanl f z xs)
+{-# INLINE postscanl #-}
 
 -- | 'scanr' is similar to 'foldr', but returns a vector of successive reduced
 -- values from the right:
@@ -688,19 +688,19 @@ scanr f z xs = ws
     ws = zipWith f xs ((tail ws)) :< z
 {-# INLINE scanr #-}
 
--- | 'sscanr' is a variant of 'scanr' that where the last result is dropped:
+-- | 'postscanr' is a variant of 'scanr' that where the last result is dropped:
 --
--- > sscanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> Nil
+-- > postscanr f z (... :> xn1 :> xn :> Nil) == ... :> (xn1 `f` (xn `f` z)) :> (xn `f` z) :> Nil
 --
--- >>> sscanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
+-- >>> postscanr (+) 0 (5 :> 4 :> 3 :> 2 :> Nil)
 -- <14,9,5,2>
 --
--- \"'sscanr' @f z xs@\" corresponds to the following circuit layout:
+-- \"'postscanr' @f z xs@\" corresponds to the following circuit layout:
 --
 -- <<doc/sscanr.svg>>
-sscanr :: (a -> b -> b) -> b -> Vec n a -> Vec n b
-sscanr f z xs = init (scanr f z xs)
-{-# INLINE sscanr #-}
+postscanr :: (a -> b -> b) -> b -> Vec n a -> Vec n b
+postscanr f z xs = init (scanr f z xs)
+{-# INLINE postscanr #-}
 
 -- | The 'mapAccumL' function behaves like a combination of 'map' and 'foldl';
 -- it applies a function to each element of a vector, passing an accumulating
