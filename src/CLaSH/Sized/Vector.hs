@@ -176,6 +176,22 @@ data Vec :: Nat -> * -> * where
 -- >>> let x = 3:>4:>5:>Nil
 -- >>> :t x
 -- x :: Num a => Vec 3 a
+--
+-- Can be used as a pattern:
+--
+-- >>> let f (x :> y :> _) = x + y
+-- >>> :t f
+-- f :: Num a => Vec ((n + 1) + 1) a -> a
+-- >>> f (3:>4:>5:>6:>7:>Nil)
+-- 7
+--
+-- Also in conjunctions with ':<':
+--
+-- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
+-- >>> :t g
+-- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
+-- >>> g (1:>2:>3:>4:>5:>Nil)
+-- 12
 pattern (:>) :: a -> Vec n a -> Vec (n + 1) a
 pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
   where
@@ -360,6 +376,22 @@ infixl 5 :<
 -- >>> let x = (3:>4:>5:>Nil) :< 1
 -- >>> :t x
 -- x :: Num a => Vec 4 a
+--
+-- Can be used as a pattern:
+--
+-- >>> let f (_ :< y :< x) = y + x
+-- >>> :t f
+-- f :: Num a => Vec ((n + 1) + 1) a -> a
+-- >>> f (3:>4:>5:>6:>7:>Nil)
+-- 13
+--
+-- Also in conjunctions with ':>':
+--
+-- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
+-- >>> :t g
+-- g :: Num a => Vec ((((n + 1) + 1) + 1) + 1) a -> a
+-- >>> g (1:>2:>3:>4:>5:>Nil)
+-- 12
 pattern (:<) :: Vec n a -> a -> Vec (n+1) a
 pattern (:<) xs x <- ((\ys -> (init ys,last ys)) -> (xs,x))
   where
