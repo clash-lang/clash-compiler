@@ -153,22 +153,22 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] 
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
-    , "type"      : "mod# :: KnownNat n => Signed n -> Signed n -> Signed n"
+    , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
     , "templateD" :
 "// modSigned begin
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][1];
-~SIGD[~SYM[2]][2];
+~SIGD[~SYM[0]][0];
+~SIGD[~SYM[1]][0];
+~SIGD[~SYM[2]][1];
 
 // remainder
-assign ~SYM[0] = ~ARG[1] % ~ARG[2];
+assign ~SYM[0] = ~ARG[0] % ~ARG[1];
 
 // modulo
-assign ~SYM[1] = ~ARG[1];
-assign ~SYM[2] = ~ARG[2];
-assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
+assign ~SYM[1] = ~ARG[0];
+assign ~SYM[2] = ~ARG[1];
+assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
                  ~SYM[0] :
-                 (~ARG[1] == ~LIT[0]'sd0 ? ~LIT[0]'sd0 : ~SYM[0] + ~ARG[1]);
+                 (~SYM[1] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~SYM[1]);
 // modSigned end"
     }
   }

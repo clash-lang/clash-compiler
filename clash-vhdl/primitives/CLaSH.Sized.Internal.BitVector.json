@@ -338,9 +338,9 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
-    , "type"      : "minBound# :: KnownNat n => BitVector n"
+    , "type"      : "minBound# :: BitVector n"
     , "comment"   : "Generates incorrect VDHL for n=0"
-    , "templateE" : "std_logic_vector'(~LIT[0]-1 downto 0 => '0')"
+    , "templateE" : "std_logic_vector'(~SIZE[~TYPO]-1 downto 0 => '0')"
     }
   }
 , { "BlackBox" :

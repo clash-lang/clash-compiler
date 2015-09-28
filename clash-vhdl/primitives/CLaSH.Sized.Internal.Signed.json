@@ -136,18 +136,18 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
-    , "type"      : "div# :: KnownNat n => Signed n -> Signed n -> Signed n"
+    , "type"      : "div# :: Signed n -> Signed n -> Signed n"
     , "templateD" :
 "-- divSigned begin
 divSigned_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-  signal ~SYM[3] : ~TYP[1];
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[1];
+  signal ~SYM[3] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
+  ~SYM[1] <= ~ARG[0];
+  ~SYM[2] <= ~ARG[1];
   ~SYM[3] <= ~SYM[1] / ~SYM[2];
-  ~RESULT <= ~SYM[3] - to_signed(1,~LIT[0]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
+  ~RESULT <= ~SYM[3] - to_signed(1,~SIZE[~TYPO]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
              ~SYM[3];
 end block;
 -- divSigned end"
@@ -155,8 +155,8 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
-    , "type"      : "mod# :: KnownNat n => Signed n -> Signed n -> Signed n"
-    , "templateE" : "~ARG[1] mod ~ARG[2]"
+    , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
+    , "templateE" : "~ARG[0] mod ~ARG[1]"
     }
   }
 , { "BlackBox" :

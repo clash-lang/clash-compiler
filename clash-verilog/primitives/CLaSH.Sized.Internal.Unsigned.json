@@ -54,8 +54,8 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.minBound#"
-    , "type"      : "minBound# :: KnownNat n => Unsigned n"
-    , "templateE" : "~LIT[0]'d0"
+    , "type"      : "minBound# :: Unsigned n"
+    , "templateE" : "~SIZE[~TYPO]'d0"
     }
   }
 , { "BlackBox" :

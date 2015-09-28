@@ -197,8 +197,8 @@ assign ~RESULT = ~SYM[0][0];
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minBound#"
-    , "type"      : "minBound# :: KnownNat n => BitVector n"
-    , "templateE" : "~LIT[0]'d0"
+    , "type"      : "minBound# :: BitVector n"
+    , "templateE" : "~SIZE[~TYPO]'d0"
     }
   }
 , { "BlackBox" :
