@@ -231,7 +231,7 @@ instance KnownNat n => Bounded (BitVector n) where
   maxBound = maxBound#
 
 {-# NOINLINE minBound# #-}
-minBound# :: KnownNat n => BitVector n
+minBound# :: BitVector n
 minBound# = BV 0
 
 {-# NOINLINE maxBound# #-}
@@ -355,7 +355,7 @@ reduceOr# (BV i) = BV (smallInteger (dataToTag# check))
 reduceXor# :: BitVector n -> BitVector 1
 reduceXor# (BV i) = BV (toInteger (popCount i `mod` 2))
 
-instance KnownNat n => Default (BitVector n) where
+instance Default (BitVector n) where
   def = minBound#
 
 -- * Accessors

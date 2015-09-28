@@ -100,7 +100,7 @@ import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type ($))
-import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (*),
                                    natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Prim                   ((==#),(<#),(-#))
@@ -1107,8 +1107,7 @@ at n xs = head $ snd $ splitAt n xs
 -- <2,4,6>
 -- >>> select d1 d2 d3 (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
 -- <2,4,6>
-select :: (CmpNat (i + s) (s * n) ~ 'GT)
-       => SNat f
+select :: SNat f
        -> SNat s
        -> SNat n
        -> Vec (f + i) a
@@ -1126,7 +1125,7 @@ select f s n xs = select' (toUNat n) $ drop f xs
 --
 -- >>> selectI d1 d2 (1:>2:>3:>4:>5:>6:>7:>8:>Nil) :: Vec 2 Int
 -- <2,4>
-selectI :: (CmpNat (i + s) (s * n) ~ 'GT, KnownNat n)
+selectI :: KnownNat n
         => SNat f
         -> SNat s
         -> Vec (f + i) a
@@ -1472,8 +1471,7 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- <2,3,4,1>
 --
 -- __NB:__ use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
-rotateLeftS :: KnownNat (d + n)
-            => Vec (d + n) a
+rotateLeftS :: Vec (d + n) a
             -> SNat d
             -> Vec (n + d) a
 rotateLeftS xs d = let (l,r) = splitAt d xs in r ++ l
