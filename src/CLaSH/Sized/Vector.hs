@@ -1132,7 +1132,10 @@ generateI f a = iterateI f (f a)
 
 -- | Transpose a matrix: go from row-major to column-major
 --
--- >>> transpose ((1:>2:>Nil):>(3:>4:>Nil):>(5:>6:>Nil):>Nil)
+-- >>> let xss = (1:>2:>Nil):>(3:>4:>Nil):>(5:>6:>Nil):>Nil
+-- >>> xss
+-- <<1,2>,<3,4>,<5,6>>
+-- >>> transpose xss
 -- <<1,3,5>,<2,4,6>>
 transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
 transpose = traverse# id
@@ -1311,10 +1314,10 @@ gather xs = map (xs!!)
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> 8 :> 9 :> Nil
 -- >>> interleave d3 xs
 -- <1,4,7,2,5,8,3,6,9>
-interleave :: (KnownNat n, KnownNat m)
-           => SNat n -- ^ Interleave step, /d/
-           -> Vec (m * n) a
-           -> Vec (n * m) a
+interleave :: (KnownNat n, KnownNat d)
+           => SNat d -- ^ Interleave step, /d/
+           -> Vec (n * d) a
+           -> Vec (d * n) a
 interleave d = concat . transpose . unconcat d
 {-# INLINE interleave #-}
 
