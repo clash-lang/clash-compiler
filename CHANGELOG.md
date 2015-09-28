@@ -14,6 +14,7 @@
   * `sscanl` and `sscanr` in `CLaSH.Sized.Vector` are renamed to `postscanl` and postscanr` to be more in line with existing Haskell packages such as `vector` and `accelerate`.
   * The `Foldable` and `Traversable` instances of `Vec` now only works for non-empty vectors.
   * 'maxIndex' and 'length' in `CLaSH.Sized.Vector` return an `Int` instead of an `Integer`.
+  * Add functions that involve an index into a vector to the `CLaSH.Sized.Vector` module: `indices`, `indicesI`, `imap`, `izipWith`, `ifoldr`, `ifoldl`, `findIndex`, `elemIndex`.
 
 ## 0.9.3 *September 21st 2015*
 * Fixes bugs:

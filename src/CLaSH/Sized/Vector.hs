@@ -33,6 +33,8 @@ module CLaSH.Sized.Vector
   , length, maxIndex, lengthS
     -- ** Indexing
   , (!!), head, last, at
+  , indices, indicesI
+  , findIndex, elemIndex
     -- ** Extracting subvectors (slicing)
   , tail, init
   , take, takeI, drop, dropI
@@ -61,14 +63,16 @@ module CLaSH.Sized.Vector
   , rotateLeft, rotateRight, rotateLeftS, rotateRightS
     -- * Element-wise operations
     -- ** Mapping
-  , map
+  , map, imap
     -- ** Zipping
   , zipWith, zipWith3
   , zip, zip3
+  , izipWith
     -- ** Unzipping
   , unzip, unzip3
     -- * Folding
   , foldr, foldl, foldr1, foldl1, fold
+  , ifoldr, ifoldl
     -- ** Specialised folds
   , dfold, vfold
     -- * Prefix sums (scans)
@@ -91,7 +95,7 @@ module CLaSH.Sized.Vector
   )
 where
 
-import Control.Lens               (Index, Ixed (..), IxValue)
+import qualified Control.Lens     as Lens
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
@@ -114,6 +118,7 @@ import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, withSNat, toUNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
+import CLaSH.Sized.Index          (Index)
 
 import CLaSH.Class.BitPack (BitPack (..))
 
@@ -549,6 +554,103 @@ map :: (a -> b) -> Vec n a -> Vec n b
 map _ Nil           = Nil
 map f (x `Cons` xs) = f x `Cons` map f xs
 {-# NOINLINE map #-}
+
+-- | Apply a function of every element of a vector and its index.
+--
+-- >>> :t imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
+-- imap (+) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Index 4)
+-- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
+-- <2,3,*** Exception: 4 is out of bounds: [0..3]
+-- >>> imap (\i a -> fromIntegral i + a) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Unsigned 8)
+-- <2,3,4,5>
+imap :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
+imap f = go 0
+  where
+    go :: Index n -> Vec m a -> Vec m b
+    go _ Nil           = Nil
+    go n (x `Cons` xs) = f n x `Cons` go (n+1) xs
+{-# NOINLINE imap #-}
+
+-- | Zip two vectors with a functions that also takes the elements' indices.
+--
+-- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
+-- <*** Exception: 3 is out of bounds: [0..1]
+-- >>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
+-- <5,6>
+--
+-- __NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
+-- third. This matters when 'izipWith' is used in a recursive setting. See
+-- 'lazyV' for more information.
+izipWith :: KnownNat n => (Index n -> a -> b -> c) -> Vec n a -> Vec n b
+         -> Vec n c
+izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
+{-# INLINE izipWith #-}
+
+-- | Right fold (function applied to each element and its index)
+--
+-- >>> let findLeftmost x xs = ifoldr (\i a b -> if a == x then Just i else b) Nothing xs
+-- >>> findLeftmost 3 (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Just 1
+-- >>> findLeftmost 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Nothing
+ifoldr :: KnownNat n => (Index n -> a -> b -> b) -> b -> Vec n a -> b
+ifoldr f z xs = head ws
+  where
+    ws = izipWith f xs ((tail ws)) :< z
+{-# INLINE ifoldr #-}
+
+-- | Left fold (function applied to each element and its index)
+--
+-- >>> let findRightmost x xs = ifoldl (\a i b -> if b == x then Just i else a) Nothing xs
+-- >>> findRightmost 3 (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Just 4
+-- >>> findRightmost 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Nothing
+ifoldl :: KnownNat n => (a -> Index n -> b -> a) -> a -> Vec n b -> a
+ifoldl f z xs = last ws
+  where
+    ws = z `Cons` izipWith (\i b a -> f a i b) xs (init ws)
+{-# INLINE ifoldl #-}
+
+-- | Generate a vector of indices.
+--
+-- >>> indices d4
+-- <0,1,2,3>
+indices :: KnownNat n => SNat n -> Vec n (Index n)
+indices _ = indicesI
+{-# INLINE indices #-}
+
+-- | Generate a vector of indices, where the length of the vector is determined
+-- by the context.
+--
+-- >>> indicesI :: Vec 4 (Index 4)
+-- <0,1,2,3>
+indicesI :: KnownNat n => Vec n (Index n)
+indicesI = imap const (repeat ())
+{-# INLINE indicesI #-}
+
+-- | \"'findIndex' @p xs@\" returns the index of the /first/ element of /xs/
+-- satisfying the predicate /p/, or 'Nothing' if there is no such element.
+--
+-- >>> findIndex (> 3) (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Just 3
+-- >>> findIndex (> 8) (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Nothing
+findIndex :: KnownNat n => (a -> Bool) -> Vec n a -> Maybe (Index n)
+findIndex f = ifoldr (\i a b -> if f a then Just i else b) Nothing
+{-# INLINE findIndex #-}
+
+-- | \"'elemIndex' @a xs@\" returns the index of the /first/ element which is
+-- equal (by '==') to the query element /a/, or 'Nothing' if there is no such
+-- element.
+--
+-- >>> elemIndex 3 (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Just 1
+-- >>> elemIndex 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
+-- Nothing
+elemIndex :: (KnownNat n, Eq a) => a -> Vec n a -> Maybe (Index n)
+elemIndex x = findIndex (x ==)
+{-# INLINE elemIndex #-}
 
 -- | 'zipWith' generalises 'zip' by zipping with the function given
 -- as the first argument, instead of a tupling function.
@@ -1624,7 +1726,7 @@ instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
 instance CoArbitrary a => CoArbitrary (Vec n a) where
   coarbitrary = coarbitrary . toList
 
-type instance Index   (Vec n a) = Int
-type instance IxValue (Vec n a) = a
-instance KnownNat n => Ixed (Vec n a) where
+type instance Lens.Index   (Vec n a) = Int
+type instance Lens.IxValue (Vec n a) = a
+instance KnownNat n => Lens.Ixed (Vec n a) where
   ix i f xs = replace_int xs i <$> f (index_int xs i)
