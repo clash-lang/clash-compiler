@@ -13,6 +13,7 @@
   * Add specialised permutation functions `interleave`, `rotateLeft`, and `rotateRight` in `CLaSH.Sized.Vector`.
   * `sscanl` and `sscanr` in `CLaSH.Sized.Vector` are renamed to `postscanl` and postscanr` to be more in line with existing Haskell packages such as `vector` and `accelerate`.
   * The `Foldable` and `Traversable` instances of `Vec` now only works for non-empty vectors.
+  * 'maxIndex' and 'length' in `CLaSH.Sized.Vector` return an `Int` instead of an `Integer`.
 
 ## 0.9.3 *September 21st 2015*
 * Fixes bugs:

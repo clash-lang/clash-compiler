@@ -177,7 +177,7 @@ stimuliGenerator' clk samples =
     genT :: Index l -> (Index l,a)
     genT s = (s',samples !! s)
       where
-        maxI = fromInteger (maxIndex samples)
+        maxI = toEnum (maxIndex samples)
 
         s' = if s < maxI
                 then s + 1
@@ -235,7 +235,7 @@ outputVerifier' clk samples i =
     genT :: Index l -> (Index l,(a,Bool))
     genT s = (s',(samples !! s,finished))
       where
-        maxI = fromInteger (maxIndex samples)
+        maxI = toEnum (maxIndex samples)
 
         s' = if s < maxI
                 then s + 1

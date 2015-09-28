@@ -219,7 +219,7 @@ instance (KnownNat m, m ~ (n+1)) => F.Foldable (Vec m) where
   foldl1  = foldl1
   toList  = toList
   null _  = False
-  length  = fromInteger . length
+  length  = length
   maximum = foldr1 (\x y -> if x >= y then x else y)
   minimum = foldr1 (\x y -> if x <= y then x else y)
   sum     = foldr1 (+)
@@ -847,21 +847,21 @@ index_int xs i@(I# n0)
 xs !! i = index_int xs (fromEnum i)
 {-# INLINE (!!) #-}
 
--- | The index (subscript) of the last element in a 'Vec'tor as an 'Integer'
+-- | The index (subscript) of the last element in a 'Vec'tor as an 'Int'
 -- value.
 --
 -- >>> maxIndex (6 :> 7 :> 8 :> Nil)
 -- 2
-maxIndex :: KnownNat n => Vec n a -> Integer
+maxIndex :: KnownNat n => Vec n a -> Int
 maxIndex = subtract 1 . length
 {-# NOINLINE maxIndex #-}
 
--- | The length of a 'Vec'tor as an 'Integer' value.
+-- | The length of a 'Vec'tor as an 'Int' value.
 --
 -- >>> length (6 :> 7 :> 8 :> Nil)
 -- 3
-length :: KnownNat n => Vec n a -> Integer
-length = natVal . asNatProxy
+length :: KnownNat n => Vec n a -> Int
+length = fromInteger . natVal . asNatProxy
 {-# NOINLINE length #-}
 
 replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a
@@ -1297,13 +1297,13 @@ interleave d = concat . transpose . unconcat d
 -- <4,1,2,3>
 --
 -- __NB:__ use `rotateLeftS` if you want to rotate left by a /static/ amount.
-rotateLeft :: (Integral i, KnownNat n)
+rotateLeft :: (Enum i, KnownNat n)
            => Vec n a
            -> i
            -> Vec n a
 rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
   where
-    i'  = toInteger i
+    i'  = fromEnum i
     len = length xs
 {-# INLINE rotateLeft #-}
 
@@ -1318,13 +1318,13 @@ rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- <2,3,4,1>
 --
 -- __NB:__ use `rotateRightS` if you want to rotate right by a /static/ amount.
-rotateRight :: (Integral i, KnownNat n)
+rotateRight :: (Enum i, KnownNat n)
             => Vec n a
             -> i
             -> Vec n a
 rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
   where
-    i'  = negate (toInteger i)
+    i'  = negate (fromEnum i)
     len = length xs
 {-# INLINE rotateRight #-}
 

@@ -518,7 +518,7 @@ blockRam# :: KnownNat n
           -- cycle
 blockRam# clk content wr rd en din = register' clk undefined dout
   where
-    szI  = fromInteger $ maxIndex content
+    szI  = maxIndex content
     dout = runST $ do
       arr <- newListArray (0,szI) (toList content)
       traverse (ramT arr) (bundle' clk (wr,rd,en,din))

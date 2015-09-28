@@ -79,7 +79,7 @@ asyncRom# :: KnownNat n
           -> a        -- ^ The value of the ROM at address @rd@
 asyncRom# content rd = arr ! rd
   where
-    szI = fromInteger (maxIndex content)
+    szI = maxIndex content
     arr = listArray (0,szI) (toList content)
 
 {-# INLINE rom #-}
@@ -169,5 +169,5 @@ rom# :: KnownNat n
      -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 rom# clk content rd = register' clk undefined ((arr !) <$> rd)
   where
-    szI = fromInteger (maxIndex content)
+    szI = maxIndex content
     arr = listArray (0,szI) (toList content)
