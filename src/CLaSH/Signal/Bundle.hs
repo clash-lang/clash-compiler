@@ -30,7 +30,7 @@ import CLaSH.Sized.Fixed     (Fixed)
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Signed    (Signed)
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.Sized.Vector    (Vec)
+import CLaSH.Sized.Vector    (Vec, traverse#)
 
 -- | Isomorphism between a 'CLaSH.Signal.Signal' of a product type (e.g. a tuple) and a
 -- product type of 'CLaSH.Signal.Signal''s.
@@ -204,4 +204,4 @@ instance KnownNat n => Bundle (Vec n a) where
 
 {-# NOINLINE vecBundle# #-}
 vecBundle# :: SClock t -> Vec n (Signal' t a) -> Signal' t (Vec n a)
-vecBundle# _ = sequenceA
+vecBundle# _ = traverse# id

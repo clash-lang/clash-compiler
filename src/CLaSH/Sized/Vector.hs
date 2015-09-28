@@ -79,7 +79,13 @@ module CLaSH.Sized.Vector
   , windows1d, windows2d
     -- * Misc
   , toList, lazyV, asNatProxy
-    -- * Functions for the 'BitPack' instance
+    -- * Primitives
+    -- ** 'Eq' instance
+  , eq#
+  , neq#
+    -- ** 'Traversable' instance
+  , traverse#
+    -- ** 'BitPack' instance
   , concatBitVector#
   , unconcatBitVector#
   )
@@ -206,13 +212,23 @@ instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
   fs <*> xs = zipWith ($) fs xs
 
-instance F.Foldable (Vec n) where
-  foldr = foldr
+instance (KnownNat m, m ~ (n+1)) => F.Foldable (Vec m) where
+  foldr   = foldr
+  foldl   = foldl
+  foldr1  = foldr1
+  foldl1  = foldl1
+  toList  = toList
+  null _  = False
+  length  = fromInteger . length
+  maximum = foldr1 (\x y -> if x >= y then x else y)
+  minimum = foldr1 (\x y -> if x <= y then x else y)
+  sum     = foldr1 (+)
+  product = foldr1 (*)
 
 instance Functor (Vec n) where
   fmap = map
 
-instance Traversable (Vec n) where
+instance (KnownNat m, m ~ (n+1)) => Traversable (Vec m) where
   traverse = traverse#
 
 {-# NOINLINE traverse# #-}
@@ -1087,7 +1103,7 @@ generateI f a = iterateI f (f a)
 -- >>> transpose ((1:>2:>Nil):>(3:>4:>Nil):>(5:>6:>Nil):>Nil)
 -- <<1,3,5>,<2,4,6>>
 transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
-transpose = sequenceA
+transpose = traverse# id
 {-# NOINLINE transpose #-}
 
 -- | 1-dimensional stencil computations
@@ -1567,8 +1583,8 @@ instance Lift a => Lift (Vec n a) where
   lift (x `Cons` xs) = [| x :> $(lift xs) |]
 
 instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
-  arbitrary = sequence $ repeat arbitrary
-  shrink    = sequence . fmap shrink
+  arbitrary = traverse# id $ repeat arbitrary
+  shrink    = traverse# id . fmap shrink
 
 instance CoArbitrary a => CoArbitrary (Vec n a) where
   coarbitrary = coarbitrary . toList
