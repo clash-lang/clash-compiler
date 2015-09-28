@@ -1472,8 +1472,7 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- <2,3,4,1>
 --
 -- __NB:__ use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
-rotateLeftS :: KnownNat (d + n)
-            => Vec (d + n) a
+rotateLeftS :: Vec (d + n) a
             -> SNat d
             -> Vec (n + d) a
 rotateLeftS xs d = let (l,r) = splitAt d xs in r ++ l

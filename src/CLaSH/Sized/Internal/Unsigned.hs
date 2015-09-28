@@ -204,7 +204,7 @@ instance KnownNat n => Bounded (Unsigned n) where
   maxBound = maxBound#
 
 {-# NOINLINE minBound# #-}
-minBound# :: KnownNat n => Unsigned n
+minBound# :: Unsigned n
 minBound# = U 0
 
 {-# NOINLINE maxBound# #-}
@@ -375,7 +375,7 @@ instance Resize Unsigned where
 resize# :: KnownNat m => Unsigned n -> Unsigned m
 resize# (U i) = fromInteger_INLINE i
 
-instance KnownNat n => Default (Unsigned n) where
+instance Default (Unsigned n) where
   def = minBound#
 
 instance KnownNat n => Lift (Unsigned n) where

@@ -304,7 +304,7 @@ quot# (S a) (S b) = S (a `quot` b)
 {-# NOINLINE rem# #-}
 rem# (S a) (S b) = S (a `rem` b)
 
-div#,mod# :: KnownNat n => Signed n -> Signed n -> Signed n
+div#,mod# :: Signed n -> Signed n -> Signed n
 {-# NOINLINE div# #-}
 div# (S a) (S b) = S (a `div` b)
 {-# NOINLINE mod# #-}
