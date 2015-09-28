@@ -93,7 +93,7 @@ Library
                       ViewPatterns
 
   Build-depends:      base                    >= 4.6.0.1 && < 5,
-                      clash-lib               >= 0.5.12,
+                      clash-lib               >= 0.5.14,
                       clash-prelude           >= 0.10,
                       fgl                     >= 5.4.2.4,
                       lens                    >= 3.9.2,

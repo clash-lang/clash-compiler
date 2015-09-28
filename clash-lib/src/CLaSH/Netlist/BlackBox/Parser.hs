@@ -69,6 +69,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> Err Nothing       <$  pToken "~ERRORO"
      <|> (Err . Just)      <$> (pToken "~ERROR" *> pBrackets pNatural)
      <|> TypElem           <$> (pToken "~TYPEL" *> pBrackets pTagE)
+     <|> IndexType         <$> (pToken "~INDEXTYPE" *> pBrackets pTagE)
      <|> CompName          <$  pToken "~COMPNAME"
      <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
      <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)

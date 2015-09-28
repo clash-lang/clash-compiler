@@ -218,6 +218,11 @@ lineToType b [(Typ (Just n))] = let (_,ty,_) = bbInputs b !! n
 lineToType b [(TypElem t)]    = case lineToType b [t] of
                                   Vector _ elTy -> elTy
                                   _ -> error $ $(curLoc) ++ "Element type selection of a non-vector type"
+lineToType b [(IndexType (L n))] =
+  case bbInputs b !! n of
+    (Left (Literal _ (NumLit n')),_,_) -> Index (fromInteger n')
+    x -> error $ $(curLoc) ++ "Index type not given a literal: " ++ show x
+
 lineToType _ _ = error $ $(curLoc) ++ "Unexpected type manipulation"
 
 -- | Give a context and a tagged hole (of a template), returns part of the
@@ -257,4 +262,5 @@ renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaratio
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
 renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
 renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
+renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
 renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"

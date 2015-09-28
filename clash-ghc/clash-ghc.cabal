@@ -94,7 +94,7 @@ Executable clash
                       unbound-generics          >= 0.1 && < 0.3,
                       unordered-containers      >= 0.2.1.0,
 
-                      clash-lib                 >= 0.5.13 && < 0.6,
+                      clash-lib                 >= 0.5.14 && < 0.6,
                       clash-systemverilog       >= 0.5.11,
                       clash-vhdl                >= 0.5.13,
                       clash-verilog             >= 0.5.11,
