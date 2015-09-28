@@ -1279,6 +1279,8 @@ interleave d = concat . transpose . unconcat d
 -- <3,4,1,2>
 -- >>> rotateLeft xs (-1)
 -- <4,1,2,3>
+--
+-- __NB:__ use `rotateLeftS` if you want to rotate left by a /static/ amount.
 rotateLeft :: (Integral i, KnownNat n)
            => Vec n a
            -> i
@@ -1298,6 +1300,8 @@ rotateLeft xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- <3,4,1,2>
 -- >>> rotateRight xs (-1)
 -- <2,3,4,1>
+--
+-- __NB:__ use `rotateRightS` if you want to rotate right by a /static/ amount.
 rotateRight :: (Integral i, KnownNat n)
             => Vec n a
             -> i
@@ -1313,6 +1317,8 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> rotateLeftS xs d1
 -- <2,3,4,1>
+--
+-- __NB:__ use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
 rotateLeftS :: KnownNat (d + n)
             => Vec (d + n) a
             -> SNat d
@@ -1325,6 +1331,8 @@ rotateLeftS xs d = let (l,r) = splitAt d xs in r ++ l
 -- >>> let xs = 1 :> 2 :> 3 :> 4 :> Nil
 -- >>> rotateRightS xs d1
 -- <4,1,2,3>
+--
+-- __NB:__ use `rotateRight` if you want to rotate right by a /dynamic/ amount.
 rotateRightS :: forall n d a . (KnownNat n)
              => Vec (n + d) a
              -> SNat d
