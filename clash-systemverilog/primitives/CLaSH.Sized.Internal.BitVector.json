@@ -275,7 +275,7 @@ assign ~RESULT = ~SYM[0][0];
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.toInteger#"
     , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateE" : "$unsigned(~ARG[0])"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 , { "BlackBox" :
@@ -339,7 +339,7 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.resize#"
     , "type"      : "resize# :: KnownNat m => BitVector n -> BitVector m"
-    , "templateE" : "$unsigned(~ARG[1])"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[1]);"
     }
   }
 ]

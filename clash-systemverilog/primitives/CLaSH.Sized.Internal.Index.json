@@ -79,7 +79,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.toInteger#"
     , "type"      : "toInteger# :: Index n -> Integer"
-    , "templateE" : "$unsigned(~ARG[0])"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 ]

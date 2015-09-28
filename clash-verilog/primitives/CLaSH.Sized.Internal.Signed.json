@@ -175,7 +175,7 @@ assign ~RESULT = (~SYM[1][~LIT[0]-1] == ~SYM[2][~LIT[0]-1]) ?
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.toInteger#"
     , "type"      : "toInteger# :: Signed n -> Integer"
-    , "templateE" : "$signed(~ARG[0])"
+    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
 , { "BlackBox" :
@@ -259,7 +259,7 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
-    , "templateE" : "$signed(~ARG[1])"
+    , "templateD" : "assign ~RESULT = $signed(~ARG[1]);"
     }
   }
 ]

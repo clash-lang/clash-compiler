@@ -127,7 +127,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.toInteger#"
     , "type"      : "toInteger# :: Unsigned n -> Integer"
-    , "templateE" : "$unsigned(~ARG[0])"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 , { "BlackBox" :
@@ -191,7 +191,7 @@ assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.resize#"
     , "type"      : "resize# :: KnownNat m => Unsigned n -> Unsigned m"
-    , "templateE" : "$unsigned(~ARG[1])"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[1]);"
     }
   }
 ]
