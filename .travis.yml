@@ -24,9 +24,6 @@ before_install:
   - ghc --version
   - $CABAL --version
   - ghdl --version
-  - travis_retry $CABAL update
-
-install:
   - |
     if [ ! -d "$HOME/iverilog" ]; then
       git clone -b v10-branch https://github.com/steveicarus/iverilog.git iverilog-source
@@ -34,6 +31,11 @@ install:
     else
       echo 'Using cached iverilog.';
     fi
+  - export PATH=$PATH:$HOME/iverilog/bin
+  - vvp -V
+  - travis_retry $CABAL update
+
+install:
   - $CABAL sandbox init --sandbox=.cabal-sandbox
   - $CABAL sandbox add-source testsuite
   - $CABAL install $JOPTS clash-testsuite
@@ -52,10 +54,6 @@ install:
   - $CABAL sandbox add-source clash-systemverilog
   - $CABAL sandbox add-source clash-verilog
   - $CABAL sandbox add-source clash-vhdl
-
-before_script:
-  - export PATH=$PATH:$HOME/iverilog/bin
-  - vvp -V
 
 script:
   - $CABAL install $JOPTS clash-ghc
