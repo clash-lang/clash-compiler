@@ -1658,7 +1658,6 @@ dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
 dfold _ _ z Nil                        = z
 dfold p f z (x `Cons` (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
 {-# NOINLINE dfold #-}
-{-# WARNING dfold "CLaSH.Sized.Vector.dfold is not synthesisable by the CLaSH compiler." #-}
 
 data V (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (V a) l = Vec l a
