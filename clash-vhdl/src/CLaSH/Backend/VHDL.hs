@@ -570,7 +570,15 @@ vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc
-exprLit Nothing       (NumLit i)   = integer i
+exprLit Nothing         (NumLit i) =
+  let integerLow  = -2^(31 :: Integer) :: Integer
+      integerHigh = 2^(31 :: Integer) - 1 :: Integer
+      i' = if i < integerLow
+              then integerLow
+              else if i > integerHigh
+                   then integerHigh
+                   else i
+  in  parenIf (i' < 0) (integer i')
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
                                        Unsigned _  -> "unsigned'" <> parens blit
                                        Signed   _  -> "signed'" <> parens blit
