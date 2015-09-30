@@ -25,7 +25,7 @@ before_install:
 install:
   # if we are building on head, test against development versions of
   # relevant dependencies
-  - $CABAL sandbox init --sandbox=.cabal-sandbox
+  - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - |
     if [ $GHCVER = "head" ]; then
       git clone https://github.com/clash-lang/ghc-tcplugins-extra.git
