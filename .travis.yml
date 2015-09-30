@@ -4,10 +4,10 @@ sudo: false
 matrix:
   include:
     - env: GHCVER=7.10.1 CABALVER=1.22 JOPTS="-j2"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,iverilog,ghdl]
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,ghdl]
                     ,sources:  [hvr-ghc,pgavin-ghdl]}}
     - env: GHCVER=head CABALVER=head JOPTS="-j2"
-      addons: {apt: {packages: [cabal-install-head,ghc-head,iverilog,ghdl]
+      addons: {apt: {packages: [cabal-install-head,ghc-head,ghdl]
                     ,sources:  [hvr-ghc,pgavin-ghdl]}}
 
   allow_failures:
@@ -19,10 +19,11 @@ before_install:
   - ghc --version
   - $CABAL --version
   - ghdl --version
-  - vvp -V
   - travis_retry $CABAL update
 
 install:
+  - git clone -b -v10-branch https://github.com/steveicarus/iverilog.git iverilog-source
+  - cd iverilog-source && sh autoconf.sh && ./configure --prefix=$HOME/iverilog && make && make install
   - $CABAL sandbox init
   - $CABAL sandbox add-source testsuite
   - $CABAL install $JOPTS clash-testsuite
@@ -41,6 +42,10 @@ install:
   - $CABAL sandbox add-source clash-systemverilog
   - $CABAL sandbox add-source clash-verilog
   - $CABAL sandbox add-source clash-vhdl
+
+before_script:
+  - export PATH=$PATH:$HOME/iverilog/bin
+  - vvp -V
 
 script:
   - $CABAL install $JOPTS clash-ghc
