@@ -797,7 +797,6 @@ fold f vs = fold' (toList vs)
       where
         (ys,zs) = P.splitAt (P.length xs `div` 2) xs
 {-# NOINLINE fold #-}
-{-# WARNING fold "CLaSH.Sized.Vector.fold is not synthesisable by the CLaSH compiler." #-}
 
 -- | 'scanl' is similar to 'foldl', but returns a vector of successive reduced
 -- values from the left:
