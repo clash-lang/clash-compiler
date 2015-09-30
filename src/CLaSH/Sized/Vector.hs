@@ -234,17 +234,19 @@ instance KnownNat n => Applicative (Vec n) where
   fs <*> xs = zipWith ($) fs xs
 
 instance (KnownNat m, m ~ (n+1)) => F.Foldable (Vec m) where
-  foldr   = foldr
-  foldl   = foldl
-  foldr1  = foldr1
-  foldl1  = foldl1
-  toList  = toList
-  null _  = False
-  length  = length
-  maximum = foldr1 (\x y -> if x >= y then x else y)
-  minimum = foldr1 (\x y -> if x <= y then x else y)
-  sum     = foldr1 (+)
-  product = foldr1 (*)
+  fold      = fold mappend
+  foldMap f = fold mappend . map f
+  foldr     = foldr
+  foldl     = foldl
+  foldr1    = foldr1
+  foldl1    = foldl1
+  toList    = toList
+  null _    = False
+  length    = length
+  maximum   = fold (\x y -> if x >= y then x else y)
+  minimum   = fold (\x y -> if x <= y then x else y)
+  sum       = fold (+)
+  product   = fold (*)
 
 instance Functor (Vec n) where
   fmap = map
