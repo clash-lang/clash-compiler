@@ -6,9 +6,12 @@ cabal-dev
 *.hi-boot
 *.po
 *.po-boot
+*.p_o
+*.p_o-boot
 *.chi
 *.chs.h
 *.dyn_o
+*.dyn_o-boot
 *.dyn_hi
 *.dyn_hi-boot
 .virtualenv
