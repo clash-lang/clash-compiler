@@ -4,10 +4,10 @@ sudo: false
 matrix:
   include:
     - env: GHCVER=7.10.1 CABALVER=1.22 JOPTS="-j2"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,ghdl]
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1,ghdl,gperf]
                     ,sources:  [hvr-ghc,pgavin-ghdl]}}
     - env: GHCVER=head CABALVER=head JOPTS="-j2"
-      addons: {apt: {packages: [cabal-install-head,ghc-head,ghdl]
+      addons: {apt: {packages: [cabal-install-head,ghc-head,ghdl,gperf]
                     ,sources:  [hvr-ghc,pgavin-ghdl]}}
 
   allow_failures:
