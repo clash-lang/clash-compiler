@@ -36,7 +36,7 @@ before_install:
   - travis_retry $CABAL update
 
 install:
-  - $CABAL sandbox init --sandbox=.cabal-sandbox
+  - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - $CABAL sandbox add-source testsuite
   - $CABAL install $JOPTS clash-testsuite
   - |

@@ -55,7 +55,9 @@ import           CLaSH.Core.Type             (TypeView (..), Type (..),
                                               LitTy (..), applyFunTy,
                                               applyTy, isPolyFunCoreTy,
                                               splitFunTy, typeKind,
-                                              tyView, mkTyConApp, mkFunTy)
+                                              tyView, mkTyConApp, mkFunTy,
+                                              splitFunForallTy)
+import           CLaSH.Core.TysPrim          (typeNatKind)
 import           CLaSH.Core.TyCon            (TyConName, tyConDataCons)
 import           CLaSH.Core.Util             (collectArgs, extractElems,
                                               idToVar, isCon,
@@ -778,6 +780,13 @@ reduceNonRepPrim _ e@(App _ _)
             let [fun,arg] = Either.lefts args
             in  reduceFold (n + 1) aTy fun arg
           _ -> return e
+      "CLaSH.Sized.Vector.dfold" | length args == 7 ->
+        let [_mTy,nTy,aTy] = Either.rights args
+        in  case nTy of
+          (LitTy (NumTy n)) ->
+            let [_motive,fun,start,arg] = Either.lefts args
+            in  reduceDFold n aTy fun start arg
+          _ -> return e
       _ -> return e
 
 reduceNonRepPrim _ e = return e
@@ -965,3 +974,33 @@ reduceFold n aTy fun arg = do
                     lF    = foldV l
                     rF    = foldV r
                 in  mkApps fun [Left lF, Left rF]
+
+reduceDFold :: Int  -- ^ Length of the vector
+            -> Type -- ^ Element type of the argument vector
+            -> Term -- ^ Function to fold with
+            -> Term -- ^ Starting value
+            -> Term -- ^ The vector to fold
+            -> NormalizeSession Term
+reduceDFold n aTy fun start arg = do
+    tcm <- Lens.view tcCache
+    (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+    let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+        [_,consCon]      = tyConDataCons vecTc
+        (vars,elems)     = second concat . unzip
+                         $ extractElems consCon aTy 'D' n arg
+    ([_ltv,Right dsTy,_etaTy,_eta1Ty],_) <- splitFunForallTy <$> termType tcm fun
+    let (TyConApp proxyTcNm _) = tyView dsTy
+        (Just proxyTc) = HashMap.lookup proxyTcNm tcm
+        [proxyDc]      = tyConDataCons proxyTc
+        lbody          = doFold (Data proxyDc) (n-1) vars
+        lb             = Letrec (bind (rec (init elems)) lbody)
+    changed lb
+  where
+    doFold _   _ []     = start
+    doFold pDc k (x:xs) = mkApps fun
+                                 [Right (LitTy (NumTy k))
+                                 ,Left (mkApps pDc [Right typeNatKind
+                                                   ,Right (LitTy (NumTy k))])
+                                 ,Left x
+                                 ,Left (doFold pDc (k-1) xs)
+                                 ]
