@@ -184,6 +184,66 @@ end
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.fold"
+    , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
+    , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
+    , "templateD" :
+"// fold begin
+// put flat input array into the first half of the intermediate array
+wire ~TYPO intermediate_~SYM[0] [0:(2*~LENGTH[~TYP[1]])-2];
+wire ~TYP[1] vecflat_~SYM[1];
+assign vecflat_~SYM[1] = ~ARG[1];
+genvar ~SYM[2];
+~GENERATE
+for (~SYM[2]=0; ~SYM[2] < ~LENGTH[~TYP[1]]; ~SYM[2]=~SYM[2]+1) begin : array_~SYM[3]
+  assign intermediate_~SYM[0][(~LENGTH[~TYP[1]]-1)-~SYM[2]] = vecflat_~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+end
+~ENDGENERATE
+
+// calculate the depth of the tree
+function integer log2_~SYM[9];
+  input integer value;
+  begin
+    value = value-1;
+    for (log2_~SYM[9]=0; value>0; log2_~SYM[9]=log2_~SYM[9]+1)
+      value = value>>1;
+  end
+endfunction
+
+localparam levels_~SYM[4] = log2_~SYM[9](~LENGTH[~TYP[1]]);
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer depth2Index_~SYM[8];
+  input integer levels;
+  input integer depth;
+
+  depth2Index_~SYM[8] = (2 ** levels) - (2 ** depth);
+endfunction
+
+// Create the tree of instantiated components
+genvar d_~SYM[5];
+genvar i_~SYM[6];
+~GENERATE
+if (~LENGTH[~TYP[1]] != 1) begin : make_tree_~SYM[7]
+  for (d_~SYM[5] = (levels_~SYM[4] - 1); d_~SYM[5] >= 0; d_~SYM[5]=d_~SYM[5]-1) begin : tree_depth
+    for (i_~SYM[6] = 0; i_~SYM[6] < (2**d_~SYM[5]); i_~SYM[6] = i_~SYM[6]+1) begin : tree_depth_loop
+        ~INST 0
+          ~OUTPUT <= intermediate_~SYM[0][depth2Index_~SYM[8](levels_~SYM[4]+1,d_~SYM[5]+1)+i_~SYM[6]]~ ~TYPO~
+          ~INPUT  <= intermediate_~SYM[0][depth2Index_~SYM[8](levels_~SYM[4]+1,d_~SYM[5]+2)+(2*i_~SYM[6])]~ ~TYPO~
+          ~INPUT  <= intermediate_~SYM[0][depth2Index_~SYM[8](levels_~SYM[4]+1,d_~SYM[5]+2)+(2*i_~SYM[6])+1]~ ~TYPO~
+        ~INST
+    end
+  end
+end
+~ENDGENERATE
+
+// The last element of the intermediate array holds the result
+assign ~RESULT = intermediate_~SYM[0][(2*~LENGTH[~TYP[1]])-2];
+// fold end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_int"
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :

@@ -33,6 +33,7 @@ where
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
+import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
@@ -768,6 +769,15 @@ reduceNonRepPrim _ e@(App _ _)
             let [dict,fun,arg] = Either.lefts args
             in  reduceTraverse n aTy fTy bTy dict fun arg
           _ -> return e
+      "CLaSH.Sized.Vector.fold" | length args == 4 -> do
+        let [aTy,nTy] = Either.rights args
+            isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
+        untranslatableTy <- isUntranslatableType aTy
+        case nTy of
+          (LitTy (NumTy n)) | not (isPow2 (n + 1)) || untranslatableTy ->
+            let [fun,arg] = Either.lefts args
+            in  reduceFold (n + 1) aTy fun arg
+          _ -> return e
       _ -> return e
 
 reduceNonRepPrim _ e = return e
@@ -933,3 +943,25 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
                                                          [(LitTy (NumTy n))
                                                          ,bTy
                                                          ,(LitTy (NumTy (n-1)))]))
+
+reduceFold :: Int  -- ^ Length of the vector
+           -> Type -- ^ Element type of the argument vector
+           -> Term -- ^ The function to fold with
+           -> Term -- ^ The argument vector
+           -> NormalizeSession Term
+reduceFold n aTy fun arg = do
+    tcm <- Lens.view tcCache
+    (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+    let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+        [_,consCon]      = tyConDataCons vecTc
+        (vars,elems)     = second concat . unzip
+                         $ extractElems consCon aTy 'F' n arg
+        lbody            = foldV vars
+        lb               = Letrec (bind (rec (init elems)) lbody)
+    changed lb
+  where
+    foldV [a] = a
+    foldV as  = let (l,r) = splitAt (length as `div` 2) as
+                    lF    = foldV l
+                    rF    = foldV r
+                in  mkApps fun [Left lF, Left rF]

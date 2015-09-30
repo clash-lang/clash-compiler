@@ -255,6 +255,45 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.fold"
+    , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
+    , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
+    , "templateD" :
+"-- fold begin
+fold_~SYM[0] : block
+  -- given a level and a depth, calculate the corresponding index into the
+  -- intermediate array
+  function depth2Index (levels,depth : in natural) return natural is
+  begin
+    return (2 ** levels - 2 ** depth);
+  end function;
+
+  signal intermediate : ~TYPM[1](0 to (2*~LENGTH[~TYP[1]])-2);
+  constant levels : natural := natural (ceil (log2 (real (~LENGTH[~TYP[1]]))));
+begin
+  -- put input array into the first half of the intermediate array
+  intermediate(0 to ~LENGTH[~TYP[1]]-1) <= ~ARG[1];
+
+  // Create the tree of instantiated components
+  make_tree : if ~LENGTH[~TYP[1]] /= 1 generate
+    tree_depth : for d in levels-1 downto 0 generate
+      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
+        ~INST 0
+          ~OUTPUT <= intermediate(depth2Index(levels+1,d+1)+i)~ ~TYPO~
+          ~INPUT  <= intermediate(depth2Index(levels+1,d+2)+(2*i))~ ~TYPO~
+          ~INPUT  <= intermediate(depth2Index(levels+1,d+2)+(2*i)+1)~ ~TYPO~
+        ~INST
+      end generate;
+    end generate;
+  end generate;
+
+  // The last element of the intermediate array holds the result
+  ~RESULT <= intermediate((2*~LENGTH[~TYP[1]])-2);
+end block;
+-- fold end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.index_int"
     , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
