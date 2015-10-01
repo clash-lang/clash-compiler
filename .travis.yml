@@ -15,6 +15,9 @@ cache:
   directories:
   - $HOME/.cabal-sandbox
 
+before_cache:
+  - rm -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar
+
 before_install:
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
   - export CABAL=cabal-$CABALVER
@@ -23,6 +26,11 @@ before_install:
   - travis_retry $CABAL update
 
 install:
+  - |
+    if [ -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar ]; then
+      echo "Deleting invalid install cache"
+      rm -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar
+    fi
   # if we are building on head, test against development versions of
   # relevant dependencies
   - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
