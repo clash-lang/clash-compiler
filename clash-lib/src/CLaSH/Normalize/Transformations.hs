@@ -799,6 +799,14 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
             let [_motive,fun,start,arg] = Either.lefts args
             in  reduceDFold n aTy fun start arg
           _ -> return e
+      "CLaSH.Sized.Vector.++" | length args == 5 ->
+        let [nTy,_aTy,mTy] = Either.rights args
+            [lArg,rArg]   = Either.lefts args
+        in case (nTy,mTy) of
+              (LitTy (NumTy n), LitTy (NumTy m))
+                | n == 0 -> changed rArg
+                | m == 0 -> changed lArg
+              _ -> return e
       _ -> return e
 
 reduceNonRepPrim _ e = return e
