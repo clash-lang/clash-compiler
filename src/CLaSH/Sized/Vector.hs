@@ -1681,8 +1681,7 @@ vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
 vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
-{-# NOINLINE vfold #-}
-{-# WARNING vfold "CLaSH.Sized.Vector.vfold is not synthesisable by the CLaSH compiler." #-}
+{-# INLINE vfold #-}
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
