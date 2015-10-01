@@ -108,6 +108,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VIndex" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecConst" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecOfSum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VFold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VMapAccum" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VMerge" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VReplace" (Just ("topEntity",False))
