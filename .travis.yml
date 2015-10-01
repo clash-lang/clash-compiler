@@ -39,6 +39,10 @@ before_install:
   - travis_retry $CABAL update
 
 install:
+  - |
+    if [ -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar ]; then
+      rm -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar
+    fi
   - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - $CABAL sandbox add-source testsuite
   - $CABAL install $JOPTS clash-testsuite
