@@ -41,6 +41,7 @@ before_install:
 install:
   - |
     if [ -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar ]; then
+      echo "Deleting invalid install cache"
       rm -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar
     fi
   - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
@@ -56,7 +57,12 @@ install:
   - git clone https://github.com/clash-lang/clash-prelude.git
   - $CABAL sandbox add-source clash-prelude
   - $CABAL sandbox add-source clash-lib
-  - $CABAL install $JOPTS --dependencies-only clash-lib
+  - |
+    if [ -d $HOME/.cabal-sandbox/$GHCVER ]; then
+      echo "Dependencies for clash-lib already installed"
+    else
+      $CABAL install $JOPTS --dependencies-only clash-lib
+    fi
   - $CABAL sandbox add-source clash-ghc
   - $CABAL sandbox add-source clash-systemverilog
   - $CABAL sandbox add-source clash-verilog
