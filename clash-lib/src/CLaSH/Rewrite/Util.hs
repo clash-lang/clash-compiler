@@ -537,8 +537,16 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   (specBndrs,specVars) <- specArgBndrsAndVars ctx (Left specArg)
   -- Create specialized function
   let newBody = mkAbstraction specArg specBndrs
-  cf   <- Lens.use curFun
-  newf <- mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
+  -- See if there's an existing binder that's alpha-equivalent to the
+  -- specialised function
+  existing <- HML.filter ((== newBody) . snd) <$> Lens.use bindings
+  -- Create a new function if an alpha-equivalent binder doesn't exist
+  newf <- case HML.toList existing of
+    [] -> do cf <- Lens.use curFun
+             mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
+    ((k,(kTy,_)):_) -> return (k,kTy)
+  -- cf <- Lens.use curFun
+  -- newf <- mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
   -- Create specialized argument
   let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars
   -- Use specialized argument
