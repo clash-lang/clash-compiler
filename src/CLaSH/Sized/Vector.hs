@@ -35,7 +35,7 @@ module CLaSH.Sized.Vector
   , (!!), head, last, at
   , indices, indicesI
   , findIndex, elemIndex
-    -- ** Extracting subvectors (slicing)
+    -- ** Extracting sub-vectors (slicing)
   , tail, init
   , take, takeI, drop, dropI
   , select, selectI
