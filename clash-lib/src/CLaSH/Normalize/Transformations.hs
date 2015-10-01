@@ -741,10 +741,21 @@ reduceConst _ e = return e
 -- * CLaSH.Sized.Vector.map
 -- * CLaSH.Sized.Vector.zipWith
 -- * CLaSH.Sized.Vector.traverse#
+-- * CLaSH.Sized.Vector.fold
+-- * CLaSH.Sized.Vector.dfold
+-- * CLaSH.Sized.Vector.(++)
 reduceNonRepPrim :: NormRewrite
-reduceNonRepPrim _ e@(App _ _)
-  | (Prim f _, args) <- collectArgs e
-  = case f of
+reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
+  tcm <- Lens.view tcCache
+  eTy <- termType tcm e
+  case tyView eTy of
+    (TyConApp vecTcNm@(name2String -> "CLaSH.Sized.Vector.Vec")
+              [LitTy (NumTy 0), aTy]) -> do
+      let (Just vecTc) = HashMap.lookup vecTcNm tcm
+          [nilCon,consCon] = tyConDataCons vecTc
+          nilE = mkVec nilCon consCon aTy 0 []
+      changed nilE
+    _ -> case f of
       "CLaSH.Sized.Vector.zipWith" | length args == 7 -> do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case nTy of
