@@ -81,8 +81,10 @@ module CLaSH.Sized.Vector
     -- * Stencil computations
   , stencil1d, stencil2d
   , windows1d, windows2d
+    -- * Conversions
+  , toList
     -- * Misc
-  , toList, lazyV, asNatProxy
+  , lazyV, asNatProxy
     -- * Primitives
     -- ** 'Eq' instance
   , eq#
@@ -1497,8 +1499,6 @@ rotateRightS xs _ = let (l,r) = splitAtI xs :: (Vec n a, Vec d a) in r ++ l
 --
 -- >>> toList (1:>2:>3:>Nil)
 -- [1,2,3]
---
--- __NB__: Not synthesisable
 toList :: Vec n a -> [a]
 toList = foldr (:) []
 {-# INLINE toList #-}
