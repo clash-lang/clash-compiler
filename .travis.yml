@@ -18,6 +18,9 @@ cache:
   - $HOME/iverilog
   - $HOME/.cabal-sandbox
 
+before_cache:
+  - rm -f $HOME/.cabal-sandbox/$GHCVER/packages/00-index.tar
+
 before_install:
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
   - export CABAL=cabal-$CABALVER
@@ -33,10 +36,10 @@ before_install:
     fi
   - export PATH=$PATH:$HOME/iverilog/bin
   - vvp -V
-  - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - travis_retry $CABAL update
 
 install:
+  - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - $CABAL sandbox add-source testsuite
   - $CABAL install $JOPTS clash-testsuite
   - |
