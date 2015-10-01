@@ -33,10 +33,10 @@ before_install:
     fi
   - export PATH=$PATH:$HOME/iverilog/bin
   - vvp -V
+  - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - travis_retry $CABAL update
 
 install:
-  - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
   - $CABAL sandbox add-source testsuite
   - $CABAL install $JOPTS clash-testsuite
   - |
