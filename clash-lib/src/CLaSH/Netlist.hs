@@ -303,7 +303,7 @@ mkExpr bbEasD ty app = do
   case appF of
     Data dc
       | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy dc tmArgs
-      | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments"
+      | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments: " ++ showDoc app
     Prim nm _ -> mkPrimitive False bbEasD nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
