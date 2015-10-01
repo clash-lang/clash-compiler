@@ -158,18 +158,20 @@ representableType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HW
                   -> HashMap TyConName TyCon
                   -> Type
                   -> Bool
-representableType builtInTranslation m = either (const False) (const True) . coreTypeToHWType builtInTranslation m
+representableType builtInTranslation m = either (const False) ((> 0) . typeSize) . coreTypeToHWType builtInTranslation m
 
 -- | Determines the bitsize of a type
 typeSize :: HWType
          -> Int
-typeSize Void = 1
+typeSize Void = 0
 typeSize Bool = 1
 typeSize (Clock _ _) = 1
 typeSize (Reset _ _) = 1
 typeSize Integer = 32
 typeSize (BitVector i) = i
-typeSize (Index u) = clog2 (max 2 u)
+typeSize (Index 0) = 0
+typeSize (Index 1) = 1
+typeSize (Index u) = clog2 u
 typeSize (Signed i) = i
 typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * typeSize el
