@@ -336,6 +336,10 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
 
 expr_ _ (Identifier id_ (Just _))                      = text id_
 
+expr_ _ (DataCon (Vector 0 _) _ _) =
+  error $ $(curLoc) ++ "SystemVerilog: Trying to create a Nil vector." ++
+          "Please report as a bug on: https://github.com/clash-lang/clash-compiler/issues"
+
 expr_ _ (DataCon (Vector 1 _) _ [e]) = "'" <> braces (expr_ False e)
 expr_ _ e@(DataCon (Vector n _) _ [e1,e2]) = "'" <> case vectorChain e of
                                                      Just es -> listBraces (mapM (expr_ False) es)
