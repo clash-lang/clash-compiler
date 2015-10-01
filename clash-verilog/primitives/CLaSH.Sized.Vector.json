@@ -225,7 +225,7 @@ endfunction
 genvar d_~SYM[5];
 genvar i_~SYM[6];
 ~GENERATE
-if (~LENGTH[~TYP[1]] != 1) begin : make_tree_~SYM[7]
+if (levels_~SYM[4] != 0) begin : make_tree_~SYM[7]
   for (d_~SYM[5] = (levels_~SYM[4] - 1); d_~SYM[5] >= 0; d_~SYM[5]=d_~SYM[5]-1) begin : tree_depth
     for (i_~SYM[6] = 0; i_~SYM[6] < (2**d_~SYM[5]); i_~SYM[6] = i_~SYM[6]+1) begin : tree_depth_loop
         ~INST 0

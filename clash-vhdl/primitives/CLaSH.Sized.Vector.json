@@ -275,7 +275,7 @@ begin
   intermediate(0 to ~LENGTH[~TYP[1]]-1) <= ~ARG[1];
 
   -- Create the tree of instantiated components
-  make_tree : if ~LENGTH[~TYP[1]] /= 1 generate
+  make_tree : if levels /= 0 generate
     tree_depth : for d in levels-1 downto 0 generate
       tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
         ~INST 0
