@@ -274,6 +274,7 @@ nonRepANF ctx e@(App appConPrim arg)
                             changed (Letrec (bind binds (App appConPrim body)))
       (True,Case {})  -> specializeNorm ctx e
       (True,Lam _)    -> specializeNorm ctx e
+      (True,TyLam _)  -> specializeNorm ctx e
       _               -> return e
 
 nonRepANF _ e = return e
