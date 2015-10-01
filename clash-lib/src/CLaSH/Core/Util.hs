@@ -258,6 +258,28 @@ mkVec nilCon consCon resTy = go
                                                      ,resTy
                                                      ,(LitTy (NumTy (n-1)))])
 
+-- | Append elements to the supplied vector
+appendToVec :: DataCon -- ^ The Cons (:>) constructor
+            -> Type    -- ^ Element type
+            -> Term    -- ^ The vector to append the elements to
+            -> Int     -- ^ Length of the vector
+            -> [Term]  -- ^ Elements to append
+            -> Term
+appendToVec consCon resTy vec = go
+  where
+    go _ []     = vec
+    go n (x:xs) = mkApps (Data consCon) [Right (LitTy (NumTy n))
+                                        ,Right resTy
+                                        ,Right (LitTy (NumTy (n-1)))
+                                        ,Left (Prim "_CO_" (consCoTy n))
+                                        ,Left x
+                                        ,Left (go (n-1) xs)]
+
+    consCoTy n = head (fromJust $! dataConInstArgTys consCon
+                                                   [(LitTy (NumTy n))
+                                                   ,resTy
+                                                   ,(LitTy (NumTy (n-1)))])
+
 -- | Create let-bindings with case-statements that select elements out of a
 -- vector. Returns both the variables to which element-selections are bound
 -- and the let-bindings

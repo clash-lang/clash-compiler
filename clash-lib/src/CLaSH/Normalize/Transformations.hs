@@ -64,7 +64,7 @@ import           CLaSH.Core.Util             (collectArgs, extractElems,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isSignalType, isVar, mkApps,
                                               mkLams, mkTmApps, mkVec,
-                                              termSize, termType)
+                                              termSize, termType, appendToVec)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -744,6 +744,8 @@ reduceConst _ e = return e
 -- * CLaSH.Sized.Vector.fold
 -- * CLaSH.Sized.Vector.dfold
 -- * CLaSH.Sized.Vector.(++)
+-- * CLaSH.Sized.Vector.head
+-- * CLaSH.Sized.Vector.tail
 reduceNonRepPrim :: NormRewrite
 reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
   tcm <- Lens.view tcCache
@@ -800,13 +802,38 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
             in  reduceDFold n aTy fun start arg
           _ -> return e
       "CLaSH.Sized.Vector.++" | length args == 5 ->
-        let [nTy,_aTy,mTy] = Either.rights args
+        let [nTy,aTy,mTy] = Either.rights args
             [lArg,rArg]   = Either.lefts args
         in case (nTy,mTy) of
               (LitTy (NumTy n), LitTy (NumTy m))
                 | n == 0 -> changed rArg
                 | m == 0 -> changed lArg
+                | otherwise -> do
+                    untranslatableTy <- isUntranslatableType aTy
+                    if untranslatableTy
+                       then reduceAppend n m aTy lArg rArg
+                       else return e
               _ -> return e
+      "CLaSH.Sized.Vector.head" | length args == 3 -> do
+        let [nTy,aTy] = Either.rights args
+            [vArg]    = Either.lefts args
+        case nTy of
+          (LitTy (NumTy n)) -> do
+            untranslatableTy <- isUntranslatableType aTy
+            if untranslatableTy
+               then reduceHead n aTy vArg
+               else return e
+          _ -> return e
+      "CLaSH.Sized.Vector.tail" | length args == 3 -> do
+        let [nTy,aTy] = Either.rights args
+            [vArg]    = Either.lefts args
+        case nTy of
+          (LitTy (NumTy n)) -> do
+            untranslatableTy <- isUntranslatableType aTy
+            if untranslatableTy
+               then reduceTail n aTy vArg
+               else return e
+          _ -> return e
       _ -> return e
 
 reduceNonRepPrim _ e = return e
@@ -1024,3 +1051,52 @@ reduceDFold n aTy fun start arg = do
                                  ,Left x
                                  ,Left (doFold pDc (k-1) xs)
                                  ]
+
+reduceHead :: Int  -- ^ Length of the vector
+           -> Type -- ^ Element type of the vector
+           -> Term -- ^ The argument vector
+           -> NormalizeSession Term
+reduceHead n aTy vArg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm vArg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [_,consCon] = tyConDataCons vecTc
+      (vars,elems)     = second concat . unzip
+                       $ extractElems consCon aTy 'H' n
+                                      vArg
+      lb = Letrec (bind (rec [head elems]) (head vars))
+  changed lb
+
+reduceTail :: Int  -- ^ Length of the vector
+           -> Type -- ^ Element type of the vector
+           -> Term -- ^ The argument vector
+           -> NormalizeSession Term
+reduceTail n aTy vArg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm vArg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [_,consCon] = tyConDataCons vecTc
+      (_,elems)     = second concat . unzip
+                       $ extractElems consCon aTy 'L' n
+                                      vArg
+      b@(tB,_) = elems !! 1
+      lb = Letrec (bind (rec [b]) (idToVar tB))
+  changed lb
+
+reduceAppend :: Int  -- ^ Length of the LHS arg
+             -> Int  -- ^ Lenght of the RHS arg
+             -> Type -- ^ Element type of the vectors
+             -> Term -- ^ The LHS argument
+             -> Term -- ^ The RHS argument
+             -> NormalizeSession Term
+reduceAppend n m aTy lArg rArg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm lArg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [_nilCon,consCon] = tyConDataCons vecTc
+      (vars,elems)     = second concat . unzip
+                       $ extractElems consCon aTy 'C' n
+                                      lArg
+      lbody            = appendToVec consCon aTy rArg (n+m) vars
+      lb               = Letrec (bind (rec (init elems)) lbody)
+  changed lb
