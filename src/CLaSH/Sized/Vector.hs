@@ -567,6 +567,10 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- <2,3,*** Exception: 4 is out of bounds: [0..3]
 -- >>> imap (\i a -> fromIntegral i + a) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Unsigned 8)
 -- <2,3,4,5>
+--
+-- \"'imap' @f xs@\" corresponds to the following circuit layout:
+--
+-- <<doc/imap.svg>>
 imap :: forall n a b . KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b
 imap f = go 0
   where
@@ -581,6 +585,10 @@ imap f = go 0
 -- <*** Exception: 3 is out of bounds: [0..1]
 -- >>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
 -- <5,6>
+--
+-- \"'imap' @f xs@\" corresponds to the following circuit layout:
+--
+-- <<doc/izipWith.svg>>
 --
 -- __NB:__ 'izipWith' is /strict/ in its second argument, and /lazy/ in its
 -- third. This matters when 'izipWith' is used in a recursive setting. See
@@ -597,6 +605,10 @@ izipWith f xs ys = imap (\i -> uncurry (f i)) (zip xs ys)
 -- Just 1
 -- >>> findLeftmost 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
+--
+-- \"'ifoldr' @f z xs@\" corresponds to the following circuit layout:
+--
+-- <<doc/ifoldr.svg>>
 ifoldr :: KnownNat n => (Index n -> a -> b -> b) -> b -> Vec n a -> b
 ifoldr f z xs = head ws
   where
@@ -610,6 +622,10 @@ ifoldr f z xs = head ws
 -- Just 4
 -- >>> findRightmost 8 (1:>3:>2:>4:>3:>5:>6:>Nil)
 -- Nothing
+--
+-- \"'ifoldl' @f z xs@\" corresponds to the following circuit layout:
+--
+-- <<doc/ifoldl.svg>>
 ifoldl :: KnownNat n => (a -> Index n -> b -> a) -> a -> Vec n b -> a
 ifoldl f z xs = last ws
   where
@@ -1681,6 +1697,10 @@ type instance Apply (V a) l = Vec l a
 --
 -- >>> csSort (7 :> 3 :> 9 :> 1 :> Nil)
 -- <1,3,7,9>
+--
+-- The circuit layout of @csSort@, build using 'vfold', is:
+--
+-- <<doc/csSort.svg>>
 vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
