@@ -575,7 +575,7 @@ vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc
-exprLit Nothing         (NumLit i) =
+exprLit Nothing (NumLit i) =
   let integerLow  = -2^(31 :: Integer) :: Integer
       integerHigh = 2^(31 :: Integer) - 1 :: Integer
       i' = if i < integerLow
