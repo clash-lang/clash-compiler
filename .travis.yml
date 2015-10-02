@@ -69,7 +69,7 @@ install:
   - $CABAL sandbox add-source clash-vhdl
 
 script:
-  - $CABAL install $JOPTS clash-ghc
+  - $CABAL install $JOPTS --force-reinstalls clash-ghc
   - $CABAL exec clash-testsuite
 
 notifications:
