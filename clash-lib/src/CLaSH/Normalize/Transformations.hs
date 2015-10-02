@@ -738,6 +738,7 @@ reduceConst _ e = return e
 -- * CLaSH.Sized.Vector.map
 -- * CLaSH.Sized.Vector.zipWith
 -- * CLaSH.Sized.Vector.traverse#
+-- * CLaSH.Sized.Vector.foldr
 -- * CLaSH.Sized.Vector.fold
 -- * CLaSH.Sized.Vector.dfold
 -- * CLaSH.Sized.Vector.(++)
@@ -790,6 +791,16 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
           (LitTy (NumTy n)) | not (isPow2 (n + 1)) || untranslatableTy ->
             let [fun,arg] = Either.lefts args
             in  reduceFold (n + 1) aTy fun arg
+          _ -> return e
+      "CLaSH.Sized.Vector.foldr" | length args == 6 ->
+        let [aTy,bTy,nTy] = Either.rights args
+        in  case nTy of
+          (LitTy (NumTy n)) -> do
+            untranslatableTys <- mapM isUntranslatableType [aTy,bTy]
+            if or untranslatableTys
+              then let [fun,start,arg] = Either.lefts args
+                   in  reduceFoldr n aTy bTy fun start arg
+              else return e
           _ -> return e
       "CLaSH.Sized.Vector.dfold" | length args == 7 ->
         let [_mTy,nTy,aTy] = Either.rights args

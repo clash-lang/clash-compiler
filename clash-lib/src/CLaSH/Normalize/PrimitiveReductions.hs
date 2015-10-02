@@ -7,6 +7,7 @@
 -- * CLaSH.Sized.Vector.map
 -- * CLaSH.Sized.Vector.zipWith
 -- * CLaSH.Sized.Vector.traverse#
+-- * CLaSH.Sized.Vector.foldr
 -- * CLaSH.Sized.Vector.fold
 -- * CLaSH.Sized.Vector.dfold
 -- * CLaSH.Sized.Vector.(++)
@@ -202,6 +203,27 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
                                                          [(LitTy (NumTy n))
                                                          ,bTy
                                                          ,(LitTy (NumTy (n-1)))]))
+
+-- | Replace an application of the @CLaSH.Sized.Vector.foldr@ primitive on
+-- vectors of a known length @n@, by the fully unrolled recursive "definition"
+-- of @CLaSH.Sized.Vector.foldr@
+reduceFoldr :: Int  -- ^ Length of the vector
+            -> Type -- ^ Element type of the argument vector
+            -> Type -- ^ Type of the starting element
+            -> Term -- ^ The function to fold with
+            -> Term -- ^ The starting value
+            -> Term -- ^ The argument vector
+            -> NormalizeSession Term
+reduceFoldr n aTy _bTy fun start arg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [_,consCon]      = tyConDataCons vecTc
+      (vars,elems)     = second concat . unzip
+                       $ extractElems consCon aTy 'G' n arg
+      lbody            = foldr (\l r -> mkApps fun [Left l,Left r]) start vars
+      lb               = Letrec (bind (rec (init elems)) lbody)
+  changed lb
 
 -- | Replace an application of the @CLaSH.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
