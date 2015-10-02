@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.5.16
+## 0.6
 * New features:
   * Support `clash-prelude-0.10`
 
