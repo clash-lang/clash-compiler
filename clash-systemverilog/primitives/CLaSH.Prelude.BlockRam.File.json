@@ -12,7 +12,7 @@
                -> Signal' clk (BitVector m)"
     , "templateD" :
 "// blockRamFile begin
-~TYPO RAM_~SYM[0] [0:~LIT[2]-1];
+~SIGDO[RAM_~SYM[0]] [0:~LIT[2]-1];
 ~SIGD[dout_~SYM[1]][7];
 
 initial begin

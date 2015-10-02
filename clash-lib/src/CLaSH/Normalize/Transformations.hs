@@ -842,6 +842,16 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                then reduceTail n aTy vArg
                else return e
           _ -> return e
+      "CLaSH.Sized.Vector.unconcat" | length args == 6 -> do
+        let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
+        case (nTy,mTy) of
+          (LitTy (NumTy n), LitTy (NumTy 0)) -> reduceUnconcat n 0 aTy arg
+          _ -> return e
+      "CLaSH.Sized.Vector.transpose" | length args == 5 -> do
+        let ([_knN,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
+        case (nTy,mTy) of
+          (LitTy (NumTy n), LitTy (NumTy 0)) -> reduceTranspose n 0 aTy arg
+          _ -> return e
       _ -> return e
 
 reduceNonRepPrim _ e = return e

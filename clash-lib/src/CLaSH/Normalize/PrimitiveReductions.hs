@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 -- | Reductions of primitives
 --
@@ -13,6 +14,12 @@
 -- * CLaSH.Sized.Vector.(++)
 -- * CLaSH.Sized.Vector.head
 -- * CLaSH.Sized.Vector.tail
+-- * CLaSH.Sized.Vector.unconcatBitVector#
+--
+-- Partially handles:
+--
+-- * CLaSH.Sized.Vector.unconcat
+-- * CLaSH.Sized.Vector.transpose
 module CLaSH.Normalize.PrimitiveReductions where
 
 import qualified Control.Lens                     as Lens
@@ -38,6 +45,8 @@ import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
 import           CLaSH.Util
+
+-- import CLaSH.Core.Pretty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.zipWith@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -293,11 +302,10 @@ reduceHead :: Int  -- ^ Length of the vector
 reduceHead n aTy vArg = do
   tcm <- Lens.view tcCache
   (TyConApp vecTcNm _) <- tyView <$> termType tcm vArg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [_,consCon] = tyConDataCons vecTc
-      (vars,elems)     = second concat . unzip
-                       $ extractElems consCon aTy 'H' n
-                                      vArg
+  let (Just vecTc)  = HashMap.lookup vecTcNm tcm
+      [_,consCon]   = tyConDataCons vecTc
+      (vars,elems)  = second concat . unzip
+                    $ extractElems consCon aTy 'H' n vArg
       lb = Letrec (bind (rec [head elems]) (head vars))
   changed lb
 
@@ -311,13 +319,12 @@ reduceTail :: Int  -- ^ Length of the vector
 reduceTail n aTy vArg = do
   tcm <- Lens.view tcCache
   (TyConApp vecTcNm _) <- tyView <$> termType tcm vArg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [_,consCon] = tyConDataCons vecTc
-      (_,elems)     = second concat . unzip
-                       $ extractElems consCon aTy 'L' n
-                                      vArg
-      b@(tB,_) = elems !! 1
-      lb = Letrec (bind (rec [b]) (idToVar tB))
+  let (Just vecTc) = HashMap.lookup vecTcNm tcm
+      [_,consCon]  = tyConDataCons vecTc
+      (_,elems)    = second concat . unzip
+                   $ extractElems consCon aTy 'L' n vArg
+      b@(tB,_)     = elems !! 1
+      lb           = Letrec (bind (rec [b]) (idToVar tB))
   changed lb
 
 -- | Replace an application of the @CLaSH.Sized.Vector.(++)@ primitive on
@@ -332,11 +339,50 @@ reduceAppend :: Int  -- ^ Length of the LHS arg
 reduceAppend n m aTy lArg rArg = do
   tcm <- Lens.view tcCache
   (TyConApp vecTcNm _) <- tyView <$> termType tcm lArg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [_nilCon,consCon] = tyConDataCons vecTc
-      (vars,elems)     = second concat . unzip
-                       $ extractElems consCon aTy 'C' n
-                                      lArg
-      lbody            = appendToVec consCon aTy rArg (n+m) vars
-      lb               = Letrec (bind (rec (init elems)) lbody)
+  let (Just vecTc) = HashMap.lookup vecTcNm tcm
+      [_,consCon]  = tyConDataCons vecTc
+      (vars,elems) = second concat . unzip
+                   $ extractElems consCon aTy 'C' n lArg
+      lbody        = appendToVec consCon aTy rArg (n+m) vars
+      lb           = Letrec (bind (rec (init elems)) lbody)
   changed lb
+
+-- | Replace an application of the @CLaSH.Sized.Vector.unconcat@ primitive on
+-- vectors of a known length @n@, by the fully unrolled recursive "definition"
+-- of @CLaSH.Sized.Vector.unconcat@
+reduceUnconcat :: Int  -- ^ Length of the result vector
+               -> Int  -- ^ Length of the elements of the result vector
+               -> Type -- ^ Element type
+               -> Term -- ^ Argument vector
+               -> NormalizeSession Term
+reduceUnconcat n 0 aTy arg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      nilVec           = mkVec nilCon consCon aTy 0 []
+      innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
+      retVec           = mkVec nilCon consCon innerVecTy n (replicate n nilVec)
+  changed retVec
+
+reduceUnconcat _ _ _ _ = error $ $(curLoc) ++ "reduceUnconcat: unimplemented"
+
+-- | Replace an application of the @CLaSH.Sized.Vector.transpose@ primitive on
+-- vectors of a known length @n@, by the fully unrolled recursive "definition"
+-- of @CLaSH.Sized.Vector.transpose@
+reduceTranspose :: Int  -- ^ Length of the result vector
+                -> Int  -- ^ Length of the elements of the result vector
+                -> Type -- ^ Element type
+                -> Term -- ^ Argument vector
+                -> NormalizeSession Term
+reduceTranspose n 0 aTy arg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      nilVec           = mkVec nilCon consCon aTy 0 []
+      innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
+      retVec           = mkVec nilCon consCon innerVecTy n (replicate n nilVec)
+  changed retVec
+
+reduceTranspose _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"

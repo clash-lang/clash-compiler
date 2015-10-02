@@ -13,32 +13,32 @@
 "-- asyncRam begin
 asyncRam_~COMPNAME_~SYM[0] : block
   type RamType is array(natural range <>) of ~TYP[6];
-  signal RAM : RamType(0 to ~LIT[2]-1);
-  signal wr  : integer range 0 to ~LIT[2] - 1;
-  signal rd  : integer range 0 to ~LIT[2] - 1;
+  signal RAM_~SYM[1] : RamType(0 to ~LIT[2]-1);
+  signal wr_~SYM[2]  : integer range 0 to ~LIT[2] - 1;
+  signal rd_~SYM[3]  : integer range 0 to ~LIT[2] - 1;
 begin
-  wr <= ~ARG[3]
+  wr_~SYM[2] <= ~ARG[3]
   -- pragma translate_off
-        mod ~LIT[2]
+                mod ~LIT[2]
   -- pragma translate_on
-        ;
+                ;
 
-  rd <= ~ARG[4]
+  rd_~SYM[3] <= ~ARG[4]
   -- pragma translate_off
-        mod ~LIT[2]
+                mod ~LIT[2]
   -- pragma translate_on
-        ;
+                ;
 
-  asyncRam_~SYM[1] : process(~CLK[0])
+  asyncRam_sync : process(~CLK[0])
   begin
     if rising_edge(~CLK[0]) then
       if ~ARG[5] then
-        RAM(wr) <= ~ARG[6];
+        RAM_~SYM[1](wr_~SYM[2]) <= ~ARG[6];
       end if;
     end if;
   end process;
 
-  ~RESULT <= RAM(rd);
+  ~RESULT <= RAM_~SYM[1](rd_~SYM[3]);
 end block;
 -- asyncRam end"
     }

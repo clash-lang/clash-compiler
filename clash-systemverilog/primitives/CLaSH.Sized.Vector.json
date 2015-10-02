@@ -116,7 +116,7 @@ assign ~SYM[0] = ~ARG[0];
 genvar ~SYM[1];
 ~GENERATE
   for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concat_~SYM[2]
-    assign ~RESULT[(~SYM[5] * $size(~SYM[0][0])) : ((~SYM[5] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
+    assign ~RESULT[(~SYM[1] * $size(~SYM[0][0])) : ((~SYM[1] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
   end
 ~ENDGENERATE
 // concat end"

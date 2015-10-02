@@ -237,8 +237,7 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
 expr_ _ (Identifier id_ (Just _))                      = text id_
 
 expr_ _ (DataCon (Vector 0 _) _ _) =
-  error $ $(curLoc) ++ "Verilog: Trying to create a Nil vector." ++
-          "Please report as a bug on: https://github.com/clash-lang/clash-compiler/issues"
+  error $ $(curLoc) ++ "Verilog: Trying to create a Nil vector."
 
 expr_ _ (DataCon (Vector 1 _) _ [e]) = expr_ False e
 expr_ _ e@(DataCon (Vector _ _) _ es@[_,_]) =

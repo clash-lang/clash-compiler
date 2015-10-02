@@ -98,7 +98,7 @@ mkTyPackage_ modName hwtys = (:[]) A.<$> (modName ++ "_types",) A.<$>
     needsDec    = nubBy eqReprTy . map mkVecZ $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
     packageDec  = vcat $ mapM tyDec hwTysSorted
-    (funDecs,funBodies) = unzip $ maxDec : (catMaybes $ map funDec (nubBy eqTypM hwTysSorted))
+    (funDecs,funBodies) = unzip . catMaybes $ map funDec (nubBy eqTypM hwTysSorted)
 
     packageBodyDec :: VHDLM Doc
     packageBodyDec = case funBodies of
@@ -176,18 +176,6 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
-
-maxDec :: (VHDLM Doc, VHDLM Doc)
-maxDec =
-  ( "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <> semi
-  , "function" <+> "max" <+> parens ("left, right: in integer") <+> "return integer" <+> "is" <$>
-    "begin" <$>
-      indent 2 (vcat $ sequence [ "if" <+> "left > right" <+> "then return left" <> semi
-                                , "else return right" <> semi
-                                , "end if" <> semi
-                                ]) <$>
-    "end" <> semi
-  )
 
 funDec :: HWType -> Maybe (VHDLM Doc,VHDLM Doc)
 funDec Bool = Just
@@ -502,8 +490,7 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int s
 expr_ _ (Identifier id_ (Just _)) = text id_
 
 expr_ _ (DataCon (Vector 0 _) _ _) =
-  error $ $(curLoc) ++ "VHDL: Trying to create a Nil vector." ++
-          "Please report as a bug on: https://github.com/clash-lang/clash-compiler/issues"
+  error $ $(curLoc) ++ "VHDL: Trying to create a Nil vector."
 
 expr_ _ (DataCon ty@(Vector 1 _) _ [e])          = vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
 expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = vhdlTypeMark ty <> "'" <> case vectorChain e of

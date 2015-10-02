@@ -27,33 +27,35 @@ blockRamFile_~COMPNAME_~SYM[0] : block
     return RAM;
   end function;
 
-  signal RAM  : RamType(0 to ~LIT[2]-1) := InitRamFromFile(~FILE[~LIT[3]]);
-  signal dout : ~TYP[7];
-  signal wr   : integer range 0 to ~LIT[2]-1;
-  signal rd   : integer range 0 to ~LIT[2]-1;
+  signal RAM_~SYM[1]  : RamType(0 to ~LIT[2]-1) := InitRamFromFile(~FILE[~LIT[3]]);
+  signal dout_~SYM[2] : ~TYP[7];
+  signal wr_~SYM[3]   : integer range 0 to ~LIT[2]-1;
+  signal rd_~SYM[4]   : integer range 0 to ~LIT[2]-1;
 begin
-  wr <= ~ARG[4]
+  wr_~SYM[3] <= ~ARG[4]
   -- pragma translate_off
-        mod ~LIT[2]
+                mod ~LIT[2]
   -- pragma translate_on
-        ;
+                ;
 
-  rd <= ~ARG[5]
+  rd_~SYM[4] <= ~ARG[5]
   -- pragma translate_off
-        mod ~LIT[2]
+                mod ~LIT[2]
   -- pragma translate_on
-        ;
+                ;
 
-  blockRamFile_~SYM[1] : process(~CLK[1])
+  blockRamFile_sync : process(~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
       if ~ARG[6] then
-        RAM(to_integer(wr)) <= to_bitvector(~ARG[7]);
+        RAM_~SYM[1](to_integer(wr_~SYM[3])) <= to_bitvector(~ARG[7]);
       end if;
 
-      ~RESULT <= to_stdlogicvector(RAM(rd));
+      dout_~SYM[2] <= to_stdlogicvector(RAM_~SYM[1](rd_~SYM[4]));
     end if;
   end process;
+
+  ~RESULT <= dout_~SYM[2];
 end block;
 -- blockRamFile end"
     }

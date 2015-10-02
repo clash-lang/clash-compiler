@@ -23,16 +23,16 @@ asyncROMFile_~SYM[0] : block
     return ROM;
   end function;
 
-  signal ROM : RomType(0 to ~LIT[1]-1) := InitRomFromFile(~FILE[~LIT[2]]);
-  signal rd  : integer range 0 to ~LIT[1]-1;
+  signal ROM_~SYM[1] : RomType(0 to ~LIT[1]-1) := InitRomFromFile(~FILE[~LIT[2]]);
+  signal rd_~SYM[2]  : integer range 0 to ~LIT[1]-1;
 begin
-  rd <= ~ARG[3]
+  rd_~SYM[2] <= ~ARG[3]
   -- pragma translate_off
-        mod ~LIT[1]
+                mod ~LIT[1]
   -- pragma translate_on
-        ;
+                ;
 
-  ~RESULT <= to_stdlogicvector(ROM(rd));
+  ~RESULT <= to_stdlogicvector(ROM_~SYM[1](rd_~SYM[2]));
 end block;
 -- asyncRomFile end"
     }
@@ -63,24 +63,24 @@ romFile_~COMPNAME_~SYM[0] : block
     return ROM;
   end function;
 
-  signal ROM  : RomType(0 to ~LIT[2]-1) := InitRomFromFile(~FILE[~LIT[3]]);
-  signal rd   : integer range 0 to ~LIT[2]-1;
-  signal dout : ~TYPO;
+  signal ROM_~SYM[1]  : RomType(0 to ~LIT[2]-1) := InitRomFromFile(~FILE[~LIT[3]]);
+  signal rd_~SYM[2]   : integer range 0 to ~LIT[2]-1;
+  signal dout_~SYM[3] : ~TYPO;
 begin
-  rd <= ~ARG[4]
+  rd_~SYM[2] <= ~ARG[4]
   -- pragma translate_off
-        mod ~LIT[2]
+                mod ~LIT[2]
   -- pragma translate_on
-        ;
+                ;
 
-  romFile_~SYM[1] : process (~CLK[1])
+  romFileSync : process (~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
-      dout <= to_stdlogicvector(ROM(rd));
+      dout_~SYM[3] <= to_stdlogicvector(ROM_~SYM[1](rd_~SYM[2]));
     end if;
   end process;
 
-  ~RESULT <= dout;
+  ~RESULT <= dout_~SYM[3];
 end block;
 -- romFile end"
     }

@@ -140,9 +140,18 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
       -> Bit"
     , "templateD" :
 "// msb begin
-wire ~SIGD[~SYM[0]][1];
-assign ~SYM[0] = ~ARG[1];
-assign ~RESULT = ~SYM[0][~LIT[0]-1];
+~GENERATE
+if (~LIT[0] == 0)
+  begin
+    assign ~RESULT = 1'b0;
+  end
+else
+  begin
+    wire ~SIGD[~SYM[0]][1];
+    assign ~SYM[0] = ~ARG[1];
+    assign ~RESULT = ~SYM[0][~LIT[0]-1];
+  end
+~ENDGENERATE
 // msb end"
     }
   }
@@ -153,9 +162,18 @@ assign ~RESULT = ~SYM[0][~LIT[0]-1];
       -> Bit"
     , "templateD" :
 "// lsb begin
-wire ~SIGD[~SYM[0]][0];
-assign ~SYM[0] = ~ARG[0];
-assign ~RESULT = ~SYM[0][0];
+~GENERATE
+if (~SIZE[~TYP[0]] == 0)
+  begin
+    assign ~RESULT = 1'b0;
+  end
+else
+  begin
+    wire ~SIGD[~SYM[0]][0];
+    assign ~SYM[0] = ~ARG[0];
+    assign ~RESULT = ~SYM[0][0];
+  end
+~ENDGENERATE
 // msb end"
     }
   }
