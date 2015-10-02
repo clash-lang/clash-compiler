@@ -255,6 +255,35 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.foldr"
+    , "type"      : "foldr :: (a -> b -> b) -> b -> Vec n a -> b"
+    , "templateD" :
+"-- foldr begin
+foldr_~SYM[0] : block
+  type foldr_res_vec_~SYM[1] is array (natural range <>) of ~TYP[1];
+  signal intermediate_~SYM[2] : foldr_res_vec_~SYM[1] (0 to ~LENGTH[~TYP[2]]);
+begin
+  intermediate_~SYM[2](~LENGTH[~TYP[2]]) <= ~ARG[1];
+
+  foldr_nz : if intermediate_~SYM[2]'length /= 1 generate
+    signal xs_~SYM[3] : ~TYP[2];
+  begin
+    xs_~SYM[3] <= ~ARG[2];
+    foldr_loop : for i_~SYM[4] in xs_~SYM[3]'range generate
+      ~INST 0
+        ~OUTPUT <= intermediate_~SYM[2](i_~SYM[4])~ ~TYP[1]~
+        ~INPUT  <= xs_~SYM[3](i_~SYM[4])~ ~TYPEL[~TYP[2]]~
+        ~INPUT  <= intermediate_~SYM[2](i_~SYM[4]+1)~ ~TYP[1]~
+      ~INST
+    end generate;
+  end generate;
+
+  ~RESULT <= intermediate_~SYM[2](0);
+end block;
+-- foldr end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.fold"
     , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"

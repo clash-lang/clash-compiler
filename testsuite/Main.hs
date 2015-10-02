@@ -98,6 +98,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "FindIndex" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Fold" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Foldr" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOClock" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOCon" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOPrim" (Just ("topEntity",False))
