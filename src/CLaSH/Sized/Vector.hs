@@ -726,8 +726,9 @@ zipWith3 f us vs ws = zipWith (\a (b,c) -> f a b c) us (zip vs ws)
 -- associative, as @"'fold' f xs"@ produces a structure with a depth of
 -- O(log_2(@'length' xs@)).
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
-foldr f z xs = head (scanr f z xs)
-{-# INLINE foldr #-}
+foldr _ z Nil           = z
+foldr f z (x `Cons` xs) = f x (foldr f z xs)
+{-# NOINLINE foldr #-}
 
 -- | 'foldl', applied to a binary operator, a starting value (typically
 -- the left-identity of the operator), and a vector, reduces the vector
