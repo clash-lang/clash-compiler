@@ -20,7 +20,7 @@ import           CLaSH.Core.FreeVars              (termFreeIds)
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Subst                 (substTms)
 import           CLaSH.Core.Term                  (Term (..), TmName)
-import           CLaSH.Core.Type                  (Type)
+import           CLaSH.Core.Type                  (Type, splitFunForallTy)
 import           CLaSH.Core.TyCon                 (TyCon, TyConName)
 import           CLaSH.Core.Util                  (collectArgs, mkApps, termType)
 import           CLaSH.Core.Var                   (Id,varName)
@@ -36,7 +36,8 @@ import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteEnv (..), RewriteState (..),
                                                    bindings, curFun, dbgLevel,
                                                    tcCache, extra)
-import           CLaSH.Rewrite.Util               (runRewrite,
+import           CLaSH.Rewrite.Util               (isUntranslatableType,
+                                                   runRewrite,
                                                    runRewriteSession)
 import           CLaSH.Util
 
@@ -97,20 +98,32 @@ normalize' nm = do
   exprM <- HashMap.lookup nm <$> Lens.use bindings
   let nmS = showDoc nm
   case exprM of
-    Just (_,tm) -> do
-      tmNorm <- makeCached nm (extra.normalized) $ do
-                  curFun .= nm
-                  tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
-                  tcm <- Lens.view tcCache
-                  ty' <- termType tcm tm'
-                  return (ty',tm')
-      let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
-      traceIf (nm `elem` usedBndrs)
-              ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm))
-              (return ())
-      prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
-      let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
-      return (toNormalize,(nm,tmNorm))
+    Just (ty,tm) -> do
+      let (_,resTy) = splitFunForallTy ty
+      resTyRep <- not <$> isUntranslatableType resTy
+      if resTyRep
+         then do
+            tmNorm <- makeCached nm (extra.normalized) $ do
+                        curFun .= nm
+                        tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
+                        tcm <- Lens.view tcCache
+                        ty' <- termType tcm tm'
+                        return (ty',tm')
+            let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
+            traceIf (nm `elem` usedBndrs)
+                    ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm))
+                    (return ())
+            prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
+            let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
+            return (toNormalize,(nm,tmNorm))
+         else do
+            let usedBndrs = Lens.toListOf termFreeIds tm
+            prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
+            let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
+            lvl <- Lens.view dbgLevel
+            traceIf (lvl >= DebugFinal)
+                    ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc resTy ++ ") has a non-representable return type. Not normalising:\n" ++ showDoc tm)
+                    (return (toNormalize,(nm,(ty,tm))))
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
 -- | Rewrite a term according to the provided transformation
