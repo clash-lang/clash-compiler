@@ -82,15 +82,9 @@ select_~SYM[0] : block
 begin
   ~SYM[1] <= ~ARG[4];
 
-  selectZ_~SYM[2] : if ~RESULT'length = 0 generate
-    ~RESULT <= ~ERRORO;
-  end generate;
-
-  selectSN_~SYM[3] : if ~RESULT'length /= 0 generate
-    selectIter_~SYM[4] : for ~SYM[5] in ~RESULT'range generate
-    begin
-      ~RESULT(~SYM[5]) <= ~SYM[1](~LIT[1]+(~LIT[2]*~SYM[5]));
-    end generate;
+  select_loop : for ~SYM[2] in ~RESULT'range generate
+  begin
+      ~RESULT(~SYM[2]) <= ~SYM[1](~LIT[1]+(~LIT[2]*~SYM[2]));
   end generate;
 end block;
 -- select end"
