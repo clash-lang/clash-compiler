@@ -80,6 +80,7 @@ setSym i l
                                                           return (Sym k)
                                             Just k  -> return (Sym k)
                       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
+                      IF c t f      -> IF <$> pure c <*> setSym' t <*> setSym' f
                       SigD e' m     -> SigD <$> (setSym' e') <*> pure m
                       _             -> pure e
               )
@@ -99,6 +100,7 @@ setClocks :: ( MonadWriter (Set (Identifier,HWType)) m
 setClocks bc bt = mapM setClocks' bt
   where
     setClocks' (D (Decl n l)) = D <$> (Decl n <$> mapM (combineM (setClocks bc) (setClocks bc)) l)
+    setClocks' (IF c t f)     = IF <$> pure c <*> setClocks bc t <*> setClocks bc f
     setClocks' (SigD e m)     = SigD <$> (setClocks bc e) <*> pure m
 
     setClocks' (Clk Nothing)  = let (clk,rate) = clkSyncId $ fst $ bbResult bc
@@ -187,6 +189,18 @@ renderElem b (SigD e m) = do
   t  <- hdlSig e' ty
   return (displayT $ renderOneLine t)
 
+renderElem b (IF c t f) = do
+  let c' = case c of
+             (Size e)   -> typeSize (lineToType b [e])
+             (Length e) -> case lineToType b [e] of
+                              (Vector n _) -> n
+                              _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
+             (L n)      -> case bbInputs b !! n of
+                             (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
+                             _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGHT, or LIT"
+  if c' > 0 then renderBlackBox t b else renderBlackBox f b
+
 renderElem b e = renderTag b e
 
 parseFail :: Text -> BlackBoxTemplate
@@ -258,17 +272,7 @@ renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b 
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  (displayT . renderOneLine) <$> hdlType ty
 renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
-renderTag b (IF c t f)      = do
-  let c' = case c of
-             (Size e)   -> typeSize (lineToType b [e])
-             (Length e) -> case lineToType b [e] of
-                              (Vector n _) -> n
-                              _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
-             (L n)      -> case bbInputs b !! n of
-                             (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
-                             _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
-             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGHT, or LIT"
-  if c' > 0 then renderBlackBox t b else renderBlackBox f b
+renderTag _ (IF _ _ _)      = error $ $(curLoc) ++ "Unexpected IF"
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
