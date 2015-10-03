@@ -2,7 +2,10 @@
 
 ## 0.6
 * New features:
+  * Support for `clash-prelude` 0.10
   * Add `~INDEXTYPE` tag: primitives get access to the `Index` clash-prelude type
+  * Add `~IF` construct: primitives can do conditional templating
+  * Unroll "definitions" of the following primitives: `fold`, `dfold`, `foldr`
 
 ## 0.5.13 *September 21st 2015*
 * Fixes bugs:
