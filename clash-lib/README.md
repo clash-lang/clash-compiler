@@ -11,8 +11,8 @@ low-level synthesizable VHDL, Verilog, or SystemVerilog.
 Features of CλaSH:
 
   * Strongly typed (like VHDL), yet with a very high degree of type inference,
-    which enables both safe and fast prototying using consise descriptions (like
-    Verilog)
+    enabling both safe and fast prototying using consise descriptions (like
+    Verilog).
 
   * Interactive REPL: load your designs in an interpreter and easily test all
     your component without needing to setup a test bench.
@@ -21,7 +21,7 @@ Features of CλaSH:
     fully parametric by default.
 
   * Synchronous sequential circuit design based on streams of values, called
-    `Signal`s.
+    `Signal`s, lead to natural descriptions of feedback loops.
 
   * Support for multiple clock domains, with type safe clock domain crossing.
 
