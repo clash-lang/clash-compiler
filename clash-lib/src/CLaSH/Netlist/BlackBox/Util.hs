@@ -1,7 +1,8 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 -- | Utilties to verify blackbox contexts against templates and rendering
 -- filled in templates
@@ -257,6 +258,17 @@ renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b 
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  (displayT . renderOneLine) <$> hdlType ty
 renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
+renderTag b (IF c t f)      = do
+  let c' = case c of
+             (Size e)   -> typeSize (lineToType b [e])
+             (Length e) -> case lineToType b [e] of
+                              (Vector n _) -> n
+                              _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
+             (L n)      -> case bbInputs b !! n of
+                             (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
+                             _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGHT, or LIT"
+  if c' > 0 then renderBlackBox t b else renderBlackBox f b
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
 renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"

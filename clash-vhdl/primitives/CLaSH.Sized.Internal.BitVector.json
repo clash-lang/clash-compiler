@@ -259,21 +259,16 @@ end block;
       => BitVector n -- ARG[1]
       -> Bit"
     , "templateD" :
-"-- msb begin
+"-- msb begin~IF ~LIT[0] ~THEN
 msb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
-  ~SYM[2]_generate : if ~SYM[1]'length = 0 generate
-  begin
-    ~RESULT <= \"0\";
-  end generate;
-
-  ~SYM[3]_generate : if ~SYM[1]'length /= 0 generate
-    ~SYM[1] <= ~ARG[1];
-    ~RESULT <= ~SYM[1](~SYM[1]'high downto ~SYM[1]'high);
-  end generate;
+  ~SYM[1] <= ~ARG[1];
+  ~RESULT <= ~SYM[1](~SYM[1]'high downto ~SYM[1]'high);
 end block;
--- msb end"
+~ELSE
+~RESULT <= \"0\";
+~FI-- msb end"
     }
   }
 , { "BlackBox" :
@@ -282,22 +277,16 @@ end block;
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
     , "templateD" :
-"-- lsb begin
+"-- lsb begin~IF ~SIZE[~TYP[0]] ~THEN
 lsb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
-  ~SYM[2]_generate : if ~SYM[1]'length = 0 generate
-  begin
-    ~RESULT <= \"0\";
-  end generate;
-
-  ~SYM[3]_generate : if ~SYM[1]'length /= 0 generate
-  begin
-    ~SYM[1] <= ~ARG[0];
-    ~RESULT <= ~SYM[1](0 downto 0);
-  end generate;
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](0 downto 0);
 end block;
--- lsb end"
+~ELSE
+~RESULT <= \"0\";
+~FI-- lsb end"
     }
   }
 , { "BlackBox" :

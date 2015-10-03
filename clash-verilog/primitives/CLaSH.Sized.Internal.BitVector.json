@@ -139,20 +139,13 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
       => BitVector n -- ARG[1]
       -> Bit"
     , "templateD" :
-"// msb begin
-~GENERATE
-if (~LIT[0] == 0)
-  begin
-    assign ~RESULT = 1'b0;
-  end
-else
-  begin
-    wire ~SIGD[~SYM[0]][1];
-    assign ~SYM[0] = ~ARG[1];
-    assign ~RESULT = ~SYM[0][~LIT[0]-1];
-  end
-~ENDGENERATE
-// msb end"
+"// msb begin~IF ~LIT[0] ~THEN
+wire ~SIGD[~SYM[0]][1];
+assign ~SYM[0] = ~ARG[1];
+assign ~RESULT = ~SYM[0][~LIT[0]-1];
+~ELSE
+assign ~RESULT = 1'b0;
+~FI// msb end"
     }
   }
 , { "BlackBox" :
@@ -161,20 +154,13 @@ else
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
     , "templateD" :
-"// lsb begin
-~GENERATE
-if (~SIZE[~TYP[0]] == 0)
-  begin
-    assign ~RESULT = 1'b0;
-  end
-else
-  begin
-    wire ~SIGD[~SYM[0]][0];
-    assign ~SYM[0] = ~ARG[0];
-    assign ~RESULT = ~SYM[0][0];
-  end
-~ENDGENERATE
-// msb end"
+"// lsb begin~IF ~SIZE[~TYP[0]] ~THEN
+wire ~SIGD[~SYM[0]][0];
+assign ~SYM[0] = ~ARG[0];
+assign ~RESULT = ~SYM[0][0];
+~ELSE
+assign ~RESULT = 1'b0;
+~FI// lsb end"
     }
   }
 , { "BlackBox" :

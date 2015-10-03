@@ -29,6 +29,7 @@ data Element = C   !Text         -- ^ Constant
              | FilePath !Element -- ^ Hole containing a filepath for a data file
              | Gen !Bool         -- ^ Hole marking beginning (True) or end (False)
                                  -- of a generative construct
+             | IF !Element [Element] [Element]
              | SigD [Element] !(Maybe Int)
   deriving Show
 

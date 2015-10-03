@@ -36,7 +36,10 @@ pText = pack <$> pList1 (pRange ('\000','\125'))
 
 -- | Parse a Declaration or Expression element
 pTagD :: Parser Element
-pTagD =  D <$> pDecl
+pTagD =  IF <$> (pTokenWS "~IF" *> pTagE)
+            <*> (pSpaces *> (pToken "~THEN" *> pBlackBoxD))
+            <*> (pToken "~ELSE" *> pBlackBoxD <* pToken "~FI")
+     <|> D <$> pDecl
      <|> pTagE
 
 -- | Parse a Declaration
