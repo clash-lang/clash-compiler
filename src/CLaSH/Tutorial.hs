@@ -654,7 +654,7 @@ a window over the input, where the size of the window matches the number
 of coefficients.
 
 @
-dotp as bs = 'foldl' (+) 0 ('zipWith' (*) as bs)
+dotp as bs = 'sum' ('zipWith' (*) as bs)
 
 fir coeffs x_t = y_t
   where
@@ -662,7 +662,7 @@ fir coeffs x_t = y_t
     xs  = 'window' x_t
 
 topEntity :: 'Signal' ('Signed' 16) -> 'Signal' ('Signed' 16)
-topEntity = fir $('v' [0::'Signal' ('Signed' 16),1,2,3])
+topEntity = fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil')
 @
 
 Here we can see that, although the CλaSH compiler does not support recursion,
@@ -1710,10 +1710,9 @@ to VHDL/Verilog/SystemVerilog (for now):
 * __GADT pattern matching__
 
     While pattern matching for regular ADTs is supported, pattern matching for
-    GADTs is __not__. The 'Vec'tor type, which is also a GADT, is __no__
-    exception! You can use the extraction and indexing functions of
-    "CLaSH.Sized.Vector" to get access to individual ranges / elements of a
-    'Vec'tor.
+    GADTs is __not__. The constructors 'Cons' and 'Nil' of the 'Vec'tor type,
+    which is also a GADT, are __no__ exception! However, you can use the
+    convenient ':>' pattern synonym.
 
 * __Floating point types__
 
