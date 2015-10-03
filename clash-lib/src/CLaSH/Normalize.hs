@@ -111,7 +111,10 @@ normalize' nm = do
                         return (ty',tm')
             let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
             traceIf (nm `elem` usedBndrs)
-                    ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc (fst tmNorm) ++ ") remains recursive after normalization:\n" ++ showDoc (snd tmNorm))
+                    (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
+                            , showDoc (fst tmNorm)
+                            , ") remains recursive after normalization:\n"
+                            , showDoc (snd tmNorm) ])
                     (return ())
             prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
             let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
@@ -122,7 +125,10 @@ normalize' nm = do
             let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
             lvl <- Lens.view dbgLevel
             traceIf (lvl >= DebugFinal)
-                    ($(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " (:: " ++ showDoc resTy ++ ") has a non-representable return type. Not normalising:\n" ++ showDoc tm)
+                    (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "
+                            , showDoc ty
+                            , ") has a non-representable return type."
+                            , " Not normalising:\n", showDoc tm] )
                     (return (toNormalize,(nm,(ty,tm))))
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
