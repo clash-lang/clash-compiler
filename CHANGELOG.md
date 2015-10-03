@@ -1,6 +1,6 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.10
+## 0.10 *October 3rd 2015*
 * New features:
   * The Vec constructor `:>` is now an explicitly bidirectional pattern synonym (the actual constructor has been renamed to Cons).
     As a result, pattern matching on `:>` is now synthesisable by the CLaSH compiler.
@@ -13,8 +13,11 @@
   * Add specialised permutation functions `interleave`, `rotateLeft`, and `rotateRight` in `CLaSH.Sized.Vector`.
   * `sscanl` and `sscanr` in `CLaSH.Sized.Vector` are renamed to `postscanl` and postscanr` to be more in line with existing Haskell packages such as `vector` and `accelerate`.
   * The `Foldable` and `Traversable` instances of `Vec` now only works for non-empty vectors.
-  * 'maxIndex' and 'length' in `CLaSH.Sized.Vector` return an `Int` instead of an `Integer`.
+  * Where possible, members of the `Foldable` instance of `Vec` are described in terms of `fold`, which builds a tree (of depth `log(n)`) of computations, instead of `foldr` which had depth `n` computations.
+    This reduces the critical path length in your circuits when using these functions.
+  * `maxIndex` and `length` in `CLaSH.Sized.Vector` return an `Int` instead of an `Integer`.
   * Add functions that involve an index into a vector to the `CLaSH.Sized.Vector` module: `indices`, `indicesI`, `imap`, `izipWith`, `ifoldr`, `ifoldl`, `findIndex`, `elemIndex`.
+  * `CLaSH.Sized.Vector`'s `fold`, `dfold`, `vfold`, and `toList` are now synthesisable by the CLaSH compiler.
 
 ## 0.9.3 *September 21st 2015*
 * Fixes bugs:
