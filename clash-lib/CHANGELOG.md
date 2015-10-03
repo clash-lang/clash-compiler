@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6
+## 0.6 *October 3rd 2015*
 * New features:
   * Support for `clash-prelude` 0.10
   * Add `~INDEXTYPE` tag: primitives get access to the `Index` clash-prelude type

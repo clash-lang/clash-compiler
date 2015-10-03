@@ -1,8 +1,10 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6
+## 0.6 *October 3rd 2015*
 * New features:
   * Support `clash-prelude-0.10`
+  * Pattern matching on `CLaSH.Sized.Vector`'s `:>` is now supported
+  * Unroll "definitions" of the following primitives: `fold`, `dfold`, `foldr`
 
 ## 0.5.15 *September 21st 2015*
 * New features:
