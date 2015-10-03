@@ -515,16 +515,19 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  , n > 32
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  , n > 32
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  , n > 32
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ b (BlackBoxE _ bs bbCtx b') = do
