@@ -193,7 +193,7 @@ data Vec :: Nat -> * -> * where
 -- >>> f (3:>4:>5:>6:>7:>Nil)
 -- 7
 --
--- Also in conjunctions with ':<':
+-- Also in conjunctions with (':<'):
 --
 -- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
 -- >>> :t g
@@ -395,7 +395,7 @@ infixl 5 :<
 -- >>> f (3:>4:>5:>6:>7:>Nil)
 -- 13
 --
--- Also in conjunctions with ':>':
+-- Also in conjunctions with (':>'):
 --
 -- >>> let g (a :> b :> (_ :< y :< x)) = a + b +  x + y
 -- >>> :t g
