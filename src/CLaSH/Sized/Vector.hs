@@ -84,7 +84,7 @@ module CLaSH.Sized.Vector
     -- * Conversions
   , toList
     -- * Misc
-  , lazyV, asNatProxy
+  , lazyV, VCons, asNatProxy
     -- * Primitives
     -- ** 'Eq' instance
   , eq#
@@ -119,6 +119,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, withSNat, toUNat)
+import CLaSH.Promoted.Nat.Unsafe  (unsafeSNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
 
@@ -1680,8 +1681,15 @@ dfold _ _ z Nil                        = z
 dfold p f z (x `Cons` (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
 {-# NOINLINE dfold #-}
 
-data V (a :: *) (f :: TyFun Nat *) :: *
-type instance Apply (V a) l = Vec l a
+-- | To be used as the motive /p/ for 'dfold', when the /f/ in \"'dfold' @p f@\"
+-- is a variation on (':>'), e.g.:
+--
+-- @
+-- map' :: KnownNat k => (a -> b) -> Vec n a -> Vec n b
+-- map' f = 'dfold' (Proxy :: Proxy ('VCons' a)) (\_ x xs -> f x :> xs)
+-- @
+data VCons (a :: *) (f :: TyFun Nat *) :: *
+type instance Apply (VCons a) l = Vec l a
 
 -- | Specialised version of 'dfold' that builds a triangular computational
 -- structure.
@@ -1705,7 +1713,7 @@ type instance Apply (V a) l = Vec l a
 vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
-vfold f xs = dfold (Proxy :: Proxy (V a)) (const f) Nil xs
+vfold f xs = dfold (Proxy :: Proxy (VCons a)) (const f) Nil xs
 {-# INLINE vfold #-}
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
