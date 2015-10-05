@@ -1666,7 +1666,7 @@ lazyV = lazyV' (repeat undefined)
 -- We now see that @append'@ has the appropriate type:
 --
 -- >>> :t append'
--- append' :: Vec k a -> Vec m a -> Vec (k + m) a
+-- append' :: KnownNat k => Vec k a -> Vec m a -> Vec (k + m) a
 --
 -- And that it works:
 --
