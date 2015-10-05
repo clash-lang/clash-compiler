@@ -162,9 +162,9 @@ import CLaSH.Class.BitPack (BitPack (..))
 -- >>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
 -- >>> type instance Apply (Append m a) l = Vec (l + m) a
 -- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
--- >>> let cs a b     = if a > b then (a,b) else (b,a)
--- >>> let csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' :< y'
--- >>> let csSort     = vfold csRow
+-- >>> let compareSwap a b = if a > b then (a,b) else (b,a)
+-- >>> let insert y xs     = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
+-- >>> let insertionSort   = vfold insert
 
 infixr 5 `Cons`
 -- | Fixed size vectors.
@@ -1701,17 +1701,17 @@ type instance Apply (VCons a) l = Vec l a
 -- Example:
 --
 -- @
--- cs a b     = if a > b then (a,b) else (b,a)
--- csRow y xs = let (y',xs') = 'mapAccumL' cs y xs in xs' ':<' y'
--- csSort     = 'vfold' csRow
+-- compareSwap a b = if a > b then (a,b) else (b,a)
+-- insert y xs     = let (y',xs') = 'mapAccumL' compareSwap y xs in xs' ':<' y'
+-- insertionSort   = 'vfold' insert
 -- @
 --
 -- Builds a triangular structure of compare and swaps to sort a row.
 --
--- >>> csSort (7 :> 3 :> 9 :> 1 :> Nil)
+-- >>> insertionSort (7 :> 3 :> 9 :> 1 :> Nil)
 -- <1,3,7,9>
 --
--- The circuit layout of @csSort@, build using 'vfold', is:
+-- The circuit layout of @insertionSort@, build using 'vfold', is:
 --
 -- <<doc/csSort.svg>>
 vfold :: KnownNat k
