@@ -1672,13 +1672,17 @@ lazyV = lazyV' (repeat undefined)
 --
 -- >>> append' (1 :> 2 :> Nil) (3 :> 4 :> Nil)
 -- <1,2,3,4>
-dfold :: Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
-      -> (forall l . Proxy l -> a -> (p $ l) -> (p $ (l + 1))) -- ^ Function to fold
+dfold :: forall p k a . KnownNat k
+      => Proxy (p :: TyFun Nat * -> *) -- ^ The /motive/
+      -> (forall l . SNat l -> a -> (p $ l) -> (p $ (l + 1))) -- ^ Function to fold
       -> (p $ 0) -- ^ Initial element
       -> Vec k a -- ^ Vector to fold over
       -> (p $ k)
-dfold _ _ z Nil                        = z
-dfold p f z (x `Cons` (xs :: Vec l a)) = f (Proxy :: Proxy l) x (dfold p f z xs)
+dfold _ f z xs = go (natVal (asNatProxy xs) - 1) xs
+  where
+    go :: Integer -> Vec n a -> (p $ n)
+    go _ Nil                        = z
+    go i (y `Cons` (ys :: Vec z a)) = f (unsafeSNat i :: SNat z) y (go (i-1) ys)
 {-# NOINLINE dfold #-}
 
 -- | To be used as the motive /p/ for 'dfold', when the /f/ in \"'dfold' @p f@\"
@@ -1710,7 +1714,8 @@ type instance Apply (VCons a) l = Vec l a
 -- The circuit layout of @csSort@, build using 'vfold', is:
 --
 -- <<doc/csSort.svg>>
-vfold :: (forall l . a -> Vec l b -> Vec (l + 1) b)
+vfold :: KnownNat k
+      => (forall l . a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
 vfold f xs = dfold (Proxy :: Proxy (VCons a)) (const f) Nil xs
