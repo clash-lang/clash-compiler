@@ -17,4 +17,4 @@ import CLaSH.Promoted.Nat (SNat (..))
 -- | I hope you know what you're doing
 unsafeSNat :: Integer -> SNat k
 unsafeSNat i = reifyNat i (unsafeCoerce . SNat)
-{-# INLINE unsafeSNat #-}
+{-# NOINLINE unsafeSNat #-}

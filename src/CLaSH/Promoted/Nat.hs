@@ -21,9 +21,11 @@ module CLaSH.Promoted.Nat
   )
 where
 
-import Data.Proxy
-import GHC.TypeLits
-import Unsafe.Coerce
+import Data.Proxy      (Proxy (..))
+import Data.Reflection (reifyNat)
+import GHC.TypeLits    (KnownNat, Nat, type (+), type (-), type (*), type (^),
+                        natVal)
+import Unsafe.Coerce   (unsafeCoerce)
 
 -- | Singleton value for a type-level natural number 'n'
 --
@@ -91,17 +93,21 @@ powUNat _ UZero     = USucc UZero
 powUNat x (USucc y) = multUNat x (powUNat x y)
 
 -- | Add two singleton natural numbers
-addSNat :: KnownNat (a + b) => SNat a -> SNat b -> SNat (a+b)
-addSNat _ _ = snat
+addSNat :: SNat a -> SNat b -> SNat (a+b)
+addSNat x y = reifyNat (snatToInteger x + snatToInteger y) (unsafeCoerce . SNat)
+{-# NOINLINE addSNat #-}
 
 -- | Subtract two singleton natural numbers
-subSNat :: KnownNat (a - b) => SNat a -> SNat b -> SNat (a-b)
-subSNat _ _ = snat
+subSNat :: SNat a -> SNat b -> SNat (a-b)
+subSNat x y = reifyNat (snatToInteger x - snatToInteger y) (unsafeCoerce . SNat)
+{-# NOINLINE subSNat #-}
 
 -- | Multiply two singleton natural numbers
-mulSNat :: KnownNat (a * b) => SNat a -> SNat b -> SNat (a*b)
-mulSNat _ _ = snat
+mulSNat :: SNat a -> SNat b -> SNat (a*b)
+mulSNat x y = reifyNat (snatToInteger x * snatToInteger y) (unsafeCoerce . SNat)
+{-# NOINLINE mulSNat #-}
 
 -- | Power of two singleton natural numbers
-powSNat :: KnownNat (a ^ b) => SNat a -> SNat b -> SNat (a^b)
-powSNat _ _ = snat
+powSNat :: SNat a -> SNat b -> SNat (a^b)
+powSNat x y = reifyNat (snatToInteger x ^ snatToInteger y) (unsafeCoerce . SNat)
+{-# NOINLINE powSNat #-}
