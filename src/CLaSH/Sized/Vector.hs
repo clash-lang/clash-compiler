@@ -118,7 +118,8 @@ import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, withSNat, toUNat)
+import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, snatToInteger,
+                                   withSNat, toUNat)
 import CLaSH.Promoted.Nat.Unsafe  (unsafeSNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
@@ -1497,11 +1498,17 @@ rotateRight xs i = map ((xs !!) . (`mod` len)) (iterateI (+1) i')
 -- <2,3,4,1>
 --
 -- __NB:__ use `rotateLeft` if you want to rotate left by a /dynamic/ amount.
-rotateLeftS :: Vec (d + n) a
+rotateLeftS :: KnownNat n
+            => Vec n a
             -> SNat d
-            -> Vec (n + d) a
-rotateLeftS xs d = let (l,r) = splitAt d xs in r ++ l
-{-# INLINE rotateLeftS #-}
+            -> Vec n a
+rotateLeftS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
+  where
+    go :: Integer -> Vec k a -> Vec k a
+    go _ Nil           = Nil
+    go 0 ys            = ys
+    go n (y `Cons` ys) = go (n-1) (ys :< y)
+{-# NOINLINE rotateLeftS #-}
 
 -- | /Statically/ rotate a 'Vec'tor to the right:
 --
@@ -1510,12 +1517,16 @@ rotateLeftS xs d = let (l,r) = splitAt d xs in r ++ l
 -- <4,1,2,3>
 --
 -- __NB:__ use `rotateRight` if you want to rotate right by a /dynamic/ amount.
-rotateRightS :: forall n d a . (KnownNat n)
-             => Vec (n + d) a
+rotateRightS :: KnownNat n
+             => Vec n a
              -> SNat d
-             -> Vec (d + n) a
-rotateRightS xs _ = let (l,r) = splitAtI xs :: (Vec n a, Vec d a) in r ++ l
-{-# INLINE rotateRightS #-}
+             -> Vec n a
+rotateRightS xs d = go (snatToInteger d `mod` natVal (asNatProxy xs)) xs
+  where
+    go _ Nil            = Nil
+    go 0 ys             = ys
+    go n ys@(Cons _ _)  = go (n-1) (last ys :> init ys)
+{-# NOINLINE rotateRightS #-}
 
 -- | Convert a vector to a list.
 --
