@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.1
+* New features:
+  * The `f` in `dfold p f`, now has an `SNat l` instead of a `Proxy l` as its first argument.
+
 ## 0.10 *October 3rd 2015*
 * New features:
   * The Vec constructor `:>` is now an explicitly bidirectional pattern synonym (the actual constructor has been renamed to Cons).
