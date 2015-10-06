@@ -4,6 +4,9 @@
 * New features:
   * Support for `clash-prelude` 0.10.1
 
+* Fixes bugs:
+  * clash won't run when not compiled with usual ghc [#82](https://github.com/clash-lang/clash-compiler/issues/82)
+
 ## 0.6 *October 3rd 2015*
 * New features:
   * Support `clash-prelude-0.10`
