@@ -96,6 +96,7 @@ main =
         , testGroup "Vector"
             [ runTest ("tests" </> "shouldwork" </> "Vector") Both [] "EnumTypes" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold2" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "FindIndex" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Fold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Foldr" (Just ("testbench",True))
