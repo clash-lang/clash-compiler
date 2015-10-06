@@ -10,4 +10,28 @@
     , "templateE" : "~LIT[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.addSNat"
+    , "type"      : "CLaSH.Promoted.Nat.addSNat :: SNat a -> SNat b -> SNat (a + b)"
+    , "templateE" : "~LIT[0] + ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.subSNat"
+    , "type"      : "CLaSH.Promoted.Nat.subSNat :: SNat a -> SNat b -> SNat (a - b)"
+    , "templateE" : "~LIT[0] - ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.mulSNat"
+    , "type"      : "CLaSH.Promoted.Nat.mulSNat :: SNat a -> SNat b -> SNat (a * b)"
+    , "templateE" : "~LIT[0] * ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.powSNat"
+    , "type"      : "CLaSH.Promoted.Nat.powSNat :: SNat a -> SNat b -> SNat (a ^ b)"
+    , "templateE" : "~LIT[0] ** ~LIT[1]"
+    }
+  }
 ]

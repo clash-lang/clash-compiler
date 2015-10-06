@@ -802,12 +802,10 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                    in  reduceFoldr n aTy bTy fun start arg
               else return e
           _ -> return e
-      "CLaSH.Sized.Vector.dfold" | length args == 7 ->
-        let [_mTy,nTy,aTy] = Either.rights args
+      "CLaSH.Sized.Vector.dfold" | length args == 8 ->
+        let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case nTy of
-          (LitTy (NumTy n)) ->
-            let [_motive,fun,start,arg] = Either.lefts args
-            in  reduceDFold n aTy fun start arg
+          (LitTy (NumTy n)) -> reduceDFold n aTy fun start arg
           _ -> return e
       "CLaSH.Sized.Vector.++" | length args == 5 ->
         let [nTy,aTy,mTy] = Either.rights args

@@ -426,4 +426,46 @@ genvar ~SYM[1];
 // unconcatBitVector end"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.rotateLeftS"
+    , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
+    , "templateD" :
+"// rotateLeftS begin
+~SIGD[~SYM[1]][1];
+localparam shift_amount_~SYM[2] = ~LIT[2] % ~LIT[0];
+
+assign ~SYM[1] = ~ARG[1];
+
+~GENERATE
+if (shift_amount_~SYM[2] == 0) begin : no_shift_~SYM[3]
+  assign ~RESULT = ~SYM[1];
+end else begin : do_shift_~SYM[4]
+  assign ~RESULT[0:~LIT[0]-shift_amount_~SYM[2]-1] = ~SYM[1][shift_amount_~SYM[2]:~LIT[0]-1];
+  assign ~RESULT[shift_amount_~SYM[2]:~LIT[0]-1] = ~SYM[1][0 to shift_amount_~SYM[2]-1];
+end
+~ENDGENERATE
+// rotateLeftS end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Vector.rotateRightS"
+    , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
+    , "templateD" :
+"// rotateRightS begin
+~SIGD[~SYM[1]][1];
+localparam shift_amount_~SYM[2] = ~LIT[2] % ~LIT[0];
+
+assign ~SYM[1] = ~ARG[1];
+
+~GENERATE
+if (shift_amount_~SYM[2] == 0) begin : no_shift_~SYM[3]
+  assign ~RESULT = ~SYM[1];
+end else begin : do_shift_~SYM[4]
+  assign ~RESULT[0:shift_amount_~SYM[2]-1] = ~SYM[1][~LIT[0]-shift_amount_~SYM[2]:~LIT[0]-1];
+  assign ~RESULT[shift_amount_~SYM[2]:~LIT[0]-1] = ~SYM[1][0:~LIT[0]-shift_amount_~SYM[2]-1];
+end
+~ENDGENERATE
+// rotateRightS end"
+    }
+  }
 ]

@@ -25,10 +25,13 @@ module CLaSH.Normalize.PrimitiveReductions where
 import qualified Control.Lens                     as Lens
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.Maybe                       as Maybe
+import           Data.Text                        (pack)
 import           Unbound.Generics.LocallyNameless (bind, embed, rec, rebind,
-                                                   string2Name)
+                                                   string2Name, name2String)
 
-import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys)
+import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys,
+                                                   dcName, dcType)
+import           CLaSH.Core.Literal               (Literal (..))
 import           CLaSH.Core.Term                  (Term (..), Pat (..))
 import           CLaSH.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), mkFunTy,
@@ -45,8 +48,6 @@ import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
 import           CLaSH.Util
-
--- import CLaSH.Core.Pretty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.zipWith@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -275,21 +276,34 @@ reduceDFold n aTy fun start arg = do
         [_,consCon]      = tyConDataCons vecTc
         (vars,elems)     = second concat . unzip
                          $ extractElems consCon aTy 'D' n arg
-    ([_ltv,Right dsTy,_etaTy,_eta1Ty],_) <- splitFunForallTy <$> termType tcm fun
-    let (TyConApp proxyTcNm _) = tyView dsTy
-        (Just proxyTc) = HashMap.lookup proxyTcNm tcm
-        [proxyDc]      = tyConDataCons proxyTc
-        lbody          = doFold (Data proxyDc) (n-1) vars
-        lb             = Letrec (bind (rec (init elems)) lbody)
+    ([_ltv,Right snTy,_etaTy,_eta1Ty],_) <- splitFunForallTy <$> termType tcm fun
+    let (TyConApp snatTcNm _) = tyView snTy
+        (Just snatTc)         = HashMap.lookup snatTcNm tcm
+        [snatDc]              = tyConDataCons snatTc
+
+        ([_nTv,_kn,Right pTy],_) = splitFunForallTy (dcType snatDc)
+        (TyConApp proxyTcNm _)   = tyView pTy
+        (Just proxyTc)           = HashMap.lookup proxyTcNm tcm
+        [proxyDc]                = tyConDataCons proxyTc
+
+        buildSNat i = mkApps (Prim (pack (name2String (dcName snatDc)))
+                                   (dcType snatDc))
+                             [Right (LitTy (NumTy i))
+                             ,Left (Literal (IntegerLiteral (toInteger i)))
+                             ,Left (mkApps (Data proxyDc)
+                                           [Right typeNatKind
+                                           ,Right (LitTy (NumTy i))])
+                             ]
+        lbody = doFold buildSNat (n-1) vars
+        lb    = Letrec (bind (rec (init elems)) lbody)
     changed lb
   where
-    doFold _   _ []     = start
-    doFold pDc k (x:xs) = mkApps fun
+    doFold _    _ []     = start
+    doFold snDc k (x:xs) = mkApps fun
                                  [Right (LitTy (NumTy k))
-                                 ,Left (mkApps pDc [Right typeNatKind
-                                                   ,Right (LitTy (NumTy k))])
+                                 ,Left (snDc k)
                                  ,Left x
-                                 ,Left (doFold pDc (k-1) xs)
+                                 ,Left (doFold snDc (k-1) xs)
                                  ]
 
 -- | Replace an application of the @CLaSH.Sized.Vector.head@ primitive on

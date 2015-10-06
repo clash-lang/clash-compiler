@@ -1,0 +1,7 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.Unsafe.unsafeSNat"
+    , "type"      : "CLaSH.Promoted.Nat.Unsafe.unsafeSNat :: Integer -> SNat k"
+    , "templateE" : "~LIT[0]"
+    }
+  }
+]
