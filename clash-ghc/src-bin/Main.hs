@@ -64,7 +64,6 @@ import Data.List
 import Data.Maybe
 
 -- clash additions
-import           System.Process (runInteractiveCommand, waitForProcess)
 import           Paths_clash_ghc
 import           InteractiveUI (makeHDL)
 import           Exception (gcatch)
@@ -80,23 +79,7 @@ import           CLaSH.Driver.Types (CLaSHOpts (..))
 import           CLaSH.GHC.CLaSHFlags
 import           CLaSH.Rewrite.Types (DebugLevel (..))
 import           CLaSH.Util (clashLibVersion)
-
-ghcLibDir :: IO FilePath
-ghcLibDir = do (libDir,exitCode) <- getProcessOutput "ghc --print-libdir"
-               case exitCode of
-                  ExitSuccess   -> return libDir
-                  ExitFailure i -> error $ "Calling GHC failed with: " ++ show i
-
-getProcessOutput :: String -> IO (String, ExitCode)
-getProcessOutput command =
-     -- Create the process
-  do (_, pOut, _, handle) <- runInteractiveCommand command
-     -- Wait for the process to finish and store its exit code
-     exitCode <- waitForProcess handle
-     -- Get the standard output.
-     output   <- hGetLine pOut
-     -- return both the output and the exit code.
-     return (output, exitCode)
+import           CLaSH.GHC.LoadModules (ghcLibDir)
 
 -----------------------------------------------------------------------------
 -- ToDo:
