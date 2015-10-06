@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell     #-}
 module CLaSH.GHC.LoadModules
   ( loadModules
+  , ghcLibDir
   )
 where
 
@@ -41,7 +42,7 @@ import           CLaSH.GHC.LoadInterfaceFiles
 import           CLaSH.Util                   (curLoc,first)
 
 ghcLibDir :: IO FilePath
-ghcLibDir = do (libDir,exitCode) <- getProcessOutput "ghc --print-libdir"
+ghcLibDir = do (libDir,exitCode) <- getProcessOutput $ "ghc-" ++ TOOL_VERSION_ghc ++ " --print-libdir"
                case exitCode of
                   ExitSuccess   -> return libDir
                   ExitFailure i -> error $ "Calling GHC failed with: " ++ show i
