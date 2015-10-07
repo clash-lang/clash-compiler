@@ -4,6 +4,9 @@
 * New features:
   * Support for `clash-prelude` 0.10.1
 
+* Fixes bugs:
+  * Case-statements acting like normal decoder circuits are erroneously synthesised to priority decoder circuits.
+
 ## 0.6 *October 3rd 2015*
 * New features:
   * Support for `clash-prelude` 0.10
