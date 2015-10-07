@@ -487,15 +487,15 @@ appProp _ e = return e
 -- GHC generates Core that looks like:
 --
 -- @
--- f = \(x :: Unsigned 4) -> case x == 3 of
---                             False -> case x == 2 of
---                               False -> case x == 1 of
---                                 False -> case x == 0 of
+-- f = \(x :: Unsigned 4) -> case x == fromInteger 3 of
+--                             False -> case x == fromInteger 2 of
+--                               False -> case x == fromInteger 1 of
+--                                 False -> case x == fromInteger 0 of
 --                                   False -> error "incomplete case"
---                                   True  -> 3
---                                 True -> 2
---                               True -> 1
---                             True -> 0
+--                                   True  -> fromInteger 3
+--                                 True -> fromInteger 2
+--                               True -> fromInteger 1
+--                             True -> fromInteger 0
 -- @
 --
 -- Which would result in a priority decoder circuit where a normal decoder
@@ -506,10 +506,10 @@ appProp _ e = return e
 -- @
 -- f = \(x :: Unsigned 4) -> case x of
 --        _ -> error "incomplete case"
---        0 -> 3
---        1 -> 2
---        2 -> 1
---        3 -> 0
+--        0 -> fromInteger 3
+--        1 -> fromInteger 2
+--        2 -> fromInteger 1
+--        3 -> fromInteger 0
 -- @
 caseFlat :: NormRewrite
 caseFlat _ e@(Case (collectArgs -> (Prim nm _,args)) ty _)
