@@ -286,7 +286,7 @@ preserveVarEnv action = do
   curCompNm .= vComp
   return val
 
-dcToLiteral :: HWType -> Int -> Expr
-dcToLiteral Bool 1 = HW.Literal Nothing (BoolLit False)
-dcToLiteral Bool 2 = HW.Literal Nothing (BoolLit True)
-dcToLiteral t i    = HW.Literal (Just  (t,conSize t)) (NumLit (toInteger i-1))
+dcToLiteral :: HWType -> Int -> Literal
+dcToLiteral Bool 1 = BoolLit False
+dcToLiteral Bool 2 = BoolLit True
+dcToLiteral _ i    = NumLit (toInteger i-1)

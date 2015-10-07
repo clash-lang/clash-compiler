@@ -102,7 +102,7 @@ data Declaration
   -- * Signal to assign
   --
   -- * Assigned expression
-  | CondAssignment !Identifier !HWType !Expr [(Maybe Expr,Expr)]
+  | CondAssignment !Identifier !HWType !Expr !HWType [(Maybe Literal,Expr)]
   -- ^ Conditional signal assignment:
   --
   -- * Signal to assign
@@ -110,6 +110,8 @@ data Declaration
   -- * Type of the result/alternatives
   --
   -- * Scrutinized expression
+  --
+  -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl !Identifier !Identifier [(Identifier,Expr)] -- ^ Instantiation of another component

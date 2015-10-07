@@ -21,13 +21,15 @@ normalization = etaTL >-> constantPropgation >-!-> anf >-!-> rmDeadcode >->
     evalConst  = topdownR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
 
+
 constantPropgation :: NormRewrite
-constantPropgation = propagate >-> repeatR inlineAndPropagate >-> lifting >-> spec
+constantPropgation = propagate >-> repeatR inlineAndPropagate >-> caseFlattening >-> lifting >-> spec
   where
     propagate = innerMost (applyMany transInner)
     inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
     lifting   = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
     spec      = bottomupR (applyMany specRws)
+    caseFlattening = repeatR (topdownR (apply "caseFlat" caseFlat))
 
     transInner :: [(String,NormRewrite)]
     transInner = [ ("applicationPropagation", appProp        )

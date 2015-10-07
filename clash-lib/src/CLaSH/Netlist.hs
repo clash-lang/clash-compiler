@@ -213,15 +213,15 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr (reverse exprs)]
+  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy (reverse exprs)]
   where
-    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe Expr,Expr),[Declaration])
+    mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
       (altExpr,altDecls) <- mkExpr False altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
         DataPat (Embed dc) _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
-        LitPat  (Embed (IntegerLiteral i)) -> return (Just (HW.Literal Nothing (NumLit $ fromInteger i)),altExpr)
+        LitPat  (Embed (IntegerLiteral i)) -> return (Just (NumLit $ fromInteger i),altExpr)
         _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
 
     mkScrutExpr :: HWType -> Pat -> Expr -> Expr

@@ -434,15 +434,24 @@ inst_ :: Declaration -> VHDLM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   text id_ <+> larrow <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ _ scrut es) = fmap Just $
+inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
+  text id_ <+> larrow
+           <+> align (vsep (sequence [expr_ False t <+> "when" <+>
+                                      expr_ False scrut <+> "else"
+                                     ,expr_ False f <> semi
+                                     ]))
+  where
+    (t,f) = if b then (l,r) else (r,l)
+
+inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <$>
       indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds es)) <> semi))
   where
-    conds :: [(Maybe Expr,Expr)] -> VHDLM [Doc]
+    conds :: [(Maybe Literal,Expr)] -> VHDLM [Doc]
     conds []                = return []
     conds [(_,e)]           = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
-    conds ((Just c ,e):es') = expr_ False e <+> "when" <+> parens (expr_ True c) <:> conds es'
+    conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
 inst_ (InstDecl nm lbl pms) = fmap Just $
     nest 2 $ text lbl <+> colon <+> "entity"
@@ -587,6 +596,19 @@ exprLit _             (BoolLit t)   = if t then "true" else "false"
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = text . T.pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
+
+patLit :: HWType -> Literal -> VHDLM Doc
+patLit Integer (NumLit i) =
+  let integerLow  = -2^(31 :: Integer) :: Integer
+      integerHigh = 2^(31 :: Integer) - 1 :: Integer
+      i' = if i < integerLow
+              then integerLow
+              else if i > integerHigh
+                   then integerHigh
+                   else i
+  in  parenIf (i' < 0) (integer i')
+patLit hwTy (NumLit i) = bits (toBits (conSize hwTy) i)
+patLit _    l          = exprLit Nothing l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)

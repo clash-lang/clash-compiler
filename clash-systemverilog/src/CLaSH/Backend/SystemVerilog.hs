@@ -270,7 +270,7 @@ inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ _ scrut [(Just (Literal _ (BoolLit b)), l),(_,r)]) = fmap Just $
+inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
     "always_comb begin" <$>
     indent 2 ("if" <> parens (expr_ True scrut) <$>
                 (indent 2 $ text id_ <+> equals <+> expr_ False t <> semi) <$>
@@ -280,18 +280,18 @@ inst_ (CondAssignment id_ _ scrut [(Just (Literal _ (BoolLit b)), l),(_,r)]) = f
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut es) = fmap Just $
+inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     "always_comb begin" <$>
     indent 2 ("case" <> parens (expr_ True scrut) <$>
                 (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
               "endcase") <$>
     "end"
   where
-    conds :: [(Maybe Expr,Expr)] -> SystemVerilogM [Doc]
+    conds :: [(Maybe Literal,Expr)] -> SystemVerilogM [Doc]
     conds []                = return []
     conds [(_,e)]           = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
     conds ((Nothing,e):_)   = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
-    conds ((Just c ,e):es') = (expr_ True c <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> conds es'
+    conds ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> conds es'
 
 inst_ (InstDecl nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
