@@ -2,18 +2,24 @@ module CLaSH.GHC.GenerateBindings
   (generateBindings)
 where
 
+import           Control.Lens            ((%~),(&))
 import           Control.Monad.State     (State)
 import qualified Control.Monad.State     as State
 import           Data.Either             (lefts, rights)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
+import           Data.IntMap.Strict      (IntMap)
+import qualified Data.IntMap.Strict      as IM
 import           Data.List               (isSuffixOf)
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (name2String, runFreshM, unembed)
 
+import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
 import qualified DynFlags                as GHC
+import qualified TyCon                   as GHC
+import qualified TysWiredIn              as GHC
 
 import           CLaSH.Annotations.TopEntity (TopEntity)
 import           CLaSH.Core.FreeVars     (termFreeIds)
@@ -25,8 +31,8 @@ import           CLaSH.Core.Subst        (substTms)
 import           CLaSH.Core.Util         (mkLams, mkTyLams, termType)
 import           CLaSH.Core.Var          (Var (..))
 import           CLaSH.Driver.Types      (BindingMap)
-import           CLaSH.GHC.GHC2Core      (GHC2CoreState, coreToId, coreToTerm,
-                                          makeAllTyCons, emptyGHC2CoreState)
+import           CLaSH.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
+                                          makeAllTyCons, qualfiedNameString, emptyGHC2CoreState)
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types  (PrimMap)
@@ -37,16 +43,17 @@ generateBindings ::
   PrimMap
   -> String
   -> Maybe  (GHC.DynFlags)
-  -> IO (BindingMap,HashMap TyConName TyCon,Maybe TopEntity)
+  -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName,Maybe TopEntity)
 generateBindings primMap modName dflagsM = do
   (bindings,clsOps,unlocatable,fiEnvs,topEntM) <- loadModules modName dflagsM
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
-      tcCache                       = makeAllTyCons tcMap fiEnvs
+      (tcMap',tupTcCache)           = mkTupTyCons tcMap
+      tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
       clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
       droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings
-  return (droppedAndRetypedBindings,allTcCache,topEntM)
+  return (droppedAndRetypedBindings,allTcCache,tupTcCache,topEntM)
 
 dropAndRetypeBindings :: HashMap TyConName TyCon -> BindingMap -> BindingMap
 dropAndRetypeBindings allTcCache allBindings = oBindings
@@ -131,7 +138,7 @@ mkClassSelector tcm ty sel = newExpr
     newExpr = case coreView tcm dictTy of
       (TyConApp _ _) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
                           (dcId,dcVar) <- mkInternalVar "dict" dictTy
-                          selE         <- mkSelectorCase "mkClassSelector" tcm [] dcVar 1 sel
+                          selE         <- mkSelectorCase "mkClassSelector" tcm dcVar 1 sel
                           return (mkTyLams (mkLams selE [dcId]) tvs)
       (FunTy arg res) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
                            (dcId,dcVar) <- mkInternalVar "dict" (mkFunTy arg res)
@@ -139,3 +146,12 @@ mkClassSelector tcm ty sel = newExpr
       (OtherType oTy) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
                            (dcId,dcVar) <- mkInternalVar "dict" oTy
                            return (mkTyLams (mkLams dcVar [dcId]) tvs)
+
+mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
+mkTupTyCons tcMap = (tcMap'',tupTcCache)
+  where
+    tupTyCons        = map (GHC.tupleTyCon GHC.BoxedTuple) [2..62]
+    (tcNames,tcMap') = State.runState (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique qualfiedNameString tc) tupTyCons) tcMap
+    tupTcCache       = IM.fromList (zip [2..62] tcNames)
+    tupHM            = HashMap.fromList (zip tcNames tupTyCons)
+    tcMap''          = tcMap' & tyConMap %~ (`HashMap.union` tupHM)

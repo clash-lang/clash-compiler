@@ -8,8 +8,11 @@
 
 module CLaSH.GHC.GHC2Core
   ( GHC2CoreState
+  , tyConMap
   , coreToTerm
   , coreToId
+  , coreToName
+  , qualfiedNameString
   , makeAllTyCons
   , emptyGHC2CoreState
   )

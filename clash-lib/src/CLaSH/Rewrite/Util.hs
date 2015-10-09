@@ -440,12 +440,11 @@ mkWildValBinder = fmap fst . mkInternalVar "wild"
 mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
                => String -- ^ Name of the caller of this function
                -> HashMap TyConName TyCon -- ^ TyCon cache
-               -> [CoreContext] -- ^ Transformation Context in which this function is called
                -> Term -- ^ Subject of the case-composition
                -> Int -- n'th DataCon
                -> Int -- n'th field
                -> m Term
-mkSelectorCase caller tcm _ scrut dcI fieldI = do
+mkSelectorCase caller tcm scrut dcI fieldI = do
   scrutTy <- termType tcm scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
   case coreView tcm scrutTy of

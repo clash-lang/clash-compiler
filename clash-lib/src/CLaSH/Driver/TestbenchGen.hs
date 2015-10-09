@@ -11,6 +11,7 @@ import           Control.Concurrent.Supply        (Supply)
 import           Control.Lens                     ((.=))
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
+import           Data.IntMap.Strict               (IntMap)
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (catMaybes,mapMaybe)
 import           Data.Text.Lazy                   (append,pack,splitOn)
@@ -40,6 +41,7 @@ genTestBench :: CLaSHOpts
              -> PrimMap                      -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
+             -> IntMap TyConName
              -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
              -> Int
              -> HashMap TmName (Type,Term)   -- ^ Global binders
@@ -49,7 +51,7 @@ genTestBench :: CLaSHOpts
              -> [(String,FilePath)]          -- ^ Set of collected data-files
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],[(String,FilePath)])
-genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM expectedNmM modName dfiles
+genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimuliNmM expectedNmM modName dfiles
   (Component cName hidden [inp] [outp] _) = do
   let ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
@@ -99,9 +101,9 @@ genTestBench opts supply primMap typeTrans tcm eval cmpCnt globals stimuliNmM ex
                     -> TmName
                     -> HashMap TmName (Type,Term)
     normalizeSignal glbls bndr =
-      runNormalization opts supply glbls typeTrans tcm eval (normalize [bndr] >>= cleanupGraph bndr)
+      runNormalization opts supply glbls typeTrans tcm tupTcm eval (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench opts _ _ _ _ _ _ _ _ _ _ dfiles c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
+genTestBench opts _ _ _ _ _ _ _ _ _ _ _ dfiles c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
 
 genClock :: PrimMap
          -> (Identifier,HWType)

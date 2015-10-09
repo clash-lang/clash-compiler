@@ -13,6 +13,7 @@ import Control.Monad
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.HashMap.Strict                   (HashMap)
+import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import Unbound.Generics.LocallyNameless      (Fresh (..))
 import Unbound.Generics.LocallyNameless.Name (Name (..))
@@ -77,6 +78,8 @@ data RewriteEnv
   -- ^ Hardcode Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon
   -- ^ TyCon cache
+  , _tupleTcCache   :: IntMap TyConName
+  -- ^ Tuple TyCon cache
   , _evaluator      :: HashMap TyConName TyCon -> Bool -> Term -> Term
   -- ^ Hardcoded evaluator (delta-reduction)}
   }

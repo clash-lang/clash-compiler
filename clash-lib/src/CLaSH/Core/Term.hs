@@ -57,7 +57,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Show,Generic,NFData,Alpha)
+  deriving (Eq,Show,Generic,NFData,Alpha)
 
 instance Eq Term where
   (==) = aeq
