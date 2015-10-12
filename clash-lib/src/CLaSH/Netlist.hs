@@ -199,7 +199,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
                                         -- When element and subject have the same HW-type,
                                         -- then the projections is just the identity
                                         | otherwise      -> Just (DC (Void,0))
-        _                      -> error $ $(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection: " ++ showDoc e
+        _ -> Nothing
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return (decls ++ [Assignment dstId extractExpr])
 

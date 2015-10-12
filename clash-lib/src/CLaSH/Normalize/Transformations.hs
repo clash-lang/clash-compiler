@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -38,6 +40,7 @@ import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
 import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
+import qualified Data.Foldable               as Foldable
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.IntMap.Strict          as IM
 import qualified Data.List                   as List
@@ -983,176 +986,170 @@ reduceNonRepPrim _ e = return e
 --- @
 disjointExpressionConsolidation :: NormRewrite
 disjointExpressionConsolidation _ e@(Case _scrut _ty _alts) = do
-    (e',_,collected) <- collectGlobals [] [] e
-    let (disJoint,notDisJoint) = List.partition (\x -> any (isDisjointFrom x) collected) collected
+    (_,collected) <- collectGlobals [] [] e
+    let disJoint = filter (isDisjoint . snd) collected
     if null disJoint
        then return e
        else do
-         let groups = List.groupBy ((==) `on` fst) disJoint
-         (exprs,locs) <- unzip <$> mapM mkDisjointGroup groups
+         exprs <- mapM mkDisjointGroup disJoint
          tcm <- Lens.view tcCache
-         exprTys <- mapM (termType tcm) exprs
-         (lids,lvs) <- unzip <$> Monad.zipWithM (\i -> mkInternalVar ("dj" ++ show i)) [(0::Integer)..] exprTys
-         let ds    = concat (zipWith (\lcs v -> map (,v) lcs) locs lvs)
-             exprs' = map (repSubst notDisJoint ds) exprs
-             e''  = repSubst notDisJoint ds e'
-             lb   = Letrec (bind (rec (zip lids (map embed exprs'))) e'')
+         (lids,lvs) <- unzip <$> Monad.zipWithM (mkFunOut tcm) disJoint exprs
+         let substitution = zip (map fst disJoint) lvs
+         (exprs',_) <- unzip <$> Monad.zipWithM (\s e' -> collectGlobals s [] e')
+                                                (l2m substitution)
+                                                exprs
+         (e',_) <- collectGlobals substitution [] e
+         let lb = Letrec (bind (rec (zip lids (map embed exprs'))) e')
          traceIf True ("DEC: before\n" ++ showDoc e ++ "\nafter:\n" ++ showDoc lb) (changed lb)
+  where
+    mkFunOut tcm (nm,_) e' = do
+      ty <- termType tcm e'
+      let nm' = name2String nm ++ "_out"
+      mkInternalVar nm' ty
 
+    l2m = go []
+      where
+        go _  []     = []
+        go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
 
 disjointExpressionConsolidation _ e = return e
 
-repSubst :: [(TmName,(TmName,Term,[(Term,Pat)]))]
-         -> [(TmName,Term)]
-         -> Term
-         -> Term
-repSubst ndj ds dj = if dj == dj' then dj' else repSubst ndj ds dj'
-  where
-    dj' = substTms ds (subsDisjoint dj ndj)
-    subsDisjoint = foldl (\k (_,(tmNm,tm,_)) -> substTm tmNm tm k)
+data CaseTree a
+  = Leaf a
+  | Branch Term [(Pat,CaseTree a)]
+  deriving (Eq,Show,Functor,Foldable)
 
-isDisjointFrom :: (TmName,(TmName,Term,[(Term,Pat)]))
-               -> (TmName,(TmName,Term,[(Term,Pat)]))
-               -> Bool
-isDisjointFrom (nm1,(_,_,pats1)) (nm2, (_,_,pats2)) =
-  nm1 == nm2 && pats1 /= pats2
+isDisjoint :: CaseTree ([Either Term Type])
+           -> Bool
+isDisjoint (Leaf _)             = False
+isDisjoint (Branch _ [])        = False
+isDisjoint (Branch _ [(_,x)])   = isDisjoint x
+isDisjoint b@(Branch _ (_:_:_)) = allEqual (map Either.rights
+                                                (Foldable.toList b))
 
+removeEmpty :: Eq a => CaseTree [a] -> CaseTree [a]
+removeEmpty l@(Leaf _)    = l
+removeEmpty (Branch s bs) = Branch s (filter ((/= (Leaf [])) . snd)
+                                      (map (second removeEmpty) bs))
 
+allEqual :: Eq a => [a] -> Bool
+allEqual []     = True
+allEqual (x:xs) = all (== x) xs
 
-collectGlobals :: [(Term,Pat)]
+collectGlobals :: [(TmName,Term)]
                -> [TmName]
                -> Term
-               -> RewriteMonad NormalizeState
-                               (Term
-                               ,[TmName]
-                               ,[(TmName,(TmName,Term,[(Term,Pat)]))]
-                               )
-collectGlobals pats seen e@(collectArgs -> (fun, args@(_:_))) = do
-  tcm <- Lens.view tcCache
-  eTy <- termType tcm e
-  case splitFunForallTy eTy of
-    ([],_) | not (isConstant e) -> do
-      case fun of
+               -> RewriteMonad NormalizeState (Term,[(TmName,CaseTree [(Either Term Type)])])
+collectGlobals substitution seen (Case scrut ty alts) = do
+  (scrut',collected)  <- collectGlobals     substitution seen scrut
+  (alts' ,collected') <- collectGlobalsAlts substitution seen scrut' alts
+  return (Case scrut' ty alts',collected ++ collected')
+
+collectGlobals substitution seen e@(collectArgs -> (fun, args@(_:_)))
+  | not (isConstant e) = do
+    tcm <- Lens.view tcCache
+    eTy <- termType tcm e
+    case splitFunForallTy eTy of
+      ([],_) -> case fun of
         (Var _ nm) | nm `notElem` seen -> do
-            (_,newf@(Var _ nm')) <- mkInternalVar (name2String nm ++ "_out") eTy
-            (args',seen',collected) <- collectGlobalsArgs pats (nm:seen) args
-            return (newf,seen',(nm,(nm',mkApps fun args',pats)):collected)
-        _ -> do
-            (args',seen',collected) <- collectGlobalsArgs pats seen args
-            return (mkApps fun args',seen',collected)
-    _ -> return (e,seen,[])
+          (args',collected) <- collectGlobalsArgs substitution (nm:seen) args
+          let e' = Maybe.fromMaybe e (List.lookup nm substitution)
+          return (e',(nm,Leaf args'):collected)
+        _ -> do (args',collected) <- collectGlobalsArgs substitution seen args
+                return (mkApps fun args',collected)
+      _ -> return (e,[])
 
-collectGlobals pats seen (Case scrut ty alts) = do
-  (scrut',seen',collected)  <- collectGlobals pats seen scrut
-  (alts',seen'',collected') <- collectGlobalsAlts pats seen' scrut' alts
-  return (Case scrut' ty alts',seen'',collected++collected')
+collectGlobals _ _ e = return (e,[])
 
-collectGlobals _ s e = return (e,s,[])
-
-collectGlobalsArgs :: [(Term,Pat)]
+collectGlobalsArgs :: [(TmName,Term)]
                    -> [TmName]
                    -> [Either Term Type]
-                   -> RewriteMonad NormalizeState
-                                   ([Either Term Type]
-                                   ,[TmName]
-                                   ,[(TmName,(TmName,Term,[(Term,Pat)]))]
-                                   )
-collectGlobalsArgs pats seen args = do
-    (seen',(args',collected)) <- second unzip <$> (mapAccumLM go seen args)
-    return (args',seen',concat collected)
+                   -> RewriteMonad NormalizeState ([Either Term Type]
+                                                  ,[(TmName,CaseTree [(Either Term Type)])]
+                                                  )
+collectGlobalsArgs substitution seen args = do
+    (_,(args',collected)) <- second unzip <$> mapAccumLM go seen args
+    return (args',concat collected)
   where
     go s (Left tm) = do
-      (tm',s',collected) <- collectGlobals pats s tm
-      return (s',(Left tm',collected))
-
+      (tm',collected) <- collectGlobals substitution s tm
+      return (map fst collected ++ s,(Left tm',collected))
     go s (Right ty) = return (s,(Right ty,[]))
 
-collectGlobalsAlts :: [(Term,Pat)]
+collectGlobalsAlts :: [(TmName,Term)]
                    -> [TmName]
                    -> Term
                    -> [Bind Pat Term]
-                   -> RewriteMonad NormalizeState
-                                   ([Bind Pat Term]
-                                   ,[TmName]
-                                   ,[(TmName,(TmName,Term,[(Term,Pat)]))]
-                                   )
-collectGlobalsAlts pats seen scrut alts = do
-    (alts',seen',collected) <- unzip3 <$> mapM go alts
-    return (alts',concat seen',concat collected)
+                   -> RewriteMonad NormalizeState ([Bind Pat Term]
+                                                  ,[(TmName,CaseTree [(Either Term Type)])]
+                                                  )
+collectGlobalsAlts substitution seen scrut alts = do
+    (alts',collected) <- unzip <$> mapM go alts
+    let collected'  = List.groupBy ((==) `on` fst) (concat collected)
+        collected'' = map (\xs -> (fst (head xs),Branch scrut (map snd xs))) collected'
+    return (alts',collected'')
   where
     go pe = do (p,e) <- unbind pe
-               (e',seen',collected) <- collectGlobals ((scrut,p):pats) seen e
-               return (bind p e',seen',collected)
+               (e',collected) <- collectGlobals substitution seen e
+               return (bind p e',map (second (p,)) collected)
 
-mkDisjointGroup :: [(TmName,(TmName,Term,[(Term,Pat)]))]
-                -> RewriteMonad NormalizeState (Term,[TmName])
-mkDisjointGroup disJoint = do
-  let (nms,termPats)     = unzip (map ((\(x,y,z) -> (x,(y,z))) . snd) disJoint)
-      (terms,pats')      = unzip (map (second reverse) termPats)
-      ((fun:_),argss)    = unzip (map collectArgs terms)
-      argssT             = zip [0..] (List.transpose argss)
-      allEqual xss       = all (== head xss) (tail xss)
-      (common,uncommonT) = List.partition (allEqual . snd) argssT
-      uncommon           = List.transpose (map snd uncommonT)
-      uncommon'          = (map.map) (either id (error "unexpected type"))
-                                     uncommon
-      caseTrees          = zipWith mkCaseTree pats' uncommon'
-      caseTree           = foldl1 mergeCaseTree caseTrees
-  tcm <- Lens.view tcCache
-  argTys <- mapM (termType tcm) (head uncommon')
-  (uncommonCaseM,uncommonSelectors) <- case length argTys of
-    0 -> return (Nothing,[])
-    1 -> let c = genCase (head argTys) Nothing [] caseTree
-         in  return (Nothing,[c])
-    m -> do tupTcm <- Lens.view tupleTcCache
-            let (Just tupTcNm) = IM.lookup m tupTcm
-                (Just tupTc)   = HashMap.lookup tupTcNm tcm
-                [tupDc]        = tyConDataCons tupTc
-                tupTy          = mkTyConApp tupTcNm argTys
-                djCase         = genCase tupTy (Just tupDc) argTys caseTree
-            (scrutId,scrutVar) <- mkInternalVar "tupIn" tupTy
-            selectors <- mapM (mkSelectorCase ($(curLoc) ++ "mkDisjointGroup")
-                                              tcm scrutVar (dcTag tupDc))
-                              [0..(m-1)]
-            return (Just (scrutId,djCase),selectors)
-  let newArgs = mkDJArgs 0 common uncommonSelectors
-      newFun  = case uncommonCaseM of
-                  Just (lbId,lbExpr) -> Letrec (bind (rec [(lbId,embed lbExpr)])
-                                                     (mkApps fun newArgs))
-                  Nothing -> mkApps fun newArgs
-  return (newFun,nms)
+mkDisjointGroup :: (TmName,CaseTree [(Either Term Type)])
+                -> RewriteMonad NormalizeState Term
+mkDisjointGroup (nm,cs) = do
+    Just (ty,_) <- HashMap.lookup nm <$> Lens.use bindings
+    let argss :: [[Either Term Type]]
+        argss    = Foldable.toList cs
+        argssT :: [(Int,[Either Term Type])]
+        argssT   = zip [0..] (List.transpose argss)
+        commonT :: [(Int,[Either Term Type])]
+        (commonT,uncommonT) = List.partition (allEqual . snd) argssT
+        common :: [(Int,Either Term Type)]
+        common = map (second head) commonT
+        uncommon :: [[Term]]
+        uncommon = map (Either.lefts) (List.transpose (map snd uncommonT))
 
-mkDJArgs :: Int -> [(Int,[Either Term Type])] -> [Term] -> [Either Term Type]
-mkDJArgs _ cms []   = map (head . snd) cms
+        cs' :: CaseTree [Term]
+        cs' = removeEmpty
+            $ fmap (Either.lefts)
+                   (if null common
+                      then cs
+                      else fmap (filter (`notElem` (map snd common))) cs)
+    tcm <- Lens.view tcCache
+    (uncommonCaseM,uncommonSelectors) <- case uncommon of
+      []       -> return (Nothing,[])
+      ([uc]:_) -> do argTy <- termType tcm uc
+                     let c = genCase argTy Nothing [] cs'
+                     return (Nothing,[c])
+      (uc:_)   -> do tupTcm <- Lens.view tupleTcCache
+                     let m              = length uc
+                         (Just tupTcNm) = IM.lookup m tupTcm
+                         (Just tupTc)   = HashMap.lookup tupTcNm tcm
+                         [tupDc]        = tyConDataCons tupTc
+                     argTys <- mapM (termType tcm) uc
+                     let tupTy  = mkTyConApp tupTcNm argTys
+                         djCase = genCase tupTy (Just tupDc) argTys cs'
+                     (scrutId,scrutVar) <- mkInternalVar "tupIn" tupTy
+                     selectors <- mapM (mkSelectorCase
+                                          ($(curLoc) ++ "mkDisjointGroup")
+                                          tcm scrutVar (dcTag tupDc))
+                                       [0..(m-1)]
+                     return (Just (scrutId,djCase),selectors)
+    let newArgs = mkDJArgs 0 common uncommonSelectors
+        fun     = Var ty nm
+        newFun  = case uncommonCaseM of
+                    Just (lbId,lbExpr) -> Letrec (bind (rec [(lbId,embed lbExpr)])
+                                                       (mkApps fun newArgs))
+                    Nothing -> mkApps fun newArgs
+    return newFun
+
+mkDJArgs :: Int -> [(Int,Either Term Type)] -> [Term] -> [Either Term Type]
+mkDJArgs _ cms []   = map snd cms
 mkDJArgs _ [] uncms = map Left uncms
-mkDJArgs n ((m,xs):cms) (y:uncms)
-  | n == m    = head xs : mkDJArgs (n+1) cms (y:uncms)
-  | otherwise = Left y  : mkDJArgs (n+1) ((m,xs):cms) uncms
+mkDJArgs n ((m,x):cms) (y:uncms)
+  | n == m    = x       : mkDJArgs (n+1) cms (y:uncms)
+  | otherwise = Left y  : mkDJArgs (n+1) ((m,x):cms) uncms
 
-data CaseTree
-  = Leaf [Term]
-  | Branch Term [(Pat,CaseTree)]
-  deriving Show
-
-mkCaseTree :: [(Term,Pat)] -> [Term] -> CaseTree
-mkCaseTree [] tms               = Leaf tms
-mkCaseTree ((tm,pat):pats) tms = Branch tm [(pat,mkCaseTree pats tms)]
-
-mergeCaseTree :: CaseTree -> CaseTree -> CaseTree
-mergeCaseTree (Branch scrut pats) (Branch _ [(pat,e)])
-    | any Either.isLeft merged
-    = Branch scrut (map (either id id) merged)
-    | otherwise
-    = Branch scrut (pats ++ [(pat,e)])
-  where
-    merged = map (`mergePats` (pat,e)) pats
-
-    mergePats (p0,ct0) (p1,ct1)
-      | p0 == p1  = Left  (p0,mergeCaseTree ct1 ct0)
-      | otherwise = Right (p0,ct0)
-mergeCaseTree l r = error (show l ++ "\n" ++ show r)
-
-genCase :: Type -> Maybe DataCon -> [Type] -> CaseTree -> Term
+genCase :: Type -> Maybe DataCon -> [Type] -> CaseTree [Term] -> Term
 genCase _ Nothing _  (Leaf tms) = head tms
 genCase _ (Just dc) argTys  (Leaf tms) =
   mkApps (Data dc) (map Right argTys ++ map Left tms)
