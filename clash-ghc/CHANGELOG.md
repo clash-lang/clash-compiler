@@ -6,6 +6,7 @@
 
 * Fixes bugs:
   * clash won't run when not compiled with usual ghc [#82](https://github.com/clash-lang/clash-compiler/issues/82)
+  * Fail to generate VHDL with blockRamFile' in clash-ghc 0.6 [#85](https://github.com/clash-lang/clash-compiler/issues/85)
 
 ## 0.6 *October 3rd 2015*
 * New features:
