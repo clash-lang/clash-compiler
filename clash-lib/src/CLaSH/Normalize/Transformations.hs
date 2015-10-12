@@ -1004,7 +1004,8 @@ disjointExpressionConsolidation _ e@(Case _scrut _ty _alts) = do
   where
     mkFunOut tcm (nm,_) e' = do
       ty <- termType tcm e'
-      let nm' = name2String nm ++ "_out"
+      let nm' = (reverse . List.takeWhile (/='.') . reverse . name2String) nm ++
+                "Out"
       mkInternalVar nm' ty
 
     l2m = go []
