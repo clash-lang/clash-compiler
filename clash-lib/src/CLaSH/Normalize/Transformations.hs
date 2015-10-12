@@ -1000,7 +1000,7 @@ disjointExpressionConsolidation _ e@(Case _scrut _ty _alts) = do
                                                 exprs
          (e',_) <- collectGlobals substitution [] e
          let lb = Letrec (bind (rec (zip lids (map embed exprs'))) e')
-         traceIf True ("DEC: before\n" ++ showDoc e ++ "\nafter:\n" ++ showDoc lb) (changed lb)
+         changed lb
   where
     mkFunOut tcm (nm,_) e' = do
       ty <- termType tcm e'
