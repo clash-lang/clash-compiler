@@ -28,7 +28,7 @@ main =
       ,runTest "examples"             Both [] "MAC"          (Just ("testbench",True))
       ,runTest "examples"             Both [] "MatrixVect"   (Just ("testbench",True))
       ,runTest "examples"             Both [] "Queens"       (Just ("topEntity",False))
-      ,runTest "examples"             Both ["-clash-debug DebugName"] "Reducer"      (Just ("topEntity",False))
+      ,runTest "examples"             Both ["-clash-debug","DebugName"] "Reducer"      (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Sprockell"    (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Windows"      (Just ("topEntity",False))
       ,runTest ("examples" </> "i2c") Both [] "I2C"          (Just ("topEntity",False))
