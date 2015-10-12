@@ -53,9 +53,9 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runExceptT $
       elHWTy <- ExceptT $ return $ coreTypeToHWType ghcTypeToHWType m elTy
       return $ Vector sz elHWTy
 
-    "String" -> return Void
+    "String" -> return String
     "GHC.Types.[]" -> case tyView (head args) of
-      (TyConApp (name2String -> "GHC.Types.Char") []) -> return Void
+      (TyConApp (name2String -> "GHC.Types.Char") []) -> return String
       _ -> fail $ "Can't translate type: " ++ showDoc ty
 
     _ -> case m ! tc of

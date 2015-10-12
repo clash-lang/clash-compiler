@@ -77,6 +77,7 @@ type Size = Int
 -- | Representable hardware types
 data HWType
   = Void -- ^ Empty type
+  | String -- ^ String type
   | Bool -- ^ Boolean type
   | Integer -- ^ Integer type
   | BitVector !Size -- ^ BitVector of a specified size

@@ -205,6 +205,7 @@ verilogType t = do
     (Signed n)    -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
     (Clock _ _)   -> "logic"
     (Reset _ _)   -> "logic"
+    String        -> "string"
     _             -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc

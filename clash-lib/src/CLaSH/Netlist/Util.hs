@@ -164,6 +164,7 @@ representableType builtInTranslation m = either (const False) ((> 0) . typeSize)
 typeSize :: HWType
          -> Int
 typeSize Void = 0
+typeSize String = 2^(32::Integer)
 typeSize Bool = 1
 typeSize (Clock _ _) = 1
 typeSize (Reset _ _) = 1

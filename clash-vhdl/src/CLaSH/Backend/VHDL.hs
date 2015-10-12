@@ -353,6 +353,7 @@ vhdlType' t@(Sum _ _)     = case typeSize t of
                               n -> "unsigned" <> parens (int (n -1) <+> "downto 0")
 vhdlType' t@(Product _ _) = tyName t
 vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+vhdlType' String          = "string"
 
 sigDecl :: VHDLM Doc -> HWType -> VHDLM Doc
 sigDecl d t = d <+> colon <+> vhdlType t
@@ -410,6 +411,7 @@ vhdlTypeErrValue (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue elTys
 vhdlTypeErrValue (Reset _ _)         = "'X'"
 vhdlTypeErrValue (Clock _ _)         = "'X'"
 vhdlTypeErrValue Void                = "(0 downto 1 => 'X')"
+vhdlTypeErrValue String              = "\"ERROR\""
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
