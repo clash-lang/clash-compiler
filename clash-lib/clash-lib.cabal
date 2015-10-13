@@ -72,6 +72,8 @@ Library
   other-extensions:   CPP
                       DeriveAnyClass
                       DeriveGeneric
+                      DeriveFoldable
+                      DeriveFunctor
                       FlexibleContexts
                       FlexibleInstances
                       GeneralizedNewtypeDeriving
