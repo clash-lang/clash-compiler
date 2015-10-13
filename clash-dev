@@ -1,3 +1,3 @@
 #!/bin/sh
 TOOL_VERSION_ghc=$(ghc --numeric-version)
-cabal exec ghci -- -DTOOL_VERSION_ghc=\"$TOOL_VERSION_ghc\" -iclash-lib/src -iclash-systemverilog/src -iclash-vhdl/src -iclash-verilog/src -iclash-ghc/src-ghc -package ghc -Wall CLaSH.hs
+cabal exec ghci -- -DTOOL_VERSION_ghc=\"$TOOL_VERSION_ghc\" -iclash-lib/src -iclash-systemverilog/src -iclash-vhdl/src -iclash-verilog/src -iclash-ghc/src-ghc -package ghc -Wall -Werror CLaSH.hs
