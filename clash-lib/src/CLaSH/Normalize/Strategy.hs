@@ -30,7 +30,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> caseFlattening
     lifting   = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
     spec      = bottomupR (applyMany specRws)
     caseFlattening = repeatR (topdownR (apply "caseFlat" caseFlat))
-    dec = repeatR (topdownR (apply "DSE" disjointExpressionConsolidation))
+    dec = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
 
     transInner :: [(String,NormRewrite)]
     transInner = [ ("applicationPropagation", appProp        )

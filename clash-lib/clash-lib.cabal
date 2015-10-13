@@ -140,6 +140,7 @@ Library
                       CLaSH.Netlist.Util
 
                       CLaSH.Normalize
+                      CLaSH.Normalize.DEC
                       CLaSH.Normalize.PrimitiveReductions
                       CLaSH.Normalize.Strategy
                       CLaSH.Normalize.Transformations
