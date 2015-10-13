@@ -4,6 +4,32 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
+
+-- | Helper functions for the 'disjointExpressionConsolidation' transformation
+--
+-- The 'disjointExpressionConsolidation' transformation lifts applications of
+-- global binders out of alternatives of case-statements.
+--
+-- e.g. It converts:
+--
+-- @
+-- case x of
+--   A -> f 3 y
+--   B -> f x x
+--   C -> h x
+-- @
+--
+-- into:
+--
+-- @
+-- let f_arg0 = case x of {A -> 3; B -> x}
+--     f_arg1 = case x of {A -> y; B -> x}
+--     f_out  = f f_arg0 f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+--       C -> h x
+--- @
 module CLaSH.Normalize.DEC
   (collectGlobals
   ,isDisjoint
@@ -140,6 +166,12 @@ collectGlobalsAlts substitution seen scrut alts = do
                (e',collected) <- collectGlobals substitution seen e
                return (bind p e',map (second (p,)) collected)
 
+-- | Given a case-tree corresponding to a disjoint interesting \"term-in-a-
+-- function-position\", return a let-expression: where the let-binding holds
+-- a case-expression selecting between the uncommon arguments of the case-tree,
+-- and the body is an application of the term applied to the common arguments of
+-- the case tree, and projections of let-binding corresponding to the uncommon
+-- argument positions.
 mkDisjointGroup :: (Term,CaseTree [(Either Term Type)])
                 -> RewriteMonad NormalizeState Term
 mkDisjointGroup (fun,cs) = do
@@ -212,9 +244,17 @@ genCase _ (Just dc) argTys  (Leaf tms) =
 genCase ty dc argTys (Branch scrut pats) =
   Case scrut ty (map (\(p,ct) -> bind p (genCase ty dc argTys ct)) pats)
 
-interestingToLift :: (Term -> Term)
-                  -> Term
-                  -> [Either Term Type]
+-- | Determine if a term in a function position is interesting to lift out of
+-- of a case-expression.
+--
+-- This holds for all global functions, and certain primitives. Currently those
+-- primitives are:
+--
+-- * All non-constant multiplications
+-- * All non-power-of-two division-like operations
+interestingToLift :: (Term -> Term) -- ^ Evaluator
+                  -> Term -- ^ Term in function position
+                  -> [Either Term Type] -- ^ Arguments
                   -> Maybe Term
 interestingToLift _    e@(Var _ _)   _    = Just e
 interestingToLift eval e@(Prim nm _) args =
