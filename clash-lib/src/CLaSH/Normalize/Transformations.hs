@@ -979,7 +979,7 @@ reduceNonRepPrim _ e = return e
 --       A -> f_out
 --       B -> f_out
 --       C -> h x
---- @
+-- @
 disjointExpressionConsolidation :: NormRewrite
 disjointExpressionConsolidation _ e@(Case _scrut _ty _alts) = do
     (_,collected) <- collectGlobals [] [] e

@@ -29,7 +29,7 @@
 --       A -> f_out
 --       B -> f_out
 --       C -> h x
---- @
+-- @
 module CLaSH.Normalize.DEC
   (collectGlobals
   ,isDisjoint
