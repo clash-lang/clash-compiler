@@ -40,7 +40,7 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
-import           Data.Text                   (Text)
+import           Data.Text                   (Text, unpack)
 import           Unbound.Generics.LocallyNameless (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
                                               unrec, name2String)
@@ -998,11 +998,14 @@ disjointExpressionConsolidation _ e@(Case _scrut _ty _alts) = do
          let lb = Letrec (bind (rec (zip lids (map embed exprs'))) e')
          changed lb
   where
-    mkFunOut tcm (nm,_) e' = do
+    mkFunOut tcm (fun,_) e' = do
       ty <- termType tcm e'
-      let nm' = (reverse . List.takeWhile (/='.') . reverse . name2String) nm ++
-                "Out"
-      mkInternalVar nm' ty
+      let nm  = case collectArgs fun of
+                   (Var _ nm',_)  -> name2String nm'
+                   (Prim nm' _,_) -> unpack nm'
+                   _             -> "complex_expression_"
+          nm'' = (reverse . List.takeWhile (/='.') . reverse) nm ++ "Out"
+      mkInternalVar nm'' ty
 
     l2m = go []
       where

@@ -1,12 +1,19 @@
-{-# LANGUAGE DeriveFoldable  #-}
-{-# LANGUAGE DeriveFunctor   #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections   #-}
-{-# LANGUAGE ViewPatterns    #-}
-module CLaSH.Normalize.DEC where
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE ViewPatterns      #-}
+module CLaSH.Normalize.DEC
+  (collectGlobals
+  ,isDisjoint
+  ,mkDisjointGroup
+  )
+where
 
 -- external
 import qualified Control.Lens                     as Lens
+import           Data.Bits                        ((.&.),complement)
 import qualified Data.Either                      as Either
 import qualified Data.Foldable                    as Foldable
 import qualified Data.HashMap.Strict              as HashMap
@@ -18,13 +25,14 @@ import           Unbound.Generics.LocallyNameless (Bind, bind, embed, rec,
 
 -- internal
 import CLaSH.Core.DataCon    (DataCon, dcTag)
-import CLaSH.Core.Term       (Pat (..), Term (..), TmName)
+import CLaSH.Core.Literal    (Literal (..))
+import CLaSH.Core.Term       (Pat (..), Term (..))
 import CLaSH.Core.TyCon      (tyConDataCons)
 import CLaSH.Core.Type       (Type, mkTyConApp, splitFunForallTy)
 import CLaSH.Core.Util       (collectArgs, mkApps, termType)
 import CLaSH.Normalize.Types (NormalizeState)
 import CLaSH.Normalize.Util  (isConstant)
-import CLaSH.Rewrite.Types   (RewriteMonad, bindings, tcCache, tupleTcCache)
+import CLaSH.Rewrite.Types   (RewriteMonad, evaluator, tcCache, tupleTcCache)
 import CLaSH.Rewrite.Util    (mkInternalVar, mkSelectorCase)
 import CLaSH.Util
 
@@ -59,11 +67,12 @@ allEqual (x:xs) = all (== x) xs
 -- of an expression. Also substitute truly disjoint applications of globals by a
 -- reference to a lifted out application.
 collectGlobals ::
-     [(TmName,Term)] -- ^ Substitution of (applications of) a global binder by a
-                     -- reference to a lifted term.
-  -> [TmName] -- ^ List of already seen global binders
+     [(Term,Term)] -- ^ Substitution of (applications of) a global
+                   -- binder by a reference to a lifted term.
+  -> [Term] -- ^ List of already seen global binders
   -> Term -- ^ The expression
-  -> RewriteMonad NormalizeState (Term,[(TmName,CaseTree [(Either Term Type)])])
+  -> RewriteMonad NormalizeState
+                  (Term,[(Term,CaseTree [(Either Term Type)])])
 collectGlobals substitution seen (Case scrut ty alts) = do
   (scrut',collected)  <- collectGlobals     substitution seen scrut
   (alts' ,collected') <- collectGlobalsAlts substitution seen scrut' alts
@@ -72,13 +81,14 @@ collectGlobals substitution seen (Case scrut ty alts) = do
 collectGlobals substitution seen e@(collectArgs -> (fun, args@(_:_)))
   | not (isConstant e) = do
     tcm <- Lens.view tcCache
+    eval <- Lens.view evaluator
     eTy <- termType tcm e
     case splitFunForallTy eTy of
-      ([],_) -> case fun of
-        (Var _ nm) | nm `notElem` seen -> do
-          (args',collected) <- collectGlobalsArgs substitution (nm:seen) args
-          let e' = Maybe.fromMaybe e (List.lookup nm substitution)
-          return (e',(nm,Leaf args'):collected)
+      ([],_) -> case interestingToLift (eval tcm False) fun args of
+        Just fun' | fun' `notElem` seen -> do
+          (args',collected) <- collectGlobalsArgs substitution (fun':seen) args
+          let e' = Maybe.fromMaybe e (List.lookup fun' substitution)
+          return (e',(fun',Leaf args'):collected)
         _ -> do (args',collected) <- collectGlobalsArgs substitution seen args
                 return (mkApps fun args',collected)
       _ -> return (e,[])
@@ -89,13 +99,14 @@ collectGlobals _ _ e = return (e,[])
 -- of a list of application arguments. Also substitute truly disjoint
 -- applications of globals by a reference to a lifted out application.
 collectGlobalsArgs ::
-     [(TmName,Term)] -- ^ Substitution of (applications of) a global binder by a
-                     -- reference to a lifted term.
-  -> [TmName] -- ^ List of already seen global binders
+     [(Term,Term)] -- ^ Substitution of (applications of) a global
+                   -- binder by a reference to a lifted term.
+  -> [Term] -- ^ List of already seen global binders
   -> [Either Term Type] -- ^ The list of arguments
-  -> RewriteMonad NormalizeState ([Either Term Type]
-                                 ,[(TmName,CaseTree [(Either Term Type)])]
-                                 )
+  -> RewriteMonad NormalizeState
+                  ([Either Term Type]
+                  ,[(Term,CaseTree [(Either Term Type)])]
+                  )
 collectGlobalsArgs substitution seen args = do
     (_,(args',collected)) <- second unzip <$> mapAccumLM go seen args
     return (args',concat collected)
@@ -109,14 +120,15 @@ collectGlobalsArgs substitution seen args = do
 -- of a list of alternatives. Also substitute truly disjoint applications of
 -- globals by a reference to a lifted out application.
 collectGlobalsAlts ::
-     [(TmName,Term)] -- ^ Substitution of (applications of) a global binder by a
-                     -- reference to a lifted term.
-  -> [TmName] -- ^ List of already seen global binders
+     [(Term,Term)] -- ^ Substitution of (applications of) a global
+                   -- binder by a reference to a lifted term.
+  -> [Term] -- ^ List of already seen global binders
   -> Term -- ^ The subject term
   -> [Bind Pat Term] -- ^ The list of alternatives
-  -> RewriteMonad NormalizeState ([Bind Pat Term]
-                                 ,[(TmName,CaseTree [(Either Term Type)])]
-                                 )
+  -> RewriteMonad NormalizeState
+                  ([Bind Pat Term]
+                  ,[(Term,CaseTree [(Either Term Type)])]
+                  )
 collectGlobalsAlts substitution seen scrut alts = do
     (alts',collected) <- unzip <$> mapM go alts
     let collected'  = List.groupBy ((==) `on` fst) (concat collected)
@@ -128,10 +140,9 @@ collectGlobalsAlts substitution seen scrut alts = do
                (e',collected) <- collectGlobals substitution seen e
                return (bind p e',map (second (p,)) collected)
 
-mkDisjointGroup :: (TmName,CaseTree [(Either Term Type)])
+mkDisjointGroup :: (Term,CaseTree [(Either Term Type)])
                 -> RewriteMonad NormalizeState Term
-mkDisjointGroup (nm,cs) = do
-    Just (ty,_) <- HashMap.lookup nm <$> Lens.use bindings
+mkDisjointGroup (fun,cs) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
         (commonT,uncommonT) = List.partition (allEqual . snd) argssT
@@ -168,7 +179,6 @@ mkDisjointGroup (nm,cs) = do
                                        [0..(m-1)]
                      return (Just (scrutId,djCase),selectors)
     let newArgs = mkDJArgs 0 common uncommonProjections
-        fun     = Var ty nm
         newFun  = case uncommonCaseM of
                     Just (lbId,lbExpr) ->
                       Letrec (bind (rec [(lbId,embed lbExpr)])
@@ -200,3 +210,66 @@ genCase _ (Just dc) argTys  (Leaf tms) =
   mkApps (Data dc) (map Right argTys ++ map Left tms)
 genCase ty dc argTys (Branch scrut pats) =
   Case scrut ty (map (\(p,ct) -> bind p (genCase ty dc argTys ct)) pats)
+
+interestingToLift :: (Term -> Term)
+                  -> Term
+                  -> [Either Term Type]
+                  -> Maybe Term
+interestingToLift _    e@(Var _ _)   _    = Just e
+interestingToLift eval e@(Prim nm _) args =
+    case List.lookup nm interestingPrims of
+      Just t | t -> Just e
+      _ -> Nothing
+  where
+    interestingPrims =
+      [("CLaSH.Sized.Internal.BitVector.*#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.BitVector.times#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.BitVector.quot#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.BitVector.rem#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Index.*#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Index.quot#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Index.rem#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Signed.*#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Signed.times#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Signed.rem#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Signed.quot#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Signed.div#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Signed.mod#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Unsigned.*#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Unsigned.times#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Unsigned.quot#",lastNotPow2)
+      ,("CLaSH.Sized.Internal.Unsigned.rem#",lastNotPow2)
+      ,("GHC.Base.quotInt",lastNotPow2)
+      ,("GHC.Base.remInt",lastNotPow2)
+      ,("GHC.Base.divInt",lastNotPow2)
+      ,("GHC.Base.modInt",lastNotPow2)
+      ,("GHC.Classes.divInt#",lastNotPow2)
+      ,("GHC.Classes.modInt#",lastNotPow2)
+      ,("GHC.Integer.Type.timesInteger",allNonConstant)
+      ,("GHC.Integer.Type.divInteger",lastNotPow2)
+      ,("GHC.Integer.Type.modInteger",lastNotPow2)
+      ,("GHC.Integer.Type.quotInteger",lastNotPow2)
+      ,("GHC.Integer.Type.remInteger",lastNotPow2)
+      ,("GHC.Prim.*#",allNonConstant)
+      ,("GHC.Prim.quotInt#",lastNotPow2)
+      ,("GHC.Prim.remInt#",lastNotPow2)
+      ]
+
+    lArgs           = Either.lefts args
+    allNonConstant  = all (not . isConstant) lArgs
+    tailNonConstant = all (not . isConstant) (tail lArgs)
+    lastNotPow2 =
+      case eval (last lArgs) of
+        Literal (IntegerLiteral n) -> not (isPow2 n)
+        a -> case collectArgs a of
+              (Prim nm' _,[Right _,Left _,Left (Literal (IntegerLiteral n))])
+                | isFromInteger nm' -> not (isPow2 n)
+              _ -> False
+    isPow2 x        = x /= 0 && (x .&. (complement x + 1)) == x
+    isFromInteger x = x `elem` ["CLaSH.Sized.Internal.BitVector.fromInteger#"
+                               ,"CLaSH.Sized.Integer.Index.fromInteger"
+                               ,"CLaSH.Sized.Internal.Signed.fromInteger#"
+                               ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
+                               ]
+
+interestingToLift _ _ _ = Nothing
