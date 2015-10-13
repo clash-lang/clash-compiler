@@ -71,6 +71,15 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         -> Literal (IntegerLiteral (i * j))
       _ -> e
+  | nm == "GHC.Integer.Type.eqInteger"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+        -> let (_,tyView -> TyConApp boolTcNm []) = splitFunForallTy ty
+               (Just boolTc) = HashMap.lookup boolTcNm tcm
+               [falseDc,trueDc] = tyConDataCons boolTc
+               retDc = if i == j then trueDc else falseDc
+           in  Data retDc
+      _ -> e
   | nm == "GHC.Integer.Type.minusInteger"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
