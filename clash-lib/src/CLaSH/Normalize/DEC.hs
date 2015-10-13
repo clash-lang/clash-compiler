@@ -148,18 +148,19 @@ mkDisjointGroup (fun,cs) = do
         (commonT,uncommonT) = List.partition (allEqual . snd) argssT
         common   = map (second head) commonT
         uncommon = map (Either.lefts) (List.transpose (map snd uncommonT))
-        cs'      = removeEmpty
-                 $ fmap (Either.lefts)
+        cs'      = fmap (zip [0..]) cs
+        cs''     = removeEmpty
+                 $ fmap (Either.lefts . map snd)
                         (if null common
-                           then cs
-                           else fmap (filter (`notElem` (map snd common))) cs)
+                           then cs'
+                           else fmap (filter (`notElem` common)) cs')
     tcm <- Lens.view tcCache
     (uncommonCaseM,uncommonProjections) <- case uncommon of
       -- only common arguments: do nothing.
       []       -> return (Nothing,[])
       -- only a single uncommon argument: no projections needed
       ([uc]:_) -> do argTy <- termType tcm uc
-                     let c = genCase argTy Nothing [] cs'
+                     let c = genCase argTy Nothing [] cs''
                      return (Nothing,[c])
       -- multiple uncommon arguments: case statement that selects between the
       -- tuples that hold uncommon arguments, and projections for every element
@@ -171,7 +172,7 @@ mkDisjointGroup (fun,cs) = do
                          [tupDc]        = tyConDataCons tupTc
                      argTys <- mapM (termType tcm) uc
                      let tupTy  = mkTyConApp tupTcNm argTys
-                         djCase = genCase tupTy (Just tupDc) argTys cs'
+                         djCase = genCase tupTy (Just tupDc) argTys cs''
                      (scrutId,scrutVar) <- mkInternalVar "tupIn" tupTy
                      selectors <- mapM (mkSelectorCase
                                           ($(curLoc) ++ "mkDisjointGroup")
