@@ -46,13 +46,18 @@ import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.IntMap.Strict               as IM
 import qualified Data.List                        as List
 import qualified Data.Maybe                       as Maybe
+import           Data.Set                         (Set)
+import qualified Data.Set                         as Set
+import qualified Data.Set.Lens                    as Lens
+
 import           Unbound.Generics.LocallyNameless (Bind, bind, embed, rec,
-                                                   unbind)
+                                                   unbind, unembed, unrec)
 
 -- internal
 import CLaSH.Core.DataCon    (DataCon, dcTag)
+import CLaSH.Core.FreeVars   (termFreeIds, typeFreeVars)
 import CLaSH.Core.Literal    (Literal (..))
-import CLaSH.Core.Term       (Pat (..), Term (..))
+import CLaSH.Core.Term       (LetBinding, Pat (..), Term (..), TmName)
 import CLaSH.Core.TyCon      (tyConDataCons)
 import CLaSH.Core.Type       (Type, mkTyConApp, splitFunForallTy)
 import CLaSH.Core.Util       (collectArgs, mkApps, termType)
@@ -62,8 +67,12 @@ import CLaSH.Rewrite.Types   (RewriteMonad, evaluator, tcCache, tupleTcCache)
 import CLaSH.Rewrite.Util    (mkInternalVar, mkSelectorCase)
 import CLaSH.Util
 
+import CLaSH.Rewrite.Util (isUntranslatableType)
+import CLaSH.Core.Pretty  (showDoc)
+
 data CaseTree a
   = Leaf a
+  | LB [LetBinding] (CaseTree a)
   | Branch Term [(Pat,CaseTree a)]
   deriving (Eq,Show,Functor,Foldable)
 
@@ -73,6 +82,7 @@ data CaseTree a
 isDisjoint :: CaseTree ([Either Term Type])
            -> Bool
 isDisjoint (Leaf _)             = False
+isDisjoint (LB _ ct)            = isDisjoint ct
 isDisjoint (Branch _ [])        = False
 isDisjoint (Branch _ [(_,x)])   = isDisjoint x
 isDisjoint b@(Branch _ (_:_:_)) = allEqual (map Either.rights
@@ -80,9 +90,15 @@ isDisjoint b@(Branch _ (_:_:_)) = allEqual (map Either.rights
 
 -- Remove empty branches from a 'CaseTree'
 removeEmpty :: Eq a => CaseTree [a] -> CaseTree [a]
-removeEmpty l@(Leaf _)    = l
-removeEmpty (Branch s bs) = Branch s (filter ((/= (Leaf [])) . snd)
-                                      (map (second removeEmpty) bs))
+removeEmpty l@(Leaf _) = l
+removeEmpty (LB lb ct) =
+  case removeEmpty ct of
+    Leaf [] -> Leaf []
+    ct'     -> LB lb ct'
+removeEmpty (Branch s bs) =
+  case filter ((/= (Leaf [])) . snd) (map (second removeEmpty) bs) of
+    []  -> Leaf []
+    bs' -> Branch s bs'
 
 -- | Test if all elements in a list are equal to each other.
 allEqual :: Eq a => [a] -> Bool
@@ -93,39 +109,55 @@ allEqual (x:xs) = all (== x) xs
 -- of an expression. Also substitute truly disjoint applications of globals by a
 -- reference to a lifted out application.
 collectGlobals ::
-     [(Term,Term)] -- ^ Substitution of (applications of) a global
+     Set TmName
+  -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
   -> Term -- ^ The expression
   -> RewriteMonad NormalizeState
                   (Term,[(Term,CaseTree [(Either Term Type)])])
-collectGlobals substitution seen (Case scrut ty alts) = do
-  (scrut',collected)  <- collectGlobals     substitution seen scrut
-  (alts' ,collected') <- collectGlobalsAlts substitution seen scrut' alts
+collectGlobals inScope substitution seen (Case scrut ty alts) = do
+  (scrut',collected)  <- collectGlobals     inScope substitution seen scrut
+  (alts' ,collected') <- collectGlobalsAlts inScope substitution seen scrut' alts
   return (Case scrut' ty alts',collected ++ collected')
 
-collectGlobals substitution seen e@(collectArgs -> (fun, args@(_:_)))
+collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
   | not (isConstant e) = do
     tcm <- Lens.view tcCache
     eval <- Lens.view evaluator
     eTy <- termType tcm e
     case splitFunForallTy eTy of
-      ([],_) -> case interestingToLift (eval tcm False) fun args of
+      ([],_) -> case interestingToLift inScope (eval tcm False) fun args of
         Just fun' | fun' `notElem` seen -> do
-          (args',collected) <- collectGlobalsArgs substitution (fun':seen) args
+          (args',collected) <- collectGlobalsArgs inScope substitution (fun':seen) args
           let e' = Maybe.fromMaybe e (List.lookup fun' substitution)
           return (e',(fun',Leaf args'):collected)
-        _ -> do (args',collected) <- collectGlobalsArgs substitution seen args
+        _ -> do (args',collected) <- collectGlobalsArgs inScope substitution seen args
                 return (mkApps fun args',collected)
       _ -> return (e,[])
 
-collectGlobals _ _ e = return (e,[])
+-- FIXME: This duplicates A LOT of let-bindings, where I just pray that after
+-- the ANF, CSE, and DeadCodeRemoval pass all duplicates are removed.
+--
+-- I think we should be able to do better, but perhaps we cannot fix it here.
+collectGlobals inScope substitution seen (Letrec b) = do
+  (unrec -> lbs,body) <- unbind b
+  (body',collected)   <- collectGlobals    inScope substitution seen body
+  (lbs',collected')   <- collectGlobalsLbs inScope substitution
+                                           (map fst collected ++ seen)
+                                           lbs
+  return (Letrec (bind (rec lbs') body')
+         ,map (second (LB lbs')) (collected ++ collected')
+         )
+
+collectGlobals _ _ _ e = return (e,[])
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of application arguments. Also substitute truly disjoint
 -- applications of globals by a reference to a lifted out application.
 collectGlobalsArgs ::
-     [(Term,Term)] -- ^ Substitution of (applications of) a global
+     Set TmName
+  -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
   -> [Either Term Type] -- ^ The list of arguments
@@ -133,12 +165,12 @@ collectGlobalsArgs ::
                   ([Either Term Type]
                   ,[(Term,CaseTree [(Either Term Type)])]
                   )
-collectGlobalsArgs substitution seen args = do
+collectGlobalsArgs inScope substitution seen args = do
     (_,(args',collected)) <- second unzip <$> mapAccumLM go seen args
     return (args',concat collected)
   where
     go s (Left tm) = do
-      (tm',collected) <- collectGlobals substitution s tm
+      (tm',collected) <- collectGlobals inScope substitution s tm
       return (map fst collected ++ s,(Left tm',collected))
     go s (Right ty) = return (s,(Right ty,[]))
 
@@ -146,7 +178,8 @@ collectGlobalsArgs substitution seen args = do
 -- of a list of alternatives. Also substitute truly disjoint applications of
 -- globals by a reference to a lifted out application.
 collectGlobalsAlts ::
-     [(Term,Term)] -- ^ Substitution of (applications of) a global
+     Set TmName
+  -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
   -> Term -- ^ The subject term
@@ -155,7 +188,7 @@ collectGlobalsAlts ::
                   ([Bind Pat Term]
                   ,[(Term,CaseTree [(Either Term Type)])]
                   )
-collectGlobalsAlts substitution seen scrut alts = do
+collectGlobalsAlts inScope substitution seen scrut alts = do
     (alts',collected) <- unzip <$> mapM go alts
     let collected'  = List.groupBy ((==) `on` fst) (concat collected)
         collected'' = map (\xs -> (fst (head xs),Branch scrut (map snd xs)))
@@ -163,8 +196,36 @@ collectGlobalsAlts substitution seen scrut alts = do
     return (alts',collected'')
   where
     go pe = do (p,e) <- unbind pe
-               (e',collected) <- collectGlobals substitution seen e
+               (e',collected) <- collectGlobals inScope substitution seen e
                return (bind p e',map (second (p,)) collected)
+
+-- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
+-- of a list of let-bindings. Also substitute truly disjoint applications of
+-- globals by a reference to a lifted out application.
+collectGlobalsLbs ::
+     Set TmName
+  -> [(Term,Term)] -- ^ Substitution of (applications of) a global
+                   -- binder by a reference to a lifted term.
+  -> [Term] -- ^ List of already seen global binders
+  -> [LetBinding] -- ^ The list let-bindings
+  -> RewriteMonad NormalizeState
+                  ([LetBinding]
+                  ,[(Term,CaseTree [(Either Term Type)])]
+                  )
+collectGlobalsLbs inScope substitution seen lbs = do
+    (_,(lbs',collected)) <- second unzip <$> mapAccumLM go seen lbs
+    return (lbs',concat collected)
+  where
+    go :: [Term] -> LetBinding
+       -> RewriteMonad NormalizeState
+                  ([Term]
+                  ,(LetBinding
+                   ,[(Term,CaseTree [(Either Term Type)])]
+                   )
+                  )
+    go s (id_,unembed -> e) = do
+      (e',collected) <- collectGlobals inScope substitution s e
+      return (map fst collected ++ s,((id_,embed e'),collected))
 
 -- | Given a case-tree corresponding to a disjoint interesting \"term-in-a-
 -- function-position\", return a let-expression: where the let-binding holds
@@ -172,12 +233,13 @@ collectGlobalsAlts substitution seen scrut alts = do
 -- and the body is an application of the term applied to the common arguments of
 -- the case tree, and projections of let-binding corresponding to the uncommon
 -- argument positions.
-mkDisjointGroup :: (Term,CaseTree [(Either Term Type)])
+mkDisjointGroup :: Set TmName -- ^ Current free variables
+                -> (Term,CaseTree [(Either Term Type)])
                 -> RewriteMonad NormalizeState Term
-mkDisjointGroup (fun,cs) = do
+mkDisjointGroup fvs (fun,cs) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
-        (commonT,uncommonT) = List.partition (allEqual . snd) argssT
+        (commonT,uncommonT) = List.partition (isCommon fvs . snd) argssT
         common   = map (second head) commonT
         uncommon = map (Either.lefts) (List.transpose (map snd uncommonT))
         cs'      = fmap (zip [0..]) cs
@@ -210,7 +272,11 @@ mkDisjointGroup (fun,cs) = do
                                           ($(curLoc) ++ "mkDisjointGroup")
                                           tcm scrutVar (dcTag tupDc))
                                        [0..(m-1)]
-                     return (Just (scrutId,djCase),selectors)
+                     untran <- isUntranslatableType tupTy
+                     funTy <- termType tcm fun
+                     if untran
+                        then error (showDoc fun ++ " :: " ++ showDoc funTy ++ "\n" ++ showDoc djCase)
+                        else return (Just (scrutId,djCase),selectors)
     let newArgs = mkDJArgs 0 common uncommonProjections
         newFun  = case uncommonCaseM of
                     Just (lbId,lbExpr) ->
@@ -218,6 +284,13 @@ mkDisjointGroup (fun,cs) = do
                                    (mkApps fun newArgs))
                     Nothing -> mkApps fun newArgs
     return newFun
+
+isCommon :: Set TmName -> [Either Term Type] -> Bool
+isCommon _   []             = True
+isCommon _   (Right ty:tys) = Set.null (Lens.setOf typeFreeVars ty) &&
+                              allEqual (Right ty:tys)
+isCommon fvs (Left tm:tms)  = Set.null (Lens.setOf termFreeIds tm Set.\\ fvs) &&
+                              allEqual (Left tm:tms)
 
 -- | Create a list of arguments given a map of positions to common arguments,
 -- and a list of arguments
@@ -238,11 +311,18 @@ genCase :: Type -- ^ Type of the alternatives
         -> [Type] -- ^ Types of the arguments
         -> CaseTree [Term] -- ^ CaseTree of arguments
         -> Term
-genCase _ Nothing _  (Leaf tms) = head tms
-genCase _ (Just dc) argTys  (Leaf tms) =
-  mkApps (Data dc) (map Right argTys ++ map Left tms)
-genCase ty dc argTys (Branch scrut pats) =
-  Case scrut ty (map (\(p,ct) -> bind p (genCase ty dc argTys ct)) pats)
+genCase ty dcM argTys = go
+  where
+    go (Leaf tms) =
+      case dcM of
+        Just dc -> mkApps (Data dc) (map Right argTys ++ map Left tms)
+        _ -> head tms
+
+    go (LB lb ct) =
+      Letrec (bind (rec lb) (go ct))
+
+    go (Branch scrut pats) =
+      Case scrut ty (map (\(p,ct) -> bind p (go ct)) pats)
 
 -- | Determine if a term in a function position is interesting to lift out of
 -- of a case-expression.
@@ -252,12 +332,16 @@ genCase ty dc argTys (Branch scrut pats) =
 --
 -- * All non-constant multiplications
 -- * All non-power-of-two division-like operations
-interestingToLift :: (Term -> Term) -- ^ Evaluator
+interestingToLift :: Set TmName -- ^ in scope
+                  -> (Term -> Term) -- ^ Evaluator
                   -> Term -- ^ Term in function position
                   -> [Either Term Type] -- ^ Arguments
                   -> Maybe Term
-interestingToLift _    e@(Var _ _)   _    = Just e
-interestingToLift eval e@(Prim nm _) args =
+interestingToLift inScope _ e@(Var _ nm) _ =
+  if nm `Set.member` inScope
+     then Just e
+     else Nothing
+interestingToLift _ eval e@(Prim nm _) args =
     case List.lookup nm interestingPrims of
       Just t | t -> Just e
       _ -> Nothing
@@ -313,4 +397,4 @@ interestingToLift eval e@(Prim nm _) args =
                                ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
                                ]
 
-interestingToLift _ _ _ = Nothing
+interestingToLift _ _ _ _ = Nothing

@@ -23,7 +23,9 @@ normalization = etaTL >-> constantPropgation >-!-> anf >-!-> rmDeadcode >->
 
 
 constantPropgation :: NormRewrite
-constantPropgation = propagate >-> repeatR inlineAndPropagate >-> caseFlattening >-> lifting >-> dec >-> spec
+constantPropgation = propagate >-> repeatR inlineAndPropagate >->
+                     caseFlattening >-> dec >-> lifting >-> spec >-> dec >->
+                     conSpec
   where
     propagate = innerMost (applyMany transInner)
     inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
@@ -31,6 +33,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> caseFlattening
     spec      = bottomupR (applyMany specRws)
     caseFlattening = repeatR (topdownR (apply "caseFlat" caseFlat))
     dec = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
+    conSpec = bottomupR (apply "constantSpec" constantSpec)
 
     transInner :: [(String,NormRewrite)]
     transInner = [ ("applicationPropagation", appProp        )
@@ -50,7 +53,6 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >-> caseFlattening
 
     specRws :: [(String,NormRewrite)]
     specRws = [ ("typeSpec"    , typeSpec)
-              , ("constantSpec", constantSpec)
               , ("nonRepSpec"  , nonRepSpec)
               ]
 

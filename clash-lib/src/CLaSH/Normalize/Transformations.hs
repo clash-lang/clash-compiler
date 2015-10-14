@@ -40,6 +40,7 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
+import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
 import           Unbound.Generics.LocallyNameless (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
@@ -981,22 +982,24 @@ reduceNonRepPrim _ e = return e
 --       C -> h x
 -- @
 disjointExpressionConsolidation :: NormRewrite
-disjointExpressionConsolidation _ e@(Case _scrut _ty _alts) = do
-    (_,collected) <- collectGlobals [] [] e
+disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts) = do
+    let eFreeIds = Lens.setOf termFreeIds e
+    (_,collected) <- collectGlobals eFreeIds [] [] e
     let disJoint = filter (isDisjoint . snd) collected
     if null disJoint
        then return e
        else do
-         exprs <- mapM mkDisjointGroup disJoint
+         exprs <- mapM (mkDisjointGroup eFreeIds) disJoint
          tcm <- Lens.view tcCache
          (lids,lvs) <- unzip <$> Monad.zipWithM (mkFunOut tcm) disJoint exprs
          let substitution = zip (map fst disJoint) lvs
-         (exprs',_) <- unzip <$> Monad.zipWithM (\s e' -> collectGlobals s [] e')
+         (exprs',_) <- unzip <$> Monad.zipWithM (\s e' -> collectGlobals eFreeIds s [] e')
                                                 (l2m substitution)
                                                 exprs
-         (e',_) <- collectGlobals substitution [] e
+         (e',_) <- collectGlobals eFreeIds substitution [] e
          let lb = Letrec (bind (rec (zip lids (map embed exprs'))) e')
-         changed lb
+         lb' <- bottomupR deadCode ctx lb
+         changed lb'
   where
     mkFunOut tcm (fun,_) e' = do
       ty <- termType tcm e'
