@@ -116,7 +116,8 @@ collectGlobals ::
                   (Term,[(Term,CaseTree [(Either Term Type)])])
 collectGlobals inScope substitution seen (Case scrut ty alts) = do
   (scrut',collected)  <- collectGlobals     inScope substitution seen scrut
-  (alts' ,collected') <- collectGlobalsAlts inScope substitution seen scrut' alts
+  (alts' ,collected') <- collectGlobalsAlts inScope substitution seen scrut'
+                                            alts
   return (Case scrut' ty alts',collected ++ collected')
 
 collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
@@ -127,10 +128,12 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
     case splitFunForallTy eTy of
       ([],_) -> case interestingToLift inScope (eval tcm False) fun args of
         Just fun' | fun' `notElem` seen -> do
-          (args',collected) <- collectGlobalsArgs inScope substitution (fun':seen) args
+          (args',collected) <- collectGlobalsArgs inScope substitution
+                                                  (fun':seen) args
           let e' = Maybe.fromMaybe e (List.lookup fun' substitution)
           return (e',(fun',Leaf args'):collected)
-        _ -> do (args',collected) <- collectGlobalsArgs inScope substitution seen args
+        _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
+                                                        seen args
                 return (mkApps fun args',collected)
       _ -> return (e,[])
 
