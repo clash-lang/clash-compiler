@@ -3,6 +3,26 @@
 ## 0.6.1
 * New features:
   * Support for `clash-prelude` 0.10.1
+  * Transformation that lifts applications of the same function out of alternatives of case-statements. e.g.
+
+    ```haskell
+    case x of
+      A -> f 3 y
+      B -> f x x
+      C -> h x
+    ```
+
+    is transformed into:
+
+    ```haskell
+    let f_arg0 = case x of {A -> 3; B -> x}
+        f_arg1 = case x of {A -> y; B -> x}
+        f_out  = f f_arg0 f_arg1
+    in  case x of
+          A -> f_out
+          B -> f_out
+          C -> h x
+    ```
 
 * Fixes bugs:
   * clash won't run when not compiled with usual ghc [#82](https://github.com/clash-lang/clash-compiler/issues/82)
