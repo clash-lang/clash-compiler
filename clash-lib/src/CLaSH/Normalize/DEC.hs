@@ -64,11 +64,9 @@ import CLaSH.Core.Util       (collectArgs, mkApps, termType)
 import CLaSH.Normalize.Types (NormalizeState)
 import CLaSH.Normalize.Util  (isConstant)
 import CLaSH.Rewrite.Types   (RewriteMonad, evaluator, tcCache, tupleTcCache)
-import CLaSH.Rewrite.Util    (mkInternalVar, mkSelectorCase)
+import CLaSH.Rewrite.Util    (mkInternalVar, mkSelectorCase,
+                              isUntranslatableType)
 import CLaSH.Util
-
-import CLaSH.Rewrite.Util (isUntranslatableType)
-import CLaSH.Core.Pretty  (showDoc)
 
 data CaseTree a
   = Leaf a
@@ -233,8 +231,9 @@ collectGlobalsLbs inScope substitution seen lbs = do
 -- and the body is an application of the term applied to the common arguments of
 -- the case tree, and projections of let-binding corresponding to the uncommon
 -- argument positions.
-mkDisjointGroup :: Set TmName -- ^ Current free variables
+mkDisjointGroup :: Set TmName -- ^ Current free variables.
                 -> (Term,CaseTree [(Either Term Type)])
+                   -- ^ Case-tree of arguments belonging to the applied term.
                 -> RewriteMonad NormalizeState Term
 mkDisjointGroup fvs (fun,cs) = do
     let argss    = Foldable.toList cs
@@ -251,39 +250,66 @@ mkDisjointGroup fvs (fun,cs) = do
     tcm <- Lens.view tcCache
     (uncommonCaseM,uncommonProjections) <- case uncommon of
       -- only common arguments: do nothing.
-      []       -> return (Nothing,[])
-      -- only a single uncommon argument: no projections needed
-      ([uc]:_) -> do argTy <- termType tcm uc
-                     let c = genCase argTy Nothing [] cs''
-                     return (Nothing,[c])
-      -- multiple uncommon arguments: case statement that selects between the
-      -- tuples that hold uncommon arguments, and projections for every element
-      -- of the tuple.
-      (uc:_)   -> do tupTcm <- Lens.view tupleTcCache
-                     let m              = length uc
-                         (Just tupTcNm) = IM.lookup m tupTcm
-                         (Just tupTc)   = HashMap.lookup tupTcNm tcm
-                         [tupDc]        = tyConDataCons tupTc
-                     argTys <- mapM (termType tcm) uc
-                     let tupTy  = mkTyConApp tupTcNm argTys
-                         djCase = genCase tupTy (Just tupDc) argTys cs''
-                     (scrutId,scrutVar) <- mkInternalVar "tupIn" tupTy
-                     selectors <- mapM (mkSelectorCase
-                                          ($(curLoc) ++ "mkDisjointGroup")
-                                          tcm scrutVar (dcTag tupDc))
-                                       [0..(m-1)]
-                     untran <- isUntranslatableType tupTy
-                     funTy <- termType tcm fun
-                     if untran
-                        then error (showDoc fun ++ " :: " ++ showDoc funTy ++ "\n" ++ showDoc djCase)
-                        else return (Just (scrutId,djCase),selectors)
+      [] -> return (Nothing,[])
+      -- Create selectors and projections
+      (uc:_) -> do
+        argTys <- mapM (termType tcm) uc
+        disJointSelProj argTys cs''
     let newArgs = mkDJArgs 0 common uncommonProjections
-        newFun  = case uncommonCaseM of
-                    Just (lbId,lbExpr) ->
-                      Letrec (bind (rec [(lbId,embed lbExpr)])
-                                   (mkApps fun newArgs))
-                    Nothing -> mkApps fun newArgs
-    return newFun
+    case uncommonCaseM of
+      Just lb -> return (Letrec (bind (rec [lb]) (mkApps fun newArgs)))
+      Nothing -> return (mkApps fun newArgs)
+
+-- | Create a single selector for all the representable uncommon arguments by
+-- selecting between tuples. This selector is only ('Just') created when the
+-- number of representable uncommmon arguments is larger than one, otherwise it
+-- is not ('Nothing').
+--
+-- It also returns:
+--
+-- * For all the non-representable uncommon arguments: a selector
+-- * For all the representable uncommon arguments: a projection out of the tuple
+--   created by the larger selector. If this larger selector does not exist, a
+--   single selector is created for the single representable uncommon argument.
+disJointSelProj :: [Type] -- ^ Types of the arguments
+                -> CaseTree [Term] -- The case-tree of arguments
+                -> RewriteMonad NormalizeState (Maybe LetBinding,[Term])
+disJointSelProj _ (Leaf []) = return (Nothing,[])
+disJointSelProj argTys cs = do
+    let maxIndex = length argTys - 1
+        css = map (\i -> fmap ((:[]) . (!!i)) cs) [0..maxIndex]
+    (untran,tran) <- partitionM (isUntranslatableType . snd) (zip [0..] argTys)
+    let untranCs   = map (css!!) (map fst untran)
+        untranSels = zipWith (\(_,ty) cs' -> genCase ty Nothing []  cs')
+                             untran untranCs
+    (lbM,projs) <- case tran of
+      []       -> return (Nothing,[])
+      [(i,ty)] -> return (Nothing,[genCase ty Nothing [] (css!!i)])
+      tys      -> do
+        tcm    <- Lens.view tcCache
+        tupTcm <- Lens.view tupleTcCache
+        let m            = length tys
+            Just tupTcNm = IM.lookup m tupTcm
+            Just tupTc   = HashMap.lookup tupTcNm tcm
+            [tupDc]      = tyConDataCons tupTc
+            (tyIxs,tys') = unzip tys
+            tupTy        = mkTyConApp tupTcNm tys'
+            cs'          = fmap (\es -> map (es !!) tyIxs) cs
+            djCase       = genCase tupTy (Just tupDc) tys' cs'
+        (scrutId,scrutVar) <- mkInternalVar "tupIn" tupTy
+        projections <- mapM (mkSelectorCase ($(curLoc) ++ "disJointSelProj")
+                                            tcm scrutVar (dcTag tupDc)) [0..m-1]
+        return (Just (scrutId,embed djCase),projections)
+    let selProjs = tranOrUnTran 0 (zip (map fst untran) untranSels) projs
+
+    return (lbM,selProjs)
+  where
+    tranOrUnTran _ []       projs     = projs
+    tranOrUnTran _ sels     []        = map snd sels
+    tranOrUnTran n ((ut,s):uts) (p:projs)
+      | n == ut   = s : tranOrUnTran (n+1) uts          (p:projs)
+      | otherwise = p : tranOrUnTran (n+1) ((ut,s):uts) projs
+
 
 isCommon :: Set TmName -> [Either Term Type] -> Bool
 isCommon _   []             = True
