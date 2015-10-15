@@ -45,6 +45,7 @@ import qualified Data.Foldable                    as Foldable
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.IntMap.Strict               as IM
 import qualified Data.List                        as List
+import qualified Data.Map.Strict                  as Map
 import qualified Data.Maybe                       as Maybe
 import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
@@ -191,10 +192,10 @@ collectGlobalsAlts ::
                   )
 collectGlobalsAlts inScope substitution seen scrut alts = do
     (alts',collected) <- unzip <$> mapM go alts
-    let collected'  = List.groupBy ((==) `on` fst) (concat collected)
-        collected'' = map (\xs -> (fst (head xs),Branch scrut (map snd xs)))
-                          collected'
-    return (alts',collected'')
+    let collectedM  = map (Map.fromList . map (second (:[]))) collected
+        collectedUN = Map.unionsWith (++) collectedM
+        collected'  = map (second (Branch scrut)) (Map.toList collectedUN)
+    return (alts',collected')
   where
     go pe = do (p,e) <- unbind pe
                (e',collected) <- collectGlobals inScope substitution seen e
