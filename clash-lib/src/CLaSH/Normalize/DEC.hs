@@ -360,8 +360,8 @@ genCase ty dcM argTys = go
 -- This holds for all global functions, and certain primitives. Currently those
 -- primitives are:
 --
--- * All non-constant multiplications
--- * All non-power-of-two division-like operations
+-- * All non-power-of-two multiplications
+-- * All division-like operations with a non-power-of-two divisor
 interestingToLift :: Set TmName -- ^ in scope
                   -> (Term -> Term) -- ^ Evaluator
                   -> Term -- ^ Term in function position
