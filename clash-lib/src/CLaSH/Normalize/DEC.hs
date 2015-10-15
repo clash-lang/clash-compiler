@@ -373,25 +373,25 @@ interestingToLift inScope _ e@(Var _ nm) _ =
      else Nothing
 interestingToLift _ eval e@(Prim nm _) args =
     case List.lookup nm interestingPrims of
-      Just t | t -> Just e
+      Just t | t || not (all isConstant lArgs) -> Just e
       _ -> Nothing
   where
     interestingPrims =
-      [("CLaSH.Sized.Internal.BitVector.*#",tailNonConstant)
-      ,("CLaSH.Sized.Internal.BitVector.times#",tailNonConstant)
+      [("CLaSH.Sized.Internal.BitVector.*#",tailNonPow2)
+      ,("CLaSH.Sized.Internal.BitVector.times#",tailNonPow2)
       ,("CLaSH.Sized.Internal.BitVector.quot#",lastNotPow2)
       ,("CLaSH.Sized.Internal.BitVector.rem#",lastNotPow2)
-      ,("CLaSH.Sized.Internal.Index.*#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Index.*#",tailNonPow2)
       ,("CLaSH.Sized.Internal.Index.quot#",lastNotPow2)
       ,("CLaSH.Sized.Internal.Index.rem#",lastNotPow2)
-      ,("CLaSH.Sized.Internal.Signed.*#",tailNonConstant)
-      ,("CLaSH.Sized.Internal.Signed.times#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Signed.*#",tailNonPow2)
+      ,("CLaSH.Sized.Internal.Signed.times#",tailNonPow2)
       ,("CLaSH.Sized.Internal.Signed.rem#",lastNotPow2)
       ,("CLaSH.Sized.Internal.Signed.quot#",lastNotPow2)
       ,("CLaSH.Sized.Internal.Signed.div#",lastNotPow2)
       ,("CLaSH.Sized.Internal.Signed.mod#",lastNotPow2)
-      ,("CLaSH.Sized.Internal.Unsigned.*#",tailNonConstant)
-      ,("CLaSH.Sized.Internal.Unsigned.times#",tailNonConstant)
+      ,("CLaSH.Sized.Internal.Unsigned.*#",tailNonPow2)
+      ,("CLaSH.Sized.Internal.Unsigned.times#",tailNonPow2)
       ,("CLaSH.Sized.Internal.Unsigned.quot#",lastNotPow2)
       ,("CLaSH.Sized.Internal.Unsigned.rem#",lastNotPow2)
       ,("GHC.Base.quotInt",lastNotPow2)
@@ -400,27 +400,31 @@ interestingToLift _ eval e@(Prim nm _) args =
       ,("GHC.Base.modInt",lastNotPow2)
       ,("GHC.Classes.divInt#",lastNotPow2)
       ,("GHC.Classes.modInt#",lastNotPow2)
-      ,("GHC.Integer.Type.timesInteger",allNonConstant)
+      ,("GHC.Integer.Type.timesInteger",allNonPow2)
       ,("GHC.Integer.Type.divInteger",lastNotPow2)
       ,("GHC.Integer.Type.modInteger",lastNotPow2)
       ,("GHC.Integer.Type.quotInteger",lastNotPow2)
       ,("GHC.Integer.Type.remInteger",lastNotPow2)
-      ,("GHC.Prim.*#",allNonConstant)
+      ,("GHC.Prim.*#",allNonPow2)
       ,("GHC.Prim.quotInt#",lastNotPow2)
       ,("GHC.Prim.remInt#",lastNotPow2)
       ]
 
-    lArgs           = Either.lefts args
-    allNonConstant  = all (not . isConstant) lArgs
-    tailNonConstant = all (not . isConstant) (tail lArgs)
-    lastNotPow2 =
-      case eval (last lArgs) of
-        Literal (IntegerLiteral n) -> not (isPow2 n)
-        a -> case collectArgs a of
-              (Prim nm' _,[Right _,Left _,Left (Literal (IntegerLiteral n))])
-                | isFromInteger nm' -> not (isPow2 n)
-              _ -> False
-    isPow2 x        = x /= 0 && (x .&. (complement x + 1)) == x
+    lArgs          = Either.lefts args
+
+    allNonPow2  = all (not . termIsPow2) lArgs
+    tailNonPow2 = all (not . termIsPow2) (tail lArgs)
+    lastNotPow2 = not (termIsPow2 (last lArgs))
+
+    termIsPow2 e' = case eval e' of
+      Literal (IntegerLiteral n) -> isPow2 n
+      a -> case collectArgs a of
+        (Prim nm' _,[Right _,Left _,Left (Literal (IntegerLiteral n))])
+          | isFromInteger nm' -> isPow2 n
+        _ -> False
+
+    isPow2 x = x /= 0 && (x .&. (complement x + 1)) == x
+
     isFromInteger x = x `elem` ["CLaSH.Sized.Internal.BitVector.fromInteger#"
                                ,"CLaSH.Sized.Integer.Index.fromInteger"
                                ,"CLaSH.Sized.Internal.Signed.fromInteger#"
