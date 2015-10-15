@@ -340,8 +340,7 @@ liftBinding :: Gamma
             -> LetBinding
             -> RewriteMonad extra LetBinding
 liftBinding gamma delta (Id idName tyE,eE) = do
-  let ty = unembed tyE
-      e  = unembed eE
+  let e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
   let localFTVs = List.nub $ Lens.toListOf termFreeTyVars e
   localFVs <- List.nub <$> (Lens.toListOf <$> localFreeIds <*> pure e)
@@ -366,10 +365,22 @@ liftBinding gamma delta (Id idName tyE,eE) = do
       e' = substTm idName newExpr e
   -- Create a new body that abstracts over the free variables
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
-  -- Add the created function to the list of global bindings
-  bindings %= HMS.insert newBodyId (newBodyTy,newBody)
-  -- Return the new binder
-  return (Id idName (embed ty), embed newExpr)
+
+  -- Check if an alpha-equivalent global binder already exists
+  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . snd)) <$> Lens.use bindings
+  case aeqExisting of
+    -- If it doesn't, create a new binder
+    [] -> do -- Add the created function to the list of global bindings
+             bindings %= HMS.insert newBodyId (newBodyTy,newBody)
+             -- Return the new binder
+             return (Id idName tyE, embed newExpr)
+    -- If it does, use the existing binder
+    ((k,(aeqTy,_)):_) ->
+      let newExpr' = mkTmApps
+                      (mkTyApps (Var aeqTy k)
+                                (zipWith VarTy localFTVkinds localFTVs))
+                      (zipWith Var localFVtys' localFVs')
+      in  return (Id idName tyE, embed newExpr')
 
 liftBinding _ _ _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
@@ -440,12 +451,11 @@ mkWildValBinder = fmap fst . mkInternalVar "wild"
 mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
                => String -- ^ Name of the caller of this function
                -> HashMap TyConName TyCon -- ^ TyCon cache
-               -> [CoreContext] -- ^ Transformation Context in which this function is called
                -> Term -- ^ Subject of the case-composition
                -> Int -- n'th DataCon
                -> Int -- n'th field
                -> m Term
-mkSelectorCase caller tcm _ scrut dcI fieldI = do
+mkSelectorCase caller tcm scrut dcI fieldI = do
   scrutTy <- termType tcm scrut
   let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
   case coreView tcm scrutTy of

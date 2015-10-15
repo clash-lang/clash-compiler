@@ -28,6 +28,7 @@ module CLaSH.Normalize.Transformations
   , reduceConst
   , reduceNonRepPrim
   , caseFlat
+  , disjointExpressionConsolidation
   )
 where
 
@@ -39,7 +40,8 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
-import           Data.Text                   (Text)
+import qualified Data.Set.Lens               as Lens
+import           Data.Text                   (Text, unpack)
 import           Unbound.Generics.LocallyNameless (Bind, Embed (..), bind, embed,
                                               rec, unbind, unembed, unrebind,
                                               unrec, name2String)
@@ -66,6 +68,7 @@ import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
+import           CLaSH.Normalize.DEC
 import           CLaSH.Normalize.PrimitiveReductions
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
@@ -644,7 +647,7 @@ collectANF _ (Letrec b) = do
 collectANF _ e@(Case _ _ [unsafeUnbind -> (DataPat dc _,_)])
   | name2String (dcName $ unembed dc) == "CLaSH.Signal.Internal.:-" = return e
 
-collectANF ctx (Case subj ty alts) = do
+collectANF _ (Case subj ty alts) = do
     localVar     <- lift (isLocalVar subj)
     (bndr,subj') <- if localVar || isConstant subj
       then return ([],subj)
@@ -684,7 +687,7 @@ collectANF ctx (Case subj ty alts) = do
     doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeState LetBinding
     doPatBndr subj' dc pId i
       = do tcm <- Lens.view tcCache
-           patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") tcm ctx subj' (dcTag dc) i
+           patExpr <- mkSelectorCase ($(curLoc) ++ "doPatBndr") tcm subj' (dcTag dc) i
            return (pId,embed patExpr)
 
 collectANF _ e = return e
@@ -954,3 +957,63 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
       _ -> return e
 
 reduceNonRepPrim _ e = return e
+
+-- | This transformation lifts applications of global binders out of
+-- alternatives of case-statements.
+--
+-- e.g. It converts:
+--
+-- @
+-- case x of
+--   A -> f 3 y
+--   B -> f x x
+--   C -> h x
+-- @
+--
+-- into:
+--
+-- @
+-- let f_arg0 = case x of {A -> 3; B -> x}
+--     f_arg1 = case x of {A -> y; B -> x}
+--     f_out  = f f_arg0 f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+--       C -> h x
+-- @
+disjointExpressionConsolidation :: NormRewrite
+disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts) = do
+    let eFreeIds = Lens.setOf termFreeIds e
+    (_,collected) <- collectGlobals eFreeIds [] [] e
+    let disJoint = filter (isDisjoint . snd) collected
+    if null disJoint
+       then return e
+       else do
+         exprs <- mapM (mkDisjointGroup eFreeIds) disJoint
+         tcm <- Lens.view tcCache
+         (lids,lvs) <- unzip <$> Monad.zipWithM (mkFunOut tcm) disJoint exprs
+         let substitution = zip (map fst disJoint) lvs
+             subsMatrix   = l2m substitution
+         (exprs',_) <- unzip <$> Monad.zipWithM (\s e' -> collectGlobals eFreeIds s [] e')
+                                                subsMatrix
+                                                exprs
+         (e',_) <- collectGlobals eFreeIds substitution [] e
+         let lb = Letrec (bind (rec (zip lids (map embed exprs'))) e')
+         lb' <- bottomupR deadCode ctx lb
+         changed lb'
+  where
+    mkFunOut tcm (fun,_) e' = do
+      ty <- termType tcm e'
+      let nm  = case collectArgs fun of
+                   (Var _ nm',_)  -> name2String nm'
+                   (Prim nm' _,_) -> unpack nm'
+                   _             -> "complex_expression_"
+          nm'' = (reverse . List.takeWhile (/='.') . reverse) nm ++ "Out"
+      mkInternalVar nm'' ty
+
+    l2m = go []
+      where
+        go _  []     = []
+        go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
+
+disjointExpressionConsolidation _ e = return e

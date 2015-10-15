@@ -9,6 +9,7 @@ import qualified Control.Lens                     as Lens
 import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
+import           Data.IntMap.Strict               (IntMap)
 import           Data.List                        (mapAccumL,intersect)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
@@ -52,18 +53,21 @@ runNormalization :: CLaSHOpts
                  -- ^ Hardcoded Type -> HWType translator
                  -> HashMap TyConName TyCon
                  -- ^ TyCon cache
+                 -> IntMap TyConName
+                 -- ^ Tuple TyCon cache
                  -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
                  -- ^ Hardcoded evaluator (delta-reduction)
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization opts supply globals typeTrans tcm eval
+runNormalization opts supply globals typeTrans tcm tupTcm eval
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
                   (opt_dbgLevel opts)
                   typeTrans
                   tcm
+                  tupTcm
                   eval
 
     rwState   = RewriteState

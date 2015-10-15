@@ -1584,9 +1584,9 @@ makeHDL backend optsRef srcs = do
               primDir <- CLaSH.Backend.primDir backend
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
-                (bindingsMap,tcm,topEntM) <- generateBindings primMap src (Just dflags)
+                (bindingsMap,tcm,tupTcm,topEntM) <- generateBindings primMap src (Just dflags)
                 CLaSH.Driver.generateHDL bindingsMap (Just backend) primMap tcm
-                  ghcTypeToHWType reduceConstant topEntM opts
+                  tupTcm ghcTypeToHWType reduceConstant topEntM opts
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)

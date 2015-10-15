@@ -10,6 +10,7 @@ import           Control.Monad.State              (evalState, get)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.HashSet                     as HashSet
+import           Data.IntMap                      (IntMap)
 import           Data.List                        (isSuffixOf)
 import           Data.Maybe                       (fromMaybe, listToMaybe)
 import qualified Data.Text.Lazy                   as Text
@@ -41,12 +42,13 @@ generateHDL :: forall backend . Backend backend
             -> Maybe backend
             -> PrimMap -- ^ Primitive / BlackBox Definitions
             -> HashMap TyConName TyCon -- ^ TyCon cache
+            -> IntMap TyConName -- ^ Tuple TyCon cache
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
             -> (HashMap TyConName TyCon -> Bool -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
             -> Maybe TopEntity
             -> CLaSHOpts -- ^ Debug information level for the normalization process
             -> IO ()
-generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
+generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval teM opts = do
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
@@ -75,7 +77,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
       let doNorm     = do norm <- normalize [fst topEntity]
                           let normChecked = checkNonRecursive (fst topEntity) norm
                           cleanupGraph (fst topEntity) normChecked
-          transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm eval doNorm
+          transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval doNorm
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -96,7 +98,7 @@ generateHDL bindingsMap hdlState primMap tcm typeTrans eval teM opts = do
                                 netlist
 
       (testBench,dfiles') <- genTestBench opts supplyTB primMap
-                                 typeTrans tcm eval cmpCnt bindingsMap
+                                 typeTrans tcm tupTcm eval cmpCnt bindingsMap
                                  (listToMaybe $ map fst $ HashMap.toList testInputs)
                                  (listToMaybe $ map fst $ HashMap.toList expectedOutputs)
                                  modName
