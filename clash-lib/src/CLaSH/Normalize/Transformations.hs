@@ -993,8 +993,9 @@ disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts) = do
          tcm <- Lens.view tcCache
          (lids,lvs) <- unzip <$> Monad.zipWithM (mkFunOut tcm) disJoint exprs
          let substitution = zip (map fst disJoint) lvs
+             subsMatrix   = l2m substitution
          (exprs',_) <- unzip <$> Monad.zipWithM (\s e' -> collectGlobals eFreeIds s [] e')
-                                                (l2m substitution)
+                                                subsMatrix
                                                 exprs
          (e',_) <- collectGlobals eFreeIds substitution [] e
          let lb = Letrec (bind (rec (zip lids (map embed exprs'))) e')
