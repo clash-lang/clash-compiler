@@ -83,12 +83,11 @@ module CLaSH.Sized.Vector
   , windows1d, windows2d
     -- * Conversions
   , toList
+  , bv2v
+  , v2bv
     -- * Misc
   , lazyV, VCons, asNatProxy
     -- * Primitives
-    -- ** 'Eq' instance
-  , eq#
-  , neq#
     -- ** 'Traversable' instance
   , traverse#
     -- ** 'BitPack' instance
@@ -217,16 +216,17 @@ instance Show a => Show (Vec n a) where
       punc (x `Cons` xs)  = show x P.++ "," P.++ punc xs
 
 instance Eq a => Eq (Vec n a) where
-  (==) = eq#
-  (/=) = neq#
-
-{-# NOINLINE eq# #-}
-eq# :: Eq a => Vec n a -> Vec n a -> Bool
-eq# v1 v2  = foldr (&&) True (zipWith (==) v1 v2)
-
-{-# NOINLINE neq# #-}
-neq# :: Eq a => Vec n a -> Vec n a -> Bool
-neq# v1 v2 = not (eq# v1 v2)
+  (==) Nil _  = True
+  (==) v1  v2 = fold (&&) (unsafeCoerce (zipWith (==) v1 v2))
+  -- FIXME: the `unsafeCoerce` is a hack because the CLaSH compiler cannot deal
+  -- with the existential length of the 'xs' in "Cons x xs".
+  --
+  -- Ideally we would write:
+  --
+  -- (==) Nil           _  = True
+  -- (==) v1@(Cons _ _) v2 = fold (&&) (zipWith (==) v1 v2)
+  --
+  -- But the CLaSH compiler currently fails on that definition.
 
 instance Ord a => Ord (Vec n a) where
   compare x y = foldr f EQ $ zipWith compare x y
