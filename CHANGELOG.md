@@ -3,6 +3,7 @@
 ## 0.10.1
 * New features:
   * The `f` in `dfold p f`, now has an `SNat l` instead of a `Proxy l` as its first argument.
+  * Add `bv2v` and `v2bv` functions that convert between `Vec n Bit` and `BitVector n`.
 
 ## 0.10 *October 3rd 2015*
 * New features:
