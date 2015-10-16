@@ -1805,7 +1805,6 @@ to VHDL/(System)Verilog (for now):
         design patterns often encountered in circuit design are captured by the
         higher-order functions in "CLaSH.Sized.Vector".
 
-
 * __Recursive datatypes__
 
     The CλaSH compiler needs to be able to determine a bit-size for any value
