@@ -120,7 +120,7 @@ import Unsafe.Coerce              (unsafeCoerce)
 import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, snatToInteger,
                                    withSNat, toUNat)
 import CLaSH.Promoted.Nat.Unsafe  (unsafeSNat)
-import CLaSH.Sized.Internal.BitVector (BitVector, (++#), split#)
+import CLaSH.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
 
 import CLaSH.Class.BitPack (BitPack (..))
@@ -1761,6 +1761,26 @@ ucBV UZero     _  = Nil
 ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
                     in  ucBV n bv' :< x
 {-# INLINE ucBV #-}
+
+-- | Convert a 'BitVector' to a 'Vec' of 'Bit's.
+--
+-- >>> let x = 6 :: BitVector 8
+-- >>> x
+-- 0000_0110
+-- >>> bv2v x
+-- <0,0,0,0,0,1,1,0>
+bv2v :: KnownNat n => BitVector n -> Vec n Bit
+bv2v = unpack
+
+-- | Convert a 'Vec' of 'Bit's to a 'BitVector'.
+--
+-- >>> let x = (0:>0:>0:>1:>0:>0:>1:>0:>Nil) :: Vec 8 Bit
+-- >>> x
+-- <0,0,0,1,0,0,1,0>
+-- >>> bv2v x
+-- 0001_0010
+v2bv :: KnownNat n => Vec n Bit -> BitVector n
+v2bv = pack
 
 instance Lift a => Lift (Vec n a) where
   lift Nil           = [| Nil |]
