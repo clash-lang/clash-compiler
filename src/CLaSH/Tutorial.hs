@@ -1796,11 +1796,15 @@ to VHDL/(System)Verilog (for now):
         Where one can imagine that a compiler can unroll the definition of
         @mapV@ four times, knowing that the @topEntity@ function applies @mapV@
         to a 'Vec' of length 4. Sadly, the compile-time evaluation mechanisms in
-        the CλaSH compiler are very poor, and a user-defined function as the
-        above is /currently/ not synthesisable. We /do/ plan to add support for
-        this in the future. In the mean time, this poor support for recursive
-        functions is amortized by the fact that the CλaSH compiler has built-in
-        support for the higher-order functions defined in "CLaSH.Sized.Vector".
+        the CλaSH compiler are very poor, and a user-defined function such as
+        the @mapV@ function defined above, is /currently/ not synthesisable.
+        We /do/ plan to add support for this in the future. In the mean time,
+        this poor support for user-defined recursive functions is amortized by
+        the fact that the CλaSH compiler has built-in support for the
+        higher-order functions defined in "CLaSH.Sized.Vector". Most regular
+        design patterns often encountered in circuit design are captured by the
+        higher-order functions in "CLaSH.Sized.Vector".
+
 
 * __Recursive datatypes__
 
