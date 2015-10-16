@@ -1795,7 +1795,7 @@ bv2v = unpack
 -- >>> let x = (0:>0:>0:>1:>0:>0:>1:>0:>Nil) :: Vec 8 Bit
 -- >>> x
 -- <0,0,0,1,0,0,1,0>
--- >>> bv2v x
+-- >>> v2bv x
 -- 0001_0010
 v2bv :: KnownNat n => Vec n Bit -> BitVector n
 v2bv = pack
