@@ -113,29 +113,51 @@ import Data.Default
 -- >>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
 -- >>> let testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
 -- >>> let expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
+-- >>> :{
+-- let fibR :: Unsigned 64 -> Unsigned 64
+--     fibR 0 = 0
+--     fibR 1 = 1
+--     fibR n = fibR (n-1) + fibR (n-2)
+-- :}
+--
+-- >>> :{
+-- let fibS :: Signal (Unsigned 64)
+--     fibS = r
+--       where r = register 0 r + register 0 (register 1 r)
+-- :}
 
 {- $introduction
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
 borrows both its syntax and semantics from the functional programming language
-Haskell. The merits of using a functional language to describe hardware comes
-from the fact that combinational circuits can be directly modeled as
-mathematical functions and that functional languages lend themselves very well
-at describing and (de-)composing mathematical functions. The CλaSH compiler
-transforms these high-level descriptions to low-level synthesizable VHDL,
-Verilog, or SystemVerilog.
+Haskell. It provides a familiar structural design approach to both combination
+and synchronous sequential circuits. The CλaSH compiler transforms these
+high-level descriptions to low-level synthesizable VHDL, Verilog, or
+SystemVerilog.
+
+Features of CλaSH:
+
+  * Strongly typed (like VHDL), yet with a very high degree of type inference,
+    enabling both safe and fast prototying using concise descriptions (like
+    Verilog).
+  * Interactive REPL: load your designs in an interpreter and easily test all
+    your component without needing to setup a test bench.
+  * Compile your designs for fast simulation.
+  * Higher-order functions, in combination with type inference, result in
+    designs that are fully parametric by default.
+  * Synchronous sequential circuit design based on streams of values, called
+    @Signal@s, lead to natural descriptions of feedback loops.
+  * Multiple clock domains, with type safe clock domain crossing.
+  * Template language for introducing new VHDL/(System)Verilog primitives.
 
 Although we say that CλaSH borrows the semantics of Haskell, that statement
 should be taken with a grain of salt. What we mean to say is that the CλaSH
 compiler views a circuit description as /structural/ description. This means,
 in an academic handwavy way, that every function denotes a component and every
 function application denotes an instantiation of said component. Now, this has
-consequences on how we view /recursive/ functions: structurally, a recursive
-function would denote an /infinitely/ deep / structured component, something
-that cannot be turned into an actual circuit (See also <#unsupported Unsupported Haskell features>).
-Of course there are variants of recursion that could be completely unfolded at
-compile-time with a finite amount of steps and hence could be converted to a
-realisable circuit. Sadly, this last feature is missing in the current version
-of the compiler.
+consequences on how we view /recursively/ defined functions: structurally, a
+recursively defined function would denote an /infinitely/ deep / structured
+component, something that cannot be turned into an actual circuit
+(See also <#unsupported Unsupported Haskell features>).
 
 On the other hand, Haskell's by-default non-strict evaluation works very well
 for the simulation of the feedback loops, which are ubiquitous in digital
@@ -147,6 +169,9 @@ counter = s
   where
     s = 'register' 0 (s + 1)
 @
+
+The above definition, which uses value-recursion, /can/ be synthesized to a
+circuit by the CλaSH compiler.
 
 Over time, you will get a better feeling for the consequences of taking a
 /structural/ view on circuit descriptions. What is always important to
@@ -665,10 +690,10 @@ topEntity :: 'Signal' ('Signed' 16) -> 'Signal' ('Signed' 16)
 topEntity = fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil')
 @
 
-Here we can see that, although the CλaSH compiler does not support recursion,
-many of the regular patterns that we often encounter in circuit design are
-already captured by the higher-order functions that are present for the 'Vec'tor
-type.
+Here we can see that, although the CλaSH compiler handles recursive function
+definitions poorly, many of the regular patterns that we often encounter in
+circuit design are already captured by the higher-order functions that are
+present for the 'Vec'tor type.
 -}
 
 {- $composition_sequential
@@ -1666,32 +1691,116 @@ A list of often encountered errors and their solutions:
 
 {- $unsupported #unsupported#
 Here is a list of Haskell features which the CλaSH compiler cannot synthesize
-to VHDL/Verilog/SystemVerilog (for now):
+to VHDL/(System)Verilog (for now):
 
-* __Recursive functions__
+* __Recursively defined functions__
 
-    Although it seems rather bad that a compiler for a
-    functional language does not support recursion, this bug/feature of the
-    CλaSH compiler is amortized by the builtin knowledge of all the functions
-    listed in "CLaSH.Sized.Vector". And as you saw in this tutorial, the
-    higher-order functions of "CLaSH.Sized.Vector" can cope with many of the
-    recursive design patterns found in circuit design.
+    At first hand, it seems rather bad that a compiler for a functional language
+    cannot synthesize recursively defined functions to circuits. However, when
+    viewing your functions as a /structural/ specification of a circuit, this
+    /feature/ of the CλaSH compiler makes sense. Also, only certain types of
+    recursion are considered non-synthesisable; recursively defined values are
+    for example synthesisable: they are (often) synthesized to feedback loops.
 
-    Also note that although recursive functions are not supported, recursively
-    (tying-the-knot) defined values are supported (as long as these values do
-    not have a function type). An example that uses recursively defined values
-    is the following function that performs one iteration of bubble sort:
+    Let us distinguish between three variants of recursion:
 
-    @
-    sortV xs = 'map' fst sorted :< (snd ('last' sorted))
-     where
-       lefts  = 'head' xs :> 'map' snd ('init' sorted)
-       rights = 'tail' xs
-       sorted = 'zipWith' compareSwapL lefts rights
-    @
+    * __Dynamic data-dependent recursion__
 
-    Where we can clearly see that 'lefts' and 'sorted' are defined in terms of
-    each other.
+        As demonstrated in this definition of a function that calculates the
+        n'th Fibbonacci number:
+
+        @
+        fibR 0 = 0
+        fibR 1 = 1
+        fibR n = fibR (n-1) + fibR (n-2)
+        @
+
+        To get the first 10 numbers, we do the following:
+
+        >>> import qualified Data.List as L
+        >>> L.map fibR [0..9]
+        [0,1,1,2,3,5,8,13,21,34]
+
+        The @fibR@ function is not synthesizable by the CλaSH compiler, because,
+        when we take a /structural/ view, @fibR@ describes an infinitely deep
+        structure.
+
+        In principal, descriptions like the above could be synthesized to a
+        circuit, but it would have to be a /sequential/ circuit. Where the most
+        general synthesis would then require a stack. Such a synthesis approach
+        is also known as /behavioural/ synthesis, something which the CλaSH
+        compiler simply does not do. One reason that CλaSH does not do this is
+        because it does not fit the paradigm that only functions working on
+        values of type 'Signal' result in sequential circuits, and all other
+        (non higher-order) functions result in combinational circuits. This
+        paradigm gives the designer the most straightforward mapping from the
+        original Haskell description to generated circuit, and thus the greatest
+        control over the eventual size of the circuit and longest propagation
+        delay.
+
+    * __Value-recursion__
+
+        As demonstrated in this definition of a function that calculates the
+        n'th Fibbonaci number on the n'th clock cycle:
+
+        @
+        fibS = r
+          where r = 'register' 0 r + 'register' 0 ('register' 1 r)
+        @
+
+        To get the first 10 numbers, we do the following:
+
+        >>> sampleN 10 fibS
+        [0,1,1,2,3,5,8,13,21,34]
+
+        Unlike the @fibR@ function, the above @fibS@ function /is/ synthesisable
+        by the CλaSH compiler. Where the recursively defined (non-function)
+        value /r/ is synthesized to a feedback loop containing three registers
+        and one adder.
+
+        Note that not all recursively defined values result in a feedback loop.
+        An example that uses recursively defined values which does not result
+        in a feedback loop is the following function that performs one iteration
+        of bubble sort:
+
+        @
+        sortV xs = 'map' fst sorted :< (snd ('last' sorted))
+         where
+           lefts  = 'head' xs :> 'map' snd ('init' sorted)
+           rights = 'tail' xs
+           sorted = 'zipWith' compareSwapL lefts rights
+        @
+
+        Where we can clearly see that 'lefts' and 'sorted' are defined in terms
+        of each other. Also the above @sortV@ function /is/ synthesisable.
+
+    * __Static/Structure-dependent recursion__
+
+        Static, or, structure-dependent recursion is a rather /vague/ concept.
+        What we mean by this concept are recursive definitions where a user can
+        sensibly imagine that the recursive definition can be completely
+        unfolded (all recursion is eliminated) at compile-time in a finite
+        amount of time.
+
+        Such definitions would e.g. be:
+
+        @
+        mapV :: (a -> b) -> Vec n a -> Vec n b
+        mapV _ Nil         = Nil
+        mapV f (Cons x xs) = Cons (f x) (mapV f xs)
+
+        topEntity :: Vec 4 Int -> Vec 4 Int
+        topEntity = mapV (+1)
+        @
+
+        Where one can imagine that a compiler can unroll the definition of
+        @mapV@ four times, knowing that the @topEntity@ function applies @mapV@
+        to a 'Vec' of length 4. Sadly, the compile-time evaluation mechanisms in
+        the CλaSH compiler are very poor, and a user-defined function as the
+        above is /currently/ not synthesisable. We /do/ plan to add support for
+        this in the future. In the mean time, this poor support for recursive
+        functions is amortized by the fact that the CλaSH compiler has built-in
+        support for the higher-order functions defined in "CLaSH.Sized.Vector".
 
 * __Recursive datatypes__
 
@@ -1723,7 +1832,6 @@ to VHDL/Verilog/SystemVerilog (for now):
 
         1.  In order to achieve reasonable operating frequencies, arithmetic
             circuits for floating point data types must be pipelined.
-
         2.  Haskell's primitive arithmetic operators on floating point data types,
             such as 'plusFloat#'
 
@@ -1748,7 +1856,7 @@ to VHDL/Verilog/SystemVerilog (for now):
     'Char', 'Array', etc. cannot to translated to hardware.
 
     The translations of 'Int', 'Int#', and 'Integer' are also incorrect: they
-    are translated to the VHDL @integer@ type, the Verilog @signed [31:0], or
+    are translated to the VHDL @integer@ type, the Verilog @signed [31:0]@, or
     the SystemVerilog @signed logic [31:0]@ type, which can only represent
     32-bit integer values. Use these types with due diligence.
 
@@ -1774,7 +1882,7 @@ embedded domain specific language. One downside of static analysis vs. the
 embedded language approach is already clearly visible: synthesis of recursive
 descriptions does not come for \"free\". This will be implemented in CλaSH in
 due time, but that doesn't help the circuit designer right now. As already
-mentioned earlier, the lack of support for recursive functions is amortized by
+mentioned earlier, the poor support for recursive functions is amortized by
 the built-in support for the higher-order in "CLaSH.Sized.Vector".
 
 The big upside of CλaSH and its static analysis approach is that CλaSH can
