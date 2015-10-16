@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.1
+## 0.6.1 *October 16th 2015*
 * New features:
   * Support for `clash-prelude` 0.10.1
   * Transformation that lifts applications of the same function out of alternatives of case-statements. e.g.

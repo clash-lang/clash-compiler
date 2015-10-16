@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.1
+## 0.6.1 *October 16th 2015*
 * New features:
   * Support for `clash-prelude` 0.10.1
   * Transformation that lifts applications of the same function out of alternatives of case-statements. e.g.
@@ -27,6 +27,7 @@
 * Fixes bugs:
   * clash won't run when not compiled with usual ghc [#82](https://github.com/clash-lang/clash-compiler/issues/82)
   * Fail to generate VHDL with blockRamFile' in clash-ghc 0.6 [#85](https://github.com/clash-lang/clash-compiler/issues/85)
+  * Case-statements acting like normal decoder circuits are erroneously synthesised to priority decoder circuits.
 
 ## 0.6 *October 3rd 2015*
 * New features:
