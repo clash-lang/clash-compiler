@@ -63,7 +63,7 @@ module CLaSH.Sized.Vector
   , rotateLeft, rotateRight, rotateLeftS, rotateRightS
     -- * Element-wise operations
     -- ** Mapping
-  , map, imap
+  , map, imap, smap
     -- ** Zipping
   , zipWith, zipWith3
   , zip, zip3
@@ -102,7 +102,7 @@ import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type ($))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
-                                   natVal)
+                                   type (-), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
@@ -118,7 +118,8 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
 import CLaSH.Promoted.Nat         (SNat (..), UNat (..), snat, snatToInteger,
-                                   withSNat, toUNat)
+                                   subSNat, withSNat, toUNat)
+import CLaSH.Promoted.Nat.Literals (d1)
 import CLaSH.Promoted.Nat.Unsafe  (unsafeSNat)
 import CLaSH.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
@@ -1731,6 +1732,23 @@ vfold :: KnownNat k
       -> Vec k b
 vfold f xs = dfold (Proxy :: Proxy (VCons a)) (const f) Nil xs
 {-# INLINE vfold #-}
+
+-- | Apply a function to every element of a vector and the element's position
+-- (as an 'SNat' value) in the vector.
+--
+-- >>> let rotateMatrix = smap (flip rotateRightS)
+-- >>> let xss = (1:>2:>3:>Nil):>(1:>2:>3:>Nil):>(1:>2:>3:>Nil):>Nil
+-- >>> xss
+-- <<1,2,3>,<1,2,3>,<1,2,3>>
+-- >>> rotateMatrix xss
+-- <<1,2,3>,<3,1,2>,<2,3,1>>
+smap :: KnownNat k => (forall l . SNat (k-1-l) -> a -> b) -> Vec k a -> Vec k b
+smap f xs = dfold (Proxy :: Proxy (VCons a))
+                  (\sn x xs' -> f (xsL `subSNat` d1 `subSNat` sn) x :> xs')
+                  Nil xs
+  where
+    xsL = lengthS xs
+{-# INLINE smap #-}
 
 instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)

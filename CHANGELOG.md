@@ -4,6 +4,7 @@
 * New features:
   * The `f` in `dfold p f`, now has an `SNat l` instead of a `Proxy l` as its first argument.
   * Add `bv2v` and `v2bv` functions that convert between `Vec n Bit` and `BitVector n`.
+  * Add `smap`: apply a function to every element of a vector and the element's position (as an 'SNat' value) in the vector.
 
 ## 0.10 *October 3rd 2015*
 * New features:
