@@ -1,16 +1,4 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.eq#"
-    , "type"      : "eq# :: Eq a => Vec n a -> Vec n a -> Bool"
-    , "templateE" : "~ARG[0] == ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.neq#"
-    , "type"      : "neq# :: Eq a => Vec n a -> Vec n a -> Bool"
-    , "templateE" : "~ARG[0] != ~ARG[1]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.head"
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateD" :
