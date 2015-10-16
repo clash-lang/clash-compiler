@@ -1,6 +1,6 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.10.1
+## 0.10.1 *October 16th 2015*
 * New features:
   * The `f` in `dfold p f`, now has an `SNat l` instead of a `Proxy l` as its first argument.
   * Add `bv2v` and `v2bv` functions that convert between `Vec n Bit` and `BitVector n`.
