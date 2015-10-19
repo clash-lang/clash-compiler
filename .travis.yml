@@ -34,13 +34,10 @@ install:
   # if we are building on head, test against development versions of
   # relevant dependencies
   - $CABAL sandbox init --sandbox=$HOME/.cabal-sandbox/$GHCVER
-  - |
-    if [ $GHCVER = "head" ]; then
-      git clone https://github.com/clash-lang/ghc-tcplugins-extra.git
-      git clone https://github.com/clash-lang/ghc-typelits-natnormalise.git
-      $CABAL sandbox add-source ghc-tcplugins-extra
-      $CABAL sandbox add-source ghc-typelits-natnormalise
-    fi
+  - git clone https://github.com/clash-lang/ghc-tcplugins-extra.git
+  - git clone https://github.com/clash-lang/ghc-typelits-natnormalise.git
+  - $CABAL sandbox add-source ghc-tcplugins-extra
+  - $CABAL sandbox add-source ghc-typelits-natnormalise
   - $CABAL install $JOPTS --enable-tests --dependencies-only
 
 script:
