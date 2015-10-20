@@ -73,13 +73,13 @@ import CLaSH.Class.Num            (ExtendingNum (..))
 -- >>> 1 + 2 :: Index 8
 -- 3
 -- >>> 2 + 6 :: Index 8
--- *** Exception: 8 is out of bounds: [0..7]
+-- *** Exception: CLaSH.Sized.Index: result 8 is out of bounds: [0..7]
 -- >>> 1 - 3 :: Index 8
--- *** Exception: -2 is out of bounds: [0..7]
+-- *** Exception: CLaSH.Sized.Index: result -2 is out of bounds: [0..7]
 -- >>> 2 * 3 :: Index 8
 -- 6
 -- >>> 2 * 4 :: Index 8
--- *** Exception: 8 is out of bounds: [0..7]
+-- *** Exception: CLaSH.Sized.Index: result 8 is out of bounds: [0..7]
 newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.

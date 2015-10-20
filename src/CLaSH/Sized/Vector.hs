@@ -567,7 +567,7 @@ map f (x `Cons` xs) = f x `Cons` map f xs
 -- >>> :t imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
 -- imap (+) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Index 4)
 -- >>> imap (+) (2 :> 2 :> 2 :> 2 :> Nil)
--- <2,3,*** Exception: 4 is out of bounds: [0..3]
+-- <2,3,*** Exception: CLaSH.Sized.Index: result 4 is out of bounds: [0..3]
 -- >>> imap (\i a -> fromIntegral i + a) (2 :> 2 :> 2 :> 2 :> Nil) :: Vec 4 (Unsigned 8)
 -- <2,3,4,5>
 --
@@ -585,7 +585,7 @@ imap f = go 0
 -- | Zip two vectors with a functions that also takes the elements' indices.
 --
 -- >>> izipWith (\i a b -> i + a + b) (2 :> 2 :> Nil)  (3 :> 3:> Nil)
--- <*** Exception: 3 is out of bounds: [0..1]
+-- <*** Exception: CLaSH.Sized.Index: result 3 is out of bounds: [0..1]
 -- >>> izipWith (\i a b -> fromIntegral i + a + b) (2 :> 2 :> Nil) (3 :> 3 :> Nil) :: Vec 2 (Unsigned 8)
 -- <5,6>
 --
