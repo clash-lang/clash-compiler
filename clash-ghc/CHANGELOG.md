@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.2
+* Fixes bugs:
+  * CLaSH interpreter was reading '.ghci' file instead of '.clashi' file [#87](https://github.com/clash-lang/clash-compiler/issues/87)
+
 ## 0.6.1 *October 16th 2015*
 * New features:
   * Support for `clash-prelude` 0.10.1
