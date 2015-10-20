@@ -475,7 +475,7 @@ ghciLogAction lastErrLocations dflags severity srcSpan style msg = do
 
 withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
 withGhcAppData right left = do
-    either_dir <- tryIO (getAppUserDataDirectory "ghc")
+    either_dir <- tryIO (getAppUserDataDirectory "clash")
     case either_dir of
         Right dir ->
             do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
@@ -587,13 +587,13 @@ runGHCi paths maybe_exprs = do
                 runCommands' hdle (Just $ hdle (toException $ ExitFailure 1) >> return ()) (return Nothing)
 
   -- and finally, exit
-  liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
+  liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving CLaSHi."
 
 runGHCiInput :: InputT GHCi a -> GHCi a
 runGHCiInput f = do
     dflags <- getDynFlags
     histFile <- if gopt Opt_GhciHistory dflags
-                then liftIO $ withGhcAppData (\dir -> return (Just (dir </> "ghci_history")))
+                then liftIO $ withGhcAppData (\dir -> return (Just (dir </> "clashi_history")))
                                              (return Nothing)
                 else return Nothing
     runInputT
