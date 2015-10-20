@@ -173,7 +173,8 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE i =
   let bound = natVal res
       i'    = i `mod` bound
-      err   = error (show i ++ " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
+      err   = error ("CLaSH.Sized.Index: result " ++ show i ++
+                     " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
       res   = if i' /= i then err else I i
   in  res
 
