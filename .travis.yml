@@ -38,7 +38,7 @@ install:
   - git clone https://github.com/clash-lang/ghc-typelits-natnormalise.git
   - $CABAL sandbox add-source ghc-tcplugins-extra
   - $CABAL sandbox add-source ghc-typelits-natnormalise
-  - $CABAL install $JOPTS --enable-tests --dependencies-only
+  - $CABAL install $JOPTS --enable-tests --dependencies-only --force-reinstalls
 
 script:
   - $CABAL configure -v2 --enable-tests
