@@ -65,6 +65,24 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.plus#"
+    , "type"      : "Index m -> Index n -> Index (m + n - 1)"
+    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.minus#"
+    , "type"      : "Index m -> Index n -> Index (m + n - 1)"
+    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.times#"
+    , "type"      : "Index m -> Index n -> Index (((m-1) * (n-1)) + 1)"
+    , "templateE" : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.quot#"
     , "type"      : "quot# :: Index n -> Index n -> Index n"
     , "templateE" : "~ARG[0] / ~ARG[1]"
