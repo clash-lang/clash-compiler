@@ -98,7 +98,7 @@ Executable clash
                       clash-systemverilog       >= 0.6.1,
                       clash-vhdl                >= 0.6.1,
                       clash-verilog             >= 0.6.1,
-                      clash-prelude             >= 0.10.1,
+                      clash-prelude             >= 0.10.1 && < 0.11,
                       ghc-typelits-natnormalise >= 0.3
 
   if os(windows)
