@@ -1,8 +1,11 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -37,6 +40,10 @@ module CLaSH.Sized.Internal.Index
   , (-#)
   , (*#)
   , fromInteger#
+    -- ** ExtendingNum
+  , plus#
+  , minus#
+  , times#
     -- ** Integral
   , quot#
   , rem#
@@ -47,10 +54,13 @@ where
 import Data.Default               (Default (..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-import GHC.TypeLits               (KnownNat, Nat, natVal)
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
+                                   natVal)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitrarySizedBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
+
+import CLaSH.Class.Num            (ExtendingNum (..))
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -166,6 +176,29 @@ fromInteger_INLINE i =
       err   = error (show i ++ " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
       res   = if i' /= i then err else I i
   in  res
+
+instance ExtendingNum (Index m) (Index n) where
+  type AResult (Index m) (Index n) = Index (m + n - 1)
+  plus  = plus#
+  minus = minus#
+  type MResult (Index m) (Index n) = Index (((m - 1) * (n - 1)) + 1)
+  times = times#
+
+plus#, minus# :: Index m -> Index n -> Index (m + n - 1)
+{-# NOINLINE plus# #-}
+plus# (I a) (I b) = I (a + b)
+
+{-# NOINLINE minus# #-}
+minus# (I a) (I b) =
+  let z   = a - b
+      err = error ("CLaSH.Sized.Index.minus: result " ++ show z ++
+                   " is smaller than 0")
+      res = if z < 0 then err else I z
+  in  res
+
+{-# NOINLINE times# #-}
+times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
+times# (I a) (I b) = I (a * b)
 
 instance KnownNat n => Real (Index n) where
   toRational = toRational . toInteger#

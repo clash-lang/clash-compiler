@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.2
+* New features
+  * `ExtendingNum` instance for `Index`
+
 ## 0.10.1 *October 16th 2015*
 * New features:
   * The `f` in `dfold p f`, now has an `SNat l` instead of a `Proxy l` as its first argument.
