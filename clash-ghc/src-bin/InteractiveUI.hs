@@ -488,16 +488,16 @@ runGHCi paths maybe_exprs = do
   let
    read_dot_files = not (gopt Opt_IgnoreDotGhci dflags)
 
-   current_dir = return (Just ".ghci")
+   current_dir = return (Just ".clashi")
 
    app_user_dir = liftIO $ withGhcAppData
-                    (\dir -> return (Just (dir </> "ghci.conf")))
+                    (\dir -> return (Just (dir </> "clashi.conf")))
                     (return Nothing)
 
    home_dir = do
     either_dir <- liftIO $ tryIO (getEnv "HOME")
     case either_dir of
-      Right home -> return (Just (home </> ".ghci"))
+      Right home -> return (Just (home </> ".clashi"))
       _ -> return Nothing
 
    canonicalizePath' :: FilePath -> IO (Maybe FilePath)
