@@ -50,8 +50,10 @@ install:
   - |
     if [ $GHCVER = "head" ]; then
       git clone https://github.com/clash-lang/ghc-tcplugins-extra.git
+      git clone https://github.com/clash-lang/ghc-typelits-extra.git
       git clone https://github.com/clash-lang/ghc-typelits-natnormalise.git
       $CABAL sandbox add-source ghc-tcplugins-extra
+      $CABAL sandbox add-source ghc-typelits-extra
       $CABAL sandbox add-source ghc-typelits-natnormalise
     fi
   - git clone https://github.com/clash-lang/clash-prelude.git
