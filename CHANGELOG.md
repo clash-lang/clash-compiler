@@ -2,7 +2,9 @@
 
 ## 0.10.2
 * New features
-  * `ExtendingNum` instance for `Index`
+  * `ExtendingNum`, `BitPack`, and `Resize` instance for `Index`
+  * Add `bv2i`: convert `BitVector n` to `Index (2^n)`
+  * Export type-level operations from [ghc-typelits-extra](http://hackage.haskell.org/package/ghc-typelits-extra)
 
 ## 0.10.1 *October 16th 2015*
 * New features:

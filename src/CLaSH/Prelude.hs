@@ -92,6 +92,7 @@ module CLaSH.Prelude
   , module CLaSH.Annotations.TopEntity
     -- ** Type-level natural numbers
   , module GHC.TypeLits
+  , module GHC.TypeLits.Extra
   , module CLaSH.Promoted.Nat
   , module CLaSH.Promoted.Nat.Literals
   , module CLaSH.Promoted.Nat.TH
@@ -121,6 +122,7 @@ import Control.Applicative
 import Data.Bits
 import Data.Default
 import GHC.TypeLits
+import GHC.TypeLits.Extra
 import Language.Haskell.TH.Syntax  (Lift(..))
 #if __GLASGOW_HASKELL__ < 711
 import Language.Haskell.TH.Lift    (deriveLift)

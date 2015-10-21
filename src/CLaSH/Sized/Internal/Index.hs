@@ -20,6 +20,9 @@ module CLaSH.Sized.Internal.Index
   ( -- * Datatypes
     Index (..)
     -- * Type classes
+    -- ** BitConvert
+  , pack#
+  , unpack#
     -- ** Eq
   , eq#
   , neq#
@@ -48,6 +51,8 @@ module CLaSH.Sized.Internal.Index
   , quot#
   , rem#
   , toInteger#
+    -- ** Resize
+  , resize#
   )
 where
 
@@ -56,11 +61,15 @@ import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
                                    natVal)
+import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitrarySizedBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import CLaSH.Class.Num            (ExtendingNum (..))
+import CLaSH.Class.BitPack            (BitPack (..))
+import CLaSH.Class.Num                (ExtendingNum (..))
+import CLaSH.Class.Resize             (Resize (..))
+import CLaSH.Sized.Internal.BitVector (BitVector (..))
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -84,6 +93,19 @@ newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     I { unsafeToInteger :: Integer }
+
+instance KnownNat n => BitPack (Index n) where
+  type BitSize (Index n) = CLog 2 n
+  pack   = pack#
+  unpack = unpack#
+
+{-# NOINLINE pack# #-}
+pack# :: Index n -> BitVector (CLog 2 n)
+pack# (I i) = BV i
+
+{-# NOINLINE unpack# #-}
+unpack# :: KnownNat n => BitVector (CLog 2 n) -> Index n
+unpack# (BV i) = fromInteger_INLINE i
 
 instance Eq (Index n) where
   (==) = eq#
@@ -222,6 +244,16 @@ quot#,rem# :: Index n -> Index n -> Index n
 {-# NOINLINE toInteger# #-}
 toInteger# :: Index n -> Integer
 toInteger# (I n) = n
+
+instance Resize Index where
+  resize     = resize#
+  zeroExtend = resize#
+  signExtend = resize#
+  truncateB  = resize#
+
+resize# :: KnownNat m => Index n -> Index m
+resize# (I i) = fromInteger_INLINE i
+{-# NOINLINE resize# #-}
 
 instance KnownNat n => Lift (Index n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))

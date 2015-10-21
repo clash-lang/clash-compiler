@@ -79,6 +79,7 @@ module CLaSH.Prelude.Safe
   , module CLaSH.Annotations.TopEntity
     -- ** Type-level natural numbers
   , module GHC.TypeLits
+  , module GHC.TypeLits.Extra
   , module CLaSH.Promoted.Nat
   , module CLaSH.Promoted.Nat.Literals
   , module CLaSH.Promoted.Nat.TH
@@ -101,6 +102,7 @@ where
 import Control.Applicative
 import Data.Bits
 import GHC.TypeLits
+import GHC.TypeLits.Extra
 import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            foldl1, foldr, foldr1, head, init,
                                            iterate, last, length, map, repeat,
