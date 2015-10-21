@@ -158,6 +158,8 @@ main = do
                                     , DynFlags.Opt_ConstraintKinds
                                     , DynFlags.Opt_TypeFamilies
                                     , DynFlags.Opt_BinaryLiterals
+                                    , DynFlags.Opt_ExplicitNamespaces
+                                    , DynFlags.Opt_KindSignatures
                                     ]
                 dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
                                      [ DynFlags.Opt_ImplicitPrelude
