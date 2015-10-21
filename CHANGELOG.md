@@ -1,6 +1,6 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.10.2
+## 0.10.2 *October 21st 2015*
 * New features
   * `ExtendingNum`, `BitPack`, and `Resize` instance for `Index`
   * Add `bv2i`: convert `BitVector n` to `Index (2^n)`
