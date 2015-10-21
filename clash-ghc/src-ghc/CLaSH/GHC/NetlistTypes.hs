@@ -74,13 +74,21 @@ tyNatSize :: HashMap TyConName TyCon
           -> Type
           -> ExceptT String Maybe Int
 tyNatSize _ (LitTy (NumTy i)) = return i
-tyNatSize m (tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
+tyNatSize m ty@(tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
   "GHC.TypeLits.+" -> (+) <$> tyNatSize m ty1 <*> tyNatSize m ty2
   "GHC.TypeLits.*" -> (*) <$> tyNatSize m ty1 <*> tyNatSize m ty2
   "GHC.TypeLits.^" -> (^) <$> tyNatSize m ty1 <*> tyNatSize m ty2
   "GHC.TypeLits.-" -> (-) <$> tyNatSize m ty1 <*> tyNatSize m ty2
   "CLaSH.Promoted.Ord.Max" -> max <$> tyNatSize m ty1 <*> tyNatSize m ty2
   "CLaSH.Promoted.Ord.Min" -> min <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "GHC.TypeLits.Extra.CLog" -> do
+    i1' <- tyNatSize m ty1
+    i2' <- tyNatSize m ty2
+    if (i1' > 1 && i2' > 0)
+       then return (ceiling (logBase (fromIntegral i1' :: Double)
+                                     (fromIntegral i2' :: Double)))
+       else fail $ $(curLoc) ++ "Can't convert: " ++ show ty
+  "GHC.TypeLits.Extra.GCD" -> gcd <$> tyNatSize m ty1 <*> tyNatSize m ty2
   _ -> fail $ $(curLoc) ++ "Can't convert tyNatOp: " ++ show tc
 -- TODO: Remove this conversion
 -- The current problem is that type-functions are not reduced by the GHC -> Core

@@ -167,9 +167,11 @@ main = do
                                      ]
 
                 ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
+                ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
                 dflagsExtra2 = dflagsExtra1
                                   { DynFlags.pluginModNames = nub $
-                                      ghcTyLitNormPlugin : DynFlags.pluginModNames dflagsExtra1
+                                      ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
+                                      DynFlags.pluginModNames dflagsExtra1
                                   }
 
 
