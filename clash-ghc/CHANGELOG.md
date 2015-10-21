@@ -3,6 +3,7 @@
 ## 0.6.2
 * Fixes bugs:
   * CLaSH interpreter was reading '.ghci' file instead of '.clashi' file [#87](https://github.com/clash-lang/clash-compiler/issues/87)
+  * DEC: Subject and alternatives are not disjoint [#88](https://github.com/clash-lang/clash-compiler/issues/88)
 
 ## 0.6.1 *October 16th 2015*
 * New features:
