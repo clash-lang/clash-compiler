@@ -117,8 +117,9 @@ collectGlobals ::
                   (Term,[(Term,CaseTree [(Either Term Type)])])
 collectGlobals inScope substitution seen (Case scrut ty alts) = do
   (scrut',collected)  <- collectGlobals     inScope substitution seen scrut
-  (alts' ,collected') <- collectGlobalsAlts inScope substitution seen scrut'
-                                            alts
+  (alts' ,collected') <- collectGlobalsAlts inScope substitution
+                                            (map fst collected ++ seen)
+                                            scrut' alts
   return (Case scrut' ty alts',collected ++ collected')
 
 collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
