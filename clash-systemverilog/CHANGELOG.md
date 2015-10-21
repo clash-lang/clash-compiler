@@ -1,6 +1,6 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.6.2
+## 0.6.2 *October 21st 2015*
 * New features:
   * Support `clash-prelude` 0.10.2
 

@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.2
+## 0.6.2 *October 21st 2015*
 * Fixes bugs:
   * DEC: Subject and alternatives are not disjoint [#88](https://github.com/clash-lang/clash-compiler/issues/88)
 

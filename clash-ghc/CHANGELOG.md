@@ -1,6 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.2
+## 0.6.2 *October 21st 2015*
+* New features:
+  * Support `clash-prelude` 0.10.2
+
 * Fixes bugs:
   * CLaSH interpreter was reading '.ghci' file instead of '.clashi' file [#87](https://github.com/clash-lang/clash-compiler/issues/87)
   * DEC: Subject and alternatives are not disjoint [#88](https://github.com/clash-lang/clash-compiler/issues/88)
