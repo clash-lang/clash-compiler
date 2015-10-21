@@ -1,4 +1,16 @@
 [ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.pack#"
+    , "type"      : "pack# :: Index n -> BitVector (CLog 2 n)"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.unpack#"
+    , "type"      : "unpack# :: KnownNat n => BitVector (CLog 2 n) -> Index n"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.eq#"
     , "type"      : "eq# :: Index n -> Index n -> Bool"
     , "templateE" : "~ARG[0] == ~ARG[1]"
@@ -98,6 +110,12 @@
     { "name"      : "CLaSH.Sized.Internal.Index.toInteger#"
     , "type"      : "toInteger# :: Index n -> Integer"
     , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.Internal.Index.resize#"
+    , "type"      : "resize# :: KnownNat m => Index n -> Index m"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[1]);"
     }
   }
 ]
