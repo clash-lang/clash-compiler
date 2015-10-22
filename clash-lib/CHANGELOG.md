@@ -2,7 +2,7 @@
 
 ## 0.6.3
 * New features:
-  * Improve DEC transformation: consider alternatives before the subject when checking for disjoin expressions.
+  * Improve DEC transformation: consider alternatives before the subject when checking for disjoint expressions.
 
 ## 0.6.2 *October 21st 2015*
 * Fixes bugs:
