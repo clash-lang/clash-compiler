@@ -8,8 +8,9 @@ module CLaSH.Rewrite.Types where
 
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.Lens                          (use, (.=), (<<%=))
-import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad
+import Control.Monad.Fix                     (MonadFix (..), fix)
+import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.HashMap.Strict                   (HashMap)
@@ -135,6 +136,9 @@ instance MonadReader RewriteEnv (RewriteMonad extra) where
    ask       = R (\r s -> (r,s,mempty))
    local f m = R (\r s -> runR m (f r) s)
    reader f  = R (\r s -> (f r,s,mempty))
+
+instance MonadFix (RewriteMonad extra) where
+  mfix f = R (\r s -> fix $ \ ~(a,_,_) -> runR (f a) r s)
 
 -- | Monadic action that transforms a term given a certain context
 type Transform m = [CoreContext] -> Term -> m Term

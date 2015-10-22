@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -51,8 +52,9 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 
-import           Unbound.Generics.LocallyNameless (Bind, bind, embed, rec,
-                                                   unbind, unembed, unrec)
+import           Unbound.Generics.LocallyNameless (Bind, bind, embed, unbind,
+                                                   unembed, unrec)
+import qualified Unbound.Generics.LocallyNameless as Unbound
 
 -- internal
 import CLaSH.Core.DataCon    (DataCon, dcTag)
@@ -116,10 +118,10 @@ collectGlobals ::
   -> RewriteMonad NormalizeState
                   (Term,[(Term,CaseTree [(Either Term Type)])])
 collectGlobals inScope substitution seen (Case scrut ty alts) = do
-  (scrut',collected)  <- collectGlobals     inScope substitution seen scrut
-  (alts' ,collected') <- collectGlobalsAlts inScope substitution
-                                            (map fst collected ++ seen)
-                                            scrut' alts
+  rec (alts' ,collected)  <- collectGlobalsAlts inScope substitution seen scrut'
+                                                alts
+      (scrut',collected') <- collectGlobals inScope substitution
+                                            (map fst collected ++ seen) scrut
   return (Case scrut' ty alts',collected ++ collected')
 
 collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
@@ -149,7 +151,7 @@ collectGlobals inScope substitution seen (Letrec b) = do
   (lbs',collected')   <- collectGlobalsLbs inScope substitution
                                            (map fst collected ++ seen)
                                            lbs
-  return (Letrec (bind (rec lbs') body')
+  return (Letrec (bind (Unbound.rec lbs') body')
          ,map (second (LB lbs')) (collected ++ collected')
          )
 
@@ -262,7 +264,7 @@ mkDisjointGroup fvs (fun,cs) = do
         disJointSelProj argTys cs''
     let newArgs = mkDJArgs 0 common uncommonProjections
     case uncommonCaseM of
-      Just lb -> return (Letrec (bind (rec [lb]) (mkApps fun newArgs)))
+      Just lb -> return (Letrec (bind (Unbound.rec [lb]) (mkApps fun newArgs)))
       Nothing -> return (mkApps fun newArgs)
 
 -- | Create a single selector for all the representable uncommon arguments by
@@ -350,7 +352,7 @@ genCase ty dcM argTys = go
         _ -> head tms
 
     go (LB lb ct) =
-      Letrec (bind (rec lb) (go ct))
+      Letrec (bind (Unbound.rec lb) (go ct))
 
     go (Branch scrut pats) =
       Case scrut ty (map (\(p,ct) -> bind p (go ct)) pats)
