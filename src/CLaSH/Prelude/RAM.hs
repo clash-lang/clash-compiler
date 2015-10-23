@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
@@ -11,7 +12,11 @@
 -- we just disable strictness analysis for this module completely. See
 -- https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
 -- for more details
+#if __GLASGOW_HASKELL__ < 711
 {-# OPTIONS_GHC -fno-strictness #-}
+#else
+{-# OPTIONS_GHC -fno-cpr-anal #-}
+#endif
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
