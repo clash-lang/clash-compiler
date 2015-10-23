@@ -52,7 +52,7 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 
-import           Unbound.Generics.LocallyNameless (Bind, bind, embed, unbind,
+import           Unbound.Generics.LocallyNameless (Bind, bind, embed, fv, unbind,
                                                    unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
@@ -353,6 +353,13 @@ genCase ty dcM argTys = go
 
     go (LB lb ct) =
       Letrec (bind (Unbound.rec lb) (go ct))
+
+    go (Branch scrut [(p,ct)]) =
+      let ct' = go ct
+          alt = bind p ct'
+      in  case Lens.setOf termFreeIds ct' == Lens.setOf fv alt of
+            True -> ct'
+            _    -> Case scrut ty [alt]
 
     go (Branch scrut pats) =
       Case scrut ty (map (\(p,ct) -> bind p (go ct)) pats)
