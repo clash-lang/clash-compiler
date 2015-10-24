@@ -159,13 +159,17 @@ Library
                       ghc-typelits-natnormalise >= 0.3,
                       lens                      >= 4.9,
                       QuickCheck                >= 2.7 && <2.9,
-                      reflection                >= 0.2,
+                      reflection                >= 2,
                       singletons                >= 1.0 && <3.0,
                       template-haskell          >= 2.9.0.0
 
-  -- Newer GHCs have -XDeriveLift
   if impl(ghc<7.11)
+    -- Newer GHCs have -XDeriveLift
     Build-depends:    th-lift                   >= 0.5.6
+    -- Newer GHCs have a -fno-cpr-anal dynflag which we can enable per module
+    -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
+    -- as to why we need this.
+    ghc-options:      -fcpr-off
 
   if flag(doclinks)
     CPP-Options:      -DDOCLINKS

@@ -1,7 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.10.3
-* Disable strictness analysis in `CLaSH.Prelude.RAM`
+## 0.10.3 *October 24th 2015*
+* Disable CPR analysis (See https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c):
+  * GHC < 7.11: In all modules using `-fcpr-off`
+  * GHC >= 7.11: In `CLaSH.Signal.Internal` and `CLaSH.Prelude.RAM` using `-fno-cpr-anal`
 
 ## 0.10.2 *October 21st 2015*
 * New features:
