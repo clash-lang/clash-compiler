@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.3
+## 0.6.3 *October 24th 2015*
 * New features:
   * Improve DEC transformation: consider alternatives before the subject when checking for disjoint expressions.
 * Fixes bugs:

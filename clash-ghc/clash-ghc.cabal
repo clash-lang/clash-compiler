@@ -94,11 +94,11 @@ Executable clash
                       unbound-generics          >= 0.1 && < 0.3,
                       unordered-containers      >= 0.2.1.0,
 
-                      clash-lib                 >= 0.6.2 && < 0.7,
+                      clash-lib                 >= 0.6.3 && < 0.7,
                       clash-systemverilog       >= 0.6.2,
                       clash-vhdl                >= 0.6.2,
                       clash-verilog             >= 0.6.2,
-                      clash-prelude             >= 0.10.2 && < 0.11,
+                      clash-prelude             >= 0.10.3 && < 0.11,
                       ghc-typelits-extra        >= 0.1,
                       ghc-typelits-natnormalise >= 0.3
 

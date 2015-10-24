@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.3
+## 0.6.3 *October 24th 2015*
 * Fixes bugs:
   * DEC: don't generate single-branch case-expressions [#90](https://github.com/clash-lang/clash-compiler/issues/90)
 
