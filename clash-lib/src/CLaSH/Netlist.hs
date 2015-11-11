@@ -204,16 +204,16 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   return (decls ++ [Assignment dstId extractExpr])
 
 mkDeclarations bndr (Case scrut altTy alts) = do
-  alts'                  <- mapM unbind alts
+  alts'                  <- reorderPats <$> mapM unbind alts
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
-  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (last alts'))) <$> mkExpr True scrutTy scrut
+  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (head alts'))) <$> mkExpr True scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = mkBasicId . Text.pack . name2String $ varName bndr
-  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy (reverse exprs)]
+  return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
@@ -231,6 +231,12 @@ mkDeclarations bndr (Case scrut altTy alts) = do
                                   Identifier scrutId _ -> Identifier scrutId modifier
                                   _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
       _ -> scrutE
+
+    -- GHC puts default patterns in the first position, we want them in the
+    -- last position.
+    reorderPats :: [(Pat,Term)] -> [(Pat,Term)]
+    reorderPats ((DefaultPat,e):alts') = alts' ++ [(DefaultPat,e)]
+    reorderPats alts'                  = alts'
 
 mkDeclarations bndr app =
   let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
