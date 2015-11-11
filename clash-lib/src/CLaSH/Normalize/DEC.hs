@@ -82,12 +82,14 @@ data CaseTree a
 -- case-expression.
 isDisjoint :: CaseTree ([Either Term Type])
            -> Bool
-isDisjoint (Leaf _)             = False
-isDisjoint (LB _ ct)            = isDisjoint ct
-isDisjoint (Branch _ [])        = False
-isDisjoint (Branch _ [(_,x)])   = isDisjoint x
-isDisjoint b@(Branch _ (_:_:_)) = allEqual (map Either.rights
-                                                (Foldable.toList b))
+isDisjoint (Branch _ [_]) = False
+isDisjoint ct = go ct
+  where
+    go (Leaf _)             = False
+    go (LB _ ct')           = go ct'
+    go (Branch _ [])        = False
+    go (Branch _ [(_,x)])   = go x
+    go b@(Branch _ (_:_:_)) = allEqual (map Either.rights (Foldable.toList b))
 
 -- Remove empty branches from a 'CaseTree'
 removeEmpty :: Eq a => CaseTree [a] -> CaseTree [a]
