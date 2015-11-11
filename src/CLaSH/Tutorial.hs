@@ -1071,7 +1071,7 @@ blockRam' clk binit wr rd en din = 'register'' clk undefined dout
       return d'
 @
 
-And for which the /definition/ primitive is:
+And for which the /declaration/ primitive is:
 
 @
 { \"BlackBox\" :
@@ -1118,7 +1118,7 @@ individual template holes mean in the above context, we will instead just give
 a general listing of the available template holes:
 
 * @~RESULT@: VHDL signal to which the result of a primitive must be assigned
-  to. NB: Only used in a /definition/ primitive.
+  to. NB: Only used in a /declaration/ primitive.
 * @~ARG[N]@: @(N+1)@'th argument to the function.
 * @~LIT[N]@: @(N+1)@'th argument to the function An extra condition that must
   hold is that this @(N+1)@'th argument is an (integer) literal.
