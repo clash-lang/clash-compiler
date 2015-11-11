@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.4
+* Fixes bugs:
+  * Reversing alternatives is not meaning preserving for literal patterns [#91](https://github.com/clash-lang/clash-compiler/issues/91)
+
 ## 0.6.3 *October 24th 2015*
 * New features:
   * Improve DEC transformation: consider alternatives before the subject when checking for disjoint expressions.
