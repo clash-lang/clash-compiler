@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.3 *November 12th 2015*
+* Fixes bugs:
+  * Do not generate overlapping literal patterns [#91](https://github.com/clash-lang/clash-compiler/issues/91)
+
 ## 0.6.2 *October 21st 2015*
 * New features:
   * Support `clash-prelude` 0.10.2

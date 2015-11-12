@@ -146,7 +146,7 @@ data Literal
   | BoolLit   !Bool      -- ^ Boolean literal
   | VecLit    [Literal] -- ^ Vector literal
   | StringLit !String    -- ^ String literal
-  deriving Show
+  deriving (Eq,Show)
 
 -- | Bit literal
 data Bit
@@ -154,7 +154,7 @@ data Bit
   | L -- ^ Low
   | U -- ^ Undefined
   | Z -- ^ High-impedance
-  deriving Show
+  deriving (Eq,Show)
 
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext

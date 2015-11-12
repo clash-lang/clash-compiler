@@ -28,7 +28,7 @@ import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Types
 import           CLaSH.Netlist.Util
-import           CLaSH.Util                           (clog2, curLoc, makeCached, (<:>))
+import           CLaSH.Util                           (clog2, curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
 import qualified Paths_clash_vhdl
@@ -447,8 +447,11 @@ inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
 
 inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <$>
-      indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds es)) <> semi))
+      indent 2 (text id_ <+> larrow <+> align (vcat (punctuate comma (conds esNub)) <> semi))
   where
+    esMod = map (first (fmap (patMod scrutTy))) es
+    esNub = nubBy ((==) `on` fst) esMod
+
     conds :: [(Maybe Literal,Expr)] -> VHDLM [Doc]
     conds []                = return []
     conds [(_,e)]           = expr_ False e <+> "when" <+> "others" <:> return []
@@ -611,6 +614,10 @@ patLit Integer (NumLit i) =
   in  parenIf (i' < 0) (integer i')
 patLit hwTy (NumLit i) = bits (toBits (conSize hwTy) i)
 patLit _    l          = exprLit Nothing l
+
+patMod :: HWType -> Literal -> Literal
+patMod hwTy (NumLit i) = NumLit (i `mod` (2 ^ typeSize hwTy))
+patMod _ l = l
 
 toBits :: Integral a => Int -> a -> [Bit]
 toBits size val = map (\x -> if odd x then H else L)
