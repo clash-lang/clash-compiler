@@ -982,7 +982,7 @@ reduceNonRepPrim _ e = return e
 --       C -> h x
 -- @
 disjointExpressionConsolidation :: NormRewrite
-disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts) = do
+disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts@(_:_:_)) = do
     let eFreeIds = Lens.setOf termFreeIds e
     (_,collected) <- collectGlobals eFreeIds [] [] e
     let disJoint = filter (isDisjoint . snd) collected
