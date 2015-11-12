@@ -1,5 +1,11 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.4 *November 12th 2015*
+* Fixes bugs:
+  * Reversing alternatives is not meaning preserving for literal patterns [#91](https://github.com/clash-lang/clash-compiler/issues/91)
+  * DEC: root of the case-tree must contain at least 2 alternatives [#92](https://github.com/clash-lang/clash-compiler/issues/92)
+  * Do not generate overlapping literal patterns in VHDL [#91](https://github.com/clash-lang/clash-compiler/issues/91)
+
 ## 0.6.3 *October 24th 2015*
 * New features:
   * Improve DEC transformation: consider alternatives before the subject when checking for disjoint expressions.
