@@ -377,9 +377,9 @@ alteraPll pllName clkExpr resExpr = ClockSource
 -- so that the following (System)Verilog is created:
 --
 -- > clkwiz50 clkwiz50_inst
--- > (.CLK_IN1 (CLOCK_50[0])
+-- > (.CLK_IN1 (CLOCK[0])
 -- > ,.CLK_OUT1 (system1000)
--- > ,.RESET (~ KEY0[0])
+-- > ,.RESET (~ KEY[0])
 -- > ,.LOCKED (clkwiz50_locked));
 clockWizard :: String -- ^ Name of the component.
             -> String -- ^ Clock Pin/Expression of the free running clock.
