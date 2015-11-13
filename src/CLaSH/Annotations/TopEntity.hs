@@ -364,10 +364,10 @@ alteraPll pllName clkExpr resExpr = ClockSource
 --
 -- > clkwiz50_inst : entity clkwiz50
 -- >   port map
--- >     (CLK_IN1  => CLOCK_50(0)
+-- >     (CLK_IN1  => CLOCK(0)
 -- >     ,CLK_OUT1 => system1000
--- >     ,RESET    => not KEY0(0)
--- >     ,LOCKED   => altpll50_locked);
+-- >     ,RESET    => not KEY(0)
+-- >     ,LOCKED   => clkwiz50_locked);
 --
 -- If you are however generating (System)Verilog you should write:
 --
@@ -377,10 +377,10 @@ alteraPll pllName clkExpr resExpr = ClockSource
 -- so that the following (System)Verilog is created:
 --
 -- > clkwiz50 clkwiz50_inst
--- > (.CLK_IN1 (CLOCK_50[0])
+-- > (.CLK_IN1 (CLOCK[0])
 -- > ,.CLK_OUT1 (system1000)
--- > ,.RESET (~ KEY0[0])
--- > ,.LOCKED (altpll50_locked));
+-- > ,.RESET (~ KEY[0])
+-- > ,.LOCKED (clkwiz50_locked));
 clockWizard :: String -- ^ Name of the component.
             -> String -- ^ Clock Pin/Expression of the free running clock.
             -> String -- ^ Reset Pin/Expression controlling the reset of the PLL.
