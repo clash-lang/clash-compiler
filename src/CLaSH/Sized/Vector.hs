@@ -126,46 +126,47 @@ import CLaSH.Sized.Index          (Index)
 
 import CLaSH.Class.BitPack (BitPack (..))
 
--- $setup
--- >>> :set -XDataKinds
--- >>> :set -XTypeFamilies
--- >>> :set -XTypeOperators
--- >>> :set -XTemplateHaskell
--- >>> :set -XFlexibleContexts
--- >>> :set -fplugin GHC.TypeLits.Normalise
--- >>> import CLaSH.Prelude
--- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
--- >>> :{
--- let sortV xs = map fst sorted :< (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith compareSwapL lefts rights
--- :}
---
--- >>> :{
--- let sortVL xs = map fst sorted :< (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith compareSwapL (lazyV lefts) rights
--- :}
---
--- >>> :{
--- let sortV_flip xs = map fst sorted :< (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith (flip compareSwapL) rights lefts
--- :}
---
--- >>> import Data.Singletons.Prelude
--- >>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
--- >>> type instance Apply (Append m a) l = Vec (l + m) a
--- >>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
--- >>> let compareSwap a b = if a > b then (a,b) else (b,a)
--- >>> let insert y xs     = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
--- >>> let insertionSort   = vfold insert
+{- $setup
+>>> :set -XDataKinds
+>>> :set -XTypeFamilies
+>>> :set -XTypeOperators
+>>> :set -XTemplateHaskell
+>>> :set -XFlexibleContexts
+>>> :set -fplugin GHC.TypeLits.Normalise
+>>> import CLaSH.Prelude
+>>> let compareSwapL a b = if a < b then (a,b) else (b,a)
+>>> :{
+let sortV xs = map fst sorted :< (snd (last sorted))
+      where
+        lefts  = head xs :> map snd (init sorted)
+        rights = tail xs
+        sorted = zipWith compareSwapL lefts rights
+:}
+
+>>> :{
+let sortVL xs = map fst sorted :< (snd (last sorted))
+      where
+        lefts  = head xs :> map snd (init sorted)
+        rights = tail xs
+        sorted = zipWith compareSwapL (lazyV lefts) rights
+:}
+
+>>> :{
+let sortV_flip xs = map fst sorted :< (snd (last sorted))
+      where
+        lefts  = head xs :> map snd (init sorted)
+        rights = tail xs
+        sorted = zipWith (flip compareSwapL) rights lefts
+:}
+
+>>> import Data.Singletons.Prelude
+>>> data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *
+>>> type instance Apply (Append m a) l = Vec (l + m) a
+>>> let append' xs ys = dfold (Proxy :: Proxy (Append m a)) (const (:>)) ys xs
+>>> let compareSwap a b = if a > b then (a,b) else (b,a)
+>>> let insert y xs     = let (y',xs') = mapAccumL compareSwap y xs in xs' :< y'
+>>> let insertionSort   = vfold insert
+-}
 
 infixr 5 `Cons`
 -- | Fixed size vectors.

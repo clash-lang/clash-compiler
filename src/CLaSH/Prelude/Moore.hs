@@ -25,20 +25,21 @@ import CLaSH.Signal          (Signal, Unbundled)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
--- $setup
--- >>> :set -XDataKinds
--- >>> import CLaSH.Prelude
--- >>> :{
--- let mac s (x,y) = x * y + s
---     topEntity = moore mac id 0
--- :}
---
--- >>> import CLaSH.Prelude.Explicit
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let mac s (x,y) = x * y + s
---
--- >>> let topEntity = moore' clkA mac id 0
+{- $setup
+>>> :set -XDataKinds
+>>> import CLaSH.Prelude
+>>> :{
+let mac s (x,y) = x * y + s
+    topEntity = moore mac id 0
+:}
+
+>>> import CLaSH.Prelude.Explicit
+>>> type ClkA = Clk "A" 100
+>>> let clkA = sclock :: SClock ClkA
+>>> let mac s (x,y) = x * y + s
+
+>>> let topEntity = moore' clkA mac id 0
+-}
 
 {-# INLINE moore #-}
 -- | Create a synchronous function from a combinational function describing

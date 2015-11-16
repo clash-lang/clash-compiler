@@ -137,8 +137,9 @@ import CLaSH.Signal
 import CLaSH.Signal.Delayed
 import CLaSH.Signal.Explicit       (systemClock)
 
--- $setup
--- >>> let rP = registerB (8,8)
+{- $setup
+>>> let rP = registerB (8,8)
+-}
 
 {- $hiding
 "CLaSH.Prelude" re-exports most of the Haskell "Prelude" with the exception of

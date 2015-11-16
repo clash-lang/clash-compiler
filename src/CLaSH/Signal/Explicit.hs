@@ -44,19 +44,20 @@ import CLaSH.Signal.Internal  (Signal' (..), Clock (..), SClock (..), register#,
                                regEn#, simulate)
 import CLaSH.Signal.Bundle    (Bundle (..), Unbundled')
 
--- $setup
--- >>> :set -XDataKinds
--- >>> import CLaSH.Prelude
--- >>> type Clk2 = Clk "clk2" 2
--- >>> type Clk7 = Clk "clk7" 7
--- >>> let clk2 = sclock :: SClock Clk2
--- >>> let clk7 = sclock :: SClock Clk7
--- >>> let oversampling = register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
--- >>> let almostId = register' clk7 70 . unsafeSynchronizer clk2 clk7 . register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let oscillate = register' clkA False (CLaSH.Signal.not1 oscillate)
--- >>> let count = regEn' clkA 0 oscillate (count + 1)
+{- $setup
+>>> :set -XDataKinds
+>>> import CLaSH.Prelude
+>>> type Clk2 = Clk "clk2" 2
+>>> type Clk7 = Clk "clk7" 7
+>>> let clk2 = sclock :: SClock Clk2
+>>> let clk7 = sclock :: SClock Clk7
+>>> let oversampling = register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
+>>> let almostId = register' clk7 70 . unsafeSynchronizer clk2 clk7 . register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
+>>> type ClkA = Clk "A" 100
+>>> let clkA = sclock :: SClock ClkA
+>>> let oscillate = register' clkA False (CLaSH.Signal.not1 oscillate)
+>>> let count = regEn' clkA 0 oscillate (count + 1)
+-}
 
 {- $relativeclocks #relativeclocks#
 CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:

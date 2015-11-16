@@ -20,12 +20,13 @@ where
 import Language.Haskell.TH
 import CLaSH.Promoted.Nat
 
--- $setup
--- >>> :set -XDataKinds
--- >>> let d1111 = snat :: SNat 1111
--- >>> let d1200 = snat :: SNat 1200
--- >>> let d1201 = snat :: SNat 1201
--- >>> let d1202 = snat :: SNat 1202
+{- $setup
+>>> :set -XDataKinds
+>>> let d1111 = snat :: SNat 1111
+>>> let d1200 = snat :: SNat 1200
+>>> let d1201 = snat :: SNat 1201
+>>> let d1202 = snat :: SNat 1202
+-}
 
 -- | Create an 'SNat' literal
 --

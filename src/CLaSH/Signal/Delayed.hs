@@ -52,22 +52,23 @@ import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
 import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> :set -XTypeOperators
--- >>> import CLaSH.Prelude
--- >>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
--- >>> let delay2 = delayI :: DSignal n Int -> DSignal (n + 2) Int
--- >>> :{
--- let mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---     mac x y = feedback (mac' x y)
---       where
---         mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---              -> (DSignal 0 Int, DSignal 1 Int)
---         mac' a b acc = let acc' = a * b + acc
---                        in  (acc, delay (singleton 0) acc')
--- :}
---
+{- $setup
+>>> :set -XDataKinds
+>>> :set -XTypeOperators
+>>> import CLaSH.Prelude
+>>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
+>>> let delay2 = delayI :: DSignal n Int -> DSignal (n + 2) Int
+>>> :{
+let mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+    mac x y = feedback (mac' x y)
+      where
+        mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+             -> (DSignal 0 Int, DSignal 1 Int)
+        mac' a b acc = let acc' = a * b + acc
+                       in  (acc, delay (singleton 0) acc')
+:}
+
+-}
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), that has accumulated @delay@ amount of samples delay

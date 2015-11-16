@@ -26,9 +26,10 @@ import Prelude                        hiding (map)
 import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
 import CLaSH.Sized.Internal.BitVector (split#)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> import CLaSH.Prelude
+{- $setup
+>>> :set -XDataKinds
+>>> import CLaSH.Prelude
+-}
 
 -- | Convert to and from a 'BitVector'
 class BitPack a where

@@ -161,11 +161,12 @@ import CLaSH.Signal
 import CLaSH.Signal.Delayed
 import CLaSH.Signal.Explicit       (systemClock)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> let window4 = window :: Signal Int -> Vec 4 (Signal Int)
--- >>> let windowD3 = windowD :: Signal Int -> Vec 3 (Signal Int)
--- >>> let rP = registerB (8,8)
+{- $setup
+>>> :set -XDataKinds
+>>> let window4 = window :: Signal Int -> Vec 4 (Signal Int)
+>>> let windowD3 = windowD :: Signal Int -> Vec 3 (Signal Int)
+>>> let rP = registerB (8,8)
+-}
 
 {- $hiding
 "CLaSH.Prelude" re-exports most of the Haskell "Prelude" with the exception of

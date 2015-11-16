@@ -71,12 +71,13 @@ import CLaSH.Prelude.Testbench     (assert', stimuliGenerator', outputVerifier')
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector          (Vec (..), (+>>), asNatProxy, repeat)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let window4 = window' clkA :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
--- >>> let windowD3 = windowD' clkA :: Signal' ClkA Int -> Vec 3 (Signal' ClkA Int)
+{- $setup
+>>> :set -XDataKinds
+>>> type ClkA = Clk "A" 100
+>>> let clkA = sclock :: SClock ClkA
+>>> let window4 = window' clkA :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
+>>> let windowD3 = windowD' clkA :: Signal' ClkA Int -> Vec 3 (Signal' ClkA Int)
+-}
 
 {-# INLINABLE window' #-}
 -- | Give a window over a 'Signal''

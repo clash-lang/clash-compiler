@@ -22,9 +22,10 @@ import CLaSH.Promoted.Nat             (SNat)
 import CLaSH.Sized.Internal.BitVector (BitVector, Bit, index#, lsb#, msb#,
                                        replaceBit#, setSlice#, slice#, split#)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> import CLaSH.Prelude
+{- $setup
+>>> :set -XDataKinds
+>>> import CLaSH.Prelude
+-}
 
 {-# INLINE (!) #-}
 -- | Get the bit at the specified bit index.

@@ -73,9 +73,10 @@ import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
 import CLaSH.Signal.Explicit (SystemClock, systemClock, simulateB')
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
--- $setup
--- >>> let oscillate = register False (not1 oscillate)
--- >>> let count = regEn 0 oscillate (count + 1)
+{- $setup
+>>> let oscillate = register False (not1 oscillate)
+>>> let count = regEn 0 oscillate (count + 1)
+-}
 
 -- * Implicitly clocked synchronous signal
 
