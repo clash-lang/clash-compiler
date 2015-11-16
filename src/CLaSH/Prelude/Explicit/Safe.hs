@@ -61,11 +61,12 @@ import CLaSH.Prelude.Synchronizer (dualFlipFlopSynchronizer,
                                    asyncFIFOSynchronizer)
 import CLaSH.Signal.Explicit
 
--- $setup
--- >>> :set -XDataKinds
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let rP = registerB' clkA (8::Int,8::Int)
+{- $setup
+>>> :set -XDataKinds
+>>> type ClkA = Clk "A" 100
+>>> let clkA = sclock :: SClock ClkA
+>>> let rP = registerB' clkA (8::Int,8::Int)
+-}
 
 {-# INLINE registerB' #-}
 -- | Create a 'register' function for product-type like signals (e.g.

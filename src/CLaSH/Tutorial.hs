@@ -79,52 +79,54 @@ import GHC.Prim
 import GHC.Word
 import Data.Default
 
--- $setup
--- >>> :set -XTemplateHaskell
--- >>> :set -XDataKinds
--- >>> let ma acc (x,y) = acc + x * y
--- >>> :{
--- let macT acc (x,y) = (acc',o)
---        where
---          acc' = ma acc (x,y)
---          o    = acc
--- :}
---
--- >>> :set -XFlexibleContexts
--- >>> :set -fplugin GHC.TypeLits.Normalise
--- >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
--- >>> :{
--- let sortV xs = map fst sorted :< (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith compareSwapL lefts rights
--- :}
---
--- >>> :{
--- let sortVL xs = map fst sorted :< (snd (last sorted))
---       where
---         lefts  = head xs :> map snd (init sorted)
---         rights = tail xs
---         sorted = zipWith compareSwapL (lazyV lefts) rights
--- :}
---
--- >>> let mac = mealy macT 0
--- >>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
--- >>> let testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
--- >>> let expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
--- >>> :{
--- let fibR :: Unsigned 64 -> Unsigned 64
---     fibR 0 = 0
---     fibR 1 = 1
---     fibR n = fibR (n-1) + fibR (n-2)
--- :}
---
--- >>> :{
--- let fibS :: Signal (Unsigned 64)
---     fibS = r
---       where r = register 0 r + register 0 (register 1 r)
--- :}
+{- $setup
+>>> :set -XTemplateHaskell
+>>> :set -XDataKinds
+>>> let ma acc (x,y) = acc + x * y
+>>> :{
+let macT acc (x,y) = (acc',o)
+       where
+         acc' = ma acc (x,y)
+         o    = acc
+:}
+
+>>> :set -XFlexibleContexts
+>>> :set -fplugin GHC.TypeLits.Normalise
+>>> let compareSwapL a b = if a < b then (a,b) else (b,a)
+>>> :{
+let sortV xs = map fst sorted :< (snd (last sorted))
+      where
+        lefts  = head xs :> map snd (init sorted)
+        rights = tail xs
+        sorted = zipWith compareSwapL lefts rights
+:}
+
+>>> :{
+let sortVL xs = map fst sorted :< (snd (last sorted))
+      where
+        lefts  = head xs :> map snd (init sorted)
+        rights = tail xs
+        sorted = zipWith compareSwapL (lazyV lefts) rights
+:}
+
+>>> let mac = mealy macT 0
+>>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
+>>> let testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+>>> let expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
+>>> :{
+let fibR :: Unsigned 64 -> Unsigned 64
+    fibR 0 = 0
+    fibR 1 = 1
+    fibR n = fibR (n-1) + fibR (n-2)
+:}
+
+>>> :{
+let fibS :: Signal (Unsigned 64)
+    fibS = r
+      where r = register 0 r + register 0 (register 1 r)
+:}
+
+-}
 
 {- $introduction
 CλaSH (pronounced ‘clash’) is a functional hardware description language that

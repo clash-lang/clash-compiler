@@ -41,7 +41,8 @@ import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (+))
-import Language.Haskell.TH.Syntax (Lift)
+import Language.Haskell.TH        (ExpQ)
+import Language.Haskell.TH.Syntax (Lift (..))
 import Prelude                    hiding (head, length, repeat)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
@@ -51,22 +52,23 @@ import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
 import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> :set -XTypeOperators
--- >>> import CLaSH.Prelude
--- >>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
--- >>> let delay2 = delayI :: DSignal n Int -> DSignal (n + 2) Int
--- >>> :{
--- let mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---     mac x y = feedback (mac' x y)
---       where
---         mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
---              -> (DSignal 0 Int, DSignal 1 Int)
---         mac' a b acc = let acc' = a * b + acc
---                        in  (acc, delay (singleton 0) acc')
--- :}
---
+{- $setup
+>>> :set -XDataKinds
+>>> :set -XTypeOperators
+>>> import CLaSH.Prelude
+>>> let delay3 = delay (0 :> 0 :> 0 :> Nil)
+>>> let delay2 = delayI :: DSignal n Int -> DSignal (n + 2) Int
+>>> :{
+let mac :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+    mac x y = feedback (mac' x y)
+      where
+        mac' :: DSignal 0 Int -> DSignal 0 Int -> DSignal 0 Int
+             -> (DSignal 0 Int, DSignal 1 Int)
+        mac' a b acc = let acc' = a * b + acc
+                       in  (acc, delay (singleton 0) acc')
+:}
+
+-}
 
 -- | A synchronized signal with samples of type @a@, synchronized to \"system\"
 -- clock (period 1000), that has accumulated @delay@ amount of samples delay
@@ -75,9 +77,12 @@ newtype DSignal (delay :: Nat) a =
     DSignal { -- | Strip a 'DSignal' from its delay information.
               toSignal :: Signal a
             }
-  deriving (Show,Default,Lift,Functor,Applicative,Num,Bounded,Fractional,
+  deriving (Show,Default,Functor,Applicative,Num,Bounded,Fractional,
             Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits,Foldable,
             Traversable,Arbitrary,CoArbitrary)
+
+instance Lift a => Lift (DSignal delay a) where
+  lift = coerce (lift :: Signal a -> ExpQ)
 
 instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
   type AResult (DSignal n a) (DSignal n b) = DSignal n (AResult a b)

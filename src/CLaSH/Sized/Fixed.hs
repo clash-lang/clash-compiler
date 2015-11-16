@@ -89,11 +89,12 @@ import CLaSH.Promoted.Ord         (Max)
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> :set -XTemplateHaskell
--- >>> import CLaSH.Prelude
--- >>> let n = $$(fLit pi) :: SFixed 4 4
+{- $setup
+>>> :set -XDataKinds
+>>> :set -XTemplateHaskell
+>>> import CLaSH.Prelude
+>>> let n = $$(fLit pi) :: SFixed 4 4
+-}
 
 -- | 'Fixed'-point number
 --

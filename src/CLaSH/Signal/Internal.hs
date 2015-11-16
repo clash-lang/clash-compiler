@@ -94,14 +94,15 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
 
--- $setup
--- >>> :set -XDataKinds
--- >>> :set -XMagicHash
--- >>> import CLaSH.Promoted.Nat
--- >>> import CLaSH.Promoted.Symbol
--- >>> type SystemClock = Clk "System" 1000
--- >>> type Signal a = Signal' SystemClock a
--- >>> let register = register# (SClock ssymbol snat :: SClock SystemClock)
+{- $setup
+>>> :set -XDataKinds
+>>> :set -XMagicHash
+>>> import CLaSH.Promoted.Nat
+>>> import CLaSH.Promoted.Symbol
+>>> type SystemClock = Clk "System" 1000
+>>> type Signal a = Signal' SystemClock a
+>>> let register = register# (SClock ssymbol snat :: SClock SystemClock)
+-}
 
 -- | A clock with a name ('Symbol') and period ('Nat')
 data Clock = Clk Symbol Nat

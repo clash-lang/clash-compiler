@@ -31,17 +31,18 @@ import CLaSH.Signal.Bundle   (unbundle')
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 
--- $setup
--- >>> :set -XTemplateHaskell
--- >>> :set -XDataKinds
--- >>> import CLaSH.Prelude
--- >>> let testInput = stimuliGenerator $(v [(1::Int),3..21])
--- >>> let expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
--- >>> import CLaSH.Prelude.Explicit
--- >>> type ClkA = Clk "A" 100
--- >>> let clkA = sclock :: SClock ClkA
--- >>> let testInput' = stimuliGenerator' clkA $(v [(1::Int),3..21])
--- >>> let expectedOutput' = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+{- $setup
+>>> :set -XTemplateHaskell
+>>> :set -XDataKinds
+>>> import CLaSH.Prelude
+>>> let testInput = stimuliGenerator $(v [(1::Int),3..21])
+>>> let expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+>>> import CLaSH.Prelude.Explicit
+>>> type ClkA = Clk "A" 100
+>>> let clkA = sclock :: SClock ClkA
+>>> let testInput' = stimuliGenerator' clkA $(v [(1::Int),3..21])
+>>> let expectedOutput' = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-}
 
 {-# INLINE assert #-}
 -- | Compares the first two 'Signal's for equality and logs a warning when they
