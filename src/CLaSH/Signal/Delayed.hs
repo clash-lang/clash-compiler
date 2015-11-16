@@ -41,7 +41,8 @@ import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (+))
-import Language.Haskell.TH.Syntax (Lift)
+import Language.Haskell.TH        (ExpQ)
+import Language.Haskell.TH.Syntax (Lift (..))
 import Prelude                    hiding (head, length, repeat)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
@@ -75,9 +76,12 @@ newtype DSignal (delay :: Nat) a =
     DSignal { -- | Strip a 'DSignal' from its delay information.
               toSignal :: Signal a
             }
-  deriving (Show,Default,Lift,Functor,Applicative,Num,Bounded,Fractional,
+  deriving (Show,Default,Functor,Applicative,Num,Bounded,Fractional,
             Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits,Foldable,
             Traversable,Arbitrary,CoArbitrary)
+
+instance Lift a => Lift (DSignal delay a) where
+  lift = coerce (lift :: Signal a -> ExpQ)
 
 instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
   type AResult (DSignal n a) (DSignal n b) = DSignal n (AResult a b)
