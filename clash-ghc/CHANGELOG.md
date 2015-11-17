@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.5
+## 0.6.5 *November 17th 2015*
 * Fixes bugs:
   * Integer literals used as arguments not always properly annotated with their type.
   * Verilog: Name collision in verilog code [#93](https://github.com/clash-lang/clash-compiler/issues/93)

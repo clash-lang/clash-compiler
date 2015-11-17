@@ -1,6 +1,6 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.6.3:
+## 0.6.3 *November 17th 2015*
 * Fixes bugs:
   * Integer literals missing "32'sd" prefix when used in assignments
 

@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.5
+## 0.6.5 *November 17th 2015*
 * Fixes bugs:
   * Integer literals used as arguments not always properly annotated with their type.
 

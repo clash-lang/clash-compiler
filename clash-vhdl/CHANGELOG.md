@@ -1,6 +1,6 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.6.4
+## 0.6.4 *November 17th 2015*
 * Fixes bugs:
   * Integer literals should only be capped to 32-bit when used in assignments.
 
