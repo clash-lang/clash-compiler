@@ -253,7 +253,11 @@ renderTag b (I n)           = let (s,_,_) = bbInputs b !! n
                               in  (displayT . renderOneLine) <$> expr False e
 renderTag b (L n)           = let (s,_,_) = bbInputs b !! n
                                   e       = either id fst s
-                              in  (displayT . renderOneLine) <$> expr False e
+                              in  (displayT . renderOneLine) <$> expr False (mkLit e)
+  where
+    mkLit (Literal (Just (Integer,_)) i) = Literal Nothing i
+    mkLit i                              = i
+
 renderTag _ (Sym n)         = return $ Text.pack ("n_" ++ show n)
 renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType . snd $ bbResult b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n

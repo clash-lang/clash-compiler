@@ -1,5 +1,5 @@
 Name:                 clash-systemverilog
-Version:              0.6.2
+Version:              0.6.3
 Synopsis:             CAES Language for Synchronous Hardware - SystemVerilog backend
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that

@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.5
+* Fixes bugs:
+  * Integer literals used as arguments not always properly annotated with their type.
+
 ## 0.6.4 *November 12th 2015*
 * Fixes bugs:
   * Reversing alternatives is not meaning preserving for literal patterns [#91](https://github.com/clash-lang/clash-compiler/issues/91)

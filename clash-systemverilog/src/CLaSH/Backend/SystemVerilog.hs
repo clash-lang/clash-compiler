@@ -411,25 +411,26 @@ vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> SystemVerilogM Doc
-exprLit Nothing (NumLit i) =
-  let integerLow  = -2^(31 :: Integer) :: Integer
-      integerHigh = 2^(31 :: Integer) - 1 :: Integer
-      i' = if i < integerLow
-              then integerLow
-              else if i > integerHigh
-                   then integerHigh
-                   else i
-  in  parenIf (i' < 0) (integer i')
-exprLit (Just (hty,sz)) (NumLit i) = case hty of
-                                       Unsigned _   -> int sz <> "'d" <> integer i
-                                       Signed _
-                                        | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
-                                        | otherwise -> int sz <> "'sd" <> integer i
-                                       Integer
-                                        | i < 0     -> "-" <> int 32 <> "'sd" <> integer (abs i)
-                                        | otherwise -> int 32 <> "'sd" <> integer i
-                                       _            -> int sz <> "'b" <> blit
+exprLit Nothing (NumLit i) = integer i
 
+exprLit (Just (hty,sz)) (NumLit i) = case hty of
+  Unsigned _ -> int sz <> "'d" <> integer i
+  Index _ -> int (typeSize hty) <> "'d" <> integer i
+  Signed _
+   | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
+   | otherwise -> int sz <> "'sd" <> integer i
+  Integer ->
+    let integerLow  = -2^(31 :: Integer) :: Integer
+        integerHigh = 2^(31 :: Integer) - 1 :: Integer
+        i' = if i < integerLow
+                then integerLow
+                else if i > integerHigh
+                     then integerHigh
+                     else i
+    in  if (i' < 0)
+           then "-" <> int 32 <> "'sd" <> integer (abs i')
+           else int 32 <> "'sd" <> integer i
+  _ -> int sz <> "'b" <> blit
   where
     blit = bits (toBits sz i)
 exprLit _             (BoolLit t)   = if t then "1'b1" else "1'b0"

@@ -97,7 +97,7 @@ mkArgument e = do
       Just hwTy -> case collectArgs e of
         (Var _ v,[]) -> let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
                         in  return ((vT,hwTy,False),[])
-        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal Nothing (N.NumLit i),hwTy,True),[])
+        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Integer,32)) (N.NumLit i),hwTy,True),[])
         (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
         (Prim f _,args) -> do
           (e',d) <- mkPrimitive True False f args ty

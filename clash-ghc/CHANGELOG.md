@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.5
+* Fixes bugs:
+  * Integer literals used as arguments not always properly annotated with their type.
+  * Verilog: Name collision in verilog code [#93](https://github.com/clash-lang/clash-compiler/issues/93)
+  * (System)Verilog: Integer literals missing "32'sd" prefix when used in assignments.
+  * VHDL: Integer literals should only be capped to 32-bit when used in assignments.
+
 ## 0.6.4 *November 12th 2015*
 * Fixes bugs:
   * Reversing alternatives is not meaning preserving for literal patterns [#91](https://github.com/clash-lang/clash-compiler/issues/91)

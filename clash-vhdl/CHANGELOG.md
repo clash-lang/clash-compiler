@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.4
+* Fixes bugs:
+  * Integer literals should only be capped to 32-bit when used in assignments.
+
 ## 0.6.3 *November 12th 2015*
 * Fixes bugs:
   * Do not generate overlapping literal patterns [#91](https://github.com/clash-lang/clash-compiler/issues/91)

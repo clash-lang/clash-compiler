@@ -3,6 +3,7 @@
 ## 0.6.3
 * Fixes bugs:
   * Name collision in verilog code [#93](https://github.com/clash-lang/clash-compiler/issues/93)
+  * Integer literals missing "32'sd" prefix when used in assignments.
 
 ## 0.6.2 *October 21st 2015*
 * New features:
