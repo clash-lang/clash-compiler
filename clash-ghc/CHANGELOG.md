@@ -6,6 +6,7 @@
   * Verilog: Name collision in verilog code [#93](https://github.com/clash-lang/clash-compiler/issues/93)
   * (System)Verilog: Integer literals missing "32'sd" prefix when used in assignments.
   * VHDL: Integer literals should only be capped to 32-bit when used in assignments.
+  * Verilog: HO-primitives incorrect for nested vectors.
 
 ## 0.6.4 *November 12th 2015*
 * Fixes bugs:
