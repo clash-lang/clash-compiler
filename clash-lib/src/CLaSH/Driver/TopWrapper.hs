@@ -240,12 +240,11 @@ mkClockDecl s = NetDecl (pack s) (Clock (pack name) (read rate))
 
 
 -- | Create a single clock path
-clockPorts :: Maybe (String,String) -> [(String,String)]
+clockPorts :: [(String,String)] -> [(String,String)]
            -> ([(Identifier,Expr)],[String])
-clockPorts inp outp = (inp' ++ outp',clks)
+clockPorts inp outp = (ports,clks)
   where
-    inp'  = maybe [] ((:[]) . (pack *** stringToVar)) inp
-    outp' = map (pack *** stringToVar) outp
+    ports = map (pack *** stringToVar) (inp ++ outp)
     clks  = map snd outp
 
 -- | Generate resets
