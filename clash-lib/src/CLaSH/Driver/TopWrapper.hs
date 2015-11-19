@@ -289,7 +289,7 @@ genSyncReset primMap lock rst nm r = do
 
   return [NetDecl rst (Reset nm r),resetGenDecl]
 
--- | The 'NetListMonad' is an transformer stack with 'IO' at the bottom.
+-- | The 'NetListMonad' is a transformer stack with 'IO' at the bottom.
 -- So we must use 'unsafePerformIO'.
 unsafeRunNetlist :: NetlistMonad a
                  -> a
