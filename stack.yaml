@@ -1,0 +1,13 @@
+resolver: lts-3.11
+
+packages:
+- 'clash-lib'
+- 'clash-verilog'
+- 'clash-systemverilog'
+- 'clash-vhdl'
+- 'clash-ghc'
+
+extra-deps:
+- clash-prelude-0.10.3
+- ghc-typelits-extra-0.1
+
