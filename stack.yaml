@@ -6,6 +6,7 @@ packages:
 - 'clash-systemverilog'
 - 'clash-vhdl'
 - 'clash-ghc'
+- 'testsuite'
 - location:
     git: https://github.com/clash-lang/clash-prelude.git
     commit: 48409067850b23d6f69d8261d90b11540d88d4a0
