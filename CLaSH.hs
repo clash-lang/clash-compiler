@@ -30,7 +30,7 @@ doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
   (bindingsMap,tcm,tupTcm,topEntM) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm tupTcm ghcTypeToHWType reduceConstant topEntM (CLaSHOpts 20 20 15 DebugName)
+  generateHDL bindingsMap (Just b) primMap tcm tupTcm ghcTypeToHWType reduceConstant topEntM (CLaSHOpts 20 20 15 DebugName True)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

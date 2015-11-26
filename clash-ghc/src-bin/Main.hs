@@ -120,6 +120,7 @@ main = do
                              , opt_inlineLimit = 20
                              , opt_specLimit   = 20
                              , opt_inlineBelow = 15
+                             , opt_cleanhdl    = True
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 

@@ -33,6 +33,7 @@ flagsClash r = [
   , defFlag "clash-spec-limit" (IntSuffix (liftEwM . setSpecLimit r))
   , defFlag "clash-inline-below" (IntSuffix (liftEwM . setInlineBelow r))
   , defFlag "clash-debug" (SepArg (setDebugLevel r))
+  , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -56,3 +57,6 @@ setDebugLevel :: IORef CLaSHOpts
 setDebugLevel r s = case readMaybe s of
   Just dbgLvl -> liftEwM $ modifyIORef r (\c -> c {opt_dbgLevel = dbgLvl})
   Nothing     -> addWarn (s ++ " is an invalid debug level")
+
+setNoClean :: IORef CLaSHOpts -> IO ()
+setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})

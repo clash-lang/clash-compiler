@@ -6,6 +6,7 @@ module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
+import           Control.Monad                    (when)
 import           Control.Monad.State              (evalState, get)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
@@ -117,7 +118,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval teM opts = do
                        , takeWhile (/= '.') (name2String $ fst topEntity)
                        , "/"
                        ]
-      prepareDir dir
+      prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       mapM_ (writeHDL hdlState' dir) hdlDocs
       copyDataFiles dir dfiles'
 
@@ -144,17 +145,22 @@ createHDL backend modName components = flip evalState backend $ do
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.
-prepareDir :: String -> IO ()
-prepareDir dir = do
+prepareDir :: Bool -- ^ Remove existing HDL files
+           -> String -- ^ File extension of the HDL files.
+           -> String
+           -> IO ()
+prepareDir cleanhdl ext dir = do
   -- Create the dir if needed
   Directory.createDirectoryIfMissing True dir
-  -- Find all .hdl files in the directory
-  files <- Directory.getDirectoryContents dir
-  let to_remove = filter ((==".hdl") . FilePath.takeExtension) files
-  -- Prepend the dirname to the filenames
-  let abs_to_remove = map (FilePath.combine dir) to_remove
-  -- Remove the files
-  mapM_ Directory.removeFile abs_to_remove
+  -- Clean the directory when needed
+  when cleanhdl $ do
+    -- Find all HDL files in the directory
+    files <- Directory.getDirectoryContents dir
+    let to_remove = filter ((==ext) . FilePath.takeExtension) files
+    -- Prepend the dirname to the filenames
+    let abs_to_remove = map (FilePath.combine dir) to_remove
+    -- Remove the files
+    mapM_ Directory.removeFile abs_to_remove
 
 -- | Writes a HDL file to the given directory
 writeHDL :: Backend backend => backend -> FilePath -> (String, Doc) -> IO ()
