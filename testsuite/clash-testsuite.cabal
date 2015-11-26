@@ -19,8 +19,8 @@ cabal-version:       >=1.10
 executable clash-testsuite
   main-is:             Main.hs
   ghc-options:         -Wall
-  -- other-modules:
-  -- other-extensions:
+  other-modules:       Test.Tasty.Program
+  other-extensions:    DeriveDataTypeable
   build-depends:       base          >=4.8 && <5,
                        deepseq       >=1.4 && <1.5,
                        directory     >=1.2 && <1.3,
