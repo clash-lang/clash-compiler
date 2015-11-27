@@ -2,7 +2,7 @@
 
 ## 0.6.6
 New features:
-  * Remove all existing HDL files before generating new ones. This can be disable by the `-clash-noclean` flag. [#96](https://github.com/clash-lang/clash-compiler/issues/96)
+  * Remove all existing HDL files before generating new ones. This can be disabled by the `-clash-noclean` flag. [#96](https://github.com/clash-lang/clash-compiler/issues/96)
 
 ## 0.6.5 *November 17th 2015*
 * Fixes bugs:
