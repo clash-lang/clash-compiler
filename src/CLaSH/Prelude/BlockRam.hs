@@ -330,8 +330,8 @@ prog2 = -- 0 := 4
        Nil
 @
 
-When we simulate our system we see that it works. This time however,
-we need to drop the first few sample, because the initial output of a
+When we simulate our system we see that it works. This time again,
+we need to drop the first sample, because the initial output of a
 'blockRam' is 'undefined', and consequently, the first output sample is
 also 'undefined'.
 
