@@ -1184,7 +1184,7 @@ replicateU (USucc s) x = x `Cons` replicateU s x
 replicateI :: KnownNat n => a -> Vec n a
 replicateI = withSNat replicate
 {-# INLINE replicateI #-}
-{-# WARNING replicateI "Use 'repeat' instead of 'replicateI'" #-}
+{-# DEPRECATED replicateI "Use 'repeat' instead of 'replicateI'" #-}
 
 -- | \"'repeat' @a@\" creates a vector with as many copies of /a/ as demanded
 -- by the context.
