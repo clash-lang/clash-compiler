@@ -279,7 +279,7 @@ defTop = TopEntity
 -- with default settings to provide a stable 'systemClock'.
 --
 -- >>> altpll "altpll50" "CLOCK(0)" "not KEY(0)"
--- ClockSource {c_name = "altpll50", c_inp = Just ("inclk0","CLOCK(0)"), c_outp = [("c0","system1000")], c_reset = Just ("areset","not KEY(0)"), c_lock = "locked", c_sync = False}
+-- ClockSource {c_name = "altpll50", c_inp = [("inclk0","CLOCK(0)")], c_outp = [("c0","system1000")], c_reset = Just ("areset","not KEY(0)"), c_lock = "locked", c_sync = False}
 --
 -- Will generate the following VHDL:
 --
@@ -293,7 +293,7 @@ defTop = TopEntity
 -- If you are however generating (System)Verilog you should write:
 --
 -- >>> altpll "altpll50" "CLOCK[0]" "~ KEY[0]"
--- ClockSource {c_name = "altpll50", c_inp = Just ("inclk0","CLOCK[0]"), c_outp = [("c0","system1000")], c_reset = Just ("areset","~ KEY[0]"), c_lock = "locked", c_sync = False}
+-- ClockSource {c_name = "altpll50", c_inp = [("inclk0","CLOCK[0]")], c_outp = [("c0","system1000")], c_reset = Just ("areset","~ KEY[0]"), c_lock = "locked", c_sync = False}
 --
 -- so that the following (System)Verilog is created:
 --
@@ -319,7 +319,7 @@ altpll pllName clkExpr resExpr = ClockSource
 -- with default settings to provide a stable 'systemClock'.
 --
 -- >>> alteraPll "alteraPll50" "CLOCK(0)" "not KEY(0)"
--- ClockSource {c_name = "alteraPll50", c_inp = Just ("refclk","CLOCK(0)"), c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","not KEY(0)"), c_lock = "locked", c_sync = False}
+-- ClockSource {c_name = "alteraPll50", c_inp = [("refclk","CLOCK(0)")], c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","not KEY(0)"), c_lock = "locked", c_sync = False}
 --
 -- Will generate the following VHDL:
 --
@@ -333,7 +333,7 @@ altpll pllName clkExpr resExpr = ClockSource
 -- If you are however generating (System)Verilog you should write:
 --
 -- >>> alteraPll "alteraPll50" "CLOCK[0]" "~ KEY[0]"
--- ClockSource {c_name = "alteraPll50", c_inp = Just ("refclk","CLOCK[0]"), c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","~ KEY[0]"), c_lock = "locked", c_sync = False}
+-- ClockSource {c_name = "alteraPll50", c_inp = [("refclk","CLOCK[0]")], c_outp = [("outclk_0","system1000")], c_reset = Just ("rst","~ KEY[0]"), c_lock = "locked", c_sync = False}
 --
 -- so that the following (System)Verilog is created:
 --
@@ -359,7 +359,7 @@ alteraPll pllName clkExpr resExpr = ClockSource
 -- with the \"Clock Wizard\", with settings to provide a stable 'systemClock'.
 --
 -- >>> clockWizard "clkwiz50" "CLOCK(0)" "not KEY(0)"
--- ClockSource {c_name = "clkwiz50", c_inp = Just ("CLK_IN1","CLOCK(0)"), c_outp = [("CLK_OUT1","system1000")], c_reset = Just ("RESET","not KEY(0)"), c_lock = "LOCKED", c_sync = False}
+-- ClockSource {c_name = "clkwiz50", c_inp = [("CLK_IN1","CLOCK(0)")], c_outp = [("CLK_OUT1","system1000")], c_reset = Just ("RESET","not KEY(0)"), c_lock = "LOCKED", c_sync = False}
 --
 -- Will generate the following VHDL:
 --
@@ -373,7 +373,7 @@ alteraPll pllName clkExpr resExpr = ClockSource
 -- If you are however generating (System)Verilog you should write:
 --
 -- >>> clockWizard "clkwiz50" "CLOCK[0]" "~ KEY[0]"
--- ClockSource {c_name = "clkwiz50", c_inp = Just ("CLK_IN1","CLOCK[0]"), c_outp = [("CLK_OUT1","system1000")], c_reset = Just ("RESET","~ KEY[0]"), c_lock = "LOCKED", c_sync = False}
+-- ClockSource {c_name = "clkwiz50", c_inp = [("CLK_IN1","CLOCK[0]")], c_outp = [("CLK_OUT1","system1000")], c_reset = Just ("RESET","~ KEY[0]"), c_lock = "LOCKED", c_sync = False}
 --
 -- so that the following (System)Verilog is created:
 --
