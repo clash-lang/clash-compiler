@@ -170,6 +170,8 @@ Library
     -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
     -- as to why we need this.
     ghc-options:      -fcpr-off
+  else
+    other-extensions: DeriveLift
 
   if flag(doclinks)
     CPP-Options:      -DDOCLINKS

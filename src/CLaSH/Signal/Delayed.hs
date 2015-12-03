@@ -1,4 +1,8 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
+#if __GLASGOW_HASKELL__ > 710
+{-# LANGUAGE DeriveLift                 #-}
+#endif
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -41,8 +45,7 @@ import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
 import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (+))
-import Language.Haskell.TH        (ExpQ)
-import Language.Haskell.TH.Syntax (Lift (..))
+import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
@@ -79,10 +82,7 @@ newtype DSignal (delay :: Nat) a =
             }
   deriving (Show,Default,Functor,Applicative,Num,Bounded,Fractional,
             Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits,Foldable,
-            Traversable,Arbitrary,CoArbitrary)
-
-instance Lift a => Lift (DSignal delay a) where
-  lift = coerce (lift :: Signal a -> ExpQ)
+            Traversable,Arbitrary,CoArbitrary,Lift)
 
 instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
   type AResult (DSignal n a) (DSignal n b) = DSignal n (AResult a b)
