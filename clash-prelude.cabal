@@ -134,6 +134,7 @@ Library
                       DataKinds
                       ConstraintKinds
                       DefaultSignatures
+                      DeriveTraversable
                       DeriveDataTypeable
                       FlexibleContexts
                       GADTs
