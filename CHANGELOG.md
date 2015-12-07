@@ -5,6 +5,7 @@
   * Add `pureDF` to `CLaSH.Prelude.DataFlow`: lift combinational circuits to `DataFlow` circuits.
   * Add `fifoDF` to `CLaSH.Prelude.DataFlow`: a simple FIFO buffer adhering to the `DataFlow` protocol.
   * Add `boolToBV` to `CLaSH.CLass.BitPack`: convert `Bool`eans to `n`-bit `BitVector`s.
+  * `ClockSource` in `CLaSH.Annotations.TopEntity` can now have multiple clock inputs [#33](https://github.com/clash-lang/clash-prelude/issues/33)
 * Bug fixes:
   * `asyncRomFile` reads file multiple times.
 
