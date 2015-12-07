@@ -412,7 +412,7 @@ resize# s@(S i) | n <= m    = extended
                    else fromInteger_INLINE i'
 
 {-# NOINLINE truncateB# #-}
-truncateB# :: KnownNat m => Signed (n + m) -> Signed m
+truncateB# :: KnownNat m => Signed (m + n) -> Signed m
 truncateB# (S n) = fromInteger_INLINE n
 
 instance KnownNat n => Default (Signed n) where

@@ -25,10 +25,9 @@ module CLaSH.Prelude.Synchronizer
 where
 
 import Data.Bits                   (complement, shiftR, xor)
-import GHC.TypeLits                (KnownNat, type (+))
+import GHC.TypeLits                (type (+))
 
-import CLaSH.Class.BitPack         (pack)
-import CLaSH.Class.Resize          (zeroExtend)
+import CLaSH.Class.BitPack         (boolToBV)
 import CLaSH.Prelude.BitIndex      (slice)
 import CLaSH.Prelude.Mealy         (mealyB')
 import CLaSH.Prelude.RAM           (asyncRam')
@@ -93,9 +92,6 @@ fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
             waddr raddr
             (winc .&&. not1 wfull)
             wdata
-
-boolToBV :: (KnownNat n, KnownNat (n+1)) => Bool -> BitVector (n + 1)
-boolToBV = zeroExtend . pack
 
 ptrCompareT :: _
             => SNat addrSize

@@ -1,10 +1,14 @@
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 {-# LANGUAGE Safe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 {-|
@@ -17,12 +21,13 @@ Self-synchronising circuits based on data-flow principles.
 module CLaSH.Prelude.DataFlow
   ( -- * Data types
     DataFlow
-  , DataFlow'
-  , df
+  , DataFlow' (..)
     -- * Creating DataFlow circuits
   , liftDF
+  , pureDF
   , mealyDF
   , mooreDF
+  , fifoDF
     -- * Composition combinators
   , idDF
   , seqDF
@@ -32,16 +37,23 @@ module CLaSH.Prelude.DataFlow
   , parDF
   , loopDF
     -- * Lock-Step operation
-  , lockStep
-  , stepLock
+  , LockStep (..)
   )
 where
 
-import GHC.TypeLits          (KnownNat, KnownSymbol)
+import GHC.TypeLits           (KnownNat, KnownSymbol, type (+), type (^))
+import Prelude                hiding ((++), (!!), length, repeat)
 
-import CLaSH.Signal          ((.&&.), regEn, unbundle)
-import CLaSH.Signal.Bundle   (Bundle (..))
-import CLaSH.Signal.Explicit (Clock (..), Signal', SystemClock, sclock)
+import CLaSH.Class.BitPack    (boolToBV)
+import CLaSH.Class.Resize     (truncateB)
+import CLaSH.Prelude.BitIndex (msb)
+import CLaSH.Prelude.Mealy    (mealyB)
+import CLaSH.Promoted.Nat     (SNat)
+import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
+import CLaSH.Signal.Bundle    (Bundle (..))
+import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
+import CLaSH.Sized.BitVector  (BitVector)
+import CLaSH.Sized.Vector     (Vec, (++), (!!), length, repeat, replace)
 
 {- | Dataflow circuit with bidirectional synchronisation channels.
 
@@ -122,6 +134,12 @@ liftDF :: (Signal' clk i -> Signal' clk Bool -> Signal' clk Bool
        -> DataFlow' clk Bool Bool i o
 liftDF = DF
 
+-- | Create a 'DataFlow' circuit where the given function @f@ operates on the
+-- data, and the synchronisation channels are passed unaltered.
+pureDF :: (i -> o)
+       -> DataFlow' clk Bool Bool i o
+pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
+
 -- | Create a 'DataFlow' circuit from a Mealy machine description as those of
 -- "CLaSH.Prelude.Mealy"
 mealyDF :: (s -> i -> (s,o))
@@ -144,6 +162,49 @@ mooreDF ft fo iS = DF (\i iV oR -> let en  = iV .&&. oR
                                        o   = fo <$> s
                                    in  (o,iV,oR))
 
+fifoDF_mealy :: forall addrSize a .
+     (KnownNat addrSize
+     ,KnownNat (addrSize + 1)
+     ,KnownNat (2 ^ addrSize))
+  => (Vec (2^addrSize) a, BitVector (addrSize + 1), BitVector (addrSize + 1))
+  -> (a, Bool, Bool)
+  -> ((Vec (2^addrSize) a, BitVector (addrSize + 1), BitVector (addrSize + 1))
+     ,(a, Bool, Bool))
+fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
+  ((mem',rptr',wptr'), (rdata,empty,full))
+  where
+    raddr = truncateB rptr :: BitVector addrSize
+    waddr = truncateB wptr :: BitVector addrSize
+
+    mem' | winc && not full = replace waddr wdata mem
+         | otherwise        = mem
+
+    rdata = mem !! raddr
+
+    rptr' = rptr + boolToBV (rinc && not empty)
+    wptr' = wptr + boolToBV (winc && not full)
+    empty = rptr == wptr
+    full  = msb rptr /= msb wptr && raddr == waddr
+
+-- | Create a FIFO buffer adhering to the 'DataFlow' protocol. Can be filled
+-- with initial content.
+fifoDF :: forall addrSize m n a .
+     (KnownNat addrSize,
+     KnownNat n, KnownNat m,
+     KnownNat (2 ^ addrSize),
+     KnownNat (addrSize + 1),
+     (m + n) ~ (2 ^ addrSize))
+  => SNat (m + n) -- ^ Total size of the vector. Must be a power of two
+  -> Vec m a      -- ^ Initial content. Can be smaller than the size of the
+                  -- FIFO. Empty spaces are initialised with 'undefined'.
+  -> DataFlow Bool Bool a a
+fifoDF _ iS = DF $ \i iV oR ->
+  let initRdPtr      = 0
+      initWrPtr      = fromIntegral (length iS)
+      initMem        = iS ++ repeat undefined :: Vec (m + n) a
+      initS          = (initMem,initRdPtr,initWrPtr)
+      (o,empty,full) = mealyB fifoDF_mealy initS (i,iV,oR)
+  in  (o,not1 empty, not1 full)
 
 -- | Identity circuit
 --
@@ -220,28 +281,28 @@ f `parDF` g = firstDF f `seqDF` secondDF g
 -- operation.
 --
 -- <<doc/loopDF.svg>>
-loopDF :: forall nm rate a b d . (KnownSymbol nm, KnownNat rate)
+loopDF :: (KnownSymbol nm, KnownNat rate)
        => DataFlow' ('Clk nm rate) Bool Bool (a,d) (b,d)
        -> DataFlow' ('Clk nm rate) Bool Bool a     b
 loopDF f = loopDF' h
   where
-    h :: DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
     h = lockStep `seqDF` f `seqDF` stepLock
 
-    loopDF' :: DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
-            -> DataFlow' ('Clk nm rate) Bool Bool   a           b
-    loopDF' (DF f') = DF (\a aV bR -> let clk          = sclock
-                                          (bd,bdV,adR) = f' ad adV bdR
-                                          (b,d)        = unbundle' clk bd
-                                          (bV,dV)      = unbundle' clk bdV
-                                          (aR,dR)      = unbundle' clk adR
-                                          ad           = bundle' clk (a,d)
-                                          adV          = bundle' clk (aV,dV)
-                                          bdR          = bundle' clk (bR,dR)
-                                      in  (b,bV,aR)
-                         )
+loopDF' :: (KnownSymbol nm, KnownNat rate)
+        => DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
+        -> DataFlow' ('Clk nm rate) Bool Bool   a           b
+loopDF' (DF f') = DF (\a aV bR -> let clk          = sclock
+                                      (bd,bdV,adR) = f' ad adV bdR
+                                      (b,d)        = unbundle' clk bd
+                                      (bV,dV)      = unbundle' clk bdV
+                                      (aR,dR)      = unbundle' clk adR
+                                      ad           = bundle' clk (a,d)
+                                      adV          = bundle' clk (aV,dV)
+                                      bdR          = bundle' clk (bR,dR)
+                                  in  (b,bV,aR)
+                     )
 
--- | Have parallel compositions operate in lock-step.
+-- | Reduce or extend the synchronisation granularity of parallel compositions.
 class LockStep a b where
   -- | Reduce the synchronisation granularity to a single 'Bool'ean value.
   --
@@ -378,4 +439,3 @@ instance (LockStep a x, LockStep b y) => LockStep (a,b) (x,y) where
                                      yV      = val .&&. xR
                                      xyV     = bundle' clk (xV,yV)
                                  in  (xy,xyV,rdy))) `seqDF` (stepLock `parDF` stepLock)
-

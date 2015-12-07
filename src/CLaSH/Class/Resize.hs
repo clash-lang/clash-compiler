@@ -37,4 +37,4 @@ class Resize (f :: Nat -> *) where
   -- | Add extra sign bits in front of the MSB
   signExtend :: (KnownNat a, KnownNat (b + a)) => f a -> f (b + a)
   -- | Remove bits from the MSB
-  truncateB :: KnownNat a => f (b + a) -> f a
+  truncateB :: KnownNat a => f (a + b) -> f a

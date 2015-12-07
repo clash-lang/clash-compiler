@@ -17,12 +17,14 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module CLaSH.Class.BitPack
   ( BitPack (..)
   , bitCoerce
+  , boolToBV
   )
 where
 
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
 import Prelude                        hiding (map)
 
+import CLaSH.Class.Resize             (zeroExtend)
 import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
 import CLaSH.Sized.Internal.BitVector (split#)
 
@@ -83,3 +85,12 @@ instance (KnownNat (BitSize b), BitPack a, BitPack b) =>
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
+
+-- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
+--
+-- >>> boolToBV True :: BitVector 6
+-- 00_0001
+-- >>> boolToBV False :: BitVector 6
+-- 00_0000
+boolToBV :: (KnownNat n, KnownNat (n+1)) => Bool -> BitVector (n + 1)
+boolToBV = zeroExtend . pack

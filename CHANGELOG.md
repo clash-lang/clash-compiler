@@ -1,5 +1,11 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.4
+* New features:
+  * Add `pureDF` to `CLaSH.Prelude.DataFlow`: lift combinational circuits to `DataFlow` circuits.
+  * Add `fifoDF` to `CLaSH.Prelude.DataFlow`: a simple FIFO buffer adhering to the `DataFlow` protocol.
+  * Add `boolToBV` to `CLaSH.CLass.BitPack`: convert `Bool`eans to `n`-bit `BitVector`s.
+
 ## 0.10.3 *October 24th 2015*
 * Disable CPR analysis (See https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c):
   * GHC < 7.11: In all modules using `-fcpr-off`
