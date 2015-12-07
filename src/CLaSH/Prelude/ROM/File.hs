@@ -88,6 +88,7 @@ where
 
 import Data.Array                  (listArray,(!))
 import GHC.TypeLits                (KnownNat, type (^))
+import System.IO.Unsafe            (unsafePerformIO)
 
 import CLaSH.Prelude.BlockRam.File (initMem)
 import CLaSH.Promoted.Nat          (SNat,snat,snatToInteger)
@@ -123,7 +124,36 @@ asyncRomFile :: (KnownNat m, Enum addr)
              -> FilePath    -- ^ File describing the content of the ROM
              -> addr        -- ^ Read address @rd@
              -> BitVector m -- ^ The value of the ROM at address @rd@
-asyncRomFile sz file rd = asyncRomFile# sz file (fromEnum rd)
+asyncRomFile sz file = asyncRomFile# sz file . fromEnum
+-- Leave 'asyncRom' eta-reduced, see Note [Eta-reduction and unsafePerformIO initMem]
+
+-- Note [Eta-reduction and unsafePerformIO initMem]
+--
+-- The 'initMem' function initializes a @[BitVector n]@ from file. Ideally,
+-- we want this IO action to happen only once. When we call 'unsafePerformIO'
+-- on @initMem file@, it becomes a thunk in that function, so is hence evaluated
+-- only once. However, me must ensure that any code calling using of the
+-- @unsafePerformIO (initMem file)@ thunk also becomes a thunk. We do this by
+-- eta-reducing function where needed so that a thunk is returned.
+--
+-- For example, instead of writing:
+--
+-- > asyncRomFile# sz file rd = (content ! rd)
+-- >   where
+-- >     mem = unsafePerformIO (initMem file)
+-- >     content = listArray (0,szI-1) mem
+-- >     szI     = fromInteger (snatToInteger sz)
+--
+-- We write:
+--
+-- > asyncRomFile# sz file = (content !)
+-- >   where
+-- >     mem     = unsafePerformIO (initMem file)
+-- >     content = listArray (0,szI-1) mem
+-- >     szI     = fromInteger (snatToInteger sz)
+--
+-- Where instead of returning the BitVector defined by @(content ! rd)@, we
+-- return the function (thunk) @(content !)@.
 
 {-# INLINE asyncRomFilePow2 #-}
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
@@ -160,9 +190,10 @@ asyncRomFile# :: KnownNat m
               -> FilePath     -- ^ File describing the content of the ROM
               -> Int          -- ^ Read address @rd@
               -> BitVector m  -- ^ The value of the ROM at address @rd@
-asyncRomFile# sz file rd = content ! rd
-  where
-    content = listArray (0,szI-1) (initMem file)
+asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
+  where                             -- Note [Eta-reduction and unsafePerformIO initMem]
+    mem     = unsafePerformIO (initMem file)
+    content = listArray (0,szI-1) mem
     szI     = fromInteger (snatToInteger sz)
 
 {-# INLINE romFile #-}
@@ -308,5 +339,6 @@ romFile# :: KnownNat m
          -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile# clk sz file rd = register' clk undefined ((content !) <$> rd)
   where
-    content = listArray (0,szI-1) (initMem file)
+    mem     = unsafePerformIO (initMem file)
+    content = listArray (0,szI-1) mem
     szI     = fromInteger (snatToInteger sz)

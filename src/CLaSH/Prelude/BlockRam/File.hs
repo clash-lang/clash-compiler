@@ -86,15 +86,15 @@ module CLaSH.Prelude.BlockRam.File
 where
 
 
-import Control.Monad         (when)
-import Control.Monad.ST.Lazy (ST,runST)
-import Data.Array.MArray     (newListArray,readArray,writeArray)
-import Data.Array.ST         (STArray)
-import Data.Char             (digitToInt)
-import Data.Maybe            (listToMaybe)
-import GHC.TypeLits          (KnownNat, type (^))
-import Numeric               (readInt)
-import System.IO.Unsafe      (unsafePerformIO)
+import Control.Monad                (when)
+import Control.Monad.ST.Lazy        (ST,runST)
+import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
+import Data.Array.MArray            (newListArray,readArray,writeArray)
+import Data.Array.ST                (STArray)
+import Data.Char                    (digitToInt)
+import Data.Maybe                   (listToMaybe)
+import GHC.TypeLits                 (KnownNat, type (^))
+import Numeric                      (readInt)
 
 import CLaSH.Promoted.Nat    (SNat,snat,snatToInteger)
 import CLaSH.Sized.BitVector (BitVector)
@@ -280,7 +280,8 @@ blockRamFile# clk sz file wr rd en din = register' clk undefined dout
   where
     szI  = fromInteger $ snatToInteger sz
     dout = runST $ do
-      arr <- newListArray (0,szI-1) (initMem file)
+      mem <- unsafeIOToST (initMem file)
+      arr <- newListArray (0,szI-1) mem
       traverse (ramT arr) (bundle' clk (wr,rd,en,din))
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
@@ -291,8 +292,8 @@ blockRamFile# clk sz file wr rd en din = register' clk undefined dout
 
 {-# NOINLINE initMem #-}
 -- | __NB:__ Not synthesisable
-initMem :: KnownNat n => FilePath -> [BitVector n]
-initMem = unsafePerformIO . fmap (map parseBV . lines) . readFile
+initMem :: KnownNat n => FilePath -> IO [BitVector n]
+initMem = fmap (map parseBV . lines) . readFile
   where
     parseBV s = case parseBV' s of
                   Just i  -> fromInteger i
