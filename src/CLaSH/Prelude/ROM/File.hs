@@ -119,6 +119,27 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
+-- * When you notice that 'asyncRomFile' is significantly slowing down your
+-- simulation, give it a /monomorphic/ type signature. So instead of leaving
+-- the type to be inferred:
+--
+--     @
+--     myRomData = asyncRomFile d512 "memory.bin"
+--     @
+--
+--     or giving it a /polymorphic/ type signature:
+--
+--     @
+--     myRomData :: Enum addr => addr -> BitVector 16
+--     myRomData = asyncRomFile d512 "memory.bin"
+--     @
+--
+--     you __should__ give it a /monomorphic/ type signature:
+--
+--     @
+--     myRomData :: Unsigned 9 -> BitVector 16
+--     myRomData = asyncRomFile d512 "memory.bin"
+--     @
 asyncRomFile :: (KnownNat m, Enum addr)
              => SNat n      -- ^ Size of the ROM
              -> FilePath    -- ^ File describing the content of the ROM
@@ -177,6 +198,20 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
+-- * When you notice that 'asyncRomFilePow2' is significantly slowing down your
+-- simulation, give it a /monomorphic/ type signature. So instead of leaving the
+-- type to be inferred:
+--
+--     @
+--     myRomData = asyncRomFilePow2 "memory.bin"
+--     @
+--
+--     you __should__ give it a /monomorphic/ type signature:
+--
+--     @
+--     myRomData :: Unsigned 9 -> BitVector 16
+--     myRomData = asyncRomFilePow2 "memory.bin"
+--     @
 asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
