@@ -188,6 +188,12 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 
 -- | Create a FIFO buffer adhering to the 'DataFlow' protocol. Can be filled
 -- with initial content.
+--
+-- To create a FIFO of size 4, with two initial values 2 and 3 you would write:
+--
+-- @
+-- fifo4 = 'fifoDF' d4 (2 :> 3 :> Nil)
+-- @
 fifoDF :: forall addrSize m n a .
      (KnownNat addrSize,
      KnownNat n, KnownNat m,
@@ -346,7 +352,17 @@ class LockStep a b where
   --
   -- <<doc/lockStep.svg>>
   --
-  -- Note that 'lockStep' works for arbitrarily nested tuples. That is:
+  -- __Note 1__: ensure that the components that you are synchronising have
+  -- buffered/delayed @ready@ and @valid@ signals, or 'lockStep' has the
+  -- potential to introduce combinational loops. You can do this by placing
+  -- 'fifoDF's on the parallel channels. Extending the above example, you would
+  -- write:
+  --
+  -- @
+  -- ((f \`@'seqDF'@\` 'fifoDF' d4 Nil) \`@'parDF'@\` (g \`@'seqDF'@\` 'fifoDF' d4 Nil)) \`@'seqDF'@\` 'lockStep' \`@'seqDF'@\` h
+  -- @
+  --
+  -- __Note 2__: 'lockStep' works for arbitrarily nested tuples. That is:
   --
   -- @
   -- p :: 'DataFlow' Bool Bool ((b,d),d) z
@@ -403,7 +419,17 @@ class LockStep a b where
   --
   -- <<doc/stepLock.svg>>
   --
-  -- Note that 'stepLock' works for arbitrarily nested tuples. That is:
+  -- __Note 1__: ensure that the components that you are synchronising have
+  -- buffered/delayed @ready@ and @valid@ signals, or 'stepLock' has the
+  -- potential to introduce combinational loops. You can do this by placing
+  -- 'fifoDF's on the parallel channels. Extending the above example, you would
+  -- write:
+  --
+  -- @
+  -- h \`@'seqDF'@\` 'stepLock' \`@'seqDF'@\` ((`fifoDF` d4 Nil \`@'seqDF'@\` f) \`@'parDF'@\` (`fifoDF` d4 Nil \`@'seqDF'@\` g))
+  -- @
+  --
+  -- __Note 2__: 'stepLock' works for arbitrarily nested tuples. That is:
   --
   -- @
   -- p :: 'DataFlow' Bool Bool z ((a,c),c)
@@ -411,7 +437,7 @@ class LockStep a b where
   -- q :: 'DataFlow' ((Bool,Bool),Bool) ((Bool,Bool),Bool) ((a,c),c) ((b,d),d)
   -- q = f \`@'parDF'@\` g \`@'parDF'@\` g
   --
-  -- r = p \`@'seqDF'@\` 'lockStep' \`@'seqDF'@\` q
+  -- r = p \`@'seqDF'@\` 'stepLock' \`@'seqDF'@\` q
   -- @
   --
   -- Does the right thing.
