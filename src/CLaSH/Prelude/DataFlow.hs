@@ -202,7 +202,7 @@ fifoDF :: forall addrSize m n a nm rate .
      KnownNat (addrSize + 1),
      (m + n) ~ (2 ^ addrSize),
      KnownSymbol nm, KnownNat rate)
-  => SNat (m + n) -- ^ Total size of the vector. Must be a power of two
+  => SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two.
   -> Vec m a      -- ^ Initial content. Can be smaller than the size of the
                   -- FIFO. Empty spaces are initialised with 'undefined'.
   -> DataFlow' ('Clk nm rate) Bool Bool a a
@@ -275,26 +275,55 @@ parDF :: (KnownSymbol nm, KnownNat rate)
       -> DataFlow' ('Clk nm rate) (aEn,cEn) (bEn,dEn) (a,c) (b,d)
 f `parDF` g = firstDF f `seqDF` secondDF g
 
--- | Feed back the second halve of the communication channel.
+-- | Feed back the second halve of the communication channel. The feedback loop
+-- is buffered by a 'fifoDF' circuit.
 --
--- Given:
+-- So given a circuit /h/ with two synchronisation channels:
 --
 -- @
--- f \`@'seqDF'@\` ('loopDF' h) \`@'seqDF'@\` g
+-- __h__ :: 'DataFlow' (Bool,Bool) (Bool,Bool) (a,d) (b,d)
 -- @
 --
--- The circuits @f@, @h@, and @g@, will operate in /lock-step/. Which means that
--- there it only progress when all three circuits are producing /valid/ data
--- and all three circuits are /ready/ to receive new data. The 'loopDF' function
--- uses the 'lockStep' and 'stepLock' functions to achieve the /lock-step/
--- operation.
+-- Feeding back the /d/ part (including its synchronisation channels) results
+-- in:
+--
+-- @
+-- 'loopDF' d4 Nil h
+-- @
 --
 -- <<doc/loopDF.svg>>
+--
+-- When you have a circuit @h'@, with only a single synchronisation channel:
+--
+-- @
+-- __h'__ :: 'DataFlow' Bool Bool (a,d) (b,d)
+-- @
+--
+-- and you want to compose /h'/ in a feedback loop, the following will not work:
+--
+-- @
+-- f \`@'seqDF'@\` ('loopDF' d4 Nil h') \`@'seqDF'@\` g
+-- @
+--
+-- The circuits @f@, @h@, and @g@, must operate in /lock-step/ because the /h'/
+-- circuit only has a single synchronisation channel. Consequently, there
+-- should only be progress when all three circuits are producing /valid/ data
+-- and all three circuits are /ready/ to receive new data. We need to compose
+-- /h'/ with the 'lockStep' and 'stepLock' functions to achieve the /lock-step/
+-- operation.
+--
+-- @
+-- f \`@'seqDF'@\` ('lockStep' \`@'seqDF'@\` 'loopDF' d4 Nil h' \`@'seqDF'@\` 'stepLock') \`@'seqDF'@\` g
+-- @
+--
+-- <<doc/loopDF_sync.svg>>
 loopDF :: (KnownNat m, KnownNat n, KnownNat rate, KnownNat addrSize
           ,KnownNat (2 ^ addrSize), KnownNat (addrSize + 1), KnownSymbol nm
           ,(m+n) ~ (2^addrSize))
-       => SNat (m + n)
-       -> Vec m d
+       => SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two
+       -> Vec m d -- ^ Initial content of the FIFO buffer. Can be smaller than
+                  -- the size of the FIFO. Empty spaces are initialised with
+                  -- 'undefined'.
        -> DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
        -> DataFlow' ('Clk nm rate) Bool Bool   a           b
 loopDF sz is (DF f) =
@@ -311,6 +340,8 @@ loopDF sz is (DF f) =
                   in  (b,bV,aR)
      )
 
+-- | Feed back the second halve of the communication channel. Unlike 'loopDF',
+-- the feedback loop is /not/ buffered.
 loopDF_nobuf :: (KnownSymbol nm, KnownNat rate)
              => DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
              -> DataFlow' ('Clk nm rate) Bool Bool   a           b
