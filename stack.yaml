@@ -9,7 +9,7 @@ packages:
 - 'testsuite'
 - location:
     git: https://github.com/clash-lang/clash-prelude.git
-    commit: aee2c0e8eb2695b09294c71ca988648e7a6a6b98
+    commit: 39efe8f4b9b707e2053359c292104db3df0ab0f2
 - location:
     git: https://github.com/clash-lang/ghc-tcplugins-extra.git
     commit: de99532bc7c00f069ef493c03d32ca662a8806e6
