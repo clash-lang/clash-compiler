@@ -1,7 +1,7 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
 ## 0.6.6 *December 11th 2015*
-New features:
+* New features:
   * Remove all existing HDL files before generating new ones. This can be disabled by the `-clash-noclean` flag. [#96](https://github.com/clash-lang/clash-compiler/issues/96)
   * Support for `clash-prelude` 0.10.4
 
