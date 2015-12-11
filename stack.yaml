@@ -1,0 +1,13 @@
+resolver: lts-3.15
+
+packages:
+- .
+- location:
+    git: https://github.com/clash-lang/ghc-tcplugins-extra.git
+    commit: de99532bc7c00f069ef493c03d32ca662a8806e6
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
+    commit: 0362e4985343694e2e770ae9cbe4e91797078588
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-extra.git
+    commit: 09fb20afaae1b988ec6c6c47d6a9650b19748268
