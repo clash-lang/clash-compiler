@@ -36,6 +36,7 @@ module CLaSH.Prelude.DataFlow
   , secondDF
   , parDF
   , loopDF
+  , loopDF_nobuf
     -- * Lock-Step operation
   , LockStep (..)
   )
@@ -47,7 +48,7 @@ import Prelude                hiding ((++), (!!), length, repeat)
 import CLaSH.Class.BitPack    (boolToBV)
 import CLaSH.Class.Resize     (truncateB)
 import CLaSH.Prelude.BitIndex (msb)
-import CLaSH.Prelude.Mealy    (mealyB)
+import CLaSH.Prelude.Mealy    (mealyB')
 import CLaSH.Promoted.Nat     (SNat)
 import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
@@ -194,22 +195,24 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 -- @
 -- fifo4 = 'fifoDF' d4 (2 :> 3 :> Nil)
 -- @
-fifoDF :: forall addrSize m n a .
+fifoDF :: forall addrSize m n a nm rate .
      (KnownNat addrSize,
      KnownNat n, KnownNat m,
      KnownNat (2 ^ addrSize),
      KnownNat (addrSize + 1),
-     (m + n) ~ (2 ^ addrSize))
+     (m + n) ~ (2 ^ addrSize),
+     KnownSymbol nm, KnownNat rate)
   => SNat (m + n) -- ^ Total size of the vector. Must be a power of two
   -> Vec m a      -- ^ Initial content. Can be smaller than the size of the
                   -- FIFO. Empty spaces are initialised with 'undefined'.
-  -> DataFlow Bool Bool a a
+  -> DataFlow' ('Clk nm rate) Bool Bool a a
 fifoDF _ iS = DF $ \i iV oR ->
-  let initRdPtr      = 0
+  let clk            = sclock
+      initRdPtr      = 0
       initWrPtr      = fromIntegral (length iS)
       initMem        = iS ++ repeat undefined :: Vec (m + n) a
       initS          = (initMem,initRdPtr,initWrPtr)
-      (o,empty,full) = mealyB fifoDF_mealy initS (i,iV,oR)
+      (o,empty,full) = mealyB' clk fifoDF_mealy initS (i,iV,oR)
   in  (o,not1 empty, not1 full)
 
 -- | Identity circuit
@@ -287,26 +290,40 @@ f `parDF` g = firstDF f `seqDF` secondDF g
 -- operation.
 --
 -- <<doc/loopDF.svg>>
-loopDF :: (KnownSymbol nm, KnownNat rate)
-       => DataFlow' ('Clk nm rate) Bool Bool (a,d) (b,d)
-       -> DataFlow' ('Clk nm rate) Bool Bool a     b
-loopDF f = loopDF' h
-  where
-    h = lockStep `seqDF` f `seqDF` stepLock
+loopDF :: (KnownNat m, KnownNat n, KnownNat rate, KnownNat addrSize
+          ,KnownNat (2 ^ addrSize), KnownNat (addrSize + 1), KnownSymbol nm
+          ,(m+n) ~ (2^addrSize))
+       => SNat (m + n)
+       -> Vec m d
+       -> DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
+       -> DataFlow' ('Clk nm rate) Bool Bool   a           b
+loopDF sz is (DF f) =
+  DF (\a aV bR -> let clk          = sclock
+                      (bd,bdV,adR) = f ad adV bdR
+                      (b,d)        = unbundle' clk bd
+                      (bV,dV)      = unbundle' clk bdV
+                      (aR,dR)      = unbundle' clk adR
+                      (d_buf,dV_buf,dR_buf) = df (fifoDF sz is) d dV dR
 
-loopDF' :: (KnownSymbol nm, KnownNat rate)
-        => DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
-        -> DataFlow' ('Clk nm rate) Bool Bool   a           b
-loopDF' (DF f') = DF (\a aV bR -> let clk          = sclock
-                                      (bd,bdV,adR) = f' ad adV bdR
-                                      (b,d)        = unbundle' clk bd
-                                      (bV,dV)      = unbundle' clk bdV
-                                      (aR,dR)      = unbundle' clk adR
-                                      ad           = bundle' clk (a,d)
-                                      adV          = bundle' clk (aV,dV)
-                                      bdR          = bundle' clk (bR,dR)
-                                  in  (b,bV,aR)
-                     )
+                      ad  = bundle' clk (a,d_buf)
+                      adV = bundle' clk (aV,dV_buf)
+                      bdR = bundle' clk (bR,dR_buf)
+                  in  (b,bV,aR)
+     )
+
+loopDF_nobuf :: (KnownSymbol nm, KnownNat rate)
+             => DataFlow' ('Clk nm rate) (Bool,Bool) (Bool,Bool) (a,d) (b,d)
+             -> DataFlow' ('Clk nm rate) Bool Bool   a           b
+loopDF_nobuf (DF f) = DF (\a aV bR -> let clk          = sclock
+                                          (bd,bdV,adR) = f ad adV bdR
+                                          (b,d)        = unbundle' clk bd
+                                          (bV,dV)      = unbundle' clk bdV
+                                          (aR,dR)      = unbundle' clk adR
+                                          ad           = bundle' clk (a,d)
+                                          adV          = bundle' clk (aV,dV)
+                                          bdR          = bundle' clk (bR,dR)
+                                      in  (b,bV,aR)
+                         )
 
 -- | Reduce or extend the synchronisation granularity of parallel compositions.
 class LockStep a b where

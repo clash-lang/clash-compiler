@@ -4,6 +4,8 @@
 * New features:
   * Add `pureDF` to `CLaSH.Prelude.DataFlow`: lift combinational circuits to `DataFlow` circuits.
   * Add `fifoDF` to `CLaSH.Prelude.DataFlow`: a simple FIFO buffer adhering to the `DataFlow` protocol.
+  * `loopDF` no longer uses the `lockStep` and `stepLock` automatically, and now includes a FIFO buffer on the feedback path.
+  * Add `loopDF_nobuf` to `CLaSH.Prelude.DataFlow`: a version of `loopDF` with no FIFO buffer on the feedback path.
   * Add `boolToBV` to `CLaSH.CLass.BitPack`: convert `Bool`eans to `n`-bit `BitVector`s.
   * `ClockSource` in `CLaSH.Annotations.TopEntity` can now have multiple clock inputs [#33](https://github.com/clash-lang/clash-prelude/issues/33)
 * Bug fixes:
