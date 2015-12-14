@@ -10,16 +10,16 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IM
-import           Data.List               (isSuffixOf)
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
-import           Unbound.Generics.LocallyNameless (name2String, runFreshM, unembed)
+import           Unbound.Generics.LocallyNameless (runFreshM, unembed)
 
 import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
 import qualified DynFlags                as GHC
 import qualified TyCon                   as GHC
 import qualified TysWiredIn              as GHC
+import qualified Var                     as GHC
 
 import           CLaSH.Annotations.TopEntity (TopEntity)
 import           CLaSH.Core.FreeVars     (termFreeIds)
@@ -43,50 +43,49 @@ generateBindings ::
   PrimMap
   -> String
   -> Maybe  (GHC.DynFlags)
-  -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName,Maybe TopEntity)
+  -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
+        ,(TmName, Maybe TopEntity) -- topEntity bndr + (maybe) TopEntity annotation
+        ,Maybe TmName              -- testInput bndr
+        ,Maybe TmName)             -- expectedOutput bndr
 generateBindings primMap modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,topEntM) <- loadModules modName dflagsM
+  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM) <- loadModules modName dflagsM
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
       clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
-      droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings
-  return (droppedAndRetypedBindings,allTcCache,tupTcCache,topEntM)
+      (topEnt',testInpM',expOutM')  = flip State.evalState tcMap' $ do
+                                          topEnt'' <- coreToName GHC.varName GHC.varUnique qualfiedNameString topEnt
+                                          testInpM'' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) testInpM
+                                          expOutM'' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) expOutM
+                                          return (topEnt'',testInpM'',expOutM'')
+      droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEnt' testInpM' expOutM'
 
-dropAndRetypeBindings :: HashMap TyConName TyCon -> BindingMap -> BindingMap
-dropAndRetypeBindings allTcCache allBindings = oBindings
+  return (droppedAndRetypedBindings,allTcCache,tupTcCache,(topEnt',topEntAnn),testInpM',expOutM')
+
+dropAndRetypeBindings :: HashMap TyConName TyCon
+                      -> BindingMap
+                      -> TmName        -- ^ topEntity
+                      -> Maybe TmName  -- ^ testInput
+                      -> Maybe TmName  -- ^ expectedOutput
+                      -> BindingMap
+
+dropAndRetypeBindings allTcCache allBindings topEnt testInpM expOutM = oBindings
   where
-    topEntities     = HashMap.toList
-                    $ HashMap.filterWithKey
-                        (\var _ -> isSuffixOf ".topEntity" $ name2String var)
-                        allBindings
-    testInputs      = HashMap.toList
-                    $ HashMap.filterWithKey
-                        (\var _ -> isSuffixOf ".testInput" $ name2String var)
-                        allBindings
-    expectedOutputs = HashMap.toList
-                    $ HashMap.filterWithKey
-                        (\var _ -> isSuffixOf ".expectedOutput" $ name2String var)
-                        allBindings
+    topEntity = do e <- HashMap.lookup topEnt allBindings
+                   return (topEnt,e)
+    testInput = do t <- testInpM
+                   e <- HashMap.lookup t allBindings
+                   return (t,e)
+    expectedOut = do t <- expOutM
+                     e <- HashMap.lookup t allBindings
+                     return (t,e)
 
-    dropAndRetype d (t,_) = snd
-                          $ retype allTcCache
-                                   ([],lambdaDropPrep d t)
-                                   t
-
-    tBindings = case topEntities of
-                  (topEntity:_) -> dropAndRetype allBindings topEntity
-                  _             -> allBindings
-
-    iBindings = case testInputs of
-                  (testInput:_) -> dropAndRetype tBindings testInput
-                  _             -> tBindings
-
-    oBindings = case expectedOutputs of
-                  (expectedOutput:_) -> dropAndRetype iBindings expectedOutput
-                  _                  -> iBindings
+    tBindings = maybe allBindings (dropAndRetype allBindings) topEntity
+    iBindings = maybe tBindings (dropAndRetype tBindings) testInput
+    oBindings = maybe iBindings (dropAndRetype iBindings) expectedOut
+    dropAndRetype d (t,_) = snd (retype allTcCache ([],lambdaDropPrep d t) t)
 
 -- | clean up cast-removal mess
 retype :: HashMap TyConName TyCon

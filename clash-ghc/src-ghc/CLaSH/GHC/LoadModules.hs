@@ -10,7 +10,7 @@ where
 
 -- External Modules
 import           Data.List                    (nub)
-import           Data.Maybe                   (listToMaybe)
+import           Data.Word                    (Word8)
 import           CLaSH.Annotations.TopEntity  (TopEntity)
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
@@ -20,6 +20,7 @@ import           System.Process               (runInteractiveCommand,
 -- GHC API
 import qualified Annotations
 import qualified CoreSyn
+import qualified Digraph
 import           DynFlags                     (GeneralFlag (..))
 import qualified DynFlags
 import qualified GHC
@@ -29,13 +30,17 @@ import qualified MonadUtils
 import qualified Panic
 import qualified Serialized
 import qualified TidyPgm
-
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
 import qualified Var
 import qualified FamInst
 import qualified FamInstEnv
+import qualified Name
+import qualified Module
+import           Outputable                   ((<>),dot,ppr)
+import qualified Outputable
+import qualified OccName
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
@@ -65,7 +70,9 @@ loadModules ::
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
-        , Maybe TopEntity
+        , (CoreSyn.CoreBndr, Maybe TopEntity)      -- topEntity bndr + (maybe) TopEntity annotation
+        , Maybe CoreSyn.CoreBndr                   -- testInput bndr
+        , Maybe CoreSyn.CoreBndr                   -- expectedOutput bndr
         )
 loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessager
                               DynFlags.defaultFlushOut $ do
@@ -144,19 +151,61 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
 
         hscEnv <- GHC.getSession
         famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
-        topEntityAnnotations <- findCLaSHAnnotations (map fst binders)
-        let topEntM = listToMaybe topEntityAnnotations
 
-        return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntM)
+        let rootModule = GHC.ms_mod_name . last
+                       . Digraph.flattenSCC
+                       . last
+                       $ GHC.topSortModuleGraph True modGraph Nothing
+
+            rootBndrs = filter (maybe False
+                                      ((== rootModule)
+                                       . Module.moduleName)
+                                . Name.nameModule_maybe
+                                . Var.varName)
+                               (map fst binders)
+
+        topEntM <- findCLaSHAnnotations rootBndrs
+        let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
+            topEntities     = filter ((== "topEntity") . varNameString) rootBndrs
+            testInputs      = filter ((== "testInput") . varNameString) rootBndrs
+            expectedOutputs = filter ((== "expectedOutput") . varNameString) rootBndrs
+        topEntity <- case topEntities of
+          [] -> case topEntM of
+                  Just (l,r) -> return (l,Just r)
+                  _ -> Panic.pgmError $ "No 'topEntity', nor function with a 'TopEntity' annotation found in root module: " ++
+                                        (Outputable.showSDocUnsafe (ppr rootModule))
+          [x] -> case topEntM of
+                  Just (l,r) | l == x    -> return (l,Just r)
+                             | otherwise -> Panic.pgmError $ "'TopEntity' annotation applied to a function that is not named 'topEntity' while a 'topEntity' function is present: " ++
+                                                             (Outputable.showSDocUnsafe (ppr rootModule <> dot <> ppr l))
+                  Nothing -> return (x,Nothing)
+          _ -> Panic.pgmError $ $(curLoc) ++  "Multiple 'topEntities' found."
+        testInput <- case testInputs of
+          []  -> return Nothing
+          [x] -> return (Just x)
+          _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
+        expectedOutput <- case expectedOutputs of
+          []  -> return Nothing
+          [x] -> return (Just x)
+          _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
+
+        return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,testInput,expectedOutput)
       GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
 
 findCLaSHAnnotations :: GHC.GhcMonad m
                      => [CoreSyn.CoreBndr]
-                     -> m [TopEntity]
+                     -> m (Maybe (CoreSyn.CoreBndr,TopEntity))
 findCLaSHAnnotations bndrs = do
-  let deserializer = Serialized.deserializeWithData
+  let deserializer = Serialized.deserializeWithData :: ([Word8] -> TopEntity)
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
-  concat <$> mapM (GHC.findGlobalAnns deserializer) targets
+
+  anns <- mapM (GHC.findGlobalAnns deserializer) targets
+  let annBndrs = filter (not . null . snd) (zip bndrs anns)
+  case annBndrs of
+    []  -> return Nothing
+    [(x,[y])] -> return (Just (x,y))
+    [(x,_)] -> Panic.pgmError $ "Root module contains a function with multiple 'TopEntity' annotation: " ++ Outputable.showSDocUnsafe (ppr x)
+    xs  -> Panic.pgmError $ "Root module contains multiple functions with a 'TopEntity' annotation: " ++ Outputable.showSDocUnsafe (ppr (map fst xs))
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do

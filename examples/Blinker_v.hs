@@ -2,9 +2,9 @@ module Blinker_v where
 
 import CLaSH.Prelude
 
-{-# ANN topEntity
+{-# ANN blinker
   (defTop
-    { t_name     = "blinker"
+    { t_name     = "Blinker"
     , t_inputs   = ["KEY1"]
     , t_outputs  = ["LED"]
     , t_extraIn  = [ ("CLOCK_50", 1)
@@ -12,8 +12,8 @@ import CLaSH.Prelude
                    ]
     , t_clocks   = [ altpll "altpll50" "CLOCK_50[0]" "~ KEY0[0]" ]
     }) #-}
-topEntity :: Signal Bit -> Signal (BitVector 8)
-topEntity key1 = leds
+blinker :: Signal Bit -> Signal (BitVector 8)
+blinker key1 = leds
   where
     key1R = isRising 1 key1
     leds  = mealy blinkerT (1,False,0) key1R

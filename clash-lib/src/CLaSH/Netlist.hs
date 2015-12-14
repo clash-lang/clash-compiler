@@ -109,17 +109,7 @@ genComponentT compName componentExpr mStart = do
   componentNumber <- cmpCount <<%= (+1)
   modName <- Lens.use modNm
 
-  let componentName' = (Text.pack (modName ++ "_") `Text.append`)
-                     . (`Text.append` (Text.pack $ show componentNumber))
-                     . ifThenElse Text.null
-                          (`Text.append` Text.pack "Component_")
-                          (`Text.append` Text.pack "_")
-                     . mkBasicId' True
-                     . stripDollarPrefixes
-                     . last
-                     . Text.splitOn (Text.pack ".")
-                     . Text.pack
-                     $ name2String compName
+  let componentName' = genComponentName modName compName componentNumber
   curCompNm .= componentName'
 
   tcm <- Lens.use tcCache
@@ -152,6 +142,21 @@ genComponentT compName componentExpr mStart = do
       compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
       component      = Component componentName' (toList clks) compInps [compOutp] (netDecls ++ decls)
   return component
+
+genComponentName :: String -> TmName -> Int -> Identifier
+genComponentName prefix nm i
+  = mkBasicId' True
+  . (Text.pack (prefix ++ "_") `Text.append`)
+  . (`Text.append` (Text.pack $ show i))
+  . ifThenElse Text.null
+      (`Text.append` Text.pack "Component_")
+      (`Text.append` Text.pack "_")
+  . mkBasicId' True
+  . stripDollarPrefixes
+  . last
+  . Text.splitOn (Text.pack ".")
+  . Text.pack
+  $ name2String nm
 
 -- | Generate a list of Declarations for a let-binder
 mkDeclarations :: Id -- ^ LHS of the let-binder
