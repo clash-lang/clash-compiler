@@ -31,7 +31,7 @@ mkBasicId' tupEncode = stripMultiscore . stripLeading . zEncode tupEncode
                     . Text.group
 
 stripDollarPrefixes :: Text -> Text
-stripDollarPrefixes = stripSpecPrefix . stripConPrefix
+stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
                     . stripWorkerPrefix . stripDictFunPrefix
   where
     stripDictFunPrefix t = case Text.stripPrefix "$f" t of
@@ -48,7 +48,9 @@ stripDollarPrefixes = stripSpecPrefix . stripConPrefix
                          Just k  -> k
                          Nothing -> t
 
-    stripSpecPrefix t = snd (Text.breakOnEnd "$s" t)
+    stripSpecPrefix t = case Text.stripPrefix "$s" t of
+                          Just k -> k
+                          Nothing -> t -- snd (Text.breakOnEnd "$s" t)
 
 
 type UserString    = Text -- As the user typed it
