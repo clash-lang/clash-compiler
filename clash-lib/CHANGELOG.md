@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.7
+* New features:
+  * Only look for 'topEntity' in the root module. [#22](https://github.com/clash-lang/clash-compiler/issues/22)
+
 ## 0.6.6 *December 11th 2015*
 * New features:
   * Remove all existing HDL files before generating new ones. This can be disabled by the `-clash-noclean` flag. [#96](https://github.com/clash-lang/clash-compiler/issues/96)
