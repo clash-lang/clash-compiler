@@ -6,7 +6,7 @@
 
 module Unbound.Generics.LocallyNameless.Extra where
 
-#ifndef CABAL
+#ifndef MIN_VERSION_unbound_generics
 #define MIN_VERSION_unbound_generics(x,y,z)(1)
 #endif
 
@@ -15,9 +15,17 @@ module Unbound.Generics.LocallyNameless.Extra where
 import Control.DeepSeq
 #endif
 import Data.Hashable                           (Hashable(..),hash)
+#if MIN_VERSION_unbound_generics(0,3,0)
+import Data.Monoid
+#endif
 import Data.Text                               (Text)
 import GHC.Real                                (Ratio)
+#if MIN_VERSION_unbound_generics(0,3,0)
+import Unbound.Generics.LocallyNameless.Alpha  (Alpha (..), NamePatFind (..),
+                                                NthPatFind (..))
+#else
 import Unbound.Generics.LocallyNameless.Alpha  (Alpha (..))
+#endif
 #if MIN_VERSION_unbound_generics(0,2,0)
 #else
 import Unbound.Generics.LocallyNameless.Bind   (Bind (..))
@@ -61,9 +69,15 @@ instance Alpha Text where
   close _ctx _b         = id
   open _ctx _b          = id
   isPat _               = mempty
+#if MIN_VERSION_unbound_generics(0,3,0)
+  isTerm _              = All True
+  nthPatFind _          = NthPatFind Left
+  namePatFind _         = NamePatFind (const (Left 0))
+#else
   isTerm _              = True
   nthPatFind _          = Left
   namePatFind _ _       = Left 0
+#endif
   swaps' _ctx _p        = id
   freshen' _ctx i       = return (i, mempty)
   lfreshen' _ctx i cont = cont i mempty

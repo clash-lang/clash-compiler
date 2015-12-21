@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -13,10 +14,19 @@ module CLaSH.Core.DataCon
   )
 where
 
+#ifndef MIN_VERSION_unbound_generics
+#define MIN_VERSION_unbound_generics(x,y,z)(1)
+#endif
+
 import Control.DeepSeq                        (NFData(..))
 import GHC.Generics                           (Generic)
 import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst(..))
 import Unbound.Generics.LocallyNameless.Extra ()
+#if MIN_VERSION_unbound_generics(0,3,0)
+import Data.Monoid                            (All (..))
+import Unbound.Generics.LocallyNameless       (NthPatFind (..),
+                                               NamePatFind (..))
+#endif
 
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
 import CLaSH.Util
@@ -59,10 +69,16 @@ instance Alpha DataCon where
   open _ _ dc         = dc
 
   isPat _             = mempty
-  isTerm _            = True
 
+#if MIN_VERSION_unbound_generics(0,3,0)
+  isTerm _            = All True
+  nthPatFind _        = NthPatFind Left
+  namePatFind _       = NamePatFind (const (Left 0))
+#else
+  isTerm _            = True
   nthPatFind _        = Left
   namePatFind _ _     = Left 0
+#endif
 
   swaps' _ _ dc       = dc
   lfreshen' _ dc cont = cont dc mempty

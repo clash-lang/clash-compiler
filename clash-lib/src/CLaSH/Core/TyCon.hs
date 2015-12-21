@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -14,12 +15,21 @@ module CLaSH.Core.TyCon
   )
 where
 
+#ifndef MIN_VERSION_unbound_generics
+#define MIN_VERSION_unbound_generics(x,y,z)(1)
+#endif
+
 -- External Import
 import Control.DeepSeq
 import GHC.Generics
 import Unbound.Generics.LocallyNameless       (Alpha(..))
 import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless.Name  (Name,name2String)
+#if MIN_VERSION_unbound_generics(0,3,0)
+import Data.Monoid                            (All (..))
+import Unbound.Generics.LocallyNameless       (NthPatFind (..),
+                                               NamePatFind (..))
+#endif
 
 -- Internal Imports
 import CLaSH.Core.DataCon                     (DataCon)
@@ -93,10 +103,16 @@ instance Alpha TyCon where
   open _ _ tc         = tc
 
   isPat _             = mempty
-  isTerm _            = True
 
+#if MIN_VERSION_unbound_generics(0,3,0)
+  isTerm _            = All True
+  nthPatFind _        = NthPatFind Left
+  namePatFind _       = NamePatFind (const (Left 0))
+#else
+  isTerm _            = True
   nthPatFind _        = Left
   namePatFind _ _     = Left 0
+#endif
 
   swaps' _ _ tc       = tc
   lfreshen' _ tc cont = cont tc mempty

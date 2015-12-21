@@ -1,5 +1,5 @@
 Name:                 clash-lib
-Version:              0.6.7
+Version:              0.6.7.1
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -108,7 +108,7 @@ Library
                       text                    >= 0.11.3.1,
                       time                    >= 1.4.0.1,
                       transformers            >= 0.3.0.0,
-                      unbound-generics        >= 0.1 && < 0.3,
+                      unbound-generics        >= 0.1 && < 0.4,
                       unordered-containers    >= 0.2.3.3,
                       uu-parsinglib           >= 2.8.1,
                       wl-pprint-text          >= 1.1.0.0

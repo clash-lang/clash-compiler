@@ -1,5 +1,8 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.7.1:
+* Support for `unbound-generics-0.3`
+
 ## 0.6.7
 * New features:
   * Only look for 'topEntity' in the root module. [#22](https://github.com/clash-lang/clash-compiler/issues/22)
