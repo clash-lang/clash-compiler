@@ -1,7 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.6.1
+## 0.6.7 *December 21st 2015*
 * Support for `unbound-generics-0.3`
+* New features:
+  * Only look for 'topEntity' in the root module. [#22](https://github.com/clash-lang/clash-compiler/issues/22)
 
 ## 0.6.6 *December 11th 2015*
 * New features:
