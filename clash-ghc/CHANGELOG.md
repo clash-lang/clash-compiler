@@ -4,6 +4,8 @@
 * Support for `unbound-generics-0.3`
 * New features:
   * Only look for 'topEntity' in the root module. [#22](https://github.com/clash-lang/clash-compiler/issues/22)
+* Fixes bugs:
+  * Unhelpful error message when GHC is not in PATH [#104](https://github.com/clash-lang/clash-compiler/issues/104)
 
 ## 0.6.6 *December 11th 2015*
 * New features:

@@ -14,6 +14,7 @@ import           Data.Word                    (Word8)
 import           CLaSH.Annotations.TopEntity  (TopEntity)
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
+import           System.IO.Error              (tryIOError)
 import           System.Process               (runInteractiveCommand,
                                                waitForProcess)
 
@@ -47,19 +48,26 @@ import           CLaSH.GHC.LoadInterfaceFiles
 import           CLaSH.Util                   (curLoc,first)
 
 ghcLibDir :: IO FilePath
-ghcLibDir = do (libDir,exitCode) <- getProcessOutput $ "ghc-" ++ TOOL_VERSION_ghc ++ " --print-libdir"
-               case exitCode of
-                  ExitSuccess   -> return libDir
-                  ExitFailure i -> error $ "Calling GHC failed with: " ++ show i
+ghcLibDir = do
+  (libDirM,exitCode) <- getProcessOutput $ "ghc-" ++ TOOL_VERSION_ghc ++ " --print-libdir"
+  case exitCode of
+     ExitSuccess   -> case libDirM of
+       Just libDir -> return libDir
+       Nothing     -> Panic.pgmError noGHC
+     ExitFailure i -> case i of
+       127         -> Panic.pgmError noGHC
+       i'          -> Panic.pgmError $ "Calling GHC failed with error code: " ++ show i'
+  where
+    noGHC = "Could not invoke ghc-" ++ TOOL_VERSION_ghc ++ ". Make sure its location is in your PATH variable."
 
-getProcessOutput :: String -> IO (String, ExitCode)
+getProcessOutput :: String -> IO (Maybe String, ExitCode)
 getProcessOutput command =
      -- Create the process
   do (_, pOut, _, handle) <- runInteractiveCommand command
      -- Wait for the process to finish and store its exit code
      exitCode <- waitForProcess handle
      -- Get the standard output.
-     output   <- hGetLine pOut
+     output   <- either (const Nothing) Just <$> tryIOError (hGetLine pOut)
      -- return both the output and the exit code.
      return (output, exitCode)
 
