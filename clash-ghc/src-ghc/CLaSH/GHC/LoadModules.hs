@@ -58,7 +58,8 @@ ghcLibDir = do
        127         -> Panic.pgmError noGHC
        i'          -> Panic.pgmError $ "Calling GHC failed with error code: " ++ show i'
   where
-    noGHC = "Could not invoke ghc-" ++ TOOL_VERSION_ghc ++ ". Make sure its location is in your PATH variable."
+    noGHC = "CLaSH needs the GHC compiler it was build with, ghc-" ++ TOOL_VERSION_ghc ++
+            ", but it was not found. Make sure its location is in your PATH variable."
 
 getProcessOutput :: String -> IO (Maybe String, ExitCode)
 getProcessOutput command =
