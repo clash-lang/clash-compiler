@@ -93,6 +93,7 @@ type Signal a = Signal' SystemClock a
 -- [8,1,2]
 register :: a -> Signal a -> Signal a
 register = register# systemClock
+infixr `register`
 
 {-# INLINE regEn #-}
 -- | Version of 'register' that only updates its content when its second argument
