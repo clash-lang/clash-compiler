@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 -- | Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
@@ -7,6 +8,10 @@ module CLaSH.Netlist.Id
   , stripDollarPrefixes
   )
 where
+
+#ifndef MIN_VERSION_text
+#error MIN_VERSION_text undefined
+#endif
 
 import Data.Char      (isAsciiLower,isAsciiUpper,isDigit,ord)
 import Data.Text.Lazy as Text
@@ -38,7 +43,10 @@ stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
                              Just k  -> takeWhileEnd (/= '_') k
                              Nothing -> t
 
+#if MIN_VERSION_text(1,2,2)
+#else
     takeWhileEnd p = Text.reverse . Text.takeWhile p . Text.reverse
+#endif
 
     stripWorkerPrefix t = case Text.stripPrefix "$w" t of
                               Just k  -> k
