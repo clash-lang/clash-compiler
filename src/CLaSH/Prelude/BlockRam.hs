@@ -350,6 +350,9 @@ module CLaSH.Prelude.BlockRam
     -- * BlockRAM synchronised to an arbitrary clock
   , blockRam'
   , blockRamPow2'
+    -- * Read/Write conflict resolution
+  , readNew
+  , readNew'
     -- * Internal
   , blockRam#
   )
@@ -361,7 +364,7 @@ import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
-import CLaSH.Signal           (Signal)
+import CLaSH.Signal           (Signal, mux)
 import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle')
 import CLaSH.Sized.Unsigned   (Unsigned)
@@ -528,3 +531,16 @@ blockRam# clk content wr rd en din = register' clk undefined dout
       d' <- readArray ram r
       when e (writeArray ram w d)
       return d'
+
+-- | Create read-after-write blockRAM from a read-before-write one (synchronised to specified clock)
+--
+readNew' :: Eq addr => SClock clk -> (Signal' clk addr -> Signal' clk addr -> Signal' clk Bool -> Signal' clk a -> Signal' clk a) -> Signal' clk addr -> Signal' clk addr -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
+readNew' clk ram wrAddr rdAddr wrEn wrData = mux wasSame wasWritten $ ram wrAddr rdAddr wrEn wrData
+  where sameAddr = (==) <$> wrAddr <*> rdAddr
+        wasSame = register' clk False ((&&) <$> wrEn <*> sameAddr)
+        wasWritten = register' clk undefined wrData
+
+-- | Create read-after-write blockRAM from a read-before-write one (synchronised to system clock)
+--
+readNew :: Eq addr => (Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a) -> Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a
+readNew = readNew' systemClock
