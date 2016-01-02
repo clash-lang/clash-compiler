@@ -7,7 +7,7 @@
 module Unbound.Generics.LocallyNameless.Extra where
 
 #ifndef MIN_VERSION_unbound_generics
-#define MIN_VERSION_unbound_generics(x,y,z)(1)
+#error MIN_VERSION_unbound_generics undefined
 #endif
 
 #if MIN_VERSION_unbound_generics(0,2,0)
