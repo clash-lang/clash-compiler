@@ -8,6 +8,10 @@ module CLaSH.GHC.LoadModules
   )
 where
 
+#ifndef TOOL_VERSION_ghc
+#error TOOL_VERSION_ghc undefined
+#endif
+
 -- External Modules
 import           Data.List                    (nub)
 import           Data.Word                    (Word8)

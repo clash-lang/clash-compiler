@@ -43,8 +43,7 @@ stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
                              Just k  -> takeWhileEnd (/= '_') k
                              Nothing -> t
 
-#if MIN_VERSION_text(1,2,2)
-#else
+#if !MIN_VERSION_text(1,2,2)
     takeWhileEnd p = Text.reverse . Text.takeWhile p . Text.reverse
 #endif
 
