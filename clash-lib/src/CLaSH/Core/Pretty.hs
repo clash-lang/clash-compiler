@@ -121,6 +121,9 @@ instance Pretty Literal where
     IntegerLiteral i
       | i < 0         -> return $ parens (integer i)
       | otherwise     -> return $ integer i
+    IntLiteral i
+      | i < 0         -> return $ parens (integer i)
+      | otherwise     -> return $ integer i
     RationalLiteral r -> return $ rational r
     StringLiteral s   -> return $ vcat $ map text $ showMultiLineString s
 

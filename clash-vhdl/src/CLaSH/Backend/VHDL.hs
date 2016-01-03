@@ -8,6 +8,8 @@
 -- | Generate VHDL for assorted Netlist datatypes
 module CLaSH.Backend.VHDL (VHDLState) where
 
+#include "MachDeps.h"
+
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
@@ -544,26 +546,38 @@ expr_ _ (BlackBoxE pNm _ bbCtx _)
   , n > 32
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
+expr_ _ (BlackBoxE pNm _ bbCtx _)
+  | pNm == "GHC.Types.I#"
+  , [Literal _ (NumLit n)] <- extractLiterals bbCtx
+  = if n >= 2^(31 :: Integer) || n < (-2^(31 :: Integer))
+       then exprLit (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit n)
+       else "to_signed" <> parens (integer n <> "," <> int WORD_SIZE_IN_BITS)
+
 expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
-expr_ _ (DataTag Bool (Left id_))          = "false when" <+> text id_ <+> "= 0 else true"
-expr_ _ (DataTag Bool (Right id_))         = "1 when" <+> text id_ <+> "else 0"
-expr_ _ (DataTag hty@(Sum _ _) (Left id_)) = "to_unsigned" <> tupled (sequence [text id_,int (typeSize hty)])
-expr_ _ (DataTag (Sum _ _) (Right id_))    = "to_integer" <> parens (text id_)
+expr_ _ (DataTag Bool (Left id_)) = "false when" <+> text id_ <+> "= 0 else true"
+expr_ _ (DataTag Bool (Right id_)) =
+  "to_signed" <> parens (int 1 <> "," <> int WORD_SIZE_IN_BITS) <+> "when" <+> text id_ <+> "else" <+>
+  "to_signed" <> parens (int 0 <> "," <> int WORD_SIZE_IN_BITS)
 
-expr_ _ (DataTag (Product _ _) (Right _))  = int 0
-expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "to_integer" <> parens
-                                               ("unsigned" <> parens
-                                               (text id_ <> parens
-                                               (int start <+> "downto" <+> int end)))
+expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
+  "resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (text id_)) <> "," <> int (typeSize hty))
+expr_ _ (DataTag (Sum _ _) (Right id_)) =
+  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens (text id_ <> "," <> int WORD_SIZE_IN_BITS)))
+
+expr_ _ (DataTag (Product _ _) (Right _))  = "to_signed" <> parens (int 0 <> "," <> int WORD_SIZE_IN_BITS)
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) =
+    "signed" <> parens ("std_logic_vector" <> parens (
+    "resize" <> parens ("unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
+                        <> "," <> int WORD_SIZE_IN_BITS)))
   where
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
 
-expr_ _ (DataTag (Vector 0 _) (Right _)) = int 0
-expr_ _ (DataTag (Vector _ _) (Right _)) = int 1
+expr_ _ (DataTag (Vector 0 _) (Right _)) = "to_signed" <> parens (int 0 <> "," <> int WORD_SIZE_IN_BITS)
+expr_ _ (DataTag (Vector _ _) (Right _)) = "to_signed" <> parens (int 1 <> "," <> int WORD_SIZE_IN_BITS)
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

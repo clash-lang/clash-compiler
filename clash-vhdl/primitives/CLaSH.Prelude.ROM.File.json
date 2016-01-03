@@ -26,11 +26,11 @@ asyncROMFile_~SYM[0] : block
   signal ROM_~SYM[1] : RomType(0 to ~LIT[1]-1) := InitRomFromFile(~FILE[~LIT[2]]);
   signal rd_~SYM[2]  : integer range 0 to ~LIT[1]-1;
 begin
-  rd_~SYM[2] <= ~ARG[3]
+  rd_~SYM[2] <= to_integer(~ARG[3]
   -- pragma translate_off
                 mod ~LIT[1]
   -- pragma translate_on
-                ;
+                );
 
   ~RESULT <= to_stdlogicvector(ROM_~SYM[1](rd_~SYM[2]));
 end block;
@@ -67,11 +67,11 @@ romFile_~COMPNAME_~SYM[0] : block
   signal rd_~SYM[2]   : integer range 0 to ~LIT[2]-1;
   signal dout_~SYM[3] : ~TYPO;
 begin
-  rd_~SYM[2] <= ~ARG[4]
+  rd_~SYM[2] <= to_integer(~ARG[4]
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
-                ;
+                );
 
   romFileSync : process (~CLK[1])
   begin

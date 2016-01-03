@@ -36,38 +36,38 @@
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.>#"
-    , "type"      : "(>#) :: Int# -> Int# -> Bool"
-    , "templateD" : "~RESULT <= 1 when ~ARG[0] > ~ARG[1] else 0;"
+    , "type"      : "(>#) :: Int# -> Int# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.>=#"
-    , "type"      : "(>=#) :: Int# -> Int# -> Bool"
-    , "templateD" : "~RESULT <= 1 when ~ARG[0] >= ~ARG[1] else 0;"
+    , "type"      : "(>=#) :: Int# -> Int# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.==#"
-    , "type"      : "(==) :: Int# -> Int# -> Bool"
-    , "templateD" : "~RESULT <= 1 when ~ARG[0] = ~ARG[1] else 0;"
+    , "type"      : "(==) :: Int# -> Int# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim./=#"
-    , "type"      : "(/=#) :: Int# -> Int# -> Bool"
-    , "templateD" : "~RESULT <= 1 when ~ARG[0] /= ~ARG[1] else 0;"
+    , "type"      : "(/=#) :: Int# -> Int# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.<#"
-    , "type"      : "(<#) :: Int# -> Int# -> Bool"
-    , "templateD" : "~RESULT <= 1 when ~ARG[0] < ~ARG[1] else 0;"
+    , "type"      : "(<#) :: Int# -> Int# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.<=#"
-    , "type"      : "(<=#) :: Int# -> Int# -> Bool"
-    , "templateD" : "~RESULT <= 1 when ~ARG[0] <= ~ARG[1] else 0;"
+    , "type"      : "(<=#) :: Int# -> Int# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "Primitive" :
@@ -89,19 +89,31 @@
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftRA#"
     , "type"      : "uncheckedIShiftRA# :: Int# -> Int# -> Int#"
-    , "templateE" : "to_integer(shift_right(to_signed(~ARG[0],32),~ARG[1]))"
+    , "templateE" : "shift_right(~ARG[0],to_integer(~ARG[1]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftRL#"
     , "type"      : "uncheckedIShiftRL# :: Int# -> Int# -> Int#"
-    , "templateE" : "to_integer(to_signed(~ARG[0],32) srl ~ARG[1])"
+    , "templateE" : "~ARG[0] srl to_integer(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.uncheckedIShiftL#"
     , "type"      : "uncheckedIShiftL# :: Int# -> Int# -> Int#"
-    , "templateE" : "to_integer(shift_left(to_signed(~ARG[0],32),~ARG[1]))"
+    , "templateE" : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ord#"
+    , "type"      : "ord# :: Char# -> Int#"
+    , "templateE" : "resize(~ARG[0],32)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow8Int#"
+    , "type"      : "narrow8Int# :: Int# -> Int#"
+    , "templateE" : "~ARG[0]"
     }
   }
 ]

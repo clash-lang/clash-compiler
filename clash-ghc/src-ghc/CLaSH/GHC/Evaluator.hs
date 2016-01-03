@@ -28,38 +28,53 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i == j    -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
+        | i == j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
       _ -> e
   | nm == "GHC.Prim.>#" || nm == "GHC.Integer.Type.gtInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i > j     -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
+        | i > j     -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
       _ -> e
   | nm == "GHC.Prim.<#" || nm == "GHC.Integer.Type.ltInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i < j     -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
+        | i < j     -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
       _ -> e
   | nm == "GHC.Prim.<=#" || nm == "GHC.Integer.Type.leInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i <= j    -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
+        | i <= j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
       _ -> e
   | nm == "GHC.Prim.>=#" || nm == "GHC.Integer.Type.geInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i >= j    -> Literal (IntegerLiteral 1)
         | otherwise -> Literal (IntegerLiteral 0)
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
+        | i >= j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
       _ -> e
   | nm == "GHC.Integer.Type.integerToInt"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i)] -> Literal (IntegerLiteral i)
+      [Literal (IntegerLiteral i)] -> Literal (IntLiteral i)
       _ -> e
   | nm == "GHC.Prim.tagToEnum#"
   = case map (Bifunctor.bimap (reduceConstant tcm isSubj) id) args of
-      [Right (ConstTy (TyCon tcN)), Left (Literal (IntegerLiteral i))] ->
+      [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] ->
         let dc = do { tc <- HashMap.lookup tcN tcm
                     ; let dcs = tyConDataCons tc
                     ; List.find ((== (i+1)) . toInteger . dcTag) dcs
@@ -68,8 +83,8 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
       _ -> e
   | nm == "GHC.Prim.*#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
-        -> Literal (IntegerLiteral (i * j))
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
+        -> Literal (IntLiteral (i * j))
       _ -> e
   | nm == "GHC.Integer.Type.eqInteger"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
@@ -102,7 +117,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
       _ -> e
   | nm == "GHC.Prim.quotRemInt#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+      [Literal (IntLiteral i), Literal (IntLiteral j)]
         -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
                (Just tupTc) = HashMap.lookup tupTcNm tcm
                [tupDc] = tyConDataCons tupTc
@@ -122,7 +137,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
       _ -> e
   | nm == "GHC.Prim.negateInt#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i)] -> Literal (IntegerLiteral (negate i))
+      [Literal (IntLiteral i)] -> Literal (IntLiteral (negate i))
       _ -> e
   | nm == "CLaSH.Sized.Internal.Signed.minBound#"
   = case args of

@@ -17,17 +17,17 @@ asyncRam_~COMPNAME_~SYM[0] : block
   signal wr_~SYM[2]  : integer range 0 to ~LIT[2] - 1;
   signal rd_~SYM[3]  : integer range 0 to ~LIT[2] - 1;
 begin
-  wr_~SYM[2] <= ~ARG[3]
+  wr_~SYM[2] <= to_integer(~ARG[3]
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
-                ;
+                );
 
-  rd_~SYM[3] <= ~ARG[4]
+  rd_~SYM[3] <= to_integer(~ARG[4]
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
-                ;
+                );
 
   asyncRam_sync : process(~CLK[0])
   begin

@@ -1,9 +1,12 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 
 -- | Functions to create BlackBox Contexts and fill in BlackBox templates
 module CLaSH.Netlist.BlackBox where
+
+#include "MachDeps.h"
 
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
@@ -98,6 +101,7 @@ mkArgument e = do
         (Var _ v,[]) -> let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
                         in  return ((vT,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Integer,32)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (N.NumLit i),hwTy,True),[])
         (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
         (Prim f _,args) -> do
           (e',d) <- mkPrimitive True False f args ty
@@ -150,7 +154,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           case args of
-            [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntegerLiteral i))] -> do
+            [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
               tcm <- Lens.use tcCache
               let dcs = tyConDataCons (tcm HashMap.! tcN)
                   dc  = dcs !! fromInteger i
@@ -171,7 +175,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
       | pNm == "GHC.Prim.dataToTag#" -> case args of
-          [Right _,Left (Data dc)] -> return (N.Literal Nothing (NumLit $ toInteger $ dcTag dc - 1),[])
+          [Right _,Left (Data dc)] -> return (N.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit $ toInteger $ dcTag dc - 1),[])
           [Right _,Left scrut] -> do
             i <- varCount <<%= (+1)
             j <- varCount <<%= (+1)
@@ -182,7 +186,7 @@ mkPrimitive bbEParen bbEasD nm args ty = do
             let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
                 tmpS         = pack ("tmp_dtt_" ++ show j)
                 netDeclRhs   = NetDecl tmpRhs scrutHTy
-                netDeclS     = NetDecl tmpS Integer
+                netDeclS     = NetDecl tmpS (Signed WORD_SIZE_IN_BITS)
                 netAssignRhs = Assignment tmpRhs scrutExpr
                 netAssignS   = Assignment tmpS   (DataTag scrutHTy (Right tmpRhs))
             return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)

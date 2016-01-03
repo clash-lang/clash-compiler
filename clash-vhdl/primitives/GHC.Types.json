@@ -8,4 +8,16 @@
     , "primType"  : "Constructor"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Types.C#"
+    , "type"      : "C# :: Char# -> Char"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Types.I#"
+    , "type"      : "I# :: Int# -> Int"
+    , "templateE" : "~ARG[0]"
+    }
+  }
 ]

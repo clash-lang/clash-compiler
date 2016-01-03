@@ -31,7 +31,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Prim.negateInt#"
     , "type"      : "negateInt# :: Int# -> Int#"
-    , "templateE" : "-~ARG[0]"
+    , "templateE" : "-(~ARG[0])"
     }
   }
 , { "BlackBox" :
