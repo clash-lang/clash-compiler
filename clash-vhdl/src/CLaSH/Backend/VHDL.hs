@@ -596,8 +596,12 @@ exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc
 exprLit Nothing (NumLit i) = integer i
 
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
-  Unsigned _  -> "unsigned'" <> parens blit
-  Signed   _  -> "signed'" <> parens blit
+  Unsigned n
+    | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
+    | otherwise -> "unsigned'" <> parens blit
+  Signed n
+    | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
+    | otherwise -> "signed'" <> parens blit
   BitVector _ -> "std_logic_vector'" <> parens blit
   Integer ->
     let integerLow  = -2^(31 :: Integer) :: Integer
