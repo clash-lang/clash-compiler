@@ -23,48 +23,63 @@ import           CLaSH.Core.Var      (Var (..))
 
 reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
-  | nm == "GHC.Prim.==#" || nm == "GHC.Integer.Type.eqInteger#"
+  | nm == "GHC.Prim.==#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
-        | i == j    -> Literal (IntegerLiteral 1)
-        | otherwise -> Literal (IntegerLiteral 0)
       [Literal (IntLiteral i), Literal (IntLiteral j)]
         | i == j    -> Literal (IntLiteral 1)
         | otherwise -> Literal (IntLiteral 0)
       _ -> e
-  | nm == "GHC.Prim.>#" || nm == "GHC.Integer.Type.gtInteger#"
+  | nm == "GHC.Integer.Type.eqInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
-        | i > j     -> Literal (IntegerLiteral 1)
-        | otherwise -> Literal (IntegerLiteral 0)
+        | i == j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
+      _ -> e
+  | nm == "GHC.Prim.>#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntLiteral i), Literal (IntLiteral j)]
         | i > j     -> Literal (IntLiteral 1)
         | otherwise -> Literal (IntLiteral 0)
       _ -> e
-  | nm == "GHC.Prim.<#" || nm == "GHC.Integer.Type.ltInteger#"
+  | nm == "GHC.Integer.Type.gtInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
-        | i < j     -> Literal (IntegerLiteral 1)
-        | otherwise -> Literal (IntegerLiteral 0)
+        | i > j     -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
+      _ -> e
+  | nm == "GHC.Prim.<#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntLiteral i), Literal (IntLiteral j)]
         | i < j     -> Literal (IntLiteral 1)
         | otherwise -> Literal (IntLiteral 0)
       _ -> e
-  | nm == "GHC.Prim.<=#" || nm == "GHC.Integer.Type.leInteger#"
+  | nm == "GHC.Integer.Type.ltInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
-        | i <= j    -> Literal (IntegerLiteral 1)
-        | otherwise -> Literal (IntegerLiteral 0)
+        | i < j     -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
+      _ -> e
+  | nm == "GHC.Prim.<=#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntLiteral i), Literal (IntLiteral j)]
         | i <= j    -> Literal (IntLiteral 1)
         | otherwise -> Literal (IntLiteral 0)
       _ -> e
-  | nm == "GHC.Prim.>=#" || nm == "GHC.Integer.Type.geInteger#"
+  | nm == "GHC.Integer.Type.leInteger#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
-        | i >= j    -> Literal (IntegerLiteral 1)
-        | otherwise -> Literal (IntegerLiteral 0)
+        | i <= j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
+      _ -> e
+  | nm == "GHC.Prim.>=#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntLiteral i), Literal (IntLiteral j)]
+        | i >= j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
+      _ -> e
+  | nm == "GHC.Integer.Type.geInteger#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
         | i >= j    -> Literal (IntLiteral 1)
         | otherwise -> Literal (IntLiteral 0)
       _ -> e
@@ -122,17 +137,17 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
                (Just tupTc) = HashMap.lookup tupTcNm tcm
                [tupDc] = tyConDataCons tupTc
                (q,r)   = quotRem i j
-               ret     = mkApps (Data tupDc) (map Right tyArgs ++ [Left (Literal (IntegerLiteral q)), Left (Literal (IntegerLiteral r))])
+               ret     = mkApps (Data tupDc) (map Right tyArgs ++ [Left (Literal (IntLiteral q)), Left (Literal (IntLiteral r))])
             in ret
       _ -> e
   | nm == "GHC.Integer.Type.shiftLInteger"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+      [Literal (IntegerLiteral i), Literal (IntLiteral j)]
         -> Literal (IntegerLiteral (i `shiftL` fromInteger j))
       _ -> e
   | nm == "GHC.Integer.Type.shiftRInteger"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+      [Literal (IntegerLiteral i), Literal (IntLiteral j)]
         -> Literal (IntegerLiteral (i `shiftR` fromInteger j))
       _ -> e
   | nm == "GHC.Prim.negateInt#"
