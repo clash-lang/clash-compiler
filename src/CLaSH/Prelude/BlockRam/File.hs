@@ -125,6 +125,7 @@ import CLaSH.Sized.Unsigned  (Unsigned)
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamFile size file) wr rd en dt@.
 -- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
@@ -164,6 +165,7 @@ blockRamFile = blockRamFile' systemClock
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamFilePow2 file) wr rd en dt@.
 -- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
@@ -202,6 +204,7 @@ blockRamFilePow2 = blockRamFile' systemClock (snat :: SNat (2^n))
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFilePow2' clk file) wr rd en dt@.
 -- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
@@ -241,6 +244,7 @@ blockRamFilePow2' clk = blockRamFile' clk (snat :: SNat (2^n))
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFile' clk size file) wr rd en dt@.
 -- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your

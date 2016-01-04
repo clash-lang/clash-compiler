@@ -350,6 +350,9 @@ module CLaSH.Prelude.BlockRam
     -- * BlockRAM synchronised to an arbitrary clock
   , blockRam'
   , blockRamPow2'
+    -- * Read/Write conflict resolution
+  , readNew
+  , readNew'
     -- * Internal
   , blockRam#
   )
@@ -361,7 +364,7 @@ import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
-import CLaSH.Signal           (Signal)
+import CLaSH.Signal           (Signal, mux)
 import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle')
 import CLaSH.Sized.Unsigned   (Unsigned)
@@ -383,6 +386,7 @@ import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) wr rd en dt@.
 blockRam :: (KnownNat n, Enum addr)
          => Vec n a     -- ^ Initial content of the BRAM, also
                         -- determines the size, @n@, of the BRAM.
@@ -413,6 +417,7 @@ blockRam = blockRam' systemClock
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) wr rd en dt@.
 blockRamPow2 :: (KnownNat (2^n), KnownNat n)
              => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                                     -- determines the size, @2^n@, of the BRAM.
@@ -448,6 +453,7 @@ blockRamPow2 = blockRam
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRam' clk inits) wr rd en dt@.
 blockRam' :: (KnownNat n, Enum addr)
           => SClock clk       -- ^ 'Clock' to synchronize to
           -> Vec n a          -- ^ Initial content of the BRAM, also
@@ -485,6 +491,7 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
+-- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) wr rd en dt@.
 blockRamPow2' :: (KnownNat n, KnownNat (2^n))
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
@@ -528,3 +535,21 @@ blockRam# clk content wr rd en din = register' clk undefined dout
       d' <- readArray ram r
       when e (writeArray ram w d)
       return d'
+
+-- | Create read-after-write blockRAM from a read-before-write one (synchronised to specified clock)
+--
+readNew' :: Eq addr => SClock clk -> (Signal' clk addr -> Signal' clk addr -> Signal' clk Bool -> Signal' clk a -> Signal' clk a) -> Signal' clk addr -> Signal' clk addr -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
+readNew' clk ram wrAddr rdAddr wrEn wrData = mux wasSame wasWritten $ ram wrAddr rdAddr wrEn wrData
+  where sameAddr = (==) <$> wrAddr <*> rdAddr
+        wasSame = register' clk False ((&&) <$> wrEn <*> sameAddr)
+        wasWritten = register' clk undefined wrData
+
+-- | Create read-after-write blockRAM from a read-before-write one (synchronised to system clock)
+--
+-- >>> import CLaSH.Prelude
+-- >>> :t readNew (blockRam (0 :> 1 :> Nil))
+-- readNew (blockRam (0 :> 1 :> Nil))
+--   :: (Enum addr, Eq addr, Num a) =>
+--      Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a
+readNew :: Eq addr => (Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a) -> Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a
+readNew = readNew' systemClock
