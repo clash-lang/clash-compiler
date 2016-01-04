@@ -107,7 +107,13 @@
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ord#"
     , "type"      : "ord# :: Char# -> Int#"
-    , "templateE" : "resize(~ARG[0],32)"
+    , "templateE" : "signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.chr#"
+    , "type"      : "ord# :: Int# -> Chr#"
+    , "templateE" : "resize(unsigned(std_logic_vector(~ARG[0])),21)"
     }
   }
 , { "BlackBox" :
