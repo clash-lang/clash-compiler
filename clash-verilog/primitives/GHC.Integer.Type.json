@@ -149,7 +149,7 @@ assign ~RESULT = (~SYM[1][31] == ~SYM[2][31]) ?
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.gtInteger#"
     , "type"      : "gtInteger :: Integer -> Integer -> Bool"
-    , "templateE" : "(~ARG[0] > ~ARG[1] ? 32'sd1 : 32'sd0"
+    , "templateE" : "(~ARG[0] > ~ARG[1]) ? 32'sd1 : 32'sd0"
     }
   }
 , { "BlackBox" :
