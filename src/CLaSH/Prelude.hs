@@ -60,6 +60,9 @@ module CLaSH.Prelude
     -- ** BlockRAM primitives initialised with a data file
   , blockRamFile
   , blockRamFilePow2
+    -- * BlockRAM read/write conflict resolution
+  , readNew
+  , readNew'
     -- * Utility functions
   , window
   , windowD
