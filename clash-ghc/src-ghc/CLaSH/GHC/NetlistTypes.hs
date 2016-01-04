@@ -27,6 +27,13 @@ ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runExceptT $
     "Integer"                       -> return Integer
     "Int"                           -> return (Signed WORD_SIZE_IN_BITS)
     "GHC.Int.Int8"                  -> return (Signed 8)
+    "GHC.Int.Int16"                 -> return (Signed 16)
+    "GHC.Int.Int32"                 -> return (Signed 32)
+    "GHC.Int.Int64"                 -> return (Signed 64)
+    "GHC.Word.Word8"                -> return (Unsigned 8)
+    "GHC.Word.Word16"               -> return (Unsigned 16)
+    "GHC.Word.Word32"               -> return (Unsigned 32)
+    "GHC.Word.Word64"               -> return (Unsigned 64)
     "GHC.Integer.Type.Integer"      -> return Integer
     "GHC.Prim.Char#"                -> return (Signed 21)
     "GHC.Prim.Int#"                 -> return (Signed WORD_SIZE_IN_BITS)

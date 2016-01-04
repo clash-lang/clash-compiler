@@ -503,6 +503,9 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int s
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
+expr_ _ (Identifier id_ (Just (Indexed ((Signed _ ),_,_)))) = "resize" <> parens (text id_ <> "," <> int WORD_SIZE_IN_BITS)
+expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = "resize" <> parens (text id_ <> "," <> int WORD_SIZE_IN_BITS)
+
 expr_ _ (Identifier id_ (Just _)) = text id_
 
 expr_ _ (DataCon (Vector 0 _) _ _) =

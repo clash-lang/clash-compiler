@@ -66,11 +66,13 @@ Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
                       primitives/GHC.Classes.json
                       primitives/GHC.CString.json
                       primitives/GHC.Err.json
+                      primitives/GHC.Int.json
                       primitives/GHC.Integer.Type.json
                       primitives/GHC.Prim.json
                       primitives/GHC.Real.json
                       primitives/GHC.Typelits.json
                       primitives/GHC.Types.json
+                      primitives/GHC.Word.json
                       primitives/Unsafe.Coerce.json
 
 Cabal-version:        >=1.10

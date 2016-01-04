@@ -13,7 +13,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Prim.*#"
     , "type"      : "(*#) :: Int# -> Int# -> Int#"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    , "templateE" : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
@@ -113,7 +113,115 @@
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
     , "type"      : "narrow8Int# :: Int# -> Int#"
-    , "templateE" : "~ARG[0]"
+    , "templateD" :
+"-- narrow8Int begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= resize(~SYM[1](7 downto 0),~SIZE[~TYPO]);
+end block;
+-- narrow8Int end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow16Int#"
+    , "type"      : "narrow16Int# :: Int# -> Int#"
+    , "templateD" :
+"-- narrow16Int begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= resize(~SYM[1](15 downto 0),~SIZE[~TYPO]);
+end block;
+-- narrow16Int end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow32Int#"
+    , "type"      : "narrow32Int# :: Int# -> Int#"
+    , "templateD" :
+"-- narrow32Int begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= resize(~SYM[1](31 downto 0),~SIZE[~TYPO]);
+end block;
+-- narrow32Int end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow8Word#"
+    , "type"      : "narrow8Word# :: Word# -> Word#"
+    , "templateD" :
+"-- narrow8Word begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= resize(~SYM[1](7 downto 0),~SIZE[~TYPO]);
+end block;
+-- narrow8Word end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow16Word#"
+    , "type"      : "narrow16Word# :: Word# -> Word#"
+    , "templateD" :
+"-- narrow16Word begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= resize(~SYM[1](15 downto 0),~SIZE[~TYPO]);
+end block;
+-- narrow16Word end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.narrow32Word#"
+    , "type"      : "narrow32Word# :: Word# -> Word#"
+    , "templateD" :
+"-- narrow32Word begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= resize(~SYM[1](31 downto 0),~SIZE[~TYPO]);
+end block;
+-- narrow32Word end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.word2Int#"
+    , "type"      : "word2Int# :: word# -> Int#"
+    , "templateE" : "signed(std_logic_vector(~ARG[0]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.int2Word#"
+    , "type"      : "word2Int# :: Int# -> Word#"
+    , "templateE" : "unsigned(std_logic_vector(~ARG[0]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.xor#"
+    , "type"      : "xor# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] xor ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.or#"
+    , "type"      : "or# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] or ~ARG[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.and#"
+    , "type"      : "and# :: Int# -> Int# -> Int#"
+    , "templateE" : "~ARG[0] and ~ARG[1]"
     }
   }
 ]
