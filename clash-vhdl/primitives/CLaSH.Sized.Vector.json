@@ -333,14 +333,14 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.maxIndex"
-    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Integer"
-    , "templateE" : "~LIT[0] - 1"
+    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
+    , "templateE" : "to_signed(~LIT[0] - 1,~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.length"
-    , "type"      : "length :: KnownNat n => Vec n a -> Integer"
-    , "templateE" : "~LIT[0]"
+    , "type"      : "length :: KnownNat n => Vec n a -> Int"
+    , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
