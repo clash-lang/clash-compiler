@@ -53,6 +53,9 @@ module CLaSH.Prelude.Safe
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
+    -- * BlockRAM read/write conflict resolution
+  , readNew
+  , readNew'
     -- * Utility functions
   , isRising
   , isFalling
@@ -116,7 +119,7 @@ import CLaSH.Class.Num
 import CLaSH.Class.Resize
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
-import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2)
+import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2, readNew, readNew')
 import CLaSH.Prelude.Explicit.Safe (registerB', isRising', isFalling')
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.Moore         (moore, mooreB)
