@@ -8,6 +8,7 @@ module CLaSH.Core.TysPrim
   , charPrimTy
   , stringPrimTy
   , voidPrimTy
+  , wordPrimTy
   , tysPrimMap
   )
 where
@@ -40,31 +41,35 @@ typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
 
-intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName, voidPrimTyConName :: TyConName
+intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
+  voidPrimTyConName, wordPrimTyConName :: TyConName
 intPrimTyConName     = string2Name "Int"
 integerPrimTyConName = string2Name "Integer"
 stringPrimTyConName  = string2Name "String"
 charPrimTyConName    = string2Name "GHC.Prim.Char#"
 voidPrimTyConName    = string2Name "VOID"
+wordPrimTyConName    = string2Name "GHC.Prim.Word#"
 
 liftedPrimTC :: TyConName
              -> TyCon
 liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
-intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc :: TyCon
+intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc, wordPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
 integerPrimTc = liftedPrimTC integerPrimTyConName
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 voidPrimTc    = liftedPrimTC voidPrimTyConName
+wordPrimTc    = liftedPrimTC wordPrimTyConName
 
-intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy :: Type
+intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy, wordPrimTy :: Type
 intPrimTy     = mkTyConTy intPrimTyConName
 integerPrimTy = mkTyConTy integerPrimTyConName
 charPrimTy    = mkTyConTy charPrimTyConName
 stringPrimTy  = mkTyConTy stringPrimTyConName
 voidPrimTy    = mkTyConTy voidPrimTyConName
+wordPrimTy    = mkTyConTy wordPrimTyConName
 
 tysPrimMap :: HashMap TyConName TyCon
 tysPrimMap = HashMap.fromList
@@ -77,4 +82,5 @@ tysPrimMap = HashMap.fromList
   , (charPrimTyConName,charPrimTc)
   , (stringPrimTyConName,stringPrimTc)
   , (voidPrimTyConName,voidPrimTc)
+  , (wordPrimTyConName,wordPrimTc)
   ]

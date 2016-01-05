@@ -313,8 +313,8 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
       MachChar   c   -> C.CharLiteral c
       MachInt    i   -> C.IntLiteral i
       MachInt64  i   -> C.IntLiteral i
-      MachWord   i   -> C.IntLiteral i
-      MachWord64 i   -> C.IntLiteral i
+      MachWord   i   -> C.WordLiteral i
+      MachWord64 i   -> C.WordLiteral i
       LitInteger i _ -> C.IntegerLiteral i
       MachFloat r    -> C.RationalLiteral r
       MachDouble r   -> C.RationalLiteral r
