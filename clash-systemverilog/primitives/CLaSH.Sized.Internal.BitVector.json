@@ -1,13 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.size#"
     , "type"      : "size# :: KnownNat n => BitVector n -> Int"
-    , "templateE" : "~LIT[0]"
+    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.maxIndex#"
     , "type"      : "maxIndex# :: KnownNat n => BitVector n -> Int"
-    , "templateE" : "~LIT[0] - 1"
+    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0] - ~SIZE[~TYPO]'sd1"
     }
   }
 , { "BlackBox" :
