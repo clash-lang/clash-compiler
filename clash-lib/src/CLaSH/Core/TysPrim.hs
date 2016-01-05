@@ -43,8 +43,8 @@ typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName :: TyConName
-intPrimTyConName     = string2Name "Int"
-integerPrimTyConName = string2Name "Integer"
+intPrimTyConName     = string2Name "GHC.Prim.Int#"
+integerPrimTyConName = string2Name "GHC.Integer.Type.Integer"
 stringPrimTyConName  = string2Name "String"
 charPrimTyConName    = string2Name "GHC.Prim.Char#"
 voidPrimTyConName    = string2Name "VOID"

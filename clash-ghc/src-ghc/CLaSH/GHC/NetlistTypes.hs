@@ -24,8 +24,6 @@ ghcTypeToHWType :: HashMap TyConName TyCon
                 -> Maybe (Either String HWType)
 ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runExceptT $
   case name2String tc of
-    "Integer"                       -> return Integer
-    "Int"                           -> return (Signed WORD_SIZE_IN_BITS)
     "GHC.Int.Int8"                  -> return (Signed 8)
     "GHC.Int.Int16"                 -> return (Signed 16)
     "GHC.Int.Int32"                 -> return (Signed 32)
