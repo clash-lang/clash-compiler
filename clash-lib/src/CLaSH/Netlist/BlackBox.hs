@@ -11,6 +11,7 @@ module CLaSH.Netlist.BlackBox where
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (filterM)
+import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
@@ -102,6 +103,7 @@ mkArgument e = do
                         in  return ((vT,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Integer,32)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (CharLiteral c), []) -> return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
         (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
         (Prim f _,args) -> do
           (e',d) <- mkPrimitive True False f args ty

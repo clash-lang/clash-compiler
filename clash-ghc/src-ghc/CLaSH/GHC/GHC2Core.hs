@@ -310,7 +310,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
                   -> C.Literal
     coreToLiteral l = case l of
       MachStr    fs  -> C.StringLiteral (Char8.unpack fs)
-      MachChar   c   -> C.StringLiteral [c]
+      MachChar   c   -> C.CharLiteral c
       MachInt    i   -> C.IntLiteral i
       MachInt64  i   -> C.IntLiteral i
       MachWord   i   -> C.IntLiteral i

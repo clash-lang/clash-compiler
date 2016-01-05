@@ -230,4 +230,40 @@ end block;
     , "templateE" : "~ARG[0] and ~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.gtWord#"
+    , "type"      : "gtWord# :: Word# -> Word# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] > ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.geWord#"
+    , "type"      : "geWord# :: Word# -> Word# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.eqWord#"
+    , "type"      : "eqWord# :: Word# -> Word# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] = ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.neWord#"
+    , "type"      : "neWord# :: Word# -> Word# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] /= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ltWord#"
+    , "type"      : "ltWord# :: Word# -> Word# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.leWord#"
+    , "type"      : "leWord# :: Word# -> Word# -> Int#"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] <= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
+    }
+  }
 ]

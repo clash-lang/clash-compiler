@@ -5,6 +5,7 @@ module CLaSH.Core.TysPrim
   , typeSymbolKind
   , intPrimTy
   , integerPrimTy
+  , charPrimTy
   , stringPrimTy
   , voidPrimTy
   , tysPrimMap
@@ -39,28 +40,31 @@ typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
 
-intPrimTyConName, integerPrimTyConName, stringPrimTyConName, voidPrimTyConName :: TyConName
-intPrimTyConName    = string2Name "Int"
+intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName, voidPrimTyConName :: TyConName
+intPrimTyConName     = string2Name "Int"
 integerPrimTyConName = string2Name "Integer"
-stringPrimTyConName = string2Name "String"
-voidPrimTyConName   = string2Name "VOID"
+stringPrimTyConName  = string2Name "String"
+charPrimTyConName    = string2Name "GHC.Prim.Char#"
+voidPrimTyConName    = string2Name "VOID"
 
 liftedPrimTC :: TyConName
              -> TyCon
 liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
-intPrimTc, integerPrimTc, stringPrimTc, voidPrimTc :: TyCon
-intPrimTc    = (liftedPrimTC intPrimTyConName )
+intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc :: TyCon
+intPrimTc     = liftedPrimTC intPrimTyConName
 integerPrimTc = liftedPrimTC integerPrimTyConName
-stringPrimTc = (liftedPrimTC stringPrimTyConName)
-voidPrimTc   = (liftedPrimTC voidPrimTyConName)
+charPrimTc    = liftedPrimTC charPrimTyConName
+stringPrimTc  = liftedPrimTC stringPrimTyConName
+voidPrimTc    = liftedPrimTC voidPrimTyConName
 
-intPrimTy, integerPrimTy, stringPrimTy, voidPrimTy :: Type
-intPrimTy    = mkTyConTy intPrimTyConName
+intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy :: Type
+intPrimTy     = mkTyConTy intPrimTyConName
 integerPrimTy = mkTyConTy integerPrimTyConName
-stringPrimTy = mkTyConTy stringPrimTyConName
-voidPrimTy   = mkTyConTy voidPrimTyConName
+charPrimTy    = mkTyConTy charPrimTyConName
+stringPrimTy  = mkTyConTy stringPrimTyConName
+voidPrimTy    = mkTyConTy voidPrimTyConName
 
 tysPrimMap :: HashMap TyConName TyCon
 tysPrimMap = HashMap.fromList
@@ -70,6 +74,7 @@ tysPrimMap = HashMap.fromList
   , (typeSymbolKindTyConName,typeSymbolKindtc)
   , (intPrimTyConName,intPrimTc)
   , (integerPrimTyConName,integerPrimTc)
+  , (charPrimTyConName,charPrimTc)
   , (stringPrimTyConName,stringPrimTc)
   , (voidPrimTyConName,voidPrimTc)
   ]
