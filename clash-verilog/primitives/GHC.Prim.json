@@ -303,6 +303,301 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt8#"
+    , "type"      : "popCnt8# :: Word# -> Word#"
+    , "templateD" :
+"// popCnt8 begin
+localparam width_~SYM[0] = 8;
+
+// ceiling of log2
+function integer log2_~SYM[1];
+  input integer value;
+  begin
+    value = value-1;
+    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+      value = value>>1;
+  end
+endfunction
+
+// depth of the tree
+localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+
+wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+
+// put input into the first half of the intermediate array
+genvar i_~SYM[4];
+~GENERATE
+for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
+  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+end
+~ENDGENERATE
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer depth2Index_~SYM[5];
+  input integer levels;
+  input integer depth;
+
+  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+endfunction
+
+// Create the tree of instantiated components
+genvar d_~SYM[6];
+genvar i_~SYM[7];
+~GENERATE
+if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
+  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
+    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
+      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+    end
+  end
+end
+~ENDGENERATE
+
+// The last element of the intermediate array holds the result
+assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+// popCnt8 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt16#"
+    , "type"      : "popCnt16# :: Word# -> Word#"
+    , "templateD" :
+"// popCnt16 begin
+localparam width_~SYM[0] = 16;
+
+// ceiling of log2
+function integer log2_~SYM[1];
+  input integer value;
+  begin
+    value = value-1;
+    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+      value = value>>1;
+  end
+endfunction
+
+// depth of the tree
+localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+
+wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+
+// put input into the first half of the intermediate array
+genvar i_~SYM[4];
+~GENERATE
+for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
+  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+end
+~ENDGENERATE
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer depth2Index_~SYM[5];
+  input integer levels;
+  input integer depth;
+
+  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+endfunction
+
+// Create the tree of instantiated components
+genvar d_~SYM[6];
+genvar i_~SYM[7];
+~GENERATE
+if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
+  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
+    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
+      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+    end
+  end
+end
+~ENDGENERATE
+
+// The last element of the intermediate array holds the result
+assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+// popCnt16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt32#"
+    , "type"      : "popCnt32# :: Word# -> Word#"
+    , "templateD" :
+"// popCnt32 begin
+localparam width_~SYM[0] = 32;
+
+// ceiling of log2
+function integer log2_~SYM[1];
+  input integer value;
+  begin
+    value = value-1;
+    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+      value = value>>1;
+  end
+endfunction
+
+// depth of the tree
+localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+
+wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+
+// put input into the first half of the intermediate array
+genvar i_~SYM[4];
+~GENERATE
+for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
+  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+end
+~ENDGENERATE
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer depth2Index_~SYM[5];
+  input integer levels;
+  input integer depth;
+
+  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+endfunction
+
+// Create the tree of instantiated components
+genvar d_~SYM[6];
+genvar i_~SYM[7];
+~GENERATE
+if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
+  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
+    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
+      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+    end
+  end
+end
+~ENDGENERATE
+
+// The last element of the intermediate array holds the result
+assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+// popCnt32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt64#"
+    , "type"      : "popCnt64# :: Word# -> Word#"
+    , "templateD" :
+"// popCnt64 begin
+localparam width_~SYM[0] = 64;
+
+// ceiling of log2
+function integer log2_~SYM[1];
+  input integer value;
+  begin
+    value = value-1;
+    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+      value = value>>1;
+  end
+endfunction
+
+// depth of the tree
+localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+
+wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+
+// put input into the first half of the intermediate array
+genvar i_~SYM[4];
+~GENERATE
+for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
+  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+end
+~ENDGENERATE
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer depth2Index_~SYM[5];
+  input integer levels;
+  input integer depth;
+
+  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+endfunction
+
+// Create the tree of instantiated components
+genvar d_~SYM[6];
+genvar i_~SYM[7];
+~GENERATE
+if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
+  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
+    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
+      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+    end
+  end
+end
+~ENDGENERATE
+
+// The last element of the intermediate array holds the result
+assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+// popCnt64 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt#"
+    , "type"      : "popCnt8# :: Word# -> Word#"
+    , "templateD" :
+"// popCnt begin
+localparam width_~SYM[0] = ~SIZE[~TYPO];
+
+// ceiling of log2
+function integer log2_~SYM[1];
+  input integer value;
+  begin
+    value = value-1;
+    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+      value = value>>1;
+  end
+endfunction
+
+// depth of the tree
+localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+
+wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+
+// put input into the first half of the intermediate array
+genvar i_~SYM[4];
+~GENERATE
+for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
+  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+end
+~ENDGENERATE
+
+// given a level and a depth, calculate the corresponding index into the
+// intermediate array
+function integer depth2Index_~SYM[5];
+  input integer levels;
+  input integer depth;
+
+  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+endfunction
+
+// Create the tree of instantiated components
+genvar d_~SYM[6];
+genvar i_~SYM[7];
+~GENERATE
+if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
+  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
+    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
+      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
+             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+    end
+  end
+end
+~ENDGENERATE
+
+// The last element of the intermediate array holds the result
+assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+// popCnt end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
