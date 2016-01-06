@@ -715,6 +715,274 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Prim.ctz8#"
+    , "type"      : "ctz8 :: Word# -> Word#"
+    , "templateD" :
+"-- ctz8 begin
+ctz8~SYM[0] : block
+  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  begin
+    case a is
+      when \"00\" => return \"10\";
+      when \"01\" => return \"01\";
+      when \"10\" => return \"00\";
+      when others => return \"00\";
+    end case;
+  end function;
+
+  function clzi(
+    constant n : in natural;
+    constant i : in unsigned) return unsigned is
+    variable v : unsigned(i'length-1 downto 0):=i;
+  begin
+    if v(n-1+n)='0' then
+      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+    else
+      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+    end if;
+  end function;
+
+  function clz8 (constant v : unsigned(0 to 7)) return unsigned is
+    variable e : unsigned(0 to 7);     -- 8
+    variable a : unsigned(0 to 2*3-1); -- 6
+  begin
+    for i in 0 to 3 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
+    for i in 0 to 1 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
+    return clzi(3,a(0 to 5));
+  end function;
+
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
+    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  end generate;
+
+  ~RESULT <= resize(clz8(~SYM[2](63 downto 56)),~SIZE[~TYPO]);
+end block;
+-- ctz8 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ctz16#"
+    , "type"      : "ctz16 :: Word# -> Word#"
+    , "templateD" :
+"-- ctz16 begin
+ctz16~SYM[0] : block
+  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  begin
+    case a is
+      when \"00\" => return \"10\";
+      when \"01\" => return \"01\";
+      when \"10\" => return \"00\";
+      when others => return \"00\";
+    end case;
+  end function;
+
+  function clzi(
+    constant n : in natural;
+    constant i : in unsigned) return unsigned is
+    variable v : unsigned(i'length-1 downto 0):=i;
+  begin
+    if v(n-1+n)='0' then
+      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+    else
+      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+    end if;
+  end function;
+
+  function clz16 (constant v : unsigned(0 to 15)) return unsigned is
+    variable e : unsigned(0 to 15);    -- 16
+    variable a : unsigned(0 to 4*3-1); -- 12
+    variable b : unsigned(0 to 2*4-1); -- 8
+  begin
+    for i in 0 to 7 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
+    for i in 0 to 3 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 1 loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
+    return clzi(4,b(0 to 7));
+  end function;
+
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
+    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  end generate;
+
+  ~RESULT <= resize(clz16(~SYM[2](63 downto 48)),~SIZE[~TYPO]);
+end block;
+-- ctz16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ctz32#"
+    , "type"      : "ctz32 :: Word# -> Word#"
+    , "templateD" :
+"-- ctz32 begin
+ctz32~SYM[0] : block
+  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  begin
+    case a is
+      when \"00\" => return \"10\";
+      when \"01\" => return \"01\";
+      when \"10\" => return \"00\";
+      when others => return \"00\";
+    end case;
+  end function;
+
+  function clzi(
+    constant n : in natural;
+    constant i : in unsigned) return unsigned is
+    variable v : unsigned(i'length-1 downto 0):=i;
+  begin
+    if v(n-1+n)='0' then
+      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+    else
+      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+    end if;
+  end function;
+
+  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+    variable e : unsigned(0 to 31);    -- 32
+    variable a : unsigned(0 to 8*3-1); -- 24
+    variable b : unsigned(0 to 4*4-1); -- 16
+    variable c : unsigned(0 to 2*5-1); -- 10
+  begin
+    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
+    return clzi(5,c(0 to 9));
+  end function;
+
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
+    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  end generate;
+
+  ~RESULT <= resize(clz32(~SYM[2](63 downto 32)),~SIZE[~TYPO]);
+end block;
+-- ctz32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ctz64#"
+    , "type"      : "ctz64 :: Word# -> Word#"
+    , "templateD" :
+"-- ctz64 begin
+ctz64~SYM[0] : block
+  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  begin
+    case a is
+      when \"00\" => return \"10\";
+      when \"01\" => return \"01\";
+      when \"10\" => return \"00\";
+      when others => return \"00\";
+    end case;
+  end function;
+
+  function clzi(
+    constant n : in natural;
+    constant i : in unsigned) return unsigned is
+    variable v : unsigned(i'length-1 downto 0):=i;
+  begin
+    if v(n-1+n)='0' then
+      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+    else
+      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+    end if;
+  end function;
+
+  function clz64 (constant v : unsigned(0 to 63)) return unsigned is
+    variable e : unsigned(0 to 63);     -- 64
+    variable a : unsigned(0 to 16*3-1); -- 48
+    variable b : unsigned(0 to 8*4-1);  -- 32
+    variable c : unsigned(0 to 4*5-1);  -- 20
+    variable d : unsigned(0 to 2*6-1);  -- 12
+  begin
+    for i in 0 to 31 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));      end loop;
+    for i in 0 to 15 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3));   end loop;
+    for i in 0 to 7  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5));   end loop;
+    for i in 0 to 3  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7));   end loop;
+    for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
+    return clzi(6,d(0 to 11));
+  end function;
+
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
+    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  end generate;
+
+  ~RESULT <= resize(clz64(~SYM[2]),~SIZE[~TYPO]);
+end block;
+-- ctz64 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.ctz#"
+    , "type"      : "ctz :: Word# -> Word#"
+    , "templateD" :
+"-- ctz begin
+ctz~SYM[0] : block
+  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  begin
+    case a is
+      when \"00\" => return \"10\";
+      when \"01\" => return \"01\";
+      when \"10\" => return \"00\";
+      when others => return \"00\";
+    end case;
+  end function;
+
+  function clzi(
+    constant n : in natural;
+    constant i : in unsigned) return unsigned is
+    variable v : unsigned(i'length-1 downto 0):=i;
+  begin
+    if v(n-1+n)='0' then
+      return (v(n-1+n) and v(n-1)) & '0' & v(2*n-2 downto n);
+    else
+      return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
+    end if;
+  end function;
+
+  function clz64 (constant v : unsigned(0 to 63)) return unsigned is
+    variable e : unsigned(0 to 63);     -- 64
+    variable a : unsigned(0 to 16*3-1); -- 48
+    variable b : unsigned(0 to 8*4-1);  -- 32
+    variable c : unsigned(0 to 4*5-1);  -- 20
+    variable d : unsigned(0 to 2*6-1);  -- 12
+  begin
+    for i in 0 to 31 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));      end loop;
+    for i in 0 to 15 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3));   end loop;
+    for i in 0 to 7  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5));   end loop;
+    for i in 0 to 3  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7));   end loop;
+    for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
+    return clzi(6,d(0 to 11));
+  end function;
+
+  signal ~SYM[1] : ~TYP[0];
+  signal ~SYM[2] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
+    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  end generate;
+
+  ~RESULT <= resize(clz64(~SYM[2]),~SIZE[~TYPO]);
+end block;
+-- ctz end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
