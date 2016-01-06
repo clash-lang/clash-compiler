@@ -310,7 +310,7 @@ mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
 mkExpr _ _ (Core.Literal (IntegerLiteral i)) = return (HW.Literal (Just (Integer,32)) $ NumLit i, [])
 mkExpr _ _ (Core.Literal (IntLiteral i)) = return (HW.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit i, [])
-mkExpr _ _ (Core.Literal (WordLiteral w)) = return (HW.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit w, [])
+mkExpr _ _ (Core.Literal (WordLiteral w)) = return (HW.Literal (Just (Unsigned WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit w, [])
 mkExpr _ _ (Core.Literal (CharLiteral c)) = return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
 mkExpr _ _ (Core.Literal _) = error $ $(curLoc) ++ "not an integer literal"
 
