@@ -983,6 +983,69 @@ end block;
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap16#"
+    , "type"      : "byteSwap16# :: Word# -> Word#"
+    , "templateD" :
+"-- byteSwap16 begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](63 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);
+end block;
+-- byteSwap16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap32#"
+    , "type"      : "byteSwap32# :: Word# -> Word#"
+    , "templateD" :
+"-- byteSwap32 begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](63 downto 32) & ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
+                                   & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
+end block;
+-- byteSwap32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap64#"
+    , "type"      : "byteSwap64# :: Word# -> Word#"
+    , "templateD" :
+"-- byteSwap64 begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
+           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24)
+           & ~SYM[1](39 downto 32) & ~SYM[1](47 downto 40)
+           & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);
+end block;
+-- byteSwap64 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.byteSwap#"
+    , "type"      : "byteSwap# :: Word# -> Word#"
+    , "templateD" :
+"-- byteSwap begin
+msb_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
+           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24)
+           & ~SYM[1](39 downto 32) & ~SYM[1](47 downto 40)
+           & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);
+end block;
+-- byteSwap end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
