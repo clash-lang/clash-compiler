@@ -287,6 +287,206 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt8#"
+    , "type"      : "popCnt8 :: Word# -> Word#"
+    , "templateD" :
+"-- popCnt8 begin
+popCnt8_~SYM[0] : block
+  -- given a level and a depth, calculate the corresponding index into the
+  -- intermediate array
+  function depth2Index (levels,depth : in natural) return natural is
+  begin
+    return (2 ** levels - 2 ** depth);
+  end function;
+
+  constant width : natural := 8;
+  constant levels : natural := natural (ceil (log2 (real (width))));
+  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
+  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+begin
+  -- put input into the first half of the intermediate array
+  make_array: for i in 0 to (width - 1) generate
+    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  end generate;
+
+  -- Create the tree of adders
+  make_tree : if levels /= 0 generate
+    tree_depth : for d in levels-1 downto 0 generate
+      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
+        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+      end generate;
+    end generate;
+  end generate;
+
+  -- The last element of the intermediate array holds the result
+  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+end block;
+-- popCnt8 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt16#"
+    , "type"      : "popCnt16 :: Word# -> Word#"
+    , "templateD" :
+"-- popCnt16 begin
+popCnt16_~SYM[0] : block
+  -- given a level and a depth, calculate the corresponding index into the
+  -- intermediate array
+  function depth2Index (levels,depth : in natural) return natural is
+  begin
+    return (2 ** levels - 2 ** depth);
+  end function;
+
+  constant width : natural := 16;
+  constant levels : natural := natural (ceil (log2 (real (width))));
+  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
+  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+begin
+  -- put input into the first half of the intermediate array
+  make_array: for i in 0 to (width - 1) generate
+    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  end generate;
+
+  -- Create the tree of adders
+  make_tree : if levels /= 0 generate
+    tree_depth : for d in levels-1 downto 0 generate
+      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
+        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+      end generate;
+    end generate;
+  end generate;
+
+  -- The last element of the intermediate array holds the result
+  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+end block;
+-- popCnt16 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt32#"
+    , "type"      : "popCnt16 :: Word# -> Word#"
+    , "templateD" :
+"-- popCnt32 begin
+popCnt32_~SYM[0] : block
+  -- given a level and a depth, calculate the corresponding index into the
+  -- intermediate array
+  function depth2Index (levels,depth : in natural) return natural is
+  begin
+    return (2 ** levels - 2 ** depth);
+  end function;
+
+  constant width : natural := 32;
+  constant levels : natural := natural (ceil (log2 (real (width))));
+  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
+  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+begin
+  -- put input into the first half of the intermediate array
+  make_array: for i in 0 to (width - 1) generate
+    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  end generate;
+
+  -- Create the tree of adders
+  make_tree : if levels /= 0 generate
+    tree_depth : for d in levels-1 downto 0 generate
+      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
+        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+      end generate;
+    end generate;
+  end generate;
+
+  -- The last element of the intermediate array holds the result
+  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+end block;
+-- popCnt32 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt64#"
+    , "type"      : "popCnt16 :: Word# -> Word#"
+    , "templateD" :
+"-- popCnt64 begin
+popCnt64_~SYM[0] : block
+  -- given a level and a depth, calculate the corresponding index into the
+  -- intermediate array
+  function depth2Index (levels,depth : in natural) return natural is
+  begin
+    return (2 ** levels - 2 ** depth);
+  end function;
+
+  constant width : natural := 64;
+  constant levels : natural := natural (ceil (log2 (real (width))));
+  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
+  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+begin
+  -- put input into the first half of the intermediate array
+  make_array: for i in 0 to (width - 1) generate
+    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  end generate;
+
+  -- Create the tree of adders
+  make_tree : if levels /= 0 generate
+    tree_depth : for d in levels-1 downto 0 generate
+      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
+        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+      end generate;
+    end generate;
+  end generate;
+
+  -- The last element of the intermediate array holds the result
+  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+end block;
+-- popCnt64 end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Prim.popCnt#"
+    , "type"      : "popCnt16 :: Word# -> Word#"
+    , "templateD" :
+"-- popCnt begin
+popCnt_~SYM[0] : block
+  -- given a level and a depth, calculate the corresponding index into the
+  -- intermediate array
+  function depth2Index (levels,depth : in natural) return natural is
+  begin
+    return (2 ** levels - 2 ** depth);
+  end function;
+
+  constant width : natural := ~SIZE[~TYPO];
+  constant levels : natural := natural (ceil (log2 (real (width))));
+  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
+  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+begin
+  -- put input into the first half of the intermediate array
+  make_array: for i in 0 to (width - 1) generate
+    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  end generate;
+
+  -- Create the tree of adders
+  make_tree : if levels /= 0 generate
+    tree_depth : for d in levels-1 downto 0 generate
+      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
+        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
+          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+      end generate;
+    end generate;
+  end generate;
+
+  -- The last element of the intermediate array holds the result
+  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+end block;
+-- popCnt end"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
