@@ -556,6 +556,13 @@ expr_ _ (BlackBoxE pNm _ bbCtx _)
        then exprLit (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit n)
        else "to_signed" <> parens (integer n <> "," <> int WORD_SIZE_IN_BITS)
 
+expr_ _ (BlackBoxE pNm _ bbCtx _)
+  | pNm == "GHC.Types.W#"
+  , [Literal _ (NumLit n)] <- extractLiterals bbCtx
+  = if n >= 2^(31 :: Integer)
+       then exprLit (Just (Unsigned WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit n)
+       else "to_unsigned" <> parens (integer n <> "," <> int WORD_SIZE_IN_BITS)
+
 expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t

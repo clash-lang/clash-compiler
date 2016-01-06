@@ -20,4 +20,10 @@
     , "templateE" : "~ARG[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Types.W#"
+    , "type"      : "W# :: Word# -> Word"
+    , "templateE" : "~ARG[0]"
+    }
+  }
 ]
