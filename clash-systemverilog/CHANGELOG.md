@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.6.4
+* New features:
+  * Support for Haskell's: `Char`, `Int8`, `Int16`, `Int32`, `Int64`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`.
+
 ## 0.6.3 *November 17th 2015*
 * Fixes bugs:
   * Integer literals missing "32'sd" prefix when used in assignments

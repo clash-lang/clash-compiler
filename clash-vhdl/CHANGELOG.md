@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.4
+* New features:
+  * Support for Haskell's: `Char`, `Int8`, `Int16`, `Int32`, `Int64`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`.
+
 ## 0.6.4 *November 17th 2015*
 * Fixes bugs:
   * Integer literals should only be capped to 32-bit when used in assignments.
