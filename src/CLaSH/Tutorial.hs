@@ -203,8 +203,8 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
           * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
           * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-1.22 ghc-7.10.2 libtinfo-dev@
-          * Update your @PATH@ with: @\/opt\/ghc\/7.10.2\/bin@, @\/opt\/cabal\/1.22/bin@, and @\$HOME\/.cabal\/bin@
+          * Run: @sudo apt-get install cabal-install-1.22 ghc-7.10.3 libtinfo-dev@
+          * Update your @PATH@ with: @\/opt\/ghc\/7.10.3\/bin@, @\/opt\/cabal\/1.22/bin@, and @\$HOME\/.cabal\/bin@
           * Run: @cabal update@
           * Skip step 2.
 
