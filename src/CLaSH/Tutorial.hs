@@ -1854,16 +1854,41 @@ to VHDL/(System)Verilog (for now):
     arithmetic operations, there is no point in supporting the floating point
     data types.
 
-* __Other primitive types__
+* __Haskell primitive types__
 
-    Most primitive types are not supported, with the exception of 'Int', 'Int#',
-    and 'Integer'. This means that types such as: 'Word', 'Word8', 'Int8',
-    'Char', 'Array', etc. cannot to translated to hardware.
+    Most primitive types are not supported, with the exception of:
 
-    The translations of 'Int', 'Int#', and 'Integer' are also incorrect: they
-    are translated to the VHDL @integer@ type, the Verilog @signed [31:0]@, or
-    the SystemVerilog @signed logic [31:0]@ type, which can only represent
-    32-bit integer values. Use these types with due diligence.
+        * 'Integer'
+        * 'Int'
+        * 'Int8'
+        * 'Int16'
+        * 'Int32'
+        * 'Int64'
+        * 'Word'
+        * 'Word8'
+        * 'Word16'
+        * 'Word32'
+        * 'Word64'
+        * 'Char'
+
+    The translation of 'Integer' is also not completely meaning-preserving:
+    it is translated to the VHDL \"@integer@\" type, the Verilog
+    \"@signed [31:0]@\" type, or the SystemVerilog \"@signed logic [31:0]@\"
+    type, all of which can only represent 32-bit integer values. Use `Integer`
+    with due diligence; be especially careful when using `fromIntegral` as it
+    does a conversion via 'Integer'. For example:
+
+    @
+    signedToUnsigned :: Signed 64 -> Unsigned 64
+    signedToUnsigned = fromIntegral
+    @
+
+    would lose the top 32 bits. Instead, you could use 'bitCoerce':
+
+    @
+    signedToUnsigned :: Signed 64 -> Unsigned 64
+    signedToUnsigned = bitCoerce
+    @
 
 * __Side-effects: 'IO', 'ST', etc.__
 
