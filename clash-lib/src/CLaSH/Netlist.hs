@@ -1,13 +1,17 @@
+{-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 
 -- | Create Netlists out of normalized CoreHW Terms
 module CLaSH.Netlist where
 
+#include "MachDeps.h"
+
 import           Control.Lens                     ((.=), (<<%=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (runStateT)
 import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
+import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
@@ -226,7 +230,10 @@ mkDeclarations bndr (Case scrut altTy alts) = do
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
         DataPat (Embed dc) _ -> return (Just (dcToLiteral scrutHTy (dcTag dc)),altExpr)
-        LitPat  (Embed (IntegerLiteral i)) -> return (Just (NumLit $ fromInteger i),altExpr)
+        LitPat  (Embed (IntegerLiteral i)) -> return (Just (NumLit i),altExpr)
+        LitPat  (Embed (IntLiteral i)) -> return (Just (NumLit i), altExpr)
+        LitPat  (Embed (WordLiteral w)) -> return (Just (NumLit w), altExpr)
+        LitPat  (Embed (CharLiteral c)) -> return (Just (NumLit . toInteger $ ord c), altExpr)
         _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
 
     mkScrutExpr :: HWType -> Pat -> Expr -> Expr
@@ -301,11 +308,11 @@ mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ _ (Core.Literal lit) = return (HW.Literal (Just (Integer,32)) . NumLit $ fromInteger  $! i,[])
-  where
-    i = case lit of
-          (IntegerLiteral i') -> i'
-          _ -> error $ $(curLoc) ++ "not an integer literal"
+mkExpr _ _ (Core.Literal (IntegerLiteral i)) = return (HW.Literal (Just (Integer,32)) $ NumLit i, [])
+mkExpr _ _ (Core.Literal (IntLiteral i)) = return (HW.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit i, [])
+mkExpr _ _ (Core.Literal (WordLiteral w)) = return (HW.Literal (Just (Unsigned WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit w, [])
+mkExpr _ _ (Core.Literal (CharLiteral c)) = return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
+mkExpr _ _ (Core.Literal _) = error $ $(curLoc) ++ "not an integer literal"
 
 mkExpr bbEasD ty app = do
   let (appF,args) = collectArgs app

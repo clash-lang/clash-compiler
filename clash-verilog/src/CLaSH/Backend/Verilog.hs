@@ -8,6 +8,8 @@
 -- | Generate SystemVerilog for assorted Netlist datatypes
 module CLaSH.Backend.Verilog (VerilogState) where
 
+#include "MachDeps.h"
+
 import qualified Control.Applicative                  as A
 import           Control.Lens                         ((+=),(-=), makeLenses, use)
 import           Control.Monad.State                  (State)
@@ -285,12 +287,12 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)
-expr_ _ (DataTag Bool (Right id_))         = "$signed" <> parens (listBraces (sequence [braces (int 31 <+> braces "1'b0"),text id_]))
+expr_ _ (DataTag Bool (Right id_))         = "$signed" <> parens (listBraces (sequence [braces (int (WORD_SIZE_IN_BITS-1) <+> braces "1'b0"),text id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$signed" <> parens (text id_)
 
-expr_ _ (DataTag (Product _ _) (Right _))  = "32'sd0"
+expr_ _ (DataTag (Product _ _) (Right _))  = int WORD_SIZE_IN_BITS <> "'sd0"
 
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
                                                (text id_ <> brackets
@@ -299,8 +301,8 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
 
-expr_ _ (DataTag (Vector 0 _) (Right _)) = "32'sd0"
-expr_ _ (DataTag (Vector _ _) (Right _)) = "32'sd1"
+expr_ _ (DataTag (Vector 0 _) (Right _)) = int WORD_SIZE_IN_BITS <> "'sd0"
+expr_ _ (DataTag (Vector _ _) (Right _)) = int WORD_SIZE_IN_BITS <> "'sd1"
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

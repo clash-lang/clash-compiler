@@ -291,11 +291,11 @@ indexVec_~SYM[0] : block
 begin
   vec <= ~ARG[1];
 
-  vec_index <= ~ARG[2]
+  vec_index <= to_integer(~ARG[2]
   -- pragma translate_off
                mod ~LIT[0]
   -- pragma translate_on
-               ;
+               );
 
   ~RESULT <= vec(vec_index);
 end block;
@@ -313,11 +313,11 @@ replaceVec_~SYM[0] : block
   signal din       : ~TYP[3];
 begin
   vec <= ~ARG[1];
-  vec_index <= ~ARG[2]
+  vec_index <= to_integer(~ARG[2]
   -- pragma translate_off
                mod ~LIT[0]
   -- pragma translate_on
-               ;
+               );
   din <= ~ARG[3];
 
   process(vec,vec_index,din)
@@ -333,14 +333,14 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.maxIndex"
-    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Integer"
-    , "templateE" : "~LIT[0] - 1"
+    , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
+    , "templateE" : "to_signed(~LIT[0] - 1,~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.length"
-    , "type"      : "length :: KnownNat n => Vec n a -> Integer"
-    , "templateE" : "~LIT[0]"
+    , "type"      : "length :: KnownNat n => Vec n a -> Int"
+    , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :

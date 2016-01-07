@@ -1,0 +1,25 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Word.W8#"
+    , "type"      : "W8# :: Word# -> Word8"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Word.W16#"
+    , "type"      : "W16# :: Word# -> Word16"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Word.W32#"
+    , "type"      : "W32# :: Word# -> Word32"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Word.W64#"
+    , "type"      : "W64# :: Word# -> Word64"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
+]

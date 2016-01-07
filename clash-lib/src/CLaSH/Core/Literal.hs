@@ -16,13 +16,18 @@ import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 
 import {-# SOURCE #-} CLaSH.Core.Type         (Type)
-import CLaSH.Core.TysPrim                     (intPrimTy, stringPrimTy, voidPrimTy)
+import CLaSH.Core.TysPrim                     (intPrimTy, integerPrimTy,
+                                               charPrimTy, stringPrimTy,
+                                               voidPrimTy, wordPrimTy)
 
 -- | Term Literal
 data Literal
   = IntegerLiteral  !Integer
+  | IntLiteral      !Integer
+  | WordLiteral     !Integer
   | StringLiteral   !String
   | RationalLiteral !Rational
+  | CharLiteral     !Char
   deriving (Eq,Ord,Show,Generic,NFData)
 
 instance Alpha Literal where
@@ -35,6 +40,9 @@ instance Subst a Literal where
 -- | Determines the Type of a Literal
 literalType :: Literal
             -> Type
-literalType (IntegerLiteral  _) = intPrimTy
-literalType (RationalLiteral _) = voidPrimTy
+literalType (IntegerLiteral  _) = integerPrimTy
+literalType (IntLiteral      _) = intPrimTy
+literalType (WordLiteral     _) = wordPrimTy
 literalType (StringLiteral   _) = stringPrimTy
+literalType (RationalLiteral _) = voidPrimTy
+literalType (CharLiteral     _) = charPrimTy

@@ -121,7 +121,12 @@ instance Pretty Literal where
     IntegerLiteral i
       | i < 0         -> return $ parens (integer i)
       | otherwise     -> return $ integer i
+    IntLiteral i
+      | i < 0         -> return $ parens (integer i)
+      | otherwise     -> return $ integer i
+    WordLiteral w     -> return $ integer w
     RationalLiteral r -> return $ rational r
+    CharLiteral c     -> return $ char c
     StringLiteral s   -> return $ vcat $ map text $ showMultiLineString s
 
 instance Pretty Pat where

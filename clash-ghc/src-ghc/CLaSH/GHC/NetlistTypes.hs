@@ -1,8 +1,11 @@
+{-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 module CLaSH.GHC.NetlistTypes
   (ghcTypeToHWType)
 where
+
+#include "MachDeps.h"
 
 import Data.HashMap.Strict              (HashMap,(!))
 import Control.Monad.Trans.Except       (ExceptT (..), runExceptT)
@@ -21,10 +24,18 @@ ghcTypeToHWType :: HashMap TyConName TyCon
                 -> Maybe (Either String HWType)
 ghcTypeToHWType m ty@(tyView -> TyConApp tc args) = runExceptT $
   case name2String tc of
-    "Int"                           -> return Integer
+    "GHC.Int.Int8"                  -> return (Signed 8)
+    "GHC.Int.Int16"                 -> return (Signed 16)
+    "GHC.Int.Int32"                 -> return (Signed 32)
+    "GHC.Int.Int64"                 -> return (Signed 64)
+    "GHC.Word.Word8"                -> return (Unsigned 8)
+    "GHC.Word.Word16"               -> return (Unsigned 16)
+    "GHC.Word.Word32"               -> return (Unsigned 32)
+    "GHC.Word.Word64"               -> return (Unsigned 64)
     "GHC.Integer.Type.Integer"      -> return Integer
-    "GHC.Prim.Int#"                 -> return Integer
-    "GHC.Types.Int"                 -> return Integer
+    "GHC.Prim.Char#"                -> return (Unsigned 21)
+    "GHC.Prim.Int#"                 -> return (Signed WORD_SIZE_IN_BITS)
+    "GHC.Prim.Word#"                -> return (Unsigned WORD_SIZE_IN_BITS)
     "GHC.Prim.ByteArray#"           ->
       fail $ "Can't translate type: " ++ showDoc ty
 

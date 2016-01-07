@@ -1,7 +1,7 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.size#"
     , "type"      : "size# :: KnownNat n => Unsigned n -> Int"
-    , "templateE" : "~LIT[0]"
+    , "templateE" : "~SIZE[~TYPO]'sd~LIT[0]"
     }
   }
 , { "BlackBox" :

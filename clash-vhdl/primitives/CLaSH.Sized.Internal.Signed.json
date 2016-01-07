@@ -1,7 +1,7 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.size#"
     , "type"      : "size# :: KnownNat n => Signed n -> Int"
-    , "templateE" : "~LIT[0]"
+    , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
@@ -192,25 +192,25 @@ end block;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.shiftL#"
     , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "shift_left(~ARG[1],~ARG[2])"
+    , "templateE" : "shift_left(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.shiftR#"
     , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "shift_right(~ARG[1],~ARG[2])"
+    , "templateE" : "shift_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "rotate_left(~ARG[1],~ARG[2])"
+    , "templateE" : "rotate_left(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
-    , "templateE" : "rotate_right(~ARG[1],~ARG[2])"
+    , "templateE" : "rotate_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :

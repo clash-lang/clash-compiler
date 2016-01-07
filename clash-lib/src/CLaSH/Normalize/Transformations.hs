@@ -242,7 +242,11 @@ caseCon ctx e@(Case subj ty alts)
     case reduceConstant tcm True subj of
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj'@(collectArgs -> (Data _,_)) -> caseCon ctx (Case subj' ty alts)
-      subj' -> traceIf (lvl > DebugNone) ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj') (caseOneAlt e)
+      subj' -> let msg = "Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj'
+               in traceIf (lvl > DebugNone) msg $
+                  if lvl > DebugFinal
+                     then error msg
+                     else caseOneAlt e
 
 caseCon _ e = caseOneAlt e
 

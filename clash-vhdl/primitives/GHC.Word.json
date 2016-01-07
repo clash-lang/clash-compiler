@@ -1,0 +1,25 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Word.W8#"
+    , "type"      : "W8# :: Word# -> Word8"
+    , "templateE" : "resize(~ARG[0],8)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Word.W16#"
+    , "type"      : "W16# :: Word# -> Word16"
+    , "templateE" : "resize(~ARG[0],16)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Word.W32#"
+    , "type"      : "W32# :: Word# -> Word32"
+    , "templateE" : "resize(~ARG[0],32)"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Word.W64#"
+    , "type"      : "W64# :: Word# -> Word64"
+    , "templateE" : "resize(~ARG[0],64)"
+    }
+  }
+]
