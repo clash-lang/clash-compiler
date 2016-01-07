@@ -69,7 +69,6 @@ module CLaSH.Sized.Internal.Signed
   , shiftR#
   , rotateL#
   , rotateR#
-  , popCount#
     -- ** Resize
   , resize#
   , truncateB#
@@ -314,7 +313,7 @@ mod# (S a) (S b) = S (a `mod` b)
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
 
-instance KnownNat n => Bits (Signed n) where
+instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => Bits (Signed n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -332,7 +331,7 @@ instance KnownNat n => Bits (Signed n) where
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount          = popCount#
+  popCount s        = popCount (pack# s)
 
 and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
@@ -344,7 +343,7 @@ xor# (S a) (S b) = fromInteger_INLINE (xor a b)
 
 {-# NOINLINE complement# #-}
 complement# :: KnownNat n => Signed n -> Signed n
-complement# = unpack# . complement . pack#
+complement# (S a) = fromInteger_INLINE (complement a)
 
 shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
@@ -377,14 +376,7 @@ rotateR# s@(S n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal s)
 
-{-# NOINLINE popCount# #-}
-popCount# :: KnownNat n => Signed n -> Int
-popCount# s@(S i) = popCount i'
-  where
-    maxI = 2 ^ natVal s
-    i'   = i `mod` maxI
-
-instance KnownNat n => FiniteBits (Signed n) where
+instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Signed n) where
   finiteBitSize = size#
 
 instance Resize Signed where

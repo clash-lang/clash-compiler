@@ -65,7 +65,6 @@ module CLaSH.Sized.Internal.Unsigned
   , shiftR#
   , rotateL#
   , rotateR#
-  , popCount#
     -- ** Resize
   , resize#
   )
@@ -286,7 +285,7 @@ rem# (U i) (U j) = U (i `rem` j)
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = i
 
-instance KnownNat n => Bits (Unsigned n) where
+instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => Bits (Unsigned n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -304,7 +303,7 @@ instance KnownNat n => Bits (Unsigned n) where
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount          = popCount#
+  popCount u        = popCount (pack# u)
 
 {-# NOINLINE and# #-}
 and# :: Unsigned n -> Unsigned n -> Unsigned n
@@ -358,11 +357,7 @@ rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal bv)
 
-{-# NOINLINE popCount# #-}
-popCount# :: Unsigned n -> Int
-popCount# (U i) = popCount i
-
-instance KnownNat n => FiniteBits (Unsigned n) where
+instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Unsigned n) where
   finiteBitSize = size#
 
 instance Resize Unsigned where

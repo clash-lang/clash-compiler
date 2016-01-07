@@ -69,7 +69,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..))
 import CLaSH.Class.Resize             (Resize (..))
-import CLaSH.Sized.Internal.BitVector (BitVector (..))
+import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (..))
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --

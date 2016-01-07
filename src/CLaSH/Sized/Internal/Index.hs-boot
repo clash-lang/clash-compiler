@@ -1,0 +1,12 @@
+{-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE KindSignatures  #-}
+{-# LANGUAGE RoleAnnotations #-}
+module CLaSH.Sized.Internal.Index where
+
+import GHC.TypeLits (KnownNat, Nat)
+
+type role Index phantom
+data Index :: Nat -> *
+
+instance KnownNat n => Num (Index n)
+instance KnownNat n => Enum (Index n)

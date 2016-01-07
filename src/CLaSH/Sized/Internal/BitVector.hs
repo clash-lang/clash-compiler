@@ -84,7 +84,7 @@ module CLaSH.Sized.Internal.BitVector
   , shiftR#
   , rotateL#
   , rotateR#
-  , popCount#
+  , popCountBV
     -- ** Resize
   , resize#
   )
@@ -110,6 +110,9 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
+
+import {-# SOURCE #-} qualified CLaSH.Sized.Vector         as V
+import {-# SOURCE #-} qualified CLaSH.Sized.Internal.Index as I
 
 {- $setup
 >>> :set -XTemplateHaskell
@@ -314,7 +317,7 @@ rem# (BV i) (BV j) = BV (i `rem` j)
 toInteger# :: BitVector n -> Integer
 toInteger# (BV i) = i
 
-instance KnownNat n => Bits (BitVector n) where
+instance (KnownNat n, KnownNat (n+1), KnownNat (n+2)) => Bits (BitVector n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -332,9 +335,9 @@ instance KnownNat n => Bits (BitVector n) where
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount          = popCount#
+  popCount bv       = fromEnum (popCountBV (bv ++# (0 :: Bit)))
 
-instance KnownNat n => FiniteBits (BitVector n) where
+instance (KnownNat n, KnownNat (n+1), KnownNat (n+2)) => FiniteBits (BitVector n) where
   finiteBitSize = size#
 
 {-# NOINLINE reduceAnd# #-}
@@ -512,9 +515,13 @@ rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal bv)
 
-{-# NOINLINE popCount# #-}
-popCount# :: BitVector n -> Int
-popCount# (BV i) = popCount i
+popCountBV :: (KnownNat (n+1), KnownNat (n + 2))
+           => BitVector (n+1)
+           -> I.Index (n+2)
+popCountBV bv = sum (V.map fromIntegral v)
+  where
+    v = V.bv2v bv
+{-# INLINE popCountBV #-}
 
 instance Resize BitVector where
   resize     = resize#
