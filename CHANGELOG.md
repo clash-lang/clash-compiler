@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.5
+* New features:
+  * Add `readNew` to `CLaSH.Prelude.BlockRam`: create a read-after-write blockRAM from a read-before-write blockRAM.
+
 ## 0.10.4 *December 11th 2015*
 * New features:
   * Add `pureDF` to `CLaSH.Prelude.DataFlow`: lift combinational circuits to `DataFlow` circuits.
