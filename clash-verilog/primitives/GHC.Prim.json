@@ -1611,7 +1611,7 @@ assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow8Int begin
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $signed(~SYM[0][7:0]);
@@ -1623,7 +1623,7 @@ assign ~RESULT = $signed(~SYM[0][7:0]);
     , "type"      : "narrow16Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow16Int begin
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $signed(~SYM[0][15:0]);
@@ -1635,7 +1635,7 @@ assign ~RESULT = $signed(~SYM[0][15:0]);
     , "type"      : "narrow32Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow32Int begin
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $signed(~SYM[0][31:0]);
@@ -1647,7 +1647,7 @@ assign ~RESULT = $signed(~SYM[0][31:0]);
     , "type"      : "narrow8Int# :: Word# -> Word#"
     , "templateD" :
 "// narrow8Word begin
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $unsigned(~SYM[0][7:0]);
@@ -1659,7 +1659,7 @@ assign ~RESULT = $unsigned(~SYM[0][7:0]);
     , "type"      : "narrow16Word# :: Word# -> Word#"
     , "templateD" :
 "// narrow16Word begin
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $unsigned(~SYM[0][15:0]);
@@ -1671,7 +1671,7 @@ assign ~RESULT = $unsigned(~SYM[0][15:0]);
     , "type"      : "narrow32Int# :: Word# -> Word#"
     , "templateD" :
 "// narrow32Word begin
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~SYM[0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $unsigned(~SYM[0][31:0]);
