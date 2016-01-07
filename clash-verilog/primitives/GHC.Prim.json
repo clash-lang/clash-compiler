@@ -745,7 +745,7 @@ end
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz32#"
-    , "type"      : "clz16 :: Word# -> Word#"
+    , "type"      : "clz32 :: Word# -> Word#"
     , "templateD" :
 "// clz32 begin
 ~GENERATE
@@ -842,7 +842,7 @@ end
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.clz64#"
-    , "type"      : "clz16 :: Word# -> Word#"
+    , "type"      : "clz64 :: Word# -> Word#"
     , "templateD" :
 "// clz64 begin
 ~GENERATE
