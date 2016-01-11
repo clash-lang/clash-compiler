@@ -7,7 +7,8 @@ type Elm  = Unsigned 8
 type Pntr n = Unsigned (n + 1)
 type Elms = Vec 4 Elm
 
-fifo :: forall n e . (KnownNat n, KnownNat (n+1), KnownNat (2^n))
+fifo :: forall n e . (KnownNat n, KnownNat (n+1), KnownNat (n+1+1)
+                     ,KnownNat (n+1+2), KnownNat (2^n))
      => (Pntr n, Pntr n, Vec (2^n) e)
      -> (e, Bool, Bool)
      -> ((Pntr n,Pntr n,Vec (2^n) e),(Bool,Bool,e))
