@@ -35,6 +35,7 @@ module CLaSH.Prelude.DataFlow
   , swapDF
   , secondDF
   , parDF
+  , parNDF
   , loopDF
   , loopDF_nobuf
     -- * Lock-Step operation
@@ -43,7 +44,8 @@ module CLaSH.Prelude.DataFlow
 where
 
 import GHC.TypeLits           (KnownNat, KnownSymbol, type (+), type (^))
-import Prelude                hiding ((++), (!!), length, repeat)
+import Prelude                hiding ((++), (!!), length, repeat, unzip3, zip3
+                              , zipWith)
 
 import CLaSH.Class.BitPack    (boolToBV)
 import CLaSH.Class.Resize     (truncateB)
@@ -54,7 +56,8 @@ import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
 import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
 import CLaSH.Sized.BitVector  (BitVector)
-import CLaSH.Sized.Vector     (Vec, (++), (!!), length, repeat, replace)
+import CLaSH.Sized.Vector     (Vec, (++), (!!), length, repeat, replace, unzip3
+                              , zip3, zipWith)
 
 {- | Dataflow circuit with bidirectional synchronisation channels.
 
@@ -274,6 +277,25 @@ parDF :: (KnownSymbol nm, KnownNat rate)
       -> DataFlow' ('Clk nm rate) cEn dEn c d
       -> DataFlow' ('Clk nm rate) (aEn,cEn) (bEn,dEn) (a,c) (b,d)
 f `parDF` g = firstDF f `seqDF` secondDF g
+
+-- | Compose /n/ 'DataFlow' circuits in parallel.
+parNDF :: (KnownSymbol nm, KnownNat rate, KnownNat n)
+       => Vec n (DataFlow' ('Clk nm rate) aEn bEn a b)
+       -> DataFlow' ('Clk nm rate)
+                    (Vec n aEn)
+                    (Vec n bEn)
+                    (Vec n a)
+                    (Vec n b)
+parNDF fs =
+  DF (\as aVs bRs ->
+        let clk  = sclock
+            as'  = unbundle' clk as
+            aVs' = unbundle' clk aVs
+            bRs' = unbundle' clk bRs
+            (bs,bVs,aRs) = unzip3 (zipWith (\k (a,b,r) -> df k a b r) fs
+                                  (zip3 as' aVs' bRs'))
+        in  (bundle' clk bs,bundle' clk bVs, bundle' clk aRs)
+     )
 
 -- | Feed back the second halve of the communication channel. The feedback loop
 -- is buffered by a 'fifoDF' circuit.
