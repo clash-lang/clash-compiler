@@ -15,6 +15,7 @@
 -- * CLaSH.Sized.Vector.head
 -- * CLaSH.Sized.Vector.tail
 -- * CLaSH.Sized.Vector.unconcatBitVector#
+-- * CLaSH.Sized.Vector.replicate
 --
 -- Partially handles:
 --
@@ -400,3 +401,16 @@ reduceTranspose n 0 aTy arg = do
   changed retVec
 
 reduceTranspose _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"
+
+reduceReplicate :: Int
+                -> Type
+                -> Type
+                -> Term
+                -> NormalizeSession Term
+reduceReplicate n aTy eTy arg = do
+  tcm <- Lens.view tcCache
+  let (TyConApp vecTcNm _) = tyView eTy
+      (Just vecTc) = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      retVec = mkVec nilCon consCon aTy n (replicate n arg)
+  changed retVec

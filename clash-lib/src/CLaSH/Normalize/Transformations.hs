@@ -958,6 +958,16 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
           (Right n, Right 0) -> reduceTranspose n 0 aTy arg
           _ -> return e
+      "CLaSH.Sized.Vector.replicate" | length args == 4 -> do
+        let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            untranslatableTy <- isUntranslatableType aTy
+            if untranslatableTy
+               then reduceReplicate n aTy eTy vArg
+               else return e
+          _ -> return e
+
       _ -> return e
 
 reduceNonRepPrim _ e = return e
