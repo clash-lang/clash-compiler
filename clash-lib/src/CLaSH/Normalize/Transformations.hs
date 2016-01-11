@@ -35,6 +35,7 @@ where
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
+import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
@@ -54,8 +55,7 @@ import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
 import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
-import           CLaSH.Core.Type             (TypeView (..), Type (..),
-                                              LitTy (..), applyFunTy,
+import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
                                               applyTy, isPolyFunCoreTy,
                                               splitFunTy, typeKind,
                                               tyView)
@@ -64,7 +64,7 @@ import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
                                               isSignalType, isVar, mkApps,
                                               mkLams, mkTmApps, mkVec,
-                                              termSize, termType)
+                                              termSize, termType, tyNatSize)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -858,7 +858,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
   eTy <- termType tcm e
   case tyView eTy of
     (TyConApp vecTcNm@(name2String -> "CLaSH.Sized.Vector.Vec")
-              [LitTy (NumTy 0), aTy]) -> do
+              [runExcept . tyNatSize tcm -> Right 0, aTy]) -> do
       let (Just vecTc) = HashMap.lookup vecTcNm tcm
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
@@ -866,8 +866,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
     _ -> case f of
       "CLaSH.Sized.Vector.zipWith" | length args == 7 -> do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
-        case nTy of
-          (LitTy (NumTy n)) -> do
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
             untranslatableTys <- mapM isUntranslatableType [lhsElTy,rhsElty,resElTy]
             if or untranslatableTys
                then let [fun,lhsArg,rhsArg] = Either.lefts args
@@ -876,8 +876,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
           _ -> return e
       "CLaSH.Sized.Vector.map" | length args == 5 -> do
         let [argElTy,resElTy,nTy] = Either.rights args
-        case nTy of
-          (LitTy (NumTy n)) -> do
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
             untranslatableTys <- mapM isUntranslatableType [argElTy,resElTy]
             if or untranslatableTys
                then let [fun,arg] = Either.lefts args
@@ -886,8 +886,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
           _ -> return e
       "CLaSH.Sized.Vector.traverse#" | length args == 7 ->
         let [aTy,fTy,bTy,nTy] = Either.rights args
-        in  case nTy of
-          (LitTy (NumTy n)) ->
+        in  case runExcept (tyNatSize tcm nTy) of
+          Right n ->
             let [dict,fun,arg] = Either.lefts args
             in  reduceTraverse n aTy fTy bTy dict fun arg
           _ -> return e
@@ -895,15 +895,15 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         let [aTy,nTy] = Either.rights args
             isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
         untranslatableTy <- isUntranslatableType aTy
-        case nTy of
-          (LitTy (NumTy n)) | not (isPow2 (n + 1)) || untranslatableTy ->
+        case runExcept (tyNatSize tcm nTy) of
+          Right n | not (isPow2 (n + 1)) || untranslatableTy ->
             let [fun,arg] = Either.lefts args
             in  reduceFold (n + 1) aTy fun arg
           _ -> return e
       "CLaSH.Sized.Vector.foldr" | length args == 6 ->
         let [aTy,bTy,nTy] = Either.rights args
-        in  case nTy of
-          (LitTy (NumTy n)) -> do
+        in  case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
             untranslatableTys <- mapM isUntranslatableType [aTy,bTy]
             if or untranslatableTys
               then let [fun,start,arg] = Either.lefts args
@@ -911,15 +911,15 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
               else return e
           _ -> return e
       "CLaSH.Sized.Vector.dfold" | length args == 8 ->
-        let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
-        in  case nTy of
-          (LitTy (NumTy n)) -> reduceDFold n aTy fun start arg
-          _ -> return e
+        let ([kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
+        in  case runExcept (tyNatSize tcm nTy) of
+          Right n -> reduceDFold n aTy fun start arg
+          _ -> error $ "DIE!\n" ++ show kn
       "CLaSH.Sized.Vector.++" | length args == 5 ->
         let [nTy,aTy,mTy] = Either.rights args
             [lArg,rArg]   = Either.lefts args
-        in case (nTy,mTy) of
-              (LitTy (NumTy n), LitTy (NumTy m))
+        in case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
+              (Right n, Right m)
                 | n == 0 -> changed rArg
                 | m == 0 -> changed lArg
                 | otherwise -> do
@@ -931,8 +931,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
       "CLaSH.Sized.Vector.head" | length args == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
-        case nTy of
-          (LitTy (NumTy n)) -> do
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
             untranslatableTy <- isUntranslatableType aTy
             if untranslatableTy
                then reduceHead n aTy vArg
@@ -941,8 +941,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
       "CLaSH.Sized.Vector.tail" | length args == 3 -> do
         let [nTy,aTy] = Either.rights args
             [vArg]    = Either.lefts args
-        case nTy of
-          (LitTy (NumTy n)) -> do
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
             untranslatableTy <- isUntranslatableType aTy
             if untranslatableTy
                then reduceTail n aTy vArg
@@ -950,13 +950,13 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
           _ -> return e
       "CLaSH.Sized.Vector.unconcat" | length args == 6 -> do
         let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
-        case (nTy,mTy) of
-          (LitTy (NumTy n), LitTy (NumTy 0)) -> reduceUnconcat n 0 aTy arg
+        case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
+          (Right n, Right 0) -> reduceUnconcat n 0 aTy arg
           _ -> return e
       "CLaSH.Sized.Vector.transpose" | length args == 5 -> do
         let ([_knN,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
-        case (nTy,mTy) of
-          (LitTy (NumTy n), LitTy (NumTy 0)) -> reduceTranspose n 0 aTy arg
+        case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
+          (Right n, Right 0) -> reduceTranspose n 0 aTy arg
           _ -> return e
       _ -> return e
 
