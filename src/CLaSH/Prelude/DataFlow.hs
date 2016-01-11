@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -44,7 +45,7 @@ module CLaSH.Prelude.DataFlow
 where
 
 import GHC.TypeLits           (KnownNat, KnownSymbol, type (+), type (^))
-import Prelude                hiding ((++), (!!), length, repeat, unzip3, zip3
+import Prelude                hiding ((++), (!!), length, map, repeat, tail, unzip3, zip3
                               , zipWith)
 
 import CLaSH.Class.BitPack    (boolToBV)
@@ -56,8 +57,7 @@ import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
 import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
 import CLaSH.Sized.BitVector  (BitVector)
-import CLaSH.Sized.Vector     (Vec, (++), (!!), length, repeat, replace, unzip3
-                              , zip3, zipWith)
+import CLaSH.Sized.Vector
 
 {- | Dataflow circuit with bidirectional synchronisation channels.
 
@@ -535,3 +535,22 @@ instance (LockStep a x, LockStep b y) => LockStep (a,b) (x,y) where
                                      yV      = val .&&. xR
                                      xyV     = bundle' clk (xV,yV)
                                  in  (xy,xyV,rdy))) `seqDF` (stepLock `parDF` stepLock)
+
+instance (LockStep en a, KnownNat m, m ~ (n + 1), KnownNat (n+1)) =>
+  LockStep (Vec m en) (Vec m a) where
+  lockStep = parNDF (repeat lockStep) `seqDF`
+    DF (\xs vals rdy ->
+          let val  = and <$> vals
+              rdys = allReady <$> rdy <*> (repeat <$> vals)
+          in  (xs,val,rdys)
+       )
+  stepLock =
+    DF (\xs val rdys ->
+          let rdy  = and <$> rdys
+              vals = allReady <$> val <*> (repeat <$> rdys)
+          in  (xs,vals,rdy)
+       ) `seqDF` parNDF (repeat stepLock)
+
+allReady :: KnownNat (n+1) => Bool -> Vec (n+1) (Vec (n+1) Bool)
+         -> Vec (n+1) Bool
+allReady b vs = map (and . (b :>) . tail) (smap (flip rotateLeftS) vs)
