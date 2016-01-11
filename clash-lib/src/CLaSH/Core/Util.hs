@@ -5,6 +5,8 @@
 -- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
+import Control.Monad.Trans.Except              (Except, throwE)
+import qualified Data.HashMap.Strict           as HMS
 import qualified Data.HashMap.Lazy             as HashMap
 import Data.HashMap.Lazy                       (HashMap)
 import qualified Data.HashSet                  as HashSet
@@ -22,9 +24,11 @@ import CLaSH.Core.Term                         (LetBinding, Pat (..), Term (..),
                                                 TmName)
 import CLaSH.Core.Type                         (Kind, LitTy (..), TyName,
                                                 Type (..), TypeView (..), applyTy,
-                                                isFunTy, isPolyFunCoreTy, mkFunTy,
+                                                findFunSubst, isFunTy,
+                                                isPolyFunCoreTy, mkFunTy,
                                                 splitFunTy, tyView)
-import CLaSH.Core.TyCon                        (TyCon, TyConName, tyConDataCons)
+import CLaSH.Core.TyCon                        (TyCon (..), TyConName,
+                                                tyConDataCons)
 import CLaSH.Core.TysPrim                      (typeNatKind)
 import CLaSH.Core.Var                          (Id, TyVar, Var (..), varType)
 import CLaSH.Util
@@ -343,3 +347,36 @@ isSignalType tcm ty = go HashSet.empty ty
                                      ++ " not found.") False
 
     go _ _ = False
+
+tyNatSize :: HMS.HashMap TyConName TyCon
+          -> Type
+          -> Except String Int
+tyNatSize _ (LitTy (NumTy i)) = return i
+tyNatSize m ty@(tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
+  "GHC.TypeLits.+" -> (+) <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "GHC.TypeLits.*" -> (*) <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "GHC.TypeLits.^" -> (^) <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "GHC.TypeLits.-" -> (-) <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "CLaSH.Promoted.Ord.Max" -> max <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "CLaSH.Promoted.Ord.Min" -> min <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  "GHC.TypeLits.Extra.CLog" -> do
+    i1' <- tyNatSize m ty1
+    i2' <- tyNatSize m ty2
+    if (i1' > 1 && i2' > 0)
+       then return (ceiling (logBase (fromIntegral i1' :: Double)
+                                     (fromIntegral i2' :: Double)))
+       else throwE $ $(curLoc) ++ "Can't convert: " ++ show ty
+  "GHC.TypeLits.Extra.GCD" -> gcd <$> tyNatSize m ty1 <*> tyNatSize m ty2
+  _ -> throwE $ $(curLoc) ++ "Can't convert tyNatOp: " ++ show tc
+-- TODO: Remove this conversion
+-- The current problem is that type-functions are not reduced by the GHC -> Core
+-- transformation process, and so end up here. Once a fix has been found for
+-- this problem remove this dirty hack.
+tyNatSize tcm ty@(tyView -> TyConApp tc tys) = do
+  case tcm HMS.! tc of
+    FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst tys of
+      Just ty' -> tyNatSize tcm ty'
+      _ -> throwE $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
+    _ -> throwE $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
+
+tyNatSize _ t = throwE $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
