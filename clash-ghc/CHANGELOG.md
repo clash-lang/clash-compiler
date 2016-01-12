@@ -3,6 +3,9 @@
 ## 0.6.8
 * New features:
   * Support for Haskell's: `Char`, `Int8`, `Int16`, `Int32`, `Int64`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`.
+  * Int/Word/Integer bitwidth for generated HDL is configurable using the `-clash-intwidth=N` flag, where `N` is the number of bits.
+* Fixes bugs:
+  * Cannot reduce `case error ... of ...` to `error ...` [#109](https://github.com/clash-lang/clash-compiler/issues/109)
 
 ## 0.6.7 *December 21st 2015*
 * Support for `unbound-generics-0.3`
