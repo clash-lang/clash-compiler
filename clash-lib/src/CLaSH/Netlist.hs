@@ -235,6 +235,8 @@ mkDeclarations bndr (Case scrut altTy alts) = do
         LitPat  (Embed (IntLiteral i)) -> return (Just (NumLit i), altExpr)
         LitPat  (Embed (WordLiteral w)) -> return (Just (NumLit w), altExpr)
         LitPat  (Embed (CharLiteral c)) -> return (Just (NumLit . toInteger $ ord c), altExpr)
+        LitPat  (Embed (Int64Literal i)) -> return (Just (NumLit i), altExpr)
+        LitPat  (Embed (Word64Literal w)) -> return (Just (NumLit w), altExpr)
         _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
 
     mkScrutExpr :: HWType -> Pat -> Expr -> Expr
@@ -315,6 +317,8 @@ mkExpr _ _ (Core.Literal l) = do
     IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
     IntLiteral i     -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
     WordLiteral w    -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit w, [])
+    Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, [])
+    Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, [])
     CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 

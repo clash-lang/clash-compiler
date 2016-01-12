@@ -9,6 +9,8 @@ module CLaSH.Core.TysPrim
   , stringPrimTy
   , voidPrimTy
   , wordPrimTy
+  , int64PrimTy
+  , word64PrimTy
   , tysPrimMap
   )
 where
@@ -42,34 +44,43 @@ typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
 
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
-  voidPrimTyConName, wordPrimTyConName :: TyConName
+  voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
+  word64PrimTyConName :: TyConName
 intPrimTyConName     = string2Name "GHC.Prim.Int#"
 integerPrimTyConName = string2Name "GHC.Integer.Type.Integer"
 stringPrimTyConName  = string2Name "String"
 charPrimTyConName    = string2Name "GHC.Prim.Char#"
 voidPrimTyConName    = string2Name "VOID"
 wordPrimTyConName    = string2Name "GHC.Prim.Word#"
+int64PrimTyConName   = string2Name "GHC.Prim.Int64#"
+word64PrimTyConName  = string2Name "GHC.Prim.Word64#"
 
 liftedPrimTC :: TyConName
              -> TyCon
 liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
-intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc, wordPrimTc :: TyCon
+intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc, wordPrimTc,
+  int64PrimTc, word64PrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
 integerPrimTc = liftedPrimTC integerPrimTyConName
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 voidPrimTc    = liftedPrimTC voidPrimTyConName
 wordPrimTc    = liftedPrimTC wordPrimTyConName
+int64PrimTc   = liftedPrimTC int64PrimTyConName
+word64PrimTc  = liftedPrimTC word64PrimTyConName
 
-intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy, wordPrimTy :: Type
+intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy, wordPrimTy,
+  int64PrimTy, word64PrimTy :: Type
 intPrimTy     = mkTyConTy intPrimTyConName
 integerPrimTy = mkTyConTy integerPrimTyConName
 charPrimTy    = mkTyConTy charPrimTyConName
 stringPrimTy  = mkTyConTy stringPrimTyConName
 voidPrimTy    = mkTyConTy voidPrimTyConName
 wordPrimTy    = mkTyConTy wordPrimTyConName
+int64PrimTy   = mkTyConTy int64PrimTyConName
+word64PrimTy  = mkTyConTy word64PrimTyConName
 
 tysPrimMap :: HashMap TyConName TyCon
 tysPrimMap = HashMap.fromList
@@ -83,4 +94,6 @@ tysPrimMap = HashMap.fromList
   , (stringPrimTyConName,stringPrimTc)
   , (voidPrimTyConName,voidPrimTc)
   , (wordPrimTyConName,wordPrimTc)
+  , (int64PrimTyConName,int64PrimTc)
+  , (word64PrimTyConName,word64PrimTc)
   ]

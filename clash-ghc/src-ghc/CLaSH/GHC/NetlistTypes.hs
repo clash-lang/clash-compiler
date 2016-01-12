@@ -38,6 +38,8 @@ ghcTypeToHWType iw = go
         "GHC.Prim.Char#"                -> return (Unsigned 21)
         "GHC.Prim.Int#"                 -> return (Signed iw)
         "GHC.Prim.Word#"                -> return (Unsigned iw)
+        "GHC.Prim.Int64#"               -> return (Signed 64)
+        "GHC.Prim.Word64#"              -> return (Unsigned 64)
         "GHC.Prim.ByteArray#"           ->
           fail $ "Can't translate type: " ++ showDoc ty
 

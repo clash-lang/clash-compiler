@@ -124,7 +124,11 @@ instance Pretty Literal where
     IntLiteral i
       | i < 0         -> return $ parens (integer i)
       | otherwise     -> return $ integer i
+    Int64Literal i
+      | i < 0         -> return $ parens (integer i)
+      | otherwise     -> return $ integer i
     WordLiteral w     -> return $ integer w
+    Word64Literal w   -> return $ integer w
     RationalLiteral r -> return $ rational r
     CharLiteral c     -> return $ char c
     StringLiteral s   -> return $ vcat $ map text $ showMultiLineString s

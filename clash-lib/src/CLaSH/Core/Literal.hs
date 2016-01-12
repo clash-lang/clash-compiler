@@ -18,13 +18,16 @@ import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 import {-# SOURCE #-} CLaSH.Core.Type         (Type)
 import CLaSH.Core.TysPrim                     (intPrimTy, integerPrimTy,
                                                charPrimTy, stringPrimTy,
-                                               voidPrimTy, wordPrimTy)
+                                               voidPrimTy, wordPrimTy,
+                                               int64PrimTy, word64PrimTy)
 
 -- | Term Literal
 data Literal
   = IntegerLiteral  !Integer
   | IntLiteral      !Integer
   | WordLiteral     !Integer
+  | Int64Literal    !Integer
+  | Word64Literal   !Integer
   | StringLiteral   !String
   | RationalLiteral !Rational
   | CharLiteral     !Char
@@ -46,3 +49,5 @@ literalType (WordLiteral     _) = wordPrimTy
 literalType (StringLiteral   _) = stringPrimTy
 literalType (RationalLiteral _) = voidPrimTy
 literalType (CharLiteral     _) = charPrimTy
+literalType (Int64Literal    _) = int64PrimTy
+literalType (Word64Literal   _) = word64PrimTy
