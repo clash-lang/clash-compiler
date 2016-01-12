@@ -855,6 +855,9 @@ reduceConst _ e = return e
 -- * CLaSH.Sized.Vector.(++)
 -- * CLaSH.Sized.Vector.head
 -- * CLaSH.Sized.Vector.tail
+-- * CLaSH.Sized.Vector.unconcat
+-- * CLaSH.Sized.Vector.transpose
+-- * CLaSH.Sized.Vector.replicate
 reduceNonRepPrim :: NormRewrite
 reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
   tcm <- Lens.view tcCache

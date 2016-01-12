@@ -53,15 +53,16 @@ genTestBench :: CLaSHOpts
              -> IO ([Component],[(String,FilePath)])
 genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimuliNmM expectedNmM modName dfiles
   (Component cName hidden [inp] [outp] _) = do
-  let ioDecl  = [ uncurry NetDecl inp
+  let iw      = opt_intWidth opts
+      ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
                 ]
       inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
   (inpInst,inpComps,cmpCnt',hidden',dfiles') <- maybe (return (inpExpr,[],cmpCnt,hidden,dfiles))
-      (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName dfiles)
+      (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName dfiles iw)
       stimuliNmM
 
-  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans modName dfiles' $ do
+  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans modName dfiles' iw $ do
       done    <- genDone primMap
       let finDecl' = [ NetDecl "finished" Bool
                      , done
@@ -70,13 +71,13 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
       return (finDecl',finExpr')
 
   (expInst,expComps,cmpCnt'',hidden'',dfiles'') <- maybe (return (finExpr,[],cmpCnt',hidden',dfiles'))
-      (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp modName dfiles')
+      (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp modName dfiles' iw)
       expectedNmM
 
   let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden
 
-  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName  dfiles'' $ do
+  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName dfiles'' iw $ do
       varCount .= (_varCount s)
       clks' <- catMaybes <$> mapM (genClock primMap) hidden''
       rsts' <- catMaybes <$> mapM (genReset primMap) hidden''
@@ -115,9 +116,9 @@ genClock primMap (clkName,Clock clkSym rate) =
           falling       = rising + rest
           ctx = emptyBBContext
                   { bbResult = (Left (Identifier clkName Nothing), Clock clkSym rate)
-                  , bbInputs = [ (Left (N.Literal Nothing (NumLit 3)),Integer,True)
-                               , (Left (N.Literal Nothing (NumLit rising)),Integer,True)
-                               , (Left (N.Literal Nothing (NumLit falling)),Integer,True)
+                  , bbInputs = [ (Left (N.Literal Nothing (NumLit 3)),Signed 32,True)
+                               , (Left (N.Literal Nothing (NumLit rising)),Signed 32,True)
+                               , (Left (N.Literal Nothing (NumLit falling)),Signed 32,True)
                                ]
                   }
       templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.clockGen" templ ctx
@@ -138,7 +139,7 @@ genReset primMap (rstName,Reset clkSym rate) =
     Just (BlackBox _ (Left templ)) -> do
       let ctx = emptyBBContext
                   { bbResult = (Left (Identifier rstName Nothing), Reset clkSym rate)
-                  , bbInputs = [(Left (N.Literal Nothing (NumLit 2)),Integer,True)]
+                  , bbInputs = [(Left (N.Literal Nothing (NumLit 2)),Signed 32,True)]
                   }
       templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.resetGen" templ ctx
       let resetGenDecl =  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" templ' ctx
@@ -157,7 +158,7 @@ genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" 
   Just (BlackBox _ (Left templ)) -> do
     let ctx = emptyBBContext
                 { bbResult = (Left (Identifier "finished" Nothing), Bool)
-                , bbInputs = [ (Left (N.Literal Nothing (NumLit 100)),Integer,True) ]
+                , bbInputs = [ (Left (N.Literal Nothing (NumLit 100)),Signed 32,True) ]
                 }
     templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.finishGen" templ ctx
     return $ BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" templ' ctx
@@ -187,11 +188,12 @@ genStimuli :: Int
            -> (Identifier,HWType)
            -> String
            -> [(String,FilePath)]
+           -> Int
            -> TmName
            -> IO (Declaration,[Component],Int,[(Identifier,HWType)],[(String,FilePath)])
-genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName dfiles signalNm = do
+genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles signalNm
+  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw signalNm
   let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` pack "_" `append` (pack (show cmpCnt))
       sigComp = case find ((== sigNm) . componentName) comps of
                   Just c -> c
@@ -222,11 +224,12 @@ genVerifier :: Int
             -> (Identifier,HWType)
             -> String
             -> [(String,FilePath)]
+            -> Int
             -> TmName
             -> IO (Declaration,[Component],Int,[(Identifier,HWType)],[(String,FilePath)])
-genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp modName dfiles signalNm = do
+genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles signalNm
+  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw signalNm
   let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` "_" `append` (pack (show cmpCnt))
       sigComp = case find ((== sigNm) . componentName) comps of
                   Just c -> c

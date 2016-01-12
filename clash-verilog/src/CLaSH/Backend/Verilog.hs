@@ -8,8 +8,6 @@
 -- | Generate SystemVerilog for assorted Netlist datatypes
 module CLaSH.Backend.Verilog (VerilogState) where
 
-#include "MachDeps.h"
-
 import qualified Control.Applicative                  as A
 import           Control.Lens                         ((+=),(-=), makeLenses, use)
 import           Control.Monad.State                  (State)
@@ -21,7 +19,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Types
+import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (curLoc, (<:>))
 
@@ -35,6 +33,7 @@ import qualified System.FilePath
 data VerilogState =
   VerilogState
     { _genDepth  :: Int -- ^ Depth of current generative block
+    , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     }
 
 makeLenses ''VerilogState
@@ -100,11 +99,10 @@ module_ c =
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
-    Integer       -> verilogType (Signed 32)
-    (Signed n)    -> "signed" <+> brackets (int (n-1) <> colon <> int 0)
-    (Clock _ _)   -> empty
-    (Reset _ _)   -> empty
-    _             -> brackets (int (typeSize t -1) <> colon <> int 0)
+  Signed n -> "signed" <+> brackets (int (n-1) <> colon <> int 0)
+  Clock {} -> empty
+  Reset {} -> empty
+  _        -> brackets (int (typeSize t -1) <> colon <> int 0)
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
@@ -287,12 +285,16 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)
-expr_ _ (DataTag Bool (Right id_))         = "$signed" <> parens (listBraces (sequence [braces (int (WORD_SIZE_IN_BITS-1) <+> braces "1'b0"),text id_]))
+expr_ _ (DataTag Bool (Right id_))         = do
+  iw <- use intWidth
+  "$signed" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),text id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$signed" <> parens (text id_)
 
-expr_ _ (DataTag (Product _ _) (Right _))  = int WORD_SIZE_IN_BITS <> "'sd0"
+expr_ _ (DataTag (Product _ _) (Right _))  = do
+  iw <- use intWidth
+  int iw <> "'sd0"
 
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
                                                (text id_ <> brackets
@@ -301,8 +303,12 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
 
-expr_ _ (DataTag (Vector 0 _) (Right _)) = int WORD_SIZE_IN_BITS <> "'sd0"
-expr_ _ (DataTag (Vector _ _) (Right _)) = int WORD_SIZE_IN_BITS <> "'sd1"
+expr_ _ (DataTag (Vector 0 _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd0"
+expr_ _ (DataTag (Vector _ _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd1"
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
@@ -326,17 +332,6 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
   Signed _
    | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
    | otherwise -> int sz <> "'sd" <> integer i
-  Integer ->
-    let integerLow  = -2^(31 :: Integer) :: Integer
-        integerHigh = 2^(31 :: Integer) - 1 :: Integer
-        i' = if i < integerLow
-                then integerLow
-                else if i > integerHigh
-                     then integerHigh
-                     else i
-    in  if (i' < 0)
-           then "-" <> int 32 <> "'sd" <> integer (abs i')
-           else int 32 <> "'sd" <> integer i
   _ -> int sz <> "'b" <> blit
   where
     blit = bits (toBits sz i)

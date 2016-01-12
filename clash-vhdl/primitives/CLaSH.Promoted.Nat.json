@@ -7,7 +7,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.snatToInteger"
     , "type"      : "snatToInteger :: SNat n -> Integer"
-    , "templateE" : "~LIT[0]"
+    , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :

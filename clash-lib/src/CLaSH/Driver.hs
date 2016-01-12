@@ -69,8 +69,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   putStrLn $ "Normalisation took " ++ show prepNormDiff
 
   let modName = takeWhile (/= '.') (name2String topEntity)
+      iw      = opt_intWidth opts
   (netlist,dfiles,cmpCnt) <- genNetlist Nothing transformedBindings primMap tcm
-                                 typeTrans Nothing modName [] topEntity
+                                 typeTrans Nothing modName [] iw topEntity
 
   netlistTime <- netlist `deepseq` Clock.getCurrentTime
   let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -95,8 +96,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
   putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-  let hdlState' = fromMaybe (initBackend :: backend) hdlState
-      topWrapper = mkTopWrapper primMap annM modName topComponent
+  let hdlState' = fromMaybe (initBackend iw :: backend) hdlState
+      topWrapper = mkTopWrapper primMap annM modName iw topComponent
       hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
       dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                    , takeWhile (/= '.') (name2String topEntity)

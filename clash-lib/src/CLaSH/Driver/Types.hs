@@ -16,4 +16,5 @@ data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_inlineBelow :: Int
                            , opt_dbgLevel    :: DebugLevel
                            , opt_cleanhdl    :: Bool
+                           , opt_intWidth    :: Int
                            }

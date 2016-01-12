@@ -34,9 +34,10 @@ import CLaSH.Util
 mkTopWrapper :: PrimMap
              -> Maybe TopEntity -- ^ TopEntity specifications
              -> String          -- ^ Name of the module containing the @topEntity@
+             -> Int             -- ^ Int/Word/Integer bit-width
              -> Component       -- ^ Entity to wrap
              -> Component
-mkTopWrapper primMap teM modName topComponent
+mkTopWrapper primMap teM modName iw topComponent
   = Component
   { componentName = maybe (pack modName `append` "_topEntity") (pack . t_name) teM
   , inputs        = inputs'' ++ extraIn teM
@@ -54,7 +55,7 @@ mkTopWrapper primMap teM modName topComponent
     iNameSupply                = maybe [] (map pack . t_inputs) teM
     originalHidden             = hiddenPorts topComponent
 
-    clkDecls                   = mkClocks primMap originalHidden teM
+    clkDecls                   = mkClocks primMap originalHidden iw teM
 
     inputs'                    = map (first (const "input"))
                                      (inputs topComponent)
@@ -203,8 +204,8 @@ mkOutput nms (i,hwty) cnt = case hwty of
     iName = append i (pack ("_" ++ show cnt))
 
 -- | Create clock generators
-mkClocks :: PrimMap -> [(Identifier,HWType)] -> Maybe TopEntity -> [Declaration]
-mkClocks primMap hidden teM = concat
+mkClocks :: PrimMap -> [(Identifier,HWType)] -> Int -> Maybe TopEntity -> [Declaration]
+mkClocks primMap hidden iw teM = concat
     [ clockGens
     , resets
     ]
@@ -212,7 +213,7 @@ mkClocks primMap hidden teM = concat
     (clockGens,clkLocks) = maybe ([],[])
                                  (first concat . unzip . map mkClock . t_clocks)
                                  teM
-    resets               = mkResets primMap hidden clkLocks
+    resets               = mkResets primMap hidden iw clkLocks
 
 stringToVar :: String -> Expr
 stringToVar = (`Identifier` Nothing) . pack
@@ -250,9 +251,10 @@ clockPorts inp outp = (ports,clks)
 -- | Generate resets
 mkResets :: PrimMap
          -> [(Identifier,HWType)]
+         -> Int
          -> [(Identifier,[String],Bool)]
          -> [Declaration]
-mkResets primMap hidden = unsafeRunNetlist . fmap concat . mapM assingReset
+mkResets primMap hidden iw = unsafeRunNetlist iw . fmap concat . mapM assingReset
   where
     assingReset (lock,clks,doSync) = concat <$> mapM connectReset matched
       where
@@ -290,9 +292,11 @@ genSyncReset primMap lock rst nm r = do
 
 -- | The 'NetListMonad' is a transformer stack with 'IO' at the bottom.
 -- So we must use 'unsafePerformIO'.
-unsafeRunNetlist :: NetlistMonad a
+unsafeRunNetlist :: Int
+                 -> NetlistMonad a
                  -> a
-unsafeRunNetlist = unsafePerformIO
-                 . fmap fst
-                 . runNetlistMonad Nothing HashMap.empty HashMap.empty
-                     HashMap.empty (\_ _ -> Nothing) "" []
+unsafeRunNetlist iw
+  = unsafePerformIO
+  . fmap fst
+  . runNetlistMonad Nothing HashMap.empty HashMap.empty
+      HashMap.empty (\_ _ -> Nothing) "" [] iw

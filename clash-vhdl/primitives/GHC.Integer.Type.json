@@ -1,13 +1,13 @@
 [ { "BlackBox" :
     { "name"      : "GHC.Integer.Type.smallInteger"
     , "type"      : "smallInteger :: Int# -> Integer"
-    , "templateE" : "to_integer(~ARG[0])"
+    , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.integerToInt"
     , "type"      : "integerToInt :: Integer -> Int#"
-    , "templateE" : "to_signed(~ARG[0],~SIZE[~TYPO])"
+    , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :

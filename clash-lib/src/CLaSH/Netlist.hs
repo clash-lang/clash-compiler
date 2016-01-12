@@ -1,11 +1,8 @@
-{-# LANGUAGE CPP             #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 
 -- | Create Netlists out of normalized CoreHW Terms
 module CLaSH.Netlist where
-
-#include "MachDeps.h"
 
 import           Control.Lens                     ((.=), (<<%=))
 import qualified Control.Lens                     as Lens
@@ -59,11 +56,13 @@ genNetlist :: Maybe Int
            -- ^ Name of the module containing the @topEntity@
            -> [(String,FilePath)]
            -- ^ Set of collected data-files
+           -> Int
+           -- ^ Int/Word/Integer bit-width
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([Component],[(String,FilePath)],Int)
-genNetlist compCntM globals primMap tcm typeTrans mStart modName dfiles topEntity = do
-  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName dfiles $ genComponent topEntity mStart
+genNetlist compCntM globals primMap tcm typeTrans mStart modName dfiles iw topEntity = do
+  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName dfiles iw $ genComponent topEntity mStart
   return (HashMap.elems $ _components s, _dataFiles s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
@@ -81,16 +80,18 @@ runNetlistMonad :: Maybe Int
                 -- ^ Name of the module containing the @topEntity@
                 -> [(String,FilePath)]
                 -- ^ Set of collected data-files
+                -> Int
+                -- ^ Int/Word/Integer bit-width
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad compCntM s p tcm typeTrans modName dfiles
+runNetlistMonad compCntM s p tcm typeTrans modName dfiles iw
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty dfiles
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty dfiles iw
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -308,11 +309,14 @@ mkExpr :: Bool -- ^ Treat BlackBox expression as declaration
        -> Type -- ^ Type of the LHS of the let-binder
        -> Term -- ^ Term to convert to an expression
        -> NetlistMonad (Expr,[Declaration]) -- ^ Returned expression and a list of generate BlackBox declarations
-mkExpr _ _ (Core.Literal (IntegerLiteral i)) = return (HW.Literal (Just (Integer,32)) $ NumLit i, [])
-mkExpr _ _ (Core.Literal (IntLiteral i)) = return (HW.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit i, [])
-mkExpr _ _ (Core.Literal (WordLiteral w)) = return (HW.Literal (Just (Unsigned WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) $ NumLit w, [])
-mkExpr _ _ (Core.Literal (CharLiteral c)) = return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
-mkExpr _ _ (Core.Literal _) = error $ $(curLoc) ++ "not an integer literal"
+mkExpr _ _ (Core.Literal l) = do
+  iw <- Lens.use intWidth
+  case l of
+    IntegerLiteral i -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
+    IntLiteral i     -> return (HW.Literal (Just (Signed iw,iw)) $ NumLit i, [])
+    WordLiteral w    -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit w, [])
+    CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
+    _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD ty app = do
   let (appF,args) = collectArgs app

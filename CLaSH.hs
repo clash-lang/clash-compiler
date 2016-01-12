@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+
+#include "MachDeps.h"
+
 import CLaSH.Driver
 import CLaSH.Driver.Types
 import CLaSH.Rewrite.Types
@@ -12,15 +16,15 @@ import CLaSH.Backend.Verilog
 
 genSystemVerilog :: String
                  -> IO ()
-genSystemVerilog = doHDL (initBackend :: SystemVerilogState)
+genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS :: SystemVerilogState)
 
 genVHDL :: String
         -> IO ()
-genVHDL = doHDL (initBackend :: VHDLState)
+genVHDL = doHDL (initBackend WORD_SIZE_IN_BITS :: VHDLState)
 
 genVerilog :: String
            -> IO ()
-genVerilog = doHDL (initBackend :: VerilogState)
+genVerilog = doHDL (initBackend WORD_SIZE_IN_BITS :: VerilogState)
 
 doHDL :: Backend s
        => s
@@ -30,7 +34,7 @@ doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
   (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm tupTcm ghcTypeToHWType reduceConstant topEnt testInpM expOutM (CLaSHOpts 20 20 15 DebugFinal True)
+  generateHDL bindingsMap (Just b) primMap tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS) reduceConstant topEnt testInpM expOutM (CLaSHOpts 20 20 15 DebugFinal True WORD_SIZE_IN_BITS)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

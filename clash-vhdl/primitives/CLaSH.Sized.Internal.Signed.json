@@ -101,7 +101,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
-    , "templateE" : "to_signed(~ARG[1],~LIT[0])"
+    , "templateE" : "resize(~ARG[1],~LIT[0])"
     }
   }
 , { "BlackBox" :
@@ -162,7 +162,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.toInteger#"
     , "type"      : "toInteger# :: Signed n -> Integer"
-    , "templateE" : "to_integer(~ARG[0])"
+    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :

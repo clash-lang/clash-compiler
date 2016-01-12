@@ -34,6 +34,7 @@ flagsClash r = [
   , defFlag "clash-inline-below" (IntSuffix (liftEwM . setInlineBelow r))
   , defFlag "clash-debug" (SepArg (setDebugLevel r))
   , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
+  , defFlag "clash-intwidth" (IntSuffix (liftEwM . setIntWidth r))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -60,3 +61,8 @@ setDebugLevel r s = case readMaybe s of
 
 setNoClean :: IORef CLaSHOpts -> IO ()
 setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})
+
+setIntWidth :: IORef CLaSHOpts
+            -> Int
+            -> IO ()
+setIntWidth r n = modifyIORef r (\c -> c {opt_intWidth = n})

@@ -32,23 +32,23 @@ blockRamFile_~COMPNAME_~SYM[0] : block
   signal wr_~SYM[3]   : integer range 0 to ~LIT[2]-1;
   signal rd_~SYM[4]   : integer range 0 to ~LIT[2]-1;
 begin
-  wr_~SYM[3] <= to_integer(~ARG[4]
+  wr_~SYM[3] <= to_integer(~ARG[4])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
-                );
+                ;
 
-  rd_~SYM[4] <= to_integer(~ARG[5]
+  rd_~SYM[4] <= to_integer(~ARG[5])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
-                );
+                ;
 
   blockRamFile_sync : process(~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
       if ~ARG[6] then
-        RAM_~SYM[1](to_integer(wr_~SYM[3])) <= to_bitvector(~ARG[7]);
+        RAM_~SYM[1](wr_~SYM[3]) <= to_bitvector(~ARG[7]);
       end if;
 
       dout_~SYM[2] <= to_stdlogicvector(RAM_~SYM[1](rd_~SYM[4]));

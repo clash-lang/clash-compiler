@@ -9,7 +9,7 @@ import CLaSH.Netlist.Types
 
 class Backend state where
   -- | Initial state for state monad
-  initBackend :: state
+  initBackend :: Int -> state
 
   -- | Location for the primitive definitions
   primDir :: state -> IO FilePath

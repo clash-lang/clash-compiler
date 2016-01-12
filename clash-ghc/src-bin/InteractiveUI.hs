@@ -114,7 +114,7 @@ import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
 import           CLaSH.Backend.VHDL (VHDLState)
 import           CLaSH.Backend.Verilog (VerilogState)
 import qualified CLaSH.Driver
-import           CLaSH.Driver.Types (CLaSHOpts)
+import           CLaSH.Driver.Types (CLaSHOpts(..))
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
@@ -1559,7 +1559,7 @@ modulesLoadedMsg ok mods = do
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
 
 makeHDL' :: CLaSH.Backend.Backend backend
-         => backend
+         => (Int -> backend)
          -> IORef CLaSHOpts
          -> [FilePath]
          -> InputT GHCi ()
@@ -1574,28 +1574,29 @@ makeHDL' backend opts lst = makeHDL backend opts =<< case lst of
 
 makeHDL :: GHC.GhcMonad m
         => CLaSH.Backend.Backend backend
-        => backend
+        => (Int -> backend)
         -> IORef CLaSHOpts
         -> [FilePath]
         -> m ()
 makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do opts  <- readIORef optsRef
-              primDir <- CLaSH.Backend.primDir backend
+              let iw = opt_intWidth opts
+              primDir <- CLaSH.Backend.primDir (backend iw)
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src (Just dflags)
-                CLaSH.Driver.generateHDL bindingsMap (Just backend) primMap tcm
-                  tupTcm ghcTypeToHWType reduceConstant topEnt testInpM expOutM opts
+                CLaSH.Driver.generateHDL bindingsMap (Just (backend iw)) primMap tcm
+                  tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
-makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
+makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> VHDLState)
 
 makeVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: VerilogState)
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> VerilogState)
 
 makeSystemVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
-makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: SystemVerilogState)
+makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> SystemVerilogState)
 
 -----------------------------------------------------------------------------
 -- :type

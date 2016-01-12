@@ -49,7 +49,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => Index n"
-    , "templateE" : "~LIT[0]-1"
+    , "templateE" : "~ARG[0]-~SIZE[~TYPO]'d1"
     }
   }
 , { "BlackBox" :

@@ -142,11 +142,11 @@ indexBitVector_~SYM[0] : block
 begin
   vec <= ~ARG[1];
 
-  vec_index <= to_integer(~ARG[2]
+  vec_index <= to_integer(~ARG[2])
   -- pragma translate_off
                mod ~LIT[0]
   -- pragma translate_on
-               );
+               ;
 
   ~RESULT <= vec(vec_index downto vec_index);
 end block;
@@ -169,11 +169,11 @@ replaceBit_~SYM[0] : block
   signal din       : ~TYP[3];
 begin
   vec <= ~ARG[1];
-  vec_index <= to_integer(~ARG[2]
+  vec_index <= to_integer(~ARG[2])
   -- pragma translate_off
                mod ~LIT[0]
   -- pragma translate_on
-               );
+               ;
   din <= ~ARG[3];
 
   process(vec,vec_index,din)
@@ -366,7 +366,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> BitVector n"
-    , "templateE" : "std_logic_vector(to_unsigned(~ARG[1],~LIT[0]))"
+    , "templateE" : "std_logic_vector(resize(unsigned(std_logic_vector(~ARG[1])),~LIT[0]))"
     }
   }
 , { "BlackBox" :
@@ -402,7 +402,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.toInteger#"
     , "type"      : "toInteger# :: BitVector n -> Integer"
-    , "templateE" : "to_integer(unsigned(~ARG[0]))"
+    , "templateE" : "signed(std_logic_vector(resize(unsigned(~ARG[0]),~SIZE[~TYPO])))"
     }
   }
 , { "BlackBox" :

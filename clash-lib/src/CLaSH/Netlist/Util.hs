@@ -168,7 +168,6 @@ typeSize String = 1
 typeSize Bool = 1
 typeSize (Clock _ _) = 1
 typeSize (Reset _ _) = 1
-typeSize Integer = 32
 typeSize (BitVector i) = i
 typeSize (Index 0) = 0
 typeSize (Index 1) = 1

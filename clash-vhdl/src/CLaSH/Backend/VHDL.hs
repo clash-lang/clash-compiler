@@ -8,8 +8,6 @@
 -- | Generate VHDL for assorted Netlist datatypes
 module CLaSH.Backend.VHDL (VHDLState) where
 
-#include "MachDeps.h"
-
 import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
@@ -28,7 +26,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Types
+import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, first, makeCached, on, (<:>))
 
@@ -44,6 +42,7 @@ data VHDLState =
   { _tyCache   :: (HashSet HWType)     -- ^ Previously encountered HWTypes
   , _tyCount   :: Int                  -- ^ Product type counter
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
+  , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   }
 
 makeLenses ''VHDLState
@@ -111,7 +110,7 @@ mkTyPackage_ modName hwtys = (:[]) A.<$> (modName ++ "_types",) A.<$>
               "end" <> semi
 
     eqReprTy :: HWType -> HWType -> Bool
-    eqReprTy (Vector n ty1) (Vector m ty2) = n == m && eqReprTy ty1 ty2
+    eqReprTy (Vector n ty1) (Vector m ty2)  = n == m && eqReprTy ty1 ty2
     eqReprTy ty1 ty2
       | isUnsigned ty1 && isUnsigned ty2 ||
         isSLV ty1 && isSLV ty2              = typeSize ty1 == typeSize ty2
@@ -200,19 +199,6 @@ funDec Bool = Just
                                 ,   indent 2 ("return" <+> "false" <> semi)
                                 ,"end" <+> "if" <> semi
                                 ]) <$>
-    "end" <> semi
-  )
-
-funDec Integer = Just
-  ( "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <> semi <$>
-    "function" <+> "toSLV" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "std_logic_vector" <> semi
-  , "function" <+> "to_integer" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "integer" <+> "is" <$>
-    "begin" <$>
-      indent 2 ("return" <+> "i" <> semi) <$>
-    "end" <> semi <$>
-    "function" <+> "toSLV" <+> parens ("i" <+> colon <+> "in" <+> "integer") <+> "return" <+> "std_logic_vector" <+> "is" <$>
-    "begin" <$>
-      indent 2 ("return" <+> "std_logic_vector" <> parens ("to_signed" <> parens ("i" <> comma <> int 32)) <> semi) <$>
     "end" <> semi
   )
 
@@ -339,7 +325,6 @@ vhdlType' :: HWType -> VHDLM Doc
 vhdlType' Bool            = "boolean"
 vhdlType' (Clock _ _)     = "std_logic"
 vhdlType' (Reset _ _)     = "std_logic"
-vhdlType' Integer         = "integer"
 vhdlType' (BitVector n)   = case n of
                               0 -> "std_logic_vector (0 downto 1)"
                               _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
@@ -369,7 +354,6 @@ vhdlTypeMark hwty = do
     vhdlTypeMark' Bool            = "boolean"
     vhdlTypeMark' (Clock _ _)     = "std_logic"
     vhdlTypeMark' (Reset _ _)     = "std_logic"
-    vhdlTypeMark' Integer         = "integer"
     vhdlTypeMark' (BitVector _)   = "std_logic_vector"
     vhdlTypeMark' (Index _)       = "unsigned"
     vhdlTypeMark' (Signed _)      = "signed"
@@ -381,7 +365,6 @@ vhdlTypeMark hwty = do
     vhdlTypeMark' t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
-tyName Integer           = "integer"
 tyName Bool              = "boolean"
 tyName (Clock _ _)       = "std_logic"
 tyName (Reset _ _)       = "std_logic"
@@ -401,7 +384,6 @@ tyName _ = empty
 -- | Convert a Netlist HWType to an error VHDL value for that type
 vhdlTypeErrValue :: HWType -> VHDLM Doc
 vhdlTypeErrValue Bool                = "true"
-vhdlTypeErrValue Integer             = "integer'high"
 vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
 vhdlTypeErrValue (Index _)           = "(others => 'X')"
 vhdlTypeErrValue (Signed _)          = "(others => 'X')"
@@ -503,8 +485,12 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int s
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-expr_ _ (Identifier id_ (Just (Indexed ((Signed _ ),_,_)))) = "resize" <> parens (text id_ <> "," <> int WORD_SIZE_IN_BITS)
-expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = "resize" <> parens (text id_ <> "," <> int WORD_SIZE_IN_BITS)
+expr_ _ (Identifier id_ (Just (Indexed ((Signed _ ),_,_))))  = do
+  iw <- use intWidth
+  "resize" <> parens (text id_ <> "," <> int iw)
+expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
+  iw <- use intWidth
+  "resize" <> parens (text id_ <> "," <> int iw)
 
 expr_ _ (Identifier id_ (Just _)) = text id_
 
@@ -534,60 +520,66 @@ expr_ _ (DataCon ty@(Product _ _) _ es)             = tupled $ zipWithM (\i e ->
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  , n > 32
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  , n > 32
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
-  , n > 32
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "GHC.Types.I#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
-  = if n >= 2^(31 :: Integer) || n < (-2^(31 :: Integer))
-       then exprLit (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit n)
-       else "to_signed" <> parens (integer n <> "," <> int WORD_SIZE_IN_BITS)
+  = do iw <- use intWidth
+       exprLit (Just (Signed iw,iw)) (NumLit n)
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "GHC.Types.W#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
-  = if n >= 2^(31 :: Integer)
-       then exprLit (Just (Unsigned WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit n)
-       else "to_unsigned" <> parens (integer n <> "," <> int WORD_SIZE_IN_BITS)
+  = do iw <- use intWidth
+       exprLit (Just (Unsigned iw,iw)) (NumLit n)
 
 expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left id_)) = "false when" <+> text id_ <+> "= 0 else true"
-expr_ _ (DataTag Bool (Right id_)) =
-  "to_signed" <> parens (int 1 <> "," <> int WORD_SIZE_IN_BITS) <+> "when" <+> text id_ <+> "else" <+>
-  "to_signed" <> parens (int 0 <> "," <> int WORD_SIZE_IN_BITS)
+expr_ _ (DataTag Bool (Right id_)) = do {
+  ; iw <- use intWidth
+  ; "to_signed" <> parens (int 1 <> "," <> int iw) <+> "when" <+> text id_ <+> "else" <+>
+    "to_signed" <> parens (int 0 <> "," <> int iw)
+  }
 
 expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
   "resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (text id_)) <> "," <> int (typeSize hty))
-expr_ _ (DataTag (Sum _ _) (Right id_)) =
-  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens (text id_ <> "," <> int WORD_SIZE_IN_BITS)))
+expr_ _ (DataTag (Sum _ _) (Right id_)) = do
+  iw <- use intWidth
+  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens (text id_ <> "," <> int iw)))
 
-expr_ _ (DataTag (Product _ _) (Right _))  = "to_signed" <> parens (int 0 <> "," <> int WORD_SIZE_IN_BITS)
-expr_ _ (DataTag hty@(SP _ _) (Right id_)) =
-    "signed" <> parens ("std_logic_vector" <> parens (
-    "resize" <> parens ("unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
-                        <> "," <> int WORD_SIZE_IN_BITS)))
+expr_ _ (DataTag (Product _ _) (Right _))  = do
+  iw <- use intWidth
+  "to_signed" <> parens (int 0 <> "," <> int iw)
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = do {
+    ; iw <- use intWidth
+    ; "signed" <> parens ("std_logic_vector" <> parens (
+      "resize" <> parens ("unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
+                          <> "," <> int iw)))
+    }
   where
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
 
-expr_ _ (DataTag (Vector 0 _) (Right _)) = "to_signed" <> parens (int 0 <> "," <> int WORD_SIZE_IN_BITS)
-expr_ _ (DataTag (Vector _ _) (Right _)) = "to_signed" <> parens (int 1 <> "," <> int WORD_SIZE_IN_BITS)
+expr_ _ (DataTag (Vector 0 _) (Right _)) = do
+  iw <- use intWidth
+  "to_signed" <> parens (int 0 <> "," <> int iw)
+expr_ _ (DataTag (Vector _ _) (Right _)) = do
+  iw <- use intWidth
+  "to_signed" <> parens (int 1 <> "," <> int iw)
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
@@ -613,15 +605,6 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
     | otherwise -> "signed'" <> parens blit
   BitVector _ -> "std_logic_vector'" <> parens blit
-  Integer ->
-    let integerLow  = -2^(31 :: Integer) :: Integer
-        integerHigh = 2^(31 :: Integer) - 1 :: Integer
-        i' = if i < integerLow
-                then integerLow
-                else if i > integerHigh
-                     then integerHigh
-                     else i
-    in  parenIf (i' < 0) (integer i')
   _           -> blit
 
   where
@@ -632,15 +615,6 @@ exprLit _             (StringLit s) = text . T.pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 patLit :: HWType -> Literal -> VHDLM Doc
-patLit Integer (NumLit i) =
-  let integerLow  = -2^(31 :: Integer) :: Integer
-      integerHigh = 2^(31 :: Integer) - 1 :: Integer
-      i' = if i < integerLow
-              then integerLow
-              else if i > integerHigh
-                   then integerHigh
-                   else i
-  in  parenIf (i' < 0) (integer i')
 patLit hwTy (NumLit i) = bits (toBits (conSize hwTy) i)
 patLit _    l          = exprLit Nothing l
 
@@ -666,7 +640,6 @@ bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = "toSLV" <> parens (expr_ False e)
-toSLV Integer      e = "std_logic_vector" <> parens ("to_signed" <> tupled (sequence [expr_ False e,int 32]))
 toSLV (BitVector _) e = expr_ False e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
@@ -692,7 +665,6 @@ toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: "
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
 fromSLV Bool              id_ start _   = "fromSLV" <> parens (text id_ <> parens (int start <+> "downto" <+> int start))
-fromSLV Integer           id_ start end = "to_integer" <> parens (fromSLV (Signed 32) id_ start end)
 fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Signed _)        id_ start end = "signed" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))

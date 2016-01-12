@@ -13,11 +13,11 @@ asyncRom_~SYM[0] : block
 begin
   ROM_~SYM[1] <= ~ARG[1];
 
-  rom_index~SYM[2] <= to_integer(~ARG[2]
+  rom_index~SYM[2] <= to_integer(~ARG[2])
   -- pragma translate_off
                       mod ~LIT[0]
   -- pragma translate_on
-                      );
+                      ;
 
   ~RESULT <= ROM_~SYM[1](rom_index_~SYM[2]);
 end block;
@@ -41,11 +41,11 @@ rom_~COMPNAME_~SYM[0] : block
 begin
   ROM_~SYM[1] <= ~ARG[2];
 
-  rd_~SYM[2] <= to_integer(~ARG[3]
+  rd_~SYM[2] <= to_integer(~ARG[3])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
-                );
+                ;
 
   romSync : process (~CLK[1])
   begin

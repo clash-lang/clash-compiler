@@ -93,7 +93,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Unsigned n"
-    , "templateE" : "to_unsigned(~ARG[1],~LIT[0])"
+    , "templateE" : "resize(unsigned(std_logic_vector(~ARG[1])),~LIT[0])"
     }
   }
 , { "BlackBox" :
@@ -129,7 +129,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.toInteger#"
     , "type"      : "toInteger# :: Unsigned n -> Integer"
-    , "templateE" : "to_integer(~ARG[0])"
+    , "templateE" : "signed(std_logic_vector(resize(~ARG[0],~SIZE[~TYPO])))"
     }
   }
 , { "BlackBox" :

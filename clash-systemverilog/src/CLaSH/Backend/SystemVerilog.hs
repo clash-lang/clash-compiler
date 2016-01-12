@@ -25,7 +25,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Types
+import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
@@ -42,6 +42,7 @@ data SystemVerilogState =
     , _tyCount   :: Int -- ^ Product type counter
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
+    , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     }
 
 makeLenses ''SystemVerilogState
@@ -201,7 +202,6 @@ verilogType t = do
   case t of
     (Vector _ _)  -> tyName t
     (Product _ _) -> tyName t
-    Integer       -> verilogType (Signed 32)
     (Signed n)    -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
     (Clock _ _)   -> "logic"
     (Reset _ _)   -> "logic"
@@ -218,7 +218,6 @@ verilogTypeMark t = do
   tyName t
 
 tyName :: HWType -> SystemVerilogM Doc
-tyName Integer           = "integer_32"
 tyName Bool              = "logic_vector_1"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)     = "logic_vector_" <> int n
@@ -237,8 +236,7 @@ tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 verilogTypeErrValue :: HWType -> SystemVerilogM Doc
-verilogTypeErrValue Bool                = "1'bx"
-verilogTypeErrValue Integer         = "{32 {1'bx}}"
+verilogTypeErrValue Bool            = "1'bx"
 verilogTypeErrValue (Unsigned n)    = braces (int n <+> braces "1'bx")
 verilogTypeErrValue (Signed n)      = braces (int n <+> braces "1'bx")
 verilogTypeErrValue (Vector n elTy) = "'" <> braces (int n <+> braces (verilogTypeErrValue elTy))
@@ -380,12 +378,16 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)
-expr_ _ (DataTag Bool (Right id_))         = "$signed" <> parens (listBraces (sequence [braces (int 31 <+> braces "1'b0"),text id_]))
+expr_ _ (DataTag Bool (Right id_))         = do
+  iw <- use intWidth
+  "$signed" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),text id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
 expr_ _ (DataTag (Sum _ _) (Right id_))    = "$signed" <> parens (text id_)
 
-expr_ _ (DataTag (Product _ _) (Right _))  = "32'sd0"
+expr_ _ (DataTag (Product _ _) (Right _))  = do
+  iw <- use intWidth
+  int iw <> "'sd0"
 
 expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
                                                (text id_ <> brackets
@@ -394,8 +396,12 @@ expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
     start = typeSize hty - 1
     end   = typeSize hty - conSize hty
 
-expr_ _ (DataTag (Vector 0 _) (Right _)) = "32'sd0"
-expr_ _ (DataTag (Vector _ _) (Right _)) = "32'sd1"
+expr_ _ (DataTag (Vector 0 _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd0"
+expr_ _ (DataTag (Vector _ _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd1"
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
@@ -419,17 +425,6 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
   Signed _
    | i < 0     -> "-" <> int sz <> "'sd" <> integer (abs i)
    | otherwise -> int sz <> "'sd" <> integer i
-  Integer ->
-    let integerLow  = -2^(31 :: Integer) :: Integer
-        integerHigh = 2^(31 :: Integer) - 1 :: Integer
-        i' = if i < integerLow
-                then integerLow
-                else if i > integerHigh
-                     then integerHigh
-                     else i
-    in  if (i' < 0)
-           then "-" <> int 32 <> "'sd" <> integer (abs i')
-           else int 32 <> "'sd" <> integer i
   _ -> int sz <> "'b" <> blit
   where
     blit = bits (toBits sz i)
@@ -491,7 +486,6 @@ fromSLV t@(Vector n elTy) id_ start _ = verilogTypeMark t <> "'" <> parens ("'" 
     ends      = map (+1) (tail starts)
     args      = zipWithM (fromSLV elTy id_) starts ends
 
-fromSLV Integer    id_ start end = fromSLV (Signed 32) id_ start end
 fromSLV (Signed _) id_ start end = "$signed" <> parens (text id_ <> brackets (int start <> colon <> int end))
 
 fromSLV _ id_ start end = text id_ <> brackets (int start <> colon <> int end)

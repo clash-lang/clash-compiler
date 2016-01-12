@@ -1,12 +1,9 @@
-{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 
 -- | Functions to create BlackBox Contexts and fill in BlackBox templates
 module CLaSH.Netlist.BlackBox where
-
-#include "MachDeps.h"
 
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
@@ -95,15 +92,16 @@ mkArgument :: Term
 mkArgument e = do
     tcm   <- Lens.use tcCache
     ty    <- termType tcm e
+    iw    <- Lens.use intWidth
     hwTyM <- N.termHWTypeM e
     ((e',t,l),d) <- case hwTyM of
       Nothing   -> return ((Identifier "__VOID__" Nothing,Void,False),[])
       Just hwTy -> case collectArgs e of
         (Var _ v,[]) -> let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
                         in  return ((vT,hwTy,False),[])
-        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Integer,32)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (N.NumLit i),hwTy,True),[])
-        (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (N.NumLit w),hwTy,True),[])
+        (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
+        (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
         (C.Literal (CharLiteral c), []) -> return ((N.Literal (Just (Unsigned 21,21)) (N.NumLit . toInteger $ ord c),hwTy,True),[])
         (C.Literal (StringLiteral s),[]) -> return ((N.Literal Nothing (N.StringLit s),hwTy,True),[])
         (Prim f _,args) -> do
@@ -178,7 +176,9 @@ mkPrimitive bbEParen bbEasD nm args ty = do
               return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
       | pNm == "GHC.Prim.dataToTag#" -> case args of
-          [Right _,Left (Data dc)] -> return (N.Literal (Just (Signed WORD_SIZE_IN_BITS,WORD_SIZE_IN_BITS)) (NumLit $ toInteger $ dcTag dc - 1),[])
+          [Right _,Left (Data dc)] -> do
+            iw <- Lens.use intWidth
+            return (N.Literal (Just (Signed iw,iw)) (NumLit $ toInteger $ dcTag dc - 1),[])
           [Right _,Left scrut] -> do
             i <- varCount <<%= (+1)
             j <- varCount <<%= (+1)
@@ -186,10 +186,11 @@ mkPrimitive bbEParen bbEasD nm args ty = do
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
             (scrutExpr,scrutDecls) <- mkExpr False scrutTy scrut
+            iw <- Lens.use intWidth
             let tmpRhs       = pack ("tmp_dtt_rhs_" ++ show i)
                 tmpS         = pack ("tmp_dtt_" ++ show j)
                 netDeclRhs   = NetDecl tmpRhs scrutHTy
-                netDeclS     = NetDecl tmpS (Signed WORD_SIZE_IN_BITS)
+                netDeclS     = NetDecl tmpS (Signed iw)
                 netAssignRhs = Assignment tmpRhs scrutExpr
                 netAssignS   = Assignment tmpS   (DataTag scrutHTy (Right tmpRhs))
             return (Identifier tmpS Nothing,[netDeclRhs,netDeclS,netAssignRhs,netAssignS] ++ scrutDecls)

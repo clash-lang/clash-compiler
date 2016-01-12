@@ -11,6 +11,8 @@
 
 module Main (main) where
 
+#include "MachDeps.h"
+
 -- The official GHC API
 import qualified GHC
 import GHC              ( -- DynFlags(..), HscTarget(..),
@@ -121,6 +123,7 @@ main = do
                              , opt_specLimit   = 20
                              , opt_inlineBelow = 15
                              , opt_cleanhdl    = True
+                             , opt_intWidth    = WORD_SIZE_IN_BITS
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 
@@ -941,18 +944,18 @@ abiHash strs = do
 -- -----------------------------------------------------------------------------
 -- VHDL Generation
 
-makeHDL' :: CLaSH.Backend.Backend backend => backend ->  IORef CLaSHOpts -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' :: CLaSH.Backend.Backend backend => (Int -> backend) ->  IORef CLaSHOpts -> [(String,Maybe Phase)] -> Ghc ()
 makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
 
 makeVHDL :: IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: VHDLState)
+makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> VHDLState)
 
 makeVerilog ::  IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: VerilogState)
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> VerilogState)
 
 makeSystemVerilog ::  IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: SystemVerilogState)
+makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

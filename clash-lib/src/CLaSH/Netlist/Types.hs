@@ -50,6 +50,7 @@ data NetlistState
   , _modNm          :: !String -- ^ Name of the module containing the @topEntity@
   , _curCompNm      :: !Identifier
   , _dataFiles      :: [(String,FilePath)]
+  , _intWidth       :: Int
   }
 
 -- | Signal reference
@@ -79,7 +80,6 @@ data HWType
   = Void -- ^ Empty type
   | String -- ^ String type
   | Bool -- ^ Boolean type
-  | Integer -- ^ Integer type
   | BitVector !Size -- ^ BitVector of a specified size
   | Index    !Size -- ^ Unsigned integer with specified (exclusive) upper bounder
   | Signed   !Size -- ^ Signed integer of a specified size
