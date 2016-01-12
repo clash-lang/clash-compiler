@@ -241,12 +241,15 @@ caseCon ctx e@(Case subj ty alts)
     reduceConstant <- Lens.view evaluator
     case reduceConstant tcm True subj of
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
-      subj'@(collectArgs -> (Data _,_)) -> caseCon ctx (Case subj' ty alts)
-      subj' -> let msg = "Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj'
-               in traceIf (lvl > DebugNone) msg $
-                  if lvl > DebugFinal
-                     then error msg
-                     else caseOneAlt e
+      subj' -> case collectArgs subj' of
+        (Data _,_) -> caseCon ctx (Case subj' ty alts)
+        (Prim nm ty',[_,msg])
+          | nm == "Control.Exception.Base.patError" ->
+            let e' = mkApps (Prim nm ty') [Right ty,msg]
+            in  changed e'
+        _ -> traceIf (lvl > DebugNone)
+                     ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
+                     (caseOneAlt e)
 
 caseCon _ e = caseOneAlt e
 
