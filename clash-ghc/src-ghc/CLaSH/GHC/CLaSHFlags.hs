@@ -34,7 +34,7 @@ flagsClash r = [
   , defFlag "clash-inline-below" (IntSuffix (liftEwM . setInlineBelow r))
   , defFlag "clash-debug" (SepArg (setDebugLevel r))
   , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
-  , defFlag "clash-intwidth" (IntSuffix (liftEwM . setIntWidth r))
+  , defFlag "clash-intwidth" (IntSuffix (setIntWidth r))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -64,8 +64,8 @@ setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})
 
 setIntWidth :: IORef CLaSHOpts
             -> Int
-            -> IO ()
+            -> EwM IO ()
 setIntWidth r n =
   if n == 32 || n == 64
-     then modifyIORef r (\c -> c {opt_intWidth = n})
+     then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
