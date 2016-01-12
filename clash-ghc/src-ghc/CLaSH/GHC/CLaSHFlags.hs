@@ -65,4 +65,7 @@ setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})
 setIntWidth :: IORef CLaSHOpts
             -> Int
             -> IO ()
-setIntWidth r n = modifyIORef r (\c -> c {opt_intWidth = n})
+setIntWidth r n =
+  if n == 32 || n == 64
+     then modifyIORef r (\c -> c {opt_intWidth = n})
+     else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
