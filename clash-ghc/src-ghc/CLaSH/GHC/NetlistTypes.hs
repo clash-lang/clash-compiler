@@ -10,13 +10,15 @@ import Data.HashMap.Strict              (HashMap,(!))
 import Control.Monad.Trans.Except       (ExceptT (..), mapExceptT, runExceptT)
 import Unbound.Generics.LocallyNameless (name2String)
 
+import CLaSH.Core.DataCon               (DataCon (..))
 import CLaSH.Core.Pretty                (showDoc)
-import CLaSH.Core.TyCon                 (TyCon (..), TyConName)
+import CLaSH.Core.TyCon                 (TyCon (..), TyConName, tyConDataCons)
 import CLaSH.Core.Type                  (Type (..), TypeView (..), findFunSubst,
                                          tyView)
 import CLaSH.Core.Util                  (tyNatSize)
 import CLaSH.Netlist.Util               (coreTypeToHWType)
 import CLaSH.Netlist.Types              (HWType(..))
+import CLaSH.Util                       (curLoc)
 
 ghcTypeToHWType :: Int
                 -> HashMap TyConName TyCon
@@ -29,11 +31,37 @@ ghcTypeToHWType iw = go
         "GHC.Int.Int8"                  -> return (Signed 8)
         "GHC.Int.Int16"                 -> return (Signed 16)
         "GHC.Int.Int32"                 -> return (Signed 32)
-        "GHC.Int.Int64"                 -> return (Signed 64)
+        "GHC.Int.Int64"                 ->
+          if iw < 64
+             then case tyConDataCons (m ! tc) of
+                    [dc] -> case dcArgTys dc of
+                      [tyView -> TyConApp nm _]
+                        | name2String nm == "GHC.Prim.Int#"   ->
+                            error $ unlines ["Int64 not supported in forced 32-bit mode on a 64-bit machine."
+                                            ,"Run CLaSH with `-clash-intwidth=64`."
+                                            ]
+                        | name2String nm == "GHC.Prim.Int64#" ->
+                            return (Signed 64)
+                      _  -> error $ $(curLoc) ++ "Int64 DC has unexpected amount of arguments"
+                    _    -> error $ $(curLoc) ++ "Int64 TC has unexpected amount of DCs"
+             else return (Signed 64)
         "GHC.Word.Word8"                -> return (Unsigned 8)
         "GHC.Word.Word16"               -> return (Unsigned 16)
         "GHC.Word.Word32"               -> return (Unsigned 32)
-        "GHC.Word.Word64"               -> return (Unsigned 64)
+        "GHC.Word.Word64"               ->
+          if iw < 64
+             then case tyConDataCons (m ! tc) of
+                    [dc] -> case dcArgTys dc of
+                      [tyView -> TyConApp nm _]
+                        | name2String nm == "GHC.Prim.Word#"   ->
+                            error $ unlines ["Word64 not supported in forced 32-bit mode on a 64-bit machine."
+                                            ,"Run CLaSH with `-clash-intwidth=64`."
+                                            ]
+                        | name2String nm == "GHC.Prim.Word64#" ->
+                            return (Unsigned 64)
+                      _  -> error $ $(curLoc) ++ "Word64 DC has unexpected amount of arguments"
+                    _    -> error $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
+             else return (Unsigned 64)
         "GHC.Integer.Type.Integer"      -> return (Signed iw)
         "GHC.Prim.Char#"                -> return (Unsigned 21)
         "GHC.Prim.Int#"                 -> return (Signed iw)
