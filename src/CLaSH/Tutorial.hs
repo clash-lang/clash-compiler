@@ -60,8 +60,8 @@ module CLaSH.Tutorial (
   -- * Troubleshooting
   -- $errorsandsolutions
 
-  -- * Unsupported Haskell features
-  -- $unsupported
+  -- * Limitations of CλaSH
+  -- $limitations
 
   -- * CλaSH vs Lava
   -- $vslava
@@ -159,7 +159,7 @@ function application denotes an instantiation of said component. Now, this has
 consequences on how we view /recursively/ defined functions: structurally, a
 recursively defined function would denote an /infinitely/ deep / structured
 component, something that cannot be turned into an actual circuit
-(See also <#unsupported Unsupported Haskell features>).
+(See also <#limitations Limitations of CλaSH>).
 
 On the other hand, Haskell's by-default non-strict evaluation works very well
 for the simulation of the feedback loops, which are ubiquitous in digital
@@ -1691,9 +1691,9 @@ A list of often encountered errors and their solutions:
     <1,2,3,4>
 -}
 
-{- $unsupported #unsupported#
-Here is a list of Haskell features which the CλaSH compiler cannot synthesize
-to VHDL/(System)Verilog (for now):
+{- $limitations #limitations#
+Here is a list of Haskell features for which the CλaSH compiler has only
+/limited/ support (for now):
 
 * __Recursively defined functions__
 
@@ -1856,39 +1856,61 @@ to VHDL/(System)Verilog (for now):
 
 * __Haskell primitive types__
 
-    Most primitive types are not supported, with the exception of:
+    Only the following primitive Haskell types are supported:
 
         * 'Integer'
         * 'Int'
         * 'Int8'
         * 'Int16'
         * 'Int32'
-        * 'Int64'
+        * 'Int64' (not available when compiling with @-clash-intwidth=32@ on a 64-bit machine)
         * 'Word'
         * 'Word8'
         * 'Word16'
         * 'Word32'
-        * 'Word64'
+        * 'Word64' (not available when compiling with @-clash-intwidth=32@ on a 64-bit machine)
         * 'Char'
 
-    The translation of 'Integer' is also not completely meaning-preserving:
-    it is translated to the VHDL \"@integer@\" type, the Verilog
-    \"@signed [31:0]@\" type, or the SystemVerilog \"@signed logic [31:0]@\"
-    type, all of which can only represent 32-bit integer values. Use `Integer`
-    with due diligence; be especially careful when using `fromIntegral` as it
-    does a conversion via 'Integer'. For example:
+    There are several aspects of which you should take note:
 
-    @
-    signedToUnsigned :: Signed 64 -> Unsigned 64
-    signedToUnsigned = fromIntegral
-    @
+        *   'Int' and 'Word' are represented by the same number of bits as is
+            native for the architecture of the computer on which the CλaSH
+            compiler is executed. This means that if you are working on a 64-bit
+            machine, 'Int' and 'Word' will be 64-bit. This might be problematic
+            when you are working in a team, and one designer has a 32-bit
+            machine, and the other has a 64-bit machine. In general, you should
+            be avoiding 'Int' in such cases, but as a band-aid solution, you can
+            force the CλaSH compiler to use a specific bit-width for `Int` and
+            `Word` using the @-clash-intwidth=N@ flag, where /N/ must either be
+            /32/ or /64/.
 
-    would lose the top 32 bits. Instead, you could use 'bitCoerce':
+        *   When you use the @-clash-intwidth=32@ flag on a /64-bit/ machine,
+            the 'Word64' and 'Int64' types /cannot/ be translated. This
+            restriction does /not/ apply to the other three combinations of
+            @-clash-intwidth@ flag and machine type.
 
-    @
-    signedToUnsigned :: Signed 64 -> Unsigned 64
-    signedToUnsigned = bitCoerce
-    @
+        *   The translation of 'Integer' is not meaning-preserving. 'Integer' in
+            Haskell is an arbitrary precision integer, something that cannot
+            be represented in a statically known number of bits. In the CλaSH
+            compiler, we chose to represent 'Integer' by the same number of bits
+            as we do for 'Int' and 'Word'. As you have read in a previous
+            bullet point, this number of bits is either 32 or 64, depending on
+            the architecture of the machine the CλaSH compiler is running on, or
+            the setting of the @-clash-intwidth@ flag.
+
+            Consequently, you should use `Integer` with due diligence; be
+            especially careful when using `fromIntegral` as it does a conversion
+            via 'Integer'. For example:
+
+                > signedToUnsigned :: Signed 128 -> Unsigned 128
+                > signedToUnsigned = fromIntegral
+
+            can either lose the top 64 or 96 bits depending on whether 'Integer'
+            is represented by 64 or 32 bits. Instead, when doing such conversions,
+            you should use 'bitCoerce':
+
+                > signedToUnsigned :: Signed 128 -> Unsigned 128
+                > signedToUnsigned = bitCoerce
 
 * __Side-effects: 'IO', 'ST', etc.__
 
