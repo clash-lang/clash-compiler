@@ -3,8 +3,8 @@ sudo: false
 
 matrix:
   include:
-    - env: GHCVER=7.10.2 CABALVER=1.22 JOPTS="-j2"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2],sources: [hvr-ghc]}}
+    - env: GHCVER=7.10.3 CABALVER=1.22 JOPTS="-j2"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3],sources: [hvr-ghc]}}
     - env: GHCVER=head CABALVER=head JOPTS="-j2"
       addons: {apt: {packages: [cabal-install-head,ghc-head],  sources: [hvr-ghc]}}
 
