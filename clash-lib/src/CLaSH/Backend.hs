@@ -42,3 +42,5 @@ class Backend state where
   inst             :: Declaration  -> State state (Maybe Doc)
   -- | Turn a Netlist expression into a HDL expression
   expr             :: Bool -> Expr -> State state Doc
+  -- | Bit-width of Int/Word/Integer
+  iwWidth          :: State state Int

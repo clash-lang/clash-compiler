@@ -190,6 +190,7 @@ renderElem b (SigD e m) = do
   return (displayT $ renderOneLine t)
 
 renderElem b (IF c t f) = do
+  iw <- iwWidth
   let c' = case c of
              (Size e)   -> typeSize (lineToType b [e])
              (Length e) -> case lineToType b [e] of
@@ -198,7 +199,8 @@ renderElem b (IF c t f) = do
              (L n)      -> case bbInputs b !! n of
                              (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
                              _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
-             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGHT, or LIT"
+             IW64      -> if iw == 64 then 1 else 0
+             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGHT, IW64, or LIT"
   if c' > 0 then renderBlackBox t b else renderBlackBox f b
 
 renderElem b e = renderTag b e
@@ -284,3 +286,4 @@ renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
 renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
 renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
 renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"
+renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"

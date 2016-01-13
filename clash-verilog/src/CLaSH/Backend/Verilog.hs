@@ -67,6 +67,7 @@ instance Backend VerilogState where
                           else "endgenerate"
   inst            = inst_
   expr            = expr_
+  iwWidth         = use intWidth
 
 type VerilogM a = State VerilogState a
 

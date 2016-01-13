@@ -693,7 +693,7 @@ clz~SYM[0] : block
       return (v(n-1+n) and v(n-1)) & not v(n-1) & v(n-2 downto 0);
     end if;
   end function;
-
+~IF ~IW64 ~THEN
   function clz64 (constant v : unsigned(0 to 63)) return unsigned is
     variable e : unsigned(0 to 63);     -- 64
     variable a : unsigned(0 to 16*3-1); -- 48
@@ -708,8 +708,26 @@ clz~SYM[0] : block
     for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
     return clzi(6,d(0 to 11));
   end function;
+~ELSE
+  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+    variable e : unsigned(0 to 31);    -- 32
+    variable a : unsigned(0 to 8*3-1); -- 24
+    variable b : unsigned(0 to 4*4-1); -- 16
+    variable c : unsigned(0 to 2*5-1); -- 10
+  begin
+    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
+    return clzi(5,c(0 to 9));
+  end function;
+~FI
 begin
+~IF ~IW64 ~THEN
   ~RESULT <= resize(clz64(~ARG[0]),~SIZE[~TYPO]);
+~ELSE
+  ~RESULT <= resize(clz32(~ARG[0]),~SIZE[~TYPO]);
+~FI
 end block;
 -- clz end"
     }
@@ -758,8 +776,11 @@ begin
   reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
     ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
   end generate;
-
+~IF ~IW64 ~THEN
   ~RESULT <= resize(clz8(~SYM[2](63 downto 56)),~SIZE[~TYPO]);
+~ELSE
+  ~RESULT <= resize(clz8(~SYM[2](31 downto 24)),~SIZE[~TYPO]);
+~FI
 end block;
 -- ctz8 end"
     }
@@ -810,8 +831,11 @@ begin
   reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
     ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
   end generate;
-
+~IF ~IW64 ~THEN
   ~RESULT <= resize(clz16(~SYM[2](63 downto 48)),~SIZE[~TYPO]);
+~ELSE
+  ~RESULT <= resize(clz16(~SYM[2](31 downto 16)),~SIZE[~TYPO]);
+~FI
 end block;
 -- ctz16 end"
     }
@@ -864,8 +888,11 @@ begin
   reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
     ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
   end generate;
-
+~IF ~IW64 ~THEN
   ~RESULT <= resize(clz32(~SYM[2](63 downto 32)),~SIZE[~TYPO]);
+~ELSE
+  ~RESULT <= resize(clz32(~SYM[2]),~SIZE[~TYPO]);
+~FI
 end block;
 -- ctz32 end"
     }
@@ -954,6 +981,7 @@ ctz~SYM[0] : block
     end if;
   end function;
 
+~IF ~IW64 ~THEN
   function clz64 (constant v : unsigned(0 to 63)) return unsigned is
     variable e : unsigned(0 to 63);     -- 64
     variable a : unsigned(0 to 16*3-1); -- 48
@@ -968,6 +996,20 @@ ctz~SYM[0] : block
     for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
     return clzi(6,d(0 to 11));
   end function;
+~ELSE
+  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+    variable e : unsigned(0 to 31);    -- 32
+    variable a : unsigned(0 to 8*3-1); -- 24
+    variable b : unsigned(0 to 4*4-1); -- 16
+    variable c : unsigned(0 to 2*5-1); -- 10
+  begin
+    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
+    return clzi(5,c(0 to 9));
+  end function;
+~FI
 
   signal ~SYM[1] : ~TYP[0];
   signal ~SYM[2] : ~TYP[0];
@@ -976,8 +1018,11 @@ begin
   reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
     ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
   end generate;
-
+~IF ~IW64 ~THEN
   ~RESULT <= resize(clz64(~SYM[2]),~SIZE[~TYPO]);
+~ELSE
+  ~RESULT <= resize(clz32(~SYM[2]),~SIZE[~TYPO]);
+~FI
 end block;
 -- ctz end"
     }
@@ -991,7 +1036,11 @@ msb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
+~IF ~IW64 ~THEN
   ~RESULT <= ~SYM[1](63 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);
+~ELSE
+  ~RESULT <= ~SYM[1](31 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);
+~FI
 end block;
 -- byteSwap16 end"
     }
@@ -1005,8 +1054,13 @@ msb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
+~IF ~IW64 ~THEN
   ~RESULT <= ~SYM[1](63 downto 32) & ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
                                    & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
+~ELSE
+  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
+           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
+~FI
 end block;
 -- byteSwap32 end"
     }
@@ -1037,10 +1091,15 @@ msb_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
+~IF ~IW64 ~THEN
   ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
            & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24)
            & ~SYM[1](39 downto 32) & ~SYM[1](47 downto 40)
            & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);
+~ELSE
+  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
+           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
+~FI
 end block;
 -- byteSwap end"
     }

@@ -30,6 +30,8 @@ data Element = C   !Text         -- ^ Constant
              | Gen !Bool         -- ^ Hole marking beginning (True) or end (False)
                                  -- of a generative construct
              | IF !Element [Element] [Element]
+             | IW64              -- ^ Hole indicating whether Int/Word/Integer
+                                 -- are 64-Bit
              | SigD [Element] !(Maybe Int)
   deriving Show
 

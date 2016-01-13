@@ -67,6 +67,7 @@ instance Backend VHDLState where
   genStmt         = const empty
   inst            = inst_
   expr            = expr_
+  iwWidth         = use intWidth
 
 type VHDLM a = State VHDLState a
 

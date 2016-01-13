@@ -969,7 +969,7 @@ function [1:0] enc;
     default: enc = 2'b00;
   endcase
 endfunction
-
+~IF ~IW64 ~THEN
 logic [0:63] v;
 assign v = ~ARG[0][63:0];
 
@@ -1059,7 +1059,81 @@ always @(*) begin
 end
 end
 ~ENDGENERATE
+~ELSE
+logic [0:31] v;
+assign v = ~ARG[0][31:0];
 
+logic [0:31] e;
+genvar i;
+~GENERATE
+for (i=0;i<16;i=i+1) begin : enc_stage
+  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+end
+~ENDGENERATE
+
+reg [0:23] a;
+genvar i1;
+~GENERATE
+for (i1=0;i1<8;i1=i1+1) begin : mux_stage1
+  localparam n = 2;
+  logic [3:0] i;
+  assign i = e[i1*4:i1*4+3];
+  always @(*) begin
+    case (i[n-1+n])
+      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    endcase
+  end
+end
+~ENDGENERATE
+
+reg [0:15] b;
+genvar i2;
+~GENERATE
+for (i2=0;i2<4;i2=i2+1) begin : mux_stage2
+  localparam n = 3;
+  logic [5:0] i;
+  assign i = a[i2*6:i2*6+5];
+  always @(*) begin
+    case (i[n-1+n])
+      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    endcase
+  end
+end
+~ENDGENERATE
+
+reg [0:9] c;
+genvar i3;
+~GENERATE
+for (i3=0;i3<2;i3=i3+1) begin : mux_stage3
+  localparam n = 4;
+  logic [7:0] i;
+  assign i = b[i3*8:i3*8+7];
+  always @(*) begin
+    case (i[n-1+n])
+      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    endcase
+  end
+end
+~ENDGENERATE
+
+reg [0:5] res;
+~GENERATE
+if (1) begin
+localparam n = 5;
+logic [9:0] i;
+assign i = c[0:9];
+always @(*) begin
+  case (i[n-1+n])
+    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+  endcase
+end
+end
+~ENDGENERATE
+~FI
 assign ~RESULT = $unsigned(res);
 end
 ~ENDGENERATE
@@ -1458,7 +1532,7 @@ function [1:0] enc;
     default: enc = 2'b00;
   endcase
 endfunction
-
+~IF ~IW64 ~THEN
 logic [0:63] v;
 genvar k;
 ~GENERATE
@@ -1553,7 +1627,86 @@ always @(*) begin
 end
 end
 ~ENDGENERATE
+~ELSE
+logic [0:31] v;
+genvar k;
+~GENERATE
+for (k=0;k<32;k=k+1) begin : reverse
+  assign v[k] = ~ARG[0][k];
+end
+~ENDGENERATE
 
+logic [0:31] e;
+genvar i;
+~GENERATE
+for (i=0;i<16;i=i+1) begin : enc_stage
+  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+end
+~ENDGENERATE
+
+reg [0:23] a;
+genvar i1;
+~GENERATE
+for (i1=0;i1<8;i1=i1+1) begin : mux_stage1
+  localparam n = 2;
+  logic [3:0] i;
+  assign i = e[i1*4:i1*4+3];
+  always @(*) begin
+    case (i[n-1+n])
+      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    endcase
+  end
+end
+~ENDGENERATE
+
+reg [0:15] b;
+genvar i2;
+~GENERATE
+for (i2=0;i2<4;i2=i2+1) begin : mux_stage2
+  localparam n = 3;
+  logic [5:0] i;
+  assign i = a[i2*6:i2*6+5];
+  always @(*) begin
+    case (i[n-1+n])
+      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    endcase
+  end
+end
+~ENDGENERATE
+
+reg [0:9] c;
+genvar i3;
+~GENERATE
+for (i3=0;i3<2;i3=i3+1) begin : mux_stage3
+  localparam n = 4;
+  logic [7:0] i;
+  assign i = b[i3*8:i3*8+7];
+  always @(*) begin
+    case (i[n-1+n])
+      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    endcase
+  end
+end
+~ENDGENERATE
+
+reg [0:5] res;
+~GENERATE
+if (1) begin
+localparam n = 5;
+logic [9:0] i;
+assign i = c[0:9];
+always @(*) begin
+  case (i[n-1+n])
+    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+  endcase
+end
+end
+~ENDGENERATE
+~FI
 assign ~RESULT = $unsigned(res);
 end
 ~ENDGENERATE
@@ -1567,7 +1720,11 @@ end
 "// byteSwap16 begin
 ~SIGDO[~SYM[0]];
 assign ~SYM[0] = ~ARG[0];
+~IF ~IW64 ~THEN
 assign ~RESULT = {~SYM[0][63:16],~SYM[0][7:0],~SYM[0][15:8]};
+~ELSE
+assign ~RESULT = {~SYM[0][31:16],~SYM[0][7:0],~SYM[0][15:8]};
+~FI
 // byteSwap16 end"
     }
   }
@@ -1578,7 +1735,11 @@ assign ~RESULT = {~SYM[0][63:16],~SYM[0][7:0],~SYM[0][15:8]};
 "// byteSwap32 begin
 ~SIGDO[~SYM[0]];
 assign ~SYM[0] = ~ARG[0];
+~IF ~IW64 ~THEN
 assign ~RESULT = {~SYM[0][63:32],~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};
+~ELSE
+assign ~RESULT = {~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};
+~FI
 // byteSwap32 end"
     }
   }
@@ -1601,8 +1762,12 @@ assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
 "// byteSwap begin
 ~SIGDO[~SYM[1]];
 assign ~SYM[1] = ~ARG[0];
+~IF ~IW64 ~THEN
 assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
                  ,~SYM[1][39:32],~SYM[1][47:40],~SYM[1][55:48],~SYM[1][63:56]};
+~ELSE
+assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]};
+~FI
 // byteSwap end"
     }
   }

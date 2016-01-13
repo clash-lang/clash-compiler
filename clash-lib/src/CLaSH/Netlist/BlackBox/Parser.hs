@@ -81,6 +81,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> Gen               <$> (False <$ pToken "~ENDGENERATE")
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pSigD) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pSigD)
+     <|> IW64              <$  pToken "~IW64"
 
 -- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a
