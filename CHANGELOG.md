@@ -4,6 +4,8 @@
 * New features:
   * Add `readNew` to `CLaSH.Prelude.BlockRam`: create a read-after-write blockRAM from a read-before-write blockRAM.
   * `popCount` functions for `BitVector`, `Signed`, and `Unsigned` are now synthesisable.
+  * Add `parNDF` to `CLaSH.Prelude.DataFlow`: compose _N_ dataflow circuits in parallel.
+  * Add and instance `Vec n a` for `LockStep` in `CLaSH.Prelude.DataFlow`: have _N_ dataflow circuits operate in lock-step.
 
 ## 0.10.4 *December 11th 2015*
 * New features:
