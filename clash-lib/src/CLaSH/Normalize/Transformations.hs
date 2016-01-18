@@ -247,6 +247,10 @@ caseCon ctx e@(Case subj ty alts)
           | nm == "Control.Exception.Base.patError" ->
             let e' = mkApps (Prim nm ty') [Right ty,msg]
             in  changed e'
+        (Prim nm ty',[_])
+          | nm == "GHC.Err.undefined" ->
+            let e' = mkApps (Prim nm ty') [Right ty]
+            in  changed e'
         _ -> traceIf (lvl > DebugNone)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
                      (caseOneAlt e)
