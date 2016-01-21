@@ -1,3 +1,9 @@
+{-|
+Copyright  :  (C) 2013-2016, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
@@ -10,11 +16,6 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-{-|
-Copyright  :  (C) 2013-2015, University of Twente
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
--}
 module CLaSH.Promoted.Nat
   ( SNat (..), snat, withSNat, snatToInteger, addSNat, subSNat, mulSNat, powSNat
   , UNat (..), toUNat, addUNat, multUNat, powUNat

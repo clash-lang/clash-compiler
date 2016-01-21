@@ -1,3 +1,11 @@
+{-|
+Copyright   :  (C) 2015-2016, University of Twente
+License     :  BSD2 (see the file LICENSE)
+Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Synchronizer circuits for safe clock domain crossings
+-}
+
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -9,13 +17,6 @@
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-{-|
-Copyright   :  (C) 2015, University of Twente
-License     :  BSD2 (see the file LICENSE)
-Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
-
-Synchronizer circuits for safe clock domain crossings
--}
 module CLaSH.Prelude.Synchronizer
   ( -- * Bit-synchronizers
     dualFlipFlopSynchronizer

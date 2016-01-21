@@ -1,3 +1,11 @@
+{-|
+Copyright  :  (C) 2013-2016, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+Self-synchronising circuits based on data-flow principles.
+-}
+
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -12,13 +20,6 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-{-|
-Copyright  :  (C) 2013-2015, University of Twente
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
-
-Self-synchronising circuits based on data-flow principles.
--}
 module CLaSH.Prelude.DataFlow
   ( -- * Data types
     DataFlow

@@ -1,12 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DataKinds       #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
+Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -24,6 +17,14 @@ d1024 = snat :: SNat 1024
 
 You can generate more 'SNat' literals using 'decLiteralsD' from "CLaSH.Promoted.Nat.TH"
 -}
+
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DataKinds       #-}
+
+{-# LANGUAGE Trustworthy #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Promoted.Nat.Literals where
 
 import CLaSH.Promoted.Nat.TH

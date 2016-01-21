@@ -1,11 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2015, University of Twente
+Copyright  :  (C) 2015-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -167,6 +161,13 @@ Where we now have:
 
 See the documentation of 'TopEntity' for the meaning of all its fields.
 -}
+
+{-# LANGUAGE DeriveDataTypeable #-}
+
+{-# LANGUAGE Safe #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Annotations.TopEntity
   ( -- * Data types
     TopEntity (..)

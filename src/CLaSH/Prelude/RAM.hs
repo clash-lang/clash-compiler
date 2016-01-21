@@ -1,3 +1,11 @@
+{-|
+Copyright  :  (C) 2015-2016, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+RAM primitives with a combinational read port.
+-}
+
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
@@ -16,13 +24,6 @@
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-{-|
-Copyright  :  (C) 2015, University of Twente
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
-
-RAM primitives with a combinational read port.
--}
 module CLaSH.Prelude.RAM
   ( -- * RAM synchronised to the system clock
     asyncRam

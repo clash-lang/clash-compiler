@@ -1,15 +1,5 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2015, University of Twente
+Copyright  :  (C) 2015-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -70,6 +60,17 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 -}
+
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
+
+{-# LANGUAGE Unsafe #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Prelude.ROM.File
   ( -- * Asynchronous ROM
     asyncRomFile

@@ -1,14 +1,5 @@
-{-# LANGUAGE CPP              #-}
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-  Copyright   :  (C) 2013-2015, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -33,6 +24,16 @@
   library. A preliminary version of a tutorial can be found in "CLaSH.Tutorial".
   Some circuit examples can be found in "CLaSH.Examples".
 -}
+
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
+
+{-# LANGUAGE Unsafe #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Prelude
   ( -- * Creating synchronous sequential circuits
     mealy

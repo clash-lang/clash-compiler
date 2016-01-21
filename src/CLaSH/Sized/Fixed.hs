@@ -1,22 +1,5 @@
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE UndecidableInstances       #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
+Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -38,6 +21,24 @@ BEWARE: rounding by truncation introduces a sign bias!
 * Truncation for positive numbers effectively results in: round towards zero.
 * Truncation for negative numbers effectively results in: round towards -infinity.
 -}
+
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
+
+{-# LANGUAGE Trustworthy #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Sized.Fixed
   ( -- * 'SFixed': 'Signed' 'Fixed' point numbers
     SFixed, sf, unSF

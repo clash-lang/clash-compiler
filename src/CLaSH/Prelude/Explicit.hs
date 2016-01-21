@@ -1,14 +1,5 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
+Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -20,6 +11,16 @@ opposed to the implicitly clocked 'Signal' used in "CLaSH.Prelude". Take a
 look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
 using explicitly clocked signals.
 -}
+
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
+
+{-# LANGUAGE Unsafe #-}
+
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Prelude.Explicit
   ( -- * Creating synchronous sequential circuits
     mealy'

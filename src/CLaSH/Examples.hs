@@ -1,11 +1,12 @@
+{-|
+Copyright : © Christiaan Baaij, 2015-2016
+Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
+-}
+
 {-# LANGUAGE NoImplicitPrelude, CPP, TemplateHaskell, DataKinds #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 
-{-|
-Copyright : © Christiaan Baaij, 2015
-Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
--}
 module CLaSH.Examples (
   -- * Decoders and Encoders
   -- $decoders_and_encoders

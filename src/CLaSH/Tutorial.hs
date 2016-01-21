@@ -1,10 +1,11 @@
+{-|
+Copyright : © Christiaan Baaij, 2014-2016
+Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
+-}
+
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-{-|
-Copyright : © Christiaan Baaij, 2014-2015
-Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
--}
 module CLaSH.Tutorial (
   -- * Introduction
   -- $introduction

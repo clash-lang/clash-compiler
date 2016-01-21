@@ -1,15 +1,5 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
-
-{-# LANGUAGE Unsafe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2015, University of Twente
+Copyright  :  (C) 2015-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -72,6 +62,17 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 @
 
 -}
+
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
+
+{-# LANGUAGE Unsafe #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Prelude.BlockRam.File
   ( -- * BlockRAM synchronised to the system clock
     blockRamFile
@@ -84,7 +85,6 @@ module CLaSH.Prelude.BlockRam.File
   , initMem
   )
 where
-
 
 import Control.Monad                (when)
 import Control.Monad.ST.Lazy        (ST,runST)

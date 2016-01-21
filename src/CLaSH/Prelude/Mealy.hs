@@ -1,7 +1,5 @@
-{-# LANGUAGE Safe #-}
-
 {-|
-  Copyright  :  (C) 2013-2015, University of Twente
+  Copyright  :  (C) 2013-2016, University of Twente
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -11,6 +9,9 @@
   Mealy machines are strictly more expressive, but may impose stricter timing
   requirements.
 -}
+
+{-# LANGUAGE Safe #-}
+
 module CLaSH.Prelude.Mealy
   ( -- * Mealy machine synchronised to the system clock
     mealy

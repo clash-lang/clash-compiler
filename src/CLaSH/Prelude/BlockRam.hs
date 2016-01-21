@@ -1,14 +1,5 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE TypeOperators    #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 {-|
-Copyright  :  (C) 2013-2015, University of Twente
+Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -343,6 +334,16 @@ __>>> L.tail $ sampleN 33 $ system3 prog2__
 This concludes the short introduction to using 'blockRam'.
 
 -}
+
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE TypeOperators    #-}
+
+{-# LANGUAGE Safe #-}
+
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 module CLaSH.Prelude.BlockRam
   ( -- * BlockRAM synchronised to the system clock
     blockRam

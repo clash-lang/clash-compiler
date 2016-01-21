@@ -1,3 +1,9 @@
+{-|
+Copyright  :  (C) 2013-2016, University of Twente
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
+
 {-# LANGUAGE MagicHash #-}
 
 {-# LANGUAGE Trustworthy #-}
@@ -5,11 +11,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-{-|
-Copyright  :  (C) 2013-2015, University of Twente
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
--}
 module CLaSH.Signal
   ( -- * Implicitly clocked synchronous signal
     Signal
