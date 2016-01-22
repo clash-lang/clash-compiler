@@ -84,9 +84,6 @@ import qualified CLaSH.Core.Literal          as C
 import qualified CLaSH.Core.Term             as C
 import qualified CLaSH.Core.TyCon            as C
 import qualified CLaSH.Core.Type             as C
-#if __GLASGOW_HASKELL__ < 710
-import qualified CLaSH.Core.Util             as C
-#endif
 import qualified CLaSH.Core.Var              as C
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
@@ -251,20 +248,7 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
         return $ C.Letrec $ bind (rec [(b',embed e')]) ct
       else caseTerm e'
 
-#if __GLASGOW_HASKELL__ < 710
-    term (Cast e co)       = do
-      e' <- term e
-      case C.collectArgs e' of
-        (C.Prim nm pTy, [Right _, Left errMsg])
-          | nm == (pack "Control.Exception.Base.irrefutPatError") -> case co of
-            (UnivCo _ _ resTy) -> do resTy' <- coreToType resTy
-                                     return (C.mkApps (C.Prim nm pTy) [Right resTy', Left errMsg])
-            _ -> error $ $(curLoc) ++ "irrefutPatError casted with an unknown coercion: " ++ showPpr co
-        _ -> return e'
-#else
     term (Cast e _)        = term e
-#endif
-
     term (Tick _ e)        = term e
     term (Type t)          = C.Prim (pack "_TY_") <$> coreToType t
     term (Coercion co)     = C.Prim (pack "_CO_") <$> coreToType (coercionType co)
