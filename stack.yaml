@@ -1,4 +1,7 @@
-resolver: lts-4.2
+resolver: nightly-2016-01-22
 
 packages:
 - .
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
+    commit: 505e66695889af5bb98c5a8ebb8d1292808d86dc

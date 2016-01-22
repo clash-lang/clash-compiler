@@ -92,6 +92,8 @@ module CLaSH.Prelude
   , module CLaSH.Sized.Fixed
     -- *** Fixed size vectors
   , module CLaSH.Sized.Vector
+    -- *** Perfect depth trees
+  , module CLaSH.Sized.RTree
     -- ** Annotations
   , module CLaSH.Annotations.TopEntity
     -- ** Type-level natural numbers
@@ -158,6 +160,7 @@ import CLaSH.Promoted.Ord
 import CLaSH.Sized.BitVector
 import CLaSH.Sized.Fixed
 import CLaSH.Sized.Index
+import CLaSH.Sized.RTree
 import CLaSH.Sized.Signed
 import CLaSH.Sized.Unsigned
 import CLaSH.Sized.Vector

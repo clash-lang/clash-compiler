@@ -118,6 +118,7 @@ Library
                       CLaSH.Sized.BitVector
                       CLaSH.Sized.Fixed
                       CLaSH.Sized.Index
+                      CLaSH.Sized.RTree
                       CLaSH.Sized.Signed
                       CLaSH.Sized.Unsigned
                       CLaSH.Sized.Vector
@@ -157,7 +158,7 @@ Library
                       integer-gmp               >= 0.5.1.0,
                       ghc-prim                  >= 0.3.1.0,
                       ghc-typelits-extra        >= 0.1,
-                      ghc-typelits-natnormalise >= 0.3,
+                      ghc-typelits-natnormalise >= 0.4.1,
                       lens                      >= 4.9,
                       QuickCheck                >= 2.7 && <2.9,
                       reflection                >= 2,
