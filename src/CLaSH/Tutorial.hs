@@ -1024,11 +1024,11 @@ primitive we define a @template__E__@ field. As the name suggest, it is a VHDL
 /template/, meaning that the compiler must fill in the holes heralded by the
 tilde (~). Here:
 
-  * @~ARG[1]@ denotes the second argument given to the @timesS@ function, which
+  * @~ARG[1]@ denotes the second argument given to the @(*#)@ function, which
     corresponds to the LHS of the ('*') operator.
-  * @~ARG[2]@ denotes the third argument given to the @timesS@ function, which
+  * @~ARG[2]@ denotes the third argument given to the @(*#)@ function, which
     corresponds to the RHS of the ('*') operator.
-  * @~LIT[0]@ denotes the first argument given to the @timesS@ function, with
+  * @~LIT[0]@ denotes the first argument given to the @(*#)@ function, with
     the extra condition that it must be a @LIT@eral. If for some reason this
     first argument does not turn out to be a literal then the compiler will
     raise an error. This first arguments corresponds to the \"@'KnownNat' n@\"
