@@ -63,6 +63,7 @@ Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
                       primitives/CLaSH.Sized.Vector.json
                       primitives/CLaSH.Transformations.json
                       primitives/Control.Exception.Base.json
+                      primitives/Debug.Trace.json
                       primitives/GHC.Base.json
                       primitives/GHC.Classes.json
                       primitives/GHC.CString.json
