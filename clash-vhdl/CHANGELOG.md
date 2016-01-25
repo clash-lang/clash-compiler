@@ -3,6 +3,8 @@
 ## 0.6.6
 * New features:
   * Support clash-lib-0.6.9
+* Fixes bugs:
+  * BlockRAM elements must be bit vectors [#113](https://github.com/clash-lang/clash-compiler/issues/113)
 
 ## 0.6.5 *January 13th 2015*
 * New features:
