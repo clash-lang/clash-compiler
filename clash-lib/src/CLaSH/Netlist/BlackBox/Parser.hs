@@ -82,6 +82,10 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pSigD) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pSigD)
      <|> IW64              <$  pToken "~IW64"
+     <|> (BV True)         <$> (pToken "~TOBV" *> pBrackets pSigD) <*> (Just <$> pBrackets pNatural)
+     <|> (BV True)         <$> (pToken "~TOBVO" *> pBrackets pSigD) <*> pure Nothing
+     <|> (BV False)        <$> (pToken "~FROMBV" *> pBrackets pSigD) <*> (Just <$> pBrackets pNatural)
+     <|> (BV False)        <$> (pToken "~FROMBVO" *> pBrackets pSigD) <*> pure Nothing
 
 -- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a
@@ -102,7 +106,9 @@ pElemE = pTagE
 
 -- | Parse SigD
 pSigD :: Parser [Element]
-pSigD = pSome (pTagE <|> pLimitedText)
+pSigD = pSome (pTagE <|> pLimitedText
+                     <|> (C <$> (pack <$> pToken "[ "))
+                     <|> (C <$> (pack <$> pToken " ]")))
 
 -- | Text excluding square brackets and tilde
 pLimitedText :: Parser Element

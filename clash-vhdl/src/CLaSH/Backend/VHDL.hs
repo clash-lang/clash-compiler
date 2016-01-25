@@ -68,6 +68,8 @@ instance Backend VHDLState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
+  toBV _ id_      = "toSLV" <> parens (text id_)
+  fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
 
 type VHDLM a = State VHDLState a
 

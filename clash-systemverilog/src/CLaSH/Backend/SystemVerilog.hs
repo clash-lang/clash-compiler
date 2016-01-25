@@ -77,6 +77,8 @@ instance Backend SystemVerilogState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
+  toBV hty id_    = verilogTypeMark hty <> "_to_lv" <> parens (text id_)
+  fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
 
 type SystemVerilogM a = State SystemVerilogState a
 

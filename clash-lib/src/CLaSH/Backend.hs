@@ -44,3 +44,7 @@ class Backend state where
   expr             :: Bool -> Expr -> State state Doc
   -- | Bit-width of Int/Word/Integer
   iwWidth          :: State state Int
+  -- | Convert to a bit-vector
+  toBV             :: HWType -> Text -> State state Doc
+  -- | Convert from a bit-vector
+  fromBV           :: HWType -> Text -> State state Doc

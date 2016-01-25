@@ -68,6 +68,8 @@ instance Backend VerilogState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
+  toBV _          = text
+  fromBV _        = text
 
 type VerilogM a = State VerilogState a
 

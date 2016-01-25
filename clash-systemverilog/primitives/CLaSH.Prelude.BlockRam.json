@@ -11,21 +11,30 @@
            -> Signal' clk a"
     , "templateD" :
 "// blockRam begin
-~SIGD[RAM_~SYM[0]][2];
-~SIGD[dout_~SYM[1]][6];
+typedef logic [~SIZE[~TYPO]-1:0] RAM_array_~SYM[4] [0:~LENGTH[~TYP[2]]-1];
+RAM_array_~SYM[4] RAM_~SYM[0];
+logic [~SIZE[~TYPO]-1:0] dout_~SYM[1];
+
+function RAM_array_~SYM[4] init_to_bv_~SYM[2];
+  input ~SIGD[value][2];
+  begin
+    for (int i_~SYM[3]=0; i_~SYM[3]<~LENGTH[~TYP[2]]; i_~SYM[3]=i_~SYM[3]+1)
+      init_to_bv_~SYM[2][i_~SYM[3]] = ~TOBV[value[ i_~SYM[3] ]][6];
+  end
+endfunction
 
 initial begin
-  ~SYM[0] = ~LIT[3];
+  RAM_~SYM[0] = init_to_bv_~SYM[2](~LIT[2]);
 end
 
 always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[3]
   if (~ARG[5]) begin
-    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
+    RAM_~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][6];
   end
   dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~FROMBV[dout_~SYM[1]][6];
 // blockRam end"
     }
   }

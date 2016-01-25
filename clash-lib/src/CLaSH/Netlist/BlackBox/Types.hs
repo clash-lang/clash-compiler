@@ -32,6 +32,7 @@ data Element = C   !Text         -- ^ Constant
              | IF !Element [Element] [Element]
              | IW64              -- ^ Hole indicating whether Int/Word/Integer
                                  -- are 64-Bit
+             | BV Bool [Element] (Maybe Int) -- ^ Convert to (True)/from(False) a bit-vector
              | SigD [Element] !(Maybe Int)
   deriving Show
 

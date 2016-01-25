@@ -82,6 +82,7 @@ setSym i l
                       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
                       IF c t f      -> IF <$> pure c <*> setSym' t <*> setSym' f
                       SigD e' m     -> SigD <$> (setSym' e') <*> pure m
+                      BV t e' m     -> BV <$> pure t <*> setSym' e' <*> pure m
                       _             -> pure e
               )
 
@@ -102,6 +103,7 @@ setClocks bc bt = mapM setClocks' bt
     setClocks' (D (Decl n l)) = D <$> (Decl n <$> mapM (combineM (setClocks bc) (setClocks bc)) l)
     setClocks' (IF c t f)     = IF <$> pure c <*> setClocks bc t <*> setClocks bc f
     setClocks' (SigD e m)     = SigD <$> (setClocks bc e) <*> pure m
+    setClocks' (BV t e m)     = BV <$> pure t <*> setClocks bc e <*> pure m
 
     setClocks' (Clk Nothing)  = let (clk,rate) = clkSyncId $ fst $ bbResult bc
                                     clkName    = Text.append clk (Text.pack (show rate))
@@ -261,6 +263,24 @@ renderTag b (L n)           = let (s,_,_) = bbInputs b !! n
     mkLit i                               = i
 
 renderTag _ (Sym n)         = return $ Text.pack ("n_" ++ show n)
+
+renderTag b (BV True es (Just n)) = do
+  e' <- Text.concat <$> mapM (renderElem b) es
+  let (_,hty,_) = bbInputs b !! n
+  (displayT . renderOneLine) <$> toBV hty e'
+renderTag b (BV True es Nothing) = do
+  e' <- Text.concat <$> mapM (renderElem b) es
+  let (_,hty) = bbResult b
+  (displayT . renderOneLine) <$> toBV hty e'
+renderTag b (BV False es (Just n)) = do
+  e' <- Text.concat <$> mapM (renderElem b) es
+  let (_,hty,_) = bbInputs b !! n
+  (displayT . renderOneLine) <$> fromBV hty e'
+renderTag b (BV False es Nothing) = do
+  e' <- Text.concat <$> mapM (renderElem b) es
+  let (_,hty) = bbResult b
+  (displayT . renderOneLine) <$> fromBV hty e'
+
 renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType . snd $ bbResult b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
                               in  (displayT . renderOneLine) <$> hdlType ty
