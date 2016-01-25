@@ -1,4 +1,4 @@
-resolver: lts-3.20
+resolver: nightly-2016-01-22
 packages:
 - 'clash-lib'
 - 'clash-verilog'
@@ -7,14 +7,5 @@ packages:
 - 'clash-ghc'
 - 'testsuite'
 - location:
-    git: https://github.com/clash-lang/clash-prelude.git
-    commit: 5f417485db3a694a013bee90ac96b5bcde35c991
-- location:
-    git: https://github.com/clash-lang/ghc-tcplugins-extra.git
-    commit: de99532bc7c00f069ef493c03d32ca662a8806e6
-- location:
     git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
-    commit: 0362e4985343694e2e770ae9cbe4e91797078588
-- location:
-    git: https://github.com/clash-lang/ghc-typelits-extra.git
-    commit: 09fb20afaae1b988ec6c6c47d6a9650b19748268
+    commit: 505e66695889af5bb98c5a8ebb8d1292808d8
