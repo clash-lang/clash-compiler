@@ -28,6 +28,7 @@ module CLaSH.Core.Type
   , splitFunTy
   , splitFunTys
   , splitFunForallTy
+  , splitCoreFunForallTy
   , splitTyConAppM
   , isPolyFunTy
   , isPolyFunCoreTy
@@ -254,6 +255,18 @@ splitFunForallTy = go []
                            in  go (Left tv:args) ty
     go args (tyView -> FunTy arg res) = go (Right arg:args) res
     go args ty                        = (reverse args,ty)
+
+-- | Split a poly-function type in a: list of type-binders and argument types,
+-- and the result type. Looks through 'Signal' and type functions.
+splitCoreFunForallTy :: HashMap TyConName TyCon
+                     -> Type
+                     -> ([Either TyVar Type], Type)
+splitCoreFunForallTy tcm = go []
+  where
+    go args (ForAllTy b) = let (tv, ty) = runFreshM $ unbind b
+                           in  go (Left tv:args) ty
+    go args (coreView tcm -> FunTy arg res) = go (Right arg:args) res
+    go args ty = (reverse args, ty)
 
 -- | Is a type a polymorphic or function type?
 isPolyFunTy :: Type

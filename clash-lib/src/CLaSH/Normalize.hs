@@ -21,7 +21,7 @@ import           CLaSH.Core.FreeVars              (termFreeIds)
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Subst                 (substTms)
 import           CLaSH.Core.Term                  (Term (..), TmName)
-import           CLaSH.Core.Type                  (Type, splitFunForallTy)
+import           CLaSH.Core.Type                  (Type, splitCoreFunForallTy)
 import           CLaSH.Core.TyCon                 (TyCon, TyConName)
 import           CLaSH.Core.Util                  (collectArgs, mkApps, termType)
 import           CLaSH.Core.Var                   (Id,varName)
@@ -103,14 +103,14 @@ normalize' nm = do
   let nmS = showDoc nm
   case exprM of
     Just (ty,tm) -> do
-      let (_,resTy) = splitFunForallTy ty
+      tcm <- Lens.view tcCache
+      let (_,resTy) = splitCoreFunForallTy tcm ty
       resTyRep <- not <$> isUntranslatableType resTy
       if resTyRep
          then do
             tmNorm <- makeCached nm (extra.normalized) $ do
                         curFun .= nm
                         tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
-                        tcm <- Lens.view tcCache
                         ty' <- termType tcm tm'
                         return (ty',tm')
             let usedBndrs = Lens.toListOf termFreeIds (snd tmNorm)
