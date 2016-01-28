@@ -3,7 +3,8 @@
 ## 0.6.9
 * Fixes bugs:
   * `case undefined of ...` should reduce to `undefined` [#116](https://github.com/clash-lang/clash-compiler/issues/109)
-  * BlockRAM elements must be bit vectors [#113](https://github.com/clash-lang/clash-compiler/issues/113)
+  * VHDL/SystemVerilog: BlockRAM elements must be bit vectors [#113](https://github.com/clash-lang/clash-compiler/issues/113)\
+  * Type families obscure eligibility for synthesis [#114](https://github.com/clash-lang/clash-compiler/issues/114)
 
 ## 0.6.8 *January 13th 2015*
 * New features:
