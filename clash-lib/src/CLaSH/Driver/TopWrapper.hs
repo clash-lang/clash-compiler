@@ -23,6 +23,7 @@ import CLaSH.Annotations.TopEntity    (TopEntity (..), ClockSource (..))
 
 import CLaSH.Netlist                  (runNetlistMonad)
 import CLaSH.Netlist.BlackBox         (prepareBlackBox)
+import CLaSH.Netlist.BlackBox.Types   (BlackBoxTemplate)
 import CLaSH.Netlist.Types            (BlackBoxContext (..), Component (..),
                                        Declaration (..), Expr (..), Identifier,
                                        HWType (..), Modifier (..), NetlistMonad,
@@ -31,7 +32,7 @@ import CLaSH.Primitives.Types         (PrimMap, Primitive (..))
 import CLaSH.Util
 
 -- | Create a wrapper around a component, potentially initiating clock sources
-mkTopWrapper :: PrimMap
+mkTopWrapper :: PrimMap BlackBoxTemplate
              -> Maybe TopEntity -- ^ TopEntity specifications
              -> String          -- ^ Name of the module containing the @topEntity@
              -> Int             -- ^ Int/Word/Integer bit-width
@@ -204,7 +205,7 @@ mkOutput nms (i,hwty) cnt = case hwty of
     iName = append i (pack ("_" ++ show cnt))
 
 -- | Create clock generators
-mkClocks :: PrimMap -> [(Identifier,HWType)] -> Int -> Maybe TopEntity -> [Declaration]
+mkClocks :: PrimMap BlackBoxTemplate -> [(Identifier,HWType)] -> Int -> Maybe TopEntity -> [Declaration]
 mkClocks primMap hidden iw teM = concat
     [ clockGens
     , resets
@@ -249,7 +250,7 @@ clockPorts inp outp = (ports,clks)
     clks  = map snd outp
 
 -- | Generate resets
-mkResets :: PrimMap
+mkResets :: PrimMap BlackBoxTemplate
          -> [(Identifier,HWType)]
          -> Int
          -> [(Identifier,[String],Bool)]
@@ -269,7 +270,7 @@ mkResets primMap hidden iw = unsafeRunNetlist iw . fmap concat . mapM assingRese
 
 -- | Generate a reset synchroniser that synchronously de-asserts an
 -- asynchronous reset signal
-genSyncReset :: PrimMap
+genSyncReset :: PrimMap BlackBoxTemplate
              -> Identifier
              -> Identifier
              -> Text

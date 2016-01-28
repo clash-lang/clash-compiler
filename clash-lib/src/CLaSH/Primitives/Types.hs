@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -12,14 +13,14 @@ import qualified Data.Text            as S
 import           Data.Text.Lazy       (Text)
 
 -- | Primitive Definitions
-type PrimMap = HashMap S.Text Primitive
+type PrimMap a = HashMap S.Text (Primitive a)
 
 -- | Externally defined primitive
-data Primitive
+data Primitive a
   -- | A primitive that has a template that can be filled out by the backend render
   = BlackBox
   { name     :: !S.Text -- ^ Name of the primitive
-  , template :: !(Either Text Text) -- ^ Either a /declaration/ or an /expression/ template.
+  , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
   | Primitive
@@ -28,7 +29,7 @@ data Primitive
   }
   deriving Show
 
-instance FromJSON Primitive where
+instance FromJSON (Primitive Text) where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
       "BlackBox"  -> BlackBox <$> conVal .: "name" <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))

@@ -44,7 +44,7 @@ data NetlistState
   , _varCount       :: !Int -- ^ Number of signal declarations
   , _cmpCount       :: !Int -- ^ Number of create components
   , _components     :: HashMap TmName Component -- ^ Cached components
-  , _primitives     :: PrimMap -- ^ Primitive Definitions
+  , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
   , _modNm          :: !String -- ^ Name of the module containing the @topEntity@

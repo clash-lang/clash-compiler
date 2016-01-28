@@ -6,9 +6,11 @@ import Control.Monad.State.Strict (State)
 import Data.HashMap.Strict (HashMap)
 import Data.Map            (Map)
 
-import CLaSH.Core.Term     (Term, TmName)
-import CLaSH.Core.Type     (Type)
-import CLaSH.Rewrite.Types (Rewrite, RewriteMonad)
+import CLaSH.Core.Term        (Term, TmName)
+import CLaSH.Core.Type        (Type)
+import CLaSH.Netlist.BlackBox.Types (BlackBoxTemplate)
+import CLaSH.Primitives.Types (PrimMap)
+import CLaSH.Rewrite.Types    (Rewrite, RewriteMonad)
 import CLaSH.Util
 
 -- | State of the 'NormalizeMonad'
@@ -37,6 +39,7 @@ data NormalizeState
   , _inlineBelow     :: !Int
   -- ^ Size of a function below which it is always inlined if it is not
   -- recursive
+  , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   }
 
 makeLenses ''NormalizeState

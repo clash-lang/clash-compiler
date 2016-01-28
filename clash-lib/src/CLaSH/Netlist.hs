@@ -31,6 +31,7 @@ import           CLaSH.Core.TyCon                 (TyConName, TyCon)
 import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
 import           CLaSH.Netlist.BlackBox
+import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types              as HW
 import           CLaSH.Netlist.Util
@@ -44,7 +45,7 @@ genNetlist :: Maybe Int
            -- ^ Starting number of the component counter
            -> HashMap TmName (Type,Term)
            -- ^ Global binders
-           -> PrimMap
+           -> PrimMap BlackBoxTemplate
            -- ^ Primitive definitions
            -> HashMap TyConName TyCon
            -- ^ TyCon cache
@@ -70,7 +71,7 @@ runNetlistMonad :: Maybe Int
                 -- ^ Starting number of the component counter
                 -> HashMap TmName (Type,Term)
                 -- ^ Global binders
-                -> PrimMap
+                -> PrimMap BlackBoxTemplate
                 -- ^ Primitive Definitions
                 -> HashMap TyConName TyCon
                 -- ^ TyCon cache

@@ -40,7 +40,7 @@ import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           CLaSH.Util              ((***),first)
 
 generateBindings ::
-  PrimMap
+     PrimMap a
   -> String
   -> Maybe  (GHC.DynFlags)
   -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
@@ -102,7 +102,7 @@ retype tcm (visited,bindings) current = (visited', HashMap.insert current (ty',t
     tm'                  = substTms (zip used usedVars) tm
     ty'                  = runFreshM (termType tcm tm')
 
-mkBindings :: PrimMap
+mkBindings :: PrimMap a
            -> [(GHC.CoreBndr, GHC.CoreExpr)] -- Binders
            -> [(GHC.CoreBndr,Int)]           -- Class operations
            -> [GHC.CoreBndr]                 -- Unlocatable Expressions

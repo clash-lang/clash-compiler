@@ -1,0 +1,7 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Transformations.removedArg"
+    , "type"      : "removedArg :: a"
+    , "templateE" : "~ERRORO"
+    }
+  }
+]

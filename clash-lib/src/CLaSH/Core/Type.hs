@@ -37,6 +37,7 @@ module CLaSH.Core.Type
   , applyFunTy
   , applyTy
   , findFunSubst
+  , undefinedTy
   )
 where
 
@@ -49,10 +50,11 @@ import           Data.Maybe                              (isJust)
 import           GHC.Generics                            (Generic(..))
 import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           Subst(..),SubstName(..),
-                                                          acompare,aeq,bind,
+                                                          acompare,aeq,bind,embed,
                                                           gacompare,gaeq,gfvAny,
                                                           runFreshM,unbind)
-import           Unbound.Generics.LocallyNameless.Name   (Name,name2String)
+import           Unbound.Generics.LocallyNameless.Name   (Name,name2String,
+                                                          string2Name)
 import           Unbound.Generics.LocallyNameless.Extra  ()
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -349,3 +351,9 @@ funSubst (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
     tySubts <- zipWithM funSubst argTys argTys'
     return (concat tySubts)
 funSubst _ _ = Nothing
+
+-- | The type of GHC.Err.undefined :: forall a . a
+undefinedTy :: Type
+undefinedTy =
+  let aNm = string2Name "a"
+  in  ForAllTy (bind (TyVar aNm (embed liftedTypeKind)) (VarTy liftedTypeKind aNm))

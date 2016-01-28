@@ -12,7 +12,7 @@ import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
-import           Data.Text.Lazy                (Text, fromStrict, pack)
+import           Data.Text.Lazy                (fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
@@ -31,7 +31,6 @@ import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
 import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication,
                                                 mkExpr)
-import           CLaSH.Netlist.BlackBox.Parser as B
 import           CLaSH.Netlist.BlackBox.Types  as B
 import           CLaSH.Netlist.BlackBox.Util   as B
 import           CLaSH.Netlist.Id              as N
@@ -70,20 +69,18 @@ mkBlackBoxContext resId args = do
          else return (im,[])
 
 prepareBlackBox :: TextS.Text
-                -> Text
+                -> BlackBoxTemplate
                 -> BlackBoxContext
                 -> NetlistMonad BlackBoxTemplate
-prepareBlackBox pNm t bbCtx =
-  let (templ,err) = runParse t
-  in  if null err && verifyBlackBoxContext bbCtx templ
-         then instantiateSym >=>
-              setClocks bbCtx >=>
-              collectFilePaths bbCtx >=>
-              instantiateCompName $ templ
-         else
-           error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show t ++
-                   "\nwith context:\n" ++ show bbCtx ++ "\ngiven errors:\n" ++
-                   show err
+prepareBlackBox pNm templ bbCtx =
+  if verifyBlackBoxContext bbCtx templ
+     then instantiateSym >=>
+          setClocks bbCtx >=>
+          collectFilePaths bbCtx >=>
+          instantiateCompName $ templ
+     else
+       error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show templ ++
+               "\nwith context:\n" ++ show bbCtx
 
 mkArgument :: Term
            -> NetlistMonad ( (SyncExpr,HWType,Bool)
@@ -255,17 +252,17 @@ mkFunInput resId e = do
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (_, Left templ') -> let (l,err) = runParse templ'
-                             in  if null err
-                                    then do
-                                      l'  <- instantiateSym l
-                                      l'' <- setClocks bbCtx l'
-                                      l3  <- instantiateCompName l''
-                                      return ((Left l3,bbCtx),dcls)
-                                    else error $ $(curLoc) ++ "\nTemplate:\n" ++ show templ ++ "\nHas errors:\n" ++ show err
-    Left (_, Right templ') -> let ass = Assignment (pack "~RESULT") (Identifier templ' Nothing)
-                              in  return ((Right ass, bbCtx),dcls)
-    Right decl -> return ((Right decl,bbCtx),dcls)
+    Left (_, Left templ') -> do
+      l'  <- instantiateSym templ'
+      l'' <- setClocks bbCtx l'
+      l3  <- instantiateCompName l''
+      return ((Left l3,bbCtx),dcls)
+    Left (_, Right templ') -> do
+      templ'' <- prettyBlackBox templ'
+      let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
+      return ((Right ass, bbCtx),dcls)
+    Right decl ->
+      return ((Right decl,bbCtx),dcls)
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
 instantiateSym :: BlackBoxTemplate

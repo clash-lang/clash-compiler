@@ -9,9 +9,11 @@ import           Control.DeepSeq
 import           Control.Monad                    (when)
 import           Control.Monad.State              (evalState, get)
 import           Data.HashMap.Strict              (HashMap)
+import qualified Data.HashMap.Strict              as HM
 import qualified Data.HashSet                     as HashSet
 import           Data.IntMap                      (IntMap)
 import           Data.Maybe                       (fromMaybe)
+import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import qualified Data.Time.Clock                  as Clock
 import qualified System.Directory                 as Directory
@@ -29,16 +31,19 @@ import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.TopWrapper
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                    (genComponentName, genNetlist)
+import           CLaSH.Netlist.BlackBox.Parser    (runParse)
+import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Types              (Component (..), HWType)
 import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           CLaSH.Primitives.Types
+import           CLaSH.Util                       (first)
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL :: forall backend . Backend backend
             => BindingMap -- ^ Set of functions
             -> Maybe backend
-            -> PrimMap -- ^ Primitive / BlackBox Definitions
+            -> PrimMap (Text.Text) -- ^ Primitive / BlackBox Definitions
             -> HashMap TyConName TyCon -- ^ TyCon cache
             -> IntMap TyConName -- ^ Tuple TyCon cache
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
@@ -52,6 +57,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   start <- Clock.getCurrentTime
   prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime start
+
+      primMap' = (HM.map parsePrimitive :: PrimMap Text.Text -> PrimMap BlackBoxTemplate) primMap
+
   putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
   (supplyN,supplyTB) <- Supply.splitSupply
@@ -62,7 +70,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let doNorm     = do norm <- normalize [topEntity]
                       let normChecked = checkNonRecursive topEntity norm
                       cleanupGraph topEntity normChecked
-      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval doNorm
+      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval primMap' doNorm
 
   normTime <- transformedBindings `deepseq` Clock.getCurrentTime
   let prepNormDiff = Clock.diffUTCTime normTime prepTime
@@ -70,7 +78,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
 
   let modName = takeWhile (/= '.') (name2String topEntity)
       iw      = opt_intWidth opts
-  (netlist,dfiles,cmpCnt) <- genNetlist Nothing transformedBindings primMap tcm
+  (netlist,dfiles,cmpCnt) <- genNetlist Nothing transformedBindings primMap' tcm
                                  typeTrans Nothing modName [] iw topEntity
 
   netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -83,7 +91,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
                                   cName)
                             netlist
 
-  (testBench,dfiles') <- genTestBench opts supplyTB primMap
+  (testBench,dfiles') <- genTestBench opts supplyTB primMap'
                              typeTrans tcm tupTcm eval cmpCnt bindingsMap
                              testInpM
                              expOutM
@@ -97,7 +105,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   putStrLn $ "Testbench generation took " ++ show netTBDiff
 
   let hdlState' = fromMaybe (initBackend iw :: backend) hdlState
-      topWrapper = mkTopWrapper primMap annM modName iw topComponent
+      topWrapper = mkTopWrapper primMap' annM modName iw topComponent
       hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
       dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
                    , takeWhile (/= '.') (name2String topEntity)
@@ -110,6 +118,14 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   end <- hdlDocs `seq` Clock.getCurrentTime
   let startEndDiff = Clock.diffUTCTime end start
   putStrLn $ "Total compilation took " ++ show startEndDiff
+
+parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
+parsePrimitive (BlackBox pNm templT) =
+  let (templ,err) = either (first Left . runParse) (first Right . runParse) templT
+  in  case err of
+        [] -> BlackBox pNm templ
+        _  -> error $ "Errors in template for: " ++ show pNm ++ ":\n" ++ show err
+parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 
 -- | Pretty print Components to HDL Documents
 createHDL :: Backend backend

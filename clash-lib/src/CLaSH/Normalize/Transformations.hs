@@ -29,6 +29,7 @@ module CLaSH.Normalize.Transformations
   , reduceNonRepPrim
   , caseFlat
   , disjointExpressionConsolidation
+  , removeUnusedExpr
   )
 where
 
@@ -41,6 +42,7 @@ import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
+import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
 import           Unbound.Generics.LocallyNameless (Bind, Embed (..), bind, embed,
@@ -58,7 +60,7 @@ import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
 import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
                                               applyTy, isPolyFunCoreTy,
                                               splitFunTy, typeKind,
-                                              tyView)
+                                              tyView, undefinedTy)
 import           CLaSH.Core.TyCon            (tyConDataCons)
 import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               isFun, isLet, isPolyFun, isPrim,
@@ -66,12 +68,14 @@ import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
                                               mkLams, mkTmApps, mkVec,
                                               termSize, termType, tyNatSize)
 import           CLaSH.Core.Var              (Id, Var (..))
+import           CLaSH.Netlist.BlackBox.Util (usedArguments)
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
 import           CLaSH.Normalize.DEC
 import           CLaSH.Normalize.PrimitiveReductions
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
+import           CLaSH.Primitives.Types      (Primitive (..))
 import           CLaSH.Rewrite.Combinators
 import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
@@ -349,6 +353,49 @@ deadCode _ e@(Letrec binds) = do
       in findUsedBndrs (used ++ explore) explore' other'
 
 deadCode _ e = return e
+
+removeUnusedExpr :: NormRewrite
+removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
+  bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
+  case bbM of
+    Just (BlackBox pNm templ) -> do
+      let usedArgs = if pNm `elem` ["CLaSH.Sized.Internal.Signed.fromInteger#"
+                                   ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
+                                   ,"CLaSH.Sized.Internal.BitVector.fromInteger#"
+                                   ,"CLaSH.Sized.Internal.Index.fromInteger#"
+                                   ]
+                        then [0,1]
+                        else either usedArguments usedArguments templ
+      tcm <- Lens.view tcCache
+      args' <- go tcm 0 usedArgs args
+      if args == args'
+         then return e
+         else changed (mkApps p args')
+    _ -> return e
+  where
+    go _ _ _ [] = return []
+    go tcm n used (Right ty:args') = do
+      args'' <- go tcm n used args'
+      return (Right ty : args'')
+    go tcm n used (Left tm : args') = do
+      args'' <- go tcm (n+1) used args'
+      ty <- termType tcm tm
+      let p' = mkApps (Prim "CLaSH.Transformations.removedArg" undefinedTy) [Right ty]
+      if n `elem` used
+         then return (Left tm : args'')
+         else return (Left p' : args'')
+
+removeUnusedExpr _ e@(Case _ _ [alt]) = do
+  (pat,altExpr) <- unbind alt
+  case pat of
+    DataPat _ (unrebind -> ([],xs)) -> do
+      let altFreeIds = Lens.setOf termFreeIds altExpr
+      if Set.null (Set.intersection (Set.fromList (map varName xs)) altFreeIds)
+         then changed altExpr
+         else return e
+    _ -> return e
+
+removeUnusedExpr _ e = return e
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant

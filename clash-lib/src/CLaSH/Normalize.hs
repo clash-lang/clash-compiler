@@ -26,6 +26,7 @@ import           CLaSH.Core.TyCon                 (TyCon, TyConName)
 import           CLaSH.Core.Util                  (collectArgs, mkApps, termType)
 import           CLaSH.Core.Var                   (Id,varName)
 import           CLaSH.Driver.Types               (CLaSHOpts (..))
+import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Types              (HWType)
 import           CLaSH.Netlist.Util               (splitNormalized)
 import           CLaSH.Normalize.Strategy
@@ -33,6 +34,7 @@ import           CLaSH.Normalize.Transformations  (bindConstantVar, caseCon,
                                                    reduceConst, topLet )
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
+import           CLaSH.Primitives.Types           (PrimMap)
 import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteEnv (..), RewriteState (..),
                                                    bindings, curFun, dbgLevel,
@@ -57,10 +59,12 @@ runNormalization :: CLaSHOpts
                  -- ^ Tuple TyCon cache
                  -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
                  -- ^ Hardcoded evaluator (delta-reduction)
+                 -> PrimMap BlackBoxTemplate
+                 -- ^ Primitive Definitions
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization opts supply globals typeTrans tcm tupTcm eval
+runNormalization opts supply globals typeTrans tcm tupTcm eval primMap
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -86,6 +90,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval
                   HashMap.empty
                   (opt_inlineLimit opts)
                   (opt_inlineBelow opts)
+                  primMap
 
 
 normalize :: [TmName]

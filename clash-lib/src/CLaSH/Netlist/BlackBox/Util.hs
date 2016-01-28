@@ -14,7 +14,7 @@ import           Control.Monad.State                  (State, runState)
 import           Control.Monad.Writer.Strict          (MonadWriter, tell)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
-import           Data.List                            (mapAccumL)
+import           Data.List                            (mapAccumL, nub)
 import           Data.Set                             (Set,singleton)
 import           Data.Text.Lazy                       (Text)
 import qualified Data.Text.Lazy                       as Text
@@ -22,7 +22,10 @@ import           System.FilePath                      (replaceBaseName,
                                                        takeBaseName,
                                                        takeFileName)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
-                                                       renderOneLine)
+                                                       renderOneLine, brackets,
+                                                       int, (<>), text, (<+>),
+                                                       vcat, (<$$>), nest)
+import qualified Text.PrettyPrint.Leijen.Text.Monadic as PP
 
 import           CLaSH.Backend                        (Backend (..))
 import           CLaSH.Netlist.BlackBox.Parser
@@ -202,7 +205,7 @@ renderElem b (IF c t f) = do
                              (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
                              _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
              IW64      -> if iw == 64 then 1 else 0
-             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGHT, IW64, or LIT"
+             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, or LIT"
   if c' > 0 then renderBlackBox t b else renderBlackBox f b
 
 renderElem b e = renderTag b e
@@ -307,3 +310,93 @@ renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
 renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
 renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"
 renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"
+
+prettyBlackBox :: Monad m
+               => BlackBoxTemplate
+               -> m Text
+prettyBlackBox bbT = Text.concat <$> mapM prettyElem bbT
+
+prettyElem :: Monad m
+           => Element
+           -> m Text
+prettyElem (C t) = return t
+prettyElem (D (Decl i args)) = do
+  args' <- mapM (\(a,b) -> (,) <$> prettyBlackBox a <*> prettyBlackBox b) args
+  (displayT . renderOneLine) <$>
+    (nest 2 (text "~INST" <+> int i <$$>
+        text "~OUTPUT" <+> text "=>" <+> text (fst (head args')) <+> text (snd (head args')) <+> text "~" <$$>
+        vcat (mapM (\(a,b) -> text "~INPUT" <+> text "=>" <+> text a <+> text b <+> text "~") (tail args')))
+      PP.<$$> text "~INST")
+prettyElem O = return "~RESULT"
+prettyElem (I i) = (displayT . renderOneLine) <$> (text "~ARG" <> brackets (int i))
+prettyElem (L i) = (displayT . renderOneLine) <$> (text "~LIT" <> brackets (int i))
+prettyElem (Sym i) = (displayT . renderOneLine) <$> (text "~SYM" <> brackets (int i))
+prettyElem (Clk Nothing) = return "~CLKO"
+prettyElem (Clk (Just i)) = (displayT . renderOneLine) <$> (text "~CLK" <> brackets (int i))
+prettyElem (Rst Nothing) = return "~RSTO"
+prettyElem (Rst (Just i)) = (displayT . renderOneLine) <$> (text "~RSTO" <> brackets (int i))
+prettyElem (Typ Nothing) = return "~TYPO"
+prettyElem (Typ (Just i)) = (displayT . renderOneLine) <$> (text "~TYPO" <> brackets (int i))
+prettyElem (TypM Nothing) = return "~TYPMO"
+prettyElem (TypM (Just i)) = (displayT . renderOneLine) <$> (text "~TYPM" <> brackets (int i))
+prettyElem (Err Nothing) = return "~ERRORO"
+prettyElem (Err (Just i)) = (displayT . renderOneLine) <$> (text "~ERROR" <> brackets (int i))
+prettyElem (TypElem e) = do
+  e' <- prettyElem e
+  (displayT . renderOneLine) <$> (text "~TYPEL" <> brackets (text e'))
+prettyElem CompName = return "~COMPNAME"
+prettyElem (IndexType e) = do
+  e' <- prettyElem e
+  (displayT . renderOneLine) <$> (text "~INDEXTYPE" <> brackets (text e'))
+prettyElem (Size e) = do
+  e' <- prettyElem e
+  (displayT . renderOneLine) <$> (text "~SIZE" <> brackets (text e'))
+prettyElem (Length e) = do
+  e' <- prettyElem e
+  (displayT . renderOneLine) <$> (text "~LENGTH" <> brackets (text e'))
+prettyElem (FilePath e) = do
+  e' <- prettyElem e
+  (displayT . renderOneLine) <$> (text "~FILE" <> brackets (text e'))
+prettyElem (Gen b) = if b then return "~GENERATE" else return "~ENDGENERATE"
+prettyElem (IF b esT esF) = do
+  b' <- prettyElem b
+  esT' <- prettyBlackBox esT
+  esF' <- prettyBlackBox esF
+  (displayT . renderCompact) <$>
+    (text "~IF" <+> text b' <+> text "~THEN" PP.<$>
+     text esT' PP.<$>
+     text "~ELSE" PP.<$>
+     text esF' PP.<$>
+     text "~FI")
+prettyElem IW64 = return "~IW64"
+prettyElem (BV b es mI) = do
+  es' <- prettyBlackBox es
+  (displayT . renderOneLine) <$>
+    if b
+       then maybe (text "~TOBVO" <> brackets (text es'))
+                  (((text "~TOBV" <> brackets (text es')) <>) . int)
+                  mI
+       else maybe (text "~FROMBVO" <> brackets (text es'))
+                  (((text "~FROMBV" <> brackets (text es')) <>) . int)
+                  mI
+prettyElem (SigD es mI) = do
+  es' <- prettyBlackBox es
+  (displayT . renderOneLine) <$>
+    (maybe (text "~SIGDO" <> brackets (text es'))
+           (((text "~SIGD" <> brackets (text es')) <>) . int)
+           mI)
+
+usedArguments :: BlackBoxTemplate
+              -> [Int]
+usedArguments = nub . concatMap go
+  where
+    go x = case x of
+      D (Decl i args) -> i : concatMap (\(a,b) -> usedArguments a ++ usedArguments b) args
+      I i -> [i]
+      L i -> [i]
+      IndexType e -> go e
+      FilePath e -> go e
+      IF b esT esF -> go b ++ usedArguments esT ++ usedArguments esF
+      SigD es _ -> usedArguments es
+      BV _ es _ -> usedArguments es
+      _ -> []

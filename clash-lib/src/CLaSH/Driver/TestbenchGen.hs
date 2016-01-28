@@ -25,7 +25,7 @@ import           CLaSH.Driver.Types
 
 import           CLaSH.Netlist
 import           CLaSH.Netlist.BlackBox           (prepareBlackBox)
-import           CLaSH.Netlist.BlackBox.Types     (Element (Err))
+import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate, Element (Err))
 import           CLaSH.Netlist.Types              as N
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
@@ -38,7 +38,7 @@ import           CLaSH.Util
 -- set of matching expected outputs
 genTestBench :: CLaSHOpts
              -> Supply
-             -> PrimMap                      -- ^ Primitives
+             -> PrimMap BlackBoxTemplate                     -- ^ Primitives
              -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
              -> HashMap TyConName TyCon
              -> IntMap TyConName
@@ -102,11 +102,11 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
                     -> TmName
                     -> HashMap TmName (Type,Term)
     normalizeSignal glbls bndr =
-      runNormalization opts supply glbls typeTrans tcm tupTcm eval (normalize [bndr] >>= cleanupGraph bndr)
+      runNormalization opts supply glbls typeTrans tcm tupTcm eval primMap (normalize [bndr] >>= cleanupGraph bndr)
 
 genTestBench opts _ _ _ _ _ _ _ _ _ _ _ dfiles c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
 
-genClock :: PrimMap
+genClock :: PrimMap BlackBoxTemplate
          -> (Identifier,HWType)
          -> NetlistMonad (Maybe [Declaration])
 genClock primMap (clkName,Clock clkSym rate) =
@@ -131,7 +131,7 @@ genClock primMap (clkName,Clock clkSym rate) =
 
 genClock _ _ = return Nothing
 
-genReset :: PrimMap
+genReset :: PrimMap BlackBoxTemplate
          -> (Identifier,HWType)
          -> NetlistMonad (Maybe [Declaration])
 genReset primMap (rstName,Reset clkSym rate) =
@@ -152,7 +152,7 @@ genReset primMap (rstName,Reset clkSym rate) =
 
 genReset _ _ =  return Nothing
 
-genFinish :: PrimMap
+genFinish :: PrimMap BlackBoxTemplate
           -> NetlistMonad Declaration
 genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" primMap of
   Just (BlackBox _ (Left templ)) -> do
@@ -164,7 +164,7 @@ genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" 
     return $ BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" templ' ctx
   pM -> error $ $(curLoc) ++ ("Can't make finish declaration for: " ++ show pM)
 
-genDone :: PrimMap
+genDone :: PrimMap BlackBoxTemplate
         -> NetlistMonad Declaration
 genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMap of
   Just (BlackBox _ (Left templ)) -> do
@@ -177,7 +177,7 @@ genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMa
   pM -> error $ $(curLoc) ++ ("Can't make done declaration for: " ++ show pM)
 
 genStimuli :: Int
-           -> PrimMap
+           -> PrimMap BlackBoxTemplate
            -> HashMap TmName (Type,Term)
            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
            -> HashMap TyConName TyCon
@@ -213,7 +213,7 @@ genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modNa
   return (decl,comps,cmpCnt',hidden'',dfiles')
 
 genVerifier :: Int
-            -> PrimMap
+            -> PrimMap BlackBoxTemplate
             -> HashMap TmName (Type,Term)
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
             -> HashMap TyConName TyCon

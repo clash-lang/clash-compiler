@@ -208,7 +208,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon _ -> return Nothing
   DataFamilyTyCon -> return Nothing
 
-coreToTerm :: PrimMap
+coreToTerm :: PrimMap a
            -> [Var]
            -> CoreExpr
            -> State GHC2CoreState C.Term
