@@ -1,4 +1,4 @@
-module BlackBox where
+module Trace where
 
 import CLaSH.Prelude
 import Debug.Trace

@@ -35,7 +35,7 @@ main =
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
-            [ runTest ("tests" </> "shouldwork" </> "Basic") Both [] "BlackBox" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Basic") Both [] "Trace" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "ByteSwap32" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "CharTest" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "ClassOps" (Just ("topEntity",False))
