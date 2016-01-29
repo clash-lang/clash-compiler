@@ -1,12 +1,15 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.9
+## 0.6.9 *January 29th 2016*
+* New features:
+  * Support for `Debug.Trace.trace`, thanks to @ggreif
+
 * Fixes bugs:
   * `case undefined of ...` should reduce to `undefined` [#116](https://github.com/clash-lang/clash-compiler/issues/109)
-  * VHDL/SystemVerilog: BlockRAM elements must be bit vectors [#113](https://github.com/clash-lang/clash-compiler/issues/113)\
+  * VHDL/SystemVerilog: BlockRAM elements must be bit vectors [#113](https://github.com/clash-lang/clash-compiler/issues/113)
   * Type families obscure eligibility for synthesis [#114](https://github.com/clash-lang/clash-compiler/issues/114)
 
-## 0.6.8 *January 13th 2015*
+## 0.6.8 *January 13th 2016*
 * New features:
   * Support for Haskell's: `Char`, `Int8`, `Int16`, `Int32`, `Int64`, `Word`, `Word8`, `Word16`, `Word32`, `Word64`.
   * Int/Word/Integer bitwidth for generated HDL is configurable using the `-clash-intwidth=N` flag, where `N` can be either 32 or 64.
