@@ -1,5 +1,13 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Types used in Normalize modules
+-}
+
 {-# LANGUAGE TemplateHaskell #-}
--- | Types used in Normalize modules
+
 module CLaSH.Normalize.Types where
 
 import Control.Monad.State.Strict (State)

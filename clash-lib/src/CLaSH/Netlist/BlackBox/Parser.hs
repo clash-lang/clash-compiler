@@ -1,4 +1,11 @@
--- | Parser definitions for BlackBox templates
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Parser definitions for BlackBox templates
+-}
+
 module CLaSH.Netlist.BlackBox.Parser
   (runParse)
 where

@@ -1,3 +1,9 @@
+{-|
+  Copyright   :  (C) 2015-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
+
 module Data.Aeson.Extra where
 
 import Data.Aeson           (FromJSON, Result (..), fromJSON, json)

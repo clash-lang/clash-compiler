@@ -1,8 +1,15 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Variables in CoreHW
+-}
+
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- | Variables in CoreHW
 module CLaSH.Core.Var
   ( Var (..)
   , Id

@@ -1,4 +1,11 @@
--- | Types used in BlackBox modules
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Types used in BlackBox modules
+-}
+
 module CLaSH.Netlist.BlackBox.Types where
 
 import Data.Text.Lazy (Text)

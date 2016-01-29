@@ -1,8 +1,15 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Functions to create BlackBox Contexts and fill in BlackBox templates
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 
--- | Functions to create BlackBox Contexts and fill in BlackBox templates
 module CLaSH.Netlist.BlackBox where
 
 import           Control.Lens                  ((.=),(<<%=))

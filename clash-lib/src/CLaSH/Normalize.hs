@@ -1,6 +1,13 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Turn CoreHW terms into normalized CoreHW Terms
+-}
+
 {-# LANGUAGE TemplateHaskell #-}
 
--- | Turn CoreHW terms into normalized CoreHW Terms
 module CLaSH.Normalize where
 
 import           Control.Concurrent.Supply        (Supply)

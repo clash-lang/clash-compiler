@@ -1,8 +1,15 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Transformations of the Normalization process
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Transformations of the Normalization process
 module CLaSH.Normalize.Transformations
   ( appProp
   , bindNonRep

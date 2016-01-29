@@ -1,8 +1,15 @@
+{-|
+  Copyright   :  (C) 2013-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Generate a HDL testbench for a component given a set of stimuli and a set of
+  matching expected outputs
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
--- | Generate a HDL testbench for a component given a set of stimuli and a
--- set of matching expected outputs
 module CLaSH.Driver.TestbenchGen
   ( genTestBench )
 where

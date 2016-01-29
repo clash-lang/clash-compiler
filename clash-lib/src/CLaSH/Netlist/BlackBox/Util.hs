@@ -1,11 +1,18 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Utilties to verify blackbox contexts against templates and rendering filled
+  in templates
+-}
+
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Utilties to verify blackbox contexts against templates and rendering
--- filled in templates
 module CLaSH.Netlist.BlackBox.Util where
 
 import           Control.Lens                         (at, use, (%=), (+=), _1,

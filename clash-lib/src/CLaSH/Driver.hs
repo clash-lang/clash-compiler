@@ -1,7 +1,14 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Module that connects all the parts of the CLaSH compiler library
+-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
--- | Module that connects all the parts of the CLaSH compiler library
 module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply

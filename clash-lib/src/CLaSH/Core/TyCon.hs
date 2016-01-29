@@ -1,10 +1,17 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Type Constructors in CoreHW
+-}
+
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- | Type Constructors in CoreHW
 module CLaSH.Core.TyCon
   ( TyCon (..)
   , TyConName

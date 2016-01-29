@@ -1,4 +1,11 @@
--- | Type definitions used by the Driver module
+{-|
+  Copyright  :  (C) 2013-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Type definitions used by the Driver module
+-}
+
 module CLaSH.Driver.Types where
 
 import Data.HashMap.Lazy (HashMap)

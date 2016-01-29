@@ -1,6 +1,13 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Rewriting combinators and traversals
+-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Rewriting combinators and traversals
 module CLaSH.Rewrite.Combinators where
 
 import           Control.DeepSeq             (deepseq)

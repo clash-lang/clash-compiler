@@ -1,3 +1,31 @@
+{-|
+  Copyright  :  (C) 2015-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Helper functions for the 'disjointExpressionConsolidation' transformation
+
+  The 'disjointExpressionConsolidation' transformation lifts applications of
+  global binders out of alternatives of case-statements.
+
+  e.g. It converts:
+
+  > case x of
+  >   A -> f 3 y
+  >   B -> f x x
+  >   C -> h x
+
+  into:
+
+  > let f_arg0 = case x of {A -> 3; B -> x}
+  >     f_arg1 = case x of {A -> y; B -> x}
+  >     f_out  = f f_arg0 f_arg1
+  > in  case x of
+  >       A -> f_out
+  >       B -> f_out
+  >       C -> h x
+-}
+
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -6,31 +34,6 @@
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Helper functions for the 'disjointExpressionConsolidation' transformation
---
--- The 'disjointExpressionConsolidation' transformation lifts applications of
--- global binders out of alternatives of case-statements.
---
--- e.g. It converts:
---
--- @
--- case x of
---   A -> f 3 y
---   B -> f x x
---   C -> h x
--- @
---
--- into:
---
--- @
--- let f_arg0 = case x of {A -> 3; B -> x}
---     f_arg1 = case x of {A -> y; B -> x}
---     f_out  = f f_arg0 f_arg1
--- in  case x of
---       A -> f_out
---       B -> f_out
---       C -> h x
--- @
 module CLaSH.Normalize.DEC
   (collectGlobals
   ,isDisjoint

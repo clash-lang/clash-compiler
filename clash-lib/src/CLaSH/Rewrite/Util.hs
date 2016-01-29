@@ -1,7 +1,14 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Utilities for rewriting: e.g. inlining, specialisation, etc.
+-}
+
 {-# LANGUAGE Rank2Types        #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
--- | Utilities for rewriting: e.g. inlining, specialisation, etc.
 module CLaSH.Rewrite.Util where
 
 import           Control.DeepSeq

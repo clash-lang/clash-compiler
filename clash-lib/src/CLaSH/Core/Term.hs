@@ -1,3 +1,11 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Term representation in the CoreHW language: System F + LetRec + Case
+-}
+
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -6,7 +14,6 @@
 
 {-# OPTIONS_GHC -fno-specialise #-}
 
--- | Term representation in the CoreHW language: System F + LetRec + Case
 module CLaSH.Core.Term
   ( Term (..)
   , TmName

@@ -1,3 +1,11 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Assortment of utility function used in the CLaSH library
+-}
+
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE Rank2Types           #-}
@@ -5,7 +13,6 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- | Assortment of utility function used in the CLaSH library
 module CLaSH.Util
   ( module CLaSH.Util
   , module X

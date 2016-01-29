@@ -1,8 +1,15 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Smart constructor and destructor functions for CoreHW
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Smart constructor and destructor functions for CoreHW
 module CLaSH.Core.Util where
 
 import Control.Monad.Trans.Except              (Except, throwE)

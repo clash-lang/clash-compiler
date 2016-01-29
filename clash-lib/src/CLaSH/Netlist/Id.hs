@@ -1,7 +1,15 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
+-}
+
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
--- | Transform/format a Netlist Identifier so that it is acceptable as a HDL identifier
+
 module CLaSH.Netlist.Id
   ( mkBasicId
   , mkBasicId'

@@ -1,3 +1,11 @@
+{-|
+  Copyright   :  (C) 2015-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Generate SystemVerilog for assorted Netlist datatypes
+-}
+
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
@@ -5,7 +13,6 @@
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Generate SystemVerilog for assorted Netlist datatypes
 module CLaSH.Backend.SystemVerilog (SystemVerilogState) where
 
 import qualified Control.Applicative                  as A

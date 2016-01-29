@@ -1,7 +1,14 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Create Netlists out of normalized CoreHW Terms
+-}
+
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 
--- | Create Netlists out of normalized CoreHW Terms
 module CLaSH.Netlist where
 
 import           Control.Lens                     ((.=), (<<%=))

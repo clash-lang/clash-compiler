@@ -1,9 +1,16 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Type and instance definitions for Rewrite modules
+-}
+
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
--- | Type and instance definitions for Rewrite modules
 module CLaSH.Rewrite.Types where
 
 import Control.Concurrent.Supply             (Supply, freshId)

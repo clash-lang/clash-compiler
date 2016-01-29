@@ -1,7 +1,15 @@
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Pretty printing class and instances for CoreHW
+-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
--- | Pretty printing class and instances for CoreHW
+
 module CLaSH.Core.Pretty
   ( Pretty (..)
   , showDoc

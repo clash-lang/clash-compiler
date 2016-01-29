@@ -1,4 +1,11 @@
--- | Capture-free substitution function for CoreHW
+{-|
+  Copyright   :  (C) 2012-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Capture-free substitution function for CoreHW
+-}
+
 module CLaSH.Core.Subst where
 
 import Unbound.Generics.LocallyNameless (subst, substs)

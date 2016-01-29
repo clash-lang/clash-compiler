@@ -1,7 +1,14 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Utility functions used by the normalisation transformations
+-}
+
 {-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- | Utility functions used by the normalisation transformations
 module CLaSH.Normalize.Util where
 
 import           Control.Lens            ((%=))

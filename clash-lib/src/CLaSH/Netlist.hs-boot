@@ -1,3 +1,9 @@
+{-|
+  Copyright   :  (C) 2015-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
+
 module CLaSH.Netlist (genComponent,mkExpr,mkDcApplication) where
 
 import CLaSH.Core.DataCon   (DataCon)

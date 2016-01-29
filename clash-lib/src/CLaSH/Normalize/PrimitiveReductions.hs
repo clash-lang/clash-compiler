@@ -1,26 +1,33 @@
+{-|
+  Copyright  :  (C) 2015-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Reductions of primitives
+
+  Currently, it contains reductions for:
+
+    * CLaSH.Sized.Vector.map
+    * CLaSH.Sized.Vector.zipWith
+    * CLaSH.Sized.Vector.traverse#
+    * CLaSH.Sized.Vector.foldr
+    * CLaSH.Sized.Vector.fold
+    * CLaSH.Sized.Vector.dfold
+    * CLaSH.Sized.Vector.(++)
+    * CLaSH.Sized.Vector.head
+    * CLaSH.Sized.Vector.tail
+    * CLaSH.Sized.Vector.unconcatBitVector#
+    * CLaSH.Sized.Vector.replicate
+
+  Partially handles:
+
+    * CLaSH.Sized.Vector.unconcat
+    * CLaSH.Sized.Vector.transpose
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
--- | Reductions of primitives
---
--- Currently, it contains reductions for:
---
--- * CLaSH.Sized.Vector.map
--- * CLaSH.Sized.Vector.zipWith
--- * CLaSH.Sized.Vector.traverse#
--- * CLaSH.Sized.Vector.foldr
--- * CLaSH.Sized.Vector.fold
--- * CLaSH.Sized.Vector.dfold
--- * CLaSH.Sized.Vector.(++)
--- * CLaSH.Sized.Vector.head
--- * CLaSH.Sized.Vector.tail
--- * CLaSH.Sized.Vector.unconcatBitVector#
--- * CLaSH.Sized.Vector.replicate
---
--- Partially handles:
---
--- * CLaSH.Sized.Vector.unconcat
--- * CLaSH.Sized.Vector.transpose
 module CLaSH.Normalize.PrimitiveReductions where
 
 import qualified Control.Lens                     as Lens

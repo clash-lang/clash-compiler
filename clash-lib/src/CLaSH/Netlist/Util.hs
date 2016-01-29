@@ -1,7 +1,14 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Utilities for converting Core Type/Term to Netlist datatypes
+-}
+
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns    #-}
 
--- | Utilities for converting Core Type/Term to Netlist datatypes
 module CLaSH.Netlist.Util where
 
 import           Control.Error           (hush)

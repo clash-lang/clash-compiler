@@ -1,4 +1,11 @@
--- | Utility functions to generate Primitives
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Utility functions to generate Primitives
+-}
+
 module CLaSH.Primitives.Util where
 
 import           Data.Aeson.Extra       (decodeAndReport)

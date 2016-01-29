@@ -1,8 +1,15 @@
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+  Type and instance definitions for Primitive
+-}
+
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Type and instance definitions for Primitive
 module CLaSH.Primitives.Types where
 
 import           Control.Applicative  ((<|>))

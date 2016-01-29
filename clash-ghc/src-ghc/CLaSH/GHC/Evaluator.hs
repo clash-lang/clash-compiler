@@ -1,5 +1,12 @@
+{-|
+  Copyright   :  (C) 2013-2016, University of Twente
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
+-}
+
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+
 module CLaSH.GHC.Evaluator where
 
 import qualified Data.Bifunctor      as Bifunctor
