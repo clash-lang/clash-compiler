@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.7
+* New features:
+  * Support `clash-prelude` 0.11
+
 ## 0.6.8 *August 3rd 2016*
 * Fixes bugs:
   * Fix primitive for CLaSH.Sized.Internal.Signed.mod# and GHC.Type.Integer.modInteger [#164](https://github.com/clash-lang/clash-compiler/issues/164)

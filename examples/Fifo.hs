@@ -26,7 +26,7 @@ fifo (rpntr, wpntr, elms) (datain,wrt,rd) = ((rpntr',wpntr',elms'),(full,empty,d
     elms' | wrt       = replace wind datain elms
           | otherwise = elms
 
-    n = fromInteger $ snatToInteger (snat :: SNat n)
+    n = fromInteger $ snatToInteger (SNat :: SNat n)
 
     empty = wpntr == rpntr
     full  = (testBit wpntr n) /= (testBit rpntr n) &&

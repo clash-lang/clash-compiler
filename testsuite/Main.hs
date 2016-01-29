@@ -107,6 +107,7 @@ main =
             [ runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Concat" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold2" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DTFold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "EnumTypes" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "FindIndex" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Fold" (Just ("testbench",True))

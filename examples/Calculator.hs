@@ -37,7 +37,7 @@ topEntity i = val
   where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
-    initMem    = replicate (snat :: SNat 8) 0
+    initMem    = replicate (SNat :: SNat 8) 0
 
 testInput :: Signal (OPC Word)
 testInput = stimuliGenerator $(v [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])

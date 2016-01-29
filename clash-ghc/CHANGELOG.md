@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.7
+* New features:
+  * Support for `clash-prelude` 0.11
+
 ## 0.6.22 *August 3rd 2016*
 * Fixes bugs:
   * Bug in DEC transformation overwrites case-alternatives

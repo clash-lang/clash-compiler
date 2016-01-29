@@ -184,6 +184,51 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
 
+  "CLaSH.Promoted.Nat.addSNat"
+    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let c = a + b
+           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral (toInteger c)))]
+
+  "CLaSH.Promoted.Nat.subSNat"
+    | [Right a, _] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral (toInteger a)))]
+
+  "CLaSH.Promoted.Nat.mulSNat"
+    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let c = a * b
+           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral (toInteger c)))]
+
+  "CLaSH.Promoted.Nat.divSNat"
+    | [Right a, _] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral (toInteger a)))]
+
+  "CLaSH.Promoted.Nat.powSNat"
+    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let c = a ^ b
+           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral (toInteger c)))]
+
+  "CLaSH.Promoted.Nat.logBaseSNat"
+    | [_, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy b)), Left (Literal (IntegerLiteral (toInteger b)))]
+
   "CLaSH.Sized.Internal.BitVector.eq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
 
@@ -240,10 +285,6 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       (map (reduceConstant tcm isSubj) . Either.lefts) args
     , nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
     -> integerToIntegerLiteral i
-
-  "CLaSH.Promoted.Nat.SNat"
-    | [(Literal (IntegerLiteral _),[]), (Data _,_)] <- (map collectArgs . Either.lefts) args
-    -> mkApps snatCon args
 
   "CLaSH.Sized.Vector.replicate"
     | isSubj
@@ -357,17 +398,3 @@ unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.fromInteger#" (ForAllTy (b
     nName        = string2Name "n"
     nVar         = VarTy typeNatKind nName
     nTV          = TyVar nName (embed typeNatKind)
-
-snatCon :: Term
-snatCon = Data (MkData snanNm 1 snatTy [nName] [] argTys)
-  where
-    snanNm = string2Name "CLaSH.Promoted.Nat.SNat"
-    snatTy = ForAllTy (bind nTV funTy)
-    argTys = [ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
-             ,AppTy (AppTy (ConstTy (TyCon (string2Name "Data.Proxy.Proxy"))) typeNatKind)
-                    nVar
-             ]
-    funTy  = foldr mkFunTy (ConstTy (TyCon (string2Name "CLaSH.Promoted.Nat.SNat"))) argTys
-    nName  = string2Name "n"
-    nVar   = VarTy typeNatKind nName
-    nTV    = TyVar nName (embed typeNatKind)

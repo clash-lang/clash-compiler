@@ -19,6 +19,7 @@
     * CLaSH.Sized.Vector.unconcatBitVector#
     * CLaSH.Sized.Vector.replicate
     * CLaSH.Sized.Vector.imap
+    * CLaSH.Sized.Vector.dtfold
 
   Partially handles:
 
@@ -35,12 +36,10 @@ module CLaSH.Normalize.PrimitiveReductions where
 import qualified Control.Lens                     as Lens
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.Maybe                       as Maybe
-import           Data.Text                        (pack)
 import           Unbound.Generics.LocallyNameless (bind, embed, rec, rebind,
-                                                   string2Name, name2String)
+                                                   string2Name)
 
-import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys,
-                                                   dcName, dcType)
+import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys)
 import           CLaSH.Core.Literal               (Literal (..))
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Term                  (Term (..), Pat (..))
@@ -357,24 +356,14 @@ reduceDFold n aTy fun start arg = do
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         let  (vars,elems)     = second concat . unzip
-                             $ extractElems consCon aTy 'D' n arg
+                         $ extractElems consCon aTy 'D' n arg
         (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm fun
         let (TyConApp snatTcNm _) = tyView snTy
             (Just snatTc)         = HashMap.lookup snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
-
-            ([_nTv,_kn,Right pTy],_) = splitFunForallTy (dcType snatDc)
-            (TyConApp proxyTcNm _)   = tyView pTy
-            (Just proxyTc)           = HashMap.lookup proxyTcNm tcm
-            [proxyDc]                = tyConDataCons proxyTc
-
-            buildSNat i = mkApps (Prim (pack (name2String (dcName snatDc)))
-                                       (dcType snatDc))
+            buildSNat i = mkApps (Data snatDc)
                                  [Right (LitTy (NumTy i))
                                  ,Left (Literal (IntegerLiteral (toInteger i)))
-                                 ,Left (mkApps (Data proxyDc)
-                                               [Right typeNatKind
-                                               ,Right (LitTy (NumTy i))])
                                  ]
             lbody = doFold buildSNat (n-1) vars
             lb    = Letrec (bind (rec (init elems)) lbody)
@@ -525,3 +514,48 @@ reduceReplicate n aTy eTy arg = do
       = let retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
         in  changed retVec
     go _ ty = error $ $(curLoc) ++ "reduceReplicate: argument does not have a vector type: " ++ showDoc ty
+
+-- | Replace an application of the @CLaSH.Sized.Vector.dtfold@ primitive on
+-- vectors of a known length @n@, by the fully unrolled recursive "definition"
+-- of @CLaSH.Sized.Vector.dtfold@
+reduceDTFold :: Int  -- ^ Length of the vector
+             -> Type -- ^ Element type of the argument vector
+             -> Term -- ^ Function to convert elements with
+             -> Term -- ^ Function to combine branches with
+             -> Term -- ^ The vector to fold
+             -> NormalizeSession Term
+reduceDTFold n aTy lrFun brFun arg = do
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm arg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = let (vars,elems)     = second concat . unzip
+                             $ extractElems consCon aTy 'T' (2^n) arg
+        (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
+        let (TyConApp snatTcNm _) = tyView snTy
+            (Just snatTc)         = HashMap.lookup snatTcNm tcm
+            [snatDc]              = tyConDataCons snatTc
+            buildSNat i = mkApps (Data snatDc)
+                                 [Right (LitTy (NumTy i))
+                                 ,Left (Literal (IntegerLiteral (toInteger i)))
+                                 ]
+            lbody = doFold buildSNat (n-1) vars
+            lb    = Letrec (bind (rec (init elems)) lbody)
+        changed lb
+  where
+    doFold :: (Int -> Term) -> Int -> [Term] -> Term
+    doFold _    _ [x] = mkApps lrFun [Left x]
+    doFold snDc k xs  =
+      let (xsL,xsR) = splitAt (2^k) xs
+          k'        = k-1
+          eL        = doFold snDc k' xsL
+          eR        = doFold snDc k' xsR
+      in  mkApps brFun [Right (LitTy (NumTy k))
+                       ,Left  (snDc k)
+                       ,Left  eL
+                       ,Left  eR
+                       ]

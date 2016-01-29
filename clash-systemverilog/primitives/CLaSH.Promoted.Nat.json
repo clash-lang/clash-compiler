@@ -1,16 +1,4 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.SNat"
-    , "type"      : "SNat :: KnownNat n => Proxy n -> SNat n"
-    , "templateE" : "~LIT[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.snatToInteger"
-    , "type"      : "snatToInteger :: SNat n -> Integer"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.addSNat"
     , "type"      : "CLaSH.Promoted.Nat.addSNat :: SNat a -> SNat b -> SNat (a + b)"
     , "templateE" : "~LIT[0] + ~LIT[1]"
@@ -32,6 +20,30 @@
     { "name"      : "CLaSH.Promoted.Nat.powSNat"
     , "type"      : "CLaSH.Promoted.Nat.powSNat :: SNat a -> SNat b -> SNat (a ^ b)"
     , "templateE" : "~LIT[0] ** ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.divSNat"
+    , "type"      : "CLaSH.Promoted.Nat.divSNat :: SNat (a*(b+1)) -> SNat (b+1) -> SNat a"
+    , "templateE" : "~LIT[0] / ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.logBaseSNat"
+    , "type"      : "CLaSH.Promoted.Nat.divSNat :: SNat (a+2) -> SNat ((a+2)^b) -> SNat b"
+    , "templateD" :
+"// logBaseSNat begin
+function integer logBase_~SYM[0];
+  input integer base, value;
+  begin
+    value = value-1;
+    for (logBase_~SYM[0]=0; value>0; logBase_~SYM[0]=logBase_~SYM[0]+1)
+      value = value / base;
+  end
+endfunction
+
+assign ~RESULT = logBase_~SYM[0](~LIT[0],~LIT[1]);
+// logBaseSNat end"
     }
   }
 ]

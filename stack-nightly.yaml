@@ -1,0 +1,11 @@
+resolver: nightly-2016-06-07
+
+packages:
+- 'clash-prelude'
+- 'clash-lib'
+- 'clash-verilog'
+- 'clash-systemverilog'
+- 'clash-vhdl'
+- 'testsuite'
+- 'ghc-typelits-extra'
+- 'ghc-typelits-natnormalise'

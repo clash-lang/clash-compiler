@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.7
+* New features:
+  * Support `clash-prelude` 0.11
+
 ## 0.6.16 *August 3rd 2016*
 * Fixes bugs:
   * Incorrect primitive for `Integer`s `ltInteger#` and `geInteger#`

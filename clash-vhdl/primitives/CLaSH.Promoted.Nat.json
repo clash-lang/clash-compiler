@@ -1,16 +1,4 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.SNat"
-    , "type"      : "SNat :: KnownNat n => Proxy n -> SNat n"
-    , "templateE" : "~LIT[0]"
-    }
-  }
-, { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.snatToInteger"
-    , "type"      : "snatToInteger :: SNat n -> Integer"
-    , "templateE" : "~IF ~IW64 ~THEN to_signed(~ARG[0],64) ~ELSE to_signed(~ARG[0],32) ~FI"
-    }
-  }
-, { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.addSNat"
     , "type"      : "CLaSH.Promoted.Nat.addSNat :: SNat a -> SNat b -> SNat (a + b)"
     , "templateE" : "~LIT[0] + ~LIT[1]"
@@ -18,7 +6,7 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.subSNat"
-    , "type"      : "CLaSH.Promoted.Nat.subSNat :: SNat a -> SNat b -> SNat (a - b)"
+    , "type"      : "CLaSH.Promoted.Nat.subSNat :: SNat (a + b) -> SNat b -> SNat a"
     , "templateE" : "~LIT[0] - ~LIT[1]"
     }
   }
@@ -32,6 +20,18 @@
     { "name"      : "CLaSH.Promoted.Nat.powSNat"
     , "type"      : "CLaSH.Promoted.Nat.powSNat :: SNat a -> SNat b -> SNat (a ^ b)"
     , "templateE" : "~LIT[0] ** ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.divSNat"
+    , "type"      : "CLaSH.Promoted.Nat.divSNat :: SNat (a*(b+1)) -> SNat (b+1) -> SNat a"
+    , "templateE" : "~LIT[0] / ~LIT[1]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.logBaseSNat"
+    , "type"      : "CLaSH.Promoted.Nat.divSNat :: SNat (a+2) -> SNat ((a+2)^b) -> SNat b"
+    , "templateE" : "log(~LIT[1],~LIT[0])"
     }
   }
 ]
