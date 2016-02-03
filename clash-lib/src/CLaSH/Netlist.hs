@@ -433,19 +433,10 @@ mkDcApplication dstHType bndr dc args = do
                    tg -> error $ $(curLoc) ++ "unknown bool literal: " ++ showDoc dc ++ "(tag: " ++ show tg ++ ")"
         in  return dc'
       Vector 0 _ -> return (HW.DataCon dstHType VecAppend [])
-      -- Note [Vector Wrapper]
-      -- The Vector type has two versions of the cons constructor:
-      --   * The 'normal' one, which takes a coercion as its first argument,
-      --     followed by the element and the vector
-      --   * The wrapper one, which just takes the element and vector argument
-      --
-      -- We need to account for both occurrences, that's why we have the two
-      -- case statements below:
       Vector 1 _ -> case argExprs of
                       [_,e,_] -> return (HW.DataCon dstHType VecAppend [e])
-                      _       -> return (HW.DataCon dstHType VecAppend [head argExprs])
+                      _       -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
       Vector _ _ -> case argExprs of
                       [_,e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
-                      _         -> return (HW.DataCon dstHType VecAppend argExprs)
-
+                      _         -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
