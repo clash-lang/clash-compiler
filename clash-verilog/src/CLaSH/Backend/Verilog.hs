@@ -300,10 +300,33 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,2)))) =
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
 
+expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 _),0,1)))) = text id_
+
+expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ _),1,1)))) =
+    text id_ <> brackets (int start <> colon <> int end)
+  where
+    start   = typeSize ty - 1
+    end     = typeSize ty `div` 2
+
+expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ _),1,2)))) =
+    text id_ <> brackets (int start <> colon <> int 0)
+  where
+    start   = (typeSize ty `div` 2) - 1
+
 -- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),10,fI)))) =
+    text id_ <> brackets (int start <> colon <> int end)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - (fI * argSize) - 1
+    end     = start - argSize + 1
+
+-- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
+-- RTree's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ argTy),10,fI)))) =
     text id_ <> brackets (int start <> colon <> int end)
   where
     argSize = typeSize argTy
@@ -325,6 +348,12 @@ expr_ _ (DataCon (Vector 0 _) _ _) =
 expr_ _ (DataCon (Vector 1 _) _ [e]) = expr_ False e
 expr_ _ e@(DataCon (Vector _ _) _ es@[_,_]) =
   case vectorChain e of
+    Just es' -> listBraces (mapM (expr_ False) es')
+    Nothing  -> listBraces (mapM (expr_ False) es)
+
+expr_ _ (DataCon (RTree 0 _) _ [e]) = expr_ False e
+expr_ _ e@(DataCon (RTree _ _) _ es@[_,_]) =
+  case rtreeChain e of
     Just es' -> listBraces (mapM (expr_ False) es')
     Nothing  -> listBraces (mapM (expr_ False) es)
 
@@ -393,6 +422,13 @@ expr_ _ (DataTag (Vector _ _) (Right _)) = do
   iw <- use intWidth
   int iw <> "'sd1"
 
+expr_ _ (DataTag (RTree 0 _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd0"
+expr_ _ (DataTag (RTree _ _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd1"
+
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
 otherSize :: [HWType] -> Int -> Int
@@ -405,6 +441,11 @@ vectorChain (DataCon (Vector 0 _) _ _)        = Just []
 vectorChain (DataCon (Vector 1 _) _ [e])     = Just [e]
 vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
+
+rtreeChain :: Expr -> Maybe [Expr]
+rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
+rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = Just e1 <:> rtreeChain e2
+rtreeChain _                               = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VerilogM Doc
 exprLit Nothing (NumLit i) = integer i

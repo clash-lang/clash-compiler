@@ -1,0 +1,25 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.RTree.treplicate"
+    , "type"      : "replicate :: SNat d -> a -> RTree d a"
+    , "templateE" : "'{(2**~LIT[0]) {~ARG[1]}}"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.RTree.textract"
+    , "type"      : "textract :: RTree 0 a -> a"
+    , "templateD" :
+"// textract begin
+wire ~SIGD[~GENSYM[tree][0]][0];
+assign ~SYM[0] = ~ARG[0];
+
+assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]];
+// textract end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.RTree.tsplit"
+    , "type"      : "tsplit:: RTree (d+1) a -> (RTree d a,RTree d a)"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]

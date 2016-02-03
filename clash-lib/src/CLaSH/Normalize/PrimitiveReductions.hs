@@ -20,6 +20,7 @@
     * CLaSH.Sized.Vector.replicate
     * CLaSH.Sized.Vector.imap
     * CLaSH.Sized.Vector.dtfold
+    * CLaSH.Sized.RTree.tfold
 
   Partially handles:
 
@@ -50,7 +51,8 @@ import           CLaSH.Core.Type                  (LitTy (..), Type (..),
 import           CLaSH.Core.TyCon                 (TyConName, tyConDataCons)
 import           CLaSH.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           CLaSH.Core.Util                  (appendToVec, extractElems,
-                                                   idToVar, mkApps, mkVec,
+                                                   extractTElems, idToVar,
+                                                   mkApps, mkRTree, mkVec,
                                                    termType)
 import           CLaSH.Core.Var                   (Var (..))
 
@@ -559,3 +561,55 @@ reduceDTFold n aTy lrFun brFun arg = do
                        ,Left  eL
                        ,Left  eR
                        ]
+
+-- | Replace an application of the @CLaSH.Sized.RTree.tdfold@ primitive on
+-- trees of a known depth @n@, by the fully unrolled recursive "definition"
+-- of @CLaSH.Sized.RTree.tdfold@
+reduceTFold :: Int  -- ^ Depth of the tree
+            -> Type -- ^ Element type of the argument tree
+            -> Term -- ^ Function to convert elements with
+            -> Term -- ^ Function to combine branches with
+            -> Term -- ^ The tree to fold
+            -> NormalizeSession Term
+reduceTFold n aTy lrFun brFun arg = do
+    tcm <- Lens.view tcCache
+    (TyConApp treeTcNm _) <- coreView tcm <$> termType tcm arg
+    let (Just treeTc)    = HashMap.lookup treeTcNm tcm
+        [lrCon,brCon]    = tyConDataCons treeTc
+        (vars,elems)     = extractTElems lrCon brCon aTy 'T' n arg
+    (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
+    let (TyConApp snatTcNm _) = coreView tcm snTy
+        (Just snatTc)         = HashMap.lookup snatTcNm tcm
+        [snatDc]              = tyConDataCons snatTc
+        buildSNat i = mkApps (Data snatDc)
+                             [Right (LitTy (NumTy i))
+                             ,Left (Literal (IntegerLiteral (toInteger i)))
+                             ]
+        lbody = doFold buildSNat (n-1) vars
+        lb    = Letrec (bind (rec elems) lbody)
+    changed lb
+  where
+    doFold _    _ [x] = mkApps lrFun [Left x]
+    doFold snDc k xs  =
+      let (xsL,xsR) = splitAt (length xs `div` 2) xs
+          k'        = k-1
+          eL        = doFold snDc k' xsL
+          eR        = doFold snDc k' xsR
+      in  mkApps brFun [Right (LitTy (NumTy k))
+                       ,Left (snDc k)
+                       ,Left eL
+                       ,Left eR
+                       ]
+
+reduceTReplicate :: Int  -- ^ Depth of the tree
+                 -> Type -- ^ Element type
+                 -> Type -- ^ Result type
+                 -> Term -- ^ Element
+                 -> NormalizeSession Term
+reduceTReplicate n aTy eTy arg = do
+  tcm <- Lens.view tcCache
+  let (TyConApp treeTcNm _) = coreView tcm eTy
+      (Just treeTc) = HashMap.lookup treeTcNm tcm
+      [lrCon,brCon] = tyConDataCons treeTc
+      retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
+  changed retVec

@@ -33,6 +33,7 @@ data Element = C   !Text         -- ^ Constant
                                   -- (exclusive) maximum index
              | Size !Element     -- ^ Size of a type hole
              | Length !Element   -- ^ Length of a vector hole
+             | Depth !Element    -- ^ Depth of a tree hole
              | FilePath !Element -- ^ Hole containing a filepath for a data file
              | Gen !Bool         -- ^ Hole marking beginning (True) or end (False)
                                  -- of a generative construct

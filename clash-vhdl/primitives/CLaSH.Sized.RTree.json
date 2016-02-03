@@ -1,0 +1,36 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Sized.RTree.treplicate"
+    , "type"      : "replicate :: SNat n -> a -> RTree d a"
+    , "templateE" : "~TYPMO'(0 to (2**~LIT[0])-1 => ~ARG[1])"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.RTree.textract"
+    , "type"      : "textract :: RTree 0 a -> a"
+    , "templateD" :
+"-- textract begin
+textract_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= ~SYM[1](0);
+end block;
+-- textract end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Sized.RTree.tsplit"
+    , "type"      : "tsplit:: RTree (d+1) a -> (RTree d a,RTree d a)"
+    , "templateD" :
+"-- tsplit begin
+textract_~SYM[0] : block
+  signal ~SYM[1] : ~TYP[0];
+begin
+  ~SYM[1] <= ~ARG[0];
+  ~RESULT <= (~SYM[1](0 to (2**(~DEPTH[~TYP[0]]-1))-1)
+             ,~SYM[1](2**(~DEPTH[~TYP[0]]-1) to (2**~DEPTH[~TYP[0]])-1));
+end block;
+-- tsplit end"
+    }
+  }
+]

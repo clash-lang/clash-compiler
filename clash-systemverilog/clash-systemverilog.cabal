@@ -60,6 +60,7 @@ Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
                       primitives/CLaSH.Sized.Internal.Index.json
                       primitives/CLaSH.Sized.Internal.Signed.json
                       primitives/CLaSH.Sized.Internal.Unsigned.json
+                      primitives/CLaSH.Sized.RTree.json
                       primitives/CLaSH.Sized.Vector.json
                       primitives/CLaSH.Transformations.json
                       primitives/Control.Exception.Base.json

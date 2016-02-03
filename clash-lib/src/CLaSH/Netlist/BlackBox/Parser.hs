@@ -84,6 +84,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> CompName          <$  pToken "~COMPNAME"
      <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
      <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
+     <|> Depth             <$> (pToken "~DEPTH" *> pBrackets pTagE)
      <|> FilePath          <$> (pToken "~FILE" *> pBrackets pTagE)
      <|> Gen               <$> (True <$ pToken "~GENERATE")
      <|> Gen               <$> (False <$ pToken "~ENDGENERATE")

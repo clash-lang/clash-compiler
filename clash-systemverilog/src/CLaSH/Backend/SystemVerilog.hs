@@ -177,6 +177,9 @@ mkTyPackage_ modName hwtys =
     eqReprTy (Vector n ty1) (Vector m ty2)
       | m == n    = eqReprTy ty1 ty2
       | otherwise = False
+    eqReprTy (RTree n ty1) (RTree m ty2)
+      | m == n    = eqReprTy ty1 ty2
+      | otherwise = False
     eqReprTy ty1 ty2
       | isUnsigned ty1 && isUnsigned ty2 = typeSize ty1 == typeSize ty2
       | otherwise                        = ty1 == ty2
@@ -193,6 +196,7 @@ mkTyPackage_ modName hwtys =
 mkUsedTys :: HWType
         -> [HWType]
 mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
+mkUsedTys t@(RTree _ elTy)    = t : mkUsedTys elTy
 mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
 mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
 mkUsedTys t                   = [t]
@@ -209,6 +213,8 @@ topSortHWTys hwtys = sorted
 
     edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,,()))
                                       (HashMap.lookup elTy nodesI)
+    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,,()))
+                                      (HashMap.lookup elTy nodesI)
     edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
                              in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys
     edge t@(SP _ ctys)     = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "SP") t nodesI
@@ -221,6 +227,16 @@ tyDec ty@(Vector n elTy) = do
   case syn of
     Vivado -> "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
               tyName ty <+> brackets (int 0 <> colon <> int (n-1)) <> semi
+    _ -> do case splitVecTy ty of
+              Just (ns,elTy') -> do
+                let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
+                "typedef" <+> elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
+              _ -> error $ $(curLoc) ++ "impossible"
+tyDec ty@(RTree n elTy) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
+              tyName ty <+> brackets (int 0 <> colon <> int (2^n-1)) <> semi
     _ -> do case splitVecTy ty of
               Just (ns,elTy') -> do
                 let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
@@ -252,6 +268,11 @@ splitVecTy = fmap splitElemTy . go
     go (Vector n elTy) = case go elTy of
       Just (ns,elTy') -> Just (n:ns,elTy')
       _               -> Just ([n],elTy)
+
+    go (RTree n elTy) = let n' = 2^n in case go elTy of
+      Just (ns,elTy') -> Just (n':ns,elTy')
+      _               -> Just ([n'],elTy)
+
     go _ = Nothing
 
 lvType :: HWType -> SystemVerilogM Doc
@@ -259,6 +280,15 @@ lvType ty@(Vector n elTy) = do
   syn <- hdlSyn
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
+    _ -> case splitVecTy ty of
+      Just (ns,elTy') -> do
+        let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
+        elTy' <> ranges
+      _ -> error $ $(curLoc) ++ "impossible"
+lvType ty@(RTree n elTy) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> "logic" <+> brackets (int 0 <> colon <> int (2^n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
     _ -> case splitVecTy ty of
       Just (ns,elTy') -> do
         let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
@@ -299,6 +329,44 @@ funDec ty@(Vector n elTy) =
                     let ranges' = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
                     elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 2))
                   _ -> error $ $(curLoc) ++ "impossible"
+
+funDec ty@(RTree n elTy) =
+  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <$>
+  indent 2
+    ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int (2^n) <> semi <+> "n=n+1") <$>
+      indent 2 (tName <> "_to_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <$>
+  "endfunction" <$>
+  "function" <+> tName <+> tName <> "_from_lv" <> parens ("logic" <+> ranges <+> "i") <> semi <$>
+  indent 2
+    ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int (2^n) <> semi <+> "n=n+1") <$>
+      indent 2 (tName <> "_from_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <$>
+  "endfunction" <$>
+  (if n > 0
+      then
+        "function" <+> tName <+> tName <> "_br" <> parens (treeSigDecl "l" <> comma <> treeSigDecl "r") <> semi <$>
+        indent 2
+          (tName <> "_br" <> brackets (int 0 <> colon <> int (2^(n-1)-1)) <+> "=" <+> "l" <> semi <$>
+           tName <> "_br" <> brackets (int (2^(n-1)) <> colon <> int (2^n-1)) <+> "=" <+> "r" <> semi) <$>
+        "endfunction"
+      else
+        empty)
+  where
+    treeSigDecl :: SystemVerilogM Doc -> SystemVerilogM Doc
+    treeSigDecl d = do
+      syn <- hdlSyn
+      case syn of
+        Vivado -> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
+                  d <+> brackets (int 0 <> colon <> int (2^(n-1)-1))
+        _ -> do case splitVecTy (RTree (n-1) elTy) of
+                  Just (ns,elTy') -> do
+                    let ranges' = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
+                    elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 1))
+                  _ -> error $ $(curLoc) ++ "impossible"
+
+    tName  = tyName ty
+    ranges = brackets (int 0 <> colon <> int (2^n-1)) <>
+             brackets (int (typeSize elTy - 1) <> colon <> int 0)
+
 funDec _ = empty
 
 module_ :: Component -> SystemVerilogM Doc
@@ -363,6 +431,9 @@ verilogType t = do
     Vector _ _ -> do
       nm <- use modNm
       text (pack nm) <> "_types::" <> tyName t
+    RTree _ _ -> do
+      nm <- use modNm
+      text (pack nm) <> "_types::" <> tyName t
     Signed n      -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
     Clock _ _     -> "logic"
     Reset _ _     -> "logic"
@@ -381,11 +452,13 @@ verilogTypeMark t = do
   case t of
     Product _ _ -> text (pack nm) <> "_types::" <> m
     Vector _ _ -> text (pack nm) <> "_types::" <> m
+    RTree _ _ -> text (pack nm) <> "_types::" <> m
     _ -> empty
 
 tyName :: HWType -> SystemVerilogM Doc
 tyName Bool              = "logic_vector_1"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (RTree n elTy)    = "tree_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)     = "logic_vector_" <> int n
 tyName t@(Index _)       = "logic_vector_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
@@ -423,6 +496,11 @@ verilogTypeErrValue (Vector n elTy) = do
   case syn of
     Vivado -> braces (int n <+> braces (int (typeSize elTy) <+> braces "1'bx"))
     _ -> braces (int n <+> braces (verilogTypeErrValue elTy))
+verilogTypeErrValue (RTree n elTy) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> braces (int (2^n) <+> braces (int (typeSize elTy) <+> braces "1'bx"))
+    _ -> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue String = "\"ERROR\""
 verilogTypeErrValue ty  = braces (int (typeSize ty) <+> braces "1'bx")
 
@@ -536,10 +614,30 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
 
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> brackets (int 1 <> colon <> int (n-1))
 
+expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
+  id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int 0))
+  simpleFromSLV elTy id'
+
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
+  let z = 2^(n-1)
+  in  text id_ <> brackets (int 0 <> colon <> int (z-1))
+
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,2)))) =
+  let z  = 2^(n-1)
+      z' = 2^n
+  in text id_ <> brackets (int z <> colon <> int (z'-1))
+
 -- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),10,fI)))) = do
+  id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int fI))
+  simpleFromSLV elTy id'
+
+-- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
+-- RTree's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+expr_ _ (Identifier id_ (Just (Indexed ((RTree _ elTy),10,fI)))) = do
   id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int fI))
   simpleFromSLV elTy id'
 
@@ -560,6 +658,12 @@ expr_ _ (DataCon (Vector 1 elTy) _ [e]) = "'" <> braces (toSLV elTy e)
 expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = case vectorChain e of
   Just es -> "'" <> listBraces (mapM (toSLV elTy) es)
   Nothing -> verilogTypeMark ty <> "_cons" <> parens (expr_ False e1 <> comma <+> expr_ False e2)
+
+expr_ _ (DataCon (RTree 0 elTy) _ [e]) = "'" <> braces (toSLV elTy e)
+
+expr_ _ e@(DataCon ty@(RTree _ elTy) _ [e1,e2]) = case rtreeChain e of
+  Just es -> "'" <> listBraces (mapM (toSLV elTy) es)
+  Nothing -> verilogTypeMark ty <> "_br" <> parens (expr_ False e1 <> comma <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
@@ -625,6 +729,13 @@ expr_ _ (DataTag (Vector _ _) (Right _)) = do
   iw <- use intWidth
   int iw <> "'sd1"
 
+expr_ _ (DataTag (RTree 0 _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd0"
+expr_ _ (DataTag (RTree _ _) (Right _)) = do
+  iw <- use intWidth
+  int iw <> "'sd1"
+
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
 otherSize :: [HWType] -> Int -> Int
@@ -637,6 +748,12 @@ vectorChain (DataCon (Vector 0 _) _ _)        = Just []
 vectorChain (DataCon (Vector 1 _) _ [e])     = Just [e]
 vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
+
+rtreeChain :: Expr -> Maybe [Expr]
+rtreeChain (DataCon (RTree 0 _) _ [e])     = Just [e]
+rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = A.liftA2 (++) (rtreeChain e1)
+                                                           (rtreeChain e2)
+rtreeChain _                               = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> SystemVerilogM Doc
 exprLit Nothing (NumLit i) = integer i
@@ -674,15 +791,18 @@ bit_char Z = char 'z'
 toSLV :: HWType -> Expr -> SystemVerilogM Doc
 toSLV t e = case t of
   Vector _ _ -> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
+  RTree _ _ -> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
   _ -> expr_ False e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> SystemVerilogM Doc
 fromSLV t@(Vector _ _) id_ start end = verilogTypeMark t <> "_from_lv" <> parens (text id_ <> brackets (int start <> colon <> int end))
+fromSLV t@(RTree _ _) id_ start end = verilogTypeMark t <> "_from_lv" <> parens (text id_ <> brackets (int start <> colon <> int end))
 fromSLV (Signed _) id_ start end = "$signed" <> parens (text id_ <> brackets (int start <> colon <> int end))
 fromSLV _ id_ start end = text id_ <> brackets (int start <> colon <> int end)
 
 simpleFromSLV :: HWType -> Identifier -> SystemVerilogM Doc
 simpleFromSLV t@(Vector _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (text id_)
+simpleFromSLV t@(RTree _ _) id_ = verilogTypeMark t <> "_from_lv" <> parens (text id_)
 simpleFromSLV (Signed _) id_ = "$signed" <> parens (text id_)
 simpleFromSLV _ id_ = text id_
 

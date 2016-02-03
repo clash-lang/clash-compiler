@@ -96,6 +96,7 @@ data HWType
   | Signed   !Size -- ^ Signed integer of a specified size
   | Unsigned !Size -- ^ Unsigned integer of a specified size
   | Vector   !Size       !HWType -- ^ Vector type
+  | RTree    !Size       !HWType -- ^ RTree type
   | Sum      !Identifier [Identifier] -- ^ Sum type: Name and Constructor names
   | Product  !Identifier [HWType] -- ^ Product type: Name and field types
   | SP       !Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
@@ -142,6 +143,7 @@ data Modifier
   = Indexed (HWType,Int,Int) -- ^ Index the expression: (Type of expression,DataCon tag,Field Tag)
   | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
   | VecAppend -- ^ See the expression in the context of a Vector append operation
+  | RTreeAppend -- ^ See the expression in the context of a Tree append operation
   deriving Show
 
 -- | Expression used in RHS of a declaration

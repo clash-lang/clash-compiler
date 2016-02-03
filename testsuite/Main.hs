@@ -89,6 +89,10 @@ main =
             [ runTest ("tests" </> "shouldwork" </> "Polymorphism") Both [] "ExistentialBoxed" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Polymorphism") Both [] "LocalPoly" (Just ("topEntity",False))
             ]
+        , testGroup "RTree"
+            [ runTest ("tests" </> "shouldwork" </> "RTree") Both [] "TFold" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "RTree") Both [] "TZip" (Just ("topEntity",False))
+            ]
         , testGroup "Signal"
             [ runTest ("tests" </> "shouldwork" </> "Signal") Both [] "AlwaysHigh" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamFile" (Just ("testbench",True))

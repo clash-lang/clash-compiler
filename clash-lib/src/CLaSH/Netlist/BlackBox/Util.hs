@@ -241,6 +241,9 @@ renderElem b (IF c t f) = do
       (L n)      -> case bbInputs b !! n of
                       (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
                       _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+      (Depth e)  -> case lineToType b [e] of
+                      (RTree n _) -> n
+                      _ -> error $ $(curLoc) ++ "IF: treedepth of non-tree type"
       IW64       -> if iw == 64 then 1 else 0
       (HdlSyn s) -> if s == syn then 1 else 0
       (IsVar n)  -> let (s,_,_) = bbInputs b !! n
@@ -343,6 +346,10 @@ renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b 
   where
     vecLen (Vector n _) = n
     vecLen _            = error $ $(curLoc) ++ "vecLen of a non-vector type"
+renderTag b (Depth e)      = return . Text.pack . show . treeDepth $ lineToType b [e]
+  where
+    treeDepth (RTree n _) = n
+    treeDepth _           = error $ $(curLoc) ++ "treeDepth of a non-tree type"
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  (displayT . renderOneLine) <$> hdlType ty
 renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
@@ -424,6 +431,9 @@ prettyElem (Size e) = do
 prettyElem (Length e) = do
   e' <- prettyElem e
   (displayT . renderOneLine) <$> (text "~LENGTH" <> brackets (text e'))
+prettyElem (Depth e) = do
+  e' <- prettyElem e
+  (displayT . renderOneLine) <$> (text "~DEPTH" <> brackets (text e'))
 prettyElem (FilePath e) = do
   e' <- prettyElem e
   (displayT . renderOneLine) <$> (text "~FILE" <> brackets (text e'))

@@ -439,4 +439,10 @@ mkDcApplication dstHType bndr dc args = do
       Vector _ _ -> case argExprs of
                       [_,e1,e2] -> return (HW.DataCon dstHType VecAppend [e1,e2])
                       _         -> error $ $(curLoc) ++ "Unexpected number of arguments for `Cons`: " ++ showDoc args
+      RTree 0 _ -> case argExprs of
+                      [_,e] -> return (HW.DataCon dstHType RTreeAppend [e])
+                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `LR`: " ++ showDoc args
+      RTree _ _ -> case argExprs of
+                      [_,e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
+                      _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showDoc args
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

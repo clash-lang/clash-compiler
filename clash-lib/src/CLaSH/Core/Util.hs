@@ -328,6 +328,91 @@ extractElems consCon resTy s maxN = go maxN
                                   (map embed idTys)
         restTy = last (fromJust (dataConInstArgTys consCon tys))
 
+
+-- | Create let-bindings with case-statements that select elements out of a
+-- tree. Returns both the variables to which element-selections are bound
+-- and the let-bindings
+extractTElems :: DataCon -- ^ The 'LR' constructor
+              -> DataCon -- ^ The 'BR' constructor
+              -> Type    -- ^ The element type
+              -> Char    -- ^ Char to append to the bound variable names
+              -> Int     -- ^ Depth of the tree
+              -> Term    -- ^ The tree
+              -> ([Term],[LetBinding])
+extractTElems lrCon brCon resTy s maxN = go maxN [0..(2^(maxN+1))-2] [0..(2^maxN - 1)]
+  where
+    go :: Int -> [Int] -> [Int] -> Term -> ([Term],[LetBinding])
+    go 0 _ ks e = ([elVar],[(Id elBNm (embed resTy), embed lhs)])
+      where
+        elBNm   = string2Name ("el" ++ s:show (head ks))
+        elVar   = Var resTy elBNm
+        pat     = DataPat (embed lrCon) (rebind [] [co,el])
+        elPatNm = string2Name "el"
+        lhs     = Case e resTy [bind pat (Var resTy elPatNm)]
+
+        tys          = [LitTy (NumTy 0),resTy]
+        (Just idTys) = dataConInstArgTys lrCon tys
+        [co,el]      = zipWith Id [string2Name "_co_",elPatNm]
+                                  (map embed idTys)
+
+    go n bs ks e = (lVars ++ rVars,(Id ltBNm (embed brTy),embed ltLhs):
+                                   (Id rtBNm (embed brTy),embed rtLhs):
+                                   (lBinds ++ rBinds))
+      where
+        ltBNm = string2Name ("lt" ++ s:show b0)
+        rtBNm = string2Name ("rt" ++ s:show b1)
+        ltVar = Var brTy ltBNm
+        rtVar = Var brTy rtBNm
+        pat   = DataPat (embed brCon) (rebind [mTV] [co,lt,rt])
+        ltPatNm = string2Name "lt"
+        rtPatNm = string2Name "rt"
+        ltLhs   = Case e brTy [bind pat (Var brTy ltPatNm)]
+        rtLhs   = Case e brTy [bind pat (Var brTy rtPatNm)]
+
+        mName = string2Name "m"
+        mTV = TyVar mName (embed typeNatKind)
+        tys = [LitTy (NumTy n),resTy,LitTy (NumTy (n-1))]
+        (Just idTys) = dataConInstArgTys brCon tys
+        [co,lt,rt] = zipWith Id [string2Name "_co_",ltPatNm,rtPatNm]
+                                (map embed idTys)
+        brTy = last idTys
+        (kL,kR) = splitAt (length ks `div` 2) ks
+        (b0:bL,b1:bR) = splitAt (length bs `div` 2) bs
+
+        (lVars,lBinds) = go (n-1) bL kL ltVar
+        (rVars,rBinds) = go (n-1) bR kR rtVar
+
+-- | Create a vector of supplied elements
+mkRTree :: DataCon -- ^ The LR constructor
+        -> DataCon -- ^ The BR constructor
+        -> Type    -- ^ Element type
+        -> Int     -- ^ Depth of the tree
+        -> [Term]  -- ^ Elements to put in the tree
+        -> Term
+mkRTree lrCon brCon resTy = go
+  where
+    go _ [x] = mkApps (Data lrCon) [Right (LitTy (NumTy 0))
+                                    ,Right resTy
+                                    ,Left  (Prim "_CO_" lrCoTy)
+                                    ,Left  x
+                                    ]
+
+    go n xs =
+      let (xsL,xsR) = splitAt (length xs `div` 2) xs
+      in  mkApps (Data brCon) [Right (LitTy (NumTy n))
+                              ,Right resTy
+                              ,Right (LitTy (NumTy (n-1)))
+                              ,Left (Prim "_CO_" (brCoTy n))
+                              ,Left (go (n-1) xsL)
+                              ,Left (go (n-1) xsR)]
+
+    lrCoTy   = head (fromJust $! dataConInstArgTys lrCon  [(LitTy (NumTy 0))
+                                                         ,resTy])
+    brCoTy n = head (fromJust $! dataConInstArgTys brCon
+                                                   [(LitTy (NumTy n))
+                                                   ,resTy
+                                                   ,(LitTy (NumTy (n-1)))])
+
 -- | Determine whether a type is isomorphic to "CLaSH.Signal.Internal.Signal'"
 --
 -- It is i.e.:

@@ -177,6 +177,7 @@ mkTyPackage_ modName hwtys = do
 mkUsedTys :: HWType
         -> [HWType]
 mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
+mkUsedTys v@(RTree _ elTy)    = v : mkUsedTys elTy
 mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
 mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
 mkUsedTys t                   = [t]
@@ -193,12 +194,15 @@ topSortHWTys hwtys = sorted
 
     edge t@(Vector _ elTy) = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "Vector") t nodesI,,()))
                                       (HashMap.lookup (mkVecZ elTy) nodesI)
+    edge t@(RTree _ elTy)  = maybe [] ((:[]) . (HashMap.lookupDefault (error $ $(curLoc) ++ "RTree") t nodesI,,()))
+                                      (HashMap.lookup (mkVecZ elTy) nodesI)
     edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
                              in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys
     edge _                 = []
 
 normaliseType :: HWType -> HWType
 normaliseType (Vector n ty)    = Vector n (normaliseType ty)
+normaliseType (RTree d ty)     = RTree n (normaliseType ty)
 normaliseType (Product nm tys) = Product nm (map normaliseType tys)
 normaliseType ty@(SP _ _)      = BitVector (typeSize ty)
 normaliseType ty@(Index _)     = Unsigned (typeSize ty)
@@ -207,6 +211,7 @@ normaliseType ty = ty
 
 mkVecZ :: HWType -> HWType
 mkVecZ (Vector _ elTy) = Vector 0 elTy
+mkVecZ (RTree _ elTy)  = RTree 0 elTy
 mkVecZ t               = t
 
 tyDec :: HWType -> VHDLM Doc
@@ -217,6 +222,13 @@ tyDec (Vector _ elTy) = do
               <+> "std_logic_vector" <> parens (int (typeSize elTy - 1) <+> "downto 0") <> semi
     _ -> "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of"
          <+> vhdlType elTy <> semi
+
+tyDec (RTree _ elTy) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> "type" <+> "tree_of_" <> tyName elTy <+> "is array (integer range <>) of"
+              <+> "std_logic_vector" <> parens (int (typeSize elTy - 1) <+> "downto 0") <> semi
+    _ ->  "type" <+> "tree_of_" <> tyName elTy <+> "is array (integer range <>) of" <+> vhdlType elTy <> semi
 
 tyDec ty@(Product _ tys@(_:_:_)) = prodDec
   where
@@ -334,6 +346,29 @@ funDec _ (BitVector _) = Just
     "end" <> semi
   )
 
+funDec syn t@(RTree _ elTy) = Just
+  ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <+> "is" <$>
+      indent 2
+        ( "alias ivalue    :" <+> vhdlTypeMark t <> "(1 to value'length) is value;" <$>
+          "variable result :" <+> "std_logic_vector" <> parens ("1 to value'length * " <> int (typeSize elTy)) <> semi
+        ) <$>
+    "begin" <$>
+      indent 2
+        ("for i in ivalue'range loop" <$>
+            indent 2
+              (  "result" <> parens (parens ("(i - 1) * " <> int (typeSize elTy)) <+> "+ 1" <+>
+                                             "to i*" <> int (typeSize elTy)) <+>
+                          ":=" <+> (case syn of
+                                      Vivado -> "ivalue" <> parens ("i")
+                                      _ -> "toSLV" <> parens ("ivalue" <> parens ("i"))) <> semi
+              ) <$>
+         "end" <+> "loop" <> semi <$>
+         "return" <+> "result" <> semi
+        ) <$>
+    "end" <> semi
+  )
+
 funDec _ _ = Nothing
 
 tyImports :: String -> VHDLM Doc
@@ -402,6 +437,9 @@ vhdlType hwty = do
     go (Vector n elTy) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
+    go (RTree d elTy)  = do
+      nm <- use modNm
+      text (T.toLower $ T.pack nm) <> "_types.tree_of_" <> tyName elTy <> parens ("0 to " <> int ((2^d)-1))
     go t@(Product _ _) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types." <> tyName t
@@ -428,6 +466,9 @@ vhdlTypeMark hwty = do
     go (Vector _ elTy) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy
+    go (RTree _ elTy)  = do
+      nm <- use modNm
+      text (T.toLower $ T.pack nm) <> "_types.tree_of_" <> tyName elTy
     go t@(Product _ _) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types." <> tyName t
@@ -438,6 +479,7 @@ tyName Bool              = "boolean"
 tyName (Clock _ _)       = "std_logic"
 tyName (Reset _ _)       = "std_logic"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (RTree n elTy)    = "tree_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)     = "std_logic_vector_" <> int n
 tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
@@ -476,6 +518,13 @@ vhdlTypeErrValue t@(Vector n elTy)   = do
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
                  rarrow <+> "'X'"))
     _ -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> vhdlTypeErrValue elTy)
+vhdlTypeErrValue t@(RTree n elTy)    = do
+  syn <-hdlSyn
+  case syn of
+    Vivado -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+>
+                "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
+                 rarrow <+> "'X'"))
+    _ -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> vhdlTypeErrValue elTy)
 vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhdlTypeErrValue elTys)
 vhdlTypeErrValue (Reset _ _)         = "'X'"
 vhdlTypeErrValue (Clock _ _)         = "'X'"
@@ -568,6 +617,15 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
     _ -> text id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> parens (int 1 <+> "to" <+> int (n-1))
 
+expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 _),0,1)))) = text id_ <> parens (int 0)
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
+  let z = 2^(n-1)
+  in  text id_ <> parens (int 0 <+> "to" <+> int (z-1))
+expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,2)))) =
+  let z  = 2^(n-1)
+      z' = 2^n
+  in  text id_ <> parens (int z <+> "to" <+> int (z'-1))
+
 -- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
@@ -578,6 +636,11 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),10,fI)))) = do
       id' <- fmap (displayT . renderOneLine) (text id_ <> parens (int fI))
       fromSLV elTy id' (typeSize elTy - 1) 0
     _ -> text id_ <> parens (int fI)
+
+-- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
+-- RTree's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+expr_ _ (Identifier id_ (Just (Indexed ((RTree _ _),10,fI)))) = text id_ <> parens (int fI)
 
 expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
   where
@@ -612,6 +675,24 @@ expr_ _ e@(DataCon ty@(Vector _ elTy) _ [e1,e2]) = do
     _ -> vhdlTypeMark ty <> "'" <> case vectorChain e of
             Just es -> tupled (mapM (expr_ False) es)
             Nothing -> parens (vhdlTypeMark elTy <> "'" <> parens (expr_ False e1) <+> "&" <+> expr_ False e2)
+
+expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
+    _ -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
+expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> vhdlTypeMark ty <> "'" <> case rtreeChain e of
+      Just es -> tupled (mapM (toSLV elTy) es)
+      Nothing -> parens ("std_logic_vector'" <> parens (toSLV elTy e1) <+>
+                         "&" <+> expr_ False e2)
+    _ -> vhdlTypeMark ty <> "'" <> case rtreeChain e of
+      Just es -> tupled (mapM (expr_ False) es)
+      Nothing -> parens (vhdlTypeMark (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
+                         "&" <+> expr_ False e2)
+
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where
     argTys     = snd $ args !! i
@@ -702,6 +783,13 @@ expr_ _ (DataTag (Vector _ _) (Right _)) = do
   iw <- use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
+expr_ _ (DataTag (RTree 0 _) (Right _)) = do
+  iw <- use intWidth
+  "to_signed" <> parens (int 0 <> "," <> int iw)
+expr_ _ (DataTag (RTree _ _) (Right _)) = do
+  iw <- use intWidth
+  "to_signed" <> parens (int 1 <> "," <> int iw)
+
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
 otherSize :: [HWType] -> Int -> Int
@@ -714,6 +802,11 @@ vectorChain (DataCon (Vector 0 _) _ _)        = Just []
 vectorChain (DataCon (Vector 1 _) _ [e])     = Just [e]
 vectorChain (DataCon (Vector _ _) _ [e1,e2]) = Just e1 <:> vectorChain e2
 vectorChain _                                       = Nothing
+
+rtreeChain :: Expr -> Maybe [Expr]
+rtreeChain (DataCon (RTree 1 _) _ [e])     = Just [e]
+rtreeChain (DataCon (RTree _ _) _ [e1,e2]) = A.liftA2 (++) (rtreeChain e1) (rtreeChain e2)
+rtreeChain _ = Nothing
 
 exprLit :: Maybe (HWType,Size) -> Literal -> VHDLM Doc
 exprLit Nothing (NumLit i) = integer i
