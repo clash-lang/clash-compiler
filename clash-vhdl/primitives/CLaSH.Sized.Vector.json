@@ -81,7 +81,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
-    , "templateE" : "~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1])"
+    , "templateE" : "~TYPMO'(~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1]))"
     }
   }
 , { "BlackBox" :

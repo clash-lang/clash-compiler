@@ -25,7 +25,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.++#"
     , "type"      : "(++#) :: KnownNat m => BitVector n -> BitVector m -> BitVector (n + m)"
-    , "templateE" : "std_logic_vector'(~ARG[1]) & std_logic_vector'(~ARG[2])"
+    , "templateE" : "std_logic_vector'(std_logic_vector'(~ARG[1]) & std_logic_vector'(~ARG[2]))"
     }
   }
 , { "BlackBox" :
