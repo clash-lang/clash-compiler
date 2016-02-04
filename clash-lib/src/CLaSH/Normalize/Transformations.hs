@@ -975,10 +975,10 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
               else return e
           _ -> return e
       "CLaSH.Sized.Vector.dfold" | length args == 8 ->
-        let ([kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
+        let ([_kn,_motive,fun,start,arg],[_mTy,nTy,aTy]) = Either.partitionEithers args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> reduceDFold n aTy fun start arg
-          _ -> error $ "DIE!\n" ++ show kn
+          _ -> return e
       "CLaSH.Sized.Vector.++" | length args == 5 ->
         let [nTy,aTy,mTy] = Either.rights args
             [lArg,rArg]   = Either.lefts args
