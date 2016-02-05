@@ -1,0 +1,16 @@
+language: haskell-stack
+
+env:
+  - GHCVER=7.10.3 CABALVER=1.22 STACK_SOLVER=YES
+  - GHCVER=7.10.3 STACK_YAML=stack-lts5.yaml
+
+matrix:
+  fast_finish: true
+
+notifications:
+  irc:
+    channels:
+    - "irc.freenode.org#clash-lang"
+    skip_join: true
+    template:
+    - "\x0313clash-prelude\x0f/\x0306%{branch}\x0f \x0314%{commit}\x0f %{message} \x0302\x1f%{build_url}\x0f"
