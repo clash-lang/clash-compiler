@@ -460,7 +460,7 @@ We are now almost at the point that we can create actual hardware, in the form
 of a <http://en.wikipedia.org/wiki/VHDL VHDL> netlist, from our sequential
 circuit specification. The first thing we have to do is create a function
 called 'topEntity' and ensure that it has a __monomorphic__ type. In our case
-that means that we have to give it an explicit type annotation. It might now
+that means that we have to give it an explicit type annotation. It might not
 always be needed, you can always check the type with the @:t@ command and see
 if the function is monomorphic:
 
