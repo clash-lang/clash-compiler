@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.6
+* Fixes bugs:
+  * `CLaSH.Prelude.DataFlow.parNDF` is not lazy enough
+
 ## 0.10.5 *January 13th 2015*
 * New features:
   * Add `readNew` to `CLaSH.Prelude.BlockRam`: create a read-after-write blockRAM from a read-before-write blockRAM.

@@ -294,7 +294,7 @@ parNDF fs =
             aVs' = unbundle' clk aVs
             bRs' = unbundle' clk bRs
             (bs,bVs,aRs) = unzip3 (zipWith (\k (a,b,r) -> df k a b r) fs
-                                  (zip3 as' aVs' bRs'))
+                                  (zip3 (lazyV as') (lazyV aVs') bRs'))
         in  (bundle' clk bs,bundle' clk bVs, bundle' clk aRs)
      )
 
