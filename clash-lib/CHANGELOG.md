@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.10
+* Fixes bugs:
+  * `caseCon` transformation does not work on non-exhaustive case-expressions
+
 ## 0.6.9
 * Fixes bugs:
   * `case undefined of ...` should reduce to `undefined` [#116](https://github.com/clash-lang/clash-compiler/issues/109)

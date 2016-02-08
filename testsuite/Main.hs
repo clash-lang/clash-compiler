@@ -69,6 +69,7 @@ main =
             ]
         , testGroup "Fixed"
             [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
             ]
         , testGroup "HOPrim"
             [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))

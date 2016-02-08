@@ -210,7 +210,7 @@ inlineNonRep _ e = return e
 -- the subject is (an application of) a DataCon; or if there is only a single
 -- alternative that doesn't reference variables bound by the pattern.
 caseCon :: NormRewrite
-caseCon _ c@(Case scrut _ alts)
+caseCon _ (Case scrut ty alts)
   | (Data dc, args) <- collectArgs scrut
   = do
     alts' <- mapM unbind alts
@@ -228,7 +228,7 @@ caseCon _ c@(Case scrut _ alts)
         in  changed (substTysinTm substTyMap e')
       _ -> case alts' of
              ((DefaultPat,e):_) -> changed e
-             _ -> error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
+             _ -> changed (mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right ty])
   where
     equalCon dc (DataPat dc' _) = dcTag dc == dcTag (unembed dc')
     equalCon _  _               = False
