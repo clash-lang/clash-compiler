@@ -1226,7 +1226,7 @@ and
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.blockRam'"
+    { "name"      : "CLaSH.Prelude.BlockRam.blockRam#"
     , "templateD" :
 "// blockRam
 ~SIGD[RAM_~SYM[0]][2];
