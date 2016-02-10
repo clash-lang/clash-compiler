@@ -7,6 +7,9 @@ packages:
 - 'clash-vhdl'
 - 'clash-ghc'
 - 'testsuite'
+- location:
+    git: https://github.com/clash-lang/clash-prelude.git
+    commit: 1ff670d0e2fd9be3f011bc3fb6a9dc5c5388741f
 
 extra-deps:
 - ghc-typelits-natnormalise-0.4.1
