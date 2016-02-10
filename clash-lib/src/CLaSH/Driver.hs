@@ -24,6 +24,7 @@ import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
 import qualified Data.Time.Clock                  as Clock
 import qualified System.Directory                 as Directory
+import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc)
@@ -114,10 +115,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let hdlState' = fromMaybe (initBackend iw :: backend) hdlState
       topWrapper = mkTopWrapper primMap' annM modName iw topComponent
       hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
-      dir = concat [ "./" ++ CLaSH.Backend.name hdlState' ++ "/"
-                   , takeWhile (/= '.') (name2String topEntity)
-                   , "/"
-                   ]
+      dir = fromMaybe "." (opt_hdlDir opts) </>
+            CLaSH.Backend.name hdlState' </>
+            takeWhile (/= '.') (name2String topEntity)
   prepareDir (opt_cleanhdl opts) (extension hdlState') dir
   mapM_ (writeHDL hdlState' dir) hdlDocs
   copyDataFiles dir dfiles'
@@ -170,7 +170,7 @@ prepareDir cleanhdl ext dir = do
 -- | Writes a HDL file to the given directory
 writeHDL :: Backend backend => backend -> FilePath -> (String, Doc) -> IO ()
 writeHDL backend dir (cname, hdl) = do
-  handle <- IO.openFile (dir ++ cname ++ CLaSH.Backend.extension backend) IO.WriteMode
+  handle <- IO.openFile (dir </> cname <.> CLaSH.Backend.extension backend) IO.WriteMode
   hPutDoc handle hdl
   IO.hPutStr handle "\n"
   IO.hClose handle

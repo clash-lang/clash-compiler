@@ -1578,12 +1578,21 @@ makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do opts  <- readIORef optsRef
               let iw = opt_intWidth opts
+                  -- determine whether `-outputdir` was used
+                  outputDir = do odir <- objectDir dflags
+                                 hidir <- hiDir dflags
+                                 sdir <- stubDir dflags
+                                 ddir <- dumpDir dflags
+                                 if all (== odir) [hidir,sdir,ddir]
+                                    then Just odir
+                                    else Nothing
+                  opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)}
               primDir <- CLaSH.Backend.primDir (backend iw)
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src (Just dflags)
                 CLaSH.Driver.generateHDL bindingsMap (Just (backend iw)) primMap tcm
-                  tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts
+                  tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts'
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> VHDLState)

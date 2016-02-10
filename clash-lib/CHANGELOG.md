@@ -1,6 +1,8 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
 ## 0.6.10
+* New features:
+  * hdl files can be written to a directory other than the current working directory [#125](https://github.com/clash-lang/clash-compiler/issues/125)
 * Fixes bugs:
   * `caseCon` transformation does not work on non-exhaustive case-expressions
 

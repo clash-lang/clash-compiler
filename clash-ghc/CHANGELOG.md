@@ -1,5 +1,15 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.10
+* New features:
+  * hdl files can be written to a directory (set by the `-clash-hdldir` flag) other than the current working directory.[#125](https://github.com/clash-lang/clash-compiler/issues/125)
+    Also respects the `-outputdir` directory, _unless_:
+      * `-clash-hdldir` is set to a different directory.
+      * `-hidir`, `-stubdir`, and `-dumbdir` are not the same directory as `-odir`
+* Fixes bugs:
+  * `caseCon` transformation does not work on non-exhaustive case-expressions
+  * VHDL: insufficient type-qualifiers for concatenation operator [#121](https://github.com/clash-lang/clash-compiler/issues/121)
+
 ## 0.6.9 *January 29th 2016*
 * New features:
   * Support for `Debug.Trace.trace`, thanks to @ggreif

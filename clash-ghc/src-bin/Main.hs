@@ -124,6 +124,7 @@ main = do
                              , opt_inlineBelow = 15
                              , opt_cleanhdl    = True
                              , opt_intWidth    = WORD_SIZE_IN_BITS
+                             , opt_hdlDir      = Nothing
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 

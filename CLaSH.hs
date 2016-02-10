@@ -34,7 +34,7 @@ doHDL b src = do
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
   (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS) reduceConstant topEnt testInpM expOutM (CLaSHOpts 20 20 15 DebugFinal True WORD_SIZE_IN_BITS)
+  generateHDL bindingsMap (Just b) primMap tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS) reduceConstant topEnt testInpM expOutM (CLaSHOpts 20 20 15 DebugFinal True WORD_SIZE_IN_BITS Nothing)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

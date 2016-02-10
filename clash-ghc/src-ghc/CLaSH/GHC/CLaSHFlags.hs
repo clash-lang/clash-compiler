@@ -42,6 +42,7 @@ flagsClash r = [
   , defFlag "clash-debug" (SepArg (setDebugLevel r))
   , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
   , defFlag "clash-intwidth" (IntSuffix (setIntWidth r))
+  , defFlag "clash-hdldir" (SepArg (setHdlDir r))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -76,3 +77,8 @@ setIntWidth r n =
   if n == 32 || n == 64
      then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
+
+setHdlDir :: IORef CLaSHOpts
+          -> String
+          -> EwM IO ()
+setHdlDir r s = liftEwM $ modifyIORef r (\c -> c {opt_hdlDir = Just s})
