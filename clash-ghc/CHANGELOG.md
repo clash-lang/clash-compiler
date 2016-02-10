@@ -2,12 +2,12 @@
 
 ## 0.6.10
 * New features:
-  * hdl files can be written to a directory (set by the `-clash-hdldir` flag) other than the current working directory.[#125](https://github.com/clash-lang/clash-compiler/issues/125)
+  * hdl files can be written to a directory (set by the `-clash-hdldir` flag) other than the current working directory [#125](https://github.com/clash-lang/clash-compiler/issues/125).
     Also respects the `-outputdir` directory, _unless_:
       * `-clash-hdldir` is set to a different directory.
       * `-hidir`, `-stubdir`, and `-dumbdir` are not the same directory as `-odir`
 * Fixes bugs:
-  * `caseCon` transformation does not work on non-exhaustive case-expressions
+  * `caseCon` transformation does not work on non-exhaustive case-expressions [#123](https://github.com/clash-lang/clash-compiler/issues/123)
   * VHDL: insufficient type-qualifiers for concatenation operator [#121](https://github.com/clash-lang/clash-compiler/issues/121)
   * Primitive reductions don't look through `Signal` [#126](https://github.com/clash-lang/clash-compiler/issues/126)
 
