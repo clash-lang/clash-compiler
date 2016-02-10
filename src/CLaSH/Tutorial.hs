@@ -1047,7 +1047,7 @@ We will use 'blockRam#' as an example, for which the Haskell/CλaSH code is:
 @
 {\-\# NOINLINE blockRam# \#-\}
 -- | blockRAM primitive
-blockRam' :: 'GHC.TypeLits.KnownNat' n
+blockRam# :: 'GHC.TypeLits.KnownNat' n
           => 'SClock' clk       -- ^ \'Clock\' to synchronize to
           -> 'Vec' n a          -- ^ Initial content of the BRAM, also
                               -- determines the size, \@n\@, of the BRAM.
@@ -1060,7 +1060,7 @@ blockRam' :: 'GHC.TypeLits.KnownNat' n
           -> 'Signal'' clk a
           -- ^ Value of the \@blockRAM\@ at address \@r\@ from the previous clock
           -- cycle
-blockRam' clk binit wr rd en din = 'register'' clk undefined dout
+blockRam# clk binit wr rd en din = 'register'' clk undefined dout
   where
     szI  = fromInteger $ 'maxIndex' content
     dout = runST $ do

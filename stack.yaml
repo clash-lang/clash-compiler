@@ -5,3 +5,7 @@ packages:
 
 extra-deps:
 - ghc-typelits-natnormalise-0.4.1
+
+flags:
+  clash-prelude:
+    doclinks: true
