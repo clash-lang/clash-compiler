@@ -284,7 +284,7 @@ reduceDFold n aTy fun start arg = do
         [_,consCon]      = tyConDataCons vecTc
         (vars,elems)     = second concat . unzip
                          $ extractElems consCon aTy 'D' n arg
-    ([_ltv,Right snTy,_etaTy,_eta1Ty],_) <- splitFunForallTy <$> termType tcm fun
+    (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm fun
     let (TyConApp snatTcNm _) = coreView tcm snTy
         (Just snatTc)         = HashMap.lookup snatTcNm tcm
         [snatDc]              = tyConDataCons snatTc
