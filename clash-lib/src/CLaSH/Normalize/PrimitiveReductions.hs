@@ -42,9 +42,9 @@ import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys,
 import           CLaSH.Core.Literal               (Literal (..))
 import           CLaSH.Core.Term                  (Term (..), Pat (..))
 import           CLaSH.Core.Type                  (LitTy (..), Type (..),
-                                                   TypeView (..), mkFunTy,
-                                                   mkTyConApp, splitFunForallTy,
-                                                   tyView)
+                                                   TypeView (..), coreView,
+                                                   mkFunTy, mkTyConApp,
+                                                   splitFunForallTy)
 import           CLaSH.Core.TyCon                 (TyConName, tyConDataCons)
 import           CLaSH.Core.TysPrim               (typeNatKind)
 import           CLaSH.Core.Util                  (appendToVec, extractElems,
@@ -70,7 +70,7 @@ reduceZipWith :: Int  -- ^ Length of the vector(s)
               -> NormalizeSession Term
 reduceZipWith n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm lhsArg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm lhsArg
   let (Just vecTc)     = HashMap.lookup vecTcNm tcm
       [nilCon,consCon] = tyConDataCons vecTc
       (varsL,elemsL)   = second concat . unzip
@@ -93,7 +93,7 @@ reduceMap :: Int  -- ^ Length of the vector
           -> NormalizeSession Term
 reduceMap n argElTy resElTy fun arg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
   let (Just vecTc)     = HashMap.lookup vecTcNm tcm
       [nilCon,consCon] = tyConDataCons vecTc
       (vars,elems)     = second concat . unzip
@@ -116,8 +116,8 @@ reduceTraverse :: Int  -- ^ Length of the vector
                -> NormalizeSession Term
 reduceTraverse n aTy fTy bTy dict fun arg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm    _) <- tyView <$> termType tcm arg
-  (TyConApp apDictTcNm _) <- tyView <$> termType tcm dict
+  (TyConApp vecTcNm    _) <- coreView tcm <$> termType tcm arg
+  (TyConApp apDictTcNm _) <- coreView tcm <$> termType tcm dict
   let (Just apDictTc)    = HashMap.lookup apDictTcNm tcm
       [apDictCon]        = tyConDataCons apDictTc
       (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
@@ -128,7 +128,7 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
                                                        ,"apConstR"])
                                       (map embed apDictIdTys)
 
-      (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
+      (TyConApp funcDictTcNm _) = coreView tcm (head apDictIdTys)
       (Just funcDictTc) = HashMap.lookup funcDictTcNm tcm
       [funcDictCon] = tyConDataCons funcDictTc
       (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
@@ -234,7 +234,7 @@ reduceFoldr :: Int  -- ^ Length of the vector
             -> NormalizeSession Term
 reduceFoldr n aTy _bTy fun start arg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
   let (Just vecTc)     = HashMap.lookup vecTcNm tcm
       [_,consCon]      = tyConDataCons vecTc
       (vars,elems)     = second concat . unzip
@@ -253,7 +253,7 @@ reduceFold :: Int  -- ^ Length of the vector
            -> NormalizeSession Term
 reduceFold n aTy fun arg = do
     tcm <- Lens.view tcCache
-    (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+    (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
     let (Just vecTc)     = HashMap.lookup vecTcNm tcm
         [_,consCon]      = tyConDataCons vecTc
         (vars,elems)     = second concat . unzip
@@ -279,18 +279,18 @@ reduceDFold :: Int  -- ^ Length of the vector
             -> NormalizeSession Term
 reduceDFold n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+    (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
     let (Just vecTc)     = HashMap.lookup vecTcNm tcm
         [_,consCon]      = tyConDataCons vecTc
         (vars,elems)     = second concat . unzip
                          $ extractElems consCon aTy 'D' n arg
     ([_ltv,Right snTy,_etaTy,_eta1Ty],_) <- splitFunForallTy <$> termType tcm fun
-    let (TyConApp snatTcNm _) = tyView snTy
+    let (TyConApp snatTcNm _) = coreView tcm snTy
         (Just snatTc)         = HashMap.lookup snatTcNm tcm
         [snatDc]              = tyConDataCons snatTc
 
         ([_nTv,_kn,Right pTy],_) = splitFunForallTy (dcType snatDc)
-        (TyConApp proxyTcNm _)   = tyView pTy
+        (TyConApp proxyTcNm _)   = coreView tcm pTy
         (Just proxyTc)           = HashMap.lookup proxyTcNm tcm
         [proxyDc]                = tyConDataCons proxyTc
 
@@ -323,7 +323,7 @@ reduceHead :: Int  -- ^ Length of the vector
            -> NormalizeSession Term
 reduceHead n aTy vArg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm vArg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm vArg
   let (Just vecTc)  = HashMap.lookup vecTcNm tcm
       [_,consCon]   = tyConDataCons vecTc
       (vars,elems)  = second concat . unzip
@@ -340,7 +340,7 @@ reduceTail :: Int  -- ^ Length of the vector
            -> NormalizeSession Term
 reduceTail n aTy vArg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm vArg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm vArg
   let (Just vecTc) = HashMap.lookup vecTcNm tcm
       [_,consCon]  = tyConDataCons vecTc
       (_,elems)    = second concat . unzip
@@ -360,7 +360,7 @@ reduceAppend :: Int  -- ^ Length of the LHS arg
              -> NormalizeSession Term
 reduceAppend n m aTy lArg rArg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm lArg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm lArg
   let (Just vecTc) = HashMap.lookup vecTcNm tcm
       [_,consCon]  = tyConDataCons vecTc
       (vars,elems) = second concat . unzip
@@ -379,7 +379,7 @@ reduceUnconcat :: Int  -- ^ Length of the result vector
                -> NormalizeSession Term
 reduceUnconcat n 0 aTy arg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
   let (Just vecTc)     = HashMap.lookup vecTcNm tcm
       [nilCon,consCon] = tyConDataCons vecTc
       nilVec           = mkVec nilCon consCon aTy 0 []
@@ -399,7 +399,7 @@ reduceTranspose :: Int  -- ^ Length of the result vector
                 -> NormalizeSession Term
 reduceTranspose n 0 aTy arg = do
   tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- tyView <$> termType tcm arg
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
   let (Just vecTc)     = HashMap.lookup vecTcNm tcm
       [nilCon,consCon] = tyConDataCons vecTc
       nilVec           = mkVec nilCon consCon aTy 0 []
@@ -416,7 +416,7 @@ reduceReplicate :: Int
                 -> NormalizeSession Term
 reduceReplicate n aTy eTy arg = do
   tcm <- Lens.view tcCache
-  let (TyConApp vecTcNm _) = tyView eTy
+  let (TyConApp vecTcNm _) = coreView tcm eTy
       (Just vecTc) = HashMap.lookup vecTcNm tcm
       [nilCon,consCon] = tyConDataCons vecTc
       retVec = mkVec nilCon consCon aTy n (replicate n arg)

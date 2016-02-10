@@ -9,6 +9,7 @@
 * Fixes bugs:
   * `caseCon` transformation does not work on non-exhaustive case-expressions
   * VHDL: insufficient type-qualifiers for concatenation operator [#121](https://github.com/clash-lang/clash-compiler/issues/121)
+  * Primitive reductions don't look through `Signal` [#126](https://github.com/clash-lang/clash-compiler/issues/126)
 
 ## 0.6.9 *January 29th 2016*
 * New features:

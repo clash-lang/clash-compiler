@@ -5,6 +5,7 @@
   * hdl files can be written to a directory other than the current working directory [#125](https://github.com/clash-lang/clash-compiler/issues/125)
 * Fixes bugs:
   * `caseCon` transformation does not work on non-exhaustive case-expressions
+  * Primitive reductions don't look through `Signal` [#126](https://github.com/clash-lang/clash-compiler/issues/126)
 
 ## 0.6.9
 * Fixes bugs:
