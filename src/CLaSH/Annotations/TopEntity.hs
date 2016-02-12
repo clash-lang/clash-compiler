@@ -205,8 +205,8 @@ data TopEntity
   -- * __Verilog__: @[n-1:0]@
   -- * __SystemVerilog__: @logic [n-1:0]@
   , t_extraOut :: [(String,Int)]
-  -- ^ Extra output ports, where every tuple holds the name of the input port
-  -- and the number of bits are used for that input port.
+  -- ^ Extra output ports, where every tuple holds the name of the output port
+  -- and the number of bits are used for that output port.
   --
   -- So given a bit-width @n@, the port has type:
   --
