@@ -100,9 +100,10 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Testbench") Both [] "SyncTB" (Just ("testbench",True))
             ]
         , testGroup "Vector"
-            [ runTest ("tests" </> "shouldwork" </> "Vector") Both [] "EnumTypes" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Concat" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold2" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "EnumTypes" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "FindIndex" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Fold" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Foldr" (Just ("testbench",True))
@@ -114,6 +115,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "PatHOCon" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Split" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "ToList" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Unconcat" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VACC" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VIndex" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecConst" (Just ("topEntity",False))
@@ -138,6 +140,7 @@ clashHDL t env extraArgs modName =
                        ,case t of { VHDL -> "--vhdl"
                                   ; Verilog -> "--verilog"
                                   }
+                       ,"-clash-hdlsyn", "Vivado"
                        ]
                       ,extraArgs
                       ,[modName <.> "hs"]

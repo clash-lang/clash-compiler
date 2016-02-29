@@ -288,9 +288,9 @@ mkFunApp dst fun args = do
                 (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False t e) (zip args argTys)
                 (argExprs',argDecls') <- (second concat . unzip) <$> mapM toSimpleVar (zip argExprs argTys)
                 let dstId         = mkBasicId . Text.pack . name2String $ varName dst
-                    hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-                    inpAssigns    = zip (map fst compInps) argExprs'
-                    outpAssign    = (fst compOutp,Identifier dstId Nothing)
+                    hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
+                    inpAssigns    = zipWith (\(i,t) e -> (i,In,t,e)) compInps argExprs'
+                    outpAssign    = (fst compOutp,Out,snd compOutp,Identifier dstId Nothing)
                     instLabel     = Text.concat [compName, Text.pack "_", dstId]
                     instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
                 tell (fromList hidden)

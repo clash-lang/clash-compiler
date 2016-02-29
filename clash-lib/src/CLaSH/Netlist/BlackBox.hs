@@ -249,9 +249,9 @@ mkFunInput resId e = do
               case HashMap.lookup fun normalized of
                 Just _ -> do
                   (Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
-                  let hiddenAssigns = map (\(i,_) -> (i,Identifier i Nothing)) hidden
-                      inpAssigns    = zip (map fst compInps) [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
-                      outpAssign    = (fst compOutp,Identifier (pack "~RESULT") Nothing)
+                  let hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
+                      inpAssigns    = zipWith (\(i,t) e' -> (i,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                      outpAssign    = (fst compOutp,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
                       instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)

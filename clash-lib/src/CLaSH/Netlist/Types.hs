@@ -122,9 +122,12 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl !Identifier !Identifier [(Identifier,Expr)] -- ^ Instantiation of another component
+  | InstDecl !Identifier !Identifier [(Identifier,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
   | BlackBoxD !S.Text !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
   | NetDecl !Identifier !HWType -- ^ Signal declaration
+  deriving Show
+
+data PortDirection = In | Out
   deriving Show
 
 instance NFData Declaration where

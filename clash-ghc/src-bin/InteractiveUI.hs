@@ -114,6 +114,7 @@ import           CLaSH.Driver.Types (CLaSHOpts(..))
 import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
+import           CLaSH.Netlist.BlackBox.Types (HdlSyn)
 import qualified CLaSH.Primitives.Util
 import           CLaSH.Util (clashLibVersion)
 import qualified Data.Version as Data.Version
@@ -1555,7 +1556,7 @@ modulesLoadedMsg ok mods = do
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg
 
 makeHDL' :: CLaSH.Backend.Backend backend
-         => (Int -> backend)
+         => (Int -> HdlSyn -> backend)
          -> IORef CLaSHOpts
          -> [FilePath]
          -> InputT GHCi ()
@@ -1570,7 +1571,7 @@ makeHDL' backend opts lst = makeHDL backend opts =<< case lst of
 
 makeHDL :: GHC.GhcMonad m
         => CLaSH.Backend.Backend backend
-        => (Int -> backend)
+        => (Int -> HdlSyn -> backend)
         -> IORef CLaSHOpts
         -> [FilePath]
         -> m ()
@@ -1578,6 +1579,7 @@ makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do opts  <- readIORef optsRef
               let iw = opt_intWidth opts
+                  syn = opt_hdlSyn opts
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
                                  hidir <- hiDir dflags
@@ -1587,21 +1589,21 @@ makeHDL backend optsRef srcs = do
                                     then Just odir
                                     else Nothing
                   opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)}
-              primDir <- CLaSH.Backend.primDir (backend iw)
+              primDir <- CLaSH.Backend.primDir (backend iw syn)
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src (Just dflags)
-                CLaSH.Driver.generateHDL bindingsMap (Just (backend iw)) primMap tcm
+                CLaSH.Driver.generateHDL bindingsMap (Just (backend iw syn)) primMap tcm
                   tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts'
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
-makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> VHDLState)
+makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VHDLState)
 
 makeVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
-makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> VerilogState)
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VerilogState)
 
 makeSystemVerilog :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
-makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> SystemVerilogState)
 
 -----------------------------------------------------------------------------
 -- :type

@@ -39,7 +39,9 @@ data Element = C   !Text         -- ^ Constant
              | IF !Element [Element] [Element]
              | IW64              -- ^ Hole indicating whether Int/Word/Integer
                                  -- are 64-Bit
-             | BV Bool [Element] (Maybe Int) -- ^ Convert to (True)/from(False) a bit-vector
+             | HdlSyn HdlSyn     -- ^ Hole indicating which synthesis tool we're
+                                 -- generating HDL for
+             | BV !Bool [Element] !Element -- ^ Convert to (True)/from(False) a bit-vector
              | SigD [Element] !(Maybe Int)
   deriving Show
 
@@ -52,3 +54,6 @@ data Element = C   !Text         -- ^ Constant
 -- is the type of the signal
 data Decl = Decl !Int [(BlackBoxTemplate,BlackBoxTemplate)]
   deriving Show
+
+data HdlSyn = Vivado | Other
+  deriving (Eq,Show,Read)

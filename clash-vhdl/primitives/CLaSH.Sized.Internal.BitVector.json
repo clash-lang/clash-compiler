@@ -243,11 +243,15 @@ end block;
 split_~SYM[0]: block
   signal ~SYM[1] : ~TYP[1];
 begin
+~IF ~VIVADO ~THEN
+  ~RESULT <= ~ARG[1];
+~ELSE
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= ( ~SYM[1](~RESULT.~TYPMO_sel0'left + ~RESULT.~TYPMO_sel1'length downto
                ~RESULT.~TYPMO_sel0'right + ~RESULT.~TYPMO_sel1'length)
              , ~SYM[1](~RESULT.~TYPMO_sel1'left downto ~RESULT.~TYPMO_sel1'right)
              );
+~FI
 end block;
 -- split end"
     }

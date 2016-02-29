@@ -43,6 +43,7 @@ flagsClash r = [
   , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
   , defFlag "clash-intwidth" (IntSuffix (setIntWidth r))
   , defFlag "clash-hdldir" (SepArg (setHdlDir r))
+  , defFlag "clash-hdlsyn" (SepArg (setHdlSyn r))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -82,3 +83,10 @@ setHdlDir :: IORef CLaSHOpts
           -> String
           -> EwM IO ()
 setHdlDir r s = liftEwM $ modifyIORef r (\c -> c {opt_hdlDir = Just s})
+
+setHdlSyn :: IORef CLaSHOpts
+          -> String
+          -> EwM IO ()
+setHdlSyn r s = case readMaybe s of
+  Just hdlSyn -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = hdlSyn})
+  Nothing     -> addWarn (s ++ " is an invalid debug level")

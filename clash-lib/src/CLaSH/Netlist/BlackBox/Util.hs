@@ -203,6 +203,7 @@ renderElem b (SigD e m) = do
 
 renderElem b (IF c t f) = do
   iw <- iwWidth
+  syn <- hdlSyn
   let c' = case c of
              (Size e)   -> typeSize (lineToType b [e])
              (Length e) -> case lineToType b [e] of
@@ -211,7 +212,8 @@ renderElem b (IF c t f) = do
              (L n)      -> case bbInputs b !! n of
                              (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
                              _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
-             IW64      -> if iw == 64 then 1 else 0
+             IW64       -> if iw == 64 then 1 else 0
+             (HdlSyn s) -> if s == syn then 1 else 0
              _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, or LIT"
   if c' > 0 then renderBlackBox t b else renderBlackBox f b
 
@@ -274,22 +276,14 @@ renderTag b (L n)           = let (s,_,_) = bbInputs b !! n
 
 renderTag _ (Sym n)         = return $ Text.pack ("n_" ++ show n)
 
-renderTag b (BV True es (Just n)) = do
+renderTag b (BV True es e) = do
   e' <- Text.concat <$> mapM (renderElem b) es
-  let (_,hty,_) = bbInputs b !! n
-  (displayT . renderOneLine) <$> toBV hty e'
-renderTag b (BV True es Nothing) = do
+  let ty = lineToType b [e]
+  (displayT . renderOneLine) <$> toBV ty e'
+renderTag b (BV False es e) = do
   e' <- Text.concat <$> mapM (renderElem b) es
-  let (_,hty) = bbResult b
-  (displayT . renderOneLine) <$> toBV hty e'
-renderTag b (BV False es (Just n)) = do
-  e' <- Text.concat <$> mapM (renderElem b) es
-  let (_,hty,_) = bbInputs b !! n
-  (displayT . renderOneLine) <$> fromBV hty e'
-renderTag b (BV False es Nothing) = do
-  e' <- Text.concat <$> mapM (renderElem b) es
-  let (_,hty) = bbResult b
-  (displayT . renderOneLine) <$> fromBV hty e'
+  let ty = lineToType b [e]
+  (displayT . renderOneLine) <$> fromBV ty e'
 
 renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType . snd $ bbResult b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
@@ -317,6 +311,7 @@ renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
 renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
 renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"
 renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"
+renderTag _ (HdlSyn s)      = error $ $(curLoc) ++ "Unexpected ~" ++ show s
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
@@ -376,16 +371,16 @@ prettyElem (IF b esT esF) = do
      text esF' PP.<$>
      text "~FI")
 prettyElem IW64 = return "~IW64"
-prettyElem (BV b es mI) = do
+prettyElem (HdlSyn s) = case s of
+  Vivado -> return "~VIVADO"
+  _ -> return "~OTHERSYN"
+prettyElem (BV b es e) = do
   es' <- prettyBlackBox es
+  e'  <- prettyBlackBox [e]
   (displayT . renderOneLine) <$>
     if b
-       then maybe (text "~TOBVO" <> brackets (text es'))
-                  (((text "~TOBV" <> brackets (text es')) <>) . int)
-                  mI
-       else maybe (text "~FROMBVO" <> brackets (text es'))
-                  (((text "~FROMBV" <> brackets (text es')) <>) . int)
-                  mI
+       then text "~TOBV" <> brackets (text es') <> brackets (text e')
+       else text "~FROMBV" <> brackets (text es') <> brackets (text e')
 prettyElem (SigD es mI) = do
   es' <- prettyBlackBox es
   (displayT . renderOneLine) <$>

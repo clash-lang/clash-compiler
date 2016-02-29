@@ -12,19 +12,12 @@
     , "templateD" :
 "-- blockRam begin
 blockRam_~COMPNAME_~SYM[0] : block
-  type RamType is array(natural range <>) of std_logic_vector(~SIZE[~TYPO]-1 downto 0);
-
-  function init_to_bv (arg : in ~TYP[2]) return RamType is
-    variable RAM_init : RamType(0 to ~LENGTH[~TYP[2]]-1);
-  begin
-    for i in RAM_init'range loop
-      RAM_init(i) := ~TOBV[arg(i)][6];
-    end loop;
-    return RAM_init;
-  end function;
-
-  signal RAM_~SYM[1]  : RamType (0 to ~LENGTH[~TYP[2]]-1) := init_to_bv(~LIT[2]);
+  signal RAM_~SYM[1]  : ~TYP[2] := ~LIT[2];
+~IF ~VIVADO ~THEN
   signal dout_~SYM[2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);
+~ELSE
+  signal dout_~SYM[2] : ~TYP[6];
+~FI
   signal wr_~SYM[3]   : integer range 0 to ~LIT[0] - 1;
   signal rd_~SYM[4]   : integer range 0 to ~LIT[0] - 1;
 begin
@@ -44,13 +37,20 @@ begin
   begin
     if rising_edge(~CLK[1]) then
       if ~ARG[5] then
-        RAM_~SYM[1](wr_~SYM[3]) <= ~TOBV[~ARG[6]][6];
+~IF ~VIVADO ~THEN
+        RAM_~SYM[1](wr_~SYM[3]) <= ~TOBV[~ARG[6]][~TYP[6]];
+~ELSE
+        RAM_~SYM[1](wr_~SYM[3]) <= ~ARG[6];
+~FI
       end if;
       dout_~SYM[2] <= RAM_~SYM[1](rd_~SYM[4]);
     end if;
   end process;
-
-  ~RESULT <= ~FROMBVO[dout_~SYM[2]];
+~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[dout_~SYM[2]][~TYPO];
+~ELSE
+  ~RESULT <= dout_~SYM[2];
+~FI
 end block;
 -- blockRam end"
     }

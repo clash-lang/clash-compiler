@@ -12,10 +12,11 @@ import Control.Monad.State                  (State)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 
 import CLaSH.Netlist.Types
+import CLaSH.Netlist.BlackBox.Types
 
 class Backend state where
   -- | Initial state for state monad
-  initBackend :: Int -> state
+  initBackend :: Int -> HdlSyn -> state
 
   -- | Location for the primitive definitions
   primDir :: state -> IO FilePath
@@ -54,3 +55,5 @@ class Backend state where
   toBV             :: HWType -> Text -> State state Doc
   -- | Convert from a bit-vector
   fromBV           :: HWType -> Text -> State state Doc
+  -- | Synthesis tool we're generating HDL for
+  hdlSyn           :: State state HdlSyn

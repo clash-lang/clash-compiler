@@ -89,10 +89,10 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> SigD              <$> (pToken "~SIGD" *> pBrackets pSigD) <*> (Just <$> (pBrackets pNatural))
      <|> (`SigD` Nothing)  <$> (pToken "~SIGDO" *> pBrackets pSigD)
      <|> IW64              <$  pToken "~IW64"
-     <|> (BV True)         <$> (pToken "~TOBV" *> pBrackets pSigD) <*> (Just <$> pBrackets pNatural)
-     <|> (BV True)         <$> (pToken "~TOBVO" *> pBrackets pSigD) <*> pure Nothing
-     <|> (BV False)        <$> (pToken "~FROMBV" *> pBrackets pSigD) <*> (Just <$> pBrackets pNatural)
-     <|> (BV False)        <$> (pToken "~FROMBVO" *> pBrackets pSigD) <*> pure Nothing
+     <|> (HdlSyn Vivado)   <$  pToken "~VIVADO"
+     <|> (HdlSyn Other)    <$  pToken "~OTHERSYN"
+     <|> (BV True)         <$> (pToken "~TOBV" *> pBrackets pSigD) <*> pBrackets pTagE
+     <|> (BV False)        <$> (pToken "~FROMBV" *> pBrackets pSigD) <*> pBrackets pTagE
 
 -- | Parse a bracketed text
 pBrackets :: Parser a -> Parser a

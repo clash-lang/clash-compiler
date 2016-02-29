@@ -1,5 +1,13 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.11
+* New features:
+  * Add support for HDL synthesis tool specific HDL generation:
+    * New `-clash-hdlsyn Vivado` flag to generate HDL tweaked for Xilinx Vivado
+* Fixes bugs:
+  * VHDL: Vivado fails to infer block ram [#127](https://github.com/clash-lang/clash-compiler/issues/127)
+    * Users must use the `-clash-hdlsyn Vivado` flag in order to generate Xilinx Vivado specific HDL for which Vivado can infer block RAM.
+
 ## 0.6.10
 * New features:
   * hdl files can be written to a directory (set by the `-clash-hdldir` flag) other than the current working directory [#125](https://github.com/clash-lang/clash-compiler/issues/125).

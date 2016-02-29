@@ -79,6 +79,7 @@ import           CLaSH.Backend.VHDL    (VHDLState)
 import           CLaSH.Backend.Verilog (VerilogState)
 import           CLaSH.Driver.Types (CLaSHOpts (..))
 import           CLaSH.GHC.CLaSHFlags
+import           CLaSH.Netlist.BlackBox.Types (HdlSyn (..))
 import           CLaSH.Rewrite.Types (DebugLevel (..))
 import           CLaSH.Util (clashLibVersion)
 import           CLaSH.GHC.LoadModules (ghcLibDir)
@@ -125,6 +126,7 @@ main = do
                              , opt_cleanhdl    = True
                              , opt_intWidth    = WORD_SIZE_IN_BITS
                              , opt_hdlDir      = Nothing
+                             , opt_hdlSyn      = Other
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 
@@ -945,18 +947,18 @@ abiHash strs = do
 -- -----------------------------------------------------------------------------
 -- VHDL Generation
 
-makeHDL' :: CLaSH.Backend.Backend backend => (Int -> backend) ->  IORef CLaSHOpts -> [(String,Maybe Phase)] -> Ghc ()
+makeHDL' :: CLaSH.Backend.Backend backend => (Int -> HdlSyn -> backend) ->  IORef CLaSHOpts -> [(String,Maybe Phase)] -> Ghc ()
 makeHDL' _       _ []   = throwGhcException (CmdLineError "No input files")
 makeHDL' backend r srcs = makeHDL backend r $ fmap fst srcs
 
 makeVHDL :: IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> VHDLState)
+makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VHDLState)
 
 makeVerilog ::  IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> VerilogState)
+makeVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VerilogState)
 
 makeSystemVerilog ::  IORef CLaSHOpts -> [(String, Maybe Phase)] -> Ghc ()
-makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> SystemVerilogState)
+makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> SystemVerilogState)
 
 -- -----------------------------------------------------------------------------
 -- Util

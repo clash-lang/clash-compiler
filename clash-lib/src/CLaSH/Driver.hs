@@ -112,7 +112,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
   putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-  let hdlState' = fromMaybe (initBackend iw :: backend) hdlState
+  let hdlsyn    = opt_hdlSyn opts
+      hdlState' = fromMaybe (initBackend iw hdlsyn :: backend) hdlState
       topWrapper = mkTopWrapper primMap' annM modName iw topComponent
       hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
       dir = fromMaybe "." (opt_hdlDir opts) </>

@@ -1,5 +1,5 @@
 Name:                 clash-lib
-Version:              0.6.10
+Version:              0.6.11
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that

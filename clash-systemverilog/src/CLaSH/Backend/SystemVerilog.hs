@@ -31,6 +31,7 @@ import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
+import           CLaSH.Netlist.BlackBox.Types         (HdlSyn)
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util
@@ -50,6 +51,7 @@ data SystemVerilogState =
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
+    , _hdlsyn    :: HdlSyn
     }
 
 makeLenses ''SystemVerilogState
@@ -86,6 +88,7 @@ instance Backend SystemVerilogState where
   iwWidth         = use intWidth
   toBV hty id_    = verilogTypeMark hty <> "_to_lv" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
+  hdlSyn          = use hdlsyn
 
 type SystemVerilogM a = State SystemVerilogState a
 
@@ -305,7 +308,7 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
 inst_ (InstDecl nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
   where
-    pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,e) <- pms]
+    pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
 inst_ (BlackBoxD _ bs bbCtx) = do
   t <- renderBlackBox bs bbCtx

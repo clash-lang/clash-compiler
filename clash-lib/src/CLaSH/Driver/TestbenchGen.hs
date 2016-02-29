@@ -81,8 +81,8 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
       (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp modName dfiles' iw)
       expectedNmM
 
-  let clkNms = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden
-      rstNms = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden
+  let clkNms = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden
+      rstNms = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden
 
   ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName dfiles'' iw $ do
       varCount .= (_varCount s)
@@ -91,9 +91,10 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
       return (clks',rsts')
 
   let instDecl = InstDecl cName "totest"
-                   (map (\i -> (i,Identifier i Nothing))
-                        (concat [ clkNms, rstNms, [fst inp], [fst outp] ])
-                   )
+                   (map (\(i,t) -> (i,In,t,Identifier i Nothing))
+                        (concat [ clkNms, rstNms, [inp] ])
+                   ++
+                   [(\(i,t) -> (i,Out,t,Identifier i Nothing)) outp])
 
       tbComp = Component (pack modName `append` "_testbench") [] [] [("done",Bool)]
                   (concat [ finDecl
@@ -210,12 +211,12 @@ genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modNa
                                (Component a b [] [(c,_)] _) -> (a,b,c)
                                (Component a _ is _ _)       -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
-      clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden'
-      rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden'
+      clkNms   = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden'
+      rstNms   = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden'
       decl     = InstDecl cName "stimuli"
-                   (map (\i -> (i,Identifier i Nothing))
+                   (map (\(i,t) -> (i,In,t,Identifier i Nothing))
                         (concat [ clkNms, rstNms ]) ++
-                        [(outp,Identifier (fst inp) Nothing)]
+                        [(outp,Out,(snd inp),Identifier (fst inp) Nothing)]
                    )
   return (decl,comps,cmpCnt',hidden'',dfiles')
 
@@ -245,11 +246,11 @@ genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp mod
         (Component a b [(c,_)] [(d,_)] _) -> (a,b,c,d)
         (Component a _ is _ _)            -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
-      clkNms   = mapMaybe (\hd -> case hd of (clkNm,Clock _ _) -> Just clkNm ; _ -> Nothing) hidden'
-      rstNms   = mapMaybe (\hd -> case hd of (clkNm,Reset _ _) -> Just clkNm ; _ -> Nothing) hidden'
+      clkNms   = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden'
+      rstNms   = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden'
       decl     = InstDecl cName "verify"
-                   (map (\i -> (i,Identifier i Nothing))
+                   (map (\(i,t) -> (i,In,t,Identifier i Nothing))
                         (concat [ clkNms, rstNms ]) ++
-                        [(inp,Identifier (fst outp) Nothing),(fin,Identifier "finished" Nothing)]
+                        [(inp,In,snd outp,Identifier (fst outp) Nothing),(fin,Out,Bool,Identifier "finished" Nothing)]
                    )
   return (decl,comps,cmpCnt',hidden'',dfiles')

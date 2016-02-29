@@ -28,7 +28,7 @@ import CLaSH.Netlist.BlackBox.Types   (BlackBoxTemplate)
 import CLaSH.Netlist.Types            (BlackBoxContext (..), Component (..),
                                        Declaration (..), Expr (..), Identifier,
                                        HWType (..), Modifier (..), NetlistMonad,
-                                       emptyBBContext)
+                                       PortDirection(..), emptyBBContext)
 import CLaSH.Primitives.Types         (PrimMap, Primitive (..))
 import CLaSH.Util
 
@@ -80,14 +80,14 @@ mkTopWrapper primMap teM modName iw topComponent
 
     instDecl = InstDecl (componentName topComponent)
                         (append (componentName topComponent) (pack "_inst"))
-                        (zipWith (\(p,_) i -> (p,Identifier i Nothing))
+                        (zipWith (\(p,t) i -> (p,In,t,Identifier i Nothing))
                                  (inputs topComponent)
                                  idsI
                          ++
-                         map (\(p,_) -> (p,Identifier p Nothing))
+                         map (\(p,t) -> (p,In,t,Identifier p Nothing))
                              (hiddenPorts topComponent)
                          ++
-                         zipWith (\(p,_) i -> (p,Identifier i Nothing))
+                         zipWith (\(p,t) i -> (p,Out,t,Identifier i Nothing))
                                  (outputs topComponent)
                                  idsO)
 
@@ -231,9 +231,9 @@ mkClock (ClockSource {..}) = (clkDecls ++ [lockedDecl,instDecl],(lockedName,clks
     clkDecls     = map mkClockDecl clks
     instDecl     = InstDecl c_nameT (append c_nameT "_inst")
                  $ concat [ ports
-                          , maybe [] ((:[]) . (pack *** stringToVar))
+                          , maybe [] ((:[]) . (\(i,e) -> (pack i,In,Reset "" 0,stringToVar e)))
                                   c_reset
-                          , [(pack c_lock,Identifier lockedName Nothing)]
+                          , [(pack c_lock,Out,Reset "" 0,Identifier lockedName Nothing)]
                           ]
 
 mkClockDecl :: String -> Declaration
@@ -244,10 +244,11 @@ mkClockDecl s = NetDecl (pack s) (Clock (pack name) (read rate))
 
 -- | Create a single clock path
 clockPorts :: [(String,String)] -> [(String,String)]
-           -> ([(Identifier,Expr)],[String])
-clockPorts inp outp = (ports,clks)
+           -> ([(Identifier,PortDirection,HWType,Expr)],[String])
+clockPorts inp outp = (inPorts ++ outPorts,clks)
   where
-    ports = map (pack *** stringToVar) (inp ++ outp)
+    inPorts  = map (\(i,e) -> (pack i,In,Clock "" 0,stringToVar e)) inp
+    outPorts = map (\(i,e) -> (pack i,Out,Clock "" 0,stringToVar e)) inp
     clks  = map snd outp
 
 -- | Generate resets
