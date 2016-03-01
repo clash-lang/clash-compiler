@@ -16,7 +16,7 @@ import CLaSH.Rewrite.Util
 
 -- | Normalisation transformation
 normalization :: NormRewrite
-normalization = etaTL >-> constantPropgation >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+normalization = constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec
   where
     etaTL      = apply "etaTL" etaExpansionTL
