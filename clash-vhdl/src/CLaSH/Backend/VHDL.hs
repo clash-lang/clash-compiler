@@ -432,7 +432,7 @@ vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
 vhdlTypeErrValue (Index _)           = "(others => 'X')"
 vhdlTypeErrValue (Signed _)          = "(others => 'X')"
 vhdlTypeErrValue (Unsigned _)        = "(others => 'X')"
-vhdlTypeErrValue (Vector _ elTy)     = parens ("others" <+> rarrow <+> vhdlTypeErrValue elTy)
+vhdlTypeErrValue (Vector _ _)        = "(others => (others => 'X'))"
 vhdlTypeErrValue (SP _ _)            = "(others => 'X')"
 vhdlTypeErrValue (Sum _ _)           = "(others => 'X')"
 vhdlTypeErrValue (Product _ elTys)   = do
