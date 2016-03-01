@@ -124,12 +124,8 @@ splitAt_~SYM[0] : block
   signal ~SYM[1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-~IF ~VIVADO ~THEN
-  ~RESULT <= ~TOBV[~SYM[1]][~TYP[1]];
-~ELSE
   ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
              ,~SYM[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));
-~FI
 end block;
 -- splitAt end"
     }
@@ -434,7 +430,7 @@ end block;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
     , "type"      : "replicate :: SNat n -> a -> Vec n a"
-    , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~IF ~VIVADO ~THEN ~TOBV[~ARG[1]][~TYP[1]] ~ELSE ~ARG[1] ~FI)"
+    , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~IF ~VIVADO ~THEN ~TOBV[~TYPM[1]'(~ARG[1])][~TYP[1]] ~ELSE ~ARG[1] ~FI)"
     }
   }
 , { "BlackBox" :
