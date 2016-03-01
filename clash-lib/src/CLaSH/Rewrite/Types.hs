@@ -38,7 +38,7 @@ data CoreContext
   = AppFun           -- ^ Function position of an application
   | AppArg           -- ^ Argument position of an application
   | TyAppC           -- ^ Function position of a type application
-  | LetBinding [Id]  -- ^ RHS of a Let-binder with the sibling LHS'
+  | LetBinding Id [Id] -- ^ RHS of a Let-binder with the sibling LHS'
   | LetBody    [Id]  -- ^ Body of a Let-binding with the bound LHS'
   | LamBody    Id    -- ^ Body of a lambda-term with the abstracted variable
   | TyLamBody  TyVar -- ^ Body of a TyLambda-term with the abstracted

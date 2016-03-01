@@ -144,7 +144,7 @@ contextEnv :: [CoreContext]
 contextEnv = go HML.empty HML.empty
   where
     go gamma delta []                   = (gamma,delta)
-    go gamma delta (LetBinding ids:ctx) = go gamma' delta ctx
+    go gamma delta (LetBinding _ ids:ctx) = go gamma' delta ctx
       where
         gamma' = foldl addToGamma gamma ids
 
@@ -171,6 +171,16 @@ contextEnv = go HML.empty HML.empty
 
     addToDelta delta (TyVar tvName ki) = HML.insert tvName (unembed ki) delta
     addToDelta _     _                 = error $ $(curLoc) ++ "Adding Id to Delta"
+
+closestLetBinder :: [CoreContext] -> Maybe Id
+closestLetBinder [] = Nothing
+closestLetBinder (LetBinding id_ _:_) = Just id_
+closestLetBinder (_:ctx)              = closestLetBinder ctx
+
+mkDerivedName :: [CoreContext] -> String -> String
+mkDerivedName ctx sf = case closestLetBinder ctx of
+  Just id_ -> ((++ ('_':sf)) . name2String . varName) id_
+  _ -> sf
 
 -- | Create a complete type and kind context out of the global binders and the
 -- transformation context
@@ -329,7 +339,7 @@ liftBinders condition ctx expr@(Letrec b) = do
   case replace of
     [] -> return expr
     _  -> do
-      (gamma,delta) <- mkEnv (LetBinding (map fst $ unrec xes) : ctx)
+      (gamma,delta) <- mkEnv (LetBinding undefined (map fst $ unrec xes) : ctx)
       replace' <- mapM (liftBinding gamma delta) replace
       let (others',res') = substituteBinders replace' others res
           newExpr = case others' of

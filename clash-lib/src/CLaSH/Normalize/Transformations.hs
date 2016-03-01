@@ -313,7 +313,7 @@ topLet ctx e
   if untranslatable
     then return e
     else do tcm <- Lens.view tcCache
-            (argId,argVar) <- mkTmBinderFor tcm "topLet" e
+            (argId,argVar) <- mkTmBinderFor tcm "result" e
             changed . Letrec $ bind (rec [(argId,embed e)]) argVar
 
 topLet ctx e@(Letrec b)
@@ -325,7 +325,7 @@ topLet ctx e@(Letrec b)
     if localVar || untranslatable
       then return e
       else do tcm <- Lens.view tcCache
-              (argId,argVar) <- mkTmBinderFor tcm "topLet" body
+              (argId,argVar) <- mkTmBinderFor tcm "result" body
               changed . Letrec $ bind (rec $ unrec binds ++ [(argId,embed body)]) argVar
 
 topLet _ e = return e
@@ -498,7 +498,7 @@ appProp _ (App (Letrec b) arg) = do
   (v,e) <- unbind b
   changed . Letrec $ bind v (App e arg)
 
-appProp _ (App (Case scrut ty alts) arg) = do
+appProp ctx (App (Case scrut ty alts) arg) = do
   tcm <- Lens.view tcCache
   argTy <- termType tcm arg
   let ty' = applyFunTy tcm ty argTy
@@ -511,7 +511,7 @@ appProp _ (App (Case scrut ty alts) arg) = do
                     ) alts
       changed $ Case scrut ty' alts'
     else do
-      (boundArg,argVar) <- mkTmBinderFor tcm "caseApp" arg
+      (boundArg,argVar) <- mkTmBinderFor tcm (mkDerivedName ctx "app_arg") arg
       alts' <- mapM ( return
                     . uncurry bind
                     . second (`App` argVar)
@@ -663,7 +663,7 @@ makeANF ctx e
       _  -> changed . Letrec $ bind (rec bndrs) e'
 
 collectANF :: NormRewriteW
-collectANF _ e@(App appf arg)
+collectANF ctx e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
@@ -671,7 +671,7 @@ collectANF _ e@(App appf arg)
     localVar       <- lift (isLocalVar arg)
     case (untranslatable,localVar || isConstant arg,arg) of
       (False,False,_) -> do tcm <- Lens.view tcCache
-                            (argId,argVar) <- lift (mkTmBinderFor tcm "repANF" arg)
+                            (argId,argVar) <- lift (mkTmBinderFor tcm (mkDerivedName ctx "app_arg") arg)
                             tell [(argId,embed arg)]
                             return (App appf argVar)
       (True,False,Letrec b) -> do (binds,body) <- unbind b
@@ -689,7 +689,7 @@ collectANF _ (Letrec b) = do
     then return body
     else do
       tcm <- Lens.view tcCache
-      (argId,argVar) <- lift (mkTmBinderFor tcm "bodyVar" body)
+      (argId,argVar) <- lift (mkTmBinderFor tcm "result" body)
       tell [(argId,embed body)]
       return argVar
 
@@ -712,12 +712,12 @@ collectANF _ (Letrec b) = do
 collectANF _ e@(Case _ _ [unsafeUnbind -> (DataPat dc _,_)])
   | name2String (dcName $ unembed dc) == "CLaSH.Signal.Internal.:-" = return e
 
-collectANF _ (Case subj ty alts) = do
+collectANF ctx (Case subj ty alts) = do
     localVar     <- lift (isLocalVar subj)
     (bndr,subj') <- if localVar || isConstant subj
       then return ([],subj)
       else do tcm <- Lens.view tcCache
-              (argId,argVar) <- lift (mkTmBinderFor tcm "subjLet" subj)
+              (argId,argVar) <- lift (mkTmBinderFor tcm (mkDerivedName ctx "case_scrut") subj)
               return ([(argId,embed subj)],argVar)
 
     (binds,alts') <- fmap (first concat . unzip) $ mapM (lift . doAlt subj') alts
@@ -738,7 +738,7 @@ collectANF _ (Case subj ty alts) = do
       if (lv && not (usesXs altExpr)) || isConstant altExpr
         then return (patSels,alt)
         else do tcm <- Lens.view tcCache
-                (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
+                (altId,altVar) <- mkTmBinderFor tcm (mkDerivedName ctx "case_alt") altExpr
                 return ((altId,embed altExpr):patSels,(DataPat dc pxs,altVar))
     doAlt' _ alt@(DataPat _ _, _) = return ([],alt)
     doAlt' _ alt@(pat,altExpr) = do
@@ -746,7 +746,7 @@ collectANF _ (Case subj ty alts) = do
       if lv || isConstant altExpr
         then return ([],alt)
         else do tcm <- Lens.view tcCache
-                (altId,altVar) <- mkTmBinderFor tcm "altLet" altExpr
+                (altId,altVar) <- mkTmBinderFor tcm (mkDerivedName ctx "case_alt") altExpr
                 return ([(altId,embed altExpr)],(pat,altVar))
 
     doPatBndr :: Term -> DataCon -> Id -> Int -> RewriteMonad NormalizeState LetBinding
@@ -776,7 +776,7 @@ etaExpansionTL ctx e
                  . splitFunTy tcm
                  <=< termType tcm
                  ) e
-        (newIdB,newIdV) <- mkInternalVar "eta" argTy
+        (newIdB,newIdV) <- mkInternalVar "arg" argTy
         e' <- etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
         changed . Lam $ bind newIdB e'
       else return e

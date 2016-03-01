@@ -62,7 +62,7 @@ allR rf trans c (Letrec b) = do
   where
     rewriteBind :: [Id] -> (Id,Embed Term) -> m (Id,Embed Term)
     rewriteBind bndrs (b', e) = do
-      e' <- trans (LetBinding bndrs:c) (unembed e)
+      e' <- trans (LetBinding b' bndrs:c) (unembed e)
       return (b',embed e')
 
 allR rf trans c (Case scrut ty alts) = do
