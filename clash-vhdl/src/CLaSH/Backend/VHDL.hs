@@ -410,18 +410,15 @@ tyName _ = empty
 -- | Convert a Netlist HWType to an error VHDL value for that type
 vhdlTypeErrValue :: HWType -> VHDLM Doc
 vhdlTypeErrValue Bool                = "true"
-vhdlTypeErrValue (BitVector _)       = "(others => 'X')"
-vhdlTypeErrValue (Index _)           = "(others => 'X')"
-vhdlTypeErrValue (Signed _)          = "(others => 'X')"
-vhdlTypeErrValue (Unsigned _)        = "(others => 'X')"
-vhdlTypeErrValue (Vector _ _)        = "(others => (others => 'X'))"
-vhdlTypeErrValue (SP _ _)            = "(others => 'X')"
-vhdlTypeErrValue (Sum _ _)           = "(others => 'X')"
-vhdlTypeErrValue (Product _ elTys)   = tupled $ mapM vhdlTypeErrValue elTys
+vhdlTypeErrValue t@(Vector n elTy)   = vhdlTypeMark t <> "'" <> (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
+                                       "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
+                                        rarrow <+> "'X'"))
+vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhdlTypeErrValue elTys)
 vhdlTypeErrValue (Reset _ _)         = "'X'"
 vhdlTypeErrValue (Clock _ _)         = "'X'"
-vhdlTypeErrValue Void                = "(0 downto 1 => 'X')"
+vhdlTypeErrValue Void                = "std_logic_vector'(0 downto 1 => 'X')"
 vhdlTypeErrValue String              = "\"ERROR\""
+vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'X'")
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
