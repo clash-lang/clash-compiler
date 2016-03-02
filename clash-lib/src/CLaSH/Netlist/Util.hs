@@ -19,7 +19,7 @@ import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
-import           Data.Text.Lazy          (pack)
+import           Data.Text.Lazy          (append,pack)
 import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed, makeName,
                                           name2Integer, name2String, unbind,
                                           unembed, unrec)
@@ -295,6 +295,20 @@ mkUnique = go []
 
     repName s n = makeName s (name2Integer n)
 
+mkUniqueIdentifier :: Identifier
+                   -> NetlistMonad Identifier
+mkUniqueIdentifier i = do
+  seen <- Lens.use seenIds
+  if i `elem` seen
+     then do
+        varCnt <- varCount <<%= (+1)
+        let i' = i `append` (pack ('_':show varCnt))
+        seenIds Lens.%= (i':)
+        return i'
+     else do
+        seenIds Lens.%= (i:)
+        return i
+
 -- | Append a string to a name
 appendToName :: TmName
              -> String
@@ -309,12 +323,14 @@ preserveVarEnv action = do
   vCnt  <- Lens.use varCount
   vEnv  <- Lens.use varEnv
   vComp <- Lens.use curCompNm
+  vSeen <- Lens.use seenIds
   -- perform action
   val <- action
   -- restore state
   varCount  .= vCnt
   varEnv    .= vEnv
   curCompNm .= vComp
+  seenIds   .= vSeen
   return val
 
 dcToLiteral :: HWType -> Int -> Literal

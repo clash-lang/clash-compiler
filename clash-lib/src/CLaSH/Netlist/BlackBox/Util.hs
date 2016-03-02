@@ -214,7 +214,19 @@ renderElem b (IF c t f) = do
                              _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
              IW64       -> if iw == 64 then 1 else 0
              (HdlSyn s) -> if s == syn then 1 else 0
-             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, or LIT"
+             (IsVar n)  -> let (s,_,_) = bbInputs b !! n
+                               e       = either id fst s
+                           in case e of
+                             Identifier _ Nothing -> 1
+                             _ -> 0
+             (IsLit n)  -> let (s,_,_) = bbInputs b !! n
+                               e       = either id fst s
+                           in case e of
+                             DataCon {} -> 1
+                             Literal {} -> 1
+                             BlackBoxE {} -> 1
+                             _ -> 0
+             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
   if c' > 0 then renderBlackBox t b else renderBlackBox f b
 
 renderElem b e = renderTag b e
@@ -312,6 +324,8 @@ renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
 renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"
 renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"
 renderTag _ (HdlSyn s)      = error $ $(curLoc) ++ "Unexpected ~" ++ show s
+renderTag _ (IsLit _)       = error $ $(curLoc) ++ "Unexpected ~ISLIT"
+renderTag _ (IsVar _)       = error $ $(curLoc) ++ "Unexpected ~ISVAR"
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
@@ -381,6 +395,8 @@ prettyElem (BV b es e) = do
     if b
        then text "~TOBV" <> brackets (text es') <> brackets (text e')
        else text "~FROMBV" <> brackets (text es') <> brackets (text e')
+prettyElem (IsLit i) = (displayT . renderOneLine) <$> (text "~ISLIT" <> brackets (int i))
+prettyElem (IsVar i) = (displayT . renderOneLine) <$> (text "~ISVAR" <> brackets (int i))
 prettyElem (SigD es mI) = do
   es' <- prettyBlackBox es
   (displayT . renderOneLine) <$>

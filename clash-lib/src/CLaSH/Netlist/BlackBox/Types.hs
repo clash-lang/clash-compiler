@@ -42,6 +42,8 @@ data Element = C   !Text         -- ^ Constant
              | HdlSyn HdlSyn     -- ^ Hole indicating which synthesis tool we're
                                  -- generating HDL for
              | BV !Bool [Element] !Element -- ^ Convert to (True)/from(False) a bit-vector
+             | IsLit !Int
+             | IsVar !Int
              | SigD [Element] !(Maybe Int)
   deriving Show
 

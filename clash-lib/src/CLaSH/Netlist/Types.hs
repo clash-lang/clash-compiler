@@ -59,6 +59,7 @@ data NetlistState
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int
   , _mkBasicIdFn    :: String -> String
+  , _seenIds        :: [Identifier]
   }
 
 -- | Signal reference
