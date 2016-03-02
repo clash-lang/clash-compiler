@@ -34,9 +34,13 @@ import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
-import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types     as HW
 import           CLaSH.Util
+
+mkBasicId :: String -> NetlistMonad String
+mkBasicId s = do
+  f <- Lens.use mkBasicIdFn
+  return (f s)
 
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
@@ -218,42 +222,39 @@ termHWTypeM e = do
   ty <- termType m e
   coreTypeToHWTypeM ty
 
--- | Turns a Core variable reference to a Netlist expression. Errors if the term
--- is not a variable.
-varToExpr :: Term
-          -> Expr
-varToExpr (Var _ var) = Identifier (mkBasicId . pack $ name2String var) Nothing
-varToExpr _           = error $ $(curLoc) ++ "not a var"
-
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
 mkUniqueNormalized :: ([Id],[LetBinding],Id)
                    -> NetlistMonad ([Id],[LetBinding],TmName)
 mkUniqueNormalized (args,binds,res) = do
-  let args' = zipWith (\n s -> modifyVarName (`appendToName` s) n)
-                args ["_i" ++ show i | i <- [(1::Integer)..]]
-  let res1  = appendToName (varName res) "_o"
+  -- Make arguments unique
+  (args',subst)   <- mkUnique []    []    args
+  -- Make result unique
+  ([res1],subst') <- mkUnique args' subst [res]
   let bndrs = map fst binds
-  let exprs = map (unembed . snd) binds
-  let usesOutput = concatMap (filter (== varName res) . Lens.toListOf termFreeIds) exprs
-  let (res2,extraBndr) = case usesOutput of
-                            [] -> (res1,[] :: [(Id, Embed Term)])
-                            _  -> let res3 = appendToName (varName res) "_o_sig"
-                                  in (res3,[(Id res1 (varType res),embed $ Var (unembed $ varType res) res3)])
-  bndrs' <- mapM (mkUnique (varName res,res2)) bndrs
-  let repl = zip args args' ++ zip bndrs bndrs'
-  exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs repl
-  return (args',zip bndrs' exprs' ++ extraBndr,res1)
-
+      exprs = map (unembed . snd) binds
+      usesOutput = concatMap (filter (== varName res) . Lens.toListOf termFreeIds) exprs
+  -- If the let-binder carrying the result is used in a feedback loop
+  -- rename the let-binder to "<X>_rec", and assign the "<X>_rec" to
+  -- "<X>". We do this because output ports in most HDLs cannot be read.
+  (res2,subst'',extraBndr) <- case usesOutput of
+    [] -> return (varName res1,(res,res1):subst',[] :: [(Id, Embed Term)])
+    _  -> do
+      ([res3],_) <- mkUnique (res1:args') [] [modifyVarName (`appendToName` "_rec") res1]
+      return (varName res3,(res,res3):subst'
+             ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
+  -- Replace occurences of "<X>" by "<X>_rec"
+  let resN    = varName res
+      bndrs'  = map (\i -> if varName i == resN then modifyVarName (const res2) i else i) bndrs
+      (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
+  -- Make let-binders unique
+  (bndrsL',substL) <- mkUnique (r:res1:args')         subst'' bndrsL
+  (bndrsR',substR) <- mkUnique (r:res1:args'++bndrsL) substL  bndrsR
+  -- Replace old IDs by update unique IDs in the RHSs of the let-binders
+  exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs substR
+  -- Return the uniquely named arguments, let-binders, and result
+  return (args',zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,varName res1)
   where
-    mkUnique :: (TmName,TmName) -> Id -> NetlistMonad Id
-    mkUnique (find,repl) v = if find == varName v
-      then return $ modifyVarName (const repl) v
-      else do
-        varCnt <- varCount <<%= (+1)
-        let v' = modifyVarName (`appendToName` ('_' : show varCnt)) v
-        return v'
-
     subsBndrs :: [Term] -> (Id,Id) -> NetlistMonad [Term]
     subsBndrs es (f,r) = mapM (subsBndr f r) es
 
@@ -270,6 +271,29 @@ mkUniqueNormalized (args,binds,res) = do
                                                 <=< unbind
                                                 ) alts
       _ -> return e
+
+-- | Make a set of IDs unique; also returns a substitution from old ID to new
+-- updated unique ID.
+mkUnique :: [Id]      -- ^ Previously seen IDs
+         -> [(Id,Id)] -- ^ Existing substitution
+         -> [Id]      -- ^ IDs to make unique
+         -> NetlistMonad ([Id],[(Id,Id)])
+         -- ^ (Unique IDs, update substitution)
+mkUnique = go []
+  where
+    go processed _    subst []     = return (reverse processed,subst)
+    go processed seen subst (i:is) = do
+      iN <- mkBasicId . name2String $ varName i
+      if any ((== iN).name2String.varName) seen
+         then do
+           varCnt <- varCount <<%= (+1)
+           let i' = modifyVarName (repName (iN ++ '_':show varCnt)) i
+           go (i':processed) (i':seen) ((i,i'):subst) is
+         else do
+           let i' = modifyVarName (repName iN) i
+           go (i':processed) (i':seen) ((i,i'):subst) is
+
+    repName s n = makeName s (name2Integer n)
 
 -- | Append a string to a name
 appendToName :: TmName

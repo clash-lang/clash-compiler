@@ -66,11 +66,13 @@ genNetlist :: Maybe Int
            -- ^ Set of collected data-files
            -> Int
            -- ^ Int/Word/Integer bit-width
+           -> (String -> String)
+           -- ^ valid identifiers
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([Component],[(String,FilePath)],Int)
-genNetlist compCntM globals primMap tcm typeTrans mStart modName dfiles iw topEntity = do
-  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName dfiles iw $ genComponent topEntity mStart
+genNetlist compCntM globals primMap tcm typeTrans mStart modName dfiles iw mkId topEntity = do
+  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName dfiles iw mkId $ genComponent topEntity mStart
   return (HashMap.elems $ _components s, _dataFiles s, _cmpCount s)
 
 -- | Run a NetlistMonad action in a given environment
@@ -90,16 +92,18 @@ runNetlistMonad :: Maybe Int
                 -- ^ Set of collected data-files
                 -> Int
                 -- ^ Int/Word/Integer bit-width
+                -> (String -> String)
+                -- ^ valid identifiers
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad compCntM s p tcm typeTrans modName dfiles iw
+runNetlistMonad compCntM s p tcm typeTrans modName dfiles iw mkId
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty dfiles iw
+    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty dfiles iw mkId
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -122,7 +126,8 @@ genComponentT compName componentExpr mStart = do
   componentNumber <- cmpCount <<%= (+1)
   modName <- Lens.use modNm
 
-  let componentName' = genComponentName modName compName componentNumber
+  mkId <- Lens.use mkBasicIdFn
+  let componentName' = genComponentName mkId modName compName componentNumber
   curCompNm .= componentName'
 
   tcm <- Lens.use tcCache
@@ -146,26 +151,28 @@ genComponentT compName componentExpr mStart = do
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
   let netDecls = map (\(id_,_) ->
-                        NetDecl (mkBasicId . Text.pack . name2String $ varName id_)
+                        NetDecl (Text.pack . name2String $ varName id_)
                                 (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
                      ) $ filter ((/= result) . varName . fst) binders
   (decls,clks) <- listen $ concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
-  let compInps       = zip (map (mkBasicId . Text.pack . name2String . varName) arguments) argTypes
-      compOutp       = (mkBasicId . Text.pack $ name2String result, resType)
+  let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
+      compOutp       = (Text.pack $ name2String result, resType)
       component      = Component componentName' (toList clks) compInps [compOutp] (netDecls ++ decls)
   return component
 
-genComponentName :: String -> TmName -> Int -> Identifier
-genComponentName prefix nm i
-  = mkBasicId' True
-  . (Text.pack (prefix ++ "_") `Text.append`)
-  . (`Text.append` (Text.pack $ show i))
-  . ifThenElse Text.null
-      (`Text.append` Text.pack "Component_")
-      (`Text.append` Text.pack "_")
-  . mkBasicId' True
+genComponentName :: (String -> String) -> String -> TmName -> Int -> Identifier
+genComponentName mkId prefix nm i
+  = Text.pack
+  . mkId
+  . ((prefix ++ "_") ++)
+  . (++ (show i))
+  . ifThenElse null
+      (++ "Component_")
+      (++ "_")
+  . mkId
   . stripDollarPrefixes
+  . Text.unpack
   . last
   . Text.splitOn (Text.pack ".")
   . Text.pack
@@ -191,7 +198,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   let sHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy
       vHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm varTy
   (selId,decls) <- case scrut of
-                     (Var _ scrutNm) -> return (mkBasicId . Text.pack $ name2String scrutNm,[])
+                     (Var _ scrutNm) -> return (Text.pack $ name2String scrutNm,[])
                      _ -> do
                         (newExpr, newDecls) <- mkExpr False scrutTy scrut
                         i   <- varCount <<%= (+1)
@@ -200,8 +207,8 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
                             tmpDecl = NetDecl tmpNmT sHwTy
                             tmpAssn = Assignment tmpNmT newExpr
                         return (tmpNmT,newDecls ++ [tmpDecl,tmpAssn])
-  let dstId    = mkBasicId . Text.pack . name2String $ varName bndr
-      altVarId = mkBasicId . Text.pack $ name2String varTm
+  let dstId    = Text.pack . name2String $ varName bndr
+      altVarId = Text.pack $ name2String varTm
       modifier = case pat of
         DataPat (Embed dc) ids -> let (exts,tms) = unrebind ids
                                       tmsTys     = map (unembed . varType) tms
@@ -230,7 +237,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (head alts'))) <$> mkExpr True scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
-  let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+  let dstId = Text.pack . name2String $ varName bndr
   return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
@@ -269,7 +276,7 @@ mkDeclarations bndr app =
       | otherwise   -> error $ $(curLoc) ++ "Not in normal form: Var-application with Type arguments"
     _ -> do
       (exprApp,declsApp) <- mkExpr False (unembed $ varType bndr) app
-      let dstId = mkBasicId . Text.pack . name2String $ varName bndr
+      let dstId = Text.pack . name2String $ varName bndr
       return (declsApp ++ [Assignment dstId exprApp])
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
@@ -287,7 +294,7 @@ mkFunApp dst fun args = do
                 argTys                <- mapM (termType tcm) args
                 (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False t e) (zip args argTys)
                 (argExprs',argDecls') <- (second concat . unzip) <$> mapM toSimpleVar (zip argExprs argTys)
-                let dstId         = mkBasicId . Text.pack . name2String $ varName dst
+                let dstId         = Text.pack . name2String $ varName dst
                     hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
                     inpAssigns    = zipWith (\(i,t) e -> (i,In,t,e)) compInps argExprs'
                     outpAssign    = (fst compOutp,Out,snd compOutp,Identifier dstId Nothing)
@@ -298,8 +305,8 @@ mkFunApp dst fun args = do
         else error $ $(curLoc) ++ "under-applied normalized function"
     Nothing -> case args of
       [] -> do
-        let dstId = mkBasicId . Text.pack . name2String $ varName dst
-        return [Assignment dstId (Identifier (mkBasicId . Text.pack $ name2String fun) Nothing)]
+        let dstId = Text.pack . name2String $ varName dst
+        return [Assignment dstId (Identifier (Text.pack $ name2String fun) Nothing)]
       _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
 
 toSimpleVar :: (Expr,Type)
@@ -340,7 +347,7 @@ mkExpr bbEasD ty app = do
       | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments: " ++ showDoc app
     Prim nm _ -> mkPrimitive False bbEasD nm args ty
     Var _ f
-      | null tmArgs -> return (Identifier (mkBasicId . Text.pack $ name2String f) Nothing,[])
+      | null tmArgs -> return (Identifier (Text.pack $ name2String f) Nothing,[])
       | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
     _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
 

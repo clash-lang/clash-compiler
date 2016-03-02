@@ -57,3 +57,5 @@ class Backend state where
   fromBV           :: HWType -> Text -> State state Doc
   -- | Synthesis tool we're generating HDL for
   hdlSyn           :: State state HdlSyn
+  -- | mkBasicId
+  mkBasicId        :: State state (String -> String)

@@ -50,6 +50,7 @@ genTestBench :: CLaSHOpts
              -> HashMap TyConName TyCon
              -> IntMap TyConName
              -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
+             -> (String -> String)
              -> Int
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
@@ -58,7 +59,7 @@ genTestBench :: CLaSHOpts
              -> [(String,FilePath)]          -- ^ Set of collected data-files
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],[(String,FilePath)])
-genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimuliNmM expectedNmM modName dfiles
+genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId cmpCnt globals stimuliNmM expectedNmM modName dfiles
   (Component cName hidden [inp] [outp] _) = do
   let iw      = opt_intWidth opts
       ioDecl  = [ uncurry NetDecl inp
@@ -66,10 +67,10 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
                 ]
       inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
   (inpInst,inpComps,cmpCnt',hidden',dfiles') <- maybe (return (inpExpr,[],cmpCnt,hidden,dfiles))
-      (genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName dfiles iw)
+      (genStimuli cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw)
       stimuliNmM
 
-  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans modName dfiles' iw $ do
+  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans modName dfiles' iw mkId $ do
       done    <- genDone primMap
       let finDecl' = [ NetDecl "finished" Bool
                      , done
@@ -78,13 +79,13 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
       return (finDecl',finExpr')
 
   (expInst,expComps,cmpCnt'',hidden'',dfiles'') <- maybe (return (finExpr,[],cmpCnt',hidden',dfiles'))
-      (genVerifier cmpCnt' primMap globals typeTrans tcm normalizeSignal hidden' outp modName dfiles' iw)
+      (genVerifier cmpCnt' primMap globals typeTrans mkId tcm normalizeSignal hidden' outp modName dfiles' iw)
       expectedNmM
 
   let clkNms = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden
 
-  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName dfiles'' iw $ do
+  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName dfiles'' iw mkId $ do
       varCount .= (_varCount s)
       clks' <- catMaybes <$> mapM (genClock primMap) hidden''
       rsts' <- catMaybes <$> mapM (genReset primMap) hidden''
@@ -112,7 +113,7 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval cmpCnt globals stimul
     normalizeSignal glbls bndr =
       runNormalization opts supply glbls typeTrans tcm tupTcm eval primMap (normalize [bndr] >>= cleanupGraph bndr)
 
-genTestBench opts _ _ _ _ _ _ _ _ _ _ _ dfiles c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
+genTestBench opts _ _ _ _ _ _ _ _ _ _ _ _ dfiles c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
 
 genClock :: PrimMap BlackBoxTemplate
          -> (Identifier,HWType)
@@ -188,6 +189,7 @@ genStimuli :: Int
            -> PrimMap BlackBoxTemplate
            -> HashMap TmName (Type,Term)
            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+           -> (String -> String)
            -> HashMap TyConName TyCon
            -> ( HashMap TmName (Type,Term)
                 -> TmName
@@ -199,9 +201,9 @@ genStimuli :: Int
            -> Int
            -> TmName
            -> IO (Declaration,[Component],Int,[(Identifier,HWType)],[(String,FilePath)])
-genStimuli cmpCnt primMap globals typeTrans tcm normalizeSignal hidden inp modName dfiles iw signalNm = do
+genStimuli cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw signalNm
+  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId signalNm
   let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` pack "_" `append` (pack (show cmpCnt))
       sigComp = case find ((== sigNm) . componentName) comps of
                   Just c -> c
@@ -224,6 +226,7 @@ genVerifier :: Int
             -> PrimMap BlackBoxTemplate
             -> HashMap TmName (Type,Term)
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+            -> (String -> String)
             -> HashMap TyConName TyCon
             -> ( HashMap TmName (Type,Term)
                  -> TmName
@@ -235,9 +238,9 @@ genVerifier :: Int
             -> Int
             -> TmName
             -> IO (Declaration,[Component],Int,[(Identifier,HWType)],[(String,FilePath)])
-genVerifier cmpCnt primMap globals typeTrans tcm normalizeSignal hidden outp modName dfiles iw signalNm = do
+genVerifier cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden outp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw signalNm
+  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId signalNm
   let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` "_" `append` (pack (show cmpCnt))
       sigComp = case find ((== sigNm) . componentName) comps of
                   Just c -> c

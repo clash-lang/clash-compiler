@@ -302,4 +302,4 @@ unsafeRunNetlist iw
   = unsafePerformIO
   . fmap fst
   . runNetlistMonad Nothing HashMap.empty HashMap.empty
-      HashMap.empty (\_ _ -> Nothing) "" [] iw
+      HashMap.empty (\_ _ -> Nothing) "" [] iw id

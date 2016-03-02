@@ -18,6 +18,7 @@ module CLaSH.Backend.Verilog (VerilogState) where
 import qualified Control.Applicative                  as A
 import           Control.Lens                         ((+=),(-=), makeLenses, use)
 import           Control.Monad.State                  (State)
+import           Data.Char                            (toUpper)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes)
 import           Data.Text.Lazy                       (pack, unpack)
@@ -27,6 +28,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn)
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
+import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (curLoc, (<:>))
@@ -80,8 +82,33 @@ instance Backend VerilogState where
   toBV _          = text
   fromBV _        = text
   hdlSyn          = use hdlsyn
+  mkBasicId       = return (filterReserved . mkBasicId' True)
 
 type VerilogM a = State VerilogState a
+
+-- List of reserved Verilog-2005 keywords
+reservedWords :: [String]
+reservedWords = ["always","and","assign","automatic","begin","buf","bufif0"
+  ,"bufif1","case","casex","casez","cell","cmos","config","deassign","default"
+  ,"defparam","design","disable","edge","else","end","endcase","endconfig"
+  ,"endfunction","endgenerate","endmodule","endprimitive","endspecify"
+  ,"endtable","endtask","event","for","force","forever","fork","function"
+  ,"generate","genvar","highz0","highz1","if","ifnone","incdir","include"
+  ,"initial","inout","input","instance","integer","join","large","liblist"
+  ,"library","localparam","macromodule","medium","module","nand","negedge"
+  ,"nmos","nor","noshowcancelled","not","notif0","notif1","or","output"
+  ,"parameter","pmos","posedge","primitive","pull0","pull1","pulldown","pullup"
+  ,"pulsestyle_onevent","pulsestyle_ondetect","rcmos","real","realtime","reg"
+  ,"release","repeat","rnmos","rpmos","rtran","rtranif0","rtranif1","scalared"
+  ,"showcancelled","signed","small","specify","specparam","strong0","strong1"
+  ,"supply0","supply1","table","task","time","tran","tranif0","tranif1","tri"
+  ,"tri0","tri1","triand","trior","trireg","unsigned","use","uwire","vectored"
+  ,"wait","wand","weak0","weak1","while","wire","wor","xnor","xor"]
+
+filterReserved :: String -> String
+filterReserved s = if s `elem` reservedWords
+  then init s ++ [toUpper (last s)]
+  else s
 
 -- | Generate VHDL for a Netlist component
 genVerilog :: Component -> VerilogM (String,Doc)

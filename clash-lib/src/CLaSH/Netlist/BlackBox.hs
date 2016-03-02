@@ -40,7 +40,6 @@ import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication,
                                                 mkExpr)
 import           CLaSH.Netlist.BlackBox.Types  as B
 import           CLaSH.Netlist.BlackBox.Util   as B
-import           CLaSH.Netlist.Id              as N
 import           CLaSH.Netlist.Types           as N
 import           CLaSH.Netlist.Util            as N
 import           CLaSH.Normalize.Util          (isConstant)
@@ -58,9 +57,9 @@ mkBlackBoxContext resId args = do
     (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
-    let res = case synchronizedClk tcm (unembed $ V.varType resId) of
-                Just clk -> Right . (,clk) . (`N.Identifier` Nothing) . mkBasicId . pack $ name2String (V.varName resId)
-                Nothing  -> Left . (`N.Identifier` Nothing) . mkBasicId . pack $ name2String (V.varName resId)
+    res   <- case synchronizedClk tcm (unembed $ V.varType resId) of
+                Just clk -> Right . (,clk) . (`N.Identifier` Nothing) . pack <$> mkBasicId (name2String (V.varName resId))
+                Nothing  -> Left . (`N.Identifier` Nothing) . pack <$> mkBasicId (name2String (V.varName resId))
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) imps funs
@@ -101,8 +100,8 @@ mkArgument e = do
     ((e',t,l),d) <- case hwTyM of
       Nothing   -> return ((Identifier "__VOID__" Nothing,Void,False),[])
       Just hwTy -> case collectArgs e of
-        (Var _ v,[]) -> let vT = Identifier (mkBasicId . pack $ name2String v) Nothing
-                        in  return ((vT,hwTy,False),[])
+        (Var _ v,[]) -> do vT <- (`Identifier` Nothing) . pack <$> mkBasicId (name2String v)
+                           return ((vT,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])

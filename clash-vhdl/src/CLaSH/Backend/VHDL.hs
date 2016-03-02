@@ -19,6 +19,7 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
+import           Data.Char                            (toLower)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -34,6 +35,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic
 import           CLaSH.Backend
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
+import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util
 import           CLaSH.Util                           (clog2, curLoc, first, makeCached, on, (<:>))
@@ -80,8 +82,31 @@ instance Backend VHDLState where
   toBV _ id_      = "toSLV" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
+  mkBasicId       = return (filterReserved . mkBasicId' True)
 
 type VHDLM a = State VHDLState a
+
+-- List of reserved VHDL-2008 keywords
+reservedWords :: [String]
+reservedWords = ["abs","access","after","alias","all","and","architecture"
+  ,"array","assert","assume","assume_guarantee","attribute","begin","block"
+  ,"body","buffer","bus","case","component","configuration","constant","context"
+  ,"cover","default","disconnect","downto","else","elsif","end","entity","exit"
+  ,"fairness","file","for","force","function","generate","generic","group"
+  ,"guarded","if","impure","in","inertial","inout","is","label","library"
+  ,"linkage","literal","loop","map","mod","nand","new","next","nor","not","null"
+  ,"of","on","open","or","others","out","package","parameter","port","postponed"
+  ,"procedure","process","property","protected","pure","range","record"
+  ,"register","reject","release","rem","report","restrict","restrict_guarantee"
+  ,"return","rol","ror","select","sequence","severity","signal","shared","sla"
+  ,"sll","sra","srl","strong","subtype","then","to","transport","type"
+  ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
+  ,"when","while","with","xnor","xor"]
+
+filterReserved :: String -> String
+filterReserved s = if map toLower s `elem` reservedWords
+  then s ++ "R"
+  else s
 
 -- | Generate VHDL for a Netlist component
 genVHDL :: String -> Component -> VHDLM (String,Doc)
