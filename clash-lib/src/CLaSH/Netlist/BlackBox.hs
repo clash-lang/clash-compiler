@@ -173,12 +173,15 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             [Right _, Left scrut] -> do
               tcm     <- Lens.use tcCache
               scrutTy <- termType tcm scrut
-              scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
               (scrutExpr,scrutDecls) <- mkExpr False (Left "tte_rhs") scrutTy scrut
-              tmpRhs <- mkUniqueIdentifier (pack "tte_rhs")
-              let netDeclRhs   = NetDecl tmpRhs scrutHTy
-                  netAssignRhs = Assignment tmpRhs scrutExpr
-              return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+              case scrutExpr of
+                Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
+                _ -> do
+                  scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+                  tmpRhs <- mkUniqueIdentifier (pack "tte_rhs")
+                  let netDeclRhs   = NetDecl tmpRhs scrutHTy
+                      netAssignRhs = Assignment tmpRhs scrutExpr
+                  return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
       | pNm == "GHC.Prim.dataToTag#" -> case args of
           [Right _,Left (Data dc)] -> do
@@ -189,10 +192,13 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
             (scrutExpr,scrutDecls) <- mkExpr False (Left "dtt_rhs") scrutTy scrut
-            tmpRhs  <- mkUniqueIdentifier "dtt_rhs"
-            let netDeclRhs   = NetDecl tmpRhs scrutHTy
-                netAssignRhs = Assignment tmpRhs scrutExpr
-            return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
+            case scrutExpr of
+              Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
+              _ -> do
+                tmpRhs  <- mkUniqueIdentifier "dtt_rhs"
+                let netDeclRhs   = NetDecl tmpRhs scrutHTy
+                    netAssignRhs = Assignment tmpRhs scrutExpr
+                return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
       | otherwise -> return (BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
     _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
