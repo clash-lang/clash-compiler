@@ -11,6 +11,7 @@ module CLaSH.Netlist.BlackBox.Parser
 where
 
 import           Data.Text.Lazy                           (Text, pack)
+import qualified Data.Text.Lazy                           as Text
 import           Text.ParserCombinators.UU
 import           Text.ParserCombinators.UU.BasicInstances hiding (Parser)
 import qualified Text.ParserCombinators.UU.Core           as PCC (parse)
@@ -71,7 +72,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> Clk Nothing       <$  pToken "~CLKO"
      <|> (Rst . Just)      <$> (pToken "~RST" *> pBrackets pNatural)
      <|> Rst Nothing       <$  pToken "~RSTO"
-     <|> Sym               <$> (pToken "~SYM" *> pBrackets pNatural)
+     <|> (Sym Text.empty)  <$> (pToken "~SYM" *> pBrackets pNatural)
      <|> Typ Nothing       <$  pToken "~TYPO"
      <|> (Typ . Just)      <$> (pToken "~TYP" *> pBrackets pNatural)
      <|> TypM Nothing      <$  pToken "~TYPMO"
@@ -95,6 +96,8 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> (BV False)        <$> (pToken "~FROMBV" *> pBrackets pSigD) <*> pBrackets pTagE
      <|> IsLit             <$> (pToken "~ISLIT" *> pBrackets pNatural)
      <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
+     <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural
+     <|> And               <$> (pToken "~AND" *> listParser pTagE)
 
 
 -- | Parse a bracketed text

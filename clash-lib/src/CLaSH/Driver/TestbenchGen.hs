@@ -21,7 +21,7 @@ import qualified Data.HashMap.Lazy                as HashMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List                        (find,nub)
 import           Data.Maybe                       (catMaybes,mapMaybe)
-import           Data.Text.Lazy                   (append,pack,splitOn)
+import           Data.Text.Lazy                   (append,pack)
 import           Unbound.Generics.LocallyNameless (name2String)
 
 import           CLaSH.Core.Term
@@ -50,8 +50,8 @@ genTestBench :: CLaSHOpts
              -> HashMap TyConName TyCon
              -> IntMap TyConName
              -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
-             -> (String -> String)
-             -> Int
+             -> (Identifier -> Identifier)
+             -> [Identifier]
              -> HashMap TmName (Type,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
@@ -59,18 +59,18 @@ genTestBench :: CLaSHOpts
              -> [(String,FilePath)]          -- ^ Set of collected data-files
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],[(String,FilePath)])
-genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId cmpCnt globals stimuliNmM expectedNmM modName dfiles
+genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals stimuliNmM expectedNmM modName dfiles
   (Component cName hidden [inp] [outp] _) = do
   let iw      = opt_intWidth opts
       ioDecl  = [ uncurry NetDecl inp
                 , uncurry NetDecl outp
                 ]
       inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
-  (inpInst,inpComps,cmpCnt',hidden',dfiles') <- maybe (return (inpExpr,[],cmpCnt,hidden,dfiles))
-      (genStimuli cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw)
+  (inpInst,inpComps,seen',hidden',dfiles') <- maybe (return (inpExpr,[],seen,hidden,dfiles))
+      (genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw)
       stimuliNmM
 
-  ((finDecl,finExpr),s) <- runNetlistMonad (Just cmpCnt') globals primMap tcm typeTrans modName dfiles' iw mkId $ do
+  ((finDecl,finExpr),s) <- runNetlistMonad globals primMap tcm typeTrans modName dfiles' iw mkId ("finished":"done":seen') $ do
       done    <- genDone primMap
       let finDecl' = [ NetDecl "finished" Bool
                      , done
@@ -78,14 +78,14 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId cmpCnt globals s
       finExpr' <- genFinish primMap
       return (finDecl',finExpr')
 
-  (expInst,expComps,cmpCnt'',hidden'',dfiles'') <- maybe (return (finExpr,[],cmpCnt',hidden',dfiles'))
-      (genVerifier cmpCnt' primMap globals typeTrans mkId tcm normalizeSignal hidden' outp modName dfiles' iw)
+  (expInst,expComps,seen'',hidden'',dfiles'') <- maybe (return (finExpr,[],seen',hidden',dfiles'))
+      (genVerifier seen' primMap globals typeTrans mkId tcm normalizeSignal hidden' outp modName dfiles' iw)
       expectedNmM
 
   let clkNms = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden
       rstNms = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden
 
-  ((clks,rsts),_) <- runNetlistMonad (Just cmpCnt'') globals primMap tcm typeTrans modName dfiles'' iw mkId $ do
+  ((clks,rsts),_) <- runNetlistMonad globals primMap tcm typeTrans modName dfiles'' iw mkId ("finished":"done":seen'') $ do
       varCount .= (_varCount s)
       clks' <- catMaybes <$> mapM (genClock primMap) hidden''
       rsts' <- catMaybes <$> mapM (genReset primMap) hidden''
@@ -97,7 +97,7 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId cmpCnt globals s
                    ++
                    [(\(i,t) -> (i,Out,t,Identifier i Nothing)) outp])
 
-      tbComp = Component (pack modName `append` "_testbench") [] [] [("done",Bool)]
+      tbComp = Component (mkId (pack modName `append` "_testbench")) [] [] [("done",Bool)]
                   (concat [ finDecl
                           , concat clks
                           , concat rsts
@@ -185,11 +185,11 @@ genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMa
     return $ BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" templ' ctx
   pM -> error $ $(curLoc) ++ ("Can't make done declaration for: " ++ show pM)
 
-genStimuli :: Int
+genStimuli :: [Identifier]
            -> PrimMap BlackBoxTemplate
            -> HashMap TmName (Type,Term)
            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
-           -> (String -> String)
+           -> (Identifier -> Identifier)
            -> HashMap TyConName TyCon
            -> ( HashMap TmName (Type,Term)
                 -> TmName
@@ -200,12 +200,12 @@ genStimuli :: Int
            -> [(String,FilePath)]
            -> Int
            -> TmName
-           -> IO (Declaration,[Component],Int,[(Identifier,HWType)],[(String,FilePath)])
-genStimuli cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw signalNm = do
+           -> IO (Declaration,[Component],[Identifier],[(Identifier,HWType)],[(String,FilePath)])
+genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId signalNm
-  let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` pack "_" `append` (pack (show cmpCnt))
-      sigComp = case find ((== sigNm) . componentName) comps of
+  (comps,dfiles',seen') <- genNetlist stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId seen signalNm
+  let sigNm   = genComponentName seen mkId modName signalNm
+      sigComp = case find ((sigNm ==) . componentName) comps of
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
 
@@ -220,13 +220,13 @@ genStimuli cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden inp 
                         (concat [ clkNms, rstNms ]) ++
                         [(outp,Out,(snd inp),Identifier (fst inp) Nothing)]
                    )
-  return (decl,comps,cmpCnt',hidden'',dfiles')
+  return (decl,comps,seen',hidden'',dfiles')
 
-genVerifier :: Int
+genVerifier :: [Identifier]
             -> PrimMap BlackBoxTemplate
             -> HashMap TmName (Type,Term)
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
-            -> (String -> String)
+            -> (Identifier -> Identifier)
             -> HashMap TyConName TyCon
             -> ( HashMap TmName (Type,Term)
                  -> TmName
@@ -237,12 +237,12 @@ genVerifier :: Int
             -> [(String,FilePath)]
             -> Int
             -> TmName
-            -> IO (Declaration,[Component],Int,[(Identifier,HWType)],[(String,FilePath)])
-genVerifier cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden outp modName dfiles iw signalNm = do
+            -> IO (Declaration,[Component],[Identifier],[(Identifier,HWType)],[(String,FilePath)])
+genVerifier seen primMap globals typeTrans mkId tcm normalizeSignal hidden outp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
-  (comps,dfiles',cmpCnt') <- genNetlist (Just cmpCnt) stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId signalNm
-  let sigNm   = pack (modName ++ "_") `append` last (splitOn (pack ".") (pack (name2String signalNm))) `append` "_" `append` (pack (show cmpCnt))
-      sigComp = case find ((== sigNm) . componentName) comps of
+  (comps,dfiles',seen') <- genNetlist stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId seen signalNm
+  let sigNm   = genComponentName seen mkId modName signalNm
+      sigComp = case find ((sigNm ==) . componentName) comps of
                   Just c -> c
                   Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
       (cName,hidden',inp,fin) = case sigComp of
@@ -256,4 +256,4 @@ genVerifier cmpCnt primMap globals typeTrans mkId tcm normalizeSignal hidden out
                         (concat [ clkNms, rstNms ]) ++
                         [(inp,In,snd outp,Identifier (fst outp) Nothing),(fin,Out,Bool,Identifier "finished" Nothing)]
                    )
-  return (decl,comps,cmpCnt',hidden'',dfiles')
+  return (decl,comps,seen',hidden'',dfiles')

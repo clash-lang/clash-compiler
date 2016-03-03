@@ -12,10 +12,10 @@
                -> Signal' clk (BitVector m)"
     , "templateD" :
 "-- blockRamFile begin
-blockRamFile_~COMPNAME_~SYM[0] : block
+~GENSYM[~COMPNAME_blockRamFile][0] : block
   type RamType is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
-  impure function InitRamFromFile (RamFileName : in string) return RamType is
+  impure function ~GENSYM[InitRamFromFile][1] (RamFileName : in string) return RamType is
     FILE RamFile : text open read_mode is RamFileName;
     variable RamFileLine : line;
     variable RAM : RamType(0 to ~LIT[2]-1);
@@ -27,18 +27,18 @@ blockRamFile_~COMPNAME_~SYM[0] : block
     return RAM;
   end function;
 
-  signal RAM_~SYM[1]  : RamType(0 to ~LIT[2]-1) := InitRamFromFile(~FILE[~LIT[3]]);
-  signal dout_~SYM[2] : ~TYP[7];
-  signal wr_~SYM[3]   : integer range 0 to ~LIT[2]-1;
-  signal rd_~SYM[4]   : integer range 0 to ~LIT[2]-1;
+  signal ~GENSYM[RAM][2] : RamType(0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
+  signal ~GENSYM[dout][3] : ~TYP[7];
+  signal ~GENSYM[wr][4] : integer range 0 to ~LIT[2]-1;
+  signal ~GENSYM[rd][5] : integer range 0 to ~LIT[2]-1;
 begin
-  wr_~SYM[3] <= to_integer(~ARG[4])
+  ~SYM[4] <= to_integer(~ARG[4])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
                 ;
 
-  rd_~SYM[4] <= to_integer(~ARG[5])
+  ~SYM[5] <= to_integer(~ARG[5])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
@@ -48,14 +48,13 @@ begin
   begin
     if (rising_edge(~CLK[1])) then
       if ~ARG[6] then
-        RAM_~SYM[1](wr_~SYM[3]) <= to_bitvector(~ARG[7]);
+        ~SYM[2](~SYM[4]) <= to_bitvector(~ARG[7]);
       end if;
-
-      dout_~SYM[2] <= to_stdlogicvector(RAM_~SYM[1](rd_~SYM[4]));
+      ~SYM[3] <= to_stdlogicvector(~SYM[2](~SYM[5]));
     end if;
   end process;
 
-  ~RESULT <= dout_~SYM[2];
+  ~RESULT <= ~SYM[3];
 end block;
 -- blockRamFile end"
     }

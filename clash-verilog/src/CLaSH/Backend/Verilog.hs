@@ -18,10 +18,10 @@ module CLaSH.Backend.Verilog (VerilogState) where
 import qualified Control.Applicative                  as A
 import           Control.Lens                         ((+=),(-=), makeLenses, use)
 import           Control.Monad.State                  (State)
-import           Data.Char                            (toUpper)
 import qualified Data.HashSet                         as HashSet
 import           Data.Maybe                           (catMaybes)
 import           Data.Text.Lazy                       (pack, unpack)
+import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -87,7 +87,7 @@ instance Backend VerilogState where
 type VerilogM a = State VerilogState a
 
 -- List of reserved Verilog-2005 keywords
-reservedWords :: [String]
+reservedWords :: [Identifier]
 reservedWords = ["always","and","assign","automatic","begin","buf","bufif0"
   ,"bufif1","case","casex","casez","cell","cmos","config","deassign","default"
   ,"defparam","design","disable","edge","else","end","endcase","endconfig"
@@ -105,9 +105,9 @@ reservedWords = ["always","and","assign","automatic","begin","buf","bufif0"
   ,"tri0","tri1","triand","trior","trireg","unsigned","use","uwire","vectored"
   ,"wait","wand","weak0","weak1","while","wire","wor","xnor","xor"]
 
-filterReserved :: String -> String
+filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
-  then init s ++ [toUpper (last s)]
+  then Text.init s `Text.append` (Text.toUpper . Text.singleton . Text.last) s
   else s
 
 -- | Generate VHDL for a Netlist component

@@ -11,7 +11,7 @@
 
 module CLaSH.Netlist where
 
-import           Control.Lens                     ((.=), (<<%=))
+import           Control.Lens                     ((.=), (%=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (runStateT)
 import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
@@ -48,9 +48,7 @@ import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: Maybe Int
-           -- ^ Starting number of the component counter
-           -> HashMap TmName (Type,Term)
+genNetlist :: HashMap TmName (Type,Term)
            -- ^ Global binders
            -> PrimMap BlackBoxTemplate
            -- ^ Primitive definitions
@@ -66,19 +64,19 @@ genNetlist :: Maybe Int
            -- ^ Set of collected data-files
            -> Int
            -- ^ Int/Word/Integer bit-width
-           -> (String -> String)
+           -> (Identifier -> Identifier)
            -- ^ valid identifiers
+           -> [Identifier]
+           -- ^ Seen components
            -> TmName
            -- ^ Name of the @topEntity@
-           -> IO ([Component],[(String,FilePath)],Int)
-genNetlist compCntM globals primMap tcm typeTrans mStart modName dfiles iw mkId topEntity = do
-  (_,s) <- runNetlistMonad compCntM globals primMap tcm typeTrans modName dfiles iw mkId $ genComponent topEntity mStart
-  return (HashMap.elems $ _components s, _dataFiles s, _cmpCount s)
+           -> IO ([Component],[(String,FilePath)],[Identifier])
+genNetlist globals primMap tcm typeTrans mStart modName dfiles iw mkId seen topEntity = do
+  (_,s) <- runNetlistMonad globals primMap tcm typeTrans modName dfiles iw mkId seen $ genComponent topEntity mStart
+  return (HashMap.elems $ _components s, _dataFiles s, _seenComps s)
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: Maybe Int
-                -- ^ Starting number of the component counter
-                -> HashMap TmName (Type,Term)
+runNetlistMonad :: HashMap TmName (Type,Term)
                 -- ^ Global binders
                 -> PrimMap BlackBoxTemplate
                 -- ^ Primitive Definitions
@@ -92,18 +90,20 @@ runNetlistMonad :: Maybe Int
                 -- ^ Set of collected data-files
                 -> Int
                 -- ^ Int/Word/Integer bit-width
-                -> (String -> String)
+                -> (Identifier -> Identifier)
                 -- ^ valid identifiers
+                -> [Identifier]
+                -- ^ Seen components
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad compCntM s p tcm typeTrans modName dfiles iw mkId
+runNetlistMonad s p tcm typeTrans modName dfiles iw mkId seen
   = runFreshMT
   . flip runStateT s'
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 (fromMaybe 0 compCntM) HashMap.empty p typeTrans tcm modName Text.empty dfiles iw mkId []
+    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm modName Text.empty dfiles iw mkId [] seen
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -123,21 +123,21 @@ genComponentT :: TmName -- ^ Name of the function
               -> NetlistMonad Component
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
-  componentNumber <- cmpCount <<%= (+1)
   modName <- Lens.use modNm
-
   mkId <- Lens.use mkBasicIdFn
-  let componentName' = genComponentName mkId modName compName componentNumber
+  seen <- Lens.use seenComps
+  let componentName' = genComponentName seen mkId modName compName
+  seenComps %= (componentName':)
   curCompNm .= componentName'
 
   tcm <- Lens.use tcCache
+  seenIds .= []
   (arguments,binders,result) <- do { normalizedM <- splitNormalized tcm componentExpr
                                    ; case normalizedM of
                                        Right normalized -> mkUniqueNormalized normalized
                                        Left err         -> error $ $(curLoc) ++ err
                                    }
-  seenIds .= map (Text.pack . name2String . varName)
-                 (arguments ++ map fst binders)
+
   let ids = HashMap.fromList
           $ map (\(Id v (Embed t)) -> (v,t))
           $ arguments ++ map fst binders
@@ -162,22 +162,26 @@ genComponentT compName componentExpr mStart = do
       component      = Component componentName' (toList clks) compInps [compOutp] (netDecls ++ decls)
   return component
 
-genComponentName :: (String -> String) -> String -> TmName -> Int -> Identifier
-genComponentName mkId prefix nm i
-  = Text.pack
-  . mkId
-  . ((prefix ++ "_") ++)
-  . (++ (show i))
-  . ifThenElse null
-      (++ "Component_")
-      (++ "_")
-  . mkId
-  . stripDollarPrefixes
-  . Text.unpack
-  . last
-  . Text.splitOn (Text.pack ".")
-  . Text.pack
-  $ name2String nm
+
+genComponentName :: [Identifier] -> (Identifier -> Identifier) -> String -> TmName -> Identifier
+genComponentName seen mkId prefix nm =
+  let i = mkId . stripDollarPrefixes . last
+        . Text.splitOn (Text.pack ".") . Text.pack
+        $ name2String nm
+      i' = if Text.null i
+              then Text.pack "Component"
+              else i
+      i'' = mkId (Text.pack (prefix ++ "_") `Text.append` i')
+  in  if i'' `elem` seen
+         then go 0 i''
+         else i''
+  where
+    go :: Integer -> Identifier -> Identifier
+    go n i =
+      let i' = mkId (i `Text.append` Text.pack ('_':show n))
+      in  if i' `elem` seen
+             then go (n+1) i
+             else i'
 
 -- | Generate a list of Declarations for a let-binder
 mkDeclarations :: Id -- ^ LHS of the let-binder

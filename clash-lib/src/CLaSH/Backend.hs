@@ -58,4 +58,4 @@ class Backend state where
   -- | Synthesis tool we're generating HDL for
   hdlSyn           :: State state HdlSyn
   -- | mkBasicId
-  mkBasicId        :: State state (String -> String)
+  mkBasicId        :: State state (Identifier -> Identifier)

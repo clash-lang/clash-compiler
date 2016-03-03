@@ -15,9 +15,10 @@
 
 module CLaSH.Netlist.BlackBox.Util where
 
-import           Control.Lens                         (at, use, (%=), (+=), _1,
-                                                       _2)
-import           Control.Monad.State                  (State, runState)
+--import           Control.Lens                         (at, use, (%=), (+=), _1,
+--                                                       _2)
+import           Control.Monad.State                  (State, StateT, evalStateT,
+                                                       lift, modify, get)
 import           Control.Monad.Writer.Strict          (MonadWriter, tell)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
@@ -40,8 +41,8 @@ import           CLaSH.Netlist.BlackBox.Types
 import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
                                                        BlackBoxContext (..),
                                                        SyncExpr, Expr (..),
-                                                       Literal (..))
-import           CLaSH.Netlist.Util                   (typeSize)
+                                                       Literal (..), NetlistMonad)
+import           CLaSH.Netlist.Util                   (mkUniqueIdentifier,typeSize)
 import           CLaSH.Util
 
 -- | Determine if the number of normal/literal/function inputs of a blackbox
@@ -75,32 +76,52 @@ extractLiterals = map (\case (e,_,_) -> either id fst e)
 
 -- | Update all the symbol references in a template, and increment the symbol
 -- counter for every newly encountered symbol.
-setSym :: Int -> BlackBoxTemplate -> (BlackBoxTemplate,Int)
-setSym i l
-  = second fst
-  $ runState (setSym' l) (i,IntMap.empty)
+setSym :: BlackBoxTemplate
+       -> NetlistMonad BlackBoxTemplate
+--setSym l = second fst
+--  $ runState (setSym' l) ((ids,i),IntMap.empty)
+setSym l = evalStateT (mapM setSym' l) IntMap.empty
   where
-    setSym' :: BlackBoxTemplate -> State (Int,IntMap.IntMap Int) BlackBoxTemplate
-    setSym' = mapM (\e -> case e of
-                      Sym i'        -> do symM <- use (_2 . at i')
-                                          case symM of
-                                            Nothing -> do k <- use _1
-                                                          _1 += 1
-                                                          _2 %= IntMap.insert i' k
-                                                          return (Sym k)
-                                            Just k  -> return (Sym k)
-                      D (Decl n l') -> D <$> (Decl n <$> mapM (combineM setSym' setSym') l')
-                      IF c t f      -> IF <$> pure c <*> setSym' t <*> setSym' f
-                      SigD e' m     -> SigD <$> (setSym' e') <*> pure m
-                      BV t e' m     -> BV <$> pure t <*> setSym' e' <*> pure m
-                      _             -> pure e
-              )
+    setSym' :: Element
+            -> StateT (IntMap.IntMap Identifier)
+                      NetlistMonad
+                      Element
+    setSym' e = case e of
+      Sym _ i -> do
+        symM <- IntMap.lookup i <$> get
+        case symM of
+          Nothing -> do
+            t <- lift (mkUniqueIdentifier (Text.pack "n"))
+            modify (IntMap.insert i t)
+            return (Sym t i)
+          Just t -> return (Sym t i)
+      GenSym t i -> do
+        symM <- IntMap.lookup i <$> get
+        case symM of
+          Nothing -> do
+            t' <- lift (mkUniqueIdentifier (concatT t))
+            modify (IntMap.insert i t')
+            return (GenSym [C t'] i)
+          Just _ -> error ("Symbol #" ++ show i ++ " is already defined")
+      D (Decl n l') -> D <$> (Decl n <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
+      IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
+      SigD e' m     -> SigD <$> (mapM setSym' e') <*> pure m
+      BV t e' m     -> BV <$> pure t <*> mapM setSym' e' <*> pure m
+      _             -> pure e
+
+    concatT :: [Element] -> Text
+    concatT = Text.concat
+            . map (\case {C t -> t; _ -> error "unexpected element in GENSYM"})
 
 setCompName :: Identifier -> BlackBoxTemplate -> BlackBoxTemplate
 setCompName nm = map setCompName'
   where
-    setCompName' CompName = C nm
-    setCompName' e        = e
+    setCompName' CompName       = C nm
+    setCompName' (D (Decl n l)) = D (Decl n (map (setCompName nm *** setCompName nm) l))
+    setCompName' (IF c t f)     = IF c (setCompName nm t) (setCompName nm f)
+    setCompName' (GenSym es i)  = GenSym (setCompName nm es) i
+    setCompName' (BV t e m)     = BV t (setCompName nm e) (setCompName' m)
+    setCompName' e              = e
 
 setClocks :: ( MonadWriter (Set (Identifier,HWType)) m
              , Applicative m
@@ -204,30 +225,35 @@ renderElem b (SigD e m) = do
 renderElem b (IF c t f) = do
   iw <- iwWidth
   syn <- hdlSyn
-  let c' = case c of
-             (Size e)   -> typeSize (lineToType b [e])
-             (Length e) -> case lineToType b [e] of
-                              (Vector n _) -> n
-                              _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
-             (L n)      -> case bbInputs b !! n of
-                             (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
-                             _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
-             IW64       -> if iw == 64 then 1 else 0
-             (HdlSyn s) -> if s == syn then 1 else 0
-             (IsVar n)  -> let (s,_,_) = bbInputs b !! n
-                               e       = either id fst s
-                           in case e of
-                             Identifier _ Nothing -> 1
-                             _ -> 0
-             (IsLit n)  -> let (s,_,_) = bbInputs b !! n
-                               e       = either id fst s
-                           in case e of
-                             DataCon {} -> 1
-                             Literal {} -> 1
-                             BlackBoxE {} -> 1
-                             _ -> 0
-             _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
+  let c' = check iw syn c
   if c' > 0 then renderBlackBox t b else renderBlackBox f b
+  where
+    check iw syn c' = case c' of
+      (Size e)   -> typeSize (lineToType b [e])
+      (Length e) -> case lineToType b [e] of
+                       (Vector n _) -> n
+                       _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
+      (L n)      -> case bbInputs b !! n of
+                      (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
+                      _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+      IW64       -> if iw == 64 then 1 else 0
+      (HdlSyn s) -> if s == syn then 1 else 0
+      (IsVar n)  -> let (s,_,_) = bbInputs b !! n
+                        e       = either id fst s
+                    in case e of
+                      Identifier _ Nothing -> 1
+                      _ -> 0
+      (IsLit n)  -> let (s,_,_) = bbInputs b !! n
+                        e       = either id fst s
+                    in case e of
+                      DataCon {} -> 1
+                      Literal {} -> 1
+                      BlackBoxE {} -> 1
+                      _ -> 0
+      (And es)   -> if all (==1) (map (check iw syn) es)
+                       then 1
+                       else 0
+      _ -> error $ $(curLoc) ++ "IF: condition must be: SIZE, LENGTH, IW64, LIT, ISLIT, or ISARG"
 
 renderElem b e = renderTag b e
 
@@ -286,7 +312,7 @@ renderTag b (L n)           = let (s,_,_) = bbInputs b !! n
     mkLit (Literal (Just (Signed _,_)) i) = Literal Nothing i
     mkLit i                               = i
 
-renderTag _ (Sym n)         = return $ Text.pack ("n_" ++ show n)
+renderTag _ (Sym t _) = return t
 
 renderTag b (BV True es e) = do
   e' <- Text.concat <$> mapM (renderElem b) es
@@ -314,6 +340,7 @@ renderTag b (Length e)      = return . Text.pack . show . vecLen $ lineToType b 
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  (displayT . renderOneLine) <$> hdlType ty
 renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
+renderTag _ (GenSym [C t] _) = return t
 renderTag _ (IF _ _ _)      = error $ $(curLoc) ++ "Unexpected IF"
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
@@ -326,6 +353,8 @@ renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"
 renderTag _ (HdlSyn s)      = error $ $(curLoc) ++ "Unexpected ~" ++ show s
 renderTag _ (IsLit _)       = error $ $(curLoc) ++ "Unexpected ~ISLIT"
 renderTag _ (IsVar _)       = error $ $(curLoc) ++ "Unexpected ~ISVAR"
+renderTag _ (GenSym _ _)    = error $ $(curLoc) ++ "Unexpected ~GENSYM"
+renderTag _ (And _)         = error $ $(curLoc) ++ "Unexpected ~AND"
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
@@ -346,7 +375,7 @@ prettyElem (D (Decl i args)) = do
 prettyElem O = return "~RESULT"
 prettyElem (I i) = (displayT . renderOneLine) <$> (text "~ARG" <> brackets (int i))
 prettyElem (L i) = (displayT . renderOneLine) <$> (text "~LIT" <> brackets (int i))
-prettyElem (Sym i) = (displayT . renderOneLine) <$> (text "~SYM" <> brackets (int i))
+prettyElem (Sym _ i) = (displayT . renderOneLine) <$> (text "~SYM" <> brackets (int i))
 prettyElem (Clk Nothing) = return "~CLKO"
 prettyElem (Clk (Just i)) = (displayT . renderOneLine) <$> (text "~CLK" <> brackets (int i))
 prettyElem (Rst Nothing) = return "~RSTO"
@@ -384,6 +413,9 @@ prettyElem (IF b esT esF) = do
      text "~ELSE" PP.<$>
      text esF' PP.<$>
      text "~FI")
+prettyElem (And es) =
+  (displayT . renderCompact) <$>
+  (PP.brackets (PP.tupled $ mapM (text <=< prettyElem) es))
 prettyElem IW64 = return "~IW64"
 prettyElem (HdlSyn s) = case s of
   Vivado -> return "~VIVADO"
@@ -397,6 +429,9 @@ prettyElem (BV b es e) = do
        else text "~FROMBV" <> brackets (text es') <> brackets (text e')
 prettyElem (IsLit i) = (displayT . renderOneLine) <$> (text "~ISLIT" <> brackets (int i))
 prettyElem (IsVar i) = (displayT . renderOneLine) <$> (text "~ISVAR" <> brackets (int i))
+prettyElem (GenSym es i) = do
+  es' <- prettyBlackBox es
+  (displayT . renderOneLine) <$> (text "~GENSYM" <> brackets (text es') <> brackets (int i))
 prettyElem (SigD es mI) = do
   es' <- prettyBlackBox es
   (displayT . renderOneLine) <$>

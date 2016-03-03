@@ -2,9 +2,10 @@ module MAC where
 
 import CLaSH.Prelude
 
-topEntity :: (Signal Integer, Signal Integer)
+topEntity :: Integer
+          -> (Signal Integer, Signal Integer)
           -> Signal Integer
-topEntity = macT <^> 0
+topEntity i = macT <^> i
 
 macT s (x,y) = (s',o)
   where

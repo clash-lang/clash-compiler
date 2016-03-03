@@ -11,23 +11,20 @@
            -> Signal' clk a"
     , "templateD" :
 "-- blockRam begin
-blockRam_~COMPNAME_~SYM[0] : block
-  signal RAM_~SYM[1]  : ~TYP[2] := ~LIT[2];
-~IF ~VIVADO ~THEN
-  signal dout_~SYM[2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);
-~ELSE
-  signal dout_~SYM[2] : ~TYP[6];
-~FI
-  signal wr_~SYM[3]   : integer range 0 to ~LIT[0] - 1;
-  signal rd_~SYM[4]   : integer range 0 to ~LIT[0] - 1;
+~GENSYM[~COMPNAME_blockRam][0] : block
+  signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
+  signal ~GENSYM[dout][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
+  signal ~SYM[2] : ~TYP[6];~FI
+  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[0] - 1;
+  signal ~GENSYM[rd][4] : integer range 0 to ~LIT[0] - 1;
 begin
-  wr_~SYM[3] <= to_integer(~ARG[3])
+  ~SYM[3] <= to_integer(~ARG[3])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
                 ;
 
-  rd_~SYM[4] <= to_integer(~ARG[4])
+  ~SYM[4] <= to_integer(~ARG[4])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
@@ -36,21 +33,15 @@ begin
   blockRam_sync : process(~CLK[1])
   begin
     if rising_edge(~CLK[1]) then
-      if ~ARG[5] then
-~IF ~VIVADO ~THEN
-        RAM_~SYM[1](wr_~SYM[3]) <= ~TOBV[~ARG[6]][~TYP[6]];
-~ELSE
-        RAM_~SYM[1](wr_~SYM[3]) <= ~ARG[6];
-~FI
+      if ~ARG[5] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
+        ~SYM[1](~SYM[3]) <= ~ARG[6];~FI
       end if;
-      dout_~SYM[2] <= RAM_~SYM[1](rd_~SYM[4]);
+      ~SYM[2] <= ~SYM[1](~SYM[4]);
     end if;
-  end process;
-~IF ~VIVADO ~THEN
-  ~RESULT <= ~FROMBV[dout_~SYM[2]][~TYPO];
-~ELSE
-  ~RESULT <= dout_~SYM[2];
-~FI
+  end process;~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[~SYM[2]][~TYPO];~ELSE
+  ~RESULT <= ~SYM[2];~FI
 end block;
 -- blockRam end"
     }

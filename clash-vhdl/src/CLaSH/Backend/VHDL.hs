@@ -19,7 +19,6 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
-import           Data.Char                            (toLower)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -37,7 +36,7 @@ import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util
+import           CLaSH.Netlist.Util                   hiding (mkBasicId)
 import           CLaSH.Util                           (clog2, curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
@@ -82,12 +81,12 @@ instance Backend VHDLState where
   toBV _ id_      = "toSLV" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . mkBasicId' True)
+  mkBasicId       = return (filterReserved . T.toLower . mkBasicId' True)
 
 type VHDLM a = State VHDLState a
 
 -- List of reserved VHDL-2008 keywords
-reservedWords :: [String]
+reservedWords :: [Identifier]
 reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"array","assert","assume","assume_guarantee","attribute","begin","block"
   ,"body","buffer","bus","case","component","configuration","constant","context"
@@ -101,11 +100,11 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"return","rol","ror","select","sequence","severity","signal","shared","sla"
   ,"sll","sra","srl","strong","subtype","then","to","transport","type"
   ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
-  ,"when","while","with","xnor","xor"]
+  ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"]
 
-filterReserved :: String -> String
-filterReserved s = if map toLower s `elem` reservedWords
-  then s ++ "R"
+filterReserved :: Identifier -> Identifier
+filterReserved s = if s `elem` reservedWords
+  then s `T.append` "_r"
   else s
 
 -- | Generate VHDL for a Netlist component
@@ -124,32 +123,34 @@ mkTyPackage_ :: String
              -> VHDLM [(String,Doc)]
 mkTyPackage_ modName hwtys = do
     { syn <- hdlSyn
+    ; mkId <- mkBasicId
     ; let usedTys     = concatMap mkUsedTys hwtys
           needsDec = nubBy (eqReprTy syn) . map mkVecZ $ (hwtys ++ usedTys)
           hwTysSorted = topSortHWTys needsDec
           packageDec  = vcat $ mapM tyDec hwTysSorted
           (funDecs,funBodies) = unzip . catMaybes $ map (funDec syn) (nubBy (eqTypM syn) hwTysSorted)
 
-    ; (:[]) A.<$> (modName ++ "_types",) A.<$>
+    ; (:[]) A.<$> (unpack $ mkId (T.pack modName `T.append` "_types"),) A.<$>
       "library IEEE;" <$>
       "use IEEE.STD_LOGIC_1164.ALL;" <$>
       "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>
-      "package" <+> modNameD <> "_types" <+> "is" <$>
+      "package" <+> text (mkId (T.pack modName `T.append` "_types")) <+> "is" <$>
          indent 2 ( packageDec <$>
                     vcat (sequence funDecs)
                   ) <$>
       "end" <> semi <> packageBodyDec funBodies
     }
   where
-    modNameD = text (T.pack modName)
-
     packageBodyDec :: [VHDLM Doc] -> VHDLM Doc
     packageBodyDec funBodies = case funBodies of
-        [] -> empty
-        _  -> linebreak <$>
-              "package" <+> "body" <+> modNameD <> "_types" <+> "is" <$>
-                indent 2 (vcat (sequence funBodies)) <$>
-              "end" <> semi
+      [] -> empty
+      _  -> do
+        { mkId <- mkBasicId
+        ; linebreak <$>
+         "package" <+> "body" <+> text (mkId (T.pack modName `T.append` "_types")) <+> "is" <$>
+           indent 2 (vcat (sequence funBodies)) <$>
+         "end" <> semi
+        }
 
     eqReprTy :: HdlSyn -> HWType -> HWType -> Bool
     eqReprTy h (Vector n ty1) (Vector m ty2)  = n == m && eqReprTy h ty1 ty2
@@ -344,7 +345,8 @@ slvToSlvDec =
   )
 
 tyImports :: String -> VHDLM Doc
-tyImports modName =
+tyImports modName = do
+  mkId <- mkBasicId
   punctuate' semi $ sequence
     [ "library IEEE"
     , "use IEEE.STD_LOGIC_1164.ALL"
@@ -352,7 +354,7 @@ tyImports modName =
     , "use IEEE.MATH_REAL.ALL"
     , "use std.textio.all"
     , "use work.all"
-    , "use work." <> text (T.pack modName) <> "_types.all"
+    , "use work." <> text (mkId (T.pack modName `T.append` "_types")) <> ".all"
     ]
 
 

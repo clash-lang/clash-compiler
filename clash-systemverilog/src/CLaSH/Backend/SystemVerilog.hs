@@ -19,7 +19,6 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
-import           Data.Char                            (toUpper)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -28,6 +27,7 @@ import qualified Data.HashSet                         as HashSet
 import           Data.List                            (mapAccumL,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (pack,unpack)
+import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -96,7 +96,7 @@ instance Backend SystemVerilogState where
 type SystemVerilogM a = State SystemVerilogState a
 
 -- List of reserved SystemVerilog-2012 keywords
-reservedWords :: [String]
+reservedWords :: [Identifier]
 reservedWords = ["accept_on","alias","always","always_comb","always_ff"
   ,"always_latch","and","assert","assign","assume","automatic","before","begin"
   ,"bind","bins","binsof","bit","break","buf","bufif0","bufif1","byte","case"
@@ -131,9 +131,9 @@ reservedWords = ["accept_on","alias","always","always_comb","always_ff"
   ,"var","vectored","virtual","void","wait","wait_order","wand","weak","weak0"
   ,"weak1","while","wildcard","wire","with","within","wor","xnor","xor"]
 
-filterReserved :: String -> String
+filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
-  then init s ++ [toUpper (last s)]
+  then Text.init s `Text.append` (Text.toUpper . Text.singleton . Text.last) s
   else s
 
 -- | Generate VHDL for a Netlist component

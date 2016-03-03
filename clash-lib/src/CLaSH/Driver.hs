@@ -30,7 +30,7 @@ import qualified System.IO                        as IO
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc)
 import           Unbound.Generics.LocallyNameless (name2String)
 
-import           CLaSH.Annotations.TopEntity      (TopEntity)
+import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Backend
 import           CLaSH.Core.Term                  (Term, TmName)
 import           CLaSH.Core.Type                  (Type)
@@ -89,9 +89,12 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
       hdlsyn    = opt_hdlSyn opts
       hdlState' = fromMaybe (initBackend iw hdlsyn :: backend) hdlState
       mkId      = evalState mkBasicId hdlState'
+      topNm     = maybe (mkId (Text.pack $ modName ++ "_topEntity"))
+                        (Text.pack . t_name)
+                        annM
 
-  (netlist,dfiles,cmpCnt) <- genNetlist Nothing transformedBindings primMap' tcm
-                                 typeTrans Nothing modName [] iw mkId topEntity
+  (netlist,dfiles,seen) <- genNetlist transformedBindings primMap' tcm
+                                 typeTrans Nothing modName [] iw mkId [topNm] topEntity
 
   netlistTime <- netlist `deepseq` Clock.getCurrentTime
   let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -99,12 +102,12 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
 
   let topComponent = head
                    $ filter (\(Component cName _ _ _ _) ->
-                                Text.isSuffixOf (genComponentName mkId modName topEntity 0)
+                                Text.isSuffixOf (genComponentName [topNm] mkId modName topEntity)
                                   cName)
                             netlist
 
   (testBench,dfiles') <- genTestBench opts supplyTB primMap'
-                             typeTrans tcm tupTcm eval mkId cmpCnt bindingsMap
+                             typeTrans tcm tupTcm eval mkId seen bindingsMap
                              testInpM
                              expOutM
                              modName
@@ -116,7 +119,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
   putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-  let topWrapper = mkTopWrapper primMap' annM modName iw topComponent
+  let topWrapper = mkTopWrapper primMap' mkId annM modName iw topComponent
       hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
       dir = fromMaybe "." (opt_hdlDir opts) </>
             CLaSH.Backend.name hdlState' </>

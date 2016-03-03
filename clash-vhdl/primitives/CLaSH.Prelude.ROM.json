@@ -7,19 +7,19 @@
            -> a"
     , "templateD" :
 "-- asyncRom begin
-asyncRom_~SYM[0] : block
-  signal ROM_~SYM[1]       : ~TYP[1];
-  signal rom_index_~SYM[2] : integer range 0 to ~LIT[0]-1;
+~GENSYM[asyncRom][0] : block
+  signal ~GENSYM[ROM][1] : ~TYP[1];
+  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[0]-1;
 begin
-  ROM_~SYM[1] <= ~ARG[1];
+  ~SYM[1] <= ~ARG[1];
 
-  rom_index~SYM[2] <= to_integer(~ARG[2])
+  ~SYM[2] <= to_integer(~ARG[2])
   -- pragma translate_off
                       mod ~LIT[0]
   -- pragma translate_on
                       ;
 
-  ~RESULT <= ROM_~SYM[1](rom_index_~SYM[2]);
+  ~RESULT <= ~SYM[1](~SYM[2]);
 end block;
 -- asyncRom end"
     }
@@ -34,14 +34,13 @@ end block;
       -> Signal' clk a"
     , "templateD" :
 "-- rom begin
-rom_~COMPNAME_~SYM[0] : block
-  signal ROM_~SYM[1]  : ~TYP[2];
-  signal rd_~SYM[2]   : integer range 0 to ~LIT[0]-1;
-  signal dout_~SYM[3] : ~TYPO;
+~GENSYM[~COMPNAME_rom][0] : block
+  signal ~GENSYM[ROM][1] : ~TYP[2];
+  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[0]-1;
 begin
-  ROM_~SYM[1] <= ~ARG[2];
+  ~SYM[1] <= ~ARG[2];
 
-  rd_~SYM[2] <= to_integer(~ARG[3])
+  ~SYM[2] <= to_integer(~ARG[3])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
@@ -50,11 +49,9 @@ begin
   romSync : process (~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
-      dout_~SYM[3] <= ROM_~SYM[1](rd_~SYM[2]);
+      ~RESULT <= ~SYM[1](~SYM[2]);
     end if;
   end process;
-
-  ~RESULT <= dout_~SYM[3];
 end block;
 -- rom end"
     }

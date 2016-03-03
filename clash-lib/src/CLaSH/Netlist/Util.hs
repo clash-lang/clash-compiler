@@ -12,14 +12,14 @@
 module CLaSH.Netlist.Util where
 
 import           Control.Error           (hush)
-import           Control.Lens            ((.=),(<<%=))
+import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
-import           Data.Text.Lazy          (append,pack)
+import           Data.Text.Lazy          (append,pack,unpack)
 import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed, makeName,
                                           name2Integer, name2String, unbind,
                                           unembed, unrec)
@@ -37,7 +37,7 @@ import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
 import           CLaSH.Netlist.Types     as HW
 import           CLaSH.Util
 
-mkBasicId :: String -> NetlistMonad String
+mkBasicId :: Identifier -> NetlistMonad Identifier
 mkBasicId s = do
   f <- Lens.use mkBasicIdFn
   return (f s)
@@ -228,9 +228,9 @@ mkUniqueNormalized :: ([Id],[LetBinding],Id)
                    -> NetlistMonad ([Id],[LetBinding],TmName)
 mkUniqueNormalized (args,binds,res) = do
   -- Make arguments unique
-  (args',subst)   <- mkUnique []    []    args
+  (args',subst)   <- mkUnique []    args
   -- Make result unique
-  ([res1],subst') <- mkUnique args' subst [res]
+  ([res1],subst') <- mkUnique subst [res]
   let bndrs = map fst binds
       exprs = map (unembed . snd) binds
       usesOutput = concatMap (filter (== varName res) . Lens.toListOf termFreeIds) exprs
@@ -240,7 +240,7 @@ mkUniqueNormalized (args,binds,res) = do
   (res2,subst'',extraBndr) <- case usesOutput of
     [] -> return (varName res1,(res,res1):subst',[] :: [(Id, Embed Term)])
     _  -> do
-      ([res3],_) <- mkUnique (res1:args') [] [modifyVarName (`appendToName` "_rec") res1]
+      ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res1]
       return (varName res3,(res,res3):subst'
              ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
   -- Replace occurences of "<X>" by "<X>_rec"
@@ -248,8 +248,8 @@ mkUniqueNormalized (args,binds,res) = do
       bndrs'  = map (\i -> if varName i == resN then modifyVarName (const res2) i else i) bndrs
       (bndrsL,r:bndrsR) = break ((== res2).varName) bndrs'
   -- Make let-binders unique
-  (bndrsL',substL) <- mkUnique (r:res1:args')         subst'' bndrsL
-  (bndrsR',substR) <- mkUnique (r:res1:args'++bndrsL) substL  bndrsR
+  (bndrsL',substL) <- mkUnique subst'' bndrsL
+  (bndrsR',substR) <- mkUnique substL  bndrsR
   -- Replace old IDs by update unique IDs in the RHSs of the let-binders
   exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs substR
   -- Return the uniquely named arguments, let-binders, and result
@@ -274,40 +274,52 @@ mkUniqueNormalized (args,binds,res) = do
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
-mkUnique :: [Id]      -- ^ Previously seen IDs
-         -> [(Id,Id)] -- ^ Existing substitution
+mkUnique :: [(Id,Id)] -- ^ Existing substitution
          -> [Id]      -- ^ IDs to make unique
          -> NetlistMonad ([Id],[(Id,Id)])
          -- ^ (Unique IDs, update substitution)
 mkUnique = go []
   where
-    go processed _    subst []     = return (reverse processed,subst)
-    go processed seen subst (i:is) = do
-      iN <- mkBasicId . name2String $ varName i
-      if any ((== iN).name2String.varName) seen
-         then do
-           varCnt <- varCount <<%= (+1)
-           let i' = modifyVarName (repName (iN ++ '_':show varCnt)) i
-           go (i':processed) (i':seen) ((i,i'):subst) is
-         else do
-           let i' = modifyVarName (repName iN) i
-           go (i':processed) (i':seen) ((i,i'):subst) is
+    go :: [Id] -> [(Id,Id)] -> [Id] -> NetlistMonad ([Id],[(Id,Id)])
+    go processed subst []     = return (reverse processed,subst)
+    go processed subst (i:is) = do
+      iN <- mkUniqueIdentifier . pack . name2String $ varName i
+      let iN_unpacked = unpack iN
+          i'          = modifyVarName (repName iN_unpacked) i
+      go (i':processed) ((i,i'):subst) is
+      --iN <- mkBasicId . pack . name2String $ varName i
+      --if any ((== iN).pack.name2String.varName) seen
+      --   then do
+      --     varCnt <- varCount <<%= (+1)
+      --     let i' = modifyVarName (repName ((unpack iN) ++ '_':show varCnt)) i
+      --     go (i':processed) (i':seen) ((i,i'):subst) is
+      --   else do
+      --     let i' = modifyVarName (repName (unpack iN)) i
+      --     go (i':processed) (i':seen) ((i,i'):subst) is
 
     repName s n = makeName s (name2Integer n)
 
 mkUniqueIdentifier :: Identifier
                    -> NetlistMonad Identifier
-mkUniqueIdentifier i = do
-  seen <- Lens.use seenIds
-  if i `elem` seen
-     then do
-        varCnt <- varCount <<%= (+1)
-        let i' = i `append` (pack ('_':show varCnt))
-        seenIds Lens.%= (i':)
-        return i'
+mkUniqueIdentifier nm = do
+  seen  <- Lens.use seenIds
+  seenC <- Lens.use seenComps
+  i     <- mkBasicId nm
+  let s = seenC ++ seen
+  if i `elem` s
+     then go 0 s i
      else do
-        seenIds Lens.%= (i:)
-        return i
+      seenIds %= (i:)
+      return i
+  where
+    go :: Integer -> [Identifier] -> Identifier -> NetlistMonad Identifier
+    go n s i = do
+      i' <- mkBasicId (i `append` pack ('_':show n))
+      if i' `elem` s
+         then go (n+1) s i
+         else do
+          seenIds %= (i':)
+          return i'
 
 -- | Append a string to a name
 appendToName :: TmName

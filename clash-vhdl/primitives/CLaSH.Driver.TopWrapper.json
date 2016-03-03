@@ -2,9 +2,9 @@
     { "name"      : "CLaSH.TopWrapper.syncReset"
     , "templateD" :
 "-- reset ~RESULT is asynchronously asserted, but synchronously de-asserted
-resetSync_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[0];
+~GENSYM[resetSync][0] : block
+  signal ~GENSYM[r1][1] : ~TYP[0];
+  signal ~GENSYM[r2][2] : ~TYP[0];
 begin
   process(~CLKO,~ARG[0])
   begin
