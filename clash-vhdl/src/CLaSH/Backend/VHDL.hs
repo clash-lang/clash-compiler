@@ -230,7 +230,9 @@ tyDec _ = empty
 funDec :: HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
 funDec _ Bool = Just
   ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <$>
-    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi
+    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi <$>
+    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <> semi <$>
+    "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <> semi
   , "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <$>
     "begin" <$>
       indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
@@ -246,6 +248,24 @@ funDec _ Bool = Just
                                 ,   indent 2 ("return" <+> "true" <> semi)
                                 ,"else"
                                 ,   indent 2 ("return" <+> "false" <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <$>
+    "end" <> semi <$>
+    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (use intWidth >>= int)) <+> "then"
+                                ,   indent 2 ("return" <+> "false" <> semi)
+                                ,"else"
+                                ,   indent 2 ("return" <+> "true" <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <$>
+    "end" <> semi <$>
+    "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <+> "is" <$>
+    "begin" <$>
+      indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (use intWidth >>= int)) <> semi)
+                                ,"else"
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (use intWidth >>= int)) <> semi)
                                 ,"end" <+> "if" <> semi
                                 ]) <$>
     "end" <> semi
@@ -618,12 +638,8 @@ expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
-expr_ _ (DataTag Bool (Left id_)) = "false when" <+> text id_ <+> "= 0 else true"
-expr_ _ (DataTag Bool (Right id_)) = do {
-  ; iw <- use intWidth
-  ; "to_signed" <> parens (int 1 <> "," <> int iw) <+> "when" <+> text id_ <+> "else" <+>
-    "to_signed" <> parens (int 0 <> "," <> int iw)
-  }
+expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (text id_)
+expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (text id_)
 
 expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
   "resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (text id_)) <> "," <> int (typeSize hty))
