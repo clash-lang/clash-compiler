@@ -1,0 +1,3 @@
+[submodule "clash-prelude"]
+	path = clash-prelude
+	url = ../clash-prelude.git
