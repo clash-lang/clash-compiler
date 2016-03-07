@@ -11,26 +11,26 @@
            -> Signal' clk a"
     , "templateD" :
 "// blockRam begin
-reg ~TYPO RAM_~SYM[0] [0:~LIT[0]-1];
-reg ~TYPO dout_~SYM[1];
+reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[0]-1];
+reg ~TYPO ~GENSYM[dout][1];
 
-reg ~TYP[2] ram_init_~SYM[2];
-integer ~SYM[3];
+reg ~TYP[2] ~GENSYM[ram_init][2];
+integer ~GENSYM[i][3];
 initial begin
-  ram_init_~SYM[2] = ~ARG[2];
+  ~SYM[2] = ~ARG[2];
   for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
-    RAM_~SYM[0][~LIT[0]-1-~SYM[3]] = ram_init_~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
 
-always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[4]
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][4]
   if (~ARG[5]) begin
-    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
+    ~SYM[0][~ARG[3]] <= ~ARG[6];
   end
-  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~SYM[1];
 // blockRam end"
     }
   }

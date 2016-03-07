@@ -55,10 +55,10 @@
         -> Bit"
     , "templateD" :
 "// indexBit begin
-wire ~TYP[1] vec_~SYM[0];
-assign vec_~SYM[0] = ~ARG[1];
+wire ~TYP[1] ~GENSYM[bv][0];
+assign ~SYM[0] = ~ARG[1];
 
-assign ~RESULT = vec_~SYM[0][~ARG[2]];
+assign ~RESULT = ~SYM[0][~ARG[2]];
 // indexBit end"
     }
   }
@@ -72,16 +72,16 @@ assign ~RESULT = vec_~SYM[0][~ARG[2]];
              -> BitVector n"
     , "templateD" :
 "// replaceBit start
-reg ~TYPO vec_~SYM[0];
-wire ~TYP[3] din_~SYM[1];
-assign din_~SYM[1] = ~ARG[3];
+reg ~TYPO ~GENSYM[bv][0];
+wire ~TYP[3] ~GENSYM[din][1];
+assign ~SYM[1] = ~ARG[3];
 
 always @(*) begin
-  vec_~SYM[0] = ~ARG[1];
-  vec_~SYM[0][~ARG[2]] = din_~SYM[1];
+  ~SYM[0] = ~ARG[1];
+  ~SYM[0][~ARG[2]] = ~SYM[1];
 end
 
-assign ~RESULT = vec_~SYM[0];
+assign ~RESULT = ~SYM[0];
 // replaceBit end"
     }
   }
@@ -95,13 +95,13 @@ assign ~RESULT = vec_~SYM[0];
            -> BitVector (m + 1 + i)"
     , "templateD" :
 "// setSlice begin
-reg ~SIGD[~SYM[0]][0];
-wire ~TYP[3] din_~SYM[1];
-assign din_~SYM[1] = ~ARG[3]
+reg ~SIGD[~GENSYM[bv][0]][0];
+wire ~TYP[3] ~GENSYM[din][1];
+assign ~SYM[1] = ~ARG[3]
 
 always @(*) begin
   ~SYM[0] = ~ARG[0];
-  ~SYM[0][~LIT[1] : ~LIT[2]] = din_~SYM[1];
+  ~SYM[0][~LIT[1] : ~LIT[2]] = ~SYM[1];
 end
 
 assign ~RESULT = ~SYM[0];
@@ -117,7 +117,7 @@ assign ~RESULT = ~SYM[0];
         -> BitVector (m + 1 - n)"
     , "templateD" :
 "// slice begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[bv][0]][0];
 assign ~SYM[0] = ~ARG[0];
 assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
 // slice end"
@@ -140,7 +140,7 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
       -> Bit"
     , "templateD" :
 "// msb begin~IF ~LIT[0] ~THEN
-wire ~SIGD[~SYM[0]][1];
+wire ~SIGD[~GENSYM[bv][0]][1];
 assign ~SYM[0] = ~ARG[1];
 assign ~RESULT = ~SYM[0][~LIT[0]-1];
 ~ELSE
@@ -155,7 +155,7 @@ assign ~RESULT = 1'b0;
       -> Bit"
     , "templateD" :
 "// lsb begin~IF ~SIZE[~TYP[0]] ~THEN
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[bv][0]][0];
 assign ~SYM[0] = ~ARG[0];
 assign ~RESULT = ~SYM[0][0];
 ~ELSE
@@ -329,7 +329,7 @@ assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
 "// rotateR begin
-wire [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~GENSYM[bv][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 // rotateR end"

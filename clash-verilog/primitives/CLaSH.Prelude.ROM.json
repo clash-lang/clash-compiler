@@ -7,18 +7,18 @@
            -> a"
     , "templateD" :
 "// asyncRom begin
-wire ~TYPO ROM_~SYM[0] [0:~LIT[0]-1];
+wire ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
 
-wire ~TYP[1] romflat_~SYM[1];
-assign romflat_~SYM[1] = ~ARG[1];
-genvar ~SYM[2];
+wire ~TYP[1] ~GENSYM[romflat][1];
+assign ~SYM[1] = ~ARG[1];
+genvar ~GENSYM[i][2];
 ~GENERATE
-for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : array_~SYM[3]
-  assign ROM_~SYM[0][(~LIT[0]-1)-~SYM[2]] = romflat_~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][3]
+  assign ~SYM[0][(~LIT[0]-1)-~SYM[2]] = ~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
 end
 ~ENDGENERATE
 
-assign ~RESULT = ROM_~SYM[0][~ARG[2]];
+assign ~RESULT = ~SYM[0][~ARG[2]];
 // asyncRom end"
     }
   }
@@ -32,23 +32,23 @@ assign ~RESULT = ROM_~SYM[0][~ARG[2]];
       -> Signal' clk a"
     , "templateD" :
 "// rom begin
-reg ~TYPO ROM_~SYM[0] [0:~LIT[0]-1];
-reg ~TYPO dout_~SYM[1];
+reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[0]-1];
+reg ~TYPO ~GENSYM[dout][1];
 
-reg ~TYP[2] rom_init_~SYM[2];
-integer ~SYM[3];
+reg ~TYP[2] ~GENSYM[rom_init][2];
+integer ~GENSYM[i][3];
 initial begin
-  rom_init_~SYM[2] = ~ARG[2];
+  ~SYM[2] = ~ARG[2];
   for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
-    ROM_~SYM[0][~LIT[0]-1-~SYM[3]] = rom_init_~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
 
-always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[4]
-  dout_~SYM[1] <= ROM_~SYM[0][~ARG[3]];
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_rom][4]
+  ~SYM[1] <= ~SYM[0][~ARG[3]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~SYM[1];
 // rom end"
     }
   }

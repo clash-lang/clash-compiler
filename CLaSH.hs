@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 #include "MachDeps.h"
-#define HDLSYN Vivado
+#define HDLSYN Other
 
 import CLaSH.Driver
 import CLaSH.Driver.Types

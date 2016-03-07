@@ -354,9 +354,9 @@ begin
   end generate;~ELSE
   begin
     ~INST 0
-      ~OUTPUT <= ~SYM[2](i_~SYM[3])~ ~TYP[1]~
-      ~INPUT  <= ~ARG[2](i_~SYM[3])~ ~TYPEL[~TYP[2]]~
-      ~INPUT  <= ~SYM[2](i_~SYM[3]+1)~ ~TYP[1]~
+      ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~
+      ~INPUT  <= ~ARG[2](~SYM[3])~ ~TYPEL[~TYP[2]]~
+      ~INPUT  <= ~SYM[2](~SYM[3]+1)~ ~TYP[1]~
     ~INST
   end generate;~FI
 
@@ -382,9 +382,9 @@ begin
   end generate;~ELSE
   begin
     ~INST 0
-      ~OUTPUT <= ~SYM[2](i_~SYM[3])~ ~TYP[1]~
-      ~INPUT  <= ~SYM[5](i_~SYM[3])~ ~TYPEL[~TYP[2]]~
-      ~INPUT  <= ~SYM[2](i_~SYM[3]+1)~ ~TYP[1]~
+      ~OUTPUT <= ~SYM[2](~SYM[3])~ ~TYP[1]~
+      ~INPUT  <= ~SYM[5](~SYM[3])~ ~TYPEL[~TYP[2]]~
+      ~INPUT  <= ~SYM[2](~SYM[3]+1)~ ~TYP[1]~
     ~INST
   end generate;~FI
 

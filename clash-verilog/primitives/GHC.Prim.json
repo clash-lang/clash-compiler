@@ -75,8 +75,8 @@
     , "type"      : "quotRemInt# :: Int# -> Int# -> (#Int#, Int##)"
     , "templateD" :
 "// quotRemInt begin
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][0];
+wire ~SIGD[~GENSYM[quot_res][0]][0];
+wire ~SIGD[~GENSYM[rem_res][1]][0];
 assign ~SYM[0] = ~ARG[0] / ~ARG[1];
 assign ~SYM[1] = ~ARG[0] % ~ARG[1];
 
@@ -215,8 +215,8 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     , "type"      : "quotRemWord# :: Word# -> Word# -> (#Word#, Word##)"
     , "templateD" :
 "// quotRemWord begin
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][0];
+wire ~SIGD[~GENSYM[quot_res][0]][0];
+wire ~SIGD[~GENSYM[rem_res][1]][0];
 assign ~SYM[0] = ~ARG[0] / ~ARG[1];
 assign ~SYM[1] = ~ARG[0] % ~ARG[1];
 
@@ -307,57 +307,57 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     , "type"      : "popCnt8# :: Word# -> Word#"
     , "templateD" :
 "// popCnt8 begin
-localparam width_~SYM[0] = 8;
+localparam ~GENSYM[width][0] = 8;
 
 // ceiling of log2
-function integer log2_~SYM[1];
+function integer ~GENSYM[log2][1];
   input integer value;
   begin
     value = value-1;
-    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
       value = value>>1;
   end
 endfunction
 
 // depth of the tree
-localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
 
-wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
 // put input into the first half of the intermediate array
-genvar i_~SYM[4];
+genvar ~GENSYM[i][4];
 ~GENERATE
-for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
-  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
+  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
 end
 ~ENDGENERATE
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer depth2Index_~SYM[5];
+function integer ~GENSYM[depth2Index][5];
   input integer levels;
   input integer depth;
 
-  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+  ~SYM[5] = (2 ** levels) - (2 ** depth);
 endfunction
 
 // Create the tree of instantiated components
-genvar d_~SYM[6];
-genvar i_~SYM[7];
+genvar ~GENSYM[d][6];
+genvar ~GENSYM[i][7];
 ~GENERATE
-if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
-  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
-    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
-      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
+  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
 ~ENDGENERATE
 
 // The last element of the intermediate array holds the result
-assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 // popCnt8 end"
     }
   }
@@ -366,57 +366,57 @@ assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
     , "type"      : "popCnt16# :: Word# -> Word#"
     , "templateD" :
 "// popCnt16 begin
-localparam width_~SYM[0] = 16;
+localparam ~GENSYM[width][0] = 16;
 
 // ceiling of log2
-function integer log2_~SYM[1];
+function integer ~GENSYM[log2][1];
   input integer value;
   begin
     value = value-1;
-    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
       value = value>>1;
   end
 endfunction
 
 // depth of the tree
-localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
 
-wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
 // put input into the first half of the intermediate array
-genvar i_~SYM[4];
+genvar ~GENSYM[i][4];
 ~GENERATE
-for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
-  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
+  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
 end
 ~ENDGENERATE
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer depth2Index_~SYM[5];
+function integer ~GENSYM[depth2Index][5];
   input integer levels;
   input integer depth;
 
-  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+  ~SYM[5] = (2 ** levels) - (2 ** depth);
 endfunction
 
 // Create the tree of instantiated components
-genvar d_~SYM[6];
-genvar i_~SYM[7];
+genvar ~GENSYM[d][6];
+genvar ~GENSYM[i][7];
 ~GENERATE
-if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
-  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
-    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
-      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
+  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
 ~ENDGENERATE
 
 // The last element of the intermediate array holds the result
-assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 // popCnt16 end"
     }
   }
@@ -425,57 +425,57 @@ assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
     , "type"      : "popCnt32# :: Word# -> Word#"
     , "templateD" :
 "// popCnt32 begin
-localparam width_~SYM[0] = 32;
+localparam ~GENSYM[width][0] = 32;
 
 // ceiling of log2
-function integer log2_~SYM[1];
+function integer ~GENSYM[log2][1];
   input integer value;
   begin
     value = value-1;
-    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
       value = value>>1;
   end
 endfunction
 
 // depth of the tree
-localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
 
-wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
 // put input into the first half of the intermediate array
-genvar i_~SYM[4];
+genvar ~GENSYM[i][4];
 ~GENERATE
-for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
-  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
+  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
 end
 ~ENDGENERATE
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer depth2Index_~SYM[5];
+function integer ~GENSYM[depth2Index][5];
   input integer levels;
   input integer depth;
 
-  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+  ~SYM[5] = (2 ** levels) - (2 ** depth);
 endfunction
 
 // Create the tree of instantiated components
-genvar d_~SYM[6];
-genvar i_~SYM[7];
+genvar ~GENSYM[d][6];
+genvar ~GENSYM[i][7];
 ~GENERATE
-if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
-  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
-    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
-      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
+  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
 ~ENDGENERATE
 
 // The last element of the intermediate array holds the result
-assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 // popCnt32 end"
     }
   }
@@ -484,57 +484,57 @@ assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
     , "type"      : "popCnt64# :: Word# -> Word#"
     , "templateD" :
 "// popCnt64 begin
-localparam width_~SYM[0] = 64;
+localparam ~GENSYM[width][0] = 64;
 
 // ceiling of log2
-function integer log2_~SYM[1];
+function integer ~GENSYM[log2][1];
   input integer value;
   begin
     value = value-1;
-    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
       value = value>>1;
   end
 endfunction
 
 // depth of the tree
-localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
 
-wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
 // put input into the first half of the intermediate array
-genvar i_~SYM[4];
+genvar ~GENSYM[i][4];
 ~GENERATE
-for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
-  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
+  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
 end
 ~ENDGENERATE
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer depth2Index_~SYM[5];
+function integer ~GENSYM[depth2Index][5];
   input integer levels;
   input integer depth;
 
-  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+  ~SYM[5] = (2 ** levels) - (2 ** depth);
 endfunction
 
 // Create the tree of instantiated components
-genvar d_~SYM[6];
-genvar i_~SYM[7];
+genvar ~GENSYM[d][6];
+genvar ~GENSYM[i][7];
 ~GENERATE
-if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
-  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
-    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
-      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
+  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
 ~ENDGENERATE
 
 // The last element of the intermediate array holds the result
-assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 // popCnt64 end"
     }
   }
@@ -543,57 +543,57 @@ assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
     , "type"      : "popCnt8# :: Word# -> Word#"
     , "templateD" :
 "// popCnt begin
-localparam width_~SYM[0] = ~SIZE[~TYPO];
+localparam ~GENSYM[width][0] = ~SIZE[~TYPO];
 
 // ceiling of log2
-function integer log2_~SYM[1];
+function integer ~GENSYM[log2][1];
   input integer value;
   begin
     value = value-1;
-    for (log2_~SYM[1]=0; value>0; log2_~SYM[1]=log2_~SYM[1]+1)
+    for (~SYM[1]=0; value>0; ~SYM[1]=~SYM[1]+1)
       value = value>>1;
   end
 endfunction
 
 // depth of the tree
-localparam levels_~SYM[2] = log2_~SYM[1](width_~SYM[0]);
+localparam ~GENSYM[levels][2] = ~SYM[1](~SYM[0]);
 
-wire [levels_~SYM[2]:0] intermediate_~SYM[3] [0:(2*width_~SYM[0])-2];
+wire [~SYM[2]:0] ~GENSYM[intermediate][3] [0:(2*~SYM[0])-2];
 
 // put input into the first half of the intermediate array
-genvar i_~SYM[4];
+genvar ~GENSYM[i][4];
 ~GENERATE
-for (i_~SYM[4] = 0; i_~SYM[4] < width_~SYM[0]; i_~SYM[4]=i_~SYM[4]+1) begin : array_~SYM[5]
-  assign intermediate_~SYM[3][i_~SYM[4]] = $unsigned(~ARG[0][i_~SYM[4]]);
+for (~SYM[4] = 0; ~SYM[4] < ~SYM[0]; ~SYM[4]=~SYM[4]+1) begin : ~GENSYM[mk_array][11]
+  assign ~SYM[3][~SYM[4]] = $unsigned(~ARG[0][~SYM[4]]);
 end
 ~ENDGENERATE
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer depth2Index_~SYM[5];
+function integer ~GENSYM[depth2Index][5];
   input integer levels;
   input integer depth;
 
-  depth2Index_~SYM[5] = (2 ** levels) - (2 ** depth);
+  ~SYM[5] = (2 ** levels) - (2 ** depth);
 endfunction
 
 // Create the tree of instantiated components
-genvar d_~SYM[6];
-genvar i_~SYM[7];
+genvar ~GENSYM[d][6];
+genvar ~GENSYM[i][7];
 ~GENERATE
-if (levels_~SYM[2] != 0) begin : make_tree_~SYM[8]
-  for (d_~SYM[6] = (levels_~SYM[2] - 1); d_~SYM[6] >= 0; d_~SYM[6]=d_~SYM[6]-1) begin : tree_depth
-    for (i_~SYM[7] = 0; i_~SYM[7] < (2**d_~SYM[6]); i_~SYM[7] = i_~SYM[7]+1) begin : tree_depth_loop
-      assign intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+1)+i_~SYM[7]] =
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])] +
-             intermediate_~SYM[3][depth2Index_~SYM[5](levels_~SYM[2]+1,d_~SYM[6]+2)+(2*i_~SYM[7])+1];
+if (~SYM[2] != 0) begin : ~GENSYM[make_tree][8]
+  for (~SYM[6] = (~SYM[2] - 1); ~SYM[6] >= 0; ~SYM[6]=~SYM[6]-1) begin : ~GENSYM[tree_depth][9]
+    for (~SYM[7] = 0; ~SYM[7] < (2**~SYM[6]); ~SYM[7] = ~SYM[7]+1) begin : ~GENSYM[tree_depth_loop][10]
+      assign ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+1)+~SYM[7]] =
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])] +
+             ~SYM[3][~SYM[5](~SYM[2]+1,~SYM[6]+2)+(2*~SYM[7])+1];
     end
   end
 end
 ~ENDGENERATE
 
 // The last element of the intermediate array holds the result
-assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
+assign ~RESULT = $unsigned(~SYM[3][(2*~SYM[0])-2]);
 // popCnt end"
     }
   }
@@ -602,63 +602,59 @@ assign ~RESULT = $unsigned(intermediate_~SYM[3][(2*width_~SYM[0])-2]);
     , "type"      : "clz8 :: Word# -> Word#"
     , "templateD" :
 "// clz8 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:7] v;
-assign v = ~ARG[0][7:0];
+wire [0:7] ~GENSYM[v][1];
+assign ~SYM[1] = ~ARG[0][7:0];
 
-wire [0:7] e;
-genvar i;
+wire [0:7] ~GENSYM[e][2];
+genvar ~GENSYM[n][3];
 ~GENERATE
-for (i=0;i<4;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<4;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:5] a;
-genvar i1;
+reg [0:5] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<2;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<2;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage1][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:3] res;
+reg [0:3] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 3;
 wire [5:0] i;
-assign i = a[0:5];
+assign i = ~SYM[4][0:5];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // clz8 end"
     }
   }
@@ -667,79 +663,75 @@ end
     , "type"      : "clz16 :: Word# -> Word#"
     , "templateD" :
 "// clz16 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:15] v;
-assign v = ~ARG[0][15:0];
+wire [0:15] ~GENSYM[v][1];
+assign ~SYM[1] = ~ARG[0][15:0];
 
-wire [0:15] e;
-genvar i;
+wire [0:15] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<8;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<8;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:11] a;
-genvar i1;
+reg [0:11] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<4;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<4;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:7] b;
-genvar i2;
+reg [0:7] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<2;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<2;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:4] res;
+reg [0:4] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 4;
 wire [7:0] i;
-assign i = b[0:7];
+assign i = ~SYM[9][0:7];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // clz16 end"
     }
   }
@@ -748,95 +740,91 @@ end
     , "type"      : "clz32 :: Word# -> Word#"
     , "templateD" :
 "// clz32 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:31] v;
-assign v = ~ARG[0][31:0];
+wire [0:31] ~GENSYM[v][1];
+assign ~SYM[1] = ~ARG[0][31:0];
 
-wire [0:31] e;
-genvar i;
+wire [0:31] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<16;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:23] a;
-genvar i1;
+reg [0:23] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<8;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<8;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:15] b;
-genvar i2;
+reg [0:15] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<4;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<4;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:9] c;
-genvar i3;
+reg [0:9] ~GENSYM[c][12];
+genvar ~GENSYM[i3][13];
 ~GENERATE
-for (i3=0;i3<2;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<2;~SYM[13]=~SYM[13]+1) begin : ~GENSYM[mux_stage3][14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:5] res;
+reg [0:5] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 5;
 wire [9:0] i;
-assign i = c[0:9];
+assign i = ~SYM[12][0:9];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // clz32 end"
     }
   }
@@ -845,111 +833,107 @@ end
     , "type"      : "clz64 :: Word# -> Word#"
     , "templateD" :
 "// clz64 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:63] v;
-assign v = ~ARG[0][63:0];
+wire [0:63] ~GENSYM[v][1];
+assign ~SYM[1] = ~ARG[0][63:0];
 
-wire [0:63] e;
-genvar i;
+wire [0:63] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<32;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:47] a;
-genvar i1;
+reg [0:47] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<16;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<16;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:31] b;
-genvar i2;
+reg [0:31] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<8;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<8;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:19] c;
-genvar i3;
+reg [0:19] ~GENSYM[c][12];
+genvar ~GENSYM[i3][13];
 ~GENERATE
-for (i3=0;i3<4;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<4;~SYM[13]=~SYM[13]+1) begin : ~GENSYM[mux_stage3][14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:11] d;
-genvar i4;
+reg [0:11] ~GENSYM[d][15];
+genvar ~GENSYM[i4][16];
 ~GENERATE
-for (i4=0;i4<2;i4=i4+1) begin : mux_stage4
+for (~SYM[16]=0;~SYM[16]<2;~SYM[16]=~SYM[16]+1) begin : ~GENSYM[mux_stage4][17]
   localparam n = 5;
   wire [9:0] i;
-  assign i = c[i4*10:i4*10+9];
+  assign i = ~SYM[12][~SYM[16]*10:~SYM[16]*10+9];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:6] res;
+reg [0:6] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 6;
 wire [11:0] i;
-assign i = d[0:11];
+assign i = ~SYM[15][0:11];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // clz64 end"
     }
   }
@@ -958,185 +942,181 @@ end
     , "type"      : "clz :: Word# -> Word#"
     , "templateD" :
 "// clz begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 ~IF ~IW64 ~THEN
-wire [0:63] v;
-assign v = ~ARG[0][63:0];
+wire [0:63] ~GENSYM[v][1];
+assign ~SYM[1] = ~ARG[0][63:0];
 
-wire [0:63] e;
-genvar i;
+wire [0:63] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<32;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:47] a;
-genvar i1;
+reg [0:47] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<16;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<16;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:31] b;
-genvar i2;
+reg [0:31] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<8;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<8;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:19] c;
-genvar i3;
+reg [0:19] ~GENSYM[c][12];
+genvar ~GENSYM[i3][13];
 ~GENERATE
-for (i3=0;i3<4;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<4;~SYM[13]=~SYM[13]+1) begin : ~GENSYM[mux_stage3][14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:11] d;
-genvar i4;
+reg [0:11] ~GENSYM[d][15];
+genvar ~GENSYM[i4][16];
 ~GENERATE
-for (i4=0;i4<2;i4=i4+1) begin : mux_stage4
+for (~SYM[16]=0;~SYM[16]<2;~SYM[16]=~SYM[16]+1) begin : ~GENSYM[mux_stage4][17]
   localparam n = 5;
   wire [9:0] i;
-  assign i = c[i4*10:i4*10+9];
+  assign i = ~SYM[12][~SYM[16]*10:~SYM[16]*10+9];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:6] res;
+reg [0:6] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 6;
 wire [11:0] i;
-assign i = d[0:11];
+assign i = ~SYM[15][0:11];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 ~ELSE
-wire [0:31] v;
-assign v = ~ARG[0][31:0];
+wire [0:31] ~SYM[1];
+assign ~SYM[1] = ~ARG[0][31:0];
 
-wire [0:31] e;
-genvar i;
+wire [0:31] ~SYM[2];
+genvar ~SYM[3];
 ~GENERATE
-for (i=0;i<16;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~SYM[8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:23] a;
-genvar i1;
+reg [0:23] ~SYM[4];
+genvar ~SYM[5];
 ~GENERATE
-for (i1=0;i1<8;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<8;~SYM[5]=~SYM[5]+1) begin : ~SYM[6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:15] b;
-genvar i2;
+reg [0:15] ~SYM[9];
+genvar ~SYM[10];
 ~GENERATE
-for (i2=0;i2<4;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<4;~SYM[10]=~SYM[10]+1) begin : ~SYM[11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:9] c;
-genvar i3;
+reg [0:9] ~SYM[12];
+genvar ~SYM[13];
 ~GENERATE
-for (i3=0;i3<2;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<2;~SYM[13]=~SYM[13]+1) begin : ~SYM[14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:5] res;
+reg [0:5] ~SYM[7];
 ~GENERATE
 if (1) begin
 localparam n = 5;
 wire [9:0] i;
-assign i = c[0:9];
+assign i = ~SYM[12][0:9];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 ~FI
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // clz end"
     }
   }
@@ -1145,68 +1125,64 @@ end
     , "type"      : "ctz8 :: Word# -> Word#"
     , "templateD" :
 "// ctz8 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:7] v;
-genvar k;
+wire [0:7] ~GENSYM[v][1];
+genvar ~GENSYM[k][18];
 ~GENERATE
-for (k=0;k<8;k=k+1) begin : reverse
-  assign v[k] = ~ARG[0][k];
+for (~SYM[18]=0;~SYM[18]<8;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
+  assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
 end
 ~ENDGENERATE
 
-wire [0:7] e;
-genvar i;
+wire [0:7] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<4;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<4;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:5] a;
-genvar i1;
+reg [0:5] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<2;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<2;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:3] res;
+reg [0:3] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 3;
 wire [5:0] i;
-assign i = a[0:5];
+assign i = ~SYM[4][0:5];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // ctz8 end"
     }
   }
@@ -1215,84 +1191,80 @@ end
     , "type"      : "ctz16 :: Word# -> Word#"
     , "templateD" :
 "// ctz16 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:15] v;
-genvar k;
+wire [0:15] ~GENSYM[v][1];
+genvar ~GENSYM[k][18];
 ~GENERATE
-for (k=0;k<16;k=k+1) begin : reverse
-  assign v[k] = ~ARG[0][k];
+for (~SYM[18]=0;~SYM[18]<16;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
+  assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
 end
 ~ENDGENERATE
 
-wire [0:15] e;
-genvar i;
+wire [0:15] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<8;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<8;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:11] a;
-genvar i1;
+reg [0:11] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<4;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<4;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:7] b;
-genvar i2;
+reg [0:7] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<2;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<2;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:4] res;
+reg [0:4] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 4;
 wire [7:0] i;
-assign i = b[0:7];
+assign i = ~SYM[9][0:7];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // ctz16 end"
     }
   }
@@ -1301,100 +1273,96 @@ end
     , "type"      : "ctz32 :: Word# -> Word#"
     , "templateD" :
 "// ctz32 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:31] v;
-genvar k;
+wire [0:31] ~GENSYM[v][1];
+genvar ~GENSYM[k][18];
 ~GENERATE
-for (k=0;k<32;k=k+1) begin : reverse
-  assign v[k] = ~ARG[0][k];
+for (~SYM[18]=0;~SYM[18]<32;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
+  assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
 end
 ~ENDGENERATE
 
-wire [0:31] e;
-genvar i;
+wire [0:31] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<16;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:23] a;
-genvar i1;
+reg [0:23] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<8;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<8;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:15] b;
-genvar i2;
+reg [0:15] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<4;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<4;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:9] c;
-genvar i3;
+reg [0:9] ~GENSYM[c][12];
+genvar ~GENSYM[i3][13];
 ~GENERATE
-for (i3=0;i3<2;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<2;~SYM[13]=~SYM[13]+1) begin : ~GENSYM[mux_stage3][14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:5] res;
+reg [0:5] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 5;
 wire [9:0] i;
-assign i = c[0:9];
+assign i = ~SYM[12][0:9];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // ctz32 end"
     }
   }
@@ -1403,116 +1371,112 @@ end
     , "type"      : "ctz64 :: Word# -> Word#"
     , "templateD" :
 "// ctz64 begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 
-wire [0:63] v;
-genvar k;
+wire [0:63] ~GENSYM[v][1];
+genvar ~GENSYM[k][18];
 ~GENERATE
-for (k=0;k<64;k=k+1) begin : reverse
-  assign v[k] = ~ARG[0][k];
+for (~SYM[18]=0;~SYM[18]<64;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
+  assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
 end
 ~ENDGENERATE
 
-wire [0:63] e;
-genvar i;
+wire [0:63] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<32;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
 reg [0:47] a;
-genvar i1;
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<16;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<16;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:31] b;
-genvar i2;
+reg [0:31] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<8;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<8;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:19] c;
-genvar i3;
+reg [0:19] ~GENSYM[c][12];
+genvar ~GENSYM[i3][13];
 ~GENERATE
-for (i3=0;i3<4;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<4;~SYM[13]=~SYM[13]+1) begin : ~GENSYM[mux_stage3][14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:11] d;
-genvar i4;
+reg [0:11] ~GENSYM[d][15];
+genvar ~GENSYM[i4][16];
 ~GENERATE
-for (i4=0;i4<2;i4=i4+1) begin : mux_stage4
+for (~SYM[16]=0;~SYM[16]<2;~SYM[16]=~SYM[16]+1) begin : ~GENSYM[mux_stage4][17]
   localparam n = 5;
   wire [9:0] i;
-  assign i = c[i4*10:i4*10+9];
+  assign i = ~SYM[12][~SYM[16]*10:~SYM[16]*10+9];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:6] res;
+reg [0:6] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 6;
 wire [11:0] i;
-assign i = d[0:11];
+assign i = ~SYM[15][0:11];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // ctz64 end"
     }
   }
@@ -1521,195 +1485,191 @@ end
     , "type"      : "ctz :: Word# -> Word#"
     , "templateD" :
 "// ctz begin
-~GENERATE
-if (1) begin
-function [1:0] enc;
+function [1:0] ~GENSYM[enc][0];
   input [1:0] a;
   case (a)
-    2'b00:   enc = 2'b10;
-    2'b01:   enc = 2'b01;
-    2'b10:   enc = 2'b00;
-    default: enc = 2'b00;
+    2'b00:   ~SYM[0] = 2'b10;
+    2'b01:   ~SYM[0] = 2'b01;
+    2'b10:   ~SYM[0] = 2'b00;
+    default: ~SYM[0] = 2'b00;
   endcase
 endfunction
 ~IF ~IW64 ~THEN
-wire [0:63] v;
-genvar k;
+wire [0:63] ~GENSYM[v][1];
+genvar ~GENSYM[k][18];
 ~GENERATE
-for (k=0;k<64;k=k+1) begin : reverse
-  assign v[k] = ~ARG[0][k];
+for (~SYM[18]=0;~SYM[18]<64;~SYM[18]=~SYM[18]+1) begin : ~GENSYM[reverse][19]
+  assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
 end
 ~ENDGENERATE
 
-wire [0:63] e;
-genvar i;
+wire [0:63] ~GENSYM[e][2];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i=0;i<32;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<32;~SYM[3]=~SYM[3]+1) begin : ~GENSYM[enc_stage][8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:47] a;
-genvar i1;
+reg [0:47] ~GENSYM[a][4];
+genvar ~GENSYM[i1][5];
 ~GENERATE
-for (i1=0;i1<16;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<16;~SYM[5]=~SYM[5]+1) begin : ~GENSYM[mux_stage][6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:31] b;
-genvar i2;
+reg [0:31] ~GENSYM[b][9];
+genvar ~GENSYM[i2][10];
 ~GENERATE
-for (i2=0;i2<8;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<8;~SYM[10]=~SYM[10]+1) begin : ~GENSYM[mux_stage2][11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:19] c;
-genvar i3;
+reg [0:19] ~GENSYM[c][12];
+genvar ~GENSYM[i3][13];
 ~GENERATE
-for (i3=0;i3<4;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<4;~SYM[13]=~SYM[13]+1) begin : ~GENSYM[mux_stage3][14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:11] d;
-genvar i4;
+reg [0:11] ~GENSYM[d][15];
+genvar ~GENSYM[i4][16];
 ~GENERATE
-for (i4=0;i4<2;i4=i4+1) begin : mux_stage4
+for (~SYM[16]=0;~SYM[16]<2;~SYM[16]=~SYM[16]+1) begin : ~GENSYM[mux_stage4][17]
   localparam n = 5;
   wire [9:0] i;
-  assign i = c[i4*10:i4*10+9];
+  assign i = ~SYM[12][~SYM[16]*10:~SYM[16]*10+9];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : d[i4*6:i4*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[15][~SYM[16]*6:~SYM[16]*6+5] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:6] res;
+reg [0:6] ~GENSYM[res][7];
 ~GENERATE
 if (1) begin
 localparam n = 6;
 wire [11:0] i;
-assign i = d[0:11];
+assign i = ~SYM[15][0:11];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 ~ELSE
-wire [0:31] v;
-genvar k;
+wire [0:31] ~SYM[1];
+genvar ~SYM[18];
 ~GENERATE
-for (k=0;k<32;k=k+1) begin : reverse
-  assign v[k] = ~ARG[0][k];
+for (~SYM[18]=0;~SYM[18]<32;~SYM[18]=~SYM[18]+1) begin : ~SYM[19]
+  assign ~SYM[1][~SYM[18]] = ~ARG[0][~SYM[18]];
 end
 ~ENDGENERATE
 
-wire [0:31] e;
-genvar i;
+wire [0:31] ~SYM[2];
+genvar ~SYM[3];
 ~GENERATE
-for (i=0;i<16;i=i+1) begin : enc_stage
-  assign e[i*2:i*2+1] = enc(v[i*2:i*2+1]);
+for (~SYM[3]=0;~SYM[3]<16;~SYM[3]=~SYM[3]+1) begin : ~SYM[8]
+  assign ~SYM[2][~SYM[3]*2:~SYM[3]*2+1] = ~SYM[0](~SYM[1][~SYM[3]*2:~SYM[3]*2+1]);
 end
 ~ENDGENERATE
 
-reg [0:23] a;
-genvar i1;
+reg [0:23] ~SYM[4];
+genvar ~SYM[5];
 ~GENERATE
-for (i1=0;i1<8;i1=i1+1) begin : mux_stage1
+for (~SYM[5]=0;~SYM[5]<8;~SYM[5]=~SYM[5]+1) begin : ~SYM[6]
   localparam n = 2;
   wire [3:0] i;
-  assign i = e[i1*4:i1*4+3];
+  assign i = ~SYM[2][~SYM[5]*4:~SYM[5]*4+3];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : a[i1*3:i1*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[4][~SYM[5]*3:~SYM[5]*3+2] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:15] b;
-genvar i2;
+reg [0:15] ~SYM[9];
+genvar ~SYM[10];
 ~GENERATE
-for (i2=0;i2<4;i2=i2+1) begin : mux_stage2
+for (~SYM[10]=0;~SYM[10]<4;~SYM[10]=~SYM[10]+1) begin : ~SYM[11]
   localparam n = 3;
   wire [5:0] i;
-  assign i = a[i2*6:i2*6+5];
+  assign i = ~SYM[4][~SYM[10]*6:~SYM[10]*6+5];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : b[i2*4:i2*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[9][~SYM[10]*4:~SYM[10]*4+3] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:9] c;
-genvar i3;
+reg [0:9] ~SYM[12];
+genvar ~SYM[13];
 ~GENERATE
-for (i3=0;i3<2;i3=i3+1) begin : mux_stage3
+for (~SYM[13]=0;~SYM[13]<2;~SYM[13]=~SYM[13]+1) begin : ~SYM[14]
   localparam n = 4;
   wire [7:0] i;
-  assign i = b[i3*8:i3*8+7];
+  assign i = ~SYM[9][~SYM[13]*8:~SYM[13]*8+7];
   always @(*) begin
     case (i[n-1+n])
-      1'b0    : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-      default : c[i3*5:i3*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+      1'b0    : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+      default : ~SYM[12][~SYM[13]*5:~SYM[13]*5+4] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
     endcase
   end
 end
 ~ENDGENERATE
 
-reg [0:5] res;
+reg [0:5] ~SYM[7];
 ~GENERATE
 if (1) begin
 localparam n = 5;
 wire [9:0] i;
-assign i = c[0:9];
+assign i = ~SYM[12][0:9];
 always @(*) begin
   case (i[n-1+n])
-    1'b0    : res = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
-    default : res = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
+    1'b0    : ~SYM[7] = {i[n-1+n] && i[n-1],1'b0,i[2*n-2:n]};
+    default : ~SYM[7] = {i[n-1+n] && i[n-1],~ i[n-1],i[n-2:0]};
   endcase
 end
 end
 ~ENDGENERATE
 ~FI
-assign ~RESULT = $unsigned(res);
-end
-~ENDGENERATE
+assign ~RESULT = $unsigned(~SYM[7]);
 // ctz end"
     }
   }
@@ -1718,13 +1678,10 @@ end
     , "type"      : "byteSwap16# :: Word# -> Word#"
     , "templateD" :
 "// byteSwap16 begin
-wire ~TYP[0] ~SYM[0];
-assign ~SYM[0] = ~ARG[0];
-~IF ~IW64 ~THEN
-assign ~RESULT = {~SYM[0][63:16],~SYM[0][7:0],~SYM[0][15:8]};
-~ELSE
-assign ~RESULT = {~SYM[0][31:16],~SYM[0][7:0],~SYM[0][15:8]};
-~FI
+wire ~TYP[0] ~GENSYM[w][0];
+assign ~SYM[0] = ~ARG[0];~IF ~IW64 ~THEN
+assign ~RESULT = {~SYM[0][63:16],~SYM[0][7:0],~SYM[0][15:8]};~ELSE
+assign ~RESULT = {~SYM[0][31:16],~SYM[0][7:0],~SYM[0][15:8]};~FI
 // byteSwap16 end"
     }
   }
@@ -1733,13 +1690,10 @@ assign ~RESULT = {~SYM[0][31:16],~SYM[0][7:0],~SYM[0][15:8]};
     , "type"      : "byteSwap32# :: Word# -> Word#"
     , "templateD" :
 "// byteSwap32 begin
-wire ~TYPO ~SYM[0];
-assign ~SYM[0] = ~ARG[0];
-~IF ~IW64 ~THEN
-assign ~RESULT = {~SYM[0][63:32],~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};
-~ELSE
-assign ~RESULT = {~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};
-~FI
+wire ~TYPO ~GENSYM[w][0];
+assign ~SYM[0] = ~ARG[0];~IF ~IW64 ~THEN
+assign ~RESULT = {~SYM[0][63:32],~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};~ELSE
+assign ~RESULT = {~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};~FI
 // byteSwap32 end"
     }
   }
@@ -1748,7 +1702,7 @@ assign ~RESULT = {~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};
     , "type"      : "byteSwap64# :: Word# -> Word#"
     , "templateD" :
 "// byteSwap64 begin
-wire ~TYP[0] ~SYM[1];
+wire ~TYP[0] ~GENSYM[w][1];
 assign ~SYM[1] = ~ARG[0];
 assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
                  ,~SYM[1][39:32],~SYM[1][47:40],~SYM[1][55:48],~SYM[1][63:56]};
@@ -1760,14 +1714,11 @@ assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
     , "type"      : "byteSwap# :: Word# -> Word#"
     , "templateD" :
 "// byteSwap begin
-wire ~TYP[0] ~SYM[1];
-assign ~SYM[1] = ~ARG[0];
-~IF ~IW64 ~THEN
+wire ~TYP[0] ~GENSYM[w][1];
+assign ~SYM[1] = ~ARG[0];~IF ~IW64 ~THEN
 assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
-                 ,~SYM[1][39:32],~SYM[1][47:40],~SYM[1][55:48],~SYM[1][63:56]};
-~ELSE
-assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]};
-~FI
+                 ,~SYM[1][39:32],~SYM[1][47:40],~SYM[1][55:48],~SYM[1][63:56]};~ELSE
+assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]};~FI
 // byteSwap end"
     }
   }
@@ -1776,7 +1727,7 @@ assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]};
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow8Int begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[s][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $signed(~SYM[0][7:0]);
@@ -1788,7 +1739,7 @@ assign ~RESULT = $signed(~SYM[0][7:0]);
     , "type"      : "narrow16Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow16Int begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[s][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $signed(~SYM[0][15:0]);
@@ -1800,7 +1751,7 @@ assign ~RESULT = $signed(~SYM[0][15:0]);
     , "type"      : "narrow32Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow32Int begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[s][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $signed(~SYM[0][31:0]);
@@ -1812,7 +1763,7 @@ assign ~RESULT = $signed(~SYM[0][31:0]);
     , "type"      : "narrow8Int# :: Word# -> Word#"
     , "templateD" :
 "// narrow8Word begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[w][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $unsigned(~SYM[0][7:0]);
@@ -1824,7 +1775,7 @@ assign ~RESULT = $unsigned(~SYM[0][7:0]);
     , "type"      : "narrow16Word# :: Word# -> Word#"
     , "templateD" :
 "// narrow16Word begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[w][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $unsigned(~SYM[0][15:0]);
@@ -1836,7 +1787,7 @@ assign ~RESULT = $unsigned(~SYM[0][15:0]);
     , "type"      : "narrow32Int# :: Word# -> Word#"
     , "templateD" :
 "// narrow32Word begin
-wire ~SIGD[~SYM[0]][0];
+wire ~SIGD[~GENSYM[w][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = $unsigned(~SYM[0][31:0]);

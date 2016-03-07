@@ -45,9 +45,9 @@
     , "type"      : "divInteger :: Integer -> Integer -> Integer"
     , "templateD" :
 "// divInteger begin
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][0];
-wire ~SIGD[~SYM[2]][1];
+wire ~SIGD[~GENSYM[quot_res][0]][0];
+wire ~SIGD[~GENSYM[dividend][1]][0];
+wire ~SIGD[~GENSYM[divider][2]][1];
 
 // divide (rounds towards zero)
 assign ~SYM[0] = ~ARG[0] / ~ARG[1];
@@ -64,9 +64,9 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ? ~SYM[0] 
     , "type"      : "modInteger :: Integer -> Integer -> Integer"
     , "templateD" :
 "// modInteger begin
-wire ~SIGD[~SYM[0]][0];
-wire ~SIGD[~SYM[1]][0];
-wire ~SIGD[~SYM[2]][1];
+wire ~SIGD[~GENSYM[rem_res][0]][0];
+wire ~SIGD[~GENSYM[dividend][1]][0];
+wire ~SIGD[~GENSYM[divider][2]][1];
 
 // remainder
 assign ~SYM[0] = ~ARG[0] % ~ARG[1];

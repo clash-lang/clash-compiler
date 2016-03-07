@@ -102,7 +102,7 @@ setSym l = evalStateT (mapM setSym' l) IntMap.empty
             t' <- lift (mkUniqueIdentifier (concatT t))
             modify (IntMap.insert i t')
             return (GenSym [C t'] i)
-          Just _ -> error ("Symbol #" ++ show i ++ " is already defined")
+          Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
       IF c t f      -> IF <$> pure c <*> mapM setSym' t <*> mapM setSym' f
       SigD e' m     -> SigD <$> (mapM setSym' e') <*> pure m

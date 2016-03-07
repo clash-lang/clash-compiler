@@ -291,37 +291,37 @@
     , "type"      : "popCnt8 :: Word# -> Word#"
     , "templateD" :
 "-- popCnt8 begin
-popCnt8_~SYM[0] : block
+~GENSYM[popCnt8][0] : block
   -- given a level and a depth, calculate the corresponding index into the
   -- intermediate array
-  function depth2Index (levels,depth : in natural) return natural is
+  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
   begin
     return (2 ** levels - 2 ** depth);
   end function;
 
-  constant width : natural := 8;
-  constant levels : natural := natural (ceil (log2 (real (width))));
-  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
-  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+  constant ~GENSYM[width][2] : natural := 8;
+  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
 begin
   -- put input into the first half of the intermediate array
-  make_array: for i in 0 to (width - 1) generate
-    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
-  make_tree : if levels /= 0 generate
-    tree_depth : for d in levels-1 downto 0 generate
-      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
-        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
       end generate;
     end generate;
   end generate;
 
   -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
 end block;
 -- popCnt8 end"
     }
@@ -331,37 +331,37 @@ end block;
     , "type"      : "popCnt16 :: Word# -> Word#"
     , "templateD" :
 "-- popCnt16 begin
-popCnt16_~SYM[0] : block
+~GENSYM[popCnt16][0] : block
   -- given a level and a depth, calculate the corresponding index into the
   -- intermediate array
-  function depth2Index (levels,depth : in natural) return natural is
+  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
   begin
     return (2 ** levels - 2 ** depth);
   end function;
 
-  constant width : natural := 16;
-  constant levels : natural := natural (ceil (log2 (real (width))));
-  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
-  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+  constant ~GENSYM[width][2] : natural := 16;
+  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
 begin
   -- put input into the first half of the intermediate array
-  make_array: for i in 0 to (width - 1) generate
-    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
-  make_tree : if levels /= 0 generate
-    tree_depth : for d in levels-1 downto 0 generate
-      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
-        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
       end generate;
     end generate;
   end generate;
 
   -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
 end block;
 -- popCnt16 end"
     }
@@ -371,37 +371,37 @@ end block;
     , "type"      : "popCnt16 :: Word# -> Word#"
     , "templateD" :
 "-- popCnt32 begin
-popCnt32_~SYM[0] : block
+~GENSYM[popCnt32][0] : block
   -- given a level and a depth, calculate the corresponding index into the
   -- intermediate array
-  function depth2Index (levels,depth : in natural) return natural is
+  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
   begin
     return (2 ** levels - 2 ** depth);
   end function;
 
-  constant width : natural := 32;
-  constant levels : natural := natural (ceil (log2 (real (width))));
-  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
-  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+  constant ~GENSYM[width][2] : natural := 32;
+  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
 begin
   -- put input into the first half of the intermediate array
-  make_array: for i in 0 to (width - 1) generate
-    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
-  make_tree : if levels /= 0 generate
-    tree_depth : for d in levels-1 downto 0 generate
-      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
-        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
       end generate;
     end generate;
   end generate;
 
   -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
 end block;
 -- popCnt32 end"
     }
@@ -411,37 +411,37 @@ end block;
     , "type"      : "popCnt16 :: Word# -> Word#"
     , "templateD" :
 "-- popCnt64 begin
-popCnt64_~SYM[0] : block
+~GENSYM[popCnt64][0] : block
   -- given a level and a depth, calculate the corresponding index into the
   -- intermediate array
-  function depth2Index (levels,depth : in natural) return natural is
+  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
   begin
     return (2 ** levels - 2 ** depth);
   end function;
 
-  constant width : natural := 64;
-  constant levels : natural := natural (ceil (log2 (real (width))));
-  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
-  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+  constant ~GENSYM[width][2] : natural := 64;
+  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
 begin
   -- put input into the first half of the intermediate array
-  make_array: for i in 0 to (width - 1) generate
-    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
-  make_tree : if levels /= 0 generate
-    tree_depth : for d in levels-1 downto 0 generate
-      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
-        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
       end generate;
     end generate;
   end generate;
 
   -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
 end block;
 -- popCnt64 end"
     }
@@ -451,37 +451,37 @@ end block;
     , "type"      : "popCnt :: Word# -> Word#"
     , "templateD" :
 "-- popCnt begin
-popCnt_~SYM[0] : block
+~GENSYM[popCnt][0] : block
   -- given a level and a depth, calculate the corresponding index into the
   -- intermediate array
-  function depth2Index (levels,depth : in natural) return natural is
+  function ~GENSYM[depth2Index][1] (levels,depth : in natural) return natural is
   begin
     return (2 ** levels - 2 ** depth);
   end function;
 
-  constant width : natural := ~SIZE[~TYPO];
-  constant levels : natural := natural (ceil (log2 (real (width))));
-  type popCnt_res_vec is array (natural range <>) of unsigned(levels downto 0);
-  signal intermediate_~SYM[1] : popCnt_res_vec(0 to (2*width)-2);
+  constant ~GENSYM[width][2] : natural := ~SIZE[~TYPO];
+  constant ~GENSYM[levels][3] : natural := natural (ceil (log2 (real (~SYM[2]))));
+  type ~GENSYM[popCnt_res_vec][4] is array (natural range <>) of unsigned(~SYM[3] downto 0);
+  signal ~GENSYM[intermediate][5] : ~SYM[4](0 to (2*~SYM[2])-2);
 begin
   -- put input into the first half of the intermediate array
-  make_array: for i in 0 to (width - 1) generate
-    intermediate_~SYM[1](i) <= resize(~ARG[0](i downto i),levels+1);
+  ~GENSYM[make_array][6]: for ~GENSYM[i][7] in 0 to (~SYM[2] - 1) generate
+    ~SYM[5](i) <= resize(~ARG[0](~SYM[7] downto ~SYM[7]),~SYM[3]+1);
   end generate;
 
   -- Create the tree of adders
-  make_tree : if levels /= 0 generate
-    tree_depth : for d in levels-1 downto 0 generate
-      tree_depth_loop: for i in 0 to (natural(2**d) - 1) generate
-        intermediate_~SYM[1](depth2Index(levels+1,d+1)+i) <=
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)) +
-          intermediate_~SYM[1](depth2Index(levels+1,d+2)+(2*i)+1);
+  ~GENSYM[make_tree][8] : if ~SYM[3] /= 0 generate
+    ~GENSYM[tree_depth][9] : for ~GENSYM[d][10] in ~SYM[3]-1 downto 0 generate
+      ~GENSYM[tree_depth_loop][11] : for ~GENSYM[i][12] in 0 to (natural(2**~SYM[10]) - 1) generate
+        ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+1)+~SYM[12]) <=
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])) +
+          ~SYM[5](~SYM[1](~SYM[3]+1,~SYM[10]+2)+(2*~SYM[12])+1);
       end generate;
     end generate;
   end generate;
 
   -- The last element of the intermediate array holds the result
-  ~RESULT <= resize(intermediate_~SYM[1]((2*width)-2),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[5]((2*~SYM[2])-2),~SIZE[~TYPO]);
 end block;
 -- popCnt end"
     }
@@ -491,8 +491,8 @@ end block;
     , "type"      : "clz8 :: Word# -> Word#"
     , "templateD" :
 "-- clz8 begin
-clz8~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+~GENSYM[clz8][0] : block
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -502,7 +502,7 @@ clz8~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -514,16 +514,16 @@ clz8~SYM[0] : block
     end if;
   end function;
 
-  function clz8 (constant v : unsigned(0 to 7)) return unsigned is
+  function ~GENSYM[clz8][3] (constant v : unsigned(0 to 7)) return unsigned is
     variable e : unsigned(0 to 7);     -- 8
     variable a : unsigned(0 to 2*3-1); -- 6
   begin
-    for i in 0 to 3 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 1 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    return clzi(3,a(0 to 5));
+    for i in 0 to 3 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 1 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    return ~SYM[2](3,a(0 to 5));
   end function;
 begin
-  ~RESULT <= resize(clz8(~ARG[0](7 downto 0)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~ARG[0](7 downto 0)),~SIZE[~TYPO]);
 end block;
 -- clz8 end"
     }
@@ -534,7 +534,7 @@ end block;
     , "templateD" :
 "-- clz16 begin
 clz16~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -544,7 +544,7 @@ clz16~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -556,18 +556,18 @@ clz16~SYM[0] : block
     end if;
   end function;
 
-  function clz16 (constant v : unsigned(0 to 15)) return unsigned is
+  function ~GENSYM[clz16][3] (constant v : unsigned(0 to 15)) return unsigned is
     variable e : unsigned(0 to 15);    -- 16
     variable a : unsigned(0 to 4*3-1); -- 12
     variable b : unsigned(0 to 2*4-1); -- 8
   begin
-    for i in 0 to 7 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 3 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 1 loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
-    return clzi(4,b(0 to 7));
+    for i in 0 to 7 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 3 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 1 loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+    return ~SYM[2](4,b(0 to 7));
   end function;
 begin
-  ~RESULT <= resize(clz16(~ARG[0](15 downto 0)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~ARG[0](15 downto 0)),~SIZE[~TYPO]);
 end block;
 -- clz16 end"
     }
@@ -578,7 +578,7 @@ end block;
     , "templateD" :
 "-- clz32 begin
 clz32~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -588,7 +588,7 @@ clz32~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -600,20 +600,20 @@ clz32~SYM[0] : block
     end if;
   end function;
 
-  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+  function ~GENSYM[clz32][3] (constant v : unsigned(0 to 31)) return unsigned is
     variable e : unsigned(0 to 31);    -- 32
     variable a : unsigned(0 to 8*3-1); -- 24
     variable b : unsigned(0 to 4*4-1); -- 16
     variable c : unsigned(0 to 2*5-1); -- 10
   begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
-    return clzi(5,c(0 to 9));
+    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+    return ~SYM[2](5,c(0 to 9));
   end function;
 begin
-  ~RESULT <= resize(clz32(~ARG[0](31 downto 0)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~ARG[0](31 downto 0)),~SIZE[~TYPO]);
 end block;
 -- clz32 end"
     }
@@ -624,7 +624,7 @@ end block;
     , "templateD" :
 "-- clz64 begin
 clz64~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -634,7 +634,7 @@ clz64~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -646,22 +646,22 @@ clz64~SYM[0] : block
     end if;
   end function;
 
-  function clz64 (constant v : unsigned(0 to 63)) return unsigned is
+  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
     variable e : unsigned(0 to 63);     -- 64
     variable a : unsigned(0 to 16*3-1); -- 48
     variable b : unsigned(0 to 8*4-1);  -- 32
     variable c : unsigned(0 to 4*5-1);  -- 20
     variable d : unsigned(0 to 2*6-1);  -- 12
   begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
-    return clzi(6,d(0 to 11));
+    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+    return ~SYM[2](6,d(0 to 11));
   end function;
 begin
-  ~RESULT <= resize(clz64(~ARG[0]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~ARG[0]),~SIZE[~TYPO]);
 end block;
 -- clz64 end"
     }
@@ -672,7 +672,7 @@ end block;
     , "templateD" :
 "-- clz begin
 clz~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -682,7 +682,7 @@ clz~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -694,39 +694,39 @@ clz~SYM[0] : block
     end if;
   end function;
 ~IF ~IW64 ~THEN
-  function clz64 (constant v : unsigned(0 to 63)) return unsigned is
+  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
     variable e : unsigned(0 to 63);     -- 64
     variable a : unsigned(0 to 16*3-1); -- 48
     variable b : unsigned(0 to 8*4-1);  -- 32
     variable c : unsigned(0 to 4*5-1);  -- 20
     variable d : unsigned(0 to 2*6-1);  -- 12
   begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
-    return clzi(6,d(0 to 11));
+    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+    return ~SYM[2](6,d(0 to 11));
   end function;
 ~ELSE
-  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+  function ~GENSYM[clz32][4] (constant v : unsigned(0 to 31)) return unsigned is
     variable e : unsigned(0 to 31);    -- 32
     variable a : unsigned(0 to 8*3-1); -- 24
     variable b : unsigned(0 to 4*4-1); -- 16
     variable c : unsigned(0 to 2*5-1); -- 10
   begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
-    return clzi(5,c(0 to 9));
+    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+    return ~SYM[2](5,c(0 to 9));
   end function;
 ~FI
 begin
 ~IF ~IW64 ~THEN
-  ~RESULT <= resize(clz64(~ARG[0]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~ARG[0]),~SIZE[~TYPO]);
 ~ELSE
-  ~RESULT <= resize(clz32(~ARG[0]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[4](~ARG[0]),~SIZE[~TYPO]);
 ~FI
 end block;
 -- clz end"
@@ -737,8 +737,8 @@ end block;
     , "type"      : "ctz8 :: Word# -> Word#"
     , "templateD" :
 "-- ctz8 begin
-ctz8~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+~GENSYM[ctz8][0] : block
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -748,7 +748,7 @@ ctz8~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -760,26 +760,26 @@ ctz8~SYM[0] : block
     end if;
   end function;
 
-  function clz8 (constant v : unsigned(0 to 7)) return unsigned is
+  function ~GENSYM[clz8][3] (constant v : unsigned(0 to 7)) return unsigned is
     variable e : unsigned(0 to 7);     -- 8
     variable a : unsigned(0 to 2*3-1); -- 6
   begin
-    for i in 0 to 3 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 1 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    return clzi(3,a(0 to 5));
+    for i in 0 to 3 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 1 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    return ~SYM[2](3,a(0 to 5));
   end function;
 
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[0];
+  signal ~GENSYM[s][4] : ~TYP[0];
+  signal ~GENSYM[s_reversed][5] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
-    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  ~SYM[4] <= ~ARG[0];
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
+    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[7]);
   end generate;
 ~IF ~IW64 ~THEN
-  ~RESULT <= resize(clz8(~SYM[2](63 downto 56)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 56)),~SIZE[~TYPO]);
 ~ELSE
-  ~RESULT <= resize(clz8(~SYM[2](31 downto 24)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5](31 downto 24)),~SIZE[~TYPO]);
 ~FI
 end block;
 -- ctz8 end"
@@ -790,8 +790,8 @@ end block;
     , "type"      : "ctz16 :: Word# -> Word#"
     , "templateD" :
 "-- ctz16 begin
-ctz16~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+~GENSYM[ctz16][0] : block
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -801,7 +801,7 @@ ctz16~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -813,28 +813,28 @@ ctz16~SYM[0] : block
     end if;
   end function;
 
-  function clz16 (constant v : unsigned(0 to 15)) return unsigned is
+  function ~GENSYM[clz16][3] (constant v : unsigned(0 to 15)) return unsigned is
     variable e : unsigned(0 to 15);    -- 16
     variable a : unsigned(0 to 4*3-1); -- 12
     variable b : unsigned(0 to 2*4-1); -- 8
   begin
-    for i in 0 to 7 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 3 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 1 loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
-    return clzi(4,b(0 to 7));
+    for i in 0 to 7 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 3 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 1 loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+    return ~SYM[2](4,b(0 to 7));
   end function;
 
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[0];
+  signal ~GENSYM[s][4] : ~TYP[0];
+  signal ~GENSYM[s_reversed][5] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
-    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  ~SYM[4] <= ~ARG[0];
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
+    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[7]);
   end generate;
 ~IF ~IW64 ~THEN
-  ~RESULT <= resize(clz16(~SYM[2](63 downto 48)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 48)),~SIZE[~TYPO]);
 ~ELSE
-  ~RESULT <= resize(clz16(~SYM[2](31 downto 16)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5](31 downto 16)),~SIZE[~TYPO]);
 ~FI
 end block;
 -- ctz16 end"
@@ -845,8 +845,8 @@ end block;
     , "type"      : "ctz32 :: Word# -> Word#"
     , "templateD" :
 "-- ctz32 begin
-ctz32~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+~GENSYM[ctz32][0] : block
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -856,7 +856,7 @@ ctz32~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -868,30 +868,30 @@ ctz32~SYM[0] : block
     end if;
   end function;
 
-  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+  function ~GENSYM[clz32][3] (constant v : unsigned(0 to 31)) return unsigned is
     variable e : unsigned(0 to 31);    -- 32
     variable a : unsigned(0 to 8*3-1); -- 24
     variable b : unsigned(0 to 4*4-1); -- 16
     variable c : unsigned(0 to 2*5-1); -- 10
   begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
-    return clzi(5,c(0 to 9));
+    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+    return ~SYM[2](5,c(0 to 9));
   end function;
 
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[0];
+  signal ~GENSYM[s][4] : ~TYP[0];
+  signal ~GENSYM[s_reversed][5] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
-    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  ~SYM[4] <= ~ARG[0];
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
+    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[3]);
   end generate;
 ~IF ~IW64 ~THEN
-  ~RESULT <= resize(clz32(~SYM[2](63 downto 32)),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 32)),~SIZE[~TYPO]);
 ~ELSE
-  ~RESULT <= resize(clz32(~SYM[2]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
 ~FI
 end block;
 -- ctz32 end"
@@ -902,8 +902,8 @@ end block;
     , "type"      : "ctz64 :: Word# -> Word#"
     , "templateD" :
 "-- ctz64 begin
-ctz64~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+~GENSYM[ctz64][0] : block
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -913,7 +913,7 @@ ctz64~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -925,30 +925,30 @@ ctz64~SYM[0] : block
     end if;
   end function;
 
-  function clz64 (constant v : unsigned(0 to 63)) return unsigned is
+  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
     variable e : unsigned(0 to 63);     -- 64
     variable a : unsigned(0 to 16*3-1); -- 48
     variable b : unsigned(0 to 8*4-1);  -- 32
     variable c : unsigned(0 to 4*5-1);  -- 20
     variable d : unsigned(0 to 2*6-1);  -- 12
   begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
-    return clzi(6,d(0 to 11));
+    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+    return ~SYM[2](6,d(0 to 11));
   end function;
 
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[0];
+  signal ~GENSYM[s][4] : ~TYP[0];
+  signal ~GENSYM[s_reversed][5] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
-    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  ~SYM[4] <= ~ARG[0];
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
+    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[7]);
   end generate;
 
-  ~RESULT <= resize(clz64(~SYM[2]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
 end block;
 -- ctz64 end"
     }
@@ -958,8 +958,8 @@ end block;
     , "type"      : "ctz :: Word# -> Word#"
     , "templateD" :
 "-- ctz begin
-ctz~SYM[0] : block
-  function enc(constant a : unsigned(1 downto 0)) return unsigned is
+~GENSYM[ctz][0] : block
+  function ~GENSYM[enc][1] (constant a : unsigned(1 downto 0)) return unsigned is
   begin
     case a is
       when \"00\" => return \"10\";
@@ -969,7 +969,7 @@ ctz~SYM[0] : block
     end case;
   end function;
 
-  function clzi(
+  function ~GENSYM[clzi][2] (
     constant n : in natural;
     constant i : in unsigned) return unsigned is
     variable v : unsigned(i'length-1 downto 0):=i;
@@ -982,46 +982,46 @@ ctz~SYM[0] : block
   end function;
 
 ~IF ~IW64 ~THEN
-  function clz64 (constant v : unsigned(0 to 63)) return unsigned is
+  function ~GENSYM[clz64][3] (constant v : unsigned(0 to 63)) return unsigned is
     variable e : unsigned(0 to 63);     -- 64
     variable a : unsigned(0 to 16*3-1); -- 48
     variable b : unsigned(0 to 8*4-1);  -- 32
     variable c : unsigned(0 to 4*5-1);  -- 20
     variable d : unsigned(0 to 2*6-1);  -- 12
   begin
-    for i in 0 to 31 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));      end loop;
-    for i in 0 to 15 loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3));   end loop;
-    for i in 0 to 7  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5));   end loop;
-    for i in 0 to 3  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7));   end loop;
-    for i in 0 to 1  loop d(i*6 to i*6+5):=clzi(5,c(i*10 to i*10+9)); end loop;
-    return clzi(6,d(0 to 11));
+    for i in 0 to 31 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));      end loop;
+    for i in 0 to 15 loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3));   end loop;
+    for i in 0 to 7  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5));   end loop;
+    for i in 0 to 3  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7));   end loop;
+    for i in 0 to 1  loop d(i*6 to i*6+5):=~SYM[2](5,c(i*10 to i*10+9)); end loop;
+    return ~SYM[2](6,d(0 to 11));
   end function;
 ~ELSE
-  function clz32 (constant v : unsigned(0 to 31)) return unsigned is
+  function ~GENSYM[clz32][4] (constant v : unsigned(0 to 31)) return unsigned is
     variable e : unsigned(0 to 31);    -- 32
     variable a : unsigned(0 to 8*3-1); -- 24
     variable b : unsigned(0 to 4*4-1); -- 16
     variable c : unsigned(0 to 2*5-1); -- 10
   begin
-    for i in 0 to 15 loop e(i*2 to i*2+1):=enc(v(i*2 to i*2+1));    end loop;
-    for i in 0 to 7  loop a(i*3 to i*3+2):=clzi(2,e(i*4 to i*4+3)); end loop;
-    for i in 0 to 3  loop b(i*4 to i*4+3):=clzi(3,a(i*6 to i*6+5)); end loop;
-    for i in 0 to 1  loop c(i*5 to i*5+4):=clzi(4,b(i*8 to i*8+7)); end loop;
-    return clzi(5,c(0 to 9));
+    for i in 0 to 15 loop e(i*2 to i*2+1):=~SYM[1](v(i*2 to i*2+1));    end loop;
+    for i in 0 to 7  loop a(i*3 to i*3+2):=~SYM[2](2,e(i*4 to i*4+3)); end loop;
+    for i in 0 to 3  loop b(i*4 to i*4+3):=~SYM[2](3,a(i*6 to i*6+5)); end loop;
+    for i in 0 to 1  loop c(i*5 to i*5+4):=~SYM[2](4,b(i*8 to i*8+7)); end loop;
+    return ~SYM[2](5,c(0 to 9));
   end function;
 ~FI
 
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[0];
+  signal ~GENSYM[s][5] : ~TYP[0];
+  signal ~GENSYM[s_reversed][6] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-  reverse_loop : for ~SYM[3] in ~SYM[1]'range generate
-    ~SYM[2](~SYM[1]'high - ~SYM[3]) <= ~SYM[1](~SYM[3]);
+  ~SYM[5] <= ~ARG[0];
+  ~GENSYM[reverse_loop][7] : for ~GENSYM[n][8] in ~SYM[5]'range generate
+    ~SYM[6](~SYM[5]'high - ~SYM[8]) <= ~SYM[5](~SYM[8]);
   end generate;
 ~IF ~IW64 ~THEN
-  ~RESULT <= resize(clz64(~SYM[2]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[3](~SYM[6]),~SIZE[~TYPO]);
 ~ELSE
-  ~RESULT <= resize(clz32(~SYM[2]),~SIZE[~TYPO]);
+  ~RESULT <= resize(~SYM[4](~SYM[6]),~SIZE[~TYPO]);
 ~FI
 end block;
 -- ctz end"
@@ -1032,15 +1032,12 @@ end block;
     , "type"      : "byteSwap16# :: Word# -> Word#"
     , "templateD" :
 "-- byteSwap16 begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[byteSwap16][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-~IF ~IW64 ~THEN
-  ~RESULT <= ~SYM[1](63 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);
-~ELSE
-  ~RESULT <= ~SYM[1](31 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);
-~FI
+  ~SYM[1] <= ~ARG[0];~IF ~IW64 ~THEN
+  ~RESULT <= ~SYM[1](63 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);~ELSE
+  ~RESULT <= ~SYM[1](31 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);~FI
 end block;
 -- byteSwap16 end"
     }
@@ -1050,17 +1047,14 @@ end block;
     , "type"      : "byteSwap32# :: Word# -> Word#"
     , "templateD" :
 "-- byteSwap32 begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[byteSwap32][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-~IF ~IW64 ~THEN
+  ~SYM[1] <= ~ARG[0];~IF ~IW64 ~THEN
   ~RESULT <= ~SYM[1](63 downto 32) & ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-                                   & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
-~ELSE
+                                   & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);~ELSE
   ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
-~FI
+           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);~FI
 end block;
 -- byteSwap32 end"
     }
@@ -1070,8 +1064,8 @@ end block;
     , "type"      : "byteSwap64# :: Word# -> Word#"
     , "templateD" :
 "-- byteSwap64 begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[byteSwap64][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
@@ -1087,19 +1081,16 @@ end block;
     , "type"      : "byteSwap# :: Word# -> Word#"
     , "templateD" :
 "-- byteSwap begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[byteSwap][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-~IF ~IW64 ~THEN
+  ~SYM[1] <= ~ARG[0];~IF ~IW64 ~THEN
   ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
            & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24)
            & ~SYM[1](39 downto 32) & ~SYM[1](47 downto 40)
-           & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);
-~ELSE
+           & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);~ELSE
   ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);
-~FI
+           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);~FI
 end block;
 -- byteSwap end"
     }
@@ -1109,8 +1100,8 @@ end block;
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
 "-- narrow8Int begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[narrow8Int][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= resize(~SYM[1](7 downto 0),~SIZE[~TYPO]);
@@ -1123,8 +1114,8 @@ end block;
     , "type"      : "narrow16Int# :: Int# -> Int#"
     , "templateD" :
 "-- narrow16Int begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[narrow16Int][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= resize(~SYM[1](15 downto 0),~SIZE[~TYPO]);
@@ -1137,8 +1128,8 @@ end block;
     , "type"      : "narrow32Int# :: Int# -> Int#"
     , "templateD" :
 "-- narrow32Int begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[narrow32Int][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= resize(~SYM[1](31 downto 0),~SIZE[~TYPO]);
@@ -1151,8 +1142,8 @@ end block;
     , "type"      : "narrow8Word# :: Word# -> Word#"
     , "templateD" :
 "-- narrow8Word begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[narrow8Word][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= resize(~SYM[1](7 downto 0),~SIZE[~TYPO]);
@@ -1165,8 +1156,8 @@ end block;
     , "type"      : "narrow16Word# :: Word# -> Word#"
     , "templateD" :
 "-- narrow16Word begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[narrow16Word][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= resize(~SYM[1](15 downto 0),~SIZE[~TYPO]);
@@ -1179,8 +1170,8 @@ end block;
     , "type"      : "narrow32Word# :: Word# -> Word#"
     , "templateD" :
 "-- narrow32Word begin
-msb_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
+~GENSYM[narrow32Word][0] : block
+  signal ~GENSYM[s][1] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
   ~RESULT <= resize(~SYM[1](31 downto 0),~SIZE[~TYPO]);

@@ -8,13 +8,13 @@
               -> BitVector m"
     , "templateD" :
 "// asyncRomFile begin
-reg ~TYPO ROM_~SYM[0] [0:~LIT[1]-1];
+reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[1]-1];
 
 initial begin
-  $readmemb(~FILE[~LIT[2]],ROM_~SYM[0]);
+  $readmemb(~FILE[~LIT[2]],~SYM[0]);
 end
 
-assign ~RESULT = ROM_~SYM[0][~ARG[3]];
+assign ~RESULT = ~SYM[0][~ARG[3]];
 // asyncRomFile end"
     }
   }
@@ -29,18 +29,18 @@ assign ~RESULT = ROM_~SYM[0][~ARG[3]];
           -> Signal' clk (BitVector m)"
     , "templateD" :
 "// romFile begin
-reg ~TYPO ROM_~SYM[0] [0:~LIT[2]-1];
+reg ~TYPO ~GENSYM[ROM][0] [0:~LIT[2]-1];
 
 initial begin
-  $readmemb(~FILE[~LIT[3]],ROM_~SYM[0]);
+  $readmemb(~FILE[~LIT[3]],~SYM[0]);
 end
 
-reg ~TYPO dout_~SYM[1];
-always @(posedge ~CLK[1]) begin : romFile_~COMPNAME_~SYM[2]
-  dout_~SYM[1] <= ROM_~SYM[0][~ARG[4]];
+reg ~TYPO ~GENSYM[dout][1];
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_romFile][2]
+  ~SYM[1] <= ~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~SYM[1];
 // romFile end"
     }
   }

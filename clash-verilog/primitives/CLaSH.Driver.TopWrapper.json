@@ -2,8 +2,8 @@
     { "name"      : "CLaSH.TopWrapper.syncReset"
     , "templateD" :
 "// reset ~RESULT is asynchronously asserted, but synchronously de-asserted
-reg ~SIGD[~SYM[0]][0];
-reg ~SIGD[~SYM[1]][0];
+reg ~SIGD[~GENSYM[r1][0]][0];
+reg ~SIGD[~GENSYM[r2][1]][0];
 
 always @(posedge ~CLKO or negedge ~ARG[0])
 if (~ ~ARG[0]) begin

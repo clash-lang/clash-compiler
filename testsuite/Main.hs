@@ -140,7 +140,6 @@ clashHDL t env extraArgs modName =
                        ,case t of { VHDL -> "--vhdl"
                                   ; Verilog -> "--verilog"
                                   }
-                       ,"-clash-hdlsyn", "Vivado"
                        ]
                       ,extraArgs
                       ,[modName <.> "hs"]
