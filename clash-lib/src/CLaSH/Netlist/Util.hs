@@ -291,15 +291,6 @@ mkUnique = go []
       let iN_unpacked = unpack iN
           i'          = modifyVarName (repName iN_unpacked) i
       go (i':processed) ((i,i'):subst) is
-      --iN <- mkBasicId . pack . name2String $ varName i
-      --if any ((== iN).pack.name2String.varName) seen
-      --   then do
-      --     varCnt <- varCount <<%= (+1)
-      --     let i' = modifyVarName (repName ((unpack iN) ++ '_':show varCnt)) i
-      --     go (i':processed) (i':seen) ((i,i'):subst) is
-      --   else do
-      --     let i' = modifyVarName (repName (unpack iN)) i
-      --     go (i':processed) (i':seen) ((i,i'):subst) is
 
     repName s n = makeName s (name2Integer n)
 
