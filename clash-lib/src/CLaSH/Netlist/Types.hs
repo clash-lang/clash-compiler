@@ -60,6 +60,7 @@ data NetlistState
   , _mkBasicIdFn    :: Identifier -> Identifier
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
+  , _componentNames :: HashMap TmName Identifier
   }
 
 -- | Signal reference

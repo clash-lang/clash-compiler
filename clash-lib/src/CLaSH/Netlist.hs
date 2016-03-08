@@ -11,7 +11,7 @@
 
 module CLaSH.Netlist where
 
-import           Control.Lens                     ((.=), (%=))
+import           Control.Lens                     ((.=))
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (runStateT)
 import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
@@ -103,7 +103,22 @@ runNetlistMonad s p tcm typeTrans modName dfiles iw mkId seen
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm modName Text.empty dfiles iw mkId [] seen
+    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm modName Text.empty dfiles iw mkId [] seen' names
+    (seen',names) = genNames mkId modName seen HashMap.empty (HashMap.keys s)
+
+genNames :: (Identifier -> Identifier)
+         -> String
+         -> [Identifier]
+         -> HashMap TmName Identifier
+         -> [TmName]
+         -> ([Identifier], HashMap TmName Identifier)
+genNames mkId modName = go
+  where
+    go s m []       = (s,m)
+    go s m (nm:nms) = let nm' = genComponentName s mkId modName nm
+                          s'  = nm':s
+                          m'  = HashMap.insert nm nm' m
+                      in  go s' m' nms
 
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
@@ -123,11 +138,7 @@ genComponentT :: TmName -- ^ Name of the function
               -> NetlistMonad Component
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
-  modName <- Lens.use modNm
-  mkId <- Lens.use mkBasicIdFn
-  seen <- Lens.use seenComps
-  let componentName' = genComponentName seen mkId modName compName
-  seenComps %= (componentName':)
+  componentName' <- (HashMap.! compName) <$> Lens.use componentNames
   curCompNm .= componentName'
 
   tcm <- Lens.use tcCache
