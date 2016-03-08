@@ -87,6 +87,9 @@ instance Backend VHDLState where
 type VHDLM a = State VHDLState a
 
 -- List of reserved VHDL-2008 keywords
+-- + used internal names: toslv, fromslv, tagtoenum, datatotag
+-- + used IEEE library names: integer, boolean, std_logic, std_logic_vector,
+--   signed, unsigned, to_integer, to_signed, to_unsigned, string
 reservedWords :: [Identifier]
 reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"array","assert","assume","assume_guarantee","attribute","begin","block"
@@ -101,7 +104,9 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"return","rol","ror","select","sequence","severity","signal","shared","sla"
   ,"sll","sra","srl","strong","subtype","then","to","transport","type"
   ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
-  ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"]
+  ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"
+  ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
+  ,"to_integer", "to_signed", "to_unsigned", "string"]
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
