@@ -20,6 +20,7 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
+import qualified Data.Text.Lazy          as Text
 import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed, makeName,
                                           name2Integer, name2String, unbind,
                                           unembed, unrec)
@@ -38,9 +39,12 @@ import           CLaSH.Netlist.Types     as HW
 import           CLaSH.Util
 
 mkBasicId :: Identifier -> NetlistMonad Identifier
-mkBasicId s = do
-  f <- Lens.use mkBasicIdFn
-  return (f s)
+mkBasicId n = do
+  f  <- Lens.use mkBasicIdFn
+  let n' = f n
+  if Text.null n'
+     then return (pack "x")
+     else return n'
 
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a

@@ -20,9 +20,8 @@ where
 #error MIN_VERSION_text undefined
 #endif
 
-import Data.Char      (isAsciiLower,isAsciiUpper,isDigit,ord)
+import Data.Char      (isAsciiLower,isAsciiUpper,isDigit)
 import Data.Text.Lazy as Text
-import Numeric        (showHex)
 
 mkBasicId' :: Bool
            -> Text
@@ -85,42 +84,12 @@ zEncode True cs = case maybeTuple cs of
                            Nothing      -> append (encodeCh c) (go' $ uncons cs')
 
 encodeDigitCh :: Char -> EncodedString
-encodeDigitCh c | isDigit c = encodeAsUnicodeChar c
+encodeDigitCh c | isDigit c = Text.empty -- encodeAsUnicodeChar c
 encodeDigitCh c             = encodeCh c
 
 encodeCh :: Char -> EncodedString
 encodeCh c | unencodedChar c = singleton c     -- Common case first
-
--- Constructors
-encodeCh '['  = "ZM"
-encodeCh ']'  = "ZN"
-encodeCh ':'  = "ZC"
-
--- Variables
-encodeCh '&'  = "za"
-encodeCh '|'  = "zb"
-encodeCh '^'  = "zc"
-encodeCh '$'  = "zd"
-encodeCh '='  = "ze"
-encodeCh '>'  = "zf"
-encodeCh '#'  = "zg"
-encodeCh '.'  = "zh"
-encodeCh '<'  = "zu"
-encodeCh '-'  = "zj"
-encodeCh '!'  = "zk"
-encodeCh '+'  = "zl"
-encodeCh '\'' = "zm"
-encodeCh '\\' = "zn"
-encodeCh '/'  = "zo"
-encodeCh '*'  = "zp"
-encodeCh '%'  = "zq"
-encodeCh c    = encodeAsUnicodeChar c
-
-encodeAsUnicodeChar :: Char -> EncodedString
-encodeAsUnicodeChar c = cons 'z' (if isDigit (Text.head hex_str)
-                                    then hex_str
-                                    else cons '0' hex_str)
-  where hex_str = pack $ showHex (ord c) "U"
+           | otherwise       = Text.empty
 
 unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar c  = or [ isAsciiLower c
@@ -129,15 +98,15 @@ unencodedChar c  = or [ isAsciiLower c
                       , c == '_']
 
 maybeTuple :: UserString -> Maybe (EncodedString,UserString)
-maybeTuple "(# #)" = Just ("Z1H",empty)
-maybeTuple "()"    = Just ("Z0T",empty)
+maybeTuple "(# #)" = Just ("Unit",empty)
+maybeTuple "()"    = Just ("Unit",empty)
 maybeTuple (uncons -> Just ('(',uncons -> Just ('#',cs))) =
   case countCommas 0 cs of
-    (n,uncons -> Just ('#',uncons -> Just (')',cs'))) -> Just (pack ('Z':shows (n+1) "H"),cs')
+    (n,uncons -> Just ('#',uncons -> Just (')',cs'))) -> Just (pack ("Tup" ++ show (n+1)),cs')
     _ -> Nothing
 maybeTuple (uncons -> Just ('(',cs)) =
   case countCommas 0 cs of
-    (n,uncons -> Just (')',cs')) -> Just (pack ('Z':shows (n+1) "T"),cs')
+    (n,uncons -> Just (')',cs')) -> Just (pack ("Tup" ++ show (n+1)),cs')
     _ -> Nothing
 maybeTuple _  = Nothing
 
