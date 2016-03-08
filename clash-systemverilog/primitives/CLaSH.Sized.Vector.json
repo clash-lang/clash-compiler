@@ -3,7 +3,7 @@
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateD" :
 "// head begin
-~SIGD[~SYM[0]][0];
+~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][0];
@@ -15,7 +15,7 @@ assign ~RESULT = ~SYM[0][0];
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "templateD" :
 "// tail begin
-~SIGD[~SYM[0]][0];
+~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];
@@ -27,7 +27,7 @@ assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];
     , "type"      : "Vec (n + 1) a -> a"
     , "templateD" :
 "// last begin
-~SIGD[~SYM[0]][0];
+~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][$high(~SYM[0])];
@@ -39,7 +39,7 @@ assign ~RESULT = ~SYM[0][$high(~SYM[0])];
     , "type"      : "Vec (n + 1) a -> Vec n a"
     , "templateD" :
 "// init begin
-~SIGD[~SYM[0]][0];
+~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
 assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];
@@ -57,12 +57,12 @@ assign ~RESULT = ~SYM[0][0 : $high(~SYM[0]) - 1];
         -> Vec n a"
     , "templateD" :
 "// select begin
-~SIGD[~SYM[0]][4];
+~SIGD[~GENSYM[vec][0]][4];
 assign ~SYM[0] = ~ARG[4];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : select_~SYM[2]
+  for (~SYM[1]=0; ~SYM[1] < ~LIT[3]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[select][2]
     assign ~RESULT[~SYM[1]] = ~SYM[0][~LIT[1] + (~LIT[2] * ~SYM[1])];
   end
 ~ENDGENERATE
@@ -74,15 +74,15 @@ genvar ~SYM[1];
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
     , "templateD" :
 "// (++) begin
-~SIGD[~SYM[0]][0];
-~SIGD[~SYM[1]][1];
+~SIGD[~GENSYM[vec1][0]][0];
+~SIGD[~GENSYM[vec2][1]][1];
 
 assign ~SYM[0] = ~ARG[0];
 assign ~SYM[1] = ~ARG[1];
 
-genvar ~SYM[2];
+genvar ~GENSYM[n][2];
 ~GENERATE
-  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : append_~SYM[3]
+  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[append][3]
     if (~SYM[2] < $size(~SYM[0])) begin
       assign ~RESULT[~SYM[2]] = ~SYM[0][~SYM[2]];
     end else begin
@@ -98,12 +98,12 @@ genvar ~SYM[2];
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "templateD" :
 "// concat begin
-~SIGD[~SYM[0]][0];
+~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concat_~SYM[2]
+  for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[concat][2]
     assign ~RESULT[(~SYM[1] * $size(~SYM[0][0])) : ((~SYM[1] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
   end
 ~ENDGENERATE
@@ -115,7 +115,7 @@ genvar ~SYM[1];
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateD" :
 "// splitAt begin
-~SIGD[~SYM[0]][1];
+~SIGD[~GENSYM[vec][0]][1];
 assign ~SYM[0] = ~ARG[1];
 
 assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0)]
@@ -133,12 +133,12 @@ assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_se
            -> Vec n (Vec m a)"
     , "templateD" :
 "// unconcat begin
-~SIGD[~SYM[0]][2];
+~SIGD[~GENSYM[vec][0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcat_~SYM[2]
+  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[unconcat][2]
     assign ~RESULT[~SYM[1]] = ~SYM[0][(~SYM[1] * ~LIT[1]) : ((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1)];
   end
 ~ENDGENERATE
@@ -150,12 +150,12 @@ genvar ~SYM[1];
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "// map begin
-~SIGD[~SYM[0]][1];
+~SIGD[~GENSYM[vec][0]][1];
 assign ~SYM[0] = ~ARG[1];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
+  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]
     ~INST 0
       ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
       ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[1]]~
@@ -170,13 +170,13 @@ genvar ~SYM[1];
     , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "// imap begin
-~SIGD[~SYM[0]][2];
+~SIGD[~GENSYM[vec][0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : map_~SYM[2]
-    logic [~SIZE[~INDEXTYPE[~LIT[0]]]-1:0] ~SYM[3];
+  for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
+    logic [~SIZE[~INDEXTYPE[~LIT[0]]]-1:0] ~GENSYM[i][3];
     assign ~SYM[3] = ~SYM[1];
     ~INST 1
       ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
@@ -193,14 +193,14 @@ genvar ~SYM[1];
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
 "// zipWith begin
-~SIGD[~SYM[0]][1];
-~SIGD[~SYM[1]][2];
+~SIGD[~GENSYM[vec1][0]][1];
+~SIGD[~GENSYM[vec2][1]][2];
 assign ~SYM[0] = ~ARG[1];
 assign ~SYM[1] = ~ARG[2];
 
-genvar ~SYM[2];
+genvar ~GENSYM[n][2];
 ~GENERATE
-  for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : zipWith_~SYM[2]
+  for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][3]
     ~INST 0
       ~OUTPUT <= ~RESULT[~SYM[2]]~ ~TYPEL[~TYPO]~
       ~INPUT  <= ~SYM[0][~SYM[2]]~ ~TYPEL[~TYP[1]]~
@@ -216,24 +216,24 @@ genvar ~SYM[2];
     , "type"      : "foldr :: (a -> b -> b) -> b -> Vec n a -> b"
     , "templateD" :
 "// foldr start~IF ~LENGTH[~TYP[2]] ~THEN
-~SIGDO[intermediate_~SYM[0]] [0:~LENGTH[~TYP[2]]];
-assign intermediate_~SYM[0][~LENGTH[~TYP[2]]] = ~ARG[1];
+~SIGDO[~GENSYM[intermediate][0]] [0:~LENGTH[~TYP[2]]];
+assign ~SYM[0][~LENGTH[~TYP[2]]] = ~ARG[1];
 
-~SIGD[xs_~SYM[2]][2];
-assign xs_~SYM[2] = ~ARG[2];
+~SIGD[~GENSYM[xs][2]][2];
+assign ~SYM[2] = ~ARG[2];
 
-genvar i_~SYM[3];
+genvar ~GENSYM[i][3];
 ~GENERATE
-for (i_~SYM[3]=0; i_~SYM[3] < ~LENGTH[~TYP[2]]; i_~SYM[3]=i_~SYM[3]+1) begin : foldr_loop
+for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr_loop][4]
   ~INST 0
-    ~OUTPUT <= intermediate_~SYM[0][i_~SYM[3]]~ ~TYP[1]~
-    ~INPUT <= xs_~SYM[2][i_~SYM[3]]~ ~TYPEL[~TYP[2]]~
-    ~INPUT <= intermediate_~SYM[0][i_~SYM[3]+1]~ ~TYP[1]~
+    ~OUTPUT <= ~SYM[0][~SYM[3]]~ ~TYP[1]~
+    ~INPUT <= ~SYM[2][~SYM[3]]~ ~TYPEL[~TYP[2]]~
+    ~INPUT <= ~SYM[0][~SYM[3]+1]~ ~TYP[1]~
   ~INST
 end
 ~ENDGENERATE
 
-assign ~RESULT = intermediate_~SYM[0][0];
+assign ~RESULT = ~SYM[0][0];
 ~ELSE
 assign ~RESULT = ~ARG[1];
 ~FI// foldr end"
@@ -246,32 +246,32 @@ assign ~RESULT = ~ARG[1];
     , "templateD" :
 "// fold begin
 // put flat input array into the first half of the intermediate array
-~SIGDO[intermediate_~SYM[0]][0:(2*~LENGTH[~TYP[1]])-2];
-assign intermediate_~SYM[0][0:~LENGTH[~TYP[1]]-1] = ~ARG[1];
+~SIGDO[~GENSYM[intermediate][0]][0:(2*~LENGTH[~TYP[1]])-2];
+assign ~SYM[0][0:~LENGTH[~TYP[1]]-1] = ~ARG[1];
 
 // calculate the depth of the tree
-localparam levels_~SYM[4] = $clog2(~LENGTH[~TYP[1]]);
+localparam ~GENSYM[levels][4] = $clog2(~LENGTH[~TYP[1]]);
 
 // given a level and a depth, calculate the corresponding index into the
 // intermediate array
-function integer depth2Index_~SYM[8];
+function integer ~GENSYM[depth2Index][8];
   input integer levels;
   input integer depth;
 
-  depth2Index_~SYM[8] = (2 ** levels) - (2 ** depth);
+  ~SYM[8] = (2 ** levels) - (2 ** depth);
 endfunction
 
 // Create the tree of instantiated components
-genvar d_~SYM[5];
-genvar i_~SYM[6];
+genvar ~GENSYM[d][5];
+genvar ~GENSYM[i][6];
 ~GENERATE
-if (levels_~SYM[4] != 0) begin : make_tree_~SYM[7]
-  for (d_~SYM[5] = (levels_~SYM[4] - 1); d_~SYM[5] >= 0; d_~SYM[5]=d_~SYM[5]-1) begin : tree_depth
-    for (i_~SYM[6] = 0; i_~SYM[6] < (2**d_~SYM[5]); i_~SYM[6] = i_~SYM[6]+1) begin : tree_depth_loop
+if (~SYM[4] != 0) begin : ~GENSYM[make_tree][7]
+  for (~SYM[5] = (~SYM[4] - 1); ~SYM[5] >= 0; ~SYM[5]=~SYM[5]-1) begin : tree_depth
+    for (~SYM[6] = 0; ~SYM[6] < (2**~SYM[5]); ~SYM[6] = ~SYM[6]+1) begin : tree_depth_loop
         ~INST 0
-          ~OUTPUT <= intermediate_~SYM[0][depth2Index_~SYM[8](levels_~SYM[4]+1,d_~SYM[5]+1)+i_~SYM[6]]~ ~TYPO~
-          ~INPUT  <= intermediate_~SYM[0][depth2Index_~SYM[8](levels_~SYM[4]+1,d_~SYM[5]+2)+(2*i_~SYM[6])]~ ~TYPO~
-          ~INPUT  <= intermediate_~SYM[0][depth2Index_~SYM[8](levels_~SYM[4]+1,d_~SYM[5]+2)+(2*i_~SYM[6])+1]~ ~TYPO~
+          ~OUTPUT <= ~SYM[0][~SYM[8](~SYM[4]+1,~SYM[5]+1)+~SYM[6]]~ ~TYPO~
+          ~INPUT  <= ~SYM[0][~SYM[8](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])]~ ~TYPO~
+          ~INPUT  <= ~SYM[0][~SYM[8](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1]~ ~TYPO~
         ~INST
     end
   end
@@ -279,7 +279,7 @@ end
 ~ENDGENERATE
 
 // The last element of the intermediate array holds the result
-assign ~RESULT = intermediate_~SYM[0][(2*~LENGTH[~TYP[1]])-2];
+assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
 // fold end"
     }
   }
@@ -288,10 +288,10 @@ assign ~RESULT = intermediate_~SYM[0][(2*~LENGTH[~TYP[1]])-2];
     , "type"      : "index_integer :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
 "// indexVec begin
-~SIGD[vec_~SYM[0]][1];
-assign vec_~SYM[0] = ~ARG[1];
+~SIGD[~GENSYM[vec][0]][1];
+assign ~SYM[0] = ~ARG[1];
 
-assign ~RESULT = vec_~SYM[0][~ARG[2]];
+assign ~RESULT = ~SYM[0][~ARG[2]];
 // indexVec end"
     }
   }
@@ -300,16 +300,14 @@ assign ~RESULT = vec_~SYM[0][~ARG[2]];
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
 "// replaceVec start
-~SIGD[vec_~SYM[0]][1];
-~SIGD[din_~SYM[1]][3];
-assign din_~SYM[1] = ~ARG[3];
+~SIGD[~GENSYM[vec][0]][1];
 
 always_comb begin
-  vec_~SYM[0] = ~ARG[1];
-  vec_~SYM[0][~ARG[2]] = din_~SYM[1];
+  ~SYM[0] = ~ARG[1];
+  ~SYM[0][~ARG[2]] = ~ARG[3];
 end
 
-assign ~RESULT = vec_~SYM[0];
+assign ~RESULT = ~SYM[0];
 // replaceVec end"
     }
   }
@@ -336,14 +334,14 @@ assign ~RESULT = vec_~SYM[0];
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
     , "templateD" :
 "// transpose begin
-~SIGD[~SYM[0]][1];
+~SIGD[~GENSYM[matrix][0]][1];
 assign ~SYM[0] = ~ARG[1];
 
-genvar ~SYM[1];
-genvar ~SYM[2];
+genvar ~GENSYM[row_index][1];
+genvar ~GENSYM[col_index][2];
 ~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : transpose_outer_~SYM[3]
-    for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : transpose_inner_~SYM[4]
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[transpose_outer][3]
+    for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[transpose_inner][4]
       assign ~RESULT[~SYM[2]][~SYM[1]] = ~SYM[0][~SYM[1]][~SYM[2]];
     end
   end
@@ -356,12 +354,12 @@ genvar ~SYM[2];
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
 "// reverse begin
-~SIGD[~SYM[0]][0];
+~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : reverse_~SYM[2]
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[reverse][2]
     assign ~RESULT[$high(~SYM[0]) - ~SYM[1]] = ~SYM[0][~SYM[1]];
   end
 ~ENDGENERATE
@@ -382,12 +380,12 @@ genvar ~SYM[1];
                   -> BitVector (n * m)"
     , "templateD" :
 "// concatBitVector begin
-~SIGD[~SYM[0]][1];
+~SIGD[~GENSYM[vec][0]][1];
 assign ~SYM[0] = ~ARG[1];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : concatBitVector_~SYM[2]
+  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[concatBitVector][2]
     assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][$high(~SYM[0]) - ~SYM[1]];
   end
 ~ENDGENERATE
@@ -402,12 +400,12 @@ genvar ~SYM[1];
                     -> Vec n (BitVector m)"
     , "templateD" :
 "// unconcatBitVector begin
-~SIGD[~SYM[0]][2];
+~SIGD[~GENSYM[bv][0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-genvar ~SYM[1];
+genvar ~GENSYM[n][1];
 ~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : unconcatBitVector_~SYM[2]
+  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[unconcatBitVector][2]
     assign ~RESULT[$high(~RESULT) - ~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
   end
 ~ENDGENERATE
@@ -419,17 +417,17 @@ genvar ~SYM[1];
     , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "templateD" :
 "// rotateLeftS begin
-~SIGD[~SYM[1]][1];
-localparam shift_amount_~SYM[2] = ~LIT[2] % ~LIT[0];
+~SIGD[~GENSYM[vec][1]][1];
+localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
 
 assign ~SYM[1] = ~ARG[1];
 
 ~GENERATE
-if (shift_amount_~SYM[2] == 0) begin : no_shift_~SYM[3]
+if (~SYM[2] == 0) begin : ~GENSYM[no_shift][3]
   assign ~RESULT = ~SYM[1];
-end else begin : do_shift_~SYM[4]
-  assign ~RESULT[0:~LIT[0]-shift_amount_~SYM[2]-1] = ~SYM[1][shift_amount_~SYM[2]:~LIT[0]-1];
-  assign ~RESULT[shift_amount_~SYM[2]:~LIT[0]-1] = ~SYM[1][0 to shift_amount_~SYM[2]-1];
+end else begin : ~GENSYM[do_shift][4]
+  assign ~RESULT[0:~LIT[0]-~SYM[2]-1] = ~SYM[1][~SYM[2]:~LIT[0]-1];
+  assign ~RESULT[~SYM[2]:~LIT[0]-1] = ~SYM[1][0 to ~SYM[2]-1];
 end
 ~ENDGENERATE
 // rotateLeftS end"
@@ -440,17 +438,17 @@ end
     , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "templateD" :
 "// rotateRightS begin
-~SIGD[~SYM[1]][1];
-localparam shift_amount_~SYM[2] = ~LIT[2] % ~LIT[0];
+~SIGD[~GENSYM[vec][1]][1];
+localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
 
 assign ~SYM[1] = ~ARG[1];
 
 ~GENERATE
-if (shift_amount_~SYM[2] == 0) begin : no_shift_~SYM[3]
+if (~SYM[2] == 0) begin : ~GENSYM[no_shift][3]
   assign ~RESULT = ~SYM[1];
-end else begin : do_shift_~SYM[4]
-  assign ~RESULT[0:shift_amount_~SYM[2]-1] = ~SYM[1][~LIT[0]-shift_amount_~SYM[2]:~LIT[0]-1];
-  assign ~RESULT[shift_amount_~SYM[2]:~LIT[0]-1] = ~SYM[1][0:~LIT[0]-shift_amount_~SYM[2]-1];
+end else begin : ~GENSYM[do_shift][4]
+  assign ~RESULT[0:~SYM[2]-1] = ~SYM[1][~LIT[0]-~SYM[2]:~LIT[0]-1];
+  assign ~RESULT[~SYM[2]:~LIT[0]-1] = ~SYM[1][0:~LIT[0]-~SYM[2]-1];
 end
 ~ENDGENERATE
 // rotateRightS end"

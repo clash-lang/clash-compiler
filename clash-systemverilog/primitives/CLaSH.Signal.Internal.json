@@ -7,9 +7,9 @@
            -> Signal' clk a"
     , "templateD" :
 "// register begin
-~SIGD[~SYM[0]][2];
+~SIGD[~GENSYM[dout][0]][2];
 
-always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : register_~COMPNAME_~SYM[1]
+always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : ~GENSYM[~COMPNAME_register][1]
   if (~ ~RST[0]) begin
     ~SYM[0] <= ~ARG[1];
   end else begin
@@ -31,9 +31,9 @@ assign ~RESULT = ~SYM[0];
         -> Signal' clk a"
     , "templateD" :
 "// regEn begin
-~SIGD[~SYM[0]][3];
+~SIGD[~GENSYM[dout][0]][3];
 
-always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : regEn_~COMPNAME_~SYM[1]
+always_ff @(posedge ~CLK[0] or negedge ~RST[0]) begin : ~GENSYM[~COMPNAME_regEn][1]
   if (~ ~RST[0]) begin
     ~SYM[0] <= ~ARG[1];
   end else begin
