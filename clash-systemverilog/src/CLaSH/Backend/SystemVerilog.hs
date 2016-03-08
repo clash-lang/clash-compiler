@@ -137,7 +137,7 @@ reservedWords = ["accept_on","alias","always","always_comb","always_ff"
 
 filterReserved :: Identifier -> Identifier
 filterReserved s = if s `elem` reservedWords
-  then Text.init s `Text.append` (Text.toUpper . Text.singleton . Text.last) s
+  then s `Text.append` "_r"
   else s
 
 -- | Generate VHDL for a Netlist component
