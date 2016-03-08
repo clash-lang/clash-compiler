@@ -341,6 +341,19 @@ renderTag b e@(TypElem _)   = let ty = lineToType b [e]
                               in  (displayT . renderOneLine) <$> hdlType ty
 renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
 renderTag _ (GenSym [C t] _) = return t
+renderTag b (Vars n)        =
+  let (s,_,_) = bbInputs b !! n
+      e       = either id fst s
+
+      go (Identifier i _) = [i]
+      go (DataCon _ _ es) = concatMap go es
+      go (DataTag _ e')   = [either id id e']
+      go _                = []
+
+      vars    = go e
+  in  case vars of
+        [] -> return Text.empty
+        _  -> return (Text.concat $ map (Text.cons ',') vars)
 renderTag _ (IF _ _ _)      = error $ $(curLoc) ++ "Unexpected IF"
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
@@ -438,6 +451,7 @@ prettyElem (SigD es mI) = do
     (maybe (text "~SIGDO" <> brackets (text es'))
            (((text "~SIGD" <> brackets (text es')) <>) . int)
            mI)
+prettyElem (Vars i) = (displayT . renderOneLine) <$> (text "~VARS" <> brackets (int i))
 
 usedArguments :: BlackBoxTemplate
               -> [Int]

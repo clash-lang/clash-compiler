@@ -172,7 +172,7 @@ end block;~FI
              -> Bit         -- ARG[3]
              -> BitVector n"
     , "templateD" :
-"-- replaceBit begin~IF ~AND[~ISVAR[1],~ISVAR[2],~ISVAR[3]] ~THEN
+"-- replaceBit begin
 ~GENSYM[replaceBit][0] : block
   signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
 begin
@@ -182,35 +182,14 @@ begin
   -- pragma translate_on
                ;
 
-  process(~ARG[1],~SYM[1],~ARG[3])
+  process(~SYM[1]~VARS[1]~VARS[3])
     variable ~GENSYM[ivec][2] : ~TYP[1];
   begin
     ~SYM[2] := ~ARG[1];
     ~SYM[2](~SYM[1] downto ~SYM[1]) := ~ARG[3];
     ~RESULT <= ~SYM[2];
   end process;
-end block;~ELSE
-~SYM[0] : block
-  signal ~GENSYM[bv][3] : ~TYP[1];
-  signal ~SYM[1] : integer range 0 to ~LIT[0]-1;
-  signal ~GENSYM[din][4] : ~TYP[3];
-begin
-  ~SYM[3] <= ~ARG[1];
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~LIT[0]
-  -- pragma translate_on
-               ;
-  ~SYM[4] <= ~ARG[3];
-
-  process(~SYM[3],~SYM[1],~SYM[4])
-    variable ~SYM[2] : ~TYP[1];
-  begin
-    ~SYM[2] := ~SYM[3];
-    ~SYM[2](~SYM[1] downto ~SYM[1]) := ~SYM[4];
-    ~RESULT <= ~SYM[2];
-  end process;
-end block;~FI
+end block;
 -- replaceBit end"
     }
   }
@@ -223,8 +202,8 @@ end block;~FI
            -> BitVector (m + 1 - n) -- ARG[3]
            -> BitVector (m + 1 + i)"
     , "templateD" :
-"-- setSlice begin~IF ~AND[~ISVAR[0],~ISVAR[3]] ~THEN
-~GENSYM[setSlice][0] : process(~ARG[0],~ARG[3])
+"-- setSlice begin~IF ~ISVAR[0] ~THEN
+~GENSYM[setSlice][0] : process(~ARG[0]~VARS[3])
   variable ~GENSYM[ivec][1] : ~TYP[0];
 begin
   ~SYM[1] := ~ARG[0];
@@ -233,15 +212,13 @@ begin
 end process;~ELSE
 ~SYM[0] : block
   signal ~GENSYM[bv][2] : ~TYP[0];
-  signal ~GENSYM[din][3] : ~TYP[3];
 begin
   ~SYM[2] <= ~ARG[0];
-  ~SYM[3] <= ~ARG[3];
-  process(~SYM[2],~SYM[3])
+  process(~SYM[2]~VARS[3])
     variable ~SYM[1] : ~TYP[0];
   begin
     ~SYM[1] := ~SYM[2];
-    ~SYM[1](~LIT[1] downto ~LIT[2]) := ~SYM[3];
+    ~SYM[1](~LIT[1] downto ~LIT[2]) := ARG[3];
     ~RESULT <= ~SYM[1];
   end process;
 end block;~FI

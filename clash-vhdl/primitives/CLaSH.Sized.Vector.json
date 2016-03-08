@@ -480,25 +480,21 @@ end block;~FI
     , "templateD" :
 "-- replace begin
 ~GENSYM[replaceVec][0] : block
-  signal ~GENSYM[vec][1] : ~TYP[1];
-  signal ~GENSYM[vec_index][2] : integer range 0 to ~LIT[0]-1;
-  signal ~GENSYM[din][3] : ~TYP[3];
+  signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
 begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= to_integer(~ARG[2])
+  ~SYM[1] <= to_integer(~ARG[2])
   -- pragma translate_off
                mod ~LIT[0]
   -- pragma translate_on
                ;
-  ~SYM[3] <= ~ARG[3];
 
-  process(~SYM[1],~SYM[1],~SYM[3])
-    variable ~GENSYM[ivec][4] : ~TYP[1];
+  process(~SYM[1]~VARS[1]~VARS[3])
+    variable ~GENSYM[ivec][2] : ~TYP[1];
   begin
-    ~SYM[4] := ~SYM[1];~IF ~VIVADO ~THEN
-    ~SYM[4](~SYM[2]) := ~TOBV[~SYM[3]][~TYP[3]];~ELSE
-    ~SYM[4](~SYM[2]) := ~SYM[3];~FI
-    ~RESULT <= ~SYM[4];
+    ~SYM[2] := ~ARG[1];~IF ~VIVADO ~THEN
+    ~SYM[2](~SYM[1]) := ~TOBV[~ARG[3]][~TYP[3]];~ELSE
+    ~SYM[2](~SYM[1]) := ~ARG[3];~FI
+    ~RESULT <= ~SYM[2];
   end process;
 end block;
 -- replace end"

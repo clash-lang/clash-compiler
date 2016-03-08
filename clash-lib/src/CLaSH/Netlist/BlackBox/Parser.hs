@@ -98,6 +98,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
      <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> And               <$> (pToken "~AND" *> listParser pTagE)
+     <|> Vars              <$> (pToken "~VARS" *> pBrackets pNatural)
 
 
 -- | Parse a bracketed text
