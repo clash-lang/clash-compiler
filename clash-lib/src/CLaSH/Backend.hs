@@ -14,6 +14,8 @@ import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.BlackBox.Types
 
+type ModName = String
+
 class Backend state where
   -- | Initial state for state monad
   initBackend :: Int -> HdlSyn -> state
@@ -59,3 +61,5 @@ class Backend state where
   hdlSyn           :: State state HdlSyn
   -- | mkBasicId
   mkBasicId        :: State state (Identifier -> Identifier)
+  -- | setModName
+  setModName       :: ModName -> state -> state

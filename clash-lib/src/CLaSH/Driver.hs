@@ -87,7 +87,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let modName   = takeWhile (/= '.') (name2String topEntity)
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
-      hdlState' = fromMaybe (initBackend iw hdlsyn :: backend) hdlState
+      hdlState' = setModName modName
+                $ fromMaybe (initBackend iw hdlsyn :: backend) hdlState
       mkId      = evalState mkBasicId hdlState'
       topNm     = maybe (mkId (Text.pack $ modName ++ "_topEntity"))
                         (Text.pack . t_name)

@@ -53,7 +53,6 @@ data NetlistState
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
-  , _modNm          :: !String -- ^ Name of the module containing the @topEntity@
   , _curCompNm      :: !Identifier
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int

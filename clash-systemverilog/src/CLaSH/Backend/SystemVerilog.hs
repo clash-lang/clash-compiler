@@ -52,6 +52,7 @@ data SystemVerilogState =
     , _tyCount   :: Int -- ^ Product type counter
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
+    , _modNm     :: String
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -59,7 +60,7 @@ data SystemVerilogState =
 makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty 0 HashMap.empty 0
+  initBackend     = SystemVerilogState HashSet.empty 0 HashMap.empty 0 ""
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -88,10 +89,13 @@ instance Backend SystemVerilogState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
-  toBV hty id_    = verilogTypeMark hty <> "_to_lv" <> parens (text id_)
+  toBV hty id_    = do
+    nm <- use modNm
+    text (pack nm) <> "_types::" <> verilogTypeMark hty <> "_to_lv" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
   mkBasicId       = return (filterReserved . mkBasicId' True)
+  setModName nm s = s {_modNm = nm}
 
 type SystemVerilogM a = State SystemVerilogState a
 
@@ -138,11 +142,10 @@ filterReserved s = if s `elem` reservedWords
 
 -- | Generate VHDL for a Netlist component
 genVerilog :: String -> Component -> SystemVerilogM (String,Doc)
-genVerilog modName c = (unpack cName,) A.<$> verilog
+genVerilog _ c = (unpack cName,) A.<$> verilog
   where
     cName   = componentName c
     verilog = "// Automatically generated SystemVerilog-2005" <$$>
-              tyImports modName <$$>
               module_ c
 
 -- | Generate a SystemVerilog package containing type definitions for the given HWTypes
@@ -231,9 +234,6 @@ funDec t =
        <> semi) <$>
   "endfunction"
 
-tyImports :: String -> SystemVerilogM Doc
-tyImports modName = "import" <+> text (pack modName) <> "_types::*;"
-
 module_ :: Component -> SystemVerilogM Doc
 module_ c =
     "module" <+> text (componentName c) <> tupled ports <> semi <$>
@@ -256,9 +256,10 @@ module_ c =
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t = do
   tyCache %= HashSet.insert t
+  nm <- use modNm
   case t of
-    (Vector _ _)  -> tyName t
-    (Product _ _) -> tyName t
+    (Vector _ _)  -> text (pack nm) <> "_types::" <> tyName t
+    (Product _ _) -> text (pack nm) <> "_types::" <> tyName t
     (Signed n)    -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
     (Clock _ _)   -> "logic"
     (Reset _ _)   -> "logic"
@@ -413,7 +414,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
-expr_ _ (DataCon ty@(Product _ _) _ es) = "'" <> listBraces (zipWithM (\i e -> verilogTypeMark ty <> "_sel" <> int i <> colon <+> expr_ False e) [0..] es)
+expr_ _ (DataCon (Product _ _) _ es) = "'" <> listBraces (mapM (expr_ False) es)
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
@@ -515,6 +516,9 @@ toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selNames = map (fmap (displayT . renderOneLine) ) [text id_ <> dot <> tName <> "_sel" <> int i | i <- [0..(length tys)-1]]
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ tys) (DataCon _ _ es) = listBraces (zipWithM toSLV tys es)
+toSLV t@(Product _ _) e = do
+  nm <- use modNm
+  text (pack nm) <> "_types::" <> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
 
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence (reverse selIds)
@@ -523,6 +527,9 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selNames = map (fmap (displayT . renderOneLine) ) $ reverse [text id_ <> brackets (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
 toSLV (Vector n elTy) (DataCon _ _ es) = listBraces (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
+toSLV t@(Vector _ _) e = do
+  nm <- use modNm
+  text (pack nm) <> "_types::" <> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
 
 toSLV _ e = expr_ False e
 

@@ -103,7 +103,7 @@ runNetlistMonad s p tcm typeTrans modName dfiles iw mkId seen
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm modName Text.empty dfiles iw mkId [] seen' names
+    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm Text.empty dfiles iw mkId [] seen' names
     (seen',names) = genNames mkId modName seen HashMap.empty (HashMap.keys s)
 
 genNames :: (Identifier -> Identifier)

@@ -82,6 +82,7 @@ instance Backend VHDLState where
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
   mkBasicId       = return (filterReserved . T.toLower . mkBasicId' True)
+  setModName _    = id
 
 type VHDLM a = State VHDLState a
 

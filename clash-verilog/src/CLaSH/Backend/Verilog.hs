@@ -83,6 +83,7 @@ instance Backend VerilogState where
   fromBV _        = text
   hdlSyn          = use hdlsyn
   mkBasicId       = return (filterReserved . mkBasicId' True)
+  setModName _    = id
 
 type VerilogM a = State VerilogState a
 
