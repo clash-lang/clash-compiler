@@ -19,7 +19,6 @@ import qualified Control.Applicative                  as A
 import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
-import           Data.Char                            (toLower)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
@@ -37,7 +36,7 @@ import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util
+import           CLaSH.Netlist.Util                   hiding (mkBasicId)
 import           CLaSH.Util                           (clog2, curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
@@ -50,7 +49,7 @@ import qualified System.FilePath
 data VHDLState =
   VHDLState
   { _tyCache   :: (HashSet HWType)     -- ^ Previously encountered HWTypes
-  , _tyCount   :: Int                  -- ^ Product type counter
+  , _tySeen    :: [Identifier]         -- ^ Generated product types
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
@@ -59,7 +58,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty 0 HashMap.empty
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else
@@ -82,12 +81,16 @@ instance Backend VHDLState where
   toBV _ id_      = "toSLV" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . mkBasicId' True)
+  mkBasicId       = return (filterReserved . T.toLower . mkBasicId' True)
+  setModName _    = id
 
 type VHDLM a = State VHDLState a
 
 -- List of reserved VHDL-2008 keywords
-reservedWords :: [String]
+-- + used internal names: toslv, fromslv, tagtoenum, datatotag
+-- + used IEEE library names: integer, boolean, std_logic, std_logic_vector,
+--   signed, unsigned, to_integer, to_signed, to_unsigned, string
+reservedWords :: [Identifier]
 reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"array","assert","assume","assume_guarantee","attribute","begin","block"
   ,"body","buffer","bus","case","component","configuration","constant","context"
@@ -101,11 +104,13 @@ reservedWords = ["abs","access","after","alias","all","and","architecture"
   ,"return","rol","ror","select","sequence","severity","signal","shared","sla"
   ,"sll","sra","srl","strong","subtype","then","to","transport","type"
   ,"unaffected","units","until","use","variable","vmode","vprop","vunit","wait"
-  ,"when","while","with","xnor","xor"]
+  ,"when","while","with","xnor","xor","toslv","fromslv","tagtoenum","datatotag"
+  ,"integer", "boolean", "std_logic", "std_logic_vector", "signed", "unsigned"
+  ,"to_integer", "to_signed", "to_unsigned", "string"]
 
-filterReserved :: String -> String
-filterReserved s = if map toLower s `elem` reservedWords
-  then s ++ "R"
+filterReserved :: Identifier -> Identifier
+filterReserved s = if s `elem` reservedWords
+  then s `T.append` "_r"
   else s
 
 -- | Generate VHDL for a Netlist component
@@ -124,32 +129,34 @@ mkTyPackage_ :: String
              -> VHDLM [(String,Doc)]
 mkTyPackage_ modName hwtys = do
     { syn <- hdlSyn
+    ; mkId <- mkBasicId
     ; let usedTys     = concatMap mkUsedTys hwtys
           needsDec = nubBy (eqReprTy syn) . map mkVecZ $ (hwtys ++ usedTys)
           hwTysSorted = topSortHWTys needsDec
           packageDec  = vcat $ mapM tyDec hwTysSorted
           (funDecs,funBodies) = unzip . catMaybes $ map (funDec syn) (nubBy (eqTypM syn) hwTysSorted)
 
-    ; (:[]) A.<$> (modName ++ "_types",) A.<$>
+    ; (:[]) A.<$> (unpack $ mkId (T.pack modName `T.append` "_types"),) A.<$>
       "library IEEE;" <$>
       "use IEEE.STD_LOGIC_1164.ALL;" <$>
       "use IEEE.NUMERIC_STD.ALL;" <$$> linebreak <>
-      "package" <+> modNameD <> "_types" <+> "is" <$>
+      "package" <+> text (mkId (T.pack modName `T.append` "_types")) <+> "is" <$>
          indent 2 ( packageDec <$>
                     vcat (sequence funDecs)
                   ) <$>
       "end" <> semi <> packageBodyDec funBodies
     }
   where
-    modNameD = text (T.pack modName)
-
     packageBodyDec :: [VHDLM Doc] -> VHDLM Doc
     packageBodyDec funBodies = case funBodies of
-        [] -> empty
-        _  -> linebreak <$>
-              "package" <+> "body" <+> modNameD <> "_types" <+> "is" <$>
-                indent 2 (vcat (sequence funBodies)) <$>
-              "end" <> semi
+      [] -> empty
+      _  -> do
+        { mkId <- mkBasicId
+        ; linebreak <$>
+         "package" <+> "body" <+> text (mkId (T.pack modName `T.append` "_types")) <+> "is" <$>
+           indent 2 (vcat (sequence funBodies)) <$>
+         "end" <> semi
+        }
 
     eqReprTy :: HdlSyn -> HWType -> HWType -> Bool
     eqReprTy h (Vector n ty1) (Vector m ty2)  = n == m && eqReprTy h ty1 ty2
@@ -344,7 +351,8 @@ slvToSlvDec =
   )
 
 tyImports :: String -> VHDLM Doc
-tyImports modName =
+tyImports modName = do
+  mkId <- mkBasicId
   punctuate' semi $ sequence
     [ "library IEEE"
     , "use IEEE.STD_LOGIC_1164.ALL"
@@ -352,7 +360,7 @@ tyImports modName =
     , "use IEEE.MATH_REAL.ALL"
     , "use std.textio.all"
     , "use work.all"
-    , "use work." <> text (T.pack modName) <> "_types.all"
+    , "use work." <> text (mkId (T.pack modName `T.append` "_types")) <> ".all"
     ]
 
 
@@ -445,10 +453,26 @@ tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
 tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
-tyName t@(Product _ _)   = makeCached t nameCache prodName
+tyName t@(Product nm _)  = makeCached t nameCache prodName
   where
-    prodName = do i <- tyCount <<%= (+1)
-                  "product" <> int i
+    prodName = do
+      seen <- use tySeen
+      mkId <- mkBasicId
+      let nm'  = (mkId . last . T.splitOn ".") nm
+          nm'' = if T.null nm'
+                    then "product"
+                    else nm'
+          nm3  = if nm'' `elem` seen
+                    then go mkId seen (0::Integer) nm''
+                    else nm''
+      tySeen %= (nm3:)
+      text nm3
+
+    go mkId s i n =
+      let n' = n `T.append` T.pack ('_':show i)
+      in  if n' `elem` s
+             then go mkId s (i+1) n
+             else n'
 tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
 tyName _ = empty
 

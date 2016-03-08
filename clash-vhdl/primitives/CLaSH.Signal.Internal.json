@@ -7,23 +7,14 @@
            -> Signal' clk a"
     , "templateD" :
 "-- register begin
-register_~COMPNAME_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
+~GENSYM[~COMPNAME_register][0] : process(~CLK[0],~RST[0]~VARS[1])
 begin
-  ~SYM[1] <= ~ARG[1];
-
-  process(~CLK[0],~RST[0],~SYM[1])
-  begin
-    if ~RST[0] = '0' then
-      ~SYM[2] <= ~SYM[1];
-    elsif rising_edge(~CLK[0]) then
-      ~SYM[2] <= ~ARG[2];
-    end if;
-  end process;
-
-  ~RESULT <= ~SYM[2];
-end block;
+  if ~RST[0] = '0' then
+    ~RESULT <= ~ARG[1];
+  elsif rising_edge(~CLK[0]) then
+    ~RESULT <= ~ARG[2];
+  end if;
+end process;
 -- register end"
     }
   }
@@ -37,27 +28,16 @@ end block;
         -> Signal' clk a"
     , "templateD" :
 "-- regEn begin
-regEn_~COMPNAME_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
-  signal ~SYM[2] : ~TYP[2];
-  signal ~SYM[3] : ~TYP[3];
+~GENSYM[~COMPNAME_regEn][0] : process(~CLK[0],~RST[0]~VARS[1]~VARS[2])
 begin
-  ~SYM[1] <= ~ARG[1];
-  ~SYM[2] <= ~ARG[2];
-
-  process(~CLK[0],~RST[0],~SYM[1],~SYM[2])
-  begin
-    if ~RST[0] = '0' then
-      ~SYM[3] <= ~SYM[1];
-    elsif rising_edge(~CLK[0]) then
-      if ~SYM[2] then
-        ~SYM[3] <= ~ARG[3];
-      end if;
+  if ~RST[0] = '0' then
+    ~RESULT <= ~ARG[1];
+  elsif rising_edge(~CLK[0]) then
+    if ~ARG[2] then
+      ~RESULT <= ~ARG[3];
     end if;
-  end process;
-
-  ~RESULT <= ~SYM[3];
-end block;
+  end if;
+end process;
 -- regEn end"
     }
   }

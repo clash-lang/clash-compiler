@@ -19,7 +19,7 @@ data Element = C   !Text         -- ^ Constant
              | O                 -- ^ Output hole
              | I   !Int          -- ^ Input hole
              | L   !Int          -- ^ Literal hole
-             | Sym !Int          -- ^ Symbol hole
+             | Sym !Text !Int    -- ^ Symbol hole
              | Clk !(Maybe Int)  -- ^ Clock hole (Maybe clk corresponding to
                                  -- input, clk corresponding to output if Nothing)
              | Rst !(Maybe Int)  -- ^ Reset hole
@@ -37,6 +37,7 @@ data Element = C   !Text         -- ^ Constant
              | Gen !Bool         -- ^ Hole marking beginning (True) or end (False)
                                  -- of a generative construct
              | IF !Element [Element] [Element]
+             | And [Element]
              | IW64              -- ^ Hole indicating whether Int/Word/Integer
                                  -- are 64-Bit
              | HdlSyn HdlSyn     -- ^ Hole indicating which synthesis tool we're
@@ -44,6 +45,8 @@ data Element = C   !Text         -- ^ Constant
              | BV !Bool [Element] !Element -- ^ Convert to (True)/from(False) a bit-vector
              | IsLit !Int
              | IsVar !Int
+             | Vars !Int
+             | GenSym [Element] !Int
              | SigD [Element] !(Maybe Int)
   deriving Show
 

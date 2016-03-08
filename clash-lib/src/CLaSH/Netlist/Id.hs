@@ -7,121 +7,89 @@
 -}
 
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 
 module CLaSH.Netlist.Id
-  -- ( mkBasicId
-  -- , mkBasicId'
-  -- , stripDollarPrefixes
-  -- )
   ( mkBasicId'
   , stripDollarPrefixes
   )
 where
 
-import Data.Char      (isAsciiLower,isAsciiUpper,isDigit,ord)
-import Data.List      (group, stripPrefix, uncons)
-import Numeric        (showHex)
+#ifndef MIN_VERSION_text
+#error MIN_VERSION_text undefined
+#endif
 
--- | Transform/format a text so that it is acceptable as a HDL identifier
--- mkBasicId :: Text
---           -> Text
--- mkBasicId = mkBasicId' False
+import Data.Char      (isAsciiLower,isAsciiUpper,isDigit)
+import Data.Text.Lazy as Text
 
 mkBasicId' :: Bool
-           -> String
-           -> String
+           -> Text
+           -> Text
 mkBasicId' tupEncode = stripMultiscore . stripLeading . zEncode tupEncode
   where
-    stripLeading    = dropWhile (`elem` ('_':['0'..'9']))
-    stripMultiscore = concat
-                    . map (\cs -> case head cs of
+    stripLeading    = Text.dropWhile (`elem` ('_':['0'..'9']))
+    stripMultiscore = Text.concat
+                    . Prelude.map (\cs -> case Text.head cs of
                                             '_' -> "_"
                                             _   -> cs
                                   )
-                    . group
+                    . Text.group
 
-stripDollarPrefixes :: String -> String
+stripDollarPrefixes :: Text -> Text
 stripDollarPrefixes = stripWorkerPrefix . stripSpecPrefix . stripConPrefix
                     . stripWorkerPrefix . stripDictFunPrefix
   where
-    stripDictFunPrefix t = case stripPrefix "$f" t of
-                             Just k  -> takeWhileEnd' (/= '_') k
+    stripDictFunPrefix t = case Text.stripPrefix "$f" t of
+                             Just k  -> takeWhileEnd (/= '_') k
                              Nothing -> t
 
-    takeWhileEnd' p = reverse . takeWhile p . reverse
+#if !MIN_VERSION_text(1,2,2)
+    takeWhileEnd p = Text.reverse . Text.takeWhile p . Text.reverse
+#endif
 
-    stripWorkerPrefix t = case stripPrefix "$w" t of
+    stripWorkerPrefix t = case Text.stripPrefix "$w" t of
                               Just k  -> k
                               Nothing -> t
 
-    stripConPrefix t = case stripPrefix "$c" t of
+    stripConPrefix t = case Text.stripPrefix "$c" t of
                          Just k  -> k
                          Nothing -> t
 
-    stripSpecPrefix t = case stripPrefix "$s" t of
+    stripSpecPrefix t = case Text.stripPrefix "$s" t of
                           Just k -> k
-                          Nothing -> t
+                          Nothing -> t -- snd (Text.breakOnEnd "$s" t)
 
-type UserString    = String -- As the user typed it
-type EncodedString = String -- Encoded form
+
+type UserString    = Text -- As the user typed it
+type EncodedString = Text -- Encoded form
 
 zEncode :: Bool -> UserString -> EncodedString
 zEncode False cs = go (uncons cs)
   where
-    go Nothing         = ""
-    go (Just (c,cs'))  = (encodeDigitCh c) ++ (go' $ uncons cs')
-    go' Nothing        = ""
-    go' (Just (c,cs')) = (encodeCh c) ++ (go' $ uncons cs')
+    go Nothing         = empty
+    go (Just (c,cs'))  = append (encodeDigitCh c) (go' $ uncons cs')
+    go' Nothing        = empty
+    go' (Just (c,cs')) = append (encodeCh c) (go' $ uncons cs')
 
 zEncode True cs = case maybeTuple cs of
-                    Just (n,cs') -> n ++ (go' (uncons cs'))
+                    Just (n,cs') -> append n (go' (uncons cs'))
                     Nothing      -> go (uncons cs)
   where
-    go Nothing         = ""
-    go (Just (c,cs'))  = (encodeDigitCh c) ++ (go' $ uncons cs')
-    go' Nothing        = ""
-    go' (Just (c,cs')) = case maybeTuple (c:cs') of
-                           Just (n,cs2) -> n ++ (go' $ uncons cs2)
-                           Nothing      -> (encodeCh c) ++ (go' $ uncons cs')
+    go Nothing         = empty
+    go (Just (c,cs'))  = append (encodeDigitCh c) (go' $ uncons cs')
+    go' Nothing        = empty
+    go' (Just (c,cs')) = case maybeTuple (cons c cs') of
+                           Just (n,cs2) -> append n (go' $ uncons cs2)
+                           Nothing      -> append (encodeCh c) (go' $ uncons cs')
 
 encodeDigitCh :: Char -> EncodedString
-encodeDigitCh c | isDigit c = encodeAsUnicodeChar c
+encodeDigitCh c | isDigit c = Text.empty -- encodeAsUnicodeChar c
 encodeDigitCh c             = encodeCh c
 
 encodeCh :: Char -> EncodedString
-encodeCh c | unencodedChar c = [c]     -- Common case first
-
--- Constructors
-encodeCh '['  = "ZM"
-encodeCh ']'  = "ZN"
-encodeCh ':'  = "ZC"
-
--- Variables
-encodeCh '&'  = "za"
-encodeCh '|'  = "zb"
-encodeCh '^'  = "zc"
-encodeCh '$'  = "zd"
-encodeCh '='  = "ze"
-encodeCh '>'  = "zf"
-encodeCh '#'  = "zg"
-encodeCh '.'  = "zh"
-encodeCh '<'  = "zu"
-encodeCh '-'  = "zj"
-encodeCh '!'  = "zk"
-encodeCh '+'  = "zl"
-encodeCh '\'' = "zm"
-encodeCh '\\' = "zn"
-encodeCh '/'  = "zo"
-encodeCh '*'  = "zp"
-encodeCh '%'  = "zq"
-encodeCh c    = encodeAsUnicodeChar c
-
-encodeAsUnicodeChar :: Char -> EncodedString
-encodeAsUnicodeChar c = 'z':(if isDigit (head hex_str)
-                                then hex_str
-                                else '0':hex_str)
-  where hex_str = showHex (ord c) "U"
+encodeCh c | unencodedChar c = singleton c     -- Common case first
+           | otherwise       = Text.empty
 
 unencodedChar :: Char -> Bool   -- True for chars that don't need encoding
 unencodedChar c  = or [ isAsciiLower c
@@ -130,15 +98,15 @@ unencodedChar c  = or [ isAsciiLower c
                       , c == '_']
 
 maybeTuple :: UserString -> Maybe (EncodedString,UserString)
-maybeTuple "(# #)" = Just ("Z1H","")
-maybeTuple "()"    = Just ("Z0T","")
+maybeTuple "(# #)" = Just ("Unit",empty)
+maybeTuple "()"    = Just ("Unit",empty)
 maybeTuple (uncons -> Just ('(',uncons -> Just ('#',cs))) =
   case countCommas 0 cs of
-    (n,uncons -> Just ('#',uncons -> Just (')',cs'))) -> Just (('Z':shows (n+1) "H"),cs')
+    (n,uncons -> Just ('#',uncons -> Just (')',cs'))) -> Just (pack ("Tup" ++ show (n+1)),cs')
     _ -> Nothing
 maybeTuple (uncons -> Just ('(',cs)) =
   case countCommas 0 cs of
-    (n,uncons -> Just (')',cs')) -> Just (('Z':shows (n+1) "T"),cs')
+    (n,uncons -> Just (')',cs')) -> Just (pack ("Tup" ++ show (n+1)),cs')
     _ -> Nothing
 maybeTuple _  = Nothing
 

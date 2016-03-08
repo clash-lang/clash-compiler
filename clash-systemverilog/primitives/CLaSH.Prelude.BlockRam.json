@@ -11,30 +11,30 @@
            -> Signal' clk a"
     , "templateD" :
 "// blockRam begin
-typedef logic [~SIZE[~TYPO]-1:0] RAM_array_~SYM[4] [0:~LENGTH[~TYP[2]]-1];
-RAM_array_~SYM[4] RAM_~SYM[0];
-logic [~SIZE[~TYPO]-1:0] dout_~SYM[1];
+typedef logic [~SIZE[~TYPO]-1:0] ~GENSYM[RAM_array][4] [0:~LENGTH[~TYP[2]]-1];
+~SYM[4] ~GENSYM[RAM][0];
+logic [~SIZE[~TYPO]-1:0] ~GENSYM[dout][1];
 
-function RAM_array_~SYM[4] init_to_bv_~SYM[2];
+function ~SYM[4] ~GENSYM[init_to_bv][2];
   input ~SIGD[value][2];
   begin
-    for (int i_~SYM[3]=0; i_~SYM[3]<~LENGTH[~TYP[2]]; i_~SYM[3]=i_~SYM[3]+1)
-      init_to_bv_~SYM[2][i_~SYM[3]] = ~TOBV[value[ i_~SYM[3] ]][6];
+    for (int ~GENSYM[i][5]=0; ~SYM[5]<~LENGTH[~TYP[2]]; ~SYM[5]=~SYM[5]+1)
+      ~SYM[2][i] = ~TOBV[value[ ~SYM[5] ]][~TYP[6]];
   end
 endfunction
 
 initial begin
-  RAM_~SYM[0] = init_to_bv_~SYM[2](~LIT[2]);
+  ~SYM[0] = ~SYM[2](~LIT[2]);
 end
 
-always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[3]
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][3]
   if (~ARG[5]) begin
-    RAM_~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][6];
+    ~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][~TYP[6]];
   end
-  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[4]];
 end
 
-assign ~RESULT = ~FROMBV[dout_~SYM[1]][6];
+assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
 // blockRam end"
     }
   }

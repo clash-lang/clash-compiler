@@ -171,7 +171,7 @@
     , "type"      : "rotateL# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "templateD" :
 "// rotateL begin
-wire [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~GENSYM[u][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
 // rotateL end"
@@ -182,7 +182,7 @@ assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
     , "type"      : "rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
     , "templateD" :
 "// rotateR begin
-wire [2*~LIT[0]-1:0] ~SYM[0];
+wire [2*~LIT[0]-1:0] ~GENSYM[u][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
 assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
 // rotateR end"

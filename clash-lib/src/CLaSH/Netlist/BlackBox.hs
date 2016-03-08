@@ -59,8 +59,8 @@ mkBlackBoxContext resId args = do
 
     -- Make context result
     res   <- case synchronizedClk tcm (unembed $ V.varType resId) of
-                Just clk -> Right . (,clk) . (`N.Identifier` Nothing) . pack <$> mkBasicId (name2String (V.varName resId))
-                Nothing  -> Left . (`N.Identifier` Nothing) . pack <$> mkBasicId (name2String (V.varName resId))
+                Just clk -> Right . (,clk) . (`N.Identifier` Nothing) <$> mkBasicId (pack $ name2String (V.varName resId))
+                Nothing  -> Left . (`N.Identifier` Nothing)  <$> mkBasicId (pack $ name2String (V.varName resId))
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) imps funs
@@ -81,10 +81,10 @@ prepareBlackBox :: TextS.Text
                 -> NetlistMonad BlackBoxTemplate
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
-     then instantiateSym >=>
+     then instantiateCompName >=>
+          setSym >=>
           setClocks bbCtx >=>
-          collectFilePaths bbCtx >=>
-          instantiateCompName $ templ
+          collectFilePaths bbCtx $ templ
      else
        error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show templ ++
                "\nwith context:\n" ++ show bbCtx
@@ -102,7 +102,7 @@ mkArgument bndr e = do
     ((e',t,l),d) <- case hwTyM of
       Nothing   -> return ((Identifier "__VOID__" Nothing,Void,False),[])
       Just hwTy -> case collectArgs e of
-        (Var _ v,[]) -> do vT <- (`Identifier` Nothing) . pack <$> mkBasicId (name2String v)
+        (Var _ v,[]) -> do vT <- (`Identifier` Nothing) <$> mkBasicId (pack $ name2String v)
                            return ((vT,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
@@ -275,9 +275,10 @@ mkFunInput resId e = do
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
     Left (_, Left templ') -> do
-      l'  <- instantiateSym templ'
+      l   <- instantiateCompName templ'
+      l'  <- setSym l
       l'' <- setClocks bbCtx l'
-      l3  <- instantiateCompName l''
+      l3  <- collectFilePaths bbCtx l''
       return ((Left l3,bbCtx),dcls)
     Left (_, Right templ') -> do
       templ'' <- prettyBlackBox templ'
@@ -287,13 +288,15 @@ mkFunInput resId e = do
       return ((Right decl,bbCtx),dcls)
 
 -- | Instantiate symbols references with a new symbol and increment symbol counter
-instantiateSym :: BlackBoxTemplate
-               -> NetlistMonad BlackBoxTemplate
-instantiateSym l = do
-  i <- Lens.use varCount
-  let (l',i') = setSym i l
-  varCount .= i'
-  return l'
+--instantiateSym :: BlackBoxTemplate
+--               -> NetlistMonad BlackBoxTemplate
+--instantiateSym l = do
+--  i <- Lens.use varCount
+--  ids <- Lens.use seenIds
+--  let (l',(ids',i')) = setSym ids i l
+--  varCount .= i'
+--  seenIds .= ids'
+--  return l'
 
 instantiateCompName :: BlackBoxTemplate
                     -> NetlistMonad BlackBoxTemplate

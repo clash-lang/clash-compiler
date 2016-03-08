@@ -49,17 +49,17 @@ data NetlistState
   { _bindings       :: HashMap TmName (Type,Term) -- ^ Global binders
   , _varEnv         :: Gamma -- ^ Type environment/context
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _cmpCount       :: !Int -- ^ Number of create components
   , _components     :: HashMap TmName Component -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
-  , _modNm          :: !String -- ^ Name of the module containing the @topEntity@
   , _curCompNm      :: !Identifier
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int
-  , _mkBasicIdFn    :: String -> String
+  , _mkBasicIdFn    :: Identifier -> Identifier
   , _seenIds        :: [Identifier]
+  , _seenComps      :: [Identifier]
+  , _componentNames :: HashMap TmName Identifier
   }
 
 -- | Signal reference

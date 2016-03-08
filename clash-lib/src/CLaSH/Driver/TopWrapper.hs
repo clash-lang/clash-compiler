@@ -34,14 +34,15 @@ import CLaSH.Util
 
 -- | Create a wrapper around a component, potentially initiating clock sources
 mkTopWrapper :: PrimMap BlackBoxTemplate
+             -> (Identifier -> Identifier)
              -> Maybe TopEntity -- ^ TopEntity specifications
              -> String          -- ^ Name of the module containing the @topEntity@
              -> Int             -- ^ Int/Word/Integer bit-width
              -> Component       -- ^ Entity to wrap
              -> Component
-mkTopWrapper primMap teM modName iw topComponent
+mkTopWrapper primMap mkId teM modName iw topComponent
   = Component
-  { componentName = maybe (pack modName `append` "_topEntity") (pack . t_name) teM
+  { componentName = maybe (mkId (pack modName `append` "_topEntity")) (pack . t_name) teM
   , inputs        = inputs'' ++ extraIn teM
   , outputs       = outputs'' ++ extraOut teM
   , hiddenPorts   = case maybe [] t_clocks teM of
@@ -301,5 +302,5 @@ unsafeRunNetlist :: Int
 unsafeRunNetlist iw
   = unsafePerformIO
   . fmap fst
-  . runNetlistMonad Nothing HashMap.empty HashMap.empty
-      HashMap.empty (\_ _ -> Nothing) "" [] iw id
+  . runNetlistMonad HashMap.empty HashMap.empty
+      HashMap.empty (\_ _ -> Nothing) "" [] iw id []

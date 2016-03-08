@@ -12,21 +12,21 @@
                -> Signal' clk (BitVector m)"
     , "templateD" :
 "// blockRamFile begin
-~SIGDO[RAM_~SYM[0]] [0:~LIT[2]-1];
-~SIGD[dout_~SYM[1]][7];
+~SIGDO[~GENSYM[RAM][0]] [0:~LIT[2]-1];
+~SIGD[~GENSYM[dout][1]][7];
 
 initial begin
-  $readmemb(~FILE[~LIT[3]],RAM_~SYM[0]);
+  $readmemb(~FILE[~LIT[3]],~SYM[0]);
 end
 
-always @(posedge ~CLK[1]) begin : blockRamFile_~COMPNAME_~SYM[2]
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRamFile][2]
   if (~ARG[7]) begin
-    RAM_~SYM[0][~ARG[4]] <= ~ARG[7];
+    ~SYM[0][~ARG[4]] <= ~ARG[7];
   end
-  dout_~SYM[1] <= RAM_~SYM[0][~ARG[6]];
+  ~SYM[1] <= ~SYM[0][~ARG[6]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~SYM[1];
 // blockRamFile end"
     }
   }

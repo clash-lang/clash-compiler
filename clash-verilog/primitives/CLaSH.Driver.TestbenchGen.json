@@ -2,7 +2,7 @@
     { "name"      : "CLaSH.Driver.TestbenchGen.clockGen"
     , "templateD" :
 "// pragma translate_off
-reg ~TYPO ~SYM[0];
+reg ~TYPO ~GENSYM[clk][0];
 always begin
   ~SYM[0] = 0;
   #~LIT[0] forever begin
@@ -20,7 +20,7 @@ assign ~RESULT = ~SYM[0];
     { "name"      : "CLaSH.Driver.TestbenchGen.resetGen"
     , "templateD" :
 "// pragma translate_off
-reg ~TYPO ~SYM[0];
+reg ~TYPO ~GENSYM[rst_n][0];
 initial begin
   #1 ~SYM[0] = 0;
   #~LIT[0] ~SYM[0] = 1;
@@ -47,7 +47,7 @@ end
 , { "BlackBox" :
     { "name"      : "CLaSH.Driver.TestbenchGen.finishedGen"
     , "templateD" :
-"reg ~TYPO ~SYM[0];
+"reg ~TYPO ~GENSYM[done][0];
 always begin
 // pragma translate_off
   ~SYM[0] <= 1'b0;

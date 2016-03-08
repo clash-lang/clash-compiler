@@ -138,10 +138,17 @@
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
     , "type"      : "div# :: Signed n -> Signed n -> Signed n"
     , "templateD" :
-"-- divSigned begin
-divSigned_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[0];
-  signal ~SYM[2] : ~TYP[1];
+"-- divSigned begin~IF ~AND[~ISVAR[0],~ISVAR[1]] ~THEN
+~GENSYM[divSigned][0] : block
+  signal ~GENSYM[quot_res][3] : ~TYP[0];
+begin
+  ~SYM[3] <= ~ARG[0] / ~ARG[1];
+  ~RESULT <= ~SYM[3] - to_signed(1,~SIZE[~TYPO]) when ~ARG[0](~ARG[0]'high) = not (~ARG[1](~ARG[1]'high)) else
+             ~SYM[3];
+end block;~ELSE
+~SYM[0] : block
+  signal ~GENSYM[dividend][1] : ~TYP[0];
+  signal ~GENSYM[divider][2] : ~TYP[1];
   signal ~SYM[3] : ~TYP[0];
 begin
   ~SYM[1] <= ~ARG[0];
@@ -149,7 +156,7 @@ begin
   ~SYM[3] <= ~SYM[1] / ~SYM[2];
   ~RESULT <= ~SYM[3] - to_signed(1,~SIZE[~TYPO]) when ~SYM[1](~SYM[1]'high) = not (~SYM[2](~SYM[2]'high)) else
              ~SYM[3];
-end block;
+end block;~FI
 -- divSigned end"
     }
   }
@@ -223,13 +230,14 @@ end block;
     { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
     , "templateD" :
-"-- truncateB begin
-truncateB_~SYM[0] : block
-  signal ~SYM[1] : ~TYP[1];
+"-- truncateB begin~IF ~ISVAR[1] ~THEN
+~RESULT <= ~ARG[1](~LIT[0]-1 downto 0);~ELSE
+~GENSYM[truncateB][0] : block
+  signal ~GENSYM[s][1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
   ~RESULT <= ~SYM[1](~LIT[0]-1 downto 0);
-end block;
+end block;~FI
 -- truncateB end"
     }
   }

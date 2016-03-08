@@ -11,19 +11,19 @@
            -> Signal' rclk a"
     , "templateD" :
 "-- asyncRam begin
-asyncRam_~COMPNAME_~SYM[0] : block
+~GENSYM[~COMPNAME_asyncRam][0] : block
   type RamType is array(natural range <>) of ~TYP[6];
-  signal RAM_~SYM[1] : RamType(0 to ~LIT[2]-1);
-  signal wr_~SYM[2]  : integer range 0 to ~LIT[2] - 1;
-  signal rd_~SYM[3]  : integer range 0 to ~LIT[2] - 1;
+  signal ~GENSYM[RAM][1] : RamType(0 to ~LIT[2]-1);
+  signal ~GENSYM[wr][2] : integer range 0 to ~LIT[2] - 1;
+  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2] - 1;
 begin
-  wr_~SYM[2] <= to_integer(~ARG[3])
+  ~SYM[2] <= to_integer(~ARG[3])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
                 ;
 
-  rd_~SYM[3] <= to_integer(~ARG[4])
+  ~SYM[3] <= to_integer(~ARG[4])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
@@ -33,12 +33,12 @@ begin
   begin
     if rising_edge(~CLK[0]) then
       if ~ARG[5] then
-        RAM_~SYM[1](wr_~SYM[2]) <= ~ARG[6];
+        ~SYM[1](~SYM[2]) <= ~ARG[6];
       end if;
     end if;
   end process;
 
-  ~RESULT <= RAM_~SYM[1](rd_~SYM[3]);
+  ~RESULT <= ~SYM[1](~SYM[3]);
 end block;
 -- asyncRam end"
     }

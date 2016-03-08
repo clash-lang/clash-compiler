@@ -7,10 +7,10 @@
            -> a"
     , "templateD" :
 "// asyncRom begin
-~SIGD[ROM_~SYM[0]][1];
-assign ROM_SYM[0] = ~ARG[1];
+~SIGD[~GENSYM[ROM][0]][1];
+assign ~SYM[0] = ~ARG[1];
 
-assign ~RESULT = ROM_~SYM[0][~ARG[2]];
+assign ~RESULT = ~SYM[0][~ARG[2]];
 // asyncRom end"
     }
   }
@@ -24,15 +24,15 @@ assign ~RESULT = ROM_~SYM[0][~ARG[2]];
       -> Signal' clk a"
     , "templateD" :
 "// rom begin
-~SIGD[ROM_~SYM[0]][2];
-assign ROM_~SYM[0] = ~ARG[2];
+~SIGD[~GENSYM[ROM][0]][2];
+assign ~SYM[0] = ~ARG[2];
 
-~SIGDO[dout_~SYM[1]];
-always @(posedge ~CLK[1]) begin : rom_~COMPNAME_~SYM[2]
-  dout_~SYM[1] <= ROM_~SYM[0][~ARG[3]];
+~SIGDO[~GENSYM[dout][1]];
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_rom][2]
+  ~SYM[1] <= ~SYM[0][~ARG[3]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~SYM[1];
 // rom end"
     }
   }

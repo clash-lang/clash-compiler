@@ -18,8 +18,8 @@ main =
   defaultMain $ testGroup "tests"
     [ testGroup "examples"
       [runTest "examples"             Both [] "ALU"          (Just ("topEntity",False))
-      ,runTest "examples"             VHDL [] "Blinker"      (Just ("topEntity_0",False))
-      ,runTest "examples"             Verilog [] "Blinker_v" (Just ("blinker_0",False))
+      ,runTest "examples"             VHDL [] "Blinker"      (Just ("topEntity",False))
+      ,runTest "examples"             Verilog [] "Blinker_v" (Just ("blinker",False))
       ,runTest "examples"             Both [] "BlockRamTest" (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Calculator"   (Just ("testbench",True ))
       ,runTest "examples"             Both [] "CochleaPlus"  (Just ("topEntity",False))
@@ -140,7 +140,6 @@ clashHDL t env extraArgs modName =
                        ,case t of { VHDL -> "--vhdl"
                                   ; Verilog -> "--verilog"
                                   }
-                       ,"-clash-hdlsyn", "Vivado"
                        ]
                       ,extraArgs
                       ,[modName <.> "hs"]
