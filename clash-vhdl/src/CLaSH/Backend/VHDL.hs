@@ -49,7 +49,7 @@ import qualified System.FilePath
 data VHDLState =
   VHDLState
   { _tyCache   :: (HashSet HWType)     -- ^ Previously encountered HWTypes
-  , _tyCount   :: Int                  -- ^ Product type counter
+  , _tySeen    :: [Identifier]         -- ^ Generated product types
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
@@ -58,7 +58,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty 0 HashMap.empty
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else
@@ -448,10 +448,26 @@ tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
 tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
-tyName t@(Product _ _)   = makeCached t nameCache prodName
+tyName t@(Product nm _)  = makeCached t nameCache prodName
   where
-    prodName = do i <- tyCount <<%= (+1)
-                  "product" <> int i
+    prodName = do
+      seen <- use tySeen
+      mkId <- mkBasicId
+      let nm'  = (mkId . last . T.splitOn ".") nm
+          nm'' = if T.null nm'
+                    then "product"
+                    else nm'
+          nm3  = if nm'' `elem` seen
+                    then go mkId seen (0::Integer) nm''
+                    else nm''
+      tySeen %= (nm3:)
+      text nm3
+
+    go mkId s i n =
+      let n' = n `T.append` T.pack ('_':show i)
+      in  if n' `elem` s
+             then go mkId s (i+1) n
+             else n'
 tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
 tyName _ = empty
 

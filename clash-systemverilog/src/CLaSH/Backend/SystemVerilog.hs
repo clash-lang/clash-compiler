@@ -36,7 +36,7 @@ import           CLaSH.Netlist.BlackBox.Types         (HdlSyn)
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util
+import           CLaSH.Netlist.Util                   hiding (mkBasicId)
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
 #ifdef CABAL
@@ -49,7 +49,7 @@ import qualified System.FilePath
 data SystemVerilogState =
   SystemVerilogState
     { _tyCache   :: HashSet HWType -- ^ Previously encountered  HWTypes
-    , _tyCount   :: Int -- ^ Product type counter
+    , _tySeen    :: [Identifier] -- ^ Product type counter
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: String
@@ -60,7 +60,7 @@ data SystemVerilogState =
 makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty 0 HashMap.empty 0 ""
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 ""
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -283,10 +283,26 @@ tyName t@(Index _)       = "logic_vector_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "logic_vector_" <> int n
 tyName t@(Sum _ _)       = "logic_vector_" <> int (typeSize t)
-tyName t@(Product _ _)   = makeCached t nameCache prodName
+tyName t@(Product nm _)  = makeCached t nameCache prodName
   where
-    prodName = do i <- tyCount <<%= (+1)
-                  "product" <> int i
+    prodName = do
+      seen <- use tySeen
+      mkId <- mkBasicId
+      let nm'  = (mkId . last . Text.splitOn ".") nm
+          nm'' = if Text.null nm'
+                    then "product"
+                    else nm'
+          nm3  = if nm'' `elem` seen
+                    then go mkId seen (0::Integer) nm''
+                    else nm''
+      tySeen %= (nm3:)
+      text nm3
+
+    go mkId s i n =
+      let n' = n `Text.append` Text.pack ('_':show i)
+      in  if n' `elem` s
+             then go mkId s (i+1) n
+             else n'
 tyName t@(SP _ _)        = "logic_vector_" <> int (typeSize t)
 tyName (Clock _ _) = "logic"
 tyName (Reset _ _) = "logic"
