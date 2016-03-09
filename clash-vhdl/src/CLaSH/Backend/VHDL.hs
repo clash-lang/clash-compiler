@@ -479,9 +479,13 @@ tyName _ = empty
 -- | Convert a Netlist HWType to an error VHDL value for that type
 vhdlTypeErrValue :: HWType -> VHDLM Doc
 vhdlTypeErrValue Bool                = "true"
-vhdlTypeErrValue t@(Vector n elTy)   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
-                                       "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
-                                        rarrow <+> "'X'"))
+vhdlTypeErrValue t@(Vector n elTy)   = do
+  syn <-hdlSyn
+  case syn of
+    Vivado -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
+                "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
+                 rarrow <+> "'X'"))
+    _ -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> vhdlTypeErrValue elTy)
 vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhdlTypeErrValue elTys)
 vhdlTypeErrValue (Reset _ _)         = "'X'"
 vhdlTypeErrValue (Clock _ _)         = "'X'"
