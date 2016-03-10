@@ -11,15 +11,15 @@
            -> Signal' rclk a"
     , "templateD" :
 "// asyncRam begin
-~SIGD[~GENSYM[RAM][0]][6] [0:~LIT[2]-1];
+logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[RAM][0] [0:~LIT[2]-1];
 
-always @(posedge ~CLK[0]) begin : ~GENSYM[~COMPNAME_Ram][4]
+always @(posedge ~CLK[0]) begin : ~GENSYM[~COMPNAME_Ram][1]
   if (~ARG[5]) begin
-    ~SYM[0][~ARG[3]] <= ~ARG[6];
+    ~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][~TYP[6]];
   end
 end
 
-assign ~RESULT = ~SYM[0][~ARG[4]];
+assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[4]\\]][~TYPO];
 // asyncRam end"
     }
   }

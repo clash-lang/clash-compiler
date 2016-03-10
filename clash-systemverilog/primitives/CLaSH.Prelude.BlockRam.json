@@ -12,7 +12,7 @@
     , "templateD" :
 "// blockRam begin
 ~SIGD[~GENSYM[RAM][0]][2];
-~SIGD[~GENSYM[dout][1]][6];
+logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[dout][1];
 initial begin
   ~SYM[0] = ~LIT[2];
 end

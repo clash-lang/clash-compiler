@@ -27,12 +27,12 @@ assign ~RESULT = ~SYM[0][~ARG[2]];
 ~SIGD[~GENSYM[ROM][0]][2];
 assign ~SYM[0] = ~ARG[2];
 
-~SIGDO[~GENSYM[dout][1]];
+logic [~SIZE[~TYPO]-1:0] ~GENSYM[dout][1];
 always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_rom][2]
   ~SYM[1] <= ~SYM[0][~ARG[3]];
 end
 
-assign ~RESULT = ~SYM[1];
+assign ~RESULT = ~FROMBV[~SYM[1]][~TYPO];
 // rom end"
     }
   }
