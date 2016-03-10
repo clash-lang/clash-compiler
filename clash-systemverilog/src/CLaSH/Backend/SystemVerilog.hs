@@ -517,6 +517,11 @@ expr_ _ (BlackBoxE pNm _ bbCtx _)
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
+expr_ _ (BlackBoxE pNm _ bbCtx _)
+  | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  = exprLit (Just (Index (fromInteger n),fromInteger n)) i
+
 expr_ b (BlackBoxE _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
