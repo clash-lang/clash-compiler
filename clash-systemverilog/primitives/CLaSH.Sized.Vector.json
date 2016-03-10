@@ -326,7 +326,7 @@ assign ~RESULT = ~SYM[0];
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.replicate"
     , "type"      : "replicate :: SNat n -> a -> Vec n a"
-    , "templateE" : "{~LIT[0] {~ARG[1]}}"
+    , "templateE" : "'{~LIT[0] {~ARG[1]}}"
     }
   }
 , { "BlackBox" :

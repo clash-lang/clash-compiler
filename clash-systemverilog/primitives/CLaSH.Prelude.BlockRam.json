@@ -10,27 +10,19 @@
            -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
-"// blockRam begin~IF ~VIVADO ~THEN
-logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[RAM][0] [0:~LENGTH[~TYP[2]]-1];
-logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[dout][1];~ELSE
-~TYP[6] ~SYM[0] [0:~LENGTH[~TYP[2]]-1];
-~SIGD[~SYM[1]][6];~FI
-~SIGD[~GENSYM[RAM_init][3]][2];
+"// blockRam begin
+~SIGD[~GENSYM[RAM][0]][2];
+~SIGD[~GENSYM[dout][1]][6];
 initial begin
-  ~SYM[3] = ~LIT[2];~IF ~VIVADO ~THEN
-  ~SYM[0] = {>> {~SYM[3]}};~ELSE
-  for (int ~GENSYM[n][4]=0; ~SYM[4] < ~LENGTH[~TYP[2]]; ~SYM[4]=~SYM[4]+1)
-    ~SYM[0][~SYM[4]] = ~SYM[3][~SYM[4]];~FI
+  ~SYM[0] = ~LIT[2];
 end
 always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][2]
-  if (~ARG[5]) begin~IF ~VIVADO ~THEN
-    ~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
-    ~SYM[0][~ARG[3]] <= ~ARG[6];~FI
+  if (~ARG[5]) begin
+    ~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][~TYP[6]];
   end
   ~SYM[1] <= ~SYM[0][~ARG[4]];
-end~IF ~VIVADO ~THEN
-assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];~ELSE
-assign ~RESULT = ~SYM[1];~FI
+end
+assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
 // blockRam end"
     }
   }
