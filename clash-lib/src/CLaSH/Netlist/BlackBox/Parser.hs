@@ -120,10 +120,7 @@ pElemE = pTagE
 
 -- | Parse SigD
 pSigD :: Parser [Element]
-pSigD = pSome (pTagE <|> pLimitedText
-                     <|> (C <$> (pack <$> pToken "[ "))
-                     <|> (C <$> (pack <$> pToken " ]")))
-
--- | Text excluding square brackets and tilde
-pLimitedText :: Parser Element
-pLimitedText = C <$> (pack <$> pList1 (pSatisfy (`notElem` "[]~") (Insertion (show "notElem \"[]~\"") '_' 5)))
+pSigD = pSome (pTagE <|> (C (pack "[") <$ (pack <$> pToken "[\\"))
+                     <|> (C (pack "]") <$ (pack <$> pToken "\\]"))
+                     <|> (C <$> (pack <$> pList1 (pRange ('\000','\90'))))
+                     <|> (C <$> (pack <$> pList1 (pRange ('\94','\125')))))

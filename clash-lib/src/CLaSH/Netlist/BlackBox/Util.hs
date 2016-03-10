@@ -354,6 +354,12 @@ renderTag b (Vars n)        =
   in  case vars of
         [] -> return Text.empty
         _  -> return (Text.concat $ map (Text.cons ',') vars)
+renderTag b (IndexType (L n)) =
+  case bbInputs b !! n of
+    (Left (Literal _ (NumLit n')),_,_) ->
+      let hty = Index (fromInteger n')
+      in  fmap (displayT . renderOneLine) (hdlType hty)
+    x -> error $ $(curLoc) ++ "Index type not given a literal: " ++ show x
 renderTag _ (IF _ _ _)      = error $ $(curLoc) ++ "Unexpected IF"
 renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
 renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"

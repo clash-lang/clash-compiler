@@ -215,7 +215,7 @@ tyDec ty@(Vector n elTy) = do
     _ -> do case splitVecTy ty of
               Just (ns,elTy') -> do
                 let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
-                "typedef" <+> verilogType elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
+                "typedef" <+> elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
               _ -> error $ $(curLoc) ++ "impossible"
 tyDec ty@(Product _ tys) = prodDec
   where
@@ -228,11 +228,22 @@ tyDec ty@(Product _ tys) = prodDec
 
 tyDec _ = empty
 
-splitVecTy :: HWType -> Maybe ([Int],HWType)
-splitVecTy (Vector n elTy) = case splitVecTy elTy of
-  Just (ns,elTy') -> Just (n:ns,elTy')
-  _               -> Just ([n],elTy)
-splitVecTy _ = Nothing
+splitVecTy :: HWType -> Maybe ([Int],SystemVerilogM Doc)
+splitVecTy = fmap splitElemTy . go
+  where
+    splitElemTy (ns,t) = case t of
+      Product _ _ -> (ns, verilogType t)
+      Vector _ _  -> error $ $(curLoc) ++ "impossible"
+      Clock _ _   -> (ns, "logic")
+      Reset _ _   -> (ns, "logic")
+      String      -> (ns, "string")
+      Signed n    -> (ns ++ [n],"logic signed")
+      _           -> (ns ++ [typeSize t], "logic")
+
+    go (Vector n elTy) = case go elTy of
+      Just (ns,elTy') -> Just (n:ns,elTy')
+      _               -> Just ([n],elTy)
+    go _ = Nothing
 
 lvType :: HWType -> SystemVerilogM Doc
 lvType ty@(Vector n elTy) = do
@@ -242,7 +253,7 @@ lvType ty@(Vector n elTy) = do
     _ -> case splitVecTy ty of
       Just (ns,elTy') -> do
         let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
-        verilogType elTy' <> ranges
+        elTy' <> ranges
       _ -> error $ $(curLoc) ++ "impossible"
 lvType ty = verilogType ty
 
@@ -277,7 +288,7 @@ funDec ty@(Vector n elTy) =
         _ -> do case splitVecTy ty of
                   Just (ns,elTy') -> do
                     let ranges' = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
-                    verilogType elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 2))
+                    elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 2))
                   _ -> error $ $(curLoc) ++ "impossible"
 funDec _ = empty
 
@@ -489,7 +500,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
-expr_ _ (DataCon (Product _ _) _ es) = listBraces (mapM (expr_ False) es)
+expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"

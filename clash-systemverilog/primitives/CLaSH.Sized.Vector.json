@@ -6,7 +6,7 @@
 ~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][0];
+assign ~RESULT = ~FROMBV[~SYM[0][\\0\\]][~TYPO];
 // head end"
     }
   }
@@ -30,7 +30,7 @@ assign ~RESULT = ~SYM[0][1 : $high(~SYM[0])];
 ~SIGD[~GENSYM[vec][0]][0];
 assign ~SYM[0] = ~ARG[0];
 
-assign ~RESULT = ~SYM[0][$high(~SYM[0])];
+assign ~RESULT = ~FROMBV[~SYM[0][\\$high(~SYM[0])\\]][~TYPO];
 // last end"
     }
   }
@@ -74,22 +74,8 @@ genvar ~GENSYM[n][1];
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
     , "templateD" :
 "// (++) begin
-~SIGD[~GENSYM[vec1][0]][0];
-~SIGD[~GENSYM[vec2][1]][1];
-
-assign ~SYM[0] = ~ARG[0];
-assign ~SYM[1] = ~ARG[1];
-
-genvar ~GENSYM[n][2];
-~GENERATE
-  for (~SYM[2]=0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[append][3]
-    if (~SYM[2] < $size(~SYM[0])) begin
-      assign ~RESULT[~SYM[2]] = ~SYM[0][~SYM[2]];
-    end else begin
-      assign ~RESULT[~SYM[2]] = ~SYM[1][~SYM[2]-$size(~SYM[0])];
-    end
-  end
-~ENDGENERATE
+assign ~RESULT[0:~LENGTH[~TYP[0]]-1] = ~ARG[0];
+assign ~RESULT[~LENGTH[~TYP[0]]:~LENGTH[~TYPO]-1] = ~ARG[1];
 // (++) end"
     }
   }
@@ -104,7 +90,7 @@ assign ~SYM[0] = ~ARG[0];
 genvar ~GENSYM[n][1];
 ~GENERATE
   for (~SYM[1]=0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[concat][2]
-    assign ~RESULT[(~SYM[1] * $size(~SYM[0][0])) : ((~SYM[1] * $size(~SYM[0][0])) + $high(~SYM[0][0]))] = ~SYM[0][~SYM[1]];
+    assign ~RESULT[~SYM[1]*~LENGTH[~TYPEL[~TYP[0]]] : ~SYM[1]*~LENGTH[~TYPEL[~TYP[0]]]+(~LENGTH[~TYPEL[~TYP[0]]]-1)] = ~FROMBV[~SYM[0][\\~SYM[1]\\]][~TYPEL[~TYP[0]]];
   end
 ~ENDGENERATE
 // concat end"
@@ -115,12 +101,12 @@ genvar ~GENSYM[n][1];
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateD" :
 "// splitAt begin
-~SIGD[~GENSYM[vec][0]][1];
-assign ~SYM[0] = ~ARG[1];
+logic [0:~LENGTH[~TYP[1]]-1] [0:~SIZE[~TYPEL[~TYP[1]]]-1] ~GENSYM[vec][0];
+assign ~SYM[0] = ~TOBV[~ARG[1]][~TYP[1]];
 
-assign ~RESULT = '{~SYM[0][$left(~RESULT.~TYPMO_sel0) : $right(~RESULT.~TYPMO_sel0)]
-                  ,~SYM[0][($left(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0)) : ($right(~RESULT.~TYPMO_sel1) + $size(~RESULT.~TYPMO_sel0))]
-                  };
+assign ~RESULT = {~SYM[0][0:~LIT[0]-1]
+                 ,~SYM[0][~LIT[0]:~LENGTH[~TYP[1]]-1]
+                 };
 // splitAt end"
     }
   }
@@ -139,7 +125,7 @@ assign ~SYM[0] = ~ARG[2];
 genvar ~GENSYM[n][1];
 ~GENERATE
   for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[unconcat][2]
-    assign ~RESULT[~SYM[1]] = ~SYM[0][(~SYM[1] * ~LIT[1]) : ((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1)];
+    assign ~RESULT[~SYM[1]] = ~TOBV[~SYM[0][\\(~SYM[1] * ~LIT[1]) : ((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1)\\]][~TYPEL[~TYPO]];
   end
 ~ENDGENERATE
 // unconcat end"
@@ -156,10 +142,14 @@ assign ~SYM[0] = ~ARG[1];
 genvar ~GENSYM[n][1];
 ~GENERATE
   for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]
+    ~TYPEL[~TYP[1]] ~GENSYM[map_in][3];
+    ~TYPEL[~TYPO] ~GENSYM[map_out][4];
+    assign ~SYM[3] = ~FROMBV[~SYM[0][\\~SYM[1]\\]][~TYPEL[~TYP[1]]];
     ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[1]]~
+      ~OUTPUT <= ~SYM[4]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[3]~ ~TYPEL[~TYP[1]]~
     ~INST
+    assign ~RESULT[~SYM[1]] = ~TOBV[~SYM[4]][~TYPEL[~TYPO]];
   end
 ~ENDGENERATE
 // map end"
@@ -176,13 +166,17 @@ assign ~SYM[0] = ~ARG[2];
 genvar ~GENSYM[n][1];
 ~GENERATE
   for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
-    logic [~SIZE[~INDEXTYPE[~LIT[0]]]-1:0] ~GENSYM[i][3];
+    ~INDEXTYPE[~LIT[0]] ~GENSYM[i][3];
     assign ~SYM[3] = ~SYM[1];
+    ~TYPEL[~TYP[2]] ~GENSYM[imap_in][4];
+    ~TYPEL[~TYPO] ~GENSYM[imap_out][5];
+    assign ~SYM[4] = ~FROMBV[~SYM[0][\\~SYM[1]\\]][~TYPEL[~TYP[2]]];
     ~INST 1
-      ~OUTPUT <= ~RESULT[~SYM[1]]~ ~TYPEL[~TYPO]~
+      ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
       ~INPUT  <= ~SYM[3]~ ~INDEXTYPE[~LIT[0]]~
-      ~INPUT  <= ~SYM[0][~SYM[1]]~ ~TYPEL[~TYP[2]]~
+      ~INPUT  <= ~SYM[4]~ ~TYPEL[~TYP[2]]~
     ~INST
+    assign ~RESULT[~SYM[1]] = ~TOBV[~SYM[5]][~TYPEL[~TYPO]];
   end
 ~ENDGENERATE
 // imap end"
@@ -201,11 +195,17 @@ assign ~SYM[1] = ~ARG[2];
 genvar ~GENSYM[n][2];
 ~GENERATE
   for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][3]
+    ~TYPEL[~TYP[1]] ~GENSYM[zipWith_in1][4];
+    ~TYPEL[~TYP[2]] ~GENSYM[zipWith_in2][5];
+    ~TYPEL[~TYPO] ~GENSYM[zipWith_out][6];
+    assign ~SYM[4] = ~FROMBV[~SYM[0][\\~SYM[2]\\]][~TYPEL[~TYP[1]]];
+    assign ~SYM[5] = ~FROMBV[~SYM[1][\\~SYM[2]\\]][~TYPEL[~TYP[2]]];
     ~INST 0
-      ~OUTPUT <= ~RESULT[~SYM[2]]~ ~TYPEL[~TYPO]~
-      ~INPUT  <= ~SYM[0][~SYM[2]]~ ~TYPEL[~TYP[1]]~
-      ~INPUT  <= ~SYM[1][~SYM[2]]~ ~TYPEL[~TYP[2]]~
+      ~OUTPUT <= ~SYM[6]~ ~TYPEL[~TYPO]~
+      ~INPUT  <= ~SYM[4]~ ~TYPEL[~TYP[1]]~
+      ~INPUT  <= ~SYM[5]~ ~TYPEL[~TYP[2]]~
     ~INST
+    assign ~RESULT[~SYM[2]] = ~TOBV[~SYM[6]][~TYPEL[~TYPO]];
   end
 ~ENDGENERATE
 // zipWith end"
@@ -225,9 +225,11 @@ assign ~SYM[2] = ~ARG[2];
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr_loop][4]
+  ~TYPEL[~TYP[2]] ~GENSYM[foldr_in][5];
+  assign ~SYM[5] = ~FROMBV[~SYM[2][\\~SYM[3]\\]][~TYPEL[~TYP[2]]];
   ~INST 0
     ~OUTPUT <= ~SYM[0][~SYM[3]]~ ~TYP[1]~
-    ~INPUT <= ~SYM[2][~SYM[3]]~ ~TYPEL[~TYP[2]]~
+    ~INPUT <= ~SYM[5]~ ~TYPEL[~TYP[2]]~
     ~INPUT <= ~SYM[0][~SYM[3]+1]~ ~TYP[1]~
   ~INST
 end
@@ -246,7 +248,7 @@ assign ~RESULT = ~ARG[1];
     , "templateD" :
 "// fold begin
 // put flat input array into the first half of the intermediate array
-~SIGDO[~GENSYM[intermediate][0]][0:(2*~LENGTH[~TYP[1]])-2];
+~SIGDO[~GENSYM[intermediate][0]] [0:(2*~LENGTH[~TYP[1]])-2];
 assign ~SYM[0][0:~LENGTH[~TYP[1]]-1] = ~ARG[1];
 
 // calculate the depth of the tree
@@ -291,7 +293,7 @@ assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
 ~SIGD[~GENSYM[vec][0]][1];
 assign ~SYM[0] = ~ARG[1];
 
-assign ~RESULT = ~SYM[0][~ARG[2]];
+assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[2]\\]][~TYPO];
 // indexVec end"
     }
   }
@@ -304,7 +306,7 @@ assign ~RESULT = ~SYM[0][~ARG[2]];
 
 always_comb begin
   ~SYM[0] = ~ARG[1];
-  ~SYM[0][~ARG[2]] = ~ARG[3];
+  ~SYM[0][~ARG[2]] = ~TOBV[~ARG[3]][~TYP[3]];
 end
 
 assign ~RESULT = ~SYM[0];
@@ -341,8 +343,9 @@ genvar ~GENSYM[row_index][1];
 genvar ~GENSYM[col_index][2];
 ~GENERATE
   for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[transpose_outer][3]
-    for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[transpose_inner][4]
-      assign ~RESULT[~SYM[2]][~SYM[1]] = ~SYM[0][~SYM[1]][~SYM[2]];
+    for (~SYM[2] = 0; ~SYM[2] < $size(~RESULT); ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[transpose_inner][4]~IF ~VIVADO ~THEN
+      assign ~RESULT[~SYM[2]][($size(~SYM[0])-~SYM[1])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 : ($size(~SYM[0])-~SYM[1]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]] = ~SYM[0][~SYM[1]][($size(~RESULT)-~SYM[2])*~SIZE[~TYPEL[~TYPEL[~TYPO]]]-1 : ($size(~RESULT)-~SYM[2]-1)*~SIZE[~TYPEL[~TYPEL[~TYPO]]]];~ELSE
+      assign ~RESULT[~SYM[2]][~SYM[1]] = ~SYM[0][~SYM[1]][~SYM[2]];~FI
     end
   end
 ~ENDGENERATE
@@ -378,18 +381,7 @@ genvar ~GENSYM[n][1];
 "concatBitVector# :: KnownNat m           -- ARG[0]
                   => Vec n (BitVector m)  -- ARG[1]
                   -> BitVector (n * m)"
-    , "templateD" :
-"// concatBitVector begin
-~SIGD[~GENSYM[vec][0]][1];
-assign ~SYM[0] = ~ARG[1];
-
-genvar ~GENSYM[n][1];
-~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~SYM[0]); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[concatBitVector][2]
-    assign ~RESULT[((~SYM[1] * ~LIT[0]) + ~LIT[0] - 1) : (~SYM[1] * ~LIT[0])] = ~SYM[0][$high(~SYM[0]) - ~SYM[1]];
-  end
-~ENDGENERATE
-// concatBitVector end"
+    , "templateE" : "~TOBV[~ARG[1]][~TYP[1]]"
     }
   }
 , { "BlackBox" :
@@ -398,18 +390,7 @@ genvar ~GENSYM[n][1];
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                     => BitVector (n * m)        -- ARG[2]
                     -> Vec n (BitVector m)"
-    , "templateD" :
-"// unconcatBitVector begin
-~SIGD[~GENSYM[bv][0]][2];
-assign ~SYM[0] = ~ARG[2];
-
-genvar ~GENSYM[n][1];
-~GENERATE
-  for (~SYM[1] = 0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[unconcatBitVector][2]
-    assign ~RESULT[$high(~RESULT) - ~SYM[1]] = ~SYM[0][((~SYM[1] * ~LIT[1]) + ~LIT[1] - 1) : (~SYM[1] * ~LIT[1])];
-  end
-~ENDGENERATE
-// unconcatBitVector end"
+    , "templateE" : "~FROMBV[~ARG[2]][~TYPO]"
     }
   }
 , { "BlackBox" :

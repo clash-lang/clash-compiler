@@ -80,7 +80,7 @@
 assign ~SYM[0] = ~ARG[0] / ~ARG[1];
 assign ~SYM[1] = ~ARG[0] % ~ARG[1];
 
-assign ~RESULT = '{~SYM[0],~SYM[1]};
+assign ~RESULT = {~SYM[0],~SYM[1]};
 // quotRemInt end"
     }
   }
@@ -220,7 +220,7 @@ assign ~RESULT = '{~SYM[0],~SYM[1]};
 assign ~SYM[0] = ~ARG[0] / ~ARG[1];
 assign ~SYM[1] = ~ARG[0] % ~ARG[1];
 
-assign ~RESULT = '{~SYM[0],~SYM[1]};
+assign ~RESULT = {~SYM[0],~SYM[1]};
 // quotRemWord end"
     }
   }

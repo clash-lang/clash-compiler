@@ -129,9 +129,9 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
 "// split begin
 ~SIGD[~GENSYM[bv][0]][1];
 assign ~SYM[0] = ~ARG[1];
-assign ~RESULT = '{ ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
-                  , ~SYM[0][(~LIT[0]-1) : 0]
-                  };
+assign ~RESULT = { ~SYM[0][$high(~SYM[0]) : ~LIT[0]]
+                 , ~SYM[0][(~LIT[0]-1) : 0]
+                 };
 // split end"
     }
   }
