@@ -11,8 +11,9 @@
            -> Signal' rclk a"
     , "templateD" :
 "-- asyncRam begin
-~GENSYM[~COMPNAME_asyncRam][0] : block
-  type RamType is array(natural range <>) of ~TYP[6];
+~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
+  type RamType is array(natural range <>) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
+  type RamType is array(natural range <>) of ~TYP[6];~FI
   signal ~GENSYM[RAM][1] : RamType(0 to ~LIT[2]-1);
   signal ~GENSYM[wr][2] : integer range 0 to ~LIT[2] - 1;
   signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2] - 1;
@@ -32,13 +33,14 @@ begin
   asyncRam_sync : process(~CLK[0])
   begin
     if rising_edge(~CLK[0]) then
-      if ~ARG[5] then
-        ~SYM[1](~SYM[2]) <= ~ARG[6];
+      if ~ARG[5] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[2]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
+        ~SYM[1](~SYM[2]) <= ~ARG[6];~FI
       end if;
     end if;
-  end process;
-
-  ~RESULT <= ~SYM[1](~SYM[3]);
+  end process;~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[~SYM[1](~SYM[3])][~TYP[6]];~ELSE
+  ~RESULT <= ~SYM[1](~SYM[3]);~FI
 end block;
 -- asyncRam end"
     }

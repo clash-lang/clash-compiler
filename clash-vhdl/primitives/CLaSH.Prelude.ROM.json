@@ -17,9 +17,9 @@ begin
   -- pragma translate_off
                       mod ~LIT[0]
   -- pragma translate_on
-                      ;
-
-  ~RESULT <= ~SYM[1](~SYM[2]);
+                      ;~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO];~ELSE
+  ~RESULT <= ~SYM[1](~SYM[2]);~FI
 end block;
 -- asyncRom end"
     }
@@ -48,8 +48,9 @@ begin
 
   romSync : process (~CLK[1])
   begin
-    if (rising_edge(~CLK[1])) then
-      ~RESULT <= ~SYM[1](~SYM[2]);
+    if (rising_edge(~CLK[1])) then~IF ~VIVADO ~THEN
+      ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO];~ELSE
+      ~RESULT <= ~SYM[1](~SYM[2]);~FI
     end if;
   end process;
 end block;
