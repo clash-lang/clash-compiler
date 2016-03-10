@@ -10,7 +10,7 @@
 ~SIGD[~GENSYM[ROM][0]][1];
 assign ~SYM[0] = ~ARG[1];
 
-assign ~RESULT = ~SYM[0][~ARG[2]];
+assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[2]\\]][~TYPO];
 // asyncRom end"
     }
   }
