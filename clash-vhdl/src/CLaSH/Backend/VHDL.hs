@@ -51,6 +51,7 @@ data VHDLState =
   { _tyCache   :: (HashSet HWType)     -- ^ Previously encountered HWTypes
   , _tySeen    :: [Identifier]         -- ^ Generated product types
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
+  , _modNm     :: String
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
   }
@@ -58,7 +59,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty ""
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else
@@ -78,11 +79,13 @@ instance Backend VHDLState where
   inst            = inst_
   expr            = expr_
   iwWidth         = use intWidth
-  toBV _ id_      = "toSLV" <> parens (text id_)
+  toBV _ id_      = do
+    nm <- use modNm
+    text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
   mkBasicId       = return (filterReserved . T.toLower . mkBasicId' True)
-  setModName _    = id
+  setModName nm s = s {_modNm = nm}
 
 type VHDLM a = State VHDLState a
 
@@ -115,11 +118,11 @@ filterReserved s = if s `elem` reservedWords
 
 -- | Generate VHDL for a Netlist component
 genVHDL :: String -> Component -> VHDLM (String,Doc)
-genVHDL modName c = (unpack cName,) A.<$> vhdl
+genVHDL nm c = (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
     vhdl    = "-- Automatically generated VHDL-93" <$$>
-              tyImports modName <$$> linebreak <>
+              tyImports nm <$$> linebreak <>
               entity c <$$> linebreak <>
               architecture c
 
@@ -221,7 +224,7 @@ tyDec (Vector _ elTy) = do
     _ -> "type" <+> "array_of_" <> tyName elTy <+> "is array (integer range <>) of"
          <+> vhdlType elTy <> semi
 
-tyDec ty@(Product _ tys) = prodDec
+tyDec ty@(Product _ tys@(_:_:_)) = prodDec
   where
     prodDec = "type" <+> tName <+> "is record" <$>
                 indent 2 (vcat $ zipWithM (\x y -> x <+> colon <+> y <> semi) selNames selTys) <$>
@@ -302,7 +305,7 @@ funDec _ t@(Product _ elTys) = Just
   where
     elTyPrint = forM [0..(length elTys - 1)]
                      (\i -> "toSLV" <>
-                            parens ("p." <> vhdlType t <> "_sel" <> int i))
+                            parens ("p." <> tyName t <> "_sel" <> int i))
 
 funDec syn t@(Vector _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi
@@ -351,7 +354,7 @@ slvToSlvDec =
   )
 
 tyImports :: String -> VHDLM Doc
-tyImports modName = do
+tyImports nm = do
   mkId <- mkBasicId
   punctuate' semi $ sequence
     [ "library IEEE"
@@ -360,7 +363,7 @@ tyImports modName = do
     , "use IEEE.MATH_REAL.ALL"
     , "use std.textio.all"
     , "use work.all"
-    , "use work." <> text (mkId (T.pack modName `T.append` "_types")) <> ".all"
+    , "use" <+> text (mkId (T.pack nm `T.append` "_types")) <> ".all"
     ]
 
 
@@ -412,12 +415,16 @@ vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
                                       else "signed" <> parens (int (n-1) <+> "downto 0")
 vhdlType' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
                                       else "unsigned" <> parens ( int (n-1) <+> "downto 0")
-vhdlType' (Vector n elTy) = "array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
+vhdlType' (Vector n elTy) = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
 vhdlType' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
 vhdlType' t@(Sum _ _)     = case typeSize t of
                               0 -> "unsigned (0 downto 1)"
                               n -> "unsigned" <> parens (int (n -1) <+> "downto 0")
-vhdlType' t@(Product _ _) = tyName t
+vhdlType' t@(Product _ _) = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types." <> tyName t
 vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
 vhdlType' String          = "string"
 
@@ -437,10 +444,14 @@ vhdlTypeMark hwty = do
     vhdlTypeMark' (Index _)       = "unsigned"
     vhdlTypeMark' (Signed _)      = "signed"
     vhdlTypeMark' (Unsigned _)    = "unsigned"
-    vhdlTypeMark' (Vector _ elTy) = "array_of_" <> tyName elTy
+    vhdlTypeMark' (Vector _ elTy) = do
+      nm <- use modNm
+      text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy
     vhdlTypeMark' (SP _ _)        = "std_logic_vector"
     vhdlTypeMark' (Sum _ _)       = "unsigned"
-    vhdlTypeMark' t@(Product _ _) = tyName t
+    vhdlTypeMark' t@(Product _ _) = do
+      nm <- use modNm
+      text (T.toLower $ T.pack nm) <> "_types." <> tyName t
     vhdlTypeMark' t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
@@ -755,7 +766,9 @@ bit_char U = char 'U'
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VHDLM Doc
-toSLV Bool         e = "toSLV" <> parens (expr_ False e)
+toSLV Bool         e = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (BitVector _) e = expr_ False e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
@@ -786,7 +799,9 @@ toSLV (Vector _ _) e = "toSLV" <> parens (expr_ False e)
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
-fromSLV Bool              id_ start _   = "fromSLV" <> parens (text id_ <> parens (int start <+> "downto" <+> int start))
+fromSLV Bool              id_ start _   = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (text id_ <> parens (int start <+> "downto" <+> int start))
 fromSLV (BitVector _)     id_ start end = text id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Index _)         id_ start end = "unsigned" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Signed _)        id_ start end = "signed" <> parens (text id_ <> parens (int start <+> "downto" <+> int end))

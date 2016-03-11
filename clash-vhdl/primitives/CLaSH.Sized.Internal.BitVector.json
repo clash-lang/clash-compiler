@@ -252,17 +252,15 @@ end block;~FI
         -> (BitVector m, BitVector n)"
     , "templateD" :
 "-- split begin~IF ~ISVAR[1] ~THEN
-~RESULT <= (~ARG[1](~RESULT.~TYPMO_sel0'left + ~RESULT.~TYPMO_sel1'length downto
-            ~RESULT.~TYPMO_sel0'right + ~RESULT.~TYPMO_sel1'length)
-           ,~ARG[1](~RESULT.~TYPMO_sel1'left downto ~RESULT.~TYPMO_sel1'right)
+~RESULT <= (~ARG[1](~ARG[1]'high downto ~LIT[0])
+           ,~ARG[1](~LIT[0]-1 downto 0)
            );~ELSE
 ~GENSYM[split][0]: block
   signal ~GENSYM[bv][1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left + ~RESULT.~TYPMO_sel1'length downto
-              ~RESULT.~TYPMO_sel0'right + ~RESULT.~TYPMO_sel1'length)
-             ,~SYM[1](~RESULT.~TYPMO_sel1'left downto ~RESULT.~TYPMO_sel1'right)
+  ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0])
+             ,~SYM[1](~LIT[0]-1 downto 0)
              );
 end block;~FI
 -- split end"

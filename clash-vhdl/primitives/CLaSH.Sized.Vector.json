@@ -122,14 +122,14 @@ end block;~FI
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateD" :
 "-- splitAt begin~IF ~ISVAR[1] ~THEN
-  ~RESULT <= (~ARG[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
-             ,~ARG[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));~ELSE
+~RESULT <= (~ARG[1](0 to ~LIT[0]-1)
+           ,~ARG[1](~LIT[0] to ~ARG[1]'high));~ELSE
 ~GENSYM[splitAt][0] : block
   signal ~GENSYM[vec][1] : ~TYP[1];
 begin
   ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~RESULT.~TYPMO_sel0'left to ~RESULT.~TYPMO_sel0'right)
-             ,~SYM[1](~RESULT.~TYPMO_sel1'left + ~RESULT.~TYPMO_sel0'length to ~RESULT.~TYPMO_sel1'right + ~RESULT.~TYPMO_sel0'length));
+  ~RESULT <= (~SYM[1](0 to ~LIT[0]-1)
+             ,~SYM[1](~LIT[0] to ~SYM[1]'high));
 end block;~FI
 -- splitAt end"
     }
