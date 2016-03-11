@@ -603,6 +603,8 @@ expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
 
 expr_ _ (Identifier id_ (Just _)) = text id_
 
+expr_ b (DataCon _ (DC (Void, -1)) [e]) =  expr_ b e
+
 expr_ _ (DataCon (Vector 0 _) _ _) =
   error $ $(curLoc) ++ "VHDL: Trying to create a Nil vector."
 

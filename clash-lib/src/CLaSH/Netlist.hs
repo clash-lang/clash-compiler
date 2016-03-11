@@ -391,7 +391,8 @@ mkDcApplication dstHType bndr dc args = do
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of
     -- Is the DC just a newtype wrapper?
-    ([Just argHwTy],[argExpr]) | argHwTy == dstHType -> return argExpr
+    ([Just argHwTy],[argExpr]) | argHwTy == dstHType ->
+      return (HW.DataCon dstHType (DC (Void,-1)) [argExpr])
     _ -> case dstHType of
       SP _ dcArgPairs -> do
         let dcI      = dcTag dc - 1
