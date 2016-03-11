@@ -1,8 +1,10 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.6.8
+## 0.6.8 *March 11th 2016*
+* Support `clash-lib` 0.6.11
 * Fixes bugs:
   * Vivado fails to infer block ram [#127](https://github.com/clash-lang/clash-compiler/issues/127)
+    * Users must use the `-clash-hdlsyn Vivado` flag in order to generate Xilinx Vivado specific HDL for which Vivado can infer block RAM.
 
 ## 0.6.7 *February 10th 2016*
 * Fixes bugs:

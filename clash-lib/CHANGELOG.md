@@ -3,8 +3,9 @@
 ## 0.6.11
 * New features:
   * Add support for HDL synthesis tool specific HDL generation
+  * Preserve more Haskell names in generated HDL
 
-## 0.6.10
+## 0.6.10 *February 10th 2016*
 * New features:
   * hdl files can be written to a directory other than the current working directory [#125](https://github.com/clash-lang/clash-compiler/issues/125)
 * Fixes bugs:

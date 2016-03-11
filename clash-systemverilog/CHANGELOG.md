@@ -1,7 +1,13 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.6.6
-* Support `clash-lib` 0.6
+## 0.6.6 *March 11th 2016*
+* New features:
+  * Support `clash-lib` 0.6
+  * Generated structs are packed
+  * Elements of arrays are packed
+* Fixes bugs:
+  * Vivado fails to infer block ram [#127](https://github.com/clash-lang/clash-compiler/issues/127)
+    * Users must use the `-clash-hdlsyn Vivado` flag in order to generate Xilinx Vivado specific HDL for which Vivado can infer block RAM.
 
 ## 0.6.5 *January 29th 2016*
 * New features:

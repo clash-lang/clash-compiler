@@ -4,6 +4,7 @@
 * New features:
   * Add support for HDL synthesis tool specific HDL generation:
     * New `-clash-hdlsyn Vivado` flag to generate HDL tweaked for Xilinx Vivado
+  * Preserve more Haskell names in generated HDL
 * Fixes bugs:
   * VHDL: Vivado fails to infer block ram [#127](https://github.com/clash-lang/clash-compiler/issues/127)
     * Users must use the `-clash-hdlsyn Vivado` flag in order to generate Xilinx Vivado specific HDL for which Vivado can infer block RAM.
