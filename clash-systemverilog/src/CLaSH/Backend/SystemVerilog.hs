@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo       #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -53,6 +54,8 @@ data SystemVerilogState =
     , _nameCache :: HashMap HWType Doc -- ^ Cache for previously generated product type names
     , _genDepth  :: Int -- ^ Depth of current generative block
     , _modNm     :: String
+    , _idSeen    :: [Identifier]
+    , _oports    :: [Identifier]
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -60,7 +63,7 @@ data SystemVerilogState =
 makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 ""
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] []
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -293,10 +296,15 @@ funDec ty@(Vector n elTy) =
 funDec _ = empty
 
 module_ :: Component -> SystemVerilogM Doc
-module_ c =
-    "module" <+> text (componentName c) <> tupled ports <> semi <$>
-    indent 2 (inputPorts <$> outputPorts <$$> decls (declarations c)) <$$> insts (declarations c) <$>
-    "endmodule"
+module_ c = do
+    { addSeen c
+    ; m <- "module" <+> text (componentName c) <> tupled ports <> semi <$>
+           indent 2 (inputPorts <$> outputPorts <$$> decls (declarations c)) <$$> insts (declarations c) <$>
+           "endmodule"
+    ; idSeen .= []
+    ; oports .= []
+    ; return m
+    }
   where
     ports = sequence
           $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
@@ -310,6 +318,34 @@ module_ c =
     outputPorts = case (outputs c) of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
+
+addSeen :: Component -> SystemVerilogM ()
+addSeen c = do
+  let iport = map fst $ inputs c
+      hport = map fst $ hiddenPorts c
+      oport = map fst $ outputs c
+      nets  = mapMaybe (\case {NetDecl i _ -> Just i; _ -> Nothing}) $ declarations c
+  idSeen .= concat [iport,hport,oport,nets]
+  oports .= oport
+
+mkUniqueId :: Identifier -> SystemVerilogM Identifier
+mkUniqueId i = do
+  mkId <- mkBasicId
+  seen <- use idSeen
+  let i' = mkId i
+  case i `elem` seen of
+    True  -> go mkId seen i' 0
+    False -> do idSeen %= (i':)
+                return i'
+  where
+    go :: (Identifier -> Identifier) -> [Identifier] -> Identifier
+       -> Int -> SystemVerilogM Identifier
+    go mkId seen i' n = do
+      let i'' = mkId (Text.append i' (Text.pack ('_':show n)))
+      case i'' `elem` seen of
+        True  -> go mkId seen i' (n+1)
+        False -> do idSeen %= (i'':)
+                    return i''
 
 verilogType :: HWType -> SystemVerilogM Doc
 verilogType t = do
@@ -406,28 +442,57 @@ inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
-    "always_comb begin" <$>
-    indent 2 ("if" <> parens (expr_ True scrut) <$>
-                (indent 2 $ text id_ <+> equals <+> expr_ False t <> semi) <$>
-             "else" <$>
-                (indent 2 $ text id_ <+> equals <+> expr_ False f <> semi)) <$>
-    "end"
+inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
+    { syn <- hdlSyn
+    ; p   <- use oports
+    ; if syn == Vivado && id_ `elem` p
+         then do
+              { regId <- mkUniqueId (Text.append id_ "_reg")
+              ; verilogType ty <+> text regId <> semi <$>
+                "always_comb begin" <$>
+                indent 2 ("if" <> parens (expr_ True scrut) <$>
+                            (indent 2 $ text regId <+> equals <+> expr_ False t <> semi) <$>
+                         "else" <$>
+                            (indent 2 $ text regId <+> equals <+> expr_ False f <> semi)) <$>
+                "end" <$>
+                "assign" <+> text id_ <+> equals <+> text regId <> semi
+              }
+         else "always_comb begin" <$>
+              indent 2 ("if" <> parens (expr_ True scrut) <$>
+                          (indent 2 $ text id_ <+> equals <+> expr_ False t <> semi) <$>
+                       "else" <$>
+                          (indent 2 $ text id_ <+> equals <+> expr_ False f <> semi)) <$>
+              "end"
+    }
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
-    "always_comb begin" <$>
-    indent 2 ("case" <> parens (expr_ True scrut) <$>
-                (indent 2 $ vcat $ punctuate semi (conds es)) <> semi <$>
-              "endcase") <$>
-    "end"
+inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
+    { syn <- hdlSyn
+    ; p <- use oports
+    ; if syn == Vivado && id_ `elem` p
+         then do
+           { regId <- mkUniqueId (Text.append id_ "_reg")
+           ; verilogType ty <+> text regId <> semi <$>
+             "always_comb begin" <$>
+             indent 2 ("case" <> parens (expr_ True scrut) <$>
+                         (indent 2 $ vcat $ punctuate semi (conds regId es)) <> semi <$>
+                       "endcase") <$>
+             "end" <$>
+             "assign" <+> text id_ <+> equals <+> text regId <> semi
+           }
+         else "always_comb begin" <$>
+              indent 2 ("case" <> parens (expr_ True scrut) <$>
+                          (indent 2 $ vcat $ punctuate semi (conds id_ es)) <> semi <$>
+                        "endcase") <$>
+              "end"
+    }
   where
-    conds :: [(Maybe Literal,Expr)] -> SystemVerilogM [Doc]
-    conds []                = return []
-    conds [(_,e)]           = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
-    conds ((Nothing,e):_)   = ("default" <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> return []
-    conds ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> text id_ <+> equals <+> expr_ False e) <:> conds es'
+    conds :: Identifier -> [(Maybe Literal,Expr)] -> SystemVerilogM [Doc]
+    conds _ []                = return []
+    conds i [(_,e)]           = ("default" <+> colon <+> text i <+> equals <+> expr_ False e) <:> return []
+    conds i ((Nothing,e):_)   = ("default" <+> colon <+> text i <+> equals <+> expr_ False e) <:> return []
+    conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> text i <+> equals <+> expr_ False e) <:> conds i es'
 
 inst_ (InstDecl nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
