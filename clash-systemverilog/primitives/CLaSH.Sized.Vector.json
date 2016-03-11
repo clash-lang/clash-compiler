@@ -72,11 +72,7 @@ genvar ~GENSYM[n][1];
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.++"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
-    , "templateD" :
-"// (++) begin
-assign ~RESULT[0:~LENGTH[~TYP[0]]-1] = ~ARG[0];
-assign ~RESULT[~LENGTH[~TYP[0]]:~LENGTH[~TYPO]-1] = ~ARG[1];
-// (++) end"
+    , "templateE" : "~FROMBV[{~TOBV[~ARG[0]][~TYP[0]],~TOBV[~ARG[1]][~TYP[1]]}][~TYPO]"
     }
   }
 , { "BlackBox" :
