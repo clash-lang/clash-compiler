@@ -46,7 +46,7 @@ begin
   -- pragma translate_on
                 ;
 
-  romSync : process (~CLK[1])
+  ~GENSYM[romSync][3] : process (~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then~IF ~VIVADO ~THEN
       ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO];~ELSE

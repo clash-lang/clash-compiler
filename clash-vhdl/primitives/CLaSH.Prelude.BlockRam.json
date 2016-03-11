@@ -30,7 +30,7 @@ begin
   -- pragma translate_on
                 ;
 
-  blockRam_sync : process(~CLK[1])
+  ~GENSYM[blockRam_sync][5] : process(~CLK[1])
   begin
     if rising_edge(~CLK[1]) then
       if ~ARG[5] then~IF ~VIVADO ~THEN

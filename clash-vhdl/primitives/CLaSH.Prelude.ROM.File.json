@@ -9,12 +9,12 @@
     , "templateD" :
 "-- asyncRomFile begin
 ~GENSYM[asyncROMFile][0] : block
-  type RomType is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
+  type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
-  impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return RomType is
+  impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
-    variable ROM : RomType(0 to ~LIT[1]-1);
+    variable ROM : ~SYM[4](0 to ~LIT[1]-1);
   begin
     for i in ROM'range loop
       readline(RomFile,RomFileLine);
@@ -23,7 +23,7 @@
     return ROM;
   end function;
 
-  signal ~GENSYM[ROM][2] : RomType(0 to ~LIT[1]-1) := ~SYM[1](~FILE[~LIT[2]]);
+  signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[1]-1) := ~SYM[1](~FILE[~LIT[2]]);
   signal ~GENSYM[rd][3] : integer range 0 to ~LIT[1]-1;
 begin
   ~SYM[3] <= to_integer(~ARG[3])
@@ -49,12 +49,12 @@ end block;
     , "templateD" :
 "-- romFile begin
 ~GENSYM[~COMPNAME_romFile][0] : block
-  type RomType is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
+  type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
-  impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return RomType is
+  impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
     FILE RomFile : text open read_mode is RomFileName;
     variable RomFileLine : line;
-    variable ROM : RomType(0 to ~LIT[2]-1);
+    variable ROM : ~SYM[4](0 to ~LIT[2]-1);
   begin
     for i in ROM'range loop
       readline(RomFile,RomFileLine);
@@ -63,7 +63,7 @@ end block;
     return ROM;
   end function;
 
-  signal ~GENSYM[ROM][2] : RomType(0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
+  signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
   signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2]-1;
 begin
   ~SYM[3] <= to_integer(~ARG[4])
@@ -72,7 +72,7 @@ begin
   -- pragma translate_on
                 ;
 
-  romFileSync : process (~CLK[1])
+  ~GENSYM[romFileSync][5] : process (~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
       ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));

@@ -13,12 +13,12 @@
     , "templateD" :
 "-- blockRamFile begin
 ~GENSYM[~COMPNAME_blockRamFile][0] : block
-  type RamType is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
+  type ~GENSYM[RamType][6] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
 
-  impure function ~GENSYM[InitRamFromFile][1] (RamFileName : in string) return RamType is
+  impure function ~GENSYM[InitRamFromFile][1] (RamFileName : in string) return ~SYM[6] is
     FILE RamFile : text open read_mode is RamFileName;
     variable RamFileLine : line;
-    variable RAM : RamType(0 to ~LIT[2]-1);
+    variable RAM : ~SYM[6](0 to ~LIT[2]-1);
   begin
     for i in RAM'range loop
       readline(RamFile,RamFileLine);
@@ -27,7 +27,7 @@
     return RAM;
   end function;
 
-  signal ~GENSYM[RAM][2] : RamType(0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
+  signal ~GENSYM[RAM][2] : ~SYM[6](0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
   signal ~GENSYM[dout][3] : ~TYP[7];
   signal ~GENSYM[wr][4] : integer range 0 to ~LIT[2]-1;
   signal ~GENSYM[rd][5] : integer range 0 to ~LIT[2]-1;
@@ -44,7 +44,7 @@ begin
   -- pragma translate_on
                 ;
 
-  blockRamFile_sync : process(~CLK[1])
+  ~GENSYM[blockRamFile_sync][7] : process(~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
       if ~ARG[6] then

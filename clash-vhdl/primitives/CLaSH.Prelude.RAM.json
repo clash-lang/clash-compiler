@@ -12,9 +12,9 @@
     , "templateD" :
 "-- asyncRam begin
 ~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
-  type RamType is array(natural range <>) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
-  type RamType is array(natural range <>) of ~TYP[6];~FI
-  signal ~GENSYM[RAM][1] : RamType(0 to ~LIT[2]-1);
+  type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
+  type ~SYM[4] is array(natural range <>) of ~TYP[6];~FI
+  signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[2]-1);
   signal ~GENSYM[wr][2] : integer range 0 to ~LIT[2] - 1;
   signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2] - 1;
 begin
@@ -30,7 +30,7 @@ begin
   -- pragma translate_on
                 ;
 
-  asyncRam_sync : process(~CLK[0])
+  ~GENSYM[asyncRam_sync][5] : process(~CLK[0])
   begin
     if rising_edge(~CLK[0]) then
       if ~ARG[5] then~IF ~VIVADO ~THEN
