@@ -764,6 +764,25 @@ etaExpansionTL ctx (Lam b) = do
   e' <- etaExpansionTL (LamBody bndr:ctx) e
   return $ Lam (bind bndr e')
 
+etaExpansionTL ctx (Letrec b) = do
+  (xesR,e) <- unbind b
+  let xes   = unrec xesR
+      bndrs = map fst xes
+  e' <- etaExpansionTL (LetBody bndrs:ctx) e
+  e'' <- stripLambda e'
+  case e'' of
+    (bs@(_:_),e2) -> do
+      let e3 = Letrec (bind xesR e2)
+      changed (mkLams e3 bs)
+    _ -> return (Letrec (bind xesR e'))
+  where
+    stripLambda :: Term -> RewriteMonad NormalizeState ([Id],Term)
+    stripLambda (Lam b') = do
+      (bndr,e)   <- unbind b'
+      (bndrs,e') <- stripLambda e
+      return (bndr:bndrs,e')
+    stripLambda e = return ([],e)
+
 etaExpansionTL ctx e
   = do
     tcm <- Lens.view tcCache
