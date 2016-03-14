@@ -19,7 +19,7 @@ normalization :: NormRewrite
 normalization = constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec
   where
-    etaTL      = apply "etaTL" etaExpansionTL
+    etaTL      = apply "etaTL" etaExpansionTL !-> repeatR (innerMost (apply "applicationPropagation" appProp))
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
