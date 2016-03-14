@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.12 *March 14th 2016*
+* Fixes bugs:
+  * Not all lambda's in a function position removed due to bad eta-expansion [#132](https://github.com/clash-lang/clash-compiler/issues/132)
+
 ## 0.6.11 *March 11th 2016*
 * New features:
   * Add support for HDL synthesis tool specific HDL generation
