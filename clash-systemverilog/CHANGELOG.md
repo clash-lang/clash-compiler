@@ -2,7 +2,7 @@
 
 ## 0.6.6 *March 11th 2016*
 * New features:
-  * Support `clash-lib` 0.6
+  * Support `clash-lib` 0.6.11
   * Generated structs are packed
   * Elements of arrays are packed
 * Fixes bugs:
