@@ -1,5 +1,5 @@
 Name:                 clash-ghc
-Version:              0.6.14
+Version:              0.6.15
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -96,7 +96,7 @@ Executable clash
 
                       clash-lib                 >= 0.6.13 && < 0.7,
                       clash-systemverilog       >= 0.6.6,
-                      clash-vhdl                >= 0.6.9,
+                      clash-vhdl                >= 0.6.10,
                       clash-verilog             >= 0.6.6,
                       clash-prelude             >= 0.10.6 && < 0.11,
                       ghc-typelits-extra        >= 0.1,

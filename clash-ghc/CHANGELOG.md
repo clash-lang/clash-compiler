@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.15 *March 15th 2016*
+* Fixes bugs:
+  * XST cannot finds "_types" package unless it is prefixed with "work." [#133](https://github.com/clash-lang/clash-compiler/pull/133)
+
 ## 0.6.14 *March 15th 2016*
 * Fixes bugs:
   * XST cannot finds "_types" package unless it is prefixed with "work." [#133](https://github.com/clash-lang/clash-compiler/pull/133)
