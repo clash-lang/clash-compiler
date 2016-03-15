@@ -363,7 +363,7 @@ tyImports nm = do
     , "use IEEE.MATH_REAL.ALL"
     , "use std.textio.all"
     , "use work.all"
-    , "use work." <+> text (mkId (T.pack nm `T.append` "_types")) <> ".all"
+    , "use work." <> text (mkId (T.pack nm `T.append` "_types")) <> ".all"
     ]
 
 
