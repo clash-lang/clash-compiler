@@ -249,7 +249,7 @@ clockPorts :: [(String,String)] -> [(String,String)]
 clockPorts inp outp = (inPorts ++ outPorts,clks)
   where
     inPorts  = map (\(i,e) -> (pack i,In,Clock "" 0,stringToVar e)) inp
-    outPorts = map (\(i,e) -> (pack i,Out,Clock "" 0,stringToVar e)) inp
+    outPorts = map (\(i,e) -> (pack i,Out,Clock "" 0,stringToVar e)) outp
     clks  = map snd outp
 
 -- | Generate resets
