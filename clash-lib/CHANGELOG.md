@@ -1,5 +1,11 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.14 *March 21st 2016*
+* New features:
+  * Also generate testbench for circuits without input ports [#135](https://github.com/clash-lang/clash-compiler/issues/135)
+* Fixes bugs:
+  * `clockWizard` broken [#49](https://github.com/clash-lang/clash-prelude/issues/49)
+
 ## 0.6.13 *March 14th 2016*
 * Fixes bugs:
   * Not all lambda's in a function position removed
