@@ -20,7 +20,8 @@ import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List                        (find,nub)
-import           Data.Maybe                       (catMaybes,mapMaybe)
+import           Data.Maybe                       (catMaybes,listToMaybe,
+                                                   mapMaybe)
 import           Data.Text.Lazy                   (append,pack)
 import           Unbound.Generics.LocallyNameless (name2String)
 
@@ -60,15 +61,20 @@ genTestBench :: CLaSHOpts
              -> Component                    -- ^ Component to generate TB for
              -> IO ([Component],[(String,FilePath)])
 genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals stimuliNmM expectedNmM modName dfiles
-  (Component cName hidden [inp] [outp] _) = do
-  let iw      = opt_intWidth opts
-      ioDecl  = [ uncurry NetDecl inp
-                , uncurry NetDecl outp
-                ]
-      inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
-  (inpInst,inpComps,seen',hidden',dfiles') <- maybe (return (inpExpr,[],seen,hidden,dfiles))
-      (genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw)
-      stimuliNmM
+  c@(Component cName hidden inps [outp] _) = do
+  let inpM    = listToMaybe inps
+      iw      = opt_intWidth opts
+      ioDecl  = maybe [] ((:[]) . uncurry NetDecl) inpM ++
+                [uncurry NetDecl outp]
+
+  (inpInstM,inpComps,seen',hidden',dfiles') <- case inpM of
+    Just inp -> case stimuliNmM of
+      Just stimuliNm
+              -> (\(v,w,x,y,z) -> (Just v,w,x,y,z)) <$>
+                 genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw stimuliNm
+      Nothing -> let inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
+                 in  return (Just inpExpr,[],seen,hidden,dfiles)
+    Nothing   -> return (Nothing,[],seen,hidden,dfiles)
 
   ((finDecl,finExpr),s) <- runNetlistMonad globals primMap tcm typeTrans modName dfiles' iw mkId ("finished":"done":seen') $ do
       done    <- genDone primMap
@@ -93,7 +99,7 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals sti
 
   let instDecl = InstDecl cName "totest"
                    (map (\(i,t) -> (i,In,t,Identifier i Nothing))
-                        (concat [ clkNms, rstNms, [inp] ])
+                        (concat [ clkNms, rstNms, maybe [] (:[]) inpM ])
                    ++
                    [(\(i,t) -> (i,Out,t,Identifier i Nothing)) outp])
 
@@ -102,10 +108,12 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals sti
                           , concat clks
                           , concat rsts
                           , ioDecl
-                          , [instDecl,inpInst,expInst]
+                          , catMaybes [Just instDecl,inpInstM,Just expInst]
                           ])
 
-  return (tbComp:(inpComps++expComps),dfiles'')
+  case inps of
+    (_:_:_) -> traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
+    _ -> return (tbComp:(inpComps++expComps),dfiles'')
   where
     normalizeSignal :: HashMap TmName (Type,Term)
                     -> TmName
