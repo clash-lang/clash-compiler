@@ -162,7 +162,7 @@ ghdlMake :: FilePath -> String -> String -> TestTree
 ghdlMake env modName entity = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work","--std=93",modName ++ "_" ++ entity] (Just env) False False
 
 ghdlSim :: FilePath -> String -> TestTree
-ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r","--std=93",modName ++ "_testbench","--assert-level=error"] (Just env) False False
+ghdlSim env modName = testProgram "GHDL (sim)" "ghdl" ["-r","--workdir=work","--std=93",modName ++ "_testbench","--assert-level=error"] (Just env) False False
 
 iverilog :: FilePath -> String -> String -> TestTree
 iverilog dir modName entity = withResource (return dir) (const (return ()))
