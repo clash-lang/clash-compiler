@@ -15,6 +15,7 @@ import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Monad                    (when)
 import           Control.Monad.State              (evalState, get)
+import qualified Data.HashMap.Lazy                as HML
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HM
 import qualified Data.HashSet                     as HashSet
@@ -44,6 +45,7 @@ import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Types              (Component (..), HWType)
 import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
+import           CLaSH.Normalize.Util             (callGraph, mkRecursiveComponents)
 import           CLaSH.Primitives.Types
 import           CLaSH.Util                       (first)
 
@@ -73,7 +75,11 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   let doNorm     = do norm <- normalize [topEntity]
                       let normChecked = checkNonRecursive topEntity norm
                       cleanupGraph topEntity normChecked
-      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval primMap' doNorm
+      cg         = callGraph [] bindingsMap topEntity
+      rcs        = concat $ mkRecursiveComponents cg
+      rcsMap     = HML.fromList
+                 $ map (\(t,_) -> (t,t `elem` rcs)) cg
+      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval primMap' rcsMap doNorm
 
   normTime <- transformedBindings `deepseq` Clock.getCurrentTime
   let prepNormDiff = Clock.diffUTCTime normTime prepTime

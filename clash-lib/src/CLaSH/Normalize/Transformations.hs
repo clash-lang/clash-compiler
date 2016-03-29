@@ -426,10 +426,11 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,body) -> let cg = callGraph [] bndrs f
-                           in if null (recursiveComponents cg)
-                              then changed (mkApps body args)
-                              else return e
+          Just (_,body) -> do
+            isRecBndr <- isRecursiveBndr f
+            if isRecBndr
+               then return e
+               else changed (mkApps body args)
           _ -> return e
 
 inlineClosed _ e@(Var fTy f) = do
@@ -442,10 +443,11 @@ inlineClosed _ e@(Var fTy f) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,body) -> let cg = callGraph [] bndrs f
-                         in if null (recursiveComponents cg)
-                            then changed body
-                            else return e
+        Just (_,body) -> do
+          isRecBndr <- isRecursiveBndr f
+          if isRecBndr
+             then return e
+             else changed body
         _ -> return e
     else return e
 
@@ -462,11 +464,11 @@ inlineSmall _ e@(collectArgs -> (Var _ f,args)) = do
       sizeLimit <- Lens.use (extra.inlineBelow)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,body) -> let cg = callGraph [] bndrs f
-                         in if null (recursiveComponents cg) &&
-                               termSize body < sizeLimit
-                            then changed (mkApps body args)
-                            else return e
+        Just (_,body) -> do
+          isRecBndr <- isRecursiveBndr f
+          if not isRecBndr && termSize body < sizeLimit
+             then changed (mkApps body args)
+             else return e
         _ -> return e
 
 inlineSmall _ e = return e

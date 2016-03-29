@@ -48,6 +48,8 @@ data NormalizeState
   -- ^ Size of a function below which it is always inlined if it is not
   -- recursive
   , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
+  , _recursiveComponents :: HashMap TmName Bool
+  -- ^ Map telling whether a components is part of a recursive group
   }
 
 makeLenses ''NormalizeState

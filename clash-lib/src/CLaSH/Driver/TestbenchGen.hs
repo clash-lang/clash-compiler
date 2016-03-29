@@ -37,6 +37,7 @@ import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate, Element (Er
 import           CLaSH.Netlist.Types              as N
 import           CLaSH.Normalize                  (cleanupGraph, normalize,
                                                    runNormalization)
+import           CLaSH.Normalize.Util             (callGraph, mkRecursiveComponents)
 import           CLaSH.Primitives.Types
 import           CLaSH.Rewrite.Types
 
@@ -118,8 +119,12 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals sti
     normalizeSignal :: HashMap TmName (Type,Term)
                     -> TmName
                     -> HashMap TmName (Type,Term)
-    normalizeSignal glbls bndr =
-      runNormalization opts supply glbls typeTrans tcm tupTcm eval primMap (normalize [bndr] >>= cleanupGraph bndr)
+    normalizeSignal glbls bndr = do
+      let cg  = callGraph [] glbls bndr
+          rcs = concat $ mkRecursiveComponents cg
+          rcsMap = HashMap.fromList
+                 $ map (\(t,_) -> (t,t `elem` rcs)) cg
+      runNormalization opts supply glbls typeTrans tcm tupTcm eval primMap rcsMap (normalize [bndr] >>= cleanupGraph bndr)
 
 genTestBench opts _ _ _ _ _ _ _ _ _ _ _ _ dfiles c = traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
 

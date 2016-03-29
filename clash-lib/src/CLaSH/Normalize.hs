@@ -68,10 +68,12 @@ runNormalization :: CLaSHOpts
                  -- ^ Hardcoded evaluator (delta-reduction)
                  -> PrimMap BlackBoxTemplate
                  -- ^ Primitive Definitions
+                 -> HashMap TmName Bool
+                 -- ^ Map telling whether a components is part of a recursive group
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization opts supply globals typeTrans tcm tupTcm eval primMap
+runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -98,6 +100,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap
                   (opt_inlineLimit opts)
                   (opt_inlineBelow opts)
                   primMap
+                  rcsMap
 
 
 normalize :: [TmName]
@@ -172,7 +175,7 @@ checkNonRecursive :: TmName -- ^ @topEntity@
                   -> HashMap TmName (Type,Term)
 checkNonRecursive topEntity norm =
   let cg = callGraph [] norm topEntity
-  in  case recursiveComponents cg of
+  in  case mkRecursiveComponents cg of
        []  -> norm
        rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs
 

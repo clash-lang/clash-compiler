@@ -31,6 +31,7 @@ import           CLaSH.Core.Type         (Type)
 import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.Util         (collectArgs, isPolyFun)
 import           CLaSH.Normalize.Types
+import           CLaSH.Rewrite.Types     (bindings,extra)
 import           CLaSH.Rewrite.Util      (specialise)
 import           CLaSH.Util              (curLoc)
 
@@ -72,6 +73,21 @@ isConstant e = case collectArgs e of
   (Literal _,_)    -> True
   _                -> False
 
+isRecursiveBndr :: TmName -> NormalizeSession Bool
+isRecursiveBndr f = do
+  cg <- Lens.use (extra.recursiveComponents)
+  case HashMap.lookup f cg of
+    Just isR -> return isR
+    Nothing -> do
+      bndrs <- Lens.use bindings
+      let cg'  = callGraph [] bndrs f
+          rcs  = concat $ mkRecursiveComponents cg'
+          isR  = f `elem` rcs
+          cg'' = HashMap.fromList
+               $ map (\(t,_) -> (t,t `elem` rcs)) cg'
+      (extra.recursiveComponents) %= HashMap.union cg''
+      return isR
+
 -- | Create a call graph for a set of global binders, given a root
 callGraph :: [TmName] -- ^ List of functions that should not be inspected
           -> HashMap TmName (Type,Term) -- ^ Global binders
@@ -85,13 +101,13 @@ callGraph visited bindingMap root = node:other
     other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
 
 -- | Determine the sets of recursive components given the edges of a callgraph
-recursiveComponents :: [(TmName,[TmName])] -- ^ [(calling function,[called function])]
+mkRecursiveComponents :: [(TmName,[TmName])] -- ^ [(calling function,[called function])]
                     -> [[TmName]]
-recursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs)))
-                       . Maybe.catMaybes
-                       . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
-                       . Graph.stronglyConnComp
-                       $ map (\(n,es) -> (n,n,es)) cg
+mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs)))
+                         . Maybe.catMaybes
+                         . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
+                         . Graph.stronglyConnComp
+                         $ map (\(n,es) -> (n,n,es)) cg
   where
     fs = map fst cg
 
@@ -102,7 +118,7 @@ lambdaDropPrep bndrs topEntity = bndrs'
   where
     depGraph = callGraph [] bndrs topEntity
     used     = HashMap.fromList depGraph
-    rcs      = recursiveComponents depGraph
+    rcs      = mkRecursiveComponents depGraph
     dropped  = map (lambdaDrop bndrs used) rcs
     bndrs'   = foldr (\(k,v) b -> HashMap.insert k v b) bndrs dropped
 
