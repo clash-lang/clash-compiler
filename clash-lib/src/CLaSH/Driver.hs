@@ -60,15 +60,10 @@ generateHDL :: forall backend . Backend backend
             -> Maybe TmName -- ^ testInput bndr
             -> Maybe TmName -- ^ expectedOutput bndr
             -> CLaSHOpts -- ^ Debug information level for the normalization process
+            -> (Clock.UTCTime,Clock.UTCTime)
             -> IO ()
-generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,annM) testInpM expOutM opts = do
-  start <- Clock.getCurrentTime
-  prepTime <- start `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
-  let prepStartDiff = Clock.diffUTCTime prepTime start
-
-      primMap' = (HM.map parsePrimitive :: PrimMap Text.Text -> PrimMap BlackBoxTemplate) primMap
-
-  putStrLn $ "Loading dependencies took " ++ show prepStartDiff
+generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,annM) testInpM expOutM opts (startTime,prepTime) = do
+  let primMap' = (HM.map parsePrimitive :: PrimMap Text.Text -> PrimMap BlackBoxTemplate) primMap
 
   (supplyN,supplyTB) <- Supply.splitSupply
                       . snd
@@ -129,8 +124,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   mapM_ (writeHDL hdlState' dir) hdlDocs
   copyDataFiles dir dfiles'
 
-  end <- hdlDocs `seq` Clock.getCurrentTime
-  let startEndDiff = Clock.diffUTCTime end start
+  endTime <- hdlDocs `seq` Clock.getCurrentTime
+  let startEndDiff = Clock.diffUTCTime endTime startTime
   putStrLn $ "Total compilation took " ++ show startEndDiff
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate

@@ -16,6 +16,9 @@ import CLaSH.Backend.VHDL
 import CLaSH.Backend.Verilog
 import CLaSH.Netlist.BlackBox.Types
 
+import Control.DeepSeq
+import qualified Data.Time.Clock as Clock
+
 genSystemVerilog :: String
                  -> IO ()
 genSystemVerilog = doHDL (initBackend WORD_SIZE_IN_BITS HDLSYN :: SystemVerilogState)
@@ -33,10 +36,14 @@ doHDL :: Backend s
        -> String
        -> IO ()
 doHDL b src = do
+  startTime <- Clock.getCurrentTime
   pd      <- primDir b
   primMap <- generatePrimMap [pd,"."]
   (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src Nothing
-  generateHDL bindingsMap (Just b) primMap tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS) reduceConstant topEnt testInpM expOutM (CLaSHOpts 20 20 15 DebugNone True WORD_SIZE_IN_BITS Nothing HDLSYN)
+  prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
+  let prepStartDiff = Clock.diffUTCTime prepTime startTime
+  putStrLn $ "Loading dependencies took " ++ show prepStartDiff
+  generateHDL bindingsMap (Just b) primMap tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS) reduceConstant topEnt testInpM expOutM (CLaSHOpts 20 20 15 DebugFinal True WORD_SIZE_IN_BITS Nothing HDLSYN) (startTime,prepTime)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

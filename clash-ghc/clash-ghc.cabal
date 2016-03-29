@@ -100,7 +100,9 @@ Executable clash
                       clash-verilog             >= 0.6.6,
                       clash-prelude             >= 0.10.6 && < 0.11,
                       ghc-typelits-extra        >= 0.1,
-                      ghc-typelits-natnormalise >= 0.3
+                      ghc-typelits-natnormalise >= 0.3,
+                      deepseq                   >= 1.3.0.2,
+                      time                      >= 1.4.0.1
 
   if os(windows)
     Build-Depends:    Win32

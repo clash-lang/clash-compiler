@@ -117,6 +117,8 @@ import           CLaSH.GHC.NetlistTypes
 import           CLaSH.Netlist.BlackBox.Types (HdlSyn)
 import qualified CLaSH.Primitives.Util
 import           CLaSH.Util (clashLibVersion)
+import           Control.DeepSeq
+import qualified Data.Time.Clock as Clock
 import qualified Data.Version as Data.Version
 import qualified Paths_clash_ghc
 
@@ -1577,7 +1579,8 @@ makeHDL :: GHC.GhcMonad m
         -> m ()
 makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
-  liftIO $ do opts  <- readIORef optsRef
+  liftIO $ do startTime <- Clock.getCurrentTime
+              opts  <- readIORef optsRef
               let iw = opt_intWidth opts
                   syn = opt_hdlSyn opts
                   -- determine whether `-outputdir` was used
@@ -1593,8 +1596,11 @@ makeHDL backend optsRef srcs = do
               primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src (Just dflags)
+                prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
+                let prepStartDiff = Clock.diffUTCTime prepTime startTime
+                putStrLn $ "Loading dependencies took " ++ show prepStartDiff
                 CLaSH.Driver.generateHDL bindingsMap (Just (backend iw syn)) primMap tcm
-                  tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts'
+                  tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts' (startTime,prepTime)
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VHDLState)
