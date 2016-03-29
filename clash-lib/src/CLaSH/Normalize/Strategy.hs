@@ -19,7 +19,7 @@ normalization :: NormRewrite
 normalization = constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
                 bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec
   where
-    etaTL      = apply "etaTL" etaExpansionTL !-> repeatR (innerMost (apply "applicationPropagation" appProp))
+    etaTL      = apply "etaTL" etaExpansionTL !-> innerMost (apply "applicationPropagation" appProp)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
     letTL      = topdownSucR (apply "topLet" topLet)
     recLetRec  = apply "recToLetRec" recToLetRec
@@ -35,34 +35,46 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
                      caseFlattening >-> dec >-> lifting >-> spec >-> dec >->
                      conSpec
   where
-    propagate = innerMost (applyMany transInner)
-    inlineAndPropagate = bottomupR (applyMany transBUP) !-> propagate
-    lifting   = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
-    spec      = bottomupR (applyMany specRws)
-    caseFlattening = repeatR (topdownR (apply "caseFlat" caseFlat))
-    dec = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
-    conSpec = bottomupR (apply "constantSpec" constantSpec)
+    propagate          = innerMost (applyMany transPropagate)
+    inlineAndPropagate = (topdownR (applyMany transInlineSafe) >-> inlineNR)
+                         !-> propagate
+    lifting            = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
+    spec               = bottomupR (applyMany specTransformations)
+    caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
+    dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
+    conSpec            = bottomupR (apply "constantSpec" constantSpec)
 
-    transInner :: [(String,NormRewrite)]
-    transInner = [ ("applicationPropagation", appProp        )
-                 , ("bindConstantVar"       , bindConstantVar)
-                 , ("caseLet"               , caseLet        )
-                 , ("caseCase"              , caseCase       )
-                 , ("caseCon"               , caseCon        )
-                 ]
+    transPropagate :: [(String,NormRewrite)]
+    transPropagate =
+      [ ("applicationPropagation", appProp        )
+      , ("bindConstantVar"       , bindConstantVar)
+      , ("caseLet"               , caseLet        )
+      , ("caseCase"              , caseCase       )
+      , ("caseCon"               , caseCon        )
+      ]
 
-    transBUP :: [(String,NormRewrite)]
-    transBUP = [ ("inlineClosed"    , inlineClosed)
-               , ("inlineSmall"     , inlineSmall)
-               , ("inlineNonRep"    , inlineNonRep)
-               , ("bindNonRep"      , bindNonRep) -- See: [Note] bindNonRep before liftNonRep
-               , ("reduceNonRepPrim", reduceNonRepPrim)
-               ]
+    -- These transformations can safely be applied in a top-down traversal as
+    -- they themselves check whether the to-be-inlined binder is recursive or not.
+    transInlineSafe :: [(String,NormRewrite)]
+    transInlineSafe =
+       [ ("inlineClosed"    , inlineClosed)
+       , ("inlineSmall"     , inlineSmall)
+       , ("bindNonRep"      , bindNonRep) -- See: [Note] bindNonRep before liftNonRep
+       , ("reduceNonRepPrim", reduceNonRepPrim)
+       ]
 
-    specRws :: [(String,NormRewrite)]
-    specRws = [ ("typeSpec"    , typeSpec)
-              , ("nonRepSpec"  , nonRepSpec)
-              ]
+    -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
+    -- binder might be recursive. The idea is, is that if the recursive
+    -- non-representable binder is inlined once, we can get rid of the recursive
+    -- aspect using the case-of-known-constructor
+    inlineNR :: NormRewrite
+    inlineNR = bottomupR (apply "inlineNonRep" inlineNonRep)
+
+    specTransformations :: [(String,NormRewrite)]
+    specTransformations =
+      [ ("typeSpec"    , typeSpec)
+      , ("nonRepSpec"  , nonRepSpec)
+      ]
 
 {- [Note] bottom-up traversal for liftNonRep
 We used to say:
