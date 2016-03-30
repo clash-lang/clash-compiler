@@ -42,6 +42,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args))
         | i == j    -> Literal (IntLiteral 1)
         | otherwise -> Literal (IntLiteral 0)
       _ -> e
+  | nm == "GHC.Integer.Type.neqInteger#"
+  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+      [Literal (IntegerLiteral i), Literal (IntegerLiteral j)]
+        | i /= j    -> Literal (IntLiteral 1)
+        | otherwise -> Literal (IntLiteral 0)
+      _ -> e
   | nm == "GHC.Prim.>#"
   = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
       [Literal (IntLiteral i), Literal (IntLiteral j)]
