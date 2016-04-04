@@ -404,13 +404,13 @@ end block;~FI~ELSE
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.quot#"
     , "type"      : "quot# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "std_logic_vector(unsigned(~ARG[1]) / unsigned(~ARG[2]))"
+    , "templateE" : "std_logic_vector(unsigned(~ARG[0]) / unsigned(~ARG[1]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.rem#"
     , "type"      : "rem# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "std_logic_vector(unsigned(~ARG[1]) rem unsigned(~ARG[2]))"
+    , "templateE" : "std_logic_vector(unsigned(~ARG[0]) rem unsigned(~ARG[1]))"
     }
   }
 , { "BlackBox" :
