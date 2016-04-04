@@ -139,7 +139,7 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
         Just fun' | fun' `notElem` seen -> do
           (args',collected) <- collectGlobalsArgs inScope substitution
                                                   (fun':seen) args
-          let e' = Maybe.fromMaybe e (List.lookup fun' substitution)
+          let e' = Maybe.fromMaybe (mkApps fun' args') (List.lookup fun' substitution)
           return (e',(fun',Leaf args'):collected)
         _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
                                                         seen args
