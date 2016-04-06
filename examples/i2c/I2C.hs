@@ -1,21 +1,15 @@
-module I2C
-  (i2c,topEntity)
-where
+module I2C where
 
 import CLaSH.Prelude
 
-import I2C.MasterBit
-import I2C.MasterByte
+import I2C.BitMaster
+import I2C.ByteMaster
 import I2C.Types
 
-{-# NOINLINE i2c #-}
-i2c clkCnt startCmd stopCmd readCmd writeCmd ackIn dIn i2ci =
-    (dOut,cmdAck,ackOut,al,busy,i2co)
+i2c rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
   where
-    (cmd,coreTxd,cmdAck,ackOut,dOut) = masterByteCtrl startCmd stopCmd readCmd
-                                        writeCmd ackIn dIn coreAck coreRxd
-    (bitOut,i2co)                    = masterBitCtrl clkCnt cmd coreTxd i2ci
-    (coreAck,al,busy,coreRxd)        = unbundle bitOut
-
+    (hostAck,ackOut,dout,bitCtrl) = mealyB byteMasterT byteMasterInit (rst,start,stop,read,write,ackIn,din,bitResp)
+    (bitResp,busy,i2cO)           = mealyB bitMasterT  bitMasterInit  (rst,ena,clkCnt,bitCtrl,i2cI)
+    (cmdAck,al,dbout)             = unbundle bitResp
 
 topEntity = i2c
