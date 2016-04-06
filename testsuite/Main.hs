@@ -31,6 +31,7 @@ main =
       ,runTest "examples"             Both [] "Reducer"      (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Sprockell"    (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Windows"      (Just ("topEntity",False))
+      ,runTest ("examples" </> "crc32") Both [] "CRC32"      (Just ("testbench",True))
       ,runTest ("examples" </> "i2c") Both [] "I2C"          (Just ("topEntity",False))
       ]
     , testGroup "unit-tests"
