@@ -39,6 +39,7 @@ busStartState
   , _cmdStop        = False              -- STOP command
   }
 
+{-# NOINLINE busStatusCtrl #-}
 busStatusCtrl :: Bool
               -> Bool
               -> Unsigned 16
@@ -59,12 +60,12 @@ busStatusCtrl rst ena clkCnt cmd clkEn i2cI bitStateM sdaChk sdaOen = do
      cI2C .= (_cI2C <<+ i2cI)
 
   -- filter SCL and SDA; (attempt to remove glitches)
-  if rst || not ena then
-     filterCnt .= 0
-  else if _filterCnt == 0 then
-     filterCnt .= resize (shiftR clkCnt 2)
-  else
-     filterCnt -= 1
+  filterCnt .= if rst || not ena then
+                  0
+               else if _filterCnt == 0 then
+                  resize (shiftR clkCnt 2)
+               else
+                  _filterCnt - 1
 
   if rst then do
      fI2C .= repeat (high,high)

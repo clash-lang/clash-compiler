@@ -45,6 +45,7 @@ byteMasterInit
   , _ackOut     = True
   }
 
+{-# NOINLINE byteMasterT #-}
 byteMasterT :: ByteMasterS -> ByteMasterI -> (ByteMasterS, ByteMasterO)
 byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
             (rst,start,stop,read,write,ackIn,din,~(coreAck,al,coreRxd)) = swap $ flip runState s $ do

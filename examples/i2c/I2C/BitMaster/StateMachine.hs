@@ -36,6 +36,7 @@ stateMachineStart
   , _bitStateM = Idle
   }
 
+{-# NOINLINE bitStateMachine #-}
 bitStateMachine :: Bool
                 -> Bool
                 -> Bool

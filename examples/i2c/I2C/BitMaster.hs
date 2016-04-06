@@ -37,6 +37,7 @@ bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _cnt            = 0          -- clock devider counter (synthesis)
                             }
 
+{-# NOINLINE bitMasterT #-}
 bitMasterT :: BitMasterS -> BitMasterI -> (BitMasterS, BitMasterO)
 bitMasterT s@(BitS { _stateMachine = StateMachine  {..}
                    , _busState     = BusStatusCtrl {..}
