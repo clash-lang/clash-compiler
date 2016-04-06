@@ -40,5 +40,4 @@ shiftRegister rst ld shiftsr din coreRxd = do
     sr   .= (_sr <<+ coreRxd)
     dcnt -= 1
 
-  --let cntDone = _dcnt == 0
   return (_dcnt == 0)
