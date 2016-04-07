@@ -14,6 +14,7 @@ import           Data.Bits           (shiftL,shiftR)
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
+import Data.Text                     (Text)
 import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed,
                                                    string2Name)
 
@@ -55,7 +56,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
        in  ret
 
   "GHC.Prim.negateInt#"
-    | [Literal (IntLiteral i)] <- (map (reduceConstant tcm isSubj) . Either.lefts) args
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral (negate i)
 
   "GHC.Prim.>#" | Just (i,j) <- intLiterals tcm isSubj args
@@ -86,7 +87,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
        in maybe e Data dc
 
   "GHC.Integer.Type.integerToInt"
-    | [Literal (IntegerLiteral i)] <- (map (reduceConstant tcm isSubj) . Either.lefts) args
+    | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral i
 
   "GHC.Integer.Type.plusInteger" | Just (i,j) <- integerLiterals tcm isSubj args
@@ -99,7 +100,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> integerToIntegerLiteral (i*j)
 
   "GHC.Integer.Type.negateInteger#"
-    | [Literal (IntegerLiteral i)] <- (map (reduceConstant tcm isSubj) . Either.lefts) args
+    | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral (negate i)
 
   "GHC.Integer.Type.divInteger" | Just (i,j) <- integerLiterals tcm isSubj args
@@ -248,33 +249,49 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
 reduceConstant _ _ e = e
 
+reduceTerms :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> [Term]
+reduceTerms tcm isSubj = map (reduceConstant tcm isSubj) . Either.lefts
+
 integerLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-integerLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+integerLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntegerLiteral i), Literal (IntegerLiteral j)] -> Just (i,j)
   _ -> Nothing
 
 intLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-intLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+intLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntLiteral i), Literal (IntLiteral j)] -> Just (i,j)
   _ -> Nothing
 
-signedLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-signedLiterals tcm isSubj args
-  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+wordLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+wordLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+  [Literal (WordLiteral i), Literal (WordLiteral j)] -> Just (i,j)
+  _ -> Nothing
+
+charLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Char,Char)
+charLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
+  [Literal (CharLiteral i), Literal (CharLiteral j)] -> Just (i,j)
+  _ -> Nothing
+
+sizedLiterals :: Text -> HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+sizedLiterals szCon tcm isSubj args
+  = case reduceTerms tcm isSubj args of
       ([ collectArgs -> (Prim nm  _,[Right _, Left _, Left (Literal (IntegerLiteral i))])
        , collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral j))])])
-        | nm  == "CLaSH.Sized.Internal.Signed.fromInteger#"
-        , nm' == "CLaSH.Sized.Internal.Signed.fromInteger#" -> Just (i,j)
+        | nm  == szCon
+        , nm' == szCon -> Just (i,j)
       _ -> Nothing
 
+bitVectorLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+bitVectorLiterals = sizedLiterals "CLaSH.Sized.Internal.BitVector.fromInteger#"
+
+indexLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+indexLiterals = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
+
+signedLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+signedLiterals = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
+
 unsignedLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-unsignedLiterals tcm isSubj args
-  = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
-      ([ collectArgs -> (Prim nm  _,[Right _, Left _, Left (Literal (IntegerLiteral i))])
-       , collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral j))])])
-        | nm  == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-        , nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#" -> Just (i,j)
-      _ -> Nothing
+unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
