@@ -152,22 +152,20 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToIntLiteral (i <= j)
 
   "GHC.Integer.Type.shiftRInteger"
-    | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <-
-      (map (reduceConstant tcm isSubj) . Either.lefts) args
+    | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral (i `shiftR` fromInteger j)
 
   "GHC.Integer.Type.shiftLInteger"
-    | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <-
-      (map (reduceConstant tcm isSubj) . Either.lefts) args
+    | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral (i `shiftL` fromInteger j)
 
   "GHC.TypeLits.natVal"
-    | [Literal (IntegerLiteral i), _] <- (map (reduceConstant tcm isSubj) . Either.lefts) args
+    | [Literal (IntegerLiteral i), _] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral i
 
   "GHC.Types.I#"
     | isSubj
-    , [Literal (IntLiteral i)] <- (map (reduceConstant tcm isSubj) . Either.lefts) args
+    , [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
             (Just intTc) = HashMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
