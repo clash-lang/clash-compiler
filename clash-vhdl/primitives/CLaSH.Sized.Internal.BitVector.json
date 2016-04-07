@@ -145,7 +145,7 @@ begin
   -- pragma translate_on
                ;
 
-  ~RESULT <= ~ARG[1](~SYM[1] downto ~SYM[1]);
+  ~RESULT(0) <= ~ARG[1](~SYM[1]);
 end block;~ELSE
 ~SYM[0] : block
   signal ~GENSYM[bv][2] : ~TYP[1];
@@ -158,7 +158,7 @@ begin
   -- pragma translate_on
                ;
 
-  ~RESULT <= ~SYM[2](~SYM[1] downto ~SYM[1]);
+  ~RESULT(0) <= ~SYM[2](~SYM[1]);
 end block;~FI
 -- indexBitVector end"
     }
@@ -172,7 +172,7 @@ end block;~FI
              -> Bit         -- ARG[3]
              -> BitVector n"
     , "templateD" :
-"-- replaceBit begin
+"-- replaceBit begin~IF ~ISVAR[3] ~THEN
 ~GENSYM[replaceBit][0] : block
   signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
 begin
@@ -186,10 +186,29 @@ begin
     variable ~GENSYM[ivec][2] : ~TYP[1];
   begin
     ~SYM[2] := ~ARG[1];
-    ~SYM[2](~SYM[1] downto ~SYM[1]) := ~ARG[3];
+    ~SYM[2](~SYM[1]) := ~ARG[3](0);
     ~RESULT <= ~SYM[2];
   end process;
-end block;
+end block;~ELSE
+~SYM[0] : block
+  signal ~SYM[1] : integer range 0 to ~LIT[0]-1;
+  signal ~GENSYM[b][3] : ~TYP[3];
+begin
+  ~SYM[1] <= to_integer(~ARG[2])
+  -- pragma translate_off
+               mod ~LIT[0]
+  -- pragma translate_on
+               ;
+  ~SYM[3] <= ~ARG[3];
+
+  process(~SYM[1],~SYM[3]~VARS[1])
+    variable ~SYM[2] : ~TYP[1];
+  begin
+    ~SYM[2] := ~ARG[1];
+    ~SYM[2](~SYM[1]) := ~SYM[3](0);
+    ~RESULT <= ~SYM[2];
+  end process;
+end block;~FI
 -- replaceBit end"
     }
   }
