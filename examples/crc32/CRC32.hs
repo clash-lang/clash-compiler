@@ -9,6 +9,8 @@ import CRC32Table
 crc32Step :: BitVector 32 -> BitVector 8 -> BitVector 32
 crc32Step prevCRC byte = entry `xor` (prevCRC `shiftR` 8)
   where
+    -- We use `$(lift crc32Table)` instead of just `crc32Table` to
+    -- force the reduction of `crc32Table` to a vector literal.
     entry = asyncRom $(lift crc32Table) (truncateB prevCRC `xor` byte)
 
 crc32 :: Signal (BitVector 8) -> Signal (BitVector 32)
