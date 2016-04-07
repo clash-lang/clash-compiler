@@ -31,6 +31,12 @@ import           CLaSH.Core.Var      (Var (..))
 
 reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
+  "GHC.Prim.eqChar#" | Just (i,j) <- charLiterals tcm isSubj args
+    -> boolToIntLiteral (i == j)
+
+  "GHC.Prim.neChar#" | Just (i,j) <- charLiterals tcm isSubj args
+    -> boolToIntLiteral (i /= j)
+
   "GHC.Prim.+#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i+j)
 
@@ -76,6 +82,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Prim.<=#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i <= j)
+
+  "GHC.Prim.eqWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i == j)
+
+  "GHC.Prim.neWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i /= j)
 
   "GHC.Prim.tagToEnum#"
     | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
@@ -170,6 +182,18 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             (Just intTc) = HashMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+
+  "CLaSH.Sized.Internal.BitVector.eq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i == j)
+
+  "CLaSH.Sized.Internal.BitVector.neq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i /= j)
+
+  "CLaSH.Sized.Internal.Index.eq#" | Just (i,j) <- indexLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i == j)
+
+  "CLaSH.Sized.Internal.Index.neq#" | Just (i,j) <- indexLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i /= j)
 
   "CLaSH.Sized.Internal.Signed.eq#" | Just (i,j) <- signedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
