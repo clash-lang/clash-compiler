@@ -1,5 +1,8 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.7 *April 7th 2016*
+* Support doctest-0.11.0
+
 ## 0.10.6 *February 10th 2016*
 * Fixes bugs:
   * `CLaSH.Prelude.DataFlow.parNDF` is not lazy enough
