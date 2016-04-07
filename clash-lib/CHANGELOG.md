@@ -1,5 +1,11 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.15 *April 7th 2016*
+* New features:
+  * Up to 2x reduced compilation times when working with large `Vec` literals
+* Fixes bugs:
+  * Bug in DEC transformation throws CLaSH into an endless loop [#140](https://github.com/clash-lang/clash-compiler/issues/140)
+
 ## 0.6.14 *March 21st 2016*
 * New features:
   * Also generate testbench for circuits without input ports [#135](https://github.com/clash-lang/clash-compiler/issues/135)

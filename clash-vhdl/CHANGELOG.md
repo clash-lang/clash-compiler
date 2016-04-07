@@ -1,5 +1,10 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.11 *April 7th 2016*
+* Fixes bugs:
+  * Incorrect primitives for `BitVector`s `quot#` and `rem#`
+  * Bit indexing and replacement primitives fail to synthesise in Synopsis tools
+
 ## 0.6.10 *March 15th 2016*
 * Fixes bugs:
   * XST cannot finds "_types" package unless it is prefixed with "work." [#133](https://github.com/clash-lang/clash-compiler/pull/133)

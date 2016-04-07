@@ -1,5 +1,14 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.17 *April 7th 2016*
+* New features:
+  * Up to 2x reduced compilation times when working with large `Vec` literals
+* Fixes bugs:
+  * VHDL: Incorrect primitives for `BitVector`s `quot#` and `rem#`
+  * VHDL: Bit indexing and replacement primitives fail to synthesise in Synopsis tools
+  * Bug in DEC transformation throws CLaSH into an endless loop [#140](https://github.com/clash-lang/clash-compiler/issues/140)
+  * Missed constant folding opportunity results in an error [#50](https://github.com/clash-lang/clash-prelude/issues/50)
+
 ## 0.6.16 *March 21st 2016*
 * New features:
   * Also generate testbench for circuits without input ports [#135](https://github.com/clash-lang/clash-compiler/issues/135)
