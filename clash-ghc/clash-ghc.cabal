@@ -1,9 +1,5 @@
 Name:                 clash-ghc
-<<<<<<< HEAD
-Version:              0.6.22
-=======
 Version:              0.7
->>>>>>> Adapt to new Proxy-less SNat
 Synopsis:             CAES Language for Synchronous Hardware
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
