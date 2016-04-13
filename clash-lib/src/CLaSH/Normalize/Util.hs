@@ -61,7 +61,7 @@ specializeNorm :: NormRewrite
 specializeNorm = specialise specialisationCache specialisationHistory specialisationLimit
 
 -- | Determine if a term is closed
-isClosed :: (Functor m, Fresh m)
+isClosed :: Fresh m
          => HashMap TyConName TyCon
          -> Term
          -> m Bool

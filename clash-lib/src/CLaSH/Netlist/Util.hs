@@ -49,7 +49,7 @@ mkBasicId n = do
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
 -- String containing the error is the term was not in a normalized form.
-splitNormalized :: (Fresh m, Functor m)
+splitNormalized :: Fresh m
                 => HashMap TyConName TyCon
                 -> Term
                 -> m (Either String ([Id],[LetBinding],Id))

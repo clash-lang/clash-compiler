@@ -4,7 +4,6 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TupleSections    #-}
@@ -61,11 +60,11 @@ import FamInstEnv (FamInst (..), FamInstEnvs,
 import FastString (unpackFS)
 import Id         (isDataConId_maybe)
 import IdInfo     (IdDetails (..), unfoldingInfo)
-import Kind       (isSuperKindTyCon)
 import Literal    (Literal (..))
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
+import PrelNames  (tYPETyConKey)
 import OccName    (occNameString)
 import Outputable (showPpr, showSDocUnsafe)
 import Pair       (Pair (..))
@@ -75,17 +74,13 @@ import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
                    isPrimTyCon, isTupleTyCon, isClosedSynFamilyTyCon_maybe,
-#if __GLASGOW_HASKELL__ >= 711
                    expandSynTyCon_maybe,
-#else
-                   tcExpandTyCon_maybe,
-#endif
                    tyConArity,
                    tyConDataCons, tyConKind,
                    tyConName, tyConUnique)
-import Type       (mkTopTvSubst, substTy, tcView)
-import TypeRep    (TyLit (..), Type (..))
-import Unique     (Uniquable (..), Unique, getKey)
+import Type       (mkTvSubstPrs, substTy, coreView)
+import TyCoRep    (TyBinder (..), TyLit (..), Type (..))
+import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
                    varUnique, idInfo)
@@ -138,7 +133,7 @@ makeTyCon fiEnvs tc = tycon
       | isTupleTyCon tc     = mkTupleTyCon
       | isAlgTyCon tc       = mkAlgTyCon
       | isPrimTyCon tc      = mkPrimTyCon
-      | isSuperKindTyCon tc = mkSuperKindTyCon
+      | tc `hasKey` tYPETyConKey = mkSuperKindTyCon
       | otherwise           = mkVoidTyCon
       where
         tcArity = tyConArity tc
@@ -224,7 +219,7 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
                                                                )
                                                )
   AbstractTyCon _ -> return Nothing
-  DataFamilyTyCon -> return Nothing
+  TupleTyCon {}   -> error "Cannot handle tuple tycons"
 
 coreToTerm :: PrimMap a
            -> [Var]
@@ -433,31 +428,28 @@ coreToDataCon dc = do
 
 coreToType :: Type
            -> State GHC2CoreState C.Type
-coreToType ty = coreToType' $ fromMaybe ty (tcView ty)
+coreToType ty = coreToType' $ fromMaybe ty (coreView ty)
 
 coreToType' :: Type
             -> State GHC2CoreState C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> (coreToVar tv)
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args
-#if __GLASGOW_HASKELL__ >= 711
   | otherwise     = case expandSynTyCon_maybe tc args of
-#else
-  | otherwise     = case tcExpandTyCon_maybe tc args of
-#endif
                       Just (substs,synTy,remArgs) -> do
-                        let substs' = mkTopTvSubst substs
+                        let substs' = mkTvSubstPrs substs
                             synTy'  = substTy substs' synTy
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
                       _ -> do
                         tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
                         tyConMap %= (HSM.insert tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
-coreToType' (FunTy ty1 ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-coreToType' (ForAllTy tv ty) = C.ForAllTy <$>
-                               (bind <$> coreToTyVar tv <*> coreToType ty)
+coreToType' (ForAllTy (Named tv _) ty) = C.ForAllTy <$> (bind <$> coreToTyVar tv <*> coreToType ty)
+coreToType' (ForAllTy (Anon ty1) ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
+coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPpr unsafeGlobalDynFlags t)
+coreToType' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPpr unsafeGlobalDynFlags t)
 
 coreToTyLit :: TyLit
             -> C.LitTy
@@ -616,14 +608,14 @@ appSignalTerm ty = error $ $(curLoc) ++ show ty
 -- | Given the type:
 --
 -- @
--- forall t.forall n.forall a.SClock t -> Vec n (Signal' t a) ->
+-- forall t.forall n.forall a.Vec n (Signal' t a) ->
 -- Signal' t (Vec n a)
 -- @
 --
 -- Generate the term:
 --
 -- @
--- /\(t:Clock)./\(n:Nat)./\(a:*).\(sclk:SClock t).\(vs:Signal' (Vec n a)).vs
+-- /\(t:Clock)./\(n:Nat)./\(a:*).\(vs:Signal' t (Vec n a)).vs
 -- @
 vecUnwrapTerm :: C.Type
               -> C.Term
@@ -631,9 +623,8 @@ vecUnwrapTerm (C.ForAllTy tvTTy) =
     C.TyLam (bind tTV (
     C.TyLam (bind nTV (
     C.TyLam (bind aTV (
-    C.Lam   (bind sclkId (
     C.Lam   (bind vsId (
-    C.Var vsTy vsName))))))))))
+    C.Var vsTy vsName))))))))
   where
     (tTV,nTV,aTV,funTy) = runFreshM $ do
       { (tTV',C.ForAllTy tvNTy) <- unbind tvTTy
@@ -641,12 +632,9 @@ vecUnwrapTerm (C.ForAllTy tvTTy) =
       ; (aTV',funTy')           <- unbind tvATy
       ; return (tTV',nTV',aTV',funTy')
       }
-    (C.FunTy sclkTy funTy'') = C.tyView funTy
-    (C.FunTy _ vsTy)         = C.tyView funTy''
-    sclkName = string2Name "sclk"
-    vsName   = string2Name "vs"
-    sclkId   = C.Id sclkName (embed sclkTy)
-    vsId     = C.Id vsName   (embed vsTy)
+    (C.FunTy _ vsTy) = C.tyView funTy
+    vsName           = string2Name "vs"
+    vsId             = C.Id vsName   (embed vsTy)
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
 
@@ -694,26 +682,34 @@ traverseTerm (C.ForAllTy tvFTy) =
 
 traverseTerm ty = error $ $(curLoc) ++ show ty
 
+-- ∀ (r :: GHC.Types.RuntimeRep)
+--   (a :: GHC.Prim.TYPE GHC.Types.PtrRepLifted)
+--   (b :: GHC.Prim.TYPE r).
+-- (a -> b) -> a -> b
+
+
 -- | Given the type:
 --
--- @forall a. forall b. (a -> b) -> a -> b@
+-- @forall (r :: Rep) (a :: TYPE Lifted) (b :: TYPE r). (a -> b) -> a -> b@
 --
 -- Generate the term:
 --
--- @/\(a:*)./\(b:*).\(f : (a -> b)).\(x : a).f x@
+-- @/\(r:Rep)/\(a:TYPE Lifted)./\(b:TYPE r).\(f : (a -> b)).\(x : a).f x@
 dollarTerm :: C.Type
            -> C.Term
-dollarTerm (C.ForAllTy tvATy) =
+dollarTerm (C.ForAllTy tvRTy) =
+    C.TyLam (bind rTV (
     C.TyLam (bind aTV (
     C.TyLam (bind bTV (
     C.Lam   (bind fId (
     C.Lam   (bind xId (
-    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))
+    C.App (C.Var fTy fName) (C.Var aTy xName)))))))))))
   where
-    (aTV,bTV,funTy) = runFreshM $ do
-      { (aTV',C.ForAllTy tvBTy) <- unbind tvATy
+    (rTV,aTV,bTV,funTy) = runFreshM $ do
+      { (rTV',C.ForAllTy tvATy) <- unbind tvRTy
+      ; (aTV',C.ForAllTy tvBTy) <- unbind tvATy
       ; (bTV',funTy')           <- unbind tvBTy
-      ; return (aTV',bTV',funTy')
+      ; return (rTV',aTV',bTV',funTy')
       }
     (C.FunTy fTy funTy'') = C.tyView funTy
     (C.FunTy aTy _)       = C.tyView funTy''

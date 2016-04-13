@@ -53,6 +53,7 @@ import qualified Module
 import           Outputable                   ((<>),dot,ppr)
 import qualified Outputable
 import qualified OccName
+import qualified GHC.LanguageExtensions       as LangExt
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
@@ -104,19 +105,19 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                 Nothing -> do
                   df <- GHC.getSessionDynFlags
                   let dfEn = foldl DynFlags.xopt_set df
-                                [ DynFlags.Opt_TemplateHaskell
-                                , DynFlags.Opt_DataKinds
-                                , DynFlags.Opt_TypeOperators
-                                , DynFlags.Opt_FlexibleContexts
-                                , DynFlags.Opt_ConstraintKinds
-                                , DynFlags.Opt_TypeFamilies
-                                , DynFlags.Opt_BinaryLiterals
-                                , DynFlags.Opt_ExplicitNamespaces
-                                , DynFlags.Opt_KindSignatures
+                                [ LangExt.TemplateHaskell
+                                , LangExt.DataKinds
+                                , LangExt.TypeOperators
+                                , LangExt.FlexibleContexts
+                                , LangExt.ConstraintKinds
+                                , LangExt.TypeFamilies
+                                , LangExt.BinaryLiterals
+                                , LangExt.ExplicitNamespaces
+                                , LangExt.KindSignatures
                                 ]
                   let dfDis = foldl DynFlags.xopt_unset dfEn
-                                [ DynFlags.Opt_ImplicitPrelude
-                                , DynFlags.Opt_MonomorphismRestriction
+                                [ LangExt.ImplicitPrelude
+                                , LangExt.MonomorphismRestriction
                                 ]
                   let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
                       ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
@@ -257,7 +258,6 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
              , Opt_DoLambdaEtaExpansion -- transform nested series of lambdas into one with multiple arguments, helps us achieve only top-level lambdas
              , Opt_CaseMerge -- We want fewer case-statements
              , Opt_DictsCheap -- Makes dictionaries seem cheap to optimizer: hopefully inline
-             , Opt_SimpleListLiterals -- Avoids 'build' rule
              , Opt_ExposeAllUnfoldings -- We need all the unfoldings we can get
              , Opt_ForceRecomp -- Force recompilation: never bad
              , Opt_EnableRewriteRules -- Reduce number of functions
@@ -288,9 +288,8 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
                , Opt_OmitInterfacePragmas -- We need all the unfoldings we can get
                , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
                , Opt_Loopification -- STG pass, don't care
-#if __GLASGOW_HASKELL__ >= 711
                , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks CLaSH, see [NOTE: CPR breaks CLaSH]
-#endif
+               , Opt_WorkerWrapper -- we have no use for W/W
                ]
 
 -- [NOTE: CPR breaks CLaSH]

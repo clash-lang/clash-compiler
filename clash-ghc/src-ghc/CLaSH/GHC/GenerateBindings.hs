@@ -158,7 +158,7 @@ mkClassSelector tcm ty sel = newExpr
 mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
 mkTupTyCons tcMap = (tcMap'',tupTcCache)
   where
-    tupTyCons        = map (GHC.tupleTyCon GHC.BoxedTuple) [2..62]
+    tupTyCons        = map (GHC.tupleTyCon GHC.Boxed) [2..62]
     (tcNames,tcMap') = State.runState (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique qualfiedNameString tc) tupTyCons) tcMap
     tupTcCache       = IM.fromList (zip [2..62] tcNames)
     tupHM            = HashMap.fromList (zip tcNames tupTyCons)

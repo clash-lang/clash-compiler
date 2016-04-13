@@ -24,7 +24,7 @@ import           CLaSH.Core.Var              (Id)
 import           CLaSH.Rewrite.Types
 
 -- | Apply a transformation on the subtrees of an term
-allR :: forall m . (Functor m, Monad m, Fresh m)
+allR :: forall m . (Monad m, Fresh m)
      => Bool -- ^ Freshen variable references in abstracted terms
      -> Transform m -- ^ The transformation to apply to the subtrees
      -> Transform m
@@ -78,32 +78,32 @@ allR rf trans c (Case scrut ty alts) = do
 
 infixr 6 >->
 -- | Apply two transformations in succession
-(>->) :: (Monad m) => Transform m -> Transform m -> Transform m
+(>->) :: Monad m => Transform m -> Transform m -> Transform m
 (>->) r1 r2 c = r1 c >=> r2 c
 
 infixr 6 >-!->
 -- | Apply two transformations in succession, and perform a deepseq in between.
-(>-!->) :: (Monad m) => Transform m -> Transform m -> Transform m
+(>-!->) :: Monad m => Transform m -> Transform m -> Transform m
 (>-!->) r1 r2 c e = do
   e' <- r1 c e
   deepseq e' (r2 c e')
 
 -- | Apply a transformation in a topdown traversal
-topdownR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
+topdownR :: Fresh m => Transform m -> Transform m
 topdownR r = r >-> allR True (topdownR r)
 
 -- | Apply a transformation in a topdown traversal. Doesn't freshen bound
 -- variables
-unsafeTopdownR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
+unsafeTopdownR :: Fresh m => Transform m -> Transform m
 unsafeTopdownR r = r >-> allR False (unsafeTopdownR r)
 
 -- | Apply a transformation in a bottomup traversal
-bottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
+bottomupR :: Fresh m => Transform m -> Transform m
 bottomupR r = allR True (bottomupR r) >-> r
 
 -- | Apply a transformation in a bottomup traversal. Doesn't freshen bound
 -- variables
-unsafeBottomupR :: (Fresh m, Functor m, Monad m) => Transform m -> Transform m
+unsafeBottomupR :: Fresh m => Transform m -> Transform m
 unsafeBottomupR r = allR False (unsafeBottomupR r) >-> r
 
 infixr 5 !->
@@ -139,7 +139,7 @@ whenR f r1 ctx expr = do
     else return expr
 
 -- | Only traverse downwards when the assertion evaluates to true
-bottomupWhenR :: (Monad m, Fresh m, Functor m)
+bottomupWhenR :: Fresh m
               => ([CoreContext] -> Term -> m Bool)
               -> Transform m
               -> Transform m

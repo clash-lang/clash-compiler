@@ -39,10 +39,10 @@ import CLaSH.Util
 
 -- | Pretty printing Show-like typeclass
 class Pretty p where
-  ppr :: (Applicative m, LFresh m) => p -> m Doc
+  ppr :: LFresh m => p -> m Doc
   ppr = pprPrec 0
 
-  pprPrec :: (Applicative m, LFresh m) => Rational -> p -> m Doc
+  pprPrec :: LFresh m => Rational -> p -> m Doc
 
 noPrec, opPrec, appPrec :: Num a => a
 noPrec = 0
@@ -68,7 +68,7 @@ instance Pretty a => Pretty [a] where
 instance Pretty (Id, Term) where
   pprPrec _ = pprTopLevelBndr
 
-pprTopLevelBndr :: (Applicative m, LFresh m) => (Id,Term) -> m Doc
+pprTopLevelBndr :: LFresh m => (Id,Term) -> m Doc
 pprTopLevelBndr (bndr,expr) = do
   bndr' <- ppr bndr
   bndrName <- ppr (varName bndr)
@@ -152,33 +152,33 @@ instance Pretty Pat where
     LitPat l   -> ppr (unembed l)
     DefaultPat -> return $ char '_'
 
-pprPrecLam :: (Applicative m, LFresh m) => Rational -> [Id] -> Term -> m Doc
+pprPrecLam :: LFresh m => Rational -> [Id] -> Term -> m Doc
 pprPrecLam prec xs e = do
   xs' <- mapM (pprBndr LambdaBind) xs
   e'  <- pprPrec noPrec e
   return $ prettyParen (prec > noPrec) $
     char 'λ' <> hsep xs' <+> rarrow $+$ e'
 
-pprPrecTyLam :: (Applicative m, LFresh m) => Rational -> [TyVar] -> Term -> m Doc
+pprPrecTyLam :: LFresh m => Rational -> [TyVar] -> Term -> m Doc
 pprPrecTyLam prec tvs e = do
   tvs' <- mapM ppr tvs
   e'   <- pprPrec noPrec e
   return $ prettyParen (prec > noPrec) $
     char 'Λ' <> hsep tvs' <+> rarrow $+$ e'
 
-pprPrecApp :: (Applicative m, LFresh m) => Rational -> Term -> Term -> m Doc
+pprPrecApp :: LFresh m => Rational -> Term -> Term -> m Doc
 pprPrecApp prec e1 e2 = do
   e1' <- pprPrec opPrec e1
   e2' <- pprPrec appPrec e2
   return $ prettyParen (prec >= appPrec) $ e1' $$ (nest 2 e2')
 
-pprPrecTyApp :: (Applicative m, LFresh m) => Rational -> Term -> Type -> m Doc
+pprPrecTyApp :: LFresh m => Rational -> Term -> Type -> m Doc
 pprPrecTyApp prec e ty = do
   e' <- pprPrec opPrec e
   ty' <- pprParendType ty
   return $ prettyParen (prec >= appPrec) $ e' $$ (char '@' <> ty')
 
-pprPrecLetrec :: (Applicative m, LFresh m) => Rational -> [(Id, Embed Term)] -> Term
+pprPrecLetrec :: LFresh m => Rational -> [(Id, Embed Term)] -> Term
   -> m Doc
 pprPrecLetrec prec xes body
   | [] <- xes = pprPrec prec body
@@ -192,20 +192,20 @@ pprPrecLetrec prec xes body
     return $ prettyParen (prec > noPrec) $
       hang (text "letrec") 2 (vcat xes') $$ text "in" <+> body'
 
-pprPrecCase :: (Applicative m, LFresh m) => Rational -> Term -> [(Pat,Term)] -> m Doc
+pprPrecCase :: LFresh m => Rational -> Term -> [(Pat,Term)] -> m Doc
 pprPrecCase prec e alts = do
   e' <- pprPrec prec e
   alts' <- mapM (pprPrecAlt noPrec) alts
   return $ prettyParen (prec > noPrec) $
     hang (text "case" <+> e' <+> text "of") 2 $ vcat alts'
 
-pprPrecAlt :: (Applicative m, LFresh m) => Rational -> (Pat,Term) -> m Doc
+pprPrecAlt :: LFresh m => Rational -> (Pat,Term) -> m Doc
 pprPrecAlt _ (altPat, altE) = do
   altPat' <- pprPrec noPrec altPat
   altE'   <- pprPrec noPrec altE
   return $ hang (altPat' <+> rarrow) 2 altE'
 
-pprBndr :: (Applicative m, LFresh m, Pretty a) => BindingSite -> a -> m Doc
+pprBndr :: (LFresh m, Pretty a) => BindingSite -> a -> m Doc
 pprBndr bs x = prettyParen needsParen <$> ppr x
   where
     needsParen = case bs of
@@ -222,13 +222,13 @@ data TypePrec
 maybeParen :: TypePrec -> TypePrec -> Doc -> Doc
 maybeParen ctxt_prec inner_prec = prettyParen (ctxt_prec >= inner_prec)
 
-pprType :: (Applicative m, LFresh m) => Type -> m Doc
+pprType :: LFresh m => Type -> m Doc
 pprType = ppr_type TopPrec
 
-pprParendType :: (Applicative m, LFresh m) => Type -> m Doc
+pprParendType :: LFresh m => Type -> m Doc
 pprParendType = ppr_type TyConPrec
 
-ppr_type :: (Applicative m, LFresh m) => TypePrec -> Type -> m Doc
+ppr_type :: LFresh m => TypePrec -> Type -> m Doc
 ppr_type _ (VarTy _ tv)                 = ppr tv
 ppr_type _ (LitTy tyLit)                = ppr tyLit
 ppr_type p ty@(ForAllTy _)              = pprForAllType p ty
@@ -242,10 +242,10 @@ ppr_type p (tyView -> FunTy ty1 ty2)    = pprArrowChain p <$> ppr_type FunPrec t
 ppr_type p (AppTy ty1 ty2) = maybeParen p TyConPrec <$> ((<+>) <$> pprType ty1 <*> ppr_type TyConPrec ty2)
 ppr_type _ (ConstTy Arrow) = return (parens rarrow)
 
-pprForAllType :: (Applicative m, LFresh m) => TypePrec -> Type -> m Doc
+pprForAllType :: LFresh m => TypePrec -> Type -> m Doc
 pprForAllType p ty = maybeParen p FunPrec <$> pprSigmaType True ty
 
-pprSigmaType :: (Applicative m, LFresh m) => Bool -> Type -> m Doc
+pprSigmaType :: LFresh m => Bool -> Type -> m Doc
 pprSigmaType showForalls ty = do
     (tvs, rho)     <- split1 [] ty
     sep <$> sequenceA [ if showForalls then pprForAll tvs else pure empty
@@ -256,13 +256,13 @@ pprSigmaType showForalls ty = do
       lunbind b $ \(tv,resTy) -> split1 (tv:tvs) resTy
     split1 tvs resTy = return (reverse tvs,resTy)
 
-pprForAll :: (Applicative m, LFresh m) => [TyVar] -> m Doc
+pprForAll :: LFresh m => [TyVar] -> m Doc
 pprForAll [] = return empty
 pprForAll tvs = do
   tvs' <- mapM pprTvBndr tvs
   return $ char '∀' <+> sep tvs' <> period
 
-pprTvBndr :: (Applicative m, LFresh m) => TyVar -> m Doc
+pprTvBndr :: LFresh m => TyVar -> m Doc
 pprTvBndr tv
   = do
       tv'   <- ppr tv
@@ -271,10 +271,10 @@ pprTvBndr tv
   where
     kind = unembed $ varKind tv
 
-pprKind :: (Applicative m, LFresh m) => Kind -> m Doc
+pprKind :: LFresh m => Kind -> m Doc
 pprKind = pprType
 
-pprTcApp :: (Applicative m, LFresh m) => TypePrec -> (TypePrec -> Type -> m Doc)
+pprTcApp :: LFresh m => TypePrec -> (TypePrec -> Type -> m Doc)
   -> TyConName -> [Type] -> m Doc
 pprTcApp _ _  tc []
   = return . text $ name2String tc

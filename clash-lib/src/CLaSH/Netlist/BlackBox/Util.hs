@@ -126,9 +126,7 @@ setCompName nm = map setCompName'
     setCompName' (BV t e m)     = BV t (setCompName nm e) (setCompName' m)
     setCompName' e              = e
 
-setClocks :: ( MonadWriter (Set (Identifier,HWType)) m
-             , Applicative m
-             )
+setClocks :: MonadWriter (Set (Identifier,HWType)) m
           => BlackBoxContext
           -> BlackBoxTemplate
           -> m BlackBoxTemplate
