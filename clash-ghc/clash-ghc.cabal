@@ -102,7 +102,9 @@ Executable clash
                       ghc-typelits-extra        >= 0.1.3    && < 0.2,
                       ghc-typelits-natnormalise >= 0.4.3    && < 0.5,
                       deepseq                   >= 1.3.0.2  && < 1.5,
-                      time                      >= 1.4.0.1  && < 1.7
+                      time                      >= 1.4.0.1  && < 1.7,
+                      ghc-boot                  >= 8.0      && < 8.2,
+                      ghci                      >= 8.0      && < 8.2
 
   if os(windows)
     Build-Depends:    Win32                     >= 2.3.1    && < 2.4
@@ -111,9 +113,10 @@ Executable clash
 
   C-Sources:          src-bin/hschooks.c
 
-  Other-Modules:      InteractiveUI
-                      GhciMonad
-                      GhciTags
+  Other-Modules:      GHCi.UI
+                      GHCi.UI.Info
+                      GHCi.UI.Monad
+                      GHCi.UI.Tags
 
                       CLaSH.GHC.CLaSHFlags
                       CLaSH.GHC.Evaluator

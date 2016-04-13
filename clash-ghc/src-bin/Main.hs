@@ -27,8 +27,15 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 #ifdef GHCI
-import InteractiveUI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
+import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
+
+-- Frontend plugins
+#ifdef GHCI
+import DynamicLoading
+import Plugins
+#endif
+import Module           ( ModuleName )
 
 
 -- Various other random stuff that we need
@@ -46,6 +53,7 @@ import Outputable
 import SrcLoc
 import Util
 import Panic
+import UniqSupply
 import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
@@ -67,11 +75,13 @@ import Data.Maybe
 
 -- clash additions
 import           Paths_clash_ghc
-import           InteractiveUI (makeHDL)
+import           GHCi.UI (makeHDL)
 import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
 import           Control.Exception (Exception(..),ErrorCall (..),throw)
+
+import qualified GHC.LanguageExtensions as LangExt
 
 import qualified CLaSH.Backend
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
@@ -101,19 +111,21 @@ main = do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
-   GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
 
--- Disable CPR analysis in versions older than GHC 7.11 by always inserting the
--- -fcpr-off flag. From GHC 7.11 and up, CPR analysis, specifically the
--- worker/wrapper it creates, can be turned off with a DynFlag.
---
--- See [NOTE: CPR breaks CLaSH] why the worker/wrapper introduced by the CPR
--- analysis is bad for CLaSH
-#if __GLASGOW_HASKELL__ >= 711
+   -- Handle GHC-specific character encoding flags, allowing us to control how
+   -- GHC produces output regardless of OS.
+   env <- getEnvironment
+   case lookup "GHC_CHARENC" env of
+    Just "UTF-8" -> do
+     hSetEncoding stdout utf8
+     hSetEncoding stderr utf8
+    _ -> do
+     -- Avoid GHC erroring out when trying to display unhandled characters
+     hSetTranslit stdout
+     hSetTranslit stderr
+
+   GHC.defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     argv0 <- getArgs
-#else
-    argv0 <- fmap ("-fcpr-off":) getArgs
-#endif
     libDir <- ghcLibDir
 
     let argv1 = map (mkGeneralLocated "on the commandline") argv0
@@ -158,20 +170,21 @@ main = do
             dflags <- GHC.getSessionDynFlags
             let dflagsExtra = foldl DynFlags.xopt_set
                                     dflags
-                                    [ DynFlags.Opt_TemplateHaskell
-                                    , DynFlags.Opt_Arrows
-                                    , DynFlags.Opt_DataKinds
-                                    , DynFlags.Opt_TypeOperators
-                                    , DynFlags.Opt_FlexibleContexts
-                                    , DynFlags.Opt_ConstraintKinds
-                                    , DynFlags.Opt_TypeFamilies
-                                    , DynFlags.Opt_BinaryLiterals
-                                    , DynFlags.Opt_ExplicitNamespaces
-                                    , DynFlags.Opt_KindSignatures
+                                    [ LangExt.TemplateHaskell
+                                    , LangExt.TemplateHaskellQuotes
+                                    , LangExt.Arrows
+                                    , LangExt.DataKinds
+                                    , LangExt.TypeOperators
+                                    , LangExt.FlexibleContexts
+                                    , LangExt.ConstraintKinds
+                                    , LangExt.TypeFamilies
+                                    , LangExt.BinaryLiterals
+                                    , LangExt.ExplicitNamespaces
+                                    , LangExt.KindSignatures
                                     ]
                 dflagsExtra1 = foldl DynFlags.xopt_unset dflagsExtra
-                                     [ DynFlags.Opt_ImplicitPrelude
-                                     , DynFlags.Opt_MonomorphismRestriction
+                                     [ LangExt.ImplicitPrelude
+                                     , LangExt.MonomorphismRestriction
                                      ]
 
                 ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
@@ -181,7 +194,6 @@ main = do
                                       ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
                                       DynFlags.pluginModNames dflagsExtra1
                                   }
-
 
             case postStartupMode of
                 Left preLoadMode ->
@@ -215,20 +227,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
                DoSystemVerilog -> (CompManager, dflt_target,    LinkInMemory)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
-  let dflags1 = case lang of
-                HscInterpreted ->
-                    let platform = targetPlatform dflags0
-                        dflags0a = updateWays $ dflags0 { ways = interpWays }
-                        dflags0b = foldl gopt_set dflags0a
-                                 $ concatMap (wayGeneralFlags platform)
-                                             interpWays
-                        dflags0c = foldl gopt_unset dflags0b
-                                 $ concatMap (wayUnsetGeneralFlags platform)
-                                             interpWays
-                    in dflags0c
-                _ ->
-                    dflags0
-      dflags2 = dflags1{ ghcMode   = mode,
+  let dflags1 = dflags0{ ghcMode   = mode,
                          hscTarget = lang,
                          ghcLink   = link,
                          verbosity = case postLoadMode of
@@ -240,14 +239,29 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
       -- can be overriden from the command-line
       -- XXX: this should really be in the interactive DynFlags, but
       -- we don't set that until later in interactiveUI
-      dflags3  | DoInteractive <- postLoadMode = imp_qual_enabled
+      dflags2  | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
-               | otherwise                     = dflags2
-        where imp_qual_enabled = dflags2 `gopt_set` Opt_ImplicitImportQualified
+               | otherwise                     = dflags1
+        where imp_qual_enabled = dflags1 `gopt_set` Opt_ImplicitImportQualified
 
         -- The rest of the arguments are "dynamic"
         -- Leftover ones are presumably files
-  (dflags4, fileish_args, dynamicFlagWarnings) <- GHC.parseDynamicFlags dflags3 args
+  (dflags3, fileish_args, dynamicFlagWarnings) <-
+      GHC.parseDynamicFlags dflags2 args
+
+  let dflags4 = case lang of
+                HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->
+                    let platform = targetPlatform dflags3
+                        dflags3a = updateWays $ dflags3 { ways = interpWays }
+                        dflags3b = foldl gopt_set dflags3a
+                                 $ concatMap (wayGeneralFlags platform)
+                                             interpWays
+                        dflags3c = foldl gopt_unset dflags3b
+                                 $ concatMap (wayUnsetGeneralFlags platform)
+                                             interpWays
+                    in dflags3c
+                _ ->
+                    dflags3
 
   GHC.prettyPrintGhcErrors dflags4 $ do
 
@@ -257,9 +271,6 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
          liftIO $ handleFlagWarnings dflags4 flagWarnings'
-
-        -- make sure we clean up after ourselves
-  GHC.defaultCleanupHandler dflags4 $ do
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -292,6 +303,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
     printInfoForUser (dflags6 { pprCols = 200 })
                      (pkgQual dflags6) (pprModuleMap dflags6)
 
+  liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
   liftIO $ checkOptions postLoadMode dflags6 srcs objs
 
@@ -310,6 +322,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        DoEval exprs           -> ghciUI clashOpts srcs $ Just $ reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
+       DoFrontend f           -> doFrontend f srcs
        DoVHDL                 -> clash makeVHDL
        DoVerilog              -> clash makeVerilog
        DoSystemVerilog        -> clash makeSystemVerilog
@@ -410,9 +423,10 @@ checkOptions mode dflags srcs objs = do
 
         -- -prof and --interactive are not a good combination
    when ((filter (not . wayRTSOnly) (ways dflags) /= interpWays)
-         && isInterpretiveMode mode) $
+         && isInterpretiveMode mode
+         && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
-                   "--interactive can't be used with -prof or -unreg.")
+              "-fexternal-interpreter is required when using --interactive with a non-standard way (-prof, -static, or -dynamic).")
         -- -ohi sanity check
    if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
@@ -436,9 +450,14 @@ checkOptions mode dflags srcs objs = do
         then throwGhcException (UsageError "no input files")
         else do
 
+   case mode of
+      StopBefore HCc | hscTarget dflags /= HscC
+        -> throwGhcException $ UsageError $
+           "the option -C is only available with an unregisterised GHC"
+      _ -> return ()
+
      -- Verify that output files point somewhere sensible.
    verifyOutputFiles dflags
-
 
 -- Compiler output options
 
@@ -534,6 +553,7 @@ data PostLoadMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
   | ShowPackages            -- ghc --show-packages
+  | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
   | DoVHDL                  -- ghc --vhdl
   | DoVerilog               -- ghc --verilog
   | DoSystemVerilog         -- ghc --systemverilog
@@ -559,6 +579,9 @@ stopBeforeMode phase = mkPostLoadMode (StopBefore phase)
 doEvalMode :: String -> Mode
 doEvalMode str = mkPostLoadMode (DoEval [str])
 
+doFrontendMode :: String -> Mode
+doFrontendMode str = mkPostLoadMode (DoFrontend (mkModuleName str))
+
 mkPostLoadMode :: PostLoadMode -> Mode
 mkPostLoadMode = Right . Right
 
@@ -573,6 +596,10 @@ isStopLnMode _ = False
 isDoMakeMode :: Mode -> Bool
 isDoMakeMode (Right (Right DoMake)) = True
 isDoMakeMode _ = False
+
+isDoEvalMode :: Mode -> Bool
+isDoEvalMode (Right (Right (DoEval _))) = True
+isDoEvalMode _ = False
 
 #ifdef GHCI
 isInteractiveMode :: PostLoadMode -> Bool
@@ -675,8 +702,8 @@ mode_flags =
           "LibDir",
           "Global Package DB",
           "C compiler flags",
-          "Gcc Linker flags",
-          "Ld Linker flags"],
+          "C compiler link flags",
+          "ld flags"],
     let k' = "-print-" ++ map (replaceSpace . toLower) k
         replaceSpace ' ' = '-'
         replaceSpace c   = c
@@ -696,6 +723,7 @@ mode_flags =
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , defFlag "-frontend"    (SepArg   (\s -> setMode (doFrontendMode s) "-frontend"))
   , defFlag "-vhdl"        (PassFlag (setMode doVHDLMode))
   , defFlag "-verilog"     (PassFlag (setMode doVerilogMode))
   , defFlag "-systemverilog" (PassFlag (setMode doSystemVerilogMode))
@@ -722,6 +750,15 @@ setMode newMode newFlag = liftEwM $ do
                       | isShowGhcUsageMode newMode &&
                         isDoInteractiveMode oldMode ->
                             ((showGhciUsageMode, newFlag), [])
+
+                    -- If we have both -e and --interactive then -e always wins
+                    _ | isDoEvalMode oldMode &&
+                        isDoInteractiveMode newMode ->
+                            ((oldMode, oldFlag), [])
+                      | isDoEvalMode newMode &&
+                        isDoInteractiveMode oldMode ->
+                            ((newMode, newFlag), [])
+
                     -- Otherwise, --help/--version/--numeric-version always win
                       | isDominantFlag oldMode -> ((oldMode, oldFlag), [])
                       | isDominantFlag newMode -> ((newMode, newFlag), [])
@@ -764,13 +801,7 @@ addFlag s flag = liftEwM $ do
 
 doMake :: [(String,Maybe Phase)] -> Ghc ()
 doMake srcs  = do
-    let (hs_srcs, non_hs_srcs) = partition haskellish srcs
-
-        haskellish (f,Nothing) =
-          looksLikeModuleName f || isHaskellUserSrcFilename f || '.' `notElem` f
-        haskellish (_,Just phase) =
-          phase `notElem` [ As True, As False, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm
-                          , StopLn]
+    let (hs_srcs, non_hs_srcs) = partition isHaskellishTarget srcs
 
     hsc_env <- GHC.getSession
 
@@ -918,6 +949,20 @@ dumpPackages       dflags = putMsg dflags (pprPackages dflags)
 dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 
 -- -----------------------------------------------------------------------------
+-- Frontend plugin support
+
+doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
+#ifndef GHCI
+doFrontend _ _ =
+    throwGhcException (CmdLineError "not built for interactive use")
+#else
+doFrontend modname srcs = do
+    hsc_env <- getSession
+    frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
+    frontend frontend_plugin (frontendPluginOpts (hsc_dflags hsc_env)) srcs
+#endif
+
+-- -----------------------------------------------------------------------------
 -- ABI hash support
 
 {-
@@ -927,8 +972,8 @@ Generates a combined hash of the ABI for modules Data.Foo and
 System.Bar.  The modules must already be compiled, and appropriate -i
 options may be necessary in order to find the .hi files.
 
-This is used by Cabal for generating the InstalledPackageId for a
-package.  The InstalledPackageId must change when the visible ABI of
+This is used by Cabal for generating the ComponentId for a
+package.  The ComponentId must change when the visible ABI of
 the package chagnes, so during registration Cabal calls ghc --abi-hash
 to get a hash of the package's ABI.
 -}
@@ -968,7 +1013,7 @@ abiHash strs = do
 
   putStrLn (showPpr dflags f)
 
--- -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 -- VHDL Generation
 
 makeHDL' :: CLaSH.Backend.Backend backend => (Int -> HdlSyn -> backend) ->  IORef CLaSHOpts -> [(String,Maybe Phase)] -> Ghc ()
@@ -992,7 +1037,7 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
   where
     oneError f =
         "unrecognised flag: " ++ f ++ "\n" ++
-        (case fuzzyMatch f (nub allFlags) of
+        (case fuzzyMatch f (nub allNonDeprecatedFlags) of
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
 

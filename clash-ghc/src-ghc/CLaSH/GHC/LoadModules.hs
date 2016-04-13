@@ -106,6 +106,7 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                   df <- GHC.getSessionDynFlags
                   let dfEn = foldl DynFlags.xopt_set df
                                 [ LangExt.TemplateHaskell
+                                , LangExt.TemplateHaskellQuotes
                                 , LangExt.DataKinds
                                 , LangExt.TypeOperators
                                 , LangExt.FlexibleContexts
