@@ -11,9 +11,6 @@ packages:
 - location:
     git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
     commit: 914cda2d25dc18f8a6d9ce0d88f34fc498085ff9
-- location:
-    git: https://github.com/christiaanb/uu-parsinglib.git
-    commit: 337ac279c83c57b3cd6e87cbe2fbf6622ffcefa0
 
 extra-deps:
 - ListLike-4.2.1
@@ -82,6 +79,7 @@ extra-deps:
 - unexceptionalio-0.3.0
 - unordered-containers-0.2.7.0
 - uu-interleaved-0.2.0.0
+- uu-parsinglib-2.9.1.1
 - vector-0.11.0.0
 - void-0.7.1
 - wl-pprint-text-1.1.0.4
