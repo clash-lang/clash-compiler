@@ -115,6 +115,7 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                 , LangExt.BinaryLiterals
                                 , LangExt.ExplicitNamespaces
                                 , LangExt.KindSignatures
+                                , LangExt.DeriveLift
                                 ]
                   let dfDis = foldl DynFlags.xopt_unset dfEn
                                 [ LangExt.ImplicitPrelude

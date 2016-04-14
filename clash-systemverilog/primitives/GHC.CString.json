@@ -3,6 +3,11 @@
     , "templateE" : "~LIT[0]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.CString.unpackFoldrCString#"
+    , "templateE" : "~LIT[0]"
+    }
+  }
 , { "Primitive" :
     { "name"     : "GHC.CString.unpackCStringUtf8#"
     , "primType" : "Function"

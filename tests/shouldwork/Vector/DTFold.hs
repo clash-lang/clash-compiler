@@ -2,7 +2,8 @@
 module DTFold where
 
 import CLaSH.Prelude
-import Data.Singletons.Prelude
+--import Data.Singletons.Prelude
+import CLaSH.Promoted.Defun
 import Data.Proxy
 
 data IIndex (f :: TyFun Nat *) :: *

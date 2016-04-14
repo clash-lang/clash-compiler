@@ -5,7 +5,8 @@ import CLaSH.Prelude
 import GHC.TypeLits.Extra
 
 import Data.Proxy
-import Data.Singletons.Prelude
+--import Data.Singletons.Prelude
+import CLaSH.Promoted.Defun
 
 data IIndex (f :: TyFun Nat *) :: *
 type instance Apply IIndex l = Index ((2^l)+1)

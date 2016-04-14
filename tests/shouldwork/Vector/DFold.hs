@@ -2,7 +2,8 @@
 module DFold where
 
 import CLaSH.Prelude
-import Data.Singletons.Prelude
+--import Data.Singletons.Prelude
+import CLaSH.Promoted.Defun
 import Data.Proxy
 
 data Append (m :: Nat) (a :: *) (f :: TyFun Nat *) :: *

@@ -9,7 +9,6 @@ system50 :: SClock System50
 system50 = sclock
 type Sig1 = Signal' System50
 regEn1 = regEn' system50
-bundle1 = bundle' system50
 
 type Word1 = Signed 18 -- SFixed 9 9
 type RomFunction = (Unsigned 9 -> Word1)
@@ -22,7 +21,7 @@ mf ::
   => (Vec n RomFunction, SNat n1, SNat n2)
   -> (Sig1 Word1, Sig1 Bool)
   -> Sig1 Word1
-mf (romFunctions, nI, coefN) (bk, dPulse) = (!!) <$> (bundle1 results) <*> curCore
+mf (romFunctions, nI, coefN) (bk, dPulse) = (!!) <$> (bundle results) <*> curCore
   where
 
     g (mem, coreIndex) = initCore (mem, curCore .==. coreIndex)
@@ -44,7 +43,7 @@ romF2 addr = 1
 topEntity = mf ((romF1 :> romF2 :> Nil), d2, d8)
 
 testInput :: (Sig1 Word1, Sig1 Bool)
-testInput = unbundle' system50 (stimuliGenerator' system50 ((5,True):>(4,False):>(2,True):>Nil))
+testInput = unbundle (stimuliGenerator' system50 ((5,True):>(4,False):>(2,True):>Nil))
 
 expectedOutput :: Sig1 Word1 -> Sig1 Bool
 expectedOutput = outputVerifier' system50 (0:>4:>2:>0:>2:>Nil)
