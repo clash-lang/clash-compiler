@@ -70,7 +70,7 @@ main =
             ]
         , testGroup "Fixed"
             [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "Mixer" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Fixed") Both ["-clash-inline-limit=200"] "SFixedTest" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
             ]
         , testGroup "HOPrim"

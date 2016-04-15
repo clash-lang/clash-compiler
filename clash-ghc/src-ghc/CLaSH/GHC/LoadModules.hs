@@ -269,6 +269,9 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
              , Opt_DictsStrict -- Hopefully helps remove class method selectors
              , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
              , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks CLaSH]
+             , Opt_FullLaziness -- increases sharing (and seems to reduce subsequent compilation time)
+             , Opt_SpecialiseAggressively -- Needed to compile Fixed point number functions quickly
+             , Opt_CrossModuleSpecialise -- Needed to compile Fixed point number functions quickly
              ]
 
     unwanted = [ Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
