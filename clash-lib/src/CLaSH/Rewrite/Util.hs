@@ -299,6 +299,18 @@ tailCalls id_ expr = case expr of
           _ -> Nothing
   _ -> Just 0
 
+-- | Determines whether a function has the following shape:
+--
+-- > \(w :: Void) -> f a b c
+--
+-- i.e. is a wrapper around a (partially) applied function 'f', where the
+-- introduced argument 'w' is not used by 'f'
+isVoidWrapper :: Term -> Bool
+isVoidWrapper (Lam b) = case unsafeUnbind b of
+  (bndr,e@(collectArgs -> (Var _ _,_))) -> varName bndr `notElem` Lens.toListOf termFreeIds e
+  _ -> False
+isVoidWrapper _ = False
+
 -- | Substitute the RHS of the first set of Let-binders for references to the
 -- first set of Let-binders in: the second set of Let-binders and the additional
 -- term
