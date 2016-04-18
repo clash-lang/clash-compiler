@@ -355,7 +355,9 @@ deadCode _ e@(Letrec binds) = do
                                ) xes
         xesUsed' = findUsedBndrs [] xesUsed xesOther
     if length xesUsed' /= length xes
-      then changed . Letrec $ bind (rec xesUsed') body
+      then case xesUsed' of
+              [] -> changed body
+              _  -> changed . Letrec $ bind (rec xesUsed') body
       else return e
   where
     findUsedBndrs :: [(Var Term, Embed Term)] -> [(Var Term, Embed Term)]
