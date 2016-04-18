@@ -99,10 +99,30 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
 
     inlineTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
     inlineTest e (id_@(Id idName _), exprE)
-      = not <$> ((||) <$> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
-                      <*> pure (isJoinPointIn id_ e))
+      = let e' = unembed exprE
+        in  not <$> ((||) <$> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure e'))
+                          -- See: [Note] join points and void wrappers
+                          <*> pure (isJoinPointIn id_ e && not (isVoidWrapper e')))
 
     inlineTest _ _ = return True
+
+{- [Note] join points and void wrappers
+Join points are functions that only occur in tail-call positions within an
+expression, and only when they occur in a tail-call position more than once.
+
+Normally bindNonRep binds/inlines all non-recursive local functions. However,
+doing so for join points would significantly increase compilation time, so we
+avoid it. The only exception to this rule are so-called void wrappers. Void
+wrappers are functions of the form:
+
+> \(w :: Void) -> f a b c
+
+i.e. a wrapper around the function 'f' where the argument 'w' is not used. We
+do bind/line these join-points because these void-wrappers interfere with the
+'disjoint expression consolidation' (DEC) and 'common sub-expression elimination'
+(CSE) transformation, sometimes resulting in circuits that are twice as big
+as they'd need to be.
+-}
 
 -- | Specialize functions on their type
 typeSpec :: NormRewrite
