@@ -20,7 +20,7 @@ data BitMasterS
   , _dsclOen        :: Bool            -- delayed sclOen signal
   , _clkEn          :: Bool            -- statemachine clock enable
   , _slaveWait      :: Bool            -- clock generation signal
-  , _cnt            :: Unsigned 16     -- clock devider counter (synthesis)
+  , _cnt            :: Unsigned 16     -- clock divider counter (synthesis)
   }
 
 makeLenses ''BitMasterS
@@ -34,7 +34,7 @@ bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _dsclOen        = False      -- delayed sclOen signal
                             , _clkEn          = True       -- statemachine clock enable
                             , _slaveWait      = False      -- clock generation signal
-                            , _cnt            = 0          -- clock devider counter (synthesis)
+                            , _cnt            = 0          -- clock divider counter (synthesis)
                             }
 
 {-# NOINLINE bitMasterT #-}
