@@ -81,6 +81,7 @@ where
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Default                   (Default (..))
+import Text.Read                      (Read (..), ReadPrec (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
@@ -110,6 +111,8 @@ import qualified CLaSH.Sized.Internal.BitVector as BV
 -- >>>  maxBound :: Signed 3
 -- 3
 -- >>> minBound :: Signed 3
+-- -4
+-- >>> read (show (minBound :: Signed 3)) :: Signed 3
 -- -4
 -- >>> 1 + 2 :: Signed 3
 -- 3
@@ -142,6 +145,10 @@ size# bv = fromInteger (natVal bv)
 
 instance Show (Signed n) where
   show (S n) = show n
+
+-- | None of the 'Read' class' methods are synthesisable.
+instance KnownNat n => Read (Signed n) where
+  readPrec = fromIntegral <$> (readPrec :: ReadPrec Int)
 
 instance KnownNat n => BitPack (Signed n) where
   type BitSize (Signed n) = n

@@ -69,6 +69,7 @@ where
 import Control.Arrow              ((***), second)
 import Data.Bits                  (Bits (..), FiniteBits)
 import Data.Default               (Default (..))
+import Text.Read                  (Read(..), ReadPrec(..))
 import Data.List                  (find)
 import Data.Maybe                 (fromJust)
 import Data.Proxy                 (Proxy (..))
@@ -138,6 +139,8 @@ deriving instance Bits (rep (int + frac)) => Bits (Fixed rep int frac)
 -- 3.9375
 -- >>> minBound :: SFixed 3 4
 -- -4.0
+-- >>> read (show (maxBound :: SFixed 3 4)) :: SFixed 3 4
+-- 3.9375
 -- >>> 1 + 2 :: SFixed 3 4
 -- 3.0
 -- >>> 2 + 3 :: SFixed 3 4
@@ -248,6 +251,11 @@ instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
       nom       = if fRepI < 0 then fRepI_abs .&. ((2 ^ nF) - 1)
                                else fRepI .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
+
+-- | None of the 'Read' class' methods are synthesisable.
+instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep size))
+      => Read (Fixed rep int frac) where
+  readPrec = fLitR <$> readPrec
 
 {- $constraintsynonyms #constraintsynonyms#
 Writing polymorphic functions over fixed point numbers can be a potentially

@@ -58,6 +58,7 @@ module CLaSH.Sized.Internal.Index
 where
 
 import Data.Default               (Default (..))
+import Text.Read                  (Read (..), ReadPrec (..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
@@ -80,6 +81,8 @@ import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (..))
 -- 7
 -- >>> minBound :: Index 8
 -- 0
+-- >>> read (show (maxBound :: Index 8)) :: Index 8
+-- 7
 -- >>> 1 + 2 :: Index 8
 -- 3
 -- >>> 2 + 6 :: Index 8
@@ -264,6 +267,10 @@ decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
 instance Show (Index n) where
   show (I n) = show n
+
+-- | None of the 'Read' class' methods are synthesisable.
+instance KnownNat n => Read (Index n) where
+  readPrec = fromIntegral <$> (readPrec :: ReadPrec Word)
 
 instance KnownNat n => Default (Index n) where
   def = fromInteger# 0
