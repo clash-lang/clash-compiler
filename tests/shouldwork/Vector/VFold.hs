@@ -2,7 +2,7 @@ module VFold where
 
 import CLaSH.Prelude
 
-csSort = vfold csRow
+csSort = vfold (const csRow)
   where
     cs a b     = if a > b then (a,b) else (b,a)
     csRow y xs = let (y',xs') = mapAccumL cs y xs in xs' :< y'
