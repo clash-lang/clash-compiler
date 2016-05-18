@@ -5,6 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -94,6 +95,7 @@ where
 import Control.Lens               (Index, Ixed (..), IxValue)
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Char                  (digitToInt)
+import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Maybe                 (listToMaybe)
 import GHC.Integer                (smallInteger)
@@ -130,6 +132,7 @@ newtype BitVector (n :: Nat) =
     -- | The constructor, 'BV', and  the field, 'unsafeToInteger', are not
     -- synthesisable.
     BV { unsafeToInteger :: Integer}
+  deriving Data
 
 -- | 'Bit': a 'BitVector' of length 1
 type Bit = BitVector 1

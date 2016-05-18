@@ -24,6 +24,7 @@ BEWARE: rounding by truncation introduces a sign bias!
 
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
@@ -68,6 +69,7 @@ where
 
 import Control.Arrow              ((***), second)
 import Data.Bits                  (Bits (..), FiniteBits)
+import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Text.Read                  (Read(..), ReadPrec(..))
 import Data.List                  (find)
@@ -113,6 +115,8 @@ import CLaSH.Sized.Unsigned       (Unsigned)
 newtype Fixed (rep :: Nat -> *) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
 
+deriving instance (Typeable rep, Typeable int, Typeable frac
+                  , Data (rep (int + frac))) => Data (Fixed rep int frac)
 deriving instance Eq (rep (int + frac))      => Eq (Fixed rep int frac)
 deriving instance Ord (rep (int + frac))     => Ord (Fixed rep int frac)
 deriving instance Enum (rep (int + frac))    => Enum (Fixed rep int frac)

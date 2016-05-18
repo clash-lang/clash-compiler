@@ -5,6 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -73,6 +74,7 @@ where
 
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
+import Data.Data                      (Data)
 import Data.Default                   (Default (..))
 import Text.Read                      (Read (..), ReadPrec (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
@@ -127,6 +129,7 @@ newtype Unsigned (n :: Nat) =
     -- | The constructor, 'U', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     U { unsafeToInteger :: Integer }
+  deriving Data
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int

@@ -1,5 +1,8 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.8 *May 17th 2016*
+* Derive instances of Data for numeric types.
+
 ## 0.10.7 *April 7th 2016*
 * Support doctest-0.11.0
 

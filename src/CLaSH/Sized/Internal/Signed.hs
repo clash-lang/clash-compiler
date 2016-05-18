@@ -5,6 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
@@ -80,6 +81,7 @@ where
 
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
+import Data.Data                      (Data)
 import Data.Default                   (Default (..))
 import Text.Read                      (Read (..), ReadPrec (..))
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
@@ -138,6 +140,7 @@ newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     S { unsafeToInteger :: Integer}
+  deriving Data
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Signed n -> Int

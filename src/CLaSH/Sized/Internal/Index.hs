@@ -5,6 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -57,6 +58,7 @@ module CLaSH.Sized.Internal.Index
   )
 where
 
+import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Text.Read                  (Read (..), ReadPrec (..))
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -97,6 +99,7 @@ newtype Index (n :: Nat) =
     -- | The constructor, 'I', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     I { unsafeToInteger :: Integer }
+  deriving Data
 
 instance KnownNat n => BitPack (Index n) where
   type BitSize (Index n) = CLog 2 n
