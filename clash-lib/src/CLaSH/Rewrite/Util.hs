@@ -328,26 +328,38 @@ localFreeIds = do
   globalBndrs <- Lens.use bindings
   return ((termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))))
 
--- | Lift the binders in a let-binding to a global function that have a certain
--- property
-liftBinders :: (Term -> LetBinding -> RewriteMonad extra Bool) -- ^ Property test
-            -> Rewrite extra
-liftBinders condition ctx expr@(Letrec b) = do
-  (xes,res)        <- unbind b
-  let expr' = Letrec (bind xes res)
-  (replace,others) <- partitionM (condition expr') (unrec xes)
+inlineOrLiftBinders :: (LetBinding -> RewriteMonad extra Bool) -- ^ Property test
+                    -> (Term -> LetBinding -> RewriteMonad extra Bool)
+                       -- ^ Test whether to lift or inline
+                       --
+                       -- * True: inline
+                       -- * False: lift
+                    -> Rewrite extra
+inlineOrLiftBinders condition inlineOrLift ctx expr@(Letrec b) = do
+  (xesR,res) <- unbind b
+  let xes = unrec xesR
+  (replace,others) <- partitionM condition xes
   case replace of
     [] -> return expr
     _  -> do
-      (gamma,delta) <- mkEnv (LetBinding undefined (map fst $ unrec xes) : ctx)
-      replace' <- mapM (liftBinding gamma delta) replace
-      let (others',res') = substituteBinders replace' others res
-          newExpr = case others' of
-                          [] -> res'
-                          _  -> Letrec (bind (rec others') res')
+      -- Because 'unbind b' refreshes binders in xes, we must recreate
+      -- the let expression, and _not_ reuse 'expr'
+      let expr' = Letrec (bind xesR res)
+      (doInline,doLift) <- partitionM (inlineOrLift expr') replace
+      -- We first substitute the binders that we can inline both the binders
+      -- that we intend to lift, the other binders, and the body
+      let (others',res')     = substituteBinders doInline (doLift ++ others) res
+          (doLift',others'') = splitAt (length doLift) others'
+      (gamma,delta) <- mkEnv (LetBinding undefined (map fst xes) : ctx)
+      doLift'' <- mapM (liftBinding gamma delta) doLift'
+      -- We then substitute the lifted binders in the other binders and the body
+      let (others3,res'') = substituteBinders doLift'' others'' res'
+          newExpr = case others3 of
+                      [] -> res''
+                      _  -> Letrec (bind (rec others3) res'')
       changed newExpr
 
-liftBinders _ _ e = return e
+inlineOrLiftBinders _ _ _ e = return e
 
 -- | Create a global function for a Let-binding and return a Let-binding where
 -- the RHS is a reference to the new global function applied to the free
