@@ -390,6 +390,24 @@ removeUnusedExpr _ e@(Case _ _ [alt]) = do
          else return e
     _ -> return e
 
+-- Replace any expression that creates a Vector of size 0 within the application
+-- of the Cons constructor, by the Nil constructor.
+removeUnusedExpr _ e@(collectArgs -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil]))
+  | name2String (dcName dc) == "CLaSH.Sized.Vector.Cons"
+  = do
+    tcm <- Lens.view tcCache
+    case runExcept (tyNatSize tcm nTy) of
+      Right 0
+        | (con, _) <- collectArgs nil
+        , not (isCon con)
+        -> do eTy <- termType tcm e
+              let (TyConApp vecTcNm _) = tyView eTy
+                  (Just vecTc) = HashMap.lookup vecTcNm tcm
+                  [nilCon,consCon] = tyConDataCons vecTc
+                  v = mkVec nilCon consCon aTy 1 [a]
+              changed v
+      _ -> return e
+
 removeUnusedExpr _ e = return e
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
