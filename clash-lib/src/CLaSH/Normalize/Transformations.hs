@@ -12,12 +12,11 @@
 
 module CLaSH.Normalize.Transformations
   ( appProp
-  , bindNonRep
-  , liftNonRep
   , caseLet
   , caseCon
   , caseCase
   , inlineNonRep
+  , inlineOrLiftNonRep
   , typeSpec
   , nonRepSpec
   , etaExpansionTL
@@ -88,33 +87,22 @@ import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
 import           CLaSH.Util
 
--- | Inline non-recursive, non-representable, non-join-point, let-bindings
-bindNonRep :: NormRewrite
-bindNonRep = inlineBinders nonRepTest
+inlineOrLiftNonRep :: NormRewrite
+inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
   where
-    nonRepTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
-    nonRepTest e (id_@(Id idName tyE), exprE)
-      = (&&) <$> (not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure (unembed tyE)))
-             <*> ((&&) <$> (notElem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
-                       <*> (pure (not $ isJoinPointIn id_ e)))
-
-    nonRepTest _ _ = return False
-
--- | Lift non-representable let-bindings
-liftNonRep :: NormRewrite
-liftNonRep = liftBinders nonRepTest
-  where
-    nonRepTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
-    nonRepTest _ ((Id _ tyE), _)
-      -- We used to also check whether the binder we are lifting is either
-      -- recursive or a join-point. This is no longer needed because we apply
-      -- bindNonRep exhaustively before we apply liftNonRep. See also:
-      -- [Note] bindNonRep before liftNonRep
+    nonRepTest :: (Var Term, Embed Term) -> RewriteMonad extra Bool
+    nonRepTest ((Id _ tyE), _)
       = not <$> (representableType <$> Lens.view typeTranslator
                                    <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
+    nonRepTest _ = return False
 
-    nonRepTest _ _ = return False
+    inlineTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
+    inlineTest e (id_@(Id idName _), exprE)
+      = not <$> ((||) <$> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure (unembed exprE)))
+                      <*> pure (isJoinPointIn id_ e))
+
+    inlineTest _ _ = return True
 
 -- | Specialize functions on their type
 typeSpec :: NormRewrite
@@ -401,6 +389,24 @@ removeUnusedExpr _ e@(Case _ _ [alt]) = do
          then changed altExpr
          else return e
     _ -> return e
+
+-- Replace any expression that creates a Vector of size 0 within the application
+-- of the Cons constructor, by the Nil constructor.
+removeUnusedExpr _ e@(collectArgs -> (Data dc, [_,Right aTy,Right nTy,_,Left a,Left nil]))
+  | name2String (dcName dc) == "CLaSH.Sized.Vector.Cons"
+  = do
+    tcm <- Lens.view tcCache
+    case runExcept (tyNatSize tcm nTy) of
+      Right 0
+        | (con, _) <- collectArgs nil
+        , not (isCon con)
+        -> do eTy <- termType tcm e
+              let (TyConApp vecTcNm _) = tyView eTy
+                  (Just vecTc) = HashMap.lookup vecTcNm tcm
+                  [nilCon,consCon] = tyConDataCons vecTc
+                  v = mkVec nilCon consCon aTy 1 [a]
+              changed v
+      _ -> return e
 
 removeUnusedExpr _ e = return e
 

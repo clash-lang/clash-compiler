@@ -32,13 +32,12 @@ normalization = constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rm
 
 constantPropgation :: NormRewrite
 constantPropgation = propagate >-> repeatR inlineAndPropagate >->
-                     caseFlattening >-> dec >-> lifting >-> spec >-> dec >->
+                     caseFlattening >-> dec >-> spec >-> dec >->
                      conSpec
   where
     propagate          = innerMost (applyMany transPropagate)
     inlineAndPropagate = (topdownR (applyMany transInlineSafe) >-> inlineNR)
                          !-> propagate
-    lifting            = bottomupR (apply "liftNonRep" liftNonRep) -- See: [Note] bottom-up traversal for liftNonRep
     spec               = bottomupR (applyMany specTransformations)
     caseFlattening     = repeatR (topdownR (apply "caseFlat" caseFlat))
     dec                = repeatR (topdownR (apply "DEC" disjointExpressionConsolidation))
@@ -59,7 +58,8 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
     transInlineSafe =
        [ ("inlineClosed"    , inlineClosed)
        , ("inlineSmall"     , inlineSmall)
-       , ("bindNonRep"      , bindNonRep) -- See: [Note] bindNonRep before liftNonRep
+       , ("bindOrLifNonRep" , inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
+                                                  -- See: [Note] bottom-up traversal for liftNonRep
        , ("reduceNonRepPrim", reduceNonRepPrim)
        ]
 
