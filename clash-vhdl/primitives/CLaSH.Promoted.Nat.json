@@ -7,7 +7,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.snatToInteger"
     , "type"      : "snatToInteger :: SNat n -> Integer"
-    , "templateE" : "~ARG[0]"
+    , "templateE" : "~IF ~IW64 ~THEN to_signed(~ARG[0],64) ~ELSE to_signed(~ARG[0],32) ~FI"
     }
   }
 , { "BlackBox" :
