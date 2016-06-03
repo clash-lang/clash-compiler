@@ -959,7 +959,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType [lhsElTy,rhsElty,resElTy]
+            untranslatableTys <- mapM isUntranslatableType_not_poly [lhsElTy,rhsElty,resElTy]
             if or untranslatableTys
                then let [fun,lhsArg,rhsArg] = Either.lefts args
                     in  reduceZipWith n lhsElTy rhsElty resElTy fun lhsArg rhsArg
@@ -969,7 +969,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         let [argElTy,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType [argElTy,resElTy]
+            untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
             if or untranslatableTys
                then let [fun,arg] = Either.lefts args
                     in  reduceMap n argElTy resElTy fun arg
@@ -985,7 +985,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
       "CLaSH.Sized.Vector.fold" | length args == 4 -> do
         let [aTy,nTy] = Either.rights args
             isPow2 x  = x /= 0 && (x .&. (complement x + 1)) == x
-        untranslatableTy <- isUntranslatableType aTy
+        untranslatableTy <- isUntranslatableType_not_poly aTy
         case runExcept (tyNatSize tcm nTy) of
           Right n | not (isPow2 (n + 1)) || untranslatableTy ->
             let [fun,arg] = Either.lefts args
@@ -995,7 +995,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         let [aTy,bTy,nTy] = Either.rights args
         in  case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTys <- mapM isUntranslatableType [aTy,bTy]
+            untranslatableTys <- mapM isUntranslatableType_not_poly [aTy,bTy]
             if or untranslatableTys
               then let [fun,start,arg] = Either.lefts args
                    in  reduceFoldr n aTy bTy fun start arg
@@ -1014,7 +1014,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                 | n == 0 -> changed rArg
                 | m == 0 -> changed lArg
                 | otherwise -> do
-                    untranslatableTy <- isUntranslatableType aTy
+                    untranslatableTy <- isUntranslatableType_not_poly aTy
                     if untranslatableTy
                        then reduceAppend n m aTy lArg rArg
                        else return e
@@ -1024,7 +1024,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType aTy
+            untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy
                then reduceHead n aTy vArg
                else return e
@@ -1034,7 +1034,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
             [vArg]    = Either.lefts args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType aTy
+            untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy
                then reduceTail n aTy vArg
                else return e
@@ -1053,13 +1053,19 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType aTy
+            untranslatableTy <- isUntranslatableType_not_poly aTy
             if untranslatableTy
                then reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
 
       _ -> return e
+  where
+    isUntranslatableType_not_poly t = do
+      u <- isUntranslatableType t
+      if u
+         then return (null $ Lens.toListOf typeFreeVars t)
+         else return False
 
 reduceNonRepPrim _ e = return e
 
