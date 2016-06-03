@@ -82,6 +82,8 @@ ghcTypeToHWType iw = go
         "GHC.Prim.~#"                   ->
           fail $ "Can't translate type: " ++ showDoc ty
 
+        "GHC.Prim.Any" -> return (BitVector 1)
+
         "CLaSH.Signal.Internal.Signal'" ->
           ExceptT $ return $ coreTypeToHWType go m (args !! 1)
 
