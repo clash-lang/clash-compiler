@@ -58,7 +58,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
     transInlineSafe =
        [ ("inlineClosed"    , inlineClosed)
        , ("inlineSmall"     , inlineSmall)
-       , ("bindOrLifNonRep" , inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
+       , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
                                                   -- See: [Note] bottom-up traversal for liftNonRep
        , ("reduceNonRepPrim", reduceNonRepPrim)
        ]
