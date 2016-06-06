@@ -1058,6 +1058,16 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                then reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
+      "CLaSH.Sized.Vector.imap" | length args == 6 -> do
+        let [nTy,argElTy,resElTy] = Either.rights args
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            untranslatableTys <- mapM isUntranslatableType_not_poly [argElTy,resElTy]
+            if or untranslatableTys
+               then let [_,fun,arg] = Either.lefts args
+                    in  reduceImap n argElTy resElTy fun arg
+               else return e
+          _ -> return e
 
       _ -> return e
   where

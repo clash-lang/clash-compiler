@@ -73,7 +73,8 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
             ]
         , testGroup "HOPrim"
-            [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "HOImap" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "Transpose" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "VecFun" (Just ("testbench",True))
             ]

@@ -18,6 +18,7 @@
     * CLaSH.Sized.Vector.tail
     * CLaSH.Sized.Vector.unconcatBitVector#
     * CLaSH.Sized.Vector.replicate
+    * CLaSH.Sized.Vector.imap
 
   Partially handles:
 
@@ -44,9 +45,9 @@ import           CLaSH.Core.Term                  (Term (..), Pat (..))
 import           CLaSH.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView,
                                                    mkFunTy, mkTyConApp,
-                                                   splitFunForallTy)
+                                                   splitFunForallTy, tyView)
 import           CLaSH.Core.TyCon                 (TyConName, tyConDataCons)
-import           CLaSH.Core.TysPrim               (typeNatKind)
+import           CLaSH.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           CLaSH.Core.Util                  (appendToVec, extractElems,
                                                    idToVar, mkApps, mkVec,
                                                    termType)
@@ -99,6 +100,42 @@ reduceMap n argElTy resElTy fun arg = do
       (vars,elems)     = second concat . unzip
                        $ extractElems consCon argElTy 'A' n arg
       funApps          = map (fun `App`) vars
+      lbody            = mkVec nilCon consCon resElTy n funApps
+      lb               = Letrec (bind (rec (init elems)) lbody)
+  changed lb
+
+-- | Replace an application of the @CLaSH.Sized.Vector.imap@ primitive on vectors
+-- of a known length @n@, by the fully unrolled recursive "definition" of
+-- @CLaSH.Sized.Vector.map@
+reduceImap :: Int  -- ^ Length of the vector
+           -> Type -- ^ Argument type of the function
+           -> Type -- ^ Result type of the function
+           -> Term -- ^ The imap'd function
+           -> Term -- ^ The imap'd over vector
+           -> NormalizeSession Term
+reduceImap n argElTy resElTy fun arg = do
+  tcm <- Lens.view tcCache
+  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
+  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
+      [nilCon,consCon] = tyConDataCons vecTc
+      (vars,elems)     = second concat . unzip
+                       $ extractElems consCon argElTy 'I' n arg
+  (Right idxTy:_,_) <- splitFunForallTy <$> termType tcm fun
+  let (TyConApp idxTcNm _) = tyView idxTy
+      nTv              = string2Name "n"
+      -- fromInteger# :: KnownNat n => Integer -> Index n
+      idxFromIntegerTy = ForAllTy (bind (TyVar nTv (embed typeNatKind))
+                                   (foldr mkFunTy
+                                          (mkTyConApp idxTcNm
+                                                      [VarTy typeNatKind nTv])
+                                          [integerPrimTy,integerPrimTy]))
+      idxFromInteger   = Prim "CLaSH.Sized.Internal.Index.fromInteger#"
+                              idxFromIntegerTy
+      idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
+                                       (Literal (IntegerLiteral (toInteger n))))
+                             . Literal . IntegerLiteral . toInteger) [0..(n-1)]
+
+      funApps          = zipWith (\i v -> App (App fun i) v) idxs vars
       lbody            = mkVec nilCon consCon resElTy n funApps
       lb               = Letrec (bind (rec (init elems)) lbody)
   changed lb
