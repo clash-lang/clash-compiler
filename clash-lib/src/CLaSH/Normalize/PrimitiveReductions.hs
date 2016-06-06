@@ -106,7 +106,7 @@ reduceMap n argElTy resElTy fun arg = do
 
 -- | Replace an application of the @CLaSH.Sized.Vector.imap@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
--- @CLaSH.Sized.Vector.map@
+-- @CLaSH.Sized.Vector.imap@
 reduceImap :: Int  -- ^ Length of the vector
            -> Type -- ^ Argument type of the function
            -> Type -- ^ Result type of the function
