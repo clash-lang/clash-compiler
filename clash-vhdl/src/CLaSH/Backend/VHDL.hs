@@ -783,6 +783,9 @@ toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ tys) (DataCon _ _ es) = do
   encloseSep lparen rparen " & " (zipWithM toSLV tys es)
+toSLV (Product _ tys) e = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (SP _ _) e = expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
@@ -795,7 +798,9 @@ toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selNames = map (fmap (displayT . renderOneLine) ) $ [text id_ <> parens (int i) | i <- [0 .. (n-1)]]
     selIds   = map (fmap (`Identifier` Nothing)) selNames
 toSLV (Vector n elTy) (DataCon _ _ es) = parens $ vcat $ punctuate " & " (zipWithM toSLV [elTy,Vector (n-1) elTy] es)
-toSLV (Vector _ _) e = "toSLV" <> parens (expr_ False e)
+toSLV (Vector _ _) e = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
