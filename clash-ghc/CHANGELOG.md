@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.18
+## 0.6.18 *June 7th 2016*
 * New features:
   * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
   * New `-clash-hdlsyn Xilinx` flag to generate HDL tweaked for Xilinx synthesis tools (both ISE and Vivado)

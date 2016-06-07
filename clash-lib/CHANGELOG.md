@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.16
+## 0.6.16 *June 7th 2016*
 * New features:
   * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
 * Fixes bugs:
