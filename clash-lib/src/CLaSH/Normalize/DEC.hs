@@ -65,7 +65,7 @@ import CLaSH.Core.FreeVars   (termFreeIds, typeFreeVars)
 import CLaSH.Core.Literal    (Literal (..))
 import CLaSH.Core.Term       (LetBinding, Pat (..), Term (..), TmName)
 import CLaSH.Core.TyCon      (tyConDataCons)
-import CLaSH.Core.Type       (Type, mkTyConApp, splitFunForallTy)
+import CLaSH.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import CLaSH.Core.Util       (collectArgs, mkApps, termType)
 import CLaSH.Normalize.Types (NormalizeState)
 import CLaSH.Normalize.Util  (isConstant)
@@ -386,10 +386,18 @@ interestingToLift inScope _ e@(Var _ nm) _ =
   if nm `Set.member` inScope
      then Just e
      else Nothing
-interestingToLift _ eval e@(Prim nm _) args =
+interestingToLift inScope eval e@(Prim nm pty) args =
     case List.lookup nm interestingPrims of
       Just t | t || not (all isConstant lArgs) -> Just e
-      _ -> Nothing
+      _ -> if isHOTy pty
+              then if not . null . Maybe.catMaybes $
+                      map (uncurry (interestingToLift inScope eval) .
+                           collectArgs
+                          ) lArgs
+                      then Just e
+                      else Nothing
+              else Nothing
+
   where
     interestingPrims =
       [("CLaSH.Sized.Internal.BitVector.*#",tailNonPow2)
@@ -425,11 +433,15 @@ interestingToLift _ eval e@(Prim nm _) args =
       ,("GHC.Prim.remInt#",lastNotPow2)
       ]
 
-    lArgs          = Either.lefts args
+    lArgs       = Either.lefts args
 
     allNonPow2  = all (not . termIsPow2) lArgs
-    tailNonPow2 = all (not . termIsPow2) (tail lArgs)
-    lastNotPow2 = not (termIsPow2 (last lArgs))
+    tailNonPow2 = case lArgs of
+                    [] -> True
+                    _  -> all (not . termIsPow2) (tail lArgs)
+    lastNotPow2 = case lArgs of
+                    [] -> True
+                    _  -> not (termIsPow2 (last lArgs))
 
     termIsPow2 e' = case eval e' of
       Literal (IntegerLiteral n) -> isPow2 n
@@ -445,5 +457,8 @@ interestingToLift _ eval e@(Prim nm _) args =
                                ,"CLaSH.Sized.Internal.Signed.fromInteger#"
                                ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
                                ]
+
+    isHOTy t = case splitFunForallTy t of
+      (args',_) -> any isPolyFunTy (Either.rights args')
 
 interestingToLift _ _ _ _ = Nothing

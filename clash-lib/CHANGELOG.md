@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.16
+* New features:
+  * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
+
 ## 0.6.15 *April 7th 2016*
 * New features:
   * Up to 2x reduced compilation times when working with large `Vec` literals
