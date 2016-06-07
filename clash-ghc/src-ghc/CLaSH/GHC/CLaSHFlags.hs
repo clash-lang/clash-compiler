@@ -18,6 +18,7 @@ import SrcLoc
 import Data.IORef
 import Control.Monad
 import CLaSH.Driver.Types
+import CLaSH.Netlist.BlackBox.Types (HdlSyn (..))
 import Text.Read (readMaybe)
 
 parseCLaSHFlags :: IORef CLaSHOpts -> [Located String]
@@ -89,4 +90,6 @@ setHdlSyn :: IORef CLaSHOpts
           -> EwM IO ()
 setHdlSyn r s = case readMaybe s of
   Just hdlSyn -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = hdlSyn})
-  Nothing     -> addWarn (s ++ " is an invalid debug level")
+  Nothing     -> if s == "Xilinx"
+                    then liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
+                    else addWarn (s ++ " is an unknown hdl synthesis tool")

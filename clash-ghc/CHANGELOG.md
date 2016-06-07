@@ -3,6 +3,7 @@
 ## 0.6.18
 * New features:
   * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
+  * New `-clash-hdlsyn Xilinx` flag to generate HDL tweaked for Xilinx synthesis tools (both ISE and Vivado)
 * Fixes bugs:
   * replicate unfolded incorrectly [#150](https://github.com/clash-lang/clash-compiler/issues/150)
   * `imap` is not unrolled [#151](https://github.com/clash-lang/clash-compiler/issues/151)
