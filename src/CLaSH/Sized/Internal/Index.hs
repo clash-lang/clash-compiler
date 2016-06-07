@@ -60,7 +60,7 @@ where
 
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
-import Text.Read                  (Read (..), ReadPrec (..))
+import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
