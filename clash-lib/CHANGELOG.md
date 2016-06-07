@@ -3,6 +3,9 @@
 ## 0.6.16
 * New features:
   * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
+* Fixes bugs:
+  * replicate unfolded incorrectly [#150](https://github.com/clash-lang/clash-compiler/issues/150)
+  * `imap` is not unrolled [#151](https://github.com/clash-lang/clash-compiler/issues/151)
 
 ## 0.6.15 *April 7th 2016*
 * New features:

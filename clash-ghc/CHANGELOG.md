@@ -1,5 +1,13 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.18
+* New features:
+  * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
+* Fixes bugs:
+  * replicate unfolded incorrectly [#150](https://github.com/clash-lang/clash-compiler/issues/150)
+  * `imap` is not unrolled [#151](https://github.com/clash-lang/clash-compiler/issues/151)
+  * VHDL: Incorrect primitive specification for `snatToInteger` [#149](https://github.com/clash-lang/clash-compiler/issues/149)
+
 ## 0.6.17 *April 7th 2016*
 * New features:
   * Up to 2x reduced compilation times when working with large `Vec` literals
