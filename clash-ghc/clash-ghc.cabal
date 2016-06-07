@@ -98,7 +98,7 @@ Executable clash
                       clash-systemverilog       >= 0.6.6    && < 0.7,
                       clash-vhdl                >= 0.6.12   && < 0.7,
                       clash-verilog             >= 0.6.6    && < 0.7,
-                      clash-prelude             >= 0.10.6   && < 0.11,
+                      clash-prelude             >= 0.10.8   && < 0.11,
                       ghc-typelits-extra        >= 0.1      && < 0.2,
                       ghc-typelits-natnormalise >= 0.3      && < 0.5,
                       deepseq                   >= 1.3.0.2  && < 1.5,
