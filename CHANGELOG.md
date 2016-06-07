@@ -1,7 +1,10 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
 ## 0.10.8 *June 7th 2016*
-* Derive instances of Data for numeric types.
+* New features:
+  * Instances of `Data` for numeric types.
+  * Instances of `Read` for {Index, Signed, Unsigned, Fixed}
+  * Instances of `BitPack` for 3-8 tuples
 
 ## 0.10.7 *April 7th 2016*
 * Support doctest-0.11.0
