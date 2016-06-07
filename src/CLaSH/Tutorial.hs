@@ -188,24 +188,25 @@ our first circuit.
 
 {- $installation
 The CλaSH compiler and Prelude library for circuit design only work with the
-<http://haskell.org/ghc GHC> Haskell compiler version 7.10.* and up.
+<http://haskell.org/ghc GHC> Haskell compiler version 7.10 (higher or lower
+versions of GHC are not supported).
 
-  (1) Install __GHC (version 7.10.* or higher)__
+  (1) Install __GHC 7.10__
 
-      * Download and install <http://www.haskell.org/ghc/download GHC for your platform>.
+      * Download and install <https://www.haskell.org/ghc/download_ghc_7_10_3 GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
         location.
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-    The following are alternative options, if you cannot find what you are looking for on <http://www.haskell.org/ghc/download>
+    Next follows a list of alternative installation instructions, in case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_7_10_3>
 
       * Ubuntu:
 
           * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
           * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-1.22 ghc-7.10.3 libtinfo-dev@
-          * Update your @PATH@ with: @\/opt\/ghc\/7.10.3\/bin@, @\/opt\/cabal\/1.22/bin@, and @\$HOME\/.cabal\/bin@
+          * Run: @sudo apt-get install cabal-install-1.24 ghc-7.10.3 libtinfo-dev@
+          * Update your @PATH@ with: @\/opt\/ghc\/7.10.3\/bin@, @\/opt\/cabal\/1.24/bin@, and @\$HOME\/.cabal\/bin@
           * Run: @cabal update@
           * Skip step 2.
 
@@ -217,11 +218,11 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 
       * Windows:
 
-          * Follow the instructions on: <https://github.com/fpco/minghc MinGHC>
+          * Follow the instructions on: <https://github.com/fpco/minghc#using-the-legacy-installer MinGHC>
           * Run: @cabal update@
           * Skip step 2.
 
-  (2) Install __Cabal (version 1.22.* or higher)__
+  (2) Install __Cabal (version 1.24 or higher)__
 
       * Binary, when available:
 
