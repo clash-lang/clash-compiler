@@ -218,9 +218,10 @@ instance Show a => Show (Vec n a) where
       punc (x `Cons` Nil) = show x
       punc (x `Cons` xs)  = show x P.++ "," P.++ punc xs
 
-instance Eq a => Eq (Vec n a) where
-  (==) Nil _  = True
-  (==) v1  v2 = fold (&&) (unsafeCoerce (zipWith (==) v1 v2))
+instance (KnownNat n, Eq a) => Eq (Vec n a) where
+  (==) v1 v2
+    | length v1 == 0 = True
+    | otherwise      = fold (&&) (unsafeCoerce (zipWith (==) v1 v2))
   -- FIXME: the `unsafeCoerce` is a hack because the CLaSH compiler cannot deal
   -- with the existential length of the 'xs' in "Cons x xs".
   --
@@ -231,7 +232,7 @@ instance Eq a => Eq (Vec n a) where
   --
   -- But the CLaSH compiler currently fails on that definition.
 
-instance Ord a => Ord (Vec n a) where
+instance (KnownNat n, Ord a) => Ord (Vec n a) where
   compare x y = foldr f EQ $ zipWith compare x y
     where f EQ   keepGoing = keepGoing
           f done _         = done
