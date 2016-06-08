@@ -9,6 +9,7 @@
 
 module CLaSH.GHC.Evaluator where
 
+import           Control.Monad.Trans.Except (runExcept)
 import qualified Data.Bifunctor      as Bifunctor
 import           Data.Bits           (shiftL,shiftR)
 import qualified Data.Either         as Either
@@ -26,7 +27,7 @@ import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
                                       mkTyConApp, splitFunForallTy)
 import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)
 import           CLaSH.Core.TysPrim  (typeNatKind)
-import           CLaSH.Core.Util     (collectArgs,mkApps,mkVec,termType)
+import           CLaSH.Core.Util     (collectArgs,mkApps,mkVec,termType,tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
 
 reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
@@ -244,14 +245,16 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Vector.replicate"
     | isSubj
-    , (TyConApp vecTcNm [LitTy (NumTy len),argTy]) <- tyView (runFreshM (termType tcm e))
+    , (TyConApp vecTcNm [lenTy,argTy]) <- tyView (runFreshM (termType tcm e))
+    , Right len <- runExcept (tyNatSize tcm lenTy)
     -> let (Just vecTc) = HashMap.lookup vecTcNm tcm
            [nilCon,consCon] = tyConDataCons vecTc
        in  mkVec nilCon consCon argTy len (replicate len (last $ Either.lefts args))
 
   "CLaSH.Sized.Vector.maxIndex"
     | isSubj
-    , [LitTy (NumTy n), _] <- Either.rights args
+    , [nTy, _] <- Either.rights args
+    , Right n <- runExcept (tyNatSize tcm nTy)
     -> let ty' = runFreshM (termType tcm e)
            (TyConApp intTcNm _) = tyView ty'
            (Just intTc) = HashMap.lookup intTcNm tcm
@@ -260,7 +263,8 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Vector.length"
     | isSubj
-    , [LitTy (NumTy n), _] <- Either.rights args
+    , [nTy, _] <- Either.rights args
+    , Right n <-runExcept (tyNatSize tcm nTy)
     -> let ty' = runFreshM (termType tcm e)
            (TyConApp intTcNm _) = tyView ty'
            (Just intTc) = HashMap.lookup intTcNm tcm
