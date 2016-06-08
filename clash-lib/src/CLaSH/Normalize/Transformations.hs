@@ -246,6 +246,9 @@ caseCon ctx e@(Case subj ty alts)
           | nm == "Control.Exception.Base.patError" ->
             let e' = mkApps (Prim nm ty') [Right ty,msg]
             in  changed e'
+          | nm == "Control.Exception.Base.absentError" ->
+            let e' = mkApps (Prim nm ty') [Right ty,msg]
+            in  changed e'
         (Prim nm ty',[_])
           | nm == "GHC.Err.undefined" ->
             let e' = mkApps (Prim nm ty') [Right ty]
