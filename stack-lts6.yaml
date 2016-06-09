@@ -1,4 +1,4 @@
-resolver: lts-5.1
+resolver: lts-6.2
 
 packages:
 - 'clash-prelude'
@@ -8,6 +8,3 @@ packages:
 - 'clash-vhdl'
 - 'clash-ghc'
 - 'testsuite'
-
-extra-deps:
-- ghc-typelits-natnormalise-0.4.1
