@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.10.9 *June 9th 2016*
+* Fixes bugs:
+  * `Eq` instance of `Vec` sometimes not synthesisable
+
 ## 0.10.8 *June 7th 2016*
 * New features:
   * Instances of `Data` for numeric types.
