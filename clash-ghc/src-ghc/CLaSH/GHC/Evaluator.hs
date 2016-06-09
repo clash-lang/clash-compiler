@@ -22,7 +22,7 @@ import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed,
 import           CLaSH.Core.DataCon  (DataCon (..))
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Term     (Term (..))
-import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
+import           CLaSH.Core.Type     (Type (..), ConstTy (..),
                                       TypeView (..), tyView, mkFunTy,
                                       mkTyConApp, splitFunForallTy)
 import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)

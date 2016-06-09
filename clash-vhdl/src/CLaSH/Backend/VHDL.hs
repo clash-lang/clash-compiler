@@ -783,7 +783,7 @@ toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds   = map (fmap (\n -> Identifier n Nothing)) selNames
 toSLV (Product _ tys) (DataCon _ _ es) = do
   encloseSep lparen rparen " & " (zipWithM toSLV tys es)
-toSLV (Product _ tys) e = do
+toSLV (Product _ _) e = do
   nm <- use modNm
   text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (SP _ _) e = expr_ False e
