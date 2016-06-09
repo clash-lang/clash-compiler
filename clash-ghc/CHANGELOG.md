@@ -1,5 +1,10 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.19 *June 9th 2016*
+* Fixes bugs:
+  * `Eq` instance of `Vec` sometimes not synthesisable
+  * VHDL: Converting product types to std_logic_vector fails when the `clash-hdlsyn Vivado` flag is enabled
+
 ## 0.6.18 *June 7th 2016*
 * New features:
   * DEC transformation also lifts HO-primitives applied to "interesting" primitives (i.e. `zipWith (*)`)
