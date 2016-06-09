@@ -1,7 +1,0 @@
-resolver: lts-5.1
-
-packages:
-- .
-
-extra-deps:
-- ghc-typelits-natnormalise-0.4.1
