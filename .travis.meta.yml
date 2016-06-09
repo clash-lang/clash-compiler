@@ -3,6 +3,7 @@ language: haskell-stack
 env:
   - GHCVER=7.10.3 CABALVER=1.22 STACK_SOLVER=YES
   - GHCVER=7.10.3 STACK_YAML=stack-lts5.yaml
+  - GHCVER=8.0.1 STACK_YAML=stack-nightly.yaml
 
 matrix:
   fast_finish: true

@@ -1672,10 +1672,7 @@ A list of often encountered errors and their solutions:
                                 else (b,a)
     @
 
-    Will not terminate because 'zipWith' is too strict in its second argument:
-
-    >>> sortV (4 :> 1 :> 2 :> 3 :> Nil)
-    <*** Exception: <<loop>>
+    Will not terminate because 'zipWith' is too strict in its second argument.
 
     In this case, adding 'lazyV' on 'zipWith's second argument:
 
