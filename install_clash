@@ -2,25 +2,25 @@
 
 cd clash-lib
 cabal clean
-cabal install
+cabal install || exit $?
 cd ..
 
 cd clash-verilog
 cabal clean
-cabal install
+cabal install || exit $?
 cd ..
 
 cd clash-systemverilog
 cabal clean
-cabal install
+cabal install || exit $?
 cd ..
 
 cd clash-vhdl
 cabal clean
-cabal install
+cabal install || exit $?
 cd ..
 
 cd clash-ghc
 cabal clean
-cabal install
+cabal install || exit $?
 cd ..
