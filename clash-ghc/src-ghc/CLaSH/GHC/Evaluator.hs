@@ -228,7 +228,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [litTy,kn@(Left (Literal (IntegerLiteral _)))] <- args
     -> mkApps unsignedConPrim [litTy,kn,Left (Literal (IntegerLiteral 0))]
 
-  "CLaSH.Sized.Internal.Unsigned.minBound#"
+  "CLaSH.Sized.Internal.Unsigned.maxBound#"
     | [litTy,kn@(Left (Literal (IntegerLiteral mb)))] <- args
     -> let maxB = (2 ^ mb) - 1
        in  mkApps unsignedConPrim [litTy,kn,Left (Literal (IntegerLiteral maxB))]
