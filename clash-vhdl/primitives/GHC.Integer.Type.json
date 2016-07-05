@@ -148,13 +148,13 @@ end block;
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.shiftRInteger"
     , "type"      : "shiftRInteger :: Integer -> Int# -> Integer"
-    , "templateE" : "~ARG[0] / (2**to_integer(~ARG[1]))"
+    , "templateE" : "shift_right(~ARG[0],to_integer(~ARG[1]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.shiftLInteger"
     , "type"      : "shiftLInteger :: Integer -> Int# -> Integer"
-    , "templateE" : "~ARG[0] * (2**to_integer(~ARG[1]))"
+    , "templateE" : "shift_left(~ARG[0],to_integer(~ARG[1]))"
     }
   }
 ]

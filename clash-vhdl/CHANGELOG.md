@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.14
+* Fixes bugs:
+  * Incorrect primitive specifications for Integer's `shiftL` and `shiftR`
+
 ## 0.6.13 *June 9th 2016*
 * Fixes bugs:
   * Converting product types to std_logic_vector fails when the `clash-hdlsyn Vivado` flag is enabled
