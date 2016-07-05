@@ -67,7 +67,7 @@ import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
                                    natVal)
 import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
-                                   arbitrarySizedBoundedIntegral,
+                                   arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
 import CLaSH.Class.BitPack            (BitPack (..))
@@ -279,8 +279,16 @@ instance KnownNat n => Default (Index n) where
   def = fromInteger# 0
 
 instance KnownNat n => Arbitrary (Index n) where
-  arbitrary = arbitrarySizedBoundedIntegral
-  shrink    = shrinkIntegral
+  arbitrary = arbitraryBoundedIntegral
+  shrink    = shrinkIndex
+
+shrinkIndex :: KnownNat n => Index n -> [Index n]
+shrinkIndex x | natVal x < 3 = case toInteger x of
+                                 1 -> [0]
+                                 _ -> []
+              -- 'shrinkIntegral' uses "`quot` 2", which for 'Index' types with
+              -- an upper bound less than 2 results in an error.
+              | otherwise    = shrinkIntegral x
 
 instance KnownNat n => CoArbitrary (Index n) where
   coarbitrary = coarbitraryIntegral

@@ -88,7 +88,7 @@ import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
-                                       arbitrarySizedBoundedIntegral,
+                                       arbitraryBoundedIntegral,
                                        coarbitraryIntegral, shrinkIntegral)
 
 import CLaSH.Class.BitPack            (BitPack (..))
@@ -481,8 +481,19 @@ minBoundSym# :: KnownNat n => Signed n
 minBoundSym# = minBound# +# fromInteger# 1
 
 instance KnownNat n => Arbitrary (Signed n) where
-  arbitrary = arbitrarySizedBoundedIntegral
-  shrink    = shrinkIntegral
+  arbitrary = arbitraryBoundedIntegral
+  shrink    = shrinkSizedSigned
+
+shrinkSizedSigned :: (KnownNat n, Integral (p n)) => p n -> [p n]
+shrinkSizedSigned x | natVal x < 2 = case toInteger x of
+                                       0 -> []
+                                       _ -> [0]
+                    -- 'shrinkIntegral' uses "`quot` 2", which for sized types
+                    -- less than 2 bits wide results in a division by zero.
+                    --
+                    -- See: https://github.com/clash-lang/clash-compiler/issues/153
+                    | otherwise    = shrinkIntegral x
+{-# INLINE shrinkSizedSigned #-}
 
 instance KnownNat n => CoArbitrary (Signed n) where
   coarbitrary = coarbitraryIntegral

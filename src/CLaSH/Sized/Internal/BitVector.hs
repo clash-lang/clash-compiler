@@ -89,6 +89,8 @@ module CLaSH.Sized.Internal.BitVector
   , popCountBV
     -- ** Resize
   , resize#
+    -- ** QuickCheck
+  , shrinkSizedUnsigned
   )
 where
 
@@ -105,7 +107,7 @@ import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, s
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric                    (readInt)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
-                                   arbitrarySizedBoundedIntegral,
+                                   arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
@@ -572,8 +574,20 @@ instance (KnownNat n, KnownNat (n + 1), KnownNat (n + n)) =>
       (rL,rR) = split# r
 
 instance KnownNat n => Arbitrary (BitVector n) where
-  arbitrary = arbitrarySizedBoundedIntegral
-  shrink    = shrinkIntegral
+  arbitrary = arbitraryBoundedIntegral
+  shrink    = shrinkSizedUnsigned
+
+-- | 'shrink' for sized unsigned types
+shrinkSizedUnsigned :: (KnownNat n, Integral (p n)) => p n -> [p n]
+shrinkSizedUnsigned x | natVal x < 2 = case toInteger x of
+                                         1 -> [0]
+                                         _ -> []
+                      -- 'shrinkIntegral' uses "`quot` 2", which for sized types
+                      -- less than 2 bits wide results in a division by zero.
+                      --
+                      -- See: https://github.com/clash-lang/clash-compiler/issues/153
+                      | otherwise    = shrinkIntegral x
+{-# INLINE shrinkSizedUnsigned #-}
 
 instance KnownNat n => CoArbitrary (BitVector n) where
   coarbitrary = coarbitraryIntegral
