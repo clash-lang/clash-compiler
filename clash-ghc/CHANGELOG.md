@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.20
+* Fixes bugs:
+  * `CLaSH.Sized.Internal.Unsigned.maxBound#` not evaluated at compile-time [#155](https://github.com/clash-lang/clash-compiler/issues/155)
+
 ## 0.6.19 *June 9th 2016*
 * Fixes bugs:
   * `Eq` instance of `Vec` sometimes not synthesisable
