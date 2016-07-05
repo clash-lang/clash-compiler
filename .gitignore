@@ -20,6 +20,7 @@ cabal.config
 *.prof
 *.aux
 *.hp
+.stack-work/
 
 *~
 *.DS_Store
