@@ -225,8 +225,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToBoolLiteral tcm ty (i /= j)
 
   "CLaSH.Sized.Internal.Unsigned.minBound#"
-    | [litTy,kn@(Left (Literal (IntegerLiteral _)))] <- args
-    -> mkApps unsignedConPrim [litTy,kn,Left (Literal (IntegerLiteral 0))]
+    | [Right nTy] <- args
+    , Right len <- runExcept (tyNatSize tcm nTy)
+    -> let kn = Left (Literal (IntegerLiteral (toInteger len)))
+       in  mkApps unsignedConPrim [Right nTy,kn,Left (Literal (IntegerLiteral 0))]
 
   "CLaSH.Sized.Internal.Unsigned.maxBound#"
     | [litTy,kn@(Left (Literal (IntegerLiteral mb)))] <- args

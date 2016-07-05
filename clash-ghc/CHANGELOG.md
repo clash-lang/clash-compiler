@@ -3,6 +3,7 @@
 ## 0.6.20
 * Fixes bugs:
   * `CLaSH.Sized.Internal.Unsigned.maxBound#` not evaluated at compile-time [#155](https://github.com/clash-lang/clash-compiler/issues/155)
+  * `CLaSH.Sized.Internal.Unsigned.minBound#` not evaluated at compile-time [#157](https://github.com/clash-lang/clash-compiler/issues/157)
 
 ## 0.6.19 *June 9th 2016*
 * Fixes bugs:
