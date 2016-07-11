@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.18
+* Fixes bugs:
+  * Values of type Index 'n', where 'n' > 2^MACHINE_WIDTH, incorrectly considered non-synthesisable due to overflow
+
 ## 0.6.17 *June 9th 2016*
 * Fixes bugs:
   * `Eq` instance of `Vec` sometimes not synthesisable
