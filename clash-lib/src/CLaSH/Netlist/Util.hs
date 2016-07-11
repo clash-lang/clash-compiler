@@ -90,7 +90,7 @@ coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*
 -- | Returns the name and period of the clock corresponding to a type
 synchronizedClk :: HashMap TyConName TyCon -- ^ TyCon cache
                 -> Type
-                -> Maybe (Identifier,Int)
+                -> Maybe (Identifier,Integer)
 synchronizedClk tcm ty
   | not . null . Lens.toListOf typeFreeVars $ ty = Nothing
   | Just (tyCon,args) <- splitTyConAppM ty
@@ -192,13 +192,13 @@ typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
-typeSize (Sum _ dcs) = max 1 (clog2 $ length dcs)
+typeSize (Sum _ dcs) = max 1 (clog2 . toInteger $ length dcs)
 typeSize (Product _ tys) = sum $ map typeSize tys
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType
         -> Int
-conSize (SP _ cons) = clog2 $ length cons
+conSize (SP _ cons) = clog2 . toInteger $ length cons
 conSize t           = typeSize t
 
 -- | Gives the length of length-indexed types

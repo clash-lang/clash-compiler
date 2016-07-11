@@ -88,22 +88,22 @@ ghcTypeToHWType iw = go
           ExceptT $ return $ coreTypeToHWType go m (args !! 1)
 
         "CLaSH.Sized.Internal.BitVector.BitVector" ->
-          BitVector <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+          (BitVector . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
 
         "CLaSH.Sized.Internal.Index.Index" ->
           Index <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
 
         "CLaSH.Sized.Internal.Signed.Signed" ->
-          Signed   <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+          (Signed . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
 
         "CLaSH.Sized.Internal.Unsigned.Unsigned" ->
-          Unsigned <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
+          (Unsigned . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
 
         "CLaSH.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
           elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
-          return $ Vector sz elHWTy
+          return $ Vector (fromInteger sz) elHWTy
 
         "String" -> return String
         "GHC.Types.[]" -> case tyView (head args) of

@@ -251,7 +251,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Right len <- runExcept (tyNatSize tcm lenTy)
     -> let (Just vecTc) = HashMap.lookup vecTcNm tcm
            [nilCon,consCon] = tyConDataCons vecTc
-       in  mkVec nilCon consCon argTy len (replicate len (last $ Either.lefts args))
+       in  mkVec nilCon consCon argTy len (replicate (fromInteger len) (last $ Either.lefts args))
 
   "CLaSH.Sized.Vector.maxIndex"
     | isSubj

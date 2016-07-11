@@ -245,7 +245,7 @@ termSize (Case subj _ alts) = let subjSz = termSize subj
 mkVec :: DataCon -- ^ The Nil constructor
       -> DataCon -- ^ The Cons (:>) constructor
       -> Type    -- ^ Element type
-      -> Int     -- ^ Length of the vector
+      -> Integer -- ^ Length of the vector
       -> [Term]  -- ^ Elements to put in the vector
       -> Term
 mkVec nilCon consCon resTy = go
@@ -273,7 +273,7 @@ mkVec nilCon consCon resTy = go
 appendToVec :: DataCon -- ^ The Cons (:>) constructor
             -> Type    -- ^ Element type
             -> Term    -- ^ The vector to append the elements to
-            -> Int     -- ^ Length of the vector
+            -> Integer -- ^ Length of the vector
             -> [Term]  -- ^ Elements to append
             -> Term
 appendToVec consCon resTy vec = go
@@ -297,12 +297,12 @@ appendToVec consCon resTy vec = go
 extractElems :: DataCon -- ^ The Cons (:>) constructor
              -> Type    -- ^ The element type
              -> Char    -- ^ Char to append to the bound variable names
-             -> Int     -- ^ Length of the vector
+             -> Integer -- ^ Length of the vector
              -> Term    -- ^ The vector
              -> [(Term,[LetBinding])]
 extractElems consCon resTy s maxN = go maxN
   where
-    go :: Int -> Term -> [(Term,[LetBinding])]
+    go :: Integer -> Term -> [(Term,[LetBinding])]
     go 0 _ = []
     go n e = (elVar
              ,[(Id elBNm (embed resTy) ,embed lhs)
@@ -357,7 +357,7 @@ isSignalType tcm ty = go HashSet.empty ty
 
 tyNatSize :: HMS.HashMap TyConName TyCon
           -> Type
-          -> Except String Int
+          -> Except String Integer
 tyNatSize _ (LitTy (NumTy i)) = return i
 tyNatSize m ty@(tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
   "GHC.TypeLits.+" -> (+) <$> tyNatSize m ty1 <*> tyNatSize m ty2

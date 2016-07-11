@@ -61,7 +61,7 @@ import           CLaSH.Util
 -- | Replace an application of the @CLaSH.Sized.Vector.zipWith@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.zipWith@
-reduceZipWith :: Int  -- ^ Length of the vector(s)
+reduceZipWith :: Integer  -- ^ Length of the vector(s)
               -> Type -- ^ Type of the lhs of the function
               -> Type -- ^ Type of the rhs of the function
               -> Type -- ^ Type of the result of the function
@@ -86,7 +86,7 @@ reduceZipWith n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.map@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @CLaSH.Sized.Vector.map@
-reduceMap :: Int  -- ^ Length of the vector
+reduceMap :: Integer  -- ^ Length of the vector
           -> Type -- ^ Argument type of the function
           -> Type -- ^ Result type of the function
           -> Term -- ^ The map'd function
@@ -107,7 +107,7 @@ reduceMap n argElTy resElTy fun arg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.imap@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
 -- @CLaSH.Sized.Vector.imap@
-reduceImap :: Int  -- ^ Length of the vector
+reduceImap :: Integer  -- ^ Length of the vector
            -> Type -- ^ Argument type of the function
            -> Type -- ^ Result type of the function
            -> Term -- ^ The imap'd function
@@ -143,7 +143,7 @@ reduceImap n argElTy resElTy fun arg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.traverse#@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.traverse#@
-reduceTraverse :: Int  -- ^ Length of the vector
+reduceTraverse :: Integer  -- ^ Length of the vector
                -> Type -- ^ Element type of the argument vector
                -> Type -- ^ The type of the applicative
                -> Type -- ^ Element type of the result vector
@@ -224,12 +224,12 @@ mkTravVec :: TyConName -- ^ Vec tcon
           -> Term      -- ^ '<*>' term
           -> Term      -- ^ 'fmap' term
           -> Type      -- ^ 'b' ty
-          -> Int       -- ^ Length of the vector
+          -> Integer       -- ^ Length of the vector
           -> [Term]    -- ^ Elements of the vector
           -> Term
 mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
   where
-    go :: Int -> [Term] -> Term
+    go :: Integer -> [Term] -> Term
     go _ [] = mkApps pureTm [Right (mkTyConApp vecTc [LitTy (NumTy 0),bTy])
                             ,Left  (mkApps (Data nilCon)
                                            [Right (LitTy (NumTy 0))
@@ -262,7 +262,7 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- | Replace an application of the @CLaSH.Sized.Vector.foldr@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.foldr@
-reduceFoldr :: Int  -- ^ Length of the vector
+reduceFoldr :: Integer  -- ^ Length of the vector
             -> Type -- ^ Element type of the argument vector
             -> Type -- ^ Type of the starting element
             -> Term -- ^ The function to fold with
@@ -283,7 +283,7 @@ reduceFoldr n aTy _bTy fun start arg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.fold@
-reduceFold :: Int  -- ^ Length of the vector
+reduceFold :: Integer  -- ^ Length of the vector
            -> Type -- ^ Element type of the argument vector
            -> Term -- ^ The function to fold with
            -> Term -- ^ The argument vector
@@ -308,7 +308,7 @@ reduceFold n aTy fun arg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.dfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.dfold@
-reduceDFold :: Int  -- ^ Length of the vector
+reduceDFold :: Integer  -- ^ Length of the vector
             -> Type -- ^ Element type of the argument vector
             -> Term -- ^ Function to fold with
             -> Term -- ^ Starting value
@@ -354,7 +354,7 @@ reduceDFold n aTy fun start arg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.head@ primitive on
 -- vectors of a known length @n@, by a projection of the first element of a
 -- vector.
-reduceHead :: Int  -- ^ Length of the vector
+reduceHead :: Integer  -- ^ Length of the vector
            -> Type -- ^ Element type of the vector
            -> Term -- ^ The argument vector
            -> NormalizeSession Term
@@ -371,7 +371,7 @@ reduceHead n aTy vArg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.tail@ primitive on
 -- vectors of a known length @n@, by a projection of the tail of a
 -- vector.
-reduceTail :: Int  -- ^ Length of the vector
+reduceTail :: Integer  -- ^ Length of the vector
            -> Type -- ^ Element type of the vector
            -> Term -- ^ The argument vector
            -> NormalizeSession Term
@@ -389,8 +389,8 @@ reduceTail n aTy vArg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.(++)@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.(++)@
-reduceAppend :: Int  -- ^ Length of the LHS arg
-             -> Int  -- ^ Lenght of the RHS arg
+reduceAppend :: Integer  -- ^ Length of the LHS arg
+             -> Integer  -- ^ Lenght of the RHS arg
              -> Type -- ^ Element type of the vectors
              -> Term -- ^ The LHS argument
              -> Term -- ^ The RHS argument
@@ -409,8 +409,8 @@ reduceAppend n m aTy lArg rArg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.unconcat@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.unconcat@
-reduceUnconcat :: Int  -- ^ Length of the result vector
-               -> Int  -- ^ Length of the elements of the result vector
+reduceUnconcat :: Integer  -- ^ Length of the result vector
+               -> Integer  -- ^ Length of the elements of the result vector
                -> Type -- ^ Element type
                -> Term -- ^ Argument vector
                -> NormalizeSession Term
@@ -421,7 +421,7 @@ reduceUnconcat n 0 aTy arg = do
       [nilCon,consCon] = tyConDataCons vecTc
       nilVec           = mkVec nilCon consCon aTy 0 []
       innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
-      retVec           = mkVec nilCon consCon innerVecTy n (replicate n nilVec)
+      retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
   changed retVec
 
 reduceUnconcat _ _ _ _ = error $ $(curLoc) ++ "reduceUnconcat: unimplemented"
@@ -429,8 +429,8 @@ reduceUnconcat _ _ _ _ = error $ $(curLoc) ++ "reduceUnconcat: unimplemented"
 -- | Replace an application of the @CLaSH.Sized.Vector.transpose@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.transpose@
-reduceTranspose :: Int  -- ^ Length of the result vector
-                -> Int  -- ^ Length of the elements of the result vector
+reduceTranspose :: Integer  -- ^ Length of the result vector
+                -> Integer  -- ^ Length of the elements of the result vector
                 -> Type -- ^ Element type
                 -> Term -- ^ Argument vector
                 -> NormalizeSession Term
@@ -441,12 +441,12 @@ reduceTranspose n 0 aTy arg = do
       [nilCon,consCon] = tyConDataCons vecTc
       nilVec           = mkVec nilCon consCon aTy 0 []
       innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
-      retVec           = mkVec nilCon consCon innerVecTy n (replicate n nilVec)
+      retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
   changed retVec
 
 reduceTranspose _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"
 
-reduceReplicate :: Int
+reduceReplicate :: Integer
                 -> Type
                 -> Type
                 -> Term
@@ -456,5 +456,5 @@ reduceReplicate n aTy eTy arg = do
   let (TyConApp vecTcNm _) = coreView tcm eTy
       (Just vecTc) = HashMap.lookup vecTcNm tcm
       [nilCon,consCon] = tyConDataCons vecTc
-      retVec = mkVec nilCon consCon aTy n (replicate n arg)
+      retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
   changed retVec

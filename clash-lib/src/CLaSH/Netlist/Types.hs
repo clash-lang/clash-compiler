@@ -90,15 +90,15 @@ data HWType
   | String -- ^ String type
   | Bool -- ^ Boolean type
   | BitVector !Size -- ^ BitVector of a specified size
-  | Index    !Size -- ^ Unsigned integer with specified (exclusive) upper bounder
+  | Index    !Integer -- ^ Unsigned integer with specified (exclusive) upper bounder
   | Signed   !Size -- ^ Signed integer of a specified size
   | Unsigned !Size -- ^ Unsigned integer of a specified size
   | Vector   !Size       !HWType -- ^ Vector type
   | Sum      !Identifier [Identifier] -- ^ Sum type: Name and Constructor names
   | Product  !Identifier [HWType] -- ^ Product type: Name and field types
   | SP       !Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock    !Identifier !Int -- ^ Clock type with specified name and period
-  | Reset    !Identifier !Int -- ^ Reset type corresponding to clock with a specified name and period
+  | Clock    !Identifier !Integer -- ^ Clock type with specified name and period
+  | Reset    !Identifier !Integer -- ^ Reset type corresponding to clock with a specified name and period
   deriving (Eq,Ord,Show,Generic)
 
 instance Hashable HWType
@@ -186,6 +186,6 @@ emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) []
 -- | Either the name of the identifier, or a tuple of the identifier and the
 -- corresponding clock
 type SyncIdentifier = Either Identifier (Identifier,(Identifier,Int))
-type SyncExpr       = Either Expr       (Expr,(Identifier,Int))
+type SyncExpr       = Either Expr       (Expr,(Identifier,Integer))
 
 makeLenses ''NetlistState

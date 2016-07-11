@@ -20,7 +20,7 @@ import Data.Char                        (isSymbol, isUpper, ord)
 import Data.Text                        (unpack)
 import GHC.Show                         (showMultiLineString)
 import Text.PrettyPrint                 (Doc, char, comma, empty, equals, hang,
-                                         hsep, int, integer, parens, punctuate,
+                                         hsep, integer, parens, punctuate,
                                          render, sep, text, vcat, ($$), ($+$),
                                          (<+>), (<>), rational, nest)
 import Unbound.Generics.LocallyNameless (Embed (..), LFresh, Name, lunbind,
@@ -94,7 +94,7 @@ instance Pretty TyCon where
   pprPrec _ tc = return . text . name2String $ tyConName tc
 
 instance Pretty LitTy where
-  pprPrec _ (NumTy i) = return $ int i
+  pprPrec _ (NumTy i) = return $ integer i
   pprPrec _ (SymTy s) = return $ text s
 
 instance Pretty Term where

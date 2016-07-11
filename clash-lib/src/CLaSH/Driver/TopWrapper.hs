@@ -277,7 +277,7 @@ genSyncReset :: PrimMap BlackBoxTemplate
              -> Identifier
              -> Identifier
              -> Text
-             -> Int
+             -> Integer
              -> NetlistMonad [Declaration]
 genSyncReset primMap lock rst nm r = do
   let resetType = Reset rst 0

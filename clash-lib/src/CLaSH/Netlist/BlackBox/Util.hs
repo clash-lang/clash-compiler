@@ -181,7 +181,7 @@ renderFilePath fs f = ((f'',f):fs,C (Text.pack $ show f''))
 
 
 -- | Get the name of the clock of an identifier
-clkSyncId :: SyncExpr -> (Identifier,Int)
+clkSyncId :: SyncExpr -> (Identifier,Integer)
 clkSyncId (Right (_,clk)) = clk
 clkSyncId (Left i) = error $ $(curLoc) ++ "No clock for: " ++ show i
 

@@ -97,7 +97,7 @@ data ConstTy
 
 -- | Literal Types
 data LitTy
-  = NumTy !Int
+  = NumTy !Integer
   | SymTy !String
   deriving (Show,Generic,NFData,Alpha)
 
