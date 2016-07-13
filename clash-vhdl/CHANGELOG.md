@@ -3,6 +3,7 @@
 ## 0.6.14
 * Fixes bugs:
   * Incorrect primitive specifications for Integer's `shiftL` and `shiftR`
+  * Types in generated types.vhdl incorrectly sorted
 
 ## 0.6.13 *June 9th 2016*
 * Fixes bugs:

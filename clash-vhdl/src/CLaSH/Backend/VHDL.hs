@@ -24,7 +24,7 @@ import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (mapAccumL,nubBy)
+import           Data.List                            (mapAccumL,nub,nubBy)
 import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
@@ -37,7 +37,7 @@ import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBl
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util                   hiding (mkBasicId)
-import           CLaSH.Util                           (clog2, curLoc, first, makeCached, on, (<:>))
+import           CLaSH.Util                           (curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
 import qualified Paths_clash_vhdl
@@ -134,10 +134,10 @@ mkTyPackage_ modName hwtys = do
     { syn <- hdlSyn
     ; mkId <- mkBasicId
     ; let usedTys     = concatMap mkUsedTys hwtys
-          needsDec = nubBy (eqReprTy syn) . map mkVecZ $ (hwtys ++ usedTys)
-          hwTysSorted = topSortHWTys needsDec
-          packageDec  = vcat $ mapM tyDec hwTysSorted
-          (funDecs,funBodies) = unzip . catMaybes $ map (funDec syn) (nubBy (eqTypM syn) hwTysSorted)
+          normTys     = nub $ map (mkVecZ . normaliseType) (hwtys ++ usedTys)
+          sortedTys   = topSortHWTys normTys
+          packageDec  = vcat $ mapM tyDec sortedTys
+          (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM sortedTys
 
     ; (:[]) A.<$> (unpack $ mkId (T.pack modName `T.append` "_types"),) A.<$>
       "library IEEE;" <$>
@@ -161,30 +161,11 @@ mkTyPackage_ modName hwtys = do
          "end" <> semi
         }
 
-    eqReprTy :: HdlSyn -> HWType -> HWType -> Bool
-    eqReprTy h (Vector n ty1) (Vector m ty2)  = n == m && eqReprTy h ty1 ty2
-    eqReprTy h ty1 ty2
-      | isUnsigned ty1 && isUnsigned ty2 ||
-        isSLV h ty1 && isSLV h ty2          = typeSize ty1 == typeSize ty2
-      | otherwise                           = ty1 == ty2
-
-    eqTypM :: HdlSyn -> HWType -> HWType -> Bool
-    eqTypM h (Vector n ty1) (Vector m ty2) = n == m && eqReprTy h ty1 ty2
-    eqTypM _ (Signed _) (Signed _) = True
-    eqTypM h ty1 ty2 = isUnsigned ty1 && isUnsigned ty2 ||
-                       isSLV h    ty1 && isSLV h    ty2 ||
-                       ty1 == ty2
-
-    isUnsigned :: HWType -> Bool
-    isUnsigned (Unsigned _)  = True
-    isUnsigned (Index _)     = True
-    isUnsigned (Sum _ _)     = True
-    isUnsigned _             = False
-
-    isSLV :: HdlSyn -> HWType -> Bool
-    isSLV _ (BitVector _) = True
-    isSLV _ (SP _ _)      = True
-    isSLV _ _             = False
+    eqTypM :: HWType -> HWType -> Bool
+    eqTypM (Signed _) (Signed _)         = True
+    eqTypM (Unsigned _) (Unsigned _)     = True
+    eqTypM (BitVector _) (BitVector _)   = True
+    eqTypM ty1 ty2 = ty1 == ty2
 
 mkUsedTys :: HWType
         -> [HWType]
@@ -207,9 +188,15 @@ topSortHWTys hwtys = sorted
                                       (HashMap.lookup (mkVecZ elTy) nodesI)
     edge t@(Product _ tys) = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "Product") t nodesI
                              in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys
-    edge t@(SP _ ctys)     = let ti = HashMap.lookupDefault (error $ $(curLoc) ++ "SP") t nodesI
-                             in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys) ctys
     edge _                 = []
+
+normaliseType :: HWType -> HWType
+normaliseType (Vector n ty)    = Vector n (normaliseType ty)
+normaliseType (Product nm tys) = Product nm (map normaliseType tys)
+normaliseType ty@(SP _ _)      = BitVector (typeSize ty)
+normaliseType ty@(Index _)     = Unsigned (typeSize ty)
+normaliseType ty@(Sum _ _)     = Unsigned (typeSize ty)
+normaliseType ty = ty
 
 mkVecZ :: HWType -> HWType
 mkVecZ (Vector _ elTy) = Vector 0 elTy
@@ -281,8 +268,6 @@ funDec _ Bool = Just
     "end" <> semi
   )
 
-funDec _ (Index _) = Just unsignedToSlvDec
-
 funDec _ (Signed _) = Just
   ( "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <> semi
   , "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <+> "is" <$>
@@ -291,9 +276,13 @@ funDec _ (Signed _) = Just
     "end" <> semi
   )
 
-funDec _ (Unsigned _) = Just unsignedToSlvDec
-
-funDec _ (Sum _ _) = Just unsignedToSlvDec
+funDec _ (Unsigned _) = Just
+  ( "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <$>
+    "begin" <$>
+      indent 2 ("return" <+> "std_logic_vector" <> parens ("u") <> semi) <$>
+    "end" <> semi
+  )
 
 funDec _ t@(Product _ elTys) = Just
   ( "function" <+> "toSLV" <+> parens ("p :" <+> vhdlType t) <+> "return std_logic_vector" <> semi
@@ -330,28 +319,15 @@ funDec syn t@(Vector _ elTy) = Just
     "end" <> semi
   )
 
-funDec _ (BitVector _) = Just slvToSlvDec
-funDec _ (SP _ _)      = Just slvToSlvDec
-
-funDec _ _ = Nothing
-
-unsignedToSlvDec :: (VHDLM Doc, VHDLM Doc)
-unsignedToSlvDec =
-  ( "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <> semi
-  , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <$>
-    "begin" <$>
-      indent 2 ("return" <+> "std_logic_vector" <> parens ("u") <> semi) <$>
-    "end" <> semi
-  )
-
-slvToSlvDec :: (VHDLM Doc, VHDLM Doc)
-slvToSlvDec =
+funDec _ (BitVector _) = Just
   ( "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi
   , "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <+> "is" <$>
     "begin" <$>
       indent 2 ("return" <+> "slv" <> semi) <$>
     "end" <> semi
   )
+
+funDec _ _ = Nothing
 
 tyImports :: String -> VHDLM Doc
 tyImports nm = do
@@ -365,7 +341,6 @@ tyImports nm = do
     , "use work.all"
     , "use work." <> text (mkId (T.pack nm `T.append` "_types")) <> ".all"
     ]
-
 
 entity :: Component -> VHDLM Doc
 entity c = do
@@ -400,33 +375,32 @@ architecture c =
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
 vhdlType hwty = do
-  tyCache %= HashSet.insert hwty
-  vhdlType' hwty
-
-vhdlType' :: HWType -> VHDLM Doc
-vhdlType' Bool            = "boolean"
-vhdlType' (Clock _ _)     = "std_logic"
-vhdlType' (Reset _ _)     = "std_logic"
-vhdlType' (BitVector n)   = case n of
-                              0 -> "std_logic_vector (0 downto 1)"
-                              _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
-vhdlType' (Index u)       = "unsigned" <> parens (int (clog2 (max 2 u) - 1) <+> "downto 0")
-vhdlType' (Signed n)      = if n == 0 then "signed (0 downto 1)"
-                                      else "signed" <> parens (int (n-1) <+> "downto 0")
-vhdlType' (Unsigned n)    = if n == 0 then "unsigned (0 downto 1)"
-                                      else "unsigned" <> parens ( int (n-1) <+> "downto 0")
-vhdlType' (Vector n elTy) = do
-  nm <- use modNm
-  text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
-vhdlType' t@(SP _ _)      = "std_logic_vector" <> parens (int (typeSize t - 1) <+> "downto 0")
-vhdlType' t@(Sum _ _)     = case typeSize t of
-                              0 -> "unsigned (0 downto 1)"
-                              n -> "unsigned" <> parens (int (n -1) <+> "downto 0")
-vhdlType' t@(Product _ _) = do
-  nm <- use modNm
-  text (T.toLower $ T.pack nm) <> "_types." <> tyName t
-vhdlType' Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
-vhdlType' String          = "string"
+    let hwty' = normaliseType hwty
+    tyCache %= HashSet.insert hwty'
+    go hwty'
+  where
+    go :: HWType -> VHDLM Doc
+    go Bool            = "boolean"
+    go (Clock _ _)     = "std_logic"
+    go (Reset _ _)     = "std_logic"
+    go (BitVector n)   = case n of
+                           0 -> "std_logic_vector (0 downto 1)"
+                           _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
+    go (Signed n)      = case n of
+                           0 -> "signed (0 downto 1)"
+                           _ -> "signed" <> parens (int (n-1) <+> "downto 0")
+    go (Unsigned n)    = case n of
+                           0 -> "unsigned (0 downto 1)"
+                           _ -> "unsigned" <> parens ( int (n-1) <+> "downto 0")
+    go (Vector n elTy) = do
+      nm <- use modNm
+      text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy <> parens ("0 to " <> int (n-1))
+    go t@(Product _ _) = do
+      nm <- use modNm
+      text (T.toLower $ T.pack nm) <> "_types." <> tyName t
+    go Void            = "std_logic_vector" <> parens (int (-1) <+> "downto 0")
+    go String          = "string"
+    go ty              = error $ $(curLoc) ++ "vhdlType: type is not normalised: " ++ show ty
 
 sigDecl :: VHDLM Doc -> HWType -> VHDLM Doc
 sigDecl d t = d <+> colon <+> vhdlType t
@@ -434,25 +408,23 @@ sigDecl d t = d <+> colon <+> vhdlType t
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
 vhdlTypeMark hwty = do
-  tyCache %= HashSet.insert hwty
-  vhdlTypeMark' hwty
+  let hwty' = normaliseType hwty
+  tyCache %= HashSet.insert hwty'
+  go hwty'
   where
-    vhdlTypeMark' Bool            = "boolean"
-    vhdlTypeMark' (Clock _ _)     = "std_logic"
-    vhdlTypeMark' (Reset _ _)     = "std_logic"
-    vhdlTypeMark' (BitVector _)   = "std_logic_vector"
-    vhdlTypeMark' (Index _)       = "unsigned"
-    vhdlTypeMark' (Signed _)      = "signed"
-    vhdlTypeMark' (Unsigned _)    = "unsigned"
-    vhdlTypeMark' (Vector _ elTy) = do
+    go Bool            = "boolean"
+    go (Clock _ _)     = "std_logic"
+    go (Reset _ _)     = "std_logic"
+    go (BitVector _)   = "std_logic_vector"
+    go (Signed _)      = "signed"
+    go (Unsigned _)    = "unsigned"
+    go (Vector _ elTy) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types.array_of_" <> tyName elTy
-    vhdlTypeMark' (SP _ _)        = "std_logic_vector"
-    vhdlTypeMark' (Sum _ _)       = "unsigned"
-    vhdlTypeMark' t@(Product _ _) = do
+    go t@(Product _ _) = do
       nm <- use modNm
       text (T.toLower $ T.pack nm) <> "_types." <> tyName t
-    vhdlTypeMark' t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
+    go t               = error $ $(curLoc) ++ "vhdlTypeMark: " ++ show t
 
 tyName :: HWType -> VHDLM Doc
 tyName Bool              = "boolean"
@@ -464,7 +436,7 @@ tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
 tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
-tyName t@(Product nm _)  = makeCached t nameCache prodName
+tyName t@(Product nm _)  = makeCached (normaliseType t) nameCache prodName
   where
     prodName = do
       seen <- use tySeen
