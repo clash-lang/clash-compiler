@@ -23,6 +23,7 @@ import           Unbound.Generics.LocallyNameless (runFreshM, unembed)
 import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
 import qualified DynFlags                as GHC
+import qualified Name                    as GHC hiding (varName)
 import qualified TyCon                   as GHC
 import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
@@ -118,7 +119,7 @@ mkBindings :: PrimMap a
                     )
 mkBindings primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\(v,e) -> do
-                          tm <- coreToTerm primMap unlocatable e
+                          tm <- coreToTerm primMap unlocatable (GHC.getSrcSpan v) e
                           v' <- coreToId v
                           return (varName v', (unembed (varType v'), tm))
                        ) bindings

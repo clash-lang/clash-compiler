@@ -26,6 +26,9 @@ where
 
 -- External Modules
 import           Control.Lens                ((^.), (%~), (&), (%=))
+import           Control.Monad.Trans.Class   (lift)
+import           Control.Monad.Trans.Reader  (ReaderT)
+import qualified Control.Monad.Trans.Reader  as Reader
 import           Control.Monad.State         (State)
 import qualified Control.Monad.State.Lazy    as State
 import qualified Data.ByteString.Char8       as Char8
@@ -33,7 +36,7 @@ import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Lazy           (HashMap)
 import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashMap.Strict         as HSM
-import           Data.Maybe                  (fromMaybe)
+import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 import           Data.Text                   (isInfixOf,pack)
 import qualified Data.Traversable            as T
 import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
@@ -42,7 +45,7 @@ import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
 import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
-import Coercion   (coercionType)
+import Coercion   (Coercion (..),Role(..),coercionType,coercionKind,mkCoercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (AltCon (..), Bind (..), CoreExpr,
                    Expr (..), rhssOfAlts)
@@ -61,9 +64,12 @@ import Kind       (isSuperKindTyCon)
 import Literal    (Literal (..))
 import Module     (moduleName, moduleNameString)
 import Name       (Name, nameModule_maybe,
-                   nameOccName, nameUnique)
+                   nameOccName, nameUnique, getSrcSpan)
 import OccName    (occNameString)
-import Outputable (showPpr)
+import Outputable (showPpr, showSDocUnsafe)
+import Pair       (Pair (..))
+import PprCore    (pprCoreExpr)
+import SrcLoc     (SrcSpan, isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
@@ -216,48 +222,70 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
 
 coreToTerm :: PrimMap a
            -> [Var]
+           -> SrcSpan
            -> CoreExpr
            -> State GHC2CoreState C.Term
-coreToTerm primMap unlocs coreExpr = term coreExpr
+coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
-    term (Var x)                 = var x
+    term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
+    term (Var x)                 = lift (var x)
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
-    term (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
+    term (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
     term (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
-    term (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> coreToTyVar x <*> term e)
-                   | otherwise   = C.Lam   <$> (bind <$> coreToId x    <*> term e)
+    term (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e))
+                   | otherwise   = C.Lam   <$> (bind <$> lift (coreToId x) <*> addUsefull (getSrcSpan x) (term e))
     term (Let (NonRec x e1) e2)  = do
-      x' <- coreToId x
-      e1' <- term e1
+      x' <- lift (coreToId x)
+      e1' <- addUsefull (getSrcSpan x) (term e1)
       e2' <- term e2
       return $ C.Letrec $ bind (rec [(x', embed e1')]) e2'
 
     term (Let (Rec xes) e) = do
-      xes' <- mapM
-                ( firstM  coreToId <=<
-                  secondM ((return . embed) <=< term)
-                ) xes
+      xes' <- mapM (\(x,b) -> (,) <$> lift (coreToId x)
+                                  <*> addUsefull (getSrcSpan x)
+                                                 (embed <$> term b))
+                   xes
       e' <- term e
       return $ C.Letrec $ bind (rec xes') e'
 
-    term (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> coreToType ty
+    term (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
     term (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
                   $ rhssOfAlts alts
-     b' <- coreToId b
-     e' <- term e
-     ty' <- coreToType ty
-     let caseTerm v = C.Case v ty' <$> mapM alt alts
+     b' <- lift (coreToId b)
+     e' <- addUsefull (getSrcSpan b) (term e)
+     ty' <- lift (coreToType ty)
+     let caseTerm v = C.Case v ty' <$> mapM (addUsefull (getSrcSpan b) . alt) alts
      if usesBndr
       then do
         ct <- caseTerm (C.Var (unembed $ C.varType b') (C.varName b'))
         return $ C.Letrec $ bind (rec [(b',embed e')]) ct
       else caseTerm e'
 
-    term (Cast e _)        = term e
+    term (Cast e co) = do
+      let (Pair ty1 ty2) = coercionKind co
+      hasPrimCoM <- lift (hasPrimCo co)
+      ty1_I <- lift (isIntegerTy ty1)
+      ty2_I <- lift (isIntegerTy ty2)
+      case hasPrimCoM of
+        Just ty | ty1_I || ty2_I -> do
+          sp <- Reader.ask
+          error (unlines [ "In the following core expression\n"
+                         , showSDocUnsafe (pprCoreExpr coreExpr)
+                         , "\nCLaSH cannot translate the following cast:\n"
+                         , showSDocUnsafe (pprCoreExpr (Cast e co))
+                         , "\nbecause it contains the following coercion:\n"
+                         , showPpr unsafeGlobalDynFlags (if ty1_I then mkCoercionType Representational ty1 ty
+                                                                  else mkCoercionType Representational ty ty2)
+                         , "\nthat exposes the internal structure of the CLaSH primitive type: " ++ showPpr unsafeGlobalDynFlags ty
+                         , "This is most likely due to the use of 'seq' or BangPatterns on values of (newtype wrappers of) types: {BitVector,Index,Signed,Unsigned}\n"
+                         , "This cast occurs in the neighbourhood of: " ++ showPpr unsafeGlobalDynFlags sp
+                         , "Note that this locations is acquired after optimisations and that the actual location of the cast can be in a function that is inlined."
+                         ])
+        _ -> term e
     term (Tick _ e)        = term e
-    term (Type t)          = C.Prim (pack "_TY_") <$> coreToType t
-    term (Coercion co)     = C.Prim (pack "_CO_") <$> coreToType (coercionType co)
+    term (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
+    term (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
 
     var x = do
         xVar   <- coreToVar x
@@ -289,10 +317,10 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> term e
     alt (DataAlt dc, xs, e) = case span isTyVar xs of
       (tyvs,tmvs) -> bind <$> (C.DataPat . embed <$>
-                                coreToDataCon False dc <*>
+                                lift (coreToDataCon False dc) <*>
                                 (rebind <$>
-                                  mapM coreToTyVar tyvs <*>
-                                  mapM coreToId tmvs)) <*>
+                                  lift (mapM coreToTyVar tyvs) <*>
+                                  lift (mapM coreToId tmvs))) <*>
                               term e
 
     coreToLiteral :: Literal
@@ -309,6 +337,65 @@ coreToTerm primMap unlocs coreExpr = term coreExpr
       MachDouble r   -> C.RationalLiteral r
       MachNullAddr   -> C.StringLiteral []
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
+
+addUsefull :: SrcSpan -> ReaderT SrcSpan (State GHC2CoreState) a
+            -> ReaderT SrcSpan (State GHC2CoreState) a
+addUsefull x = Reader.local (\r -> if isGoodSrcSpan x then x else r)
+
+isIntegerTy :: Type -> State GHC2CoreState Bool
+isIntegerTy (TyConApp tc []) = do
+  tcNm <- qualfiedNameString (tyConName tc)
+  return (tcNm == "GHC.Integer.Type.Integer")
+isIntegerTy _ = return False
+
+hasPrimCo :: Coercion -> State GHC2CoreState (Maybe Type)
+hasPrimCo (TyConAppCo _ _ coers) = do
+  tcs <- catMaybes <$> mapM hasPrimCo coers
+  return (listToMaybe tcs)
+
+hasPrimCo (AppCo co1 co2) = do
+  tc1M <- hasPrimCo co1
+  case tc1M of
+    Just _ -> return tc1M
+    _ -> hasPrimCo co2
+hasPrimCo (ForAllCo _ co) = hasPrimCo co
+
+hasPrimCo co@(AxiomInstCo _ _ coers) = do
+    let (Pair ty1 _) = coercionKind co
+    ty1PM <- isPrimTc ty1
+    if ty1PM
+       then return (Just ty1)
+       else do
+         tcs <- catMaybes <$> mapM hasPrimCo coers
+         return (listToMaybe tcs)
+  where
+    isPrimTc (TyConApp tc _) = do
+      tcNm <- qualfiedNameString (tyConName tc)
+      return (tcNm `elem` ["CLaSH.Sized.Internal.BitVector.BitVector"
+                          ,"CLaSH.Sized.Internal.Index.Index"
+                          ,"CLaSH.Sized.Internal.Signed.Signed"
+                          ,"CLaSH.Sized.Internal.Unsigned.Unsigned"
+                          ])
+    isPrimTc _ = return False
+
+hasPrimCo (SymCo co) = hasPrimCo co
+
+hasPrimCo (TransCo co1 co2) = do
+  tc1M <- hasPrimCo co1
+  case tc1M of
+    Just _ -> return tc1M
+    _ -> hasPrimCo co2
+
+hasPrimCo (AxiomRuleCo _ _ coers) = do
+  tcs <- catMaybes <$> mapM hasPrimCo coers
+  return (listToMaybe tcs)
+
+hasPrimCo (NthCo _ co)  = hasPrimCo co
+hasPrimCo (LRCo _ co)   = hasPrimCo co
+hasPrimCo (InstCo co _) = hasPrimCo co
+hasPrimCo (SubCo co)    = hasPrimCo co
+
+hasPrimCo _ = return Nothing
 
 coreToDataCon :: Bool
               -> DataCon
