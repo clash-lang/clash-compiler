@@ -1,6 +1,8 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.6.20
+## 0.6.20 *July 15th 2016*
+* New features:
+  * Better error location reporting
 * Fixes bugs:
   * `CLaSH.Sized.Internal.Unsigned.maxBound#` not evaluated at compile-time [#155](https://github.com/clash-lang/clash-compiler/issues/155)
   * `CLaSH.Sized.Internal.Unsigned.minBound#` not evaluated at compile-time [#157](https://github.com/clash-lang/clash-compiler/issues/157)

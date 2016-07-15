@@ -95,9 +95,9 @@ Executable clash
                       unordered-containers      >= 0.2.1.0  && < 0.3,
 
                       clash-lib                 >= 0.6.18   && < 0.7,
-                      clash-systemverilog       >= 0.6.6    && < 0.7,
+                      clash-systemverilog       >= 0.6.7    && < 0.7,
                       clash-vhdl                >= 0.6.14   && < 0.7,
-                      clash-verilog             >= 0.6.6    && < 0.7,
+                      clash-verilog             >= 0.6.7    && < 0.7,
                       clash-prelude             >= 0.10.10  && < 0.11,
                       ghc-typelits-extra        >= 0.1.2    && < 0.2,
                       ghc-typelits-natnormalise >= 0.4.2    && < 0.5,
