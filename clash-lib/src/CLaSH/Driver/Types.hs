@@ -8,7 +8,10 @@
 
 module CLaSH.Driver.Types where
 
+import Control.Exception (Exception)
 import Data.HashMap.Lazy (HashMap)
+
+import SrcLoc            (SrcSpan)
 
 import CLaSH.Core.Term   (Term,TmName)
 import CLaSH.Core.Type   (Type)
@@ -27,4 +30,12 @@ data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_intWidth    :: Int
                            , opt_hdlDir      :: Maybe String
                            , opt_hdlSyn      :: HdlSyn
+                           , opt_errorExtra  :: Bool
                            }
+
+data CLaSHException = CLaSHException SrcSpan String (Maybe String)
+
+instance Show CLaSHException where
+  show (CLaSHException _ s eM) = s ++ "\n" ++ maybe "" id eM
+
+instance Exception CLaSHException

@@ -25,6 +25,7 @@ module CLaSH.GHC.GHC2Core
 where
 
 -- External Modules
+import           Control.Exception           (throw)
 import           Control.Lens                ((^.), (%~), (&), (%=))
 import           Control.Monad.Trans.Class   (lift)
 import           Control.Monad.Trans.Reader  (ReaderT)
@@ -97,6 +98,7 @@ import qualified CLaSH.Core.Term             as C
 import qualified CLaSH.Core.TyCon            as C
 import qualified CLaSH.Core.Type             as C
 import qualified CLaSH.Core.Var              as C
+import           CLaSH.Driver.Types
 import           CLaSH.Primitives.Types
 import           CLaSH.Util
 
@@ -270,18 +272,19 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       case hasPrimCoM of
         Just ty | ty1_I || ty2_I -> do
           sp <- Reader.ask
-          error (unlines [ "In the following core expression\n"
-                         , showSDocUnsafe (pprCoreExpr coreExpr)
-                         , "\nCLaSH cannot translate the following cast:\n"
-                         , showSDocUnsafe (pprCoreExpr (Cast e co))
-                         , "\nbecause it contains the following coercion:\n"
-                         , showPpr unsafeGlobalDynFlags (if ty1_I then mkCoercionType Representational ty1 ty
-                                                                  else mkCoercionType Representational ty ty2)
-                         , "\nthat exposes the internal structure of the CLaSH primitive type: " ++ showPpr unsafeGlobalDynFlags ty
-                         , "This is most likely due to the use of 'seq' or BangPatterns on values of (newtype wrappers of) types: {BitVector,Index,Signed,Unsigned}\n"
-                         , "This cast occurs in the neighbourhood of: " ++ showPpr unsafeGlobalDynFlags sp
-                         , "Note that this locations is acquired after optimisations and that the actual location of the cast can be in a function that is inlined."
-                         ])
+          throw (CLaSHException sp
+                  (unlines [ "CLaSH cannot translate the following cast:\n"
+                           , showSDocUnsafe (pprCoreExpr (Cast e co))
+                           , "\nbecause it contains the following coercion:\n"
+                           , showPpr unsafeGlobalDynFlags (if ty1_I then mkCoercionType Representational ty1 ty
+                                                                    else mkCoercionType Representational ty ty2)
+                           , "\nthat exposes the internal structure of the CLaSH primitive type: " ++ showPpr unsafeGlobalDynFlags ty
+                           , "This is most likely due to the use of 'seq' or BangPatterns on values of (newtype wrappers of) types: {BitVector,Index,Signed,Unsigned}"
+                           ])
+                  (Just (unlines ["The cast occurs in the following core expression:\n"
+                                 , showSDocUnsafe (pprCoreExpr coreExpr)]))
+                  )
+
         _ -> term e
     term (Tick _ e)        = term e
     term (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
