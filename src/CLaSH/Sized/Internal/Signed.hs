@@ -147,7 +147,14 @@ size# :: KnownNat n => Signed n -> Int
 size# bv = fromInteger (natVal bv)
 
 instance Show (Signed n) where
-  show (S n) = show n
+  showsPrec p s = showsPrec p (toInteger# s)
+  show s = show (toInteger# s)
+  -- We cannot say:
+  --
+  -- > show (S i) = show i
+  --
+  -- Because GHC translates that to a cast from Signed to Integer,
+  -- which the CLaSH compiler can (currently) not handle.
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Signed n) where

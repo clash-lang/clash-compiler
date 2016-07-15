@@ -269,7 +269,14 @@ decIndex :: Integer -> TypeQ
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 
 instance Show (Index n) where
-  show (I n) = show n
+  showsPrec p ix = showsPrec p (toInteger# ix)
+  show ix = show (toInteger# ix)
+  -- We cannot say:
+  --
+  -- > show (I i) = show i
+  --
+  -- Because GHC translates that to a cast from Index to Integer,
+  -- which the CLaSH compiler can (currently) not handle.
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Index n) where

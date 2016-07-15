@@ -141,7 +141,7 @@ type Bit = BitVector 1
 
 -- * Instances
 instance KnownNat n => Show (BitVector n) where
-  show bv@(BV i) = reverse . underScore . reverse $ showBV (natVal bv) i []
+  show bv = reverse . underScore . reverse $ showBV (natVal bv) (toInteger# bv) []
     where
       showBV 0 _ s = s
       showBV n v s = let (a,b) = divMod v 2

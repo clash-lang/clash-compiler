@@ -136,7 +136,14 @@ size# :: KnownNat n => Unsigned n -> Int
 size# u = fromInteger (natVal u)
 
 instance Show (Unsigned n) where
-  show (U i) = show i
+  showsPrec p u = showsPrec p (toInteger# u)
+  show u = show (toInteger# u)
+  -- We cannot say:
+  --
+  -- > show (U i) = show i
+  --
+  -- Because GHC translates that to a cast from Unsigned to Integer,
+  -- which the CLaSH compiler can (currently) not handle
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Unsigned n) where

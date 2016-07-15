@@ -3,6 +3,7 @@
 ## 0.10.10
 * Fixes bugs:
   * `shrink` functions for numeric types throw exceptions [#153](https://github.com/clash-lang/clash-compiler/issues/153)
+  * CLaSH compiler sees internals of numeric types in their Show functions
 
 ## 0.10.9 *June 9th 2016*
 * Fixes bugs:
