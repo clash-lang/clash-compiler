@@ -160,7 +160,7 @@ inlineNonRep :: NormRewrite
 inlineNonRep _ e@(Case scrut altsTy alts)
   | (Var _ f, args) <- collectArgs scrut
   = do
-    cf        <- Lens.use curFun
+    (cf,_)    <- Lens.use curFun
     isInlined <- zoomExtra (alreadyInlined f cf)
     limit     <- Lens.use (extra.inlineLimit)
     tcm       <- Lens.view tcCache
@@ -184,7 +184,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
-          (True,Just (_, scrutBody)) -> do
+          (True,Just (_,_,scrutBody)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
@@ -435,7 +435,7 @@ inlineClosed _ e@(collectArgs -> (Var _ f,args))
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,body) -> do
+          Just (_,_,body) -> do
             isRecBndr <- isRecursiveBndr f
             if isRecBndr
                then return e
@@ -452,7 +452,7 @@ inlineClosed _ e@(Var fTy f) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,body) -> do
+        Just (_,_,body) -> do
           isRecBndr <- isRecursiveBndr f
           if isRecBndr
              then return e
@@ -473,7 +473,7 @@ inlineSmall _ e@(collectArgs -> (Var _ f,args)) = do
       sizeLimit <- Lens.use (extra.inlineBelow)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,body) -> do
+        Just (_,_,body) -> do
           isRecBndr <- isRecursiveBndr f
           if not isRecBndr && termSize body < sizeLimit
              then changed (mkApps body args)
@@ -817,12 +817,12 @@ etaExpansionTL ctx e
 -- found in the body of the top-level let-expression.
 recToLetRec :: NormRewrite
 recToLetRec [] e = do
-  fn          <- Lens.use curFun
+  (fn,_)      <- Lens.use curFun
   bodyM       <- fmap (HashMap.lookup fn) $ Lens.use bindings
   tcm         <- Lens.view tcCache
   normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
-    (Right (args,bndrs,res), Just (bodyTy,_)) -> do
+    (Right (args,bndrs,res), Just (bodyTy,_,_)) -> do
       let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)
           (toInline,others) = List.partition ((==) appF . unembed . snd) bndrs
           resV              = idToVar res
@@ -844,7 +844,7 @@ inlineHO _ e@(App _ _)
     tcm <- Lens.view tcCache
     hasPolyFunArgs <- or <$> mapM (either (isPolyFun tcm) (const (return False))) args
     if hasPolyFunArgs
-      then do cf        <- Lens.use curFun
+      then do (cf,_)    <- Lens.use curFun
               isInlined <- zoomExtra (alreadyInlined f cf)
               limit     <- Lens.use (extra.inlineLimit)
               if (Maybe.fromMaybe 0 isInlined) > limit
@@ -854,7 +854,7 @@ inlineHO _ e@(App _ _)
                 else do
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
-                    Just (_, body) -> do
+                    Just (_,_,body) -> do
                       zoomExtra (addNewInline f cf)
                       changed (mkApps body args)
                     _ -> return e

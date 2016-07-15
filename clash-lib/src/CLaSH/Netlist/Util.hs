@@ -65,7 +65,7 @@ splitNormalized tcm expr = do
       | otherwise -> return $! Left ($(curLoc) ++ "Not in normal form: tyArgs")
     _ -> do
       ty <- termType tcm expr
-      return $! Left ($(curLoc) ++ "Not in normal from: no Letrec:\n" ++ showDoc expr ++ "\nWhich has type:\n"  ++ showDoc ty)
+      return $! Left ($(curLoc) ++ "Not in normal from: no Letrec:\n\n" ++ showDoc expr ++ "\n\nWhich has type:\n\n"  ++ showDoc ty)
 
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.

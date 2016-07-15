@@ -11,7 +11,7 @@
 
 module CLaSH.Normalize.Util where
 
-import           Control.Lens            ((%=))
+import           Control.Lens            ((%=),(^.),_3)
 import qualified Control.Lens            as Lens
 import           Data.Function           (on)
 import qualified Data.Graph              as Graph
@@ -23,6 +23,8 @@ import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (Fresh, bind, embed, rec)
+
+import           SrcLoc                  (SrcSpan)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Var          (Var (Id))
@@ -90,13 +92,13 @@ isRecursiveBndr f = do
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph :: [TmName] -- ^ List of functions that should not be inspected
-          -> HashMap TmName (Type,Term) -- ^ Global binders
+          -> HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
           -> TmName -- ^ Root of the call graph
           -> [(TmName,[TmName])]
 callGraph visited bindingMap root = node:other
   where
     rootTm = Maybe.fromMaybe (error $ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ Lens.setOf termFreeIds (snd rootTm)
+    used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _3)
     node   = (root,used)
     other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
 
@@ -111,9 +113,9 @@ mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs))
   where
     fs = map fst cg
 
-lambdaDropPrep :: HashMap TmName (Type,Term)
+lambdaDropPrep :: HashMap TmName (Type,SrcSpan,Term)
                -> TmName
-               -> HashMap TmName (Type,Term)
+               -> HashMap TmName (Type,SrcSpan,Term)
 lambdaDropPrep bndrs topEntity = bndrs'
   where
     depGraph = callGraph [] bndrs topEntity
@@ -122,10 +124,10 @@ lambdaDropPrep bndrs topEntity = bndrs'
     dropped  = map (lambdaDrop bndrs used) rcs
     bndrs'   = foldr (\(k,v) b -> HashMap.insert k v b) bndrs dropped
 
-lambdaDrop :: HashMap TmName (Type,Term) -- ^ Original Binders
+lambdaDrop :: HashMap TmName (Type,SrcSpan,Term) -- ^ Original Binders
            -> HashMap TmName [TmName]    -- ^ Dependency Graph
            -> [TmName]                   -- ^ Recursive block
-           -> (TmName,(Type,Term))       -- ^ Lambda-dropped Binders
+           -> (TmName,(Type,SrcSpan,Term))       -- ^ Lambda-dropped Binders
 lambdaDrop bndrs depGraph cyc@(root:_) = block
   where
     doms  = dominator depGraph cyc
@@ -150,16 +152,16 @@ dominator cfg cyc = mkGraph nodes (map (\(e,b) -> (b,e,nodesM HashMap.! e)) doms
     graph    = mkGraph nodes edges :: Gr TmName ()
     doms     = iDom graph 0
 
-blockSink :: HashMap TmName (Type,Term) -- ^ Original Binders
+blockSink :: HashMap TmName (Type,SrcSpan,Term) -- ^ Original Binders
           -> Gr TmName TmName           -- ^ Recursive block dominator
           -> LNode TmName               -- ^ Recursive block dominator root
-          -> (TmName,(Type,Term))       -- ^ Block sank binder
-blockSink bndrs doms (nId,tmName) = (tmName,(ty,newTm))
+          -> (TmName,(Type,SrcSpan,Term))       -- ^ Block sank binder
+blockSink bndrs doms (nId,tmName) = (tmName,(ty,sp,newTm))
   where
-    (ty,tm) = bndrs HashMap.! tmName
+    (ty,sp,tm) = bndrs HashMap.! tmName
     sucTm   = lsuc doms nId
     tmS     = map (blockSink bndrs doms) sucTm
-    bnds    = map (\(tN,(ty',tm')) -> (Id tN (embed ty'),embed tm')) tmS
+    bnds    = map (\(tN,(ty',_,tm')) -> (Id tN (embed ty'),embed tm')) tmS
     newTm   = case sucTm of
                 [] -> tm
                 _  -> Letrec (bind (rec bnds) tm)

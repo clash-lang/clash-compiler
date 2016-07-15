@@ -10,12 +10,13 @@ import CLaSH.Core.DataCon   (DataCon)
 import CLaSH.Core.Term      (Term,TmName)
 import CLaSH.Core.Type      (Type)
 import CLaSH.Core.Var       (Id)
+import CLaSH.Driver.Types   (SrcSpan)
 import CLaSH.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
                              Declaration)
 
 genComponent :: TmName
              -> Maybe Int
-             -> NetlistMonad Component
+             -> NetlistMonad (SrcSpan,Component)
 
 mkExpr :: Bool
        -> Either Identifier Id

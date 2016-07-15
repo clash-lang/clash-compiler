@@ -8,7 +8,7 @@ module CLaSH.GHC.GenerateBindings
   (generateBindings)
 where
 
-import           Control.Lens            ((%~),(&))
+import           Control.Lens            ((%~),(&),(^.),_1)
 import           Control.Monad.State     (State)
 import qualified Control.Monad.State     as State
 import           Data.Either             (lefts, rights)
@@ -27,6 +27,7 @@ import qualified Name                    as GHC hiding (varName)
 import qualified TyCon                   as GHC
 import qualified TysWiredIn              as GHC
 import qualified Var                     as GHC
+import qualified SrcLoc                  as GHC
 
 import           CLaSH.Annotations.TopEntity (TopEntity)
 import           CLaSH.Core.FreeVars     (termFreeIds)
@@ -60,7 +61,7 @@ generateBindings primMap modName dflagsM = do
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
-      clsMap                        = HashMap.map (\(ty,i) -> (ty,mkClassSelector allTcCache ty i)) clsVMap
+      clsMap                        = HashMap.map (\(ty,i) -> (ty,GHC.noSrcSpan,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
       (topEnt',testInpM',expOutM')  = flip State.evalState tcMap' $ do
                                           topEnt'' <- coreToName GHC.varName GHC.varUnique qualfiedNameString topEnt
@@ -99,12 +100,12 @@ retype :: HashMap TyConName TyCon
        -> ([TmName], BindingMap) -- (visited, bindings)
        -> TmName                 -- top
        -> ([TmName], BindingMap)
-retype tcm (visited,bindings) current = (visited', HashMap.insert current (ty',tm') bindings')
+retype tcm (visited,bindings) current = (visited', HashMap.insert current (ty',sp,tm') bindings')
   where
-    (_,tm)               = bindings HashMap.! current
+    (_,sp,tm)            = bindings HashMap.! current
     used                 = Set.toList $ Lens.setOf termFreeIds tm
     (visited',bindings') = foldl (retype tcm) (current:visited,bindings) (filter (`notElem` visited) used)
-    usedTys              = map (fst . (bindings' HashMap.!)) used
+    usedTys              = map ((^. _1) . (bindings' HashMap.!)) used
     usedVars             = zipWith Var usedTys used
     tm'                  = substTms (zip used usedVars) tm
     ty'                  = runFreshM (termType tcm tm')
@@ -119,9 +120,10 @@ mkBindings :: PrimMap a
                     )
 mkBindings primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\(v,e) -> do
-                          tm <- coreToTerm primMap unlocatable (GHC.getSrcSpan v) e
+                          let sp = GHC.getSrcSpan v
+                          tm <- coreToTerm primMap unlocatable sp e
                           v' <- coreToId v
-                          return (varName v', (unembed (varType v'), tm))
+                          return (varName v', (unembed (varType v'), sp, tm))
                        ) bindings
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v

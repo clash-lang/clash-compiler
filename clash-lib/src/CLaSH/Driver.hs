@@ -31,6 +31,8 @@ import qualified System.IO                        as IO
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc)
 import           Unbound.Generics.LocallyNameless (name2String)
 
+import           GHC.Extra                        ()
+
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Backend
 import           CLaSH.Core.Term                  (Term, TmName)
@@ -103,7 +105,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   putStrLn $ "Netlist generation took " ++ show normNetDiff
 
   let topComponent = head
-                   $ filter (\(Component cName _ _ _ _) ->
+                   $ filter (\(_,Component cName _ _ _ _) ->
                                 Text.isSuffixOf (genComponentName [topNm] mkId modName topEntity)
                                   cName)
                             netlist
@@ -114,15 +116,15 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
                              expOutM
                              modName
                              dfiles
-                             topComponent
+                             (snd topComponent)
 
 
   testBenchTime <- testBench `seq` Clock.getCurrentTime
   let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
   putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-  let topWrapper = mkTopWrapper primMap' mkId annM modName iw topComponent
-      hdlDocs = createHDL hdlState' modName (topWrapper : netlist ++ testBench)
+  let topWrapper = mkTopWrapper primMap' mkId annM modName iw (snd topComponent)
+      hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : netlist ++ testBench)
       dir = fromMaybe "." (opt_hdlDir opts) </>
             CLaSH.Backend.name hdlState' </>
             takeWhile (/= '.') (name2String topEntity)
@@ -146,12 +148,12 @@ parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 createHDL :: Backend backend
            => backend     -- ^ Backend
            -> String
-           -> [Component] -- ^ List of components
+           -> [(SrcSpan,Component)] -- ^ List of components
            -> [(String,Doc)]
 createHDL backend modName components = flip evalState backend $ do
   -- (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
   -- let hdlNmDocs = zip hdlNms hdlDocs
-  hdlNmDocs <- mapM (genHDL modName) components
+  hdlNmDocs <- mapM (uncurry (genHDL modName)) components
   hwtys <- HashSet.toList <$> extractTypes <$> get
   typesPkg <- mkTyPackage modName hwtys
   return (typesPkg ++ hdlNmDocs)

@@ -11,7 +11,8 @@
 
 module CLaSH.Netlist where
 
-import           Control.Lens                     ((.=))
+import           Control.Exception                (throw)
+import           Control.Lens                     ((.=),(^.),_1,_2)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (runStateT)
 import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
@@ -27,6 +28,8 @@ import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
                                                   runFreshMT, unbind, unembed,
                                                   unrebind)
 
+import           SrcLoc                           (SrcSpan,noSrcSpan)
+
 import           CLaSH.Core.DataCon               (DataCon (..))
 import           CLaSH.Core.FreeVars              (typeFreeVars)
 import           CLaSH.Core.Literal               (Literal (..))
@@ -37,6 +40,7 @@ import           CLaSH.Core.Type                  (Type (..))
 import           CLaSH.Core.TyCon                 (TyConName, TyCon)
 import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
+import           CLaSH.Driver.Types               (CLaSHException (..))
 import           CLaSH.Netlist.BlackBox
 import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Id
@@ -48,7 +52,7 @@ import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: HashMap TmName (Type,Term)
+genNetlist :: HashMap TmName (Type,SrcSpan,Term)
            -- ^ Global binders
            -> PrimMap BlackBoxTemplate
            -- ^ Primitive definitions
@@ -70,13 +74,14 @@ genNetlist :: HashMap TmName (Type,Term)
            -- ^ Seen components
            -> TmName
            -- ^ Name of the @topEntity@
-           -> IO ([Component],[(String,FilePath)],[Identifier])
+           -> IO ([(SrcSpan,Component)],[(String,FilePath)],[Identifier])
 genNetlist globals primMap tcm typeTrans mStart modName dfiles iw mkId seen topEntity = do
+
   (_,s) <- runNetlistMonad globals primMap tcm typeTrans modName dfiles iw mkId seen $ genComponent topEntity mStart
   return (HashMap.elems $ _components s, _dataFiles s, _seenComps s)
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: HashMap TmName (Type,Term)
+runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
                 -- ^ Global binders
                 -> PrimMap BlackBoxTemplate
                 -- ^ Primitive Definitions
@@ -103,7 +108,7 @@ runNetlistMonad s p tcm typeTrans modName dfiles iw mkId seen
   . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm Text.empty dfiles iw mkId [] seen' names
+    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seen' names
     (seen',names) = genNames mkId modName seen HashMap.empty (HashMap.keys s)
 
 genNames :: (Identifier -> Identifier)
@@ -123,37 +128,40 @@ genNames mkId modName = go
 -- | Generate a component for a given function (caching)
 genComponent :: TmName -- ^ Name of the function
              -> Maybe Int -- ^ Starting value of the unique counter
-             -> NetlistMonad Component
+             -> NetlistMonad (SrcSpan,Component)
 genComponent compName mStart = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
-    Nothing -> error $ $(curLoc) ++ "No normalized expression found for: " ++ show compName
-    Just (_,expr_) -> makeCached compName components $
-                      genComponentT compName expr_ mStart
+    Nothing -> do
+      (_,sp) <- Lens.use curCompNm
+      throw (CLaSHException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
+    Just (_,_,expr_) -> makeCached compName components $
+                          genComponentT compName expr_ mStart
 
 -- | Generate a component for a given function
 genComponentT :: TmName -- ^ Name of the function
               -> Term -- ^ Corresponding term
               -> Maybe Int -- ^ Starting value of the unique counter
-              -> NetlistMonad Component
+              -> NetlistMonad (SrcSpan,Component)
 genComponentT compName componentExpr mStart = do
   varCount .= fromMaybe 0 mStart
   componentName' <- (HashMap.! compName) <$> Lens.use componentNames
-  curCompNm .= componentName'
+  sp <- ((^. _2) . (HashMap.! compName)) <$> Lens.use bindings
+  curCompNm .= (componentName',sp)
 
   tcm <- Lens.use tcCache
   seenIds .= []
   (arguments,binders,result) <- do { normalizedM <- splitNormalized tcm componentExpr
                                    ; case normalizedM of
                                        Right normalized -> mkUniqueNormalized normalized
-                                       Left err         -> error $ $(curLoc) ++ err
+                                       Left err         -> throw (CLaSHException sp err Nothing)
                                    }
 
   let ids = HashMap.fromList
           $ map (\(Id v (Embed t)) -> (v,t))
           $ arguments ++ map fst binders
 
-  gamma <- (ids `HashMap.union`) . HashMap.map fst
+  gamma <- (ids `HashMap.union`) . HashMap.map (^. _1)
            <$> Lens.use bindings
 
   varEnv .= gamma
@@ -171,7 +179,7 @@ genComponentT compName componentExpr mStart = do
   let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (Text.pack $ name2String result, resType)
       component      = Component componentName' (toList clks) compInps [compOutp] (netDecls ++ decls)
-  return component
+  return (sp,component)
 
 
 genComponentName :: [Identifier] -> (Identifier -> Identifier) -> String -> TmName -> Identifier
@@ -200,14 +208,16 @@ mkDeclarations :: Id -- ^ LHS of the let-binder
                -> NetlistMonad [Declaration]
 mkDeclarations bndr (Var _ v) = mkFunApp bndr v []
 
-mkDeclarations _ e@(Case _ _ []) =
-  error $ $(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported: " ++ showDoc e
+mkDeclarations _ e@(Case _ _ []) = do
+  (_,sp) <- Lens.use curCompNm
+  throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported:\n\n" ++ showDoc e) Nothing)
 
 mkDeclarations bndr e@(Case scrut _ [alt]) = do
   (pat,v) <- unbind alt
+  (_,sp) <- Lens.use curCompNm
   (varTy,varTm) <- case v of
                      (Var t n) -> return (t,n)
-                     _ -> error $ $(curLoc) ++ "Not in normal form: RHS of case-projection is not a variable: " ++ showDoc e
+                     _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: RHS of case-projection is not a variable:\n\n" ++ showDoc e) Nothing)
   typeTrans    <- Lens.use typeTranslator
   tcm          <- Lens.use tcCache
   scrutTy      <- termType tcm scrut
@@ -233,7 +243,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
                                       tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
                                       extNms     = map varName exts
                                       tms'       = if any (`elem` tmsFVs) extNms
-                                                      then error $ $(curLoc) ++ "Not in normal form: Pattern binds existential variables: " ++ showDoc e
+                                                      then throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
                                                       else tms
                                   in case elemIndex (Id varTm (Embed varTy)) tms' of
                                        Nothing -> Nothing
@@ -242,7 +252,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
                                         -- When element and subject have the same HW-type,
                                         -- then the projections is just the identity
                                         | otherwise      -> Just (DC (Void,0))
-        _ -> error $ $(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection: " ++ showDoc e
+        _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
   return (decls ++ [Assignment dstId extractExpr])
 
@@ -253,7 +263,8 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
   let scrutId = Text.pack . (++ "_case_scrut") . name2String $ varName bndr
-  (scrutExpr,scrutDecls) <- first (mkScrutExpr scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
+  (_,sp) <- Lens.use curCompNm
+  (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
   let dstId = Text.pack . name2String $ varName bndr
@@ -272,14 +283,16 @@ mkDeclarations bndr (Case scrut altTy alts) = do
         LitPat  (Embed (CharLiteral c)) -> return (Just (NumLit . toInteger $ ord c), altExpr)
         LitPat  (Embed (Int64Literal i)) -> return (Just (NumLit i), altExpr)
         LitPat  (Embed (Word64Literal w)) -> return (Just (NumLit w), altExpr)
-        _                    -> error $ $(curLoc) ++ "Not an integer literal in LitPat"
+        _  -> do
+          (_,sp) <- Lens.use curCompNm
+          throw (CLaSHException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showDoc pat) Nothing)
 
-    mkScrutExpr :: HWType -> Pat -> Expr -> Expr
-    mkScrutExpr scrutHTy pat scrutE = case pat of
+    mkScrutExpr :: SrcSpan -> HWType -> Pat -> Expr -> Expr
+    mkScrutExpr sp scrutHTy pat scrutE = case pat of
       DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
                               in case scrutE of
                                   Identifier scrutId _ -> Identifier scrutId modifier
-                                  _ -> error $ $(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement"
+                                  _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
       _ -> scrutE
 
     -- GHC puts default patterns in the first position, we want them in the
@@ -293,7 +306,9 @@ mkDeclarations bndr app =
   in case appF of
     Var _ f
       | null tyArgs -> mkFunApp bndr f args
-      | otherwise   -> error $ $(curLoc) ++ "Not in normal form: Var-application with Type arguments"
+      | otherwise   -> do
+        (_,sp) <- Lens.use curCompNm
+        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showDoc app) Nothing)
     _ -> do
       (exprApp,declsApp) <- mkExpr False (Right bndr) (unembed $ varType bndr) app
       let dstId = Text.pack . name2String $ varName bndr
@@ -311,7 +326,7 @@ mkFunApp dst fun args = do
   normalized <- Lens.use bindings
   case HashMap.lookup fun normalized of
     Just _ -> do
-      (Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
+      (_,Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
       if length args == length compInps
         then do tcm <- Lens.use tcCache
                 argTys                <- mapM (termType tcm) args
@@ -365,15 +380,18 @@ mkExpr bbEasD bndr ty app = do
   let (appF,args) = collectArgs app
       tmArgs      = lefts args
   hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
+  (_,sp) <- Lens.use curCompNm
   case appF of
     Data dc
       | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy bndr dc tmArgs
-      | otherwise                                  -> error $ $(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments: " ++ showDoc app
+      | otherwise                                  ->
+        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments:\n\n" ++ showDoc app) Nothing)
     Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (Text.pack $ name2String f) Nothing,[])
-      | otherwise -> error $ $(curLoc) ++ "Not in normal form: top-level binder in argument position: " ++ showDoc app
-    _ -> error $ $(curLoc) ++ "Not in normal form: application of a Let/Lam/Case: " ++ showDoc app
+      | otherwise ->
+        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showDoc app) Nothing)
+    _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: application of a Let/Lam/Case:\n\n" ++ showDoc app) Nothing)
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder

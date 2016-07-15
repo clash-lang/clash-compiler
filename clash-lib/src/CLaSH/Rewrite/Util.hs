@@ -12,7 +12,8 @@
 module CLaSH.Rewrite.Util where
 
 import           Control.DeepSeq
-import           Control.Lens                (Lens', (%=), (+=), (^.))
+import           Control.Exception           (throw)
+import           Control.Lens                (Lens', (%=), (+=), (^.),_1,_3)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
@@ -32,6 +33,8 @@ import           Unbound.Generics.LocallyNameless     (Fresh, bind,
                                               unembed, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           SrcLoc                      (SrcSpan)
+
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               typeFreeVars)
@@ -48,6 +51,7 @@ import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
                                               mkLams, mkTmApps, mkTyApps,
                                               mkTyLams, mkTyVar, termType)
 import           CLaSH.Core.Var              (Id, TyVar, Var (..))
+import           CLaSH.Driver.Types          (CLaSHException (..))
 import           CLaSH.Netlist.Util          (representableType)
 import           CLaSH.Rewrite.Types
 import           CLaSH.Util
@@ -188,7 +192,7 @@ mkEnv :: [CoreContext]
       -> RewriteMonad extra (Gamma, Delta)
 mkEnv ctx = do
   let (gamma,delta) = contextEnv ctx
-  tsMap             <- fmap (HML.map fst) $ Lens.use bindings
+  tsMap             <- fmap (HML.map (^. _1)) $ Lens.use bindings
   let gamma'        = tsMap `HML.union` gamma
   return (gamma',delta)
 
@@ -382,7 +386,7 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   -- Make a new global ID
   tcm       <- Lens.view tcCache
   newBodyTy <- termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
-  cf        <- Lens.use curFun
+  (cf,sp)   <- Lens.use curFun
   newBodyId <- fmap (makeName (name2String cf ++ "_" ++ name2String idName) . toInteger) getUniqueM
   -- Make a new expression, consisting of the the lifted function applied to
   -- its free variables
@@ -396,15 +400,15 @@ liftBinding gamma delta (Id idName tyE,eE) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . snd)) <$> Lens.use bindings
+  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . (^. _3))) <$> Lens.use bindings
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
-             bindings %= HMS.insert newBodyId (newBodyTy,newBody)
+             bindings %= HMS.insert newBodyId (newBodyTy,sp,newBody)
              -- Return the new binder
              return (Id idName tyE, embed newExpr)
     -- If it does, use the existing binder
-    ((k,(aeqTy,_)):_) ->
+    ((k,(aeqTy,_,_)):_) ->
       let newExpr' = mkTmApps
                       (mkTyApps (Var aeqTy k)
                                 (zipWith VarTy localFTVkinds localFTVs))
@@ -415,21 +419,23 @@ liftBinding _ _ _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound 
 
 -- | Make a global function for a name-term tuple
 mkFunction :: TmName -- ^ Name of the function
+           -> SrcSpan
            -> Term -- ^ Term bound to the function
            -> RewriteMonad extra (TmName,Type) -- ^ Name with a proper unique and the type of the function
-mkFunction bndr body = do
+mkFunction bndr sp body = do
   tcm    <- Lens.view tcCache
   bodyTy <- termType tcm body
   bodyId <- cloneVar bndr
-  addGlobalBind bodyId bodyTy body
+  addGlobalBind bodyId bodyTy sp body
   return (bodyId,bodyTy)
 
 -- | Add a function to the set of global binders
 addGlobalBind :: TmName
               -> Type
+              -> SrcSpan
               -> Term
               -> RewriteMonad extra ()
-addGlobalBind vId ty body = (ty,body) `deepseq` bindings %= HMS.insert vId (ty,body)
+addGlobalBind vId ty sp body = (ty,body) `deepseq` bindings %= HMS.insert vId (ty,sp,body)
 
 -- | Create a new name out of the given name, but with another unique
 cloneVar :: TmName
@@ -544,17 +550,20 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
       -- Determine if we can specialize f
       bodyMaybe <- fmap (HML.lookup f) $ Lens.use bindings
       case bodyMaybe of
-        Just (_,bodyTm) -> do
+        Just (_,sp,bodyTm) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- HML.lookup f <$> Lens.use (extra.specHistLbl)
           specLim   <- Lens.use (extra . specLimitLbl)
           if maybe False (> specLim) specHistM
-            then fail $ unlines [ "Hit specialisation limit " ++ show specLim ++ " on function `" ++ showDoc f ++ "'.\n"
-                                , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
-                                , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
-                                , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showDoc showDoc) specArg
-                                , "Run with '-clash-spec-limit=N' to increase the specialisation limit to N."
-                                ]
+            then throw (CLaSHException
+                        sp
+                        (unlines [ "Hit specialisation limit " ++ show specLim ++ " on function `" ++ showDoc f ++ "'.\n"
+                                 , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
+                                 , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
+                                 , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showDoc showDoc) specArg
+                                 , "Run with '-clash-spec-limit=N' to increase the specialisation limit to N."
+                                 ])
+                        Nothing)
             else do
               -- Make new binders for existing arguments
               tcm                 <- Lens.view tcCache
@@ -562,7 +571,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
                                      mapM (mkBinderFor tcm "pTS") args
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
-              newf <- mkFunction f newBody
+              newf <- mkFunction f sp newBody
               -- Remember specialization
               (extra.specHistLbl) %= HML.insertWith (+) f 1
               (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
@@ -578,12 +587,12 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   let newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialised function
-  existing <- HML.filter ((== newBody) . snd) <$> Lens.use bindings
+  existing <- HML.filter ((== newBody) . (^. _3)) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case HML.toList existing of
-    [] -> do cf <- Lens.use curFun
-             mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
-    ((k,(kTy,_)):_) -> return (k,kTy)
+    [] -> do (cf,sp) <- Lens.use curFun
+             mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) sp newBody
+    ((k,(kTy,_,_)):_) -> return (k,kTy)
   -- cf <- Lens.use curFun
   -- newf <- mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
   -- Create specialized argument

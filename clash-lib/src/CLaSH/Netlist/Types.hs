@@ -24,6 +24,8 @@ import Data.Text.Lazy                       (Text, pack)
 import GHC.Generics                         (Generic)
 import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 
+import SrcLoc                               (SrcSpan)
+
 import CLaSH.Core.Term                      (Term, TmName)
 import CLaSH.Core.Type                      (Type)
 import CLaSH.Core.TyCon                     (TyCon, TyConName)
@@ -46,14 +48,14 @@ newtype NetlistMonad a =
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: HashMap TmName (Type,Term) -- ^ Global binders
+  { _bindings       :: HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
   , _varEnv         :: Gamma -- ^ Type environment/context
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: HashMap TmName Component -- ^ Cached components
+  , _components     :: HashMap TmName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
   , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
-  , _curCompNm      :: !Identifier
+  , _curCompNm      :: !(Identifier,SrcSpan)
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int
   , _mkBasicIdFn    :: Identifier -> Identifier

@@ -318,7 +318,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
 
 handleCLaSHException df opts e = case fromException e of
   Just (CLaSHException sp s eM) ->
-    throwOneError (mkPlainErrMsg df sp (text s $$ srcInfo $$ showExtra (opt_errorExtra opts) eM))
+    throwOneError (mkPlainErrMsg df sp (text s $$ blankLine $$ srcInfo $$ showExtra (opt_errorExtra opts) eM))
   _ -> case fromException e of
     Just (ErrorCall msg) ->
       throwOneError (mkPlainErrMsg df noSrcSpan (text "CLaSH error call:" $$ text msg))

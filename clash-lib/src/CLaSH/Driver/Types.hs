@@ -6,12 +6,16 @@
   Type definitions used by the Driver module
 -}
 
-module CLaSH.Driver.Types where
+module CLaSH.Driver.Types
+  (module CLaSH.Driver.Types
+  ,SrcSpan, noSrcSpan
+  )
+where
 
 import Control.Exception (Exception)
 import Data.HashMap.Lazy (HashMap)
 
-import SrcLoc            (SrcSpan)
+import SrcLoc            (SrcSpan, noSrcSpan)
 
 import CLaSH.Core.Term   (Term,TmName)
 import CLaSH.Core.Type   (Type)
@@ -20,7 +24,7 @@ import CLaSH.Rewrite.Types (DebugLevel)
 import CLaSH.Netlist.BlackBox.Types (HdlSyn)
 
 -- | Global function binders
-type BindingMap = HashMap TmName (Type,Term)
+type BindingMap = HashMap TmName (Type,SrcSpan,Term)
 
 data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_specLimit   :: Int

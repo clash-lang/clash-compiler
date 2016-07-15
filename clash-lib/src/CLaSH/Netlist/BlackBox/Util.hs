@@ -17,6 +17,7 @@ module CLaSH.Netlist.BlackBox.Util where
 
 --import           Control.Lens                         (at, use, (%=), (+=), _1,
 --                                                       _2)
+import           Control.Exception                    (throw)
 import           Control.Monad.State                  (State, StateT, evalStateT,
                                                        lift, modify, get)
 import           Control.Monad.Writer.Strict          (MonadWriter, tell)
@@ -36,6 +37,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
 import qualified Text.PrettyPrint.Leijen.Text.Monadic as PP
 
 import           CLaSH.Backend                        (Backend (..))
+import           CLaSH.Driver.Types                   (CLaSHException (..))
 import           CLaSH.Netlist.BlackBox.Parser
 import           CLaSH.Netlist.BlackBox.Types
 import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
@@ -211,7 +213,9 @@ renderElem b (D (Decl n (l:ls))) = do
                               return . parseFail . displayT $ renderCompact inst'
     if verifyBlackBoxContext b' templ'
       then Text.concat <$> mapM (renderElem b') templ'
-      else error $ $(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ
+      else do
+        sp <- getSrcSpan
+        throw (CLaSHException sp ($(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ) Nothing)
 
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (renderElem b) e
