@@ -1,6 +1,6 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
-## 0.10.10
+## 0.10.10 *July 15th 2016*
 * Fixes bugs:
   * `shrink` functions for numeric types throw exceptions [#153](https://github.com/clash-lang/clash-compiler/issues/153)
   * CLaSH compiler sees internals of numeric types in their Show functions
