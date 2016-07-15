@@ -45,6 +45,7 @@ flagsClash r = [
   , defFlag "clash-intwidth" (IntSuffix (setIntWidth r))
   , defFlag "clash-hdldir" (SepArg (setHdlDir r))
   , defFlag "clash-hdlsyn" (SepArg (setHdlSyn r))
+  , defFlag "clash-error-extra" (NoArg (liftEwM (setErrorExtra r)))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -93,3 +94,6 @@ setHdlSyn r s = case readMaybe s of
   Nothing     -> if s == "Xilinx"
                     then liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
                     else addWarn (s ++ " is an unknown hdl synthesis tool")
+
+setErrorExtra :: IORef CLaSHOpts -> IO ()
+setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})

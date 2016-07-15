@@ -69,15 +69,15 @@ import Data.Maybe
 import           Paths_clash_ghc
 import           InteractiveUI (makeHDL)
 import           Exception (gcatch)
-import           Data.IORef (IORef, newIORef)
+import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
-import           Control.Exception (ErrorCall (..))
+import           Control.Exception (Exception(..),ErrorCall (..),throw)
 
 import qualified CLaSH.Backend
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
 import           CLaSH.Backend.VHDL    (VHDLState)
 import           CLaSH.Backend.Verilog (VerilogState)
-import           CLaSH.Driver.Types (CLaSHOpts (..))
+import           CLaSH.Driver.Types (CLaSHOpts (..), CLaSHException (..))
 import           CLaSH.GHC.CLaSHFlags
 import           CLaSH.Netlist.BlackBox.Types (HdlSyn (..))
 import           CLaSH.Rewrite.Types (DebugLevel (..))
@@ -127,6 +127,7 @@ main = do
                              , opt_intWidth    = WORD_SIZE_IN_BITS
                              , opt_hdlDir      = Nothing
                              , opt_hdlSyn      = Other
+                             , opt_errorExtra  = False
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 
@@ -298,7 +299,8 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-    let clash fun = gcatch (fun clashOpts srcs) (\(ErrorCall e) -> throwOneError $ mkPlainErrMsg dflags6 noSrcSpan (text ("CLaSH Error:\n" ++ e)))
+    clashOpts' <- liftIO (readIORef clashOpts)
+    let clash fun = gcatch (fun clashOpts srcs) (handleCLaSHException dflags6 clashOpts')
     case postLoadMode of
        ShowInterface f        -> liftIO $ doShowIface dflags6 f
        DoMake                 -> doMake srcs
@@ -313,6 +315,28 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
        DoSystemVerilog        -> clash makeSystemVerilog
 
   liftIO $ dumpFinalStats dflags6
+
+handleCLaSHException df opts e = case fromException e of
+  Just (CLaSHException sp s eM) ->
+    throwOneError (mkPlainErrMsg df sp (text s $$ srcInfo $$ showExtra (opt_errorExtra opts) eM))
+  _ -> case fromException e of
+    Just (ErrorCall msg) ->
+      throwOneError (mkPlainErrMsg df noSrcSpan (text "CLaSH error call:" $$ text msg))
+    _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ text (displayException e)))
+  where
+    srcInfo = text "NB: The source location of the error is not exact, only indicative, as it is acquired after optimisations." $$
+              text "The actual location of the error can be in a function that is inlined." $$
+              text "To prevent inlining of those functions, annotate them with a NOINLINE pragma."
+
+    showExtra False (Just _)   =
+      blankLine $$
+      text "This error contains additional information, rerun with '-clash-error-extra' to show this information."
+    showExtra True  (Just msg) =
+      blankLine $$
+      text "Additional information:" $$ blankLine $$
+      text msg
+    showExtra _ _ = empty
+
 
 ghciUI :: IORef CLaSHOpts -> [(FilePath, Maybe Phase)] -> Maybe [String] -> Ghc ()
 #ifndef GHCI
