@@ -54,13 +54,13 @@ genTestBench :: CLaSHOpts
              -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
              -> (Identifier -> Identifier)
              -> [Identifier]
-             -> HashMap TmName (Type,Term)   -- ^ Global binders
+             -> HashMap TmName (Type,SrcSpan,Term)   -- ^ Global binders
              -> Maybe TmName                 -- ^ Stimuli
              -> Maybe TmName                 -- ^ Expected output
              -> String                       -- ^ Name of the module containing the @topEntity@
              -> [(String,FilePath)]          -- ^ Set of collected data-files
              -> Component                    -- ^ Component to generate TB for
-             -> IO ([Component],[(String,FilePath)])
+             -> IO ([(SrcSpan,Component)],[(String,FilePath)])
 genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals stimuliNmM expectedNmM modName dfiles
   c@(Component cName hidden inps [outp] _) = do
   let inpM    = listToMaybe inps
@@ -114,11 +114,11 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals sti
 
   case inps of
     (_:_:_) -> traceIf (opt_dbgLevel opts > DebugNone) ("Can't make testbench for: " ++ show c) $ return ([],dfiles)
-    _ -> return (tbComp:(inpComps++expComps),dfiles'')
+    _ -> return ((noSrcSpan,tbComp):(inpComps++expComps),dfiles'')
   where
-    normalizeSignal :: HashMap TmName (Type,Term)
+    normalizeSignal :: HashMap TmName (Type,SrcSpan,Term)
                     -> TmName
-                    -> HashMap TmName (Type,Term)
+                    -> HashMap TmName (Type,SrcSpan,Term)
     normalizeSignal glbls bndr = do
       let cg  = callGraph [] glbls bndr
           rcs = concat $ mkRecursiveComponents cg
@@ -200,31 +200,31 @@ genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMa
 
 genStimuli :: [Identifier]
            -> PrimMap BlackBoxTemplate
-           -> HashMap TmName (Type,Term)
+           -> HashMap TmName (Type,SrcSpan,Term)
            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
            -> (Identifier -> Identifier)
            -> HashMap TyConName TyCon
-           -> ( HashMap TmName (Type,Term)
+           -> ( HashMap TmName (Type,SrcSpan,Term)
                 -> TmName
-                -> HashMap TmName (Type,Term) )
+                -> HashMap TmName (Type,SrcSpan,Term) )
            -> [(Identifier,HWType)]
            -> (Identifier,HWType)
            -> String
            -> [(String,FilePath)]
            -> Int
            -> TmName
-           -> IO (Declaration,[Component],[Identifier],[(Identifier,HWType)],[(String,FilePath)])
+           -> IO (Declaration,[(SrcSpan,Component)],[Identifier],[(Identifier,HWType)],[(String,FilePath)])
 genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
   (comps,dfiles',seen') <- genNetlist stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId seen signalNm
   let sigNm   = genComponentName seen mkId modName signalNm
-      sigComp = case find ((sigNm ==) . componentName) comps of
+      sigComp = case find ((sigNm ==) . componentName . snd) comps of
                   Just c -> c
-                  Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
+                  Nothing -> error $ $(curLoc) ++ "Can't locate component for stimuli gen: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName.snd) comps)
 
       (cName,hidden',outp) = case sigComp of
-                               (Component a b [] [(c,_)] _) -> (a,b,c)
-                               (Component a _ is _ _)       -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
+                               (_,Component a b [] [(c,_)] _) -> (a,b,c)
+                               (_,Component a _ is _ _)       -> error $ $(curLoc) ++ "Stimuli gen " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
       clkNms   = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden'
       rstNms   = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden'
@@ -237,30 +237,30 @@ genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp mo
 
 genVerifier :: [Identifier]
             -> PrimMap BlackBoxTemplate
-            -> HashMap TmName (Type,Term)
+            -> HashMap TmName (Type,SrcSpan,Term)
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
             -> (Identifier -> Identifier)
             -> HashMap TyConName TyCon
-            -> ( HashMap TmName (Type,Term)
+            -> ( HashMap TmName (Type,SrcSpan,Term)
                  -> TmName
-                 -> HashMap TmName (Type,Term) )
+                 -> HashMap TmName (Type,SrcSpan,Term) )
             -> [(Identifier,HWType)]
             -> (Identifier,HWType)
             -> String
             -> [(String,FilePath)]
             -> Int
             -> TmName
-            -> IO (Declaration,[Component],[Identifier],[(Identifier,HWType)],[(String,FilePath)])
+            -> IO (Declaration,[(SrcSpan,Component)],[Identifier],[(Identifier,HWType)],[(String,FilePath)])
 genVerifier seen primMap globals typeTrans mkId tcm normalizeSignal hidden outp modName dfiles iw signalNm = do
   let stimNormal = normalizeSignal globals signalNm
   (comps,dfiles',seen') <- genNetlist stimNormal primMap tcm typeTrans Nothing modName dfiles iw mkId seen signalNm
   let sigNm   = genComponentName seen mkId modName signalNm
-      sigComp = case find ((sigNm ==) . componentName) comps of
+      sigComp = case find ((sigNm ==) . componentName . snd) comps of
                   Just c -> c
-                  Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName) comps)
+                  Nothing -> error $ $(curLoc) ++ "Can't locate component for Verifier: " ++ (show $ pack $ name2String signalNm) ++ show (map (componentName . snd) comps)
       (cName,hidden',inp,fin) = case sigComp of
-        (Component a b [(c,_)] [(d,_)] _) -> (a,b,c,d)
-        (Component a _ is _ _)            -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
+        (_,Component a b [(c,_)] [(d,_)] _) -> (a,b,c,d)
+        (_,Component a _ is _ _)            -> error $ $(curLoc) ++ "Verifier " ++ show a ++ " has unexpected inputs: " ++ show is
       hidden'' = nub (hidden ++ hidden')
       clkNms   = mapMaybe (\hd -> case hd of (_,Clock _ _) -> Just hd; _ -> Nothing) hidden'
       rstNms   = mapMaybe (\hd -> case hd of (_,Reset _ _) -> Just hd; _ -> Nothing) hidden'

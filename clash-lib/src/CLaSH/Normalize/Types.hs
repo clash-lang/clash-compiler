@@ -14,6 +14,8 @@ import Control.Monad.State.Strict (State)
 import Data.HashMap.Strict (HashMap)
 import Data.Map            (Map)
 
+import SrcLoc (SrcSpan)
+
 import CLaSH.Core.Term        (Term, TmName)
 import CLaSH.Core.Type        (Type)
 import CLaSH.Netlist.BlackBox.Types (BlackBoxTemplate)
@@ -24,7 +26,7 @@ import CLaSH.Util
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: HashMap TmName (Type,Term)
+  { _normalized          :: HashMap TmName (Type,SrcSpan,Term)
   -- ^ Global binders
   , _specialisationCache :: Map (TmName,Int,Either Term Type) (TmName,Type)
   -- ^ Cache of previously specialised functions:

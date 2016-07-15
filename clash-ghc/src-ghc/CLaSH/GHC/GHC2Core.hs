@@ -70,7 +70,7 @@ import OccName    (occNameString)
 import Outputable (showPpr, showSDocUnsafe)
 import Pair       (Pair (..))
 import PprCore    (pprCoreExpr)
-import SrcLoc     (SrcSpan, isGoodSrcSpan)
+import SrcLoc     (isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,

@@ -33,6 +33,7 @@ import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
+import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Id                     (mkBasicId')
@@ -56,6 +57,7 @@ data SystemVerilogState =
     , _modNm     :: String
     , _idSeen    :: [Identifier]
     , _oports    :: [Identifier]
+    , _srcSpan   :: SrcSpan
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -63,7 +65,7 @@ data SystemVerilogState =
 makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] []
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -97,6 +99,8 @@ instance Backend SystemVerilogState where
   hdlSyn          = use hdlsyn
   mkBasicId       = return (filterReserved . mkBasicId' True)
   setModName nm s = s {_modNm = nm}
+  setSrcSpan      = (srcSpan .=)
+  getSrcSpan      = use srcSpan
 
 type SystemVerilogM a = State SystemVerilogState a
 
@@ -142,8 +146,10 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVerilog :: String -> Component -> SystemVerilogM (String,Doc)
-genVerilog _ c = (unpack cName,) A.<$> verilog
+genVerilog :: String -> SrcSpan -> Component -> SystemVerilogM (String,Doc)
+genVerilog _ sp c = do
+    setSrcSpan sp
+    (unpack cName,) A.<$> verilog
   where
     cName   = componentName c
     verilog = "// Automatically generated SystemVerilog-2005" <$$>

@@ -11,6 +11,8 @@ import Data.Text.Lazy                       (Text)
 import Control.Monad.State                  (State)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 
+import SrcLoc (SrcSpan)
+
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.BlackBox.Types
 
@@ -34,7 +36,7 @@ class Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: String -> Component -> State state (String, Doc)
+  genHDL           :: String -> SrcSpan -> Component -> State state (String, Doc)
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: String -> [HWType] -> State state [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
@@ -63,3 +65,7 @@ class Backend state where
   mkBasicId        :: State state (Identifier -> Identifier)
   -- | setModName
   setModName       :: ModName -> state -> state
+  -- | setSrcSpan
+  setSrcSpan       :: SrcSpan -> State state ()
+  -- | getSrcSpan
+  getSrcSpan       :: State state SrcSpan

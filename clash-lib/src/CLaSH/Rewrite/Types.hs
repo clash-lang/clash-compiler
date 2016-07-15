@@ -26,6 +26,8 @@ import Data.Monoid                           (Any)
 import Unbound.Generics.LocallyNameless      (Fresh (..))
 import Unbound.Generics.LocallyNameless.Name (Name (..))
 
+import SrcLoc (SrcSpan)
+
 import CLaSH.Core.Term           (Term, TmName)
 import CLaSH.Core.Type           (Type)
 import CLaSH.Core.TyCon          (TyCon, TyConName)
@@ -53,11 +55,11 @@ data RewriteState extra
   = RewriteState
   { _transformCounter :: {-# UNPACK #-} !Int
   -- ^ Number of applied transformations
-  , _bindings         :: !(HashMap TmName (Type,Term))
+  , _bindings         :: !(HashMap TmName (Type,SrcSpan,Term))
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: TmName -- Initially set to undefined: no strictness annotation
+  , _curFun           :: (TmName,SrcSpan) -- Initially set to undefined: no strictness annotation
   -- ^ Function which is currently normalized
   , _nameCounter      :: {-# UNPACK #-} !Int
   -- ^ Used for 'Fresh'

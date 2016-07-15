@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.6.7
+* New features:
+  * Support clash-lib-0.6.18
+
 ## 0.6.6 *March 11th 2016*
 * Support `clash-lib` 0.6.11
 

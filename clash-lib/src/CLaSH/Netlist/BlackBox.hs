@@ -12,6 +12,7 @@
 
 module CLaSH.Netlist.BlackBox where
 
+import           Control.Exception             (throw)
 import           Control.Lens                  ((.=),(<<%=))
 import qualified Control.Lens                  as Lens
 import           Control.Monad                 (filterM)
@@ -36,6 +37,7 @@ import           CLaSH.Core.Type               as C (Type (..), ConstTy (..),
 import           CLaSH.Core.TyCon              as C (tyConDataCons)
 import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
+import           CLaSH.Driver.Types            (CLaSHException (..))
 import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication,
                                                 mkExpr)
 import           CLaSH.Netlist.BlackBox.Types  as B
@@ -85,9 +87,11 @@ prepareBlackBox pNm templ bbCtx =
           setSym >=>
           setClocks bbCtx >=>
           collectFilePaths bbCtx $ templ
-     else
-       error $ $(curLoc) ++ "\nCan't match template for " ++ show pNm ++ " :\n" ++ show templ ++
-               "\nwith context:\n" ++ show bbCtx
+     else do
+       (_,sp) <- Lens.use curCompNm
+       let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ show templ ++
+                "\n\nwith context:\n\n" ++ show bbCtx
+       throw (CLaSHException sp msg Nothing)
 
 mkArgument :: Identifier -- ^ LHS of the original let-binder
            -> Term
@@ -201,7 +205,9 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
       | otherwise -> return (BlackBoxE "" [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
-    _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
+    _ -> do
+      (_,sp) <- Lens.use curCompNm
+      throw (CLaSHException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
   where
     resBndr :: Bool -> (Either Identifier Id) -> NetlistMonad (Id,Identifier,[Declaration])
     resBndr mkDec dst' = case dst' of
@@ -231,9 +237,10 @@ mkFunInput resId e = do
   templ <- case appE of
             Prim nm _ -> do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
+              (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
                             Just p@(P.BlackBox {}) -> Left (name p, template p)
-                            _ -> error $ $(curLoc) ++ "No blackbox found for: " ++ unpack nm
+                            _ -> throw (CLaSHException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
               tcm <- Lens.use tcCache
@@ -263,7 +270,7 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
+                  (_,Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
                   let hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
                       inpAssigns    = zipWith (\(i,t) e' -> (i,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (fst compOutp,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
@@ -301,7 +308,7 @@ mkFunInput resId e = do
 instantiateCompName :: BlackBoxTemplate
                     -> NetlistMonad BlackBoxTemplate
 instantiateCompName l = do
-  nm <- Lens.use curCompNm
+  (nm,_) <- Lens.use curCompNm
   return (setCompName nm l)
 
 collectFilePaths :: BlackBoxContext

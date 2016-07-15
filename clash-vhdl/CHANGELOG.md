@@ -1,6 +1,8 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
 ## 0.6.14
+* New features:
+  * Support clash-lib-0.6.18
 * Fixes bugs:
   * Incorrect primitive specifications for Integer's `shiftL` and `shiftR`
   * Types in generated types.vhdl incorrectly sorted

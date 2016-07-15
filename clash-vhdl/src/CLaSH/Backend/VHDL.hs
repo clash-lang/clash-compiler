@@ -32,6 +32,7 @@ import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
+import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
 import           CLaSH.Netlist.Id                     (mkBasicId')
@@ -52,6 +53,7 @@ data VHDLState =
   , _tySeen    :: [Identifier]         -- ^ Generated product types
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
   , _modNm     :: String
+  , _srcSpan   :: SrcSpan
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
   }
@@ -59,7 +61,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty ""
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else
@@ -86,6 +88,8 @@ instance Backend VHDLState where
   hdlSyn          = use hdlsyn
   mkBasicId       = return (filterReserved . T.toLower . mkBasicId' True)
   setModName nm s = s {_modNm = nm}
+  setSrcSpan      = (srcSpan .=)
+  getSrcSpan      = use srcSpan
 
 type VHDLM a = State VHDLState a
 
@@ -117,8 +121,10 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: String -> Component -> VHDLM (String,Doc)
-genVHDL nm c = (unpack cName,) A.<$> vhdl
+genVHDL :: String -> SrcSpan -> Component -> VHDLM (String,Doc)
+genVHDL nm sp c = do
+    setSrcSpan sp
+    (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
     vhdl    = "-- Automatically generated VHDL-93" <$$>
