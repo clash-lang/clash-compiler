@@ -358,32 +358,83 @@ isSignalType tcm ty = go HashSet.empty ty
 tyNatSize :: HMS.HashMap TyConName TyCon
           -> Type
           -> Except String Integer
-tyNatSize _ (LitTy (NumTy i)) = return i
-tyNatSize m ty@(tyView -> TyConApp tc [ty1,ty2]) = case name2String tc of
-  "GHC.TypeLits.+" -> (+) <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  "GHC.TypeLits.*" -> (*) <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  "GHC.TypeLits.^" -> (^) <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  "GHC.TypeLits.-" -> (-) <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  "CLaSH.Promoted.Ord.Max" -> max <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  "CLaSH.Promoted.Ord.Min" -> min <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  "GHC.TypeLits.Extra.CLog" -> do
-    i1' <- tyNatSize m ty1
-    i2' <- tyNatSize m ty2
-    if (i1' > 1 && i2' > 0)
-       then return (ceiling (logBase (fromIntegral i1' :: Double)
-                                     (fromIntegral i2' :: Double)))
-       else throwE $ $(curLoc) ++ "Can't convert: " ++ show ty
-  "GHC.TypeLits.Extra.GCD" -> gcd <$> tyNatSize m ty1 <*> tyNatSize m ty2
-  _ -> throwE $ $(curLoc) ++ "Can't convert tyNatOp: " ++ show tc
--- TODO: Remove this conversion
--- The current problem is that type-functions are not reduced by the GHC -> Core
--- transformation process, and so end up here. Once a fix has been found for
--- this problem remove this dirty hack.
-tyNatSize tcm ty@(tyView -> TyConApp tc tys) = do
-  case tcm HMS.! tc of
-    FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst tys of
-      Just ty' -> tyNatSize tcm ty'
-      _ -> throwE $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
-    _ -> throwE $ $(curLoc) ++ "Can't convert tyNat: " ++ show ty
+tyNatSize tcm ty = case go ty of
+    Right (Left i) -> return i
+    Right _  -> throwE $ $(curLoc) ++ "Cannot reduce an integer: " ++ show ty
+    Left msg -> throwE msg
+  where
+    go :: Type -> Either String (Either Integer Bool)
+    go (LitTy (NumTy i)) = return (Left i)
 
-tyNatSize _ t = throwE $ $(curLoc) ++ "Can't convert tyNat: " ++ show t
+    go (tyView -> TyConApp tc tys)
+      | name2String tc == "GHC.TypeLits.+"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 + i2))
+
+      | name2String tc == "GHC.TypeLits.*"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 * i2))
+
+      | name2String tc == "GHC.TypeLits.^"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 ^ i2))
+
+      | name2String tc == "GHC.TypeLits.-"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 - i2))
+
+      | name2String tc == "CLaSH.Promoted.Ord.Max"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 `max` i2))
+
+      | name2String tc == "CLaSH.Promoted.Ord.Min"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 `min` i2))
+
+      | name2String tc == "GHC.TypeLits.Extra.CLog"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      , i1 > 1
+      , i2 > 2
+      = return (Left (ceiling (logBase (fromIntegral i1 :: Double)
+                                       (fromIntegral i2 :: Double))))
+
+      | name2String tc == "GHC.TypeLits.Extra.GCD"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Left (i1 `gcd` i2))
+
+      | name2String tc == "Data.Type.Bool.If"
+      , TyConApp tcNat _ <- tyView (tys !! 0)
+      , name2String tcNat == "GHC.TypeLits.Nat"
+      , Right (Right b) <- go (tys !! 1)
+      , Right (Left i1) <- go (tys !! 2)
+      , Right (Left i2) <- go (tys !! 3)
+      = if b then return (Left i1)
+             else return (Left i2)
+
+      | name2String tc == "GHC.TypeLits.<=?"
+      , length tys == 2
+      , Right (Left i1) <- go (tys !! 0)
+      , Right (Left i2) <- go (tys !! 1)
+      = return (Right (i1 <= i2))
+
+      | FunTyCon {tyConSubst = tcSubst} <- tcm HMS.! tc
+      , Just ty' <- findFunSubst tcSubst tys
+      = go ty'
+
+    go t = Left ($(curLoc) ++ "Can't convert tyNat: " ++ show t)
