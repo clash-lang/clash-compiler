@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.15
+* Fixes bugs:
+  * Incorrect primitive for `Index`s `*#`
+
 ## 0.6.14 *July 15th 2016*
 * New features:
   * Support clash-lib-0.6.18
