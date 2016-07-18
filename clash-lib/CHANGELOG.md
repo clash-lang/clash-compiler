@@ -1,6 +1,8 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.18
+## 0.6.18 *July 15th 2016*
+* New features:
+  * Better error location reporting
 * Fixes bugs:
   * Values of type Index 'n', where 'n' > 2^MACHINE_WIDTH, incorrectly considered non-synthesisable due to overflow
 
