@@ -29,6 +29,7 @@ import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
 import           Prelude                              hiding ((<$>))
+import           Text.Printf
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Backend
@@ -720,22 +721,27 @@ exprLit Nothing (NumLit i) = integer i
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
   Unsigned n
     | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
-    | otherwise -> "unsigned'" <> parens blit
+    | otherwise -> "unsigned'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
   Signed n
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
-    | otherwise -> "signed'" <> parens blit
-  BitVector _ -> "std_logic_vector'" <> parens blit
+    | otherwise -> "signed'" <> parens hlit
+  BitVector _ -> "std_logic_vector'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
   _           -> blit
 
   where
     blit = bits (toBits sz i)
+    hlit = hex (toHex sz i)
 exprLit _             (BoolLit t)   = if t then "true" else "false"
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = text . T.pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 patLit :: HWType -> Literal -> VHDLM Doc
-patLit hwTy (NumLit i) = bits (toBits (conSize hwTy) i)
+patLit hwTy (NumLit i) =
+  let sz = conSize hwTy
+  in  case sz `mod` 4 of
+        0 -> hex  (toHex sz i)
+        _ -> bits (toBits sz i)
 patLit _    l          = exprLit Nothing l
 
 patMod :: HWType -> Literal -> Literal
@@ -751,6 +757,14 @@ toBits size val = map (\x -> if odd x then H else L)
 
 bits :: [Bit] -> VHDLM Doc
 bits = dquotes . hcat . mapM bit_char
+
+toHex :: Int -> Integer -> String
+toHex sz i =
+  let Just d = clogBase 16 (2^sz)
+  in  printf ("%0" ++ show d ++ "X") i
+
+hex :: String -> VHDLM Doc
+hex s = char 'x' <> dquotes (text (T.pack s))
 
 bit_char :: Bit -> VHDLM Doc
 bit_char H = char '1'
