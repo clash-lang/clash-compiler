@@ -1,5 +1,11 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.21 *July 19th 2016*
+* Fixes bugs:
+  * Rounding error in `logBase` calculation
+  * VHDL: Incorrect primitive for `Index`s `*#`
+  * VHDL: Incorrect handling of `Index`s `fromInteger#` and `maxBound#` primitives for values larger than 2^MACHINE_WIDTH
+
 ## 0.6.20 *July 15th 2016*
 * New features:
   * Better error location reporting
