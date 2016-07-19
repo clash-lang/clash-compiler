@@ -407,10 +407,8 @@ tyNatSize tcm ty = case go ty of
       , length tys == 2
       , Right (Left i1) <- go (tys !! 0)
       , Right (Left i2) <- go (tys !! 1)
-      , i1 > 1
-      , i2 > 2
-      = return (Left (ceiling (logBase (fromIntegral i1 :: Double)
-                                       (fromIntegral i2 :: Double))))
+      , Just k <- clogBase i1 i2
+      = return (Left (toInteger k))
 
       | name2String tc == "GHC.TypeLits.Extra.GCD"
       , length tys == 2

@@ -186,19 +186,19 @@ typeSize (Reset _ _) = 1
 typeSize (BitVector i) = i
 typeSize (Index 0) = 0
 typeSize (Index 1) = 1
-typeSize (Index u) = clog2 u
+typeSize (Index u) = fromMaybe 0 (clogBase 2 u)
 typeSize (Signed i) = i
 typeSize (Unsigned i) = i
 typeSize (Vector n el) = n * typeSize el
 typeSize t@(SP _ cons) = conSize t +
   maximum (map (sum . map typeSize . snd) cons)
-typeSize (Sum _ dcs) = max 1 (clog2 . toInteger $ length dcs)
+typeSize (Sum _ dcs) = max 1 (fromMaybe 0 . clogBase 2 . toInteger $ length dcs)
 typeSize (Product _ tys) = sum $ map typeSize tys
 
 -- | Determines the bitsize of the constructor of a type
 conSize :: HWType
         -> Int
-conSize (SP _ cons) = clog2 . toInteger $ length cons
+conSize (SP _ cons) = fromMaybe 0 . clogBase 2 . toInteger $ length cons
 conSize t           = typeSize t
 
 -- | Gives the length of length-indexed types

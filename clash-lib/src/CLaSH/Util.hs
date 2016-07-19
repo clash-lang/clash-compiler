@@ -8,6 +8,7 @@
 
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE Rank2Types           #-}
 {-# LANGUAGE TupleSections        #-}
 
@@ -36,6 +37,8 @@ import Data.Maybe                     (fromMaybe)
 import Data.Version                   (Version)
 import Control.Lens
 import Debug.Trace                    (trace)
+import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
+import GHC.Integer.Logarithms         (integerLogBase#)
 import qualified Language.Haskell.TH  as TH
 
 #ifdef CABAL
@@ -222,6 +225,12 @@ clashLibVersion = Paths_clash_lib.version
 clashLibVersion = error "development version"
 #endif
 
--- | ceiling (log_2(c))
-clog2 :: Integer -> Int
-clog2 = ceiling . logBase (2 :: Double) . fromIntegral
+-- | \x y -> ceiling (logBase x y), x > 1 && y > 0
+clogBase :: Integer -> Integer -> Maybe Int
+clogBase x y | x > 1 && y > 0 =
+  let z1 = integerLogBase# x y
+      z2 = integerLogBase# x (y-1)
+  in  if (isTrue# (z1 ==# z2))
+         then Just (I# (z1 +# 1#))
+         else Just (I# z1)
+clogBase _ _ = Nothing

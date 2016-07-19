@@ -38,7 +38,7 @@ import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBl
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util                   hiding (mkBasicId)
-import           CLaSH.Util                           (curLoc, first, makeCached, on, (<:>))
+import           CLaSH.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
 import qualified Paths_clash_vhdl
