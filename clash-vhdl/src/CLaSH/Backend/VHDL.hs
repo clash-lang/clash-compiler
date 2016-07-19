@@ -642,6 +642,21 @@ expr_ _ (BlackBoxE pNm _ bbCtx _)
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
 expr_ _ (BlackBoxE pNm _ bbCtx _)
+  | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
+  , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
+  , Just k <- clogBase 2 n
+  , let k' = max 1 k
+  = exprLit (Just (Unsigned k',k')) i
+
+expr_ _ (BlackBoxE pNm _ bbCtx _)
+  | pNm == "CLaSH.Sized.Internal.Index.maxBound#"
+  , [Literal _ (NumLit n)] <- extractLiterals bbCtx
+  , n > 0
+  , Just k <- clogBase 2 n
+  , let k' = max 1 k
+  = exprLit (Just (Unsigned k',k')) (NumLit (n-1))
+
+expr_ _ (BlackBoxE pNm _ bbCtx _)
   | pNm == "GHC.Types.I#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   = do iw <- use intWidth

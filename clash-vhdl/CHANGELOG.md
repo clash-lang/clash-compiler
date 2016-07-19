@@ -1,8 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.6.15
+## 0.6.15 *July 19th 2016*
 * Fixes bugs:
   * Incorrect primitive for `Index`s `*#`
+  * Incorrect handling of `Index`s `fromInteger#` and `maxBound#` primitives for values larger than 2^MACHINE_WIDTH
 
 ## 0.6.14 *July 15th 2016*
 * New features:
