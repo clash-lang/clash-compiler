@@ -1,3 +1,9 @@
 [submodule "clash-prelude"]
 	path = clash-prelude
 	url = ../clash-prelude.git
+[submodule "ghc-typelits-natnormalise"]
+	path = ghc-typelits-natnormalise
+	url = ../ghc-typelits-natnormalise.git
+[submodule "ghc-typelits-extra"]
+	path = ghc-typelits-extra
+	url = ../ghc-typelits-extra.git

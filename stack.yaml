@@ -8,3 +8,5 @@ packages:
 - 'clash-vhdl'
 - 'clash-ghc'
 - 'testsuite'
+- 'ghc-typelits-extra'
+- 'ghc-typelits-natnormalise'
