@@ -149,7 +149,29 @@ signal# a = let s = a :- s in s
 
 {-# NOINLINE appSignal# #-}
 appSignal# :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
-appSignal# (f :- fs) ~(a :- as) = f a :- appSignal# fs as
+appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
+
+{- NOTE: Lazy ap
+Signal's ap, i.e (Applicative.<*>), must be lazy in it's second argument:
+
+> appSignal :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
+> appSignal (f :- fs) ~(a :- as) = f a :- appSignal fs as
+
+because some feedback loops, such as the loop described in 'system' in the
+example at http://hackage.haskell.org/package/clash-prelude-0.10.10/docs/CLaSH-Prelude-BlockRam.html,
+will lead to "Exception <<loop>>".
+
+However, this "naive" lazy version is _too_ lazy and induces spaceleaks.
+The current version:
+
+> appSignal# :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
+> appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as)
+
+Is lazy enough to handle the earlier mentioned feedback loops, but doesn't leak
+(as much) memory like the "naive" lazy version, because the Signal constructor
+of the second argument is evaluated as soon as the tail of the result is evaluated.
+-}
+
 
 {-# NOINLINE joinSignal# #-}
 -- | __WARNING: EXTREMELY EXPERIMENTAL__
