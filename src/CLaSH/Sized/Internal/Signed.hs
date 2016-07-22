@@ -10,6 +10,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -83,6 +84,7 @@ import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
+import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -272,16 +274,14 @@ fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: KnownNat n => Integer -> Signed n
-fromInteger_INLINE i
-    | n == 0    = S 0
-    | otherwise = res
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
+fromInteger_INLINE i = sz `seq` if sz == 0 then S 0 else S res
   where
-    n   = natVal res
-    sz  = 2 ^ (n - 1)
-    res = case divMod i sz of
-            (s,i') | even s    -> S i'
-                   | otherwise -> S (i' - sz)
+    sz   = natVal (Proxy :: Proxy n)
+    mask = shiftL 1 (fromInteger sz - 1)
+    res  = case divMod i mask of
+             (s,i') | even s    -> i'
+                    | otherwise -> i' - sz
 
 instance (KnownNat (1 + Max m n), KnownNat (m + n)) =>
   ExtendingNum (Signed m) (Signed n) where

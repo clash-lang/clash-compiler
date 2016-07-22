@@ -9,6 +9,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -76,6 +77,7 @@ import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
+import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -258,8 +260,10 @@ fromInteger# :: KnownNat n => Integer -> Unsigned n
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: KnownNat n => Integer -> Unsigned n
-fromInteger_INLINE i = let res = U (i `mod` (2 ^ natVal res)) in res
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> Unsigned n
+fromInteger_INLINE i = sz `seq` U (i `mod` (shiftL 1 sz))
+  where
+    sz = fromInteger (natVal (Proxy :: Proxy n))
 
 instance (KnownNat (1 + Max m n), KnownNat (m + n)) =>
   ExtendingNum (Unsigned m) (Unsigned n) where

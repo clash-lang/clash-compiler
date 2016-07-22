@@ -10,6 +10,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
@@ -100,6 +101,7 @@ import Data.Char                  (digitToInt)
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Maybe                 (listToMaybe)
+import Data.Proxy                 (Proxy (..))
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
@@ -278,8 +280,10 @@ fromInteger# :: KnownNat n => Integer -> BitVector n
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: KnownNat n => Integer -> BitVector n
-fromInteger_INLINE i = let res = BV (i `mod` (2 ^ natVal res)) in res
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> BitVector n
+fromInteger_INLINE i = sz `seq` BV (i `mod` (shiftL 1 sz))
+  where
+    sz = fromInteger (natVal (Proxy :: Proxy n))
 
 instance (KnownNat (Max m n + 1), KnownNat (m + n)) =>
   ExtendingNum (BitVector m) (BitVector n) where
