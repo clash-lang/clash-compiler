@@ -251,7 +251,7 @@ instance KnownNat n => Num (Unsigned n) where
 
 {-# NOINLINE negate# #-}
 negate# :: KnownNat n => Unsigned n -> Unsigned n
-negate# u@(U i) = U (sz - i)
+negate# u@(U i) = sz `seq` U (sz - i)
   where
     sz = 2 ^ natVal u
 
