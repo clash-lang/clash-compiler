@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -60,6 +61,7 @@ where
 
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
+import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -195,17 +197,17 @@ instance KnownNat n => Num (Index n) where
 {-# NOINLINE (*#) #-}
 (*#) (I a) (I b) = fromInteger_INLINE $ a * b
 
-fromInteger#,fromInteger_INLINE :: KnownNat n => Integer -> Index n
+fromInteger# :: KnownNat n => Integer -> Index n
 {-# NOINLINE fromInteger# #-}
 fromInteger# = fromInteger_INLINE
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE i =
-  let bound = natVal res
-      i'    = i `mod` bound
-      err   = error ("CLaSH.Sized.Index: result " ++ show i ++
-                     " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
-      res   = if i' /= i then err else I i
-  in  res
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> Index n
+fromInteger_INLINE i = bound `seq` if i' == i then I i else err
+  where
+    bound = natVal (Proxy :: Proxy n)
+    i'    = i `mod` bound
+    err   = error ("CLaSH.Sized.Index: result " ++ show i ++
+                   " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
 
 instance ExtendingNum (Index m) (Index n) where
   type AResult (Index m) (Index n) = Index (m + n - 1)
