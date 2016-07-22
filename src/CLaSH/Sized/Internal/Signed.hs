@@ -281,7 +281,7 @@ fromInteger_INLINE i = sz `seq` if sz == 0 then S 0 else S res
     mask = shiftL 1 (fromInteger sz - 1)
     res  = case divMod i mask of
              (s,i') | even s    -> i'
-                    | otherwise -> i' - sz
+                    | otherwise -> i' - mask
 
 instance (KnownNat (1 + Max m n), KnownNat (m + n)) =>
   ExtendingNum (Signed m) (Signed n) where
