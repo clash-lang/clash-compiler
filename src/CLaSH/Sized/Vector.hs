@@ -97,6 +97,7 @@ module CLaSH.Sized.Vector
   )
 where
 
+import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
@@ -179,6 +180,10 @@ data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
 {-# WARNING Cons "Use ':>' instead of 'Cons'" #-}
+
+instance NFData a => NFData (Vec n a) where
+  rnf Nil         = ()
+  rnf (Cons x xs) = rnf x `seq` rnf xs
 
 -- | Add an element to the head of a vector.
 --
