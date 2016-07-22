@@ -271,7 +271,7 @@ instance KnownNat n => Num (BitVector n) where
 
 {-# NOINLINE negate# #-}
 negate# :: KnownNat n => BitVector n -> BitVector n
-negate# bv@(BV i) = BV (sz - i)
+negate# bv@(BV i) = sz `seq` BV (sz - i)
   where
     sz = 2 ^ natVal bv
 
