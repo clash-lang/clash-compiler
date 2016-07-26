@@ -300,7 +300,7 @@ register' :: SClock clk -> a -> Signal' clk a -> Signal' clk a
 register' = register#
 
 {-# INLINE regEn' #-}
--- | Version of 'register'' that only updates its content when its second
+-- | Version of 'register'' that only updates its content when its third
 -- argument is asserted. So given:
 --
 -- @
