@@ -1,8 +1,0 @@
-resolver: lts-6.9
-
-packages:
-- .
-
-flags:
-  clash-prelude:
-    doclinks: true

@@ -30,7 +30,7 @@ script:
 matrix:
   fast_finish: true
   include:
-  - env: GHCVER=8.0.1 STACK_YAML=stack-ghc801.yaml
+  - env: GHCVER=8.0.1
     addons:
       apt:
         sources:
@@ -38,7 +38,7 @@ matrix:
         packages:
         - ghc-8.0.1
         - libgmp-dev
-    compiler: ! ': # ghc-8.0.1 stack-ghc801.yaml'
+    compiler: ! ': # ghc-8.0.1'
 cache:
   directories:
   - ~/.stack
