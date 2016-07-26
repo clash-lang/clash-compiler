@@ -19,9 +19,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
 -- as to why we need this.
-#if __GLASGOW_HASKELL__ > 711
 {-# OPTIONS_GHC -fno-cpr-anal #-}
-#endif
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -102,7 +100,7 @@ import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
 >>> import CLaSH.Promoted.Symbol
 >>> type SystemClock = Clk "System" 1000
 >>> type Signal a = Signal' SystemClock a
->>> let register = register# (SClock ssymbol snat :: SClock SystemClock)
+>>> let register = register# (SClock SSymbol SNat :: SClock SystemClock)
 -}
 
 -- | A clock with a name ('Symbol') and period ('Nat')
@@ -681,6 +679,7 @@ fromList = Prelude.foldr (:-) (error "finite list")
 --
 -- >>> simulate (register 8) [1, 2, 3]
 -- [8,1,2,3...
+-- ...
 --
 -- __NB__: This function is not synthesisable
 simulate :: (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]

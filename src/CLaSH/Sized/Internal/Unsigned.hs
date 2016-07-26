@@ -380,7 +380,9 @@ rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
     sz  = fromInteger (natVal bv)
 
 instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Unsigned n) where
-  finiteBitSize = size#
+  finiteBitSize        = size#
+  countLeadingZeros  u = countLeadingZeros  (pack# u)
+  countTrailingZeros u = countTrailingZeros (pack# u)
 
 instance Resize Unsigned where
   resize     = resize#

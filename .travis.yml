@@ -30,26 +30,7 @@ script:
 matrix:
   fast_finish: true
   include:
-  - env: GHCVER=7.10.3 CABALVER=1.24 STACK_SOLVER=YES
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - ghc-7.10.3
-        - cabal-install-1.24
-        - libgmp-dev
-    compiler: ! ': # ghc-7.10.3  YES'
-  - env: GHCVER=7.10.3 STACK_YAML=stack-lts6.yaml
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        packages:
-        - ghc-7.10.3
-        - libgmp-dev
-    compiler: ! ': # ghc-7.10.3 stack-lts6.yaml'
-  - env: GHCVER=8.0.1 STACK_YAML=stack-nightly.yaml
+  - env: GHCVER=8.0.1 STACK_YAML=stack-ghc801.yaml
     addons:
       apt:
         sources:
@@ -57,9 +38,7 @@ matrix:
         packages:
         - ghc-8.0.1
         - libgmp-dev
-    compiler: ! ': # ghc-8.0.1 stack-nightly.yaml'
-  allow_failures:
-  - env: GHCVER=8.0.1 STACK_YAML=stack-nightly.yaml
+    compiler: ! ': # ghc-8.0.1 stack-ghc801.yaml'
 cache:
   directories:
   - ~/.stack

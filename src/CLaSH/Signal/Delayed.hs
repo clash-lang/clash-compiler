@@ -6,9 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DataKinds                  #-}
-#if __GLASGOW_HASKELL__ > 710
 {-# LANGUAGE DeriveLift                 #-}
-#endif
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

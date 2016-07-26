@@ -60,10 +60,12 @@ import CLaSH.Prelude.RAM          (asyncRam',asyncRamPow2')
 import CLaSH.Prelude.ROM          (rom', romPow2')
 import CLaSH.Prelude.Synchronizer (dualFlipFlopSynchronizer,
                                    asyncFIFOSynchronizer)
+import CLaSH.Signal.Bundle        (Bundle(..), Unbundled')
 import CLaSH.Signal.Explicit
 
 {- $setup
 >>> :set -XDataKinds
+>>> import CLaSH.Prelude
 >>> type ClkA = Clk "A" 100
 >>> let clkA = sclock :: SClock ClkA
 >>> let rP = registerB' clkA (8::Int,8::Int)
@@ -83,10 +85,11 @@ import CLaSH.Signal.Explicit
 -- rP = 'registerB'' clkA (8,8)
 -- @
 --
--- >>> simulateB' clkA clkA rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
+-- >>> simulateB rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
+-- ...
 registerB' :: Bundle a => SClock clk -> a -> Unbundled' clk a -> Unbundled' clk a
-registerB' clk i = unbundle' clk Prelude.. register' clk i Prelude.. bundle' clk
+registerB' clk i = unbundle Prelude.. register' clk i Prelude.. bundle
 
 {-# INLINABLE isRising' #-}
 -- | Give a pulse when the 'Signal'' goes from 'minBound' to 'maxBound'

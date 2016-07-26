@@ -1,5 +1,5 @@
 Name:                 clash-prelude
-Version:              0.10.10
+Version:              0.11
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -131,18 +131,22 @@ Library
                       CLaSH.Tutorial
                       CLaSH.Examples
 
-  other-extensions:   BangPatterns
-                      DataKinds
+  other-extensions:   CPP
+                      BangPatterns
                       ConstraintKinds
+                      DataKinds
                       DefaultSignatures
-                      DeriveTraversable
                       DeriveDataTypeable
+                      DeriveTraversable
+                      DeriveLift
                       FlexibleContexts
+                      FlexibleInstances
                       GADTs
                       GeneralizedNewtypeDeriving
                       KindSignatures
                       MagicHash
                       MultiParamTypeClasses
+                      PatternSynonyms
                       Rank2Types
                       ScopedTypeVariables
                       StandaloneDeriving
@@ -151,6 +155,7 @@ Library
                       TypeFamilies
                       TypeOperators
                       UndecidableInstances
+                      ViewPatterns
 
   Build-depends:      array                     >= 0.5.1.0 && < 0.6,
                       base                      >= 4.8.0.0 && < 5,
@@ -159,22 +164,12 @@ Library
                       deepseq                   >= 1.4.1.0 && < 1.5,
                       ghc-prim                  >= 0.3.1.0 && < 0.6,
                       ghc-typelits-extra        >= 0.1     && < 0.2,
-                      ghc-typelits-natnormalise >= 0.4.1   && < 0.5,
+                      ghc-typelits-natnormalise >= 0.4.2   && < 0.5,
                       lens                      >= 4.9     && < 4.15,
                       QuickCheck                >= 2.7     && < 2.10,
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
                       template-haskell          >= 2.9.0.0 && < 2.12
-
-  if impl(ghc<7.11)
-    -- Newer GHCs have -XDeriveLift
-    Build-depends:    th-lift                   >= 0.5.6
-    -- Newer GHCs have a -fno-cpr-anal dynflag which we can enable per module
-    -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
-    -- as to why we need this.
-    ghc-options:      -fcpr-off
-  else
-    other-extensions: DeriveLift
 
   if flag(doclinks)
     CPP-Options:      -DDOCLINKS

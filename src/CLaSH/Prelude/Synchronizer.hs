@@ -15,6 +15,7 @@ Synchronizer circuits for safe clock domain crossings
 {-# LANGUAGE Safe #-}
 
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.Synchronizer
@@ -95,12 +96,12 @@ fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
             wdata
 
 ptrCompareT :: _
-            => SNat addrSize
-            -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
-            -> (BitVector (addrSize + 1), BitVector (addrSize + 1), Bool)
-            -> (BitVector (addrSize + 1), Bool)
-            -> ((BitVector (addrSize + 1), BitVector (addrSize + 1), Bool)
-               ,(Bool, BitVector addrSize, BitVector (addrSize + 1)))
+            => SNat (addrSize + 1)
+            -> (BitVector (addrSize + 2) -> BitVector (addrSize + 2) -> Bool)
+            -> (BitVector (addrSize + 2), BitVector (addrSize + 2), Bool)
+            -> (BitVector (addrSize + 2), Bool)
+            -> ((BitVector (addrSize + 2), BitVector (addrSize + 2), Bool)
+               ,(Bool, BitVector (addrSize + 1), BitVector (addrSize + 2)))
 ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
                                                           ,(flag,addr,ptr))
   where
@@ -111,12 +112,11 @@ ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
 
     flag' = flagGen ptr' s_ptr
 
-
 -- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
 isFull :: _
-       => SNat addrSize
-       -> BitVector (addrSize + 1)
-       -> BitVector (addrSize + 1)
+       => SNat (2 + addrSize)
+       -> BitVector ((2 + addrSize) + 1)
+       -> BitVector ((2 + addrSize) + 1)
        -> Bool
 isFull addrSize ptr s_ptr =
   ptr == (complement (slice addrSize (addrSize `subSNat` d1) s_ptr) ++#
@@ -128,16 +128,16 @@ isFull addrSize ptr s_ptr =
 --
 -- __NB__: This synchroniser can be used for __word__-synchronization.
 asyncFIFOSynchronizer :: _
-                      => SNat addrSize     -- ^ Size of the internally used
-                                           -- addresses, the FIFO contains
-                                           -- @2^addrSize@ elements.
-                      -> SClock wclk       -- ^ 'Clock' to which the write port
-                                           -- is synchronised
-                      -> SClock rclk       -- ^ 'Clock' to which the read port
-                                           -- is synchronised
-                      -> Signal' wclk a    -- ^ Element to insert
-                      -> Signal' wclk Bool -- ^ Write request
-                      -> Signal' rclk Bool -- ^ Read request
+                      => SNat (addrSize + 2) -- ^ Size of the internally used
+                                             -- addresses, the FIFO contains
+                                             -- @2^addrSize@ elements.
+                      -> SClock wclk         -- ^ 'Clock' to which the write port
+                                             -- is synchronised
+                      -> SClock rclk         -- ^ 'Clock' to which the read port
+                                             -- is synchronised
+                      -> Signal' wclk a      -- ^ Element to insert
+                      -> Signal' wclk Bool   -- ^ Write request
+                      -> Signal' rclk Bool   -- ^ Read request
                       -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
                       -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
 asyncFIFOSynchronizer addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)

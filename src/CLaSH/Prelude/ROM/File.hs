@@ -92,7 +92,7 @@ import GHC.TypeLits                (KnownNat, type (^))
 import System.IO.Unsafe            (unsafePerformIO)
 
 import CLaSH.Prelude.BlockRam.File (initMem)
-import CLaSH.Promoted.Nat          (SNat,snat,snatToInteger)
+import CLaSH.Promoted.Nat          (SNat (..), snatToInteger)
 import CLaSH.Sized.BitVector       (BitVector)
 import CLaSH.Signal                (Signal)
 import CLaSH.Signal.Explicit       (Signal', SClock, register', systemClock)
@@ -217,7 +217,7 @@ asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
                  -> BitVector m -- ^ The value of the ROM at address @rd@
-asyncRomFilePow2 = asyncRomFile (snat :: SNat (2^n))
+asyncRomFilePow2 = asyncRomFile (SNat :: SNat (2^n))
 
 {-# NOINLINE asyncRomFile# #-}
 -- | asyncROMFile primitive
@@ -293,7 +293,7 @@ romFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
             -> Signal (Unsigned n)  -- ^ Read address @rd@
             -> Signal (BitVector m)
             -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFilePow2 = romFile' systemClock (snat :: SNat (2^n))
+romFilePow2 = romFile' systemClock (SNat :: SNat (2^n))
 
 {-# INLINE romFilePow2' #-}
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -327,7 +327,7 @@ romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
              -> Signal' clk (BitVector m)
              -- ^ The value of the ROM at address @rd@ from the previous clock
              -- cycle
-romFilePow2' clk = romFile' clk (snat :: SNat (2^n))
+romFilePow2' clk = romFile' clk (SNat :: SNat (2^n))
 
 {-# INLINE romFile' #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements

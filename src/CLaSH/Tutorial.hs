@@ -1654,7 +1654,7 @@ A list of often encountered errors and their solutions:
       @topEntity@ has no arguments, you're out of luck for now. If it has
       multiple arguments, consider bundling them in a tuple.
 
-*  __\<*** Exception: \<\<loop\>\>__
+*  __\<*** Exception: \<\<loop\>\>__ or "blinking cursor"
 
     You are using value-recursion, but one of the 'Vec'tor functions that you
     are using is too /strict/ in one of the recursive arguments. For example:

@@ -166,6 +166,7 @@ It instead exports the identically named functions defined in terms of
 --
 -- >>> simulateB rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
+-- ...
 registerB :: Bundle a => a -> Unbundled a -> Unbundled a
 registerB = registerB' systemClock
 

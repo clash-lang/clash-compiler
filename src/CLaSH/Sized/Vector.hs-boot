@@ -19,5 +19,7 @@ data Vec :: Nat -> * -> *
 
 instance (KnownNat m, (~) m ((+) n 1)) => Foldable (Vec m)
 
-bv2v :: KnownNat n => BitVector n -> Vec n Bit
-map  :: (a -> b) -> Vec n a -> Vec n b
+bv2v  :: KnownNat n => BitVector n -> Vec n Bit
+map   :: (a -> b) -> Vec n a -> Vec n b
+foldr :: (a -> b -> b) -> b -> Vec n a -> b
+foldl :: (b -> a -> b) -> b -> Vec n a -> b

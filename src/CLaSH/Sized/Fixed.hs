@@ -658,7 +658,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- We then compile this to an executable:
 --
 -- @
--- $ clash --make createRomFile.hs
+-- \$ clash --make createRomFile.hs
 -- @
 --
 -- We can then use this utility to convert our @Data.txt@ file which contains
@@ -666,7 +666,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 -- binary data:
 --
 -- @
--- $ ./createRomFile \"Data.txt\" \"Data.bin\"
+-- \$ ./createRomFile \"Data.txt\" \"Data.bin\"
 -- @
 --
 -- Which results in a @Data.bin@ file containing:

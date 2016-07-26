@@ -8,11 +8,11 @@ Predefined 'SNat' singleton literals in the range [0 .. 1024]
 Defines:
 
 @
-d0 = snat :: SNat 0
-d1 = snat :: SNat 1
-d2 = snat :: SNat 2
+d0 = SNat :: SNat 0
+d1 = SNat :: SNat 1
+d2 = SNat :: SNat 2
 ...
-d1024 = snat :: SNat 1024
+d1024 = SNat :: SNat 1024
 @
 
 You can generate more 'SNat' literals using 'decLiteralsD' from "CLaSH.Promoted.Nat.TH"

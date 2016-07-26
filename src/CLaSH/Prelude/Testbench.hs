@@ -28,7 +28,7 @@ import Prelude               hiding ((!!))
 
 import CLaSH.Signal          (Signal, fromList)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
-import CLaSH.Signal.Bundle   (unbundle')
+import CLaSH.Signal.Bundle   (unbundle)
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 
@@ -173,7 +173,7 @@ stimuliGenerator' :: forall l clk a . KnownNat l
                   -> Vec l a        -- ^ Samples to generate
                   -> Signal' clk a  -- ^ Signal of given samples
 stimuliGenerator' clk samples =
-    let (r,o) = unbundle' clk (genT <$> register' clk 0 r)
+    let (r,o) = unbundle (genT <$> register' clk 0 r)
     in  o
   where
     genT :: Index l -> (Index l,a)
@@ -230,8 +230,8 @@ outputVerifier' :: forall l clk a . (KnownNat l, Eq a, Show a)
                 -> Signal' clk a    -- ^ Signal to verify
                 -> Signal' clk Bool -- ^ Indicator that all samples are verified
 outputVerifier' clk samples i =
-    let (s,o) = unbundle' clk (genT <$> register' clk 0 s)
-        (e,f) = unbundle' clk o
+    let (s,o) = unbundle (genT <$> register' clk 0 s)
+        (e,f) = unbundle o
     in  assert' clk "outputVerifier" i e (register' clk False f)
   where
     genT :: Index l -> (Index l,(a,Bool))

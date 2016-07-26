@@ -96,11 +96,11 @@ import Data.Maybe                   (listToMaybe)
 import GHC.TypeLits                 (KnownNat, type (^))
 import Numeric                      (readInt)
 
-import CLaSH.Promoted.Nat    (SNat,snat,snatToInteger)
+import CLaSH.Promoted.Nat    (SNat (..), snatToInteger)
 import CLaSH.Sized.BitVector (BitVector)
 import CLaSH.Signal          (Signal)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
-import CLaSH.Signal.Bundle   (bundle')
+import CLaSH.Signal.Bundle   (bundle)
 import CLaSH.Sized.Unsigned  (Unsigned)
 
 {-# INLINE blockRamFile #-}
@@ -180,7 +180,7 @@ blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  -> Signal (BitVector m)
                  -- ^ Value of the @blockRAM@ at address @r@ from the previous
                  -- clock cycle
-blockRamFilePow2 = blockRamFile' systemClock (snat :: SNat (2^n))
+blockRamFilePow2 = blockRamFile' systemClock (SNat :: SNat (2^n))
 
 {-# INLINE blockRamFilePow2' #-}
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -220,7 +220,7 @@ blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                   -> Signal' clk (BitVector m)
                   -- ^ Value of the @blockRAM@ at address @r@ from the previous
                   -- clock cycle
-blockRamFilePow2' clk = blockRamFile' clk (snat :: SNat (2^n))
+blockRamFilePow2' clk = blockRamFile' clk (SNat :: SNat (2^n))
 
 {-# INLINE blockRamFile' #-}
 -- | Create a blockRAM with space for @n@ elements
@@ -286,7 +286,7 @@ blockRamFile# clk sz file wr rd en din = register' clk undefined dout
     dout = runST $ do
       mem <- unsafeIOToST (initMem file)
       arr <- newListArray (0,szI-1) mem
-      traverse (ramT arr) (bundle' clk (wr,rd,en,din))
+      traverse (ramT arr) (bundle (wr,rd,en,din))
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
     ramT ram (w,r,e,d) = do

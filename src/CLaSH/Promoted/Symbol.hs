@@ -13,25 +13,26 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Promoted.Symbol
-  (SSymbol (..), ssymbol, ssymbolToString)
+  (SSymbol (..), ssymbolProxy, ssymbolToString)
 where
 
-import Data.Proxy
 import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
 
 -- | Singleton value for a type-level string @s@
-data SSymbol (s :: Symbol) = KnownSymbol s => SSymbol (Proxy s)
+data SSymbol (s :: Symbol) where
+  SSymbol :: KnownSymbol s => SSymbol s
 
 instance Show (SSymbol s) where
-  show (SSymbol s) = symbolVal s
+  show s@SSymbol = symbolVal s
 
-{-# INLINE ssymbol #-}
--- | Create a singleton literal for a type-level natural number
-ssymbol :: KnownSymbol s => SSymbol s
-ssymbol = SSymbol Proxy
+{-# INLINE ssymbolProxy #-}
+-- | Create a singleton symbol literal @'SSymbol' s@ from a proxy for
+-- /s/
+ssymbolProxy :: KnownSymbol s => proxy s -> SSymbol s
+ssymbolProxy _ = SSymbol
 
 {-# INLINE ssymbolToString #-}
 -- | Reify the type-level 'Symbol' @s@ to it's term-level 'String'
 -- representation.
 ssymbolToString :: SSymbol s -> String
-ssymbolToString (SSymbol s) = symbolVal s
+ssymbolToString s@SSymbol = symbolVal s

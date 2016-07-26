@@ -13,9 +13,8 @@ where
 import Data.Reflection    (reifyNat)
 import Unsafe.Coerce      (unsafeCoerce)
 
-import CLaSH.Promoted.Nat (SNat (..))
+import CLaSH.Promoted.Nat (SNat, snatProxy)
 
 -- | I hope you know what you're doing
 unsafeSNat :: Integer -> SNat k
-unsafeSNat i = reifyNat i (unsafeCoerce . SNat)
-{-# NOINLINE unsafeSNat #-}
+unsafeSNat i = reifyNat i $ (\p -> unsafeCoerce (snatProxy p))

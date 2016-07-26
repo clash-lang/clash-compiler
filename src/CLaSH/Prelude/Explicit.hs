@@ -18,7 +18,6 @@ using explicitly clocked signals.
 
 {-# LANGUAGE Unsafe #-}
 
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.Explicit
@@ -74,6 +73,7 @@ import CLaSH.Sized.Vector          (Vec (..), (+>>), asNatProxy, repeat)
 
 {- $setup
 >>> :set -XDataKinds
+>>> import CLaSH.Prelude
 >>> type ClkA = Clk "A" 100
 >>> let clkA = sclock :: SClock ClkA
 >>> let window4 = window' clkA :: Signal' ClkA Int -> Vec 4 (Signal' ClkA Int)
@@ -93,8 +93,9 @@ import CLaSH.Sized.Vector          (Vec (..), (+>>), asNatProxy, repeat)
 -- window4 = 'window'' clkA
 -- @
 --
--- >>> simulateB' clkA clkA window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
+-- >>> simulateB window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
+-- ...
 window' :: (KnownNat n, Default a)
         => SClock clk                  -- ^ Clock to which the incoming
                                        -- signal is synchronized
@@ -102,7 +103,7 @@ window' :: (KnownNat n, Default a)
         -> Vec (n + 1) (Signal' clk a) -- ^ Window of at least size 1
 window' clk x = res
   where
-    res  = x `Cons` prev
+    res  = x :> prev
     prev = case natVal (asNatProxy prev) of
              0 -> repeat def
              _ -> let next = x +>> prev
@@ -121,8 +122,9 @@ window' clk x = res
 -- windowD3 = 'windowD'' clkA
 -- @
 --
--- >>> simulateB' clkA clkA windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
+-- >>> simulateB windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
+-- ...
 windowD' :: (KnownNat (n + 1), Default a)
          => SClock clk                   -- ^ Clock to which the incoming signal
                                          -- is synchronized

@@ -30,20 +30,15 @@ module CLaSH.Signal.Explicit
     -- * Basic circuit functions
   , register'
   , regEn'
-    -- * Product/Signal isomorphism
-  , Bundle (..)
-    -- * Simulation functions (not synthesisable)
-  , simulateB'
   )
 where
 
 import GHC.TypeLits           (KnownNat, KnownSymbol)
 
-import CLaSH.Promoted.Nat     (snat, snatToInteger)
-import CLaSH.Promoted.Symbol  (ssymbol)
+import CLaSH.Promoted.Nat     (SNat (..), snatToInteger)
+import CLaSH.Promoted.Symbol  (SSymbol (..))
 import CLaSH.Signal.Internal  (Signal' (..), Clock (..), SClock (..), register#,
-                               regEn#, simulate)
-import CLaSH.Signal.Bundle    (Bundle (..), Unbundled')
+                               regEn#)
 
 {- $setup
 >>> :set -XDataKinds
@@ -123,14 +118,14 @@ never create a clock that goes any faster!
 -- @
 sclock :: (KnownSymbol name, KnownNat period)
        => SClock ('Clk name period)
-sclock = SClock ssymbol snat
+sclock = SClock SSymbol SNat
 
 {-# INLINE withSClock #-}
 -- | Supply a function with a singleton clock @clk@ according to the context
 withSClock :: (KnownSymbol name, KnownNat period)
            => (SClock ('Clk name period) -> a)
            -> a
-withSClock f = f (SClock ssymbol snat)
+withSClock f = f (SClock SSymbol SNat)
 
 -- | The standard system clock with a period of 1000
 type SystemClock = 'Clk "system" 1000
@@ -325,19 +320,3 @@ register' = register#
 -- [0,0,1,1,2,2,3,3]
 regEn' :: SClock clk -> a -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
 regEn' = regEn#
-
--- * Simulation functions
-
--- | Simulate a (@'Unbundled'' clk1 a -> 'Unbundled'' clk2 b@) function given a
--- list of samples of type @a@
---
--- >>> simulateB' clkA clkA (unbundle' clkA . register' clkA (8,8) . bundle' clkA) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(1,1),(2,2),(3,3)...
---
--- __NB__: This function is not synthesisable
-simulateB' :: (Bundle a, Bundle b)
-           => SClock clk1 -- ^ 'Clock' of the incoming signal
-           -> SClock clk2 -- ^ 'Clock' of the outgoing signal
-           -> (Unbundled' clk1 a -> Unbundled' clk2 b) -- ^ Function to simulate
-           -> [a] -> [b]
-simulateB' clk1 clk2 f = simulate (bundle' clk2 . f . unbundle' clk1)

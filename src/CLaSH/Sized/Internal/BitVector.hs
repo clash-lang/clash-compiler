@@ -88,6 +88,9 @@ module CLaSH.Sized.Internal.BitVector
   , rotateL#
   , rotateR#
   , popCountBV
+    -- ** FiniteBits
+  , countLeadingZerosBV
+  , countTrailingZerosBV
     -- ** Resize
   , resize#
     -- ** QuickCheck
@@ -348,7 +351,17 @@ instance (KnownNat n, KnownNat (n+1), KnownNat (n+2)) => Bits (BitVector n) wher
   popCount bv       = fromEnum (popCountBV (bv ++# (0 :: Bit)))
 
 instance (KnownNat n, KnownNat (n+1), KnownNat (n+2)) => FiniteBits (BitVector n) where
-  finiteBitSize = size#
+  finiteBitSize       = size#
+  countLeadingZeros   = fromEnum . countLeadingZerosBV
+  countTrailingZeros  = fromEnum . countTrailingZerosBV
+
+countLeadingZerosBV :: (KnownNat n, KnownNat (n+1)) => BitVector n -> I.Index (n+1)
+countLeadingZerosBV = V.foldr (\l r -> if eq# l low then 1 + r else 0) 0 . V.bv2v
+{-# INLINE countLeadingZerosBV #-}
+
+countTrailingZerosBV :: (KnownNat n, KnownNat (n+1)) => BitVector n -> I.Index (n+1)
+countTrailingZerosBV = V.foldl (\l r -> if eq# r low then 1 + l else 0) 0 . V.bv2v
+{-# INLINE countTrailingZerosBV #-}
 
 {-# NOINLINE reduceAnd# #-}
 reduceAnd# :: (KnownNat n) => BitVector n -> BitVector 1

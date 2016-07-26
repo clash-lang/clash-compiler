@@ -67,6 +67,7 @@ let mac s (x,y) = (s',s)
 --
 -- >>> simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
+-- ...
 --
 -- Synchronous sequential functions can be composed just like their
 -- combinational counterpart:
@@ -158,6 +159,7 @@ mealyB = mealyB' systemClock
 --
 -- >>> simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
+-- ...
 --
 -- Synchronous sequential functions can be composed just like their
 -- combinational counterpart:
@@ -178,7 +180,7 @@ mealy' :: SClock clk        -- ^ 'Clock' to synchronize to
        -> (Signal' clk i -> Signal' clk o)
        -- ^ Synchronous sequential function with input and output matching that
        -- of the mealy machine
-mealy' clk f iS = \i -> let (s',o) = unbundle' clk $ f <$> s <*> i
+mealy' clk f iS = \i -> let (s',o) = unbundle $ f <$> s <*> i
                             s      = register' clk iS s'
                         in  o
 
@@ -217,4 +219,4 @@ mealyB' :: (Bundle i, Bundle o)
         -> (Unbundled' clk i -> Unbundled' clk o)
         -- ^ Synchronous sequential function with input and output matching that
         -- of the mealy machine
-mealyB' clk f iS i = unbundle' clk (mealy' clk f iS (bundle' clk i))
+mealyB' clk f iS i = unbundle (mealy' clk f iS (bundle i))

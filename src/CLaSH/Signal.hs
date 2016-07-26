@@ -22,10 +22,8 @@ module CLaSH.Signal
     -- * Boolean connectives
   , (.&&.), (.||.), not1
     -- * Product/Signal isomorphism
-  , Bundle
+  , Bundle(..)
   , Unbundled
-  , bundle
-  , unbundle
     -- * Simulation functions (not synthesisable)
   , simulate
   , simulateB
@@ -71,7 +69,7 @@ import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
                               unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
                               rotateR1, (.||.), (.&&.), not1, mux, sample,
                               sampleN, fromList, simulate, signal, testFor)
-import CLaSH.Signal.Explicit (SystemClock, systemClock, simulateB')
+import CLaSH.Signal.Explicit (SystemClock, systemClock)
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
 {- $setup
@@ -120,42 +118,13 @@ regEn = regEn# systemClock
 -- product type of 'Signal's.
 type Unbundled a = Unbundled' SystemClock a
 
-{-# INLINE unbundle #-}
--- | Example:
---
--- @
--- __unbundle__ :: 'Signal' (a,b) -> ('Signal' a, 'Signal' b)
--- @
---
--- However:
---
--- @
--- __unbundle__ :: 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
--- @
-unbundle :: Bundle a => Signal a -> Unbundled a
-unbundle = unbundle' systemClock
-
-{-# INLINE bundle #-}
--- | Example:
---
--- @
--- __bundle__ :: ('Signal' a, 'Signal' b) -> 'Signal' (a,b)
--- @
---
--- However:
---
--- @
--- __bundle__ :: 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
--- @
-bundle :: Bundle a => Unbundled a -> Signal a
-bundle = bundle' systemClock
-
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type @a@
 --
 -- >>> simulateB (unbundle . register (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
+-- ...
 --
 -- __NB__: This function is not synthesisable
-simulateB :: (Bundle a, Bundle b) => (Unbundled a -> Unbundled b) -> [a] -> [b]
-simulateB = simulateB' systemClock systemClock
+simulateB :: (Bundle a, Bundle b) => (Unbundled' clk1 a -> Unbundled' clk2 b) -> [a] -> [b]
+simulateB f = simulate (bundle . f . unbundle)

@@ -1,5 +1,20 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.11
+* New features:
+  * Add `BNat` (and supporting functions) to `CLaSH.Promoted.Nat`: base-2 encoded natural numbers.
+  * Add `divSNat` and `logBaseSNat` to `CLaSH.Promoted.Nat`: division and logarithm for singleton natural numbers.
+  * Add `predUNat` and `subUNat` to `CLaSH.Promoted.Nat`: predecessor and subtraction for unary-encoded natural numbers.
+  * Add `dtfold` to `CLaSH.Sized.Vector`: a dependently-typed tree-fold over `Vec`.
+  * Add the perfect-depth binary trees module `CLaSH.Sized.RTree`
+  * Synthesisable definitions of `countLeadingZeros` and `countTrailingZeros` for: `BitVector`, `Signed`, `Unsigned`, and `Fixed`
+* Changes:
+  * `bundle'` and `unbundle'` are removed; `bundle` now has type `Unbundled' clk a -> Signal' clk a`, `unbundle` now has type `Signal' clk a -> Unbundled' clk a`
+  * `subSNat` now has the type `SNat (a+b) -> SNat b -> SNat a` (where it used to be `SNat a -> SNat b -> SNat (a-b)`)
+  * Renamed `multUNat` to `mulUNat` to be in sync with `mulSNat` and `mulBNat`.
+  * The function argument of `vfold` in `CLaSH.Sized.Vector` is now `(forall l . SNat l -> a -> Vec l b -> Vec (l + 1) b)` (where it used to be `(forall l . a -> Vec l b -> Vec (l + 1) b)`)
+  * `Cons` constructor of `Vec` is no longer visible; `(:>)` and `(:<)` are now listed as constructors of `Vec`
+
 ## 0.10.10 *July 15th 2016*
 * Fixes bugs:
   * `shrink` functions for numeric types throw exceptions [#153](https://github.com/clash-lang/clash-compiler/issues/153)
