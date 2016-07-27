@@ -212,3 +212,6 @@ benchmark benchmark-clash-prelude
       criterion         >= 1.1.1.0 && < 1.2,
       deepseq           >= 1.4.0.1 && < 1.5,
       template-haskell  >= 2.9.0.0 && < 2.12
+
+  Other-Modules:    BenchBitVector
+                    BenchSigned

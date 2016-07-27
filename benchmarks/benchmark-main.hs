@@ -3,6 +3,7 @@ module Main where
 import Criterion.Main
 
 import BenchBitVector
+import BenchSigned
 
 main :: IO ()
 main =
@@ -15,5 +16,8 @@ main =
         , appendBenchL
         , splitBench
         , splitBenchL
+        ]
+    bgroup "Signed"
+        [ fromIntegerBench
         ]
   ]
