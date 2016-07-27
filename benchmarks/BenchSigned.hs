@@ -13,7 +13,7 @@ import Language.Haskell.TH.Syntax     (lift)
 
 smallValueI_pos :: Integer
 smallValueI_pos = $(lift (2^(16::Int)-10 :: Integer))
-{-# INLINE smallValueI #-}
+{-# INLINE smallValueI_pos #-}
 
 fromIntegerBench :: Benchmark
 fromIntegerBench = env setup $ \m ->

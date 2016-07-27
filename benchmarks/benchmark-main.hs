@@ -17,7 +17,7 @@ main =
         , splitBench
         , splitBenchL
         ]
-    bgroup "Signed"
+  , bgroup "Signed"
         [ fromIntegerBench
         ]
   ]
