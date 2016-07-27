@@ -208,10 +208,9 @@ fromInteger# :: KnownNat n => Integer -> Index n
 fromInteger# = fromInteger_INLINE
 {-# INLINE fromInteger_INLINE #-}
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> Index n
-fromInteger_INLINE i = bound `seq` if i' == i then I i else err
+fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
     bound = natVal (Proxy :: Proxy n)
-    i'    = i `mod` bound
     err   = error ("CLaSH.Sized.Index: result " ++ show i ++
                    " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
 
