@@ -16,7 +16,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module CLaSH.Prelude.BitIndex where
 
-import GHC.TypeLits                   (KnownNat, type (+), type (-))
+import GHC.TypeLits                   (KnownNat, type (+), type (-), type (^))
 
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Promoted.Nat             (SNat)
@@ -74,7 +74,7 @@ slice m n v = slice# (pack v) m n
 -- 00_0111
 -- >>> split (7 :: Unsigned 6) :: (BitVector 2, BitVector 4)
 -- (00,0111)
-split :: (BitPack a, BitSize a ~ (m + n), KnownNat n) => a
+split :: (BitPack a, BitSize a ~ (m + n), KnownNat n, KnownNat (2^n)) => a
       -> (BitVector m, BitVector n)
 split v = split# (pack v)
 
@@ -134,7 +134,7 @@ setSlice m n w v = unpack (setSlice# (pack v) m n w)
 -- 00_0100
 -- >>> msb (4 :: Signed 6)
 -- 0
-msb :: (BitPack a, KnownNat (BitSize a)) => a -> Bit
+msb :: (BitPack a, KnownNat (BitSize a - 1)) => a -> Bit
 msb v = msb# (pack v)
 
 {-# INLINE lsb #-}

@@ -1911,7 +1911,7 @@ smap f xs = reverse
                   Nil (reverse xs)
 {-# INLINE smap #-}
 
-instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) where
+instance (KnownNat n, KnownNat (BitSize a), KnownNat (2^(BitSize a)), BitPack a) => BitPack (Vec n a) where
   type BitSize (Vec n a) = n * (BitSize a)
   pack   = concatBitVector# . map pack
   unpack = map unpack . unconcatBitVector#
@@ -1928,13 +1928,13 @@ concatBitVector# = concatBitVector' . reverse
     concatBitVector' (x `Cons` xs) = concatBitVector' xs ++# x
 {-# NOINLINE concatBitVector# #-}
 
-unconcatBitVector# :: (KnownNat n, KnownNat m)
+unconcatBitVector# :: (KnownNat n, KnownNat m, KnownNat (2^m))
                    => BitVector (n * m)
                    -> Vec n (BitVector m)
 unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
 {-# NOINLINE unconcatBitVector# #-}
 
-ucBV :: forall n m . KnownNat m
+ucBV :: forall n m . (KnownNat m, KnownNat (2^m))
      => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
 ucBV UZero     _  = Nil
 ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv

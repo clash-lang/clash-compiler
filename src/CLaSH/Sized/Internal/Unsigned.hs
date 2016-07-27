@@ -77,9 +77,12 @@ import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
+import Data.Promotion.Prelude         (ConstSym1, FlipSym1, type (:.$), type (:+$),
+                                       type (:^$$))
 import Data.Proxy                     (Proxy (..))
+import Data.Singletons.Prelude        (type (@@))
 import Text.Read                      (Read (..), ReadPrec)
-import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
+import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-), type (^), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
@@ -92,6 +95,7 @@ import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
+import CLaSH.Promoted.Nat.Defun       (DotSym, KnownNatSym)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
@@ -148,7 +152,7 @@ instance Show (Unsigned n) where
   -- which the CLaSH compiler can (currently) not handle
 
 -- | None of the 'Read' class' methods are synthesisable.
-instance KnownNat n => Read (Unsigned n) where
+instance KnownNat (2^n) => Read (Unsigned n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Word)
 
 instance BitPack (Unsigned n) where
@@ -194,7 +198,7 @@ le# (U n) (U m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesisable.
-instance KnownNat n => Enum (Unsigned n) where
+instance KnownNat (2^n) => Enum (Unsigned n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
   toEnum         = fromInteger# . toInteger
@@ -208,10 +212,10 @@ instance KnownNat n => Enum (Unsigned n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat n => Unsigned n -> [Unsigned n]
-enumFromThen#   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromTo#     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenTo# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+enumFrom#       :: KnownNat (2^n) => Unsigned n -> [Unsigned n]
+enumFromThen#   :: KnownNat (2^n) => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromTo#     :: KnownNat (2^n) => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: KnownNat (2^n) => Unsigned n -> Unsigned n -> Unsigned n
                 -> [Unsigned n]
 enumFrom# x             = map toEnum [fromEnum x ..]
 enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
@@ -230,7 +234,7 @@ minBound# = U 0
 maxBound# :: KnownNat n => Unsigned n
 maxBound# = let res = U ((2 ^ natVal res) - 1) in res
 
-instance KnownNat n => Num (Unsigned n) where
+instance KnownNat (2^n) => Num (Unsigned n) where
   (+)         = (+#)
   (-)         = (-#)
   (*)         = (*#)
@@ -239,7 +243,7 @@ instance KnownNat n => Num (Unsigned n) where
   signum bv   = resize# (unpack# (reduceOr bv))
   fromInteger = fromInteger#
 
-(+#),(-#),(*#) :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
+(+#),(-#),(*#) :: KnownNat (2^n) => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
 (+#) (U i) (U j) = fromInteger_INLINE (i + j)
 
@@ -250,31 +254,31 @@ instance KnownNat n => Num (Unsigned n) where
 (*#) (U i) (U j) = fromInteger_INLINE (i * j)
 
 {-# NOINLINE negate# #-}
-negate# :: KnownNat n => Unsigned n -> Unsigned n
-negate# u@(U i) = sz `seq` U (sz - i)
+negate# :: forall n . KnownNat (2^n) => Unsigned n -> Unsigned n
+negate# (U i) = sz `seq` U (sz - i)
   where
-    sz = 2 ^ natVal u
+    sz = natVal (Proxy :: Proxy (2^n))
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat n => Integer -> Unsigned n
+fromInteger# :: KnownNat (2^n) => Integer -> Unsigned n
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat n => Integer -> Unsigned n
-fromInteger_INLINE i = sz `seq` U (i `mod` (shiftL 1 sz))
+fromInteger_INLINE :: forall n . KnownNat (2^n) => Integer -> Unsigned n
+fromInteger_INLINE i = U (i `mod` sz)
   where
-    sz = fromInteger (natVal (Proxy :: Proxy n))
+    sz = (natVal (Proxy :: Proxy (2^n)))
 
-instance (KnownNat (1 + Max m n), KnownNat (m + n)) =>
+instance (KnownNat (2^(Max m n + 1)), KnownNat (2^(m + n))) =>
   ExtendingNum (Unsigned m) (Unsigned n) where
-  type AResult (Unsigned m) (Unsigned n) = Unsigned (1 + Max m n)
+  type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
   plus  = plus#
   minus = minus#
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
   times = times#
 
-plus#, minus# :: KnownNat (1 + Max m n) => Unsigned m -> Unsigned n
-              -> Unsigned (1 + Max m n)
+plus#, minus# :: KnownNat (2^(Max m n + 1)) => Unsigned m -> Unsigned n
+              -> Unsigned (Max m n + 1)
 {-# NOINLINE plus# #-}
 plus# (U a) (U b) = fromInteger_INLINE (a + b)
 
@@ -282,13 +286,13 @@ plus# (U a) (U b) = fromInteger_INLINE (a + b)
 minus# (U a) (U b) = fromInteger_INLINE (a - b)
 
 {-# NOINLINE times# #-}
-times# :: KnownNat (m + n) => Unsigned m -> Unsigned n -> Unsigned (m + n)
+times# :: KnownNat (2^(m + n)) => Unsigned m -> Unsigned n -> Unsigned (m + n)
 times# (U a) (U b) = fromInteger_INLINE (a * b)
 
-instance KnownNat n => Real (Unsigned n) where
+instance KnownNat (2^n) => Real (Unsigned n) where
   toRational = toRational . toInteger#
 
-instance KnownNat n => Integral (Unsigned n) where
+instance KnownNat (2^n) => Integral (Unsigned n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
@@ -307,7 +311,7 @@ rem# (U i) (U j) = U (i `rem` j)
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = i
 
-instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => Bits (Unsigned n) where
+instance (KnownNat n, KnownNat (2^n), KnownNat (n + 1), KnownNat (n + 2)) => Bits (Unsigned n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -340,10 +344,10 @@ xor# :: Unsigned n -> Unsigned n -> Unsigned n
 xor# (U v1) (U v2) = U (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat n => Unsigned n -> Unsigned n
+complement# :: KnownNat (2^n) => Unsigned n -> Unsigned n
 complement# (U i) = fromInteger_INLINE (complement i)
 
-shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int
+shiftL#, shiftR#, rotateL#, rotateR# :: (KnownNat n, KnownNat (2^n)) => Unsigned n -> Int
                                      -> Unsigned n
 {-# NOINLINE shiftL# #-}
 shiftL# (U v) i
@@ -379,19 +383,23 @@ rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal bv)
 
-instance (KnownNat n, KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Unsigned n) where
+instance (KnownNat n, KnownNat (2^n), KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Unsigned n) where
   finiteBitSize        = size#
   countLeadingZeros  u = countLeadingZeros  (pack# u)
   countTrailingZeros u = countTrailingZeros (pack# u)
 
 instance Resize Unsigned where
+  type ResizeC Unsigned = ConstSym1 ((:.$) @@ KnownNatSym @@ ((:^$$) 2))
   resize     = resize#
+  type ExtendC Unsigned = DotSym @@ ((:.$) @@ KnownNatSym @@ ((:^$$) 2)) @@ (FlipSym1 (:+$))
+  extend     = resize#
   zeroExtend = resize#
   signExtend = resize#
+  type TruncateC Unsigned = FlipSym1 (ConstSym1 ((:.$) @@ KnownNatSym @@ ((:^$$) 2)))
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
-resize# :: KnownNat m => Unsigned n -> Unsigned m
+resize# :: KnownNat (2^m) => Unsigned n -> Unsigned m
 resize# (U i) = fromInteger_INLINE i
 
 instance Default (Unsigned n) where
@@ -403,7 +411,7 @@ instance KnownNat n => Lift (Unsigned n) where
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
-instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
+instance (((n+1)-1)~n, KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1)), KnownNat (2^(n + n))) =>
   SaturatingNum (Unsigned n) where
   satPlus SatWrap a b = a +# b
   satPlus w a b = case msb r of
@@ -431,11 +439,11 @@ instance (KnownNat n, KnownNat (1 + n), KnownNat (n + n)) =>
       r       = times# a b
       (rL,rR) = split r
 
-instance KnownNat n => Arbitrary (Unsigned n) where
+instance (KnownNat n, KnownNat (2^n)) => Arbitrary (Unsigned n) where
   arbitrary = arbitraryBoundedIntegral
   shrink    = BV.shrinkSizedUnsigned
 
-instance KnownNat n => CoArbitrary (Unsigned n) where
+instance KnownNat (2^n) => CoArbitrary (Unsigned n) where
   coarbitrary = coarbitraryIntegral
 
 type instance Index   (Unsigned n) = Int
