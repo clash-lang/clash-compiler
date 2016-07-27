@@ -7,9 +7,8 @@
 module BenchSigned where
 
 import CLaSH.Sized.Internal.Signed
-import GHC.TypeLits                   (type (*))
-import Criterion                      (Benchmark, env, bench, nf)
-import Language.Haskell.TH.Syntax     (lift)
+import Criterion                   (Benchmark, env, bench, nf)
+import Language.Haskell.TH.Syntax  (lift)
 
 smallValueI_pos :: Integer
 smallValueI_pos = $(lift (2^(16::Int)-10 :: Integer))
@@ -17,6 +16,6 @@ smallValueI_pos = $(lift (2^(16::Int)-10 :: Integer))
 
 fromIntegerBench :: Benchmark
 fromIntegerBench = env setup $ \m ->
-  bench "msb# WORD_SIZE_IN_BITS" $ nf (fromInteger# :: Integer -> Signed WORD_SIZE_IN_BITS) m
+  bench "fromInteger# WORD_SIZE_IN_BITS" $ nf (fromInteger# :: Integer -> Signed WORD_SIZE_IN_BITS) m
   where
     setup = return smallValueI_pos
