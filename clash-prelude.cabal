@@ -67,6 +67,12 @@ flag doctests
   default: True
   manual: True
 
+flag benchmarks
+  description:
+    You can disable testing with benchmarks using `-f-benchmarks`.
+  default: True
+  manual: True
+
 flag doclinks
   description:
     Create hyperlinks to non-dependent packages using `-fdoclinks`.
@@ -189,3 +195,20 @@ test-suite doctests
     build-depends:
       base    >= 4     && < 5,
       doctest >= 0.9.1 && < 0.12
+
+benchmark benchmark-clash-prelude
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          benchmark-main.hs
+  ghc-options:      -O2 -Wall
+  hs-source-dirs:   benchmarks
+
+  if !flag(benchmarks)
+    buildable: False
+  else
+    build-depends:
+      base              >= 4       && < 5,
+      clash-prelude,
+      criterion         >= 1.1.1.0 && < 1.2,
+      deepseq           >= 1.4.0.1 && < 1.5,
+      template-haskell  >= 2.9.0.0 && < 2.12
