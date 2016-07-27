@@ -438,7 +438,7 @@ resize# s@(S i) | n' <= m'  = extended
     mask      = natVal (Proxy :: Proxy (2^(m-1)))
     i'        = i `mod` mask
     truncated = if testBit i (n-1)
-                   then S (i' .|. mask)
+                   then S (i' - mask)
                    else S i'
 
 {-# NOINLINE truncateB# #-}
