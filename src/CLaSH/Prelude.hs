@@ -115,6 +115,8 @@ module CLaSH.Prelude
   , module Control.Applicative
   , module Data.Bits
   , module Data.Default
+    -- ** Exceptions
+  , module CLaSH.XException
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -161,6 +163,7 @@ import CLaSH.Sized.Vector
 import CLaSH.Signal
 import CLaSH.Signal.Delayed
 import CLaSH.Signal.Explicit       (systemClock)
+import CLaSH.XException
 
 {- $setup
 >>> :set -XDataKinds

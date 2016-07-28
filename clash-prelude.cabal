@@ -135,6 +135,8 @@ Library
                       CLaSH.Sized.Internal.Signed
                       CLaSH.Sized.Internal.Unsigned
 
+                      CLaSH.XException
+
                       CLaSH.Tutorial
                       CLaSH.Examples
 
