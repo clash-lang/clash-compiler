@@ -67,16 +67,16 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ? ~SYM[0] 
 wire ~SIGD[~GENSYM[rem_res][0]][0];
 wire ~SIGD[~GENSYM[dividend][1]][0];
 wire ~SIGD[~GENSYM[divider][2]][1];
-
-// remainder
-assign ~SYM[0] = ~ARG[0] % ~ARG[1];
-
-// modulo
 assign ~SYM[1] = ~ARG[0];
 assign ~SYM[2] = ~ARG[1];
+
+// remainder
+assign ~SYM[0] = ~SYM[1] % ~SYM[2];
+
+// modulo
 assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
                  ~SYM[0] :
-                 ((~ARG[1] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0) : ~SYM[0] + ~ARG[1]);
+                 (~SYM[2] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~SYM[2]);
 // modInteger end"
     }
   }
