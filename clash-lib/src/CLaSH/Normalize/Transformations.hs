@@ -1109,7 +1109,7 @@ disjointExpressionConsolidation :: NormRewrite
 disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts@(_:_:_)) = do
     let eFreeIds = Lens.setOf termFreeIds e
     (_,collected) <- collectGlobals eFreeIds [] [] e
-    let disJoint = filter (isDisjoint . snd) collected
+    let disJoint = filter (isDisjoint . snd. snd) collected
     if null disJoint
        then return e
        else do
@@ -1118,7 +1118,7 @@ disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts@(_:_:_)) = do
          (lids,lvs) <- unzip <$> Monad.zipWithM (mkFunOut tcm) disJoint exprs
          let substitution = zip (map fst disJoint) lvs
              subsMatrix   = l2m substitution
-         (exprs',_) <- unzip <$> Monad.zipWithM (\s e' -> collectGlobals eFreeIds s [] e')
+         (exprs',_) <- unzip <$> Monad.zipWithM (\s (e',seen) -> collectGlobals eFreeIds s seen e')
                                                 subsMatrix
                                                 exprs
          (e',_) <- collectGlobals eFreeIds substitution [] e
@@ -1126,7 +1126,7 @@ disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts@(_:_:_)) = do
          lb' <- bottomupR deadCode ctx lb
          changed lb'
   where
-    mkFunOut tcm (fun,_) e' = do
+    mkFunOut tcm (fun,_) (e',_) = do
       ty <- termType tcm e'
       let nm  = case collectArgs fun of
                    (Var _ nm',_)  -> name2String nm'

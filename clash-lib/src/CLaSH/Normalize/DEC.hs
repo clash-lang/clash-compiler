@@ -121,7 +121,7 @@ collectGlobals ::
   -> [Term] -- ^ List of already seen global binders
   -> Term -- ^ The expression
   -> RewriteMonad NormalizeState
-                  (Term,[(Term,CaseTree [(Either Term Type)])])
+                  (Term,[(Term,([Term],CaseTree [(Either Term Type)]))])
 collectGlobals inScope substitution seen (Case scrut ty alts) = do
   rec (alts' ,collected)  <- collectGlobalsAlts inScope substitution seen scrut'
                                                 alts
@@ -143,7 +143,11 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
           (args',collected) <- collectGlobalsArgs inScope substitution
                                                   (fun':seen) args
           let e' = Maybe.fromMaybe (mkApps fun' args') (List.lookup fun' substitution)
-          return (e',(fun',Leaf args'):collected)
+          -- This function is lifted out an environment with the currently 'seen'
+          -- binders. When we later apply substitution, we need to start with this
+          -- environment, otherwise we perform incorrect substitutions in the
+          -- arguments.
+          return (e',(fun',(seen,Leaf args')):collected)
         _ -> do (args',collected) <- collectGlobalsArgs inScope substitution
                                                         seen args
                 return (mkApps fun args',collected)
@@ -160,7 +164,7 @@ collectGlobals inScope substitution seen (Letrec b) = do
                                            (map fst collected ++ seen)
                                            lbs
   return (Letrec (bind (Unbound.rec lbs') body')
-         ,map (second (LB lbs')) (collected ++ collected')
+         ,map (second (second (LB lbs'))) (collected ++ collected')
          )
 
 collectGlobals _ _ _ e = return (e,[])
@@ -176,7 +180,7 @@ collectGlobalsArgs ::
   -> [Either Term Type] -- ^ The list of arguments
   -> RewriteMonad NormalizeState
                   ([Either Term Type]
-                  ,[(Term,CaseTree [(Either Term Type)])]
+                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
 collectGlobalsArgs inScope substitution seen args = do
     (_,(args',collected)) <- second unzip <$> mapAccumLM go seen args
@@ -199,18 +203,18 @@ collectGlobalsAlts ::
   -> [Bind Pat Term] -- ^ The list of alternatives
   -> RewriteMonad NormalizeState
                   ([Bind Pat Term]
-                  ,[(Term,CaseTree [(Either Term Type)])]
+                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
 collectGlobalsAlts inScope substitution seen scrut alts = do
     (alts',collected) <- unzip <$> mapM go alts
-    let collectedM  = map (Map.fromList . map (second (:[]))) collected
-        collectedUN = Map.unionsWith (++) collectedM
-        collected'  = map (second (Branch scrut)) (Map.toList collectedUN)
+    let collectedM  = map (Map.fromList . map (second (second (:[])))) collected
+        collectedUN = Map.unionsWith (\(l1,r1) (l2,r2) -> (List.nub (l1 ++ l2),r1 ++ r2)) collectedM
+        collected'  = map (second (second (Branch scrut))) (Map.toList collectedUN)
     return (alts',collected')
   where
     go pe = do (p,e) <- unbind pe
                (e',collected) <- collectGlobals inScope substitution seen e
-               return (bind p e',map (second (p,)) collected)
+               return (bind p e',map (second (second (p,))) collected)
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications of globals out
 -- of a list of let-bindings. Also substitute truly disjoint applications of
@@ -223,7 +227,7 @@ collectGlobalsLbs ::
   -> [LetBinding] -- ^ The list let-bindings
   -> RewriteMonad NormalizeState
                   ([LetBinding]
-                  ,[(Term,CaseTree [(Either Term Type)])]
+                  ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                   )
 collectGlobalsLbs inScope substitution seen lbs = do
     (_,(lbs',collected)) <- second unzip <$> mapAccumLM go seen lbs
@@ -233,7 +237,7 @@ collectGlobalsLbs inScope substitution seen lbs = do
        -> RewriteMonad NormalizeState
                   ([Term]
                   ,(LetBinding
-                   ,[(Term,CaseTree [(Either Term Type)])]
+                   ,[(Term,([Term],CaseTree [(Either Term Type)]))]
                    )
                   )
     go s (id_,unembed -> e) = do
@@ -247,10 +251,10 @@ collectGlobalsLbs inScope substitution seen lbs = do
 -- the case tree, and projections of let-binding corresponding to the uncommon
 -- argument positions.
 mkDisjointGroup :: Set TmName -- ^ Current free variables.
-                -> (Term,CaseTree [(Either Term Type)])
+                -> (Term,([Term],CaseTree [(Either Term Type)]))
                    -- ^ Case-tree of arguments belonging to the applied term.
-                -> RewriteMonad NormalizeState Term
-mkDisjointGroup fvs (fun,cs) = do
+                -> RewriteMonad NormalizeState (Term,[Term])
+mkDisjointGroup fvs (fun,(seen,cs)) = do
     let argss    = Foldable.toList cs
         argssT   = zip [0..] (List.transpose argss)
         (commonT,uncommonT) = List.partition (isCommon fvs . snd) argssT
@@ -272,8 +276,8 @@ mkDisjointGroup fvs (fun,cs) = do
         disJointSelProj argTys cs''
     let newArgs = mkDJArgs 0 common uncommonProjections
     case uncommonCaseM of
-      Just lb -> return (Letrec (bind (Unbound.rec [lb]) (mkApps fun newArgs)))
-      Nothing -> return (mkApps fun newArgs)
+      Just lb -> return (Letrec (bind (Unbound.rec [lb]) (mkApps fun newArgs)), seen)
+      Nothing -> return (mkApps fun newArgs, seen)
 
 -- | Create a single selector for all the representable uncommon arguments by
 -- selecting between tuples. This selector is only ('Just') created when the
