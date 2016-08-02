@@ -134,8 +134,11 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
     tcm <- Lens.view tcCache
     eval <- Lens.view evaluator
     eTy <- termType tcm e
-    case splitFunForallTy eTy of
-      ([],_) -> case interestingToLift inScope (eval tcm False) fun args of
+    untran <- isUntranslatableType eTy
+    case untran of
+      -- Don't lift out non-representable values, because they cannot be let-bound
+      -- in our desired normal form.
+      False -> case interestingToLift inScope (eval tcm False) fun args of
         Just fun' | fun' `notElem` seen -> do
           (args',collected) <- collectGlobalsArgs inScope substitution
                                                   (fun':seen) args
