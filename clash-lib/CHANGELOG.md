@@ -1,5 +1,10 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.20
+* Fixes bugs:
+  * Bug in DEC transformation overwrites case-alternatives
+  * Bug in DEC transformation creates non-representable let-binders
+
 ## 0.6.19 *July 19th 2016*
 * Fixes bugs:
   * Rounding error in `logBase` calculation
