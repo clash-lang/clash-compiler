@@ -136,13 +136,13 @@ end block;
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.ltInteger#"
     , "type"      : "ltInteger# :: Integer -> Integer -> Int#"
-    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(1,~SIZE[~TYPO]);"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] < ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.geInteger#"
     , "type"      : "geInteger# :: Integer -> Integer -> Int#"
-    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(1,~SIZE[~TYPO]);"
+    , "templateD" : "~RESULT <= to_signed(1,~SIZE[~TYPO]) when ~ARG[0] >= ~ARG[1] else to_signed(0,~SIZE[~TYPO]);"
     }
   }
 , { "BlackBox" :

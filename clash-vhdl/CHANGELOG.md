@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.6.16
+* Fixes bugs:
+  * Incorrect primitive for `Integer`s `ltInteger#` and `geInteger#`
+
 ## 0.6.15 *July 19th 2016*
 * Fixes bugs:
   * Incorrect primitive for `Index`s `*#`
