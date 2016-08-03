@@ -152,7 +152,7 @@ type Bit = BitVector 1
 
 -- * Instances
 instance KnownNat n => Show (BitVector n) where
-  show bv = reverse . underScore . reverse $ showBV (natVal bv) (toInteger# bv) []
+  show bv@(BV i) = reverse . underScore . reverse $ showBV (natVal bv) i []
     where
       showBV 0 _ s = s
       showBV n v s = let (a,b) = divMod v 2
@@ -163,6 +163,7 @@ instance KnownNat n => Show (BitVector n) where
       underScore xs = case splitAt 5 xs of
                         ([a,b,c,d,e],rest) -> [a,b,c,d,'_'] ++ underScore (e:rest)
                         (rest,_)               -> rest
+  {-# NOINLINE show #-}
 
 -- | Create a binary literal
 --
