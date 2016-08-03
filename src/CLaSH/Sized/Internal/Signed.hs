@@ -82,7 +82,7 @@ module CLaSH.Sized.Internal.Signed
   )
 where
 
-import Control.DeepSeq                (NFData)
+import Control.DeepSeq                (NFData (..))
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
@@ -148,11 +148,17 @@ newtype Signed (n :: Nat) =
     -- | The constructor, 'S', and the field, 'unsafeToInteger', are not
     -- synthesisable.
     S { unsafeToInteger :: Integer}
-  deriving (Data, NFData)
+  deriving (Data)
 
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Signed n -> Int
 size# bv = fromInteger (natVal bv)
+
+instance NFData (Signed n) where
+  rnf (S i) = rnf i `seq` ()
+  {-# NOINLINE rnf #-}
+  -- NOINLINE is needed so that CLaSH doesn't trip on the "Signed ~# Integer"
+  -- coercion
 
 instance Show (Signed n) where
   show (S i) = show i

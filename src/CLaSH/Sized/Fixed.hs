@@ -67,6 +67,7 @@ module CLaSH.Sized.Fixed
   )
 where
 
+import Control.DeepSeq            (NFData)
 import Control.Arrow              ((***), second)
 import Data.Bits                  (Bits (..), FiniteBits)
 import Data.Data                  (Data)
@@ -116,6 +117,7 @@ import CLaSH.Sized.Unsigned       (Unsigned)
 newtype Fixed (rep :: Nat -> *) (int :: Nat) (frac :: Nat) =
   Fixed { unFixed :: rep (int + frac) }
 
+deriving instance NFData (rep (int + frac)) => NFData (Fixed rep int frac)
 deriving instance (Typeable rep, Typeable int, Typeable frac
                   , Data (rep (int + frac))) => Data (Fixed rep int frac)
 deriving instance Eq (rep (int + frac))      => Eq (Fixed rep int frac)

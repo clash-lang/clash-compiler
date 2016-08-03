@@ -59,6 +59,7 @@ module CLaSH.Sized.Internal.Index
   )
 where
 
+import Control.DeepSeq            (NFData (..))
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Promotion.Prelude     (ConstSym1, FlipSym1, type (:+$))
@@ -108,6 +109,12 @@ newtype Index (n :: Nat) =
     -- synthesisable.
     I { unsafeToInteger :: Integer }
   deriving Data
+
+instance NFData (Index n) where
+  rnf (I i) = rnf i `seq` ()
+  {-# NOINLINE rnf #-}
+  -- NOINLINE is needed so that CLaSH doesn't trip on the "Index ~# Integer"
+  -- coercion
 
 instance KnownNat n => BitPack (Index n) where
   type BitSize (Index n) = CLog 2 n

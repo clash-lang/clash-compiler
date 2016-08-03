@@ -73,6 +73,7 @@ module CLaSH.Sized.Internal.Unsigned
   )
 where
 
+import Control.DeepSeq                (NFData (..))
 import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
@@ -140,6 +141,12 @@ newtype Unsigned (n :: Nat) =
 {-# NOINLINE size# #-}
 size# :: KnownNat n => Unsigned n -> Int
 size# u = fromInteger (natVal u)
+
+instance NFData (Unsigned n) where
+  rnf (U i) = rnf i `seq` ()
+  {-# NOINLINE rnf #-}
+  -- NOINLINE is needed so that CLaSH doesn't trip on the "Unsigned ~# Integer"
+  -- coercion
 
 instance Show (Unsigned n) where
   show (U i) = show i
