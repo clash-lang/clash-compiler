@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.22 *August 3rd 2016*
+* Fixes bugs:
+  * Bug in DEC transformation overwrites case-alternatives
+  * Bug in DEC transformation creates non-representable let-binders
+  * VHDL: Incorrect primitive for `Integer`s `ltInteger#` and `geInteger#`
+  * (System)Verilog: Fix primitive for CLaSH.Sized.Internal.Signed.mod# and GHC.Type.Integer.modInteger [#164](https://github.com/clash-lang/clash-compiler/issues/164)
+
 ## 0.6.21 *July 19th 2016*
 * Fixes bugs:
   * Rounding error in `logBase` calculation

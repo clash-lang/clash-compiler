@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-## 0.6.20
+## 0.6.20 *August 3rd 2016*
 * Fixes bugs:
   * Bug in DEC transformation overwrites case-alternatives
   * Bug in DEC transformation creates non-representable let-binders
