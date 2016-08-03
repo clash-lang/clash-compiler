@@ -573,6 +573,7 @@ resize# (BV n) = fromInteger_INLINE n
 
 instance KnownNat n => Lift (BitVector n) where
   lift bv@(BV i) = sigE [| fromInteger# i |] (decBitVector (natVal bv))
+  {-# NOINLINE lift #-}
 
 decBitVector :: Integer -> TypeQ
 decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)

@@ -446,6 +446,7 @@ instance KnownNat (2^(n-1)) => Default (Signed n) where
 
 instance KnownNat n => Lift (Signed n) where
   lift s@(S i) = sigE [| fromInteger# i |] (decSigned (natVal s))
+  {-# NOINLINE lift #-}
 
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)

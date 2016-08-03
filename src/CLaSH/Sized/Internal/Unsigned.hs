@@ -401,6 +401,7 @@ instance Default (Unsigned n) where
 
 instance KnownNat n => Lift (Unsigned n) where
   lift u@(U i) = sigE [| fromInteger# i |] (decUnsigned (natVal u))
+  {-# NOINLINE lift #-}
 
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)

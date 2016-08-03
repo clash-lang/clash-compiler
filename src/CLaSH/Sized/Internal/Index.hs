@@ -275,6 +275,7 @@ resize# (I i) = fromInteger_INLINE i
 
 instance KnownNat n => Lift (Index n) where
   lift u@(I i) = sigE [| fromInteger# i |] (decIndex (natVal u))
+  {-# NOINLINE lift #-}
 
 decIndex :: Integer -> TypeQ
 decIndex n = appT (conT ''Index) (litT $ numTyLit n)
