@@ -69,7 +69,8 @@ main =
             [ runTest ("tests" </> "shouldwork" </> "Feedback") Both [] "Fib" (Just ("testbench",True))
             ]
         , testGroup "Fixed"
-            [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "Mixer" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
             ]
         , testGroup "HOPrim"
