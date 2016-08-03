@@ -32,7 +32,7 @@ import CLaSH.Sized.Fixed     (Fixed)
 import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Signed    (Signed)
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.Sized.Vector    (Vec, traverse#)
+import CLaSH.Sized.Vector    (Vec, traverse#, lazyV)
 import CLaSH.Sized.RTree     (RTree)
 
 -- | Isomorphism between a 'CLaSH.Signal.Signal' of a product type (e.g. a tuple) and a
@@ -203,7 +203,7 @@ instance KnownNat n => Bundle (Vec n a) where
   -- The 'Traversable' instance of 'Vec' is not synthesisable, so we must
   -- define 'bundle' as a primitive.
   bundle   = vecBundle#
-  unbundle = sequenceA
+  unbundle = sequenceA . fmap lazyV
 
 {-# NOINLINE vecBundle# #-}
 vecBundle# :: Vec n (Signal' t a) -> Signal' t (Vec n a)
