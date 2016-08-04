@@ -33,7 +33,7 @@ import CLaSH.Sized.Index     (Index)
 import CLaSH.Sized.Signed    (Signed)
 import CLaSH.Sized.Unsigned  (Unsigned)
 import CLaSH.Sized.Vector    (Vec, traverse#, lazyV)
-import CLaSH.Sized.RTree     (RTree)
+import CLaSH.Sized.RTree     (RTree, lazyT)
 
 -- | Isomorphism between a 'CLaSH.Signal.Signal' of a product type (e.g. a tuple) and a
 -- product type of 'CLaSH.Signal.Signal''s.
@@ -212,4 +212,4 @@ vecBundle# = traverse# id
 instance KnownNat d => Bundle (RTree d a) where
   type Unbundled' t (RTree d a) = RTree d (Signal' t a)
   bundle   = sequenceA
-  unbundle = sequenceA
+  unbundle = sequenceA . fmap lazyT

@@ -49,6 +49,8 @@ module CLaSH.Sized.RTree
     -- * Conversions
   , v2t
   , t2v
+    -- * Misc
+  , lazyT
   )
 where
 
@@ -453,3 +455,12 @@ tunzip = tdfold (Proxy :: Proxy (UnzipTree a b)) lr br
     lr   (a,b) = (LR a,LR b)
 
     br _ (l1,r1) (l2,r2) = (BR l1 l2, BR r1 r2)
+
+-- | Given a function 'f' that is strict in its /n/th 'RTree' argument, make it
+-- lazy by applying 'lazyT' to this argument:
+--
+-- > f x0 x1 .. (lazyT xn) .. xn_plus_k
+lazyT :: KnownNat d
+      => RTree d a
+      -> RTree d a
+lazyT = tzipWith (flip const) (trepeat undefined)
