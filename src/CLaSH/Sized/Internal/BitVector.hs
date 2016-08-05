@@ -287,7 +287,8 @@ instance (KnownNat (2^n)) => Num (BitVector n) where
 
 {-# NOINLINE negate# #-}
 negate# :: forall n . KnownNat (2^n) => BitVector n -> BitVector n
-negate# (BV i) = sz `seq` BV (sz - i)
+negate# (BV 0) = BV 0
+negate# (BV i) = BV (sz - i)
   where
     sz = natVal (Proxy :: Proxy (2^n))
 
