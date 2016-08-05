@@ -10,7 +10,11 @@ main =
   defaultMain
   [
     bgroup "BitVector"
-        [ msbBench
+        [ addBench
+        , negateBench
+        , subBench
+        , multBench
+        , msbBench
         , msbBenchL
         , appendBench
         , appendBenchL

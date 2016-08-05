@@ -27,6 +27,30 @@ largeValue2 :: BitVector (3*WORD_SIZE_IN_BITS)
 largeValue2 =  2^(2*WORD_SIZE_IN_BITS :: Int)-100 :: BitVector (3*WORD_SIZE_IN_BITS)
 {-# INLINE largeValue2 #-}
 
+addBench :: Benchmark
+addBench = env setup $ \m ->
+  bench "+# WORD_SIZE_IN_BITS" $ nf (uncurry (+#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+negateBench :: Benchmark
+negateBench = env setup $ \m ->
+  bench "negate# WORD_SIZE_IN_BITS" $ nf negate# m
+  where
+    setup = return smallValue1
+
+subBench :: Benchmark
+subBench = env setup $ \m ->
+  bench "-# WORD_SIZE_IN_BITS" $ nf (uncurry (-#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+multBench :: Benchmark
+multBench = env setup $ \m ->
+  bench "*# WORD_SIZE_IN_BITS" $ nf (uncurry (*#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
 msbBench :: Benchmark
 msbBench = env setup $ \m ->
   bench "msb# WORD_SIZE_IN_BITS" $ nf msb# m
