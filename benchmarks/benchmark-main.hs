@@ -3,6 +3,7 @@ module Main where
 import Criterion.Main
 
 import qualified BenchBitVector as BV
+import qualified BenchFixed     as F
 import qualified BenchSigned    as S
 
 main :: IO ()
@@ -39,5 +40,11 @@ main =
         , S.timesBench
         , S.packBench
         , S.unpackBench
+        ]
+  , bgroup "Fixed"
+        [ F.fromRationalBench
+        , F.addBench
+        , F.subBench
+        , F.multBench
         ]
   ]

@@ -216,4 +216,5 @@ benchmark benchmark-clash-prelude
       template-haskell  >= 2.9.0.0 && < 2.12
 
   Other-Modules:    BenchBitVector
+                    BenchFixed
                     BenchSigned

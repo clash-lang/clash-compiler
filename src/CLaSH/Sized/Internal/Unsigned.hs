@@ -356,8 +356,8 @@ xor# (U v1) (U v2) = U (v1 `xor` v2)
 complement# :: KnownNat (2^n) => Unsigned n -> Unsigned n
 complement# (U i) = fromInteger_INLINE (complement i)
 
-shiftL#, shiftR#, rotateL#, rotateR# :: (KnownNat n, KnownNat (2^n)) => Unsigned n -> Int
-                                     -> Unsigned n
+shiftL#, rotateL#, rotateR# :: (KnownNat n, KnownNat (2^n))
+                            => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftL# #-}
 shiftL# (U v) i
   | i < 0     = error
@@ -365,10 +365,11 @@ shiftL# (U v) i
   | otherwise = fromInteger_INLINE (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
+shiftR# :: Unsigned n -> Int -> Unsigned n
 shiftR# (U v) i
   | i < 0     = error
               $ "'shiftR undefined for negative number: " ++ show i
-  | otherwise = fromInteger_INLINE (shiftR v i)
+  | otherwise = U (shiftR v i)
 
 {-# NOINLINE rotateL# #-}
 rotateL# _ b | b < 0 = error "'shiftL undefined for negative numbers"
