@@ -34,5 +34,7 @@ main =
         , S.plusBench
         , S.minusBench
         , S.timesBench
+        , S.packBench
+        , S.unpackBench
         ]
   ]

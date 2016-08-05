@@ -175,13 +175,13 @@ instance (KnownNat (2^n), KnownNat (2^(n-1))) => BitPack (Signed n) where
 
 {-# NOINLINE pack# #-}
 pack# :: forall n . KnownNat (2^n) => Signed n -> BitVector n
-pack# (S i) = BV (i `mod` maxI)
-  where
-    maxI = natVal (Proxy :: Proxy (2^n))
+pack# (S i) = let m = natVal (Proxy :: Proxy (2^n))
+              in  if i < 0 then BV (m + i) else BV i
 
 {-# NOINLINE unpack# #-}
-unpack# :: KnownNat (2^(n-1)) => BitVector n -> Signed n
-unpack# (BV i) = fromInteger_INLINE i
+unpack# :: forall n . KnownNat (2^(n-1)) => BitVector n -> Signed n
+unpack# (BV i) = let m = natVal (Proxy :: Proxy (2^(n-1)))
+                 in  if i >= m then S (i-2*m) else S i
 
 instance Eq (Signed n) where
   (==) = eq#

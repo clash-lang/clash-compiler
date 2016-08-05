@@ -6,6 +6,7 @@
 
 module BenchSigned where
 
+import CLaSH.Sized.BitVector
 import CLaSH.Sized.Internal.Signed
 import Criterion                   (Benchmark, env, bench, nf)
 import Language.Haskell.TH.Syntax  (lift)
@@ -21,6 +22,10 @@ smallValue_pos1 = $(lift (2^(16::Int)-100 :: Signed WORD_SIZE_IN_BITS))
 smallValue_pos2 :: Signed WORD_SIZE_IN_BITS
 smallValue_pos2 = $(lift (2^(16::Int)-100 :: Signed WORD_SIZE_IN_BITS))
 {-# INLINE smallValue_pos2 #-}
+
+smallValueBV :: BitVector WORD_SIZE_IN_BITS
+smallValueBV = $(lift (2^(16::Int)-10 :: BitVector WORD_SIZE_IN_BITS))
+{-# INLINE smallValueBV #-}
 
 addBench :: Benchmark
 addBench = env setup $ \m ->
@@ -75,3 +80,15 @@ fromIntegerBench = env setup $ \m ->
   bench "fromInteger# WORD_SIZE_IN_BITS" $ nf (fromInteger# :: Integer -> Signed WORD_SIZE_IN_BITS) m
   where
     setup = return smallValueI_pos
+
+packBench :: Benchmark
+packBench = env setup $ \m ->
+  bench "pack# WORD_SIZE_IN_BITS" $ nf pack# m
+  where
+    setup = return smallValue_pos1
+
+unpackBench :: Benchmark
+unpackBench = env setup $ \m ->
+  bench "unpack# WORD_SIZE_IN_BITS" $ nf unpack# m
+  where
+    setup = return smallValueBV
