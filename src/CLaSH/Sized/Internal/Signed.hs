@@ -258,22 +258,32 @@ instance KnownNat (2^(n-1)) => Num (Signed n) where
                    if s > 0 then 1 else 0
   fromInteger = fromInteger#
 
-(+#), (-#), (*#) :: KnownNat (2^(n-1)) => Signed n -> Signed n -> Signed n
+(+#), (-#), (*#) :: forall n . KnownNat (2^(n-1)) => Signed n -> Signed n -> Signed n
 {-# NOINLINE (+#) #-}
-(S a) +# (S b) = fromInteger_INLINE (a + b)
+(S a) +# (S b) = let m  = natVal (Proxy :: Proxy (2^(n-1)))
+                     z  = a + b
+                 in  if z >= m then S (z - 2*m) else
+                        if z < negate m then S (z + 2*m) else S z
 
 {-# NOINLINE (-#) #-}
-(S a) -# (S b) = fromInteger_INLINE (a - b)
+(S a) -# (S b) = let m  = natVal (Proxy :: Proxy (2^(n-1)))
+                     z  = a - b
+                 in  if z < negate m then S (z + 2*m) else
+                        if z >= m then S (z - 2*m) else S z
 
 {-# NOINLINE (*#) #-}
 (S a) *# (S b) = fromInteger_INLINE (a * b)
 
-negate#,abs# :: KnownNat (2^(n-1)) => Signed n -> Signed n
+negate#,abs# :: forall n . KnownNat (2^(n-1)) => Signed n -> Signed n
 {-# NOINLINE negate# #-}
-negate# (S n) = fromInteger_INLINE (negate n)
+negate# (S n) = let m = natVal (Proxy :: Proxy (2^(n-1)))
+                    z = negate n
+                in  if z == m then S n else S z
 
 {-# NOINLINE abs# #-}
-abs# (S n) = fromInteger_INLINE (abs n)
+abs# (S n) = let m = natVal (Proxy :: Proxy (2^(n-1)))
+                 z = abs n
+             in  if z == m then S n else S z
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat (2^(n-1)) => Integer -> Signed (n :: Nat)
@@ -288,25 +298,23 @@ fromInteger_INLINE i = mask `seq` S res
              (s,i') | even s    -> i'
                     | otherwise -> i' - mask
 
-instance (KnownNat (2^(Max m n)), KnownNat (2^((m + n)-1))) =>
-  ExtendingNum (Signed m) (Signed n) where
+instance ExtendingNum (Signed m) (Signed n) where
   type AResult (Signed m) (Signed n) = Signed (Max m n + 1)
   plus  = plus#
   minus = minus#
   type MResult (Signed m) (Signed n) = Signed (m + n)
   times = times#
 
-plus#, minus# :: ((((Max m n)+1)-1)~Max m n, KnownNat (2^(Max m n))) => Signed m -> Signed n
-              -> Signed (Max m n + 1)
+plus#, minus# :: Signed m -> Signed n -> Signed (Max m n + 1)
 {-# NOINLINE plus# #-}
-plus# (S a) (S b) = fromInteger_INLINE (a + b)
+plus# (S a) (S b) = S (a + b)
 
 {-# NOINLINE minus# #-}
-minus# (S a) (S b) = fromInteger_INLINE (a - b)
+minus# (S a) (S b) = S (a - b)
 
 {-# NOINLINE times# #-}
-times# :: KnownNat (2^((m + n)-1)) => Signed m -> Signed n -> Signed (m + n)
-times# (S a) (S b) = fromInteger_INLINE (a * b)
+times# :: Signed m -> Signed n -> Signed (m + n)
+times# (S a) (S b) = S (a * b)
 
 instance KnownNat (2^(n-1)) => Real (Signed n) where
   toRational = toRational . toInteger#
