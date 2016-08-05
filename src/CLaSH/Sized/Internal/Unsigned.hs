@@ -256,6 +256,7 @@ instance KnownNat (2^n) => Num (Unsigned n) where
 
 {-# NOINLINE negate# #-}
 negate# :: forall n . KnownNat (2^n) => Unsigned n -> Unsigned n
+negate# (U 0) = U 0
 negate# (U i) = sz `seq` U (sz - i)
   where
     sz = natVal (Proxy :: Proxy (2^n))
