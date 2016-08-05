@@ -306,7 +306,7 @@ fromInteger_INLINE i = sz `seq` BV (i `mod` sz)
   where
     sz = natVal (Proxy :: Proxy (2^n))
 
-instance (KnownNat (2^(Max m n + 1)), KnownNat (2^(m + n))) =>
+instance KnownNat (2^(Max m n + 1)) =>
   ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
   plus  = plus#
@@ -314,17 +314,20 @@ instance (KnownNat (2^(Max m n + 1)), KnownNat (2^(m + n))) =>
   type MResult (BitVector m) (BitVector n) = BitVector (m + n)
   times = times#
 
-plus#, minus# :: KnownNat (2^(Max m n + 1)) => BitVector m -> BitVector n
-              -> BitVector (Max m n + 1)
 {-# NOINLINE plus# #-}
-plus# (BV a) (BV b) = fromInteger_INLINE (a + b)
+plus# :: BitVector m -> BitVector n -> BitVector (Max m n + 1)
+plus# (BV a) (BV b) = BV (a + b)
 
 {-# NOINLINE minus# #-}
-minus# (BV a) (BV b) = fromInteger_INLINE (a - b)
+minus# :: forall m n . KnownNat (2^(Max m n + 1)) => BitVector m -> BitVector n
+                                                  -> BitVector (Max m n + 1)
+minus# (BV a) (BV b) = let m = natVal (Proxy :: Proxy (2^(Max m n + 1)))
+                           z = a - b
+                       in  if z < 0 then BV (m + z) else BV z
 
 {-# NOINLINE times# #-}
-times# :: KnownNat (2^(m + n)) => BitVector m -> BitVector n -> BitVector (m + n)
-times# (BV a) (BV b) = fromInteger_INLINE (a * b)
+times# :: BitVector m -> BitVector n -> BitVector (m + n)
+times# (BV a) (BV b) = BV (a * b)
 
 instance (KnownNat (2^n)) => Real (BitVector n) where
   toRational = toRational . toInteger#
@@ -589,7 +592,7 @@ instance KnownNat n => Lift (BitVector n) where
 decBitVector :: Integer -> TypeQ
 decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
 
-instance (((n+1)-1)~n,KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1)), KnownNat (2^(n + n))) =>
+instance (((n+1)-1)~n,KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
   SaturatingNum (BitVector n) where
   satPlus SatWrap a b = a +# b
   satPlus w a b = case msb# r of

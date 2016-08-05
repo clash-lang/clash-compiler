@@ -51,6 +51,24 @@ multBench = env setup $ \m ->
   where
     setup = return (smallValue1,smallValue2)
 
+plusBench :: Benchmark
+plusBench = env setup $ \m ->
+  bench "plus# WORD_SIZE_IN_BITS" $ nf (uncurry (plus#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+minusBench :: Benchmark
+minusBench = env setup $ \m ->
+  bench "minus# WORD_SIZE_IN_BITS" $ nf (uncurry (minus#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+timesBench :: Benchmark
+timesBench = env setup $ \m ->
+  bench "times# WORD_SIZE_IN_BITS" $ nf (uncurry (times#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
 msbBench :: Benchmark
 msbBench = env setup $ \m ->
   bench "msb# WORD_SIZE_IN_BITS" $ nf msb# m

@@ -275,7 +275,7 @@ fromInteger_INLINE i = U (i `mod` sz)
   where
     sz = (natVal (Proxy :: Proxy (2^n)))
 
-instance (KnownNat (2^(Max m n + 1)), KnownNat (2^(m + n))) =>
+instance KnownNat (2^(Max m n + 1)) =>
   ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
   plus  = plus#
@@ -283,17 +283,20 @@ instance (KnownNat (2^(Max m n + 1)), KnownNat (2^(m + n))) =>
   type MResult (Unsigned m) (Unsigned n) = Unsigned (m + n)
   times = times#
 
-plus#, minus# :: KnownNat (2^(Max m n + 1)) => Unsigned m -> Unsigned n
-              -> Unsigned (Max m n + 1)
 {-# NOINLINE plus# #-}
-plus# (U a) (U b) = fromInteger_INLINE (a + b)
+plus# :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
+plus# (U a) (U b) = U (a + b)
 
 {-# NOINLINE minus# #-}
-minus# (U a) (U b) = fromInteger_INLINE (a - b)
+minus# :: forall m n . KnownNat (2^(Max m n + 1)) => Unsigned m -> Unsigned n
+                                                  -> Unsigned (Max m n + 1)
+minus# (U a) (U b) = let m = natVal (Proxy :: Proxy (2^(Max m n + 1)))
+                         z = a - b
+                     in  if z < 0 then U (m + z) else U z
 
 {-# NOINLINE times# #-}
-times# :: KnownNat (2^(m + n)) => Unsigned m -> Unsigned n -> Unsigned (m + n)
-times# (U a) (U b) = fromInteger_INLINE (a * b)
+times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
+times# (U a) (U b) = U (a * b)
 
 instance KnownNat (2^n) => Real (Unsigned n) where
   toRational = toRational . toInteger#
@@ -418,7 +421,7 @@ instance KnownNat n => Lift (Unsigned n) where
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
-instance (((n+1)-1)~n, KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1)), KnownNat (2^(n + n))) =>
+instance (((n+1)-1)~n, KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
   SaturatingNum (Unsigned n) where
   satPlus SatWrap a b = a +# b
   satPlus w a b = case msb r of

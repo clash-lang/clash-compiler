@@ -14,6 +14,9 @@ main =
         , negateBench
         , subBench
         , multBench
+        , plusBench
+        , minusBench
+        , timesBench
         , msbBench
         , msbBenchL
         , appendBench
