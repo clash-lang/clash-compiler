@@ -244,12 +244,16 @@ instance KnownNat (2^n) => Num (Unsigned n) where
   signum bv   = resize# (unpack# (reduceOr bv))
   fromInteger = fromInteger#
 
-(+#),(-#),(*#) :: KnownNat (2^n) => Unsigned n -> Unsigned n -> Unsigned n
+(+#),(-#),(*#) :: forall n . KnownNat (2^n) => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
-(+#) (U i) (U j) = fromInteger_INLINE (i + j)
+(+#) (U i) (U j) = let m = natVal (Proxy :: Proxy (2^n))
+                       z = i + j
+                   in  if z >= m then U (z - m) else U z
 
 {-# NOINLINE (-#) #-}
-(-#) (U i) (U j) = fromInteger_INLINE (i - j)
+(-#) (U i) (U j) = let m = natVal (Proxy :: Proxy (2^n))
+                       z = i - j
+                   in  if z < 0 then U (m + z) else U z
 
 {-# NOINLINE (*#) #-}
 (*#) (U i) (U j) = fromInteger_INLINE (i * j)
