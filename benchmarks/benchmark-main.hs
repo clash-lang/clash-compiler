@@ -17,6 +17,9 @@ main =
         , BV.plusBench
         , BV.minusBench
         , BV.timesBench
+        , BV.boundedPlusBench
+        , BV.boundedMinBench
+        , BV.boundedMultBench
         , BV.msbBench
         , BV.msbBenchL
         , BV.appendBench

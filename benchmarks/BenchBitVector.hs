@@ -7,6 +7,7 @@
 module BenchBitVector where
 
 import CLaSH.Sized.Internal.BitVector
+import CLaSH.Class.Num
 import GHC.TypeLits                   (type (*))
 import Criterion                      (Benchmark, env, bench, nf)
 import Language.Haskell.TH.Syntax     (lift)
@@ -66,6 +67,24 @@ minusBench = env setup $ \m ->
 timesBench :: Benchmark
 timesBench = env setup $ \m ->
   bench "times# WORD_SIZE_IN_BITS" $ nf (uncurry (times#)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+boundedPlusBench :: Benchmark
+boundedPlusBench = env setup $ \m ->
+  bench "boundedPlus WORD_SIZE_IN_BITS" $ nf (uncurry (boundedPlus)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+boundedMinBench :: Benchmark
+boundedMinBench = env setup $ \m ->
+  bench "boundedMin WORD_SIZE_IN_BITS" $ nf (uncurry (boundedMin)) m
+  where
+    setup = return (smallValue1,smallValue2)
+
+boundedMultBench :: Benchmark
+boundedMultBench = env setup $ \m ->
+  bench "boundedMult WORD_SIZE_IN_BITS" $ nf (uncurry (boundedMult)) m
   where
     setup = return (smallValue1,smallValue2)
 

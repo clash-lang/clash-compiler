@@ -582,8 +582,9 @@ instance Resize BitVector where
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
-resize# :: KnownNat (2^m) => BitVector n -> BitVector m
-resize# (BV n) = fromInteger_INLINE n
+resize# :: forall n m . KnownNat (2^m) => BitVector n -> BitVector m
+resize# (BV i) = let m = natVal (Proxy :: Proxy (2^m))
+                 in  if i >= m then fromInteger_INLINE i else BV i
 
 instance KnownNat n => Lift (BitVector n) where
   lift bv@(BV i) = sigE [| fromInteger# i |] (decBitVector (natVal bv))
@@ -595,13 +596,16 @@ decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
 instance (((n+1)-1)~n,KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
   SaturatingNum (BitVector n) where
   satPlus SatWrap a b = a +# b
-  satPlus w a b = case msb# r of
-                   0 -> resize# r
-                   _ -> case w of
-                          SatZero  -> minBound#
-                          _        -> maxBound#
-    where
-      r = plus# a b
+  satPlus SatZero a b =
+    let r = plus# a b
+    in  case msb# r of
+          0 -> resize# r
+          _ -> minBound#
+  satPlus _ a b =
+    let r  = plus# a b
+    in  case msb# r of
+          0 -> resize# r
+          _ -> maxBound#
 
   satMin SatWrap a b = a -# b
   satMin _ a b = case msb# r of
@@ -611,14 +615,18 @@ instance (((n+1)-1)~n,KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
       r = minus# a b
 
   satMult SatWrap a b = a *# b
-  satMult w a b = case rL of
-                     0 -> rR
-                     _ -> case w of
-                            SatZero  -> minBound#
-                            _        -> maxBound#
-    where
-      r       = times# a b
-      (rL,rR) = split# r
+  satMult SatZero a b =
+    let r       = times# a b
+        (rL,rR) = split# r
+    in  case rL of
+          0 -> rR
+          _ -> minBound#
+  satMult _ a b =
+    let r       = times# a b
+        (rL,rR) = split# r
+    in  case rL of
+          0 -> rR
+          _ -> maxBound#
 
 instance (KnownNat n, KnownNat (2^n)) => Arbitrary (BitVector n) where
   arbitrary = arbitraryBoundedIntegral
