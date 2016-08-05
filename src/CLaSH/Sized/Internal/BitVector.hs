@@ -275,12 +275,16 @@ instance (KnownNat (2^n)) => Num (BitVector n) where
   signum bv   = resize# (reduceOr# bv)
   fromInteger = fromInteger#
 
-(+#),(-#),(*#) :: KnownNat (2^n) => BitVector n -> BitVector n -> BitVector n
+(+#),(-#),(*#) :: forall n . KnownNat (2^n) => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE (+#) #-}
-(+#) (BV i) (BV j) = fromInteger_INLINE (i + j)
+(+#) (BV i) (BV j) = let m = natVal (Proxy :: Proxy (2^n))
+                         z = i + j
+                     in  if z >= m then BV (z - m) else BV z
 
 {-# NOINLINE (-#) #-}
-(-#) (BV i) (BV j) = fromInteger_INLINE (i - j)
+(-#) (BV i) (BV j) = let m = natVal (Proxy :: Proxy (2^n))
+                         z = i - j
+                     in  if z < 0 then BV (m + z) else BV z
 
 {-# NOINLINE (*#) #-}
 (*#) (BV i) (BV j) = fromInteger_INLINE (i * j)
