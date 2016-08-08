@@ -107,9 +107,7 @@ import Data.Char                  (digitToInt)
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Maybe                 (listToMaybe)
-import Data.Promotion.Prelude     (ConstSym1, FlipSym1, type (:+$))
 import Data.Proxy                 (Proxy (..))
-import Data.Singletons.Prelude    (type (@@))
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
@@ -124,7 +122,6 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, addSNat)
-import CLaSH.Promoted.Nat.Defun   (DotSym, KnownNatSym)
 import CLaSH.Promoted.Ord         (Max)
 
 import {-# SOURCE #-} qualified CLaSH.Sized.Vector         as V
@@ -307,8 +304,7 @@ fromInteger_INLINE i = sz `seq` BV (i `mod` sz)
   where
     sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
 
-instance KnownNat (Max m n + 1) =>
-  ExtendingNum (BitVector m) (BitVector n) where
+instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
   plus  = plus#
   minus = minus#
@@ -320,12 +316,14 @@ plus# :: BitVector m -> BitVector n -> BitVector (Max m n + 1)
 plus# (BV a) (BV b) = BV (a + b)
 
 {-# NOINLINE minus# #-}
-minus# :: forall m n . KnownNat (Max m n + 1) => BitVector m -> BitVector n
-                                              -> BitVector (Max m n + 1)
+minus# :: forall m n . (KnownNat m, KnownNat n) => BitVector m -> BitVector n
+                                                -> BitVector (Max m n + 1)
 minus# (BV a) (BV b) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
-      z = a - b
-  in  if z < 0 then BV (m + z) else BV z
+  let m    = fromInteger (natVal (Proxy :: Proxy m))
+      n    = fromInteger (natVal (Proxy :: Proxy n))
+      mask = 1 `shiftL` (max m n + 1)
+      z    = a - b
+  in  if z < 0 then BV (mask + z) else BV z
 
 {-# NOINLINE times# #-}
 times# :: BitVector m -> BitVector n -> BitVector (m + n)
@@ -576,13 +574,8 @@ popCountBV bv = case addSNat (SNat @ n) (SNat @ 1) of
 {-# INLINE popCountBV #-}
 
 instance Resize BitVector where
-  type ResizeC BitVector = ConstSym1 KnownNatSym
   resize     = resize#
-  type ExtendC BitVector = DotSym @@ KnownNatSym @@ (FlipSym1 (:+$))
-  extend     = resize#
-  zeroExtend = resize#
-  signExtend = resize#
-  type TruncateC BitVector = FlipSym1 (ConstSym1 KnownNatSym)
+  zeroExtend = extend
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}

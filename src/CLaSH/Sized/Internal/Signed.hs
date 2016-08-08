@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -88,11 +89,8 @@ import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
-import Data.Promotion.Prelude         (ConstSym1, FlipSym1)
 import Data.Proxy                     (Proxy (..))
-import Data.Singletons.Prelude        (Apply, TyFun)
 import Text.Read                      (Read (..), ReadPrec)
-import GHC.Exts                       (Constraint)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
@@ -107,7 +105,6 @@ import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Promoted.Nat             (SNat (..), addSNat)
-import CLaSH.Promoted.Nat.Defun       (KnownNatSym)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
@@ -416,24 +413,10 @@ instance KnownNat n => FiniteBits (Signed n) where
   countLeadingZeros  s = countLeadingZeros  (pack# s)
   countTrailingZeros s = countTrailingZeros (pack# s)
 
-data ResizeSigned1 (n :: Nat) (f :: TyFun Nat Constraint) :: *
-type instance Apply (ResizeSigned1 n) m = (KnownNat n, KnownNat m)
-data ResizeSigned (f :: TyFun Nat (TyFun Nat Constraint -> *)) :: *
-type instance Apply ResizeSigned n = ResizeSigned1 n
-
-data ExtendSigned1 (n :: Nat) (f :: TyFun Nat Constraint) :: *
-type instance Apply (ExtendSigned1 n) m = (KnownNat n, KnownNat m, KnownNat (m+n))
-data ExtendSigned (f :: TyFun Nat (TyFun Nat Constraint -> *)) :: *
-type instance Apply ExtendSigned n = ExtendSigned1 n
-
 instance Resize Signed where
-  type ResizeC Signed = ResizeSigned
   resize       = resize#
-  type ExtendC Signed = ExtendSigned
-  extend       = resize#
-  zeroExtend s = unpack# (0 ++# pack s)
-  signExtend   = resize#
-  type TruncateC Signed = FlipSym1 (ConstSym1 KnownNatSym)
+  zeroExtend :: forall a b . (KnownNat a, KnownNat b) => Signed a -> Signed (b + a)
+  zeroExtend s = case addSNat (SNat @ b) (SNat @ a) of SNat -> unpack# (0 ++# pack s)
   truncateB    = truncateB#
 
 {-# NOINLINE resize# #-}
@@ -466,8 +449,7 @@ instance KnownNat n => Lift (Signed n) where
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
-instance KnownNat n =>
-  SaturatingNum (Signed n) where
+instance KnownNat n => SaturatingNum (Signed n) where
   satPlus SatWrap  a b = a +# b
   satPlus SatBound a b = case addSNat (SNat @ n) (SNat @ 1) of
     SNat -> let r      = plus# a b

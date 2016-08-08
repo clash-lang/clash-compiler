@@ -79,9 +79,7 @@ import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
-import Data.Promotion.Prelude         (ConstSym1, FlipSym1, type (:+$))
 import Data.Proxy                     (Proxy (..))
-import Data.Singletons.Prelude        (type (@@))
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -97,7 +95,6 @@ import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
 import CLaSH.Promoted.Nat             (SNat (..), addSNat)
-import CLaSH.Promoted.Nat.Defun       (DotSym, KnownNatSym)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
@@ -277,8 +274,7 @@ fromInteger_INLINE i = U (i `mod` sz)
   where
     sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
 
-instance KnownNat (Max m n + 1) =>
-  ExtendingNum (Unsigned m) (Unsigned n) where
+instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
   plus  = plus#
   minus = minus#
@@ -290,12 +286,14 @@ plus# :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
 plus# (U a) (U b) = U (a + b)
 
 {-# NOINLINE minus# #-}
-minus# :: forall m n . KnownNat (Max m n + 1) => Unsigned m -> Unsigned n
-                                              -> Unsigned (Max m n + 1)
+minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
+                                                -> Unsigned (Max m n + 1)
 minus# (U a) (U b) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
-      z = a - b
-  in  if z < 0 then U (m + z) else U z
+  let m    = fromInteger (natVal (Proxy :: Proxy m))
+      n    = fromInteger (natVal (Proxy :: Proxy n))
+      mask = 1 `shiftL` (max m n + 1)
+      z    = a - b
+  in  if z < 0 then U (mask + z) else U z
 
 {-# NOINLINE times# #-}
 times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
@@ -401,13 +399,8 @@ instance KnownNat n => FiniteBits (Unsigned n) where
   countTrailingZeros u = countTrailingZeros (pack# u)
 
 instance Resize Unsigned where
-  type ResizeC Unsigned = ConstSym1 KnownNatSym
   resize     = resize#
-  type ExtendC Unsigned = DotSym @@ KnownNatSym @@ (FlipSym1 (:+$))
-  extend     = resize#
-  zeroExtend = resize#
-  signExtend = resize#
-  type TruncateC Unsigned = FlipSym1 (ConstSym1 KnownNatSym)
+  zeroExtend = extend
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}

@@ -62,9 +62,7 @@ where
 import Control.DeepSeq            (NFData (..))
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
-import Data.Promotion.Prelude     (ConstSym1, FlipSym1, type (:+$))
 import Data.Proxy                 (Proxy (..))
-import Data.Singletons.Prelude    (type (@@))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -78,7 +76,6 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..))
 import CLaSH.Class.Resize             (Resize (..))
-import CLaSH.Promoted.Nat.Defun       (DotSym, KnownNatSym)
 import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (..))
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
@@ -267,13 +264,8 @@ toInteger# :: Index n -> Integer
 toInteger# (I n) = n
 
 instance Resize Index where
-  type ResizeC Index = ConstSym1 KnownNatSym
   resize     = resize#
-  type ExtendC Index = DotSym @@ KnownNatSym @@ (FlipSym1 (:+$))
-  extend     = resize#
-  zeroExtend = resize#
-  signExtend = resize#
-  type TruncateC Index = FlipSym1 (ConstSym1 KnownNatSym)
+  zeroExtend = extend
   truncateB  = resize#
 
 resize# :: KnownNat m => Index n -> Index m

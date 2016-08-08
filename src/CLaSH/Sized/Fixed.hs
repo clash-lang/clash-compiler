@@ -77,7 +77,6 @@ import Data.List                  (find)
 import Data.Maybe                 (fromJust)
 import Data.Proxy                 (Proxy (..))
 import Data.Ratio                 ((%), denominator, numerator)
-import Data.Singletons.Prelude    (type (@@))
 import Data.Typeable              (Typeable, TypeRep, typeRep)
 import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
@@ -468,9 +467,7 @@ type ResizeFC rep int1 frac1 int2 frac2
     , KnownNat frac1
     , KnownNat frac2
     , KnownNat (int1 + frac1)
-    , ResizeC rep @@ (int2 + frac2) @@ (int1 + frac1)
     , KnownNat (int2 + frac2)
-    , ResizeC rep @@ (int1 + frac1) @@ (int2 + frac2)
     )
 
 -- | Constraint for the 'resizeF' function, specialized for 'SFixed'
@@ -802,8 +799,6 @@ type DivideC rep int1 frac1 int2 frac2
     , KnownNat (int1 + frac1)
     , KnownNat (int2 + frac2)
     , KnownNat ((int1 + frac2 + 1) + (int2 + frac1))
-    , ResizeC rep @@ (int1 + frac1) @@ ((int1 + frac2 + 1) + (int2 + frac1))
-    , ResizeC rep @@ (int2 + frac2) @@ ((int1 + frac2 + 1) + (int2 + frac1))
     )
 
 -- | Constraint for the 'divide' function, specialized for 'SFixed'
@@ -850,7 +845,6 @@ type FracFixedC rep int frac
   = ( NumFixedC rep int frac
     , DivideC   rep int frac int frac
     , Integral  (rep (int + frac))
-    , ResizeC rep @@ (((int + frac) + 1) + (int + frac)) @@ (int + frac)
     )
 
 -- | Constraint for the 'Fractional' instance of 'SFixed'
