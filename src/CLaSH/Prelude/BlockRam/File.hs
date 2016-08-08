@@ -67,6 +67,7 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -93,10 +94,10 @@ import Data.Array.MArray            (newListArray,readArray,writeArray)
 import Data.Array.ST                (STArray)
 import Data.Char                    (digitToInt)
 import Data.Maybe                   (listToMaybe)
-import GHC.TypeLits                 (KnownNat, type (^))
+import GHC.TypeLits                 (KnownNat)
 import Numeric                      (readInt)
 
-import CLaSH.Promoted.Nat    (SNat (..), snatToInteger)
+import CLaSH.Promoted.Nat    (SNat (..), pow2SNat, snatToInteger)
 import CLaSH.Sized.BitVector (BitVector)
 import CLaSH.Signal          (Signal)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
@@ -170,7 +171,7 @@ blockRamFile = blockRamFile' systemClock
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
+blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n)
                  => FilePath             -- ^ File describing the initial
                                          -- content of the blockRAM
                  -> Signal (Unsigned n)  -- ^ Write address @w@
@@ -180,7 +181,7 @@ blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  -> Signal (BitVector m)
                  -- ^ Value of the @blockRAM@ at address @r@ from the previous
                  -- clock cycle
-blockRamFilePow2 = blockRamFile' systemClock (SNat :: SNat (2^n))
+blockRamFilePow2 = blockRamFilePow2' systemClock
 
 {-# INLINE blockRamFilePow2' #-}
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -209,7 +210,7 @@ blockRamFilePow2 = blockRamFile' systemClock (SNat :: SNat (2^n))
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
+blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n)
                   => SClock clk                -- ^ 'Clock' to synchronize to
                   -> FilePath                  -- ^ File describing the initial
                                                -- content of the blockRAM
@@ -220,7 +221,7 @@ blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                   -> Signal' clk (BitVector m)
                   -- ^ Value of the @blockRAM@ at address @r@ from the previous
                   -- clock cycle
-blockRamFilePow2' clk = blockRamFile' clk (SNat :: SNat (2^n))
+blockRamFilePow2' clk = blockRamFile' clk (pow2SNat (SNat @ n))
 
 {-# INLINE blockRamFile' #-}
 -- | Create a blockRAM with space for @n@ elements

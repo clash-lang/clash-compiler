@@ -30,6 +30,8 @@ module CLaSH.Promoted.Nat
   , addSNat, mulSNat, powSNat
     -- *** Partial
   , subSNat, divSNat, logBaseSNat
+    -- *** Specialised
+  , pow2SNat
     -- * Unary/Peano-encoded natural numbers
     -- ** Data type
   , UNat (..)
@@ -59,6 +61,7 @@ module CLaSH.Promoted.Nat
   )
 where
 
+import Data.Bits       (shiftL)
 import Data.Reflection (reifyNat)
 import GHC.TypeLits    (KnownNat, Nat, type (+), type (-), type (*), type (^),
                         natVal)
@@ -207,6 +210,12 @@ logBaseSNat x y =
                            (fromInteger (snatToInteger y) :: Float)))
   $ \p -> unsafeCoerce (snatProxy p)
 {-# NOINLINE logBaseSNat #-}
+
+-- | Power of two of a singleton natural number
+pow2SNat :: SNat a -> SNat (2^a)
+pow2SNat x = reifyNat (shiftL 1 (fromInteger (snatToInteger x)))
+           $ \p -> unsafeCoerce (snatProxy p)
+{-# NOINLINE pow2SNat #-}
 
 -- | Base-2 encoded natural number
 --

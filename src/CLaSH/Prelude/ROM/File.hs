@@ -65,6 +65,7 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Unsafe #-}
@@ -88,11 +89,11 @@ module CLaSH.Prelude.ROM.File
 where
 
 import Data.Array                  (listArray,(!))
-import GHC.TypeLits                (KnownNat, type (^))
+import GHC.TypeLits                (KnownNat)
 import System.IO.Unsafe            (unsafePerformIO)
 
 import CLaSH.Prelude.BlockRam.File (initMem)
-import CLaSH.Promoted.Nat          (SNat (..), snatToInteger)
+import CLaSH.Promoted.Nat          (SNat (..), pow2SNat, snatToInteger)
 import CLaSH.Sized.BitVector       (BitVector)
 import CLaSH.Signal                (Signal)
 import CLaSH.Signal.Explicit       (Signal', SClock, register', systemClock)
@@ -213,11 +214,11 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 --     myRomData :: Unsigned 9 -> BitVector 16
 --     myRomData = asyncRomFilePow2 "memory.bin"
 --     @
-asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
+asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n)
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
                  -> BitVector m -- ^ The value of the ROM at address @rd@
-asyncRomFilePow2 = asyncRomFile (SNat :: SNat (2^n))
+asyncRomFilePow2 = asyncRomFile (pow2SNat (SNat @ n))
 
 {-# NOINLINE asyncRomFile# #-}
 -- | asyncROMFile primitive
@@ -288,12 +289,12 @@ romFile = romFile' systemClock
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-romFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
+romFilePow2 :: forall n m . (KnownNat m, KnownNat n)
             => FilePath             -- ^ File describing the content of the ROM
             -> Signal (Unsigned n)  -- ^ Read address @rd@
             -> Signal (BitVector m)
             -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFilePow2 = romFile' systemClock (SNat :: SNat (2^n))
+romFilePow2 = romFilePow2' systemClock
 
 {-# INLINE romFilePow2' #-}
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -319,7 +320,7 @@ romFilePow2 = romFile' systemClock (SNat :: SNat (2^n))
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
+romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n)
              => SClock clk                -- ^ 'Clock' to synchronize to
              -> FilePath                  -- ^ File describing the content of
                                           -- the ROM
@@ -327,7 +328,7 @@ romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
              -> Signal' clk (BitVector m)
              -- ^ The value of the ROM at address @rd@ from the previous clock
              -- cycle
-romFilePow2' clk = romFile' clk (SNat :: SNat (2^n))
+romFilePow2' clk = romFile' clk (pow2SNat (SNat @ n))
 
 {-# INLINE romFile' #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements

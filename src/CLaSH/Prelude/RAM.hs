@@ -11,6 +11,7 @@ RAM primitives with a combinational read port.
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -38,9 +39,9 @@ import Control.Monad          (when)
 import Control.Monad.ST.Lazy  (ST,runST)
 import Data.Array.MArray.Safe (newArray_,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
-import GHC.TypeLits           (KnownNat, type (^))
+import GHC.TypeLits           (KnownNat)
 
-import CLaSH.Promoted.Nat     (SNat (..), snatToInteger)
+import CLaSH.Promoted.Nat     (SNat (..), snatToInteger, pow2SNat)
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Bundle    (bundle)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock, unsafeSynchronizer)
@@ -73,13 +74,13 @@ asyncRam = asyncRam' systemClock systemClock
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
-asyncRamPow2 :: forall n a . (KnownNat n, KnownNat (2^n))
+asyncRamPow2 :: KnownNat n
              => Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
              -> Signal Bool         -- ^ Write enable
              -> Signal a            -- ^ Value to write (at address @w@)
              -> Signal a            -- ^ Value of the @RAM@ at address @r@
-asyncRamPow2 = asyncRam' systemClock systemClock (SNat :: SNat (2^n))
+asyncRamPow2 = asyncRamPow2' systemClock systemClock
 
 {-# INLINE asyncRamPow2' #-}
 -- | Create a RAM with space for 2^@n@ elements
@@ -91,7 +92,7 @@ asyncRamPow2 = asyncRam' systemClock systemClock (SNat :: SNat (2^n))
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2' :: forall wclk rclk n a .
-                 (KnownNat n, KnownNat (2^n))
+                 KnownNat n
               => SClock wclk               -- ^ 'Clock' to which to synchronise
                                            -- the write port of the RAM
               -> SClock rclk               -- ^ 'Clock' to which the read
@@ -103,7 +104,7 @@ asyncRamPow2' :: forall wclk rclk n a .
               -> Signal' wclk a            -- ^ Value to write (at address @w@)
               -> Signal' rclk a
               -- ^ Value of the @RAM@ at address @r@
-asyncRamPow2' wclk rclk = asyncRam' wclk rclk (SNat :: SNat (2^n))
+asyncRamPow2' wclk rclk = asyncRam' wclk rclk (pow2SNat (SNat @ n))
 
 {-# INLINE asyncRam' #-}
 -- | Create a RAM with space for @n@ elements

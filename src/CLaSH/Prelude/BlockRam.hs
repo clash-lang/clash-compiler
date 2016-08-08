@@ -335,10 +335,12 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MagicHash        #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -365,6 +367,7 @@ import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
+import CLaSH.Promoted.Nat     (SNat (..), pow2SNat)
 import CLaSH.Signal           (Signal, mux)
 import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle)
@@ -419,7 +422,7 @@ blockRam = blockRam' systemClock
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) wr rd en dt@.
-blockRamPow2 :: (KnownNat n, KnownNat (2^n))
+blockRamPow2 :: KnownNat n
              => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                                     -- determines the size, @2^n@, of the BRAM.
                                     --
@@ -431,7 +434,7 @@ blockRamPow2 :: (KnownNat n, KnownNat (2^n))
              -> Signal a
              -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
              -- cycle
-blockRamPow2 = blockRam
+blockRamPow2 = blockRamPow2' systemClock
 
 {-# INLINE blockRam' #-}
 -- | Create a blockRAM with space for @n@ elements
@@ -493,7 +496,7 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) wr rd en dt@.
-blockRamPow2' :: (KnownNat n, KnownNat (2^n))
+blockRamPow2' :: forall clk n a . KnownNat n
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
                                           -- determines the size, @2^n@, of
@@ -507,7 +510,7 @@ blockRamPow2' :: (KnownNat n, KnownNat (2^n))
               -> Signal' clk a
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
-blockRamPow2' = blockRam'
+blockRamPow2' = case pow2SNat (SNat @ n) of SNat -> blockRam'
 
 {-# NOINLINE blockRam# #-}
 -- | blockRAM primitive

@@ -11,6 +11,7 @@ Self-synchronising circuits based on data-flow principles.
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -45,7 +46,7 @@ module CLaSH.Prelude.DataFlow
   )
 where
 
-import GHC.TypeLits           (KnownNat, KnownSymbol, type (+), type (-), type (^))
+import GHC.TypeLits           (KnownNat, KnownSymbol, type (+), type (^))
 import Prelude                hiding ((++), (!!), length, map, repeat, tail, unzip3, zip3
                               , zipWith)
 
@@ -53,7 +54,7 @@ import CLaSH.Class.BitPack    (boolToBV)
 import CLaSH.Class.Resize     (truncateB)
 import CLaSH.Prelude.BitIndex (msb)
 import CLaSH.Prelude.Mealy    (mealyB')
-import CLaSH.Promoted.Nat     (SNat)
+import CLaSH.Promoted.Nat     (SNat (..), addSNat, pow2SNat)
 import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
 import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
@@ -167,29 +168,28 @@ mooreDF ft fo iS = DF (\i iV oR -> let en  = iV .&&. oR
                                        o   = fo <$> s
                                    in  (o,iV,oR))
 
-fifoDF_mealy :: forall addrSize a .
-     (KnownNat addrSize
-     ,KnownNat (addrSize + 1)
-     ,KnownNat (2 ^ addrSize))
+fifoDF_mealy :: forall addrSize a . KnownNat addrSize
   => (Vec (2^addrSize) a, BitVector (addrSize + 1), BitVector (addrSize + 1))
   -> (a, Bool, Bool)
   -> ((Vec (2^addrSize) a, BitVector (addrSize + 1), BitVector (addrSize + 1))
      ,(a, Bool, Bool))
 fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
-  ((mem',rptr',wptr'), (rdata,empty,full))
-  where
-    raddr = truncateB rptr :: BitVector addrSize
-    waddr = truncateB wptr :: BitVector addrSize
+  case pow2SNat (SNat @ addrSize) of
+    SNat -> case addSNat (SNat @ addrSize) (SNat @ 1) of
+      SNat ->
+        let raddr = truncateB rptr :: BitVector addrSize
+            waddr = truncateB wptr :: BitVector addrSize
 
-    mem' | winc && not full = replace waddr wdata mem
-         | otherwise        = mem
+            mem' | winc && not full = replace waddr wdata mem
+                 | otherwise        = mem
 
-    rdata = mem !! raddr
+            rdata = mem !! raddr
 
-    rptr' = rptr + boolToBV (rinc && not empty)
-    wptr' = wptr + boolToBV (winc && not full)
-    empty = rptr == wptr
-    full  = msb rptr /= msb wptr && raddr == waddr
+            rptr' = rptr + boolToBV (rinc && not empty)
+            wptr' = wptr + boolToBV (winc && not full)
+            empty = rptr == wptr
+            full  = msb rptr /= msb wptr && raddr == waddr
+        in  ((mem',rptr',wptr'), (rdata,empty,full))
 
 -- | Create a FIFO buffer adhering to the 'DataFlow' protocol. Can be filled
 -- with initial content.
@@ -200,24 +200,21 @@ fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
 -- fifo4 = 'fifoDF' d4 (2 :> 3 :> Nil)
 -- @
 fifoDF :: forall addrSize m n a nm rate .
-     (((addrSize + 1) - 1) ~ addrSize, KnownNat addrSize,
-     KnownNat n, KnownNat m,
-     KnownNat (2 ^ addrSize),
-     KnownNat (addrSize + 1),
-     (m + n) ~ (2 ^ addrSize),
+     (KnownNat addrSize, KnownNat n, KnownNat m, (m + n) ~ (2 ^ addrSize),
      KnownSymbol nm, KnownNat rate)
   => SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two.
   -> Vec m a      -- ^ Initial content. Can be smaller than the size of the
                   -- FIFO. Empty spaces are initialised with 'undefined'.
   -> DataFlow' ('Clk nm rate) Bool Bool a a
-fifoDF _ iS = DF $ \i iV oR ->
-  let clk            = sclock
-      initRdPtr      = 0
-      initWrPtr      = fromIntegral (length iS)
-      initMem        = iS ++ repeat undefined :: Vec (m + n) a
-      initS          = (initMem,initRdPtr,initWrPtr)
-      (o,empty,full) = mealyB' clk fifoDF_mealy initS (i,iV,oR)
-  in  (o,not1 empty, not1 full)
+fifoDF _ iS = DF $ \i iV oR -> case addSNat (SNat @ addrSize) (SNat @ 1) of
+  SNat ->
+    let clk            = sclock
+        initRdPtr      = 0
+        initWrPtr      = fromIntegral (length iS)
+        initMem        = iS ++ repeat undefined :: Vec (m + n) a
+        initS          = (initMem,initRdPtr,initWrPtr)
+        (o,empty,full) = mealyB' clk fifoDF_mealy initS (i,iV,oR)
+    in  (o,not1 empty, not1 full)
 
 -- | Identity circuit
 --
@@ -335,9 +332,8 @@ parNDF fs =
 -- @
 --
 -- <<doc/loopDF_sync.svg>>
-loopDF :: (((addrSize + 1) - 1) ~ addrSize, KnownNat m, KnownNat n, KnownNat addrSize, KnownNat rate
-          ,KnownNat (2 ^ addrSize), KnownNat (addrSize + 1), KnownSymbol nm
-          ,(m+n) ~ (2^addrSize))
+loopDF :: (KnownNat m, KnownNat n, KnownNat addrSize, KnownNat rate
+          ,KnownSymbol nm,(m+n) ~ (2^addrSize))
        => SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two
        -> Vec m d -- ^ Initial content of the FIFO buffer. Can be smaller than
                   -- the size of the FIFO. Empty spaces are initialised with
@@ -525,7 +521,7 @@ instance (LockStep a x, LockStep b y) => LockStep (a,b) (x,y) where
                                      xyV     = bundle (xV,yV)
                                  in  (xy,xyV,rdy))) `seqDF` (stepLock `parDF` stepLock)
 
-instance (LockStep en a, m ~ (n + 1), KnownNat (n+1)) =>
+instance (LockStep en a, m ~ (n + 1), KnownNat m, KnownNat n) =>
   LockStep (Vec m en) (Vec m a) where
   lockStep = parNDF (repeat lockStep) `seqDF`
     DF (\xs vals rdy ->
@@ -540,6 +536,8 @@ instance (LockStep en a, m ~ (n + 1), KnownNat (n+1)) =>
           in  (xs,vals,rdy)
        ) `seqDF` parNDF (repeat stepLock)
 
-allReady :: KnownNat (n+1) => Bool -> Vec (n+1) (Vec (n+1) Bool)
+allReady :: forall n . KnownNat n
+         => Bool -> Vec (n+1) (Vec (n+1) Bool)
          -> Vec (n+1) Bool
-allReady b vs = map (and . (b :>) . tail) (smap (flip rotateLeftS) vs)
+allReady b vs = case addSNat (SNat @ n) (SNat @ 1) of
+  SNat -> map (and . (b :>) . tail) (smap (flip rotateLeftS) vs)
