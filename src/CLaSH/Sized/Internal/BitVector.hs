@@ -13,6 +13,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -106,13 +107,12 @@ import Data.Char                  (digitToInt)
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
 import Data.Maybe                 (listToMaybe)
-import Data.Promotion.Prelude     (ConstSym1, FlipSym1, type (:.$), type (:+$),
-                                   type (:^$$))
+import Data.Promotion.Prelude     (ConstSym1, FlipSym1, type (:+$))
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (type (@@))
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (^), natVal)
+import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric                    (readInt)
@@ -123,7 +123,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
-import CLaSH.Promoted.Nat         (SNat, snatToInteger)
+import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, addSNat)
 import CLaSH.Promoted.Nat.Defun   (DotSym, KnownNatSym)
 import CLaSH.Promoted.Ord         (Max)
 
@@ -189,7 +189,7 @@ instance KnownNat n => Show (BitVector n) where
 -- >>> import qualified Data.List as List
 -- >>> $$(bLit (List.replicate 4 '1')) :: BitVector 4
 -- 1111
-bLit :: KnownNat (2^n) => String -> Q (TExp (BitVector n))
+bLit :: KnownNat n => String -> Q (TExp (BitVector n))
 bLit s = [|| fromInteger# i' ||]
   where
     i :: Maybe Integer
@@ -230,7 +230,7 @@ le# (BV n) (BV m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesisable.
-instance KnownNat (2^n) => Enum (BitVector n) where
+instance KnownNat n => Enum (BitVector n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
   toEnum         = fromInteger# . toInteger
@@ -244,10 +244,10 @@ instance KnownNat (2^n) => Enum (BitVector n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat (2^n) => BitVector n -> [BitVector n]
-enumFromThen#   :: KnownNat (2^n) => BitVector n -> BitVector n -> [BitVector n]
-enumFromTo#     :: KnownNat (2^n) => BitVector n -> BitVector n -> [BitVector n]
-enumFromThenTo# :: KnownNat (2^n) => BitVector n -> BitVector n -> BitVector n
+enumFrom#       :: KnownNat n => BitVector n -> [BitVector n]
+enumFromThen#   :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
+enumFromTo#     :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
+enumFromThenTo# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
                 -> [BitVector n]
 enumFrom# x             = map toEnum [fromEnum x ..]
 enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
@@ -263,10 +263,11 @@ minBound# :: BitVector n
 minBound# = BV 0
 
 {-# NOINLINE maxBound# #-}
-maxBound# :: KnownNat n => BitVector n
-maxBound# = let res = BV ((2 ^ natVal res) - 1) in res
+maxBound# :: forall n . KnownNat n => BitVector n
+maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+            in  BV (m-1)
 
-instance (KnownNat (2^n)) => Num (BitVector n) where
+instance KnownNat n => Num (BitVector n) where
   (+)         = (+#)
   (-)         = (-#)
   (*)         = (*#)
@@ -275,14 +276,14 @@ instance (KnownNat (2^n)) => Num (BitVector n) where
   signum bv   = resize# (reduceOr# bv)
   fromInteger = fromInteger#
 
-(+#),(-#),(*#) :: forall n . KnownNat (2^n) => BitVector n -> BitVector n -> BitVector n
+(+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE (+#) #-}
-(+#) (BV i) (BV j) = let m = natVal (Proxy :: Proxy (2^n))
+(+#) (BV i) (BV j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
                          z = i + j
                      in  if z >= m then BV (z - m) else BV z
 
 {-# NOINLINE (-#) #-}
-(-#) (BV i) (BV j) = let m = natVal (Proxy :: Proxy (2^n))
+(-#) (BV i) (BV j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
                          z = i - j
                      in  if z < 0 then BV (m + z) else BV z
 
@@ -290,23 +291,23 @@ instance (KnownNat (2^n)) => Num (BitVector n) where
 (*#) (BV i) (BV j) = fromInteger_INLINE (i * j)
 
 {-# NOINLINE negate# #-}
-negate# :: forall n . KnownNat (2^n) => BitVector n -> BitVector n
+negate# :: forall n . KnownNat n => BitVector n -> BitVector n
 negate# (BV 0) = BV 0
 negate# (BV i) = BV (sz - i)
   where
-    sz = natVal (Proxy :: Proxy (2^n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat (2^n) => Integer -> BitVector n
+fromInteger# :: KnownNat n => Integer -> BitVector n
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat (2^n) => Integer -> BitVector n
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> BitVector n
 fromInteger_INLINE i = sz `seq` BV (i `mod` sz)
   where
-    sz = natVal (Proxy :: Proxy (2^n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
 
-instance KnownNat (2^(Max m n + 1)) =>
+instance KnownNat (Max m n + 1) =>
   ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
   plus  = plus#
@@ -319,20 +320,21 @@ plus# :: BitVector m -> BitVector n -> BitVector (Max m n + 1)
 plus# (BV a) (BV b) = BV (a + b)
 
 {-# NOINLINE minus# #-}
-minus# :: forall m n . KnownNat (2^(Max m n + 1)) => BitVector m -> BitVector n
-                                                  -> BitVector (Max m n + 1)
-minus# (BV a) (BV b) = let m = natVal (Proxy :: Proxy (2^(Max m n + 1)))
-                           z = a - b
-                       in  if z < 0 then BV (m + z) else BV z
+minus# :: forall m n . KnownNat (Max m n + 1) => BitVector m -> BitVector n
+                                              -> BitVector (Max m n + 1)
+minus# (BV a) (BV b) =
+  let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
+      z = a - b
+  in  if z < 0 then BV (m + z) else BV z
 
 {-# NOINLINE times# #-}
 times# :: BitVector m -> BitVector n -> BitVector (m + n)
 times# (BV a) (BV b) = BV (a * b)
 
-instance (KnownNat (2^n)) => Real (BitVector n) where
+instance KnownNat n => Real (BitVector n) where
   toRational = toRational . toInteger#
 
-instance (KnownNat (2^n)) => Integral (BitVector n) where
+instance KnownNat n => Integral (BitVector n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
@@ -351,7 +353,7 @@ rem# (BV i) (BV j) = BV (i `rem` j)
 toInteger# :: BitVector n -> Integer
 toInteger# (BV i) = i
 
-instance (KnownNat n, KnownNat (2^n), KnownNat (n+1), KnownNat (n+2)) => Bits (BitVector n) where
+instance KnownNat n => Bits (BitVector n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -369,23 +371,25 @@ instance (KnownNat n, KnownNat (2^n), KnownNat (n+1), KnownNat (n+2)) => Bits (B
   shiftR v i        = shiftR# v i
   rotateL v i       = rotateL# v i
   rotateR v i       = rotateR# v i
-  popCount bv       = fromEnum (popCountBV (bv ++# (0 :: Bit)))
+  popCount bv       = fromInteger (I.toInteger# (popCountBV (bv ++# (0 :: Bit))))
 
-instance (KnownNat n, KnownNat (2^n), KnownNat (n+1), KnownNat (n+2)) => FiniteBits (BitVector n) where
+instance KnownNat n => FiniteBits (BitVector n) where
   finiteBitSize       = size#
-  countLeadingZeros   = fromEnum . countLeadingZerosBV
-  countTrailingZeros  = fromEnum . countTrailingZerosBV
+  countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
+  countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
 
-countLeadingZerosBV :: (KnownNat n, KnownNat (n+1)) => BitVector n -> I.Index (n+1)
-countLeadingZerosBV = V.foldr (\l r -> if eq# l low then 1 + r else 0) 0 . V.bv2v
+countLeadingZerosBV :: forall n . KnownNat n => BitVector n -> I.Index (n+1)
+countLeadingZerosBV = case addSNat (SNat @ n) (SNat @ 1) of
+  SNat -> V.foldr (\l r -> if eq# l low then 1 + r else 0) 0 . V.bv2v
 {-# INLINE countLeadingZerosBV #-}
 
-countTrailingZerosBV :: (KnownNat n, KnownNat (n+1)) => BitVector n -> I.Index (n+1)
-countTrailingZerosBV = V.foldl (\l r -> if eq# r low then 1 + l else 0) 0 . V.bv2v
+countTrailingZerosBV :: forall n . KnownNat n => BitVector n -> I.Index (n+1)
+countTrailingZerosBV = case addSNat (SNat @ n) (SNat @ 1) of
+  SNat -> V.foldl (\l r -> if eq# r low then 1 + l else 0) 0 . V.bv2v
 {-# INLINE countTrailingZerosBV #-}
 
 {-# NOINLINE reduceAnd# #-}
-reduceAnd# :: (KnownNat n) => BitVector n -> BitVector 1
+reduceAnd# :: KnownNat n => BitVector n -> BitVector 1
 reduceAnd# bv@(BV i) = BV (smallInteger (dataToTag# check))
   where
     check = i == maxI
@@ -435,10 +439,10 @@ index# bv@(BV v) i
 
 {-# NOINLINE msb# #-}
 -- | MSB
-msb# :: forall n . KnownNat (n-1) => BitVector n -> Bit
-msb# (BV v) = BV (smallInteger (dataToTag# (testBit v i)))
-  where
-    i = fromInteger (natVal (Proxy :: Proxy (n-1)))
+msb# :: forall n . KnownNat n => BitVector n -> Bit
+msb# (BV v)
+  = let i = fromInteger (natVal (Proxy :: Proxy n) - 1)
+    in  BV (smallInteger (dataToTag# (testBit v i)))
 
 {-# NOINLINE lsb# #-}
 -- | LSB
@@ -501,12 +505,12 @@ setSlice# (BV i) m n (BV j) = BV ((i .&. mask) .|. j')
     mask = complement ((2 ^ (m' + 1) - 1) `xor` (2 ^ n' - 1))
 
 {-# NOINLINE split# #-}
-split# :: forall n m . (KnownNat n, KnownNat (2 ^ n))
+split# :: forall n m . KnownNat n
        => BitVector (m + n) -> (BitVector m, BitVector n)
 split# (BV i) = (BV l, BV r)
   where
     n     = fromInteger (natVal (Proxy :: Proxy n))
-    mask  = natVal (Proxy :: Proxy ((2^n)))
+    mask  = 1 `shiftL` n
     -- The code below is faster than:
     -- > (l,r) = i `divMod` mask
     r    = i `mod` mask
@@ -523,10 +527,10 @@ or# (BV v1) (BV v2) = BV (v1 .|. v2)
 xor# (BV v1) (BV v2) = BV (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat (2^n) => BitVector n -> BitVector n
+complement# :: KnownNat n => BitVector n -> BitVector n
 complement# (BV v1) = fromInteger_INLINE (complement v1)
 
-shiftL#, rotateL#, rotateR# :: (KnownNat n, KnownNat (2^n))
+shiftL#, rotateL#, rotateR# :: KnownNat n
                             => BitVector n -> Int -> BitVector n
 
 {-# NOINLINE shiftL# #-}
@@ -564,27 +568,26 @@ rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal bv)
 
-popCountBV :: (KnownNat (n+1), KnownNat (n + 2))
-           => BitVector (n+1)
-           -> I.Index (n+2)
-popCountBV bv = sum (V.map fromIntegral v)
-  where
-    v = V.bv2v bv
+popCountBV :: forall n . KnownNat n => BitVector (n+1) -> I.Index (n+2)
+popCountBV bv = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> case addSNat (SNat @ n) (SNat @ 2) of
+      SNat -> let v = V.bv2v bv
+              in  sum (V.map fromIntegral v)
 {-# INLINE popCountBV #-}
 
 instance Resize BitVector where
-  type ResizeC BitVector = ConstSym1 ((:.$) @@ KnownNatSym @@ ((:^$$) 2))
+  type ResizeC BitVector = ConstSym1 KnownNatSym
   resize     = resize#
-  type ExtendC BitVector = DotSym @@ ((:.$) @@ KnownNatSym @@ ((:^$$) 2)) @@ (FlipSym1 (:+$))
+  type ExtendC BitVector = DotSym @@ KnownNatSym @@ (FlipSym1 (:+$))
   extend     = resize#
   zeroExtend = resize#
   signExtend = resize#
-  type TruncateC BitVector = FlipSym1 (ConstSym1 ((:.$) @@ KnownNatSym @@ ((:^$$) 2)))
+  type TruncateC BitVector = FlipSym1 (ConstSym1 KnownNatSym)
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
-resize# :: forall n m . KnownNat (2^m) => BitVector n -> BitVector m
-resize# (BV i) = let m = natVal (Proxy :: Proxy (2^m))
+resize# :: forall n m . KnownNat m => BitVector n -> BitVector m
+resize# (BV i) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy m))
                  in  if i >= m then fromInteger_INLINE i else BV i
 
 instance KnownNat n => Lift (BitVector n) where
@@ -594,26 +597,25 @@ instance KnownNat n => Lift (BitVector n) where
 decBitVector :: Integer -> TypeQ
 decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
 
-instance (((n+1)-1)~n,KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
-  SaturatingNum (BitVector n) where
+instance KnownNat n => SaturatingNum (BitVector n) where
   satPlus SatWrap a b = a +# b
-  satPlus SatZero a b =
-    let r = plus# a b
-    in  case msb# r of
-          0 -> resize# r
-          _ -> minBound#
-  satPlus _ a b =
-    let r  = plus# a b
-    in  case msb# r of
-          0 -> resize# r
-          _ -> maxBound#
+  satPlus SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r = plus# a b
+            in  case msb# r of
+                  0 -> resize# r
+                  _ -> minBound#
+  satPlus _ a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r  = plus# a b
+            in  case msb# r of
+                  0 -> resize# r
+                  _ -> maxBound#
 
   satMin SatWrap a b = a -# b
-  satMin _ a b = case msb# r of
-                   0 -> resize# r
-                   _ -> minBound#
-    where
-      r = minus# a b
+  satMin _ a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r = minus# a b
+            in  case msb# r of
+                  0 -> resize# r
+                  _ -> minBound#
 
   satMult SatWrap a b = a *# b
   satMult SatZero a b =
@@ -629,7 +631,7 @@ instance (((n+1)-1)~n,KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
           0 -> rR
           _ -> maxBound#
 
-instance (KnownNat n, KnownNat (2^n)) => Arbitrary (BitVector n) where
+instance KnownNat n => Arbitrary (BitVector n) where
   arbitrary = arbitraryBoundedIntegral
   shrink    = shrinkSizedUnsigned
 
@@ -645,7 +647,7 @@ shrinkSizedUnsigned x | natVal x < 2 = case toInteger x of
                       | otherwise    = shrinkIntegral x
 {-# INLINE shrinkSizedUnsigned #-}
 
-instance KnownNat (2^n) => CoArbitrary (BitVector n) where
+instance KnownNat n => CoArbitrary (BitVector n) where
   coarbitrary = coarbitraryIntegral
 
 type instance Index   (BitVector n) = Int

@@ -62,7 +62,7 @@ asyncRom content rd = asyncRom# content (fromEnum rd)
 --
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-asyncRomPow2 :: KnownNat (2^n)
+asyncRomPow2 :: (KnownNat n, KnownNat (2^n))
              => Vec (2^n) a -- ^ ROM content
                             --
                             -- __NB:__ must be a constant
@@ -93,7 +93,7 @@ asyncRom# content rd = arr ! rd
 --
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-rom :: (KnownNat n, KnownNat (2^m))
+rom :: (KnownNat n, KnownNat m)
     => Vec n a               -- ^ ROM content
                              --
                              -- __NB:__ must be a constant
@@ -111,7 +111,7 @@ rom = rom' systemClock
 --
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-romPow2 :: KnownNat (2^n)
+romPow2 :: (KnownNat n, KnownNat (2^n))
         => Vec (2^n) a         -- ^ ROM content
                                --
                                -- __NB:__ must be a constant
@@ -129,7 +129,7 @@ romPow2 = rom' systemClock
 --
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-romPow2' :: KnownNat (2^n)
+romPow2' :: (KnownNat n, KnownNat (2^n))
          => SClock clk               -- ^ 'Clock' to synchronize to
          -> Vec (2^n) a              -- ^ ROM content
                                      --

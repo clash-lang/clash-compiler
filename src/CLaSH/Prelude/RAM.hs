@@ -73,7 +73,7 @@ asyncRam = asyncRam' systemClock systemClock
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
-asyncRamPow2 :: forall n a . KnownNat (2^n)
+asyncRamPow2 :: forall n a . (KnownNat n, KnownNat (2^n))
              => Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
              -> Signal Bool         -- ^ Write enable
@@ -91,7 +91,7 @@ asyncRamPow2 = asyncRam' systemClock systemClock (SNat :: SNat (2^n))
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2' :: forall wclk rclk n a .
-                 KnownNat (2^n)
+                 (KnownNat n, KnownNat (2^n))
               => SClock wclk               -- ^ 'Clock' to which to synchronise
                                            -- the write port of the RAM
               -> SClock rclk               -- ^ 'Clock' to which the read

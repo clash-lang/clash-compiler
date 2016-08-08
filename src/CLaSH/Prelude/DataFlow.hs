@@ -168,9 +168,8 @@ mooreDF ft fo iS = DF (\i iV oR -> let en  = iV .&&. oR
                                    in  (o,iV,oR))
 
 fifoDF_mealy :: forall addrSize a .
-     (((addrSize + 1) - 1) ~ addrSize
-     ,KnownNat addrSize
-     ,KnownNat (2 ^ (addrSize + 1))
+     (KnownNat addrSize
+     ,KnownNat (addrSize + 1)
      ,KnownNat (2 ^ addrSize))
   => (Vec (2^addrSize) a, BitVector (addrSize + 1), BitVector (addrSize + 1))
   -> (a, Bool, Bool)
@@ -204,7 +203,7 @@ fifoDF :: forall addrSize m n a nm rate .
      (((addrSize + 1) - 1) ~ addrSize, KnownNat addrSize,
      KnownNat n, KnownNat m,
      KnownNat (2 ^ addrSize),
-     KnownNat (2 ^ (addrSize + 1)),
+     KnownNat (addrSize + 1),
      (m + n) ~ (2 ^ addrSize),
      KnownSymbol nm, KnownNat rate)
   => SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two.
@@ -337,7 +336,7 @@ parNDF fs =
 --
 -- <<doc/loopDF_sync.svg>>
 loopDF :: (((addrSize + 1) - 1) ~ addrSize, KnownNat m, KnownNat n, KnownNat addrSize, KnownNat rate
-          ,KnownNat (2 ^ addrSize), KnownNat (2^(addrSize + 1)), KnownSymbol nm
+          ,KnownNat (2 ^ addrSize), KnownNat (addrSize + 1), KnownSymbol nm
           ,(m+n) ~ (2^addrSize))
        => SNat (m + n) -- ^ Depth of the FIFO buffer. Must be a power of two
        -> Vec m d -- ^ Initial content of the FIFO buffer. Can be smaller than

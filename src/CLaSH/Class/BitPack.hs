@@ -7,6 +7,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -23,10 +25,11 @@ module CLaSH.Class.BitPack
   )
 where
 
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (^))
+import GHC.TypeLits                   (KnownNat, Nat, type (+))
 import Prelude                        hiding (map)
 
 import CLaSH.Class.Resize             (zeroExtend)
+import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
 import CLaSH.Sized.Internal.BitVector (split#)
 
@@ -82,43 +85,43 @@ instance BitPack (BitVector n) where
   pack   v = v
   unpack v = v
 
-instance (KnownNat (BitSize b), KnownNat (2^(BitSize b)), BitPack a, BitPack b) =>
+instance (KnownNat (BitSize b), BitPack a, BitPack b) =>
     BitPack (a,b) where
   type BitSize (a,b) = BitSize a + BitSize b
   pack (a,b) = pack a ++# pack b
   unpack ab  = let (a,b) = split# ab in (unpack a, unpack b)
 
-instance (KnownNat (BitSize c), KnownNat (2^(BitSize c)), BitPack (a,b), BitPack c) =>
+instance (KnownNat (BitSize c), BitPack (a,b), BitPack c) =>
     BitPack (a,b,c) where
   type BitSize (a,b,c) = BitSize (a,b) + BitSize c
   pack (a,b,c) = pack (a,b) ++# pack c
   unpack (unpack -> ((a,b), c)) = (a,b,c)
 
-instance (KnownNat (BitSize d), KnownNat (2^(BitSize d)), BitPack (a,b,c), BitPack d) =>
+instance (KnownNat (BitSize d), BitPack (a,b,c), BitPack d) =>
     BitPack (a,b,c,d) where
   type BitSize (a,b,c,d) = BitSize (a,b,c) + BitSize d
   pack (a,b,c,d) = pack (a,b,c) ++# pack d
   unpack (unpack -> ((a,b,c), d)) = (a,b,c,d)
 
-instance (KnownNat (BitSize e), KnownNat (2^(BitSize e)), BitPack (a,b,c,d), BitPack e) =>
+instance (KnownNat (BitSize e), BitPack (a,b,c,d), BitPack e) =>
     BitPack (a,b,c,d,e) where
   type BitSize (a,b,c,d,e) = BitSize (a,b,c,d) + BitSize e
   pack (a,b,c,d,e) = pack (a,b,c,d) ++# pack e
   unpack (unpack -> ((a,b,c,d), e)) = (a,b,c,d,e)
 
-instance (KnownNat (BitSize f), KnownNat (2^(BitSize f)), BitPack (a,b,c,d,e), BitPack f) =>
+instance (KnownNat (BitSize f), BitPack (a,b,c,d,e), BitPack f) =>
     BitPack (a,b,c,d,e,f) where
   type BitSize (a,b,c,d,e,f) = BitSize (a,b,c,d,e) + BitSize f
   pack (a,b,c,d,e,f) = pack (a,b,c,d,e) ++# pack f
   unpack (unpack -> ((a,b,c,d,e), f)) = (a,b,c,d,e,f)
 
-instance (KnownNat (BitSize g), KnownNat (2^(BitSize g)), BitPack (a,b,c,d,e,f), BitPack g) =>
+instance (KnownNat (BitSize g), BitPack (a,b,c,d,e,f), BitPack g) =>
     BitPack (a,b,c,d,e,f,g) where
   type BitSize (a,b,c,d,e,f,g) = BitSize (a,b,c,d,e,f) + BitSize g
   pack (a,b,c,d,e,f,g) = pack (a,b,c,d,e,f) ++# pack g
   unpack (unpack -> ((a,b,c,d,e,f), g)) = (a,b,c,d,e,f,g)
 
-instance (KnownNat (BitSize h), KnownNat (2^(BitSize h)), BitPack (a,b,c,d,e,f,g), BitPack h) =>
+instance (KnownNat (BitSize h), BitPack (a,b,c,d,e,f,g), BitPack h) =>
     BitPack (a,b,c,d,e,f,g,h) where
   type BitSize (a,b,c,d,e,f,g,h) = BitSize (a,b,c,d,e,f,g) + BitSize h
   pack (a,b,c,d,e,f,g,h) = pack (a,b,c,d,e,f,g) ++# pack h
@@ -130,5 +133,6 @@ instance (KnownNat (BitSize h), KnownNat (2^(BitSize h)), BitPack (a,b,c,d,e,f,g
 -- 00_0001
 -- >>> boolToBV False :: BitVector 6
 -- 00_0000
-boolToBV :: KnownNat (2^(n+1)) => Bool -> BitVector (n + 1)
-boolToBV = zeroExtend . pack
+boolToBV :: forall n . KnownNat n => Bool -> BitVector (n + 1)
+boolToBV = case addSNat (SNat @ n) (SNat @ 1) of
+  SNat -> zeroExtend . pack

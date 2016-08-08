@@ -130,7 +130,7 @@ import CLaSH.Sized.Unsigned  (Unsigned)
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFile :: (KnownNat (2^m), Enum addr)
+blockRamFile :: (KnownNat m, Enum addr)
              => SNat n               -- ^ Size of the blockRAM
              -> FilePath             -- ^ File describing the initial content
                                      -- of the blockRAM
@@ -170,7 +170,7 @@ blockRamFile = blockRamFile' systemClock
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFilePow2 :: forall n m . (KnownNat (2^m), KnownNat (2^n))
+blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath             -- ^ File describing the initial
                                          -- content of the blockRAM
                  -> Signal (Unsigned n)  -- ^ Write address @w@
@@ -209,7 +209,7 @@ blockRamFilePow2 = blockRamFile' systemClock (SNat :: SNat (2^n))
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFilePow2' :: forall clk n m . (KnownNat (2^m), KnownNat (2^n))
+blockRamFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                   => SClock clk                -- ^ 'Clock' to synchronize to
                   -> FilePath                  -- ^ File describing the initial
                                                -- content of the blockRAM
@@ -249,7 +249,7 @@ blockRamFilePow2' clk = blockRamFile' clk (SNat :: SNat (2^n))
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFile' :: (KnownNat (2^m), Enum addr)
+blockRamFile' :: (KnownNat m, Enum addr)
               => SClock clk                -- ^ 'Clock' to synchronize to
               -> SNat n                    -- ^ Size of the blockRAM
               -> FilePath                  -- ^ File describing the initial
@@ -268,7 +268,7 @@ blockRamFile' clk sz file wr rd en din = blockRamFile# clk sz file
 
 {-# NOINLINE blockRamFile# #-}
 -- | blockRamFile primitive
-blockRamFile# :: KnownNat (2^m)
+blockRamFile# :: KnownNat m
               => SClock clk                -- ^ 'Clock' to synchronize to
               -> SNat n                    -- ^ Size of the blockRAM
               -> FilePath                  -- ^ File describing the initial
@@ -296,7 +296,7 @@ blockRamFile# clk sz file wr rd en din = register' clk undefined dout
 
 {-# NOINLINE initMem #-}
 -- | __NB:__ Not synthesisable
-initMem :: KnownNat (2^n) => FilePath -> IO [BitVector n]
+initMem :: KnownNat n => FilePath -> IO [BitVector n]
 initMem = fmap (map parseBV . lines) . readFile
   where
     parseBV s = case parseBV' s of

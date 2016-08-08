@@ -419,7 +419,7 @@ blockRam = blockRam' systemClock
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) wr rd en dt@.
-blockRamPow2 :: KnownNat (2^n)
+blockRamPow2 :: (KnownNat n, KnownNat (2^n))
              => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                                     -- determines the size, @2^n@, of the BRAM.
                                     --
@@ -493,7 +493,7 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) wr rd en dt@.
-blockRamPow2' :: KnownNat (2^n)
+blockRamPow2' :: (KnownNat n, KnownNat (2^n))
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
                                           -- determines the size, @2^n@, of

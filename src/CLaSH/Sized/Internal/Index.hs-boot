@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE KindSignatures  #-}
+{-# LANGUAGE MagicHash       #-}
 {-# LANGUAGE RoleAnnotations #-}
 module CLaSH.Sized.Internal.Index where
 
@@ -15,4 +16,4 @@ type role Index phantom
 data Index :: Nat -> *
 
 instance KnownNat n => Num (Index n)
-instance KnownNat n => Enum (Index n)
+toInteger# :: Index n -> Integer

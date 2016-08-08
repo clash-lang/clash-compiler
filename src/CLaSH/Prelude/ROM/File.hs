@@ -141,7 +141,7 @@ import CLaSH.Sized.Unsigned        (Unsigned)
 --     myRomData :: Unsigned 9 -> BitVector 16
 --     myRomData = asyncRomFile d512 "memory.bin"
 --     @
-asyncRomFile :: (KnownNat (2^m), Enum addr)
+asyncRomFile :: (KnownNat m, Enum addr)
              => SNat n      -- ^ Size of the ROM
              -> FilePath    -- ^ File describing the content of the ROM
              -> addr        -- ^ Read address @rd@
@@ -213,7 +213,7 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 --     myRomData :: Unsigned 9 -> BitVector 16
 --     myRomData = asyncRomFilePow2 "memory.bin"
 --     @
-asyncRomFilePow2 :: forall n m . (KnownNat (2^m), KnownNat (2^n))
+asyncRomFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
                  => FilePath    -- ^ File describing the content of the ROM
                  -> Unsigned n  -- ^ Read address @rd@
                  -> BitVector m -- ^ The value of the ROM at address @rd@
@@ -221,7 +221,7 @@ asyncRomFilePow2 = asyncRomFile (SNat :: SNat (2^n))
 
 {-# NOINLINE asyncRomFile# #-}
 -- | asyncROMFile primitive
-asyncRomFile# :: KnownNat (2^m)
+asyncRomFile# :: KnownNat m
               => SNat n       -- ^ Size of the ROM
               -> FilePath     -- ^ File describing the content of the ROM
               -> Int          -- ^ Read address @rd@
@@ -256,10 +256,10 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-romFile :: (KnownNat (2^m), KnownNat (2^k))
+romFile :: (KnownNat m, KnownNat n)
         => SNat n               -- ^ Size of the ROM
         -> FilePath             -- ^ File describing the content of the ROM
-        -> Signal (Unsigned k)  -- ^ Read address @rd@
+        -> Signal (Unsigned n)  -- ^ Read address @rd@
         -> Signal (BitVector m)
         -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile = romFile' systemClock
@@ -288,7 +288,7 @@ romFile = romFile' systemClock
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-romFilePow2 :: forall n m . (KnownNat (2^m), KnownNat (2^n))
+romFilePow2 :: forall n m . (KnownNat m, KnownNat n, KnownNat (2^n))
             => FilePath             -- ^ File describing the content of the ROM
             -> Signal (Unsigned n)  -- ^ Read address @rd@
             -> Signal (BitVector m)
@@ -319,7 +319,7 @@ romFilePow2 = romFile' systemClock (SNat :: SNat (2^n))
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-romFilePow2' :: forall clk n m . (KnownNat (2^m), KnownNat (2^n))
+romFilePow2' :: forall clk n m . (KnownNat m, KnownNat n, KnownNat (2^n))
              => SClock clk                -- ^ 'Clock' to synchronize to
              -> FilePath                  -- ^ File describing the content of
                                           -- the ROM
@@ -353,7 +353,7 @@ romFilePow2' clk = romFile' clk (SNat :: SNat (2^n))
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-romFile' :: (KnownNat (2^m), Enum addr)
+romFile' :: (KnownNat m, Enum addr)
          => SClock clk                -- ^ 'Clock' to synchronize to
          -> SNat n                    -- ^ Size of the ROM
          -> FilePath                  -- ^ File describing the content of the
@@ -365,7 +365,7 @@ romFile' clk sz file rd = romFile# clk sz file (fromEnum <$> rd)
 
 {-# NOINLINE romFile# #-}
 -- | romFile primitive
-romFile# :: KnownNat (2^m)
+romFile# :: KnownNat m
          => SClock clk                -- ^ 'Clock' to synchronize to
          -> SNat n                    -- ^ Size of the ROM
          -> FilePath                  -- ^ File describing the content of the

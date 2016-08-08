@@ -13,6 +13,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -92,7 +93,7 @@ import Data.Proxy                     (Proxy (..))
 import Data.Singletons.Prelude        (Apply, TyFun)
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.Exts                       (Constraint)
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-), type (^), natVal)
+import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
@@ -105,6 +106,8 @@ import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
+import CLaSH.Promoted.Nat             (SNat (..), addSNat)
+import CLaSH.Promoted.Nat.Defun       (KnownNatSym)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
@@ -165,23 +168,24 @@ instance Show (Signed n) where
   {-# NOINLINE show #-}
 
 -- | None of the 'Read' class' methods are synthesisable.
-instance KnownNat (2^(n-1)) => Read (Signed n) where
+instance KnownNat n => Read (Signed n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Int)
 
-instance (KnownNat (2^n), KnownNat (2^(n-1))) => BitPack (Signed n) where
+instance KnownNat n => BitPack (Signed n) where
   type BitSize (Signed n) = n
   pack   = pack#
   unpack = unpack#
 
 {-# NOINLINE pack# #-}
-pack# :: forall n . KnownNat (2^n) => Signed n -> BitVector n
-pack# (S i) = let m = natVal (Proxy :: Proxy (2^n))
+pack# :: forall n . KnownNat n => Signed n -> BitVector n
+pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
               in  if i < 0 then BV (m + i) else BV i
 
 {-# NOINLINE unpack# #-}
-unpack# :: forall n . KnownNat (2^(n-1)) => BitVector n -> Signed n
-unpack# (BV i) = let m = natVal (Proxy :: Proxy (2^(n-1)))
-                 in  if i >= m then S (i-2*m) else S i
+unpack# :: forall n . KnownNat n => BitVector n -> Signed n
+unpack# (BV i) =
+  let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) - 1)
+  in  if i >= m then S (i-2*m) else S i
 
 instance Eq (Signed n) where
   (==) = eq#
@@ -213,7 +217,7 @@ le# (S n) (S m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesisable.
-instance KnownNat (2^(n-1)) => Enum (Signed n) where
+instance KnownNat n => Enum (Signed n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
   toEnum         = fromInteger# . toInteger
@@ -227,10 +231,10 @@ instance KnownNat (2^(n-1)) => Enum (Signed n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat (2^(n-1)) => Signed n -> [Signed n]
-enumFromThen#   :: KnownNat (2^(n-1)) => Signed n -> Signed n -> [Signed n]
-enumFromTo#     :: KnownNat (2^(n-1)) => Signed n -> Signed n -> [Signed n]
-enumFromThenTo# :: KnownNat (2^(n-1)) => Signed n -> Signed n -> Signed n -> [Signed n]
+enumFrom#       :: KnownNat n => Signed n -> [Signed n]
+enumFromThen#   :: KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromTo#     :: KnownNat n => Signed n -> Signed n -> [Signed n]
+enumFromThenTo# :: KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
 enumFrom# x             = map toEnum [fromEnum x ..]
 enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
 enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
@@ -248,7 +252,7 @@ minBound# = let res = S $ negate $ 2 ^ (natVal res - 1) in res
 maxBound# = let res = S $ 2 ^ (natVal res - 1) - 1 in res
 
 -- | Operators do @wrap-around@ on overflow
-instance KnownNat (2^(n-1)) => Num (Signed n) where
+instance KnownNat n => Num (Signed n) where
   (+)         = (+#)
   (-)         = (-#)
   (*)         = (*#)
@@ -258,15 +262,15 @@ instance KnownNat (2^(n-1)) => Num (Signed n) where
                    if s > 0 then 1 else 0
   fromInteger = fromInteger#
 
-(+#), (-#), (*#) :: forall n . KnownNat (2^(n-1)) => Signed n -> Signed n -> Signed n
+(+#), (-#), (*#) :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE (+#) #-}
-(S a) +# (S b) = let m  = natVal (Proxy :: Proxy (2^(n-1)))
+(S a) +# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
                      z  = a + b
                  in  if z >= m then S (z - 2*m) else
                         if z < negate m then S (z + 2*m) else S z
 
 {-# NOINLINE (-#) #-}
-(S a) -# (S b) = let m  = natVal (Proxy :: Proxy (2^(n-1)))
+(S a) -# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
                      z  = a - b
                  in  if z < negate m then S (z + 2*m) else
                         if z >= m then S (z - 2*m) else S z
@@ -274,26 +278,26 @@ instance KnownNat (2^(n-1)) => Num (Signed n) where
 {-# NOINLINE (*#) #-}
 (S a) *# (S b) = fromInteger_INLINE (a * b)
 
-negate#,abs# :: forall n . KnownNat (2^(n-1)) => Signed n -> Signed n
+negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
 {-# NOINLINE negate# #-}
-negate# (S n) = let m = natVal (Proxy :: Proxy (2^(n-1)))
+negate# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
                     z = negate n
                 in  if z == m then S n else S z
 
 {-# NOINLINE abs# #-}
-abs# (S n) = let m = natVal (Proxy :: Proxy (2^(n-1)))
+abs# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
                  z = abs n
              in  if z == m then S n else S z
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat (2^(n-1)) => Integer -> Signed (n :: Nat)
+fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat (2^(n-1)) => Integer -> Signed n
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
 fromInteger_INLINE i = mask `seq` S res
   where
-    mask = natVal (Proxy :: Proxy (2^(n-1)))
+    mask = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
     res  = case divMod i mask of
              (s,i') | even s    -> i'
                     | otherwise -> i' - mask
@@ -316,10 +320,10 @@ minus# (S a) (S b) = S (a - b)
 times# :: Signed m -> Signed n -> Signed (m + n)
 times# (S a) (S b) = S (a * b)
 
-instance KnownNat (2^(n-1)) => Real (Signed n) where
+instance KnownNat n => Real (Signed n) where
   toRational = toRational . toInteger#
 
-instance KnownNat (2^(n-1)) => Integral (Signed n) where
+instance KnownNat n => Integral (Signed n) where
   quot        = quot#
   rem         = rem#
   div         = div#
@@ -344,7 +348,7 @@ mod# (S a) (S b) = S (a `mod` b)
 toInteger# :: Signed n -> Integer
 toInteger# (S n) = n
 
-instance (KnownNat n, KnownNat (2^n), KnownNat (2^(n-1)), KnownNat (n + 1), KnownNat (n + 2)) => Bits (Signed n) where
+instance KnownNat n => Bits (Signed n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -364,7 +368,7 @@ instance (KnownNat n, KnownNat (2^n), KnownNat (2^(n-1)), KnownNat (n + 1), Know
   rotateR v i       = rotateR# v i
   popCount s        = popCount (pack# s)
 
-and#,or#,xor# :: KnownNat (2^(n-1)) => Signed n -> Signed n -> Signed n
+and#,or#,xor# :: KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE and# #-}
 and# (S a) (S b) = fromInteger_INLINE (a .&. b)
 {-# NOINLINE or# #-}
@@ -373,10 +377,10 @@ or# (S a) (S b)  = fromInteger_INLINE (a .|. b)
 xor# (S a) (S b) = fromInteger_INLINE (xor a b)
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat (2^(n-1)) => Signed n -> Signed n
+complement# :: KnownNat n => Signed n -> Signed n
 complement# (S a) = fromInteger_INLINE (complement a)
 
-shiftL#,shiftR#,rotateL#,rotateR# :: (KnownNat n, KnownNat (2^(n-1))) => Signed n -> Int -> Signed n
+shiftL#,shiftR#,rotateL#,rotateR# :: KnownNat n => Signed n -> Int -> Signed n
 {-# NOINLINE shiftL# #-}
 shiftL# _ b | b < 0  = error "'shiftL undefined for negative numbers"
 shiftL# (S n) b      = fromInteger_INLINE (shiftL n b)
@@ -407,23 +411,20 @@ rotateR# s@(S n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal s)
 
-instance (KnownNat n, KnownNat (2^(n-1)), KnownNat (2^n), KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Signed n) where
+instance KnownNat n => FiniteBits (Signed n) where
   finiteBitSize        = size#
   countLeadingZeros  s = countLeadingZeros  (pack# s)
   countTrailingZeros s = countTrailingZeros (pack# s)
 
 data ResizeSigned1 (n :: Nat) (f :: TyFun Nat Constraint) :: *
-type instance Apply (ResizeSigned1 n) m = (KnownNat n, KnownNat (2^(m-1)))
+type instance Apply (ResizeSigned1 n) m = (KnownNat n, KnownNat m)
 data ResizeSigned (f :: TyFun Nat (TyFun Nat Constraint -> *)) :: *
 type instance Apply ResizeSigned n = ResizeSigned1 n
 
 data ExtendSigned1 (n :: Nat) (f :: TyFun Nat Constraint) :: *
-type instance Apply (ExtendSigned1 n) m = (KnownNat n, KnownNat (2^n), KnownNat (2^(n-1)), KnownNat (2^m), KnownNat (2^((m+n)-1)))
+type instance Apply (ExtendSigned1 n) m = (KnownNat n, KnownNat m, KnownNat (m+n))
 data ExtendSigned (f :: TyFun Nat (TyFun Nat Constraint -> *)) :: *
 type instance Apply ExtendSigned n = ExtendSigned1 n
-
-data TruncateSigned (f :: TyFun Nat Constraint) :: *
-type instance Apply TruncateSigned m = KnownNat (2^(m-1))
 
 instance Resize Signed where
   type ResizeC Signed = ResizeSigned
@@ -432,11 +433,11 @@ instance Resize Signed where
   extend       = resize#
   zeroExtend s = unpack# (0 ++# pack s)
   signExtend   = resize#
-  type TruncateC Signed = FlipSym1 (ConstSym1 TruncateSigned)
+  type TruncateC Signed = FlipSym1 (ConstSym1 KnownNatSym)
   truncateB    = truncateB#
 
 {-# NOINLINE resize# #-}
-resize# :: forall m n . (KnownNat n, KnownNat (2^(m-1))) => Signed n -> Signed m
+resize# :: forall m n . (KnownNat n, KnownNat m) => Signed n -> Signed m
 resize# s@(S i) | n' <= m'  = extended
                 | otherwise = truncated
   where
@@ -445,17 +446,17 @@ resize# s@(S i) | n' <= m'  = extended
     m' = shiftL mask 1
     extended = S i
 
-    mask      = natVal (Proxy :: Proxy (2^(m-1)))
+    mask      = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy m) -1)
     i'        = i `mod` mask
     truncated = if testBit i (n-1)
                    then S (i' - mask)
                    else S i'
 
 {-# NOINLINE truncateB# #-}
-truncateB# :: KnownNat (2^(m-1)) => Signed (m + n) -> Signed m
+truncateB# :: KnownNat m => Signed (m + n) -> Signed m
 truncateB# (S n) = fromInteger_INLINE n
 
-instance KnownNat (2^(n-1)) => Default (Signed n) where
+instance KnownNat n => Default (Signed n) where
   def = fromInteger# 0
 
 instance KnownNat n => Lift (Signed n) where
@@ -465,60 +466,96 @@ instance KnownNat n => Lift (Signed n) where
 decSigned :: Integer -> TypeQ
 decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
-instance (((n+1)-1)~n, (n+1) ~ (1+n), KnownNat (2 ^ (1 + n)), KnownNat (2 ^ (n + n)), KnownNat n, KnownNat (2^n), KnownNat (2^(n-1)), KnownNat (n-1), KnownNat (n+1), KnownNat (2^(n + n - 1))) =>
+instance KnownNat n =>
   SaturatingNum (Signed n) where
-  satPlus SatWrap a b = a +# b
-  satPlus w a b = case msb r `xor` msb r' of
-                     0 -> unpack# r'
-                     _ -> case msb a .&. msb b of
-                            1 -> case w of
-                                   SatBound     -> minBound#
-                                   SatSymmetric -> minBoundSym#
-                                   _            -> fromInteger# 0
-                            _ -> case w of
-                                   SatZero -> fromInteger# 0
-                                   _       -> maxBound#
-    where
-      r      = plus# a b
-      (_,r') = split r
+  satPlus SatWrap  a b = a +# b
+  satPlus SatBound a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r      = plus# a b
+                (_,r') = split r
+            in  case msb r `xor` msb r' of
+                  0 -> unpack# r'
+                  _ -> case msb a .&. msb b of
+                    0 -> maxBound#
+                    _ -> minBound#
+  satPlus SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r      = plus# a b
+                (_,r') = split r
+            in  case msb r `xor` msb r' of
+                  0 -> unpack# r'
+                  _ -> fromInteger# 0
+  satPlus SatSymmetric a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r      = plus# a b
+                (_,r') = split r
+            in  case msb r `xor` msb r' of
+                  0 -> unpack# r'
+                  _ -> case msb a .&. msb b of
+                    0 -> maxBound#
+                    _ -> minBoundSym#
 
   satMin SatWrap a b = a -# b
-  satMin w a b = case msb r `xor` msb r' of
-                     0 -> unpack# r'
-                     _ -> case msb a ++# msb b of
-                            2 -> case w of
-                                   SatBound     -> minBound#
-                                   SatSymmetric -> minBoundSym#
-                                   _            -> fromInteger# 0
-                            _ -> case w of
-                                   SatZero -> fromInteger# 0
-                                   _       -> maxBound#
-    where
-      r      = minus# a b
-      (_,r') = split r
-
+  satMin SatBound a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r      = minus# a b
+                (_,r') = split r
+            in  case msb r `xor` msb r' of
+                  0 -> unpack# r'
+                  _ -> case msb a ++# msb b of
+                    2 -> minBound#
+                    _ -> maxBound#
+  satMin SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r      = minus# a b
+                (_,r') = split r
+            in  case msb r `xor` msb r' of
+                  0 -> unpack# r'
+                  _ -> fromInteger# 0
+  satMin SatSymmetric a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r      = minus# a b
+                (_,r') = split r
+            in  case msb r `xor` msb r' of
+                  0 -> unpack# r'
+                  _ -> case msb a ++# msb b of
+                    2 -> minBoundSym#
+                    _ -> maxBound#
 
   satMult SatWrap a b = a *# b
-  satMult w a b = case overflow of
-                     1 -> unpack# rR
-                     _ -> case msb rL of
-                            0 -> case w of
-                                   SatZero -> fromInteger# 0
-                                   _       -> maxBound#
-                            _ -> case w of
-                                   SatBound     -> minBound#
-                                   SatSymmetric -> minBoundSym#
-                                   _            -> fromInteger# 0
-    where
-      overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                            reduceAnd (msb rR ++# pack rL)
-      r        = times# a b
-      (rL,rR)  = split r
+  satMult SatBound a b = case addSNat (SNat @ n) (SNat @ n) of
+    SNat -> case addSNat (SNat @ 1) (SNat @ n) of
+      SNat ->
+        let r        = times# a b
+            (rL,rR)  = split r
+            overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                                  reduceAnd (msb rR ++# pack rL)
+        in  case overflow of
+              1 -> unpack# rR
+              _ -> case msb rL of
+                0 -> maxBound#
+                _ -> minBound#
+  satMult SatZero a b = case addSNat (SNat @ n) (SNat @ n) of
+    SNat -> case addSNat (SNat @ 1) (SNat @ n) of
+      SNat ->
+        let r        = times# a b
+            (rL,rR)  = split r
+            overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                                  reduceAnd (msb rR ++# pack rL)
+        in  case overflow of
+              1 -> unpack# rR
+              _ -> fromInteger# 0
+  satMult SatSymmetric a b = case addSNat (SNat @ n) (SNat @ n) of
+    SNat -> case addSNat (SNat @ 1) (SNat @ n) of
+      SNat ->
+        let r        = times# a b
+            (rL,rR)  = split r
+            overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                                  reduceAnd (msb rR ++# pack rL)
+        in  case overflow of
+              1 -> unpack# rR
+              _ -> case msb rL of
+                0 -> maxBound#
+                _ -> minBoundSym#
 
-minBoundSym# :: (KnownNat n, KnownNat (2^(n-1))) => Signed n
+minBoundSym# :: KnownNat n => Signed n
 minBoundSym# = minBound# +# fromInteger# 1
 
-instance (KnownNat n, KnownNat (2^(n-1))) => Arbitrary (Signed n) where
+instance KnownNat n => Arbitrary (Signed n) where
   arbitrary = arbitraryBoundedIntegral
   shrink    = shrinkSizedSigned
 
@@ -533,11 +570,11 @@ shrinkSizedSigned x | natVal x < 2 = case toInteger x of
                     | otherwise    = shrinkIntegral x
 {-# INLINE shrinkSizedSigned #-}
 
-instance KnownNat (2^(n-1)) => CoArbitrary (Signed n) where
+instance KnownNat n => CoArbitrary (Signed n) where
   coarbitrary = coarbitraryIntegral
 
 type instance Index   (Signed n) = Int
 type instance IxValue (Signed n) = Bit
-instance (KnownNat n, KnownNat (2^n), KnownNat (2 ^ (n - 1))) => Ixed (Signed n) where
+instance KnownNat n => Ixed (Signed n) where
   ix i f s = unpack# <$> BV.replaceBit# (pack# s) i
                      <$> f (BV.index# (pack# s) i)

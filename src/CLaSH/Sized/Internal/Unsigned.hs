@@ -11,6 +11,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -78,12 +79,11 @@ import Control.Lens                   (Index, Ixed (..), IxValue)
 import Data.Bits                      (Bits (..), FiniteBits (..))
 import Data.Data                      (Data)
 import Data.Default                   (Default (..))
-import Data.Promotion.Prelude         (ConstSym1, FlipSym1, type (:.$), type (:+$),
-                                       type (:^$$))
+import Data.Promotion.Prelude         (ConstSym1, FlipSym1, type (:+$))
 import Data.Proxy                     (Proxy (..))
 import Data.Singletons.Prelude        (type (@@))
 import Text.Read                      (Read (..), ReadPrec)
-import GHC.TypeLits                   (KnownNat, Nat, type (+), type (-), type (^), natVal)
+import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
@@ -96,6 +96,7 @@ import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
+import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Promoted.Nat.Defun       (DotSym, KnownNatSym)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, high, low)
@@ -153,7 +154,7 @@ instance Show (Unsigned n) where
   {-# NOINLINE show #-}
 
 -- | None of the 'Read' class' methods are synthesisable.
-instance KnownNat (2^n) => Read (Unsigned n) where
+instance KnownNat n => Read (Unsigned n) where
   readPrec = fromIntegral <$> (readPrec :: ReadPrec Word)
 
 instance BitPack (Unsigned n) where
@@ -199,7 +200,7 @@ le# (U n) (U m) = n <= m
 
 -- | The functions: 'enumFrom', 'enumFromThen', 'enumFromTo', and
 -- 'enumFromThenTo', are not synthesisable.
-instance KnownNat (2^n) => Enum (Unsigned n) where
+instance KnownNat n => Enum (Unsigned n) where
   succ           = (+# fromInteger# 1)
   pred           = (-# fromInteger# 1)
   toEnum         = fromInteger# . toInteger
@@ -213,10 +214,10 @@ instance KnownNat (2^n) => Enum (Unsigned n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat (2^n) => Unsigned n -> [Unsigned n]
-enumFromThen#   :: KnownNat (2^n) => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromTo#     :: KnownNat (2^n) => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenTo# :: KnownNat (2^n) => Unsigned n -> Unsigned n -> Unsigned n
+enumFrom#       :: KnownNat n => Unsigned n -> [Unsigned n]
+enumFromThen#   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromTo#     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
                 -> [Unsigned n]
 enumFrom# x             = map toEnum [fromEnum x ..]
 enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
@@ -232,10 +233,11 @@ minBound# :: Unsigned n
 minBound# = U 0
 
 {-# NOINLINE maxBound# #-}
-maxBound# :: KnownNat n => Unsigned n
-maxBound# = let res = U ((2 ^ natVal res) - 1) in res
+maxBound# :: forall n .KnownNat n => Unsigned n
+maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+            in  U (m - 1)
 
-instance KnownNat (2^n) => Num (Unsigned n) where
+instance KnownNat n => Num (Unsigned n) where
   (+)         = (+#)
   (-)         = (-#)
   (*)         = (*#)
@@ -244,14 +246,14 @@ instance KnownNat (2^n) => Num (Unsigned n) where
   signum bv   = resize# (unpack# (reduceOr bv))
   fromInteger = fromInteger#
 
-(+#),(-#),(*#) :: forall n . KnownNat (2^n) => Unsigned n -> Unsigned n -> Unsigned n
+(+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
-(+#) (U i) (U j) = let m = natVal (Proxy :: Proxy (2^n))
+(+#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
                        z = i + j
                    in  if z >= m then U (z - m) else U z
 
 {-# NOINLINE (-#) #-}
-(-#) (U i) (U j) = let m = natVal (Proxy :: Proxy (2^n))
+(-#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
                        z = i - j
                    in  if z < 0 then U (m + z) else U z
 
@@ -259,23 +261,23 @@ instance KnownNat (2^n) => Num (Unsigned n) where
 (*#) (U i) (U j) = fromInteger_INLINE (i * j)
 
 {-# NOINLINE negate# #-}
-negate# :: forall n . KnownNat (2^n) => Unsigned n -> Unsigned n
+negate# :: forall n . KnownNat n => Unsigned n -> Unsigned n
 negate# (U 0) = U 0
 negate# (U i) = sz `seq` U (sz - i)
   where
-    sz = natVal (Proxy :: Proxy (2^n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
 
 {-# NOINLINE fromInteger# #-}
-fromInteger# :: KnownNat (2^n) => Integer -> Unsigned n
+fromInteger# :: KnownNat n => Integer -> Unsigned n
 fromInteger# = fromInteger_INLINE
 
 {-# INLINE fromInteger_INLINE #-}
-fromInteger_INLINE :: forall n . KnownNat (2^n) => Integer -> Unsigned n
+fromInteger_INLINE :: forall n . KnownNat n => Integer -> Unsigned n
 fromInteger_INLINE i = U (i `mod` sz)
   where
-    sz = (natVal (Proxy :: Proxy (2^n)))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
 
-instance KnownNat (2^(Max m n + 1)) =>
+instance KnownNat (Max m n + 1) =>
   ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
   plus  = plus#
@@ -288,20 +290,21 @@ plus# :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
 plus# (U a) (U b) = U (a + b)
 
 {-# NOINLINE minus# #-}
-minus# :: forall m n . KnownNat (2^(Max m n + 1)) => Unsigned m -> Unsigned n
-                                                  -> Unsigned (Max m n + 1)
-minus# (U a) (U b) = let m = natVal (Proxy :: Proxy (2^(Max m n + 1)))
-                         z = a - b
-                     in  if z < 0 then U (m + z) else U z
+minus# :: forall m n . KnownNat (Max m n + 1) => Unsigned m -> Unsigned n
+                                              -> Unsigned (Max m n + 1)
+minus# (U a) (U b) =
+  let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
+      z = a - b
+  in  if z < 0 then U (m + z) else U z
 
 {-# NOINLINE times# #-}
 times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)
 times# (U a) (U b) = U (a * b)
 
-instance KnownNat (2^n) => Real (Unsigned n) where
+instance KnownNat n => Real (Unsigned n) where
   toRational = toRational . toInteger#
 
-instance KnownNat (2^n) => Integral (Unsigned n) where
+instance KnownNat n => Integral (Unsigned n) where
   quot        = quot#
   rem         = rem#
   div         = quot#
@@ -320,7 +323,7 @@ rem# (U i) (U j) = U (i `rem` j)
 toInteger# :: Unsigned n -> Integer
 toInteger# (U i) = i
 
-instance (KnownNat n, KnownNat (2^n), KnownNat (n + 1), KnownNat (n + 2)) => Bits (Unsigned n) where
+instance KnownNat n => Bits (Unsigned n) where
   (.&.)             = and#
   (.|.)             = or#
   xor               = xor#
@@ -353,11 +356,10 @@ xor# :: Unsigned n -> Unsigned n -> Unsigned n
 xor# (U v1) (U v2) = U (v1 `xor` v2)
 
 {-# NOINLINE complement# #-}
-complement# :: KnownNat (2^n) => Unsigned n -> Unsigned n
+complement# :: KnownNat n => Unsigned n -> Unsigned n
 complement# (U i) = fromInteger_INLINE (complement i)
 
-shiftL#, rotateL#, rotateR# :: (KnownNat n, KnownNat (2^n))
-                            => Unsigned n -> Int -> Unsigned n
+shiftL#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftL# #-}
 shiftL# (U v) i
   | i < 0     = error
@@ -393,24 +395,24 @@ rotateR# bv@(U n) b   = fromInteger_INLINE (l .|. r)
     b'' = sz - b'
     sz  = fromInteger (natVal bv)
 
-instance (KnownNat n, KnownNat (2^n), KnownNat (n + 1), KnownNat (n + 2)) => FiniteBits (Unsigned n) where
+instance KnownNat n => FiniteBits (Unsigned n) where
   finiteBitSize        = size#
   countLeadingZeros  u = countLeadingZeros  (pack# u)
   countTrailingZeros u = countTrailingZeros (pack# u)
 
 instance Resize Unsigned where
-  type ResizeC Unsigned = ConstSym1 ((:.$) @@ KnownNatSym @@ ((:^$$) 2))
+  type ResizeC Unsigned = ConstSym1 KnownNatSym
   resize     = resize#
-  type ExtendC Unsigned = DotSym @@ ((:.$) @@ KnownNatSym @@ ((:^$$) 2)) @@ (FlipSym1 (:+$))
+  type ExtendC Unsigned = DotSym @@ KnownNatSym @@ (FlipSym1 (:+$))
   extend     = resize#
   zeroExtend = resize#
   signExtend = resize#
-  type TruncateC Unsigned = FlipSym1 (ConstSym1 ((:.$) @@ KnownNatSym @@ ((:^$$) 2)))
+  type TruncateC Unsigned = FlipSym1 (ConstSym1 KnownNatSym)
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
-resize# :: forall n m . KnownNat (2^m) => Unsigned n -> Unsigned m
-resize# (U i) = let m = natVal (Proxy :: Proxy (2^m))
+resize# :: forall n m . KnownNat m => Unsigned n -> Unsigned m
+resize# (U i) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy m))
                 in  if i >= m then fromInteger_INLINE i else U i
 
 instance Default (Unsigned n) where
@@ -423,26 +425,25 @@ instance KnownNat n => Lift (Unsigned n) where
 decUnsigned :: Integer -> TypeQ
 decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
-instance (((n+1)-1)~n, KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
-  SaturatingNum (Unsigned n) where
+instance KnownNat n => SaturatingNum (Unsigned n) where
   satPlus SatWrap a b = a +# b
-  satPlus SatZero a b =
-    let r = plus# a b
-    in  case msb r of
-          0 -> resize# r
-          _ -> minBound#
-  satPlus _ a b =
-    let r = plus# a b
-    in  case msb r of
-          0 -> resize# r
-          _ -> maxBound#
+  satPlus SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r = plus# a b
+            in  case msb r of
+                  0 -> resize# r
+                  _ -> minBound#
+  satPlus _ a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r  = plus# a b
+            in  case msb r of
+                  0 -> resize# r
+                  _ -> maxBound#
 
   satMin SatWrap a b = a -# b
-  satMin _ a b = case msb r of
-                   0 -> resize# r
-                   _ -> minBound#
-    where
-      r = minus# a b
+  satMin _ a b = case addSNat (SNat @ n) (SNat @ 1) of
+    SNat -> let r = minus# a b
+            in  case msb r of
+                  0 -> resize# r
+                  _ -> minBound#
 
   satMult SatWrap a b = a *# b
   satMult SatZero a b =
@@ -458,11 +459,11 @@ instance (((n+1)-1)~n, KnownNat n, KnownNat (2^n), KnownNat (2^(n + 1))) =>
           0 -> unpack# rR
           _ -> maxBound#
 
-instance (KnownNat n, KnownNat (2^n)) => Arbitrary (Unsigned n) where
+instance KnownNat n => Arbitrary (Unsigned n) where
   arbitrary = arbitraryBoundedIntegral
   shrink    = BV.shrinkSizedUnsigned
 
-instance KnownNat (2^n) => CoArbitrary (Unsigned n) where
+instance KnownNat n => CoArbitrary (Unsigned n) where
   coarbitrary = coarbitraryIntegral
 
 type instance Index   (Unsigned n) = Int
