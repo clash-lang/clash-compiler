@@ -173,19 +173,19 @@ subUNat UZero     _         = error "impossible: 0 + (n + 1) ~ 0"
 addSNat :: SNat a -> SNat b -> SNat (a+b)
 addSNat x y = reifyNat (snatToInteger x + snatToInteger y)
             $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE addSNat #-}
+{-# INLINE addSNat #-}
 
 -- | Subtract two singleton natural numbers
 subSNat :: SNat (a+b) -> SNat b -> SNat a
 subSNat x y = reifyNat (snatToInteger x - snatToInteger y)
             $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE subSNat #-}
+{-# INLINE subSNat #-}
 
 -- | Multiply two singleton natural numbers
 mulSNat :: SNat a -> SNat b -> SNat (a*b)
 mulSNat x y = reifyNat (snatToInteger x * snatToInteger y)
             $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE mulSNat #-}
+{-# INLINE mulSNat #-}
 
 -- | Power of two singleton natural numbers
 powSNat :: SNat a -> SNat b -> SNat (a^b)
@@ -204,7 +204,7 @@ powSNat x y = let x' = snatToInteger x
 divSNat :: SNat (a*(b+1)) -> SNat (b+1) -> SNat a
 divSNat x y = reifyNat (snatToInteger x `div` snatToInteger y)
             $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE divSNat #-}
+{-# INLINE divSNat #-}
 
 -- | Logarithm of a natural number
 --
@@ -215,13 +215,13 @@ logBaseSNat :: SNat (a+2) -- ^ Base
 logBaseSNat x y =
   reifyNat (smallInteger (integerLogBase# (snatToInteger x) (snatToInteger y)))
   $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE logBaseSNat #-}
+{-# INLINE logBaseSNat #-}
 
 -- | Power of two of a singleton natural number
 pow2SNat :: SNat a -> SNat (2^a)
 pow2SNat x = reifyNat (shiftL 1 (fromInteger (snatToInteger x)))
            $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE pow2SNat #-}
+{-# INLINE pow2SNat #-}
 
 -- | Base-2 encoded natural number
 --
