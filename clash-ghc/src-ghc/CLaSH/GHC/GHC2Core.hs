@@ -46,6 +46,7 @@ import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
 import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
+import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), brListMapM)
 import Coercion   (Coercion (..),Role(..),coercionType,coercionKind,mkCoercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (AltCon (..), Bind (..), CoreExpr,
@@ -74,7 +75,7 @@ import SrcLoc     (isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
-                   isPrimTyCon, isTupleTyCon,
+                   isPrimTyCon, isTupleTyCon, isClosedSynFamilyTyCon_maybe,
 #if __GLASGOW_HASKELL__ >= 711
                    expandSynTyCon_maybe,
 #else
@@ -161,8 +162,12 @@ makeTyCon fiEnvs tc = tycon
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          let instances = familyInstances fiEnvs tc
-          substs <- mapM famInstToSubst instances
+          substs <- case isClosedSynFamilyTyCon_maybe tc of
+            Nothing -> let instances = familyInstances fiEnvs tc
+                       in  mapM famInstToSubst instances
+            Just cx -> let bx = co_ax_branches cx
+                       in  brListMapM (\b -> (,) <$> mapM coreToType (cab_lhs b)
+                                                 <*> coreToType (cab_rhs b)) bx
           return
             C.FunTyCon
             { C.tyConName  = tcName
