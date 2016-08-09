@@ -76,7 +76,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..))
 import CLaSH.Class.Resize             (Resize (..))
-import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (..))
+import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (BV))
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -170,14 +170,14 @@ instance KnownNat n => Enum (Index n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat n => Index n -> [Index n]
-enumFromThen#   :: KnownNat n => Index n -> Index n -> [Index n]
-enumFromTo#     :: KnownNat n => Index n -> Index n -> [Index n]
-enumFromThenTo# :: KnownNat n => Index n -> Index n -> Index n -> [Index n]
-enumFrom# x             = map toEnum [fromEnum x ..]
-enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+enumFrom#       :: Index n -> [Index n]
+enumFromThen#   :: Index n -> Index n -> [Index n]
+enumFromTo#     :: Index n -> Index n -> [Index n]
+enumFromThenTo# :: Index n -> Index n -> Index n -> [Index n]
+enumFrom# x             = map I [unsafeToInteger x ..]
+enumFromThen# x y       = map I [unsafeToInteger x, unsafeToInteger y ..]
+enumFromTo# x y         = map I [unsafeToInteger x .. unsafeToInteger y]
+enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 
 instance KnownNat n => Bounded (Index n) where
   minBound = fromInteger# 0

@@ -241,15 +241,14 @@ instance KnownNat n => Enum (BitVector n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat n => BitVector n -> [BitVector n]
-enumFromThen#   :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
-enumFromTo#     :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
-enumFromThenTo# :: KnownNat n => BitVector n -> BitVector n -> BitVector n
-                -> [BitVector n]
-enumFrom# x             = map toEnum [fromEnum x ..]
-enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+enumFrom#       :: BitVector n -> [BitVector n]
+enumFromThen#   :: BitVector n -> BitVector n -> [BitVector n]
+enumFromTo#     :: BitVector n -> BitVector n -> [BitVector n]
+enumFromThenTo# :: BitVector n -> BitVector n -> BitVector n -> [BitVector n]
+enumFrom# x             = map BV [unsafeToInteger x ..]
+enumFromThen# x y       = map BV [unsafeToInteger x, unsafeToInteger y ..]
+enumFromTo# x y         = map BV [unsafeToInteger x .. unsafeToInteger y]
+enumFromThenTo# x1 x2 y = map BV [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 
 instance KnownNat n => Bounded (BitVector n) where
   minBound = minBound#

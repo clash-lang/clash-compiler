@@ -96,7 +96,7 @@ import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
 import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, high, low)
+import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
@@ -211,15 +211,14 @@ instance KnownNat n => Enum (Unsigned n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat n => Unsigned n -> [Unsigned n]
-enumFromThen#   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromTo#     :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
-enumFromThenTo# :: KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
-                -> [Unsigned n]
-enumFrom# x             = map toEnum [fromEnum x ..]
-enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+enumFrom#       :: Unsigned n -> [Unsigned n]
+enumFromThen#   :: Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromTo#     :: Unsigned n -> Unsigned n -> [Unsigned n]
+enumFromThenTo# :: Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
+enumFrom# x             = map U [unsafeToInteger x ..]
+enumFromThen# x y       = map U [unsafeToInteger x, unsafeToInteger y ..]
+enumFromTo# x y         = map U [unsafeToInteger x .. unsafeToInteger y]
+enumFromThenTo# x1 x2 y = map U [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 
 instance KnownNat n => Bounded (Unsigned n) where
   minBound = minBound#

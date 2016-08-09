@@ -106,7 +106,7 @@ import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Promoted.Ord             (Max)
-import CLaSH.Sized.Internal.BitVector (BitVector (..), Bit, (++#), high, low)
+import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
@@ -228,14 +228,14 @@ instance KnownNat n => Enum (Signed n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: KnownNat n => Signed n -> [Signed n]
-enumFromThen#   :: KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromTo#     :: KnownNat n => Signed n -> Signed n -> [Signed n]
-enumFromThenTo# :: KnownNat n => Signed n -> Signed n -> Signed n -> [Signed n]
-enumFrom# x             = map toEnum [fromEnum x ..]
-enumFromThen# x y       = map toEnum [fromEnum x, fromEnum y ..]
-enumFromTo# x y         = map toEnum [fromEnum x .. fromEnum y]
-enumFromThenTo# x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
+enumFrom#       :: Signed n -> [Signed n]
+enumFromThen#   :: Signed n -> Signed n -> [Signed n]
+enumFromTo#     :: Signed n -> Signed n -> [Signed n]
+enumFromThenTo# :: Signed n -> Signed n -> Signed n -> [Signed n]
+enumFrom# x             = map S [unsafeToInteger x ..]
+enumFromThen# x y       = map S [unsafeToInteger x, unsafeToInteger y ..]
+enumFromTo# x y         = map S [unsafeToInteger x .. unsafeToInteger y]
+enumFromThenTo# x1 x2 y = map S [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 
 
 instance KnownNat n => Bounded (Signed n) where
