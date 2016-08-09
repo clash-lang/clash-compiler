@@ -1001,7 +1001,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
             untranslatableTys <- mapM isUntranslatableType_not_poly [aTy,bTy]
             if or untranslatableTys
               then let [fun,start,arg] = Either.lefts args
-                   in  reduceFoldr n aTy bTy fun start arg
+                   in  reduceFoldr n aTy fun start arg
               else return e
           _ -> return e
       "CLaSH.Sized.Vector.dfold" | length args == 8 ->

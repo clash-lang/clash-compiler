@@ -8,6 +8,7 @@
 
 {-# LANGUAGE Rank2Types        #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module CLaSH.Rewrite.Util where
 
@@ -44,8 +45,8 @@ import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
                                               TmName)
 import           CLaSH.Core.TyCon            (TyCon, TyConName, tyConDataCons)
 import           CLaSH.Core.Type             (KindOrType, Type (..),
-                                              TypeView (..), transparentTy,
-                                              typeKind, coreView)
+                                              TypeView (..), coreView,
+                                              typeKind, tyView)
 import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
                                               mkAbstraction, mkApps, mkId,
                                               mkLams, mkTmApps, mkTyApps,
@@ -77,10 +78,10 @@ apply name rewrite ctx expr = do
 
   Monad.when (lvl > DebugNone && hasChanged) $ do
     tcm                  <- Lens.view tcCache
-    beforeTy             <- fmap transparentTy $ termType tcm expr
+    beforeTy             <- termType tcm expr
     let beforeFTV        = Lens.setOf termFreeTyVars expr
     beforeFV             <- Lens.setOf <$> localFreeIds <*> pure expr
-    afterTy              <- fmap transparentTy $ termType tcm expr'
+    afterTy              <- termType tcm expr'
     let afterFTV         = Lens.setOf termFreeTyVars expr
     afterFV              <- Lens.setOf <$> localFreeIds <*> pure expr'
     let newFV = Set.size afterFTV > Set.size beforeFTV ||
@@ -491,18 +492,19 @@ mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
                -> Int -- n'th field
                -> m Term
 mkSelectorCase caller tcm scrut dcI fieldI = do
-  scrutTy <- termType tcm scrut
-  let cantCreate loc info = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
-  case coreView tcm scrutTy of
-    TyConApp tc args ->
+    scrutTy <- termType tcm scrut
+    go scrutTy
+  where
+    go (coreView tcm -> Just ty')   = go ty'
+    go scrutTy@(tyView -> TyConApp tc args) =
       case tyConDataCons (tcm HMS.! tc) of
-        [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc)
-        dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max"
+        [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc) scrutTy
+        dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
             | otherwise -> do
           let dc = indexNote ($(curLoc) ++ "No DC with tag: " ++ show (dcI-1)) dcs (dcI-1)
           let (Just fieldTys) = dataConInstArgTys dc args
           if fieldI >= length fieldTys
-            then cantCreate $(curLoc) "Field index exceed max"
+            then cantCreate $(curLoc) "Field index exceed max" scrutTy
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
               let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
@@ -511,7 +513,9 @@ mkSelectorCase caller tcm scrut dcI fieldI = do
                   pat    = DataPat (embed dc) (rebind [] bndrs)
                   retVal = Case scrut ty [ bind pat (snd selBndr) ]
               return retVal
-    _ -> cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showDoc scrutTy)
+    go scrutTy = cantCreate $(curLoc) ("Type of subject is not a datatype: " ++ showDoc scrutTy) scrutTy
+
+    cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
 
 -- | Specialise an application on its argument
 specialise :: Lens' extra (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations

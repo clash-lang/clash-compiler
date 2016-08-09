@@ -32,7 +32,7 @@ import qualified SrcLoc                  as GHC
 import           CLaSH.Annotations.TopEntity (TopEntity)
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
-import           CLaSH.Core.Type         (Type, TypeView (..), coreView, mkFunTy, splitFunForallTy)
+import           CLaSH.Core.Type         (Type, TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           CLaSH.Core.TyCon        (TyCon, TyConName)
 import           CLaSH.Core.TysPrim      (tysPrimMap)
 import           CLaSH.Core.Subst        (substTms)
@@ -143,7 +143,7 @@ mkClassSelector tcm ty sel = newExpr
                        $ first (span (\l -> case l of Left _ -> True
                                                       _      -> False))
                        $ splitFunForallTy ty
-    newExpr = case coreView tcm dictTy of
+    newExpr = case tyView dictTy of
       (TyConApp _ _) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
                           (dcId,dcVar) <- mkInternalVar "dict" dictTy
                           selE         <- mkSelectorCase "mkClassSelector" tcm dcVar 1 sel

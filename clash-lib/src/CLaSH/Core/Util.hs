@@ -31,9 +31,8 @@ import CLaSH.Core.Term                         (LetBinding, Pat (..), Term (..),
                                                 TmName)
 import CLaSH.Core.Type                         (Kind, LitTy (..), TyName,
                                                 Type (..), TypeView (..), applyTy,
-                                                findFunSubst, isFunTy,
-                                                isPolyFunCoreTy, mkFunTy,
-                                                splitFunTy, tyView)
+                                                coreView, isFunTy, isPolyFunCoreTy,
+                                                mkFunTy, splitFunTy, tyView)
 import CLaSH.Core.TyCon                        (TyCon (..), TyConName,
                                                 tyConDataCons)
 import CLaSH.Core.TysPrim                      (typeNatKind)
@@ -358,81 +357,6 @@ isSignalType tcm ty = go HashSet.empty ty
 tyNatSize :: HMS.HashMap TyConName TyCon
           -> Type
           -> Except String Integer
-tyNatSize tcm ty = case go ty of
-    Right (Left i) -> return i
-    Right _  -> throwE $ $(curLoc) ++ "Cannot reduce an integer: " ++ show ty
-    Left msg -> throwE msg
-  where
-    go :: Type -> Either String (Either Integer Bool)
-    go (LitTy (NumTy i)) = return (Left i)
-
-    go (tyView -> TyConApp tc tys)
-      | name2String tc == "GHC.TypeLits.+"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 + i2))
-
-      | name2String tc == "GHC.TypeLits.*"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 * i2))
-
-      | name2String tc == "GHC.TypeLits.^"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 ^ i2))
-
-      | name2String tc == "GHC.TypeLits.-"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 - i2))
-
-      | name2String tc == "CLaSH.Promoted.Ord.Max"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 `max` i2))
-
-      | name2String tc == "CLaSH.Promoted.Ord.Min"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 `min` i2))
-
-      | name2String tc == "GHC.TypeLits.Extra.CLog"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      , Just k <- clogBase i1 i2
-      = return (Left (toInteger k))
-
-      | name2String tc == "GHC.TypeLits.Extra.GCD"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Left (i1 `gcd` i2))
-
-      | name2String tc == "Data.Type.Bool.If"
-      , TyConApp tcNat _ <- tyView (tys !! 0)
-      , name2String tcNat == "GHC.TypeLits.Nat"
-      , Right (Right b) <- go (tys !! 1)
-      , Right (Left i1) <- go (tys !! 2)
-      , Right (Left i2) <- go (tys !! 3)
-      = if b then return (Left i1)
-             else return (Left i2)
-
-      | name2String tc == "GHC.TypeLits.<=?"
-      , length tys == 2
-      , Right (Left i1) <- go (tys !! 0)
-      , Right (Left i2) <- go (tys !! 1)
-      = return (Right (i1 <= i2))
-
-      | FunTyCon {tyConSubst = tcSubst} <- tcm HMS.! tc
-      , Just ty' <- findFunSubst tcSubst tys
-      = go ty'
-
-    go t = Left ($(curLoc) ++ "Can't convert tyNat: " ++ show t)
+tyNatSize m (coreView m -> Just ty) = tyNatSize m ty
+tyNatSize _ (LitTy (NumTy i))       = return i
+tyNatSize _ ty = throwE $ $(curLoc) ++ "Cannot reduce an integer: " ++ show ty

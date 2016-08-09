@@ -28,6 +28,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module CLaSH.Normalize.PrimitiveReductions where
 
@@ -41,6 +42,7 @@ import           Unbound.Generics.LocallyNameless (bind, embed, rec, rebind,
 import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys,
                                                    dcName, dcType)
 import           CLaSH.Core.Literal               (Literal (..))
+import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Term                  (Term (..), Pat (..))
 import           CLaSH.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView,
@@ -70,18 +72,23 @@ reduceZipWith :: Integer  -- ^ Length of the vector(s)
               -> Term -- ^ The 2nd vector argument
               -> NormalizeSession Term
 reduceZipWith n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm lhsArg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      (varsL,elemsL)   = second concat . unzip
-                       $ extractElems consCon lhsElTy 'L' n lhsArg
-      (varsR,elemsR)   = second concat . unzip
-                       $ extractElems consCon rhsElTy 'R' n rhsArg
-      funApps          = zipWith (\l r -> mkApps fun [Left l,Left r]) varsL varsR
-      lbody            = mkVec nilCon consCon resElTy n funApps
-      lb               = Letrec (bind (rec (init elemsL ++ init elemsR)) lbody)
-  changed lb
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm lhsArg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = let (varsL,elemsL)   = second concat . unzip
+                             $ extractElems consCon lhsElTy 'L' n lhsArg
+            (varsR,elemsR)   = second concat . unzip
+                             $ extractElems consCon rhsElTy 'R' n rhsArg
+            funApps          = zipWith (\l r -> mkApps fun [Left l,Left r]) varsL varsR
+            lbody            = mkVec nilCon consCon resElTy n funApps
+            lb               = Letrec (bind (rec (init elemsL ++ init elemsR)) lbody)
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceZipWith: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.map@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
@@ -93,16 +100,21 @@ reduceMap :: Integer  -- ^ Length of the vector
           -> Term -- ^ The map'd over vector
           -> NormalizeSession Term
 reduceMap n argElTy resElTy fun arg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      (vars,elems)     = second concat . unzip
-                       $ extractElems consCon argElTy 'A' n arg
-      funApps          = map (fun `App`) vars
-      lbody            = mkVec nilCon consCon resElTy n funApps
-      lb               = Letrec (bind (rec (init elems)) lbody)
-  changed lb
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm arg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = let (vars,elems)     = second concat . unzip
+                             $ extractElems consCon argElTy 'A' n arg
+            funApps          = map (fun `App`) vars
+            lbody            = mkVec nilCon consCon resElTy n funApps
+            lb               = Letrec (bind (rec (init elems)) lbody)
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceMap: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.imap@ primitive on vectors
 -- of a known length @n@, by the fully unrolled recursive "definition" of
@@ -114,31 +126,37 @@ reduceImap :: Integer  -- ^ Length of the vector
            -> Term -- ^ The imap'd over vector
            -> NormalizeSession Term
 reduceImap n argElTy resElTy fun arg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      (vars,elems)     = second concat . unzip
-                       $ extractElems consCon argElTy 'I' n arg
-  (Right idxTy:_,_) <- splitFunForallTy <$> termType tcm fun
-  let (TyConApp idxTcNm _) = tyView idxTy
-      nTv              = string2Name "n"
-      -- fromInteger# :: KnownNat n => Integer -> Index n
-      idxFromIntegerTy = ForAllTy (bind (TyVar nTv (embed typeNatKind))
-                                   (foldr mkFunTy
-                                          (mkTyConApp idxTcNm
-                                                      [VarTy typeNatKind nTv])
-                                          [integerPrimTy,integerPrimTy]))
-      idxFromInteger   = Prim "CLaSH.Sized.Internal.Index.fromInteger#"
-                              idxFromIntegerTy
-      idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
-                                       (Literal (IntegerLiteral (toInteger n))))
-                             . Literal . IntegerLiteral . toInteger) [0..(n-1)]
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm arg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = do
+        let (vars,elems)     = second concat . unzip
+                             $ extractElems consCon argElTy 'I' n arg
+        (Right idxTy:_,_) <- splitFunForallTy <$> termType tcm fun
+        let (TyConApp idxTcNm _) = tyView idxTy
+            nTv              = string2Name "n"
+            -- fromInteger# :: KnownNat n => Integer -> Index n
+            idxFromIntegerTy = ForAllTy (bind (TyVar nTv (embed typeNatKind))
+                                         (foldr mkFunTy
+                                                (mkTyConApp idxTcNm
+                                                            [VarTy typeNatKind nTv])
+                                                [integerPrimTy,integerPrimTy]))
+            idxFromInteger   = Prim "CLaSH.Sized.Internal.Index.fromInteger#"
+                                    idxFromIntegerTy
+            idxs             = map (App (App (TyApp idxFromInteger (LitTy (NumTy n)))
+                                             (Literal (IntegerLiteral (toInteger n))))
+                                   . Literal . IntegerLiteral . toInteger) [0..(n-1)]
 
-      funApps          = zipWith (\i v -> App (App fun i) v) idxs vars
-      lbody            = mkVec nilCon consCon resElTy n funApps
-      lb               = Letrec (bind (rec (init elems)) lbody)
-  changed lb
+            funApps          = zipWith (\i v -> App (App fun i) v) idxs vars
+            lbody            = mkVec nilCon consCon resElTy n funApps
+            lb               = Letrec (bind (rec (init elems)) lbody)
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceImap: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.traverse#@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -152,65 +170,70 @@ reduceTraverse :: Integer  -- ^ Length of the vector
                -> Term -- ^ The argument vector
                -> NormalizeSession Term
 reduceTraverse n aTy fTy bTy dict fun arg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm    _) <- coreView tcm <$> termType tcm arg
-  (TyConApp apDictTcNm _) <- coreView tcm <$> termType tcm dict
-  let (Just apDictTc)    = HashMap.lookup apDictTcNm tcm
-      [apDictCon]        = tyConDataCons apDictTc
-      (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-      apDictIds          = zipWith Id (map string2Name ["functorDict"
-                                                       ,"pure"
-                                                       ,"ap"
-                                                       ,"apConstL"
-                                                       ,"apConstR"])
-                                      (map embed apDictIdTys)
+    tcm <- Lens.view tcCache
+    (TyConApp apDictTcNm _) <- tyView <$> termType tcm dict
+    ty <- termType tcm arg
+    go tcm apDictTcNm ty
+  where
+    go tcm apDictTcNm (coreView tcm -> Just ty') = go tcm apDictTcNm ty'
+    go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = let (Just apDictTc)    = HashMap.lookup apDictTcNm tcm
+            [apDictCon]        = tyConDataCons apDictTc
+            (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
+            apDictIds          = zipWith Id (map string2Name ["functorDict"
+                                                             ,"pure"
+                                                             ,"ap"
+                                                             ,"apConstL"
+                                                             ,"apConstR"])
+                                            (map embed apDictIdTys)
 
-      (TyConApp funcDictTcNm _) = coreView tcm (head apDictIdTys)
-      (Just funcDictTc) = HashMap.lookup funcDictTcNm tcm
-      [funcDictCon] = tyConDataCons funcDictTc
-      (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
-      funcDicIds    = zipWith Id (map string2Name ["fmap","fmapConst"])
-                                 (map embed funcDictIdTys)
+            (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
+            (Just funcDictTc) = HashMap.lookup funcDictTcNm tcm
+            [funcDictCon] = tyConDataCons funcDictTc
+            (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
+            funcDicIds    = zipWith Id (map string2Name ["fmap","fmapConst"])
+                                       (map embed funcDictIdTys)
 
-      apPat    = DataPat (embed apDictCon) (rebind [] apDictIds)
-      fnPat    = DataPat (embed funcDictCon) (rebind [] funcDicIds)
+            apPat    = DataPat (embed apDictCon) (rebind [] apDictIds)
+            fnPat    = DataPat (embed funcDictCon) (rebind [] funcDicIds)
 
-      -- Extract the 'pure' function from the Applicative dictionary
-      pureTy = apDictIdTys!!1
-      pureTm = Case dict pureTy [bind apPat (Var pureTy (string2Name "pure"))]
+            -- Extract the 'pure' function from the Applicative dictionary
+            pureTy = apDictIdTys!!1
+            pureTm = Case dict pureTy [bind apPat (Var pureTy (string2Name "pure"))]
 
-      -- Extract the '<*>' function from the Applicative dictionary
-      apTy   = apDictIdTys!!2
-      apTm   = Case dict apTy [bind apPat (Var apTy (string2Name "ap"))]
+            -- Extract the '<*>' function from the Applicative dictionary
+            apTy   = apDictIdTys!!2
+            apTm   = Case dict apTy [bind apPat (Var apTy (string2Name "ap"))]
 
-      -- Extract the Functor dictionary from the Applicative dictionary
-      funcTy = (head apDictIdTys)
-      funcTm = Case dict funcTy
-                         [bind apPat (Var funcTy (string2Name "functorDict"))]
+            -- Extract the Functor dictionary from the Applicative dictionary
+            funcTy = (head apDictIdTys)
+            funcTm = Case dict funcTy
+                               [bind apPat (Var funcTy (string2Name "functorDict"))]
 
-      -- Extract the 'fmap' function from the Functor dictionary
-      fmapTy = (head funcDictIdTys)
-      fmapTm = Case (Var funcTy (string2Name "functorDict")) fmapTy
-                    [bind fnPat (Var fmapTy (string2Name "fmap"))]
+            -- Extract the 'fmap' function from the Functor dictionary
+            fmapTy = (head funcDictIdTys)
+            fmapTm = Case (Var funcTy (string2Name "functorDict")) fmapTy
+                          [bind fnPat (Var fmapTy (string2Name "fmap"))]
 
-      (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      (vars,elems)     = second concat . unzip
-                                       $ extractElems consCon aTy 'T' n arg
+            (vars,elems) = second concat . unzip
+                         $ extractElems consCon aTy 'T' n arg
 
-      funApps = map (fun `App`) vars
+            funApps = map (fun `App`) vars
 
-      lbody   = mkTravVec vecTcNm nilCon consCon (idToVar (apDictIds!!1))
-                                                 (idToVar (apDictIds!!2))
-                                                 (idToVar (funcDicIds!!0))
-                                                 bTy n funApps
+            lbody   = mkTravVec vecTcNm nilCon consCon (idToVar (apDictIds!!1))
+                                                       (idToVar (apDictIds!!2))
+                                                       (idToVar (funcDicIds!!0))
+                                                       bTy n funApps
 
-      lb      = Letrec (bind (rec ([((apDictIds!!0),embed funcTm)
-                                   ,((apDictIds!!1),embed pureTm)
-                                   ,((apDictIds!!2),embed apTm)
-                                   ,((funcDicIds!!0),embed fmapTm)
-                                   ] ++ init elems)) lbody)
-  changed lb
+            lb      = Letrec (bind (rec ([((apDictIds!!0),embed funcTm)
+                                         ,((apDictIds!!1),embed pureTm)
+                                         ,((apDictIds!!2),embed apTm)
+                                         ,((funcDicIds!!0),embed fmapTm)
+                                         ] ++ init elems)) lbody)
+          in  changed lb
+    go _ _ ty = error $ $(curLoc) ++ "reduceTraverse: argument does not have a vector type: " ++ showDoc ty
 
 -- | Create the traversable vector
 --
@@ -264,21 +287,25 @@ mkTravVec vecTc nilCon consCon pureTm apTm fmapTm bTy = go
 -- of @CLaSH.Sized.Vector.foldr@
 reduceFoldr :: Integer  -- ^ Length of the vector
             -> Type -- ^ Element type of the argument vector
-            -> Type -- ^ Type of the starting element
             -> Term -- ^ The function to fold with
             -> Term -- ^ The starting value
             -> Term -- ^ The argument vector
             -> NormalizeSession Term
-reduceFoldr n aTy _bTy fun start arg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [_,consCon]      = tyConDataCons vecTc
-      (vars,elems)     = second concat . unzip
-                       $ extractElems consCon aTy 'G' n arg
-      lbody            = foldr (\l r -> mkApps fun [Left l,Left r]) start vars
-      lb               = Letrec (bind (rec (init elems)) lbody)
-  changed lb
+reduceFoldr n aTy fun start arg = do
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm arg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon] <- tyConDataCons vecTc
+      = let (vars,elems)     = second concat . unzip
+                             $ extractElems consCon aTy 'G' n arg
+            lbody            = foldr (\l r -> mkApps fun [Left l,Left r]) start vars
+            lb               = Letrec (bind (rec (init elems)) lbody)
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceFoldr: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.fold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -290,15 +317,20 @@ reduceFold :: Integer  -- ^ Length of the vector
            -> NormalizeSession Term
 reduceFold n aTy fun arg = do
     tcm <- Lens.view tcCache
-    (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-    let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-        [_,consCon]      = tyConDataCons vecTc
-        (vars,elems)     = second concat . unzip
-                         $ extractElems consCon aTy 'F' n arg
-        lbody            = foldV vars
-        lb               = Letrec (bind (rec (init elems)) lbody)
-    changed lb
+    ty  <- termType tcm arg
+    go tcm ty
   where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = let (vars,elems)     = second concat . unzip
+                             $ extractElems consCon aTy 'F' n arg
+            lbody            = foldV vars
+            lb               = Letrec (bind (rec (init elems)) lbody)
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceFold: argument does not have a vector type: " ++ showDoc ty
+
     foldV [a] = a
     foldV as  = let (l,r) = splitAt (length as `div` 2) as
                     lF    = foldV l
@@ -316,33 +348,39 @@ reduceDFold :: Integer  -- ^ Length of the vector
             -> NormalizeSession Term
 reduceDFold n aTy fun start arg = do
     tcm <- Lens.view tcCache
-    (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-    let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-        [_,consCon]      = tyConDataCons vecTc
-        (vars,elems)     = second concat . unzip
-                         $ extractElems consCon aTy 'D' n arg
-    (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm fun
-    let (TyConApp snatTcNm _) = coreView tcm snTy
-        (Just snatTc)         = HashMap.lookup snatTcNm tcm
-        [snatDc]              = tyConDataCons snatTc
-
-        ([_nTv,_kn,Right pTy],_) = splitFunForallTy (dcType snatDc)
-        (TyConApp proxyTcNm _)   = coreView tcm pTy
-        (Just proxyTc)           = HashMap.lookup proxyTcNm tcm
-        [proxyDc]                = tyConDataCons proxyTc
-
-        buildSNat i = mkApps (Prim (pack (name2String (dcName snatDc)))
-                                   (dcType snatDc))
-                             [Right (LitTy (NumTy i))
-                             ,Left (Literal (IntegerLiteral (toInteger i)))
-                             ,Left (mkApps (Data proxyDc)
-                                           [Right typeNatKind
-                                           ,Right (LitTy (NumTy i))])
-                             ]
-        lbody = doFold buildSNat (n-1) vars
-        lb    = Letrec (bind (rec (init elems)) lbody)
-    changed lb
+    ty  <- termType tcm arg
+    go tcm ty
   where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = do
+        let  (vars,elems)     = second concat . unzip
+                             $ extractElems consCon aTy 'D' n arg
+        (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm fun
+        let (TyConApp snatTcNm _) = tyView snTy
+            (Just snatTc)         = HashMap.lookup snatTcNm tcm
+            [snatDc]              = tyConDataCons snatTc
+
+            ([_nTv,_kn,Right pTy],_) = splitFunForallTy (dcType snatDc)
+            (TyConApp proxyTcNm _)   = tyView pTy
+            (Just proxyTc)           = HashMap.lookup proxyTcNm tcm
+            [proxyDc]                = tyConDataCons proxyTc
+
+            buildSNat i = mkApps (Prim (pack (name2String (dcName snatDc)))
+                                       (dcType snatDc))
+                                 [Right (LitTy (NumTy i))
+                                 ,Left (Literal (IntegerLiteral (toInteger i)))
+                                 ,Left (mkApps (Data proxyDc)
+                                               [Right typeNatKind
+                                               ,Right (LitTy (NumTy i))])
+                                 ]
+            lbody = doFold buildSNat (n-1) vars
+            lb    = Letrec (bind (rec (init elems)) lbody)
+        changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showDoc ty
+
     doFold _    _ []     = start
     doFold snDc k (x:xs) = mkApps fun
                                  [Right (LitTy (NumTy k))
@@ -359,14 +397,19 @@ reduceHead :: Integer  -- ^ Length of the vector
            -> Term -- ^ The argument vector
            -> NormalizeSession Term
 reduceHead n aTy vArg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm vArg
-  let (Just vecTc)  = HashMap.lookup vecTcNm tcm
-      [_,consCon]   = tyConDataCons vecTc
-      (vars,elems)  = second concat . unzip
-                    $ extractElems consCon aTy 'H' n vArg
-      lb = Letrec (bind (rec [head elems]) (head vars))
-  changed lb
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm vArg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = let (vars,elems)  = second concat . unzip
+                          $ extractElems consCon aTy 'H' n vArg
+            lb = Letrec (bind (rec [head elems]) (head vars))
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceHead: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.tail@ primitive on
 -- vectors of a known length @n@, by a projection of the tail of a
@@ -376,15 +419,20 @@ reduceTail :: Integer  -- ^ Length of the vector
            -> Term -- ^ The argument vector
            -> NormalizeSession Term
 reduceTail n aTy vArg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm vArg
-  let (Just vecTc) = HashMap.lookup vecTcNm tcm
-      [_,consCon]  = tyConDataCons vecTc
-      (_,elems)    = second concat . unzip
-                   $ extractElems consCon aTy 'L' n vArg
-      b@(tB,_)     = elems !! 1
-      lb           = Letrec (bind (rec [b]) (idToVar tB))
-  changed lb
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm vArg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = let (_,elems)    = second concat . unzip
+                         $ extractElems consCon aTy 'L' n vArg
+            b@(tB,_)     = elems !! 1
+            lb           = Letrec (bind (rec [b]) (idToVar tB))
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceTail: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.(++)@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -396,15 +444,20 @@ reduceAppend :: Integer  -- ^ Length of the LHS arg
              -> Term -- ^ The RHS argument
              -> NormalizeSession Term
 reduceAppend n m aTy lArg rArg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm lArg
-  let (Just vecTc) = HashMap.lookup vecTcNm tcm
-      [_,consCon]  = tyConDataCons vecTc
-      (vars,elems) = second concat . unzip
-                   $ extractElems consCon aTy 'C' n lArg
-      lbody        = appendToVec consCon aTy rArg (n+m) vars
-      lb           = Letrec (bind (rec (init elems)) lbody)
-  changed lb
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm lArg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = let (vars,elems) = second concat . unzip
+                         $ extractElems consCon aTy 'C' n lArg
+            lbody        = appendToVec consCon aTy rArg (n+m) vars
+            lb           = Letrec (bind (rec (init elems)) lbody)
+        in  changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceAppend: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.unconcat@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
@@ -415,14 +468,19 @@ reduceUnconcat :: Integer  -- ^ Length of the result vector
                -> Term -- ^ Argument vector
                -> NormalizeSession Term
 reduceUnconcat n 0 aTy arg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      nilVec           = mkVec nilCon consCon aTy 0 []
-      innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
-      retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
-  changed retVec
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm arg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = let nilVec           = mkVec nilCon consCon aTy 0 []
+            innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
+            retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
+        in  changed retVec
+    go _ ty = error $ $(curLoc) ++ "reduceUnconcat: argument does not have a vector type: " ++ showDoc ty
 
 reduceUnconcat _ _ _ _ = error $ $(curLoc) ++ "reduceUnconcat: unimplemented"
 
@@ -435,14 +493,19 @@ reduceTranspose :: Integer  -- ^ Length of the result vector
                 -> Term -- ^ Argument vector
                 -> NormalizeSession Term
 reduceTranspose n 0 aTy arg = do
-  tcm <- Lens.view tcCache
-  (TyConApp vecTcNm _) <- coreView tcm <$> termType tcm arg
-  let (Just vecTc)     = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      nilVec           = mkVec nilCon consCon aTy 0 []
-      innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
-      retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
-  changed retVec
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm arg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = let nilVec           = mkVec nilCon consCon aTy 0 []
+            innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
+            retVec           = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
+        in  changed retVec
+    go _ ty = error $ $(curLoc) ++ "reduceTranspose: argument does not have a vector type: " ++ showDoc ty
 
 reduceTranspose _ _ _ _ = error $ $(curLoc) ++ "reduceTranspose: unimplemented"
 
@@ -452,9 +515,13 @@ reduceReplicate :: Integer
                 -> Term
                 -> NormalizeSession Term
 reduceReplicate n aTy eTy arg = do
-  tcm <- Lens.view tcCache
-  let (TyConApp vecTcNm _) = coreView tcm eTy
-      (Just vecTc) = HashMap.lookup vecTcNm tcm
-      [nilCon,consCon] = tyConDataCons vecTc
-      retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
-  changed retVec
+    tcm <- Lens.view tcCache
+    go tcm eTy
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon] <- tyConDataCons vecTc
+      = let retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
+        in  changed retVec
+    go _ ty = error $ $(curLoc) ++ "reduceReplicate: argument does not have a vector type: " ++ showDoc ty

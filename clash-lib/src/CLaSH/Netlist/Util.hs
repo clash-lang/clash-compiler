@@ -32,7 +32,7 @@ import           CLaSH.Core.Subst        (substTys)
 import           CLaSH.Core.Term         (LetBinding, Term (..), TmName)
 import           CLaSH.Core.TyCon        (TyCon (..), TyConName, tyConDataCons)
 import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
-                                          splitTyConAppM, tyView)
+                                          coreView, splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
 import           CLaSH.Netlist.Types     as HW
@@ -121,12 +121,10 @@ coreTypeToHWType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWT
                  -> HashMap TyConName TyCon
                  -> Type
                  -> Either String HWType
-coreTypeToHWType builtInTranslation m ty =
-  fromMaybe
-    (case tyView ty of
-       TyConApp tc args -> mkADT builtInTranslation m (showDoc ty) tc args
-       _                -> Left $ "Can't translate non-tycon type: " ++ showDoc ty)
-    (builtInTranslation m ty)
+coreTypeToHWType builtInTranslation m (builtInTranslation m -> Just hty) = hty
+coreTypeToHWType builtInTranslation m (coreView m -> Just ty) = coreTypeToHWType builtInTranslation m ty
+coreTypeToHWType builtInTranslation m ty@(tyView -> TyConApp tc args) = mkADT builtInTranslation m (showDoc ty) tc args
+coreTypeToHWType _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
 mkADT :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator

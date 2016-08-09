@@ -20,8 +20,7 @@ import Unbound.Generics.LocallyNameless (name2String)
 import CLaSH.Core.DataCon               (DataCon (..))
 import CLaSH.Core.Pretty                (showDoc)
 import CLaSH.Core.TyCon                 (TyCon (..), TyConName, tyConDataCons)
-import CLaSH.Core.Type                  (Type (..), TypeView (..), findFunSubst,
-                                         tyView)
+import CLaSH.Core.Type                  (Type (..), TypeView (..), tyView)
 import CLaSH.Core.Util                  (tyNatSize)
 import CLaSH.Netlist.Util               (coreTypeToHWType)
 import CLaSH.Netlist.Types              (HWType(..))
@@ -110,14 +109,6 @@ ghcTypeToHWType iw = go
           (TyConApp (name2String -> "GHC.Types.Char") []) -> return String
           _ -> fail $ "Can't translate type: " ++ showDoc ty
 
-        _ -> case m ! tc of
-               -- TODO: Remove this conversion
-               -- The current problem is that type-functions are not reduced by the GHC -> Core
-               -- transformation process, and so end up here. Once a fix has been found for
-               -- this problem remove this dirty hack.
-               FunTyCon {tyConSubst = tcSubst} -> case findFunSubst tcSubst args of
-                 Just ty' -> ExceptT $ return $ coreTypeToHWType go m ty'
-                 _ -> ExceptT Nothing
-               _ -> ExceptT Nothing
+        _ -> ExceptT Nothing
 
     go _ _ = Nothing
