@@ -189,8 +189,12 @@ mulSNat x y = reifyNat (snatToInteger x * snatToInteger y)
 
 -- | Power of two singleton natural numbers
 powSNat :: SNat a -> SNat b -> SNat (a^b)
-powSNat x y = reifyNat (snatToInteger x ^ snatToInteger y)
-            $ \p -> unsafeCoerce (snatProxy p)
+powSNat x y = let x' = snatToInteger x
+                  y' = snatToInteger y
+                  z  = case x' of
+                         2 -> shiftL 1 (fromInteger y')
+                         _ -> x' ^ y'
+              in  reifyNat z (\p -> unsafeCoerce (snatProxy p))
 {-# NOINLINE powSNat #-}
 
 -- | Division of two singleton natural numbers
