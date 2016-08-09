@@ -12,9 +12,11 @@ look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
 using explicitly clocked signals.
 -}
 
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Unsafe #-}
 
@@ -68,6 +70,7 @@ import CLaSH.Prelude.Explicit.Safe
 import CLaSH.Prelude.BlockRam.File (blockRamFile', blockRamFilePow2')
 import CLaSH.Prelude.ROM.File      (romFile', romFilePow2')
 import CLaSH.Prelude.Testbench     (assert', stimuliGenerator', outputVerifier')
+import CLaSH.Promoted.Nat          (SNat (..), addSNat)
 import CLaSH.Signal.Explicit
 import CLaSH.Sized.Vector          (Vec (..), (+>>), asNatProxy, repeat)
 
@@ -125,12 +128,12 @@ window' clk x = res
 -- >>> simulateB windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
-windowD' :: (KnownNat (n + 1), Default a)
+windowD' :: forall n clk a . (KnownNat n, Default a)
          => SClock clk                   -- ^ Clock to which the incoming signal
                                          -- is synchronized
          -> Signal' clk a                -- ^ Signal to create a window over
          -> Vec (n + 1) (Signal' clk a)  -- ^ Window of at least size 1
-windowD' clk x = prev
-  where
-    prev = registerB' clk (repeat def) next
-    next = x +>> prev
+windowD' clk x = case addSNat (SNat @ n) (SNat @ 1) of
+  SNat -> let prev = registerB' clk (repeat def) next
+              next = x +>> prev
+          in  prev

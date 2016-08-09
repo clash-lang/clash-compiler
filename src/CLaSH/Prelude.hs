@@ -205,7 +205,7 @@ window = window' systemClock
 -- >>> simulateB windowD3 [1::Int,2,3,4] :: [Vec 3 Int]
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
-windowD :: (KnownNat (n + 1), Default a)
+windowD :: (KnownNat n, Default a)
         => Signal a               -- ^ Signal to create a window over
         -> Vec (n + 1) (Signal a) -- ^ Window of at least size 1
 windowD = windowD' systemClock
