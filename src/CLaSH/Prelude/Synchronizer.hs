@@ -33,7 +33,7 @@ import CLaSH.Class.BitPack         (boolToBV)
 import CLaSH.Prelude.BitIndex      (slice)
 import CLaSH.Prelude.Mealy         (mealyB')
 import CLaSH.Prelude.RAM           (asyncRam')
-import CLaSH.Promoted.Nat          (SNat, powSNat, subSNat)
+import CLaSH.Promoted.Nat          (SNat, pow2SNat, subSNat)
 import CLaSH.Promoted.Nat.Literals (d0, d1, d2)
 import CLaSH.Signal                ((.&&.), not1)
 import CLaSH.Signal.Explicit       (Signal', SClock, register',
@@ -90,7 +90,7 @@ fifoMem :: _
         -> Signal' rclk a
 fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
   asyncRam' wclk rclk
-            (d2 `powSNat` addrSize)
+            (pow2SNat addrSize)
             waddr raddr
             (winc .&&. not1 wfull)
             wdata

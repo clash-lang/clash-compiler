@@ -67,9 +67,9 @@ import Prelude                     hiding ((++), (!!))
 import Test.QuickCheck             (Arbitrary (..), CoArbitrary (..))
 
 import CLaSH.Class.BitPack         (BitPack (..))
-import CLaSH.Promoted.Nat          (SNat (..), UNat (..), powSNat, snatToInteger,
+import CLaSH.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToInteger,
                                     subSNat, toUNat)
-import CLaSH.Promoted.Nat.Literals (d1, d2)
+import CLaSH.Promoted.Nat.Literals (d1)
 import CLaSH.Sized.Index           (Index)
 import CLaSH.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
 
@@ -359,7 +359,7 @@ tmap f = tdfold (Proxy :: Proxy (MapTree b)) (LR . f) (\_ l r -> BR l r)
 tindices :: (KnownNat d, KnownNat (2^d)) => RTree d (Index (2^d))
 tindices =
   tdfold (Proxy :: Proxy (MapTree (Index (2^d)))) LR
-         (\s@SNat l r -> BR l (tmap (+(fromInteger (snatToInteger (d2 `powSNat` s)))) r))
+         (\s@SNat l r -> BR l (tmap (+(fromInteger (snatToInteger (pow2SNat s)))) r))
          (treplicate SNat 0)
 
 data V2TTree (a :: *) (f :: TyFun Nat *) :: *

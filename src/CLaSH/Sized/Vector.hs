@@ -119,9 +119,9 @@ import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Promoted.Nat         (SNat (..), UNat (..), powSNat, snatProxy,
+import CLaSH.Promoted.Nat         (SNat (..), UNat (..), pow2SNat, snatProxy,
                                    snatToInteger, subSNat, withSNat, toUNat)
-import CLaSH.Promoted.Nat.Literals (d1, d2)
+import CLaSH.Promoted.Nat.Literals (d1)
 import CLaSH.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
 
@@ -1855,7 +1855,7 @@ dtfold _ f g = go (SNat :: SNat k)
     go _  (x `Cons` Nil) = f x
     go sn xs =
       let sn'       = sn `subSNat` d1
-          (xsL,xsR) = splitAt (d2 `powSNat` sn') xs
+          (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
 {-# NOINLINE dtfold #-}
 
