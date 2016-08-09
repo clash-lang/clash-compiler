@@ -32,6 +32,7 @@ BEWARE: rounding by truncation introduces a sign bias!
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -89,7 +90,7 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..), boundedPlus, boundedMin,
                                    boundedMult)
 import CLaSH.Class.Resize         (Resize (..))
-import CLaSH.Promoted.Nat         (SNat)
+import CLaSH.Promoted.Nat         (SNat (..), addSNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
@@ -357,15 +358,15 @@ type ENumFixedC rep int1 frac1 int2 frac2
 
 -- | Constraint for the 'ExtendingNum' instance of 'SFixed'
 type ENumSFixedC int1 frac1 int2 frac2
-  = ( KnownNat frac1
-    , KnownNat frac2
+  = ( KnownNat (int2 + frac2)
+    , KnownNat (1 +  Max int1 int2 + Max frac1 frac2)
     , KnownNat (Max frac1 frac2)
+    , KnownNat (1 +  Max int1 int2)
     , KnownNat (int1 + frac1)
-    , KnownNat (int2 + frac2)
-    , KnownNat ((int1 + int2) + (frac1 + frac2))
-    , KnownNat (1 + Max (int1 + frac1) (int2 + frac2))
-    , KnownNat ((1 + Max int1 int2) + Max frac1 frac2)
-    , ((int1 + frac1) + (int2 + frac2)) ~ ((int1 + int2) + (frac1 + frac2))
+    , KnownNat frac2
+    , KnownNat int2
+    , KnownNat frac1
+    , KnownNat int1
     )
 
 -- | Constraint for the 'ExtendingNum' instance of 'UFixed'
@@ -406,13 +407,14 @@ type NumFixedC rep int frac
 
 -- | Constraint for the 'Num' instance of 'SFixed'
 type NumSFixedC int frac =
-  ( KnownNat frac
+  ( KnownNat ((int + int) + (frac + frac))
   , KnownNat (frac + frac)
+  , KnownNat (int + int)
   , KnownNat (int + frac)
-  , KnownNat (1 + (int + frac))
-  , KnownNat ((int + frac) + (int + frac))
-  , ((int + int) + (frac + frac)) ~ ((int + frac) + (int + frac))
+  , KnownNat frac
+  , KnownNat int
   )
+
 -- | Constraint for the 'Num' instance of 'UFixed'
 type NumUFixedC int frac =
      NumSFixedC int frac
@@ -464,18 +466,20 @@ type ResizeFC rep int1 frac1 int2 frac2
     , Num      (rep (int1 + frac1))
     , Bits     (rep (int1 + frac1))
     , Bits     (rep (int2 + frac2))
+    , KnownNat int1
     , KnownNat frac1
+    , KnownNat int2
     , KnownNat frac2
-    , KnownNat (int1 + frac1)
-    , KnownNat (int2 + frac2)
     )
 
 -- | Constraint for the 'resizeF' function, specialized for 'SFixed'
 type ResizeSFC int1 frac1 int2 frac2
-  = ( KnownNat frac1
+  = ( KnownNat int1
+    , KnownNat frac1
+    , KnownNat int2
     , KnownNat frac2
-    , KnownNat (int1 + frac1)
     , KnownNat (int2 + frac2)
+    , KnownNat (int1 + frac1)
     )
 
 -- | Constraint for the 'resizeF' function, specialized for 'UFixed'
@@ -520,44 +524,46 @@ resizeF' :: forall rep int1 frac1 int2 frac2 . ResizeFC rep int1 frac1 int2 frac
          -> Fixed rep int2 frac2
 resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
   where
-    argSZ = natVal (Proxy :: Proxy (int1 + frac1))
-    resSZ = natVal (Proxy :: Proxy (int2 + frac2))
-
     argFracSZ = fromInteger (natVal (Proxy :: Proxy frac1))
     resFracSZ = fromInteger (natVal (Proxy :: Proxy frac2))
 
     -- All size and frac comparisons and related if-then-else statements should
     -- be optimized away by the compiler
-    sat = if argSZ <= resSZ
-            -- if the argument is smaller than the result, resize before shift
-            then if argFracSZ <= resFracSZ
-                    then resize fRep `shiftL` (resFracSZ - argFracSZ)
-                    else resize fRep `shiftR` (argFracSZ - resFracSZ)
-            -- if the argument is bigger than the result, shift before resize
-            else let mask = complement (resize fMax) :: rep (int1 + frac1)
-                 in if argFracSZ <= resFracSZ
-                       then let shiftedL         = fRep `shiftL`
-                                                   (resFracSZ - argFracSZ)
-                                shiftedL_masked  = shiftedL .&. mask
-                                shiftedL_resized = resize shiftedL
-                            in if doWrap then shiftedL_resized else if fRep >= 0
-                                  then if shiftedL_masked == 0
-                                          then shiftedL_resized
-                                          else fMax
-                                  else if shiftedL_masked == mask
-                                          then shiftedL_resized
-                                          else fMin
-                       else let shiftedR         = fRep `shiftR`
-                                                   (argFracSZ - resFracSZ)
-                                shiftedR_masked  = shiftedR .&. mask
-                                shiftedR_resized = resize shiftedR
-                            in if doWrap then shiftedR_resized else if fRep >= 0
-                                  then if shiftedR_masked == 0
-                                          then shiftedR_resized
-                                          else fMax
-                                  else if shiftedR_masked == mask
-                                          then shiftedR_resized
-                                          else fMin
+    sat = case addSNat (SNat @ int1) (SNat @ frac1) of
+      s1@SNat -> case addSNat (SNat @ int2) (SNat @ frac2) of
+        s2@SNat ->
+          let argSZ = snatToInteger s1
+              resSZ = snatToInteger s2
+          in if argSZ <= resSZ
+              -- if the argument is smaller than the result, resize before shift
+              then if argFracSZ <= resFracSZ
+                      then resize fRep `shiftL` (resFracSZ - argFracSZ)
+                      else resize fRep `shiftR` (argFracSZ - resFracSZ)
+              -- if the argument is bigger than the result, shift before resize
+              else let mask = complement (resize fMax) :: rep (int1 + frac1)
+                   in if argFracSZ <= resFracSZ
+                         then let shiftedL         = fRep `shiftL`
+                                                     (resFracSZ - argFracSZ)
+                                  shiftedL_masked  = shiftedL .&. mask
+                                  shiftedL_resized = resize shiftedL
+                              in if doWrap then shiftedL_resized else if fRep >= 0
+                                    then if shiftedL_masked == 0
+                                            then shiftedL_resized
+                                            else fMax
+                                    else if shiftedL_masked == mask
+                                            then shiftedL_resized
+                                            else fMin
+                         else let shiftedR         = fRep `shiftR`
+                                                     (argFracSZ - resFracSZ)
+                                  shiftedR_masked  = shiftedR .&. mask
+                                  shiftedR_resized = resize shiftedR
+                              in if doWrap then shiftedR_resized else if fRep >= 0
+                                    then if shiftedR_masked == 0
+                                            then shiftedR_resized
+                                            else fMax
+                                    else if shiftedR_masked == mask
+                                            then shiftedR_resized
+                                            else fMin
 
 -- | Convert, at compile-time, a 'Double' /constant/ to a 'Fixed'-point /literal/.
 -- The conversion saturates on overflow, and uses truncation as its rounding
@@ -794,20 +800,19 @@ type DivideC rep int1 frac1 int2 frac2
   = ( Resize   rep
     , Integral (rep (((int1 + frac2) + 1) + (int2 + frac1)))
     , Bits     (rep (((int1 + frac2) + 1) + (int2 + frac1)))
+    , KnownNat int1
+    , KnownNat frac1
     , KnownNat int2
     , KnownNat frac2
-    , KnownNat (int1 + frac1)
-    , KnownNat (int2 + frac2)
-    , KnownNat ((int1 + frac2 + 1) + (int2 + frac1))
     )
 
 -- | Constraint for the 'divide' function, specialized for 'SFixed'
 type DivideSC int1 frac1 int2 frac2
-  = ( KnownNat int2
+  = ( KnownNat (((int1 + frac2) + 1) + (int2 + frac1))
     , KnownNat frac2
-    , KnownNat (int1 + frac1)
-    , KnownNat (int2 + frac2)
-    , KnownNat ((int1 + frac2 + 1) + (int2 + frac1))
+    , KnownNat int2
+    , KnownNat frac1
+    , KnownNat int1
     )
 
 -- | Constraint for the 'divide' function, specialized for 'UFixed'
@@ -827,30 +832,35 @@ type DivideUC int1 frac1 int2 frac2 =
 --
 -- * @'DivideUC' rep int1 frac1 int2 frac2@ for:
 --   @'UFixed' int1 frac1 -> 'UFixed' int2 frac2 -> 'UFixed' (int1 + frac2 + 1) (int2 + frac1)@
-divide :: DivideC rep int1 frac1 int2 frac2
+divide :: forall rep int1 frac1 int2 frac2 .
+          DivideC rep int1 frac1 int2 frac2
        => Fixed rep int1 frac1
        -> Fixed rep int2 frac2
        -> Fixed rep (int1 + frac2 + 1) (int2 + frac1)
-divide (Fixed fr1) fx2@(Fixed fr2) = Fixed res
-  where
-    int2  = fromInteger (natVal (asIntProxy fx2))
-    frac2 = fromInteger (natVal fx2)
-    fr1'  = resize fr1
-    fr2'  = resize fr2
-    fr1SH = shiftL fr1' ((int2 + frac2))
-    res   = fr1SH `quot` fr2'
+divide (Fixed fr1) fx2@(Fixed fr2) = case addSNat (SNat @ int1) (SNat @ frac1) of
+  SNat -> case addSNat (SNat @ int2) (SNat @ frac2) of
+    SNat -> case addSNat (addSNat (addSNat (SNat @ int1) (SNat @ frac2)) (SNat @ 1)) (addSNat (SNat @ int2) (SNat @ frac1)) of
+      SNat ->
+        let int2  = fromInteger (natVal (asIntProxy fx2))
+            frac2 = fromInteger (natVal fx2)
+            fr1'  = resize fr1
+            fr2'  = resize fr2
+            fr1SH = shiftL fr1' ((int2 + frac2))
+            res   = fr1SH `quot` fr2'
+        in  Fixed res
 
 -- | Constraint for the 'Fractional' instance of 'Fixed'
 type FracFixedC rep int frac
   = ( NumFixedC rep int frac
     , DivideC   rep int frac int frac
     , Integral  (rep (int + frac))
+    , KnownNat  int
+    , KnownNat  frac
     )
 
 -- | Constraint for the 'Fractional' instance of 'SFixed'
 type FracSFixedC int frac
   = ( NumSFixedC int frac
-    , KnownNat int
     , KnownNat ((int + frac + 1) + (int + frac))
     )
 
@@ -868,9 +878,13 @@ type FracUFixedC int frac
 -- * @'FracFixedC' frac rep size@ for: @'Fixed' frac rep size@
 -- * @'FracSFixedC' int frac@     for: @'SFixed' int frac@
 -- * @'FracUFixedC' int frac@     for: @'UFixed' int frac@
-instance (FracFixedC rep int frac) => Fractional (Fixed rep int frac) where
-  f1 / f2        = resizeF (divide f1 f2)
-  recip fx       = resizeF (divide (1 :: Fixed rep int frac) fx)
+instance FracFixedC rep int frac => Fractional (Fixed rep int frac) where
+  f1 / f2        = case addSNat (SNat @ int) (SNat @ frac) of
+                    s@SNat -> case addSNat s (SNat @ 1) of
+                      SNat -> resizeF (divide f1 f2)
+  recip fx       = case addSNat (SNat @ int) (SNat @ frac) of
+                    s@SNat -> case addSNat s (SNat @ 1) of
+                      SNat -> resizeF (divide (1 :: Fixed rep int frac) fx)
   fromRational r = res
     where
       res  = Fixed (fromInteger sat)
