@@ -13,6 +13,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -149,11 +150,11 @@ pattern BR l r <- ((\t -> (tsplit t)) -> (l,r))
   where
     BR l r = BR_ l r
 
-instance (KnownNat d, KnownNat (2^d), Eq a) => Eq (RTree d a) where
-  (==) t1 t2 = (==) (t2v t1) (t2v t2)
+instance (KnownNat d, Eq a) => Eq (RTree d a) where
+  (==) t1 t2 = case pow2SNat (SNat @ d) of SNat -> (==) (t2v t1) (t2v t2)
 
-instance (KnownNat d, KnownNat (2^d), Ord a) => Ord (RTree d a) where
-  compare t1 t2 = compare (t2v t1) (t2v t2)
+instance (KnownNat d, Ord a) => Ord (RTree d a) where
+  compare t1 t2 = case pow2SNat (SNat @ d) of SNat -> compare (t2v t1) (t2v t2)
 
 instance Show a => Show (RTree n a) where
   show (LR_ a)   = show a
@@ -177,15 +178,15 @@ instance KnownNat d => Traversable (RTree d) where
                       (fmap LR . f)
                       (const (liftA2 BR))
 
-instance (KnownNat (2^d), KnownNat d, KnownNat (BitSize a), KnownNat (2^(BitSize a)), BitPack a) =>
+instance (KnownNat d, KnownNat (BitSize a), BitPack a) =>
   BitPack (RTree d a) where
   type BitSize (RTree d a) = (2^d) * (BitSize a)
-  pack   = pack . t2v
-  unpack = v2t . unpack
+  pack   = case pow2SNat (SNat @ d) of SNat -> pack . t2v
+  unpack = case pow2SNat (SNat @ d) of SNat -> v2t . unpack
 
 type instance Lens.Index   (RTree d a) = Int
 type instance Lens.IxValue (RTree d a) = a
-instance (KnownNat d, KnownNat (2^d)) => Lens.Ixed (RTree d a) where
+instance KnownNat d => Lens.Ixed (RTree d a) where
   ix i f t = replaceTree i <$> f (indexTree t i) <*> pure t
 
 instance (KnownNat d, Default a) => Default (RTree d a) where
@@ -356,11 +357,12 @@ tmap f = tdfold (Proxy :: Proxy (MapTree b)) (LR . f) (\_ l r -> BR l r)
 --
 -- >>> tindices :: RTree 3 (Index 8)
 -- <<<0,1>,<2,3>>,<<4,5>,<6,7>>>
-tindices :: (KnownNat d, KnownNat (2^d)) => RTree d (Index (2^d))
-tindices =
-  tdfold (Proxy :: Proxy (MapTree (Index (2^d)))) LR
-         (\s@SNat l r -> BR l (tmap (+(fromInteger (snatToInteger (pow2SNat s)))) r))
-         (treplicate SNat 0)
+tindices :: forall d . KnownNat d => RTree d (Index (2^d))
+tindices = case pow2SNat (SNat @ d) of
+  SNat ->
+    tdfold (Proxy :: Proxy (MapTree (Index (2^d)))) LR
+           (\s@SNat l r -> BR l (tmap (+(fromInteger (snatToInteger (pow2SNat s)))) r))
+           (treplicate SNat 0)
 
 data V2TTree (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (V2TTree a) d = RTree d a
@@ -398,8 +400,8 @@ t2v = tdfold (Proxy :: Proxy (T2VTree a)) (:> Nil) (\_ l r -> l ++ r)
 -- >>> indexTree (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4))) 14
 -- *** Exception: CLaSH.Sized.Vector.(!!): index 14 is larger than maximum index 3
 -- ...
-indexTree :: (KnownNat d, KnownNat (2^d), Enum i) => RTree d a -> i -> a
-indexTree t i = (t2v t) !! i
+indexTree :: forall d i a . (KnownNat d, Enum i) => RTree d a -> i -> a
+indexTree t i = case pow2SNat (SNat @ d) of SNat -> (t2v t) !! i
 
 -- | \"'replaceTree' @n a t@\" returns the tree /t/ where the /n/'th element is
 -- replaced by /a/.
@@ -414,8 +416,8 @@ indexTree t i = (t2v t) !! i
 -- >>> replaceTree 9 6 (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- <<1,2>,<3,*** Exception: CLaSH.Sized.Vector.replace: index 9 is larger than maximum index 3
 -- ...
-replaceTree :: (KnownNat d, KnownNat (2^d), Enum i) => i -> a -> RTree d a -> RTree d a
-replaceTree i a = v2t . replace i a . t2v
+replaceTree :: forall d i a . (KnownNat d, Enum i) => i -> a -> RTree d a -> RTree d a
+replaceTree i a = case pow2SNat (SNat @ d) of SNat -> v2t . replace i a . t2v
 
 data ZipWithTree (b :: *) (c :: *) (f :: TyFun Nat *) :: *
 type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c
