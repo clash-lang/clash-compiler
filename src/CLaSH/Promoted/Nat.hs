@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
@@ -61,11 +62,13 @@ module CLaSH.Promoted.Nat
   )
 where
 
-import Data.Bits       (shiftL)
-import Data.Reflection (reifyNat)
-import GHC.TypeLits    (KnownNat, Nat, type (+), type (-), type (*), type (^),
-                        natVal)
-import Unsafe.Coerce   (unsafeCoerce)
+import Data.Bits              (shiftL)
+import Data.Reflection        (reifyNat)
+import GHC.Integer            (smallInteger)
+import GHC.Integer.Logarithms (integerLogBase#)
+import GHC.TypeLits           (KnownNat, Nat, type (+), type (-), type (*),
+                               type (^), natVal)
+import Unsafe.Coerce          (unsafeCoerce)
 
 {- $setup
 >>> :set -XBinaryLiterals
@@ -206,8 +209,7 @@ logBaseSNat :: SNat (a+2) -- ^ Base
             -> SNat ((a+2)^b)
             -> SNat b
 logBaseSNat x y =
-  reifyNat (round (logBase (fromInteger (snatToInteger x) :: Float)
-                           (fromInteger (snatToInteger y) :: Float)))
+  reifyNat (smallInteger (integerLogBase# (snatToInteger x) (snatToInteger y)))
   $ \p -> unsafeCoerce (snatProxy p)
 {-# NOINLINE logBaseSNat #-}
 
