@@ -1,5 +1,9 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
+## 0.6.21
+* Fixes bugs:
+  * Type families are not currently being reduced correctly [#167](https://github.com/clash-lang/clash-compiler/issues/167)
+
 ## 0.6.20 *August 3rd 2016*
 * Fixes bugs:
   * Bug in DEC transformation overwrites case-alternatives
