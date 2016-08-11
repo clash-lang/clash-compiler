@@ -31,7 +31,7 @@ install:
 script:
 - if [ "$PEDANTIC" = "YES" ]; then export STACKOPTS=--pedantic; fi
 - stack --no-terminal --skip-ghc-check build $STACKOPTS
-- stack --no-terminal --skip-ghc-check sdist
+# - stack --no-terminal --skip-ghc-check sdist
 - stack exec clash-testsuite
 matrix:
   fast_finish: true
