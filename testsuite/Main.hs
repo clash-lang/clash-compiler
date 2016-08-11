@@ -150,6 +150,7 @@ clashHDL t env extraArgs modName =
                                   ; Verilog -> "--verilog"
                                   }
                        ]
+                      ,["-O2"]
                       ,extraArgs
                       ,[modName <.> "hs"]
                       ])
