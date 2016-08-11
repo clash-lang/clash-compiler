@@ -7,18 +7,15 @@ Self-synchronising circuits based on data-flow principles.
 -}
 
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
 
 {-# LANGUAGE Safe #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.DataFlow
@@ -54,7 +51,7 @@ import CLaSH.Class.BitPack    (boolToBV)
 import CLaSH.Class.Resize     (truncateB)
 import CLaSH.Prelude.BitIndex (msb)
 import CLaSH.Prelude.Mealy    (mealyB')
-import CLaSH.Promoted.Nat     (SNat (..), addSNat, pow2SNat)
+import CLaSH.Promoted.Nat     (SNat)
 import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
 import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
@@ -174,22 +171,19 @@ fifoDF_mealy :: forall addrSize a . KnownNat addrSize
   -> ((Vec (2^addrSize) a, BitVector (addrSize + 1), BitVector (addrSize + 1))
      ,(a, Bool, Bool))
 fifoDF_mealy (mem,rptr,wptr) (wdata,winc,rinc) =
-  case pow2SNat (SNat @ addrSize) of
-    SNat -> case addSNat (SNat @ addrSize) (SNat @ 1) of
-      SNat ->
-        let raddr = truncateB rptr :: BitVector addrSize
-            waddr = truncateB wptr :: BitVector addrSize
+  let raddr = truncateB rptr :: BitVector addrSize
+      waddr = truncateB wptr :: BitVector addrSize
 
-            mem' | winc && not full = replace waddr wdata mem
-                 | otherwise        = mem
+      mem' | winc && not full = replace waddr wdata mem
+           | otherwise        = mem
 
-            rdata = mem !! raddr
+      rdata = mem !! raddr
 
-            rptr' = rptr + boolToBV (rinc && not empty)
-            wptr' = wptr + boolToBV (winc && not full)
-            empty = rptr == wptr
-            full  = msb rptr /= msb wptr && raddr == waddr
-        in  ((mem',rptr',wptr'), (rdata,empty,full))
+      rptr' = rptr + boolToBV (rinc && not empty)
+      wptr' = wptr + boolToBV (winc && not full)
+      empty = rptr == wptr
+      full  = msb rptr /= msb wptr && raddr == waddr
+  in  ((mem',rptr',wptr'), (rdata,empty,full))
 
 -- | Create a FIFO buffer adhering to the 'DataFlow' protocol. Can be filled
 -- with initial content.
@@ -206,15 +200,14 @@ fifoDF :: forall addrSize m n a nm rate .
   -> Vec m a      -- ^ Initial content. Can be smaller than the size of the
                   -- FIFO. Empty spaces are initialised with 'undefined'.
   -> DataFlow' ('Clk nm rate) Bool Bool a a
-fifoDF _ iS = DF $ \i iV oR -> case addSNat (SNat @ addrSize) (SNat @ 1) of
-  SNat ->
-    let clk            = sclock
-        initRdPtr      = 0
-        initWrPtr      = fromIntegral (length iS)
-        initMem        = iS ++ repeat undefined :: Vec (m + n) a
-        initS          = (initMem,initRdPtr,initWrPtr)
-        (o,empty,full) = mealyB' clk fifoDF_mealy initS (i,iV,oR)
-    in  (o,not1 empty, not1 full)
+fifoDF _ iS = DF $ \i iV oR ->
+  let clk            = sclock
+      initRdPtr      = 0
+      initWrPtr      = fromIntegral (length iS)
+      initMem        = iS ++ repeat undefined :: Vec (m + n) a
+      initS          = (initMem,initRdPtr,initWrPtr)
+      (o,empty,full) = mealyB' clk fifoDF_mealy initS (i,iV,oR)
+  in  (o,not1 empty, not1 full)
 
 -- | Identity circuit
 --
@@ -521,23 +514,22 @@ instance (LockStep a x, LockStep b y) => LockStep (a,b) (x,y) where
                                      xyV     = bundle (xV,yV)
                                  in  (xy,xyV,rdy))) `seqDF` (stepLock `parDF` stepLock)
 
-instance (LockStep en a, m ~ (n + 1), KnownNat m, KnownNat n) =>
-  LockStep (Vec m en) (Vec m a) where
+instance (LockStep en a, KnownNat n) => LockStep (Vec n en) (Vec n a) where
   lockStep = parNDF (repeat lockStep) `seqDF`
     DF (\xs vals rdy ->
-          let val  = and <$> vals
-              rdys = allReady <$> rdy <*> (repeat <$> vals)
+          let val  = (and . (True :>)) <$> vals
+              rdys = allReady <$> rdy <*> (repeat . (:< True) <$> vals)
           in  (xs,val,rdys)
        )
   stepLock =
     DF (\xs val rdys ->
-          let rdy  = and <$> rdys
-              vals = allReady <$> val <*> (repeat <$> rdys)
+          let rdy  = (and . (True :>)) <$> rdys
+              vals = allReady <$> val <*> (repeat . (:< True) <$> rdys)
           in  (xs,vals,rdy)
        ) `seqDF` parNDF (repeat stepLock)
 
-allReady :: forall n . KnownNat n
-         => Bool -> Vec (n+1) (Vec (n+1) Bool)
-         -> Vec (n+1) Bool
-allReady b vs = case addSNat (SNat @ n) (SNat @ 1) of
-  SNat -> map (and . (b :>) . tail) (smap (flip rotateLeftS) vs)
+allReady :: KnownNat n
+         => Bool
+         -> Vec n (Vec (n+1) Bool)
+         -> Vec n Bool
+allReady b vs = map (and . (b :>) . tail) (smap (flip rotateLeftS) vs)

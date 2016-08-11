@@ -6,20 +6,19 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Sized.Internal.BitVector
@@ -121,7 +120,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
-import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, addSNat)
+import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Ord         (Max)
 
 import {-# SOURCE #-} qualified CLaSH.Sized.Vector         as V
@@ -375,14 +374,12 @@ instance KnownNat n => FiniteBits (BitVector n) where
   countLeadingZeros   = fromInteger . I.toInteger# . countLeadingZerosBV
   countTrailingZeros  = fromInteger . I.toInteger# . countTrailingZerosBV
 
-countLeadingZerosBV :: forall n . KnownNat n => BitVector n -> I.Index (n+1)
-countLeadingZerosBV = case addSNat (SNat @ n) (SNat @ 1) of
-  SNat -> V.foldr (\l r -> if eq# l low then 1 + r else 0) 0 . V.bv2v
+countLeadingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
+countLeadingZerosBV = V.foldr (\l r -> if eq# l low then 1 + r else 0) 0 . V.bv2v
 {-# INLINE countLeadingZerosBV #-}
 
-countTrailingZerosBV :: forall n . KnownNat n => BitVector n -> I.Index (n+1)
-countTrailingZerosBV = case addSNat (SNat @ n) (SNat @ 1) of
-  SNat -> V.foldl (\l r -> if eq# r low then 1 + l else 0) 0 . V.bv2v
+countTrailingZerosBV :: KnownNat n => BitVector n -> I.Index (n+1)
+countTrailingZerosBV = V.foldl (\l r -> if eq# r low then 1 + l else 0) 0 . V.bv2v
 {-# INLINE countTrailingZerosBV #-}
 
 {-# NOINLINE reduceAnd# #-}
@@ -566,10 +563,9 @@ rotateR# bv@(BV n) b   = fromInteger_INLINE (l .|. r)
     sz  = fromInteger (natVal bv)
 
 popCountBV :: forall n . KnownNat n => BitVector (n+1) -> I.Index (n+2)
-popCountBV bv = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> case addSNat (SNat @ n) (SNat @ 2) of
-      SNat -> let v = V.bv2v bv
-              in  sum (V.map fromIntegral v)
+popCountBV bv =
+  let v = V.bv2v bv
+  in  sum (V.map fromIntegral v)
 {-# INLINE popCountBV #-}
 
 instance Resize BitVector where
@@ -591,23 +587,23 @@ decBitVector n = appT (conT ''BitVector) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (BitVector n) where
   satPlus SatWrap a b = a +# b
-  satPlus SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r = plus# a b
-            in  case msb# r of
-                  0 -> resize# r
-                  _ -> minBound#
-  satPlus _ a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r  = plus# a b
-            in  case msb# r of
-                  0 -> resize# r
-                  _ -> maxBound#
+  satPlus SatZero a b =
+    let r = plus# a b
+    in  case msb# r of
+          0 -> resize# r
+          _ -> minBound#
+  satPlus _ a b =
+    let r  = plus# a b
+    in  case msb# r of
+          0 -> resize# r
+          _ -> maxBound#
 
   satMin SatWrap a b = a -# b
-  satMin _ a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r = minus# a b
-            in  case msb# r of
-                  0 -> resize# r
-                  _ -> minBound#
+  satMin _ a b =
+    let r = minus# a b
+    in  case msb# r of
+          0 -> resize# r
+          _ -> minBound#
 
   satMult SatWrap a b = a *# b
   satMult SatZero a b =

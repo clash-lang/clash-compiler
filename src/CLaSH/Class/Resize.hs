@@ -4,21 +4,18 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeOperators  #-}
 
 {-# LANGUAGE Safe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Class.Resize where
 
 import GHC.TypeLits (Nat, KnownNat, type (+))
-import CLaSH.Promoted.Nat (SNat (..), addSNat)
 
 -- | Coerce a value to be represented by a different number of bits
 class Resize (f :: Nat -> *) where
@@ -34,12 +31,12 @@ class Resize (f :: Nat -> *) where
   resize :: (KnownNat a, KnownNat b) => f a -> f b
   -- | Perform a 'zeroExtend' for unsigned datatypes, and 'signExtend' for a
   -- signed datatypes
-  extend :: forall a b . (KnownNat a, KnownNat b) => f a -> f (b + a)
-  extend = case addSNat (SNat @ b) (SNat @ a) of SNat -> resize
+  extend :: (KnownNat a, KnownNat b) => f a -> f (b + a)
+  extend = resize
   -- | Add extra zero bits in front of the MSB
   zeroExtend :: (KnownNat a, KnownNat b) => f a -> f (b + a)
   -- | Add extra sign bits in front of the MSB
-  signExtend :: forall a b . (KnownNat a, KnownNat b) => f a -> f (b + a)
-  signExtend = case addSNat (SNat @ b) (SNat @ a) of SNat -> resize
+  signExtend :: (KnownNat a, KnownNat b) => f a -> f (b + a)
+  signExtend = resize
   -- | Remove bits from the MSB
   truncateB :: KnownNat a => f (a + b) -> f a

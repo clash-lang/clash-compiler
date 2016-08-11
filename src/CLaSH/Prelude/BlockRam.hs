@@ -335,15 +335,13 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE MagicHash     #-}
+{-# LANGUAGE TypeOperators #-}
 
 {-# LANGUAGE Safe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.BlockRam
@@ -367,7 +365,6 @@ import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
-import CLaSH.Promoted.Nat     (SNat (..), pow2SNat)
 import CLaSH.Signal           (Signal, mux)
 import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle)
@@ -496,7 +493,7 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) wr rd en dt@.
-blockRamPow2' :: forall clk n a . KnownNat n
+blockRamPow2' :: KnownNat n
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
                                           -- determines the size, @2^n@, of
@@ -510,7 +507,7 @@ blockRamPow2' :: forall clk n a . KnownNat n
               -> Signal' clk a
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
-blockRamPow2' = case pow2SNat (SNat @ n) of SNat -> blockRam'
+blockRamPow2' = blockRam'
 
 {-# NOINLINE blockRam# #-}
 -- | blockRAM primitive

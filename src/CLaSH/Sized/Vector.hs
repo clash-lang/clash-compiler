@@ -6,7 +6,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE BangPatterns         #-}
 {-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE MagicHash            #-}
@@ -15,7 +14,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TupleSections        #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -23,7 +21,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns -fno-warn-redundant-constraints #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -120,7 +118,7 @@ import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Promoted.Nat         (SNat (..), UNat (..), addSNat, pow2SNat, snatProxy,
+import CLaSH.Promoted.Nat         (SNat (..), UNat (..), pow2SNat, snatProxy,
                                    snatToInteger, subSNat, withSNat, toUNat)
 import CLaSH.Promoted.Nat.Literals (d1)
 import CLaSH.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
@@ -479,13 +477,12 @@ shiftOutFrom0 m xs = shiftInAtN xs (replicate m def)
 --
 -- >>> shiftOutFromN d2 ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :: Vec 5 Integer)
 -- (<0,0,1,2,3>,<4,5>)
-shiftOutFromN :: forall a m n . (Default a, KnownNat n)
+shiftOutFromN :: (Default a, KnownNat n)
               => SNat m        -- ^ @m@, the number of elements to shift out
               -> Vec (m + n) a -- ^ The old vector
               -> (Vec (m + n) a, Vec m a)
               -- ^ (The new vector, shifted out elements)
-shiftOutFromN m xs = case addSNat m (SNat @ n) of
-  SNat -> shiftInAt0 xs (replicate m def)
+shiftOutFromN m@SNat xs = shiftInAt0 xs (replicate m def)
 {-# INLINE shiftOutFromN #-}
 
 infixr 5 ++
@@ -1355,12 +1352,11 @@ stencil2d stY stX f xss = (map.map) f (windows2d stY stX xss)
 -- windows1d d2 xs :: Num a => Vec 5 (Vec 2 a)
 -- >>> windows1d d2 xs
 -- <<1,2>,<2,3>,<3,4>,<4,5>,<5,6>>
-windows1d :: forall n stX a . KnownNat n
+windows1d :: KnownNat n
           => SNat (stX + 1) -- ^ Length of the window, at least size 1
           -> Vec ((stX + n) + 1) a
           -> Vec (n + 1) (Vec (stX + 1) a)
-windows1d stX xs = case addSNat (SNat @ n) d1 of
-    SNat -> map (take stX) (rotations xs)
+windows1d stX xs = map (take stX) (rotations xs)
   where
     rotateL ys   = tail ys :< head ys
     rotations ys = iterateI rotateL ys
@@ -1378,13 +1374,12 @@ windows1d stX xs = case addSNat (SNat @ n) d1 of
 -- windows2d d2 d2 xss :: Num a => Vec 3 (Vec 3 (Vec 2 (Vec 2 a)))
 -- >>> windows2d d2 d2 xss
 -- <<<<1,2>,<5,6>>,<<2,3>,<6,7>>,<<3,4>,<7,8>>>,<<<5,6>,<9,10>>,<<6,7>,<10,11>>,<<7,8>,<11,12>>>,<<<9,10>,<13,14>>,<<10,11>,<14,15>>,<<11,12>,<15,16>>>>
-windows2d :: forall n m stX stY a . (KnownNat n,KnownNat m)
+windows2d :: (KnownNat n,KnownNat m)
           => SNat (stY + 1) -- ^ Window hight /stY/, at least size 1
           -> SNat (stX + 1) -- ^ Window width /stX/, at least size 1
           -> Vec ((stY + m) + 1) (Vec (stX + n + 1) a)
           -> Vec (m + 1) (Vec (n + 1) (Vec (stY + 1) (Vec (stX + 1) a)))
-windows2d stY stX xss = case addSNat (SNat @ n) (SNat @ 1) of
-  SNat -> map (transpose . (map (windows1d stX))) (windows1d stY xss)
+windows2d stY stX xss = map (transpose . (map (windows1d stX))) (windows1d stY xss)
 {-# INLINE windows2d #-}
 
 -- | Forward permutation specified by an index mapping, /ix/. The result vector

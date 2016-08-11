@@ -6,15 +6,13 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 ROMs
 -}
 
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE MagicHash     #-}
+{-# LANGUAGE TypeOperators #-}
 
 {-# LANGUAGE Safe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.ROM
@@ -36,7 +34,6 @@ where
 import Data.Array             ((!),listArray)
 import GHC.TypeLits           (KnownNat, type (^))
 
-import CLaSH.Promoted.Nat     (SNat (..), pow2SNat)
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock)
 import CLaSH.Sized.Unsigned   (Unsigned)
@@ -65,13 +62,13 @@ asyncRom content rd = asyncRom# content (fromEnum rd)
 --
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-asyncRomPow2 :: forall n a . KnownNat n
+asyncRomPow2 :: KnownNat n
              => Vec (2^n) a -- ^ ROM content
                             --
                             -- __NB:__ must be a constant
              -> Unsigned n  -- ^ Read address @rd@
              -> a           -- ^ The value of the ROM at address @rd@
-asyncRomPow2 = case pow2SNat (SNat @ n) of SNat -> asyncRom
+asyncRomPow2 = asyncRom
 
 {-# NOINLINE asyncRom# #-}
 -- | asyncROM primitive
@@ -132,14 +129,14 @@ romPow2 = romPow2' systemClock
 --
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
-romPow2' :: forall clk n a . KnownNat n
+romPow2' :: KnownNat n
          => SClock clk               -- ^ 'Clock' to synchronize to
          -> Vec (2^n) a              -- ^ ROM content
                                      --
                                      -- __NB:__ must be a constant
          -> Signal' clk (Unsigned n) -- ^ Read address @rd@
          -> Signal' clk a            -- ^ The value of the ROM at address @rd@
-romPow2' = case pow2SNat (SNat @ n) of SNat -> rom'
+romPow2' = rom'
 
 {-# INLINE rom' #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements

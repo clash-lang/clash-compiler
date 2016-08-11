@@ -64,7 +64,6 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 -}
 
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -72,6 +71,7 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.BlockRam.File
@@ -171,7 +171,7 @@ blockRamFile = blockRamFile' systemClock
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
-blockRamFilePow2 :: forall n m . (KnownNat m, KnownNat n)
+blockRamFilePow2 :: (KnownNat m, KnownNat n)
                  => FilePath             -- ^ File describing the initial
                                          -- content of the blockRAM
                  -> Signal (Unsigned n)  -- ^ Write address @w@

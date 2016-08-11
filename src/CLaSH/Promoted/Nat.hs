@@ -4,17 +4,15 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE GADTs          #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MagicHash      #-}
+{-# LANGUAGE TypeOperators  #-}
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Promoted.Nat
@@ -62,7 +60,6 @@ module CLaSH.Promoted.Nat
   )
 where
 
-import Data.Bits              (shiftL)
 import Data.Reflection        (reifyNat)
 import GHC.Integer            (smallInteger)
 import GHC.Integer.Logarithms (integerLogBase#)
@@ -171,8 +168,7 @@ subUNat UZero     _         = error "impossible: 0 + (n + 1) ~ 0"
 
 -- | Add two singleton natural numbers
 addSNat :: SNat a -> SNat b -> SNat (a+b)
-addSNat x y = reifyNat (snatToInteger x + snatToInteger y)
-            $ \p -> unsafeCoerce (snatProxy p)
+addSNat SNat SNat = SNat
 {-# INLINE addSNat #-}
 
 -- | Subtract two singleton natural numbers
@@ -183,18 +179,12 @@ subSNat x y = reifyNat (snatToInteger x - snatToInteger y)
 
 -- | Multiply two singleton natural numbers
 mulSNat :: SNat a -> SNat b -> SNat (a*b)
-mulSNat x y = reifyNat (snatToInteger x * snatToInteger y)
-            $ \p -> unsafeCoerce (snatProxy p)
+mulSNat SNat SNat = SNat
 {-# INLINE mulSNat #-}
 
 -- | Power of two singleton natural numbers
 powSNat :: SNat a -> SNat b -> SNat (a^b)
-powSNat x y = let x' = snatToInteger x
-                  y' = snatToInteger y
-                  z  = case x' of
-                         2 -> shiftL 1 (fromInteger y')
-                         _ -> x' ^ y'
-              in  reifyNat z (\p -> unsafeCoerce (snatProxy p))
+powSNat SNat SNat = SNat
 {-# NOINLINE powSNat #-}
 
 -- | Division of two singleton natural numbers
@@ -219,8 +209,7 @@ logBaseSNat x y =
 
 -- | Power of two of a singleton natural number
 pow2SNat :: SNat a -> SNat (2^a)
-pow2SNat x = reifyNat (shiftL 1 (fromInteger (snatToInteger x)))
-           $ \p -> unsafeCoerce (snatProxy p)
+pow2SNat SNat = SNat
 {-# INLINE pow2SNat #-}
 
 -- | Base-2 encoded natural number

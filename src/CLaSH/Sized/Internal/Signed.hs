@@ -6,15 +6,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -22,7 +19,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 module CLaSH.Sized.Internal.Signed
   ( -- * Datatypes
@@ -104,7 +101,6 @@ import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
-import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
@@ -415,8 +411,7 @@ instance KnownNat n => FiniteBits (Signed n) where
 
 instance Resize Signed where
   resize       = resize#
-  zeroExtend :: forall a b . (KnownNat a, KnownNat b) => Signed a -> Signed (b + a)
-  zeroExtend s = case addSNat (SNat @ b) (SNat @ a) of SNat -> unpack# (0 ++# pack s)
+  zeroExtend s = unpack# (0 ++# pack s)
   truncateB    = truncateB#
 
 {-# NOINLINE resize# #-}
@@ -451,88 +446,82 @@ decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Signed n) where
   satPlus SatWrap  a b = a +# b
-  satPlus SatBound a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r      = plus# a b
-                (_,r') = split r
-            in  case msb r `xor` msb r' of
-                  0 -> unpack# r'
-                  _ -> case msb a .&. msb b of
-                    0 -> maxBound#
-                    _ -> minBound#
-  satPlus SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r      = plus# a b
-                (_,r') = split r
-            in  case msb r `xor` msb r' of
-                  0 -> unpack# r'
-                  _ -> fromInteger# 0
-  satPlus SatSymmetric a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r      = plus# a b
-                (_,r') = split r
-            in  case msb r `xor` msb r' of
-                  0 -> unpack# r'
-                  _ -> case msb a .&. msb b of
-                    0 -> maxBound#
-                    _ -> minBoundSym#
+  satPlus SatBound a b =
+    let r      = plus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> case msb a .&. msb b of
+            0 -> maxBound#
+            _ -> minBound#
+  satPlus SatZero a b =
+    let r      = plus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> fromInteger# 0
+  satPlus SatSymmetric a b =
+    let r      = plus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> case msb a .&. msb b of
+            0 -> maxBound#
+            _ -> minBoundSym#
 
   satMin SatWrap a b = a -# b
-  satMin SatBound a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r      = minus# a b
-                (_,r') = split r
-            in  case msb r `xor` msb r' of
-                  0 -> unpack# r'
-                  _ -> case msb a ++# msb b of
-                    2 -> minBound#
-                    _ -> maxBound#
-  satMin SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r      = minus# a b
-                (_,r') = split r
-            in  case msb r `xor` msb r' of
-                  0 -> unpack# r'
-                  _ -> fromInteger# 0
-  satMin SatSymmetric a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r      = minus# a b
-                (_,r') = split r
-            in  case msb r `xor` msb r' of
-                  0 -> unpack# r'
-                  _ -> case msb a ++# msb b of
-                    2 -> minBoundSym#
-                    _ -> maxBound#
+  satMin SatBound a b =
+    let r      = minus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> case msb a ++# msb b of
+            2 -> minBound#
+            _ -> maxBound#
+  satMin SatZero a b =
+    let r      = minus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> fromInteger# 0
+  satMin SatSymmetric a b =
+    let r      = minus# a b
+        (_,r') = split r
+    in  case msb r `xor` msb r' of
+          0 -> unpack# r'
+          _ -> case msb a ++# msb b of
+            2 -> minBoundSym#
+            _ -> maxBound#
 
   satMult SatWrap a b = a *# b
-  satMult SatBound a b = case addSNat (SNat @ n) (SNat @ n) of
-    SNat -> case addSNat (SNat @ 1) (SNat @ n) of
-      SNat ->
-        let r        = times# a b
-            (rL,rR)  = split r
-            overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                                  reduceAnd (msb rR ++# pack rL)
-        in  case overflow of
-              1 -> unpack# rR
-              _ -> case msb rL of
-                0 -> maxBound#
-                _ -> minBound#
-  satMult SatZero a b = case addSNat (SNat @ n) (SNat @ n) of
-    SNat -> case addSNat (SNat @ 1) (SNat @ n) of
-      SNat ->
-        let r        = times# a b
-            (rL,rR)  = split r
-            overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                                  reduceAnd (msb rR ++# pack rL)
-        in  case overflow of
-              1 -> unpack# rR
-              _ -> fromInteger# 0
-  satMult SatSymmetric a b = case addSNat (SNat @ n) (SNat @ n) of
-    SNat -> case addSNat (SNat @ 1) (SNat @ n) of
-      SNat ->
-        let r        = times# a b
-            (rL,rR)  = split r
-            overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
-                                  reduceAnd (msb rR ++# pack rL)
-        in  case overflow of
-              1 -> unpack# rR
-              _ -> case msb rL of
-                0 -> maxBound#
-                _ -> minBoundSym#
+  satMult SatBound a b =
+    let r        = times# a b
+        (rL,rR)  = split r
+        overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                              reduceAnd (msb rR ++# pack rL)
+    in  case overflow of
+          1 -> unpack# rR
+          _ -> case msb rL of
+            0 -> maxBound#
+            _ -> minBound#
+  satMult SatZero a b =
+    let r        = times# a b
+        (rL,rR)  = split r
+        overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                              reduceAnd (msb rR ++# pack rL)
+    in  case overflow of
+          1 -> unpack# rR
+          _ -> fromInteger# 0
+  satMult SatSymmetric a b =
+    let r        = times# a b
+        (rL,rR)  = split r
+        overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                              reduceAnd (msb rR ++# pack rL)
+    in  case overflow of
+          1 -> unpack# rR
+          _ -> case msb rL of
+            0 -> maxBound#
+            _ -> minBoundSym#
 
 minBoundSym# :: KnownNat n => Signed n
 minBoundSym# = minBound# +# fromInteger# 1

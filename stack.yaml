@@ -2,6 +2,10 @@ resolver: nightly-2016-07-19
 
 packages:
 - .
+- location:
+    git: git@github.com:clash-lang/ghc-typelits-knownnat.git
+    commit: 47a64ef45032dee29e98cd275c2289f0e1fd23f0
+  extra-dep: true
 
 flags:
   clash-prelude:

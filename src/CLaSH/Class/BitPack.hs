@@ -5,10 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE MagicHash            #-}
-{-# LANGUAGE ScopedTypeVariables  #-}
-{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -16,6 +13,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE Trustworthy #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Class.BitPack
@@ -29,7 +27,6 @@ import GHC.TypeLits                   (KnownNat, Nat, type (+))
 import Prelude                        hiding (map)
 
 import CLaSH.Class.Resize             (zeroExtend)
-import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
 import CLaSH.Sized.Internal.BitVector (split#)
 
@@ -133,6 +130,5 @@ instance (KnownNat (BitSize h), BitPack (a,b,c,d,e,f,g), BitPack h) =>
 -- 00_0001
 -- >>> boolToBV False :: BitVector 6
 -- 00_0000
-boolToBV :: forall n . KnownNat n => Bool -> BitVector (n + 1)
-boolToBV = case addSNat (SNat @ n) (SNat @ 1) of
-  SNat -> zeroExtend . pack
+boolToBV :: KnownNat n => Bool -> BitVector (n + 1)
+boolToBV = zeroExtend . pack

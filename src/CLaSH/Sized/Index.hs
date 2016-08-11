@@ -4,16 +4,13 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE MagicHash           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE MagicHash     #-}
+{-# LANGUAGE TypeOperators #-}
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
@@ -45,5 +42,5 @@ import CLaSH.Sized.Internal.Index
 --
 -- 'bv2i' on the other hand will /never/ fail at run-time, because the
 -- 'BitVector' argument determines the size.
-bv2i :: forall n . KnownNat n => BitVector n -> Index (2^n)
-bv2i = case pow2SNat (SNat @ n) of SNat -> unpack#
+bv2i :: KnownNat n => BitVector n -> Index (2^n)
+bv2i = unpack#

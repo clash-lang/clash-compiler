@@ -6,18 +6,17 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Sized.Internal.Unsigned
@@ -94,7 +93,6 @@ import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
-import CLaSH.Promoted.Nat             (SNat (..), addSNat)
 import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
@@ -419,23 +417,23 @@ decUnsigned n = appT (conT ''Unsigned) (litT $ numTyLit n)
 
 instance KnownNat n => SaturatingNum (Unsigned n) where
   satPlus SatWrap a b = a +# b
-  satPlus SatZero a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r = plus# a b
-            in  case msb r of
-                  0 -> resize# r
-                  _ -> minBound#
-  satPlus _ a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r  = plus# a b
-            in  case msb r of
-                  0 -> resize# r
-                  _ -> maxBound#
+  satPlus SatZero a b =
+    let r = plus# a b
+    in  case msb r of
+          0 -> resize# r
+          _ -> minBound#
+  satPlus _ a b =
+    let r  = plus# a b
+    in  case msb r of
+          0 -> resize# r
+          _ -> maxBound#
 
   satMin SatWrap a b = a -# b
-  satMin _ a b = case addSNat (SNat @ n) (SNat @ 1) of
-    SNat -> let r = minus# a b
-            in  case msb r of
-                  0 -> resize# r
-                  _ -> minBound#
+  satMin _ a b =
+    let r = minus# a b
+    in  case msb r of
+          0 -> resize# r
+          _ -> minBound#
 
   satMult SatWrap a b = a *# b
   satMult SatZero a b =
