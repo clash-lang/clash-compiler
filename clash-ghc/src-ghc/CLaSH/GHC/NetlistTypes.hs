@@ -108,7 +108,7 @@ ghcTypeToHWType iw = go
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
           elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
-          return $ RTree sz elHWTy
+          return $ RTree (fromInteger sz) elHWTy
 
         "String" -> return String
         "GHC.Types.[]" -> case tyView (head args) of

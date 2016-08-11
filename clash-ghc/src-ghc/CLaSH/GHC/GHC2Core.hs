@@ -45,8 +45,9 @@ import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
 import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
-import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), brListMapM)
-import Coercion   (Coercion (..),Role(..),coercionType,coercionKind,mkCoercionType)
+import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
+                   fromBranches)
+import Coercion   (Role(..),coercionType,coercionKind,mkCoercionType)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn    (AltCon (..), Bind (..), CoreExpr,
                    Expr (..), Unfolding (..), rhssOfAlts, unfoldingTemplate)
@@ -73,13 +74,14 @@ import SrcLoc     (isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
-                   isPrimTyCon, isTupleTyCon, isClosedSynFamilyTyCon_maybe,
+                   isPrimTyCon, isTupleTyCon,
+                   isClosedSynFamilyTyConWithAxiom_maybe,
                    expandSynTyCon_maybe,
                    tyConArity,
                    tyConDataCons, tyConKind,
                    tyConName, tyConUnique)
 import Type       (mkTvSubstPrs, substTy, coreView)
-import TyCoRep    (TyBinder (..), TyLit (..), Type (..))
+import TyCoRep    (Coercion (..), TyBinder (..), TyLit (..), Type (..))
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
@@ -156,12 +158,13 @@ makeTyCon fiEnvs tc = tycon
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
           tcKind <- coreToType (tyConKind tc)
-          substs <- case isClosedSynFamilyTyCon_maybe tc of
+          substs <- case isClosedSynFamilyTyConWithAxiom_maybe tc of
             Nothing -> let instances = familyInstances fiEnvs tc
                        in  mapM famInstToSubst instances
-            Just cx -> let bx = co_ax_branches cx
-                       in  brListMapM (\b -> (,) <$> mapM coreToType (cab_lhs b)
-                                                 <*> coreToType (cab_rhs b)) bx
+            Just cx -> let bx = fromBranches (co_ax_branches cx)
+                       in  mapM (\b -> (,) <$> mapM coreToType (cab_lhs b)
+                                           <*> coreToType (cab_rhs b))
+                                bx
           return
             C.FunTyCon
             { C.tyConName  = tcName
@@ -229,7 +232,9 @@ coreToTerm :: PrimMap a
 coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
-    term (Var x)                 = lift (var x)
+    term (Var x)                 = do
+      srcsp' <- Reader.ask
+      lift (var srcsp' x)
     term (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
     term (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
@@ -289,7 +294,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     term (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
     term (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
 
-    var x = do
+    var srcsp' x = do
         xVar   <- coreToVar x
         xPrim  <- coreToPrimVar x
         let xNameS = pack $ Unbound.name2String xPrim
@@ -301,7 +306,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
                    in  case unfolding of
-                          CoreUnfolding {} -> term (unfoldingTemplate unfolding)
+                          CoreUnfolding {} -> Reader.runReaderT (term (unfoldingTemplate unfolding)) srcsp'
                           NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
                           _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPpr unsafeGlobalDynFlags x)
               else C.Data <$> coreToDataCon dc
@@ -326,7 +331,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
     alt (LitAlt l  , _ , e) = bind (C.LitPat . embed $ coreToLiteral l) <$> term e
     alt (DataAlt dc, xs, e) = case span isTyVar xs of
       (tyvs,tmvs) -> bind <$> (C.DataPat . embed <$>
-                                coreToDataCon dc <*>
+                                lift (coreToDataCon dc) <*>
                                 (rebind <$>
                                   lift (mapM coreToTyVar tyvs) <*>
                                   lift (mapM coreToId tmvs))) <*>
@@ -348,7 +353,7 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 
 addUsefull :: SrcSpan -> ReaderT SrcSpan (State GHC2CoreState) a
-            -> ReaderT SrcSpan (State GHC2CoreState) a
+           -> ReaderT SrcSpan (State GHC2CoreState) a
 addUsefull x = Reader.local (\r -> if isGoodSrcSpan x then x else r)
 
 isIntegerTy :: Type -> State GHC2CoreState Bool
@@ -367,7 +372,7 @@ hasPrimCo (AppCo co1 co2) = do
   case tc1M of
     Just _ -> return tc1M
     _ -> hasPrimCo co2
-hasPrimCo (ForAllCo _ co) = hasPrimCo co
+hasPrimCo (ForAllCo _ _ co) = hasPrimCo co
 
 hasPrimCo co@(AxiomInstCo _ _ coers) = do
     let (Pair ty1 _) = coercionKind co
@@ -395,7 +400,7 @@ hasPrimCo (TransCo co1 co2) = do
     Just _ -> return tc1M
     _ -> hasPrimCo co2
 
-hasPrimCo (AxiomRuleCo _ _ coers) = do
+hasPrimCo (AxiomRuleCo _ coers) = do
   tcs <- catMaybes <$> mapM hasPrimCo coers
   return (listToMaybe tcs)
 

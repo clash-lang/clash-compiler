@@ -22,7 +22,7 @@ import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed,
 import           CLaSH.Core.DataCon  (DataCon (..))
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Term     (Term (..))
-import           CLaSH.Core.Type     (Type (..), ConstTy (..),
+import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
                                       TypeView (..), tyView, mkFunTy,
                                       mkTyConApp, splitFunForallTy)
 import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)
@@ -185,50 +185,26 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
 
-  "CLaSH.Promoted.Nat.addSNat"
-    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
-    -> let c = a + b
-           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral (toInteger c)))]
-
   "CLaSH.Promoted.Nat.subSNat"
     | [Right a, _] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral (toInteger a)))]
-
-  "CLaSH.Promoted.Nat.mulSNat"
-    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
-    -> let c = a * b
-           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral (toInteger c)))]
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral a))]
 
   "CLaSH.Promoted.Nat.divSNat"
     | [Right a, _] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral (toInteger a)))]
-
-  "CLaSH.Promoted.Nat.powSNat"
-    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
-    -> let c = a ^ b
-           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
-           [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral (toInteger c)))]
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral a))]
 
   "CLaSH.Promoted.Nat.logBaseSNat"
     | [_, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy b)), Left (Literal (IntegerLiteral (toInteger b)))]
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy b)), Left (Literal (IntegerLiteral b))]
 
   "CLaSH.Sized.Internal.BitVector.eq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
@@ -289,7 +265,8 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.RTree.treplicate"
     | isSubj
-    , (TyConApp treeTcNm [LitTy (NumTy len),argTy]) <- tyView (runFreshM (termType tcm e))
+    , (TyConApp treeTcNm [lenTy,argTy]) <- tyView (runFreshM (termType tcm e))
+    , Right len <- runExcept (tyNatSize tcm lenTy)
     -> let (Just treeTc) = HashMap.lookup treeTcNm tcm
            [lrCon,brCon] = tyConDataCons treeTc
        in  mkRTree lrCon brCon argTy len (replicate (2^len) (last $ Either.lefts args))

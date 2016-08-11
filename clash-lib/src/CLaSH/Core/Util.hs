@@ -336,12 +336,12 @@ extractTElems :: DataCon -- ^ The 'LR' constructor
               -> DataCon -- ^ The 'BR' constructor
               -> Type    -- ^ The element type
               -> Char    -- ^ Char to append to the bound variable names
-              -> Int     -- ^ Depth of the tree
+              -> Integer -- ^ Depth of the tree
               -> Term    -- ^ The tree
               -> ([Term],[LetBinding])
 extractTElems lrCon brCon resTy s maxN = go maxN [0..(2^(maxN+1))-2] [0..(2^maxN - 1)]
   where
-    go :: Int -> [Int] -> [Int] -> Term -> ([Term],[LetBinding])
+    go :: Integer -> [Int] -> [Int] -> Term -> ([Term],[LetBinding])
     go 0 _ ks e = ([elVar],[(Id elBNm (embed resTy), embed lhs)])
       where
         elBNm   = string2Name ("el" ++ s:show (head ks))
@@ -386,7 +386,7 @@ extractTElems lrCon brCon resTy s maxN = go maxN [0..(2^(maxN+1))-2] [0..(2^maxN
 mkRTree :: DataCon -- ^ The LR constructor
         -> DataCon -- ^ The BR constructor
         -> Type    -- ^ Element type
-        -> Int     -- ^ Depth of the tree
+        -> Integer -- ^ Depth of the tree
         -> [Term]  -- ^ Elements to put in the tree
         -> Term
 mkRTree lrCon brCon resTy = go

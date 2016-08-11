@@ -520,11 +520,11 @@ reduceReplicate n aTy eTy arg = do
 -- | Replace an application of the @CLaSH.Sized.Vector.dtfold@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.Vector.dtfold@
-reduceDTFold :: Int  -- ^ Length of the vector
-             -> Type -- ^ Element type of the argument vector
-             -> Term -- ^ Function to convert elements with
-             -> Term -- ^ Function to combine branches with
-             -> Term -- ^ The vector to fold
+reduceDTFold :: Integer  -- ^ Length of the vector
+             -> Type     -- ^ Element type of the argument vector
+             -> Term     -- ^ Function to convert elements with
+             -> Term     -- ^ Function to combine branches with
+             -> Term     -- ^ The vector to fold
              -> NormalizeSession Term
 reduceDTFold n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
@@ -535,21 +535,22 @@ reduceDTFold n aTy lrFun brFun arg = do
     go tcm (tyView -> TyConApp vecTcNm _)
       | (Just vecTc) <- HashMap.lookup vecTcNm tcm
       , [_,consCon]  <- tyConDataCons vecTc
-      = let (vars,elems)     = second concat . unzip
-                             $ extractElems consCon aTy 'T' (2^n) arg
-        (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
-        let (TyConApp snatTcNm _) = tyView snTy
-            (Just snatTc)         = HashMap.lookup snatTcNm tcm
-            [snatDc]              = tyConDataCons snatTc
-            buildSNat i = mkApps (Data snatDc)
-                                 [Right (LitTy (NumTy i))
-                                 ,Left (Literal (IntegerLiteral (toInteger i)))
-                                 ]
-            lbody = doFold buildSNat (n-1) vars
-            lb    = Letrec (bind (rec (init elems)) lbody)
-        changed lb
-  where
-    doFold :: (Int -> Term) -> Int -> [Term] -> Term
+      = do let (vars,elems) = second concat . unzip
+                            $ extractElems consCon aTy 'T' (2^n) arg
+           (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
+           let (TyConApp snatTcNm _) = tyView snTy
+               (Just snatTc)         = HashMap.lookup snatTcNm tcm
+               [snatDc]              = tyConDataCons snatTc
+               buildSNat i = mkApps (Data snatDc)
+                                    [Right (LitTy (NumTy i))
+                                    ,Left (Literal (IntegerLiteral i))
+                                    ]
+               lbody = doFold buildSNat (n-1) vars
+               lb    = Letrec (bind (rec (init elems)) lbody)
+           changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showDoc ty
+
+    doFold :: (Integer -> Term) -> Integer -> [Term] -> Term
     doFold _    _ [x] = mkApps lrFun [Left x]
     doFold snDc k xs  =
       let (xsL,xsR) = splitAt (2^k) xs
@@ -565,30 +566,35 @@ reduceDTFold n aTy lrFun brFun arg = do
 -- | Replace an application of the @CLaSH.Sized.RTree.tdfold@ primitive on
 -- trees of a known depth @n@, by the fully unrolled recursive "definition"
 -- of @CLaSH.Sized.RTree.tdfold@
-reduceTFold :: Int  -- ^ Depth of the tree
-            -> Type -- ^ Element type of the argument tree
-            -> Term -- ^ Function to convert elements with
-            -> Term -- ^ Function to combine branches with
-            -> Term -- ^ The tree to fold
+reduceTFold :: Integer -- ^ Depth of the tree
+            -> Type    -- ^ Element type of the argument tree
+            -> Term    -- ^ Function to convert elements with
+            -> Term    -- ^ Function to combine branches with
+            -> Term    -- ^ The tree to fold
             -> NormalizeSession Term
 reduceTFold n aTy lrFun brFun arg = do
     tcm <- Lens.view tcCache
-    (TyConApp treeTcNm _) <- coreView tcm <$> termType tcm arg
-    let (Just treeTc)    = HashMap.lookup treeTcNm tcm
-        [lrCon,brCon]    = tyConDataCons treeTc
-        (vars,elems)     = extractTElems lrCon brCon aTy 'T' n arg
-    (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
-    let (TyConApp snatTcNm _) = coreView tcm snTy
-        (Just snatTc)         = HashMap.lookup snatTcNm tcm
-        [snatDc]              = tyConDataCons snatTc
-        buildSNat i = mkApps (Data snatDc)
-                             [Right (LitTy (NumTy i))
-                             ,Left (Literal (IntegerLiteral (toInteger i)))
-                             ]
-        lbody = doFold buildSNat (n-1) vars
-        lb    = Letrec (bind (rec elems) lbody)
-    changed lb
+    ty  <- termType tcm arg
+    go tcm ty
   where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp treeTcNm _)
+      | (Just treeTc) <- HashMap.lookup treeTcNm tcm
+      , [lrCon,brCon] <- tyConDataCons treeTc
+      = do let (vars,elems)     = extractTElems lrCon brCon aTy 'T' n arg
+           (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
+           let (TyConApp snatTcNm _) = tyView snTy
+               (Just snatTc)         = HashMap.lookup snatTcNm tcm
+               [snatDc]              = tyConDataCons snatTc
+               buildSNat i = mkApps (Data snatDc)
+                                    [Right (LitTy (NumTy i))
+                                    ,Left (Literal (IntegerLiteral i))
+                                    ]
+               lbody = doFold buildSNat (n-1) vars
+               lb    = Letrec (bind (rec elems) lbody)
+           changed lb
+    go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showDoc ty
+
     doFold _    _ [x] = mkApps lrFun [Left x]
     doFold snDc k xs  =
       let (xsL,xsR) = splitAt (length xs `div` 2) xs
@@ -601,15 +607,19 @@ reduceTFold n aTy lrFun brFun arg = do
                        ,Left eR
                        ]
 
-reduceTReplicate :: Int  -- ^ Depth of the tree
-                 -> Type -- ^ Element type
-                 -> Type -- ^ Result type
-                 -> Term -- ^ Element
+reduceTReplicate :: Integer -- ^ Depth of the tree
+                 -> Type    -- ^ Element type
+                 -> Type    -- ^ Result type
+                 -> Term    -- ^ Element
                  -> NormalizeSession Term
 reduceTReplicate n aTy eTy arg = do
-  tcm <- Lens.view tcCache
-  let (TyConApp treeTcNm _) = coreView tcm eTy
-      (Just treeTc) = HashMap.lookup treeTcNm tcm
-      [lrCon,brCon] = tyConDataCons treeTc
-      retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
-  changed retVec
+    tcm <- Lens.view tcCache
+    go tcm eTy
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp treeTcNm _)
+      | (Just treeTc) <- HashMap.lookup treeTcNm tcm
+      , [lrCon,brCon] <- tyConDataCons treeTc
+      = let retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
+        in  changed retVec
+    go _ ty = error $ $(curLoc) ++ "reduceTReplicate: argument does not have a vector type: " ++ showDoc ty

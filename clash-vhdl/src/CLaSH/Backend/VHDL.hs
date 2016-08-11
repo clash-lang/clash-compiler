@@ -202,7 +202,7 @@ topSortHWTys hwtys = sorted
 
 normaliseType :: HWType -> HWType
 normaliseType (Vector n ty)    = Vector n (normaliseType ty)
-normaliseType (RTree d ty)     = RTree n (normaliseType ty)
+normaliseType (RTree d ty)     = RTree d (normaliseType ty)
 normaliseType (Product nm tys) = Product nm (map normaliseType tys)
 normaliseType ty@(SP _ _)      = BitVector (typeSize ty)
 normaliseType ty@(Index _)     = Unsigned (typeSize ty)
