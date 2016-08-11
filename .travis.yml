@@ -43,7 +43,7 @@ matrix:
         - hvr-ghc
         - pgavin-ghdl
         packages:
-        - ghc-7.10.3
+        - ghc-8.0.1
         - libgmp-dev
         - ghdl
         - gperf
