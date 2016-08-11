@@ -175,7 +175,7 @@ addSNat SNat SNat = SNat
 subSNat :: SNat (a+b) -> SNat b -> SNat a
 subSNat x y = reifyNat (snatToInteger x - snatToInteger y)
             $ \p -> unsafeCoerce (snatProxy p)
-{-# INLINE subSNat #-}
+{-# NOINLINE subSNat #-}
 
 -- | Multiply two singleton natural numbers
 mulSNat :: SNat a -> SNat b -> SNat (a*b)
@@ -194,7 +194,7 @@ powSNat SNat SNat = SNat
 divSNat :: SNat (a*(b+1)) -> SNat (b+1) -> SNat a
 divSNat x y = reifyNat (snatToInteger x `div` snatToInteger y)
             $ \p -> unsafeCoerce (snatProxy p)
-{-# INLINE divSNat #-}
+{-# NOINLINE divSNat #-}
 
 -- | Logarithm of a natural number
 --
@@ -205,7 +205,7 @@ logBaseSNat :: SNat (a+2) -- ^ Base
 logBaseSNat x y =
   reifyNat (smallInteger (integerLogBase# (snatToInteger x) (snatToInteger y)))
   $ \p -> unsafeCoerce (snatProxy p)
-{-# INLINE logBaseSNat #-}
+{-# NOINLINE logBaseSNat #-}
 
 -- | Power of two of a singleton natural number
 pow2SNat :: SNat a -> SNat (2^a)
