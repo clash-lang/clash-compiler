@@ -8,5 +8,15 @@ packages:
 - 'clash-vhdl'
 - 'clash-ghc'
 - 'testsuite'
-- 'ghc-typelits-extra'
-- 'ghc-typelits-natnormalise'
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-extra.git
+    commit: e132d9f758e8e2cc45f33eb0bcb1995bf7495c24
+  extra-dep: true
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-knownnat.git
+    commit: 47a64ef45032dee29e98cd275c2289f0e1fd23f0
+  extra-dep: true
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
+    commit: 3a8774b5a83e63aeb9cac823adeec8f0bcb0bde6
+  extra-dep: true
