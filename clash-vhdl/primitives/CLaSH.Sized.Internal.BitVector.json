@@ -404,20 +404,20 @@ end block;~FI~ELSE
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.plus#"
-    , "type"      : "plus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]) + resize(unsigned(~ARG[2]),~LIT[0]))"
+    , "type"      : "plus# :: BitVector m -> BitVector n -> BitVector (Max m n + 1)"
+    , "templateE" : "std_logic_vector(resize(unsigned(~ARG[0]),~SIZE[~TYPO]) + resize(unsigned(~ARG[1]),~SIZE[~TYPO]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minus#"
-    , "type"      : "minus# :: KnownNat (Max m n + 1) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "templateE" : "std_logic_vector(resize(unsigned(~ARG[1]),~LIT[0]) - resize(unsigned(~ARG[2]),~LIT[0]))"
+    , "type"      : "minus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
+    , "templateE" : "std_logic_vector(resize(unsigned(~ARG[2]),~SIZE[~TYPO]) - resize(unsigned(~ARG[3]),~SIZE[~TYPO]))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.times#"
-    , "type"      : "times# :: KnownNat (m + n) => BitVector m -> BitVector n -> BitVector (m + n)"
-    , "templateE" : "std_logic_vector(unsigned(~ARG[1]) * unsigned(~ARG[2]))"
+    , "type"      : "times# :: BitVector m -> BitVector n -> BitVector (m + n)"
+    , "templateE" : "std_logic_vector(unsigned(~ARG[0]) * unsigned(~ARG[1]))"
     }
   }
 , { "BlackBox" :
@@ -470,8 +470,8 @@ end block;~FI~ELSE
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.shiftR#"
-    , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
-    , "templateE" : "std_logic_vector(shift_right(unsigned(~ARG[1]),to_integer(~ARG[2])))"
+    , "type"      : "shiftR# :: BitVector n -> Int -> BitVector n"
+    , "templateE" : "std_logic_vector(shift_right(unsigned(~ARG[0]),to_integer(~ARG[1])))"
     }
   }
 , { "BlackBox" :

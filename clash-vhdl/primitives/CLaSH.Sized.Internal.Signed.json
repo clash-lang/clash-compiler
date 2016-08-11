@@ -106,20 +106,20 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.plus#"
-    , "type"      : "plus# :: KnownNat (1 + Max m n) => Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateE" : "resize(~ARG[1],~LIT[0]) + resize(~ARG[2],~LIT[0])"
+    , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
+    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minus#"
-    , "type"      : "minus# :: KnownNat (1 + Max m n) => Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateE" : "resize(~ARG[1],~LIT[0]) - resize(~ARG[2],~LIT[0])"
+    , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
+    , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.times#"
-    , "type"      : "times# :: KnownNat (m + n) => Signed m -> Signed n -> Signed (m + n)"
-    , "templateE" : "~ARG[1] * ~ARG[2]"
+    , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
+    , "templateE" : "~ARG[0] * ~ARG[1]"
     }
   }
 , { "BlackBox" :
