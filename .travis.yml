@@ -36,31 +36,15 @@ script:
 matrix:
   fast_finish: true
   include:
-  - env: GHCVER=7.10.3 CABALVER=1.24
+  - env: GHCVER=8.0.1
     addons:
       apt:
         sources:
         - hvr-ghc
-        - pgavin-ghdl
         packages:
-        - ghc-7.10.3
-        - cabal-install-1.24
+        - ghc-8.0.1
         - libgmp-dev
-        - ghdl
-        - gperf
-    compiler: ! ': # ghc-7.10.3  YES'
-  - env: GHCVER=7.10.3 STACK_YAML="$(pwd)/stack-lts6.yaml"
-    addons:
-      apt:
-        sources:
-        - hvr-ghc
-        - pgavin-ghdl
-        packages:
-        - ghc-7.10.3
-        - libgmp-dev
-        - ghdl
-        - gperf
-    compiler: ! ': # ghc-7.10.3 stack-lts6.yaml'
+    compiler: ! ': # ghc-8.0.1'
 cache:
   directories:
   - ~/.stack
