@@ -293,7 +293,6 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
                , Opt_IrrefutableTuples -- Introduce irrefutPatError: avoid
                , Opt_Loopification -- STG pass, don't care
                , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks CLaSH, see [NOTE: CPR breaks CLaSH]
-               , Opt_WorkerWrapper -- we have no use for W/W
                , Opt_FullLaziness -- increases sharing, but seems to result in worse circuits (in both area and propagation delay)
                ]
 
