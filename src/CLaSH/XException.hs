@@ -26,7 +26,7 @@ CallStack (from HasCallStack):
 
 module CLaSH.XException
   ( -- * 'X': An exception for uninitialized values
-    X, errorX
+    XException, errorX
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith)
 where
@@ -43,24 +43,24 @@ import GHC.Stack         (HasCallStack, callStack, prettyCallStack)
 import System.IO.Unsafe  (unsafeDupablePerformIO)
 
 -- | An exception representing an \"uninitialised\" value.
-newtype X = X String
+newtype XException = XException String
 
-instance Show X where
-  show (X s) = s
+instance Show XException where
+  show (XException s) = s
 
-instance Exception X
+instance Exception XException
 
 -- | Like 'error', but throwing an 'XException' instead of an 'ErrorCall'
 --
 -- The 'ShowX' methods print these error-values as \"X\"; instead of error'ing
 -- out with an exception.
 errorX :: HasCallStack => String -> a
-errorX msg = throw (X ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
+errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
 
 showXWith :: (a -> ShowS) -> a -> ShowS
 showXWith f x =
   \s -> unsafeDupablePerformIO (catch (f <$> evaluate x <*> pure s)
-                                      (\(X _) -> return ('X': s)))
+                                      (\(XException _) -> return ('X': s)))
 
 -- | Use when you want to create a 'ShowX' instance where:
 --
