@@ -12,8 +12,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
-{-# OPTIONS_GHC -fno-specialise #-}
-
 module CLaSH.Core.Term
   ( Term (..)
   , TmName

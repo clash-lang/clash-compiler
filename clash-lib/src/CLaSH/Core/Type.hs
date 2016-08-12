@@ -13,8 +13,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
 
-{-# OPTIONS_GHC -fno-specialise #-}
-
 module CLaSH.Core.Type
   ( Type (..)
   , TypeView (..)
