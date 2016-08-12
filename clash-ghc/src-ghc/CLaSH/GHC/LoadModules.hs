@@ -123,8 +123,10 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                 ]
                   let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
                       ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
+                      ghcTyLitKNPlugin   = GHC.mkModuleName "GHC.TypeLits.KnownNat.Solver"
                   let dfPlug = dfDis { DynFlags.pluginModNames = nub $
-                                          ghcTyLitNormPlugin : ghcTyLitExtrPlugin : DynFlags.pluginModNames dfDis
+                                          ghcTyLitNormPlugin : ghcTyLitExtrPlugin :
+                                          ghcTyLitKNPlugin : DynFlags.pluginModNames dfDis
                                      }
                   return dfPlug
 
