@@ -169,6 +169,7 @@ It instead exports the identically named functions defined in terms of
 -- ...
 registerB :: Bundle a => a -> Unbundled a -> Unbundled a
 registerB = registerB' systemClock
+infixr 3 `registerB`
 
 {-# INLINE isRising #-}
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
