@@ -32,7 +32,7 @@ main =
       ,runTest "examples"             Both [] "Sprockell"    (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Windows"      (Just ("topEntity",False))
       ,runTest ("examples" </> "crc32") Both [] "CRC32"      (Just ("testbench",True))
-      ,runTest ("examples" </> "i2c") Both [] "I2C"          (Just ("topEntity",False))
+      ,runTest ("examples" </> "i2c") Both ["-O2"] "I2C"          (Just ("topEntity",False))
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
@@ -150,7 +150,6 @@ clashHDL t env extraArgs modName =
                                   ; Verilog -> "--verilog"
                                   }
                        ]
-                      ,["-O2"]
                       ,extraArgs
                       ,[modName <.> "hs"]
                       ])
