@@ -48,5 +48,5 @@ Between the brackets the Verilog top-entity must be defined. This QuasiQuoter wi
 The function 'coSim' will execute the co-simulation. The first argument is the 'CoSimSettings', the second argument indicates the Verilog Simulator (in this case 'Icarus'), and the third argument is the name of the top-module. The next arguments are the input-values which will be connected to the Verilog ports.
 
 The 'CoSimSettings' can be added with two functions: 'coSimSeq' and 'coSimFiles'. The last one will add extra Verilog sources, defined as the path to the sources or the directory containing the sources.
-With the function 'coSimSeq' also files can be added, but also the clock-period can the adjusted and a reset phase can be added. 
+With the function 'coSimSeq' files can also be added, the clock-period can be adjusted and a reset phase can be added. 
 
