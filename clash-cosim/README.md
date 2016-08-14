@@ -5,21 +5,7 @@ For my master thesis, I implemented co-simulation between CλaSH and Verilog (us
 
 This implementation can be seen as an extension for CλaSH and CλaSH is thus the first prerequisite. See http://www.clash-lang.org for the details on how to install CλaSH.
 
-Furthermore, a Verilog simulator is needed. I recommended Icarus Verilog. Please build and install Icarus Verilog from source; for the latest instructions go to https://github.com/steveicarus/iverilog or try the following commands:
-
-sudo apt-get install bison
-sudo apt-get install flex
-sudo apt-get install gperf
-sudo apt-get install autoconf
-sudo apt-get install g++
-sudo apt-get install build-essential
-
-git clone https://github.com/steveicarus/iverilog
-cd iverilog
-autoreconf -i
-./configure
-make
-sudo make install
+Furthermore, a Verilog simulator is needed. I recommended Icarus Verilog. Please build and install Icarus Verilog from source; for the latest instructions go to https://github.com/steveicarus/iverilog.
 
 After installing CλaSH and Icarus Verilog, the MAKEFILE can be used to build and load this co-simulation. The MAKEFILE will automatically execute CλaSH. A FIR filter is added as example in the file 'CoSimTest.hs, which is copied from http://www.clash-lang.org.
 To execute this example, please run:
