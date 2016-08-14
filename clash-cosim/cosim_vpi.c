@@ -12,8 +12,8 @@
 *C*/
 
 /* Include */
-#include "./include/vpi_user.h"
 #include "./comm/cosim_comm.c"
+#include "./include/vpi_user.h"
 #include "./types/cosim_types_vpi.c"
 #include "./control/cosim_control_vpi.c"
 #include "./traversing/cosim_traversing_vpi.c"
