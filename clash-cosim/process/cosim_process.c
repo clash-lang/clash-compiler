@@ -22,10 +22,10 @@ int tempName(char **name)
         return -1;
     }
     
-    //#pragma clang diagnostic push
-    //#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     *name = tempnam(".","clash");
-    //#pragma clang diagnostic pop
+    #pragma clang diagnostic pop
     
     if (*name == NULL)
     {
