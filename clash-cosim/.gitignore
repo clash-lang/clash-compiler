@@ -31,3 +31,8 @@
 # Debug files
 *.dSYM/
 *.su
+
+# VPI
+*.vvp
+*.vpi
+*.sl
