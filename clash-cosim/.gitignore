@@ -36,3 +36,6 @@
 *.vvp
 *.vpi
 *.sl
+
+# Apple
+*.DS_Store
