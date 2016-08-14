@@ -11,11 +11,13 @@ After installing CλaSH and Icarus Verilog, the MAKEFILE can be used to build an
 To execute this example, please run:
 
 λ> sampleN 4 $ topEntity testInput
+
 [4,12,1,20]
 
 Comparing this output with the 'expectedOutput' returns four times 'false' (meaning that the values are the same).
 
 λ> sampleN 4 $ expectedOutput $ topEntity testInput
+
 [False,False,False,False]
 
 With the command ':verilog', the CλaSH-compiler will compile the FIR filter to Verilog code.
@@ -25,18 +27,23 @@ With the command ':verilog', the CλaSH-compiler will compile the FIR filter to 
 After the compilation, the Verilog code can be tested with the co-simulation.
 
 λ> sampleN 4 $ verilog_fir testInput
+
 [4,12,1,20]
 
 Two other examples are added, the first one defines a multiplier in Verilog.
 
 λ> let a = fromList [1..]
+
 λ> let b = verilog_mult a $ register 1 b
+
 λ> sampleN 10 b
+
 [1,2,6,24,120,720,5040,40320,362880,3628800]
 
 The last one is an adder with the memory element in Verilog. 
 
 λ> sampleN 10 $ verilog_reg $ fromList [1..]
+
 [0,1,3,6,10,15,21,28,36,45]
 
 The co-simulation works mainly with four commands. See the file 'CoSimTest.hs' for examples of these commands. The first one is a QuasiQuoter defined as:
