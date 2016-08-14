@@ -103,10 +103,11 @@ verilog_reg x       = s
                                 input      [data_width-1:0] d;                           
                                 output reg [data_width-1:0] q;   
                                 
-                                reg clk = 0, rst = 0;
+                                reg clk = 0, rst = 1;
                             
                                 initial begin 
-                                    #1 rst = 1;
+                                    #1 rst = 0;
+                                    #2 rst = 1;
                                 end
                             
                                 always begin
