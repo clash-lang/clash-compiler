@@ -173,7 +173,7 @@
 "// rotateL begin
 logic [2*~LIT[0]-1:0] ~GENSYM[u][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
+assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 // rotateL end"
     }
   }
@@ -184,7 +184,7 @@ assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
 "// rotateR begin
 logic [2*~LIT[0]-1:0] ~GENSYM[u][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[1]-1 : 0];
+assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
 // rotateR end"
     }
   }

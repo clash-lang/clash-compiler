@@ -221,7 +221,7 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
 "// rotateL begin
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);
+assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
 // rotateL end"
     }
   }
@@ -232,7 +232,7 @@ assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);
 "// rotateR begin
 wire [2*~LIT[0]-1:0] ~GENSYM[s][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = $signed(~SYM[0][~LIT[1]-1 : 0]);
+assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
 // rotateR end"
     }
   }

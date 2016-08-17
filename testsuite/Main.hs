@@ -44,6 +44,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "IrrefError" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NestedPrimitives" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NestedPrimitives2" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NORX" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "PatError" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "PopCount" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "RecordSumOfProducts" (Just ("topEntity",False))
