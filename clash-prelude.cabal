@@ -117,6 +117,7 @@ Library
                       CLaSH.Signal
                       CLaSH.Signal.Bundle
                       CLaSH.Signal.Delayed
+                      CLaSH.Signal.Delayed.Explicit
                       CLaSH.Signal.Explicit
                       CLaSH.Signal.Internal
 
