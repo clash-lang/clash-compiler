@@ -87,7 +87,7 @@ Library
                       TupleSections
                       ViewPatterns
 
-  Build-depends:      aeson                   >= 0.6.2.0  && < 0.12,
+  Build-depends:      aeson                   >= 0.6.2.0  && < 1.1,
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.8      && < 5,
                       bytestring              >= 0.10.0.2 && < 0.11,
