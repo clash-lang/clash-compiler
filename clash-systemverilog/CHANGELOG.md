@@ -1,6 +1,6 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.6.9
+## 0.6.9 *August 18th 2016*
 * Fixes bugs:
   * Fix primitives for {Signed,Unsigned} rotateL# and rotateR# [#169](https://github.com/clash-lang/clash-compiler/issues/169)
 

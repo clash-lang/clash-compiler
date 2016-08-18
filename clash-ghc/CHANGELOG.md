@@ -1,5 +1,10 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.23 *August 18th 2015*
+* Fixes bugs:
+  * Type families are not being reduced correctly  [#167](https://github.com/clash-lang/clash-compiler/issues/167)
+  * (System)Verilog: Fix primitives for {Signed,Unsigned} rotateL# and rotateR# [#169](https://github.com/clash-lang/clash-compiler/issues/169)
+
 ## 0.6.22 *August 3rd 2016*
 * Fixes bugs:
   * Bug in DEC transformation overwrites case-alternatives
