@@ -889,3 +889,11 @@ instance FracFixedC rep int frac => Fractional (Fixed rep int frac) where
       frac = fromInteger (natVal res)
       n    = numerator   r `shiftL` (2 * frac)
       d    = denominator r `shiftL` frac
+
+instance (NumFixedC rep int frac, Integral (rep (int + frac))) =>
+         Real (Fixed rep int frac) where
+  toRational f@(Fixed fRep) = nom % denom
+   where
+     nF        = fracShift f
+     denom     = 1 `shiftL` nF
+     nom       = toInteger fRep
