@@ -89,8 +89,6 @@ module CLaSH.Prelude.Safe
   , module CLaSH.Promoted.Nat
   , module CLaSH.Promoted.Nat.Literals
   , module CLaSH.Promoted.Nat.TH
-    -- ** Type-level functions
-  , module CLaSH.Promoted.Ord
     -- ** Type classes
     -- *** CLaSH
   , module CLaSH.Class.BitPack
@@ -132,7 +130,6 @@ import CLaSH.Prelude.DataFlow
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
-import CLaSH.Promoted.Ord
 import CLaSH.Sized.BitVector
 import CLaSH.Sized.Fixed
 import CLaSH.Sized.Index

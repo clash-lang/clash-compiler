@@ -112,7 +112,6 @@ Library
                       CLaSH.Promoted.Nat.Literals
                       CLaSH.Promoted.Nat.TH
                       CLaSH.Promoted.Nat.Unsafe
-                      CLaSH.Promoted.Ord
                       CLaSH.Promoted.Symbol
 
                       CLaSH.Signal
@@ -171,9 +170,9 @@ Library
                       integer-gmp               >= 0.5.1.0 && < 1.1,
                       deepseq                   >= 1.4.1.0 && < 1.5,
                       ghc-prim                  >= 0.3.1.0 && < 0.6,
-                      ghc-typelits-extra        >= 0.1     && < 0.2,
-                      ghc-typelits-knownnat     >= 0.1.2   && < 0.2,
-                      ghc-typelits-natnormalise >= 0.4.2   && < 0.5,
+                      ghc-typelits-extra        >= 0.1     && < 0.3,
+                      ghc-typelits-knownnat     >= 0.1.2   && < 0.3,
+                      ghc-typelits-natnormalise >= 0.4.2   && < 0.6,
                       lens                      >= 4.9     && < 4.15,
                       QuickCheck                >= 2.7     && < 2.10,
                       reflection                >= 2       && < 2.2,

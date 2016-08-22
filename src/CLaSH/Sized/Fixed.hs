@@ -80,6 +80,7 @@ import Data.Proxy                 (Proxy (..))
 import Data.Ratio                 ((%), denominator, numerator)
 import Data.Typeable              (Typeable, TypeRep, typeRep)
 import GHC.TypeLits               (KnownNat, Nat, type (+), natVal)
+import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, mkName,
                                    numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
@@ -91,7 +92,6 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    boundedMult)
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat)
-import CLaSH.Promoted.Ord         (Max)
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 

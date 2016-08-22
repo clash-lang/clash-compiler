@@ -110,6 +110,7 @@ import Data.Proxy                 (Proxy (..))
 import GHC.Integer                (smallInteger)
 import GHC.Prim                   (dataToTag#)
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), natVal)
+import GHC.TypeLits.Extra         (Max)
 import Language.Haskell.TH        (Q, TExp, TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import Numeric                    (readInt)
@@ -121,7 +122,6 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
-import CLaSH.Promoted.Ord         (Max)
 
 import {-# SOURCE #-} qualified CLaSH.Sized.Vector         as V
 import {-# SOURCE #-} qualified CLaSH.Sized.Internal.Index as I

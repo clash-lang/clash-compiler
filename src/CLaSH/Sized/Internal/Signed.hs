@@ -19,7 +19,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 module CLaSH.Sized.Internal.Signed
   ( -- * Datatypes
@@ -89,6 +91,7 @@ import Data.Default                   (Default (..))
 import Data.Proxy                     (Proxy (..))
 import Text.Read                      (Read (..), ReadPrec)
 import GHC.TypeLits                   (KnownNat, Nat, type (+), natVal)
+import GHC.TypeLits.Extra             (Max)
 import Language.Haskell.TH            (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax     (Lift(..))
 import Test.QuickCheck.Arbitrary      (Arbitrary (..), CoArbitrary (..),
@@ -101,7 +104,6 @@ import CLaSH.Class.Num                (ExtendingNum (..), SaturatingNum (..),
 import CLaSH.Class.Resize             (Resize (..))
 import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
-import CLaSH.Promoted.Ord             (Max)
 import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
 
@@ -447,7 +449,7 @@ decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 instance KnownNat n => SaturatingNum (Signed n) where
   satPlus SatWrap  a b = a +# b
   satPlus SatBound a b =
-    let r      = plus# a b
+    let r      = plus# a b :: Signed (n + 1)
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
@@ -471,7 +473,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
 
   satMin SatWrap a b = a -# b
   satMin SatBound a b =
-    let r      = minus# a b
+    let r      = minus# a b :: Signed (n + 1)
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
