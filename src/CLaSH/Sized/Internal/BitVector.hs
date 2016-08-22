@@ -317,9 +317,8 @@ plus# (BV a) (BV b) = BV (a + b)
 minus# :: forall m n . (KnownNat m, KnownNat n) => BitVector m -> BitVector n
                                                 -> BitVector (Max m n + 1)
 minus# (BV a) (BV b) =
-  let m    = fromInteger (natVal (Proxy :: Proxy m))
-      n    = fromInteger (natVal (Proxy :: Proxy n))
-      mask = 1 `shiftL` (max m n + 1)
+  let sz   = fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
+      mask = 1 `shiftL` sz
       z    = a - b
   in  if z < 0 then BV (mask + z) else BV z
 

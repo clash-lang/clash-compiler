@@ -286,9 +286,8 @@ plus# (U a) (U b) = U (a + b)
 minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
                                                 -> Unsigned (Max m n + 1)
 minus# (U a) (U b) =
-  let m    = fromInteger (natVal (Proxy :: Proxy m))
-      n    = fromInteger (natVal (Proxy :: Proxy n))
-      mask = 1 `shiftL` (max m n + 1)
+  let sz   = fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
+      mask = 1 `shiftL` sz
       z    = a - b
   in  if z < 0 then U (mask + z) else U z
 
