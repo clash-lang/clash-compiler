@@ -48,7 +48,6 @@ where
 
 -- External import
 import           Control.DeepSeq                         as DS
-import           Control.Monad                           (zipWithM)
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.Maybe                              (isJust, mapMaybe)
@@ -336,23 +335,40 @@ findFunSubst tcm (tcSubst:rest) args = case funSubsts tcm tcSubst args of
 -- a substituted RHS
 funSubsts :: HashMap TyConName TyCon -> ([Type],Type) -> [Type] -> Maybe Type
 funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
-  tySubts <- concat <$> zipWithM (funSubst tcm) tcSubstLhs args
+  tySubts <- foldl (funSubst tcm) (Just []) (zip tcSubstLhs args)
   let tyRhs = substTys tySubts tcSubstRhs
   return tyRhs
 
 -- Given a LHS matching type, and a RHS to-match type, check if LHS and RHS
 -- are a match. If they do match, and the LHS is a variable, return a
 -- substitution
-funSubst :: HashMap TyConName TyCon -> Type -> Type -> Maybe [(TyName,Type)]
-funSubst _ (VarTy _ nmF) ty  = Just [(nmF,ty)]
-funSubst tcm ty1 (reduceTypeFamily tcm -> Just ty2) = funSubst tcm ty1 ty2 -- See [Note: lazy type families]
-funSubst _ tyL@(LitTy _) tyR = if tyL == tyR then Just [] else Nothing
-funSubst tcm (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
-  | tc == tc'
-  = do
-    tySubts <- zipWithM (funSubst tcm) argTys argTys'
-    return (concat tySubts)
-funSubst _ _ _ = Nothing
+funSubst :: HashMap TyConName TyCon -> Maybe [(TyName,Type)] -> (Type,Type) -> Maybe [(TyName,Type)]
+funSubst _   Nothing  = const Nothing
+funSubst tcm (Just s) = uncurry go
+  where
+    go (VarTy _ nmF) ty = case lookup nmF s of
+      Nothing -> Just ((nmF,ty):s)
+      -- Given, for example, the type family definition:
+      --
+      -- > type family Max x y where
+      -- >   Max 0 b = b
+      -- >   Max a 0 = a
+      -- >   Max n n = n
+      -- >   Max a b = If (a <=? b) b a
+      --
+      -- Then `Max 4 8` matches against the 4th clause.
+      --
+      -- So this is why, whenever we match against a type variable, we first
+      -- check if there is already a substitution defined for this type variable,
+      -- and if so, the applied type, and the type in the substitution should match.
+      Just ty' | ty' == ty -> Just s
+      _ -> Nothing
+    go ty1 (reduceTypeFamily tcm -> Just ty2) = go ty1 ty2 -- See [Note: lazy type families]
+    go ty1@(LitTy _) ty2 = if ty1 == ty2 then Just s else Nothing
+    go (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
+      | tc == tc'
+      = foldl (funSubst tcm) (Just s) (zip argTys argTys')
+    go _ _ = Nothing
 
 {- [Note: lazy type families]
 
