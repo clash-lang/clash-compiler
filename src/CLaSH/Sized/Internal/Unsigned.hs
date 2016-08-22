@@ -10,6 +10,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -228,7 +229,7 @@ minBound# = U 0
 
 {-# NOINLINE maxBound# #-}
 maxBound# :: forall n .KnownNat n => Unsigned n
-maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
             in  U (m - 1)
 
 instance KnownNat n => Num (Unsigned n) where
@@ -242,12 +243,12 @@ instance KnownNat n => Num (Unsigned n) where
 
 (+#),(-#),(*#) :: forall n . KnownNat n => Unsigned n -> Unsigned n -> Unsigned n
 {-# NOINLINE (+#) #-}
-(+#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+(+#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
                        z = i + j
                    in  if z >= m then U (z - m) else U z
 
 {-# NOINLINE (-#) #-}
-(-#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+(-#) (U i) (U j) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
                        z = i - j
                    in  if z < 0 then U (m + z) else U z
 
@@ -259,7 +260,7 @@ negate# :: forall n . KnownNat n => Unsigned n -> Unsigned n
 negate# (U 0) = U 0
 negate# (U i) = sz `seq` U (sz - i)
   where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat n => Integer -> Unsigned n
@@ -269,7 +270,7 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> Unsigned n
 fromInteger_INLINE i = U (i `mod` sz)
   where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (Unsigned m) (Unsigned n) where
   type AResult (Unsigned m) (Unsigned n) = Unsigned (Max m n + 1)
@@ -286,7 +287,7 @@ plus# (U a) (U b) = U (a + b)
 minus# :: forall m n . (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n
                                                 -> Unsigned (Max m n + 1)
 minus# (U a) (U b) =
-  let sz   = fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
+  let sz   = fromInteger (natVal (Proxy @(Max m n + 1)))
       mask = 1 `shiftL` sz
       z    = a - b
   in  if z < 0 then U (mask + z) else U z
@@ -401,7 +402,7 @@ instance Resize Unsigned where
 
 {-# NOINLINE resize# #-}
 resize# :: forall n m . KnownNat m => Unsigned n -> Unsigned m
-resize# (U i) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy m))
+resize# (U i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @m))
                 in  if i >= m then fromInteger_INLINE i else U i
 
 instance Default (Unsigned n) where

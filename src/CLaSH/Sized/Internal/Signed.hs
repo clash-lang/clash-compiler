@@ -12,6 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -172,13 +173,13 @@ instance KnownNat n => BitPack (Signed n) where
 
 {-# NOINLINE pack# #-}
 pack# :: forall n . KnownNat n => Signed n -> BitVector n
-pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+pack# (S i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
               in  if i < 0 then BV (m + i) else BV i
 
 {-# NOINLINE unpack# #-}
 unpack# :: forall n . KnownNat n => BitVector n -> Signed n
 unpack# (BV i) =
-  let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) - 1)
+  let m = 1 `shiftL` fromInteger (natVal (Proxy @n) - 1)
   in  if i >= m then S (i-2*m) else S i
 
 instance Eq (Signed n) where
@@ -258,13 +259,13 @@ instance KnownNat n => Num (Signed n) where
 
 (+#), (-#), (*#) :: forall n . KnownNat n => Signed n -> Signed n -> Signed n
 {-# NOINLINE (+#) #-}
-(S a) +# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
+(S a) +# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
                      z  = a + b
                  in  if z >= m then S (z - 2*m) else
                         if z < negate m then S (z + 2*m) else S z
 
 {-# NOINLINE (-#) #-}
-(S a) -# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
+(S a) -# (S b) = let m  = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
                      z  = a - b
                  in  if z < negate m then S (z + 2*m) else
                         if z >= m then S (z - 2*m) else S z
@@ -274,12 +275,12 @@ instance KnownNat n => Num (Signed n) where
 
 negate#,abs# :: forall n . KnownNat n => Signed n -> Signed n
 {-# NOINLINE negate# #-}
-negate# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
+negate# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
                     z = negate n
                 in  if z == m then S n else S z
 
 {-# NOINLINE abs# #-}
-abs# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
+abs# (S n) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
                  z = abs n
              in  if z == m then S n else S z
 
@@ -291,7 +292,7 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> Signed n
 fromInteger_INLINE i = mask `seq` S res
   where
-    mask = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n) -1)
+    mask = 1 `shiftL` fromInteger (natVal (Proxy @n) -1)
     res  = case divMod i mask of
              (s,i') | even s    -> i'
                     | otherwise -> i' - mask
@@ -425,7 +426,7 @@ resize# s@(S i) | n' <= m'  = extended
     m' = shiftL mask 1
     extended = S i
 
-    mask      = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy m) -1)
+    mask      = 1 `shiftL` fromInteger (natVal (Proxy @m) -1)
     i'        = i `mod` mask
     truncated = if testBit i (n-1)
                    then S (i' - mask)

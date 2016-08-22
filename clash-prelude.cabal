@@ -150,6 +150,7 @@ Library
                       FlexibleInstances
                       GADTs
                       GeneralizedNewtypeDeriving
+                      InstanceSigs
                       KindSignatures
                       MagicHash
                       MultiParamTypeClasses
@@ -159,6 +160,7 @@ Library
                       StandaloneDeriving
                       TemplateHaskell
                       TupleSections
+                      TypeApplications
                       TypeFamilies
                       TypeOperators
                       UndecidableInstances

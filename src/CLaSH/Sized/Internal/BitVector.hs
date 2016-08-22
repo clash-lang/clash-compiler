@@ -12,6 +12,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -259,7 +260,7 @@ minBound# = BV 0
 
 {-# NOINLINE maxBound# #-}
 maxBound# :: forall n . KnownNat n => BitVector n
-maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+maxBound# = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
             in  BV (m-1)
 
 instance KnownNat n => Num (BitVector n) where
@@ -273,12 +274,12 @@ instance KnownNat n => Num (BitVector n) where
 
 (+#),(-#),(*#) :: forall n . KnownNat n => BitVector n -> BitVector n -> BitVector n
 {-# NOINLINE (+#) #-}
-(+#) (BV i) (BV j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+(+#) (BV i) (BV j) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
                          z = i + j
                      in  if z >= m then BV (z - m) else BV z
 
 {-# NOINLINE (-#) #-}
-(-#) (BV i) (BV j) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+(-#) (BV i) (BV j) = let m = 1 `shiftL` fromInteger (natVal (Proxy @n))
                          z = i - j
                      in  if z < 0 then BV (m + z) else BV z
 
@@ -290,7 +291,7 @@ negate# :: forall n . KnownNat n => BitVector n -> BitVector n
 negate# (BV 0) = BV 0
 negate# (BV i) = BV (sz - i)
   where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 {-# NOINLINE fromInteger# #-}
 fromInteger# :: KnownNat n => Integer -> BitVector n
@@ -300,7 +301,7 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> BitVector n
 fromInteger_INLINE i = sz `seq` BV (i `mod` sz)
   where
-    sz = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy n))
+    sz = 1 `shiftL` fromInteger (natVal (Proxy @n))
 
 instance (KnownNat m, KnownNat n) => ExtendingNum (BitVector m) (BitVector n) where
   type AResult (BitVector m) (BitVector n) = BitVector (Max m n + 1)
@@ -317,7 +318,7 @@ plus# (BV a) (BV b) = BV (a + b)
 minus# :: forall m n . (KnownNat m, KnownNat n) => BitVector m -> BitVector n
                                                 -> BitVector (Max m n + 1)
 minus# (BV a) (BV b) =
-  let sz   = fromInteger (natVal (Proxy :: Proxy (Max m n + 1)))
+  let sz   = fromInteger (natVal (Proxy @(Max m n + 1)))
       mask = 1 `shiftL` sz
       z    = a - b
   in  if z < 0 then BV (mask + z) else BV z
@@ -434,7 +435,7 @@ index# bv@(BV v) i
 -- | MSB
 msb# :: forall n . KnownNat n => BitVector n -> Bit
 msb# (BV v)
-  = let i = fromInteger (natVal (Proxy :: Proxy n) - 1)
+  = let i = fromInteger (natVal (Proxy @n) - 1)
     in  BV (smallInteger (dataToTag# (testBit v i)))
 
 {-# NOINLINE lsb# #-}
@@ -502,7 +503,7 @@ split# :: forall n m . KnownNat n
        => BitVector (m + n) -> (BitVector m, BitVector n)
 split# (BV i) = (BV l, BV r)
   where
-    n     = fromInteger (natVal (Proxy :: Proxy n))
+    n     = fromInteger (natVal (Proxy @n))
     mask  = 1 `shiftL` n
     -- The code below is faster than:
     -- > (l,r) = i `divMod` mask
@@ -574,7 +575,7 @@ instance Resize BitVector where
 
 {-# NOINLINE resize# #-}
 resize# :: forall n m . KnownNat m => BitVector n -> BitVector m
-resize# (BV i) = let m = 1 `shiftL` fromInteger (natVal (Proxy :: Proxy m))
+resize# (BV i) = let m = 1 `shiftL` fromInteger (natVal (Proxy @m))
                  in  if i >= m then fromInteger_INLINE i else BV i
 
 instance KnownNat n => Lift (BitVector n) where

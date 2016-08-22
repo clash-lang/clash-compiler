@@ -32,6 +32,7 @@ BEWARE: rounding by truncation introduces a sign bias!
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -436,7 +437,7 @@ instance (NumFixedC rep int frac) => Num (Fixed rep int frac) where
   negate (Fixed a) = Fixed (negate a)
   abs    (Fixed a) = Fixed (abs a)
   signum (Fixed a) = Fixed (signum a)
-  fromInteger i    = let fSH = fromInteger (natVal (Proxy :: Proxy frac))
+  fromInteger i    = let fSH = fromInteger (natVal (Proxy @frac))
                          res = Fixed (fromInteger i `shiftL` fSH)
                      in  res
 
@@ -524,11 +525,11 @@ resizeF' :: forall rep int1 frac1 int2 frac2 . ResizeFC rep int1 frac1 int2 frac
          -> Fixed rep int2 frac2
 resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
   where
-    argSZ = natVal (Proxy :: Proxy (int1 + frac1))
-    resSZ = natVal (Proxy :: Proxy (int2 + frac2))
+    argSZ = natVal (Proxy @(int1 + frac1))
+    resSZ = natVal (Proxy @(int2 + frac2))
 
-    argFracSZ = fromInteger (natVal (Proxy :: Proxy frac1))
-    resFracSZ = fromInteger (natVal (Proxy :: Proxy frac2))
+    argFracSZ = fromInteger (natVal (Proxy @frac1))
+    resFracSZ = fromInteger (natVal (Proxy @frac2))
 
     -- All size and frac comparisons and related if-then-else statements should
     -- be optimized away by the compiler
@@ -612,7 +613,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
                            then rMin
                            else truncated
     truncated = truncate shifted :: Integer
-    shifted   = a * (2 ^ (natVal (Proxy :: Proxy frac)))
+    shifted   = a * (2 ^ (natVal (Proxy @frac)))
 
 -- | Convert, at run-time, a 'Double' to a 'Fixed'-point.
 --
@@ -777,7 +778,7 @@ fLitR a = Fixed (fromInteger sat)
                            then rMin
                            else truncated
     truncated = truncate shifted :: Integer
-    shifted   = a * (2 ^ (natVal (Proxy :: Proxy frac)))
+    shifted   = a * (2 ^ (natVal (Proxy @frac)))
 
 instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
   satPlus w (Fixed a) (Fixed b) = Fixed (satPlus w a b)

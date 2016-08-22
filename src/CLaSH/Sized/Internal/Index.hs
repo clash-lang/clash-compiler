@@ -11,6 +11,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
@@ -214,7 +215,7 @@ fromInteger# = fromInteger_INLINE
 fromInteger_INLINE :: forall n . KnownNat n => Integer -> Index n
 fromInteger_INLINE i = bound `seq` if i > (-1) && i < bound then I i else err
   where
-    bound = natVal (Proxy :: Proxy n)
+    bound = natVal (Proxy @n)
     err   = error ("CLaSH.Sized.Index: result " ++ show i ++
                    " is out of bounds: [0.." ++ show (bound - 1) ++ "]")
 

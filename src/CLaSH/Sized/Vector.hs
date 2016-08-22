@@ -14,6 +14,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -132,6 +133,7 @@ import CLaSH.Class.BitPack (BitPack (..))
 >>> :set -XTypeOperators
 >>> :set -XTemplateHaskell
 >>> :set -XFlexibleContexts
+>>> :set -XTypeApplications
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> import CLaSH.Prelude
 >>> let compareSwapL a b = if a < b then (a,b) else (b,a)
@@ -170,7 +172,7 @@ let sortV_flip xs = map fst sorted :< (snd (last sorted))
 >>> type instance Apply IIndex l = Index ((2^l)+1)
 >>> :{
 let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = dtfold (Proxy :: Proxy IIndex)
+    populationCount' bv = dtfold (Proxy @IIndex)
                                  fromIntegral
                                  (\_ x y -> plus x y)
                                  (bv2v bv)
@@ -1808,7 +1810,7 @@ dfold _ f z xs = go (snatProxy (asNatProxy xs)) xs
 --
 -- populationCount' :: (KnownNat k, KnownNat (2^k))
 --                  => BitVector (2^k) -> Index ((2^k)+1)
--- populationCount' bv = 'dtfold' (Proxy :: Proxy IIndex)
+-- populationCount' bv = 'dtfold' (Proxy @IIndex)
 --                              fromIntegral
 --                              (\\_ x y -> 'CLaSH.Class.Num.plus' x y)
 --                              ('bv2v' bv)
@@ -1861,8 +1863,8 @@ dtfold _ f g = go (SNat :: SNat k)
 -- is a variation on (':>'), e.g.:
 --
 -- @
--- map' :: KnownNat k => (a -> b) -> Vec n a -> Vec n b
--- map' f = 'dfold' (Proxy :: Proxy ('VCons' a)) (\_ x xs -> f x :> xs)
+-- map' :: forall n a b . KnownNat n => (a -> b) -> Vec n a -> Vec n b
+-- map' f = 'dfold' (Proxy @('VCons' b)) (\_ x xs -> f x :> xs)
 -- @
 data VCons (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (VCons a) l = Vec l a
@@ -1886,11 +1888,11 @@ type instance Apply (VCons a) l = Vec l a
 -- The circuit layout of @insertionSort@, build using 'vfold', is:
 --
 -- <<doc/csSort.svg>>
-vfold :: KnownNat k
+vfold :: forall k a b . KnownNat k
       => (forall l . SNat l -> a -> Vec l b -> Vec (l + 1) b)
       -> Vec k a
       -> Vec k b
-vfold f xs = dfold (Proxy :: Proxy (VCons a)) f Nil xs
+vfold f xs = dfold (Proxy @(VCons b)) f Nil xs
 {-# INLINE vfold #-}
 
 -- | Apply a function to every element of a vector and the element's position
@@ -1902,9 +1904,9 @@ vfold f xs = dfold (Proxy :: Proxy (VCons a)) f Nil xs
 -- <<1,2,3>,<1,2,3>,<1,2,3>>
 -- >>> rotateMatrix xss
 -- <<1,2,3>,<3,1,2>,<2,3,1>>
-smap :: KnownNat k => (forall l . SNat l -> a -> b) -> Vec k a -> Vec k b
+smap :: forall k a b . KnownNat k => (forall l . SNat l -> a -> b) -> Vec k a -> Vec k b
 smap f xs = reverse
-          $ dfold (Proxy :: Proxy (VCons a))
+          $ dfold (Proxy @(VCons b))
                   (\sn x xs' -> f sn x :> xs')
                   Nil (reverse xs)
 {-# INLINE smap #-}

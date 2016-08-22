@@ -6,12 +6,14 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE InstanceSigs         #-}
 {-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -78,6 +80,7 @@ import CLaSH.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
 >>> :set -XTypeOperators
 >>> :set -XTemplateHaskell
 >>> :set -XFlexibleContexts
+>>> :set -XTypeApplications
 >>> :set -fplugin GHC.TypeLits.Normalise
 >>> :set -XUndecidableInstances
 >>> import CLaSH.Prelude
@@ -85,7 +88,7 @@ import CLaSH.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
 >>> type instance Apply IIndex l = Index ((2^l)+1)
 >>> :{
 let populationCount' :: (KnownNat k, KnownNat (2^k)) => BitVector (2^k) -> Index ((2^k)+1)
-    populationCount' bv = tdfold (Proxy :: Proxy IIndex)
+    populationCount' bv = tdfold (Proxy @IIndex)
                                  fromIntegral
                                  (\_ x y -> plus x y)
                                  (v2t (bv2v bv))
@@ -172,7 +175,8 @@ data TraversableTree (g :: * -> *) (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (TraversableTree f a) d = f (RTree d a)
 
 instance KnownNat d => Traversable (RTree d) where
-  traverse f = tdfold (Proxy :: Proxy (TraversableTree f b))
+  traverse :: forall f a b . Applicative f => (a -> f b) -> RTree d a -> f (RTree d b)
+  traverse f = tdfold (Proxy @(TraversableTree f b))
                       (fmap LR . f)
                       (const (liftA2 BR))
 
@@ -276,7 +280,7 @@ instance (KnownNat d, CoArbitrary a) => CoArbitrary (RTree d a) where
 --
 -- populationCount' :: (KnownNat k, KnownNat (2^k))
 --                  => BitVector (2^k) -> Index ((2^k)+1)
--- populationCount' bv = 'tdfold' (Proxy :: Proxy IIndex)
+-- populationCount' bv = 'tdfold' (Proxy @IIndex)
 --                              fromIntegral
 --                              (\\_ x y -> 'CLaSH.Class.Num.plus' x y)
 --                              ('v2t' ('CLaSH.Sized.Vector.bv2v' bv))
@@ -309,13 +313,14 @@ data TfoldTree (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (TfoldTree a) d = a
 
 -- | Reduce a tree to a single element
-tfold :: KnownNat d
+tfold :: forall d a b .
+         KnownNat d
       => (a -> b) -- ^ Function to apply to the leaves
       -> (b -> b -> b) -- ^ Function to combine the results of the reduction
                        -- of two branches
       -> RTree d a -- ^ Tree to fold reduce
       -> b
-tfold f g = tdfold (Proxy :: Proxy (TfoldTree b)) f (const g)
+tfold f g = tdfold (Proxy @(TfoldTree b)) f (const g)
 
 -- | \"'treplicate' @d a@\" returns a tree of depth /d/, and has /2^d/ copies
 -- of /a/.
@@ -347,8 +352,8 @@ type instance Apply (MapTree a) d = RTree d a
 -- i.e.,
 --
 -- > tmap f (BR (LR a) (LR b)) == BR (LR (f a)) (LR (f b))
-tmap :: KnownNat d => (a -> b) -> RTree d a -> RTree d b
-tmap f = tdfold (Proxy :: Proxy (MapTree b)) (LR . f) (\_ l r -> BR l r)
+tmap :: forall d a b . KnownNat d => (a -> b) -> RTree d a -> RTree d b
+tmap f = tdfold (Proxy @(MapTree b)) (LR . f) (\_ l r -> BR l r)
 
 -- | Generate a tree of indices, where the depth of the tree is determined by
 -- the context.
@@ -357,7 +362,7 @@ tmap f = tdfold (Proxy :: Proxy (MapTree b)) (LR . f) (\_ l r -> BR l r)
 -- <<<0,1>,<2,3>>,<<4,5>,<6,7>>>
 tindices :: forall d . KnownNat d => RTree d (Index (2^d))
 tindices =
-  tdfold (Proxy :: Proxy (MapTree (Index (2^d)))) LR
+  tdfold (Proxy @(MapTree (Index (2^d)))) LR
          (\s@SNat l r -> BR l (tmap (+(fromInteger (snatToInteger (pow2SNat s)))) r))
          (treplicate SNat 0)
 
@@ -370,8 +375,8 @@ type instance Apply (V2TTree a) d = RTree d a
 -- <1,2,3,4>
 -- >>> v2t (1:>2:>3:>4:>Nil)
 -- <<1,2>,<3,4>>
-v2t :: KnownNat d => Vec (2^d) a -> RTree d a
-v2t = dtfold (Proxy :: Proxy (V2TTree a)) LR (const BR)
+v2t :: forall d a . KnownNat d => Vec (2^d) a -> RTree d a
+v2t = dtfold (Proxy @(V2TTree a)) LR (const BR)
 
 data T2VTree (a :: *) (f :: TyFun Nat *) :: *
 type instance Apply (T2VTree a) d = Vec (2^d) a
@@ -382,8 +387,8 @@ type instance Apply (T2VTree a) d = Vec (2^d) a
 -- <<1,2>,<3,4>>
 -- >>> t2v (BR (BR (LR 1) (LR 2)) (BR (LR 3) (LR 4)))
 -- <1,2,3,4>
-t2v :: KnownNat d => RTree d a -> Vec (2^d) a
-t2v = tdfold (Proxy :: Proxy (T2VTree a)) (:> Nil) (\_ l r -> l ++ r)
+t2v :: forall d a . KnownNat d => RTree d a -> Vec (2^d) a
+t2v = tdfold (Proxy @(T2VTree a)) (:> Nil) (\_ l r -> l ++ r)
 
 -- | \"'indexTree' @t n@\" returns the /n/'th element of /t/.
 --
@@ -425,7 +430,7 @@ type instance Apply (ZipWithTree b c) d = RTree d b -> RTree d c
 --
 -- > tzipWith f (BR (LR a1) (LR b1)) (BR (LR a2) (LR b2)) == BR (LR (f a1 a2)) (LR (f b1 b2))
 tzipWith :: forall a b c d . KnownNat d => (a -> b -> c) -> RTree d a -> RTree d b -> RTree d c
-tzipWith f = tdfold (Proxy :: Proxy (ZipWithTree b c)) lr br
+tzipWith f = tdfold (Proxy @(ZipWithTree b c)) lr br
   where
     lr :: a -> RTree 0 b -> RTree 0 c
     lr a (LR b) = LR (f a b)
@@ -448,8 +453,8 @@ type instance Apply (UnzipTree a b) d = (RTree d a, RTree d b)
 
 -- | 'tunzip' transforms a tree of pairs into a tree of first components and a
 -- tree of second components.
-tunzip :: KnownNat d => RTree d (a,b) -> (RTree d a,RTree d b)
-tunzip = tdfold (Proxy :: Proxy (UnzipTree a b)) lr br
+tunzip :: forall d a b . KnownNat d => RTree d (a,b) -> (RTree d a,RTree d b)
+tunzip = tdfold (Proxy @(UnzipTree a b)) lr br
   where
     lr   (a,b) = (LR a,LR b)
 
