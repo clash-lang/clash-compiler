@@ -28,7 +28,7 @@ module CLaSH.Promoted.Nat
     -- ** Arithmetic
   , addSNat, mulSNat, powSNat
     -- *** Partial
-  , subSNat, divSNat, logBaseSNat
+  , subSNat, divSNat, modSNat, flogBaseSNat, clogBaseSNat, logBaseSNat
     -- *** Specialised
   , pow2SNat
     -- * Unary/Peano-encoded natural numbers
@@ -60,12 +60,10 @@ module CLaSH.Promoted.Nat
   )
 where
 
-import Data.Reflection        (reifyNat)
-import GHC.Integer            (smallInteger)
-import GHC.Integer.Logarithms (integerLogBase#)
-import GHC.TypeLits           (KnownNat, Nat, type (+), type (-), type (*),
-                               type (^), natVal)
-import Unsafe.Coerce          (unsafeCoerce)
+import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
+                           type (^), type (<=), natVal)
+import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
+import Unsafe.Coerce      (unsafeCoerce)
 
 {- $setup
 >>> :set -XBinaryLiterals
@@ -187,23 +185,39 @@ powSNat SNat SNat = SNat
 {-# NOINLINE powSNat #-}
 
 -- | Division of two singleton natural numbers
---
--- __NB__: Only works when the dividend is an integer multiple of the
--- divisor.
-divSNat :: SNat (a*(b+1)) -> SNat (b+1) -> SNat a
-divSNat x y = reifyNat (snatToInteger x `div` snatToInteger y)
-            $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE divSNat #-}
+divSNat :: (1 <= b) => SNat a -> SNat b -> SNat (Div a b)
+divSNat SNat SNat = SNat
+{-# INLINE divSNat #-}
 
--- | Logarithm of a natural number
+-- | Modulo of two singleton natural numbers
+modSNat :: (1 <= b) => SNat a -> SNat b -> SNat (Mod a b)
+modSNat SNat SNat = SNat
+{-# INLINE modSNat #-}
+
+-- | Floor of the logarithm of a natural number
+flogBaseSNat :: (2 <= base, 1 <= x)
+             => SNat base -- ^ Base
+             -> SNat x
+             -> SNat (FLog base x)
+flogBaseSNat SNat SNat = SNat
+{-# NOINLINE flogBaseSNat #-}
+
+-- | Ceiling of the logarithm of a natural number
+clogBaseSNat :: (2 <= base, 1 <= x)
+             => SNat base -- ^ Base
+             -> SNat x
+             -> SNat (CLog base x)
+clogBaseSNat SNat SNat = SNat
+{-# NOINLINE clogBaseSNat #-}
+
+-- | Exact integer logarithm of a natural number
 --
 -- __NB__: Only works when the argument is a power of the base
-logBaseSNat :: SNat (a+2) -- ^ Base
-            -> SNat ((a+2)^b)
-            -> SNat b
-logBaseSNat x y =
-  reifyNat (smallInteger (integerLogBase# (snatToInteger x) (snatToInteger y)))
-  $ \p -> unsafeCoerce (snatProxy p)
+logBaseSNat :: (FLog base x ~ CLog base x)
+            => SNat base -- ^ Base
+            -> SNat x
+            -> SNat (Log base x)
+logBaseSNat SNat SNat = SNat
 {-# NOINLINE logBaseSNat #-}
 
 -- | Power of two of a singleton natural number
