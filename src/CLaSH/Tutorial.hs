@@ -564,16 +564,16 @@ compares against the results we got from our earlier simulation. We can even
 simulate the behaviour of the /testbench/:
 
 >>> sampleN 7 $ expectedOutput (topEntity testInput)
-[False,False,False,False,
+[False,False,False,False
 cycle(system1000): 4, outputVerifier
 expected value: 14, not equal to actual value: 30
-True,
+,True
 cycle(system1000): 5, outputVerifier
 expected value: 14, not equal to actual value: 46
-True,
+,True
 cycle(system1000): 6, outputVerifier
 expected value: 14, not equal to actual value: 62
-True]
+,True]
 
 We can see that for the first 4 samples, everything is working as expected,
 after which warnings are being reported. The reason is that 'stimuliGenerator'

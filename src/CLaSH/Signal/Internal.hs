@@ -37,10 +37,16 @@ module CLaSH.Signal.Internal
   , (.&&.), (.||.), not1
     -- * Simulation functions (not synthesisable)
   , simulate
+    -- ** lazy version
+  , simulate_lazy
     -- * List \<-\> Signal conversion (not synthesisable)
   , sample
   , sampleN
   , fromList
+    -- ** lazy versions
+  , sample_lazy
+  , sampleN_lazy
+  , fromList_lazy
     -- * QuickCheck combinators
   , testFor
     -- * Type classes
@@ -82,10 +88,13 @@ module CLaSH.Signal.Internal
 where
 
 import Control.Applicative        (liftA2, liftA3)
+import Control.DeepSeq            (NFData, force)
+import Control.Exception          (SomeException, catch, evaluate, throw)
 import Data.Bits                  (Bits (..), FiniteBits (..))
 import Data.Default               (Default (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
+import System.IO.Unsafe           (unsafeDupablePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
@@ -612,7 +621,7 @@ instance Arbitrary a => Arbitrary (Signal' clk a) where
 instance CoArbitrary a => CoArbitrary (Signal' clk a) where
   coarbitrary xs gen = do
     n <- arbitrary
-    coarbitrary (take (abs n) (sample xs)) gen
+    coarbitrary (take (abs n) (sample_lazy xs)) gen
 
 -- | The above type is a generalisation for:
 --
@@ -625,6 +634,16 @@ testFor :: Foldable f => Int -> f Bool -> Property
 testFor n = property . and . take n . sample
 
 -- * List \<-\> Signal conversion (not synthesisable)
+
+-- | A 'force' that lazily returns exceptions
+forceNoException :: NFData a => a -> IO a
+forceNoException x = catch (evaluate (force x)) (\(e :: SomeException) -> return (throw e))
+
+headStrictCons :: NFData a => a -> [a] -> [a]
+headStrictCons x xs = unsafeDupablePerformIO ((:) <$> forceNoException x <*> pure xs)
+
+headStrictSignal :: NFData a => a -> Signal' clk a -> Signal' clk a
+headStrictSignal x xs = unsafeDupablePerformIO ((:-) <$> forceNoException x <*> pure xs)
 
 -- | The above type is a generalisation for:
 --
@@ -640,8 +659,8 @@ testFor n = property . and . take n . sample
 -- > sample s == [s0, s1, s2, s3, ...
 --
 -- __NB__: This function is not synthesisable
-sample :: Foldable f => f a -> [a]
-sample = foldr (:) []
+sample :: (Foldable f, NFData a) => f a -> [a]
+sample = foldr headStrictCons []
 
 -- | The above type is a generalisation for:
 --
@@ -657,7 +676,7 @@ sample = foldr (:) []
 -- > sampleN 3 s == [s0, s1, s2]
 --
 -- __NB__: This function is not synthesisable
-sampleN :: Foldable f => Int -> f a -> [a]
+sampleN :: (Foldable f, NFData a) => Int -> f a -> [a]
 sampleN n = take n . sample
 
 -- | Create a 'CLaSH.Signal.Signal' from a list
@@ -669,8 +688,8 @@ sampleN n = take n . sample
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-fromList :: [a] -> Signal' clk a
-fromList = Prelude.foldr (:-) (error "finite list")
+fromList :: NFData a => [a] -> Signal' clk a
+fromList = Prelude.foldr headStrictSignal (error "finite list")
 
 -- * Simulation functions (not synthesisable)
 
@@ -682,5 +701,64 @@ fromList = Prelude.foldr (:-) (error "finite list")
 -- ...
 --
 -- __NB__: This function is not synthesisable
-simulate :: (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]
+simulate :: (NFData a, NFData b) => (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]
 simulate f = sample . f . fromList
+
+-- | The above type is a generalisation for:
+--
+-- @
+-- __sample__ :: 'CLaSH.Signal.Signal' a -> [a]
+-- @
+--
+-- Get an infinite list of samples from a 'CLaSH.Signal.Signal'
+--
+-- The elements in the list correspond to the values of the 'CLaSH.Signal.Signal'
+-- at consecutive clock cycles
+--
+-- > sample s == [s0, s1, s2, s3, ...
+--
+-- __NB__: This function is not synthesisable
+sample_lazy :: Foldable f => f a -> [a]
+sample_lazy = foldr (:) []
+
+-- | The above type is a generalisation for:
+--
+-- @
+-- __sampleN__ :: Int -> 'CLaSH.Signal.Signal' a -> [a]
+-- @
+--
+-- Get a list of @n@ samples from a 'CLaSH.Signal.Signal'
+--
+-- The elements in the list correspond to the values of the 'CLaSH.Signal.Signal'
+-- at consecutive clock cycles
+--
+-- > sampleN 3 s == [s0, s1, s2]
+--
+-- __NB__: This function is not synthesisable
+sampleN_lazy :: Foldable f => Int -> f a -> [a]
+sampleN_lazy n = take n . sample_lazy
+
+-- | Create a 'CLaSH.Signal.Signal' from a list
+--
+-- Every element in the list will correspond to a value of the signal for one
+-- clock cycle.
+--
+-- >>> sampleN 2 (fromList [1,2,3,4,5])
+-- [1,2]
+--
+-- __NB__: This function is not synthesisable
+fromList_lazy :: [a] -> Signal' clk a
+fromList_lazy = Prelude.foldr (:-) (error "finite list")
+
+-- * Simulation functions (not synthesisable)
+
+-- | Simulate a (@'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' b@) function
+-- given a list of samples of type @a@
+--
+-- >>> simulate (register 8) [1, 2, 3]
+-- [8,1,2,3...
+-- ...
+--
+-- __NB__: This function is not synthesisable
+simulate_lazy :: (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]
+simulate_lazy f = sample_lazy . f . fromList_lazy

@@ -33,12 +33,15 @@ module CLaSH.Signal.Delayed
   , toSignal
     -- * List \<-\> DSignal conversion (not synthesisable)
   , dfromList
+    -- ** lazy versions
+  , dfromList_lazy
     -- * Experimental
   , unsafeFromSignal
   , antiDelay
   )
 where
 
+import Control.DeepSeq            (NFData)
 import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
@@ -52,7 +55,8 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum)
 import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
-import CLaSH.Signal               (Signal, fromList, register, bundle, unbundle)
+import CLaSH.Signal               (Signal, fromList, fromList_lazy, register,
+                                   bundle, unbundle)
 
 {- $setup
 >>> :set -XDataKinds
@@ -99,8 +103,20 @@ instance ExtendingNum a b => ExtendingNum (DSignal n a) (DSignal n b) where
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-dfromList :: [a] -> DSignal 0 a
+dfromList :: NFData a => [a] -> DSignal 0 a
 dfromList = coerce . fromList
+
+-- | Create a 'DSignal' from a list
+--
+-- Every element in the list will correspond to a value of the signal for one
+-- clock cycle.
+--
+-- >>> sampleN 2 (dfromList [1,2,3,4,5])
+-- [1,2]
+--
+-- __NB__: This function is not synthesisable
+dfromList_lazy :: [a] -> DSignal 0 a
+dfromList_lazy = coerce . fromList_lazy
 
 -- | Delay a 'DSignal' for @d@ periods.
 --

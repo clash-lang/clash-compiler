@@ -27,10 +27,17 @@ module CLaSH.Signal
     -- * Simulation functions (not synthesisable)
   , simulate
   , simulateB
+    -- ** lazy versions
+  , simulate_lazy
+  , simulateB_lazy
     -- * List \<-\> Signal conversion (not synthesisable)
   , sample
   , sampleN
   , fromList
+    -- ** lazy versions
+  , sample_lazy
+  , sampleN_lazy
+  , fromList_lazy
     -- * QuickCheck combinators
   , testFor
     -- * Type classes
@@ -60,6 +67,7 @@ module CLaSH.Signal
   )
 where
 
+import Control.DeepSeq       (NFData)
 import Data.Bits             (Bits) -- Haddock only
 
 import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
@@ -68,7 +76,9 @@ import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
                               shift1, rotate1, setBit1, clearBit1, shiftL1,
                               unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
                               rotateR1, (.||.), (.&&.), not1, mux, sample,
-                              sampleN, fromList, simulate, signal, testFor)
+                              sampleN, fromList, simulate, signal, testFor,
+                              sample_lazy, sampleN_lazy, simulate_lazy,
+                              fromList_lazy)
 import CLaSH.Signal.Explicit (SystemClock, systemClock)
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
@@ -126,5 +136,16 @@ type Unbundled a = Unbundled' SystemClock a
 -- ...
 --
 -- __NB__: This function is not synthesisable
-simulateB :: (Bundle a, Bundle b) => (Unbundled' clk1 a -> Unbundled' clk2 b) -> [a] -> [b]
+simulateB :: (Bundle a, Bundle b, NFData a, NFData b) => (Unbundled' clk1 a -> Unbundled' clk2 b) -> [a] -> [b]
 simulateB f = simulate (bundle . f . unbundle)
+
+-- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
+-- samples of type @a@
+--
+-- >>> simulateB (unbundle . register (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- [(8,8),(1,1),(2,2),(3,3)...
+-- ...
+--
+-- __NB__: This function is not synthesisable
+simulateB_lazy :: (Bundle a, Bundle b) => (Unbundled' clk1 a -> Unbundled' clk2 b) -> [a] -> [b]
+simulateB_lazy f = simulate_lazy (bundle . f . unbundle)

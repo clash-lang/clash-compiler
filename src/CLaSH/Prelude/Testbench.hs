@@ -94,25 +94,25 @@ stimuliGenerator = stimuliGenerator' systemClock
 --
 -- >>> import qualified Data.List as List
 -- >>> sampleN 12 (expectedOutput (fromList ([0..10] List.++ [10,10,10])))
--- [
+-- <BLANKLINE>
 -- cycle(system1000): 0, outputVerifier
 -- expected value: 70, not equal to actual value: 0
--- False,
+-- [False
 -- cycle(system1000): 1, outputVerifier
 -- expected value: 99, not equal to actual value: 1
--- False,False,False,False,False,
+-- ,False,False,False,False,False
 -- cycle(system1000): 6, outputVerifier
 -- expected value: 7, not equal to actual value: 6
--- False,
+-- ,False
 -- cycle(system1000): 7, outputVerifier
 -- expected value: 8, not equal to actual value: 7
--- False,
+-- ,False
 -- cycle(system1000): 8, outputVerifier
 -- expected value: 9, not equal to actual value: 8
--- False,
+-- ,False
 -- cycle(system1000): 9, outputVerifier
 -- expected value: 10, not equal to actual value: 9
--- False,True,True]
+-- ,False,True,True]
 outputVerifier :: forall l a . (KnownNat l, Eq a, Show a)
                => Vec l a     -- ^ Samples to compare with
                -> Signal a    -- ^ Signal to verify
@@ -204,25 +204,25 @@ stimuliGenerator' clk samples =
 --
 -- >>> import qualified Data.List as List
 -- >>> sampleN 12 (expectedOutput' (fromList ([0..10] List.++ [10,10,10])))
--- [
+-- <BLANKLINE>
 -- cycle(A100): 0, outputVerifier
 -- expected value: 70, not equal to actual value: 0
--- False,
+-- [False
 -- cycle(A100): 1, outputVerifier
 -- expected value: 99, not equal to actual value: 1
--- False,False,False,False,False,
+-- ,False,False,False,False,False
 -- cycle(A100): 6, outputVerifier
 -- expected value: 7, not equal to actual value: 6
--- False,
+-- ,False
 -- cycle(A100): 7, outputVerifier
 -- expected value: 8, not equal to actual value: 7
--- False,
+-- ,False
 -- cycle(A100): 8, outputVerifier
 -- expected value: 9, not equal to actual value: 8
--- False,
+-- ,False
 -- cycle(A100): 9, outputVerifier
 -- expected value: 10, not equal to actual value: 9
--- False,True,True]
+-- ,False,True,True]
 outputVerifier' :: forall l clk a . (KnownNat l, Eq a, Show a)
                 => SClock clk       -- ^ Clock to which the input signal is
                                     -- synchronized to
