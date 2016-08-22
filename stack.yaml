@@ -10,13 +10,13 @@ packages:
 - 'testsuite'
 - location:
     git: https://github.com/clash-lang/ghc-typelits-extra.git
-    commit: e132d9f758e8e2cc45f33eb0bcb1995bf7495c24
+    commit: f108df6aa7e144061e17de884e8e46b0a7a6639c
   extra-dep: true
 - location:
     git: https://github.com/clash-lang/ghc-typelits-knownnat.git
-    commit: f8d2ed35f137b86aa973780f294086104e812ef0
+    commit: e8cc5156ec755f98ed4687c92fe8caac4b7a9b3a
   extra-dep: true
 - location:
     git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
-    commit: 3a8774b5a83e63aeb9cac823adeec8f0bcb0bde6
+    commit: 2af456ff627ca22c664d79775e5ffac23ac87c5f
   extra-dep: true
