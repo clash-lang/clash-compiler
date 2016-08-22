@@ -19,7 +19,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Extra.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
@@ -449,7 +448,7 @@ decSigned n = appT (conT ''Signed) (litT $ numTyLit n)
 instance KnownNat n => SaturatingNum (Signed n) where
   satPlus SatWrap  a b = a +# b
   satPlus SatBound a b =
-    let r      = plus# a b :: Signed (n + 1)
+    let r      = plus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'
@@ -473,7 +472,7 @@ instance KnownNat n => SaturatingNum (Signed n) where
 
   satMin SatWrap a b = a -# b
   satMin SatBound a b =
-    let r      = minus# a b :: Signed (n + 1)
+    let r      = minus# a b
         (_,r') = split r
     in  case msb r `xor` msb r' of
           0 -> unpack# r'

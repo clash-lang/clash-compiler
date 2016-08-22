@@ -4,7 +4,7 @@ packages:
 - .
 - location:
     git: https://github.com/clash-lang/ghc-typelits-extra.git
-    commit: f61cdeafa563a72a2b311caa3411f7ffb7fdd4f5
+    commit: f108df6aa7e144061e17de884e8e46b0a7a6639c
   extra-dep: true
 - location:
     git: https://github.com/clash-lang/ghc-typelits-knownnat.git
