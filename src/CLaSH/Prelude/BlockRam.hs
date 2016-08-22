@@ -116,8 +116,8 @@ alu CmpGt x y = if x > y then 1 else 0
 We initially create a memory out of simple registers:
 
 @
-dataMem :: Signal MemAddr -- ^ Read address
-        -> Signal MemAddr -- ^ Write address
+dataMem :: Signal MemAddr -- ^ Write address
+        -> Signal MemAddr -- ^ Read address
         -> Signal Bool    -- ^ Write enable
         -> Signal Value   -- ^ data in
         -> Signal Value   -- ^ data out
