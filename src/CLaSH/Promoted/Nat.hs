@@ -173,9 +173,8 @@ addSNat SNat SNat = SNat
 
 -- | Subtract two singleton natural numbers
 subSNat :: SNat (a+b) -> SNat b -> SNat a
-subSNat x y = reifyNat (snatToInteger x - snatToInteger y)
-            $ \p -> unsafeCoerce (snatProxy p)
-{-# NOINLINE subSNat #-}
+subSNat SNat SNat = SNat
+{-# INLINE subSNat #-}
 
 -- | Multiply two singleton natural numbers
 mulSNat :: SNat a -> SNat b -> SNat (a*b)
