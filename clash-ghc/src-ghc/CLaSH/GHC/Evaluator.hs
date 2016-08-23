@@ -30,6 +30,7 @@ import           CLaSH.Core.TysPrim  (typeNatKind)
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
                                       tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
+import           CLaSH.Util          (clogBase, flogBase)
 
 reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
@@ -185,26 +186,42 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
 
-  "CLaSH.Promoted.Nat.subSNat"
-    | [Right a, _] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
-    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+  "CLaSH.Promoted.Nat.powSNat"
+    | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    -> let c = case a of
+                 2 -> 1 `shiftL` (fromInteger b)
+                 _ -> a ^ b
+           (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral a))]
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral c))]
 
-  "CLaSH.Promoted.Nat.divSNat"
-    | [Right a, _] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+  "CLaSH.Promoted.Nat.flogBaseSNat"
+    | [_,_,Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    , Just c <- flogBase a b
+    , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy a)), Left (Literal (IntegerLiteral a))]
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c')), Left (Literal (IntegerLiteral c'))]
+
+  "CLaSH.Promoted.Nat.clogBaseSNat"
+    | [_,_,Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    , Just c <- clogBase a b
+    , let c' = toInteger c
+    -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
+           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           [snatDc] = tyConDataCons snatTc
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c')), Left (Literal (IntegerLiteral c'))]
 
   "CLaSH.Promoted.Nat.logBaseSNat"
-    | [_, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    | [_,Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
+    , Just c <- flogBase a b
+    , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy b)), Left (Literal (IntegerLiteral b))]
+       in  mkApps (Data snatDc) [Right (LitTy (NumTy c')), Left (Literal (IntegerLiteral c'))]
 
   "CLaSH.Sized.Internal.BitVector.eq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)

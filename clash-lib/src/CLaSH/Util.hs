@@ -225,12 +225,19 @@ clashLibVersion = Paths_clash_lib.version
 clashLibVersion = error "development version"
 #endif
 
+-- | \x y -> floor (logBase x y), x > 1 && y > 0
+flogBase :: Integer -> Integer -> Maybe Int
+flogBase x y | x > 1 && y > 0 = Just (I# (integerLogBase# x y))
+flogBase _ _ = Nothing
+
 -- | \x y -> ceiling (logBase x y), x > 1 && y > 0
 clogBase :: Integer -> Integer -> Maybe Int
 clogBase x y | x > 1 && y > 0 =
-  let z1 = integerLogBase# x y
-      z2 = integerLogBase# x (y-1)
-  in  if (isTrue# (z1 ==# z2))
-         then Just (I# (z1 +# 1#))
-         else Just (I# z1)
+  case y of
+    1 -> Just 0
+    _ -> let z1 = integerLogBase# x y
+             z2 = integerLogBase# x (y-1)
+         in  if isTrue# (z1 ==# z2)
+                then Just (I# (z1 +# 1#))
+                else Just (I# z1)
 clogBase _ _ = Nothing

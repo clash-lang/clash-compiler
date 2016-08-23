@@ -1,19 +1,34 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.subSNat"
-    , "type"      : "CLaSH.Promoted.Nat.subSNat :: SNat (a + b) -> SNat b -> SNat a"
-    , "templateE" : "~LIT[0] - ~LIT[1]"
+    { "name"      : "CLaSH.Promoted.Nat.powSNat"
+    , "type"      : "CLaSH.Promoted.Nat.powSNat :: SNat a -> SNat b -> SNat (a^b)"
+    , "templateE" : "~LIT[0] ** ~LIT[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Promoted.Nat.divSNat"
-    , "type"      : "CLaSH.Promoted.Nat.divSNat :: SNat (a*(b+1)) -> SNat (b+1) -> SNat a"
-    , "templateE" : "~LIT[0] / ~LIT[1]"
+    { "name"      : "CLaSH.Promoted.Nat.flogBaseSNat"
+    , "type"      : "CLaSH.Promoted.Nat.flogBaseSNat :: (2 <= base, 1 <= x)
+                                                     => SNat base -- ARG[2]
+                                                     -> SNat x    -- ARG[3]
+                                                     -> SNat (FLog base x)"
+    , "templateE" : "integer(floor(log(real(~LIT[3]),real(~LIT[2]))))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Promoted.Nat.clogBaseSNat"
+    , "type"      : "CLaSH.Promoted.Nat.clogBaseSNat :: (2 <= base, 1 <= x)
+                                                     => SNat base -- ARG[2]
+                                                     -> SNat x    -- ARG[3]
+                                                     -> SNat (CLog base x)"
+    , "templateE" : "integer(ceiling(log(real(~LIT[3]),real(~LIT[2]))))"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Promoted.Nat.logBaseSNat"
-    , "type"      : "CLaSH.Promoted.Nat.divSNat :: SNat (a+2) -> SNat ((a+2)^b) -> SNat b"
-    , "templateE" : "log(~LIT[1],~LIT[0])"
+    , "type"      : "CLaSH.Promoted.Nat.logBaseSNat :: (FLog base x ~ CLog base x)
+                                                    => SNat base -- ARG[1]
+                                                    -> SNat x    -- ARG[2]
+                                                    -> SNat (Log base x)"
+    , "templateE" : "integer(ceiling(log(real(~LIT[2]),real(~LIT[1]))))"
     }
   }
 ]
