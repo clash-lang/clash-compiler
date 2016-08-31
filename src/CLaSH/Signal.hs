@@ -17,6 +17,7 @@ module CLaSH.Signal
     -- * Basic circuit functions
   , signal
   , register
+  , registerMaybe
   , regEn
   , mux
     -- * Boolean connectives
@@ -50,6 +51,7 @@ where
 
 import Control.DeepSeq       (NFData)
 import Data.Bits             (Bits) -- Haddock only
+import Data.Maybe            (isJust, fromJust)
 
 import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
                               (.<.), (.<=.), (.>=.), (.>.), (.||.), (.&&.),
@@ -81,7 +83,13 @@ register :: a -> Signal a -> Signal a
 register = register# systemClock
 infixr 3 `register`
 
+registerMaybe :: a -> Signal (Maybe a) -> Signal a
+registerMaybe initial i = regEn# systemClock initial (fmap isJust i) (fmap fromJust i)
+{-# INLINE registerMaybe #-}
+infixr 3 `registerMaybe`
+
 {-# INLINE regEn #-}
+{-# DEPRECATED regEn "'regEn' will be removed in clash-prelude-1.0, use 'registerMaybe'." #-}
 -- | Version of 'register' that only updates its content when its second argument
 -- is asserted. So given:
 --

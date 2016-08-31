@@ -29,10 +29,12 @@ module CLaSH.Signal.Explicit
   , unsafeSynchronizer
     -- * Basic circuit functions
   , register'
+  , registerMaybe'
   , regEn'
   )
 where
 
+import Data.Maybe             (isJust, fromJust)
 import GHC.TypeLits           (KnownNat, KnownSymbol)
 
 import CLaSH.Promoted.Nat     (SNat (..), snatToInteger)
@@ -299,7 +301,12 @@ repSchedule high low = take low $ repSchedule' low high 1
 register' :: SClock clk -> a -> Signal' clk a -> Signal' clk a
 register' = register#
 
+registerMaybe' :: SClock clk -> a -> Signal' clk (Maybe a) -> Signal' clk a
+registerMaybe' clk initial i = regEn# clk initial (fmap isJust i) (fmap fromJust i)
+{-# INLINE registerMaybe' #-}
+
 {-# INLINE regEn' #-}
+{-# DEPRECATED regEn' "'regEn'' will be removed in clash-prelude-1.0, use 'registerMaybe''." #-}
 -- | Version of 'register'' that only updates its content when its third
 -- argument is asserted. So given:
 --
