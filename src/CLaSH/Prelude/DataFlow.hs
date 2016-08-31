@@ -52,7 +52,7 @@ import CLaSH.Class.Resize     (truncateB)
 import CLaSH.Prelude.BitIndex (msb)
 import CLaSH.Prelude.Mealy    (mealyB')
 import CLaSH.Promoted.Nat     (SNat)
-import CLaSH.Signal           ((.&&.), not1, regEn, unbundle)
+import CLaSH.Signal           ((.&&.), regEn, unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
 import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
 import CLaSH.Sized.BitVector  (BitVector)
@@ -207,7 +207,7 @@ fifoDF _ iS = DF $ \i iV oR ->
       initMem        = iS ++ repeat undefined :: Vec (m + n) a
       initS          = (initMem,initRdPtr,initWrPtr)
       (o,empty,full) = mealyB' clk fifoDF_mealy initS (i,iV,oR)
-  in  (o,not1 empty, not1 full)
+  in  (o, not <$> empty, not <$> full)
 
 -- | Identity circuit
 --

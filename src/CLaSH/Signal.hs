@@ -20,7 +20,7 @@ module CLaSH.Signal
   , regEn
   , mux
     -- * Boolean connectives
-  , (.&&.), (.||.), not1
+  , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
   , Unbundled
@@ -44,26 +44,7 @@ module CLaSH.Signal
     -- ** 'Eq'-like
   , (.==.), (./=.)
     -- ** 'Ord'-like
-  , compare1, (.<.), (.<=.), (.>=.), (.>.)
-    -- ** 'Enum'-like
-  , fromEnum1
-    -- ** 'Rational'-like
-  , toRational1
-    -- ** 'Integral'-like
-  , toInteger1
-    -- ** 'Bits'-like
-  , testBit1
-  , popCount1
-  , shift1
-  , rotate1
-  , setBit1
-  , clearBit1
-  , shiftL1
-  , unsafeShiftL1
-  , shiftR1
-  , unsafeShiftR1
-  , rotateL1
-  , rotateR1
+  , (.<.), (.<=.), (.>=.), (.>.)
   )
 where
 
@@ -71,19 +52,15 @@ import Control.DeepSeq       (NFData)
 import Data.Bits             (Bits) -- Haddock only
 
 import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
-                              compare1, (.<.), (.<=.), (.>=.), (.>.), fromEnum1,
-                              toRational1, toInteger1, testBit1, popCount1,
-                              shift1, rotate1, setBit1, clearBit1, shiftL1,
-                              unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
-                              rotateR1, (.||.), (.&&.), not1, mux, sample,
-                              sampleN, fromList, simulate, signal, testFor,
-                              sample_lazy, sampleN_lazy, simulate_lazy,
+                              (.<.), (.<=.), (.>=.), (.>.), (.||.), (.&&.),
+                              mux, sample,sampleN, fromList, simulate, signal,
+                              testFor, sample_lazy, sampleN_lazy, simulate_lazy,
                               fromList_lazy)
 import CLaSH.Signal.Explicit (SystemClock, systemClock)
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
 {- $setup
->>> let oscillate = register False (not1 oscillate)
+>>> let oscillate = register False (not <$> oscillate)
 >>> let count = regEn 0 oscillate (count + 1)
 -}
 
@@ -109,7 +86,7 @@ infixr 3 `register`
 -- is asserted. So given:
 --
 -- @
--- oscillate = 'register' False ('not1' oscillate)
+-- oscillate = 'register' False ('not' <$> oscillate)
 -- count     = 'regEn' 0 oscillate (count + 1)
 -- @
 --

@@ -51,7 +51,7 @@ import CLaSH.Signal.Internal  (Signal' (..), Clock (..), SClock (..), register#,
 >>> let almostId = register' clk7 70 . unsafeSynchronizer clk2 clk7 . register' clk2 99 . unsafeSynchronizer clk7 clk2 . register' clk7 50
 >>> type ClkA = Clk "A" 100
 >>> let clkA = sclock :: SClock ClkA
->>> let oscillate = register' clkA False (CLaSH.Signal.not1 oscillate)
+>>> let oscillate = register' clkA False (not <$> oscillate)
 >>> let count = regEn' clkA 0 oscillate (count + 1)
 -}
 
@@ -308,7 +308,7 @@ register' = register#
 -- clkA :: 'SClock' ClkA
 -- clkA = 'sclock'
 --
--- oscillate = 'register'' clkA False ('CLaSH.Signal.not1' oscillate)
+-- oscillate = 'register'' clkA False ('not' <$> oscillate)
 -- count     = 'regEn'' clkA 0 oscillate (count + 1)
 -- @
 --
