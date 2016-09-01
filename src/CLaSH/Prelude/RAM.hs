@@ -15,7 +15,7 @@ RAM primitives with a combinational read port.
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
 -- as to why we need this.
@@ -35,9 +35,11 @@ module CLaSH.Prelude.RAM
   )
 where
 
+import Control.Exception      (catch, evaluate, throw)
 import Control.Monad          (when)
 import Control.Monad.ST.Lazy  (ST,runST)
-import Data.Array.MArray.Safe (newArray_,readArray,writeArray)
+import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
+import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat)
 
@@ -46,6 +48,7 @@ import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Bundle    (bundle)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock, unsafeSynchronizer)
 import CLaSH.Sized.Unsigned   (Unsigned)
+import CLaSH.XException       (XException, errorX)
 
 {-# INLINE asyncRam #-}
 -- | Create a RAM with space for @n@ elements.
@@ -146,11 +149,17 @@ asyncRam# wclk rclk sz wr rd en din = unsafeSynchronizer wclk rclk dout
     szI  = fromInteger $ snatToInteger sz
     rd'  = unsafeSynchronizer rclk wclk rd
     dout = runST $ do
-      arr <- newArray_ (0,szI-1)
+      arr <- newListArray (0,szI-1) (replicate szI (errorX "asyncRam#: initial value undefined"))
       traverse (ramT arr) (bundle (wr,rd',en,din))
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
     ramT ram (w,r,e,d) = do
-      d' <- readArray ram r
+      -- reading from address using an 'X' exception results in an 'X' result
+      r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
+                                (\(err :: XException) -> return (Left (throw err))))
+      d' <- case r' of
+              Right r2 -> readArray ram r2
+              Left err -> return err
+      -- writing to an address using an 'X' exception makes everything 'X'
       when e (writeArray ram w d)
       return d'

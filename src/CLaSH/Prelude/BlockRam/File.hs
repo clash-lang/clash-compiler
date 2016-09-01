@@ -87,6 +87,7 @@ module CLaSH.Prelude.BlockRam.File
   )
 where
 
+import Control.Exception            (catch, evaluate, throw)
 import Control.Monad                (when)
 import Control.Monad.ST.Lazy        (ST,runST)
 import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
@@ -103,6 +104,7 @@ import CLaSH.Signal          (Signal)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle   (bundle)
 import CLaSH.Sized.Unsigned  (Unsigned)
+import CLaSH.XException      (XException, errorX)
 
 {-# INLINE blockRamFile #-}
 -- | Create a blockRAM with space for @n@ elements
@@ -281,7 +283,7 @@ blockRamFile# :: KnownNat m
               -> Signal' clk (BitVector m)
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
-blockRamFile# clk sz file wr rd en din = register' clk undefined dout
+blockRamFile# clk sz file wr rd en din = register' clk (errorX "blockRamFile#: intial value undefined") dout
   where
     szI  = fromInteger $ snatToInteger sz
     dout = runST $ do
@@ -291,7 +293,13 @@ blockRamFile# clk sz file wr rd en din = register' clk undefined dout
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
     ramT ram (w,r,e,d) = do
-      d' <- readArray ram r
+      -- reading from address using an 'X' exception results in an 'X' result
+      r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
+                                (\(err :: XException) -> return (Left (throw err))))
+      d' <- case r' of
+              Right r2 -> readArray ram r2
+              Left err -> return err
+      -- writing to an address using an 'X' exception makes everything 'X'
       when e (writeArray ram w d)
       return d'
 

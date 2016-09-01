@@ -22,6 +22,8 @@ CallStack (from HasCallStack):
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeOperators       #-}
 
+{-# LANGUAGE Trustworthy #-}
+
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module CLaSH.XException
