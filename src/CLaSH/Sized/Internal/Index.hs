@@ -78,6 +78,7 @@ import CLaSH.Class.BitPack            (BitPack (..))
 import CLaSH.Class.Num                (ExtendingNum (..))
 import CLaSH.Class.Resize             (Resize (..))
 import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (BV))
+import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
 --
@@ -283,6 +284,9 @@ decIndex n = appT (conT ''Index) (litT $ numTyLit n)
 instance Show (Index n) where
   show (I i) = show i
   {-# NOINLINE show #-}
+
+instance ShowX (Index n) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Index n) where

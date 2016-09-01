@@ -97,6 +97,7 @@ import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceOr)
 import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
+import CLaSH.XException               (ShowX (..), showsPrecXWith)
 
 -- | Arbitrary-width unsigned integer represented by @n@ bits
 --
@@ -148,6 +149,9 @@ instance NFData (Unsigned n) where
 instance Show (Unsigned n) where
   show (U i) = show i
   {-# NOINLINE show #-}
+
+instance ShowX (Unsigned n) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Unsigned n) where

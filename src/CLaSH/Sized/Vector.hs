@@ -126,6 +126,7 @@ import CLaSH.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
 
 import CLaSH.Class.BitPack (BitPack (..))
+import CLaSH.XException    (ShowX (..), showsX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -225,12 +226,22 @@ pattern (:>) x xs <- ((\ys -> (head ys,tail ys)) -> (x,xs))
 infixr 5 :>
 
 instance Show a => Show (Vec n a) where
-  show vs = "<" P.++ punc vs P.++ ">"
+  showsPrec _ vs = \s -> '<':punc vs ('>':s)
     where
-      punc :: Vec m a -> String
-      punc Nil        = ""
-      punc (x `Cons` Nil) = show x
-      punc (x `Cons` xs)  = show x P.++ "," P.++ punc xs
+      punc :: Vec m a -> ShowS
+      punc Nil            = id
+      punc (x `Cons` Nil) = shows x
+      punc (x `Cons` xs)  = \s -> shows x (',':punc xs s)
+
+instance ShowX a => ShowX (Vec n a) where
+  showsPrecX = showsPrecXWith go
+    where
+      go _ vs = \s -> '<': punc vs ('>':s)
+        where
+          punc :: Vec m a -> ShowS
+          punc Nil            = id
+          punc (x `Cons` Nil) = showsX x
+          punc (x `Cons` xs)  = \s -> showsX x (',':punc xs s)
 
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
   (==) v1 v2

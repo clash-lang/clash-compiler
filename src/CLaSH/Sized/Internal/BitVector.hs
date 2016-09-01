@@ -123,6 +123,7 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
+import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
 import {-# SOURCE #-} qualified CLaSH.Sized.Vector         as V
 import {-# SOURCE #-} qualified CLaSH.Sized.Internal.Index as I
@@ -167,6 +168,9 @@ instance KnownNat n => Show (BitVector n) where
                         ([a,b,c,d,e],rest) -> [a,b,c,d,'_'] ++ underScore (e:rest)
                         (rest,_)               -> rest
   {-# NOINLINE show #-}
+
+instance KnownNat n => ShowX (BitVector n) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | Create a binary literal
 --

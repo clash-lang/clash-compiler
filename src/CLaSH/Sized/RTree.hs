@@ -73,6 +73,7 @@ import CLaSH.Promoted.Nat          (SNat (..), UNat (..), pow2SNat, snatToIntege
 import CLaSH.Promoted.Nat.Literals (d1)
 import CLaSH.Sized.Index           (Index)
 import CLaSH.Sized.Vector          (Vec (..), (!!), (++), dtfold, replace)
+import CLaSH.XException            (ShowX (..), showsX, showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -158,8 +159,15 @@ instance (KnownNat d, Ord a) => Ord (RTree d a) where
   compare t1 t2 = compare (t2v t1) (t2v t2)
 
 instance Show a => Show (RTree n a) where
-  show (LR_ a)   = show a
-  show (BR_ l r) = '<':show l P.++ (',':show r) P.++ ">"
+  showsPrec _ (LR_ a)   = shows a
+  showsPrec _ (BR_ l r) = \s -> '<':shows l (',':shows r ('>':s))
+
+instance ShowX a => ShowX (RTree n a) where
+  showsPrecX = showsPrecXWith go
+    where
+      go :: Int -> RTree d a -> ShowS
+      go _ (LR_ a)   = showsX a
+      go _ (BR_ l r) = \s -> '<':showsX l (',':showsX r ('>':s))
 
 instance KnownNat d => Functor (RTree d) where
   fmap = tmap

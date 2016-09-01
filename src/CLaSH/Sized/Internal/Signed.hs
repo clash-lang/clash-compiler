@@ -106,6 +106,7 @@ import CLaSH.Prelude.BitIndex         ((!), msb, replaceBit, split)
 import CLaSH.Prelude.BitReduction     (reduceAnd, reduceOr)
 import CLaSH.Sized.Internal.BitVector (BitVector (BV), Bit, (++#), high, low)
 import qualified CLaSH.Sized.Internal.BitVector as BV
+import CLaSH.XException               (ShowX (..), showsPrecXWith)
 
 -- | Arbitrary-width signed integer represented by @n@ bits, including the sign
 -- bit.
@@ -161,6 +162,9 @@ instance NFData (Signed n) where
 instance Show (Signed n) where
   show (S i) = show i
   {-# NOINLINE show #-}
+
+instance ShowX (Signed n) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance KnownNat n => Read (Signed n) where

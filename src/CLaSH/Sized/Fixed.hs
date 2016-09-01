@@ -95,6 +95,7 @@ import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
+import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
 {- $setup
 >>> :set -XDataKinds
@@ -259,6 +260,10 @@ instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
       nom       = if fRepI < 0 then fRepI_abs .&. ((2 ^ nF) - 1)
                                else fRepI .&. ((2 ^ nF) - 1)
       denom     = 2 ^ nF
+
+instance ( size ~ (int + frac), KnownNat frac, Integral (rep size)
+         ) => ShowX (Fixed rep int frac) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | None of the 'Read' class' methods are synthesisable.
 instance (size ~ (int + frac), KnownNat frac, Bounded (rep size), Integral (rep size))

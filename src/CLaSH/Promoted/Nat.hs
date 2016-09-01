@@ -64,6 +64,7 @@ import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
 import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
 import Unsafe.Coerce      (unsafeCoerce)
+import CLaSH.XException   (ShowX (..), showsPrecXWith)
 
 {- $setup
 >>> :set -XBinaryLiterals
@@ -90,6 +91,9 @@ snatProxy _ = SNat
 instance Show (SNat n) where
   show p@SNat = 'd' : show (natVal p)
 
+instance ShowX (SNat n) where
+  showsPrecX = showsPrecXWith showsPrec
+
 {-# INLINE withSNat #-}
 -- | Supply a function with a singleton natural 'n' according to the context
 withSNat :: KnownNat n => (SNat n -> a) -> a
@@ -109,6 +113,9 @@ data UNat :: Nat -> * where
 
 instance KnownNat n => Show (UNat n) where
   show x = 'u':show (natVal x)
+
+instance KnownNat n => ShowX (UNat n) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | Convert a singleton natural number to its unary representation
 --
@@ -259,6 +266,9 @@ data BNat :: Nat -> * where
 
 instance KnownNat n => Show (BNat n) where
   show x = 'b':show (natVal x)
+
+instance KnownNat n => ShowX (BNat n) where
+  showsPrecX = showsPrecXWith showsPrec
 
 -- | Show a base-2 encoded natural as a binary literal
 --
