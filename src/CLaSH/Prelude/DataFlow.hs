@@ -8,12 +8,13 @@ Self-synchronising circuits based on data-flow principles.
 
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -52,8 +53,9 @@ import CLaSH.Class.Resize     (truncateB)
 import CLaSH.Prelude.BitIndex (msb)
 import CLaSH.Prelude.Mealy    (mealyB')
 import CLaSH.Promoted.Nat     (SNat)
-import CLaSH.Signal           ((.&&.), regEn, unbundle)
+import CLaSH.Signal           ((.&&.), unbundle)
 import CLaSH.Signal.Bundle    (Bundle (..))
+import CLaSH.Signal.Internal  (regEn#)
 import CLaSH.Signal.Explicit  (Clock (..), Signal', SystemClock, sclock)
 import CLaSH.Sized.BitVector  (BitVector)
 import CLaSH.Sized.Vector
@@ -145,23 +147,25 @@ pureDF f = DF (\i iV oR -> (fmap f i,iV,oR))
 
 -- | Create a 'DataFlow' circuit from a Mealy machine description as those of
 -- "CLaSH.Prelude.Mealy"
-mealyDF :: (s -> i -> (s,o))
+mealyDF :: (KnownSymbol nm, KnownNat rate)
+        => (s -> i -> (s,o))
         -> s
-        -> DataFlow Bool Bool i o
+        -> DataFlow' ('Clk nm rate) Bool Bool i o
 mealyDF f iS = DF (\i iV oR -> let en     = iV .&&. oR
                                    (s',o) = unbundle (f <$> s <*> i)
-                                   s      = regEn iS en s'
+                                   s      = regEn# sclock iS en s'
                                in  (o,iV,oR))
 
 -- | Create a 'DataFlow' circuit from a Moore machine description as those of
 -- "CLaSH.Prelude.Moore"
-mooreDF :: (s -> i -> s)
+mooreDF :: (KnownSymbol nm, KnownNat rate)
+        => (s -> i -> s)
         -> (s -> o)
         -> s
-        -> DataFlow Bool Bool i o
+        -> DataFlow' ('Clk nm rate) Bool Bool i o
 mooreDF ft fo iS = DF (\i iV oR -> let en  = iV .&&. oR
                                        s'  = ft <$> s <*> i
-                                       s   = regEn iS en s'
+                                       s   = regEn# sclock iS en s'
                                        o   = fo <$> s
                                    in  (o,iV,oR))
 
