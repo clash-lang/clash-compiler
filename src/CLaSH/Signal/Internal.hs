@@ -70,7 +70,7 @@ where
 
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, force)
-import Control.Exception          (SomeException, catch, evaluate, throw)
+import Control.Exception          (catch, evaluate, throw)
 import Data.Default               (Default (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
@@ -80,6 +80,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
+import CLaSH.XException           (XException, errorX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -359,7 +360,7 @@ testFor n = property . and . take n . sample
 
 -- | A 'force' that lazily returns exceptions
 forceNoException :: NFData a => a -> IO a
-forceNoException x = catch (evaluate (force x)) (\(e :: SomeException) -> return (throw e))
+forceNoException x = catch (evaluate (force x)) (\(e :: XException) -> return (throw e))
 
 headStrictCons :: NFData a => a -> [a] -> [a]
 headStrictCons x xs = unsafeDupablePerformIO ((:) <$> forceNoException x <*> pure xs)
@@ -411,7 +412,7 @@ sampleN n = take n . sample
 --
 -- __NB__: This function is not synthesisable
 fromList :: NFData a => [a] -> Signal' clk a
-fromList = Prelude.foldr headStrictSignal (error "finite list")
+fromList = Prelude.foldr headStrictSignal (errorX "finite list")
 
 -- * Simulation functions (not synthesisable)
 
