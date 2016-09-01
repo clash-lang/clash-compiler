@@ -335,11 +335,12 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE MagicHash     #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
@@ -359,8 +360,10 @@ module CLaSH.Prelude.BlockRam
   )
 where
 
+import Control.Exception      (catch, evaluate, throw)
 import Control.Monad          (when)
 import Control.Monad.ST.Lazy  (ST,runST)
+import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
 import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
@@ -370,6 +373,7 @@ import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
+import CLaSH.XException       (XException, errorX)
 
 {-# INLINE blockRam #-}
 -- | Create a blockRAM with space for @n@ elements.
@@ -524,7 +528,7 @@ blockRam# :: KnownNat n
           -> Signal' clk a
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam# clk content wr rd en din = register' clk undefined dout
+blockRam# clk content wr rd en din = register' clk (errorX "blockRam#: intial value undefined") dout
   where
     szI  = maxIndex content
     dout = runST $ do
@@ -533,7 +537,13 @@ blockRam# clk content wr rd en din = register' clk undefined dout
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
     ramT ram (w,r,e,d) = do
-      d' <- readArray ram r
+      -- reading from address using an 'X' exception results in an 'X' result
+      r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
+                                (\(err :: XException) -> return (Left (throw err))))
+      d' <- case r' of
+              Right r2 -> readArray ram r2
+              Left err -> return err
+      -- writing to an address using an 'X' exception makes everything 'X'
       when e (writeArray ram w d)
       return d'
 
