@@ -24,13 +24,13 @@ where
 
 import Debug.Trace           (trace)
 import GHC.TypeLits          (KnownNat)
-import Prelude               hiding ((!!))
+import Prelude               hiding ((!!), length)
 
 import CLaSH.Signal          (Signal, fromList)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle   (unbundle)
 import CLaSH.Sized.Index     (Index)
-import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
+import CLaSH.Sized.Vector    (Vec, (!!), length)
 
 {- $setup
 >>> :set -XTemplateHaskell
@@ -179,7 +179,7 @@ stimuliGenerator' clk samples =
     genT :: Index l -> (Index l,a)
     genT s = (s',samples !! s)
       where
-        maxI = toEnum (maxIndex samples)
+        maxI = toEnum (length samples - 1)
 
         s' = if s < maxI
                 then s + 1
@@ -237,7 +237,7 @@ outputVerifier' clk samples i =
     genT :: Index l -> (Index l,(a,Bool))
     genT s = (s',(samples !! s,finished))
       where
-        maxI = toEnum (maxIndex samples)
+        maxI = toEnum (length samples - 1)
 
         s' = if s < maxI
                 then s + 1

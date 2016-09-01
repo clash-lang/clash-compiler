@@ -369,12 +369,13 @@ import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
 import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat, type (^))
+import Prelude                hiding (length)
 
 import CLaSH.Signal           (Signal, mux)
 import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
 import CLaSH.Signal.Bundle    (bundle)
 import CLaSH.Sized.Unsigned   (Unsigned)
-import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
+import CLaSH.Sized.Vector     (Vec, length, toList)
 import CLaSH.XException       (XException, errorX)
 
 {- $setup
@@ -774,9 +775,9 @@ blockRam# :: KnownNat n
           -- cycle
 blockRam# clk content wr rd en din = register' clk (errorX "blockRam#: intial value undefined") dout
   where
-    szI  = maxIndex content
+    szI  = length content
     dout = runST $ do
-      arr <- newListArray (0,szI) (toList content)
+      arr <- newListArray (0,szI-1) (toList content)
       traverse (ramT arr) (bundle (wr,rd,en,din))
 
     ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e

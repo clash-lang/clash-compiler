@@ -186,7 +186,7 @@ infixr 5 `Cons`
 --
 -- * Lists with their length encoded in their type
 -- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
---   ending at 'maxIndex' (== 'length' - 1).
+--   ending at @'length' - 1@.
 data Vec :: Nat -> * -> * where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
@@ -1018,7 +1018,7 @@ index_int xs i@(I# n0)
     sub Nil     _ = error (P.concat [ "CLaSH.Sized.Vector.(!!): index "
                                     , show i
                                     , " is larger than maximum index "
-                                    , show (maxIndex xs)
+                                    , show ((length xs)-1)
                                     ])
     sub (y `Cons` (!ys)) n = if isTrue# (n ==# 0#)
                                 then y
@@ -1028,11 +1028,11 @@ index_int xs i@(I# n0)
 -- | \"@xs@ '!!' @n@\" returns the /n/'th element of /xs/.
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
--- ending at 'maxIndex'.
+-- ending at @'length' - 1@.
 --
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 4
 -- 5
--- >>> (1:>2:>3:>4:>5:>Nil) !! maxIndex (1:>2:>3:>4:>5:>Nil)
+-- >>> (1:>2:>3:>4:>5:>Nil) !! (length (1:>2:>3:>4:>5:>Nil) - 1)
 -- 5
 -- >>> (1:>2:>3:>4:>5:>Nil) !! 1
 -- 2
@@ -1045,12 +1045,10 @@ xs !! i = index_int xs (fromEnum i)
 
 -- | The index (subscript) of the last element in a 'Vec'tor as an 'Int'
 -- value.
---
--- >>> maxIndex (6 :> 7 :> 8 :> Nil)
--- 2
 maxIndex :: KnownNat n => Vec n a -> Int
 maxIndex = subtract 1 . length
 {-# NOINLINE maxIndex #-}
+{-# DEPRECATED maxIndex "'maxIndex' will be removed in clash-prelude-1.0, use 'length xs - 1' instead." #-}
 
 -- | The length of a 'Vec'tor as an 'Int' value.
 --
@@ -1069,7 +1067,7 @@ replace_int xs i@(I# n0) a
     sub Nil     _ _ = error (P.concat [ "CLaSH.Sized.Vector.replace: index "
                                       , show i
                                       , " is larger than maximum index "
-                                      , show (maxIndex xs)
+                                      , show (length xs - 1)
                                       ])
     sub (y `Cons` (!ys)) n b = if isTrue# (n ==# 0#)
                                  then b `Cons` ys
@@ -1080,7 +1078,7 @@ replace_int xs i@(I# n0) a
 -- replaced by /a/.
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
--- ending at 'maxIndex'.
+-- ending at @'length' - 1@.
 --
 -- >>> replace 3 7 (1:>2:>3:>4:>5:>Nil)
 -- <1,2,3,7,5>
@@ -1153,7 +1151,7 @@ dropI = withSNat drop
 -- | \"'at' @n xs@\" returns /n/'th element of /xs/
 --
 -- __NB__: vector elements have an __ASCENDING__ subscript starting from 0 and
--- ending at 'maxIndex'.
+-- ending at @'length' - 1@.
 --
 -- >>> at (SNat :: SNat 1) (1:>2:>3:>4:>5:>Nil)
 -- 2

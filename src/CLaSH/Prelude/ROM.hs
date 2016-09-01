@@ -33,12 +33,13 @@ where
 
 import Data.Array             ((!),listArray)
 import GHC.TypeLits           (KnownNat, type (^))
+import Prelude hiding         (length)
 
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Signal.Explicit  (register')
-import CLaSH.Sized.Vector     (Vec, maxIndex, toList)
+import CLaSH.Sized.Vector     (Vec, length, toList)
 
 {-# INLINE asyncRom #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
@@ -80,8 +81,8 @@ asyncRom# :: KnownNat n
           -> a        -- ^ The value of the ROM at address @rd@
 asyncRom# content rd = arr ! rd
   where
-    szI = maxIndex content
-    arr = listArray (0,szI) (toList content)
+    szI = length content
+    arr = listArray (0,szI-1) (toList content)
 
 {-# INLINE rom #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
@@ -170,5 +171,5 @@ rom# :: KnownNat n
      -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 rom# clk content rd = register' clk undefined ((arr !) <$> rd)
   where
-    szI = maxIndex content
-    arr = listArray (0,szI) (toList content)
+    szI = length content
+    arr = listArray (0,szI-1) (toList content)
