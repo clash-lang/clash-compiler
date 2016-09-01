@@ -96,7 +96,7 @@ let encoderCase :: Bool -> BitVector 16 -> BitVector 4
 let upCounter :: Signal Bool -> Signal (Unsigned 8)
     upCounter enable = s
       where
-        s = regEn 0 enable (s + 1)
+        s = register 0 (mux enable (s + 1) s)
 :}
 
 >>> :{
@@ -156,7 +156,7 @@ let grayCounter :: Signal Bool -> Signal (BitVector 8)
 let oneHotCounter :: Signal Bool -> Signal (BitVector 8)
     oneHotCounter enable = s
       where
-        s = regEn 1 enable (rotateL <$> s <*> 1)
+        s = register 1 (mux enable (rotateL <$> s <*> 1) s)
 :}
 
 >>> :{
@@ -179,7 +179,7 @@ let crcT bv dIn = replaceBit 0  dInXor
 let crc :: Signal Bool -> Signal Bool -> Signal Bit -> Signal (BitVector 16)
     crc enable ld dIn = s
       where
-        s = regEn 0xFFFF enable (mux ld 0xFFFF (crcT <$> s <*> dIn))
+        s = register 0xFFFF (mux enable (mux ld 0xFFFF (crcT <$> s <*> dIn)) s)
 :}
 
 >>> :{
@@ -389,13 +389,13 @@ prop> \en decIn -> en ==> (encoderCase en (decoderCase en decIn) === decIn)
 {- $counters
 = 8-bit Simple Up Counter
 
-Using `regEn`:
+Using `register`:
 
 @
 upCounter :: Signal Bool -> Signal (Unsigned 8)
 upCounter enable = s
   where
-    s = `regEn` 0 enable (s + 1)
+    s = `register` 0 (`mux` enable (s + 1) s)
 @
 
 = 8-bit Up Counter With Load
@@ -484,7 +484,7 @@ Basically a barrel-shifter:
 oneHotCounter :: Signal Bool -> Signal (BitVector 8)
 oneHotCounter enable = s
   where
-    s = 'regEn' 1 enable ('rotateL' <$> s <*> 1)
+    s = 'register' 1 ('mux' enable ('rotateL' '<$>' s '<*>' 1) s)
 @
 -}
 
@@ -520,7 +520,7 @@ crcT bv dIn = 'replaceBit' 0  dInXor
 crc :: Signal Bool -> Signal Bool -> Signal Bit -> Signal (BitVector 16)
 crc enable ld dIn = s
   where
-    s = 'regEn' 0xFFFF enable ('mux' ld 0xFFFF (crcT '<$>' s '<*>' dIn))
+    s = 'register' 0xFFFF ('mux' enable ('mux' ld 0xFFFF (crcT '<$>' s '<*>' dIn)) s)
 @
 -}
 
