@@ -112,8 +112,8 @@ let sortVL xs = map fst sorted :< (snd (last sorted))
 
 >>> let mac = mealy macT 0
 >>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
->>> let testInput = stimuliGenerator $(v [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
->>> let expectedOutput = outputVerifier $(v [0 :: Signed 9,1,5,14])
+>>> let testInput = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+>>> let expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
 >>> :{
 let fibR :: Unsigned 64 -> Unsigned 64
     fibR 0 = 0
@@ -552,10 +552,10 @@ and @'outputVerifier'@:
 
 @
 testInput :: 'Signal' ('Signed' 9,'Signed' 9)
-testInput = 'stimuliGenerator' $('v' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
+testInput = 'stimuliGenerator' $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
 
 expectedOutput :: 'Signal' ('Signed' 9) -> 'Signal' Bool
-expectedOutput = 'outputVerifier' $('v' [0 :: 'Signed' 9,1,5,14])
+expectedOutput = 'outputVerifier' $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
 @
 
 This will create a stimulus generator that creates the same inputs as we used
@@ -1818,7 +1818,7 @@ Here is a list of Haskell features for which the CλaSH compiler has only
     for which the compiler has hard-coded knowledge.
 
     For \"easy\" 'Vec'tor literals you should use Template Haskell splices and
-    the 'v' /meta/-function that as we have seen earlier in this tutorial.
+    the 'listToVecTH' /meta/-function that as we have seen earlier in this tutorial.
 
 * __GADT pattern matching__
 

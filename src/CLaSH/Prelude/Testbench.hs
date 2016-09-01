@@ -36,13 +36,13 @@ import CLaSH.Sized.Vector    (Vec, (!!), maxIndex)
 >>> :set -XTemplateHaskell
 >>> :set -XDataKinds
 >>> import CLaSH.Prelude
->>> let testInput = stimuliGenerator $(v [(1::Int),3..21])
->>> let expectedOutput = outputVerifier $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+>>> let testInput = stimuliGenerator $(listToVecTH [(1::Int),3..21])
+>>> let expectedOutput = outputVerifier $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 >>> import CLaSH.Prelude.Explicit
 >>> type ClkA = Clk "A" 100
 >>> let clkA = sclock :: SClock ClkA
->>> let testInput' = stimuliGenerator' clkA $(v [(1::Int),3..21])
->>> let expectedOutput' = outputVerifier' clkA $(v ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+>>> let testInput' = stimuliGenerator' clkA $(listToVecTH [(1::Int),3..21])
+>>> let expectedOutput' = outputVerifier' clkA $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -}
 
 {-# INLINE assert #-}
@@ -70,7 +70,7 @@ assert = assert' systemClock
 --
 -- @
 -- testInput :: 'Signal' Int
--- testInput = 'stimuliGenerator' $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
+-- testInput = 'stimuliGenerator' $('CLaSH.Sized.Vector.listToVecTH' [(1::Int),3..21])
 -- @
 --
 -- >>> sampleN 13 testInput
@@ -89,7 +89,7 @@ stimuliGenerator = stimuliGenerator' systemClock
 --
 -- @
 -- expectedOutput :: 'Signal' Int -> 'Signal' Bool
--- expectedOutput = 'outputVerifier' $('CLaSH.Sized.Vector.v' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- expectedOutput = 'outputVerifier' $('CLaSH.Sized.Vector.listToVecTH' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- @
 --
 -- >>> import qualified Data.List as List
@@ -162,7 +162,7 @@ assert' clk msg checked expected returned =
 -- clkA = 'CLaSH.Signal.Explicit.sclock'
 --
 -- testInput' :: 'Signal'' clkA Int
--- testInput' = 'stimuliGenerator'' clkA $('CLaSH.Sized.Vector.v' [(1::Int),3..21])
+-- testInput' = 'stimuliGenerator'' clkA $('CLaSH.Sized.Vector.listToVecTH' [(1::Int),3..21])
 -- @
 --
 -- >>> sampleN 13 testInput'
@@ -199,7 +199,7 @@ stimuliGenerator' clk samples =
 -- clkA = 'CLaSH.Signal.Explicit.sclock'
 --
 -- expectedOutput' :: 'Signal'' ClkA Int -> 'Signal'' ClkA Bool
--- expectedOutput' = 'outputVerifier'' clkA $('CLaSH.Sized.Vector.v' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
+-- expectedOutput' = 'outputVerifier'' clkA $('CLaSH.Sized.Vector.listToVecTH' ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -- @
 --
 -- >>> import qualified Data.List as List

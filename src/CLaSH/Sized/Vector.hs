@@ -50,7 +50,7 @@ module CLaSH.Sized.Vector
   , replicate, replicateI, repeat
   , iterate, iterateI, generate, generateI
     -- *** Initialisation from a list
-  , v
+  , listToVecTH, v
     -- ** Concatenation
   , (++), (+>>), (<<+), concat
   , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
@@ -1579,15 +1579,19 @@ toList = foldr (:) []
 
 -- | Create a vector literal from a list literal.
 --
--- > $(v [1::Signed 8,2,3,4,5]) == (8:>2:>3:>4:>5:>Nil) :: Vec 5 (Signed 8)
+-- > $(listToVecTH [1::Signed 8,2,3,4,5]) == (8:>2:>3:>4:>5:>Nil) :: Vec 5 (Signed 8)
 --
 -- >>> [1 :: Signed 8,2,3,4,5]
 -- [1,2,3,4,5]
--- >>> $(v [1::Signed 8,2,3,4,5])
+-- >>> $(listToVecTH [1::Signed 8,2,3,4,5])
 -- <1,2,3,4,5>
+listToVecTH :: Lift a => [a] -> ExpQ
+listToVecTH []     = [| Nil |]
+listToVecTH (x:xs) = [| x :> $(listToVecTH xs) |]
+
 v :: Lift a => [a] -> ExpQ
-v []     = [| Nil |]
-v (x:xs) = [| x :> $(v xs) |]
+v = listToVecTH
+{-# DEPRECATED v "'v' will be removed in clash-prelude-1.0, use 'listToVecTH'" #-}
 
 -- | 'Vec'tor as a 'Proxy' for 'Nat'
 asNatProxy :: Vec n a -> Proxy n
