@@ -90,7 +90,7 @@ where
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, force)
 import Control.Exception          (catch, evaluate, throw)
-import Data.Bits                  (Bits (..), FiniteBits (..))
+import Data.Bits                  (Bits (..))
 import Data.Default               (Default (..))
 import GHC.TypeLits               (Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
@@ -98,7 +98,6 @@ import System.IO.Unsafe           (unsafeDupablePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
-import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..))
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
 import CLaSH.XException           (XException, errorX)
@@ -260,6 +259,7 @@ infixr 3 .&&.
 -- It is a version of 'not' that operates on 'CLaSH.Signal.Signal's of 'Bool'
 not1 :: Functor f => f Bool -> f Bool
 not1 = fmap not
+{-# DEPRECATED not1 "'not1' will be removed in clash-prelude-1.0, use \"fmap not\" instead." #-}
 
 {-# NOINLINE register# #-}
 register# :: SClock clk -> a -> Signal' clk a -> Signal' clk a
@@ -298,28 +298,6 @@ mux = liftA3 (\b t f -> if b then t else f)
 signal :: Applicative f => a -> f a
 signal = pure
 
-instance Bounded a => Bounded (Signal' clk a) where
-  minBound = signal# minBound
-  maxBound = signal# maxBound
-
-instance ExtendingNum a b => ExtendingNum (Signal' clk a) (Signal' clk b) where
-  type AResult (Signal' clk a) (Signal' clk b) = Signal' clk (AResult a b)
-  plus  = liftA2 plus
-  minus = liftA2 minus
-  type MResult (Signal' clk a) (Signal' clk b) = Signal' clk (MResult a b)
-  times = liftA2 times
-
-instance SaturatingNum a => SaturatingNum (Signal' clk a) where
-  satPlus s = liftA2 (satPlus s)
-  satMin  s = liftA2 (satMin s)
-  satMult s = liftA2 (satMult s)
-
--- | __WARNING__: ('==') and ('/=') are undefined, use ('.==.') and ('./=.')
--- instead
-instance Eq (Signal' clk a) where
-  (==) = error "(==)' undefined for 'Signal'', use '(.==.)' instead"
-  (/=) = error "(/=)' undefined for 'Signal'', use '(./=.)' instead"
-
 infix 4 .==.
 -- | The above type is a generalisation for:
 --
@@ -342,17 +320,6 @@ infix 4 ./=.
 (./=.) :: (Eq a, Applicative f) => f a -> f a -> f Bool
 (./=.) = liftA2 (/=)
 
--- | __WARNING__: 'compare', ('<'), ('>='), ('>'), and ('<=') are
--- undefined, use 'compare1', ('.<.'), ('.>=.'), ('.>.'), and ('.<=.') instead
-instance Ord a => Ord (Signal' clk a) where
-  compare = error "'compare' undefined for 'Signal'', use 'compare1' instead"
-  (<)     = error "'(<)' undefined for 'Signal'', use '(.<.)' instead"
-  (>=)    = error "'(>=)' undefined for 'Signal'', use '(.>=.)' instead"
-  (>)     = error "'(>)' undefined for 'Signal'', use '(.>.)' instead"
-  (<=)    = error "'(<=)' undefined for 'Signal'', use '(.<=.)' instead"
-  max     = liftA2 max
-  min     = liftA2 min
-
 -- | The above type is a generalisation for:
 --
 -- @
@@ -362,6 +329,7 @@ instance Ord a => Ord (Signal' clk a) where
 -- It is a version of 'compare' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
 compare1 :: (Ord a, Applicative f) => f a -> f a -> f Ordering
 compare1 = liftA2 compare
+{-# DEPRECATED compare1 "'compare1' will be removed in clash-prelude-1.0, use \"liftA2 compare\" instead." #-}
 
 infix 4 .<.
 -- | The above type is a generalisation for:
@@ -407,17 +375,6 @@ infix 4 .>=.
 (.>=.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.>=.) = liftA2 (>=)
 
--- | __WARNING__: 'fromEnum' is undefined, use 'fromEnum1' instead
-instance Enum a => Enum (Signal' clk a) where
-  succ           = fmap succ
-  pred           = fmap pred
-  toEnum         = signal# . toEnum
-  fromEnum       = error "'fromEnum' undefined for 'Signal'', use 'fromEnum1'"
-  enumFrom       = sequenceA . fmap enumFrom
-  enumFromThen   = (sequenceA .) . liftA2 enumFromThen
-  enumFromTo     = (sequenceA .) . liftA2 enumFromTo
-  enumFromThenTo = ((sequenceA .) .) . liftA3 enumFromThenTo
-
 -- | The above type is a generalisation for:
 --
 -- @
@@ -427,10 +384,7 @@ instance Enum a => Enum (Signal' clk a) where
 -- It is a version of 'fromEnum' that returns a CLaSH.Signal.Signal' of 'Int'
 fromEnum1 :: (Enum a, Functor f) => f a -> f Int
 fromEnum1 = fmap fromEnum
-
--- | __WARNING__: 'toRational' is undefined, use 'toRational1' instead
-instance (Num a, Ord a) => Real (Signal' clk a) where
-  toRational = error "'toRational' undefined for 'Signal'', use 'toRational1'"
+{-# DEPRECATED fromEnum1 "'fromEnum1' will be removed in clash-prelude-1.0, use \"fmap fromEnum\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -441,16 +395,7 @@ instance (Num a, Ord a) => Real (Signal' clk a) where
 -- It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
 toRational1 :: (Real a, Functor f) => f a -> f Rational
 toRational1 = fmap toRational
-
--- | __WARNING__: 'toInteger' is undefined, use 'toInteger1' instead
-instance Integral a => Integral (Signal' clk a) where
-  quot        = liftA2 quot
-  rem         = liftA2 rem
-  div         = liftA2 div
-  mod         = liftA2 mod
-  quotRem a b = (quot a b, rem a b)
-  divMod a b  = (div a b, mod a b)
-  toInteger   = error "'toInteger' undefined for 'Signal'', use 'toInteger1'"
+{-# DEPRECATED toRational1 "'toRational1' will be removed in clash-prelude-1.0, use \"fmap toRational\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -461,34 +406,7 @@ instance Integral a => Integral (Signal' clk a) where
 -- It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Integer'
 toInteger1 :: (Integral a, Functor f) => f a -> f Integer
 toInteger1 = fmap toInteger
-
--- | __WARNING__: 'testBit' and 'popCount' are undefined, use 'testBit1' and
--- 'popCount1' instead
-instance Bits a => Bits (Signal' clk a) where
-  (.&.)            = liftA2 (.&.)
-  (.|.)            = liftA2 (.|.)
-  xor              = liftA2 xor
-  complement       = fmap complement
-  shift a i        = fmap (`shift` i) a
-  rotate a i       = fmap (`rotate` i) a
-  zeroBits         = signal# zeroBits
-  bit              = signal# . bit
-  setBit a i       = fmap (`setBit` i) a
-  clearBit a i     = fmap (`clearBit` i) a
-  testBit          = error "'testBit' undefined for 'Signal'', use 'testbit1'"
-  bitSizeMaybe _   = bitSizeMaybe (undefined :: a)
-  bitSize _        = maybe 0 id (bitSizeMaybe (undefined :: a))
-  isSigned _       = isSigned (undefined :: a)
-  shiftL a i       = fmap (`shiftL` i) a
-  unsafeShiftL a i = fmap (`unsafeShiftL` i) a
-  shiftR a i       = fmap (`shiftR` i) a
-  unsafeShiftR a i = fmap (`unsafeShiftR` i) a
-  rotateL a i      = fmap (`rotateL` i) a
-  rotateR a i      = fmap (`rotateR` i) a
-  popCount         = error "'popCount' undefined for 'Signal'', use 'popCount1'"
-
-instance FiniteBits a => FiniteBits (Signal' clk a) where
-  finiteBitSize _ = finiteBitSize (undefined :: a)
+{-# DEPRECATED toInteger1 "'toInteger1' will be removed in clash-prelude-1.0, use \"fmap toInteger\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -500,6 +418,7 @@ instance FiniteBits a => FiniteBits (Signal' clk a) where
 -- argument, and a result of 'CLaSH.Signal.Signal' of 'Bool'
 testBit1 :: (Bits a, Applicative f) => f a -> f Int -> f Bool
 testBit1 = liftA2 testBit
+{-# DEPRECATED testBit1 "'testBit1' will be removed in clash-prelude-1.0, use \"liftA2 testBit\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -510,6 +429,7 @@ testBit1 = liftA2 testBit
 --  It is a version of 'popCount' that returns a 'CLaSH.Signal.Signal' of 'Int'
 popCount1 :: (Bits a, Functor f) => f a -> f Int
 popCount1 = fmap popCount
+{-# DEPRECATED popCount1 "'popCount1' will be removed in clash-prelude-1.0, use \"fmap popCount\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -520,6 +440,7 @@ popCount1 = fmap popCount
 -- It is a version of 'shift' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 shift1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 shift1 = liftA2 shift
+{-# DEPRECATED shift1 "'shift1' will be removed in clash-prelude-1.0, use \"liftA2 shift\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -530,6 +451,7 @@ shift1 = liftA2 shift
 -- It is a version of 'rotate' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 rotate1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 rotate1 = liftA2 rotate
+{-# DEPRECATED rotate1 "'rotate1' will be removed in clash-prelude-1.0, use \"liftA2 rotate\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -540,6 +462,7 @@ rotate1 = liftA2 rotate
 -- It is a version of 'setBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 setBit1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 setBit1 = liftA2 setBit
+{-# DEPRECATED setBit1 "'setBit1' will be removed in clash-prelude-1.0, use \"liftA2 setBit\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -550,6 +473,7 @@ setBit1 = liftA2 setBit
 -- It is a version of 'clearBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 clearBit1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 clearBit1 = liftA2 clearBit
+{-# DEPRECATED clearBit1 "'clearBit1' will be removed in clash-prelude-1.0, use \"liftA2 clearBit\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -560,6 +484,7 @@ clearBit1 = liftA2 clearBit
 -- It is a version of 'shiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 shiftL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 shiftL1 = liftA2 shiftL
+{-# DEPRECATED shiftL1 "'shiftL1' will be removed in clash-prelude-1.0, use \"liftA2 shiftL\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -570,6 +495,7 @@ shiftL1 = liftA2 shiftL
 -- It is a version of 'unsafeShiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 unsafeShiftL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 unsafeShiftL1 = liftA2 unsafeShiftL
+{-# DEPRECATED unsafeShiftL1 "'unsafeShiftL1' will be removed in clash-prelude-1.0, use \"liftA2 unsafeShiftL\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -580,6 +506,7 @@ unsafeShiftL1 = liftA2 unsafeShiftL
 -- It is a version of 'shiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 shiftR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 shiftR1 = liftA2 shiftR
+{-# DEPRECATED shiftR1 "'shiftR1' will be removed in clash-prelude-1.0, use \"liftA2 shiftR\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -590,6 +517,7 @@ shiftR1 = liftA2 shiftR
 -- It is a version of 'unsafeShiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 unsafeShiftR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 unsafeShiftR1 = liftA2 unsafeShiftR
+{-# DEPRECATED unsafeShiftR1 "'unsafeShiftR1' will be removed in clash-prelude-1.0, use \"liftA2 unsafeShiftR\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -600,6 +528,7 @@ unsafeShiftR1 = liftA2 unsafeShiftR
 -- It is a version of 'rotateL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 rotateL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 rotateL1 = liftA2 rotateL
+{-# DEPRECATED rotateL1 "'rotateL1' will be removed in clash-prelude-1.0, use \"liftA2 rotateL\" instead." #-}
 
 -- | The above type is a generalisation for:
 --
@@ -610,6 +539,7 @@ rotateL1 = liftA2 rotateL
 -- It is a version of 'rotateR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
 rotateR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
 rotateR1 = liftA2 rotateR
+{-# DEPRECATED rotateR1 "'rotateR1' will be removed in clash-prelude-1.0, use \"liftA2 rotateR\" instead." #-}
 
 instance Fractional a => Fractional (Signal' clk a) where
   (/)          = liftA2 (/)

@@ -42,16 +42,13 @@ module CLaSH.Signal.Delayed.Explicit
 where
 
 import Control.DeepSeq            (NFData)
-import Data.Bits                  (Bits, FiniteBits)
 import Data.Coerce                (coerce)
 import Data.Default               (Default(..))
-import Control.Applicative        (liftA2)
 import GHC.TypeLits               (KnownNat, Nat, type (+))
 import Language.Haskell.TH.Syntax (Lift)
 import Prelude                    hiding (head, length, repeat)
 import Test.QuickCheck            (Arbitrary, CoArbitrary)
 
-import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum)
 import CLaSH.Promoted.Nat         (SNat)
 import CLaSH.Sized.Vector         (Vec, head, length, repeat, shiftInAt0,
                                    singleton)
@@ -85,19 +82,8 @@ newtype DSignal' (clk :: Clock) (delay :: Nat) a =
     DSignal' { -- | Strip a 'DSignal' from its delay information.
                toSignal :: Signal' clk a
              }
-  deriving (Show,Default,Functor,Applicative,Num,Bounded,Fractional,
-            Real,Integral,SaturatingNum,Eq,Ord,Enum,Bits,FiniteBits,Foldable,
-            Traversable,Arbitrary,CoArbitrary,Lift)
-
-instance ExtendingNum a b
-      => ExtendingNum (DSignal' clk n a) (DSignal' clk n b) where
-  type AResult (DSignal' clk n a) (DSignal' clk n b) =
-    DSignal' clk n (AResult a b)
-  plus  = liftA2 plus
-  minus = liftA2 minus
-  type MResult (DSignal' clk n a) (DSignal' clk n b) =
-    DSignal' clk n (MResult a b)
-  times = liftA2 times
+  deriving (Show,Default,Functor,Applicative,Num,Fractional,
+            Foldable,Traversable,Arbitrary,CoArbitrary,Lift)
 
 -- | Create a 'DSignal'' from a list
 --

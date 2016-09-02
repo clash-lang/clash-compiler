@@ -85,7 +85,7 @@ import CLaSH.Signal.Explicit (SystemClock, systemClock)
 import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
 
 {- $setup
->>> let oscillate = register False (not1 oscillate)
+>>> let oscillate = register False (not <$> oscillate)
 >>> let count = regEn 0 oscillate (count + 1)
 -}
 
@@ -117,7 +117,7 @@ infixr 3 `registerMaybe`
 -- is asserted. So given:
 --
 -- @
--- oscillate = 'register' False ('not1' oscillate)
+-- oscillate = 'register' False ('not1' '<$>' oscillate)
 -- count     = 'regEn' 0 oscillate (count + 1)
 -- @
 --

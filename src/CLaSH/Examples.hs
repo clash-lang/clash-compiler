@@ -156,7 +156,7 @@ let grayCounter :: Signal Bool -> Signal (BitVector 8)
 let oneHotCounter :: Signal Bool -> Signal (BitVector 8)
     oneHotCounter enable = s
       where
-        s = register 1 (mux enable (rotateL s 1) s)
+        s = register 1 (mux enable (rotateL <$> s <*> 1) s)
 :}
 
 >>> :{
@@ -484,7 +484,7 @@ Basically a barrel-shifter:
 oneHotCounter :: Signal Bool -> Signal (BitVector 8)
 oneHotCounter enable = s
   where
-    s = 'register' 1 ('mux' enable ('rotateL' s 1) s)
+    s = 'register' 1 ('mux' enable ('rotateL' '<$>' s '<*>' 1) s)
 @
 -}
 
