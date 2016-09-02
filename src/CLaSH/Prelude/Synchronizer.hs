@@ -35,7 +35,7 @@ import CLaSH.Prelude.Mealy         (mealyB')
 import CLaSH.Prelude.RAM           (asyncRam')
 import CLaSH.Promoted.Nat          (SNat, pow2SNat, subSNat)
 import CLaSH.Promoted.Nat.Literals (d0, d1, d2)
-import CLaSH.Signal                ((.&&.))
+import CLaSH.Signal                ((.&&.), not1)
 import CLaSH.Signal.Explicit       (Signal', SClock, register',
                                     unsafeSynchronizer)
 import CLaSH.Sized.BitVector       (BitVector, (++#))
@@ -92,7 +92,7 @@ fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
   asyncRam' wclk rclk
             (pow2SNat addrSize)
             waddr raddr
-            (winc .&&. fmap not wfull)
+            (winc .&&. not1 wfull)
             wdata
 
 ptrCompareT :: _
