@@ -18,6 +18,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE Unsafe #-}
 
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Sized.Internal.Index
@@ -68,15 +69,16 @@ import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
-                                   natVal)
+                                   type (<=), type (^), natVal)
 import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
                                    coarbitraryIntegral, shrinkIntegral)
 
-import CLaSH.Class.BitPack            (BitPack (..))
-import CLaSH.Class.Num                (ExtendingNum (..))
-import CLaSH.Class.Resize             (Resize (..))
+import CLaSH.Class.BitPack        (BitPack (..))
+import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
+                                   SaturationMode (..))
+import CLaSH.Class.Resize         (Resize (..))
 import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (BV))
 import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
@@ -242,6 +244,43 @@ minus# (I a) (I b) =
 {-# NOINLINE times# #-}
 times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
+
+instance (KnownNat n, 1 <= (n*2), (n*2) <= (n^2)) => SaturatingNum (Index n) where
+  satPlus SatWrap a b = case plus# a b of
+    z | let m = fromInteger# (natVal (Proxy @ n))
+      , z >= m -> resize# (z - m)
+    z -> resize# z
+  satPlus SatZero a b = case plus# a b of
+    z | let m = fromInteger# (natVal (Proxy @ n))
+      , z >= m -> fromInteger# 0
+    z -> resize# z
+  satPlus _ a b = case plus# a b of
+    z | let m = fromInteger# (natVal (Proxy @ n))
+      , z >= m -> maxBound#
+    z -> resize# z
+
+  satMin SatWrap a b =
+    if lt# a b
+       then maxBound -# (b -# a) +# 1
+       else a -# b
+
+  satMin _ a b =
+    if lt# a b
+       then fromInteger# 0
+       else a -# b
+
+  satMult SatWrap a b = case times# a b of
+    z | let m = fromInteger# (natVal (Proxy @ n))
+      , z >= m -> resize# (z - m)
+    z -> resize# z
+  satMult SatZero a b = case times# a b of
+    z | let m = fromInteger# (natVal (Proxy @ n))
+      , z >= m -> fromInteger# 0
+    z -> resize# z
+  satMult _ a b = case times# a b of
+    z | let m = fromInteger# (natVal (Proxy @ n))
+      , z >= m -> maxBound#
+    z -> resize# z
 
 instance KnownNat n => Real (Index n) where
   toRational = toRational . toInteger#
