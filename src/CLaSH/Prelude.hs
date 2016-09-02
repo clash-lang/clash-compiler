@@ -115,6 +115,7 @@ module CLaSH.Prelude
   , module Data.Default
     -- ** Exceptions
   , module CLaSH.XException
+  , undefined
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -132,7 +133,8 @@ import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            iterate, last, length, map, repeat,
                                            replicate, reverse, scanl, scanr,
                                            splitAt, tail, take, unzip, unzip3,
-                                           zip, zip3, zipWith, zipWith3)
+                                           zip, zip3, zipWith, zipWith3,
+                                           undefined)
 
 import CLaSH.Annotations.TopEntity
 import CLaSH.Class.BitPack

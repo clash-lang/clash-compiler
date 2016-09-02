@@ -97,6 +97,9 @@ module CLaSH.Prelude.Safe
     -- *** Other
   , module Control.Applicative
   , module Data.Bits
+      -- ** Exceptions
+  , module CLaSH.XException
+  , undefined
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -105,6 +108,7 @@ where
 
 import Control.Applicative
 import Data.Bits
+import GHC.Stack
 import GHC.TypeLits
 import GHC.TypeLits.Extra
 import Prelude                     hiding ((++), (!!), concat, drop, foldl,
@@ -112,7 +116,8 @@ import Prelude                     hiding ((++), (!!), concat, drop, foldl,
                                            iterate, last, length, map, repeat,
                                            replicate, reverse, scanl, scanr,
                                            splitAt, tail, take, unzip, unzip3,
-                                           zip, zip3, zipWith, zipWith3)
+                                           zip, zip3, zipWith, zipWith3,
+                                           undefined)
 
 import CLaSH.Annotations.TopEntity
 import CLaSH.Class.BitPack
@@ -140,6 +145,7 @@ import CLaSH.Sized.Vector
 import CLaSH.Signal
 import CLaSH.Signal.Delayed
 import CLaSH.Signal.Explicit       (systemClock)
+import CLaSH.XException
 
 {- $setup
 >>> let rP = registerB (8,8)
@@ -183,3 +189,6 @@ isFalling :: (Bounded a, Eq a)
           -> Signal a
           -> Signal Bool
 isFalling = isFalling' systemClock
+
+undefined :: HasCallStack => a
+undefined = errorX "undefined"
