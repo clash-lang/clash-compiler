@@ -35,7 +35,8 @@ import CLaSH.Prelude.Mealy         (mealyB')
 import CLaSH.Prelude.RAM           (asyncRam')
 import CLaSH.Promoted.Nat          (SNat, pow2SNat, subSNat)
 import CLaSH.Promoted.Nat.Literals (d0, d1, d2)
-import CLaSH.Signal                ((.&&.))
+import CLaSH.Signal                ((.&&.), mux)
+import CLaSH.Signal.Bundle         (bundle)
 import CLaSH.Signal.Explicit       (Signal', SClock, register',
                                     unsafeSynchronizer)
 import CLaSH.Sized.BitVector       (BitVector, (++#))
@@ -82,18 +83,17 @@ fifoMem :: _
         => SClock wclk
         -> SClock rclk
         -> SNat addrSize
-        -> Signal' wclk (BitVector addrSize)
         -> Signal' rclk (BitVector addrSize)
+        -> Signal' wclk (BitVector addrSize)
         -> Signal' wclk Bool
         -> Signal' wclk Bool
         -> Signal' wclk a
         -> Signal' rclk a
-fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
+fifoMem wclk rclk addrSize raddr waddr winc wfull wdata =
   asyncRam' wclk rclk
             (pow2SNat addrSize)
-            waddr raddr
-            (winc .&&. fmap not wfull)
-            wdata
+            raddr
+            (mux (winc .&&. fmap not wfull) (Just <$> bundle (waddr,wdata)) (pure Nothing))
 
 ptrCompareT :: _
             => SNat (addrSize + 1)
@@ -145,7 +145,7 @@ asyncFIFOSynchronizer addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
     s_rptr = dualFlipFlopSynchronizer rclk wclk 0 rptr
     s_wptr = dualFlipFlopSynchronizer wclk rclk 0 wptr
 
-    rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
+    rdata = fifoMem wclk rclk addrSize raddr waddr winc wfull wdata
 
     (rempty,raddr,rptr) = mealyB' rclk (ptrCompareT addrSize (==)) (0,0,True)
                                   (s_wptr,rinc)

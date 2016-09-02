@@ -16,7 +16,7 @@ We start with the definition of the Instructions, Register names and machine
 codes:
 
 @
-{\-\# LANGUAGE RecordWildCards \#-\}
+{\-\# LANGUAGE RecordWildCards, TupleSections \#-\}
 module CPU where
 
 import CLaSH.Prelude
@@ -55,13 +55,12 @@ data MachCode
   , aluCode :: Operator
   , ldReg   :: Reg
   , rdAddr  :: MemAddr
-  , wrAddr  :: MemAddr
-  , wrEn    :: Bool
+  , wrAddrM :: Maybe MemAddr
   , jmpM    :: Maybe Value
   }
 
 nullCode = MachCode { inputX = Zero, inputY = Zero, result = Zero, aluCode = Imm
-                    , ldReg = Zero, wrAddr = 0, rdAddr = 0, wrEn = False
+                    , ldReg = Zero, rdAddr = 0, wrAddrM = Nothing
                     , jmpM = Nothing
                     }
 @
@@ -72,9 +71,9 @@ Next we define the CPU and its ALU:
 cpu :: Vec 7 Value          -- ^ Register bank
     -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
     -> ( Vec 7 Value
-       , (MemAddr,MemAddr,Bool,Value,InstrAddr)
+       , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
        )
-cpu regbank (memOut,instr) = (regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
+cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) '<$>' wrAddrM,fromIntegral ipntr))
   where
     -- Current instruction pointer
     ipntr = regbank '!!' PC
@@ -85,7 +84,7 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral i
       Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
       Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
       Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddr=a,wrEn=True}
+      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
       Nop                  -> nullCode
 
     -- ALU
@@ -115,18 +114,17 @@ alu CmpGt x y = if x > y then 1 else 0
 We initially create a memory out of simple registers:
 
 @
-dataMem :: Signal MemAddr -- ^ Write address
-        -> Signal MemAddr -- ^ Read address
-        -> Signal Bool    -- ^ Write enable
-        -> Signal Value   -- ^ data in
-        -> Signal Value   -- ^ data out
-dataMem wr rd en din = 'CLaSH.Prelude.Mealy.mealy' dataMemT ('replicate' d32 0) (bundle (wr,rd,en,din))
+dataMem :: Signal MemAddr                 -- ^ Read address
+        -> Signal (Maybe (MemAddr,Value)) -- ^ (write address, data in)
+        -> Signal Value                   -- ^ data out
+dataMem rd wrM = 'CLaSH.Prelude.Mealy.mealy' dataMemT ('replicate' d32 0) (bundle (rd,wrM))
   where
-    dataMemT mem (wr,rd,en,din) = (mem',dout)
+    dataMemT mem (rd,wrM) = (mem',dout)
       where
         dout = mem '!!' rd
-        mem' | en        = 'replace' wr din mem
-             | otherwise = mem
+        mem' = case wrM of
+                 Just (wr,din) -> 'replace' wr din mem
+                 _ -> mem
 @
 
 And then connect everything:
@@ -135,8 +133,8 @@ And then connect everything:
 system :: KnownNat n => Vec n Instruction -> Signal Value
 system instrs = memOut
   where
-    memOut = dataMem wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'CLaSH.Prelude.Mealy.mealyB' cpu ('replicate' d7 0) (memOut,instr)
+    memOut = dataMem rdAddr dout
+    (rdAddr,dout,ipntr) = 'CLaSH.Prelude.Mealy.mealyB' cpu ('replicate' d7 0) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -197,8 +195,8 @@ has the potential to be translated to a more efficient structure:
 system2 :: KnownNat n => Vec n Instruction -> Signal Value
 system2 instrs = memOut
   where
-    memOut = 'CLaSH.Prelude.RAM.asyncRam' d32 wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'mealyB' cpu ('replicate' d7 0) (memOut,instr)
+    memOut = 'CLaSH.Prelude.RAM.asyncRam' d32 rdAddr dout
+    (rdAddr,dout,ipntr) = 'mealyB' cpu ('replicate' d7 0) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -237,9 +235,9 @@ is loaded:
 cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
      -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
      -> ( (Vec 7 Value,Reg)
-        , (MemAddr,MemAddr,Bool,Value,InstrAddr)
+        , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
         )
-cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
+cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) '<$>' wrAddrM,fromIntegral ipntr))
   where
     -- Current instruction pointer
     ipntr = regbank '!!' PC
@@ -250,7 +248,7 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,a
       Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
       Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
       Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddr=a,wrEn=True}
+      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
       Nop                  -> nullCode
 
     -- ALU
@@ -278,8 +276,8 @@ We can now finally instantiate our system with a 'blockRam':
 system3 :: KnownNat n => Vec n Instruction -> Signal Value
 system3 instrs = memOut
   where
-    memOut = 'blockRam' (replicate d32 0) wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = 'mealyB' cpu2 (('replicate' d7 0),Zero) (memOut,instr)
+    memOut = 'blockRam' (replicate d32 0) rdAddr dout
+    (rdAddr,dout,ipntr) = 'mealyB' cpu2 (('replicate' d7 0),Zero) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -368,12 +366,13 @@ import Control.Monad.ST.Lazy  (ST,runST)
 import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
 import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
+import Data.Maybe             (fromJust, isJust)
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding (length)
 
 import CLaSH.Signal           (Signal, mux)
 import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
-import CLaSH.Signal.Bundle    (bundle)
+import CLaSH.Signal.Bundle    (bundle, unbundle)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, length, toList)
 import CLaSH.XException       (XException, errorX)
@@ -381,7 +380,7 @@ import CLaSH.XException       (XException, errorX)
 {- $setup
 >>> import CLaSH.Prelude as C
 >>> import qualified Data.List as L
->>> :set -XDataKinds -XRecordWildCards
+>>> :set -XDataKinds -XRecordWildCards -XTupleSections
 >>> type InstrAddr = Unsigned 8
 >>> type MemAddr = Unsigned 5
 >>> type Value = Signed 8
@@ -422,15 +421,14 @@ data MachCode
   , aluCode :: Operator
   , ldReg   :: Reg
   , rdAddr  :: MemAddr
-  , wrAddr  :: MemAddr
-  , wrEn    :: Bool
+  , wrAddrM :: Maybe MemAddr
   , jmpM    :: Maybe Value
   }
 :}
 
 >>> :{
 nullCode = MachCode { inputX = Zero, inputY = Zero, result = Zero, aluCode = Imm
-                    , ldReg = Zero, wrAddr = 0, rdAddr = 0, wrEn = False
+                    , ldReg = Zero, rdAddr = 0, wrAddrM = Nothing
                     , jmpM = Nothing
                     }
 :}
@@ -447,9 +445,9 @@ alu CmpGt x y = if x > y then 1 else 0
 cpu :: Vec 7 Value          -- ^ Register bank
     -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
     -> ( Vec 7 Value
-       , (MemAddr,MemAddr,Bool,Value,InstrAddr)
+       , (MemAddr,Maybe (MemAddr,Value),InstrAddr)
        )
-cpu regbank (memOut,instr) = (regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
+cpu regbank (memOut,instr) = (regbank',(rdAddr,(,aluOut) <$> wrAddrM,fromIntegral ipntr))
   where
     -- Current instruction pointer
     ipntr = regbank C.!! PC
@@ -459,7 +457,7 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral i
       Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
       Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
       Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddr=a,wrEn=True}
+      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
       Nop                  -> nullCode
     -- ALU
     regX   = regbank C.!! inputX
@@ -479,25 +477,24 @@ cpu regbank (memOut,instr) = (regbank',(rdAddr,wrAddr,wrEn,aluOut,fromIntegral i
 
 >>> :{
 dataMem :: Signal MemAddr
-        -> Signal MemAddr
-        -> Signal Bool
+        -> Signal (Maybe (MemAddr,Value))
         -> Signal Value
-        -> Signal Value
-dataMem wr rd en din = mealy dataMemT (C.replicate d32 0) (bundle (wr,rd,en,din))
+dataMem rd wrM = mealy dataMemT (C.replicate d32 0) (bundle (rd,wrM))
   where
-    dataMemT mem (wr,rd,en,din) = (mem',dout)
+    dataMemT mem (rd,wrM) = (mem',dout)
       where
         dout = mem C.!! rd
-        mem' | en        = replace wr din mem
-             | otherwise = mem
+        mem' = case wrM of
+                 Just (wr,din) -> replace wr din mem
+                 Nothing       -> mem
 :}
 
 >>> :{
 system :: KnownNat n => Vec n Instruction -> Signal Value
 system instrs = memOut
   where
-    memOut = dataMem wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
+    memOut = dataMem rdAddr dout
+    (rdAddr,dout,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
     instr  = asyncRom instrs <$> ipntr
 :}
 
@@ -537,8 +534,8 @@ prog = -- 0 := 4
 system2 :: KnownNat n => Vec n Instruction -> Signal Value
 system2 instrs = memOut
   where
-    memOut = asyncRam d32 wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
+    memOut = asyncRam d32 rdAddr dout
+    (rdAddr,dout,ipntr) = mealyB cpu (C.replicate d7 0) (memOut,instr)
     instr  = asyncRom instrs <$> ipntr
 :}
 
@@ -546,9 +543,9 @@ system2 instrs = memOut
 cpu2 :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
      -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
      -> ( (Vec 7 Value,Reg)
-        , (MemAddr,MemAddr,Bool,Value,InstrAddr)
+        , (MemAddr,Maybe (MemAddr,Value),InstrAddr)
         )
-cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,aluOut,fromIntegral ipntr))
+cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,(,aluOut) <$> wrAddrM,fromIntegral ipntr))
   where
     -- Current instruction pointer
     ipntr = regbank C.!! PC
@@ -558,7 +555,7 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,a
       Branch cr a          -> nullCode {inputX=cr,jmpM=Just a}
       Jump a               -> nullCode {aluCode=Incr,jmpM=Just a}
       Load a r             -> nullCode {ldReg=r,rdAddr=a}
-      Store r a            -> nullCode {inputX=r,wrAddr=a,wrEn=True}
+      Store r a            -> nullCode {inputX=r,wrAddrM=Just a}
       Nop                  -> nullCode
     -- ALU
     regX   = regbank C.!! inputX
@@ -581,8 +578,8 @@ cpu2 (regbank,ldRegD) (memOut,instr) = ((regbank',ldRegD'),(rdAddr,wrAddr,wrEn,a
 system3 :: KnownNat n => Vec n Instruction -> Signal Value
 system3 instrs = memOut
   where
-    memOut = blockRam (C.replicate d32 0) wrAddr rdAddr wrEn aluOut
-    (rdAddr,wrAddr,wrEn,aluOut,ipntr) = mealyB cpu2 ((C.replicate d7 0),Zero) (memOut,instr)
+    memOut = blockRam (C.replicate d32 0) rdAddr dout
+    (rdAddr,dout,ipntr) = mealyB cpu2 ((C.replicate d7 0),Zero) (memOut,instr)
     instr  = asyncRom instrs <$> ipntr
 :}
 
@@ -627,8 +624,9 @@ prog2 = -- 0 := 4
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- bram40 :: 'Signal' ('Unsigned' 6) -> Signal ('Unsigned' 6) -> 'Signal' Bool
---        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> Signal 'CLaSH.Sized.BitVector.Bit'
+-- bram40 :: 'Signal' ('Unsigned' 6)
+--        -> 'Signal' (Maybe ('Unsigned' 6, 'CLaSH.Sized.BitVector.Bit'))
+--        -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam' ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
 --
@@ -636,16 +634,15 @@ prog2 = -- 0 := 4
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) wr rd en dt@.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
 blockRam :: (KnownNat n, Enum addr)
          => Vec n a     -- ^ Initial content of the BRAM, also
                         -- determines the size, @n@, of the BRAM.
                         --
                         -- __NB__: __MUST__ be a constant.
-         -> Signal addr -- ^ Write address @w@
          -> Signal addr -- ^ Read address @r@
-         -> Signal Bool -- ^ Write enable
-         -> Signal a    -- ^ Value to write (at address @w@)
+         -> Signal (Maybe (addr, a))
+          -- ^ (write address @w@, value to write)
          -> Signal a
          -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
          -- cycle
@@ -658,8 +655,9 @@ blockRam = blockRam' systemClock
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- bram32 :: 'Signal' ('Unsigned' 5) -> Signal ('Unsigned' 5) -> 'Signal' Bool
---        -> 'Signal' 'CLaSH.Sized.BitVector.Bit' -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
+-- bram32 :: 'Signal' ('Unsigned' 5)
+--        -> 'Signal' (Maybe ('Unsigned' 5, 'CLaSH.Sized.BitVector.Bit'))
+--        -> 'Signal' 'CLaSH.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2' ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
 --
@@ -667,16 +665,15 @@ blockRam = blockRam' systemClock
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) wr rd en dt@.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRamPow2 inits) rd wrM@.
 blockRamPow2 :: KnownNat n
              => Vec (2^n) a         -- ^ Initial content of the BRAM, also
                                     -- determines the size, @2^n@, of the BRAM.
                                     --
                                     -- __NB__: __MUST__ be a constant.
-             -> Signal (Unsigned n) -- ^ Write address @w@
              -> Signal (Unsigned n) -- ^ Read address @r@
-             -> Signal Bool         -- ^ Write enable
-             -> Signal a            -- ^ Value to write (at address @w@)
+             -> Signal (Maybe (Unsigned n, a))
+             -- ^ (write address @w@, value to write)
              -> Signal a
              -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
              -- cycle
@@ -694,8 +691,9 @@ blockRamPow2 = blockRamPow2' systemClock
 -- clkA100 :: SClock ClkA
 -- clkA100 = 'CLaSH.Signal.Explicit.sclock'
 --
--- bram40 :: 'Signal'' ClkA ('Unsigned' 6) -> 'Signal'' ClkA ('Unsigned' 6)
---        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> ClkA 'Signal'' 'CLaSH.Sized.BitVector.Bit'
+-- bram40 :: 'Signal'' ClkA ('Unsigned' 6)
+--        -> 'Signal'' ClkA (Maybe ('Unsigned' 6, 'CLaSH.Sized.BitVector.Bit'))
+--        -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit'
 -- bram40 = 'blockRam'' clkA100 ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
 --
@@ -703,22 +701,25 @@ blockRamPow2 = blockRamPow2' systemClock
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRam' clk inits) wr rd en dt@.
+-- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRam' clk inits) rd wrM@.
 blockRam' :: (KnownNat n, Enum addr)
           => SClock clk       -- ^ 'Clock' to synchronize to
           -> Vec n a          -- ^ Initial content of the BRAM, also
                               -- determines the size, @n@, of the BRAM.
                               --
                               -- __NB__: __MUST__ be a constant.
-          -> Signal' clk addr -- ^ Write address @w@
           -> Signal' clk addr -- ^ Read address @r@
-          -> Signal' clk Bool -- ^ Write enable
-          -> Signal' clk a    -- ^ Value to write (at address @w@)
+          -> Signal' clk (Maybe (addr, a))
+          -- ^ (write address @w@, value to write)
           -> Signal' clk a
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
-                                               (fromEnum <$> rd) en din
+blockRam' clk content rd wrM =
+  blockRam# clk content
+            (fromEnum <$> rd)
+            (isJust <$> wrM)
+            ((fromEnum . fst . fromJust) <$> wrM)
+            ((snd . fromJust) <$> wrM)
 
 {-# INLINE blockRamPow2' #-}
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -732,8 +733,9 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 -- clkA100 :: SClock ClkA
 -- clkA100 = 'CLaSH.Signal.Explicit.sclock'
 --
--- bram32 :: 'Signal'' ClkA ('Unsigned' 5) -> Signal' ClkA ('Unsigned' 5)
---        -> 'Signal'' ClkA Bool -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit' -> Signal' ClkA 'CLaSH.Sized.BitVector.Bit'
+-- bram32 :: 'Signal'' ClkA ('Unsigned' 5)
+--        -> 'Signal'' ClkA (Maybe ('Unsigned' 5, 'CLaSH.Sized.BitVector.Bit'))
+--        -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit'
 -- bram32 = 'blockRamPow2'' clkA100 ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
 --
@@ -741,7 +743,7 @@ blockRam' clk content wr rd en din = blockRam# clk content (fromEnum <$> wr)
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) wr rd en dt@.
+-- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) rd wrM@.
 blockRamPow2' :: KnownNat n
               => SClock clk               -- ^ 'Clock' to synchronize to
               -> Vec (2^n) a              -- ^ Initial content of the BRAM, also
@@ -749,10 +751,9 @@ blockRamPow2' :: KnownNat n
                                           -- the BRAM.
                                           --
                                           -- __NB__: __MUST__ be a constant.
-              -> Signal' clk (Unsigned n) -- ^ Write address @w@
               -> Signal' clk (Unsigned n) -- ^ Read address @r@
-              -> Signal' clk Bool         -- ^ Write enable
-              -> Signal' clk a            -- ^ Value to write (at address @w@)
+              -> Signal' clk (Maybe (Unsigned n, a))
+              -- ^ (Write address @w@, value to write)
               -> Signal' clk a
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
@@ -766,22 +767,22 @@ blockRam# :: KnownNat n
                               -- determines the size, @n@, of the BRAM.
                               --
                               -- __NB__: __MUST__ be a constant.
-          -> Signal' clk Int  -- ^ Write address @w@
           -> Signal' clk Int  -- ^ Read address @r@
           -> Signal' clk Bool -- ^ Write enable
+          -> Signal' clk Int  -- ^ Write address @w@
           -> Signal' clk a    -- ^ Value to write (at address @w@)
           -> Signal' clk a
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam# clk content wr rd en din = register' clk (errorX "blockRam#: intial value undefined") dout
+blockRam# clk content rd en wr din = register' clk (errorX "blockRam#: intial value undefined") dout
   where
     szI  = length content
     dout = runST $ do
       arr <- newListArray (0,szI-1) (toList content)
-      traverse (ramT arr) (bundle (wr,rd,en,din))
+      traverse (ramT arr) (bundle (rd,en,wr,din))
 
-    ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
-    ramT ram (w,r,e,d) = do
+    ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
+    ramT ram (r,e,w,d) = do
       -- reading from address using an 'X' exception results in an 'X' result
       r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
                                 (\(err :: XException) -> return (Left (throw err))))
@@ -794,11 +795,21 @@ blockRam# clk content wr rd en din = register' clk (errorX "blockRam#: intial va
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronised to specified clock)
 --
-readNew' :: Eq addr => SClock clk -> (Signal' clk addr -> Signal' clk addr -> Signal' clk Bool -> Signal' clk a -> Signal' clk a) -> Signal' clk addr -> Signal' clk addr -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
-readNew' clk ram wrAddr rdAddr wrEn wrData = mux wasSame wasWritten $ ram wrAddr rdAddr wrEn wrData
-  where sameAddr = (==) <$> wrAddr <*> rdAddr
-        wasSame = register' clk False ((&&) <$> wrEn <*> sameAddr)
-        wasWritten = register' clk (errorX "readNew'#: initial 'wasWritten' value undefined") wrData
+readNew' :: Eq addr
+         => SClock clk
+         -> (Signal' clk addr -> Signal' clk (Maybe (addr, a)) -> Signal' clk a)
+         -- ^ The @ram@ component
+         -> Signal' clk addr              -- ^ Read address @r@
+         -> Signal' clk (Maybe (addr, a)) -- ^ (Write address @w@, value to write)
+         -> Signal' clk a
+         -- ^ Value of the @ram@ at address @r@ from the previous clock
+         -- cycle
+readNew' clk ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
+  where readNewT rd (Just (wr, wrdata)) = (wr == rd, wrdata)
+        readNewT _  Nothing             = (False   , undefined)
+
+        (wasSame,wasWritten) = unbundle (register' clk (False,undefined)
+                                                       (readNewT <$> rdAddr <*> wrM))
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronised to system clock)
 --
@@ -806,6 +817,13 @@ readNew' clk ram wrAddr rdAddr wrEn wrData = mux wasSame wasWritten $ ram wrAddr
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))
 -- readNew (blockRam (0 :> 1 :> Nil))
 --   :: (Num a, Eq addr, Enum addr) =>
---      Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a
-readNew :: Eq addr => (Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a) -> Signal addr -> Signal addr -> Signal Bool -> Signal a -> Signal a
+--      Signal addr -> Signal (Maybe (addr, a)) -> Signal a
+readNew :: Eq addr
+        => (Signal addr -> Signal (Maybe (addr, a)) -> Signal a)
+        -- ^ The @ram@ component
+        -> Signal addr              -- ^ Read address @r@
+        -> Signal (Maybe (addr, a)) -- ^ (Write address @w@, value to write)
+        -> Signal a
+        -- ^ Value of the @ram@ at address @r@ from the previous clock
+        -- cycle
 readNew = readNew' systemClock
