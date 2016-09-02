@@ -93,7 +93,7 @@ import GHC.TypeLits                (KnownNat)
 import System.IO.Unsafe            (unsafePerformIO)
 
 import CLaSH.Prelude.BlockRam.File (initMem)
-import CLaSH.Promoted.Nat          (SNat (..), pow2SNat, snatToInteger)
+import CLaSH.Promoted.Nat          (SNat (..), pow2SNat, snatToNum)
 import CLaSH.Sized.BitVector       (BitVector)
 import CLaSH.Signal                (Signal)
 import CLaSH.Signal.Explicit       (Signal', SClock, register', systemClock)
@@ -166,7 +166,7 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- >   where
 -- >     mem = unsafePerformIO (initMem file)
 -- >     content = listArray (0,szI-1) mem
--- >     szI     = fromInteger (snatToInteger sz)
+-- >     szI     = snatToNum sz
 --
 -- We write:
 --
@@ -174,7 +174,7 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- >   where
 -- >     mem     = unsafePerformIO (initMem file)
 -- >     content = listArray (0,szI-1) mem
--- >     szI     = fromInteger (snatToInteger sz)
+-- >     szI     = snatToNum sz
 --
 -- Where instead of returning the BitVector defined by @(content ! rd)@, we
 -- return the function (thunk) @(content !)@.
@@ -232,7 +232,7 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
   where                             -- Note [Eta-reduction and unsafePerformIO initMem]
     mem     = unsafePerformIO (initMem file)
     content = listArray (0,szI-1) mem
-    szI     = fromInteger (snatToInteger sz)
+    szI     = snatToNum sz
 
 {-# INLINE romFile #-}
 -- | A ROM with a synchronous read port, with space for @n@ elements
@@ -379,4 +379,4 @@ romFile# clk sz file rd = register' clk (errorX "romFile#: initial value undefin
   where
     mem     = unsafePerformIO (initMem file)
     content = listArray (0,szI-1) mem
-    szI     = fromInteger (snatToInteger sz)
+    szI     = snatToNum sz

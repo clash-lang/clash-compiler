@@ -24,7 +24,7 @@ module CLaSH.Promoted.Nat
   , withSNat
   , snat
     -- ** Conversion
-  , snatToInteger
+  , snatToInteger, snatToNum
     -- ** Arithmetic
   , addSNat, mulSNat, powSNat
     -- *** Partial
@@ -103,6 +103,11 @@ withSNat f = f SNat
 -- | Reify the type-level 'Nat' @n@ to it's term-level 'Integer' representation.
 snatToInteger :: SNat n -> Integer
 snatToInteger p@SNat = natVal p
+
+-- | Reify the type-level 'Nat' @n@ to it's term-level 'Num'ber.
+snatToNum :: Num a => SNat n -> a
+snatToNum p@SNat = fromInteger (natVal p)
+{-# INLINE snatToNum #-}
 
 -- | Unary representation of a type-level natural
 --

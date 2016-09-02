@@ -37,7 +37,7 @@ where
 import Data.Maybe             (isJust, fromJust)
 import GHC.TypeLits           (KnownNat, KnownSymbol)
 
-import CLaSH.Promoted.Nat     (SNat (..), snatToInteger)
+import CLaSH.Promoted.Nat     (SNat (..), snatToNum)
 import CLaSH.Promoted.Symbol  (SSymbol (..))
 import CLaSH.Signal.Internal  (Signal' (..), Clock (..), SClock (..), register#,
                                regEn#)
@@ -243,8 +243,8 @@ unsafeSynchronizer :: SClock clk1 -- ^ 'Clock' of the incoming signal
                    -> Signal' clk2 a
 unsafeSynchronizer (SClock _ period1) (SClock _ period2) s = s'
   where
-    t1    = fromInteger (snatToInteger period1)
-    t2    = fromInteger (snatToInteger period2)
+    t1    = snatToNum period1
+    t2    = snatToNum period2
     s' | t1 < t2   = compress   t2 t1 s
        | t1 > t2   = oversample t1 t2 s
        | otherwise = same s

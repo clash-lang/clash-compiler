@@ -43,7 +43,7 @@ import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
 import Data.Array.ST.Safe     (STArray)
 import GHC.TypeLits           (KnownNat)
 
-import CLaSH.Promoted.Nat     (SNat (..), snatToInteger, pow2SNat)
+import CLaSH.Promoted.Nat     (SNat (..), snatToNum, pow2SNat)
 import CLaSH.Signal           (Signal)
 import CLaSH.Signal.Bundle    (bundle)
 import CLaSH.Signal.Explicit  (Signal', SClock, systemClock, unsafeSynchronizer)
@@ -146,7 +146,7 @@ asyncRam# :: SClock wclk       -- ^ 'Clock' to which to synchronise the write
           -> Signal' rclk a    -- ^ Value of the @RAM@ at address @r@
 asyncRam# wclk rclk sz wr rd en din = unsafeSynchronizer wclk rclk dout
   where
-    szI  = fromInteger $ snatToInteger sz
+    szI  = snatToNum sz
     rd'  = unsafeSynchronizer rclk wclk rd
     dout = runST $ do
       arr <- newListArray (0,szI-1) (replicate szI (errorX "asyncRam#: initial value undefined"))

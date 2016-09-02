@@ -122,7 +122,7 @@ import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
 import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
-import CLaSH.Promoted.Nat         (SNat, snatToInteger)
+import CLaSH.Promoted.Nat         (SNat, snatToInteger, snatToNum)
 import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
 import {-# SOURCE #-} qualified CLaSH.Sized.Vector         as V
@@ -452,7 +452,7 @@ slice# :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
 slice# (BV i) m n = BV (shiftR (i .&. mask) n')
   where
     m' = snatToInteger m
-    n' = fromInteger (snatToInteger n)
+    n' = snatToNum n
 
     mask = 2 ^ (m' + 1) - 1
 

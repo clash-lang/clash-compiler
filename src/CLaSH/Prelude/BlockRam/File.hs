@@ -98,7 +98,7 @@ import Data.Maybe                   (listToMaybe)
 import GHC.TypeLits                 (KnownNat)
 import Numeric                      (readInt)
 
-import CLaSH.Promoted.Nat    (SNat (..), pow2SNat, snatToInteger)
+import CLaSH.Promoted.Nat    (SNat (..), pow2SNat, snatToNum)
 import CLaSH.Sized.BitVector (BitVector)
 import CLaSH.Signal          (Signal)
 import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
@@ -285,7 +285,7 @@ blockRamFile# :: KnownNat m
               -- clock cycle
 blockRamFile# clk sz file wr rd en din = register' clk (errorX "blockRamFile#: intial value undefined") dout
   where
-    szI  = fromInteger $ snatToInteger sz
+    szI  = snatToNum sz
     dout = runST $ do
       mem <- unsafeIOToST (initMem file)
       arr <- newListArray (0,szI-1) mem
