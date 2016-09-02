@@ -40,6 +40,7 @@ import CLaSH.Signal.Explicit  (Signal', SClock, systemClock)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Signal.Explicit  (register')
 import CLaSH.Sized.Vector     (Vec, length, toList)
+import CLaSH.XException       (errorX)
 
 {-# INLINE asyncRom #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
@@ -169,7 +170,7 @@ rom# :: KnownNat n
      -> Signal' clk Int -- ^ Read address @rd@
      -> Signal' clk a
      -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-rom# clk content rd = register' clk undefined ((arr !) <$> rd)
+rom# clk content rd = register' clk (errorX "rom#: initial value undefined") ((arr !) <$> rd)
   where
     szI = length content
     arr = listArray (0,szI-1) (toList content)

@@ -98,6 +98,7 @@ import CLaSH.Sized.BitVector       (BitVector)
 import CLaSH.Signal                (Signal)
 import CLaSH.Signal.Explicit       (Signal', SClock, register', systemClock)
 import CLaSH.Sized.Unsigned        (Unsigned)
+import CLaSH.XException            (errorX)
 
 {-# INLINE asyncRomFile #-}
 -- | An asynchronous/combinational ROM with space for @n@ elements
@@ -374,7 +375,7 @@ romFile# :: KnownNat m
          -> Signal' clk Int           -- ^ Read address @rd@
          -> Signal' clk (BitVector m)
          -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFile# clk sz file rd = register' clk undefined ((content !) <$> rd)
+romFile# clk sz file rd = register' clk (errorX "romFile#: initial value undefined") ((content !) <$> rd)
   where
     mem     = unsafePerformIO (initMem file)
     content = listArray (0,szI-1) mem

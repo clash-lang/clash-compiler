@@ -798,7 +798,7 @@ readNew' :: Eq addr => SClock clk -> (Signal' clk addr -> Signal' clk addr -> Si
 readNew' clk ram wrAddr rdAddr wrEn wrData = mux wasSame wasWritten $ ram wrAddr rdAddr wrEn wrData
   where sameAddr = (==) <$> wrAddr <*> rdAddr
         wasSame = register' clk False ((&&) <$> wrEn <*> sameAddr)
-        wasWritten = register' clk undefined wrData
+        wasWritten = register' clk (errorX "readNew'#: initial 'wasWritten' value undefined") wrData
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronised to system clock)
 --
