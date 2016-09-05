@@ -4,9 +4,9 @@
 "blockRam# :: KnownNat n       -- ARG[0]
            => SClock clk       -- clk,  ARG[1]
            -> Vec n a          -- init, ARG[2]
-           -> Signal' clk Int  -- wr,   ARG[3]
-           -> Signal' clk Int  -- rd,   ARG[4]
-           -> Signal' clk Bool -- wren, ARG[5]
+           -> Signal' clk Int  -- rd,   ARG[3]
+           -> Signal' clk Bool -- wren, ARG[4]
+           -> Signal' clk Int  -- wr,   ARG[5]
            -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
@@ -24,10 +24,10 @@ initial begin
 end
 
 always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][4]
-  if (~ARG[5]) begin
-    ~SYM[0][~ARG[3]] <= ~ARG[6];
+  if (~ARG[4]) begin
+    ~SYM[0][~ARG[5]] <= ~ARG[6];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[3]];
 end
 
 assign ~RESULT = ~SYM[1];

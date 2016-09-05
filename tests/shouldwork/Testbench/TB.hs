@@ -15,12 +15,12 @@ transfer s i = (i,o)
 initS = (0,(Nothing,0))
 
 testInput :: Signal Inp
-testInput = stimuliGenerator $(v ([ (1,(Just (4,True), 0))
+testInput = stimuliGenerator $(listToVecTH ([ (1,(Just (4,True), 0))
                                   , (3,(Nothing, 1))
                                   ]::[(Signed 4,(Maybe (Signed 8,Bool),Bit))]))
 
 expectedOutput :: Signal Outp -> Signal Bool
-expectedOutput = outputVerifier $(v ([(Nothing,0)
+expectedOutput = outputVerifier $(listToVecTH ([(Nothing,0)
                                       ,(Just (4,True), 0)
                                       ]::[(Maybe (Signed 8,Bool),Bit)]))
 

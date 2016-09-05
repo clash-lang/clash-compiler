@@ -12,7 +12,7 @@ type Din     = Vec 8 (MbWord3)
 type Dout    = Vec 8 Word3
 
 din :: Din
-din = $(v [ Nothing :: Maybe (Unsigned 3), Just 1, Nothing, Nothing, Just 4, Nothing, Just 6, Just 7 ])
+din = $(listToVecTH [ Nothing :: Maybe (Unsigned 3), Just 1, Nothing, Nothing, Just 4, Nothing, Just 6, Just 7 ])
 
 dout0 :: Dout
 dout0 = 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil :: Dout

@@ -22,8 +22,8 @@ topEntity = fmap unpack . crc32
 
 -- test bench
 testInput :: Signal (BitVector 8)
-testInput = stimuliGenerator $(v (L.map (fromIntegral . ord) "CLaSH" :: [BitVector 8]))
+testInput = stimuliGenerator $(listToVecTH (L.map (fromIntegral . ord) "CLaSH" :: [BitVector 8]))
 
 expectedOutput :: Signal (Unsigned 32) -> Signal Bool
-expectedOutput = outputVerifier $(v [0 :: Unsigned 32,3523407757,2920022741
-                                    ,1535101039,903986498,3095867074,3755410077])
+expectedOutput = outputVerifier (0 :> 3523407757 :> 2920022741 :> 1535101039 :>
+                                 903986498 :> 3095867074 :> 3755410077 :> Nil)

@@ -5,9 +5,9 @@
                => SClock clk                 -- clk,  ARG[1]
                -> SNat n                     -- sz,   ARG[2]
                -> FilePath                   -- file, ARG[3]
-               -> Signal' clk Int            -- wr,   ARG[4]
-               -> Signal' clk Int            -- rd,   ARG[5]
-               -> Signal' clk Bool           -- wren, ARG[6]
+               -> Signal' clk Int            -- rd,   ARG[4]
+               -> Signal' clk Bool           -- wren, ARG[5]
+               -> Signal' clk Int            -- wr,   ARG[6]
                -> Signal' clk (BitVector m)  -- din,  ARG[7]
                -> Signal' clk (BitVector m)"
     , "templateD" :
@@ -20,10 +20,10 @@ initial begin
 end
 
 always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRamFile][2]
-  if (~ARG[7]) begin
-    ~SYM[0][~ARG[4]] <= ~ARG[7];
+  if (~ARG[5]) begin
+    ~SYM[0][~ARG[6]] <= ~ARG[7];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[6]];
+  ~SYM[1] <= ~SYM[0][~ARG[4]];
 end
 
 assign ~RESULT = ~SYM[1];

@@ -55,10 +55,10 @@ topEntity (i,s) = bundle $ busSwitch1 v i s where
     f xK = fmap (fmap xK)
 
 
-testInput = stimuliGenerator $(v ([(a,Just b) | b <- [1,2,3,4],  a <- [0,1,2,3]] :: [(Index 4, Maybe (Signed 5))]))
+testInput = stimuliGenerator $(listToVecTH ([(a,Just b) | b <- [1,2,3,4],  a <- [0,1,2,3]] :: [(Index 4, Maybe (Signed 5))]))
 
-expectedOutput = outputVerifier $(v [$(v [Just 2 :: Maybe (Signed 5),Nothing,Nothing,Nothing])
-                                    ,$(v [Nothing :: Maybe (Signed 5),Just 2,Nothing,Nothing])
-                                    ,$(v [Nothing :: Maybe (Signed 5),Nothing,Just 0,Nothing])
-                                    ,$(v [Nothing :: Maybe (Signed 5),Nothing,Nothing,Just (-1)])
-                                    ])
+expectedOutput = outputVerifier $(listToVecTH [$(listToVecTH [Just 2 :: Maybe (Signed 5),Nothing,Nothing,Nothing])
+                                              ,$(listToVecTH [Nothing :: Maybe (Signed 5),Just 2,Nothing,Nothing])
+                                              ,$(listToVecTH [Nothing :: Maybe (Signed 5),Nothing,Just 0,Nothing])
+                                              ,$(listToVecTH [Nothing :: Maybe (Signed 5),Nothing,Nothing,Just (-1)])
+                                              ])

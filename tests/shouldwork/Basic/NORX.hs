@@ -47,10 +47,10 @@ topEntity :: Vec 16 W -> Vec 16 W
 topEntity = norx
 
 testInput :: Signal (Vec 16 (Unsigned 32))
-testInput = stimuliGenerator $(v [ (0 :: Unsigned 32):>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil ] )
+testInput = stimuliGenerator ((0:>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil):>Nil)
 
 expectedOutput :: Signal (Vec 16 (Unsigned 32)) -> Signal Bool
-expectedOutput = outputVerifier $(v [ (0x99a0283a :: Unsigned 32)
+expectedOutput = outputVerifier   ((   0x99a0283a
                                     :> 0x16c4b42e
                                     :> 0x6e7fa00b
                                     :> 0x7d075c66
@@ -66,4 +66,4 @@ expectedOutput = outputVerifier $(v [ (0x99a0283a :: Unsigned 32)
                                     :> 0x078203d3
                                     :> 0x9b3c0701
                                     :> 0x9ce6be37
-                                    :> Nil ])
+                                    :> Nil) :> Nil)

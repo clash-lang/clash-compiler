@@ -40,7 +40,7 @@ topEntity i = val
     initMem    = replicate (SNat :: SNat 8) 0
 
 testInput :: Signal (OPC Word)
-testInput = stimuliGenerator $(v [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
+testInput = stimuliGenerator $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
 
 expectedOutput :: Signal (Maybe Word) -> Signal Bool
-expectedOutput = outputVerifier $(v [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
+expectedOutput = outputVerifier $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])

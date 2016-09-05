@@ -5,9 +5,9 @@
                => SClock clk                -- clk,  ARG[1]
                -> SNat n                    -- sz,   ARG[2]
                -> FilePath                  -- file, ARG[3]
-               -> Signal' clk Int           -- wr,   ARG[4]
-               -> Signal' clk Int           -- rd,   ARG[5]
-               -> Signal' clk Bool          -- wren, ARG[6]
+               -> Signal' clk Int           -- rd,   ARG[4]
+               -> Signal' clk Bool          -- wren, ARG[5]
+               -> Signal' clk Int           -- wr,   ARG[6]
                -> Signal' clk (BitVector m) -- din,  ARG[7]
                -> Signal' clk (BitVector m)"
     , "templateD" :
@@ -29,8 +29,8 @@
 
   signal ~GENSYM[RAM][2] : ~SYM[6](0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
   signal ~GENSYM[dout][3] : ~TYP[7];
-  signal ~GENSYM[wr][4] : integer range 0 to ~LIT[2]-1;
-  signal ~GENSYM[rd][5] : integer range 0 to ~LIT[2]-1;
+  signal ~GENSYM[rd][4] : integer range 0 to ~LIT[2]-1;
+  signal ~GENSYM[wr][5] : integer range 0 to ~LIT[2]-1;
 begin
   ~SYM[4] <= to_integer(~ARG[4])
   -- pragma translate_off
@@ -38,7 +38,7 @@ begin
   -- pragma translate_on
                 ;
 
-  ~SYM[5] <= to_integer(~ARG[5])
+  ~SYM[5] <= to_integer(~ARG[6])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
@@ -47,10 +47,10 @@ begin
   ~GENSYM[blockRamFile_sync][7] : process(~CLK[1])
   begin
     if (rising_edge(~CLK[1])) then
-      if ~ARG[6] then
-        ~SYM[2](~SYM[4]) <= to_bitvector(~ARG[7]);
+      if ~ARG[5] then
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[7]);
       end if;
-      ~SYM[3] <= to_stdlogicvector(~SYM[2](~SYM[5]));
+      ~SYM[3] <= to_stdlogicvector(~SYM[2](~SYM[4]));
     end if;
   end process;
 

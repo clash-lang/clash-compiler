@@ -19,7 +19,7 @@ topEntity :: BitVector 16 -> Index 17
 topEntity = populationCount
 
 testInput :: Signal (BitVector 16)
-testInput = stimuliGenerator $(v ([0..20]::[BitVector 16]))
+testInput = stimuliGenerator $(listToVecTH ([0..20]::[BitVector 16]))
 
 expectedOutput :: Signal (Index 17) -> Signal Bool
-expectedOutput = outputVerifier $(v ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))
+expectedOutput = outputVerifier $(listToVecTH ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))

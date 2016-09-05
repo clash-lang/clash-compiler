@@ -4,9 +4,9 @@
 "blockRam# :: KnownNat n       -- ARG[0]
            => SClock clk       -- clk,  ARG[1]
            -> Vec n a          -- init, ARG[2]
-           -> Signal' clk Int  -- wr,   ARG[3]
-           -> Signal' clk Int  -- rd,   ARG[4]
-           -> Signal' clk Bool -- wren, ARG[5]
+           -> Signal' clk Int  -- rd,   ARG[3]
+           -> Signal' clk Bool -- wren, ARG[4]
+           -> Signal' clk Int  -- wr,   ARG[5]
            -> Signal' clk a    -- din,  ARG[6]
            -> Signal' clk a"
     , "templateD" :
@@ -15,8 +15,8 @@
   signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
   signal ~GENSYM[dout][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
   signal ~SYM[2] : ~TYP[6];~FI
-  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[0] - 1;
-  signal ~GENSYM[rd][4] : integer range 0 to ~LIT[0] - 1;
+  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[0] - 1;
+  signal ~GENSYM[wr][4] : integer range 0 to ~LIT[0] - 1;
 begin
   ~SYM[3] <= to_integer(~ARG[3])
   -- pragma translate_off
@@ -24,7 +24,7 @@ begin
   -- pragma translate_on
                 ;
 
-  ~SYM[4] <= to_integer(~ARG[4])
+  ~SYM[4] <= to_integer(~ARG[5])
   -- pragma translate_off
                 mod ~LIT[0]
   -- pragma translate_on
@@ -33,11 +33,11 @@ begin
   ~GENSYM[blockRam_sync][5] : process(~CLK[1])
   begin
     if rising_edge(~CLK[1]) then
-      if ~ARG[5] then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
-        ~SYM[1](~SYM[3]) <= ~ARG[6];~FI
+      if ~ARG[4] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
+        ~SYM[1](~SYM[4]) <= ~ARG[6];~FI
       end if;
-      ~SYM[2] <= ~SYM[1](~SYM[4]);
+      ~SYM[2] <= ~SYM[1](~SYM[3]);
     end if;
   end process;~IF ~VIVADO ~THEN
   ~RESULT <= ~FROMBV[~SYM[2]][~TYPO];~ELSE

@@ -3,12 +3,13 @@ module TestMap
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
+import CLaSH.Signal.Internal (regEn#)
 
 type System50 = Clk "system" 72
 system50 :: SClock System50
 system50 = sclock
 type Sig1 = Signal' System50
-regEn1 = regEn' system50
+regEn1 = regEn# system50
 
 type Word1 = Signed 18 -- SFixed 9 9
 type RomFunction = (Unsigned 9 -> Word1)

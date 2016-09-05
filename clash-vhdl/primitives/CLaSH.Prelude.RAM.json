@@ -4,9 +4,9 @@
 "asyncRam# :: SClock wclk       -- ^ wclk, ARG[0]
            -> SClock rclk       -- ^ rclk, ARG[1]
            -> SNat n            -- ^ sz,   ARG[2]
-           -> Signal' wclk Int  -- ^ wr,   ARG[3]
-           -> Signal' rclk Int  -- ^ rd,   ARG[4]
-           -> Signal' wclk Bool -- ^ en,   ARG[5]
+           -> Signal' rclk Int  -- ^ rd,   ARG[3]
+           -> Signal' wclk Bool -- ^ en,   ARG[4]
+           -> Signal' wclk Int  -- ^ wr,   ARG[5]
            -> Signal' wclk a    -- ^ din,  ARG[6]
            -> Signal' rclk a"
     , "templateD" :
@@ -15,8 +15,8 @@
   type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
   type ~SYM[4] is array(natural range <>) of ~TYP[6];~FI
   signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[2]-1);
-  signal ~GENSYM[wr][2] : integer range 0 to ~LIT[2] - 1;
-  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2] - 1;
+  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[2] - 1;
+  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[2] - 1;
 begin
   ~SYM[2] <= to_integer(~ARG[3])
   -- pragma translate_off
@@ -24,7 +24,7 @@ begin
   -- pragma translate_on
                 ;
 
-  ~SYM[3] <= to_integer(~ARG[4])
+  ~SYM[3] <= to_integer(~ARG[5])
   -- pragma translate_off
                 mod ~LIT[2]
   -- pragma translate_on
@@ -33,14 +33,14 @@ begin
   ~GENSYM[asyncRam_sync][5] : process(~CLK[0])
   begin
     if rising_edge(~CLK[0]) then
-      if ~ARG[5] then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[2]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
-        ~SYM[1](~SYM[2]) <= ~ARG[6];~FI
+      if ~ARG[4] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
+        ~SYM[1](~SYM[3]) <= ~ARG[6];~FI
       end if;
     end if;
   end process;~IF ~VIVADO ~THEN
-  ~RESULT <= ~FROMBV[~SYM[1](~SYM[3])][~TYP[6]];~ELSE
-  ~RESULT <= ~SYM[1](~SYM[3]);~FI
+  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[6]];~ELSE
+  ~RESULT <= ~SYM[1](~SYM[2]);~FI
 end block;
 -- asyncRam end"
     }

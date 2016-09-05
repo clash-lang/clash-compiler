@@ -4,9 +4,9 @@
 "asyncRam# :: SClock wclk       -- ^ wclk, ARG[0]
            -> SClock rclk       -- ^ rclk, ARG[1]
            -> SNat n            -- ^ sz,   ARG[2]
-           -> Signal' wclk Int  -- ^ wr,   ARG[3]
-           -> Signal' rclk Int  -- ^ rd,   ARG[4]
-           -> Signal' wclk Bool -- ^ en,   ARG[5]
+           -> Signal' rclk Int  -- ^ rd,   ARG[3]
+           -> Signal' wclk Bool -- ^ en,   ARG[4]
+           -> Signal' wclk Int  -- ^ wr,   ARG[5]
            -> Signal' wclk a    -- ^ din,  ARG[6]
            -> Signal' rclk a"
     , "templateD" :
@@ -14,12 +14,12 @@
 logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[RAM][0] [0:~LIT[2]-1];
 
 always @(posedge ~CLK[0]) begin : ~GENSYM[~COMPNAME_Ram][1]
-  if (~ARG[5]) begin
-    ~SYM[0][~ARG[3]] <= ~TOBV[~ARG[6]][~TYP[6]];
+  if (~ARG[4]) begin
+    ~SYM[0][~ARG[5]] <= ~TOBV[~ARG[6]][~TYP[6]];
   end
 end
 
-assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[4]\\]][~TYPO];
+assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[3]\\]][~TYPO];
 // asyncRam end"
     }
   }
