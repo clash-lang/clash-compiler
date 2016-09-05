@@ -1985,7 +1985,7 @@ instance (KnownNat n, Arbitrary a) => Arbitrary (Vec n a) where
 instance CoArbitrary a => CoArbitrary (Vec n a) where
   coarbitrary = coarbitrary . toList
 
-type instance Lens.Index   (Vec n a) = Int
+type instance Lens.Index   (Vec n a) = Index n
 type instance Lens.IxValue (Vec n a) = a
 instance KnownNat n => Lens.Ixed (Vec n a) where
-  ix i f xs = replace_int xs i <$> f (index_int xs i)
+  ix i f xs = replace_int xs (fromEnum i) <$> f (index_int xs (fromEnum i))

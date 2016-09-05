@@ -24,6 +24,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module CLaSH.Sized.Internal.Index
   ( -- * Datatypes
     Index (..)
+    -- * Construction
+  , fromSNat
     -- * Type classes
     -- ** BitConvert
   , pack#
@@ -68,8 +70,8 @@ import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
-import GHC.TypeLits               (KnownNat, Nat, type (+), type (-), type (*),
-                                   type (<=), type (^), natVal)
+import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
+                                   type (*), type (<=), type (^), natVal)
 import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
@@ -80,6 +82,7 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (BV))
+import CLaSH.Promoted.Nat         (SNat, snatToNum)
 import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
@@ -121,6 +124,10 @@ instance KnownNat n => BitPack (Index n) where
   type BitSize (Index n) = CLog 2 n
   pack   = pack#
   unpack = unpack#
+
+-- | Safely convert an `SNat` value to an `Index`
+fromSNat :: (KnownNat m, CmpNat n m ~ 'LT) => SNat n -> Index m
+fromSNat = snatToNum
 
 {-# NOINLINE pack# #-}
 pack# :: Index n -> BitVector (CLog 2 n)
