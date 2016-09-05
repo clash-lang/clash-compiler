@@ -9,6 +9,7 @@
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE ViewPatterns          #-}
@@ -51,7 +52,10 @@ import           Control.DeepSeq                         as DS
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.Maybe                              (isJust, mapMaybe)
+import           GHC.Base                                (isTrue#,(==#))
 import           GHC.Generics                            (Generic(..))
+import           GHC.Integer                             (smallInteger)
+import           GHC.Integer.Logarithms                  (integerLogBase#)
 import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           Subst(..),SubstName(..),
                                                           acompare,aeq,bind,embed,
@@ -406,14 +410,37 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
     in  if i1 <= i2 then Just (mkTyConApp trueTc [] )
                     else Just (mkTyConApp falseTc [])
 
+  | name2String tc == "GHC.TypeLits.Extra.FLog"
+  , [i1, i2] <- mapMaybe (litView tcm) tys
+  , i1 > 1
+  , i2 > 0
+  = Just (LitTy (NumTy (smallInteger (integerLogBase# i1 i2))))
+
   | name2String tc == "GHC.TypeLits.Extra.CLog"
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , Just k <- clogBase i1 i2
   = Just (LitTy (NumTy (toInteger k)))
 
+  | name2String tc == "GHC.TypeLits.Extra.Log"
+  , [i1, i2] <- mapMaybe (litView tcm) tys
+  , i1 > 1
+  , i2 > 0
+  = if i2 == 1
+       then Just (LitTy (NumTy 0))
+       else let z1 = integerLogBase# i1 i2
+                z2 = integerLogBase# i1 (i2-1)
+            in  if isTrue# (z1 ==# z2)
+                   then Nothing
+                   else Just (LitTy (NumTy (smallInteger z1)))
+
+
   | name2String tc == "GHC.TypeLits.Extra.GCD"
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 `gcd` i2)))
+
+  | name2String tc == "GHC.TypeLits.Extra.LCM"
+  , [i1, i2] <- mapMaybe (litView tcm) tys
+  = Just (LitTy (NumTy (i1 `lcm` i2)))
 
   | Just (FunTyCon {tyConSubst = tcSubst}) <- HashMap.lookup tc tcm
   = findFunSubst tcm tcSubst tys
