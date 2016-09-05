@@ -371,13 +371,6 @@ renderTag b (IndexType (L n)) =
       let hty = Index (fromInteger n')
       in  fmap (displayT . renderOneLine) (hdlType hty)
     x -> error $ $(curLoc) ++ "Index type not given a literal: " ++ show x
-renderTag _ (IF _ _ _)      = error $ $(curLoc) ++ "Unexpected IF"
-renderTag _ (D _)           = error $ $(curLoc) ++ "Unexpected component declaration"
-renderTag _ (SigD _ _)      = error $ $(curLoc) ++ "Unexpected signal declaration"
-renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
-renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
-renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
-renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
 renderTag b (FilePath e)    = case e of
   L n -> do
     let (s,_,_) = bbInputs b !! n
@@ -390,12 +383,8 @@ renderTag b (FilePath e)    = case e of
       _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- prettyElem e
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
-renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"
-renderTag _ (HdlSyn s)      = error $ $(curLoc) ++ "Unexpected ~" ++ show s
-renderTag _ (IsLit _)       = error $ $(curLoc) ++ "Unexpected ~ISLIT"
-renderTag _ (IsVar _)       = error $ $(curLoc) ++ "Unexpected ~ISVAR"
-renderTag _ (GenSym _ _)    = error $ $(curLoc) ++ "Unexpected ~GENSYM"
-renderTag _ (And _)         = error $ $(curLoc) ++ "Unexpected ~AND"
+renderTag _ e = do e' <- prettyElem e
+                   error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
