@@ -378,7 +378,18 @@ renderTag _ (Clk _)         = error $ $(curLoc) ++ "Unexpected clock"
 renderTag _ (Rst _)         = error $ $(curLoc) ++ "Unexpected reset"
 renderTag _ CompName        = error $ $(curLoc) ++ "Unexpected component name"
 renderTag _ (IndexType _)   = error $ $(curLoc) ++ "Unexpected index type"
-renderTag _ (FilePath _)    = error $ $(curLoc) ++ "Unexpected file name"
+renderTag b (FilePath e)    = case e of
+  L n -> do
+    let (s,_,_) = bbInputs b !! n
+        e'      = either id fst s
+    e2  <- prettyElem e
+    case e' of
+      BlackBoxE "GHC.CString.unpackCString#" _ bbCtx' _ -> case bbInputs bbCtx' of
+        [(Left (Literal Nothing (StringLit _)),_,_)] -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+        _ ->  error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+      _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
+  _ -> do e' <- prettyElem e
+          error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
 renderTag _ IW64            = error $ $(curLoc) ++ "Unexpected IW64"
 renderTag _ (HdlSyn s)      = error $ $(curLoc) ++ "Unexpected ~" ++ show s
 renderTag _ (IsLit _)       = error $ $(curLoc) ++ "Unexpected ~ISLIT"
