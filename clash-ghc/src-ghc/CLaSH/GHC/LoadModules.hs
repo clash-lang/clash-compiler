@@ -266,7 +266,9 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
              , Opt_FloatIn -- Moves let-bindings inwards, although it defeats the normal-form with a single top-level let-binding, it helps with other transformations
              , Opt_DictsStrict -- Hopefully helps remove class method selectors
              , Opt_DmdTxDictSel -- I think demand and strictness are related, strictness helps with dead-code, enable
+#if __GLASGOW_HASKELL__ >= 711
              , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks CLaSH]
+#endif
              ]
 
     unwanted = [ Opt_LiberateCase -- Perform unrolling of recursive RHS: avoid
@@ -290,6 +292,12 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
                , Opt_Loopification -- STG pass, don't care
 #if __GLASGOW_HASKELL__ >= 711
                , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks CLaSH, see [NOTE: CPR breaks CLaSH]
+#else
+               , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks CLaSH]
+                                -- So, strictness analysis must be disabled completely on GHC versions below 8.0,
+                                -- because strictness analysis implies demand analysis, which implies CPR analysis,
+                                -- which cannot be completely disabled due to https://ghc.haskell.org/trac/ghc/ticket/10696.
+                                -- This bug shows itself as: https://github.com/clash-lang/clash-compiler/issues/174
 #endif
                ]
 

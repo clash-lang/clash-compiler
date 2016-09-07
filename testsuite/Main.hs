@@ -95,6 +95,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamFile" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamTest" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "MAC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "NoCPR" (Just ("example",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "SigP" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "Ram" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "Rom" (Just ("testbench",True))
