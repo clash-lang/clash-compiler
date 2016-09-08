@@ -16,6 +16,7 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IM
+import           Data.Text.Lazy          (Text)
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (runFreshM, unembed)
@@ -44,19 +45,22 @@ import           CLaSH.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, cor
 import           CLaSH.GHC.LoadModules   (loadModules)
 import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types  (PrimMap)
+import           CLaSH.Primitives.Util   (generatePrimMap)
 import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           CLaSH.Util              ((***),first)
 
 generateBindings ::
-     PrimMap a
+     FilePath
   -> String
   -> Maybe  (GHC.DynFlags)
   -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
         ,(TmName, Maybe TopEntity) -- topEntity bndr + (maybe) TopEntity annotation
         ,Maybe TmName              -- testInput bndr
-        ,Maybe TmName)             -- expectedOutput bndr
-generateBindings primMap modName dflagsM = do
+        ,Maybe TmName              -- expectedOutput bndr
+        ,PrimMap Text)             -- The primitives found in '.' and 'primDir'
+generateBindings primDir modName dflagsM = do
   (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM) <- loadModules modName dflagsM
+  primMap <- generatePrimMap [primDir,"."]
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
@@ -70,7 +74,7 @@ generateBindings primMap modName dflagsM = do
                                           return (topEnt'',testInpM'',expOutM'')
       droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEnt' testInpM' expOutM'
 
-  return (droppedAndRetypedBindings,allTcCache,tupTcCache,(topEnt',topEntAnn),testInpM',expOutM')
+  return (droppedAndRetypedBindings,allTcCache,tupTcCache,(topEnt',topEntAnn),testInpM',expOutM',primMap)
 
 dropAndRetypeBindings :: HashMap TyConName TyCon
                       -> BindingMap
