@@ -115,7 +115,6 @@ import           CLaSH.GHC.Evaluator
 import           CLaSH.GHC.GenerateBindings
 import           CLaSH.GHC.NetlistTypes
 import           CLaSH.Netlist.BlackBox.Types (HdlSyn)
-import qualified CLaSH.Primitives.Util
 import           CLaSH.Util (clashLibVersion)
 import           Control.DeepSeq
 import qualified Data.Time.Clock as Clock
@@ -1593,9 +1592,8 @@ makeHDL backend optsRef srcs = do
                                     else Nothing
                   opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)}
               primDir <- CLaSH.Backend.primDir (backend iw syn)
-              primMap <- CLaSH.Primitives.Util.generatePrimMap [primDir,"."]
               forM_ srcs $ \src -> do
-                (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src (Just dflags)
+                (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM,primMap) <- generateBindings primDir src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff

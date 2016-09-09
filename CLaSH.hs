@@ -9,7 +9,6 @@ import CLaSH.Rewrite.Types
 import CLaSH.GHC.Evaluator
 import CLaSH.GHC.GenerateBindings
 import CLaSH.GHC.NetlistTypes
-import CLaSH.Primitives.Util
 import CLaSH.Backend
 import CLaSH.Backend.SystemVerilog
 import CLaSH.Backend.VHDL
@@ -38,8 +37,7 @@ doHDL :: Backend s
 doHDL b src = do
   startTime <- Clock.getCurrentTime
   pd      <- primDir b
-  primMap <- generatePrimMap [pd,"."]
-  (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM) <- generateBindings primMap src Nothing
+  (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM,primMap) <- generateBindings pd src Nothing
   prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime startTime
   putStrLn $ "Loading dependencies took " ++ show prepStartDiff
