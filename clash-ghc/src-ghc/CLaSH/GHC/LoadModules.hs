@@ -53,8 +53,6 @@ import qualified Module
 import           Outputable                   ((<>),dot,ppr)
 import qualified Outputable
 import qualified OccName
-import qualified MkIface
-import qualified Finder
 
 -- Internal Modules
 import           CLaSH.GHC.LoadInterfaceFiles
@@ -153,11 +151,6 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
         modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
     tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
                                  ; tcMod <- GHC.typecheckModule pMod
-                                 ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod
-                                 ; hsc_env <- GHC.getSession
-                                 ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
-                                 ; (tidy_guts,md) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
-
                                  -- The purpose of the home package table (HPT) is to track
                                  -- the already compiled modules, so subsequent modules can
                                  -- rely/use those compilation results
@@ -174,13 +167,11 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                  --
                                  -- Given that TH splices can do non-trivial computation and I/O,
                                  -- running TH twice must be avoid.
-                                 ; (_,Just (mi,_)) <- MonadUtils.liftIO $ MkIface.mkIface hsc_env Nothing md simpl_guts
-                                 ; li <- MonadUtils.liftIO (Finder.findObjectLinkableMaybe (HscTypes.ms_mod m) (HscTypes.ms_location m))
-                                 ; let hmi     = HscTypes.HomeModInfo mi md li
-                                 ; let old_hpt = HscTypes.hsc_HPT hsc_env
-                                 ; let new_hpt = UniqFM.addToUFM old_hpt (HscTypes.ms_mod_name m) hmi
-                                 ; GHC.setSession (hsc_env {HscTypes.hsc_HPT = new_hpt})
-
+                                 ; tcMod' <- GHC.loadModule tcMod
+                                 ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
+                                 ; hsc_env <- GHC.getSession
+                                 ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
+                                 ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                  ; let pgm        = HscTypes.cg_binds tidy_guts
                                  ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
                                  ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
