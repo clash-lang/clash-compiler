@@ -210,9 +210,9 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
-               DoVHDL          -> (CompManager, dflt_target,    LinkInMemory)
-               DoVerilog       -> (CompManager, dflt_target,    LinkInMemory)
-               DoSystemVerilog -> (CompManager, dflt_target,    LinkInMemory)
+               DoVHDL          -> (CompManager, dflt_target,    LinkBinary)
+               DoVerilog       -> (CompManager, dflt_target,    LinkBinary)
+               DoSystemVerilog -> (CompManager, dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
 
   let dflags1 = case lang of

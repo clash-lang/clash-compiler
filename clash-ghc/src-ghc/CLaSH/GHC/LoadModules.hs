@@ -135,7 +135,7 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
 #endif
                     , DynFlags.optLevel = 2
                     , DynFlags.ghcMode  = GHC.CompManager
-                    , DynFlags.ghcLink  = GHC.LinkInMemory
+                    , DynFlags.ghcLink  = GHC.LinkBinary
                     , DynFlags.hscTarget = DynFlags.defaultObjectTarget
                                              (DynFlags.targetPlatform dflags)
                     }
