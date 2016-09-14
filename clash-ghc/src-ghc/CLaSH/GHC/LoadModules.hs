@@ -158,6 +158,10 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
                                  ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
                                  ; (tidy_guts,md) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
 
+                                 -- The purpose of the home package table (HPT) is to track
+                                 -- the already compiled modules, so subsequent modules can
+                                 -- rely/use those compilation results
+                                 --
                                  -- We need to update the home package table (HPT) ourselves
                                  -- as we can no longer depend on 'GHC.load' to create a
                                  -- proper HPT.
