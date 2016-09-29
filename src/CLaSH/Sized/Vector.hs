@@ -103,7 +103,7 @@ import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
-import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (*),
+import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
                                    type (^), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Prim                   ((==#),(<#),(-#))
@@ -1864,10 +1864,11 @@ dtfold :: forall p k a . KnownNat k
        -> (p @@ k)
 dtfold _ f g = go (SNat :: SNat k)
   where
-    go :: SNat n -> Vec (2^n) a -> (p @@ n)
+    go :: forall n . SNat n -> Vec (2^n) a -> (p @@ n)
     go _  (x `Cons` Nil) = f x
     go sn xs =
-      let sn'       = sn `subSNat` d1
+      let sn' :: SNat (n - 1)
+          sn'       = sn `subSNat` d1
           (xsL,xsR) = splitAt (pow2SNat sn') xs
       in  g sn' (go sn' xsL) (go sn' xsR)
 {-# NOINLINE dtfold #-}
