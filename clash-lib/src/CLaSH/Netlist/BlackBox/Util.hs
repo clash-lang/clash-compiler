@@ -441,10 +441,10 @@ prettyElem (IF b esT esF) = do
   esT' <- prettyBlackBox esT
   esF' <- prettyBlackBox esF
   (displayT . renderCompact) <$>
-    (text "~IF" <+> text b' <+> text "~THEN" PP.<$>
-     text esT' PP.<$>
-     text "~ELSE" PP.<$>
-     text esF' PP.<$>
+    (text "~IF" <+> text b' <+> text "~THEN" <>
+     text esT' <>
+     text "~ELSE" <>
+     text esF' <>
      text "~FI")
 prettyElem (And es) =
   (displayT . renderCompact) <$>
