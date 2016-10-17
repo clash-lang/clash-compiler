@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+## 0.6.10 *October 17th 20168
+* Fixes bugs:
+  * CLaSH.Sized.Vector.imap primitive gets indices in reverse order
+
 ## 0.6.9 *August 18th 2016*
 * Fixes bugs:
   * Fix primitives for {Signed,Unsigned} rotateL# and rotateR# [#169](https://github.com/clash-lang/clash-compiler/issues/169)

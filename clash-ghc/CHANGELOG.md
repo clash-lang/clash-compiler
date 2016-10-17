@@ -1,5 +1,12 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.6.24 *October 17th 20168
+* Call generatePrimMap after loadModules [#175](https://github.com/clash-lang/clash-compiler/pull/175)
+* Fixes bugs:
+  * (System)Verilog: CLaSH.Sized.Vector.imap primitive gets indices in reverse order
+  * Template Haskell splices are run twice
+  * CLaSH errors out when observing the constructor for `Signal` [#174](https://github.com/clash-lang/clash-compiler/issues/174)
+
 ## 0.6.23 *August 18th 2015*
 * Fixes bugs:
   * Type families are not being reduced correctly  [#167](https://github.com/clash-lang/clash-compiler/issues/167)
