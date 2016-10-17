@@ -1,0 +1,7 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Integer.Logarithms.integerLogBase#"
+    , "type"      : "integerLogBase# :: Integer -> Integer -> Int#"
+    , "templateE" : "integer(floor(log(real(~ARG[1]),real(~ARG[0]))))"
+    }
+  }
+]

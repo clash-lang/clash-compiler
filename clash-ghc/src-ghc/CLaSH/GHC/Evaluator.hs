@@ -101,6 +101,11 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                    }
        in maybe e Data dc
 
+  "GHC.Integer.Logarithms.integerLogBase#"
+    | Just (a,b) <- integerLiterals tcm isSubj args
+    , Just c <- flogBase a b
+    -> (Literal . IntLiteral . toInteger) c
+
   "GHC.Integer.Type.integerToInt"
     | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral i

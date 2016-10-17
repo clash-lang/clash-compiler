@@ -70,6 +70,7 @@ Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
                       primitives/GHC.CString.json
                       primitives/GHC.Err.json
                       primitives/GHC.Int.json
+                      primitives/GHC.Integer.Logarithms.json
                       primitives/GHC.Integer.Type.json
                       primitives/GHC.Prim.json
                       primitives/GHC.Real.json

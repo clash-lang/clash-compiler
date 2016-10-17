@@ -1,0 +1,18 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.Integer.Logarithms.integerLogBase#"
+    , "type"      : "integerLogBase# :: Integer -> Integer -> Int#"
+    , "templateD" :
+"// integerLogBase begin
+function integer ~GENSYM[integerLogBase][0];
+  input integer base, value;
+  begin
+    for (~SYM[0] = 0; value >= base; ~SYM[0]=~SYM[0]+1)
+      value = value / base;
+  end
+endfunction
+
+assign ~RESULT = ~SYM[0](~ARG[0],~ARG[1]);
+// integerLogBase end"
+    }
+  }
+]
