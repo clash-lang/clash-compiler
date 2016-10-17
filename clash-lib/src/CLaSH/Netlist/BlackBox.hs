@@ -88,7 +88,8 @@ prepareBlackBox pNm templ bbCtx =
           collectFilePaths bbCtx $ templ
      else do
        (_,sp) <- Lens.use curCompNm
-       let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ show templ ++
+       templ' <- prettyBlackBox templ
+       let msg = $(curLoc) ++ "Can't match template for " ++ show pNm ++ " :\n\n" ++ Text.unpack templ' ++
                 "\n\nwith context:\n\n" ++ show bbCtx
        throw (CLaSHException sp msg Nothing)
 
