@@ -163,7 +163,7 @@ genvar ~GENSYM[n][1];
 ~GENERATE
   for (~SYM[1]=0; ~SYM[1] < $size(~RESULT); ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
     ~INDEXTYPE[~LIT[0]] ~GENSYM[i][3];
-    assign ~SYM[3] = ~SYM[1];
+    assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1];
     ~TYPEL[~TYP[2]] ~GENSYM[imap_in][4];
     ~TYPEL[~TYPO] ~GENSYM[imap_out][5];
     assign ~SYM[4] = ~FROMBV[~SYM[0][\\~SYM[1]\\]][~TYPEL[~TYP[2]]];
