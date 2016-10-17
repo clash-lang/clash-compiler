@@ -262,16 +262,11 @@ caseCon ctx e@(Case subj ty alts)
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj' -> case collectArgs subj' of
         (Data _,_) -> caseCon ctx (Case subj' ty alts)
-        (Prim nm ty',[_,msg])
-          | nm == "Control.Exception.Base.patError" ->
-            let e' = mkApps (Prim nm ty') [Right ty,msg]
-            in  changed e'
-          | nm == "Control.Exception.Base.absentError" ->
-            let e' = mkApps (Prim nm ty') [Right ty,msg]
-            in  changed e'
-        (Prim nm ty',[_])
-          | nm == "GHC.Err.undefined" ->
-            let e' = mkApps (Prim nm ty') [Right ty]
+        (Prim nm ty',repTy:_:msgOrCallStack:_)
+          | nm `elem` ["Control.Exception.Base.patError"
+                      ,"Control.Exception.Base.absentError"
+                      ,"GHC.Err.undefined"] ->
+            let e' = mkApps (Prim nm ty') [repTy,Right ty,msgOrCallStack]
             in  changed e'
         _ -> traceIf (lvl > DebugNone)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
