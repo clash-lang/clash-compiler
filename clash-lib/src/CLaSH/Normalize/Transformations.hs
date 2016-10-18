@@ -236,7 +236,7 @@ caseCon _ (Case scrut ty alts)
         in  changed (substTysinTm substTyMap e')
       _ -> case alts' of
              ((DefaultPat,e):_) -> changed e
-             _ -> changed (mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right ty])
+             _ -> changed (mkApps (Prim "CLaSH.Transformations.undefined" undefinedTy) [Right ty])
   where
     equalCon dc (DataPat dc' _) = dcTag dc == dcTag (unembed dc')
     equalCon _  _               = False
@@ -268,6 +268,10 @@ caseCon ctx e@(Case subj ty alts)
                       ,"GHC.Err.undefined"] ->
             let e' = mkApps (Prim nm ty') [repTy,Right ty,msgOrCallStack]
             in  changed e'
+        (Prim nm ty',[_])
+          | nm `elem` ["CLaSH.Transformations.undefined"] ->
+            let e' = mkApps (Prim nm ty') [Right ty]
+            in changed e'
         _ -> traceIf (lvl > DebugNone)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
                      (caseOneAlt e)
