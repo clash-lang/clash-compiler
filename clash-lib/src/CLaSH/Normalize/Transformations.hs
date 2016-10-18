@@ -209,7 +209,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
   where
-    exception tcm ((tyView . typeKind tcm) -> TyConApp (name2String -> "GHC.Prim.Constraint") _) = True
+    exception tcm ((tyView . typeKind tcm) -> TyConApp (name2String -> "GHC.Types.Constraint") _) = True
     exception _ _ = False
 
 inlineNonRep _ e = return e
