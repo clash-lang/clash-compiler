@@ -34,7 +34,7 @@ import qualified Maybes
 import qualified MkCore
 import qualified MonadUtils
 import qualified Name
-import           Outputable  (showPpr, showSDoc, text)
+import           Outputable  (showPpr, showSDoc, text, empty)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -50,7 +50,7 @@ runIfl modName action = do
   hscEnv <- GHC.getSession
   let localEnv = TcRnTypes.IfLclEnv modName (text "runIfl")
                    UniqFM.emptyUFM UniqFM.emptyUFM
-  let globalEnv = TcRnTypes.IfGblEnv Nothing
+  let globalEnv = TcRnTypes.IfGblEnv empty Nothing
   MonadUtils.liftIO $ TcRnMonad.initTcRnIf 'r' hscEnv globalEnv
                         localEnv action
 
