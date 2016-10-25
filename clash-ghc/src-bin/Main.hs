@@ -161,7 +161,7 @@ main = do
             do case preStartupMode of
                    ShowSupportedExtensions   -> showSupportedExtensions
                    ShowVersion               -> showVersion
-                   ShowNumVersion            -> putStrLn (Data.Version.showVersion Paths_clash_ghc.version)
+                   ShowNumVersion            -> putStrLn cProjectVersion
                    ShowOptions isInteractive -> showOptions isInteractive
         Right postStartupMode ->
             -- start our GHC session

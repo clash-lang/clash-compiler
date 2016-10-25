@@ -154,72 +154,82 @@ loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessa
     _ <- GHC.setSessionDynFlags dflags3
     target <- GHC.guessTarget modName Nothing
     GHC.setTargets [target]
-    ldRes <- GHC.load GHC.LoadAllTargets
-    case ldRes of
-      GHC.Succeeded -> do
-        modGraph <- GHC.getModuleGraph
-        let modGraph' = map disableOptimizationsFlags modGraph
-        tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
-                                     ; tcMod <- GHC.typecheckModule pMod
-                                     ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod
-                                     ; hsc_env <- GHC.getSession
-                                     ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
-                                     ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
-                                     ; let pgm        = HscTypes.cg_binds tidy_guts
-                                     ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
-                                     ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
-                                     }
-                             ) modGraph'
+    modGraph <- GHC.depanal [] False
+    let modGraph' = map disableOptimizationsFlags modGraph
+        modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
+    tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
+                                 ; tcMod <- GHC.typecheckModule pMod
+                                 -- The purpose of the home package table (HPT) is to track
+                                 -- the already compiled modules, so subsequent modules can
+                                 -- rely/use those compilation results
+                                 --
+                                 -- We need to update the home package table (HPT) ourselves
+                                 -- as we can no longer depend on 'GHC.load' to create a
+                                 -- proper HPT.
+                                 --
+                                 -- The reason we have to cannot rely on 'GHC.load' is that
+                                 -- it runs the rename/type-checker, which we also run in
+                                 -- the code above. This would mean that the renamer/type-checker
+                                 -- is run twice, which in turn means that template haskell
+                                 -- splices are run twice.
+                                 --
+                                 -- Given that TH splices can do non-trivial computation and I/O,
+                                 -- running TH twice must be avoid.
+                                 ; tcMod' <- GHC.loadModule tcMod
+                                 ; dsMod <- fmap GHC.coreModule $ GHC.desugarModule tcMod'
+                                 ; hsc_env <- GHC.getSession
+                                 ; simpl_guts <- MonadUtils.liftIO $ HscMain.hscSimplify hsc_env dsMod
+                                 ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
+                                 ; let pgm        = HscTypes.cg_binds tidy_guts
+                                 ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
+                                 ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
+                                 }
+                         ) modGraph2
 
-        let (binders,modFamInstEnvs) = first concat $ unzip tidiedMods
-            modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
+    let (binders,modFamInstEnvs) = first concat $ unzip tidiedMods
+        modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
 
-        (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
-                                                (map snd binders)
-                                                (map fst binders)
+    (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
+                                            (map snd binders)
+                                            (map fst binders)
 
-        hscEnv <- GHC.getSession
-        famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
+    hscEnv <- GHC.getSession
+    famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
 
-        let rootModule = GHC.ms_mod_name . last
-                       . Digraph.flattenSCC
-                       . last
-                       $ GHC.topSortModuleGraph True modGraph Nothing
+    let rootModule = GHC.ms_mod_name . last $ modGraph2
+        rootBndrs = filter (maybe False
+                                  ((== rootModule)
+                                   . Module.moduleName)
+                            . Name.nameModule_maybe
+                            . Var.varName)
+                           (map fst binders)
 
-            rootBndrs = filter (maybe False
-                                      ((== rootModule)
-                                       . Module.moduleName)
-                                . Name.nameModule_maybe
-                                . Var.varName)
-                               (map fst binders)
+    topEntM <- findCLaSHAnnotations rootBndrs
+    let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
+        topEntities     = filter ((== "topEntity") . varNameString) rootBndrs
+        testInputs      = filter ((== "testInput") . varNameString) rootBndrs
+        expectedOutputs = filter ((== "expectedOutput") . varNameString) rootBndrs
+    topEntity <- case topEntities of
+      [] -> case topEntM of
+              Just (l,r) -> return (l,Just r)
+              _ -> Panic.pgmError $ "No 'topEntity', nor function with a 'TopEntity' annotation found in root module: " ++
+                                    (Outputable.showSDocUnsafe (ppr rootModule))
+      [x] -> case topEntM of
+              Just (l,r) | l == x    -> return (l,Just r)
+                         | otherwise -> Panic.pgmError $ "'TopEntity' annotation applied to a function that is not named 'topEntity' while a 'topEntity' function is present: " ++
+                                                         (Outputable.showSDocUnsafe (ppr rootModule <> dot <> ppr l))
+              Nothing -> return (x,Nothing)
+      _ -> Panic.pgmError $ $(curLoc) ++  "Multiple 'topEntities' found."
+    testInput <- case testInputs of
+      []  -> return Nothing
+      [x] -> return (Just x)
+      _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
+    expectedOutput <- case expectedOutputs of
+      []  -> return Nothing
+      [x] -> return (Just x)
+      _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
 
-        topEntM <- findCLaSHAnnotations rootBndrs
-        let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
-            topEntities     = filter ((== "topEntity") . varNameString) rootBndrs
-            testInputs      = filter ((== "testInput") . varNameString) rootBndrs
-            expectedOutputs = filter ((== "expectedOutput") . varNameString) rootBndrs
-        topEntity <- case topEntities of
-          [] -> case topEntM of
-                  Just (l,r) -> return (l,Just r)
-                  _ -> Panic.pgmError $ "No 'topEntity', nor function with a 'TopEntity' annotation found in root module: " ++
-                                        (Outputable.showSDocUnsafe (ppr rootModule))
-          [x] -> case topEntM of
-                  Just (l,r) | l == x    -> return (l,Just r)
-                             | otherwise -> Panic.pgmError $ "'TopEntity' annotation applied to a function that is not named 'topEntity' while a 'topEntity' function is present: " ++
-                                                             (Outputable.showSDocUnsafe (ppr rootModule <> dot <> ppr l))
-                  Nothing -> return (x,Nothing)
-          _ -> Panic.pgmError $ $(curLoc) ++  "Multiple 'topEntities' found."
-        testInput <- case testInputs of
-          []  -> return Nothing
-          [x] -> return (Just x)
-          _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
-        expectedOutput <- case expectedOutputs of
-          []  -> return Nothing
-          [x] -> return (Just x)
-          _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
-
-        return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,testInput,expectedOutput)
-      GHC.Failed -> Panic.pgmError $ $(curLoc) ++ "failed to load module: " ++ modName
+    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,testInput,expectedOutput)
 
 findCLaSHAnnotations :: GHC.GhcMonad m
                      => [CoreSyn.CoreBndr]

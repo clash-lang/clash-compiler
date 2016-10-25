@@ -4,7 +4,7 @@
 * New features:
   * Support for `clash-prelude` 0.11
 
-## 0.6.21
+## 0.6.21 *August 18th 2016*
 * Fixes bugs:
   * Type families are not currently being reduced correctly [#167](https://github.com/clash-lang/clash-compiler/issues/167)
 
