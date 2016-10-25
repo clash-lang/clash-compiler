@@ -4,6 +4,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE MagicHash            #-}
 {-# LANGUAGE TypeFamilies         #-}
@@ -16,6 +17,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
+#include "MachDeps.h"
+
 module CLaSH.Class.BitPack
   ( BitPack (..)
   , bitCoerce
@@ -23,6 +26,8 @@ module CLaSH.Class.BitPack
   )
 where
 
+import Data.Int
+import Data.Word
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
 import Prelude                        hiding (map)
 
@@ -81,6 +86,65 @@ instance BitPack (BitVector n) where
   type BitSize (BitVector n) = n
   pack   v = v
   unpack v = v
+
+instance BitPack Int where
+  type BitSize Int = WORD_SIZE_IN_BITS
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Int8 where
+  type BitSize Int8 = 8
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Int16 where
+  type BitSize Int16 = 16
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Int32 where
+  type BitSize Int32 = 32
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+#if WORD_SIZE_IN_BITS >= 64
+instance BitPack Int64 where
+  type BitSize Int64 = 64
+  pack   = fromIntegral
+  unpack = fromIntegral
+#endif
+
+instance BitPack Word where
+  type BitSize Word = WORD_SIZE_IN_BITS
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Word8 where
+  type BitSize Word8 = 8
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Word16 where
+  type BitSize Word16 = 16
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Word32 where
+  type BitSize Word32 = 32
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+#if WORD_SIZE_IN_BITS >= 64
+instance BitPack Word64 where
+  type BitSize Word64 = 64
+  pack   = fromIntegral
+  unpack = fromIntegral
+#endif
+
+instance BitPack () where
+  type BitSize () = 0
+  pack   _ = minBound
+  unpack _ = ()
 
 instance (KnownNat (BitSize b), BitPack a, BitPack b) =>
     BitPack (a,b) where
