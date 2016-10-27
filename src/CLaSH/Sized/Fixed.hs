@@ -481,6 +481,7 @@ type ResizeFC rep int1 frac1 int2 frac2
     , Num      (rep (int1 + frac1))
     , Bits     (rep (int1 + frac1))
     , Bits     (rep (int2 + frac2))
+    , Bounded  (rep (int2 + frac2))
     , KnownNat int1
     , KnownNat frac1
     , KnownNat int2
@@ -526,19 +527,13 @@ type ResizeUFC int1 frac1 int2 frac2 =
 --
 -- * @'ResizeUFC' rep int1 frac1 int2 frac2@ for:
 --   @'UFixed' int1 frac1 -> 'UFixed' int2 frac2@
-resizeF ::(ResizeFC rep int1 frac1 int2 frac2, Bounded (rep (int2 + frac2)))
+resizeF :: forall rep int1 frac1 int2 frac2 . ResizeFC rep int1 frac1 int2 frac2
         => Fixed rep int1 frac1
         -> Fixed rep int2 frac2
-resizeF = resizeF' False minBound maxBound
-
-resizeF' :: forall rep int1 frac1 int2 frac2 . ResizeFC rep int1 frac1 int2 frac2
-         => Bool               -- ^ Wrap
-         -> rep (int2 + frac2) -- ^ minBound
-         -> rep (int2 + frac2) -- ^ maxBound
-         -> Fixed rep int1 frac1
-         -> Fixed rep int2 frac2
-resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
+resizeF (Fixed fRep) = Fixed sat
   where
+    fMin  = minBound :: rep (int2 + frac2)
+    fMax  = maxBound :: rep (int2 + frac2)
     argSZ = natVal (Proxy @(int1 + frac1))
     resSZ = natVal (Proxy @(int2 + frac2))
 
@@ -559,7 +554,7 @@ resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
                                                    (resFracSZ - argFracSZ)
                                 shiftedL_masked  = shiftedL .&. mask
                                 shiftedL_resized = resize shiftedL
-                            in if doWrap then shiftedL_resized else if fRep >= 0
+                            in if fRep >= 0
                                   then if shiftedL_masked == 0
                                           then shiftedL_resized
                                           else fMax
@@ -570,7 +565,7 @@ resizeF' doWrap fMin fMax (Fixed fRep) = Fixed sat
                                                    (argFracSZ - resFracSZ)
                                 shiftedR_masked  = shiftedR .&. mask
                                 shiftedR_resized = resize shiftedR
-                            in if doWrap then shiftedR_resized else if fRep >= 0
+                            in if fRep >= 0
                                   then if shiftedR_masked == 0
                                           then shiftedR_resized
                                           else fMax
