@@ -44,6 +44,12 @@ subBench = env setup $ \m ->
 
 multBench :: Benchmark
 multBench = env setup $ \m ->
+  bench "*" $ nf (uncurry (*)) m
+  where
+    setup = return (smallValueU1,smallValueU2)
+
+multBench_wrap :: Benchmark
+multBench_wrap = env setup $ \m ->
   bench "satMult SatWrap" $ nf (uncurry (satMult SatWrap)) m
   where
     setup = return (smallValueU1,smallValueU2)

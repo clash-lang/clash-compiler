@@ -93,6 +93,9 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    boundedMult)
 import CLaSH.Class.Resize         (Resize (..))
 import CLaSH.Promoted.Nat         (SNat)
+import CLaSH.Prelude.BitIndex     (msb, split)
+import CLaSH.Prelude.BitReduction (reduceAnd, reduceOr)
+import CLaSH.Sized.BitVector      (BitVector, (++#))
 import CLaSH.Sized.Signed         (Signed)
 import CLaSH.Sized.Unsigned       (Unsigned)
 import CLaSH.XException           (ShowX (..), showsPrecXWith)
@@ -409,6 +412,12 @@ type NumFixedC rep int frac
     , ResizeFC rep (int + int) (frac + frac) int frac
     , MResult (rep (int + frac)) (rep (int + frac)) ~
               rep ((int + int) + (frac + frac))
+    , BitSize (rep ((int + int) + (frac + frac))) ~
+              (int + ((int + frac) + frac))
+    , BitPack (rep ((int + int) + (frac + frac)))
+    , KnownNat (BitSize (rep (int + frac)))
+    , BitPack (rep (int + frac))
+    , Enum    (rep (int + frac))
     )
 
 -- | Constraint for the 'Num' instance of 'SFixed'
@@ -788,16 +797,58 @@ fLitR a = Fixed (fromInteger sat)
 instance NumFixedC rep int frac => SaturatingNum (Fixed rep int frac) where
   satPlus w (Fixed a) (Fixed b) = Fixed (satPlus w a b)
   satMin  w (Fixed a) (Fixed b) = Fixed (satMin w a b)
-  satMult w (Fixed a) (Fixed b) = case w of
-      SatWrap      -> resizeF' True 0 0 res
-      SatBound     -> resizeF' False minBound maxBound res
-      SatZero      -> resizeF' False 0 0 res
-      SatSymmetric -> resizeF' False fMinSym maxBound res
-    where
-      res     = Fixed (a `times` b) :: Fixed rep (int + int) (frac + frac)
-      fMinSym = if isSigned a
-                   then 0
-                   else minBound + 1
+
+  satMult SatWrap (Fixed a) (Fixed b) =
+    let res  = a `times` b
+        sh   = fromInteger (natVal (Proxy @frac))
+        res' = shiftR res sh
+    in  Fixed (resize res')
+
+  satMult SatBound (Fixed a) (Fixed b) =
+    let res     = a `times` b
+        sh      = fromInteger (natVal (Proxy @frac))
+        (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
+    in  case isSigned a of
+          True  -> let overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                                             reduceAnd (msb rR ++# pack rL)
+                   in  case overflow of
+                         1 -> unpack (resize (shiftR rR sh))
+                         _ -> case msb rL of
+                                0 -> maxBound
+                                _ -> minBound
+          False -> case rL of
+                     0 -> unpack (resize (shiftR rR sh))
+                     _ -> maxBound
+
+  satMult SatZero (Fixed a) (Fixed b) =
+    let res     = a `times` b
+        sh      = fromInteger (natVal (Proxy @frac))
+        (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
+    in  case isSigned a of
+          True  -> let overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                                             reduceAnd (msb rR ++# pack rL)
+                   in  case overflow of
+                         1 -> unpack (resize (shiftR rR sh))
+                         _ -> 0
+          False -> case rL of
+                     0 -> unpack (resize (shiftR rR sh))
+                     _ -> 0
+
+  satMult SatSymmetric (Fixed a) (Fixed b) =
+    let res     = a `times` b
+        sh      = fromInteger (natVal (Proxy @frac))
+        (rL,rR) = split res :: (BitVector int, BitVector (int + frac + frac))
+    in  case isSigned a of
+          True  -> let overflow = complement (reduceOr (msb rR ++# pack rL)) .|.
+                                             reduceAnd (msb rR ++# pack rL)
+                   in  case overflow of
+                         1 -> unpack (resize (shiftR rR sh))
+                         _ -> case msb rL of
+                                0 -> maxBound
+                                _ -> succ minBound
+          False -> case rL of
+                     0 -> unpack (resize (shiftR rR sh))
+                     _ -> maxBound
 
 -- | Constraint for the 'divide' function
 type DivideC rep int1 frac1 int2 frac2

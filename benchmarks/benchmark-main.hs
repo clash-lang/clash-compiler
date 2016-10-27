@@ -46,5 +46,6 @@ main =
         , F.addBench
         , F.subBench
         , F.multBench
+        , F.multBench_wrap
         ]
   ]
