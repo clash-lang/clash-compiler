@@ -356,21 +356,25 @@ mac3 x y s = (x \`times\` y) \`plus\` s
 
 -- | Constraint for the 'ExtendingNum' instance of 'Fixed'
 type ENumFixedC rep int1 frac1 int2 frac2
-  = ( ResizeFC rep int1 frac1 (1 + Max int1 int2) (Max frac1 frac2)
-    , ResizeFC rep int2 frac2 (1 + Max int1 int2) (Max frac1 frac2)
-    , Bounded  (rep ((1 + Max int1 int2) + Max frac1 frac2))
+  = ( Bounded  (rep ((1 + Max int1 int2) + Max frac1 frac2))
     , Num      (rep ((1 + Max int1 int2) + Max frac1 frac2))
+    , Bits     (rep ((1 + Max int1 int2) + Max frac1 frac2))
     , ExtendingNum (rep (int1 + frac1)) (rep (int2 + frac2))
     , MResult (rep (int1 + frac1)) (rep (int2 + frac2)) ~
               rep ((int1 + int2) + (frac1 + frac2))
+    , KnownNat int1
+    , KnownNat int2
+    , KnownNat frac1
+    , KnownNat frac2
+    , Resize   rep
     )
 
 -- | Constraint for the 'ExtendingNum' instance of 'SFixed'
 type ENumSFixedC int1 frac1 int2 frac2
   = ( KnownNat (int2 + frac2)
-    , KnownNat (1 +  Max int1 int2 + Max frac1 frac2)
+    , KnownNat (1 + Max int1 int2 + Max frac1 frac2)
     , KnownNat (Max frac1 frac2)
-    , KnownNat (1 +  Max int1 int2)
+    , KnownNat (1 + Max int1 int2)
     , KnownNat (int1 + frac1)
     , KnownNat frac2
     , KnownNat int2
@@ -393,13 +397,17 @@ instance ENumFixedC rep int1 frac1 int2 frac2 =>
   ExtendingNum (Fixed rep int1 frac1) (Fixed rep int2 frac2) where
   type AResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
                Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
-  plus f1 f2  =
-    let (Fixed f1R) = resizeF f1 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
-        (Fixed f2R) = resizeF f2 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
+  plus (Fixed f1) (Fixed f2) =
+    let sh1 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac1)) :: Int
+        f1R = shiftL (resize f1) sh1 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
+        sh2 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac2)) :: Int
+        f2R = shiftL (resize f2) sh2 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
     in  Fixed (f1R + f2R)
-  minus f1 f2 =
-    let (Fixed f1R) = resizeF f1 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
-        (Fixed f2R) = resizeF f2 :: Fixed rep (1 + Max int1 int2) (Max frac1 frac2)
+  minus (Fixed f1) (Fixed f2) =
+    let sh1 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac1)) :: Int
+        f1R = shiftL (resize f1) sh1 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
+        sh2 = fromInteger (natVal (Proxy @(Max frac1 frac2)) - natVal (Proxy @frac2)) :: Int
+        f2R = shiftL (resize f2) sh2 :: rep ((1 + Max int1 int2) + (Max frac1 frac2))
     in  Fixed (f1R - f2R)
   type MResult (Fixed rep int1 frac1) (Fixed rep int2 frac2) =
                Fixed rep (int1 + int2) (frac1 + frac2)
@@ -409,15 +417,19 @@ instance ENumFixedC rep int1 frac1 int2 frac2 =>
 type NumFixedC rep int frac
   = ( SaturatingNum (rep (int + frac))
     , ExtendingNum (rep (int + frac)) (rep (int + frac))
-    , ResizeFC rep (int + int) (frac + frac) int frac
     , MResult (rep (int + frac)) (rep (int + frac)) ~
               rep ((int + int) + (frac + frac))
     , BitSize (rep ((int + int) + (frac + frac))) ~
               (int + ((int + frac) + frac))
     , BitPack (rep ((int + int) + (frac + frac)))
+    , Bits    (rep ((int + int) + (frac + frac)))
     , KnownNat (BitSize (rep (int + frac)))
     , BitPack (rep (int + frac))
     , Enum    (rep (int + frac))
+    , Bits    (rep (int + frac))
+    , Resize  rep
+    , KnownNat int
+    , KnownNat frac
     )
 
 -- | Constraint for the 'Num' instance of 'SFixed'
