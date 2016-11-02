@@ -15,6 +15,7 @@ import           Control.Error           (hush)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import qualified Control.Monad           as Monad
+import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
@@ -33,7 +34,7 @@ import           CLaSH.Core.Term         (LetBinding, Term (..), TmName)
 import           CLaSH.Core.TyCon        (TyCon (..), TyConName, tyConDataCons)
 import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView, splitTyConAppM, tyView)
-import           CLaSH.Core.Util         (collectBndrs, termType)
+import           CLaSH.Core.Util         (collectBndrs, termType, tyNatSize)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
 import           CLaSH.Netlist.Types     as HW
 import           CLaSH.Util
@@ -97,11 +98,13 @@ synchronizedClk tcm ty
   = case name2String tyCon of
       "CLaSH.Sized.Vector.Vec"        -> synchronizedClk tcm (args!!1)
       "CLaSH.Signal.Internal.SClock" -> case splitTyConAppM (head args) of
-                                          Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack s,i)
-                                          _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
+        Just (_,[LitTy (SymTy s),litTy])
+          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
+        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       "CLaSH.Signal.Internal.Signal'" -> case splitTyConAppM (head args) of
-                                           Just (_,[LitTy (SymTy s),LitTy (NumTy i)]) -> Just (pack s,i)
-                                           _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
+        Just (_,[LitTy (SymTy s),litTy])
+          | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
+        _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
       _                               -> case tyConDataCons (tcm HashMap.! tyCon) of
                                            [dc] -> let argTys   = dcArgTys dc
                                                        argTVs   = dcUnivTyVars dc
