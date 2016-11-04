@@ -442,6 +442,16 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 `lcm` i2)))
 
+  | name2String tc == "GHC.TypeLits.Extra.Div"
+  , [i1, i2] <- mapMaybe (litView tcm) tys
+  , i2 > 0
+  = Just (LitTy (NumTy (i1 `div` i2)))
+
+  | name2String tc == "GHC.TypeLits.Extra.Mod"
+  , [i1, i2] <- mapMaybe (litView tcm) tys
+  , i2 > 0
+  = Just (LitTy (NumTy (i1 `mod` i2)))
+
   | Just (FunTyCon {tyConSubst = tcSubst}) <- HashMap.lookup tc tcm
   = findFunSubst tcm tcSubst tys
 

@@ -10,7 +10,7 @@ packages:
 - 'testsuite'
 - location:
     git: https://github.com/clash-lang/ghc-typelits-extra.git
-    commit: 09fb4ed8f7a6b060050d14e0ea071fc9f6a2f03a
+    commit: ea4df57b83b88a11c4a90d4126232c7d084d896c
   extra-dep: true
 - location:
     git: https://github.com/clash-lang/ghc-typelits-knownnat.git
