@@ -47,7 +47,8 @@ import           CLaSH.Core.Term                  (Term (..), Pat (..))
 import           CLaSH.Core.Type                  (LitTy (..), Type (..),
                                                    TypeView (..), coreView,
                                                    mkFunTy, mkTyConApp,
-                                                   splitFunForallTy, tyView)
+                                                   splitFunForallTy, tyView,
+                                                   undefinedTy)
 import           CLaSH.Core.TyCon                 (TyConName, tyConDataCons)
 import           CLaSH.Core.TysPrim               (integerPrimTy, typeNatKind)
 import           CLaSH.Core.Util                  (appendToVec, extractElems,
@@ -433,6 +434,58 @@ reduceTail n aTy vArg = do
             lb           = Letrec (bind (rec [b]) (idToVar tB))
         in  changed lb
     go _ ty = error $ $(curLoc) ++ "reduceTail: argument does not have a vector type: " ++ showDoc ty
+
+-- | Replace an application of the @CLaSH.Sized.Vector.last@ primitive on
+-- vectors of a known length @n@, by a projection of the last element of a
+-- vector.
+reduceLast :: Integer  -- ^ Length of the vector
+           -> Type -- ^ Element type of the vector
+           -> Term -- ^ The argument vector
+           -> NormalizeSession Term
+reduceLast n aTy vArg = do
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm vArg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [_,consCon]  <- tyConDataCons vecTc
+      = let (_,elems)    = unzip
+                         $ extractElems consCon aTy 'L' n vArg
+            (tB,_)       = head (last elems)
+        in case n of
+            0 -> changed (mkApps (Prim "CLaSH.Transformations.undefined" undefinedTy) [Right aTy])
+            _ -> changed (Letrec (bind (rec (init (concat elems))) (idToVar tB)))
+    go _ ty = error $ $(curLoc) ++ "reduceLast: argument does not have a vector type: " ++ showDoc ty
+
+-- | Replace an application of the @CLaSH.Sized.Vector.init@ primitive on
+-- vectors of a known length @n@, by a projection of the init of a
+-- vector.
+reduceInit :: Integer  -- ^ Length of the vector
+           -> Type -- ^ Element type of the vector
+           -> Term -- ^ The argument vector
+           -> NormalizeSession Term
+reduceInit n aTy vArg = do
+    tcm <- Lens.view tcCache
+    ty  <- termType tcm vArg
+    go tcm ty
+  where
+    go tcm (coreView tcm -> Just ty') = go tcm ty'
+    go tcm (tyView -> TyConApp vecTcNm _)
+      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      , [nilCon,consCon]  <- tyConDataCons vecTc
+      = let (_,elems)    = unzip
+                         $ extractElems consCon aTy 'L' n vArg
+        in case n of
+            0 -> changed (mkApps (Prim "CLaSH.Transformations.undefined" undefinedTy) [Right aTy])
+            1 -> changed (mkVec nilCon consCon aTy 0 [])
+            _ -> let el = init elems
+                     iv = mkVec nilCon consCon aTy (n-1) (map (idToVar . fst . head) el)
+                     lb = rec (init (concat el))
+                 in  changed (Letrec (bind lb iv))
+
+    go _ ty = error $ $(curLoc) ++ "reduceInit: argument does not have a vector type: " ++ showDoc ty
 
 -- | Replace an application of the @CLaSH.Sized.Vector.(++)@ primitive on
 -- vectors of a known length @n@, by the fully unrolled recursive "definition"
