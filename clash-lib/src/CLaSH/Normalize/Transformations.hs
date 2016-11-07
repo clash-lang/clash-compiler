@@ -1064,6 +1064,26 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                then reduceTail n aTy vArg
                else return e
           _ -> return e
+      "CLaSH.Sized.Vector.last" | length args == 3 -> do
+        let [nTy,aTy] = Either.rights args
+            [vArg]    = Either.lefts args
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            untranslatableTy <- isUntranslatableType_not_poly aTy
+            if untranslatableTy
+               then reduceLast n aTy vArg
+               else return e
+          _ -> return e
+      "CLaSH.Sized.Vector.init" | length args == 3 -> do
+        let [nTy,aTy] = Either.rights args
+            [vArg]    = Either.lefts args
+        case runExcept (tyNatSize tcm nTy) of
+          Right n -> do
+            untranslatableTy <- isUntranslatableType_not_poly aTy
+            if untranslatableTy
+               then reduceInit n aTy vArg
+               else return e
+          _ -> return e
       "CLaSH.Sized.Vector.unconcat" | length args == 6 -> do
         let ([_knN,_sm,arg],[mTy,nTy,aTy]) = Either.partitionEithers args
         case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy)) of
