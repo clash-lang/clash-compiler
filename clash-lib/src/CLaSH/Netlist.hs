@@ -16,6 +16,7 @@ import           Control.Lens                     ((.=),(^.),_1,_2)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (runStateT)
 import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
+import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
@@ -374,6 +375,12 @@ mkExpr _ _ _ (Core.Literal l) = do
     Int64Literal i   -> return (HW.Literal (Just (Signed 64,64)) $ NumLit i, [])
     Word64Literal w  -> return (HW.Literal (Just (Unsigned 64,64)) $ NumLit w, [])
     CharLiteral c    -> return (HW.Literal (Just (Unsigned 21,21)) . NumLit . toInteger $ ord c, [])
+    FloatLiteral r   -> let f = fromRational r :: Float
+                            i = toInteger (floatToWord f)
+                        in  return (HW.Literal (Just (BitVector 32,32)) (NumLit i), [])
+    DoubleLiteral r  -> let d = fromRational r :: Double
+                            i = toInteger (doubleToWord d)
+                        in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD bndr ty app = do

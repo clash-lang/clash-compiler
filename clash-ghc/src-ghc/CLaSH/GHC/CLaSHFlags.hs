@@ -46,6 +46,7 @@ flagsClash r = [
   , defFlag "clash-hdldir" (SepArg (setHdlDir r))
   , defFlag "clash-hdlsyn" (SepArg (setHdlSyn r))
   , defFlag "clash-error-extra" (NoArg (liftEwM (setErrorExtra r)))
+  , defFlag "clash-float-support" (NoArg (liftEwM (setFloatSupport r)))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -97,3 +98,6 @@ setHdlSyn r s = case readMaybe s of
 
 setErrorExtra :: IORef CLaSHOpts -> IO ()
 setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})
+
+setFloatSupport :: IORef CLaSHOpts -> IO ()
+setFloatSupport r = modifyIORef r (\c -> c {opt_floatSupport = True})

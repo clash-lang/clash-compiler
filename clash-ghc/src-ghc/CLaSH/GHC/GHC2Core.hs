@@ -347,8 +347,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       MachWord   i   -> C.WordLiteral i
       MachWord64 i   -> C.WordLiteral i
       LitInteger i _ -> C.IntegerLiteral i
-      MachFloat r    -> C.RationalLiteral r
-      MachDouble r   -> C.RationalLiteral r
+      MachFloat r    -> C.FloatLiteral r
+      MachDouble r   -> C.DoubleLiteral r
       MachNullAddr   -> C.StringLiteral []
       MachLabel fs _ _ -> C.StringLiteral (unpackFS fs)
 

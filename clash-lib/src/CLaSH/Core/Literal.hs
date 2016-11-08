@@ -25,8 +25,9 @@ import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
 import {-# SOURCE #-} CLaSH.Core.Type         (Type)
 import CLaSH.Core.TysPrim                     (intPrimTy, integerPrimTy,
                                                charPrimTy, stringPrimTy,
-                                               voidPrimTy, wordPrimTy,
-                                               int64PrimTy, word64PrimTy)
+                                               wordPrimTy,
+                                               int64PrimTy, word64PrimTy,
+                                               floatPrimTy, doublePrimTy)
 
 -- | Term Literal
 data Literal
@@ -36,7 +37,8 @@ data Literal
   | Int64Literal    !Integer
   | Word64Literal   !Integer
   | StringLiteral   !String
-  | RationalLiteral !Rational
+  | FloatLiteral    !Rational
+  | DoubleLiteral   !Rational
   | CharLiteral     !Char
   deriving (Eq,Ord,Show,Generic,NFData)
 
@@ -54,7 +56,8 @@ literalType (IntegerLiteral  _) = integerPrimTy
 literalType (IntLiteral      _) = intPrimTy
 literalType (WordLiteral     _) = wordPrimTy
 literalType (StringLiteral   _) = stringPrimTy
-literalType (RationalLiteral _) = voidPrimTy
+literalType (FloatLiteral    _) = floatPrimTy
+literalType (DoubleLiteral   _) = doublePrimTy
 literalType (CharLiteral     _) = charPrimTy
 literalType (Int64Literal    _) = int64PrimTy
 literalType (Word64Literal   _) = word64PrimTy

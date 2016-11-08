@@ -19,10 +19,11 @@ where
 import Data.Char                        (isSymbol, isUpper, ord)
 import Data.Text                        (unpack)
 import GHC.Show                         (showMultiLineString)
+import Numeric                          (fromRat)
 import Text.PrettyPrint                 (Doc, char, comma, empty, equals, hang,
                                          hsep, integer, parens, punctuate,
                                          render, sep, text, vcat, ($$), ($+$),
-                                         (<+>), (<>), rational, nest)
+                                         (<+>), (<>), nest, float, double)
 import Unbound.Generics.LocallyNameless (Embed (..), LFresh, Name, lunbind,
                                          name2String, runLFreshM, unembed,
                                          unrebind, unrec)
@@ -137,7 +138,8 @@ instance Pretty Literal where
       | otherwise     -> return $ integer i
     WordLiteral w     -> return $ integer w
     Word64Literal w   -> return $ integer w
-    RationalLiteral r -> return $ rational r
+    FloatLiteral r    -> return $ float (fromRat r)
+    DoubleLiteral r   -> return $ double (fromRat r)
     CharLiteral c     -> return $ char c
     StringLiteral s   -> return $ vcat $ map text $ showMultiLineString s
 

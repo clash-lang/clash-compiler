@@ -6,6 +6,7 @@
 
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module CLaSH.GHC.Evaluator where
 
@@ -16,11 +17,13 @@ import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
 import Data.Text                     (Text)
+import           GHC.Real            (Ratio (..))
 import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed,
                                                    string2Name)
 
 import           CLaSH.Core.DataCon  (DataCon (..))
 import           CLaSH.Core.Literal  (Literal (..))
+import           CLaSH.Core.Pretty   (showDoc)
 import           CLaSH.Core.Term     (Term (..))
 import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
                                       TypeView (..), tyView, mkFunTy,
@@ -30,7 +33,7 @@ import           CLaSH.Core.TysPrim  (typeNatKind)
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
                                       tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
-import           CLaSH.Util          (clogBase, flogBase)
+import           CLaSH.Util          (clogBase, flogBase, curLoc)
 
 reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
@@ -190,6 +193,32 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             (Just intTc) = HashMap.lookup intTcNm tcm
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+
+  "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
+    | [Literal (IntLiteral _minEx)
+      ,Literal (IntLiteral matDigs)
+      ,Literal (IntegerLiteral n)
+      ,Literal (IntegerLiteral d)] <- reduceTerms tcm isSubj args
+    -> case fromInteger matDigs of
+          matDigs'
+            | matDigs' == floatDigits (undefined :: Float)
+            -> Literal (FloatLiteral (toRational (fromRational (n :% d) :: Float)))
+            | matDigs' == floatDigits (undefined :: Double)
+            -> Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double)))
+          _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double: " ++ showDoc e
+
+  "GHC.Float.$w$sfromRat''1" -- XXX: Very fragile
+    | [Literal (IntLiteral _minEx)
+      ,Literal (IntLiteral matDigs)
+      ,Literal (IntegerLiteral n)
+      ,Literal (IntegerLiteral d)] <- reduceTerms tcm isSubj args
+    -> case fromInteger matDigs of
+          matDigs'
+            | matDigs' == floatDigits (undefined :: Float)
+            -> Literal (FloatLiteral (toRational (fromRational (n :% d) :: Float)))
+            | matDigs' == floatDigits (undefined :: Double)
+            -> Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double)))
+          _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double: " ++ showDoc e
 
   "CLaSH.Promoted.Nat.powSNat"
     | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args

@@ -27,10 +27,11 @@ import CLaSH.Netlist.Types              (HWType(..))
 import CLaSH.Util                       (curLoc)
 
 ghcTypeToHWType :: Int
+                -> Bool
                 -> HashMap TyConName TyCon
                 -> Type
                 -> Maybe (Either String HWType)
-ghcTypeToHWType iw = go
+ghcTypeToHWType iw floatSupport = go
   where
     go m ty@(tyView -> TyConApp tc args) = runExceptT $
       case name2String tc of
@@ -74,10 +75,14 @@ ghcTypeToHWType iw = go
         "GHC.Prim.Word#"                -> return (Unsigned iw)
         "GHC.Prim.Int64#"               -> return (Signed 64)
         "GHC.Prim.Word64#"              -> return (Unsigned 64)
+        "GHC.Prim.Float#" | floatSupport -> return (BitVector 32)
+        "GHC.Prim.Double#" | floatSupport -> return (BitVector 64)
         "GHC.Prim.ByteArray#"           ->
           fail $ "Can't translate type: " ++ showDoc ty
 
         "GHC.Types.Bool"                -> return Bool
+        "GHC.Types.Float" | floatSupport-> return (BitVector 32)
+        "GHC.Types.Double" | floatSupport -> return (BitVector 64)
         "GHC.Prim.~#"                   ->
           fail $ "Can't translate type: " ++ showDoc ty
 

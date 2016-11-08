@@ -140,6 +140,7 @@ main = do
                              , opt_hdlDir      = Nothing
                              , opt_hdlSyn      = Other
                              , opt_errorExtra  = False
+                             , opt_floatSupport = False
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 

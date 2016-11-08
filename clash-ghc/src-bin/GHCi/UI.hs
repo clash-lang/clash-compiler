@@ -1739,6 +1739,7 @@ makeHDL backend optsRef srcs = do
   liftIO $ do startTime <- Clock.getCurrentTime
               opts  <- readIORef optsRef
               let iw = opt_intWidth opts
+                  fp = opt_floatSupport opts
                   syn = opt_hdlSyn opts
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
@@ -1756,7 +1757,7 @@ makeHDL backend optsRef srcs = do
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
                 CLaSH.Driver.generateHDL bindingsMap (Just (backend iw syn)) primMap tcm
-                  tupTcm (ghcTypeToHWType iw) reduceConstant topEnt testInpM expOutM opts' (startTime,prepTime)
+                  tupTcm (ghcTypeToHWType iw fp) reduceConstant topEnt testInpM expOutM opts' (startTime,prepTime)
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VHDLState)
