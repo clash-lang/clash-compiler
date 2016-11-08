@@ -220,6 +220,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             -> Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double)))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double: " ++ showDoc e
 
+  "GHC.Base.eqString"
+    | [(_,[Left (Literal (StringLiteral s1))])
+      ,(_,[Left (Literal (StringLiteral s2))])
+      ] <- map collectArgs (Either.lefts args)
+    -> boolToBoolLiteral tcm ty (s1 == s2)
+
   "CLaSH.Promoted.Nat.powSNat"
     | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
     -> let c = case a of
