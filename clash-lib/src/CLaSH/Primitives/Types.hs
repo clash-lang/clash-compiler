@@ -13,7 +13,7 @@
 module CLaSH.Primitives.Types where
 
 import           Control.Applicative  ((<|>))
-import           Data.Aeson           (FromJSON (..), Value (..), (.:))
+import           Data.Aeson           (FromJSON (..), Value (..), (.:), (.:?), (.!=))
 import           Data.HashMap.Lazy    (HashMap)
 import qualified Data.HashMap.Strict  as H
 import qualified Data.Text            as S
@@ -27,6 +27,8 @@ data Primitive a
   -- | A primitive that has a template that can be filled out by the backend render
   = BlackBox
   { name     :: !S.Text -- ^ Name of the primitive
+  , library  :: [S.Text]
+  , imports  :: [S.Text]
   , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
@@ -39,7 +41,10 @@ data Primitive a
 instance FromJSON (Primitive Text) where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
-      "BlackBox"  -> BlackBox <$> conVal .: "name" <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
+      "BlackBox"  -> BlackBox <$> conVal .: "name"
+                              <*> conVal .:? "libraries" .!= []
+                              <*> conVal .:? "imports" .!= []
+                              <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
       "Primitive" -> Primitive <$> conVal .: "name" <*> conVal .: "primType"
       _ -> error "Expected: BlackBox or Primitive object"
     _ -> error "Expected: BlackBox or Primitive object"

@@ -128,7 +128,7 @@ data Declaration
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl !Identifier !Identifier [(Identifier,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
-  | BlackBoxD !S.Text !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
+  | BlackBoxD !S.Text [S.Text] [S.Text] !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
   | NetDecl !Identifier !HWType -- ^ Signal declaration
   deriving Show
 
@@ -152,7 +152,7 @@ data Expr
   | DataCon    !HWType       !Modifier  [Expr] -- ^ DataCon application
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
-  | BlackBoxE !S.Text !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | BlackBoxE !S.Text [S.Text] [S.Text] !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
   deriving Show
 
 -- | Literals used in an expression

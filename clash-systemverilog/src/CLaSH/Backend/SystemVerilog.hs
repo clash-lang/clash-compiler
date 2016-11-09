@@ -583,7 +583,7 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
   where
     pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
-inst_ (BlackBoxD _ bs bbCtx) = do
+inst_ (BlackBoxD _ _ _ bs bbCtx) = do
   t <- renderBlackBox bs bbCtx
   fmap Just (string t)
 
@@ -679,27 +679,27 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Index (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE _ bs bbCtx b') = do
+expr_ b (BlackBoxE _ _ _ bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 

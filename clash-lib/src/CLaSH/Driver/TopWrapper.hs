@@ -327,9 +327,9 @@ genSyncReset primMap lock rst nm r = do
               }
       bbName = "CLaSH.TopWrapper.syncReset"
   resetGenDecl <- case HashMap.lookup bbName primMap of
-        Just (BlackBox _ (Left templ)) -> do
+        Just (BlackBox _ lib imps (Left templ)) -> do
           templ' <- prepareBlackBox bbName templ ctx
-          return (BlackBoxD bbName templ' ctx)
+          return (BlackBoxD bbName lib imps templ' ctx)
         pM -> error $ $(curLoc) ++ ("Can't make reset sync for: " ++ show pM)
 
   return [NetDecl rst (Reset nm r),resetGenDecl]

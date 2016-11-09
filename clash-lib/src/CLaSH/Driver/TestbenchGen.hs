@@ -73,7 +73,7 @@ genTestBench opts supply primMap typeTrans tcm tupTcm eval mkId seen globals sti
       Just stimuliNm
               -> (\(v,w,x,y,z) -> (Just v,w,x,y,z)) <$>
                  genStimuli seen primMap globals typeTrans mkId tcm normalizeSignal hidden inp modName dfiles iw stimuliNm
-      Nothing -> let inpExpr = Assignment (fst inp) (BlackBoxE "" [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
+      Nothing -> let inpExpr = Assignment (fst inp) (BlackBoxE "" [] [] [Err Nothing] (emptyBBContext {bbResult = (undefined,snd inp)}) False)
                  in  return (Just inpExpr,[],seen,hidden,dfiles)
     Nothing   -> return (Nothing,[],seen,hidden,dfiles)
 
@@ -133,7 +133,7 @@ genClock :: PrimMap BlackBoxTemplate
          -> NetlistMonad (Maybe [Declaration])
 genClock primMap (clkName,Clock clkSym rate) =
   case HashMap.lookup "CLaSH.Driver.TestbenchGen.clockGen" primMap of
-    Just (BlackBox _ (Left templ)) -> do
+    Just (BlackBox _ lib imps (Left templ)) -> do
       let (rising,rest) = divMod (toInteger rate) 2
           falling       = rising + rest
           ctx = emptyBBContext
@@ -144,7 +144,7 @@ genClock primMap (clkName,Clock clkSym rate) =
                                ]
                   }
       templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.clockGen" templ ctx
-      let clkGenDecl = BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" templ' ctx
+      let clkGenDecl = BlackBoxD "CLaSH.Driver.TestbenchGen.clockGen" lib imps templ' ctx
           clkDecls   = [ NetDecl clkName (Clock clkSym rate)
                        , clkGenDecl
                        ]
@@ -158,13 +158,13 @@ genReset :: PrimMap BlackBoxTemplate
          -> NetlistMonad (Maybe [Declaration])
 genReset primMap (rstName,Reset clkSym rate) =
   case HashMap.lookup "CLaSH.Driver.TestbenchGen.resetGen" primMap of
-    Just (BlackBox _ (Left templ)) -> do
+    Just (BlackBox _ lib imps (Left templ)) -> do
       let ctx = emptyBBContext
                   { bbResult = (Left (Identifier rstName Nothing), Reset clkSym rate)
                   , bbInputs = [(Left (N.Literal Nothing (NumLit 2)),Signed 32,True)]
                   }
       templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.resetGen" templ ctx
-      let resetGenDecl =  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" templ' ctx
+      let resetGenDecl =  BlackBoxD "CLaSH.Driver.TestbenchGen.resetGen" lib imps templ' ctx
           rstDecls     = [ NetDecl rstName (Reset clkSym rate)
                        , resetGenDecl
                        ]
@@ -177,25 +177,25 @@ genReset _ _ =  return Nothing
 genFinish :: PrimMap BlackBoxTemplate
           -> NetlistMonad Declaration
 genFinish primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.finishedGen" primMap of
-  Just (BlackBox _ (Left templ)) -> do
+  Just (BlackBox _ lib imps (Left templ)) -> do
     let ctx = emptyBBContext
                 { bbResult = (Left (Identifier "finished" Nothing), Bool)
                 , bbInputs = [ (Left (N.Literal Nothing (NumLit 100)),Signed 32,True) ]
                 }
     templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.finishGen" templ ctx
-    return $ BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" templ' ctx
+    return $ BlackBoxD "CLaSH.Driver.TestbenchGen.finishGen" lib imps templ' ctx
   pM -> error $ $(curLoc) ++ ("Can't make finish declaration for: " ++ show pM)
 
 genDone :: PrimMap BlackBoxTemplate
         -> NetlistMonad Declaration
 genDone primMap = case HashMap.lookup "CLaSH.Driver.TestbenchGen.doneGen" primMap of
-  Just (BlackBox _ (Left templ)) -> do
+  Just (BlackBox _ lib imps (Left templ)) -> do
     let ctx = emptyBBContext
                 { bbResult    = (Left (Identifier "done" Nothing), Bool)
                 , bbInputs    = [(Left (Identifier "finished" Nothing),Bool,False)]
                 }
     templ' <- prepareBlackBox "CLaSH.Driver.TestbenchGen.doneGen" templ ctx
-    return $ BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" templ' ctx
+    return $ BlackBoxD "CLaSH.Driver.TestbenchGen.doneGen" lib imps templ' ctx
   pM -> error $ $(curLoc) ++ ("Can't make done declaration for: " ++ show pM)
 
 genStimuli :: [Identifier]

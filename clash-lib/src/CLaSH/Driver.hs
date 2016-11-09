@@ -137,10 +137,10 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   putStrLn $ "Total compilation took " ++ show startEndDiff
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
-parsePrimitive (BlackBox pNm templT) =
+parsePrimitive (BlackBox pNm libM imps templT) =
   let (templ,err) = either (first Left . runParse) (first Right . runParse) templT
   in  case err of
-        [] -> BlackBox pNm templ
+        [] -> BlackBox pNm libM imps templ
         _  -> error $ "Errors in template for: " ++ show pNm ++ ":\n" ++ show err
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 

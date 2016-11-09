@@ -55,6 +55,8 @@ data VHDLState =
   , _nameCache :: (HashMap HWType Doc) -- ^ Cache for previously generated product type names
   , _modNm     :: String
   , _srcSpan   :: SrcSpan
+  , _libraries :: [T.Text]
+  , _packages  :: [T.Text]
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
   }
@@ -62,7 +64,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] []
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else
@@ -128,10 +130,14 @@ genVHDL nm sp c = do
     (unpack cName,) A.<$> vhdl
   where
     cName   = componentName c
-    vhdl    = "-- Automatically generated VHDL-93" <$$>
-              tyImports nm <$$> linebreak <>
-              entity c <$$> linebreak <>
-              architecture c
+    vhdl    = do
+      ent  <- entity c
+      arch <- architecture c
+      imps <- tyImports nm
+      ("-- Automatically generated VHDL-93" <$$>
+       pure imps <$$> linebreak <>
+       pure ent <$$> linebreak <>
+       pure arch)
 
 -- | Generate a VHDL package containing type definitions for the given HWTypes
 mkTyPackage_ :: String
@@ -374,15 +380,18 @@ funDec _ _ = Nothing
 tyImports :: String -> VHDLM Doc
 tyImports nm = do
   mkId <- mkBasicId
+  libs <- use libraries
+  packs <- use packages
   punctuate' semi $ sequence
-    [ "library IEEE"
-    , "use IEEE.STD_LOGIC_1164.ALL"
-    , "use IEEE.NUMERIC_STD.ALL"
-    , "use IEEE.MATH_REAL.ALL"
-    , "use std.textio.all"
-    , "use work.all"
-    , "use work." <> text (mkId (T.pack nm `T.append` "_types")) <> ".all"
-    ]
+    ([ "library IEEE"
+     , "use IEEE.STD_LOGIC_1164.ALL"
+     , "use IEEE.NUMERIC_STD.ALL"
+     , "use IEEE.MATH_REAL.ALL"
+     , "use std.textio.all"
+     , "use work.all"
+     , "use work." <> text (mkId (T.pack nm `T.append` "_types")) <> ".all"
+     ] ++ (map (("library" <+>) . text) (nub libs))
+       ++ (map (("use" <+>) . text) (nub packs)))
 
 entity :: Component -> VHDLM Doc
 entity c = do
@@ -585,8 +594,11 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
       rec (p,ls) <- fmap unzip $ sequence [ (,fromIntegral (T.length i)) A.<$> fill (maximum ls) (text i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
       nest 2 $ "port map" <$$> tupled (A.pure p)
 
-inst_ (BlackBoxD _ bs bbCtx) = do t <- renderBlackBox bs bbCtx
-                                  fmap Just (string t)
+inst_ (BlackBoxD _ libs packs bs bbCtx) = do
+  libraries %= ((map T.fromStrict libs) ++)
+  packages  %= ((map T.fromStrict packs) ++)
+  t <- renderBlackBox bs bbCtx
+  fmap Just (string t)
 
 inst_ _ = return Nothing
 
@@ -708,29 +720,29 @@ expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = "to_unsigned" <> tupled (sequence
 expr_ _ (DataCon ty@(Product _ _) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   , Just k <- clogBase 2 n
   , let k' = max 1 k
   = exprLit (Just (Unsigned k',k')) i
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Index.maxBound#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   , n > 0
@@ -738,19 +750,21 @@ expr_ _ (BlackBoxE pNm _ bbCtx _)
   , let k' = max 1 k
   = exprLit (Just (Unsigned k',k')) (NumLit (n-1))
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "GHC.Types.I#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   = do iw <- use intWidth
        exprLit (Just (Signed iw,iw)) (NumLit n)
 
-expr_ _ (BlackBoxE pNm _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   | pNm == "GHC.Types.W#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   = do iw <- use intWidth
        exprLit (Just (Unsigned iw,iw)) (NumLit n)
 
-expr_ b (BlackBoxE _ bs bbCtx b') = do
+expr_ b (BlackBoxE _ libs packs bs bbCtx b') = do
+  libraries %= ((map T.fromStrict libs) ++)
+  packages  %= ((map T.fromStrict packs) ++)
   t <- renderBlackBox bs bbCtx
   parenIf (b || b') $ string t
 
