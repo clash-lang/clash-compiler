@@ -306,7 +306,6 @@ registerMaybe' clk initial i = regEn# clk initial (fmap isJust i) (fmap fromJust
 {-# INLINE registerMaybe' #-}
 
 {-# INLINE regEn' #-}
-{-# DEPRECATED regEn' "'regEn'' will be removed in clash-prelude-1.0, use 'registerMaybe''." #-}
 -- | Version of 'register'' that only updates its content when its third
 -- argument is asserted. So given:
 --

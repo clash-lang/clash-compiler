@@ -112,7 +112,6 @@ registerMaybe initial i = regEn# systemClock initial (fmap isJust i) (fmap fromJ
 infixr 3 `registerMaybe`
 
 {-# INLINE regEn #-}
-{-# DEPRECATED regEn "'regEn' will be removed in clash-prelude-1.0, use 'registerMaybe'." #-}
 -- | Version of 'register' that only updates its content when its second argument
 -- is asserted. So given:
 --
