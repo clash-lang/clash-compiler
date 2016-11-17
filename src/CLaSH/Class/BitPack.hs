@@ -26,6 +26,8 @@ module CLaSH.Class.BitPack
   )
 where
 
+import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
+                                       wordToFloat)
 import Data.Int
 import Data.Word
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
@@ -33,7 +35,7 @@ import Prelude                        hiding (map)
 
 import CLaSH.Class.Resize             (zeroExtend)
 import CLaSH.Sized.BitVector          (BitVector, (++#), high, low)
-import CLaSH.Sized.Internal.BitVector (split#)
+import CLaSH.Sized.Internal.BitVector (unsafeToInteger, split#)
 
 {- $setup
 >>> :set -XDataKinds
@@ -140,6 +142,32 @@ instance BitPack Word64 where
   pack   = fromIntegral
   unpack = fromIntegral
 #endif
+
+instance BitPack Float where
+  type BitSize Float = 32
+  pack   = packFloat#
+  unpack = unpackFloat#
+
+packFloat# :: Float -> BitVector 32
+packFloat# = fromIntegral . floatToWord
+{-# NOINLINE packFloat# #-}
+
+unpackFloat# :: BitVector 32 -> Float
+unpackFloat# = wordToFloat . fromInteger . unsafeToInteger
+{-# NOINLINE unpackFloat# #-}
+
+instance BitPack Double where
+  type BitSize Double = 64
+  pack   = packDouble#
+  unpack = unpackDouble#
+
+packDouble# :: Double -> BitVector 64
+packDouble# = fromIntegral . doubleToWord
+{-# NOINLINE packDouble# #-}
+
+unpackDouble# :: BitVector 64 -> Double
+unpackDouble# = wordToDouble . fromInteger . unsafeToInteger
+{-# NOINLINE unpackDouble# #-}
 
 instance BitPack () where
   type BitSize () = 0
