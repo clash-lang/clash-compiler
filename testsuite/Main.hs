@@ -74,6 +74,9 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
             ]
+        , testGroup "Floating"
+            [ runTest ("tests" </> "shouldwork" </> "Floating") Both ["-clash-float-support"] "FloatPack" (Just ("topEntity",False))
+            ]
         , testGroup "HOPrim"
             [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "HOImap" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))

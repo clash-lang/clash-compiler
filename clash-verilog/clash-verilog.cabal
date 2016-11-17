@@ -41,7 +41,8 @@ Build-type:           Simple
 Extra-source-files:   README.md,
                       CHANGELOG.md
 
-Data-files:           primitives/CLaSH.Driver.TestbenchGen.json
+Data-files:           primitives/CLaSH.Class.BitPack.json
+                      primitives/CLaSH.Driver.TestbenchGen.json
                       primitives/CLaSH.Driver.TopWrapper.json
                       primitives/CLaSH.GHC.GHC2Core.json
                       primitives/CLaSH.Prelude.BlockRam.json

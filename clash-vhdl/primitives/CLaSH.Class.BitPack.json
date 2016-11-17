@@ -1,0 +1,29 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Class.BitPack.packFloat#"
+    , "type" :
+"packFloat# :: Float -> BitVector 32"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Class.BitPack.unpackFloat#"
+    , "type" :
+"packFloat# :: BitVector 32 -> Float"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Class.BitPack.packDouble#"
+    , "type" :
+"packFloat# :: Double -> BitVector 64"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Class.BitPack.unpackDouble#"
+    , "type" :
+"packFloat# :: BitVector 64 -> Double"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]
