@@ -174,7 +174,24 @@ representableType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HW
                   -> HashMap TyConName TyCon
                   -> Type
                   -> Bool
-representableType builtInTranslation m = either (const False) ((> 0) . typeSize) . coreTypeToHWType builtInTranslation m
+representableType builtInTranslation m = either (const False) isRepresentable . coreTypeToHWType builtInTranslation m
+  where
+    isRepresentable hty = case hty of
+      String          -> True
+      Bool            -> True
+      BitVector n     -> n > 0
+      Index n         -> n > 0
+      Signed n        -> n > 0
+      Unsigned  n     -> n > 0
+      Vector n elTy
+        | n > 0       -> isRepresentable elTy
+      RTree _n elTy   -> isRepresentable elTy
+      Sum {}          -> True
+      Product _ elTys -> all isRepresentable elTys
+      SP _ elTyss     -> all (all isRepresentable . snd) elTyss
+      Clock {}        -> True
+      Reset {}        -> True
+      _               -> False
 
 -- | Determines the bitsize of a type
 typeSize :: HWType

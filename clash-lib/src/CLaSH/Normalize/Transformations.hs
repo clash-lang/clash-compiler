@@ -979,7 +979,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
           [nilCon,consCon] = tyConDataCons vecTc
           nilE = mkVec nilCon consCon aTy 0 []
       changed nilE
-    _ -> case f of
+    tv -> case f of
       "CLaSH.Sized.Vector.zipWith" | length args == 7 -> do
         let [lhsElTy,rhsElty,resElTy,nTy] = Either.rights args
         case runExcept (tyNatSize tcm nTy) of
@@ -1132,6 +1132,40 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                then reduceReplicate n aTy eTy vArg
                else return e
           _ -> return e
+      "CLaSH.Sized.Internal.BitVector.split#" | length args == 4 -> do
+        let ([_knArg,bvArg],[nTy,mTy]) = Either.partitionEithers args
+        case (runExcept (tyNatSize tcm nTy), runExcept (tyNatSize tcm mTy), tv) of
+          (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
+            | n == 0 -> do
+              let (Just tupTc) = HashMap.lookup tupTcNm tcm
+                  [tupDc]      = tyConDataCons tupTc
+                  tup          = mkApps (Data tupDc)
+                                    [Right lTy
+                                    ,Right rTy
+                                    ,Left  bvArg
+                                    ,Left  (Prim "CLaSH.Transformations.removedArg" lTy)
+                                    ]
+
+              changed tup
+            | m == 0 -> do
+              let (Just tupTc) = HashMap.lookup tupTcNm tcm
+                  [tupDc]      = tyConDataCons tupTc
+                  tup          = mkApps (Data tupDc)
+                                    [Right lTy
+                                    ,Right rTy
+                                    ,Left  (Prim "CLaSH.Transformations.removedArg" lTy)
+                                    ,Left  bvArg
+                                    ]
+
+              changed tup
+          _ -> return e
+      "CLaSH.Sized.Internal.BitVector.eq#"
+        | ([_,_],[nTy]) <- Either.partitionEithers args
+        , Right 0 <- runExcept (tyNatSize tcm nTy)
+        , TyConApp boolTcNm [] <- tv
+        -> let (Just boolTc) = HashMap.lookup boolTcNm tcm
+               [_falseDc,trueDc] = tyConDataCons boolTc
+           in  changed (Data trueDc)
       _ -> return e
   where
     isUntranslatableType_not_poly t = do

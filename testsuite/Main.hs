@@ -73,6 +73,7 @@ main =
             [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "Mixer" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "ZeroInt" (Just ("testbench",True))
             ]
         , testGroup "Floating"
             [ runTest ("tests" </> "shouldwork" </> "Floating") Both ["-clash-float-support"] "FloatPack" (Just ("topEntity",False))
