@@ -245,12 +245,12 @@ instance KnownNat n => Enum (BitVector n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: BitVector n -> [BitVector n]
-enumFromThen#   :: BitVector n -> BitVector n -> [BitVector n]
+enumFrom#       :: KnownNat n => BitVector n -> [BitVector n]
+enumFromThen#   :: KnownNat n => BitVector n -> BitVector n -> [BitVector n]
 enumFromTo#     :: BitVector n -> BitVector n -> [BitVector n]
 enumFromThenTo# :: BitVector n -> BitVector n -> BitVector n -> [BitVector n]
-enumFrom# x             = map BV [unsafeToInteger x ..]
-enumFromThen# x y       = map BV [unsafeToInteger x, unsafeToInteger y ..]
+enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x ..]
+enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y ..]
 enumFromTo# x y         = map BV [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map BV [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 

@@ -230,12 +230,12 @@ instance KnownNat n => Enum (Signed n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: Signed n -> [Signed n]
-enumFromThen#   :: Signed n -> Signed n -> [Signed n]
+enumFrom#       :: KnownNat n => Signed n -> [Signed n]
+enumFromThen#   :: KnownNat n => Signed n -> Signed n -> [Signed n]
 enumFromTo#     :: Signed n -> Signed n -> [Signed n]
 enumFromThenTo# :: Signed n -> Signed n -> Signed n -> [Signed n]
-enumFrom# x             = map S [unsafeToInteger x ..]
-enumFromThen# x y       = map S [unsafeToInteger x, unsafeToInteger y ..]
+enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x ..]
+enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y ..]
 enumFromTo# x y         = map S [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map S [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 

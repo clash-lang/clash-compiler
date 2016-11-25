@@ -181,12 +181,12 @@ instance KnownNat n => Enum (Index n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: Index n -> [Index n]
-enumFromThen#   :: Index n -> Index n -> [Index n]
+enumFrom#       :: KnownNat n => Index n -> [Index n]
+enumFromThen#   :: KnownNat n => Index n -> Index n -> [Index n]
 enumFromTo#     :: Index n -> Index n -> [Index n]
 enumFromThenTo# :: Index n -> Index n -> Index n -> [Index n]
-enumFrom# x             = map I [unsafeToInteger x ..]
-enumFromThen# x y       = map I [unsafeToInteger x, unsafeToInteger y ..]
+enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x ..]
+enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y ..]
 enumFromTo# x y         = map I [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map I [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 

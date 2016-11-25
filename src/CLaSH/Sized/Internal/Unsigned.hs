@@ -214,12 +214,12 @@ instance KnownNat n => Enum (Unsigned n) where
 {-# NOINLINE enumFromThen# #-}
 {-# NOINLINE enumFromTo# #-}
 {-# NOINLINE enumFromThenTo# #-}
-enumFrom#       :: Unsigned n -> [Unsigned n]
-enumFromThen#   :: Unsigned n -> Unsigned n -> [Unsigned n]
+enumFrom#       :: KnownNat n => Unsigned n -> [Unsigned n]
+enumFromThen#   :: KnownNat n => Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromTo#     :: Unsigned n -> Unsigned n -> [Unsigned n]
 enumFromThenTo# :: Unsigned n -> Unsigned n -> Unsigned n -> [Unsigned n]
-enumFrom# x             = map U [unsafeToInteger x ..]
-enumFromThen# x y       = map U [unsafeToInteger x, unsafeToInteger y ..]
+enumFrom# x             = map fromInteger_INLINE [unsafeToInteger x ..]
+enumFromThen# x y       = map fromInteger_INLINE [unsafeToInteger x, unsafeToInteger y ..]
 enumFromTo# x y         = map U [unsafeToInteger x .. unsafeToInteger y]
 enumFromThenTo# x1 x2 y = map U [unsafeToInteger x1, unsafeToInteger x2 .. unsafeToInteger y]
 
