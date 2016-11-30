@@ -9,7 +9,7 @@
 
 module GHC.Extra where
 
-#if !(MIN_VERSION_GLASGOW_HASKELL(8,0,2,0))
+#if !(MIN_VERSION_GLASGOW_HASKELL(8,0,1,20161117))
 import Control.DeepSeq
 import SrcLoc (SrcSpan)
 
