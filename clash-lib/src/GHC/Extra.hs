@@ -4,12 +4,15 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module GHC.Extra where
 
+#if !(MIN_VERSION_GLASGOW_HASKELL(8,0,1,20161117))
 import Control.DeepSeq
 import SrcLoc (SrcSpan)
 
 instance NFData SrcSpan where
   rnf x = x `seq` ()
+#endif

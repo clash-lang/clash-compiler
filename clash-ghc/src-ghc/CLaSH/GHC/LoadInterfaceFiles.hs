@@ -4,6 +4,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
@@ -34,7 +35,7 @@ import qualified Maybes
 import qualified MkCore
 import qualified MonadUtils
 import qualified Name
-import           Outputable  (showPpr, showSDoc, text)
+import           Outputable  (showPpr, showSDoc, text, empty)
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -50,7 +51,11 @@ runIfl modName action = do
   hscEnv <- GHC.getSession
   let localEnv = TcRnTypes.IfLclEnv modName (text "runIfl")
                    UniqFM.emptyUFM UniqFM.emptyUFM
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,1,20161117)
+  let globalEnv = TcRnTypes.IfGblEnv empty Nothing
+#else
   let globalEnv = TcRnTypes.IfGblEnv Nothing
+#endif
   MonadUtils.liftIO $ TcRnMonad.initTcRnIf 'r' hscEnv globalEnv
                         localEnv action
 
