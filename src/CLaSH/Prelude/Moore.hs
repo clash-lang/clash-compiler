@@ -16,9 +16,13 @@ module CLaSH.Prelude.Moore
   ( -- * Moore machine synchronised to the system clock
     moore
   , mooreB
+  , medvedev
+  , medvedevB
     -- * Moore machine synchronised to an arbitrary clock
   , moore'
   , mooreB'
+  , medvedev'
+  , medvedevB'
   )
 where
 
@@ -82,6 +86,12 @@ moore :: (s -> i -> s) -- ^ Transfer function in moore machine form:
       -- of the moore machine
 moore = moore' systemClock
 
+{-# INLINE medvedev #-}
+-- | Create a synchronous function from a combinational function describing
+-- a moore machine without any output logic
+medvedev :: (s -> i -> s) -> s -> Signal i -> Signal s
+medvedev tr st = moore tr id st
+
 {-# INLINE mooreB #-}
 -- | A version of 'moore' that does automatic 'Bundle'ing
 --
@@ -120,6 +130,11 @@ mooreB :: (Bundle i, Bundle o)
        -- ^ Synchronous sequential function with input and output matching that
        -- of the moore machine
 mooreB = mooreB' systemClock
+
+{-# INLINE medvedevB #-}
+-- | A version of 'medvedev' that does automatic 'Bundle'ing
+medvedevB :: (Bundle i, Bundle s) => (s -> i -> s) -> s -> Unbundled i -> Unbundled s
+medvedevB tr st = mooreB tr id st
 
 {-# INLINABLE moore' #-}
 -- | Create a synchronous function from a combinational function describing
@@ -169,6 +184,12 @@ moore' clk ft fo iS = \i -> let s' = ft <$> s <*> i
                                 s  = register' clk iS s'
                         in fo <$> s
 
+{-# INLINE medvedev' #-}
+-- | Create a synchronous function from a combinational function describing
+-- a moore machine without any output logic
+medvedev' :: SClock clk -> (s -> i -> s) -> s -> (Signal' clk i -> Signal' clk s)
+medvedev' clk tr st = moore' clk tr id st
+
 {-# INLINE mooreB' #-}
 -- | A version of 'moore'' that does automatic 'Bundle'ing
 --
@@ -208,3 +229,8 @@ mooreB' :: (Bundle i, Bundle o)
         -- ^ Synchronous sequential function with input and output matching that
         -- of the moore machine
 mooreB' clk ft fo iS i = unbundle (moore' clk ft fo iS (bundle i))
+
+{-# INLINE medvedevB' #-}
+-- | A version of 'medvedev'' that does automatic 'Bundle'ing
+medvedevB' :: (Bundle i, Bundle s) => SClock clk -> (s -> i -> s) -> s -> Unbundled' clk i -> Unbundled' clk s
+medvedevB' clk tr st = mooreB' clk tr id st
