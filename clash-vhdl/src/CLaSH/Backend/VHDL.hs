@@ -837,7 +837,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
 
   where
     blit = bits (toBits sz i)
-    hlit = hex (toHex sz i)
+    hlit = (if i < 0 then "-" else empty) <> hex (toHex sz i)
 exprLit _             (BoolLit t)   = if t then "true" else "false"
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = text . T.pack $ show s
@@ -868,7 +868,7 @@ bits = dquotes . hcat . mapM bit_char
 toHex :: Int -> Integer -> String
 toHex sz i =
   let Just d = clogBase 16 (2^sz)
-  in  printf ("%0" ++ show d ++ "X") i
+  in  printf ("%0" ++ show d ++ "X") (abs i)
 
 hex :: String -> VHDLM Doc
 hex s = char 'x' <> dquotes (text (T.pack s))
