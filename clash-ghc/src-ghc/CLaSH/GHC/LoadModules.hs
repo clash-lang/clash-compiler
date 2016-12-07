@@ -95,8 +95,7 @@ loadModules ::
         , Maybe CoreSyn.CoreBndr                   -- testInput bndr
         , Maybe CoreSyn.CoreBndr                   -- expectedOutput bndr
         )
-loadModules modName dflagsM = GHC.defaultErrorHandler DynFlags.defaultFatalMessager
-                              DynFlags.defaultFlushOut $ do
+loadModules modName dflagsM = do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections #-}
+{-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables, TupleSections #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
@@ -341,7 +341,11 @@ handleCLaSHException df opts e = case fromException e of
   _ -> case fromException e of
     Just (ErrorCall msg) ->
       throwOneError (mkPlainErrMsg df noSrcSpan (text "CLaSH error call:" $$ text msg))
-    _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ text (displayException e)))
+    _ -> case fromException e of
+      Just (e' :: SourceError) -> do
+        GHC.printException e'
+        liftIO $ exitWith (ExitFailure 1)
+      _ -> throwOneError (mkPlainErrMsg df noSrcSpan (text "Other error:" $$ text (displayException e)))
   where
     srcInfo = text "NB: The source location of the error is not exact, only indicative, as it is acquired after optimisations." $$
               text "The actual location of the error can be in a function that is inlined." $$
