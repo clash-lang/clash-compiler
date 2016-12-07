@@ -831,7 +831,7 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
     | otherwise -> "unsigned'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
   Signed n
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
-    | otherwise -> "signed'" <> parens hlit
+    | otherwise -> "signed'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
   BitVector _ -> "std_logic_vector'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
   _           -> blit
 
