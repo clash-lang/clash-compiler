@@ -471,6 +471,7 @@ isUntranslatable :: Term
 isUntranslatable tm = do
   tcm <- Lens.view tcCache
   not <$> (representableType <$> Lens.view typeTranslator
+                             <*> Lens.view allowZero
                              <*> pure tcm
                              <*> termType tcm tm)
 
@@ -480,6 +481,7 @@ isUntranslatableType :: Type
                      -> RewriteMonad extra Bool
 isUntranslatableType ty =
   not <$> (representableType <$> Lens.view typeTranslator
+                             <*> Lens.view allowZero
                              <*> Lens.view tcCache
                              <*> pure ty)
 

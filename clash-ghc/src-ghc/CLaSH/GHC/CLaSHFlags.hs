@@ -47,6 +47,7 @@ flagsClash r = [
   , defFlag "clash-hdlsyn" (SepArg (setHdlSyn r))
   , defFlag "clash-error-extra" (NoArg (liftEwM (setErrorExtra r)))
   , defFlag "clash-float-support" (NoArg (liftEwM (setFloatSupport r)))
+  , defFlag "clash-allow-zero-width" (NoArg (liftEwM (setAllowZeroWidth r)))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
@@ -101,3 +102,6 @@ setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})
 
 setFloatSupport :: IORef CLaSHOpts -> IO ()
 setFloatSupport r = modifyIORef r (\c -> c {opt_floatSupport = True})
+
+setAllowZeroWidth :: IORef CLaSHOpts -> IO ()
+setAllowZeroWidth r = modifyIORef r (\c -> c {opt_allowZero = True})

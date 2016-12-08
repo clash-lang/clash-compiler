@@ -36,6 +36,7 @@ data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_hdlSyn      :: HdlSyn
                            , opt_errorExtra  :: Bool
                            , opt_floatSupport :: Bool
+                           , opt_allowZero   :: Bool
                            }
 
 data CLaSHException = CLaSHException SrcSpan String (Maybe String)

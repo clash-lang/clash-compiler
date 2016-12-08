@@ -92,6 +92,8 @@ data RewriteEnv
   -- ^ Tuple TyCon cache
   , _evaluator      :: HashMap TyConName TyCon -> Bool -> Term -> Term
   -- ^ Hardcoded evaluator (delta-reduction)}
+  , _allowZero      :: Bool
+  -- ^ Zero bit wide things are representable
   }
 
 makeLenses ''RewriteEnv

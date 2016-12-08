@@ -93,6 +93,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     nonRepTest :: (Var Term, Embed Term) -> RewriteMonad extra Bool
     nonRepTest ((Id _ tyE), _)
       = not <$> (representableType <$> Lens.view typeTranslator
+                                   <*> Lens.view allowZero
                                    <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
     nonRepTest _ = return False
@@ -143,7 +144,7 @@ nonRepSpec ctx e@(App e1 e2)
   = do tcm <- Lens.view tcCache
        e2Ty <- termType tcm e2
        localVar <- isLocalVar e2
-       nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure e2Ty)
+       nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure e2Ty)
        if nonRepE2 && not localVar
          then specializeNorm ctx e
          else return e
@@ -162,7 +163,7 @@ caseLet _ e = return e
 caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
-    ty1Rep  <- representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure alts1Ty
+    ty1Rep  <- representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure alts1Ty
     if not ty1Rep
       then do newAlts <- mapM ( return
                                   . uncurry bind
@@ -202,7 +203,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                      (return e)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
-        nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view tcCache <*> pure scrutTy)
+        nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_,_,scrutBody)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))

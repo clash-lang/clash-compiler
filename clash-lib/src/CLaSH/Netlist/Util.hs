@@ -171,20 +171,21 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! tc) of
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
 representableType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+                  -> Bool -- ^ Allow zero-bit things
                   -> HashMap TyConName TyCon
                   -> Type
                   -> Bool
-representableType builtInTranslation m = either (const False) isRepresentable . coreTypeToHWType builtInTranslation m
+representableType builtInTranslation allowZero m = either (const False) isRepresentable . coreTypeToHWType builtInTranslation m
   where
     isRepresentable hty = case hty of
       String          -> True
       Bool            -> True
-      BitVector n     -> n > 0
-      Index n         -> n > 0
-      Signed n        -> n > 0
-      Unsigned  n     -> n > 0
+      BitVector n     -> (n > 0) || allowZero
+      Index n         -> (n > 0) || allowZero
+      Signed n        -> (n > 0) || allowZero
+      Unsigned  n     -> (n > 0) || allowZero
       Vector n elTy
-        | n > 0       -> isRepresentable elTy
+        | n > 0 || allowZero -> isRepresentable elTy
       RTree _n elTy   -> isRepresentable elTy
       Sum {}          -> True
       Product _ elTys -> all isRepresentable elTys
