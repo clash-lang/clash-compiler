@@ -8,6 +8,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE GADTs          #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MagicHash      #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators  #-}
 
 {-# LANGUAGE Trustworthy #-}
@@ -63,6 +64,8 @@ where
 import GHC.TypeLits       (KnownNat, Nat, type (+), type (-), type (*),
                            type (^), type (<=), natVal)
 import GHC.TypeLits.Extra (CLog, FLog, Div, Log, Mod)
+import Language.Haskell.TH (appT, conT, litT, numTyLit, sigE)
+import Language.Haskell.TH.Syntax (Lift (..))
 import Unsafe.Coerce      (unsafeCoerce)
 import CLaSH.XException   (ShowX (..), showsPrecXWith)
 
@@ -78,6 +81,10 @@ import CLaSH.XException   (ShowX (..), showsPrecXWith)
 --   'SNat' literals
 data SNat (n :: Nat) where
   SNat :: KnownNat n => SNat n
+
+instance Lift (SNat n) where
+  lift s = sigE [| SNat |]
+                (appT (conT ''SNat) (litT $ numTyLit (snatToInteger s)))
 
 -- | Create a singleton literal for a type-level natural number
 snat :: KnownNat n => SNat n
