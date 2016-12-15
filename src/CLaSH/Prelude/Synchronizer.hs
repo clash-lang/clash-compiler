@@ -6,16 +6,21 @@ Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 Synchronizer circuits for safe clock domain crossings
 -}
 
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
-{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.Synchronizer
@@ -27,14 +32,21 @@ module CLaSH.Prelude.Synchronizer
 where
 
 import Data.Bits                   (complement, shiftR, xor)
-import GHC.TypeLits                (type (+))
+import Data.Constraint             ((:-)(..), Dict (..))
+#if MIN_VERSION_constraints(0,9,0)
+import Data.Constraint.Nat         (leTrans)
+#else
+import Unsafe.Coerce
+#endif
+import GHC.TypeLits                (type (+), type (-), type (<=))
 
 import CLaSH.Class.BitPack         (boolToBV)
+import CLaSH.Class.Resize          (truncateB)
 import CLaSH.Prelude.BitIndex      (slice)
 import CLaSH.Prelude.Mealy         (mealyB')
 import CLaSH.Prelude.RAM           (asyncRam')
-import CLaSH.Promoted.Nat          (SNat, pow2SNat, subSNat)
-import CLaSH.Promoted.Nat.Literals (d0, d1, d2)
+import CLaSH.Promoted.Nat          (SNat (..), pow2SNat)
+import CLaSH.Promoted.Nat.Literals (d0)
 import CLaSH.Signal                ((.&&.), mux)
 import CLaSH.Signal.Bundle         (bundle)
 import CLaSH.Signal.Explicit       (Signal', SClock, register',
@@ -79,8 +91,7 @@ dualFlipFlopSynchronizer clk1 clk2 i = register' clk2 i
 
 -- * Asynchronous FIFO synchronizer
 
-fifoMem :: _
-        => SClock wclk
+fifoMem :: SClock wclk
         -> SClock rclk
         -> SNat addrSize
         -> Signal' rclk (BitVector addrSize)
@@ -89,46 +100,48 @@ fifoMem :: _
         -> Signal' wclk Bool
         -> Signal' wclk a
         -> Signal' rclk a
-fifoMem wclk rclk addrSize raddr waddr winc wfull wdata =
+fifoMem wclk rclk addrSize@SNat raddr waddr winc wfull wdata =
   asyncRam' wclk rclk
             (pow2SNat addrSize)
             raddr
             (mux (winc .&&. fmap not wfull) (Just <$> bundle (waddr,wdata)) (pure Nothing))
 
-ptrCompareT :: _
-            => SNat (addrSize + 1)
-            -> (BitVector (addrSize + 2) -> BitVector (addrSize + 2) -> Bool)
-            -> (BitVector (addrSize + 2), BitVector (addrSize + 2), Bool)
-            -> (BitVector (addrSize + 2), Bool)
-            -> ((BitVector (addrSize + 2), BitVector (addrSize + 2), Bool)
-               ,(Bool, BitVector (addrSize + 1), BitVector (addrSize + 2)))
-ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
-                                                          ,(flag,addr,ptr))
+ptrCompareT :: SNat addrSize
+            -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
+            -> (BitVector (addrSize + 1), BitVector (addrSize + 1), Bool)
+            -> (BitVector (addrSize + 1), Bool)
+            -> ((BitVector (addrSize + 1), BitVector (addrSize + 1), Bool)
+               ,(Bool, BitVector addrSize, BitVector (addrSize + 1)))
+ptrCompareT SNat flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
+                                                      ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
     bin' = bin + boolToBV (inc && not flag)
     ptr' = (bin' `shiftR` 1) `xor` bin'
-    addr = slice (addrSize `subSNat` d1) d0 bin
+    addr = truncateB bin
 
     flag' = flagGen ptr' s_ptr
 
 -- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
-isFull :: _
-       => SNat (2 + addrSize)
-       -> BitVector ((2 + addrSize) + 1)
-       -> BitVector ((2 + addrSize) + 1)
+isFull :: forall addrSize .
+          (2 <= addrSize)
+       => SNat addrSize
+       -> BitVector (addrSize + 1)
+       -> BitVector (addrSize + 1)
        -> Bool
-isFull addrSize ptr s_ptr =
-  ptr == (complement (slice addrSize (addrSize `subSNat` d1) s_ptr) ++#
-         slice (addrSize `subSNat` d2) d0 s_ptr)
+isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
+  Sub Dict ->
+    let a1 = SNat @(addrSize - 1)
+        a2 = SNat @(addrSize - 2)
+    in  ptr == (complement (slice addrSize a1 s_ptr) ++# slice a2 d0 s_ptr)
 
 -- | Synchroniser implemented as a FIFO around an asynchronous RAM. Based on the
 -- design described in "CLaSH.Tutorial#multiclock", which is itself based on the
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
 --
 -- __NB__: This synchroniser can be used for __word__-synchronization.
-asyncFIFOSynchronizer :: _
-                      => SNat (addrSize + 2) -- ^ Size of the internally used
+asyncFIFOSynchronizer :: (2 <= addrSize)
+                      => SNat addrSize       -- ^ Size of the internally used
                                              -- addresses, the FIFO contains
                                              -- @2^addrSize@ elements.
                       -> SClock wclk         -- ^ 'Clock' to which the write port
@@ -140,7 +153,7 @@ asyncFIFOSynchronizer :: _
                       -> Signal' rclk Bool   -- ^ Read request
                       -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
                       -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
-asyncFIFOSynchronizer addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
+asyncFIFOSynchronizer addrSize@SNat wclk rclk wdata winc rinc = (rdata,rempty,wfull)
   where
     s_rptr = dualFlipFlopSynchronizer rclk wclk 0 rptr
     s_wptr = dualFlipFlopSynchronizer wclk rclk 0 wptr
@@ -152,3 +165,14 @@ asyncFIFOSynchronizer addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
 
     (wfull,waddr,wptr)  = mealyB' wclk (ptrCompareT addrSize (isFull addrSize))
                                   (0,0,False) (s_rptr,winc)
+
+#if !MIN_VERSION_constraints(0,9,0)
+axiom :: forall a b . Dict (a ~ b)
+axiom = unsafeCoerce (Dict :: Dict (a ~ a))
+
+axiomLe :: forall a b. Dict (a <= b)
+axiomLe = axiom
+
+leTrans :: forall a b c. (b <= c, a <= b) :- (a <= c)
+leTrans = Sub (axiomLe @a @c)
+#endif
