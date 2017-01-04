@@ -82,12 +82,12 @@ data CoSimulator            = Icarus | ModelSim deriving (Show, Eq)
 --------------------------------------
 
 verilog                     :: QuasiQuoter
-verilog                     = createQuasiQuoter' $ inlineCoSim' 1
+verilog                     = createQuasiQuoter' $ inlineCoSim' Icarus
 
-inlineCoSim'                :: Int -> String -> Q Exp
+inlineCoSim'                :: CoSimulator -> String -> Q Exp
 inlineCoSim' hdl s          = liftM TupE $ sequence [q_hdl, q_period, q_reset, q_data, q_list, q_stdOut]
     where
-        q_hdl               = lift hdl
+        q_hdl               = lift (sim2Num hdl :: Int)
         q_period            = lift (20 :: Int)
         q_reset             = lift False
         q_data              = lift s
