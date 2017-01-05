@@ -5,9 +5,11 @@
 -}
 
 {-# LANGUAGE CPP                 #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module CLaSH.GHC.LoadModules
   ( loadModules
@@ -20,6 +22,7 @@ where
 #endif
 
 -- External Modules
+import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.List                    (nub)
 import           Data.Word                    (Word8)
 import           CLaSH.Annotations.TopEntity  (TopEntity)
@@ -157,7 +160,7 @@ loadModules modName dflagsM = do
     let modGraph' = map disableOptimizationsFlags modGraph
         modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
     tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
-                                 ; tcMod <- GHC.typecheckModule pMod
+                                 ; tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
                                  -- The purpose of the home package table (HPT) is to track
                                  -- the already compiled modules, so subsequent modules can
                                  -- rely/use those compilation results
@@ -333,3 +336,61 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
 -- properly. At the moment, CLaSH cannot deal with this recursive type and the
 -- recursive functions involved, and hence we need to disable this useful transformation. After
 -- everything is done properly, we should enable it again.
+
+-- | Remove all strictness annotations:
+--
+-- * Remove strictness annotations from data type declarations
+--   (only works for data types that are currently being compiled, i.e.,
+--    that are not part of a pre-compiled imported library)
+--
+-- We need to remove strictness annotations because GHC will introduce casts
+-- between Integer and CLaSH' numeric primitives otherwise, where CLaSH will
+-- error when it sees such casts. The reason it does this is because
+-- Integer is a completely unconstrained integer type and is currently
+-- (erroneously) translated to a 64-bit integer in the HDL; this means that
+-- we could lose bits when the original numeric type had more bits than 64.
+--
+-- Removing these strictness annotations is perfectly safe, as they only
+-- affect simulation behaviour.
+removeStrictnessAnnotations ::
+     GHC.ParsedModule
+  -> GHC.ParsedModule
+removeStrictnessAnnotations pm =
+    pm {GHC.pm_parsed_source = fmap rmPS (GHC.pm_parsed_source pm)}
+  where
+    rmPS :: GHC.DataId name => GHC.HsModule name -> GHC.HsModule name
+    rmPS hsm = hsm {GHC.hsmodDecls = (fmap . fmap) rmHSD (GHC.hsmodDecls hsm)}
+
+    rmHSD :: GHC.DataId name => GHC.HsDecl name -> GHC.HsDecl name
+    rmHSD (GHC.TyClD tyClDecl) = GHC.TyClD (rmTyClD tyClDecl)
+    rmHSD hsd = hsd
+
+    rmTyClD :: GHC.DataId name => GHC.TyClDecl name -> GHC.TyClDecl name
+    rmTyClD dc@(GHC.DataDecl {}) = dc {GHC.tcdDataDefn = rmDataDefn (GHC.tcdDataDefn dc)}
+    rmTyClD tyClD = tyClD
+
+    rmDataDefn :: GHC.DataId name => GHC.HsDataDefn name -> GHC.HsDataDefn name
+    rmDataDefn hdf = hdf {GHC.dd_cons = (fmap . fmap) rmCD (GHC.dd_cons hdf)}
+
+    rmCD :: GHC.DataId name => GHC.ConDecl name -> GHC.ConDecl name
+    rmCD gadt@(GHC.ConDeclGADT {}) = gadt {GHC.con_type = rmSigType (GHC.con_type gadt)}
+    rmCD h98@(GHC.ConDeclH98 {})   = h98  {GHC.con_details = rmConDetails (GHC.con_details h98)}
+
+    -- type LHsSigType name = HsImplicitBndrs name (LHsType name)
+    rmSigType :: GHC.DataId name => GHC.LHsSigType name -> GHC.LHsSigType name
+    rmSigType hsIB = hsIB {GHC.hsib_body = rmHsType (GHC.hsib_body hsIB)}
+
+    -- type HsConDeclDetails name = HsConDetails (LBangType name) (Located [LConDeclField name])
+    rmConDetails :: GHC.DataId name => GHC.HsConDeclDetails name -> GHC.HsConDeclDetails name
+    rmConDetails (GHC.PrefixCon args) = GHC.PrefixCon (fmap rmHsType args)
+    rmConDetails (GHC.RecCon rec)     = GHC.RecCon ((fmap . fmap . fmap) rmConDeclF rec)
+    rmConDetails (GHC.InfixCon l r)   = GHC.InfixCon (rmHsType l) (rmHsType r)
+
+    rmHsType :: GHC.DataId name => GHC.Located (GHC.HsType name) -> GHC.Located (GHC.HsType name)
+    rmHsType = transform go
+      where
+        go (GHC.unLoc -> GHC.HsBangTy _ ty) = ty
+        go ty = ty
+
+    rmConDeclF :: GHC.DataId name => GHC.ConDeclField name -> GHC.ConDeclField name
+    rmConDeclF cdf = cdf {GHC.cd_fld_type = rmHsType (GHC.cd_fld_type cdf)}
