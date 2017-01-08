@@ -42,6 +42,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "CharTest" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "ClassOps" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "CountTrailingZeros" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "DivMod" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "IrrefError" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NestedPrimitives" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NestedPrimitives2" (Just ("topEntity",False))

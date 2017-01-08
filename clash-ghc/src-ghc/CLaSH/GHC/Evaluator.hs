@@ -138,6 +138,17 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Integer.Type.remInteger" | Just (i,j) <- integerLiterals tcm isSubj args
     -> integerToIntegerLiteral (i `rem` j)
 
+  "GHC.Integer.Type.divModInteger" | Just (i,j) <- integerLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp ubTupTcNm [liftedKi,_,intTy,_]) = splitFunForallTy ty
+           (Just ubTupTc) = HashMap.lookup ubTupTcNm tcm
+           [ubTupDc] = tyConDataCons ubTupTc
+           (d,m) = divMod i j
+       in  mkApps (Data ubTupDc) [ Right liftedKi, Right liftedKi
+                                 , Right intTy,    Right intTy
+                                 , Left (Literal (IntegerLiteral d))
+                                 , Left (Literal (IntegerLiteral m))
+                                 ]
+
   "GHC.Integer.Type.gtInteger" | Just (i,j) <- integerLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i > j)
 
