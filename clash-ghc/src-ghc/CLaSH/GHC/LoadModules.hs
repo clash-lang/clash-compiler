@@ -121,6 +121,7 @@ loadModules modName dflagsM = do
                                 , LangExt.TypeApplications
                                 , LangExt.ScopedTypeVariables
                                 , LangExt.MagicHash
+                                , LangExt.ExplicitForAll
                                 ]
                   let dfDis = foldl DynFlags.xopt_unset dfEn
                                 [ LangExt.ImplicitPrelude
