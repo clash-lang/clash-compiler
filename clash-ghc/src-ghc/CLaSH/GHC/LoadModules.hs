@@ -23,7 +23,7 @@ where
 
 -- External Modules
 import           Data.Generics.Uniplate.DataOnly (transform)
-import           Data.List                    (nub)
+import           Data.List                    (foldl', nub)
 import           Data.Word                    (Word8)
 import           CLaSH.Annotations.TopEntity  (TopEntity)
 import           System.Exit                  (ExitCode (..))
@@ -126,6 +126,8 @@ loadModules modName dflagsM = do
                   let dfDis = foldl DynFlags.xopt_unset dfEn
                                 [ LangExt.ImplicitPrelude
                                 , LangExt.MonomorphismRestriction
+                                , LangExt.Strict
+                                , LangExt.StrictData
                                 ]
                   let ghcTyLitNormPlugin = GHC.mkModuleName "GHC.TypeLits.Normalise"
                       ghcTyLitExtrPlugin = GHC.mkModuleName "GHC.TypeLits.Extra.Solver"
@@ -271,7 +273,10 @@ disableOptimizationsFlags ms@(GHC.ModSummary {..})
               })
 
 wantedOptimizationFlags :: GHC.DynFlags -> GHC.DynFlags
-wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set df wanted) unwanted
+wantedOptimizationFlags df =
+  foldl' DynFlags.xopt_unset
+    (foldl' DynFlags.gopt_unset
+        (foldl' DynFlags.gopt_set df wanted) unwanted) unwantedLang
   where
     wanted = [ Opt_CSE -- CSE
              , Opt_Specialise -- Specialise on types, specialise type-class-overloaded function defined in this module for the types
@@ -313,6 +318,13 @@ wantedOptimizationFlags df = foldl DynFlags.gopt_unset (foldl DynFlags.gopt_set 
                , Opt_CprAnal -- The worker/wrapper introduced by CPR breaks CLaSH, see [NOTE: CPR breaks CLaSH]
                , Opt_FullLaziness -- increases sharing, but seems to result in worse circuits (in both area and propagation delay)
                ]
+
+    -- Coercions between Integer and CLaSH' numeric primitives cause CLaSH to
+    -- fail. As strictness only affects simulation behaviour, removing them
+    -- is perfectly safe.
+    unwantedLang = [ LangExt.Strict
+                   , LangExt.StrictData
+                   ]
 
 -- [NOTE: CPR breaks CLaSH]
 -- We used to completely disable strictness analysis because it causes GHC to

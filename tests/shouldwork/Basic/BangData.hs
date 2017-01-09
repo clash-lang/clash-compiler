@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 module BangData where
 
 import CLaSH.Prelude
