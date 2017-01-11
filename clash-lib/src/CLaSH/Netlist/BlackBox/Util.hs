@@ -21,6 +21,7 @@ import           Control.Exception                    (throw)
 import           Control.Monad.State                  (State, StateT, evalStateT,
                                                        lift, modify, get)
 import           Control.Monad.Writer.Strict          (MonadWriter, tell)
+import           Data.Bool                            (bool)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
 import           Data.List                            (mapAccumL, nub)
@@ -45,6 +46,7 @@ import           CLaSH.Netlist.Types                  (HWType (..), Identifier,
                                                        SyncExpr, Expr (..),
                                                        Literal (..), NetlistMonad,
                                                        Modifier (..))
+import qualified CLaSH.Netlist.Types                  as N
 import           CLaSH.Netlist.Util                   (mkUniqueIdentifier,typeSize)
 import           CLaSH.Util
 
@@ -237,7 +239,15 @@ renderElem b (IF c t f) = do
                        (Vector n _) -> n
                        _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
       (L n)      -> case bbInputs b !! n of
-                      (either id fst -> Literal _ (NumLit i),_,_) -> fromInteger i
+                      (either id fst -> Literal _ l,_,_) ->
+                        case l of
+                          NumLit i -> fromInteger i
+                          BitLit bl -> case bl of
+                            N.H -> 1
+                            N.L -> 0
+                            _   -> error $ $(curLoc) ++ "IF: LIT bit literal must be high or low"
+                          BoolLit bl -> bool 0 1 bl
+                          _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
                       _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
       (Depth e)  -> case lineToType b [e] of
                       (RTree n _) -> n
