@@ -21,6 +21,7 @@ import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
+import           Data.Hashable                        (Hashable (..))
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
@@ -31,6 +32,7 @@ import           Data.Text.Lazy                       (pack,unpack)
 import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
+import           Text.Printf
 
 import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
@@ -58,6 +60,7 @@ data SystemVerilogState =
     , _idSeen    :: [Identifier]
     , _oports    :: [Identifier]
     , _srcSpan   :: SrcSpan
+    , _includes  :: [(String,Doc)]
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
     , _hdlsyn    :: HdlSyn
     }
@@ -65,7 +68,7 @@ data SystemVerilogState =
 makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
-  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan
+  initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan []
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -146,10 +149,12 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVerilog :: String -> SrcSpan -> Component -> SystemVerilogM (String,Doc)
+genVerilog :: String -> SrcSpan -> Component -> SystemVerilogM ((String,Doc),[(String,Doc)])
 genVerilog _ sp c = do
     setSrcSpan sp
-    (unpack cName,) A.<$> verilog
+    v    <- verilog
+    incs <- use includes
+    return ((unpack cName,v),incs)
   where
     cName   = componentName c
     verilog = "// Automatically generated SystemVerilog-2005" <$$>
@@ -583,8 +588,20 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
   where
     pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
-inst_ (BlackBoxD _ _ _ bs bbCtx) = do
+inst_ (BlackBoxD _ _ _ Nothing bs bbCtx) = do
   t <- renderBlackBox bs bbCtx
+  fmap Just (string t)
+
+inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
+  inc' <- renderBlackBox inc bbCtx
+  iw <- use intWidth
+  let incHash = hash inc'
+      nm'     = Text.concat [ Text.fromStrict nm
+                            , Text.pack (printf ("%0" ++ show iw ++ "X") incHash)
+                            ]
+  t <- renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
+  inc'' <- text inc'
+  includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
 inst_ (NetDecl _ _) = return Nothing
@@ -678,28 +695,40 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Index (fromInteger n),fromInteger n)) i
 
-expr_ b (BlackBoxE _ _ _ bs bbCtx b') = do
+expr_ b (BlackBoxE _ _ _ Nothing bs bbCtx b') = do
   t <- renderBlackBox bs bbCtx
+  parenIf (b || b') $ string t
+
+expr_ b (BlackBoxE _ _ _ (Just (nm,inc)) bs bbCtx b') = do
+  inc' <- renderBlackBox inc bbCtx
+  iw <- use intWidth
+  let incHash = hash inc'
+      nm'     = Text.concat [ Text.fromStrict nm
+                            , Text.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
+                            ]
+  t <- renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
+  inc'' <- text inc'
+  includes %= ((unpack nm', inc''):)
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)

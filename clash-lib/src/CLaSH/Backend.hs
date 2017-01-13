@@ -36,7 +36,7 @@ class Backend state where
   extractTypes     :: state -> HashSet HWType
 
   -- | Generate HDL for a Netlist component
-  genHDL           :: String -> SrcSpan -> Component -> State state (String, Doc)
+  genHDL           :: String -> SrcSpan -> Component -> State state ((String, Doc),[(String,Doc)])
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: String -> [HWType] -> State state [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type

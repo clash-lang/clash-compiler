@@ -49,7 +49,7 @@ import           CLaSH.Normalize                  (checkNonRecursive, cleanupGra
                                                    normalize, runNormalization)
 import           CLaSH.Normalize.Util             (callGraph, mkRecursiveComponents)
 import           CLaSH.Primitives.Types
-import           CLaSH.Util                       (first)
+import           CLaSH.Util                       (first, second)
 
 -- | Create a set of target HDL files for a set of functions
 generateHDL :: forall backend . Backend backend
@@ -129,7 +129,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
             CLaSH.Backend.name hdlState' </>
             takeWhile (/= '.') (name2String topEntity)
   prepareDir (opt_cleanhdl opts) (extension hdlState') dir
-  mapM_ (writeHDL hdlState' dir) hdlDocs
+  mapM_ (writeHDL dir) hdlDocs
   copyDataFiles dir dfiles'
 
   endTime <- hdlDocs `seq` Clock.getCurrentTime
@@ -137,10 +137,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   putStrLn $ "Total compilation took " ++ show startEndDiff
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
-parsePrimitive (BlackBox pNm libM imps templT) =
+parsePrimitive (BlackBox pNm libM imps inc templT) =
   let (templ,err) = either (first Left . runParse) (first Right . runParse) templT
+      inc'        = case fmap (second runParse) inc of
+                      Just (x,(t,[])) -> Just (x,t)
+                      _ -> Nothing
   in  case err of
-        [] -> BlackBox pNm libM imps templ
+        [] -> BlackBox pNm libM imps inc' templ
         _  -> error $ "Errors in template for: " ++ show pNm ++ ":\n" ++ show err
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 
@@ -153,10 +156,12 @@ createHDL :: Backend backend
 createHDL backend modName components = flip evalState backend $ do
   -- (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
   -- let hdlNmDocs = zip hdlNms hdlDocs
-  hdlNmDocs <- mapM (uncurry (genHDL modName)) components
+  (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
   hwtys <- HashSet.toList <$> extractTypes <$> get
   typesPkg <- mkTyPackage modName hwtys
-  return (typesPkg ++ hdlNmDocs)
+  let hdl   = map (first (<.> CLaSH.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
+      qincs = map (first (<.> "qsys")) (concat incs)
+  return (hdl ++ qincs)
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.
@@ -178,9 +183,9 @@ prepareDir cleanhdl ext dir = do
     mapM_ Directory.removeFile abs_to_remove
 
 -- | Writes a HDL file to the given directory
-writeHDL :: Backend backend => backend -> FilePath -> (String, Doc) -> IO ()
-writeHDL backend dir (cname, hdl) = do
-  handle <- IO.openFile (dir </> cname <.> CLaSH.Backend.extension backend) IO.WriteMode
+writeHDL :: FilePath -> (String, Doc) -> IO ()
+writeHDL dir (cname, hdl) = do
+  handle <- IO.openFile (dir </> cname) IO.WriteMode
   hPutDoc handle hdl
   IO.hPutStr handle "\n"
   IO.hClose handle

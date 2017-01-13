@@ -64,7 +64,7 @@ mkBlackBoxContext resId args = do
                 Nothing  -> Left . (`N.Identifier` Nothing)  <$> mkBasicId (pack $ name2String (V.varName resId))
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
-    return ( Context (res,resTy) imps funs
+    return ( Context (res,resTy) imps funs Nothing
            , concat impDecls ++ concat funDecls
            )
   where
@@ -146,7 +146,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           let pNm = name p
           (dst',dstNm,dstDecl) <- resBndr True dst
           (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-          bbDecl <- N.BlackBoxD pNm (library p) (imports p) <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
+          bbDecl <- N.BlackBoxD pNm (library p) (imports p) (qsysInclude p) <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
           return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ [bbDecl])
         (Right tempE) -> do
           let pNm = name p
@@ -155,13 +155,13 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               (dst',dstNm,dstDecl) <- resBndr True dst
               (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
               bbTempl <- prepareBlackBox pNm tempE bbCtx
-              let tmpAssgn = Assignment dstNm (BlackBoxE pNm (library p) (imports p) bbTempl bbCtx bbEParen)
+              let tmpAssgn = Assignment dstNm (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen)
               return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ [tmpAssgn])
             else do
               (dst',_,_) <- resBndr False dst
               (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
               bbTempl <- prepareBlackBox pNm tempE bbCtx
-              return (BlackBoxE pNm (library p) (imports p) bbTempl bbCtx bbEParen,ctxDcls)
+              return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -202,7 +202,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                     netAssignRhs = Assignment tmpRhs scrutExpr
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
-      | otherwise -> return (BlackBoxE "" [] [] [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
+      | otherwise -> return (BlackBoxE "" [] [] Nothing [C $ mconcat ["NO_TRANSLATION_FOR:",fromStrict pNm]] emptyBBContext False,[])
     _ -> do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)

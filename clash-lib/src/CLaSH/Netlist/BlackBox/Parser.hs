@@ -82,6 +82,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> TypElem           <$> (pToken "~TYPEL" *> pBrackets pTagE)
      <|> IndexType         <$> (pToken "~INDEXTYPE" *> pBrackets pTagE)
      <|> CompName          <$  pToken "~COMPNAME"
+     <|> QSysIncludeName   <$  pToken "~QSYSINCLUDENAME"
      <|> Size              <$> (pToken "~SIZE" *> pBrackets pTagE)
      <|> Length            <$> (pToken "~LENGTH" *> pBrackets pTagE)
      <|> Depth             <$> (pToken "~DEPTH" *> pBrackets pTagE)

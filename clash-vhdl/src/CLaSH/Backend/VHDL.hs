@@ -20,6 +20,7 @@ import           Control.Lens                         hiding (Indexed)
 import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
+import           Data.Hashable                        (Hashable (..))
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
@@ -57,6 +58,7 @@ data VHDLState =
   , _srcSpan   :: SrcSpan
   , _libraries :: [T.Text]
   , _packages  :: [T.Text]
+  , _includes  :: [(String,Doc)]
   , _intWidth  :: Int                  -- ^ Int/Word/Integer bit-width
   , _hdlsyn    :: HdlSyn               -- ^ For which HDL synthesis tool are we generating VHDL
   }
@@ -64,7 +66,7 @@ data VHDLState =
 makeLenses ''VHDLState
 
 instance Backend VHDLState where
-  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] []
+  initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] []
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else
@@ -124,10 +126,12 @@ filterReserved s = if s `elem` reservedWords
   else s
 
 -- | Generate VHDL for a Netlist component
-genVHDL :: String -> SrcSpan -> Component -> VHDLM (String,Doc)
+genVHDL :: String -> SrcSpan -> Component -> VHDLM ((String,Doc),[(String,Doc)])
 genVHDL nm sp c = do
     setSrcSpan sp
-    (unpack cName,) A.<$> vhdl
+    v <- vhdl
+    i <- use includes
+    return ((unpack cName,v),i)
   where
     cName   = componentName c
     vhdl    = do
@@ -594,10 +598,24 @@ inst_ (InstDecl nm lbl pms) = fmap Just $
       rec (p,ls) <- fmap unzip $ sequence [ (,fromIntegral (T.length i)) A.<$> fill (maximum ls) (text i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
       nest 2 $ "port map" <$$> tupled (A.pure p)
 
-inst_ (BlackBoxD _ libs packs bs bbCtx) = do
+inst_ (BlackBoxD _ libs packs Nothing bs bbCtx) = do
   libraries %= ((map T.fromStrict libs) ++)
   packages  %= ((map T.fromStrict packs) ++)
   t <- renderBlackBox bs bbCtx
+  fmap Just (string t)
+
+inst_ (BlackBoxD _ libs packs (Just (nm,inc)) bs bbCtx) = do
+  libraries %= ((map T.fromStrict libs) ++)
+  packages  %= ((map T.fromStrict packs) ++)
+  inc' <- renderBlackBox inc bbCtx
+  iw <- use intWidth
+  let incHash = hash inc'
+      nm'     = T.concat [ T.fromStrict nm
+                         , T.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
+                         ]
+  t <- renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
+  inc'' <- text inc'
+  includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
 inst_ _ = return Nothing
@@ -719,29 +737,29 @@ expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = "to_unsigned" <> tupled (sequence
 expr_ _ (DataCon ty@(Product _ _) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Signed.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Signed (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (Unsigned (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   = exprLit (Just (BitVector (fromInteger n),fromInteger n)) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Index.fromInteger#"
   , [Literal _ (NumLit n), Literal _ i] <- extractLiterals bbCtx
   , Just k <- clogBase 2 n
   , let k' = max 1 k
   = exprLit (Just (Unsigned k',k')) i
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "CLaSH.Sized.Internal.Index.maxBound#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   , n > 0
@@ -749,22 +767,36 @@ expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
   , let k' = max 1 k
   = exprLit (Just (Unsigned k',k')) (NumLit (n-1))
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "GHC.Types.I#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   = do iw <- use intWidth
        exprLit (Just (Signed iw,iw)) (NumLit n)
 
-expr_ _ (BlackBoxE pNm _ _ _ bbCtx _)
+expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "GHC.Types.W#"
   , [Literal _ (NumLit n)] <- extractLiterals bbCtx
   = do iw <- use intWidth
        exprLit (Just (Unsigned iw,iw)) (NumLit n)
 
-expr_ b (BlackBoxE _ libs packs bs bbCtx b') = do
+expr_ b (BlackBoxE _ libs packs Nothing bs bbCtx b') = do
   libraries %= ((map T.fromStrict libs) ++)
   packages  %= ((map T.fromStrict packs) ++)
   t <- renderBlackBox bs bbCtx
+  parenIf (b || b') $ string t
+
+expr_ b (BlackBoxE _ libs packs (Just (nm,inc)) bs bbCtx b') = do
+  libraries %= ((map T.fromStrict libs) ++)
+  packages  %= ((map T.fromStrict packs) ++)
+  inc' <- renderBlackBox inc bbCtx
+  iw <- use intWidth
+  let incHash = hash inc'
+      nm'     = T.concat [ T.fromStrict nm
+                         , T.pack (printf ("%0" ++ show (iw `div` 4) ++ "X") incHash)
+                         ]
+  t <- renderBlackBox bs (bbCtx {bbQsysIncName = Just nm'})
+  inc'' <- text inc'
+  includes %= ((unpack nm', inc''):)
   parenIf (b || b') $ string t
 
 expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (text id_)

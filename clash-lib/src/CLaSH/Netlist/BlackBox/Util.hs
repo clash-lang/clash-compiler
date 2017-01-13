@@ -165,7 +165,7 @@ findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
         let (s,_,_) = bbInputs bbCtx !! n
             e'      = either id fst s
         in case e' of
-          BlackBoxE "GHC.CString.unpackCString#" _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
+          BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
             [(Left (Literal Nothing (StringLit s')),_,_)] -> renderFilePath fs s'
             _ -> (fs',FilePath e)
           _ -> (fs',FilePath e)
@@ -387,12 +387,15 @@ renderTag b (FilePath e)    = case e of
         e'      = either id fst s
     e2  <- prettyElem e
     case e' of
-      BlackBoxE "GHC.CString.unpackCString#" _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
+      BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
         [(Left (Literal Nothing (StringLit _)),_,_)] -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
         _ ->  error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
       _ -> error $ $(curLoc) ++ "argument of ~FILEPATH:" ++ show e2 ++  "does not reduce to a string"
   _ -> do e' <- prettyElem e
           error $ $(curLoc) ++ "~FILEPATH expects a ~LIT[N] argument, but got: " ++ show e'
+renderTag b QSysIncludeName = case bbQsysIncName b of
+  Just nm -> return nm
+  _ -> error $ $(curLoc) ++ "~QSYSINCLUDENAME used where no 'qysInclude' was specified in the primitive definition"
 renderTag _ e = do e' <- prettyElem e
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
@@ -430,6 +433,7 @@ prettyElem (TypElem e) = do
   e' <- prettyElem e
   (displayT . renderOneLine) <$> (text "~TYPEL" <> brackets (text e'))
 prettyElem CompName = return "~COMPNAME"
+prettyElem QSysIncludeName = return "~QSYSINCLUDENAME"
 prettyElem (IndexType e) = do
   e' <- prettyElem e
   (displayT . renderOneLine) <$> (text "~INDEXTYPE" <> brackets (text e'))

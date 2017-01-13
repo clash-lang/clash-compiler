@@ -29,6 +29,7 @@ data Primitive a
   { name     :: !S.Text -- ^ Name of the primitive
   , library  :: [S.Text]
   , imports  :: [S.Text]
+  , qsysInclude :: Maybe (S.Text,a)
   , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
@@ -44,8 +45,13 @@ instance FromJSON (Primitive Text) where
       "BlackBox"  -> BlackBox <$> conVal .: "name"
                               <*> conVal .:? "libraries" .!= []
                               <*> conVal .:? "imports" .!= []
+                              <*> (conVal .:? "qysInclude" >>= parseInclude)
                               <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
       "Primitive" -> Primitive <$> conVal .: "name" <*> conVal .: "primType"
       _ -> error "Expected: BlackBox or Primitive object"
     _ -> error "Expected: BlackBox or Primitive object"
+    where
+      parseInclude Nothing  = pure Nothing
+      parseInclude (Just c) =
+        Just <$> ((,) <$> c .: "name" <*> c .: "content")
   parseJSON _ = error "Expected: BlackBox or Primitive object"
