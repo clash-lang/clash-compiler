@@ -215,7 +215,7 @@ data TopEntity
   -- * __SystemVerilog__: @logic [n-1:0]@
   , t_clocks   :: [ClockSource]  -- ^ List of clock sources
   }
-  deriving (Data,Show)
+  deriving (Data,Show,Read)
 
 -- | A clock source
 data ClockSource
@@ -259,7 +259,7 @@ data ClockSource
   -- When 'c_sync' is set to 'True' those reset synchronisers are not generated
   -- and there is change for reset-induced metastability.
   }
-  deriving (Data,Show)
+  deriving (Data,Show,Read)
 
 -- | Default 'TopEntity' which has no clocks, and no specified names for the
 -- input and output ports. Also has no clock sources:
