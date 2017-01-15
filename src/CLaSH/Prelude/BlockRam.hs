@@ -759,7 +759,6 @@ blockRamPow2' :: KnownNat n
               -- clock cycle
 blockRamPow2' = blockRam'
 
-{-# NOINLINE blockRam# #-}
 -- | blockRAM primitive
 blockRam# :: KnownNat n
           => SClock clk       -- ^ 'Clock' to synchronize to
@@ -774,7 +773,8 @@ blockRam# :: KnownNat n
           -> Signal' clk a
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam# clk content rd en wr din = register' clk (errorX "blockRam#: intial value undefined") dout
+blockRam# clk content rd en wr din =
+    register' clk (errorX "blockRam#: intial value undefined") dout
   where
     szI  = length content
     dout = runST $ do
@@ -784,14 +784,16 @@ blockRam# clk content rd en wr din = register' clk (errorX "blockRam#: intial va
     ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
     ramT ram (r,e,w,d) = do
       -- reading from address using an 'X' exception results in an 'X' result
-      r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
-                                (\(err :: XException) -> return (Left (throw err))))
+      r' <- unsafeIOToST $
+               catch (evaluate r >>= (return . Right))
+                     (\(err :: XException) -> return (Left (throw err)))
       d' <- case r' of
               Right r2 -> readArray ram r2
               Left err -> return err
       -- writing to an address using an 'X' exception makes everything 'X'
       when e (writeArray ram w d)
       return d'
+{-# NOINLINE blockRam# #-}
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronised to specified clock)
 --
