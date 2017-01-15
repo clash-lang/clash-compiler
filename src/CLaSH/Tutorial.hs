@@ -214,14 +214,14 @@ GHC are not supported).
       * OS X:
 
           * Follow the instructions on: <https://www.haskell.org/platform/mac.html Haskell Platform Mac OS X>
-            to install the _minimal_ Haskell platform
+            to install the /minimal/ Haskell platform
           * Run: @cabal update@
           * Skip step 2.
 
       * Windows:
 
           * Follow the instructions on: <https://www.haskell.org/platform/windows.html Haskell Platform Windows>
-            to install the _minimal_ Haskell platform
+            to install the /minimal/ Haskell platform
           * Run: @cabal update@
           * Skip step 2.
 
@@ -256,7 +256,7 @@ GHC are not supported).
 
   (4) Verify that everything is working by:
 
-      * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/049e6e2eacb9b3b5ae8664b9b79979c321b322d9/examples/FIR.hss Fir.hs> example
+      * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/049e6e2eacb9b3b5ae8664b9b79979c321b322d9/examples/FIR.hs Fir.hs> example
       * Run: @clash --interactive FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command
       * Execute, in the interpreter, the @:verilog@ command
