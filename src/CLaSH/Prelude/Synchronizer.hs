@@ -31,6 +31,7 @@ module CLaSH.Prelude.Synchronizer
   )
 where
 
+import Control.Applicative         (liftA2)
 import Data.Bits                   (complement, shiftR, xor)
 import Data.Constraint             ((:-)(..), Dict (..))
 #if MIN_VERSION_constraints(0,9,0)
@@ -38,6 +39,7 @@ import Data.Constraint.Nat         (leTrans)
 #else
 import Unsafe.Coerce
 #endif
+import Data.Maybe                  (isJust)
 import GHC.TypeLits                (type (+), type (-), type (<=))
 
 import CLaSH.Class.BitPack         (boolToBV)
@@ -47,8 +49,7 @@ import CLaSH.Prelude.Mealy         (mealyB')
 import CLaSH.Prelude.RAM           (asyncRam')
 import CLaSH.Promoted.Nat          (SNat (..), pow2SNat)
 import CLaSH.Promoted.Nat.Literals (d0)
-import CLaSH.Signal                ((.&&.), mux)
-import CLaSH.Signal.Bundle         (bundle)
+import CLaSH.Signal                (mux)
 import CLaSH.Signal.Explicit       (Signal', SClock, register',
                                     unsafeSynchronizer)
 import CLaSH.Sized.BitVector       (BitVector, (++#))
@@ -91,20 +92,19 @@ dualFlipFlopSynchronizer clk1 clk2 i = register' clk2 i
 
 -- * Asynchronous FIFO synchronizer
 
-fifoMem :: SClock wclk
-        -> SClock rclk
-        -> SNat addrSize
-        -> Signal' rclk (BitVector addrSize)
-        -> Signal' wclk (BitVector addrSize)
-        -> Signal' wclk Bool
-        -> Signal' wclk Bool
-        -> Signal' wclk a
-        -> Signal' rclk a
-fifoMem wclk rclk addrSize@SNat raddr waddr winc wfull wdata =
+fifoMem ::
+     SClock wclk
+  -> SClock rclk
+  -> SNat addrSize
+  -> Signal' wclk Bool
+  -> Signal' rclk (BitVector addrSize)
+  -> Signal' wclk (Maybe (BitVector addrSize, a))
+  -> Signal' rclk a
+fifoMem wclk rclk addrSize@SNat full raddr writeM =
   asyncRam' wclk rclk
             (pow2SNat addrSize)
             raddr
-            (mux (winc .&&. fmap not wfull) (Just <$> bundle (waddr,wdata)) (pure Nothing))
+            (mux full (pure Nothing) writeM)
 
 ptrCompareT :: SNat addrSize
             -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
@@ -140,31 +140,29 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 -- design described in <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>.
 --
 -- __NB__: This synchroniser can be used for __word__-synchronization.
-asyncFIFOSynchronizer :: (2 <= addrSize)
-                      => SNat addrSize       -- ^ Size of the internally used
-                                             -- addresses, the FIFO contains
-                                             -- @2^addrSize@ elements.
-                      -> SClock wclk         -- ^ 'Clock' to which the write port
-                                             -- is synchronised
-                      -> SClock rclk         -- ^ 'Clock' to which the read port
-                                             -- is synchronised
-                      -> Signal' wclk a      -- ^ Element to insert
-                      -> Signal' wclk Bool   -- ^ Write request
-                      -> Signal' rclk Bool   -- ^ Read request
-                      -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
-                      -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
-asyncFIFOSynchronizer addrSize@SNat wclk rclk wdata winc rinc = (rdata,rempty,wfull)
+asyncFIFOSynchronizer
+  :: (2 <= addrSize)
+  => SNat addrSize           -- ^ Size of the internally used addresses, the
+                             -- FIFO contains @2^addrSize@ elements.
+  -> SClock wclk             -- ^ 'Clock' to which the write port is synchronised
+  -> SClock rclk             -- ^ 'Clock' to which the read port is synchronised
+  -> Signal' rclk Bool       -- ^ Read request
+  -> Signal' wclk (Maybe a)  -- ^ Element to insert
+  -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+  -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
+asyncFIFOSynchronizer addrSize@SNat wclk rclk rinc wdataM = (rdata,rempty,wfull)
   where
     s_rptr = dualFlipFlopSynchronizer rclk wclk 0 rptr
     s_wptr = dualFlipFlopSynchronizer wclk rclk 0 wptr
 
-    rdata = fifoMem wclk rclk addrSize raddr waddr winc wfull wdata
+    rdata = fifoMem wclk rclk addrSize wfull raddr
+              (liftA2 (,) <$> (pure <$> waddr) <*> wdataM)
 
     (rempty,raddr,rptr) = mealyB' rclk (ptrCompareT addrSize (==)) (0,0,True)
                                   (s_wptr,rinc)
 
     (wfull,waddr,wptr)  = mealyB' wclk (ptrCompareT addrSize (isFull addrSize))
-                                  (0,0,False) (s_rptr,winc)
+                                  (0,0,False) (s_rptr,isJust <$> wdataM)
 
 #if !MIN_VERSION_constraints(0,9,0)
 axiom :: forall a b . Dict (a ~ b)
