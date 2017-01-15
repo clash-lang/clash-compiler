@@ -1,5 +1,5 @@
 {-|
-Copyright : © Christiaan Baaij, 2014-2016
+Copyright : © 2014-2016, Christiaan Baaij, 2017, QBayLogic
 Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
 -}
 
@@ -77,6 +77,7 @@ import Data.Array
 import Data.Char
 import Data.Int
 import GHC.Prim
+import GHC.TypeLits
 import GHC.Word
 import Data.Default
 
@@ -139,9 +140,8 @@ SystemVerilog.
 
 Features of CλaSH:
 
-  * Strongly typed (like VHDL), yet with a very high degree of type inference,
-    enabling both safe and fast prototying using concise descriptions (like
-    Verilog).
+  * Strongly typed, but with a very high degree of type inference, enabling
+    both safe and fast prototyping using concise descriptions.
   * Interactive REPL: load your designs in an interpreter and easily test all
     your component without needing to setup a test bench.
   * Compile your designs for fast simulation.
@@ -188,37 +188,40 @@ our first circuit.
 
 {- $installation
 The CλaSH compiler and Prelude library for circuit design only work with the
-<http://haskell.org/ghc GHC> Haskell compiler version 7.10 (higher or lower
-versions of GHC are not supported).
+<http://haskell.org/ghc GHC> Haskell compiler version 8.0 (lower versions of
+GHC are not supported).
 
-  (1) Install __GHC 7.10__
+  (1) Install __GHC 8.0__
 
-      * Download and install <https://www.haskell.org/ghc/download_ghc_7_10_3 GHC for your platform>.
+      * Download and install <https://www.haskell.org/ghc/download_ghc_8_0_2 GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
         location.
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-    Next follows a list of alternative installation instructions, in case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_7_10_3>
+    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_0_2>,
+    you can, /alternatively/, use the following instructions:
 
       * Ubuntu:
 
           * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
           * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-1.24 ghc-7.10.3 libtinfo-dev@
-          * Update your @PATH@ with: @\/opt\/ghc\/7.10.3\/bin@, @\/opt\/cabal\/1.24/bin@, and @\$HOME\/.cabal\/bin@
+          * Run: @sudo apt-get install cabal-install-1.24 ghc-8.0.2 libtinfo-dev@
+          * Update your @PATH@ with: @\/opt\/ghc\/8.0.2\/bin@, @\/opt\/cabal\/1.24/bin@, and @\$HOME\/.cabal\/bin@
           * Run: @cabal update@
           * Skip step 2.
 
       * OS X:
 
-          * Follow the instructions on: <https://ghcformacosx.github.io/ Haskell for Mac OS X>
+          * Follow the instructions on: <https://www.haskell.org/platform/mac.html Haskell Platform Mac OS X>
+            to install the _minimal_ Haskell platform
           * Run: @cabal update@
           * Skip step 2.
 
       * Windows:
 
-          * Follow the instructions on: <https://github.com/fpco/minghc#using-the-legacy-installer MinGHC>
+          * Follow the instructions on: <https://www.haskell.org/platform/windows.html Haskell Platform Windows>
+            to install the _minimal_ Haskell platform
           * Run: @cabal update@
           * Skip step 2.
 
@@ -253,7 +256,7 @@ versions of GHC are not supported).
 
   (4) Verify that everything is working by:
 
-      * Downloading the <https://raw.github.com/clash-lang/clash-compiler/master/examples/FIR.hs Fir.hs> example
+      * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/049e6e2eacb9b3b5ae8664b9b79979c321b322d9/examples/FIR.hss Fir.hs> example
       * Run: @clash --interactive FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command
       * Execute, in the interpreter, the @:verilog@ command
@@ -447,8 +450,8 @@ Where the first argument of @'mealy'@ is our @macT@ function, and the second
 argument is the initial state, in this case 0. We can see it is functioning
 correctly in our interpreter:
 
->>> import qualified Data.List
->>> Data.List.take 4 $ simulate mac [(1::Int,1),(2,2),(3,3),(4,4)] :: [Int]
+>>> import qualified Data.List as L
+>>> L.take 4 $ simulate mac [(1,1),(2,2),(3,3),(4,4)]
 [0,1,5,14]
 
 Where we simulate our sequential circuit over a list of input samples and take
@@ -773,8 +776,8 @@ That is:
 @
 instance 'Bundle' (a,b) where
   type 'Unbundled'' clk (a,b) = ('Signal'' clk a, 'Signal'' clk b)
-  bundle'   _ (a,b) = (,) '<$>' a '<*>' b
-  unbundle' _ tup   = (fst '<$>' tup, snd '<*>' tup)
+  bundle   (a,b) = (,) '<$>' a '<*>' b
+  unbundle tup   = (fst '<$>' tup, snd '<*>' tup)
 @
 
 but,
@@ -782,8 +785,8 @@ but,
 @
 instance 'Bundle' Bool where
   type 'Unbundled'' clk Bool = 'Signal'' clk Bool
-  bundle'   _ s = s
-  unbundle' _ s = s
+  bundle   s = s
+  unbundle s = s
 @
 
 What you need take away from the above is that a product type (e.g. a tuple) of
@@ -1004,9 +1007,9 @@ primitives, using 'Signed' multiplication ('*') as an example. The
 "CLaSH.Sized.Internal.Signed" module specifies multiplication as follows:
 
 @
-{\-\# NOINLINE (*#) \#-\}
 (*#) :: 'GHC.TypeLits.KnownNat' n => 'Signed' n -> 'Signed' n -> 'Signed' n
 (S a) *# (S b) = fromInteger_INLINE (a * b)
+{\-\# NOINLINE (*#) \#-\}
 @
 
 For which the VHDL /expression/ primitive is:
@@ -1046,73 +1049,94 @@ The second kind of primitive that we will explore is the /declaration/ primitive
 We will use 'blockRam#' as an example, for which the Haskell/CλaSH code is:
 
 @
-{\-\# NOINLINE blockRam# \#-\}
 -- | blockRAM primitive
-blockRam# :: 'GHC.TypeLits.KnownNat' n
-          => 'SClock' clk       -- ^ \'Clock\' to synchronize to
+blockRam# :: 'KnownNat' n
+          => 'SClock' clk       -- ^ 'Clock' to synchronize to
           -> 'Vec' n a          -- ^ Initial content of the BRAM, also
-                              -- determines the size, \@n\@, of the BRAM.
+                              -- determines the size, @n@, of the BRAM.
                               --
-                              -- \_\_NB\_\_: \_\_MUST\_\_ be a constant.
-          -> 'Signal'' clk 'Int'  -- ^ Write address \@w\@
-          -> 'Signal'' clk 'Int'  -- ^ Read address \@r\@
+                              -- __NB__: __MUST__ be a constant.
+          -> 'Signal'' clk Int  -- ^ Read address @r@
           -> 'Signal'' clk Bool -- ^ Write enable
-          -> 'Signal'' clk a    -- ^ Value to write (at address \@w\@)
+          -> 'Signal'' clk Int  -- ^ Write address @w@
+          -> 'Signal'' clk a    -- ^ Value to write (at address @w@)
           -> 'Signal'' clk a
-          -- ^ Value of the \@blockRAM\@ at address \@r\@ from the previous clock
+          -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam# clk binit wr rd en din = 'register'' clk undefined dout
+blockRam# clk content rd en wr din =
+    'register'' clk ('errorX' "blockRam#: intial value undefined") dout
   where
-    szI  = fromInteger $ 'maxIndex' content
+    szI  = 'length' content
     dout = runST $ do
-      arr <- newListArray (0,szI) ('toList' content)
-      traverse (ramT arr) ('bundle'' clk (wr,rd,en,din))
+      arr <- newListArray (0,szI-1) ('toList' content)
+      traverse (ramT arr) ('bundle' (rd,en,wr,din))
 
-    ramT :: STArray s Int e -> (Int,Int,Bool,e) -> ST s e
-    ramT ram (w,r,e,d) = do
-      d' <- readArray ram r
+    ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
+    ramT ram (r,e,w,d) = do
+      -- reading from address using an 'X' exception results in an 'X' result
+      r' <- unsafeIOToST $
+               catch (evaluate r >>= (return . Right))
+                     (\(err :: XException) -> return (Left (throw err)))
+      d' <- case r' of
+              Right r2 -> readArray ram r2
+              Left err -> return err
+      -- writing to an address using an 'X' exception makes everything 'X'
       when e (writeArray ram w d)
       return d'
+{\-\# NOINLINE blockRam# \#-\}
 @
 
 And for which the /declaration/ primitive is:
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.blockRam#"
+    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
+    , "type" :
+"blockRam# :: KnownNat n       -- ARG[0]
+           => SClock clk       -- clk,  ARG[1]
+           -> Vec n a          -- init, ARG[2]
+           -> Signal' clk Int  -- rd,   ARG[3]
+           -> Signal' clk Bool -- wren, ARG[4]
+           -> Signal' clk Int  -- wr,   ARG[5]
+           -> Signal' clk a    -- din,  ARG[6]
+           -> Signal' clk a"
     , "templateD" :
-"blockRam_~COMPNAME_~SYM[0] : block
-  signal RAM  : ~TYP[2] := ~LIT[2];
-  signal dout : ~TYP[6];
-  signal wr   : integer range 0 to ~LIT[0] - 1;
-  signal rd   : integer range 0 to ~LIT[0] - 1;
+"-- blockRam begin
+~GENSYM[~COMPNAME_blockRam][0] : block
+  signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
+  signal ~GENSYM[dout][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
+  signal ~SYM[2] : ~TYP[6];~FI
+  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[0] - 1;
+  signal ~GENSYM[wr][4] : integer range 0 to ~LIT[0] - 1;
 begin
-  wr <= ~ARG[3]
+  ~SYM[3] <= to_integer(~ARG[3])
   -- pragma translate_off
-        mod ~LIT[0]
+                mod ~LIT[0]
   -- pragma translate_on
-        ;
+                ;
 
-  rd <= ~ARG[4]
+  ~SYM[4] <= to_integer(~ARG[5])
   -- pragma translate_off
-        mod ~LIT[0]
+                mod ~LIT[0]
   -- pragma translate_on
-        ;
+                ;
 
-  blockRam_~SYM[1] : process(~CLK[1])
+  ~GENSYM[blockRam_sync][5] : process(~CLK[1])
   begin
     if rising_edge(~CLK[1]) then
-      if ~ARG[5] then
-        RAM(wr) <= ~ARG[6];
+      if ~ARG[4] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
+        ~SYM[1](~SYM[4]) <= ~ARG[6];~FI
       end if;
-      dout <= RAM(rd);
+      ~SYM[2] <= ~SYM[1](~SYM[3]);
     end if;
-  end process;
-
-  ~RESULT <= dout;
-end block;"
+  end process;~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[~SYM[2]][~TYPO];~ELSE
+  ~RESULT <= ~SYM[2];~FI
+end block;
+-- blockRam end"
     }
-  }
+}
 @
 
 Again, the @name@ of the primitive is the fully qualified name of the function
@@ -1139,9 +1163,10 @@ a general listing of the available template holes:
 * @~TYPM@: VHDL type/name/ of the result; used in /type qualification/.
 * @~ERROR[N]@: Error value for the VHDL type of the @(N+1)@'th argument.
 * @~ERRORO@: Error value for the VHDL type of the result.
-* @~SYM[N]@: Randomly generated, but unique, symbol. Multiple occurrences of
-  @~SYM[N]@ in the same primitive definition all refer to the same random, but
-  unique, symbol.
+* @~GENSYM[\<NAME\>][N]@: Create a unique name, trying to stay as close to
+  the given @\<NAME\>@ as possible. This unique symbol can be referred to in
+  other places using @~SYM[N]@.
+* @~SYM[N]@: a reference to the unique symbol created by @~GENSYM[\<NAME\>][N]@.
 * @~SIGD[\<HOLE\>][N]@: Create a signal declaration, using @\<HOLE\>@ as the name
   of the signal, and the type of the @(N+1)@'th argument.
 * @~SIGDO[\<HOLE\>]@: Create a signal declaration, using @\<HOLE\>@ as the name
@@ -1150,9 +1175,25 @@ a general listing of the available template holes:
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~COMPNAME@: The name of the component in which the primitive is instantiated.
 * @~LENGTH[\<HOLE\>]@: The vector length of the type represented by @\<HOLE\>@.
+* @~DEPTH[\<HOLE\>]@: The tree depth of the type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
 * @~SIZE[\<HOLE\>]@: The number of bits needed to encode the type represented by @\<HOLE\>@.
   The content of @\<HOLE\>@ must either be: @TYPM[N]@, @TYPO@, or @TYPELEM[\<HOLE\>]@.
+* @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the \<ELSE\>
+  part when \<CONDITION\> evaluates to /0/, and renders the \<THEN\> in all
+  other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
+  @~DEPTH[\<HOLE\>]@, and @~VIVADO@.
+* @~VIVADO@: /1/ when CλaSH compiler is invoked with the @-clash-xilinx@ or
+  @-clash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
+  statement.
+* @~FROMBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
+  expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
+  The @\<TYPE\>@ hole indicates the type of the expression and must be either
+  @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
+* @~TOBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
+  expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type, is
+  converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole indicates the
+  must be either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
 
 Some final remarks to end this section: VHDL primitives are there to instruct the
 CλaSH compiler to use the given VHDL template, instead of trying to do normal
@@ -1183,33 +1224,43 @@ and
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.blockRam#"
+    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
+    , "type" :
+"blockRam# :: KnownNat n       -- ARG[0]
+           => SClock clk       -- clk,  ARG[1]
+           -> Vec n a          -- init, ARG[2]
+           -> Signal' clk Int  -- rd,   ARG[3]
+           -> Signal' clk Bool -- wren, ARG[4]
+           -> Signal' clk Int  -- wr,   ARG[5]
+           -> Signal' clk a    -- din,  ARG[6]
+           -> Signal' clk a"
     , "templateD" :
 "// blockRam begin
-reg ~TYPO RAM_~SYM[0] [0:~LIT[0]-1];
-reg ~TYPO dout_~SYM[1];
+reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[0]-1];
+reg ~TYPO ~GENSYM[dout][1];
 
-reg ~TYP[2] ram_init_~SYM[2];
-integer ~SYM[3];
+reg ~TYP[2] ~GENSYM[ram_init][2];
+integer ~GENSYM[i][3];
 initial begin
-  ram_init_~SYM[2] = ~ARG[2];
+  ~SYM[2] = ~ARG[2];
   for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
-    RAM_~SYM[0][~LIT[0]-1-~SYM[3]] = ram_init_~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
 
-always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[4]
-  if (~ARG[5]) begin
-    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][4]
+  if (~ARG[4]) begin
+    ~SYM[0][~ARG[5]] <= ~ARG[6];
   end
-  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[3]];
 end
 
-assign ~RESULT = dout_~SYM[1];
+assign ~RESULT = ~SYM[1];
 // blockRam end"
     }
-  }
+}
 @
+
 -}
 
 {- $svprimitives
@@ -1227,24 +1278,31 @@ and
 
 @
 { \"BlackBox\" :
-    { "name"      : "CLaSH.Prelude.BlockRam.blockRam#"
+    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
+    , "type" :
+"blockRam# :: KnownNat n       -- ARG[0]
+           => SClock clk       -- clk,  ARG[1]
+           -> Vec n a          -- init, ARG[2]
+           -> Signal' clk Int  -- rd,   ARG[3]
+           -> Signal' clk Bool -- wren, ARG[4]
+           -> Signal' clk Int  -- wr,   ARG[5]
+           -> Signal' clk a    -- din,  ARG[6]
+           -> Signal' clk a"
     , "templateD" :
-"// blockRam
-~SIGD[RAM_~SYM[0]][2];
-~SIGD[dout_~SYM[1]][6];
-
+"// blockRam begin
+~SIGD[~GENSYM[RAM][0]][2];
+logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[dout][1];
 initial begin
-  ~SYM[0] = ~LIT[3];
+  ~SYM[0] = ~LIT[2];
 end
-
-always @(posedge ~CLK[1]) begin : blockRam_~COMPNAME_~SYM[3]
-  if (~ARG[5]) begin
-    RAM_~SYM[0][~ARG[3]] <= ~ARG[6];
+always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][2]
+  if (~ARG[4]) begin
+    ~SYM[0][~ARG[5]] <= ~TOBV[~ARG[6]][~TYP[6]];
   end
-  dout_~SYM[1] <= RAM_~SYM[0][~ARG[4]];
+  ~SYM[1] <= ~SYM[0][~ARG[3]];
 end
-
-assign ~RESULT = dout_~SYM[1];"
+assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
+// blockRam end"
     }
   }
 @
@@ -1297,6 +1355,7 @@ module MultiClockFifo where
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
+import Data.Maybe             (isJust)
 @
 
 Then we'll start with the /heart/ of the FIFO synchroniser, an asynchronous RAM
@@ -1306,14 +1365,14 @@ CλaSH we don't really have asynchronous logic, there is only combinational and
 synchronous logic. As a consequence, we see in the type signature of 'asyncRam'':
 
 @
-__asyncRam'__ :: _ => SClock wclk        -- ^ Clock to which to synchronise the write port of the RAM
-               -> SClock rclk        -- ^ Clock to which the read address signal __r__ is synchronised
-               -> SNat n             -- ^ Size __n__ of the RAM
-               -> Signal' wclk addr  -- ^ Write address __w__
-               -> Signal' rclk addr  -- ^ Read address __r__
-               -> Signal' wclk Bool  -- ^ Write enable
-               -> Signal' wclk a     -- ^ Value to write (at address __w__)
-               -> Signal' rclk a     -- ^ Value of the RAM at address __r__
+__asyncRam'__
+  :: _
+  => SClock wclk                   -- ^ Clock to which to synchronise the write port of the RAM
+  -> SClock rclk                   -- ^ Clock to which the read address signal __r__ is synchronised
+  -> SNat n                        -- ^ Size __n__ of the RAM
+  -> Signal' rclk addr             -- ^ Read address __r__
+  -> Signal' wclk (Maybe (addr,a)) -- ^ (write address @w@, value to write)
+  -> Signal' rclk a                -- ^ Value of the RAM at address __r__
 @
 
 that the signal containing the read address __r__ is synchronised to a different
@@ -1322,12 +1381,13 @@ clock. That is, there is __no__ such thing as an @AsyncSignal@ in CλaSH.
 We continue by instantiating the 'asyncRam'':
 
 @
-fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
+fifoMem wclk rclk addrSize wfull raddr wdataM =
   'asyncRam'' wclk rclk
-            (d2 ``powSNat`` addrSize)
-            waddr raddr
-            (winc '.&&.' 'not1' wfull)
-            wdata
+            ('pow2SNat' addrSize)
+            raddr
+            ('mux' (not \<$\> wfull)
+                 wdataM
+                 (pure Nothing))
 @
 
 We see that we give it @2^addrSize@ elements, where @addrSize@ is the bit-size
@@ -1337,24 +1397,17 @@ requested, indicated by @winc@, and the buffer is not full, indicated by
 
 The next part of the design calculates the read and write address for the
 asynchronous RAM, and creates the flags indicating whether the FIFO is full
-or empty. We start with a function that converts 'Bool'eans to @n + 1@ bit
-bitvectors:
+or empty. The address and flag generator is given in 'mealy' machine style:
 
 @
-boolToBV :: (KnownNat n, KnownNat (n+1)) => Bool -> BitVector (n + 1)
-boolToBV = 'zeroExtend' . 'pack'
-@
-
-followed by the actual address and flag generator in 'mealy' machine style:
-
-@
-ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
-                                                          ,(flag,addr,ptr))
+ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) =
+    ((bin',ptr',flag')
+    ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
-    bin' = bin + boolToBV (inc && not flag)
+    bin' = bin + 'boolToBV' (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
-    addr = 'slice' (addrSize ``subSNat``  d1) d0 bin
+    addr = 'slice' (addrSize ``subSNat`` d1) d0 bin
 
     flag' = flagGen ptr' s_ptr
 @
@@ -1375,8 +1428,10 @@ isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
 -- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
-isFull addrSize ptr s_ptr = ptr == ('complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
-                                   'slice' (addrSize ``subSNat`` d2) d0 s_ptr)
+isFull addrSize ptr s_ptr =
+    ptr == 'complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
+                      'slice' (addrSize ``subSNat`` d2) d0  s_ptr
+
 wptrFullInit        = (0,0,False)
 @
 
@@ -1399,28 +1454,32 @@ proper synchronizer.
 Finally we combine all the component in:
 
 @
-fifo :: _
-     => SNat addrSize -> SClock wclk -> SClock rclk
-     -> Signal' wclk a -> Signal' wclk Bool
-     -> Signal' rclk Bool
-     -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
-fifo addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
+fifo
+  :: _
+  => SNat (addrSize + 2)
+  -> SClock wclk
+  -> SClock rclk
+  -> Signal' rclk Bool
+  -> Signal' wclk (Maybe a)
+  -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+fifo addrSize wclk rclk rinc wdataM = (rdata,rempty,wfull)
   where
     s_rptr = ptrSync rclk wclk rptr
     s_wptr = ptrSync wclk rclk wptr
 
-    rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
+    rdata = fifoMem wclk rclk addrSize wfull raddr
+               (liftA2 (,) \<$\> (Just \<$\> waddr) \<*\> wdataM)
 
     (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT addrSize isEmpty) rptrEmptyInit
                                   (s_wptr,rinc)
 
     (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT addrSize (isFull addrSize))
-                                  wptrFullInit (s_rptr,winc)
+                                  wptrFullInit (s_rptr,isJust \<$\> wdataM)
 @
 
 where we first specify the synchronisation of the read and the write pointers,
-instantiate the asynchronous RAM, and instantiate the read address/pointer/flag
-generator and write address/pointer/flag generator.
+instantiate the asynchronous RAM, and instantiate the read address \/ pointer \/
+flag generator and write address \/ pointer \/ flag generator.
 
 Ultimately, the whole file containing our FIFO design will look like this:
 
@@ -1431,22 +1490,22 @@ module MultiClockFifo where
 
 import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
+import Data.Maybe             (isJust)
 
-fifoMem wclk rclk addrSize waddr raddr winc wfull wdata =
+fifoMem wclk rclk addrSize wfull raddr wdataM =
   'asyncRam'' wclk rclk
-            (d2 ``powSNat`` addrSize)
-            waddr raddr
-            (winc '.&&.' 'not1' wfull)
-            wdata
+            ('pow2SNat' addrSize)
+            raddr
+            ('mux' (not \<$\> wfull)
+                 wdataM
+                 (pure Nothing))
 
-boolToBV :: (KnownNat n, KnownNat (n+1)) => Bool -> BitVector (n + 1)
-boolToBV = 'zeroExtend' . 'pack'
-
-ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) = ((bin',ptr',flag')
-                                                          ,(flag,addr,ptr))
+ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) =
+    ((bin',ptr',flag')
+    ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
-    bin' = bin + boolToBV (inc && not flag)
+    bin' = bin + 'boolToBV' (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
     addr = 'slice' (addrSize ``subSNat`` d1) d0 bin
 
@@ -1457,8 +1516,10 @@ isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
 -- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
-isFull addrSize ptr s_ptr = ptr == ('complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
-                                   'slice' (addrSize ``subSNat`` d2) d0 s_ptr)
+isFull addrSize ptr s_ptr =
+    ptr == 'complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
+                      'slice' (addrSize ``subSNat`` d2) d0  s_ptr
+
 wptrFullInit        = (0,0,False)
 
 -- Dual flip-flip synchroniser
@@ -1467,23 +1528,27 @@ ptrSync clk1 clk2 = 'register'' clk2 0
                   . 'unsafeSynchronizer' clk1 clk2
 
 -- Async FIFO synchroniser
-fifo :: _
-     => SNat addrSize -> SClock wclk -> SClock rclk
-     -> Signal' wclk a -> Signal' wclk Bool
-     -> Signal' rclk Bool
-     -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
-fifo addrSize wclk rclk wdata winc rinc = (rdata,rempty,wfull)
+fifo
+  :: _
+  => SNat (addrSize + 2)
+  -> SClock wclk
+  -> SClock rclk
+  -> Signal' rclk Bool
+  -> Signal' wclk (Maybe a)
+  -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+fifo addrSize wclk rclk rinc wdataM = (rdata,rempty,wfull)
   where
     s_rptr = ptrSync rclk wclk rptr
     s_wptr = ptrSync wclk rclk wptr
 
-    rdata = fifoMem wclk rclk addrSize waddr raddr winc wfull wdata
+    rdata = fifoMem wclk rclk addrSize wfull raddr
+               (liftA2 (,) \<$\> (Just \<$\> waddr) \<*\> wdataM)
 
     (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT addrSize isEmpty) rptrEmptyInit
                                   (s_wptr,rinc)
 
     (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT addrSize (isFull addrSize))
-                                  wptrFullInit (s_rptr,winc)
+                                  wptrFullInit (s_rptr,isJust \<$\> wdataM)
 @
 
 == Instantiating a FIFO synchroniser
@@ -1521,10 +1586,10 @@ and subsequently a 256-space FIFO synchroniser that safely bridges the ADC clock
 domain and to the FFT clock domain:
 
 @
-adcToFFT :: Signal' ClkADC (SFixed 8 8)
-         -> Signal' ClkADC Bool
-         -> Signal' ClkFFT Bool
-         -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkFFT Bool, Signal' ClkADC Bool)
+adcToFFT
+  :: Signal' ClkFFT Bool
+  -> Signal' ClkADC (Maybe (SFixed 8 8))
+  -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkFFT Bool, Signal' ClkADC Bool)
 adcToFFT = fifo d8 clkADC clkFFT
 @
 
