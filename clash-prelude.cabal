@@ -91,6 +91,8 @@ Library
                       CLaSH.Class.Num
                       CLaSH.Class.Resize
 
+                      CLaSH.NamedTypes
+
                       CLaSH.Prelude
                       CLaSH.Prelude.BitIndex
                       CLaSH.Prelude.BitReduction

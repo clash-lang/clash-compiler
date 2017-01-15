@@ -116,6 +116,8 @@ module CLaSH.Prelude
     -- ** Exceptions
   , module CLaSH.XException
   , undefined
+    -- ** Named types
+  , module CLaSH.NamedTypes
     -- ** Haskell Prelude
     -- $hiding
   , module Prelude
@@ -140,6 +142,7 @@ import CLaSH.Annotations.TopEntity
 import CLaSH.Class.BitPack
 import CLaSH.Class.Num
 import CLaSH.Class.Resize
+import CLaSH.NamedTypes
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam.File (blockRamFile, blockRamFilePow2)
