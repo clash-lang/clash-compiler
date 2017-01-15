@@ -2,8 +2,6 @@
 
 ## 0.11
 * New features:
-  * `asyncRam`, `blockRam`, `blockRamFile` have a `Maybe (addr,a)` as write input instead of three separate `Bool`, `addr`, and `a` inputs.
-  * `asyncFIFOSynchronizer` has a `Maybe a` as write-request instead of a separate `Bool` and `a` input
   * Add `BNat` (and supporting functions) to `CLaSH.Promoted.Nat`: base-2 encoded natural numbers.
   * Add `divSNat` and `logBaseSNat` to `CLaSH.Promoted.Nat`: division and logarithm for singleton natural numbers.
   * Add `predUNat` and `subUNat` to `CLaSH.Promoted.Nat`: predecessor and subtraction for unary-encoded natural numbers.
@@ -11,6 +9,8 @@
   * Add the perfect-depth binary trees module `CLaSH.Sized.RTree`
   * Synthesisable definitions of `countLeadingZeros` and `countTrailingZeros` for: `BitVector`, `Signed`, `Unsigned`, and `Fixed`
 * Changes:
+  * `asyncRam`, `blockRam`, `blockRamFile` have a `Maybe (addr,a)` as write input instead of three separate `Bool`, `addr`, and `a` inputs.
+  * `asyncFIFOSynchronizer` has a `Maybe a` as write-request instead of a separate `Bool` and `a` input
   * `bundle'` and `unbundle'` are removed; `bundle` now has type `Unbundled' clk a -> Signal' clk a`, `unbundle` now has type `Signal' clk a -> Unbundled' clk a`
   * `subSNat` now has the type `SNat (a+b) -> SNat b -> SNat a` (where it used to be `SNat a -> SNat b -> SNat (a-b)`)
   * Renamed `multUNat` to `mulUNat` to be in sync with `mulSNat` and `mulBNat`.
