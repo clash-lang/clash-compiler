@@ -180,7 +180,7 @@ Library
                       ghc-typelits-extra        >= 0.2.1   && < 0.3,
                       ghc-typelits-knownnat     >= 0.2.2   && < 0.3,
                       ghc-typelits-natnormalise >= 0.4.2   && < 0.6,
-                      lens                      >= 4.9     && < 4.15,
+                      lens                      >= 4.9     && < 4.16,
                       QuickCheck                >= 2.7     && < 2.10,
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
