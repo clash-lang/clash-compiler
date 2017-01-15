@@ -5,7 +5,7 @@
 [![Hackage Dependencies](https://img.shields.io/hackage-deps/v/clash-prelude.svg?style=flat)](http://packdeps.haskellers.com/feed?needle=exact%3Aclash-prelude)
 
 __WARNING__
-Only works with GHC-7.10.* (http://www.haskell.org/ghc/download_ghc_7_10_3)!
+Only works with GHC-8.0.* (http://www.haskell.org/ghc/download_ghc_8_0_2)!
 
 CλaSH (pronounced ‘clash’) is a functional hardware description language that
 borrows both its syntax and semantics from the functional programming language
@@ -14,9 +14,8 @@ low-level synthesizable VHDL, Verilog, or SystemVerilog.
 
 Features of CλaSH:
 
-  * Strongly typed (like VHDL), yet with a very high degree of type inference,
-    enabling both safe and fast prototying using consise descriptions (like
-    Verilog).
+  * Strongly typed, yet with a very high degree of type inference, enabling both
+    safe and fast prototyping using concise descriptions.
 
   * Interactive REPL: load your designs in an interpreter and easily test all
     your component without needing to setup a test bench.
