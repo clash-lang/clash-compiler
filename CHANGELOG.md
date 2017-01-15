@@ -2,12 +2,14 @@
 
 ## 0.11
 * New features:
+  * `CLaSH.XException`: a module defining an exception representing uninitialised values. Additionally adds the `ShowX` class which has methods that prints values as "X" where they would normally raise an `XException` exception.
   * Add `BNat` (and supporting functions) to `CLaSH.Promoted.Nat`: base-2 encoded natural numbers.
   * Add `divSNat` and `logBaseSNat` to `CLaSH.Promoted.Nat`: division and logarithm for singleton natural numbers.
   * Add `predUNat` and `subUNat` to `CLaSH.Promoted.Nat`: predecessor and subtraction for unary-encoded natural numbers.
   * Add `dtfold` to `CLaSH.Sized.Vector`: a dependently-typed tree-fold over `Vec`.
   * Add the perfect-depth binary trees module `CLaSH.Sized.RTree`
   * Synthesisable definitions of `countLeadingZeros` and `countTrailingZeros` for: `BitVector`, `Signed`, `Unsigned`, and `Fixed`
+  * Add the `(:::)` type alias in `CLaSH.NamedTypes` which allows you to annotate types with documentation
 * Changes:
   * `asyncRam`, `blockRam`, `blockRamFile` have a `Maybe (addr,a)` as write input instead of three separate `Bool`, `addr`, and `a` inputs.
   * `asyncFIFOSynchronizer` has a `Maybe a` as write-request instead of a separate `Bool` and `a` input
@@ -16,6 +18,7 @@
   * Renamed `multUNat` to `mulUNat` to be in sync with `mulSNat` and `mulBNat`.
   * The function argument of `vfold` in `CLaSH.Sized.Vector` is now `(forall l . SNat l -> a -> Vec l b -> Vec (l + 1) b)` (where it used to be `(forall l . a -> Vec l b -> Vec (l + 1) b)`)
   * `Cons` constructor of `Vec` is no longer visible; `(:>)` and `(:<)` are now listed as constructors of `Vec`
+  * Simulation speed improvements for numeric types
 
 ## 0.10.12
 * Fixes bugs:
