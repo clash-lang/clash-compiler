@@ -9,9 +9,8 @@ Description:
   .
   Features of CλaSH:
   .
-  * Strongly typed (like VHDL), yet with a very high degree of type inference,
-    enabling both safe and fast prototying using consise descriptions (like
-    Verilog).
+  * Strongly typed, but with a very high degree of type inference, enabling both
+    safe and fast prototyping using concise descriptions.
   .
   * Interactive REPL: load your designs in an interpreter and easily test all
     your component without needing to setup a test bench.
@@ -37,7 +36,7 @@ License:              BSD2
 License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
-Copyright:            Copyright © 2012-2016 University of Twente
+Copyright:            Copyright © 2012-2016, University of Twente, 2017 QBayLogic
 Category:             Hardware
 Build-type:           Simple
 
