@@ -231,6 +231,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             -> Literal (DoubleLiteral (toRational (fromRational (n :% d) :: Double)))
           _ -> error $ $(curLoc) ++ "GHC.Float.$w$sfromRat'': Not a Float or Double: " ++ showDoc e
 
+  "GHC.Integer.Type.doubleFromInteger"
+    | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal (DoubleLiteral (toRational (fromInteger i :: Double)))
+
+  "GHC.Prim.double2Float#"
+    | [Literal (DoubleLiteral d)] <- reduceTerms tcm isSubj args
+    -> Literal (FloatLiteral (toRational (fromRational d :: Float)))
+
   "GHC.Base.eqString"
     | [(_,[Left (Literal (StringLiteral s1))])
       ,(_,[Left (Literal (StringLiteral s2))])
