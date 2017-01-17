@@ -1,4 +1,4 @@
-resolver: nightly-2016-08-06
+resolver: lts-7.16
 
 packages:
 - 'clash-prelude'
@@ -10,13 +10,13 @@ packages:
 - 'testsuite'
 - location:
     git: https://github.com/clash-lang/ghc-typelits-extra.git
-    commit: 4ed53dcf9065bc66f7a19030247f4698e688794a
+    commit: e3b69af363bea59fcbe7f7f51df605ee8cca11b2
   extra-dep: true
 - location:
     git: https://github.com/clash-lang/ghc-typelits-knownnat.git
-    commit: a1af2abb705349b4c5c5843346bf998e13849cfb
+    commit: 9a7204508c30260ddbe51bc674b0adcaea04b323
   extra-dep: true
 - location:
     git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
-    commit: f81d6841edd6baea23dbe0ff9a896571d0e72d09
+    commit: 3f1622fb0605e7dc42047643d7a56f1a7a86fb4f
   extra-dep: true
