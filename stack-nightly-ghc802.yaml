@@ -1,4 +1,5 @@
-resolver: lts-7.16
+resolver: nightly-2017-01-16
+compiler: ghc-8.0.2
 
 packages:
 - 'clash-prelude'
