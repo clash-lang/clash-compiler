@@ -48,7 +48,7 @@ matrix:
         - ghdl
         - gperf
     compiler: ! ': # ghc-8.0.1'
-  - env: GHCVER=8.0.1 STACK_YAML=stack-nightly.yaml
+  - env: GHCVER=8.0.1 STACK_YAML="$(pwd)/stack-nightly.yaml"
     addons:
       apt:
         sources:
@@ -59,8 +59,8 @@ matrix:
         - libgmp-dev
         - ghdl
         - gperf
-    compiler: ! ': # ghc-8.0.1'
-  - env: GHCVER=8.0.2 STACK_YAML=stack-nightly-ghc802.yaml
+    compiler: ! ': # ghc-8.0.1 nightly'
+  - env: GHCVER=8.0.2 STACK_YAML="$(pwd)/stack-nightly-ghc802.yaml"
     addons:
       apt:
         sources:
@@ -71,10 +71,10 @@ matrix:
         - libgmp-dev
         - ghdl
         - gperf
-    compiler: ! ': # ghc-8.0.2'
+    compiler: ! ': # ghc-8.0.2 nightly'
   allow_failures:
-  - env: GHCVER=8.0.1 STACK_YAML=stack-nightly.yaml
-  - env: GHCVER=8.0.2 STACK_YAML=stack-nightly-ghc802.yaml
+  - env: GHCVER=8.0.1 STACK_YAML="$(pwd)/stack-nightly.yaml"
+  - env: GHCVER=8.0.2 STACK_YAML="$(pwd)/stack-nightly-ghc802.yaml"
 cache:
   directories:
   - ~/.stack
