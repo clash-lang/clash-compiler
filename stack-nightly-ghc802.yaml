@@ -9,3 +9,7 @@ packages:
 - 'clash-vhdl'
 - 'clash-ghc'
 - 'testsuite'
+
+extra-deps:
+- ghc-boot-8.0.2
+- ghc-boot-th-8.0.2
