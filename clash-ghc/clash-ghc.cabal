@@ -43,7 +43,8 @@ Build-type:           Simple
 Extra-source-files:   README.md,
                       CHANGELOG.md,
                       LICENSE_GHC,
-                      src-bin/PosixSource.h
+                      src-bin/PosixSource.h,
+                      src-bin/GHCi/HsVersions.h
 
 Cabal-version:        >=1.10
 
