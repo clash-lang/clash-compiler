@@ -1,5 +1,9 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+## 0.7.0.1 *January 17th 2017
+* Fixes bugs:
+  * Include HsVersions.h in source distribution
+
 ## 0.7 *January 16th 2017*
 * New features:
   * Support for `clash-prelude` 0.11
