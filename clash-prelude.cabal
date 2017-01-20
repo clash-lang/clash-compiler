@@ -86,6 +86,7 @@ Library
   ghc-options:        -Wall -fexpose-all-unfoldings
 
   Exposed-modules:    CLaSH.Annotations.TopEntity
+                      CLaSH.Annotations.Primitive
 
                       CLaSH.Class.BitPack
                       CLaSH.Class.Num
