@@ -201,9 +201,10 @@ system2 instrs = memOut
 @
 
 Again, we can simulate our system and see that it works. This time however,
-we need to drop the first few output samples, because the initial content of an
+we need to disregard the first few output samples, because the initial content of an
 'CLaSH.Prelude.RAM.asyncRam' is 'undefined', and consequently, the first few
-output samples are also 'undefined'.
+output samples are also 'undefined'. We use the utility function 'printX' to conveniently
+filter out the undefinedness and replace it with the string "X" in the few leading outputs.
 
 @
 >>> printX $ sampleN 31 $ system2 prog
@@ -321,9 +322,9 @@ prog2 = -- 0 := 4
 @
 
 When we simulate our system we see that it works. This time again,
-we need to drop the first sample, because the initial output of a
-'blockRam' is 'undefined', and consequently, the first output sample is
-also 'undefined'.
+we need to disregard the first sample, because the initial output of a
+'blockRam' is 'undefined'. We use the utility function 'printX' to conveniently
+filter out the undefinedness and replace it with the string "X".
 
 @
 >>> printX $ sampleN 33 $ system3 prog2
