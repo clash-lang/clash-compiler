@@ -45,7 +45,7 @@ instance FromJSON (Primitive Text) where
       "BlackBox"  -> BlackBox <$> conVal .: "name"
                               <*> conVal .:? "libraries" .!= []
                               <*> conVal .:? "imports" .!= []
-                              <*> (conVal .:? "qysInclude" >>= parseInclude)
+                              <*> (conVal .:? "qsysInclude" >>= parseInclude)
                               <*> ((Left <$> conVal .: "templateD") <|> (Right <$> conVal .: "templateE"))
       "Primitive" -> Primitive <$> conVal .: "name" <*> conVal .: "primType"
       _ -> error "Expected: BlackBox or Primitive object"
