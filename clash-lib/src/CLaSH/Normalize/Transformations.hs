@@ -195,10 +195,10 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                              , show cf
                              , "\nType of the subject is: " ++ showDoc ty
                              , "\nFunction " ++ show cf
-                             , "will not reach a normal form, and compilation"
-                             , "might fail."
+                             , " will not reach a normal form, and compilation"
+                             , " might fail."
                              , "\nRun with '-clash-inline-limit=N' to increase"
-                             , "the inlining limit to N."
+                             , " the inlining limit to N."
                              ])
                      (return e)
       else do
