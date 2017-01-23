@@ -33,6 +33,7 @@ import           Prelude                              hiding ((<$>))
 import           Text.Printf
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
+import           CLaSH.Annotations.Primitive          (HDL (..))
 import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
@@ -67,6 +68,7 @@ makeLenses ''VHDLState
 
 instance Backend VHDLState where
   initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] []
+  hdlKind         = const VHDL
 #ifdef CABAL
   primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
 #else

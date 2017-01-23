@@ -25,6 +25,7 @@ where
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.List                    (foldl', nub)
 import           Data.Word                    (Word8)
+import           CLaSH.Annotations.Primitive  (HDL)
 import           CLaSH.Annotations.TopEntity  (TopEntity)
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
@@ -87,8 +88,9 @@ getProcessOutput command =
      -- return both the output and the exit code.
      return (output, exitCode)
 
-loadModules ::
-  String
+loadModules
+  :: HDL
+  -> String
   -> Maybe (DynFlags.DynFlags)
   -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
         , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
@@ -97,8 +99,9 @@ loadModules ::
         , (CoreSyn.CoreBndr, Maybe TopEntity)      -- topEntity bndr + (maybe) TopEntity annotation
         , Maybe CoreSyn.CoreBndr                   -- testInput bndr
         , Maybe CoreSyn.CoreBndr                   -- expectedOutput bndr
+        , [FilePath]
         )
-loadModules modName dflagsM = do
+loadModules hdl modName dflagsM = do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -194,9 +197,8 @@ loadModules modName dflagsM = do
     let (binders,modFamInstEnvs) = first concat $ unzip tidiedMods
         modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
 
-    (externalBndrs,clsOps,unlocatable) <- loadExternalExprs
-                                            (map snd binders)
-                                            (map fst binders)
+    (externalBndrs,clsOps,unlocatable,pFP) <-
+      loadExternalExprs hdl (map snd binders) (map fst binders)
 
     hscEnv <- GHC.getSession
     famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
@@ -234,7 +236,7 @@ loadModules modName dflagsM = do
       [x] -> return (Just x)
       _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
 
-    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,testInput,expectedOutput)
+    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,testInput,expectedOutput,nub pFP)
 
 findCLaSHAnnotations :: GHC.GhcMonad m
                      => [CoreSyn.CoreBndr]

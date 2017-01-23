@@ -31,6 +31,7 @@ import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
 import           CLaSH.Annotations.TopEntity (TopEntity)
+import           CLaSH.Annotations.Primitive (HDL)
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
 import           CLaSH.Core.Type         (Type, TypeView (..), mkFunTy, splitFunForallTy, tyView)
@@ -51,6 +52,7 @@ import           CLaSH.Util              ((***),first)
 
 generateBindings ::
      FilePath
+  -> HDL
   -> String
   -> Maybe  (GHC.DynFlags)
   -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
@@ -58,9 +60,9 @@ generateBindings ::
         ,Maybe TmName              -- testInput bndr
         ,Maybe TmName              -- expectedOutput bndr
         ,PrimMap Text)             -- The primitives found in '.' and 'primDir'
-generateBindings primDir modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM) <- loadModules modName dflagsM
-  primMap <- generatePrimMap [primDir,"."]
+generateBindings primDir hdl modName dflagsM = do
+  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM,pFP) <- loadModules hdl modName dflagsM
+  primMap <- generatePrimMap (pFP ++ [primDir,"."])
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs

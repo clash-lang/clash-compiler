@@ -17,9 +17,13 @@ where
 -- External Modules
 import           Data.Either (partitionEithers)
 import           Data.List   (elemIndex, partition)
-import           Data.Maybe  (isJust, isNothing)
+import           Data.Maybe  (isJust, isNothing, mapMaybe)
+import           Data.Word   (Word8)
+
+import           CLaSH.Annotations.Primitive
 
 -- GHC API
+import qualified Annotations
 import qualified BasicTypes
 import qualified Class
 import qualified CoreFVs
@@ -36,6 +40,7 @@ import qualified MkCore
 import qualified MonadUtils
 import qualified Name
 import           Outputable  (showPpr, showSDoc, text)
+import qualified Serialized
 import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
@@ -44,7 +49,7 @@ import qualified Var
 import qualified VarSet
 
 -- Internal Modules
-import           CLaSH.Util  (curLoc, traceIf)
+import           CLaSH.Util  ((***), curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
@@ -77,14 +82,16 @@ loadIface foundMod = do
 
 loadExternalExprs ::
   GHC.GhcMonad m
-  => [CoreSyn.CoreExpr]
+  => HDL
+  -> [CoreSyn.CoreExpr]
   -> [CoreSyn.CoreBndr]
   -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
        , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
        , [CoreSyn.CoreBndr]                    -- Unlocatable
+       , [FilePath]
        )
-loadExternalExprs []           _       = return ([],[],[])
-loadExternalExprs (expr:exprs) visited = do
+loadExternalExprs _   []           _       = return ([],[],[],[])
+loadExternalExprs hdl (expr:exprs) visited = do
   let fvs = VarSet.varSetElems $ CoreFVs.exprSomeFreeVars
               (\v -> Var.isId v &&
                      isNothing (Id.isDataConId_maybe v) &&
@@ -93,8 +100,8 @@ loadExternalExprs (expr:exprs) visited = do
 
   let (clsOps,fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
 
-  (locatedExprs,unlocated) <- fmap partitionEithers
-                                $ mapM loadExprFromIface fvs'
+  ((locatedExprs,unlocated),pFP) <-
+     ((partitionEithers *** concat) . unzip) <$> mapM (loadExprFromIface hdl) fvs'
 
   let visited' = concat [ map fst locatedExprs
                         , unlocated
@@ -102,8 +109,9 @@ loadExternalExprs (expr:exprs) visited = do
                         , visited
                         ]
 
-  (locatedExprs', clsOps', unlocated') <-
+  (locatedExprs', clsOps', unlocated',pFP') <-
     loadExternalExprs
+      hdl
       (exprs ++ map snd locatedExprs)
       visited'
 
@@ -118,32 +126,51 @@ loadExternalExprs (expr:exprs) visited = do
   return ( locatedExprs ++ locatedExprs'
          , clsOps''     ++ clsOps'
          , unlocated    ++ unlocated'
+         , pFP          ++ pFP'
          )
 
 loadExprFromIface ::
   GHC.GhcMonad m
-  => CoreSyn.CoreBndr
+  => HDL
+  -> CoreSyn.CoreBndr
   -> m (Either
           (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
           CoreSyn.CoreBndr
+       ,[FilePath]
        )
-loadExprFromIface bndr = do
+loadExprFromIface hdl bndr = do
   let moduleM = Name.nameModule_maybe $ Var.varName bndr
   case moduleM of
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
       case ifaceM of
-        Nothing    -> return (Right bndr)
+        Nothing    -> return (Right bndr,[])
         Just iface -> do
           let decls = map snd (GHC.mi_decls iface)
           let nameFun = GHC.getOccName $ Var.varName bndr
           let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
+          anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
+          let primFPs = loadPrimitiveAnnotations hdl anns
           case declM of
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
-              return $ loadExprFromTyThing bndr tyThing
-            _ -> return (Right bndr)
-    Nothing -> return (Right bndr)
+              return (loadExprFromTyThing bndr tyThing,primFPs)
+            _ -> return (Right bndr,primFPs)
+    Nothing -> return (Right bndr,[])
+
+loadPrimitiveAnnotations
+  :: HDL
+  -> [Annotations.Annotation]
+  -> [FilePath]
+loadPrimitiveAnnotations hdl anns = mapMaybe toFP (concat prims)
+  where
+    annEnv       = Annotations.mkAnnEnv anns
+    prims        = UniqFM.eltsUFM (Annotations.deserializeAnns deserializer annEnv)
+    deserializer = Serialized.deserializeWithData :: ([Word8] -> Primitive)
+    toFP (Primitive hdl' fp)
+      | hdl == hdl'
+      = Just fp
+    toFP _ = Nothing
 
 loadExprFromTyThing :: CoreSyn.CoreBndr
                     -> GHC.TyThing
