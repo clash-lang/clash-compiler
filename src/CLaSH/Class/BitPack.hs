@@ -228,6 +228,14 @@ instance (KnownNat (BitSize h), BitPack (a,b,c,d,e,f,g), BitPack h) =>
   pack (a,b,c,d,e,f,g,h) = pack (a,b,c,d,e,f,g) ++# pack h
   unpack (unpack -> ((a,b,c,d,e,f,g), h)) = (a,b,c,d,e,f,g,h)
 
+instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
+  type BitSize (Maybe a) = 1 + BitSize a
+  pack Nothing  = low  ++# undefined
+  pack (Just x) = high ++# pack x
+  unpack x = case split# x of
+    (c,rest) | c == low  -> Nothing
+             | otherwise -> Just (unpack rest)
+
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --
 -- >>> boolToBV True :: BitVector 6
