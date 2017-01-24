@@ -30,7 +30,9 @@ import Data.Binary.IEEE754            (doubleToWord, floatToWord, wordToDouble,
                                        wordToFloat)
 import Data.Int
 import Data.Word
+import Foreign.C.Types                (CUShort)
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
+import Numeric.Half                   (Half (..))
 import Prelude                        hiding (map)
 
 import CLaSH.Class.Resize             (zeroExtend)
@@ -168,6 +170,16 @@ packDouble# = fromIntegral . doubleToWord
 unpackDouble# :: BitVector 64 -> Double
 unpackDouble# = wordToDouble . fromInteger . unsafeToInteger
 {-# NOINLINE unpackDouble# #-}
+
+instance BitPack CUShort where
+  type BitSize CUShort = 16
+  pack   = fromIntegral
+  unpack = fromIntegral
+
+instance BitPack Half where
+  type BitSize Half = 16
+  pack (Half x) = pack x
+  unpack x      = Half (unpack x)
 
 instance BitPack () where
   type BitSize () = 0
