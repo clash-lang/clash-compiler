@@ -176,4 +176,10 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
     , "templateE" : "~ARG[0] <<< ~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.wordToInteger"
+    , "type"      : "geInteger :: Word -> Integer"
+    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
+    }
+  }
 ]

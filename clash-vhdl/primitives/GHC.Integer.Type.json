@@ -157,4 +157,10 @@ end block;
     , "templateE" : "shift_left(~ARG[0],to_integer(~ARG[1]))"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.wordToInteger"
+    , "type"      : "geInteger :: Word -> Integer"
+    , "templateE" : "signed(std_logic_vector(~ARG[0]))"
+    }
+  }
 ]
