@@ -575,6 +575,8 @@ popCountBV bv =
 instance Resize BitVector where
   resize     = resize#
   zeroExtend = extend
+  signExtend = \ bv -> (case msb# bv of 0 -> id
+                                        1 -> complement) 0 ++# bv
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
