@@ -6,6 +6,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 RAM primitives with a combinational read port.
 -}
 
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
@@ -35,21 +36,17 @@ module CLaSH.Prelude.RAM
   )
 where
 
-import Control.Exception      (catch, evaluate, throw)
-import Control.Monad          (when)
-import Control.Monad.ST.Lazy  (ST,runST)
-import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
-import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
-import Data.Array.ST.Safe     (STArray)
 import Data.Maybe             (fromJust, isJust)
 import GHC.TypeLits           (KnownNat)
+import qualified Data.Vector  as V
 
 import CLaSH.Promoted.Nat     (SNat (..), snatToNum, pow2SNat)
 import CLaSH.Signal           (Signal)
-import CLaSH.Signal.Bundle    (bundle)
-import CLaSH.Signal.Explicit  (Signal', SClock, systemClock, unsafeSynchronizer)
+import CLaSH.Signal.Bundle    (unbundle)
+import CLaSH.Signal.Explicit  (SClock, systemClock, unsafeSynchronizer)
+import CLaSH.Signal.Internal  (Signal' (..))
 import CLaSH.Sized.Unsigned   (Unsigned)
-import CLaSH.XException       (XException, errorX)
+import CLaSH.XException       (errorX)
 
 {-# INLINE asyncRam #-}
 -- | Create a RAM with space for @n@ elements.
@@ -127,14 +124,10 @@ asyncRam' :: Enum addr
           -- ^ (write address @w@, value to write)
           -> Signal' rclk a    -- ^ Value of the @RAM@ at address @r@
 asyncRam' wclk rclk sz rd wrM =
-  asyncRam# wclk rclk sz
-            (fromEnum <$> rd)
-            (isJust <$> wrM)
-            ((fromEnum . fst . fromJust) <$> wrM)
-            ((snd . fromJust) <$> wrM)
+  let en       = isJust <$> wrM
+      (wr,din) = unbundle (fromJust <$> wrM)
+  in  asyncRam# wclk rclk sz (fromEnum <$> rd) en (fromEnum <$> wr) din
 
-
-{-# NOINLINE asyncRam# #-}
 -- | RAM primitive
 asyncRam# :: SClock wclk       -- ^ 'Clock' to which to synchronise the write
                                -- port of the RAM
@@ -148,20 +141,17 @@ asyncRam# :: SClock wclk       -- ^ 'Clock' to which to synchronise the write
           -> Signal' rclk a    -- ^ Value of the @RAM@ at address @r@
 asyncRam# wclk rclk sz rd en wr din = unsafeSynchronizer wclk rclk dout
   where
-    szI  = snatToNum sz
     rd'  = unsafeSynchronizer rclk wclk rd
-    dout = runST $ do
-      arr <- newListArray (0,szI-1) (replicate szI (errorX "asyncRam#: initial value undefined"))
-      traverse (ramT arr) (bundle (rd',en,wr,din))
+    ramI = V.replicate (snatToNum sz) (errorX "asyncRam#: initial value undefined")
+    dout = go ramI rd' en wr din
 
-    ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
-    ramT ram (r,e,w,d) = do
-      -- reading from address using an 'X' exception results in an 'X' result
-      r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
-                                (\(err :: XException) -> return (Left (throw err))))
-      d' <- case r' of
-              Right r2 -> readArray ram r2
-              Left err -> return err
-      -- writing to an address using an 'X' exception makes everything 'X'
-      when e (writeArray ram w d)
-      return d'
+    go :: V.Vector a -> Signal' wclk Int -> Signal' wclk Bool
+       -> Signal' wclk Int -> Signal' wclk a -> Signal' wclk a
+    go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
+      let ram'  = upd ram e w d
+          o     = ram `V.unsafeIndex` r
+      in  o :- go ram' rs es ws ds
+
+    upd ram True  !addr !d = ram `V.unsafeUpd` [(addr,d)]
+    upd ram False _     _  = ram
+{-# NOINLINE asyncRam# #-}

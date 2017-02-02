@@ -63,6 +63,7 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 
 -}
 
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -73,6 +74,10 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+
+-- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
+-- as to why we need this.
+{-# OPTIONS_GHC -fno-cpr-anal #-}
 
 module CLaSH.Prelude.BlockRam.File
   ( -- * BlockRAM synchronised to the system clock
@@ -87,24 +92,21 @@ module CLaSH.Prelude.BlockRam.File
   )
 where
 
-import Control.Exception            (catch, evaluate, throw)
-import Control.Monad                (when)
-import Control.Monad.ST.Lazy        (ST,runST)
-import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
-import Data.Array.MArray            (newListArray,readArray,writeArray)
-import Data.Array.ST                (STArray)
 import Data.Char                    (digitToInt)
 import Data.Maybe                   (fromJust, isJust, listToMaybe)
+import qualified Data.Vector        as V
 import GHC.TypeLits                 (KnownNat)
 import Numeric                      (readInt)
+import System.IO.Unsafe             (unsafePerformIO)
 
-import CLaSH.Promoted.Nat    (SNat (..), pow2SNat, snatToNum)
+import CLaSH.Promoted.Nat    (SNat (..), pow2SNat)
 import CLaSH.Sized.BitVector (BitVector)
 import CLaSH.Signal          (Signal)
-import CLaSH.Signal.Explicit (Signal', SClock, register', systemClock)
-import CLaSH.Signal.Bundle   (bundle)
+import CLaSH.Signal.Explicit (SClock, systemClock)
+import CLaSH.Signal.Internal (Signal' (..))
+import CLaSH.Signal.Bundle   (unbundle)
 import CLaSH.Sized.Unsigned  (Unsigned)
-import CLaSH.XException      (XException, errorX)
+import CLaSH.XException      (errorX)
 
 {-# INLINE blockRamFile #-}
 -- | Create a blockRAM with space for @n@ elements
@@ -261,13 +263,10 @@ blockRamFile' :: (KnownNat m, Enum addr)
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
 blockRamFile' clk sz file rd wrM =
-  blockRamFile# clk sz file
-                (fromEnum <$> rd)
-                (isJust <$> wrM)
-                ((fromEnum . fst . fromJust) <$> wrM)
-                ((snd . fromJust) <$> wrM)
+  let en       = isJust <$> wrM
+      (wr,din) = unbundle (fromJust <$> wrM)
+  in  blockRamFile# clk sz file (fromEnum <$> rd) en (fromEnum <$> wr) din
 
-{-# NOINLINE blockRamFile# #-}
 -- | blockRamFile primitive
 blockRamFile# :: KnownNat m
               => SClock clk                -- ^ 'Clock' to synchronize to
@@ -281,25 +280,20 @@ blockRamFile# :: KnownNat m
               -> Signal' clk (BitVector m)
               -- ^ Value of the @blockRAM@ at address @r@ from the previous
               -- clock cycle
-blockRamFile# clk sz file rd en wr din = register' clk (errorX "blockRamFile#: intial value undefined") dout
+blockRamFile# _clk _sz file =
+    go ramI (errorX "blockRamFile#: intial value undefined")
   where
-    szI  = snatToNum sz
-    dout = runST $ do
-      mem <- unsafeIOToST (initMem file)
-      arr <- newListArray (0,szI-1) mem
-      traverse (ramT arr) (bundle (rd,en,wr,din))
+    go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
+      let ram'  = upd ram e w d
+          o'    = ram `V.unsafeIndex` r
+      in  o :- go ram' o' rs en wr din
 
-    ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
-    ramT ram (r,e,w,d) = do
-      -- reading from address using an 'X' exception results in an 'X' result
-      r' <- unsafeIOToST (catch (evaluate r >>= (return . Right))
-                                (\(err :: XException) -> return (Left (throw err))))
-      d' <- case r' of
-              Right r2 -> readArray ram r2
-              Left err -> return err
-      -- writing to an address using an 'X' exception makes everything 'X'
-      when e (writeArray ram w d)
-      return d'
+    upd ram True  !addr !d = ram `V.unsafeUpd` [(addr,d)]
+    upd ram False _     _  = ram
+
+    content = unsafePerformIO (initMem file)
+    ramI    = V.fromList content
+{-# NOINLINE blockRamFile# #-}
 
 {-# NOINLINE initMem #-}
 -- | __NB:__ Not synthesisable

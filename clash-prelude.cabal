@@ -186,7 +186,8 @@ Library
                       QuickCheck                >= 2.7     && < 2.10,
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
-                      template-haskell          >= 2.9.0.0 && < 2.12
+                      template-haskell          >= 2.9.0.0 && < 2.12,
+                      vector                    >= 0.11    && < 1.0
 
   if flag(doclinks)
     CPP-Options:      -DDOCLINKS

@@ -336,6 +336,7 @@ This concludes the short introduction to using 'blockRam'.
 
 -}
 
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -345,6 +346,10 @@ This concludes the short introduction to using 'blockRam'.
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
+
+-- See: https://github.com/clash-lang/clash-compiler/commit/721fcfa9198925661cd836668705f817bddaae3c
+-- as to why we need this.
+{-# OPTIONS_GHC -fno-cpr-anal #-}
 
 module CLaSH.Prelude.BlockRam
   ( -- * BlockRAM synchronised to the system clock
@@ -361,22 +366,18 @@ module CLaSH.Prelude.BlockRam
   )
 where
 
-import Control.Exception      (catch, evaluate, throw)
-import Control.Monad          (when)
-import Control.Monad.ST.Lazy  (ST,runST)
-import Control.Monad.ST.Lazy.Unsafe (unsafeIOToST)
-import Data.Array.MArray.Safe (newListArray,readArray,writeArray)
-import Data.Array.ST.Safe     (STArray)
 import Data.Maybe             (fromJust, isJust)
+import qualified Data.Vector  as V
 import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding (length)
 
 import CLaSH.Signal           (Signal, mux)
-import CLaSH.Signal.Explicit  (Signal', SClock, register', systemClock)
-import CLaSH.Signal.Bundle    (bundle, unbundle)
+import CLaSH.Signal.Explicit  (SClock, register', systemClock)
+import CLaSH.Signal.Internal  (Signal' (..))
+import CLaSH.Signal.Bundle    (unbundle)
 import CLaSH.Sized.Unsigned   (Unsigned)
-import CLaSH.Sized.Vector     (Vec, length, toList)
-import CLaSH.XException       (XException, errorX)
+import CLaSH.Sized.Vector     (Vec, toList)
+import CLaSH.XException       (errorX)
 
 {- $setup
 >>> import CLaSH.Prelude as C
@@ -716,11 +717,9 @@ blockRam' :: (KnownNat n, Enum addr)
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
 blockRam' clk content rd wrM =
-  blockRam# clk content
-            (fromEnum <$> rd)
-            (isJust <$> wrM)
-            ((fromEnum . fst . fromJust) <$> wrM)
-            ((snd . fromJust) <$> wrM)
+  let en       = isJust <$> wrM
+      (wr,din) = unbundle (fromJust <$> wrM)
+  in  blockRam# clk content (fromEnum <$> rd) en (fromEnum <$> wr) din
 
 {-# INLINE blockRamPow2' #-}
 -- | Create a blockRAM with space for 2^@n@ elements
@@ -774,26 +773,16 @@ blockRam# :: KnownNat n
           -> Signal' clk a
           -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
           -- cycle
-blockRam# clk content rd en wr din =
-    register' clk (errorX "blockRam#: intial value undefined") dout
+blockRam# _clk content =
+    go (V.fromList (toList content)) (errorX "blockRam#: intial value undefined")
   where
-    szI  = length content
-    dout = runST $ do
-      arr <- newListArray (0,szI-1) (toList content)
-      traverse (ramT arr) (bundle (rd,en,wr,din))
+    go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
+      let ram' = upd ram e w d
+          o'    = ram `V.unsafeIndex` r
+      in  o :- go ram' o' rs en wr din
 
-    ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
-    ramT ram (r,e,w,d) = do
-      -- reading from address using an 'X' exception results in an 'X' result
-      r' <- unsafeIOToST $
-               catch (evaluate r >>= (return . Right))
-                     (\(err :: XException) -> return (Left (throw err)))
-      d' <- case r' of
-              Right r2 -> readArray ram r2
-              Left err -> return err
-      -- writing to an address using an 'X' exception makes everything 'X'
-      when e (writeArray ram w d)
-      return d'
+    upd ram True  !addr !d = ram `V.unsafeUpd` [(addr,d)]
+    upd ram False _     _  = ram
 {-# NOINLINE blockRam# #-}
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronised to specified clock)
