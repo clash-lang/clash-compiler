@@ -230,7 +230,10 @@ instance (KnownNat (BitSize h), BitPack (a,b,c,d,e,f,g), BitPack h) =>
 
 instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
   type BitSize (Maybe a) = 1 + BitSize a
-  pack Nothing  = low  ++# undefined
+  pack Nothing  = low  ++# 0
+  -- We cannot do `low ++# undefined`, because `BitVector`s underlying
+  -- representation is `Integer`, so `low ++# undefined` would make the
+  -- entire `BitVector` undefined.
   pack (Just x) = high ++# pack x
   unpack x = case split# x of
     (c,rest) | c == low  -> Nothing
