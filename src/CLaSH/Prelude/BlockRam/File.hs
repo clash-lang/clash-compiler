@@ -284,12 +284,12 @@ blockRamFile# _clk _sz file =
     go ramI (errorX "blockRamFile#: intial value undefined")
   where
     go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
-      let ram'  = upd ram e w d
-          o'    = ram `V.unsafeIndex` r
+      let ram' = upd ram e w d
+          o'   = ram V.! r
       in  o :- go ram' o' rs en wr din
 
-    upd ram True  !addr !d = ram `V.unsafeUpd` [(addr,d)]
-    upd ram False _     _  = ram
+    upd ram True  addr d = ram V.// [(addr,d)]
+    upd ram False _    _ = ram
 
     content = unsafePerformIO (initMem file)
     ramI    = V.fromList content

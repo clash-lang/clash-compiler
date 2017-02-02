@@ -148,10 +148,10 @@ asyncRam# wclk rclk sz rd en wr din = unsafeSynchronizer wclk rclk dout
     go :: V.Vector a -> Signal' wclk Int -> Signal' wclk Bool
        -> Signal' wclk Int -> Signal' wclk a -> Signal' wclk a
     go !ram (r :- rs) (e :- es) (w :- ws) (d :- ds) =
-      let ram'  = upd ram e w d
-          o     = ram `V.unsafeIndex` r
+      let ram' = upd ram e w d
+          o    = ram V.! r
       in  o :- go ram' rs es ws ds
 
-    upd ram True  !addr !d = ram `V.unsafeUpd` [(addr,d)]
-    upd ram False _     _  = ram
+    upd ram True  addr d = ram V.// [(addr,d)]
+    upd ram False _    _ = ram
 {-# NOINLINE asyncRam# #-}

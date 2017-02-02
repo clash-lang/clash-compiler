@@ -778,11 +778,11 @@ blockRam# _clk content =
   where
     go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e w d
-          o'    = ram `V.unsafeIndex` r
+          o'   = ram V.! r
       in  o :- go ram' o' rs en wr din
 
-    upd ram True  !addr !d = ram `V.unsafeUpd` [(addr,d)]
-    upd ram False _     _  = ram
+    upd ram True  addr d = ram V.// [(addr,d)]
+    upd ram False _    _ = ram
 {-# NOINLINE blockRam# #-}
 
 -- | Create read-after-write blockRAM from a read-before-write one (synchronised to specified clock)
