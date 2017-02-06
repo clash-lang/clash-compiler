@@ -159,7 +159,7 @@ end block;
   }
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.wordToInteger"
-    , "type"      : "geInteger :: Word -> Integer"
+    , "type"      : "wordToInteger :: Word# -> Integer"
     , "templateE" : "signed(std_logic_vector(~ARG[0]))"
     }
   }
