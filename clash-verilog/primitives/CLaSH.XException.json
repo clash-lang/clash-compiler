@@ -1,0 +1,7 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.XException.seqX"
+    , "type"      : "seqX :: a -> b -> b"
+    , "templateE" : "~ARG[1]"
+    }
+  }
+]
