@@ -163,4 +163,10 @@ end block;
     , "templateE" : "signed(std_logic_vector(~ARG[0]))"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToWord"
+    , "type"      : "integerToWord :: Integer -> Word#"
+    , "templateE" : "unsigned(std_logic_vector(~ARG[0]))"
+    }
+  }
 ]

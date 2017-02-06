@@ -182,4 +182,10 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
     , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToWord"
+    , "type"      : "integerToWord :: Integer -> Word#"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
+    }
+  }
 ]
