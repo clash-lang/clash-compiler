@@ -1,5 +1,5 @@
 {-|
-Copyright  :  (C) 2016, University of Twente
+Copyright  :  (C) 2016, University of Twente, 2017, QBayLogic
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -30,7 +30,10 @@ module CLaSH.XException
   ( -- * 'X': An exception for uninitialized values
     XException, errorX
     -- * Printing 'X' exceptions as \"X\"
-  , ShowX (..), showsX, printX, showsPrecXWith)
+  , ShowX (..), showsX, printX, showsPrecXWith
+    -- * Strict evaluation
+  , seqX
+  )
 where
 
 import Control.Exception (Exception, catch, evaluate, throw)
@@ -58,6 +61,20 @@ instance Exception XException
 -- out with an exception.
 errorX :: HasCallStack => String -> a
 errorX msg = throw (XException ("X: " ++ msg ++ "\n" ++ prettyCallStack callStack))
+
+-- | Like 'seq', however, whereas 'seq' will always do:
+--
+-- > seq  _|_              b = _|_
+--
+-- 'seqX' will do:
+--
+-- > seqX (XException msg) b = b
+-- > seqX _|_              b = _|_
+seqX :: a -> b -> b
+seqX a b = unsafeDupablePerformIO
+  (catch (evaluate a >> return b) (\(XException _) -> return b))
+{-# NOINLINE seqX #-}
+infixr 0 `seqX`
 
 showXWith :: (a -> ShowS) -> a -> ShowS
 showXWith f x =
