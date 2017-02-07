@@ -637,7 +637,7 @@ prog2 = -- 0 := 4
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @readNew (blockRam inits) rd wrM@.
-blockRam :: (KnownNat n, Enum addr)
+blockRam :: Enum addr
          => Vec n a     -- ^ Initial content of the BRAM, also
                         -- determines the size, @n@, of the BRAM.
                         --
@@ -704,7 +704,7 @@ blockRamPow2 = blockRamPow2' systemClock
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRam' clk inits) rd wrM@.
-blockRam' :: (KnownNat n, Enum addr)
+blockRam' :: Enum addr
           => SClock clk       -- ^ 'Clock' to synchronize to
           -> Vec n a          -- ^ Initial content of the BRAM, also
                               -- determines the size, @n@, of the BRAM.
@@ -760,8 +760,7 @@ blockRamPow2' :: KnownNat n
 blockRamPow2' = blockRam'
 
 -- | blockRAM primitive
-blockRam# :: KnownNat n
-          => SClock clk       -- ^ 'Clock' to synchronize to
+blockRam# :: SClock clk       -- ^ 'Clock' to synchronize to
           -> Vec n a          -- ^ Initial content of the BRAM, also
                               -- determines the size, @n@, of the BRAM.
                               --
