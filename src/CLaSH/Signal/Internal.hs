@@ -100,7 +100,7 @@ import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
 
 import CLaSH.Promoted.Nat         (SNat, snatToInteger)
 import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
-import CLaSH.XException           (XException, errorX)
+import CLaSH.XException           (XException, errorX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -267,10 +267,10 @@ register# _ i s = i :- s
 
 {-# NOINLINE regEn# #-}
 regEn# :: SClock clk -> a -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
-regEn# clk i b s = r
+regEn# _ = go
   where
-    r  = register# clk i s'
-    s' = mux b s r
+    go o (e :- es) as@(~(x :- xs)) =
+      o `seqX` o :- (as `seq` if e then go x es xs else go o es xs)
 
 {-# INLINE mux #-}
 -- | The above type is a generalisation for:
