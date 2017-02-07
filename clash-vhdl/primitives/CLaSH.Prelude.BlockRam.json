@@ -1,41 +1,40 @@
 [ { "BlackBox" :
     { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
     , "type" :
-"blockRam# :: KnownNat n       -- ARG[0]
-           => SClock clk       -- clk,  ARG[1]
-           -> Vec n a          -- init, ARG[2]
-           -> Signal' clk Int  -- rd,   ARG[3]
-           -> Signal' clk Bool -- wren, ARG[4]
-           -> Signal' clk Int  -- wr,   ARG[5]
-           -> Signal' clk a    -- din,  ARG[6]
+"blockRam# :: SClock clk       -- clk,  ARG[0]
+           -> Vec n a          -- init, ARG[1]
+           -> Signal' clk Int  -- rd,   ARG[2]
+           -> Signal' clk Bool -- wren, ARG[3]
+           -> Signal' clk Int  -- wr,   ARG[4]
+           -> Signal' clk a    -- din,  ARG[5]
            -> Signal' clk a"
     , "templateD" :
 "-- blockRam begin
 ~GENSYM[~COMPNAME_blockRam][0] : block
-  signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
-  signal ~GENSYM[dout][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
-  signal ~SYM[2] : ~TYP[6];~FI
-  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[0] - 1;
-  signal ~GENSYM[wr][4] : integer range 0 to ~LIT[0] - 1;
+  signal ~GENSYM[RAM][1] : ~TYP[1] := ~LIT[1];~IF ~VIVADO ~THEN
+  signal ~GENSYM[dout][2] : std_logic_vector(~SIZE[~TYP[5]]-1 downto 0);~ELSE
+  signal ~SYM[2] : ~TYP[5];~FI
+  signal ~GENSYM[rd][3] : integer range 0 to ~LENGTH[~TYP[1]] - 1;
+  signal ~GENSYM[wr][4] : integer range 0 to ~LENGTH[~TYP[1]] - 1;
 begin
-  ~SYM[3] <= to_integer(~ARG[3])
+  ~SYM[3] <= to_integer(~ARG[2])
   -- pragma translate_off
-                mod ~LIT[0]
+                mod ~LENGTH[~TYP[1]]
   -- pragma translate_on
                 ;
 
-  ~SYM[4] <= to_integer(~ARG[5])
+  ~SYM[4] <= to_integer(~ARG[4])
   -- pragma translate_off
-                mod ~LIT[0]
+                mod ~LENGTH[~TYP[1]]
   -- pragma translate_on
                 ;
 
-  ~GENSYM[blockRam_sync][5] : process(~CLK[1])
+  ~GENSYM[blockRam_sync][5] : process(~CLK[0])
   begin
-    if rising_edge(~CLK[1]) then
-      if ~ARG[4] then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
-        ~SYM[1](~SYM[4]) <= ~ARG[6];~FI
+    if rising_edge(~CLK[0]) then
+      if ~ARG[3] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[5]][~TYP[5]];~ELSE
+        ~SYM[1](~SYM[4]) <= ~ARG[5];~FI
       end if;
       ~SYM[2] <= ~SYM[1](~SYM[3]);
     end if;
