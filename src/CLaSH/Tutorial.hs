@@ -1392,8 +1392,8 @@ fifoMem wclk rclk addrSize wfull raddr wdataM =
 
 We see that we give it @2^addrSize@ elements, where @addrSize@ is the bit-size
 of the address. Also, we only write new values to the ram when a new write is
-requested, indicated by @winc@, and the buffer is not full, indicated by
-@wfull@.
+requested, indicated by @wdataM@ having a $Just$ value, and the buffer is not
+full, indicated by @wfull@.
 
 The next part of the design calculates the read and write address for the
 asynchronous RAM, and creates the flags indicating whether the FIFO is full
@@ -1427,7 +1427,7 @@ for the empty and full flags:
 isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
--- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
+-- FIFO full: when next pntr == synchronized {~wptr[addrSize:addrSize-1],wptr[addrSize-2:0]}
 isFull addrSize ptr s_ptr =
     ptr == 'complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
                       'slice' (addrSize ``subSNat`` d2) d0  s_ptr
@@ -1515,14 +1515,14 @@ ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) =
 isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
--- FIFO full: when next pntr == synchonized {~wptr[addrSize:addrSize-1],wptr[addrSize-1:0]}
+-- FIFO full: when next pntr == synchronized {~wptr[addrSize:addrSize-1],wptr[addrSize-2:0]}
 isFull addrSize ptr s_ptr =
     ptr == 'complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
                       'slice' (addrSize ``subSNat`` d2) d0  s_ptr
 
 wptrFullInit        = (0,0,False)
 
--- Dual flip-flip synchroniser
+-- Dual flip-flop synchroniser
 ptrSync clk1 clk2 = 'register'' clk2 0
                   . 'register'' clk2 0
                   . 'unsafeSynchronizer' clk1 clk2
