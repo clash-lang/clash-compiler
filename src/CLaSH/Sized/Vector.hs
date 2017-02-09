@@ -246,7 +246,7 @@ instance ShowX a => ShowX (Vec n a) where
 instance (KnownNat n, Eq a) => Eq (Vec n a) where
   (==) v1 v2
     | length v1 == 0 = True
-    | otherwise      = fold (&&) (unsafeCoerce (zipWith (==) v1 v2))
+    | otherwise      = fold @Bool @n (&&) (unsafeCoerce (zipWith (==) v1 v2))
   -- FIXME: the `unsafeCoerce` is a hack because the CLaSH compiler cannot deal
   -- with the existential length of the 'xs' in "Cons x xs".
   --
