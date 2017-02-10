@@ -1391,7 +1391,7 @@ fifoMem wclk rclk addrSize wfull raddr wdataM =
 @
 
 We see that we give it @2^addrSize@ elements, where @addrSize@ is the bit-size
-of the address. Also, we only write new values to the ram when a new write is
+of the address. Also, we only write new values to the RAM when a new write is
 requested, indicated by @wdataM@ having a $Just$ value, and the buffer is not
 full, indicated by @wfull@.
 
