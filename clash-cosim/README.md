@@ -1,4 +1,9 @@
 # clash-cosim
+
+FOR THE LATEST VERSION SEE THE BRANCH CoSimV2
+
+
+
 CλaSH (pronounced ‘clash’) is a functional hardware description language that borrows both its syntax and semantics from the functional programming language Haskell. The CλaSH compiler transforms these high-level descriptions to low-level synthesizable VHDL, Verilog, or SystemVerilog. [COPIED FROM http://www.clash-lang.org]
 
 For my master thesis, I implemented co-simulation between CλaSH and Verilog (using the VPI). If you have any questions or suggestions about the code, code-style, the usage, or other things related to this co-simulation please let me know :)
