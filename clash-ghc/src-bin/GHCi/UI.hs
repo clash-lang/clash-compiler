@@ -1749,12 +1749,14 @@ makeHDL backend optsRef srcs = do
                                  if all (== odir) [hidir,sdir,ddir]
                                     then Just odir
                                     else Nothing
-                  opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)}
+                  idirs = importPaths dflags
+                  opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)
+                               ,opt_importPaths = idirs}
                   backend' = backend iw syn
               primDir <- CLaSH.Backend.primDir backend'
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM,primMap) <-
-                  generateBindings primDir (CLaSH.Backend.hdlKind backend') src (Just dflags)
+                  generateBindings primDir idirs (CLaSH.Backend.hdlKind backend') src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff

@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2013-2016, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente, 2017, QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -52,6 +52,7 @@ import           CLaSH.Util              ((***),first)
 
 generateBindings ::
      FilePath
+  -> [FilePath]
   -> HDL
   -> String
   -> Maybe  (GHC.DynFlags)
@@ -60,9 +61,9 @@ generateBindings ::
         ,Maybe TmName              -- testInput bndr
         ,Maybe TmName              -- expectedOutput bndr
         ,PrimMap Text)             -- The primitives found in '.' and 'primDir'
-generateBindings primDir hdl modName dflagsM = do
+generateBindings primDir importDirs hdl modName dflagsM = do
   (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM,pFP) <- loadModules hdl modName dflagsM
-  primMap <- generatePrimMap (pFP ++ [primDir,"."])
+  primMap <- generatePrimMap (pFP ++ (primDir:importDirs))
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs

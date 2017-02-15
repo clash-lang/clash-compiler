@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente, 2017, QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -130,7 +130,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
             takeWhile (/= '.') (name2String topEntity)
   prepareDir (opt_cleanhdl opts) (extension hdlState') dir
   mapM_ (writeHDL dir) hdlDocs
-  copyDataFiles dir dfiles'
+  copyDataFiles (opt_importPaths opts) dir dfiles'
 
   endTime <- hdlDocs `seq` Clock.getCurrentTime
   let startEndDiff = Clock.diffUTCTime endTime startTime
@@ -190,7 +190,21 @@ writeHDL dir (cname, hdl) = do
   IO.hPutStr handle "\n"
   IO.hClose handle
 
-copyDataFiles :: FilePath -> [(String,FilePath)] -> IO ()
-copyDataFiles dir = mapM_ copyFile'
+copyDataFiles :: [FilePath] -> FilePath -> [(String,FilePath)] -> IO ()
+copyDataFiles idirs dir = mapM_ (copyFile' idirs)
   where
-    copyFile' (nm,old) = Directory.copyFile old (dir FilePath.</> nm)
+    copyFile' dirs (nm,old) = do
+      oldExists <- Directory.doesFileExist old
+      if oldExists
+        then Directory.copyFile old new
+        else goImports dirs
+      where
+        new = dir FilePath.</> nm
+
+        goImports []     = Directory.copyFile old new
+        goImports (d:ds) = do
+          let old2 = d FilePath.</> old
+          old2Exists <- Directory.doesFileExist old2
+          if old2Exists
+            then Directory.copyFile old2 new
+            else goImports ds
