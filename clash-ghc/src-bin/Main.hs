@@ -142,6 +142,7 @@ main = do
                              , opt_errorExtra  = False
                              , opt_floatSupport = False
                              , opt_allowZero   = False
+                             , opt_importPaths = []
                              })
     (argv3, clashFlagWarnings) <- parseCLaSHFlags r argv2
 
