@@ -1148,7 +1148,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                                     [Right lTy
                                     ,Right rTy
                                     ,Left  bvArg
-                                    ,Left  (Prim "CLaSH.Transformations.removedArg" lTy)
+                                    ,Left  (mkApps (Prim "CLaSH.Transformations.removedArg" undefinedTy)
+                                                   [Right rTy])
                                     ]
 
               changed tup
@@ -1158,7 +1159,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
                                     ,Right rTy
-                                    ,Left  (Prim "CLaSH.Transformations.removedArg" lTy)
+                                    ,Left  (mkApps (Prim "CLaSH.Transformations.removedArg" undefinedTy)
+                                                   [Right lTy])
                                     ,Left  bvArg
                                     ]
 
