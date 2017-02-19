@@ -50,7 +50,7 @@ data SaturationMode
   = SatWrap  -- ^ Wrap around on overflow and underflow
   | SatBound -- ^ Become 'maxBound' on overflow, and 'minBound' on underflow
   | SatZero  -- ^ Become @0@ on overflow and underflow
-  | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' - 1@) on
+  | SatSymmetric -- ^ Become 'maxBound' on overflow, and (@'minBound' + 1@) on
                  -- underflow for signed numbers, and 'minBound' for unsigned
                  -- numbers.
   deriving Eq
