@@ -870,7 +870,12 @@ exprLit (Just (hty,sz)) (NumLit i) = case hty of
 
   where
     blit = bits (toBits sz i)
-    hlit = (if i < 0 then "-" else empty) <> hex (toHex sz i)
+    i'   = case hty of
+             Signed _ -> let mask = 2^(sz-1) in case divMod i mask of
+                (s,i'') | even s    -> i''
+                        | otherwise -> i'' - mask
+             _ -> i `mod` 2^sz
+    hlit = (if i' < 0 then "-" else empty) <> hex (toHex sz i')
 exprLit _             (BoolLit t)   = if t then "true" else "false"
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = text . T.pack $ show s
