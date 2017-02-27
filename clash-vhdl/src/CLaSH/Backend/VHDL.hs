@@ -861,14 +861,16 @@ exprLit Nothing (NumLit i) = integer i
 exprLit (Just (hty,sz)) (NumLit i) = case hty of
   Unsigned n
     | i < 2^(31 :: Integer) -> "to_unsigned" <> parens (integer i <> "," <> int n)
-    | otherwise -> "unsigned'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
+    | otherwise -> "unsigned'" <> parens lit
   Signed n
     | i < 2^(31 :: Integer) && i > (-2^(31 :: Integer)) -> "to_signed" <> parens (integer i <> "," <> int n)
-    | otherwise -> "signed'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
-  BitVector _ -> "std_logic_vector'" <> parens (if sz `mod` 4 == 0 then hlit else blit)
+    | otherwise -> "signed'" <> parens lit
+  BitVector _ -> "std_logic_vector'" <> parens lit
   _           -> blit
 
   where
+    validHexLit = sz `mod` 4 == 0 && sz /= 0
+    lit = if validHexLit then hlit else blit
     blit = bits (toBits sz i)
     i'   = case hty of
              Signed _ -> let mask = 2^(sz-1) in case divMod i mask of
