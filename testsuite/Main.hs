@@ -23,6 +23,7 @@ main =
       ,runTest "examples"             Both [] "BlockRamTest" (Just ("topEntity",False))
       ,runTest "examples"             Both [] "Calculator"   (Just ("testbench",True ))
       ,runTest "examples"             Both [] "CochleaPlus"  (Just ("topEntity",False))
+      ,runTest "examples"             Both [] "DDR"          (Just ("testbench",True ))
       ,runTest "examples"             Both [] "FIR"          (Just ("testbench",True ))
       ,runTest "examples"             Both [] "Fifo"         (Just ("topEntity",False))
       ,runTest "examples"             Both [] "MAC"          (Just ("testbench",True))
