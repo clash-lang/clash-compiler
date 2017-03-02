@@ -12,6 +12,7 @@ The Product/Signal isomorphism
 {-# LANGUAGE MagicHash              #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE TypeOperators          #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -26,6 +27,7 @@ import Control.Applicative   (liftA2)
 import GHC.TypeLits          (KnownNat)
 import Prelude               hiding (head, map, tail)
 
+import CLaSH.NamedTypes      ((:::))
 import CLaSH.Signal.Internal (Clock, Signal' (..))
 import CLaSH.Sized.BitVector (BitVector)
 import CLaSH.Sized.Fixed     (Fixed)
@@ -106,7 +108,6 @@ instance Bundle Integer
 instance Bundle Int
 instance Bundle Float
 instance Bundle Double
-instance Bundle ()
 instance Bundle (Maybe a)
 instance Bundle (Either a b)
 
@@ -115,6 +116,16 @@ instance Bundle (Index n)
 instance Bundle (Fixed rep int frac)
 instance Bundle (Signed n)
 instance Bundle (Unsigned n)
+
+-- | Note that:
+--
+-- > bundle   :: () -> Signal' clk ()
+-- > unbundle :: Signal' clk () -> ()
+instance Bundle () where
+  type Unbundled' t () = t ::: ()
+  -- ^ This is just to satisfy the injectivity annotation
+  bundle   u = pure u
+  unbundle _ = ()
 
 instance Bundle (a,b) where
   type Unbundled' t (a,b) = (Signal' t a, Signal' t b)
