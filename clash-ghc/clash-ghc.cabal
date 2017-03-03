@@ -82,7 +82,7 @@ Executable clash
                       containers                >= 0.5.4.0  && < 0.6,
                       directory                 >= 1.2      && < 1.4,
                       filepath                  >= 1.3      && < 1.5,
-                      ghc                       >= 8.0.1    && < 8.2,
+                      ghc                       >= 8.0.2    && < 8.2,
                       process                   >= 1.2      && < 1.5,
                       hashable                  >= 1.1.2.3  && < 1.3,
                       haskeline                 >= 0.7.0.3  && < 0.8,
@@ -103,8 +103,8 @@ Executable clash
                       ghc-typelits-natnormalise >= 0.4.3    && < 0.6,
                       deepseq                   >= 1.3.0.2  && < 1.5,
                       time                      >= 1.4.0.1  && < 1.8,
-                      ghc-boot                  >= 8.0.1    && < 8.2,
-                      ghci                      >= 8.0.1    && < 8.2,
+                      ghc-boot                  >= 8.0.2    && < 8.2,
+                      ghci                      >= 8.0.2    && < 8.2,
                       uniplate                  >= 1.6.12   && < 1.8
 
   if os(windows)
