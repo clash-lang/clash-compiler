@@ -109,6 +109,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Just c <- flogBase a b
     -> (Literal . IntLiteral . toInteger) c
 
+  "GHC.Integer.Type.smallInteger"
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal (IntegerLiteral i)
+
   "GHC.Integer.Type.integerToInt"
     | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral i
