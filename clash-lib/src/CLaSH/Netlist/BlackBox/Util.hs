@@ -168,6 +168,7 @@ findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
           BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
             [(Left (Literal Nothing (StringLit s')),_,_)] -> renderFilePath fs s'
             _ -> (fs',FilePath e)
+          Literal Nothing (StringLit s') -> renderFilePath fs s'
           _ -> (fs',FilePath e)
       _ -> (fs',FilePath e)
     findAndSet fs' l = (fs',l)

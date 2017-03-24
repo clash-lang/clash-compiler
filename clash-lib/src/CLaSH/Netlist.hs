@@ -460,4 +460,9 @@ mkDcApplication dstHType bndr dc args = do
       RTree _ _ -> case argExprs of
                       [_,e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showDoc args
+      String ->
+        let dc' = case dcTag dc of
+                    1 -> HW.Literal Nothing (StringLit "")
+                    _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,dcTag dc,args,argHWTys)
+        in  return dc'
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)
