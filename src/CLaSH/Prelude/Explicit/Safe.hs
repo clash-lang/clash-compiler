@@ -14,9 +14,10 @@ look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
 using explicitly clocked signals.
 -}
 
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -44,12 +45,15 @@ module CLaSH.Prelude.Explicit.Safe
     -- * Utility functions
   , isRising'
   , isFalling'
+  , riseEvery'
+  , oscillate'
     -- * Exported modules
     -- ** Explicitly clocked synchronous signals
   , module CLaSH.Signal.Explicit
   )
 where
 
+import GHC.TypeLits
 import Control.Applicative        (liftA2)
 import Prelude                    hiding (repeat)
 
@@ -60,8 +64,12 @@ import CLaSH.Prelude.RAM          (asyncRam',asyncRamPow2')
 import CLaSH.Prelude.ROM          (rom', romPow2')
 import CLaSH.Prelude.Synchronizer (dualFlipFlopSynchronizer,
                                    asyncFIFOSynchronizer)
+import CLaSH.Promoted.Nat         (SNat(..))
+import CLaSH.Sized.Index          (Index)
 import CLaSH.Signal.Bundle        (Bundle(..), Unbundled')
 import CLaSH.Signal.Explicit
+import CLaSH.Sized.Unsigned
+
 
 {- $setup
 >>> :set -XDataKinds
@@ -114,3 +122,27 @@ isFalling' clk is s = liftA2 edgeDetect prev s
   where
     prev = register' clk is s
     edgeDetect old new = old == maxBound && new == minBound
+
+{-# INLINEABLE riseEvery' #-}
+-- | Give a pulse every @n@ clock cycles. This is a useful helper function when
+-- combined with functions like @'CLaSH.Signal.regEn'@ or @'CLaSH.Signal.mux'@,
+-- in order to delay a register by a known amount.
+riseEvery' :: forall clk n. KnownNat n => SClock clk -> SNat n -> Signal' clk Bool
+riseEvery' clk SNat = moore' clk transfer output 0 (pure ())
+  where
+    output :: Index n -> Bool
+    output = (== maxBound)
+
+    transfer :: Index n -> () -> Index n
+    transfer s _ = if (s == maxBound) then 0 else s+1
+
+{-# INLINEABLE oscillate' #-}
+-- | Oscillate a @'Bool'@ for a given number of cycles, given the starting state.
+oscillate' :: forall clk n. KnownNat n => SClock clk -> Bool -> SNat n -> Signal' clk Bool
+oscillate' clk begin SNat = moore' clk transfer snd (0, begin) (pure ())
+  where
+    transfer :: (Index n, Bool) -> () -> (Index n, Bool)
+    transfer (s, i) _ =
+      if s == maxBound
+        then (0,   not i) -- reset state and oscillate output
+        else (s+1, i)     -- hold current output

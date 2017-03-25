@@ -27,9 +27,9 @@
   Some circuit examples can be found in "CLaSH.Examples".
 -}
 
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -60,6 +60,8 @@ module CLaSH.Prelude.Safe
     -- * Utility functions
   , isRising
   , isFalling
+  , riseEvery
+  , oscillate
     -- * Exported modules
     -- ** Synchronous signals
   , module CLaSH.Signal
@@ -129,7 +131,8 @@ import CLaSH.NamedTypes
 import CLaSH.Prelude.BitIndex
 import CLaSH.Prelude.BitReduction
 import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2, readNew, readNew')
-import CLaSH.Prelude.Explicit.Safe (registerB', isRising', isFalling')
+import CLaSH.Prelude.Explicit.Safe (registerB', isRising', isFalling',
+                                    oscillate', riseEvery')
 import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
 import CLaSH.Prelude.Moore         (moore, mooreB)
 import CLaSH.Prelude.RAM           (asyncRam,asyncRamPow2)
@@ -192,6 +195,52 @@ isFalling :: (Bounded a, Eq a)
           -> Signal a
           -> Signal Bool
 isFalling = isFalling' systemClock
+
+{-# INLINE riseEvery #-}
+-- | Give a pulse every @n@ clock cycles. This is a useful helper function when
+-- combined with functions like @'CLaSH.Signal.regEn'@ or @'CLaSH.Signal.mux'@,
+-- in order to delay a register by a known amount.
+--
+-- To be precise: the given signal will be @'False'@ for the next @n-1@ cycles,
+-- followed by a single @'True'@ value:
+--
+-- >>> Prelude.last (sampleN 1024 (riseEvery d1024)) == True
+-- True
+-- >>> Prelude.or (sampleN 1023 (riseEvery d1024)) == False
+-- True
+--
+-- For example, to update a counter once every 10 million cycles:
+--
+-- @
+-- counter = 'CLaSH.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
+-- @
+riseEvery :: KnownNat n => SNat n -> Signal Bool
+riseEvery = riseEvery' systemClock
+
+{-# INLINE oscillate #-}
+-- | Oscillate a @'Bool'@ for a given number of cycles. This is a convenient
+-- function when combined with something like @'regEn'@, as it allows you to
+-- easily hold a register value for a given number of cycles. The input @'Bool'@
+-- determines what the initial value is.
+--
+-- To oscillate on an interval of 5 cycles:
+--
+-- >>> sampleN 10 (oscillate False d5)
+-- [False,False,False,False,False,True,True,True,True,True]
+--
+-- To oscillate between @'True'@ and @'False'@:
+--
+-- >>> sampleN 10 (oscillate False d1)
+-- [False,True,False,True,False,True,False,True,False,True]
+--
+-- An alternative definition for the above could be:
+--
+-- >>> let osc' = register False (not <$> osc')
+-- >>> let sample' = sampleN 200
+-- >>> sample' (oscillate False d1) == sample' osc'
+-- True
+oscillate :: KnownNat n => Bool -> SNat n -> Signal Bool
+oscillate = oscillate' systemClock
 
 undefined :: HasCallStack => a
 undefined = errorX "undefined"
