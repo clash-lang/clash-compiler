@@ -10,7 +10,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI.Monad (
+module CLaSH.GHCi.UI.Monad (
         GHCi(..), startGHCi,
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
@@ -31,7 +31,7 @@ module GHCi.UI.Monad (
 
 #include "../HsVersions.h"
 
-import GHCi.UI.Info (ModInfo)
+import CLaSH.GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
