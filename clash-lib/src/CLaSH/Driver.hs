@@ -199,7 +199,11 @@ copyDataFiles idirs dir = mapM_ (copyFile' idirs)
       where
         new = dir FilePath.</> nm
 
-        goImports []     = Directory.copyFile old new
+        goImports [] = do
+          oldExists <- Directory.doesFileExist old
+          if oldExists
+            then Directory.copyFile old new
+            else putStr ("WARNING: file " ++ show old ++ " does not exist")
         goImports (d:ds) = do
           let old2 = d FilePath.</> old
           old2Exists <- Directory.doesFileExist old2
