@@ -13,7 +13,7 @@ module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Monad                    (when)
+import           Control.Monad                    (when, unless)
 import           Control.Monad.State              (evalState, get)
 import qualified Data.HashMap.Lazy                as HML
 import           Data.HashMap.Strict              (HashMap)
@@ -203,7 +203,7 @@ copyDataFiles idirs dir = mapM_ (copyFile' idirs)
           oldExists <- Directory.doesFileExist old
           if oldExists
             then Directory.copyFile old new
-            else putStr ("WARNING: file " ++ show old ++ " does not exist")
+            else unless (null old) (putStrLn ("WARNING: file " ++ show old ++ " does not exist"))
         goImports (d:ds) = do
           let old2 = d FilePath.</> old
           old2Exists <- Directory.doesFileExist old2
