@@ -20,7 +20,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI (
+module CLaSH.GHCi.UI (
         interactiveUI,
         GhciSettings(..),
         defaultGhciSettings,
@@ -32,10 +32,10 @@ module GHCi.UI (
 #include "HsVersions.h"
 
 -- GHCi
-import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls )
-import GHCi.UI.Monad hiding ( args, runStmt, runDecls )
-import GHCi.UI.Tags
-import GHCi.UI.Info
+import qualified CLaSH.GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls )
+import CLaSH.GHCi.UI.Monad hiding ( args, runStmt, runDecls )
+import CLaSH.GHCi.UI.Tags
+import CLaSH.GHCi.UI.Info
 import Debugger
 
 -- The GHC interface

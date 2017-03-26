@@ -9,7 +9,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Main (main) where
+module CLaSH.Main (defaultMain) where
 
 #include "MachDeps.h"
 
@@ -27,7 +27,7 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 #ifdef GHCI
-import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
+import CLaSH.GHCi.UI    ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
@@ -75,7 +75,7 @@ import Data.Maybe
 
 -- clash additions
 import           Paths_clash_ghc
-import           GHCi.UI (makeHDL)
+import           CLaSH.GHCi.UI (makeHDL)
 import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
@@ -106,8 +106,10 @@ import           CLaSH.GHC.LoadModules (ghcLibDir)
 -----------------------------------------------------------------------------
 -- GHC's command-line interface
 
-main :: IO ()
-main = do
+-- | Run the Clash compiler with a given set of arguments. This is equivalent to
+-- simply invoking the main @clash@ binary with the same arguments.
+defaultMain :: [String] -> IO ()
+defaultMain = flip withArgs $ do
    initGCStatistics -- See Note [-Bsymbolic and hooks]
    hSetBuffering stdout LineBuffering
    hSetBuffering stderr LineBuffering
