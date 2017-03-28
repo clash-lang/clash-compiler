@@ -179,7 +179,7 @@ blockRamFilePow2 :: (KnownNat m, KnownNat n)
                                          -- content of the blockRAM
                  -> Signal (Unsigned n) -- ^ Read address @r@
                  -> Signal (Maybe (Unsigned n, BitVector m))
-                 -- ^ (write address @w@, value to write)@)
+                 -- ^ (write address @w@, value to write)
                  -> Signal (BitVector m)
                  -- ^ Value of the @blockRAM@ at address @r@ from the previous
                  -- clock cycle
