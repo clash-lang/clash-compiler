@@ -4,8 +4,9 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ViewPatterns    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module CLaSH.GHC.NetlistTypes
   (ghcTypeToHWType)
@@ -83,8 +84,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Types.Bool"                -> return Bool
         "GHC.Types.Float" | floatSupport-> return (BitVector 32)
         "GHC.Types.Double" | floatSupport -> return (BitVector 64)
-        "GHC.Prim.~#"                   ->
-          fail $ "Can't translate type: " ++ showDoc ty
+        "GHC.Prim.~#"                   -> return (Sum "GHC.Prim.~#" ["GHC.Types.Eq#"])
 
         "GHC.Prim.Any" -> return (BitVector 1)
 
