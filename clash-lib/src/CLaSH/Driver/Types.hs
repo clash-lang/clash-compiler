@@ -38,6 +38,7 @@ data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_floatSupport :: Bool
                            , opt_allowZero   :: Bool
                            , opt_importPaths :: [FilePath]
+                           , opt_errorInvalidCoercions :: Bool
                            }
 
 data CLaSHException = CLaSHException SrcSpan String (Maybe String)
