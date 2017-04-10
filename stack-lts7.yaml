@@ -1,4 +1,4 @@
-resolver: nightly-2017-01-16
+resolver: lts-7.16
 
 packages:
 - 'clash-prelude'
