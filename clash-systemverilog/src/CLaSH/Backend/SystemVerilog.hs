@@ -318,7 +318,7 @@ funDec ty@(Vector n elTy) =
   "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy <> comma <> vecSigDecl "xs") <> semi <$>
   indent 2
     (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi <$>
-     tName <> "_cons" <> brackets (int 1 <> colon <> int (n-1)) <+> "=" <+> "xs" <> semi) <$>
+     if n > 1 then tName <> "_cons" <> brackets (int 1 <> colon <> int (n-1)) <+> "=" <+> "xs" <> semi else empty) <$>
   "endfunction"
   where
     tName  = tyName ty
