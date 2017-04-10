@@ -224,12 +224,13 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon _ -> return Nothing
   TupleTyCon {}   -> error "Cannot handle tuple tycons"
 
-coreToTerm :: PrimMap a
+coreToTerm :: Bool
+           -> PrimMap a
            -> [Var]
            -> SrcSpan
            -> CoreExpr
            -> State GHC2CoreState C.Term
-coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
+coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
     term (Var x)                 = do
@@ -274,7 +275,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
       ty1_I <- lift (isIntegerTy ty1)
       ty2_I <- lift (isIntegerTy ty2)
       case hasPrimCoM of
-        Just ty | ty1_I || ty2_I -> do
+        Just ty | ty1_I || ty2_I
+                , errorInvalidCoercions -> do
           sp <- Reader.ask
           throw (CLaSHException sp
                   (unlines [ "CLaSH cannot translate the following cast:\n"

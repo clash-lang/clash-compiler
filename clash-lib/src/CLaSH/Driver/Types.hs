@@ -1,5 +1,5 @@
 {-|
-  Copyright  :  (C) 2013-2016, University of Twente
+  Copyright  :  (C) 2013-2016, University of Twente, 2017, QBayLogic
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -37,6 +37,8 @@ data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_errorExtra  :: Bool
                            , opt_floatSupport :: Bool
                            , opt_allowZero   :: Bool
+                           , opt_importPaths :: [FilePath]
+                           , opt_errorInvalidCoercions :: Bool
                            }
 
 data CLaSHException = CLaSHException SrcSpan String (Maybe String)

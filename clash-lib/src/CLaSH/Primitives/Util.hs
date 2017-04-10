@@ -26,11 +26,16 @@ generatePrimMap :: [FilePath] -- ^ Directories to search for primitive definitio
                 -> IO (PrimMap Text)
 generatePrimMap filePaths = do
   primitiveFiles <- fmap concat $ mapM
-                      (\filePath ->
-                          fmap ( map (FilePath.combine filePath)
-                               . filter (isSuffixOf ".json")
-                               ) (Directory.getDirectoryContents filePath)
-                      ) filePaths
+     (\filePath -> do
+         fpExists <- Directory.doesDirectoryExist filePath
+         if fpExists
+           then
+             fmap ( map (FilePath.combine filePath)
+                  . filter (isSuffixOf ".json")
+                  ) (Directory.getDirectoryContents filePath)
+           else
+             return []
+     ) filePaths
 
   primitives <- fmap concat $ mapM
                   ( return

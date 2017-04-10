@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2013-2016, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente, 2017, QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -31,6 +31,7 @@ import qualified Var                     as GHC
 import qualified SrcLoc                  as GHC
 
 import           CLaSH.Annotations.TopEntity (TopEntity)
+import           CLaSH.Annotations.Primitive (HDL)
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Term         (Term (..), TmName)
 import           CLaSH.Core.Type         (Type, TypeView (..), mkFunTy, splitFunForallTy, tyView)
@@ -50,7 +51,10 @@ import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           CLaSH.Util              ((***),first)
 
 generateBindings ::
-     FilePath
+     Bool
+  -> FilePath
+  -> [FilePath]
+  -> HDL
   -> String
   -> Maybe  (GHC.DynFlags)
   -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
@@ -58,10 +62,10 @@ generateBindings ::
         ,Maybe TmName              -- testInput bndr
         ,Maybe TmName              -- expectedOutput bndr
         ,PrimMap Text)             -- The primitives found in '.' and 'primDir'
-generateBindings primDir modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM) <- loadModules modName dflagsM
-  primMap <- generatePrimMap [primDir,"."]
-  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
+generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = do
+  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM,pFP) <- loadModules hdl modName dflagsM
+  primMap <- generatePrimMap (pFP ++ (primDir:importDirs))
+  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
@@ -114,7 +118,8 @@ retype tcm (visited,bindings) current = (visited', HashMap.insert current (ty',s
     tm'                  = substTms (zip used usedVars) tm
     ty'                  = runFreshM (termType tcm tm')
 
-mkBindings :: PrimMap a
+mkBindings :: Bool
+           -> PrimMap a
            -> [(GHC.CoreBndr, GHC.CoreExpr)] -- Binders
            -> [(GHC.CoreBndr,Int)]           -- Class operations
            -> [GHC.CoreBndr]                 -- Unlocatable Expressions
@@ -122,10 +127,10 @@ mkBindings :: PrimMap a
                     ( BindingMap
                     , HashMap TmName (Type,Int)
                     )
-mkBindings primMap bindings clsOps unlocatable = do
+mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\(v,e) -> do
                           let sp = GHC.getSrcSpan v
-                          tm <- coreToTerm primMap unlocatable sp e
+                          tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
                           v' <- coreToId v
                           return (varName v', (unembed (varType v'), sp, tm))
                        ) bindings

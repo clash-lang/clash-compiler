@@ -168,6 +168,7 @@ findAndSetDataFiles bbCtx fs = mapAccumL findAndSet fs
           BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ bbCtx' _ -> case bbInputs bbCtx' of
             [(Left (Literal Nothing (StringLit s')),_,_)] -> renderFilePath fs s'
             _ -> (fs',FilePath e)
+          Literal Nothing (StringLit s') -> renderFilePath fs s'
           _ -> (fs',FilePath e)
       _ -> (fs',FilePath e)
     findAndSet fs' l = (fs',l)
@@ -238,17 +239,20 @@ renderElem b (IF c t f) = do
       (Length e) -> case lineToType b [e] of
                        (Vector n _) -> n
                        _ -> error $ $(curLoc) ++ "IF: veclen of a non-vector type"
-      (L n)      -> case bbInputs b !! n of
-                      (either id fst -> Literal _ l,_,_) ->
-                        case l of
-                          NumLit i -> fromInteger i
-                          BitLit bl -> case bl of
-                            N.H -> 1
-                            N.L -> 0
-                            _   -> error $ $(curLoc) ++ "IF: LIT bit literal must be high or low"
-                          BoolLit bl -> bool 0 1 bl
-                          _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
-                      _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+      (L n) -> case bbInputs b !! n of
+        (l,_,_)
+          | Literal _ l' <- either id fst l ->
+            case l' of
+              NumLit i -> fromInteger i
+              BitLit bl -> case bl of
+                N.H -> 1
+                N.L -> 0
+                _   -> error $ $(curLoc) ++ "IF: LIT bit literal must be high or low"
+              BoolLit bl -> bool 0 1 bl
+              _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
+          | DataCon (Signed _) _ [Literal _ (NumLit i)] <- either id fst l
+            -> fromInteger i
+        k -> error $ $(curLoc) ++ ("IF: LIT must be a numeric lit:" ++ show k)
       (Depth e)  -> case lineToType b [e] of
                       (RTree n _) -> n
                       _ -> error $ $(curLoc) ++ "IF: treedepth of non-tree type"

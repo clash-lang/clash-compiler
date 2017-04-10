@@ -63,6 +63,7 @@ Data-files:           primitives/CLaSH.Class.BitPack.json
                       primitives/CLaSH.Sized.RTree.json
                       primitives/CLaSH.Sized.Vector.json
                       primitives/CLaSH.Transformations.json
+                      primitives/CLaSH.XException.json
                       primitives/Control.Exception.Base.json
                       primitives/Debug.Trace.json
                       primitives/GHC.Base.json
@@ -70,6 +71,7 @@ Data-files:           primitives/CLaSH.Class.BitPack.json
                       primitives/GHC.CString.json
                       primitives/GHC.Err.json
                       primitives/GHC.Int.json
+                      primitives/GHC.IO.Exception.json
                       primitives/GHC.Integer.Logarithms.json
                       primitives/GHC.Integer.Type.json
                       primitives/GHC.Prim.json

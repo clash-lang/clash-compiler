@@ -136,8 +136,16 @@ genComponent compName mStart = do
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
-    Just (_,_,expr_) -> makeCached compName components $
-                          genComponentT compName expr_ mStart
+    Just (_,_,expr_) -> do
+      c@(_,Component _ clks _ _ _) <- makeCached compName components $ genComponentT compName expr_ mStart
+      -- This might seem redundant, because you think `genComponentT` already
+      -- added those clocks, right? wrong!
+      --
+      -- `makeCached` stores the value returned by a monadic action, so when
+      -- we use a cached result, its clocks weren't added to the current
+      -- writer which is keeping track of used clock ports.
+      tell (fromList clks)
+      return c
 
 -- | Generate a component for a given function
 genComponentT :: TmName -- ^ Name of the function
@@ -452,4 +460,9 @@ mkDcApplication dstHType bndr dc args = do
       RTree _ _ -> case argExprs of
                       [_,e1,e2] -> return (HW.DataCon dstHType RTreeAppend [e1,e2])
                       _ -> error $ $(curLoc) ++ "Unexpected number of arguments for `BR`: " ++ showDoc args
+      String ->
+        let dc' = case dcTag dc of
+                    1 -> HW.Literal Nothing (StringLit "")
+                    _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,dcTag dc,args,argHWTys)
+        in  return dc'
       _ -> error $ $(curLoc) ++ "mkDcApplication undefined for: " ++ show (dstHType,dc,args,argHWTys)

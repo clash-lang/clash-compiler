@@ -1,4 +1,4 @@
-resolver: lts-7.16
+resolver: lts-8.3
 
 packages:
 - 'clash-prelude'

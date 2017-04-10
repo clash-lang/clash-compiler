@@ -37,7 +37,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Prim.ord#"
     , "type"      : "ord :: Char# -> Int#"
-    , "templateD" : "assign ~RESULT = $signed(~ARG[0]);"
+    , "templateD" : "assign ~RESULT = $unsigned(~ARG[0]);"
     }
   }
 , { "BlackBox" :

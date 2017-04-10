@@ -16,11 +16,16 @@ import SrcLoc (SrcSpan)
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.BlackBox.Types
 
+import CLaSH.Annotations.Primitive          (HDL)
+
 type ModName = String
 
 class Backend state where
   -- | Initial state for state monad
   initBackend :: Int -> HdlSyn -> state
+
+  -- | What HDL is the backend generating
+  hdlKind :: state -> HDL
 
   -- | Location for the primitive definitions
   primDir :: state -> IO FilePath

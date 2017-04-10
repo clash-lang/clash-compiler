@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2013-2016, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente, 2017, QBayLogic
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -108,6 +108,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | Just (a,b) <- integerLiterals tcm isSubj args
     , Just c <- flogBase a b
     -> (Literal . IntLiteral . toInteger) c
+
+  "GHC.Integer.Type.smallInteger"
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal (IntegerLiteral i)
 
   "GHC.Integer.Type.integerToInt"
     | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
@@ -238,6 +242,11 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.double2Float#"
     | [Literal (DoubleLiteral d)] <- reduceTerms tcm isSubj args
     -> Literal (FloatLiteral (toRational (fromRational d :: Float)))
+
+  "GHC.Prim.divideFloat#"
+    | [Literal (FloatLiteral f1)
+      ,Literal (FloatLiteral f2)] <- reduceTerms tcm isSubj args
+    -> Literal (FloatLiteral (toRational (fromRational f1 / fromRational f2 :: Float)))
 
   "GHC.Base.eqString"
     | [(_,[Left (Literal (StringLiteral s1))])

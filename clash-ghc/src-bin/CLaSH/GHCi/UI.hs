@@ -20,7 +20,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHCi.UI (
+module CLaSH.GHCi.UI (
         interactiveUI,
         GhciSettings(..),
         defaultGhciSettings,
@@ -32,10 +32,10 @@ module GHCi.UI (
 #include "HsVersions.h"
 
 -- GHCi
-import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls )
-import GHCi.UI.Monad hiding ( args, runStmt, runDecls )
-import GHCi.UI.Tags
-import GHCi.UI.Info
+import qualified CLaSH.GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls )
+import CLaSH.GHCi.UI.Monad hiding ( args, runStmt, runDecls )
+import CLaSH.GHCi.UI.Tags
+import CLaSH.GHCi.UI.Info
 import Debugger
 
 -- The GHC interface
@@ -1749,14 +1749,18 @@ makeHDL backend optsRef srcs = do
                                  if all (== odir) [hidir,sdir,ddir]
                                     then Just odir
                                     else Nothing
-                  opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)}
-              primDir <- CLaSH.Backend.primDir (backend iw syn)
+                  idirs = importPaths dflags
+                  opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)
+                               ,opt_importPaths = idirs}
+                  backend' = backend iw syn
+              primDir <- CLaSH.Backend.primDir backend'
               forM_ srcs $ \src -> do
-                (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM,primMap) <- generateBindings primDir src (Just dflags)
+                (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM,primMap) <-
+                  generateBindings (opt_errorInvalidCoercions opts') primDir idirs (CLaSH.Backend.hdlKind backend') src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
-                CLaSH.Driver.generateHDL bindingsMap (Just (backend iw syn)) primMap tcm
+                CLaSH.Driver.generateHDL bindingsMap (Just backend') primMap tcm
                   tupTcm (ghcTypeToHWType iw fp) reduceConstant topEnt testInpM expOutM opts' (startTime,prepTime)
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()

@@ -25,7 +25,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.timesInteger"
     , "type"      : "timesInteger :: Integer -> Integer -> Integer"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    , "templateE" : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
@@ -155,6 +155,18 @@ end block;
     { "name"      : "GHC.Integer.Type.shiftLInteger"
     , "type"      : "shiftLInteger :: Integer -> Int# -> Integer"
     , "templateE" : "shift_left(~ARG[0],to_integer(~ARG[1]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.wordToInteger"
+    , "type"      : "wordToInteger :: Word# -> Integer"
+    , "templateE" : "signed(std_logic_vector(~ARG[0]))"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "GHC.Integer.Type.integerToWord"
+    , "type"      : "integerToWord :: Integer -> Word#"
+    , "templateE" : "unsigned(std_logic_vector(~ARG[0]))"
     }
   }
 ]

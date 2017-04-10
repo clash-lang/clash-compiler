@@ -195,10 +195,10 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                              , show cf
                              , "\nType of the subject is: " ++ showDoc ty
                              , "\nFunction " ++ show cf
-                             , "will not reach a normal form, and compilation"
-                             , "might fail."
+                             , " will not reach a normal form, and compilation"
+                             , " might fail."
                              , "\nRun with '-clash-inline-limit=N' to increase"
-                             , "the inlining limit to N."
+                             , " the inlining limit to N."
                              ])
                      (return e)
       else do
@@ -273,6 +273,9 @@ caseCon ctx e@(Case subj ty alts)
           | nm `elem` ["CLaSH.Transformations.undefined"] ->
             let e' = mkApps (Prim nm ty') [Right ty]
             in changed e'
+        (Prim nm _,[])
+          | nm `elem` ["EmptyCase"] ->
+            changed (Prim nm ty)
         _ -> traceIf (lvl > DebugNone)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
                      (caseOneAlt e)
@@ -1145,7 +1148,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                                     [Right lTy
                                     ,Right rTy
                                     ,Left  bvArg
-                                    ,Left  (Prim "CLaSH.Transformations.removedArg" lTy)
+                                    ,Left  (mkApps (Prim "CLaSH.Transformations.removedArg" undefinedTy)
+                                                   [Right rTy])
                                     ]
 
               changed tup
@@ -1155,7 +1159,8 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
                   tup          = mkApps (Data tupDc)
                                     [Right lTy
                                     ,Right rTy
-                                    ,Left  (Prim "CLaSH.Transformations.removedArg" lTy)
+                                    ,Left  (mkApps (Prim "CLaSH.Transformations.removedArg" undefinedTy)
+                                                   [Right lTy])
                                     ,Left  bvArg
                                     ]
 

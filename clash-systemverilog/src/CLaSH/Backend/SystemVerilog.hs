@@ -34,6 +34,7 @@ import           Prelude                              hiding ((<$>))
 import           Text.PrettyPrint.Leijen.Text.Monadic
 import           Text.Printf
 
+import           CLaSH.Annotations.Primitive          (HDL (..))
 import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
@@ -69,6 +70,7 @@ makeLenses ''SystemVerilogState
 
 instance Backend SystemVerilogState where
   initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan []
+  hdlKind         = const SystemVerilog
 #ifdef CABAL
   primDir         = const (Paths_clash_systemverilog.getDataFileName "primitives")
 #else
@@ -175,8 +177,8 @@ mkTyPackage_ modName hwtys =
     usedTys     = concatMap mkUsedTys hwtys
     needsDec    = nubBy eqReprTy $ (hwtys ++ usedTys)
     hwTysSorted = topSortHWTys needsDec
-    packageDec  = vcat $ mapM tyDec hwTysSorted
-    funDecs     = vcat $ mapM funDec hwTysSorted
+    packageDec  = vcat $ fmap catMaybes $ mapM tyDec hwTysSorted
+    funDecs     = vcat $ fmap catMaybes $ mapM funDec hwTysSorted
 
     eqReprTy :: HWType -> HWType -> Bool
     eqReprTy (Vector n ty1) (Vector m ty2)
@@ -226,8 +228,8 @@ topSortHWTys hwtys = sorted
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
-tyDec :: HWType -> SystemVerilogM Doc
-tyDec ty@(Vector n elTy) = do
+tyDec :: HWType -> SystemVerilogM (Maybe Doc)
+tyDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
     Vivado -> "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
@@ -237,7 +239,7 @@ tyDec ty@(Vector n elTy) = do
                 let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
                 "typedef" <+> elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
               _ -> error $ $(curLoc) ++ "impossible"
-tyDec ty@(RTree n elTy) = do
+tyDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
     Vivado -> "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
@@ -247,16 +249,21 @@ tyDec ty@(RTree n elTy) = do
                 let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
                 "typedef" <+> elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
               _ -> error $ $(curLoc) ++ "impossible"
-tyDec ty@(Product _ tys) = prodDec
+tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
   where
     prodDec = "typedef struct packed {" <$>
-                indent 2 (vcat $ zipWithM (\x y -> lvType y <+> x <> semi) selNames tys) <$>
+                indent 2 (vcat $ fmap catMaybes $ zipWithM combineM selNames tys) <$>
               "}" <+> tName <> semi
 
+    combineM x y = do
+      yM <- lvType y
+      case yM of
+        Nothing -> pure Nothing
+        Just y' -> Just A.<$> (pure y' <+> x <> semi)
     tName    = tyName ty
     selNames = map (\i -> tName <> "_sel" <> int i) [0..]
 
-tyDec _ = empty
+tyDec _ = pure Nothing
 
 splitVecTy :: HWType -> Maybe ([Int],SystemVerilogM Doc)
 splitVecTy = fmap splitElemTy . go
@@ -280,8 +287,8 @@ splitVecTy = fmap splitElemTy . go
 
     go _ = Nothing
 
-lvType :: HWType -> SystemVerilogM Doc
-lvType ty@(Vector n elTy) = do
+lvType :: HWType -> SystemVerilogM (Maybe Doc)
+lvType ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
@@ -290,7 +297,7 @@ lvType ty@(Vector n elTy) = do
         let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
         elTy' <> ranges
       _ -> error $ $(curLoc) ++ "impossible"
-lvType ty@(RTree n elTy) = do
+lvType ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (2^n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
@@ -299,10 +306,11 @@ lvType ty@(RTree n elTy) = do
         let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
         elTy' <> ranges
       _ -> error $ $(curLoc) ++ "impossible"
-lvType ty = verilogType ty
+lvType ty | typeSize ty > 0 = Just A.<$> verilogType ty
+lvType _ = pure Nothing
 
-funDec :: HWType -> SystemVerilogM Doc
-funDec ty@(Vector n elTy) =
+funDec :: HWType -> SystemVerilogM (Maybe Doc)
+funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
   "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <$>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int n <> semi <+> "n=n+1") <$>
@@ -313,11 +321,17 @@ funDec ty@(Vector n elTy) =
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int n <> semi <+> "n=n+1") <$>
       indent 2 (tName <> "_from_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <$>
   "endfunction" <$>
-  "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy <> comma <> vecSigDecl "xs") <> semi <$>
-  indent 2
-    (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi <$>
-     tName <> "_cons" <> brackets (int 1 <> colon <> int (n-1)) <+> "=" <+> "xs" <> semi) <$>
-  "endfunction"
+  if n > 1 then
+    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy <> comma <> vecSigDecl "xs") <> semi <$>
+    indent 2
+      (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi <$>
+       tName <> "_cons" <> brackets (int 1 <> colon <> int (n-1)) <+> "=" <+> "xs" <> semi) <$>
+    "endfunction"
+  else
+    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy) <> semi <$>
+    indent 2
+      (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi) <$>
+    "endfunction"
   where
     tName  = tyName ty
     ranges = brackets (int 0 <> colon <> int (n-1)) <>
@@ -335,7 +349,8 @@ funDec ty@(Vector n elTy) =
                     elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 2))
                   _ -> error $ $(curLoc) ++ "impossible"
 
-funDec ty@(RTree n elTy) =
+
+funDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$>
   "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <$>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int (2^n) <> semi <+> "n=n+1") <$>
@@ -372,7 +387,7 @@ funDec ty@(RTree n elTy) =
     ranges = brackets (int 0 <> colon <> int (2^n-1)) <>
              brackets (int (typeSize elTy - 1) <> colon <> int 0)
 
-funDec _ = empty
+funDec _ = pure Nothing
 
 module_ :: Component -> SystemVerilogM Doc
 module_ c = do
@@ -500,12 +515,12 @@ verilogTypeErrValue (Vector n elTy) = do
   syn <- hdlSyn
   case syn of
     Vivado -> braces (int n <+> braces (int (typeSize elTy) <+> braces "1'bx"))
-    _ -> braces (int n <+> braces (verilogTypeErrValue elTy))
+    _ -> char '\'' <> braces (int n <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue (RTree n elTy) = do
   syn <- hdlSyn
   case syn of
     Vivado -> braces (int (2^n) <+> braces (int (typeSize elTy) <+> braces "1'bx"))
-    _ -> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
+    _ -> char '\'' <> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue String = "\"ERROR\""
 verilogTypeErrValue ty  = braces (int (typeSize ty) <+> braces "1'bx")
 
@@ -734,16 +749,16 @@ expr_ b (BlackBoxE _ _ _ (Just (nm,inc)) bs bbCtx b') = do
 expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_))         = do
   iw <- use intWidth
-  "$signed" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),text id_]))
+  "$unsigned" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),text id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
-expr_ _ (DataTag (Sum _ _) (Right id_))    = "$signed" <> parens (text id_)
+expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (text id_)
 
 expr_ _ (DataTag (Product _ _) (Right _))  = do
   iw <- use intWidth
   int iw <> "'sd0"
 
-expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
                                                (text id_ <> brackets
                                                (int start <> colon <> int end))
   where
@@ -818,8 +833,8 @@ bit_char Z = char 'z'
 
 toSLV :: HWType -> Expr -> SystemVerilogM Doc
 toSLV t e = case t of
-  Vector _ _ -> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
-  RTree _ _ -> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
+  Vector _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
+  RTree _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
   _ -> expr_ False e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> SystemVerilogM Doc
