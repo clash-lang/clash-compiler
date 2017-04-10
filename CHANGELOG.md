@@ -1,5 +1,11 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.11.1
+* Changes:
+  * Bundle instance for `()` behaves like a product-type instance [#96](https://github.com/clash-lang/clash-prelude/issues/96)
+* Fixes bugs:
+  * Ensure that `fold` gets correctly type-applied in `Vec.==` [#202](https://github.com/clash-lang/clash-compiler/issues/202)
+
 ## 0.11
 * New features:
   * `CLaSH.XException`: a module defining an exception representing uninitialised values. Additionally adds the `ShowX` class which has methods that prints values as "X" where they would normally raise an `XException` exception.
