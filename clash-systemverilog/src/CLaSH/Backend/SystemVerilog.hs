@@ -820,8 +820,8 @@ bit_char Z = char 'z'
 
 toSLV :: HWType -> Expr -> SystemVerilogM Doc
 toSLV t e = case t of
-  Vector _ _ -> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
-  RTree _ _ -> verilogTypeMark t <> "_to_lv" <> parens (expr_ False e)
+  Vector _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
+  RTree _ _ -> braces (verilogTypeMark t <> "_to_lv" <> parens (expr_ False e))
   _ -> expr_ False e
 
 fromSLV :: HWType -> Identifier -> Int -> Int -> SystemVerilogM Doc
