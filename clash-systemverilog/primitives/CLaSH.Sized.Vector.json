@@ -404,7 +404,7 @@ if (~SYM[2] == 0) begin : ~GENSYM[no_shift][3]
   assign ~RESULT = ~SYM[1];
 end else begin : ~GENSYM[do_shift][4]
   assign ~RESULT[0:~LIT[0]-~SYM[2]-1] = ~SYM[1][~SYM[2]:~LIT[0]-1];
-  assign ~RESULT[~SYM[2]:~LIT[0]-1] = ~SYM[1][0 to ~SYM[2]-1];
+  assign ~RESULT[~LIT[0]-~SYM[2]:~LIT[0]-1] = ~SYM[1][0:~SYM[2]-1];
 end
 ~ENDGENERATE
 // rotateLeftS end"

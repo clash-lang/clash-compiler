@@ -152,6 +152,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMerge" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReplace" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReverse" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VRotate" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VScan" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VSelect" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VZip" (Just ("topEntity",False))
