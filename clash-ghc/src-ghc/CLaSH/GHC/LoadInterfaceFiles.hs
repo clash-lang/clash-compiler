@@ -56,7 +56,11 @@ runIfl modName action = do
   hscEnv <- GHC.getSession
   let localEnv = TcRnTypes.IfLclEnv modName (text "runIfl")
                    UniqFM.emptyUFM UniqFM.emptyUFM
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,1,20161117)
   let globalEnv = TcRnTypes.IfGblEnv (text "CLaSH.runIfl") Nothing
+#else
+  let globalEnv = TcRnTypes.IfGblEnv Nothing
+#endif
   MonadUtils.liftIO $ TcRnMonad.initTcRnIf 'r' hscEnv globalEnv
                         localEnv action
 

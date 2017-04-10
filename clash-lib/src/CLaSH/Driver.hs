@@ -31,6 +31,8 @@ import qualified System.IO                        as IO
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc)
 import           Unbound.Generics.LocallyNameless (name2String)
 
+import           GHC.Extra                        ()
+
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Backend
 import           CLaSH.Core.Term                  (Term, TmName)

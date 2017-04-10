@@ -161,5 +161,6 @@ Library
                       CLaSH.Util
 
   Other-Modules:      Data.Aeson.Extra
+                      GHC.Extra
                       Paths_clash_lib
                       Unbound.Generics.LocallyNameless.Extra
