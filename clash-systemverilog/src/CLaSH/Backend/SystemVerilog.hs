@@ -502,12 +502,12 @@ verilogTypeErrValue (Vector n elTy) = do
   syn <- hdlSyn
   case syn of
     Vivado -> braces (int n <+> braces (int (typeSize elTy) <+> braces "1'bx"))
-    _ -> braces (int n <+> braces (verilogTypeErrValue elTy))
+    _ -> char '\'' <> braces (int n <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue (RTree n elTy) = do
   syn <- hdlSyn
   case syn of
     Vivado -> braces (int (2^n) <+> braces (int (typeSize elTy) <+> braces "1'bx"))
-    _ -> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
+    _ -> char '\'' <> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue String = "\"ERROR\""
 verilogTypeErrValue ty  = braces (int (typeSize ty) <+> braces "1'bx")
 
