@@ -18,7 +18,7 @@ defBuild :: BuildTarget
 #ifdef TRAVISBUILD
 defBuild = Both
 #else
-defBuild = SystemVerilog
+defBuild = All
 #endif
 
 main :: IO ()
