@@ -25,7 +25,7 @@
 , { "BlackBox" :
     { "name"      : "GHC.Integer.Type.timesInteger"
     , "type"      : "timesInteger :: Integer -> Integer -> Integer"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    , "templateE" : "resize(~ARG[0] * ~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
