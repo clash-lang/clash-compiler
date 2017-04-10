@@ -99,10 +99,15 @@ genvar ~GENSYM[n][1];
 "// splitAt begin
 logic [0:~LENGTH[~TYP[1]]-1] [0:~SIZE[~TYPEL[~TYP[1]]]-1] ~GENSYM[vec][0];
 assign ~SYM[0] = ~TOBV[~ARG[1]][~TYP[1]];
-
-assign ~RESULT = {~SYM[0][0:~LIT[0]-1]
-                 ,~SYM[0][~LIT[0]:~LENGTH[~TYP[1]]-1]
-                 };
+~GENERATE
+  if (~LIT[0] == ~LENGTH[~TYP[1]]) begin : ~GENSYM[no_split][1]
+    assign ~RESULT = {~SYM[0]};
+  end else begin : ~GENSYM[do_split][2]
+    assign ~RESULT = {~SYM[0][0:~LIT[0]-1]
+                     ,~SYM[0][~LIT[0]:~LENGTH[~TYP[1]]-1]
+                     };
+  end
+~ENDGENERATE
 // splitAt end"
     }
   }

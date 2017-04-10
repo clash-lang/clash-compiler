@@ -140,6 +140,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Minimum" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "MovingAvg" (Just ("topEntity", False))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "PatHOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Scatter" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Split" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "ToList" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Unconcat" (Just ("testbench",True))
