@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main (main) where
 
 import Test.Tasty
@@ -10,143 +11,150 @@ import           System.FilePath  ((</>),(<.>))
 import qualified System.IO.Unsafe as Unsafe
 
 data BuildTarget
-  = VHDL | Verilog | Both
+  = VHDL | Verilog | SystemVerilog | Both | All
   deriving Show
+
+defBuild :: BuildTarget
+#ifdef TRAVISBUILD
+defBuild = Both
+#else
+defBuild = SystemVerilog
+#endif
 
 main :: IO ()
 main =
   defaultMain $ testGroup "tests"
     [ testGroup "examples"
-      [runTest "examples"             Both [] "ALU"          (Just ("topEntity",False))
+      [runTest "examples"             defBuild [] "ALU"          (Just ("topEntity",False))
       ,runTest "examples"             VHDL [] "Blinker"      (Just ("topEntity",False))
       ,runTest "examples"             Verilog [] "Blinker_v" (Just ("blinker",False))
-      ,runTest "examples"             Both [] "BlockRamTest" (Just ("topEntity",False))
-      ,runTest "examples"             Both [] "Calculator"   (Just ("testbench",True ))
-      ,runTest "examples"             Both [] "CochleaPlus"  (Just ("topEntity",False))
-      ,runTest "examples"             Both [] "DDR"          (Just ("testbench",True ))
-      ,runTest "examples"             Both [] "FIR"          (Just ("testbench",True ))
-      ,runTest "examples"             Both [] "Fifo"         (Just ("topEntity",False))
-      ,runTest "examples"             Both [] "MAC"          (Just ("testbench",True))
-      ,runTest "examples"             Both [] "MatrixVect"   (Just ("testbench",True))
-      ,runTest "examples"             Both [] "Queens"       (Just ("topEntity",False))
-      ,runTest "examples"             Both [] "Reducer"      (Just ("topEntity",False))
-      ,runTest "examples"             Both [] "Sprockell"    (Just ("topEntity",False))
-      ,runTest "examples"             Both [] "Windows"      (Just ("topEntity",False))
-      ,runTest ("examples" </> "crc32") Both [] "CRC32"      (Just ("testbench",True))
-      ,runTest ("examples" </> "i2c") Both ["-O2"] "I2C"          (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "BlockRamTest" (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "Calculator"   (Just ("testbench",True ))
+      ,runTest "examples"             defBuild [] "CochleaPlus"  (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "DDR"          (Just ("testbench",True ))
+      ,runTest "examples"             defBuild [] "FIR"          (Just ("testbench",True ))
+      ,runTest "examples"             defBuild [] "Fifo"         (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "MAC"          (Just ("testbench",True))
+      ,runTest "examples"             defBuild [] "MatrixVect"   (Just ("testbench",True))
+      ,runTest "examples"             defBuild [] "Queens"       (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "Reducer"      (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "Sprockell"    (Just ("topEntity",False))
+      ,runTest "examples"             defBuild [] "Windows"      (Just ("topEntity",False))
+      ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      (Just ("testbench",True))
+      ,runTest ("examples" </> "i2c") defBuild ["-O2"] "I2C"          (Just ("topEntity",False))
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
-            [ runTest ("tests" </> "shouldwork" </> "Basic") Both [] "BangData" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "Trace" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "ByteSwap32" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "CharTest" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "ClassOps" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "CountTrailingZeros" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "DivMod" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "IrrefError" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "LotOfStates" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NestedPrimitives" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NestedPrimitives2" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "NORX" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "PatError" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "PopCount" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "RecordSumOfProducts" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "Shift" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "SimpleConstructor" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "TagToEnum" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "TestIndex" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Basic") Both [] "TwoFunctions" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "BangData" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Trace" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ByteSwap32" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CharTest" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ClassOps" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CountTrailingZeros" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "DivMod" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives2" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NORX" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "PatError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "PopCount" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "RecordSumOfProducts" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Shift" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "SimpleConstructor" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TagToEnum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TestIndex" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TwoFunctions" (Just ("topEntity",False))
             ]
         , testGroup "BitVector"
-            [ runTest ("tests" </> "shouldwork" </> "BitVector") Both [] "Box" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "BitVector") Both [] "BoxGrow" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "BitVector") Both [] "RePack" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "RePack" (Just ("topEntity",False))
             ]
         , testGroup "BoxedFunctions"
-            [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") Both [] "DeadRecursiveBoxed" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "BoxedFunctions") defBuild [] "DeadRecursiveBoxed" (Just ("topEntity",False))
             ]
         , testGroup "CSignal"
-            [ runTest ("tests" </> "shouldwork" </> "CSignal") Both [] "CBlockRamTest" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "CSignal") Both [] "MAC" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "CSignal") defBuild [] "CBlockRamTest" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "CSignal") defBuild [] "MAC" (Just ("topEntity",False))
             ]
         , testGroup "Feedback"
-            [ runTest ("tests" </> "shouldwork" </> "Feedback") Both [] "Fib" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (Just ("testbench",True))
             ]
         , testGroup "Fixed"
-            [ runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "Mixer" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SFixedTest" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "SatWrap" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Fixed") Both [] "ZeroInt" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "Mixer" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "SFixedTest" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "SatWrap" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "ZeroInt" (Just ("testbench",True))
             ]
         , testGroup "Floating"
-            [ runTest ("tests" </> "shouldwork" </> "Floating") Both ["-clash-float-support"] "FloatPack" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-clash-float-support"] "FloatPack" (Just ("topEntity",False))
             ]
         , testGroup "HOPrim"
-            [ runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "HOImap" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "TestMap" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "Transpose" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "HOPrim") Both [] "VecFun" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Transpose" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun" (Just ("testbench",True))
             ]
         , testGroup "Numbers"
-            [ runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Bounds"  (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize"  (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "Resize2" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Numbers") Both [] "SatMult" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"  (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"  (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult" (Just ("topEntity",False))
             ]
         , testGroup "Polymorphism"
-            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") Both [] "ExistentialBoxed" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Polymorphism") Both [] "LocalPoly" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "ExistentialBoxed" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Polymorphism") defBuild [] "LocalPoly" (Just ("topEntity",False))
             ]
         , testGroup "RTree"
-            [ runTest ("tests" </> "shouldwork" </> "RTree") Both [] "TFold" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "RTree") Both [] "TZip" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TFold" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "RTree") defBuild [] "TZip" (Just ("topEntity",False))
             ]
         , testGroup "Signal"
-            [ runTest ("tests" </> "shouldwork" </> "Signal") Both [] "AlwaysHigh" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamFile" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "BlockRamTest" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "MAC" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "NoCPR" (Just ("example",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "SigP" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "Ram" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "Rom" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Signal") Both [] "RomFile" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamFile" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamTest" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "MAC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "NoCPR" (Just ("example",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "SigP" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Ram" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Rom" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RomFile" (Just ("testbench",True))
             ]
         , testGroup "Testbench"
-            [ runTest ("tests" </> "shouldwork" </> "Testbench") Both ["-clash-inline-limit=0"] "TB" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Testbench") Both [] "SyncTB" (Just ("testbench",True))
+            [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-clash-inline-limit=0"] "TB" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Testbench") defBuild [] "SyncTB" (Just ("testbench",True))
             ]
         , testGroup "Vector"
-            [ runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Concat" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DFold2" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "DTFold" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "EnumTypes" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "FindIndex" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Fold" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Foldr" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOClock" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOCon" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "HOPrim" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Minimum" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "MovingAvg" (Just ("topEntity", False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "PatHOCon" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Split" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "ToList" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "Unconcat" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VACC" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VIndex" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecConst" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VecOfSum" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VFold" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VMapAccum" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VMerge" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VReplace" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VReverse" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VScan" (Just ("topEntity",False))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VSelect" (Just ("testbench",True))
-            , runTest ("tests" </> "shouldwork" </> "Vector") Both [] "VZip" (Just ("topEntity",False))
+            [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold2" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DTFold" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "EnumTypes" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FindIndex" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Fold" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Foldr" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOClock" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOPrim" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Minimum" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "MovingAvg" (Just ("topEntity", False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "PatHOCon" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Split" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "ToList" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Unconcat" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VACC" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VIndex" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecConst" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecOfSum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VFold" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMapAccum" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMerge" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReplace" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReverse" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VScan" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VSelect" (Just ("testbench",True))
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VZip" (Just ("topEntity",False))
             ]
         ]
     ]
@@ -158,6 +166,7 @@ clashHDL t env extraArgs modName =
               (concat [["exec","clash","--"
                        ,case t of { VHDL -> "--vhdl"
                                   ; Verilog -> "--verilog"
+                                  ; SystemVerilog -> "--systemverilog"
                                   }
                        ]
                       ,extraArgs
@@ -195,6 +204,27 @@ iverilog dir modName entity = withResource (return dir) (const (return ()))
 
 vvp :: FilePath -> String -> TestTree
 vvp env modName = testProgram "vvp" "vvp" [modName ++ "_testbench"] (Just env) False True
+
+vlog :: FilePath -> String -> TestTree
+vlog dir modName = testGroup "vlog"
+  [ testProgram "vlib" "vlib" ["work"] (Just dir) False False
+  , testProgram "vlog" "vlog" ["-sv","-work","work",modName ++ "_types.sv","*.sv"] (Just dir) False False
+  ]
+
+vsim :: FilePath -> String -> String -> TestTree
+vsim dir modName entName =
+  testProgram "vsim" "vsim"
+    ["-batch","-do",doScript,modName ++ "_" ++ entName] (Just dir) False False
+  where
+    doScript = List.intercalate ";"
+      [ "run -all"
+      , unwords
+         ["if {[string equal ready [runStatus]]}"
+         ,"then {quit -f}"
+         ,"else {quit -code 1 -f}"
+         ]
+      , "quit -code 2 -f"
+      ]
 
 runTest :: FilePath
         -> BuildTarget
@@ -235,7 +265,28 @@ runTest env Verilog extraArgs modName entNameM =
     doMakeAndRun (entName,doRun) = [ iverilog modDir modName entName
                                    ] ++ if doRun then [vvp modDir modName] else []
 
+runTest env SystemVerilog extraArgs modName entNameM =
+    withResource (return ()) release (const grp)
+  where
+    svDir     = env </> "systemverilog"
+    modDir    = svDir </> modName
+    release _ = Directory.removeDirectoryRecursive svDir
+
+    grp = testGroup modName
+            ( clashHDL SystemVerilog env extraArgs modName
+            : maybe [] doMakeAndRun entNameM
+            )
+
+    doMakeAndRun (entName,doRun) =
+      vlog modDir modName : if doRun then [vsim modDir modName entName] else []
+
 runTest env Both extraArgs modName entNameM = testGroup "VHDL & Verilog"
   [ runTest env VHDL extraArgs modName entNameM
   , runTest env Verilog extraArgs modName entNameM
+  ]
+
+runTest env All extraArgs modName entNameM = testGroup "VHDL & Verilog & SystemVerilog"
+  [ runTest env VHDL extraArgs modName entNameM
+  , runTest env Verilog extraArgs modName entNameM
+  , runTest env SystemVerilog extraArgs modName entNameM
   ]
