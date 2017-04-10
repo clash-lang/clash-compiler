@@ -736,16 +736,16 @@ expr_ b (BlackBoxE _ _ _ (Just (nm,inc)) bs bbCtx b') = do
 expr_ _ (DataTag Bool (Left id_))          = text id_ <> brackets (int 0)
 expr_ _ (DataTag Bool (Right id_))         = do
   iw <- use intWidth
-  "$signed" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),text id_]))
+  "$unsigned" <> parens (listBraces (sequence [braces (int (iw-1) <+> braces "1'b0"),text id_]))
 
 expr_ _ (DataTag (Sum _ _) (Left id_))     = "$unsigned" <> parens (text id_)
-expr_ _ (DataTag (Sum _ _) (Right id_))    = "$signed" <> parens (text id_)
+expr_ _ (DataTag (Sum _ _) (Right id_))    = "$unsigned" <> parens (text id_)
 
 expr_ _ (DataTag (Product _ _) (Right _))  = do
   iw <- use intWidth
   int iw <> "'sd0"
 
-expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$signed" <> parens
+expr_ _ (DataTag hty@(SP _ _) (Right id_)) = "$unsigned" <> parens
                                                (text id_ <> brackets
                                                (int start <> colon <> int end))
   where
