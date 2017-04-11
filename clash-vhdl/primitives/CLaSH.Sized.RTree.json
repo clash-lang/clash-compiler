@@ -12,8 +12,9 @@
 textract_~SYM[0] : block
   signal ~SYM[1] : ~TYP[0];
 begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](0);
+  ~SYM[1] <= ~ARG[0];~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[~SYM[1](0)][~TYPO];~ELSE
+  ~RESULT <= ~SYM[1](0);~FI
 end block;
 -- textract end"
     }
