@@ -1,6 +1,6 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-##
+## 0.7.1 *April 11th 2017*
 * Fixes bugs:
   * Incorrect unsigned->signed wrap-around and conversion
   * Use unpacked array syntax in array literals

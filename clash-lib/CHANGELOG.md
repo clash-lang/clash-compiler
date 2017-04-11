@@ -1,6 +1,6 @@
 # Changelog for the [`clash-lib`](http://hackage.haskell.org/package/clash-lib) package
 
-##
+## 0.7.1 *April 11th 2017*
 * New features:
   * Support distribution of primitive templates with Cabal/Hackage packages [commit](https://github.com/clash-lang/clash-compiler/commit/82cd31863aafcbaf3bdbf7746d89d13859af5aaf)
   * Find memory data files and primitive files relative to import dirs (`-i<DIR>`)
