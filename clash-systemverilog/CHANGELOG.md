@@ -1,6 +1,14 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
-## 0.7
+##
+* Fixes bugs:
+  * Incorrect unsigned->signed wrap-around and conversion
+  * Use unpacked array syntax in array literals
+  * Add braces when converting unpacked to packed arrays
+  * Fixed `rotateLeftS` systemverilog template
+  * Do not generate null-slices
+
+## 0.7 *January 16th 2017*
 * New features:
   * Support `clash-prelude` 0.11
 

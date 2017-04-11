@@ -1,6 +1,10 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
-## 0.7
+##
+* Fixes bugs:
+  * resize `Integer` multiplication result
+
+## 0.7 *January 16th 2017*
 * New features:
   * Support `clash-prelude` 0.11
 
