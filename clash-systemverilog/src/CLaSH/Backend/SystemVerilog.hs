@@ -228,27 +228,41 @@ topSortHWTys hwtys = sorted
                              in concatMap (\(_,tys) -> mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup ty nodesI)) tys) ctys
     edge _                 = []
 
+range :: Either Int Int -> SystemVerilogM Doc
+range (Left n)  = brackets (int (n-1) <> colon <> int 0)
+range (Right n) = brackets (int 0 <> colon <> int (n-1))
+
 tyDec :: HWType -> SystemVerilogM (Maybe Doc)
 tyDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
-    Vivado -> "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
-              tyName ty <+> brackets (int 0 <> colon <> int (n-1)) <> semi
-    _ -> do case splitVecTy ty of
-              Just (ns,elTy') -> do
-                let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
-                "typedef" <+> elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
-              _ -> error $ $(curLoc) ++ "impossible"
+    Vivado -> case splitVecTy ty of
+      Just ([Right n',Left n''],elTy') ->
+        "typedef" <+> elTy' <+> brackets (int (n''-1) <> colon <> int 0) <+>
+        tyName ty <+> brackets (int 0 <> colon <> int (n'-1)) <> semi
+      _ ->
+        "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
+        tyName ty <+> brackets (int 0 <> colon <> int (n-1)) <> semi
+    _ -> case splitVecTy ty of
+      Just (Right n':ns,elTy') ->
+        "typedef" <+> elTy' <+> hcat (mapM range ns) <+> tyName ty <+>
+        brackets (int 0 <> colon <> int (n' - 1)) <> semi
+      _ -> error $ $(curLoc) ++ "impossible"
 tyDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
-    Vivado -> "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
-              tyName ty <+> brackets (int 0 <> colon <> int (2^n-1)) <> semi
-    _ -> do case splitVecTy ty of
-              Just (ns,elTy') -> do
-                let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
-                "typedef" <+> elTy' <+> ranges <+> tyName ty <+> brackets (int 0 <> colon <> int (head ns - 1)) <> semi
-              _ -> error $ $(curLoc) ++ "impossible"
+    Vivado -> case splitVecTy ty of
+      Just ([Right n',Left n''],elTy') -> -- n' == 2^n
+        "typedef" <+> elTy' <+> brackets (int 0 <> colon <> int (n''-1)) <+>
+        tyName ty <+> brackets (int 0 <> colon <> int (n'-1)) <> semi
+      _ ->
+        "typedef" <+> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
+        tyName ty <+> brackets (int 0 <> colon <> int (2^n-1)) <> semi
+    _ -> case splitVecTy ty of
+      Just (Right n':ns,elTy') -> -- n' == 2^n
+        "typedef" <+> elTy' <+> hcat (mapM range ns) <+> tyName ty <+>
+        brackets (int 0 <> colon <> int (n' - 1)) <> semi
+      _ -> error $ $(curLoc) ++ "impossible"
 tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
   where
     prodDec = "typedef struct packed {" <$>
@@ -265,7 +279,7 @@ tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
 
 tyDec _ = pure Nothing
 
-splitVecTy :: HWType -> Maybe ([Int],SystemVerilogM Doc)
+splitVecTy :: HWType -> Maybe ([Either Int Int],SystemVerilogM Doc)
 splitVecTy = fmap splitElemTy . go
   where
     splitElemTy (ns,t) = case t of
@@ -274,16 +288,16 @@ splitVecTy = fmap splitElemTy . go
       Clock _ _   -> (ns, "logic")
       Reset _ _   -> (ns, "logic")
       String      -> (ns, "string")
-      Signed n    -> (ns ++ [n],"logic signed")
-      _           -> (ns ++ [typeSize t], "logic")
+      Signed n    -> (ns ++ [Left n],"logic signed")
+      _           -> (ns ++ [Left (typeSize t)], "logic")
 
     go (Vector n elTy) = case go elTy of
-      Just (ns,elTy') -> Just (n:ns,elTy')
-      _               -> Just ([n],elTy)
+      Just (ns,elTy') -> Just (Right n:ns,elTy')
+      _               -> Just ([Right n],elTy)
 
     go (RTree n elTy) = let n' = 2^n in case go elTy of
-      Just (ns,elTy') -> Just (n':ns,elTy')
-      _               -> Just ([n'],elTy)
+      Just (ns,elTy') -> Just (Right n':ns,elTy')
+      _               -> Just ([Right n'],elTy)
 
     go _ = Nothing
 
@@ -293,18 +307,14 @@ lvType ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$> do
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
     _ -> case splitVecTy ty of
-      Just (ns,elTy') -> do
-        let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
-        elTy' <> ranges
+      Just (ns,elTy') -> elTy' <> hcat (mapM range ns)
       _ -> error $ $(curLoc) ++ "impossible"
 lvType ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
   syn <- hdlSyn
   case syn of
     Vivado -> "logic" <+> brackets (int 0 <> colon <> int (2^n-1)) <> brackets (int (typeSize elTy - 1) <> colon <> int 0)
     _ -> case splitVecTy ty of
-      Just (ns,elTy') -> do
-        let ranges = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) ns)
-        elTy' <> ranges
+      Just (ns,elTy') -> elTy' <> hcat (mapM range ns)
       _ -> error $ $(curLoc) ++ "impossible"
 lvType ty | typeSize ty > 0 = Just A.<$> verilogType ty
 lvType _ = pure Nothing
@@ -341,13 +351,18 @@ funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
     vecSigDecl d = do
       syn <- hdlSyn
       case syn of
-        Vivado -> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
-                  d <+> brackets (int 0 <> colon <> int (n-2))
-        _ -> do case splitVecTy ty of
-                  Just (ns,elTy') -> do
-                    let ranges' = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
-                    elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 2))
-                  _ -> error $ $(curLoc) ++ "impossible"
+        Vivado -> case splitVecTy ty of
+          Just ([Right n',Left n''],elTy') ->
+            elTy' <+> brackets (int 0 <> colon <> int (n''-1)) <+>
+            d <+> brackets (int 0 <> colon <> int (n'-2))
+          _ ->
+            "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
+            d <+> brackets (int 0 <> colon <> int (n-2))
+        _ -> case splitVecTy ty of
+         Just (Right n':ns,elTy') ->
+           elTy' <+> hcat (mapM range ns) <+> d <+>
+           brackets (int 0 <> colon <> int (n' - 2))
+         _ -> error $ $(curLoc) ++ "impossible"
 
 
 funDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$>
@@ -375,13 +390,18 @@ funDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$>
     treeSigDecl d = do
       syn <- hdlSyn
       case syn of
-        Vivado -> "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
-                  d <+> brackets (int 0 <> colon <> int (2^(n-1)-1))
-        _ -> do case splitVecTy (RTree (n-1) elTy) of
-                  Just (ns,elTy') -> do
-                    let ranges' = hcat (mapM (\n' -> brackets (int 0 <> colon <> int (n'-1))) (tail ns))
-                    elTy' <+> ranges' <+> d <+> brackets (int 0 <> colon <> int (head ns - 1))
-                  _ -> error $ $(curLoc) ++ "impossible"
+        Vivado -> case splitVecTy (RTree (n-1) elTy) of
+          Just ([Right n',Left n''],elTy') -> -- n' == 2 ^ (n-1)
+            elTy' <+> brackets (int 0 <> colon <> int (n''-1)) <+>
+            d <+> brackets (int 0 <> colon <> int (n' - 1))
+          _ ->
+            "logic" <+> brackets (int (typeSize elTy - 1) <> colon <> int 0) <+>
+            d <+> brackets (int 0 <> colon <> int (2^(n-1)-1))
+        _ -> case splitVecTy (RTree (n-1) elTy) of
+          Just (Right n':ns,elTy') -> -- n' == 2 ^ (n-1)
+            elTy' <+> hcat (mapM range ns) <+> d <+>
+            brackets (int 0 <> colon <> int (n' - 1))
+          _ -> error $ $(curLoc) ++ "impossible"
 
     tName  = tyName ty
     ranges = brackets (int 0 <> colon <> int (2^n-1)) <>
@@ -514,12 +534,12 @@ verilogTypeErrValue :: HWType -> SystemVerilogM Doc
 verilogTypeErrValue (Vector n elTy) = do
   syn <- hdlSyn
   case syn of
-    Vivado -> braces (int n <+> braces (int (typeSize elTy) <+> braces "1'bx"))
+    Vivado -> char '\'' <> braces (int n <+> braces (braces (int (typeSize elTy) <+> braces "1'bx")))
     _ -> char '\'' <> braces (int n <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue (RTree n elTy) = do
   syn <- hdlSyn
   case syn of
-    Vivado -> braces (int (2^n) <+> braces (int (typeSize elTy) <+> braces "1'bx"))
+    Vivado -> char '\'' <> braces (int (2^n) <+> braces (braces (int (typeSize elTy) <+> braces "1'bx")))
     _ -> char '\'' <> braces (int (2^n) <+> braces (verilogTypeErrValue elTy))
 verilogTypeErrValue String = "\"ERROR\""
 verilogTypeErrValue ty  = braces (int (typeSize ty) <+> braces "1'bx")

@@ -649,7 +649,13 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
     _ -> text id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> parens (int 1 <+> "to" <+> int (n-1))
 
-expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 _),0,1)))) = text id_ <> parens (int 0)
+expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> do
+      id' <- fmap (displayT . renderOneLine) (text id_ <> parens (int 0))
+      fromSLV elTy id' (typeSize elTy - 1) 0
+    _ -> text id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((RTree n _),1,1)))) =
   let z = 2^(n-1)
   in  text id_ <> parens (int 0 <+> "to" <+> int (z-1))
@@ -672,7 +678,13 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),10,fI)))) = do
 -- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed ((RTree _ _),10,fI)))) = text id_ <> parens (int fI)
+expr_ _ (Identifier id_ (Just (Indexed ((RTree _ elTy),10,fI)))) = do
+  syn <- hdlSyn
+  case syn of
+    Vivado -> do
+      id' <- fmap (displayT . renderOneLine) (text id_ <> parens (int fI))
+      fromSLV elTy id' (typeSize elTy - 1) 0
+    _ -> text id_ <> parens (int fI)
 
 expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> parens (int start <+> "downto" <+> int end)
   where
@@ -712,17 +724,10 @@ expr_ _ (DataCon ty@(RTree 0 elTy) _ [e]) = do
   case syn of
     Vivado -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> toSLV elTy e)
     _ -> vhdlTypeMark ty <> "'" <> parens (int 0 <+> rarrow <+> expr_ False e)
-expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = do
-  syn <- hdlSyn
-  case syn of
-    Vivado -> vhdlTypeMark ty <> "'" <> case rtreeChain e of
-      Just es -> tupled (mapM (toSLV elTy) es)
-      Nothing -> parens ("std_logic_vector'" <> parens (toSLV elTy e1) <+>
-                         "&" <+> expr_ False e2)
-    _ -> vhdlTypeMark ty <> "'" <> case rtreeChain e of
-      Just es -> tupled (mapM (expr_ False) es)
-      Nothing -> parens (vhdlTypeMark (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
-                         "&" <+> expr_ False e2)
+expr_ _ e@(DataCon ty@(RTree d elTy) _ [e1,e2]) = vhdlTypeMark ty <> "'" <> case rtreeChain e of
+  Just es -> tupled (mapM (expr_ False) es)
+  Nothing -> parens (vhdlTypeMark (RTree (d-1) elTy) <> "'" <> parens (expr_ False e1) <+>
+                     "&" <+> expr_ False e2)
 
 expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
   where

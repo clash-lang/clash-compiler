@@ -1,5 +1,9 @@
 # Changelog for the [`clash-systemverilog`](http://hackage.haskell.org/package/clash-systemverilog) package
 
+##
+* Fixes bugs:
+  * Incorrect unsigned->signed wrap-around and conversion
+
 ## 0.7 *January 16th 2017*
 * New features:
   * Support `clash-prelude` 0.11

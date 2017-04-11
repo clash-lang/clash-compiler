@@ -1,5 +1,14 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
+##
+* New features:
+  * Support distribution of primitive templates with Cabal/Hackage packages [commit](https://github.com/clash-lang/clash-compiler/commit/82cd31863aafcbaf3bdbf7746d89d13859af5aaf)
+  * Find memory data files and primitive files relative to import dirs (`-i<DIR>`)
+  * Add 'clashi' program and 'clash-ghc' package [#208](https://github.com/clash-lang/clash-compiler/issues/208), thanks to @thoughtpolice
+* Fixes bugs:
+  * `case (EmptyCase ty) of ty' { ... }` -> `EmptyCase ty'` [#198](https://github.com/clash-lang/clash-compiler/issues/198)
+  * `BitVector.split#` apply the correct type arguments
+
 ## 0.7.0.1 *January 17th 2017
 * Fixes bugs:
   * Include HsVersions.h in source distribution
@@ -7,6 +16,13 @@
 ## 0.7 *January 16th 2017*
 * New features:
   * Support for `clash-prelude` 0.11
+  * Primitive templates can include QSys files
+  * VHDL blackboxes: support additional libraries and uses keywords in generated VHDL
+  * Highly limited Float/Double support (literals and `Rational` conversion), hidden behind the `-clash-float-support` flag.
+* Fixes bugs:
+  * Reduce type families inside clock period calculation [#180](https://github.com/clash-lang/clash-compiler/issues/180)
+  * Only output signed literals as hex when they're multiple of 4 bits [#187](https://github.com/clash-lang/clash-compiler/issues/187)
+  * Correctly print negative hex literals
 
 ## 0.6.24 *October 17th 20168
 * Call generatePrimMap after loadModules [#175](https://github.com/clash-lang/clash-compiler/pull/175)
