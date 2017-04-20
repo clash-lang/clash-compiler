@@ -737,7 +737,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     argExprs   = zipWith toSLV argTys es
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
-                   n -> [exprLit (Just (ty,n)) (NumLit 0)]
+                   n -> [bits (replicate n U)]
     assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
