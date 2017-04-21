@@ -724,7 +724,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     argExprs   = zipWith toSLV argTys es
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
-                   n -> [exprLit (Just (ty,n)) (NumLit 0)]
+                   n -> [int n <> "'b" <> bits (replicate n U)]
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
