@@ -269,7 +269,22 @@ register# _ i s = i :- s
 regEn# :: SClock clk -> a -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
 regEn# _ = go
   where
-    go o (e :- es) as@(~(x :- xs)) =
+    -- In order to produce the first (current) value of the register's output
+    -- signal, 'o', we don't need to know the shape of either input (enable or
+    -- value-in).  This is important, because both values might be produced from
+    -- the output in a feedback loop, so we can't know their shape (pattern
+    -- match) them until we have produced output.
+    --
+    -- Thus, we use lazy pattern matching to delay inspecting the shape of
+    -- either argument until output has been produced.
+    --
+    -- However, both arguments need to be evaluated to WHNF as soon as possible
+    -- to avoid a space-leak.  Below, we explicitly reduce the value-in signal
+    -- using 'seq' as the tail of our output signal is produced.  On the other
+    -- hand, because the value of the tail depends on the value of the enable
+    -- signal 'e', it will be forced by the 'if'/'then' statement and we don't
+    -- need to 'seq' it explicitly.
+    go o ~(e :- es) as@(~(x :- xs)) =
       o `seqX` o :- (as `seq` if e then go x es xs else go o es xs)
 
 {-# INLINE mux #-}
