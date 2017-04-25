@@ -1,6 +1,6 @@
 # Changelog for the [`clash-ghc`](http://hackage.haskell.org/package/clash-ghc) package
 
-## 0.7.2
+## 0.7.2 *April 25th 2017*
 * New features:
   * Sum-of-product types: unused bits now "don't-care" [#212](https://github.com/clash-lang/clash-compiler/commit/fabf745793491ce3baf84ef0066b4ccf0753d503)
 * Fixes bugs:
