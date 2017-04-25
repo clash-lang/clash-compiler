@@ -56,11 +56,13 @@ executable clash
   Main-Is:            src-ghc/Batch.hs
   Build-Depends:      base, clash-ghc
   GHC-Options:        -Wall
+  default-language:   Haskell2010
 
 executable clashi
   Main-Is:            src-ghc/Interactive.hs
   Build-Depends:      base, clash-ghc
   GHC-Options:        -Wall
+  default-language:   Haskell2010
 
 library
   HS-Source-Dirs:     src-ghc src-bin
