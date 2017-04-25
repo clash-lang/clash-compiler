@@ -1,5 +1,12 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.11.2
+* New features:
+  * Add `riseEvery`: Give a pulse every @n@ clock cycles. (Thanks to @thoughtpolice)
+  * Add `oscillate`: Oscillate a @'Bool'@ with a given half-period of cycles. (Thanks to @thoughtpolice)
+* Fixes bugs:
+  * Eagerness bug in `regEn` [#104](https://github.com/clash-lang/clash-prelude/issues/104) (Thanks to @cbiffle)
+
 ## 0.11.1
 * Changes:
   * Bundle instance for `()` behaves like a product-type instance [#96](https://github.com/clash-lang/clash-prelude/issues/96)
