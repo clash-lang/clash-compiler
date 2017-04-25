@@ -1,5 +1,9 @@
 # Changelog for the [`clash-vhdl`](http://hackage.haskell.org/package/clash-vhdl) package
 
+## 0.7.2
+* New features:
+  * Sum-of-product types: unused bits now "don't-care" [#212](https://github.com/clash-lang/clash-compiler/commit/fabf745793491ce3baf84ef0066b4ccf0753d503)
+
 ## 0.7.1 *April 11th 2017*
 * Fixes bugs:
   * resize `Integer` multiplication result
