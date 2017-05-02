@@ -179,14 +179,14 @@ Library
                       deepseq                   >= 1.4.1.0 && < 1.5,
                       ghc-prim                  >= 0.3.1.0 && < 0.6,
                       ghc-typelits-extra        >= 0.2.1   && < 0.3,
-                      ghc-typelits-knownnat     >= 0.2.2   && < 0.3,
+                      ghc-typelits-knownnat     >= 0.2.2   && < 0.4,
                       ghc-typelits-natnormalise >= 0.4.2   && < 0.6,
                       half                      >= 0.2.2.3 && < 1.0,
                       lens                      >= 4.9     && < 4.16,
                       QuickCheck                >= 2.7     && < 2.10,
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
-                      template-haskell          >= 2.9.0.0 && < 2.12,
+                      template-haskell          >= 2.9.0.0 && < 2.13,
                       vector                    >= 0.11    && < 1.0
 
   if flag(doclinks)
@@ -222,7 +222,7 @@ benchmark benchmark-clash-prelude
       clash-prelude,
       criterion         >= 1.1.1.0 && < 1.2,
       deepseq           >= 1.4.0.1 && < 1.5,
-      template-haskell  >= 2.9.0.0 && < 2.12
+      template-haskell  >= 2.9.0.0 && < 2.13
 
   Other-Modules:    BenchBitVector
                     BenchFixed

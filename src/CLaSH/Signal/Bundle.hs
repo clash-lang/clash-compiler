@@ -84,7 +84,8 @@ class Bundle a where
   bundle :: Unbundled' clk a -> Signal' clk a
 
   {-# INLINE bundle #-}
-  default bundle :: Signal' clk a -> Signal' clk a
+  default bundle :: (Signal' clk a ~ Unbundled' clk a)
+                 => Unbundled' clk a -> Signal' clk a
   bundle s = s
   -- | Example:
   --
@@ -100,7 +101,8 @@ class Bundle a where
   unbundle :: Signal' clk a -> Unbundled' clk a
 
   {-# INLINE unbundle #-}
-  default unbundle :: Signal' clk a -> Signal' clk a
+  default unbundle :: (Unbundled' clk a ~ Signal' clk a)
+                   => Signal' clk a -> Unbundled' clk a
   unbundle s = s
 
 instance Bundle Bool
