@@ -84,9 +84,14 @@ import Data.Default
 {- $setup
 >>> :set -XTemplateHaskell
 >>> :set -XDataKinds
->>> let ma acc (x,y) = acc + x * y
 >>> :{
-let macT acc (x,y) = (acc',o)
+let ma :: Num a => a -> (a, a) -> a
+    ma acc (x,y) = acc + x * y
+:}
+
+>>> :{
+let macT :: Num a => a -> (a,a) -> (a,a)
+    macT acc (x,y) = (acc',o)
        where
          acc' = ma acc (x,y)
          o    = acc
@@ -427,7 +432,7 @@ Going back to the original specification we note the following:
 When we examine the type of 'macT' we see that is still completely combinational:
 
 >>> :t macT
-macT :: Num t => t -> (t, t) -> (t, t)
+macT :: Num a => a -> (a, a) -> (a, a)
 
 The "CLaSH.Prelude" library contains a function that creates a sequential
 circuit from a combinational circuit that has the same Mealy machine type /

@@ -1680,15 +1680,15 @@ lazyV = lazyV' (repeat undefined)
 -- >>> let append' xs ys = foldr (:>) ys xs
 -- <BLANKLINE>
 -- <interactive>:...
---     • Occurs check: cannot construct the infinite type: t ~ t + 1
---       Expected type: a -> Vec t a -> Vec t a
---         Actual type: a -> Vec t a -> Vec (t + 1) a
+--     • Occurs check: cannot construct the infinite type: ... ~ ... + 1
+--       Expected type: a -> Vec ... a -> Vec ... a
+--         Actual type: a -> Vec ... a -> Vec (... + 1) a
 --     • In the first argument of ‘foldr’, namely ‘(:>)’
 --       In the expression: foldr (:>) ys xs
 --       In an equation for ‘append'’: append' xs ys = foldr (:>) ys xs
 --     • Relevant bindings include
---         ys :: Vec t a (bound at ...)
---         append' :: Vec n a -> Vec t a -> Vec t a
+--         ys :: Vec ... a (bound at ...)
+--         append' :: Vec n a -> Vec ... a -> Vec ... a
 --           (bound at ...)
 --
 -- The reason is that the type of 'foldr' is:
