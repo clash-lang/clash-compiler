@@ -262,7 +262,7 @@ assign ~RESULT = 1'b0;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.quot#"
     , "type"      : "quot# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[0]) / ~ARG[1]"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
