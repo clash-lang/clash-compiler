@@ -4,6 +4,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TupleSections    #-}
@@ -82,11 +83,18 @@ import TyCon      (AlgTyConRhs (..), TyCon,
                    tyConDataCons, tyConKind,
                    tyConName, tyConUnique)
 import Type       (mkTvSubstPrs, substTy, coreView)
+#if MIN_VERSION_ghc(8,2,0)
+import TyCoRep    (Coercion (..), TyLit (..), Type (..))
+#else
 import TyCoRep    (Coercion (..), TyBinder (..), TyLit (..), Type (..))
+#endif
 import Unique     (Uniquable (..), Unique, getKey, hasKey)
 import Var        (Id, TyVar, Var, idDetails,
                    isTyVar, varName, varType,
                    varUnique, idInfo)
+#if MIN_VERSION_ghc(8,2,0)
+import Var        (TyVarBndr (..))
+#endif
 import VarSet     (isEmptyVarSet)
 
 -- Local imports
@@ -217,13 +225,16 @@ makeAlgTyConRhs :: AlgTyConRhs
                 -> State GHC2CoreState (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs algTcRhs = case algTcRhs of
   DataTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+#if MIN_VERSION_ghc(8,2,0)
+  SumTyCon dcs -> Just <$> C.DataTyCon <$> mapM coreToDataCon dcs
+#endif
   NewTyCon dc _ (rhsTvs,rhsEtad) _ -> Just <$> (C.NewTyCon <$> coreToDataCon dc
                                                            <*> ((,) <$> mapM coreToVar rhsTvs
                                                                     <*> coreToType rhsEtad
                                                                )
                                                )
-  AbstractTyCon _ -> return Nothing
-  TupleTyCon {}   -> error "Cannot handle tuple tycons"
+  AbstractTyCon {} -> return Nothing
+  TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
 coreToTerm :: Bool
            -> PrimMap a
@@ -487,8 +498,13 @@ coreToType' (TyConApp tc args)
                         tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
                         tyConMap %= (HSM.insert tcName tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
+#if MIN_VERSION_ghc(8,2,0)
+coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> (bind <$> coreToTyVar tv <*> coreToType ty)
+coreToType' (FunTy ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#else
 coreToType' (ForAllTy (Named tv _) ty) = C.ForAllTy <$> (bind <$> coreToTyVar tv <*> coreToType ty)
 coreToType' (ForAllTy (Anon ty1) ty2)  = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+#endif
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPpr unsafeGlobalDynFlags t)

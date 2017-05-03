@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -215,7 +216,11 @@ findType infos span0 string = do
              MaybeT $ pure $ M.lookup name infos
 
     case resolveType (modinfoSpans info) (spanInfoFromRealSrcSpan' span0) of
+#if MIN_VERSION_ghc(8,2,0)
+        Nothing -> (,) info <$> lift (exprType TM_Inst string)
+#else
         Nothing -> (,) info <$> lift (exprType string)
+#endif
         Just ty -> return (info, ty)
   where
     -- | Try to resolve the type display from the given span.

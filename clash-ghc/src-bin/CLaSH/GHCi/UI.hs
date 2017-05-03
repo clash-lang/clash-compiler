@@ -56,6 +56,10 @@ import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, listVisibleModuleNames, pprFlag )
+#if MIN_VERSION_ghc(8,2,0)
+import Packages ( getInstalledPackageDetails )
+import IfaceSyn ( showToHeader )
+#endif
 import PprTyThing
 import PrelNames
 import RdrName ( RdrName, getGRE_NameQualifier_maybes, getRdrName )
@@ -95,6 +99,9 @@ import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
+#if MIN_VERSION_ghc(8,2,0)
+import qualified Data.Set as S
+#endif
 import Data.Maybe
 import qualified Data.Map as M
 
@@ -741,10 +748,18 @@ mkPrompt = do
         rev_imports = reverse imports -- rightmost are the most recent
         modules_bit =
              hsep [ char '*' <> ppr m | IIModule m <- rev_imports ] <+>
+#if MIN_VERSION_ghc(8,2,0)
+             hsep (map ppr [ moduleNameString (myIdeclName d) | IIDecl d <- rev_imports ])
+#else
              hsep (map ppr [ myIdeclName d | IIDecl d <- rev_imports ])
+#endif
 
          --  use the 'as' name if there is one
+#if MIN_VERSION_ghc(8,2,0)
+        myIdeclName d | Just m <- ideclAs d = unLoc m
+#else
         myIdeclName d | Just m <- ideclAs d = m
+#endif
                       | otherwise           = unLoc (ideclName d)
 
         deflt_prompt = dots <> context_bit <> modules_bit
@@ -1034,9 +1049,15 @@ afterRunStmt step_here run_result = do
                         afterRunStmt step_here >> return ()
 
   flushInterpBuffers
+#if MIN_VERSION_ghc(8,2,0)
+  withSignalHandlers $ do
+     b <- isOptionSet RevertCAFs
+     when b revertCAFs
+#else
   liftIO installSignalHandlers
   b <- isOptionSet RevertCAFs
   when b revertCAFs
+#endif
 
   return run_result
 
@@ -1777,7 +1798,15 @@ makeSystemVerilog = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> Syst
 
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str = handleSourceError GHC.printException $ do
+#if MIN_VERSION_ghc(8,2,0)
+    let (mode, expr_str) = case break isSpace str of
+          ("+d", rest) -> (GHC.TM_Default, dropWhile isSpace rest)
+          ("+v", rest) -> (GHC.TM_NoInst,  dropWhile isSpace rest)
+          _            -> (GHC.TM_Inst,    str)
+    ty <- GHC.exprType mode expr_str
+#else
     ty <- GHC.exprType str
+#endif
     printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser ty)]
 
 -----------------------------------------------------------------------------
@@ -1988,13 +2017,21 @@ isSafeModule m = do
     liftIO $ putStrLn $ "Package Trust: " ++ (if packageTrustOn dflags then "On" else "Off")
     when (not $ null good)
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
+#if MIN_VERSION_ghc(8,2,0)
+                        (intercalate ", " $ map (showPpr dflags) (S.toList good)))
+#else
                         (intercalate ", " $ map (showPpr dflags) good))
+#endif
     case msafe && null bad of
         True -> liftIO $ putStrLn $ mname ++ " is trusted!"
         False -> do
             when (not $ null bad)
                  (liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
+#if MIN_VERSION_ghc(8,2,0)
+                            ++ (intercalate ", " $ map (showPpr dflags) (S.toList bad)))
+#else
                             ++ (intercalate ", " $ map (showPpr dflags) bad))
+#endif
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
@@ -2004,9 +2041,15 @@ isSafeModule m = do
         | thisPackage dflags == moduleUnitId md = True
         | otherwise = trusted $ getPackageDetails dflags (moduleUnitId md)
 
+#if MIN_VERSION_ghc(8,2,0)
+    tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
+                          | otherwise = S.partition part deps
+        where part pkg = trusted $ getInstalledPackageDetails dflags pkg
+#else
     tallyPkgs dflags deps | not (packageTrustOn dflags) = ([], [])
                           | otherwise = partition part deps
         where part pkg = trusted $ getPackageDetails dflags pkg
+#endif
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -2081,8 +2124,13 @@ browseModule bang modl exports_only = do
 
         let things | bang      = catMaybes mb_things
                    | otherwise = filtered_things
+#if MIN_VERSION_ghc(8,2,0)
+            pretty | bang      = pprTyThing showToHeader
+                   | otherwise = pprTyThingInContext showToHeader
+#else
             pretty | bang      = pprTyThing
                    | otherwise = pprTyThingInContext
+#endif
 
             labels  [] = text "-- not currently imported"
             labels  l  = text $ intercalate "\n" $ map qualifier l
@@ -2487,12 +2535,14 @@ setOptions wds =
       -- then, dynamic flags
       newDynFlags False minus_opts
 
+#if !MIN_VERSION_ghc(8,2,0)
 packageFlagsChanged :: DynFlags -> DynFlags -> Bool
 packageFlagsChanged idflags1 idflags0 =
     packageFlags idflags1 /= packageFlags idflags0 ||
     ignorePackageFlags idflags1 /= ignorePackageFlags idflags0 ||
     pluginPackageFlags idflags1 /= pluginPackageFlags idflags0 ||
     trustFlags idflags1 /= trustFlags idflags0
+#endif
 
 newDynFlags :: Bool -> [String] -> GHCi ()
 newDynFlags interactive_only minus_opts = do
@@ -2726,7 +2776,11 @@ showBindings = do
 
     pprTT :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst]) -> SDoc
     pprTT (thing, fixity, _cls_insts, _fam_insts)
+#if MIN_VERSION_ghc(8,2,0)
+      = pprTyThing showToHeader thing
+#else
       = pprTyThing thing
+#endif
         $$ show_fixity
       where
         show_fixity
@@ -2735,7 +2789,11 @@ showBindings = do
 
 
 printTyThing :: TyThing -> GHCi ()
+#if MIN_VERSION_ghc(8,2,0)
+printTyThing tyth = printForUser (pprTyThing showToHeader tyth)
+#else
 printTyThing tyth = printForUser (pprTyThing tyth)
+#endif
 
 showBkptTable :: GHCi ()
 showBkptTable = do
@@ -3419,8 +3477,12 @@ listAround pan do_highlight = do
           prefixed = zipWith ($) highlighted bs_line_nos
           output   = BS.intercalate (BS.pack "\n") prefixed
 
+#if MIN_VERSION_ghc(8,2,0)
+      let utf8Decoded = utf8DecodeByteString output
+#else
       utf8Decoded <- liftIO $ BS.useAsCStringLen output
                         $ \(p,n) -> utf8DecodeString (castPtr p) n
+#endif
       liftIO $ putStrLn utf8Decoded
   where
         file  = GHC.srcSpanFile pan
@@ -3547,8 +3609,13 @@ handler :: SomeException -> GHCi Bool
 
 handler exception = do
   flushInterpBuffers
+#if MIN_VERSION_ghc(8,2,0)
+  withSignalHandlers $
+     ghciHandle handler (showException exception >> return False)
+#else
   liftIO installSignalHandlers
   ghciHandle handler (showException exception >> return False)
+#endif
 
 showException :: SomeException -> GHCi ()
 showException se =

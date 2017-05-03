@@ -42,10 +42,15 @@ import Module           ( ModuleName )
 import Config
 import Constants
 import HscTypes
-import Packages         ( pprPackages, pprPackagesSimple, pprModuleMap )
+import Packages         ( pprPackages, pprPackagesSimple )
+#if !MIN_VERSION_ghc(8,2,0)
+import Packages         ( pprModuleMap )
+#endif
 import DriverPhases
 import BasicTypes       ( failed )
+#if !MIN_VERSION_ghc(8,2,0)
 import StaticFlags
+#endif
 import DynFlags
 import ErrUtils
 import FastString
@@ -59,9 +64,19 @@ import MonadUtils       ( liftIO )
 -- Imports for --abi-hash
 import LoadIface           ( loadUserInterface )
 import Module              ( mkModuleName )
-import Finder              ( findImportedModule, cannotFindInterface )
+import Finder              ( findImportedModule )
+#if MIN_VERSION_ghc(8,2,0)
+import Finder              ( cannotFindModule )
+#else
+import Finder              ( cannotFindInterface )
+#endif
 import TcRnMonad           ( initIfaceCheck )
+#if MIN_VERSION_ghc(8,2,0)
+import Binary              ( openBinMem, put_ )
+import BinFingerprint      ( fingerprintBinMem )
+#else
 import Binary              ( openBinMem, put_, fingerprintBinMem )
+#endif
 
 -- Standard Haskell libraries
 import System.IO
@@ -79,9 +94,10 @@ import           CLaSH.GHCi.UI (makeHDL)
 import           Exception (gcatch)
 import           Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Version (showVersion)
-import           Control.Exception (Exception(..),ErrorCall (..),throw)
+import           Control.Exception (Exception(..),ErrorCall (..))
 
 import qualified GHC.LanguageExtensions as LangExt
+import           GHC.Exception ( SomeException )
 
 import qualified CLaSH.Backend
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
@@ -130,8 +146,12 @@ defaultMain = flip withArgs $ do
     argv0 <- getArgs
     libDir <- ghcLibDir
 
+#if MIN_VERSION_ghc(8,2,0)
+    let argv2 = map (mkGeneralLocated "on the commandline") argv0
+#else
     let argv1 = map (mkGeneralLocated "on the commandline") argv0
     (argv2, staticFlagWarnings) <- parseStaticFlags argv1
+#endif
 
     r <- newIORef (CLaSHOpts { opt_dbgLevel    = DebugNone
                              , opt_inlineLimit = 20
@@ -152,7 +172,11 @@ defaultMain = flip withArgs $ do
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
     (mode, argv4, modeFlagWarnings) <- parseModeFlags argv3
 
+#if MIN_VERSION_ghc(8,2,0)
+    let flagWarnings = modeFlagWarnings ++ clashFlagWarnings
+#else
     let flagWarnings = staticFlagWarnings ++ modeFlagWarnings ++ clashFlagWarnings
+#endif
 
     -- If all we want to do is something like showing the version number
     -- then do it now, before we start a GHC session etc. This makes
@@ -307,6 +331,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
       | v >= 5 -> liftIO $ dumpPackages dflags6
       | otherwise -> return ()
 
+#if !MIN_VERSION_ghc(8,2,0)
   when (verbosity dflags6 >= 3) $ do
         liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
 
@@ -314,6 +339,7 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
   when (dopt Opt_D_dump_mod_map dflags6) . liftIO $
     printInfoForUser (dflags6 { pprCols = 200 })
                      (pkgQual dflags6) (pprModuleMap dflags6)
+#endif
 
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
@@ -341,6 +367,12 @@ main' postLoadMode dflags0 args flagWarnings clashOpts = do
 
   liftIO $ dumpFinalStats dflags6
 
+handleCLaSHException
+  :: GhcMonad m
+  => DynFlags
+  -> CLaSHOpts
+  -> SomeException
+  -> m a
 handleCLaSHException df opts e = case fromException e of
   Just (CLaSHException sp s eM) ->
     throwOneError (mkPlainErrMsg df sp (text s $$ blankLine $$ srcInfo $$ showExtra (opt_errorExtra opts) eM))
@@ -898,15 +930,19 @@ showOptions isInteractive = putStr (unlines availableOptions)
         flagsForCompletion isInteractive,
         map ('-':) (concat [
             getFlagNames mode_flags
+#if !MIN_VERSION_ghc(8,2,0)
           , (filterUnwantedStatic . getFlagNames $ flagsStatic)
           , flagsStaticNames
+#endif
           ])
         ]
       getFlagNames opts         = map flagName opts
+#if !MIN_VERSION_ghc(8,2,0)
       -- this is a hack to get rid of two unwanted entries that get listed
       -- as static flags. Hopefully this hack will disappear one day together
       -- with static flags
       filterUnwantedStatic      = filter (`notElem`["f", "fno-"])
+#endif
 
 showGhcUsage :: DynFlags -> IO ()
 showGhcUsage = showUsage False
@@ -1013,12 +1049,20 @@ abiHash strs = do
          case r of
            Found _ m -> return m
            _error    -> throwGhcException $ CmdLineError $ showSDoc dflags $
+#if MIN_VERSION_ghc(8,2,0)
+                          cannotFindModule dflags modname r
+#else
                           cannotFindInterface dflags modname r
+#endif
 
   mods <- mapM find_it strs
 
   let get_iface modl = loadUserInterface False (text "abiHash") modl
+#if MIN_VERSION_ghc(8,2,0)
+  ifaces <- initIfaceCheck (text "abiHash") hsc_env $ mapM get_iface mods
+#else
   ifaces <- initIfaceCheck hsc_env $ mapM get_iface mods
+#endif
 
   bh <- openBinMem (3*1024) -- just less than a block
   put_ bh hiVersion
