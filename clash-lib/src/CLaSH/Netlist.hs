@@ -292,6 +292,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
         LitPat  (Embed (CharLiteral c)) -> return (Just (NumLit . toInteger $ ord c), altExpr)
         LitPat  (Embed (Int64Literal i)) -> return (Just (NumLit i), altExpr)
         LitPat  (Embed (Word64Literal w)) -> return (Just (NumLit w), altExpr)
+        LitPat  (Embed (NaturalLiteral n)) -> return (Just (NumLit n), altExpr)
         _  -> do
           (_,sp) <- Lens.use curCompNm
           throw (CLaSHException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showDoc pat) Nothing)
@@ -389,6 +390,7 @@ mkExpr _ _ _ (Core.Literal l) = do
     DoubleLiteral r  -> let d = fromRational r :: Double
                             i = toInteger (doubleToWord d)
                         in  return (HW.Literal (Just (BitVector 64,64)) (NumLit i), [])
+    NaturalLiteral n -> return (HW.Literal (Just (Unsigned iw,iw)) $ NumLit n, [])
     _ -> error $ $(curLoc) ++ "not an integer or char literal"
 
 mkExpr bbEasD bndr ty app = do

@@ -4,6 +4,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -104,6 +105,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                    }
        in maybe e Data dc
 
+  "GHC.Prim.int2Word#"
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behaviour
+
   "GHC.Integer.Logarithms.integerLogBase#"
     | Just (a,b) <- integerLiterals tcm isSubj args
     , Just c <- flogBase a b
@@ -197,9 +202,24 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral (i `shiftL` fromInteger j)
 
+  "GHC.Natural.NatS#"
+    | [Literal (WordLiteral w)] <- reduceTerms tcm isSubj args
+    -> Literal (NaturalLiteral w)
+
   "GHC.TypeLits.natVal"
+#if MIN_VERSION_ghc(8,2,0)
+    | [Literal (NaturalLiteral n), _] <- reduceTerms tcm isSubj args
+    -> integerToIntegerLiteral n
+#else
     | [Literal (IntegerLiteral i), _] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral i
+#endif
+
+#if MIN_VERSION_ghc(8,2,0)
+  "GHC.TypeNats.natVal"
+    | [Literal (NaturalLiteral n), _] <- reduceTerms tcm isSubj args
+    -> Literal (NaturalLiteral n)
+#endif
 
   "GHC.Types.I#"
     | isSubj
@@ -445,6 +465,9 @@ boolToBoolLiteral tcm ty b =
 
 integerToIntLiteral :: Integer -> Term
 integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer -> Int) -- for overflow behaviour
+
+integerToWordLiteral :: Integer -> Term
+integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integer -> Word) -- for overflow behaviour
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral

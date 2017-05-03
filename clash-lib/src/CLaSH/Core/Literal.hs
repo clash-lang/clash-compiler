@@ -27,7 +27,8 @@ import CLaSH.Core.TysPrim                     (intPrimTy, integerPrimTy,
                                                charPrimTy, stringPrimTy,
                                                wordPrimTy,
                                                int64PrimTy, word64PrimTy,
-                                               floatPrimTy, doublePrimTy)
+                                               floatPrimTy, doublePrimTy,
+                                               naturalPrimTy)
 
 -- | Term Literal
 data Literal
@@ -40,6 +41,7 @@ data Literal
   | FloatLiteral    !Rational
   | DoubleLiteral   !Rational
   | CharLiteral     !Char
+  | NaturalLiteral  !Integer
   deriving (Eq,Ord,Show,Generic,NFData)
 
 instance Alpha Literal where
@@ -61,3 +63,4 @@ literalType (DoubleLiteral   _) = doublePrimTy
 literalType (CharLiteral     _) = charPrimTy
 literalType (Int64Literal    _) = int64PrimTy
 literalType (Word64Literal   _) = word64PrimTy
+literalType (NaturalLiteral  _) = naturalPrimTy

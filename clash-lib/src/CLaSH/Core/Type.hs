@@ -6,6 +6,7 @@
   Types in CoreHW
 -}
 
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -385,23 +386,43 @@ to (WH)NF when the formal parameter is _not_ a type variable.
 
 reduceTypeFamily :: HashMap TyConName TyCon -> Type -> Maybe Type
 reduceTypeFamily tcm (tyView -> TyConApp tc tys)
+#if MIN_VERSION_ghc(8,2,0)
+  | name2String tc == "GHC.TypeNats.+"
+#else
   | name2String tc == "GHC.TypeLits.+"
+#endif
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 + i2)))
 
+#if MIN_VERSION_ghc(8,2,0)
+  | name2String tc == "GHC.TypeNats.*"
+#else
   | name2String tc == "GHC.TypeLits.*"
+#endif
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 * i2)))
 
+#if MIN_VERSION_ghc(8,2,0)
+  | name2String tc == "GHC.TypeNats.^"
+#else
   | name2String tc == "GHC.TypeLits.^"
+#endif
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 ^ i2)))
 
+#if MIN_VERSION_ghc(8,2,0)
+  | name2String tc == "GHC.TypeNats.-"
+#else
   | name2String tc == "GHC.TypeLits.-"
+#endif
   , [i1, i2] <- mapMaybe (litView tcm) tys
   = Just (LitTy (NumTy (i1 - i2)))
 
+#if MIN_VERSION_ghc(8,2,0)
+  | name2String tc == "GHC.TypeNats.<=?"
+#else
   | name2String tc == "GHC.TypeLits.<=?"
+#endif
   , [i1, i2] <- mapMaybe (litView tcm) tys
   , Just (FunTyCon {tyConKind = tck}) <- HashMap.lookup tc tcm
   , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck

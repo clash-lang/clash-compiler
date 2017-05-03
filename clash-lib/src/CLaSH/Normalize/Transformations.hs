@@ -59,6 +59,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           CLaSH.Core.DataCon          (DataCon (..))
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               typeFreeVars)
+import           CLaSH.Core.Literal          (Literal (..))
 import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
                                               substTysinTm)
@@ -247,9 +248,7 @@ caseCon _ c@(Case (Literal l) _ alts) = do
   let ltAltsM = List.find (equalLit . fst) alts'
   case ltAltsM of
     Just (LitPat _,e) -> changed e
-    _ -> case alts' of
-           ((DefaultPat,e):_) -> changed e
-           _ -> error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
+    _ -> matchLiteralContructor c l alts'
   where
     equalLit (LitPat l')     = l == (unembed l')
     equalLit _               = False
@@ -281,6 +280,56 @@ caseCon ctx e@(Case subj ty alts)
                      (caseOneAlt e)
 
 caseCon _ e = caseOneAlt e
+
+matchLiteralContructor
+  :: Term
+  -> Literal
+  -> [(Pat,Term)]
+  -> NormalizeSession Term
+matchLiteralContructor c (IntegerLiteral l) alts = do
+  let dcAltM = List.find (smallInt . fst) alts
+  case dcAltM of
+    Just (DataPat _ pxs, e) ->
+      let ([],xs)   = unrebind pxs
+          fvs       = Lens.toListOf  termFreeIds e
+          (binds,_) = List.partition ((`elem` fvs) . varName . fst)
+                    $ zip xs [Literal (IntLiteral l)]
+          e' = case binds of
+                 [] -> e
+                 _  -> Letrec $ bind (rec $ map (second embed) binds) e
+      in changed e'
+    _ -> matchLiteralDefault c alts
+  where
+    smallInt (DataPat dc _)
+      | dcTag (unembed dc) == 1
+      , l < 2^(63 :: Int)
+      = True
+    smallInt _ = False
+matchLiteralContructor c (NaturalLiteral l) alts = do
+  let dcAltM = List.find (smallNat . fst) alts
+  case dcAltM of
+    Just (DataPat _ pxs, e) ->
+      let ([],xs)   = unrebind pxs
+          fvs       = Lens.toListOf  termFreeIds e
+          (binds,_) = List.partition ((`elem` fvs) . varName . fst)
+                    $ zip xs [Literal (WordLiteral (toInteger l))]
+          e' = case binds of
+                 [] -> e
+                 _  -> Letrec $ bind (rec $ map (second embed) binds) e
+      in changed e'
+    _ -> matchLiteralDefault c alts
+  where
+    smallNat (DataPat dc _)
+      | dcTag (unembed dc) == 1
+      , l < 2^(63 :: Int)
+      = True
+    smallNat _ = False
+matchLiteralContructor c _ alts = matchLiteralDefault c alts
+
+matchLiteralDefault :: Term -> [(Pat,Term)] -> NormalizeSession Term
+matchLiteralDefault _ ((DefaultPat,e):_) = changed e
+matchLiteralDefault c _ =
+  error $ $(curLoc) ++ "Report as bug: caseCon error: " ++ showDoc c
 
 caseOneAlt :: Term -> RewriteMonad extra Term
 caseOneAlt e@(Case _ _ [alt]) = do

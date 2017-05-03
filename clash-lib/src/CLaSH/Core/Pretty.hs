@@ -142,6 +142,7 @@ instance Pretty Literal where
     DoubleLiteral r   -> return $ double (fromRat r)
     CharLiteral c     -> return $ char c
     StringLiteral s   -> return $ vcat $ map text $ showMultiLineString s
+    NaturalLiteral n  -> return $ integer n
 
 instance Pretty Pat where
   pprPrec prec pat = case pat of
