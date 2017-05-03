@@ -99,7 +99,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
-    , "templateE" : "$signed(~ARG[1])"
+    , "templateE" : "$signed(~ARG[1][(~LIT[0]-1):0])"
     }
   }
 , { "BlackBox" :

@@ -73,7 +73,7 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Index.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Index n"
-    , "templateE" : "$unsigned(~ARG[1])"
+    , "templateE" : "$unsigned(~ARG[1][(~LIT[0]-1):0])"
     }
   }
 , { "BlackBox" :

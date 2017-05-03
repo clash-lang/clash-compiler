@@ -241,7 +241,7 @@ assign ~RESULT = 1'b0;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> BitVector n"
-    , "templateE" : "$unsigned(~ARG[1])"
+    , "templateE" : "$unsigned(~ARG[1][(~LIT[0]-1):0])"
     }
   }
 , { "BlackBox" :
@@ -265,7 +265,7 @@ assign ~RESULT = 1'b0;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.quot#"
     , "type"      : "quot# :: BitVector n -> BitVector n -> BitVector n"
-    , "templateE" : "~ARG[0]) / ~ARG[1]"
+    , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
