@@ -6,6 +6,8 @@
   Builtin Type and Kind definitions
 -}
 
+{-# LANGUAGE CPP #-}
+
 module CLaSH.Core.TysPrim
   ( liftedTypeKind
   , typeNatKind
@@ -80,8 +82,12 @@ floatPrimTyConName   = makeName "GHC.Prim.Float#"
                                 (uniqueToInteger floatPrimTyConKey)
 doublePrimTyConName  = makeName "GHC.Prim.Double#"
                                 (uniqueToInteger doublePrimTyConKey)
+#if MIN_VERSION_ghc(8,2,0)
 naturalPrimTyConName = makeName "GHC.Natural.Natural"
                                 (uniqueToInteger naturalTyConKey)
+#else
+naturalPrimTyConName = string2Name "GHC.Natural.Natural"
+#endif
 
 liftedPrimTC :: TyConName
              -> TyCon
