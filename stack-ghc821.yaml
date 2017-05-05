@@ -1,0 +1,159 @@
+flags:
+  time-locale-compat:
+    old-locale: false
+packages:
+- clash-prelude
+- clash-lib
+- clash-verilog
+- clash-systemverilog
+- clash-vhdl
+- clash-ghc
+- testsuite
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-natnormalise.git
+    commit: 8f6eb8178ebd82700a44eb7c43daf52c9c6a5a51
+  extra-dep: true
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-knownnat.git
+    commit: 8784eb6006b4dfccba46d60524e9cabd5215f7da
+  extra-dep: true
+- location:
+    git: https://github.com/clash-lang/ghc-typelits-extra.git
+    commit: 9743a913d703fd09eda5c87f3eb771c32ba3a727
+  extra-dep: true
+- location:
+    git: https://github.com/clash-lang/ghc-tcplugins-extra.git
+    commit: d4eefba5a61083e62b40962d052b82c4386883e7
+  extra-dep: true
+- location:
+    git: https://github.com/DanielSchuessler/th-expand-syns.git
+    commit: 0a9420c9fe60c038f72a17cc262f30e09e56c9d5
+  extra-dep: true
+- location:
+    git: https://github.com/mboes/th-lift.git
+    commit: 671d6f967ba2f6b30398b40e8c04ee38d49fa4b0
+  extra-dep: true
+- location:
+    git: https://github.com/goldfirere/th-desugar.git
+    commit: 97567a887c0fab84889bd22894151b3576bd616e
+  extra-dep: true
+- location:
+    git: https://github.com/RyanGlScott/singletons.git
+    commit: 784257ffe08324763a65f14c6e72776e935a4ea4
+  extra-dep: true
+- location:
+    git: https://github.com/christiaanb/cabal-doctest.git
+    commit: 3e8e22abd53af14bb8f7ed402172ef30f31a3e9b
+  extra-dep: true
+extra-deps:
+- Glob-0.7.14
+- HUnit-1.6.0.0
+- ListLike-4.5.1
+- QuickCheck-2.9.2
+- StateVar-1.1.0.4
+- abstract-deque-0.3
+- abstract-par-0.3.3
+- adjunctions-4.3
+- aeson-1.2.0.0
+- ansi-terminal-0.6.2.3
+- ansi-wl-pprint-0.6.7.3
+- async-2.1.1.1
+- attoparsec-0.13.1.0
+- base-compat-0.9.3
+- base-orphans-0.6
+- bifunctors-5.4.2
+- blaze-builder-0.4.0.2
+- call-stack-0.1.0
+- cassava-0.4.5.1
+- cereal-0.5.4.0
+- clock-0.7.2
+- code-page-0.1.3
+- comonad-5.0.1
+- concurrent-supply-0.1.8
+- constraints-0.9.1
+- contravariant-1.4
+- criterion-1.1.4.0
+- data-binary-ieee754-0.4.4
+- data-default-0.7.1.1
+- data-default-class-0.1.2.0
+- data-default-instances-containers-0.0.1
+- data-default-instances-dlist-0.0.1
+- data-default-instances-old-locale-0.0.1
+- distributive-0.5.2
+- dlist-0.8.0.2
+- doctest-0.11.2
+- erf-2.0.0.0
+- errors-2.2.0
+- exceptions-0.8.3
+- fgl-5.5.3.1
+- fmlist-0.9
+- free-4.12.4
+- ghc-paths-0.1.0.9
+- half-0.2.2.3
+- hashable-1.2.6.0
+- hastache-0.6.1
+- hspec-2.4.3
+- hspec-core-2.4.3
+- hspec-discover-2.4.3
+- hspec-expectations-0.8.2
+- ieee754-0.8.0
+- integer-logarithms-1.0.1
+- js-flot-0.8.3
+- js-jquery-3.2.1
+- kan-extensions-5.0.1
+- lens-4.15.2
+- math-functions-0.2.1.0
+- monad-par-0.3.4.8
+- monad-par-extras-0.3.3
+- mtl-2.2.1
+- mwc-random-0.13.6.0
+- old-locale-1.0.0.5
+- optparse-applicative-0.13.2.0
+- parallel-3.2.1.1
+- parsec-3.1.11
+- prelude-extras-0.4.0.3
+- primitive-0.6.2.0
+- profunctors-5.2
+- quickcheck-io-0.1.4
+- random-1.1
+- reflection-2.1.2
+- regex-base-0.93.2
+- regex-tdfa-1.2.2
+- safe-0.3.14
+- scientific-0.3.4.12
+- semigroupoids-5.2
+- semigroups-0.18.3
+- setenv-0.1.1.3
+- statistics-0.13.3.0
+- stm-2.4.4.1
+- syb-0.7
+- tagged-0.8.5
+- tasty-0.11.2
+- tasty-golden-2.3.1.1
+- tasty-hunit-0.9.2
+- tasty-quickcheck-0.8.4
+- temporary-1.2.0.4
+- text-1.2.2.1
+- tf-random-0.5
+- th-lift-instances-0.1.11
+- th-orphans-0.13.3
+- th-reify-many-0.1.6
+- time-locale-compat-0.1.1.3
+- transformers-compat-0.5.1.4
+- unbound-generics-0.3.1
+- unbounded-delays-0.1.0.10
+- unexceptionalio-0.3.0
+- uniplate-1.6.12
+- unordered-containers-0.2.8.0
+- utf8-string-1.0.1.1
+- uu-interleaved-0.2.0.0
+- uu-parsinglib-2.9.1.1
+- uuid-types-1.0.3
+- vector-0.12.0.1
+- vector-algorithms-0.7.0.1
+- vector-binary-instances-0.2.3.5
+- vector-th-unbox-0.2.1.6
+- void-0.7.2
+- wl-pprint-text-1.1.1.0
+resolver: ghc-8.2.0.20170502
+system-ghc: true

@@ -48,6 +48,18 @@ matrix:
         - ghdl
         - gperf
     compiler: ! ': # ghc-8.0.2'
+  - env: GHCVER=8.2.1 STACK_YAML="$(pwd)/stack-ghc821.yaml" STACKOPTS="--flag clash-testsuite:travisci"
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        - pgavin-ghdl
+        packages:
+        - ghc-8.2.1
+        - libgmp-dev
+        - ghdl
+        - gperf
+    compiler: ! ': # ghc-8.2.1'
 cache:
   directories:
   - ~/.stack
