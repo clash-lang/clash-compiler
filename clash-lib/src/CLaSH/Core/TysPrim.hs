@@ -27,7 +27,10 @@ where
 
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
-import           Unbound.Generics.LocallyNameless (string2Name)
+import           Unbound.Generics.LocallyNameless (makeName, string2Name)
+
+import           PrelNames
+import           Unique                           (Unique, getKey)
 
 import           CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
@@ -52,22 +55,33 @@ liftedTypeKind = mkTyConTy liftedTypeKindTyConName
 typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
+uniqueToInteger :: Unique -> Integer
+uniqueToInteger = toInteger . getKey
 
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
   word64PrimTyConName, floatPrimTyConName, doublePrimTyConName,
   naturalPrimTyConName :: TyConName
-intPrimTyConName     = string2Name "GHC.Prim.Int#"
-integerPrimTyConName = string2Name "GHC.Integer.Type.Integer"
+intPrimTyConName     = makeName "GHC.Prim.Int#"
+                                (uniqueToInteger intPrimTyConKey)
+integerPrimTyConName = makeName "GHC.Integer.Type.Integer"
+                                (uniqueToInteger integerTyConKey)
 stringPrimTyConName  = string2Name "String"
-charPrimTyConName    = string2Name "GHC.Prim.Char#"
+charPrimTyConName    = makeName "GHC.Prim.Char#"
+                                (uniqueToInteger charPrimTyConKey)
 voidPrimTyConName    = string2Name "VOID"
-wordPrimTyConName    = string2Name "GHC.Prim.Word#"
-int64PrimTyConName   = string2Name "GHC.Prim.Int64#"
-word64PrimTyConName  = string2Name "GHC.Prim.Word64#"
-floatPrimTyConName   = string2Name "GHC.Prim.Float#"
-doublePrimTyConName  = string2Name "GHC.Prim.Double#"
-naturalPrimTyConName = string2Name "GHC.Natural.Natural"
+wordPrimTyConName    = makeName "GHC.Prim.Word#"
+                                (uniqueToInteger wordPrimTyConKey)
+int64PrimTyConName   = makeName "GHC.Prim.Int64#"
+                                (uniqueToInteger int64PrimTyConKey)
+word64PrimTyConName  = makeName "GHC.Prim.Word64#"
+                                (uniqueToInteger word64PrimTyConKey)
+floatPrimTyConName   = makeName "GHC.Prim.Float#"
+                                (uniqueToInteger floatPrimTyConKey)
+doublePrimTyConName  = makeName "GHC.Prim.Double#"
+                                (uniqueToInteger doublePrimTyConKey)
+naturalPrimTyConName = makeName "GHC.Natural.Natural"
+                                (uniqueToInteger naturalTyConKey)
 
 liftedPrimTC :: TyConName
              -> TyCon
