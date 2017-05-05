@@ -4,10 +4,13 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE UnboxedTuples     #-}
 
 module CLaSH.GHC.Evaluator where
 
@@ -18,7 +21,10 @@ import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
 import Data.Text                     (Text)
+-- import           Data.Word
+import           GHC.Prim
 import           GHC.Real            (Ratio (..))
+import           GHC.Word
 import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed,
                                                    string2Name)
 
@@ -30,7 +36,7 @@ import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
                                       TypeView (..), tyView, mkFunTy,
                                       mkTyConApp, splitFunForallTy)
 import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)
-import           CLaSH.Core.TysPrim  (typeNatKind)
+import           CLaSH.Core.TysPrim
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
                                       tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
@@ -108,6 +114,34 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.int2Word#"
     | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     -> Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behaviour
+
+  "GHC.Prim.plusWord2#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           [tupDc] = tyConDataCons tupTc
+           !(W# a)  = fromInteger i
+           !(W# b)  = fromInteger j
+           !(# h, l #) = plusWord2# a b
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . WordLiteral . toInteger $ W# h)
+                   , Left (Literal . WordLiteral . toInteger $ W# l)])
+
+  "GHC.Prim.timesWord2#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           [tupDc] = tyConDataCons tupTc
+           !(W# a)  = fromInteger i
+           !(W# b)  = fromInteger j
+           !(# h, l #) = timesWord2# a b
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . WordLiteral . toInteger $ W# h)
+                   , Left (Literal . WordLiteral . toInteger $ W# l)])
+
+  "GHC.Prim.uncheckedShiftL#"
+    | [ Literal (WordLiteral w)
+      , Literal (IntLiteral  i)
+      ] <- reduceTerms tcm isSubj args
+    -> Literal (WordLiteral (w `shiftL` fromInteger i))
 
   "GHC.Integer.Logarithms.integerLogBase#"
     | Just (a,b) <- integerLiterals tcm isSubj args
@@ -202,6 +236,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral (i `shiftL` fromInteger j)
 
+  "GHC.Integer.Type.wordToInteger"
+    | [Literal (WordLiteral w)] <- reduceTerms tcm isSubj args
+    -> Literal (IntegerLiteral w)
+
   "GHC.Natural.NatS#"
     | [Literal (WordLiteral w)] <- reduceTerms tcm isSubj args
     -> Literal (NaturalLiteral w)
@@ -282,7 +320,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c)), Left (Literal (IntegerLiteral c))]
+       in  mkApps (Data snatDc) [ Right (LitTy (NumTy c))
+#if MIN_VERSION_ghc(8,2,0)
+                                , Left (Literal (NaturalLiteral c))]
+#else
+                                , Left (Literal (IntegerLiteral c))]
+#endif
 
   "CLaSH.Promoted.Nat.flogBaseSNat"
     | [_,_,Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
@@ -291,7 +334,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c')), Left (Literal (IntegerLiteral c'))]
+       in  mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+#if MIN_VERSION_ghc(8,2,0)
+                                , Left (Literal (NaturalLiteral c'))]
+#else
+                                , Left (Literal (IntegerLiteral c'))]
+#endif
 
   "CLaSH.Promoted.Nat.clogBaseSNat"
     | [_,_,Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
@@ -300,7 +348,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c')), Left (Literal (IntegerLiteral c'))]
+       in  mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+#if MIN_VERSION_ghc(8,2,0)
+                                , Left (Literal (NaturalLiteral c'))]
+#else
+                                , Left (Literal (IntegerLiteral c'))]
+#endif
 
   "CLaSH.Promoted.Nat.logBaseSNat"
     | [_,Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
@@ -309,7 +362,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
            (Just snatTc) = HashMap.lookup snatTcNm tcm
            [snatDc] = tyConDataCons snatTc
-       in  mkApps (Data snatDc) [Right (LitTy (NumTy c')), Left (Literal (IntegerLiteral c'))]
+       in  mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
+#if MIN_VERSION_ghc(8,2,0)
+                                , Left (Literal (NaturalLiteral c'))]
+#else
+                                , Left (Literal (IntegerLiteral c'))]
+#endif
 
   "CLaSH.Sized.Internal.BitVector.eq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
@@ -330,14 +388,16 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToBoolLiteral tcm ty (i /= j)
 
   "CLaSH.Sized.Internal.Signed.minBound#"
-    | [litTy,kn@(Left (Literal (IntegerLiteral mb)))] <- args
+    | [Right litTy,kn] <- args
+    , Right mb <- runExcept (tyNatSize tcm litTy)
     -> let minB = negate (2 ^ (mb - 1))
-       in  mkApps signedConPrim [litTy,kn,Left (Literal (IntegerLiteral minB))]
+       in  mkApps signedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral minB))]
 
   "CLaSH.Sized.Internal.Signed.maxBound#"
-    | [litTy,kn@(Left (Literal (IntegerLiteral mb)))] <- args
+    | [Right litTy,kn] <- args
+    , Right mb <- runExcept (tyNatSize tcm litTy)
     -> let maxB = (2 ^ (mb - 1)) - 1
-       in  mkApps signedConPrim [litTy,kn,Left (Literal (IntegerLiteral maxB))]
+       in  mkApps signedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral maxB))]
 
   "CLaSH.Sized.Internal.Signed.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
@@ -358,9 +418,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
        in  mkApps unsignedConPrim [Right nTy,kn,Left (Literal (IntegerLiteral 0))]
 
   "CLaSH.Sized.Internal.Unsigned.maxBound#"
-    | [litTy,kn@(Left (Literal (IntegerLiteral mb)))] <- args
+    | [Right litTy,kn] <- args
+    , Right mb <- runExcept (tyNatSize tcm litTy)
     -> let maxB = (2 ^ mb) - 1
-       in  mkApps unsignedConPrim [litTy,kn,Left (Literal (IntegerLiteral maxB))]
+       in  mkApps unsignedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral maxB))]
 
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
@@ -475,8 +536,11 @@ integerToIntegerLiteral = Literal . IntegerLiteral
 signedConPrim :: Term
 signedConPrim = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind nTV funTy))
   where
-    funTy      = foldr1 mkFunTy [intTy,intTy,mkTyConApp signedTcNm [nVar]]
-    intTy      = ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
+#if MIN_VERSION_ghc(8,2,0)
+    funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
+#else
+    funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
+#endif
     signedTcNm = string2Name "CLaSH.Sized.Internal.Signed.Signed"
     nName      = string2Name "n"
     nVar       = VarTy typeNatKind nName
@@ -485,8 +549,11 @@ signedConPrim = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind 
 unsignedConPrim :: Term
 unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.fromInteger#" (ForAllTy (bind nTV funTy))
   where
-    funTy        = foldr1 mkFunTy [intTy,intTy,mkTyConApp unsignedTcNm [nVar]]
-    intTy        = ConstTy (TyCon (string2Name "GHC.Integer.Type.Integer"))
+#if MIN_VERSION_ghc(8,2,0)
+    funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp unsignedTcNm [nVar]]
+#else
+    funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp unsignedTcNm [nVar]]
+#endif
     unsignedTcNm = string2Name "CLaSH.Sized.Internal.Unsigned.Unsigned"
     nName        = string2Name "n"
     nVar         = VarTy typeNatKind nName

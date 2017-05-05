@@ -28,6 +28,7 @@
     * CLaSH.Sized.Vector.transpose
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -364,11 +365,7 @@ reduceDFold n aTy fun start arg = do
         let (TyConApp snatTcNm _) = tyView snTy
             (Just snatTc)         = HashMap.lookup snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
-            buildSNat i = mkApps (Data snatDc)
-                                 [Right (LitTy (NumTy i))
-                                 ,Left (Literal (IntegerLiteral (toInteger i)))
-                                 ]
-            lbody = doFold buildSNat (n-1) vars
+            lbody = doFold (buildSNat snatDc) (n-1) vars
             lb    = Letrec (bind (rec (init elems)) lbody)
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showDoc ty
@@ -594,11 +591,7 @@ reduceDTFold n aTy lrFun brFun arg = do
            let (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = HashMap.lookup snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
-               buildSNat i = mkApps (Data snatDc)
-                                    [Right (LitTy (NumTy i))
-                                    ,Left (Literal (IntegerLiteral i))
-                                    ]
-               lbody = doFold buildSNat (n-1) vars
+               lbody = doFold (buildSNat snatDc) (n-1) vars
                lb    = Letrec (bind (rec (init elems)) lbody)
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showDoc ty
@@ -639,11 +632,7 @@ reduceTFold n aTy lrFun brFun arg = do
            let (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = HashMap.lookup snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
-               buildSNat i = mkApps (Data snatDc)
-                                    [Right (LitTy (NumTy i))
-                                    ,Left (Literal (IntegerLiteral i))
-                                    ]
-               lbody = doFold buildSNat (n-1) vars
+               lbody = doFold (buildSNat snatDc) (n-1) vars
                lb    = Letrec (bind (rec elems) lbody)
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showDoc ty
@@ -676,3 +665,14 @@ reduceTReplicate n aTy eTy arg = do
       = let retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
         in  changed retVec
     go _ ty = error $ $(curLoc) ++ "reduceTReplicate: argument does not have a vector type: " ++ showDoc ty
+
+buildSNat :: DataCon -> Integer -> Term
+buildSNat snatDc i =
+  mkApps (Data snatDc)
+         [Right (LitTy (NumTy i))
+#if MIN_VERSION_ghc(8,2,0)
+         ,Left (Literal (NaturalLiteral (toInteger i)))
+#else
+         ,Left (Literal (IntegerLiteral (toInteger i)))
+#endif
+         ]
