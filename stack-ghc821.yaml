@@ -43,7 +43,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/christiaanb/cabal-doctest.git
-    commit: 3e8e22abd53af14bb8f7ed402172ef30f31a3e9b
+    commit: 3a009f5dcf16658ec5affc60885e3f64995e31f2
   extra-dep: true
 extra-deps:
 - Glob-0.7.14
