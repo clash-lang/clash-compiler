@@ -30,6 +30,7 @@ import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
 import           Prelude                              hiding ((<$>))
+import qualified System.FilePath
 import           Text.Printf
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -44,9 +45,7 @@ import           CLaSH.Netlist.Util                   hiding (mkBasicId)
 import           CLaSH.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
-import qualified Paths_clash_vhdl
-#else
-import qualified System.FilePath
+import qualified Paths_clash_lib
 #endif
 
 -- | State for the 'CLaSH.Netlist.VHDL.VHDLM' monad:
@@ -70,9 +69,9 @@ instance Backend VHDLState where
   initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] []
   hdlKind         = const VHDL
 #ifdef CABAL
-  primDir         = const (Paths_clash_vhdl.getDataFileName "primitives")
+  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "vhdl"))
 #else
-  primDir _       = return ("clash-vhdl" System.FilePath.</> "primitives")
+  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "vhdl")
 #endif
   extractTypes    = _tyCache
   name            = const "vhdl"

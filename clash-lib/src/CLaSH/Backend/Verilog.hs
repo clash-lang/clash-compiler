@@ -25,6 +25,7 @@ import           Data.Maybe                           (catMaybes,mapMaybe)
 import           Data.Text.Lazy                       (pack, unpack)
 import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
+import qualified System.FilePath
 import           Text.Printf
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
@@ -39,9 +40,7 @@ import           CLaSH.Netlist.Util                   hiding (mkBasicId)
 import           CLaSH.Util                           (curLoc, (<:>))
 
 #ifdef CABAL
-import qualified Paths_clash_verilog
-#else
-import qualified System.FilePath
+import qualified Paths_clash_lib
 #endif
 
 -- | State for the 'CLaSH.Backend.Verilog.VerilogM' monad:
@@ -61,9 +60,9 @@ instance Backend VerilogState where
   initBackend     = VerilogState 0 [] noSrcSpan []
   hdlKind         = const Verilog
 #ifdef CABAL
-  primDir         = const (Paths_clash_verilog.getDataFileName "primitives")
+  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "verilog"))
 #else
-  primDir _       = return ("clash-verilog" System.FilePath.</> "primitives")
+  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "verilog")
 #endif
   extractTypes    = const HashSet.empty
   name            = const "verilog"
