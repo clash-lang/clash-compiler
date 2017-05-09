@@ -15,7 +15,6 @@ import           Control.Lens            ((%=),(^.),_3)
 import qualified Control.Lens            as Lens
 import           Data.Function           (on)
 import qualified Data.Graph              as Graph
-import           Data.Graph.Inductive    (Gr,LNode,lsuc,mkGraph,iDom)
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.List               as List
@@ -35,7 +34,6 @@ import           CLaSH.Core.Util         (collectArgs, isPolyFun)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Types     (bindings,extra)
 import           CLaSH.Rewrite.Util      (specialise)
-import           CLaSH.Util              (curLoc)
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
 alreadyInlined :: TmName -- ^ Function we want to inline
@@ -113,55 +111,52 @@ mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs))
   where
     fs = map fst cg
 
-lambdaDropPrep :: HashMap TmName (Type,SrcSpan,Term)
-               -> TmName
-               -> HashMap TmName (Type,SrcSpan,Term)
-lambdaDropPrep bndrs topEntity = bndrs'
+-- | Let-binds mutually recursive functions at their call-sites. That is,
+-- given a group of recursive top-level binders @rc@, and a function @f@ where
+-- @any (`elem` FreeVars(f)) rc@, replace the body of @f@, @fBody@, by
+-- @letrec rc in fBody@.
+--
+-- This transformation is performed to, where possible, transform global
+-- mutually recursive bindings into: local let-recursive non-function-type
+-- binders. Where the let-recursive non-function-type binders can be turned
+-- into feedback loops.
+--
+-- We need this transformation because GHC has a transformation which does the
+-- exact opposite. This is a problem because global (mutual) recursive functions
+-- describe an infinite structure when viewed with a structural lens, which
+-- cannot be realised as a circuit.
+lambdaDrop :: HashMap TmName (Type,SrcSpan,Term)
+           -> TmName
+           -> HashMap TmName (Type,SrcSpan,Term)
+lambdaDrop bndrs topEntity = bndrs''
   where
     depGraph = callGraph [] bndrs topEntity
-    used     = HashMap.fromList depGraph
-    rcs      = mkRecursiveComponents depGraph
-    dropped  = map (lambdaDrop bndrs used) rcs
-    bndrs'   = foldr (\(k,v) b -> HashMap.insert k v b) bndrs dropped
+    -- We only care about mutually recursive bindings, there is no point
+    -- lambda-dropping self-recursive bindings as they would be lifted again
+    -- in a later stage.
+    rcs     = filter ((>1).length) (mkRecursiveComponents depGraph)
+    -- Add the bodies to the recursive components.
+    rcsTms  = zipWith (,) rcs (map (map (bndrs HashMap.!)) rcs)
+    -- Add the recursive binders at call-sites
+    bndrs'  = HashMap.map addRC bndrs
+    -- Delete any of the remaining mutually recursive top-level binders, they
+    -- should no longer be needed because they are all let-bound at their
+    -- call-sites.
+    --
+    -- Also, if there's a bug in lambdaDrop, Clash will complain loudly because
+    -- it will look for a function which has been deleted.
+    bndrs'' = List.foldl' (flip HashMap.delete) bndrs' (concat rcs)
 
-lambdaDrop :: HashMap TmName (Type,SrcSpan,Term) -- ^ Original Binders
-           -> HashMap TmName [TmName]    -- ^ Dependency Graph
-           -> [TmName]                   -- ^ Recursive block
-           -> (TmName,(Type,SrcSpan,Term))       -- ^ Lambda-dropped Binders
-lambdaDrop bndrs depGraph cyc@(root:_) = block
-  where
-    doms  = dominator depGraph cyc
-    block = blockSink bndrs doms (0,root)
+    addRC (ty,sp,tm) =
+      let fv      = Lens.toListOf termFreeIds tm
+          -- Only interested in the recursive components which are used in this
+          -- function
+          rcsTms' = filter (any (`elem` fv) . fst) rcsTms
+          -- We create a single list of all the recursive bindings
+          bnds    = map mkBind (concat (map (uncurry zip) rcsTms'))
+          newTm   = Letrec (bind (rec bnds) tm)
+      in  case bnds of
+            [] -> (ty,sp,tm)
+            _  -> (ty,sp,newTm)
 
-lambdaDrop _ _ [] = error $ $(curLoc) ++ "Can't lambdadrop empty cycle"
-
-dominator :: HashMap TmName [TmName] -- ^ Dependency Graph
-          -> [TmName]                -- ^ Recursive block
-          -> Gr TmName TmName        -- ^ Recursive block dominator
-dominator cfg cyc = mkGraph nodes (map (\(e,b) -> (b,e,nodesM HashMap.! e)) doms)
-  where
-    nodes    = zip [0..] cyc
-    nodesM   = HashMap.fromList nodes
-    nodesI   = HashMap.fromList $ zip cyc [0..]
-    cycEdges = HashMap.map ( map (nodesI HashMap.!)
-                           . filter (`elem` cyc)
-                           )
-             $ HashMap.filterWithKey (\k _ -> k `elem` cyc) cfg
-    edges    = concatMap (\(i,n) -> zip3 (repeat i) (cycEdges HashMap.! n) (repeat ())
-                         ) nodes
-    graph    = mkGraph nodes edges :: Gr TmName ()
-    doms     = iDom graph 0
-
-blockSink :: HashMap TmName (Type,SrcSpan,Term) -- ^ Original Binders
-          -> Gr TmName TmName           -- ^ Recursive block dominator
-          -> LNode TmName               -- ^ Recursive block dominator root
-          -> (TmName,(Type,SrcSpan,Term))       -- ^ Block sank binder
-blockSink bndrs doms (nId,tmName) = (tmName,(ty,sp,newTm))
-  where
-    (ty,sp,tm) = bndrs HashMap.! tmName
-    sucTm   = lsuc doms nId
-    tmS     = map (blockSink bndrs doms) sucTm
-    bnds    = map (\(tN,(ty',_,tm')) -> (Id tN (embed ty'),embed tm')) tmS
-    newTm   = case sucTm of
-                [] -> tm
-                _  -> Letrec (bind (rec bnds) tm)
+    mkBind (nm,(ty,_,tm)) = (Id nm (embed ty),embed tm)

@@ -44,7 +44,7 @@ import           CLaSH.Driver.Types      (BindingMap)
 import           CLaSH.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
                                           makeAllTyCons, qualfiedNameString, emptyGHC2CoreState)
 import           CLaSH.GHC.LoadModules   (loadModules)
-import           CLaSH.Normalize.Util
+import           CLaSH.Normalize.Util    (lambdaDrop)
 import           CLaSH.Primitives.Types  (PrimMap)
 import           CLaSH.Primitives.Util   (generatePrimMap)
 import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
@@ -101,7 +101,7 @@ dropAndRetypeBindings allTcCache allBindings topEnt testInpM expOutM = oBindings
     tBindings = maybe allBindings (dropAndRetype allBindings) topEntity
     iBindings = maybe tBindings (dropAndRetype tBindings) testInput
     oBindings = maybe iBindings (dropAndRetype iBindings) expectedOut
-    dropAndRetype d (t,_) = snd (retype allTcCache ([],lambdaDropPrep d t) t)
+    dropAndRetype d (t,_) = snd (retype allTcCache ([],lambdaDrop d t) t)
 
 -- | clean up cast-removal mess
 retype :: HashMap TyConName TyCon

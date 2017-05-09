@@ -53,6 +53,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CountTrailingZeros" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "DivMod" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError" (Just ("topEntity",False))
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates" (Just ("testbench",True))
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives" (Just ("topEntity",False))
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives2" (Just ("topEntity",False))
