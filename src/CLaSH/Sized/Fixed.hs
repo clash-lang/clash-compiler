@@ -731,7 +731,7 @@ fLit a = [|| Fixed (fromInteger sat) ||]
 --
 -- For those of us who like to live on the edge, another option is to convert
 -- our @Data.txt@ at compile-time using
--- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/template-haskell.html Template Haskell>.
+-- <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#template-haskell Template Haskell>.
 -- For this we first create a module @CreateRomFileTH.hs@:
 --
 -- @
