@@ -196,7 +196,7 @@ instance KnownNat n => Bounded (Index n) where
 
 {-# NOINLINE maxBound# #-}
 maxBound# :: KnownNat n => Index n
-maxBound# = let res = I (natVal res - 1) in res
+maxBound# = let res = fromInteger_INLINE (natVal res - 1) in res
 
 -- | Operators report an error on overflow and underflow
 instance KnownNat n => Num (Index n) where
