@@ -3,7 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-__This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe-haskell.html Safe> API only of "CLaSH.Prelude.Explicit"__
+__This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe_haskell.html Safe> API only of "CLaSH.Prelude.Explicit"__
 
 This module defines the explicitly clocked counterparts of the functions
 defined in "CLaSH.Prelude".
