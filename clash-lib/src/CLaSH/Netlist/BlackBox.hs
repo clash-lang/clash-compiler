@@ -19,6 +19,7 @@ import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
+import           Data.Semigroup                ((<>))
 import           Data.Text.Lazy                (append,fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
@@ -103,8 +104,14 @@ mkArgument bndr e = do
     ty    <- termType tcm e
     iw    <- Lens.use intWidth
     hwTyM <- N.termHWTypeM e
+    let -- <christiaanb> yeah.. I could't make it lazy enough
+        -- <christiaanb> otherwise I would've used error there
+        -- <christiaanb> so it's intentionally an invalid identifier
+        -- <christiaanb> the problem is that templates can be nested
+        -- <christiaanb> and then partial templates must be rendered
+        err = Text.pack $ "(This code is deliberately unparseable see BlackBox.hs in clash-lib)(" <> showDoc e <> " :: " <> showDoc ty <> ")"
     ((e',t,l),d) <- case hwTyM of
-      Nothing   -> return ((Identifier "__VOID__" Nothing,Void,False),[])
+      Nothing   -> return ((Identifier ("__VOID1__" <> err) Nothing,Void,False),[])
       Just hwTy -> case collectArgs e of
         (Var _ v,[]) -> do vT <- (`Identifier` Nothing) <$> mkBasicId (pack $ name2String v)
                            return ((vT,hwTy,False),[])
@@ -123,7 +130,7 @@ mkArgument bndr e = do
         (Data dc, args) -> do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
           return ((exprN,hwTy,isConstant e),dcDecls)
-        _ -> return ((Identifier "__VOID__" Nothing,hwTy,False),[])
+        _ -> return ((Identifier ("__VOID2__" <> err) Nothing,hwTy,False),[])
     return ((addClock tcm ty e',t,l),d)
   where
     addClock tcm ty e' = case synchronizedClk tcm ty of
