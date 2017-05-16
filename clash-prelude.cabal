@@ -1,5 +1,5 @@
 Name:                 clash-prelude
-Version:              0.11.2
+Version:              0.99
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -94,6 +94,22 @@ Library
                       CLaSH.Class.Num
                       CLaSH.Class.Resize
 
+                      CLaSH.Explicit.BlockRam
+                      CLaSH.Explicit.BlockRam.File
+                      CLaSH.Explicit.Mealy
+                      CLaSH.Explicit.Moore
+                      CLaSH.Explicit.RAM
+                      CLaSH.Explicit.ROM
+                      CLaSH.Explicit.ROM.File
+                      CLaSH.Explicit.Prelude
+                      CLaSH.Explicit.Prelude.Safe
+                      CLaSH.Explicit.Signal
+                      CLaSH.Explicit.Signal.Delayed
+                      CLaSH.Explicit.Synchronizer
+                      CLaSH.Explicit.Testbench
+
+                      CLaSH.Intel.ClockGen
+
                       CLaSH.NamedTypes
 
                       CLaSH.Prelude
@@ -102,15 +118,12 @@ Library
                       CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.BlockRam.File
                       CLaSH.Prelude.DataFlow
-                      CLaSH.Prelude.Explicit
-                      CLaSH.Prelude.Explicit.Safe
                       CLaSH.Prelude.Mealy
                       CLaSH.Prelude.Moore
                       CLaSH.Prelude.RAM
                       CLaSH.Prelude.ROM
                       CLaSH.Prelude.ROM.File
                       CLaSH.Prelude.Safe
-                      CLaSH.Prelude.Synchronizer
                       CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat
@@ -122,8 +135,6 @@ Library
                       CLaSH.Signal
                       CLaSH.Signal.Bundle
                       CLaSH.Signal.Delayed
-                      CLaSH.Signal.Delayed.Explicit
-                      CLaSH.Signal.Explicit
                       CLaSH.Signal.Internal
 
                       CLaSH.Sized.BitVector

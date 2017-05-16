@@ -203,6 +203,9 @@ instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h
 instance {-# OVERLAPPABLE #-} ShowX a => ShowX [a] where
   showsPrecX _ = showListX
 
+instance ShowX Char where
+  showsPrecX = showsPrecXWith showsPrec
+
 instance ShowX Bool
 
 instance ShowX Double where

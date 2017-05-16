@@ -3,9 +3,12 @@ Copyright : © Christiaan Baaij, 2015-2016
 Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
 -}
 
-{-# LANGUAGE NoImplicitPrelude, CPP, TemplateHaskell, DataKinds #-}
+{-# LANGUAGE NoImplicitPrelude, CPP, TemplateHaskell, DataKinds, BinaryLiterals,
+             FlexibleContexts, GADTs, TypeOperators, TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
+{-# OPTIONS_GHC -fno-warn-type-defaults #-}
+
 
 module CLaSH.Examples (
   -- * Decoders and Encoders
@@ -22,7 +25,7 @@ module CLaSH.Examples (
   )
 where
 
-import CLaSH.Prelude
+import CLaSH.Prelude hiding (feedback)
 import Control.Lens
 import Control.Monad
 import Test.QuickCheck
@@ -30,6 +33,90 @@ import Test.QuickCheck
 #ifdef DOCLINKS
 import Control.Monad.Trans.State
 #endif
+
+upCounter :: HasClockReset domain gated synchronous
+          => Signal domain Bool -> Signal domain (Unsigned 8)
+upCounter enable = s
+  where
+    s = register 0 (mux enable (s + 1) s)
+
+upCounterLdT
+  :: Num a => a -> (Bool, Bool, a) -> (a,a)
+upCounterLdT s (ld,en,dIn) = (s',s)
+  where
+    s' | ld        = dIn
+       | en        = s + 1
+       | otherwise = s
+
+upCounterLd :: HasClockReset domain gated synchronous
+            => Signal domain (Bool,Bool,Unsigned 8) -> Signal domain (Unsigned 8)
+upCounterLd = mealy upCounterLdT 0
+
+upDownCounter :: HasClockReset domain gated synchronous
+              => Signal domain Bool -> Signal domain (Unsigned 8)
+upDownCounter upDown = s
+  where
+    s = register 0 (mux upDown (s + 1) (s - 1))
+
+upDownEq :: SystemClockReset => Bool -> Signal System Bool
+upDownEq en = upCounter (pure en) .==. upDownCounter (pure en)
+
+lfsrF' :: BitVector 16 -> BitVector 16
+lfsrF' s = feedback ++# slice d15 d1 s
+  where
+    feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
+
+lfsrF :: HasClockReset domain gated synchronous
+      => BitVector 16 -> Signal domain Bit
+lfsrF seed = msb <$> r
+  where r = register seed (lfsrF' <$> r)
+
+lfsrGP
+  :: (KnownNat (n + 1), Bits a)
+  => Vec (n + 1) Bool
+  -> Vec (n + 1) a
+  -> Vec (n + 1) a
+lfsrGP taps regs = zipWith xorM taps (fb +>> regs)
+  where
+    fb = last regs
+    xorM i x | i         =  x `xor` fb
+             | otherwise = x
+
+lfsrG :: HasClockReset domain gated synchronous => BitVector 16 -> Signal domain Bit
+lfsrG seed = last (unbundle r)
+  where r = register (unpack seed) (lfsrGP (unpack 0b0011010000000000) <$> r)
+
+lfsrEq :: Property
+lfsrEq = testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645)
+
+grayCounter :: HasClockReset domain gated synchronous
+            => Signal domain Bool -> Signal domain (BitVector 8)
+grayCounter en = gray <$> upCounter en
+  where gray xs = msb xs ++# xor (slice d7 d1 xs) (slice d6 d0 xs)
+
+oneHotCounter :: HasClockReset domain gated synchronous
+              => Signal domain Bool -> Signal domain (BitVector 8)
+oneHotCounter enable = s
+  where
+    s = register 1 (mux enable (rotateL <$> s <*> 1) s)
+
+crcT
+  :: (Bits a, KnownNat (BitSize a), BitPack a)
+  => a -> Bit -> a
+crcT bv dIn = replaceBit 0  dInXor
+            $ replaceBit 5  (bv!4  `xor` dInXor)
+            $ replaceBit 12 (bv!11 `xor` dInXor)
+              rotated
+  where
+    dInXor  = dIn `xor` fb
+    rotated = rotateL bv 1
+    fb      = msb bv
+
+crc :: HasClockReset domain gated synchronous
+    => Signal domain Bool -> Signal domain Bool -> Signal domain Bit -> Signal domain (BitVector 16)
+crc enable ld dIn = s
+  where
+    s = register 0xFFFF (mux enable (mux ld 0xFFFF (crcT <$> s <*> dIn)) s)
 
 {- $setup
 >>> :set -XDataKinds -XFlexibleContexts -XBinaryLiterals -XTypeFamilies -XTemplateHaskell -XRecordWildCards
@@ -90,96 +177,6 @@ let encoderCase :: Bool -> BitVector 16 -> BitVector 4
         0x4000 -> 0xE
         0x8000 -> 0xF
     encoderCase _ _ = 0
-:}
-
->>> :{
-let upCounter :: Signal Bool -> Signal (Unsigned 8)
-    upCounter enable = s
-      where
-        s = register 0 (mux enable (s + 1) s)
-:}
-
->>> :{
-let upCounterLdT s (ld,en,dIn) = (s',s)
-      where
-        s' | ld        = dIn
-           | en        = s + 1
-           | otherwise = s
-:}
-
->>> :{
-let upCounterLd :: Signal (Bool,Bool,Unsigned 8) -> Signal (Unsigned 8)
-    upCounterLd = mealy upCounterLdT 0
-:}
-
->>> :{
-let upDownCounter :: Signal Bool -> Signal (Unsigned 8)
-    upDownCounter upDown = s
-      where
-        s = register 0 (mux upDown (s + 1) (s - 1))
-:}
-
->>> :{
-let lfsrF' :: BitVector 16 -> BitVector 16
-    lfsrF' s = feedback ++# slice d15 d1 s
-      where
-        feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
-:}
-
->>> :{
-let lfsrF :: BitVector 16 -> Signal Bit
-    lfsrF seed = msb <$> r
-      where r = register seed (lfsrF' <$> r)
-:}
-
->>> :{
-let lfsrGP taps regs = zipWith xorM taps (fb +>> regs)
-      where
-        fb = last regs
-        xorM i x | i         =  x `xor` fb
-                 | otherwise = x
-:}
-
->>> :{
-let lfsrG :: BitVector 16 -> Signal Bit
-    lfsrG seed = last (unbundle r)
-      where r = register (unpack seed) (lfsrGP (unpack 0b0011010000000000) <$> r)
-:}
-
->>> :{
-let grayCounter :: Signal Bool -> Signal (BitVector 8)
-    grayCounter en = gray <$> upCounter en
-      where gray xs = msb xs ++# xor (slice d7 d1 xs) (slice d6 d0 xs)
-:}
-
->>> :{
-let oneHotCounter :: Signal Bool -> Signal (BitVector 8)
-    oneHotCounter enable = s
-      where
-        s = register 1 (mux enable (rotateL <$> s <*> 1) s)
-:}
-
->>> :{
-let parity :: Unsigned 8 -> Bit
-    parity data_in = reduceXor data_in
-:}
-
->>> :{
-let crcT bv dIn = replaceBit 0  dInXor
-                $ replaceBit 5  (bv!4  `xor` dInXor)
-                $ replaceBit 12 (bv!11 `xor` dInXor)
-                  rotated
-      where
-        dInXor  = dIn `xor` fb
-        rotated = rotateL bv 1
-        fb      = msb bv
-:}
-
->>> :{
-let crc :: Signal Bool -> Signal Bool -> Signal Bit -> Signal (BitVector 16)
-    crc enable ld dIn = s
-      where
-        s = register 0xFFFF (mux enable (mux ld 0xFFFF (crcT <$> s <*> dIn)) s)
 :}
 
 >>> :{
@@ -426,7 +423,11 @@ upDownCounter upDown = s
 
 The following property holds:
 
-prop> \en -> en ==> testFor 1000 (upCounter (signal en) .==. upDownCounter (signal en))
+@
+upDownEq = withSystem (upCounter (signal en) .==.upDownCounter (signal en))
+@
+
+prop> \en -> en ==> testFor 1000 (upDownEq en)
 
 = LFSR
 
@@ -464,7 +465,11 @@ lfsrG seed = 'last' ('unbundle' r)
 
 The following property holds:
 
-prop> testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645)
+@
+lfsrEq = testFor 100 (withSystem (lfsrF 0xACE1 .==. lfsrG 0x4645))
+@
+
+prop> lfsrEq
 
 = Gray counter
 

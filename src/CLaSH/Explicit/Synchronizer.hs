@@ -16,14 +16,14 @@ Synchronizer circuits for safe clock domain crossings
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Safe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 
 {-# OPTIONS_HADDOCK show-extensions #-}
 
-module CLaSH.Prelude.Synchronizer
+module CLaSH.Explicit.Synchronizer
   ( -- * Bit-synchronizers
     dualFlipFlopSynchronizer
     -- * Word-synchronizers
@@ -45,13 +45,13 @@ import GHC.TypeLits                (type (+), type (-), type (<=))
 import CLaSH.Class.BitPack         (boolToBV)
 import CLaSH.Class.Resize          (truncateB)
 import CLaSH.Prelude.BitIndex      (slice)
-import CLaSH.Prelude.Mealy         (mealyB')
-import CLaSH.Prelude.RAM           (asyncRam')
+import CLaSH.Explicit.Mealy        (mealyB)
+import CLaSH.Explicit.RAM          (asyncRam)
+import CLaSH.Explicit.Signal
+  (Clock, Reset, Signal, register, unsafeSynchronizer)
 import CLaSH.Promoted.Nat          (SNat (..), pow2SNat)
 import CLaSH.Promoted.Nat.Literals (d0)
 import CLaSH.Signal                (mux)
-import CLaSH.Signal.Explicit       (Signal', SClock, register',
-                                    unsafeSynchronizer)
 import CLaSH.Sized.BitVector       (BitVector, (++#))
 
 -- * Dual flip-flop synchronizer
@@ -78,33 +78,35 @@ import CLaSH.Sized.BitVector       (BitVector, (++#))
 --
 --      If you want to have /safe/ __word__-synchronisation use
 --      'asyncFIFOSynchronizer'.
-dualFlipFlopSynchronizer :: SClock clk1    -- ^ 'Clock' to which the incoming
-                                           -- data is synchronised
-                         -> SClock clk2    -- ^ 'Clock' to which the outgoing
-                                           -- data is synchronised
-                         -> a              -- ^ Initial value of the two
-                                           -- synchronisation registers
-                         -> Signal' clk1 a -- ^ Incoming data
-                         -> Signal' clk2 a -- ^ Outgoing, synchronised, data
-dualFlipFlopSynchronizer clk1 clk2 i = register' clk2 i
-                                     . register' clk2 i
-                                     . unsafeSynchronizer clk1 clk2
+dualFlipFlopSynchronizer
+  :: Clock domain1 gated1
+  -- ^ 'Clock' to which the incoming  data is synchronised
+  -> Clock domain2 gated2
+  -- ^ 'Clock' to which the outgoing data is synchronised
+  -> Reset domain2 synchronous
+  -- ^ 'Reset' for registers on the outgoing domain
+  -> a
+  -- ^ Initial value of the two synchronisation registers
+  -> Signal domain1 a -- ^ Incoming data
+  -> Signal domain2 a -- ^ Outgoing, synchronised, data
+dualFlipFlopSynchronizer clk1 clk2 rst i =
+  register clk2 rst i . register clk2 rst i . unsafeSynchronizer clk1 clk2
 
 -- * Asynchronous FIFO synchronizer
 
-fifoMem ::
-     SClock wclk
-  -> SClock rclk
+fifoMem
+  :: Clock wdomain wgated
+  -> Clock rdomain rgated
   -> SNat addrSize
-  -> Signal' wclk Bool
-  -> Signal' rclk (BitVector addrSize)
-  -> Signal' wclk (Maybe (BitVector addrSize, a))
-  -> Signal' rclk a
+  -> Signal wdomain Bool
+  -> Signal rdomain (BitVector addrSize)
+  -> Signal wdomain (Maybe (BitVector addrSize, a))
+  -> Signal rdomain a
 fifoMem wclk rclk addrSize@SNat full raddr writeM =
-  asyncRam' wclk rclk
-            (pow2SNat addrSize)
-            raddr
-            (mux full (pure Nothing) writeM)
+  asyncRam wclk rclk
+           (pow2SNat addrSize)
+           raddr
+           (mux full (pure Nothing) writeM)
 
 ptrCompareT :: SNat addrSize
             -> (BitVector (addrSize + 1) -> BitVector (addrSize + 1) -> Bool)
@@ -142,27 +144,35 @@ isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
 -- __NB__: This synchroniser can be used for __word__-synchronization.
 asyncFIFOSynchronizer
   :: (2 <= addrSize)
-  => SNat addrSize           -- ^ Size of the internally used addresses, the
-                             -- FIFO contains @2^addrSize@ elements.
-  -> SClock wclk             -- ^ 'Clock' to which the write port is synchronised
-  -> SClock rclk             -- ^ 'Clock' to which the read port is synchronised
-  -> Signal' rclk Bool       -- ^ Read request
-  -> Signal' wclk (Maybe a)  -- ^ Element to insert
-  -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
+  => SNat addrSize
+  -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
+  -- elements.
+  -> Clock wdomain wgated
+  -- ^ 'Clock' to which the write port is synchronised
+  -> Clock rdomain rgated
+  -- ^ 'Clock' to which the read port is synchronised
+  -> Reset wdomain synchronous
+  -> Reset rdomain synchronous
+  -> Signal rdomain Bool
+  -- ^ Read request
+  -> Signal wdomain (Maybe a)
+  -- ^ Element to insert
+  -> (Signal rdomain a, Signal rdomain Bool, Signal wdomain Bool)
   -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
-asyncFIFOSynchronizer addrSize@SNat wclk rclk rinc wdataM = (rdata,rempty,wfull)
+asyncFIFOSynchronizer addrSize@SNat wclk rclk wrst rrst rinc wdataM =
+    (rdata,rempty,wfull)
   where
-    s_rptr = dualFlipFlopSynchronizer rclk wclk 0 rptr
-    s_wptr = dualFlipFlopSynchronizer wclk rclk 0 wptr
+    s_rptr = dualFlipFlopSynchronizer rclk wclk wrst 0 rptr
+    s_wptr = dualFlipFlopSynchronizer wclk rclk rrst 0 wptr
 
     rdata = fifoMem wclk rclk addrSize wfull raddr
               (liftA2 (,) <$> (pure <$> waddr) <*> wdataM)
 
-    (rempty,raddr,rptr) = mealyB' rclk (ptrCompareT addrSize (==)) (0,0,True)
-                                  (s_wptr,rinc)
+    (rempty,raddr,rptr) = mealyB rclk rrst (ptrCompareT addrSize (==)) (0,0,True)
+                                 (s_wptr,rinc)
 
-    (wfull,waddr,wptr)  = mealyB' wclk (ptrCompareT addrSize (isFull addrSize))
-                                  (0,0,False) (s_rptr,isJust <$> wdataM)
+    (wfull,waddr,wptr)  = mealyB wclk wrst (ptrCompareT addrSize (isFull addrSize))
+                                 (0,0,False) (s_rptr,isJust <$> wdataM)
 
 #if !MIN_VERSION_constraints(0,9,0)
 axiom :: forall a b . Dict (a ~ b)

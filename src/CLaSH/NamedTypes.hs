@@ -7,27 +7,28 @@ Add inline documentation to types:
 
 @
 fifo
-  :: SClock clk
+  :: Clock domain gated
+  -> Reset domain synchronous
   -> SNat addrSize
-  -> "read request" ::: Signal' clk Bool
-  -> "write request" ::: Signal' clk (Maybe (BitVector dataSize))
-  -> ( "q"     ::: Signal' clk (BitVector dataSize)
-     , "full"  ::: Signal' clk Bool
-     , "empty" ::: Signal' clk Bool
+  -> "read request" ::: Signal domain Bool
+  -> "write request" ::: Signal domain (Maybe (BitVector dataSize))
+  -> ( "q"     ::: Signal domain (BitVector dataSize)
+     , "full"  ::: Signal domain Bool
+     , "empty" ::: Signal domain Bool
      )
 @
 
 which can subsequently be inspected in the interactive environment:
 
->>> :t fifo systemClock
-fifo systemClock
-  :: SNat addrSize
-     -> "read request" ::: Signal' SystemClock Bool
-     -> "write request"
-        ::: Signal' SystemClock (Maybe (BitVector dataSize))
-     -> ("q" ::: Signal' SystemClock (BitVector dataSize),
-         "full" ::: Signal' SystemClock Bool,
-         "empty" ::: Signal' SystemClock Bool)
+>>> :t fifo @System
+fifo @System
+  :: Clock System gated
+     -> Reset System synchronous
+     -> SNat addrSize
+     -> ("read request" ::: Signal System Bool)
+     -> ("write request" ::: Signal System (Maybe (BitVector dataSize)))
+     -> ("q" ::: Signal System (BitVector dataSize),
+         "full" ::: Signal System Bool, "empty" ::: Signal System Bool)
 
 -}
 
@@ -47,19 +48,19 @@ type (name :: k) ::: a = a
 
 {- $setup
 >>> :set -XDataKinds -XTypeOperators -XNoImplicitPrelude
->>> import CLaSH.Prelude
->>> import CLaSH.Prelude.Explicit
+>>> import CLaSH.Explicit.Prelude
 >>> :{
 let fifo
-      :: SClock clk
+      :: Clock domain gated
+      -> Reset domain synchronous
       -> SNat addrSize
-      -> "read request" ::: Signal' clk Bool
-      -> "write request" ::: Signal' clk (Maybe (BitVector dataSize))
-      -> ( "q"     ::: Signal' clk (BitVector dataSize)
-         , "full"  ::: Signal' clk Bool
-         , "empty" ::: Signal' clk Bool
+      -> "read request" ::: Signal domain Bool
+      -> "write request" ::: Signal domain (Maybe (BitVector dataSize))
+      -> ( "q"     ::: Signal domain (BitVector dataSize)
+         , "full"  ::: Signal domain Bool
+         , "empty" ::: Signal domain Bool
          )
-    fifo = CLaSH.Prelude.undefined
+    fifo = CLaSH.Explicit.Prelude.undefined
 :}
 
 -}

@@ -70,8 +70,7 @@ module CLaSH.Tutorial (
 where
 
 import CLaSH.Prelude
-import CLaSH.Prelude.Explicit
-import CLaSH.Prelude.BlockRam
+import CLaSH.Explicit.Prelude (freqCalc)
 import Control.Monad.ST
 import Data.Array
 import Data.Char
@@ -82,8 +81,7 @@ import GHC.Word
 import Data.Default
 
 {- $setup
->>> :set -XTemplateHaskell
->>> :set -XDataKinds
+>>> :set -XTemplateHaskell -XDataKinds -XConstraintKinds -XTypeApplications
 >>> :{
 let ma :: Num a => a -> (a, a) -> a
     ma acc (x,y) = acc + x * y
@@ -117,7 +115,7 @@ let sortVL xs = map fst sorted :< (snd (last sorted))
 :}
 
 >>> let mac = mealy macT 0
->>> let topEntity = mac :: Signal (Signed 9, Signed 9) -> Signal (Signed 9)
+>>> let topEntity = mac :: SystemClockReset => Signal System (Signed 9, Signed 9) -> Signal System (Signed 9)
 >>> let testInput = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
 >>> let expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
 >>> :{
@@ -128,7 +126,7 @@ let fibR :: Unsigned 64 -> Unsigned 64
 :}
 
 >>> :{
-let fibS :: Signal (Unsigned 64)
+let fibS :: SystemClockReset => Signal System (Unsigned 64)
     fibS = r
       where r = register 0 r + register 0 (register 1 r)
 :}
@@ -363,7 +361,7 @@ combinational logic or (synchronous) sequential logic. We do this by examining
 the type of one of the sequential primitives, the @'register'@ function:
 
 @
-register :: a -> 'Signal' a -> 'Signal' a
+register :: ... => a -> 'Signal' domain a -> 'Signal' domain a
 register i s = ...
 @
 
@@ -387,7 +385,7 @@ it has an initial value @a@ which is its output at time 0. We can further
 examine the 'register' function by taking a look at the first 4 samples of the
 'register' functions applied to a constant signal with the value 8:
 
->>> sampleN 4 (register 0 (signal 8))
+>>> sampleN 4 (register 0 (pure 8))
 [0,8,8,8]
 
 Where we see that the initial value of the signal is the specified 0 value,
@@ -573,13 +571,13 @@ simulate the behaviour of the /testbench/:
 
 >>> sampleN 7 $ expectedOutput (topEntity testInput)
 [False,False,False,False
-cycle(system1000): 4, outputVerifier
+cycle(system10000): 4, outputVerifier
 expected value: 14, not equal to actual value: 30
 ,True
-cycle(system1000): 5, outputVerifier
+cycle(system10000): 5, outputVerifier
 expected value: 14, not equal to actual value: 46
 ,True
-cycle(system1000): 6, outputVerifier
+cycle(system10000): 6, outputVerifier
 expected value: 14, not equal to actual value: 62
 ,True]
 

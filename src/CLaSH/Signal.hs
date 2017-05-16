@@ -4,7 +4,13 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE ImplicitParams  #-}
+{-# LANGUAGE MagicHash       #-}
+{-# LANGUAGE RankNTypes      #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -13,18 +19,29 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 module CLaSH.Signal
   ( -- * Implicitly clocked synchronous signal
-    Signal
+    Signal, Domain (..), HasReset, HasClock, HasClockReset, hasReset, hasClock
+  , withClock, withReset, withClockReset
+  , System, SystemClockReset, systemClock, systemReset
+  , Clock, Reset, ClockKind (..), ResetKind (..)
+  , resetSynchroniser
+  , unsafeFromAsyncReset
+  , unsafeToAsyncReset
+  , fromSyncReset
+  , toSyncReset
     -- * Basic circuit functions
-  , signal
+  , delay
   , register
-  , registerMaybe
+  , regMaybe
   , regEn
   , mux
+    -- * Testbench functions
+  , clockGen
+  , asyncResetGen
+  , syncResetGen
     -- * Boolean connectives
-  , (.&&.), (.||.), not1
+  , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
-  , Unbundled
     -- * Simulation functions (not synthesisable)
   , simulate
   , simulateB
@@ -45,78 +62,119 @@ module CLaSH.Signal
     -- ** 'Eq'-like
   , (.==.), (./=.)
     -- ** 'Ord'-like
-  , compare1, (.<.), (.<=.), (.>=.), (.>.)
-    -- ** 'Enum'-like
-  , fromEnum1
-    -- ** 'Rational'-like
-  , toRational1
-    -- ** 'Integral'-like
-  , toInteger1
-    -- ** 'Bits'-like
-  , testBit1
-  , popCount1
-  , shift1
-  , rotate1
-  , setBit1
-  , clearBit1
-  , shiftL1
-  , unsafeShiftL1
-  , shiftR1
-  , unsafeShiftR1
-  , rotateL1
-  , rotateR1
+  , (.<.), (.<=.), (.>=.), (.>.)
   )
 where
 
-import Control.DeepSeq       (NFData)
-import Data.Bits             (Bits) -- Haddock only
-import Data.Maybe            (isJust, fromJust)
+import           Control.DeepSeq       (NFData)
+import           GHC.Stack             (HasCallStack, withFrozenCallStack)
+import           GHC.TypeLits          (KnownNat, KnownSymbol)
+import           Data.Bits             (Bits) -- Haddock only
+import           Data.Maybe            (isJust, fromJust)
+import           Test.QuickCheck       (Property, property)
+import           Unsafe.Coerce         (unsafeCoerce)
 
-import CLaSH.Signal.Internal (Signal', register#, regEn#, (.==.), (./=.),
-                              compare1, (.<.), (.<=.), (.>=.), (.>.), fromEnum1,
-                              toRational1, toInteger1, testBit1, popCount1,
-                              shift1, rotate1, setBit1, clearBit1, shiftL1,
-                              unsafeShiftL1, shiftR1, unsafeShiftR1, rotateL1,
-                              rotateR1, (.||.), (.&&.), not1, mux, sample,
-                              sampleN, fromList, simulate, signal, testFor,
-                              sample_lazy, sampleN_lazy, simulate_lazy,
-                              fromList_lazy)
-import CLaSH.Signal.Explicit (SystemClock, systemClock)
-import CLaSH.Signal.Bundle   (Bundle (..), Unbundled')
+import           CLaSH.Explicit.Signal
+  (System, resetSynchroniser, systemClock, systemReset)
+import qualified CLaSH.Explicit.Signal as S
+import           CLaSH.Promoted.Nat    (SNat (..))
+import           CLaSH.Promoted.Symbol (SSymbol (..))
+import           CLaSH.Signal.Bundle   (Bundle (..))
+import           CLaSH.Signal.Internal hiding
+  (sample, sampleN, simulate, simulate_lazy, testFor)
+import qualified CLaSH.Signal.Internal as S
 
 {- $setup
+>>> :set -XTypeApplications
+>>> import CLaSH.XException (printX)
 >>> let oscillate = register False (not <$> oscillate)
 >>> let count = regEn 0 oscillate (count + 1)
 -}
 
--- * Implicitly clocked synchronous signal
-
--- | Signal synchronised to the \"system\" clock, which has a period of 1000.
-type Signal a = Signal' SystemClock a
-
 -- * Basic circuit functions
 
-{-# INLINE register #-}
+type HasReset domain synchronous = (?rst :: Reset domain synchronous)
+type HasClock domain gated       = (?clk :: Clock domain gated)
+type HasClockReset domain gated synchronous =
+  (HasClock domain gated, HasReset domain synchronous)
+
+hasReset :: HasReset domain synchronous => Reset domain synchronous
+hasReset = ?rst
+{-# INLINE hasReset #-}
+
+hasClock :: HasClock domain gated => Clock domain gated
+hasClock = ?clk
+{-# INLINE hasClock #-}
+
+type SystemClockReset = HasClockReset System 'Source 'Asynchronous
+
+withClock
+  :: Clock domain gated
+  -> (HasClock domain gated => r)
+  -> r
+withClock clk r
+  = let ?clk = clk
+    in  r
+
+withReset
+  :: Reset domain synchronous
+  -> (HasReset domain synchronous => r)
+  -> r
+withReset rst r
+  = let ?rst = rst
+    in  r
+
+withClockReset
+  :: Clock domain gated
+  -> Reset domain synchronous
+  -> (HasClockReset domain gated synchronous => r)
+  -> r
+withClockReset clk rst r
+  = let ?clk = clk
+        ?rst = rst
+    in  r
+
+-- | 'delay' @s@ delays the values in 'Signal' @s@ for once cycle, the value
+-- at time 0 is undefined.
+--
+-- >>> printX (sampleN 3 (delay (fromList [1,2,3,4])))
+-- [X,1,2]
+delay
+  :: (HasClock domain gated, HasCallStack)
+  => Signal domain a
+  -> Signal domain a
+delay = \i -> withFrozenCallStack (delay# ?clk i)
+{-# INLINE delay #-}
+
 -- | 'register' @i s@ delays the values in 'Signal' @s@ for one cycle, and sets
 -- the value at time 0 to @i@
 --
 -- >>> sampleN 3 (register 8 (fromList [1,2,3,4]))
 -- [8,1,2]
-register :: a -> Signal a -> Signal a
-register = register# systemClock
+register
+  :: (HasClockReset domain gated synchronous, HasCallStack)
+  => a
+  -> Signal domain a
+  -> Signal domain a
+register = \i s -> withFrozenCallStack (register# ?clk ?rst i s)
+{-# INLINE register #-}
 infixr 3 `register`
 
-registerMaybe :: a -> Signal (Maybe a) -> Signal a
-registerMaybe initial i = regEn# systemClock initial (fmap isJust i) (fmap fromJust i)
-{-# INLINE registerMaybe #-}
-infixr 3 `registerMaybe`
+regMaybe
+  :: (HasClockReset domain gated synchronous, HasCallStack)
+  => a
+  -> Signal domain (Maybe a)
+  -> Signal domain a
+regMaybe = \initial iM -> withFrozenCallStack
+  (register# (clockGate ?clk (fmap isJust iM)) ?rst initial (fmap fromJust iM))
+{-# INLINE regMaybe #-}
+infixr 3 `regMaybe`
 
-{-# INLINE regEn #-}
 -- | Version of 'register' that only updates its content when its second argument
 -- is asserted. So given:
 --
 -- @
--- oscillate = 'register' False ('not1' '<$>' oscillate)
+-- oscillate = 'register' False ('not' '<$>' oscillate)
 -- count     = 'regEn' 0 oscillate (count + 1)
 -- @
 --
@@ -126,33 +184,83 @@ infixr 3 `registerMaybe`
 -- [False,True,False,True,False,True,False,True]
 -- >>> sampleN 8 count
 -- [0,0,1,1,2,2,3,3]
-regEn :: a -> Signal Bool -> Signal a -> Signal a
-regEn = regEn# systemClock
+regEn
+  :: (HasClockReset domain gated synchronous, HasCallStack)
+  => a
+  -> Signal domain Bool
+  -> Signal domain a
+  -> Signal domain a
+regEn = \initial en i -> withFrozenCallStack
+  (register# (clockGate ?clk en) ?rst initial i)
+{-# INLINE regEn #-}
 
--- * Product/Signal isomorphism
+sample
+  :: NFData a
+  => ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Signal domain a)
+  -> [a]
+sample s =
+  let ?clk = unsafeCoerce (Clock @System (pure True))
+      ?rst = unsafeCoerce (Async @System (True :- pure False))
+  in  S.sample s
 
--- | Isomorphism between a 'Signal' of a product type (e.g. a tuple) and a
--- product type of 'Signal's.
-type Unbundled a = Unbundled' SystemClock a
+sampleN
+  :: NFData a
+  => Int
+  -> ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Signal domain a)
+  -> [a]
+sampleN n s =
+  let ?clk = unsafeCoerce (Clock @System (pure True))
+      ?rst = unsafeCoerce (Async @System (True :- pure False))
+  in  S.sampleN n s
 
--- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
--- samples of type @a@
---
--- >>> simulateB (unbundle . register (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(1,1),(2,2),(3,3)...
--- ...
---
--- __NB__: This function is not synthesisable
-simulateB :: (Bundle a, Bundle b, NFData a, NFData b) => (Unbundled' clk1 a -> Unbundled' clk2 b) -> [a] -> [b]
-simulateB f = simulate (bundle . f . unbundle)
+simulate
+  :: (NFData a, NFData b)
+  => ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Signal domain a -> Signal domain b)
+  -> [a]
+  -> [b]
+simulate f =
+  let ?clk = unsafeCoerce (Clock @System (pure True))
+      ?rst = unsafeCoerce (Async @System (True :- pure False))
+  in  S.simulate f
 
--- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
--- samples of type @a@
---
--- >>> simulateB (unbundle . register (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
--- [(8,8),(1,1),(2,2),(3,3)...
--- ...
---
--- __NB__: This function is not synthesisable
-simulateB_lazy :: (Bundle a, Bundle b) => (Unbundled' clk1 a -> Unbundled' clk2 b) -> [a] -> [b]
-simulateB_lazy f = simulate_lazy (bundle . f . unbundle)
+simulate_lazy
+  :: ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Signal domain a -> Signal domain b)
+  -> [a]
+  -> [b]
+simulate_lazy f =
+  let ?clk = unsafeCoerce (Clock @System (pure True))
+      ?rst = unsafeCoerce (Async @System (True :- pure False))
+  in  S.simulate_lazy f
+
+simulateB
+  :: (Bundle a, Bundle b, NFData a, NFData b)
+  => ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Unbundled domain a -> Unbundled domain b)
+  -> [a]
+  -> [b]
+simulateB f =
+  let ?clk = unsafeCoerce (Clock @System (pure True))
+      ?rst = unsafeCoerce (Async @System (True :- pure False))
+  in  S.simulateB f
+
+simulateB_lazy
+  :: (Bundle a, Bundle b)
+  => ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Unbundled domain a -> Unbundled domain b)
+  -> [a]
+  -> [b]
+simulateB_lazy f =
+  let ?clk = unsafeCoerce (Clock @System (pure True))
+      ?rst = unsafeCoerce (Async @System (True :- pure False))
+  in  S.simulateB_lazy f
+
+testFor
+  :: Int
+  -> ((HasClock domain 'Source, HasReset domain 'Asynchronous) =>
+      Signal domain Bool)
+  -> Property
+testFor n s = property (and (CLaSH.Signal.sampleN n s))
