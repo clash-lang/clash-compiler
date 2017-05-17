@@ -103,8 +103,11 @@ mkArgument bndr e = do
     ty    <- termType tcm e
     iw    <- Lens.use intWidth
     hwTyM <- N.termHWTypeM e
+    let eTyMsg = "(" ++ showDoc e ++ " :: " ++ showDoc ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
-      Nothing   -> return ((Identifier "__VOID__" Nothing,Void,False),[])
+      Nothing   ->
+        return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
+                ,Void,False),[])
       Just hwTy -> case collectArgs e of
         (Var _ v,[]) -> do vT <- (`Identifier` Nothing) <$> mkBasicId (pack $ name2String v)
                            return ((vT,hwTy,False),[])
@@ -123,7 +126,9 @@ mkArgument bndr e = do
         (Data dc, args) -> do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
           return ((exprN,hwTy,isConstant e),dcDecls)
-        _ -> return ((Identifier "__VOID__" Nothing,hwTy,False),[])
+        _ ->
+          return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
+                  ,hwTy,False),[])
     return ((addClock tcm ty e',t,l),d)
   where
     addClock tcm ty e' = case synchronizedClk tcm ty of
