@@ -54,7 +54,9 @@ Build-type:           Simple
 
 Extra-source-files:
   README.md,
-  CHANGELOG.md,
+  CHANGELOG.md
+
+Data-files:
   prims/verilog/*.json,
   prims/systemverilog/*.json,
   prims/vhdl/*.json
