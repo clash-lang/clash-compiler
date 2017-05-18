@@ -1,21 +1,12 @@
 #!/bin/sh
+set -e
+
+cd clash-prelude
+cabal clean
+cabal install
+cd ..
 
 cd clash-lib
-cabal clean
-cabal install
-cd ..
-
-cd clash-verilog
-cabal clean
-cabal install
-cd ..
-
-cd clash-systemverilog
-cabal clean
-cabal install
-cd ..
-
-cd clash-vhdl
 cabal clean
 cabal install
 cd ..
