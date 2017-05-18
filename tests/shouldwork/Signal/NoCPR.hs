@@ -14,10 +14,10 @@ import           CLaSH.Prelude
           }
   )#-}
 
-example :: Signal (BitVector 1) -> Signal (BitVector 1, BitVector 1)
+example :: Signal System (BitVector 1) -> Signal System (BitVector 1, BitVector 1)
 example input = foo $ bundle (input, pure 0)
 
 {-# NOINLINE foo #-}
-foo :: Signal (BitVector 1, BitVector 1)
-    -> Signal (BitVector 1, BitVector 1)
+foo :: Signal domain (BitVector 1, BitVector 1)
+    -> Signal domain (BitVector 1, BitVector 1)
 foo input = input

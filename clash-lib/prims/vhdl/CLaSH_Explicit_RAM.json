@@ -1,0 +1,63 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.RAM.asyncRam#"
+    , "type" :
+"asyncRam#
+  :: HasCallStack      -- ARG[0]
+  => Clock wdom wgated -- ^ wclk, ARG[1]
+  -> Clock rdom rgated -- ^ rclk, ARG[2]
+  -> SNat n            -- ^ sz,   ARG[3]
+  -> Signal rdom Int   -- ^ rd,   ARG[4]
+  -> Signal wdom Bool  -- ^ en,   ARG[5]
+  -> Signal wdom Int   -- ^ wr,   ARG[6]
+  -> Signal wdom a     -- ^ din,  ARG[7]
+  -> Signal rdom a"
+    , "templateD" :
+"-- asyncRam begin
+~GENSYM[~COMPNAME_asyncRam][0] : block~IF ~VIVADO ~THEN
+  type ~GENSYM[RamType][4] is array(natural range <>) of std_logic_vector(~SIZE[~TYP[7]]-1 downto 0);~ELSE
+  type ~SYM[4] is array(natural range <>) of ~TYP[7];~FI
+  signal ~GENSYM[RAM][1] : ~SYM[4](0 to ~LIT[3]-1);
+  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[3] - 1;
+  signal ~GENSYM[wr][3] : integer range 0 to ~LIT[3] - 1;~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[clk][5] : std_logic;
+  signal ~GENSYM[ce][6] : boolean;~ELSE ~FI
+begin
+  ~SYM[2] <= to_integer(~ARG[4])
+  -- pragma translate_off
+                mod ~LIT[3]
+  -- pragma translate_on
+                ;
+
+  ~SYM[3] <= to_integer(~ARG[6])
+  -- pragma translate_off
+                mod ~LIT[3]
+  -- pragma translate_on
+                ;
+  ~IF ~ISGATED[1] ~THEN
+  (~SYM[5],~SYM[6]) <= ~ARG[1];
+  ~GENSYM[asyncRam_sync][7] : process(~SYM[5])
+  begin
+    if rising_edge(~SYM[5]) then
+      if (~ARG[5] and ~SYM[6]) then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[7]][~TYP[7]];~ELSE
+        ~SYM[1](~SYM[3]) <= ~ARG[7];~FI
+      end if;
+    end if;
+  end process;~ELSE
+  ~SYM[7] : process(~ARG[1])
+  begin
+    if rising_edge(~ARG[1]) then
+      if ~ARG[5] then~IF ~VIVADO ~THEN
+        ~SYM[1](~SYM[3]) <= ~TOBV[~ARG[7]][~TYP[7]];~ELSE
+        ~SYM[1](~SYM[3]) <= ~ARG[7];~FI
+      end if;
+    end if;
+  end process;~FI
+  ~IF ~VIVADO ~THEN
+  ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYP[7]];~ELSE
+  ~RESULT <= ~SYM[1](~SYM[2]);~FI
+end block;
+-- asyncRam end"
+    }
+  }
+]

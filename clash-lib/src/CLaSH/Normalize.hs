@@ -72,10 +72,12 @@ runNormalization :: CLaSHOpts
                  -- ^ Primitive Definitions
                  -> HashMap TmName Bool
                  -- ^ Map telling whether a components is part of a recursive group
+                 -> [TmName]
+                 -- ^ topEntities
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap
+runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -104,6 +106,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap
                   (opt_inlineBelow opts)
                   primMap
                   rcsMap
+                  topEnts
 
 
 normalize :: [TmName]
@@ -189,11 +192,11 @@ checkNonRecursive topEntity norm =
 cleanupGraph :: TmName
              -> (HashMap TmName (Type,SrcSpan,Term))
              -> NormalizeSession (HashMap TmName (Type,SrcSpan,Term))
-cleanupGraph topEntity norm = do
-  let ct = mkCallTree [] norm topEntity
-  ctFlat <- flattenCallTree ct
-  return (HashMap.fromList $ snd $ callTreeToList [] ctFlat)
-
+cleanupGraph topEntity norm
+  | Just ct <- mkCallTree [] norm topEntity
+  = do ctFlat <- flattenCallTree ct
+       return (HashMap.fromList $ snd $ callTreeToList [] ctFlat)
+cleanupGraph _ norm = return norm
 
 data CallTree = CLeaf   (TmName,(Type,SrcSpan,Term))
               | CBranch (TmName,(Type,SrcSpan,Term)) [CallTree]
@@ -201,14 +204,15 @@ data CallTree = CLeaf   (TmName,(Type,SrcSpan,Term))
 mkCallTree :: [TmName] -- ^ Visited
            -> HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
            -> TmName -- ^ Root of the call graph
-           -> CallTree
-mkCallTree visited bindingMap root = case used of
-                            [] -> CLeaf   (root,rootTm)
-                            _  -> CBranch (root,rootTm) other
-  where
-    rootTm = Maybe.fromMaybe (error $ $(curLoc) ++ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _3)
-    other  = map (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
+           -> Maybe CallTree
+mkCallTree visited bindingMap root
+  | Just rootTm <- HashMap.lookup root bindingMap
+  = let used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _3)
+        other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
+    in  case used of
+          [] -> Just (CLeaf   (root,rootTm))
+          _  -> Just (CBranch (root,rootTm) other)
+mkCallTree _ _ _ = Nothing
 
 stripArgs :: [TmName]
           -> [Id]

@@ -7,9 +7,12 @@ import Data.Bits
 
 topEntity :: Word -> Int
 topEntity = popCount
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal Word
-testInput = stimuliGenerator $(listToVecTH [1::Word,3,8,50,0])
-
-expectedOutput :: Signal Int -> Signal Bool
-expectedOutput = outputVerifier $(listToVecTH ([1,2,1,3,0]::[Int]))
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator $(listToVecTH [1::Word,3,8,50,0])
+    expectedOutput = outputVerifier   $(listToVecTH ([1,2,1,3,0]::[Int]))
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done

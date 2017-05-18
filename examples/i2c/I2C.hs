@@ -12,4 +12,19 @@ i2c rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,
     (bitResp,busy,i2cO)           = mealyB bitMasterT  bitMasterInit  (rst,ena,clkCnt,bitCtrl,i2cI)
     (cmdAck,al,dbout)             = unbundle bitResp
 
+topEntity
+  :: SystemClockReset
+  => Signal System Bool
+  -> Signal System Bool
+  -> Signal System (Unsigned 16)
+  -> Signal System Bool
+  -> Signal System Bool
+  -> Signal System Bool
+  -> Signal System Bool
+  -> Signal System Bool
+  -> Signal System (BitVector 8)
+  -> Signal System (Bit, Bit)
+  -> (Signal System (BitVector 8), Signal System Bool,
+      Signal System Bool, Signal System Bool, Signal System Bool,
+      Signal System (Bit, Bool, Bit, Bool))
 topEntity = i2c

@@ -101,7 +101,7 @@ synchronizedClk tcm ty
         Just (_,[LitTy (SymTy s),litTy])
           | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
         _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
-      "CLaSH.Signal.Internal.Signal'" -> case splitTyConAppM (head args) of
+      "CLaSH.Signal.Internal.Signal" -> case splitTyConAppM (head args) of
         Just (_,[LitTy (SymTy s),litTy])
           | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
         _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
@@ -200,8 +200,8 @@ typeSize :: HWType
 typeSize Void = 0
 typeSize String = 1
 typeSize Bool = 1
-typeSize (Clock _ _) = 1
-typeSize (Reset _ _) = 1
+typeSize (Clock {}) = 1
+typeSize (Reset {}) = 1
 typeSize (BitVector i) = i
 typeSize (Index 0) = 0
 typeSize (Index 1) = 1

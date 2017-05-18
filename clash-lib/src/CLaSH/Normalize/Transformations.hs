@@ -69,11 +69,10 @@ import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
                                               splitFunTy, typeKind,
                                               tyView, undefinedTy)
 import           CLaSH.Core.TyCon            (tyConDataCons)
-import           CLaSH.Core.Util             (collectArgs, idToVar, isCon,
-                                              isFun, isLet, isPolyFun, isPrim,
-                                              isSignalType, isVar, mkApps,
-                                              mkLams, mkTmApps, mkVec,
-                                              termSize, termType, tyNatSize)
+import           CLaSH.Core.Util
+  (collectArgs, idToVar, isClockOrReset, isCon, isFun, isLet, isPolyFun, isPrim,
+   isSignalType, isVar, mkApps, mkLams, mkTmApps, mkVec, termSize, termType,
+   tyNatSize)
 import           CLaSH.Core.Var              (Id, Var (..))
 import           CLaSH.Netlist.BlackBox.Util (usedArguments)
 import           CLaSH.Netlist.Util          (representableType,
@@ -489,11 +488,11 @@ removeUnusedExpr _ e@(collectArgs -> (Data dc, [_,Right aTy,Right nTy,_,Left a,L
 removeUnusedExpr _ e = return e
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
--- is constant
+-- is constant (except clock or reset generators)
 bindConstantVar :: NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test _ (_,Embed e) = (||) <$> isLocalVar e <*> pure (isConstant e)
+    test _ (_,Embed e) = (||) <$> isLocalVar e <*> isConstantNotClockReset e
 
 -- | Inline nullary/closed functions
 inlineClosed :: NormRewrite
@@ -541,7 +540,8 @@ inlineClosed _ e = return e
 inlineSmall :: NormRewrite
 inlineSmall _ e@(collectArgs -> (Var _ f,args)) = do
   untranslatable <- isUntranslatable e
-  if untranslatable
+  topEnts <- Lens.use (extra.topEntities)
+  if untranslatable || f `elem` topEnts
     then return e
     else do
       bndrs <- Lens.use bindings
@@ -557,14 +557,20 @@ inlineSmall _ e@(collectArgs -> (Var _ f,args)) = do
 
 inlineSmall _ e = return e
 
--- | Specialise functions on arguments which are constant
+-- | Specialise functions on arguments which are constant, except when they
+-- are clock or reset generators
 constantSpec :: NormRewrite
 constantSpec ctx e@(App e1 e2)
   | (Var _ _, args) <- collectArgs e1
   , (_, [])     <- Either.partitionEithers args
   , null $ Lens.toListOf termFreeTyVars e2
   , isConstant e2
-  = specializeNorm ctx e
+  = do tcm <- Lens.view tcCache
+       e2Ty <- termType tcm e2
+       -- Don't specialise on clock or reset generators
+       case isClockOrReset tcm e2Ty of
+          False -> specializeNorm ctx e
+          _ -> return e
 
 constantSpec _ e = return e
 
@@ -755,7 +761,8 @@ collectANF ctx e@(App appf arg)
   = do
     untranslatable <- lift (isUntranslatable arg)
     localVar       <- lift (isLocalVar arg)
-    case (untranslatable,localVar || isConstant arg,arg) of
+    constantNoCR   <- lift (isConstantNotClockReset arg)
+    case (untranslatable,localVar || constantNoCR,arg) of
       (False,False,_) -> do tcm <- Lens.view tcCache
                             (argId,argVar) <- lift (mkTmBinderFor tcm (mkDerivedName ctx "app_arg") arg)
                             tell [(argId,embed arg)]

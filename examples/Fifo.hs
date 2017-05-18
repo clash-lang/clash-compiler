@@ -34,7 +34,10 @@ fifo (rpntr, wpntr, elms) (datain,wrt,rd) = ((rpntr',wpntr',elms'),(full,empty,d
 
     dataout = elms !! rind
 
-fifoL :: Signal (Elm,Bool,Bool) -> Signal (Bool,Bool,Elm)
+fifoL
+  :: SystemClockReset
+  => Signal System (Elm,Bool,Bool)
+  -> Signal System (Bool,Bool,Elm)
 fifoL = fifo `mealy` (0,0,replicate d4 0)
 
 topEntity = fifoL

@@ -59,9 +59,7 @@ mkBlackBoxContext resId args = do
     (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
-    res   <- case synchronizedClk tcm (unembed $ V.varType resId) of
-                Just clk -> Right . (,clk) . (`N.Identifier` Nothing) <$> mkBasicId (pack $ name2String (V.varName resId))
-                Nothing  -> Left . (`N.Identifier` Nothing)  <$> mkBasicId (pack $ name2String (V.varName resId))
+    res   <- (`N.Identifier` Nothing) <$> mkBasicId (pack $ name2String (V.varName resId))
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) imps funs Nothing
@@ -83,8 +81,7 @@ prepareBlackBox :: TextS.Text
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
      then instantiateCompName >=>
-          setSym >=>
-          setClocks bbCtx >=>
+          setSym bbCtx >=>
           collectFilePaths bbCtx $ templ
      else do
        (_,sp) <- Lens.use curCompNm
@@ -95,7 +92,7 @@ prepareBlackBox pNm templ bbCtx =
 
 mkArgument :: Identifier -- ^ LHS of the original let-binder
            -> Term
-           -> NetlistMonad ( (SyncExpr,HWType,Bool)
+           -> NetlistMonad ( (Expr,HWType,Bool)
                            , [Declaration]
                            )
 mkArgument bndr e = do
@@ -130,11 +127,7 @@ mkArgument bndr e = do
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
                   ,hwTy,False),[])
-    return ((addClock tcm ty e',t,l),d)
-  where
-    addClock tcm ty e' = case synchronizedClk tcm ty of
-                           Just clk -> Right (e',clk)
-                           _        -> Left  e'
+    return ((e',t,l),d)
 
 mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
             -> Bool -- ^ Treat BlackBox expression as declaration
@@ -274,7 +267,7 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (_,Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun Nothing
+                  (_,Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
                   let hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
                       inpAssigns    = zipWith (\(i,t) e' -> (i,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
                       outpAssign    = (fst compOutp,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
@@ -287,27 +280,15 @@ mkFunInput resId e = do
   case templ of
     Left (_, Left templ') -> do
       l   <- instantiateCompName templ'
-      l'  <- setSym l
-      l'' <- setClocks bbCtx l'
-      l3  <- collectFilePaths bbCtx l''
-      return ((Left l3,bbCtx),dcls)
+      l'  <- setSym bbCtx l
+      l'' <- collectFilePaths bbCtx l'
+      return ((Left l'',bbCtx),dcls)
     Left (_, Right templ') -> do
       templ'' <- prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
       return ((Right ass, bbCtx),dcls)
     Right decl ->
       return ((Right decl,bbCtx),dcls)
-
--- | Instantiate symbols references with a new symbol and increment symbol counter
---instantiateSym :: BlackBoxTemplate
---               -> NetlistMonad BlackBoxTemplate
---instantiateSym l = do
---  i <- Lens.use varCount
---  ids <- Lens.use seenIds
---  let (l',(ids',i')) = setSym ids i l
---  varCount .= i'
---  seenIds .= ids'
---  return l'
 
 instantiateCompName :: BlackBoxTemplate
                     -> NetlistMonad BlackBoxTemplate

@@ -43,6 +43,7 @@ import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBl
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
 #ifdef CABAL
@@ -205,6 +206,7 @@ mkUsedTys v@(Vector _ elTy)   = v : mkUsedTys elTy
 mkUsedTys t@(RTree _ elTy)    = t : mkUsedTys elTy
 mkUsedTys p@(Product _ elTys) = p : concatMap mkUsedTys elTys
 mkUsedTys sp@(SP _ elTys)     = sp : concatMap mkUsedTys (concatMap snd elTys)
+mkUsedTys c@(Clock n r Gated) = [c,Clock n r Source,Bool]
 mkUsedTys t                   = [t]
 
 topSortHWTys :: [HWType]
@@ -278,14 +280,19 @@ tyDec ty@(Product _ tys) | typeSize ty > 0 = Just A.<$> prodDec
 
 tyDec _ = pure Nothing
 
+gatedClockType :: HWType -> HWType
+gatedClockType (Clock nm rt Gated) = Product ("GatedClock" `Text.append` (pack (show (nm,rt)))) [Clock nm rt Source,Bool]
+gatedClockType ty = ty
+{-# INLINE gatedClockType #-}
+
 splitVecTy :: HWType -> Maybe ([Either Int Int],SystemVerilogM Doc)
 splitVecTy = fmap splitElemTy . go
   where
     splitElemTy (ns,t) = case t of
       Product _ _ -> (ns, verilogType t)
       Vector _ _  -> error $ $(curLoc) ++ "impossible"
-      Clock _ _   -> (ns, "logic")
-      Reset _ _   -> (ns, "logic")
+      Clock {}    -> (ns, verilogType t)
+      Reset {}    -> (ns, "logic")
       String      -> (ns, "string")
       Signed n    -> (ns ++ [Left n],"logic signed")
       _           -> (ns ++ [Left (typeSize t)], "logic")
@@ -474,8 +481,9 @@ verilogType t = do
       nm <- use modNm
       text (pack nm) <> "_types::" <> tyName t
     Signed n      -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
-    Clock _ _     -> "logic"
-    Reset _ _     -> "logic"
+    Clock _ _ Gated -> verilogType (gatedClockType t)
+    Clock {}      -> "logic"
+    Reset {}      -> "logic"
     String        -> "string"
     _ -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
@@ -524,8 +532,9 @@ tyName t@(Product nm _)  = makeCached t nameCache prodName
              then go mkId s (i+1) n
              else n'
 tyName t@(SP _ _)  = "logic_vector_" <> int (typeSize t)
-tyName (Clock _ _) = "logic"
-tyName (Reset _ _) = "logic"
+tyName t@(Clock _ _ Gated) = tyName (gatedClockType t)
+tyName (Clock {})  = "logic"
+tyName (Reset {})  = "logic"
 tyName t =  error $ $(curLoc) ++ "tyName: " ++ show t
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
@@ -882,6 +891,7 @@ punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> SystemVerilogM Doc
-encodingNote (Clock _ _) = "// clock"
-encodingNote (Reset _ _) = "// asynchronous reset: active low"
-encodingNote _           = empty
+encodingNote (Clock _ _ Gated) = "// gated clock"
+encodingNote (Clock {})        = "// clock"
+encodingNote (Reset {})        = "// asynchronous reset: active high"
+encodingNote _                 = empty

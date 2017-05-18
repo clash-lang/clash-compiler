@@ -2,20 +2,27 @@ module RomFile where
 
 import CLaSH.Prelude
 
-zeroAt0 :: Signal (Unsigned 8) -> Signal (Unsigned 8)
+zeroAt0
+  :: HasClockReset domain gated synchronous
+  => Signal domain (Unsigned 8)
+  -> Signal domain (Unsigned 8)
 zeroAt0 a = mux en a 0
   where
-    en = register False (signal True)
+    en = register False (pure True)
 
-topEntity :: Signal (Unsigned 8) -> Signal (Unsigned 8)
+topEntity
+  :: SystemClockReset
+  => Signal System (Unsigned 8)
+  -> Signal System (Unsigned 8)
 topEntity rd = zeroAt0 (unpack <$> dout)
   where
     dout = romFilePow2 "memory.list" rd
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Unsigned 8)
-testInput = cnt
+testBench :: Signal System Bool
+testBench = done'
   where
-    cnt = register 0 (cnt + 1)
-
-expectedOutput :: Signal (Unsigned 8) -> Signal Bool
-expectedOutput = outputVerifier $(listToVecTH [0::Unsigned 8,0,1,2,3,4,5,6,7,8])
+    testInput      = register 0 (testInput + 1)
+    expectedOutput = outputVerifier $(listToVecTH [0::Unsigned 8,0,1,2,3,4,5,6,7,8])
+    done           = expectedOutput (topEntity testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done

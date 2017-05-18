@@ -2,5 +2,7 @@ module HOClock where
 
 import CLaSH.Prelude
 
-topEntity :: Vec 8 (Signal (Int,Int)) -> Vec 8 (Signal (Int,Int))
+topEntity
+  :: SystemClockReset
+  => Vec 8 (Signal System (Int,Int)) -> Vec 8 (Signal System (Int,Int))
 topEntity = map (register (0,0))

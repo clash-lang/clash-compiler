@@ -60,6 +60,10 @@ hfk1d xs = x2 + multwc (x1 - 2 * x2 + x3)
     x2 = xs !! 1
     x3 = xs !! 2
 
+topEntity
+  :: SystemClockReset
+  => Signal System (Vec 2 Temp)
+  -> Signal System (Vec 2 Temp)
 topEntity = (swarch1d hfk1d) `mealy` (repeat 0)
 
 res :: [Vec 2 Temp]

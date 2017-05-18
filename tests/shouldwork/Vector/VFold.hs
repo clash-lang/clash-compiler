@@ -9,9 +9,12 @@ csSort = vfold (const csRow)
 
 topEntity :: Vec 4 Int -> Vec 4 Int
 topEntity = csSort
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 4 Int)
-testInput = pure (7 :> 3 :> 9 :> 1 :> Nil)
-
-expectedOutput :: Signal (Vec 4 Int) -> Signal Bool
-expectedOutput = outputVerifier ((1:>3:>7:>9:>Nil):>Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure (7 :> 3 :> 9 :> 1 :> Nil)
+    expectedOutput = outputVerifier ((1:>3:>7:>9:>Nil):>Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done

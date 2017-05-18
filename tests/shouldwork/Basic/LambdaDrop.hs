@@ -2,7 +2,7 @@ module LambdaDrop where
 
 import CLaSH.Prelude
 
-topEntity :: Signal (BitVector 2)
+topEntity :: Signal System (BitVector 2)
 topEntity = (++#) <$> outport1 <*> outport2
   where
     (outport1, outResp1) = gpio (decodeReq 1 req)
@@ -11,20 +11,20 @@ topEntity = (++#) <$> outport1 <*> outport2
 
     req = core $ (<|>) <$> ramResp <*> ((<|>) <$> outResp1 <*> outResp2)
 
-core :: Signal (Maybe Bit) -> Signal Bit
+core :: Signal domain (Maybe Bit) -> Signal domain Bit
 core = fmap (maybe low id)
 {-# NOINLINE core #-}
 
-ram :: Signal Bit -> Signal (Maybe Bit)
+ram :: Signal domain Bit -> Signal domain (Maybe Bit)
 ram = fmap pure
 {-# NOINLINE ram #-}
 
-decodeReq :: Integer -> Signal Bit -> Signal Bit
+decodeReq :: Integer -> Signal domain Bit -> Signal domain Bit
 decodeReq 0 = fmap (const low)
 decodeReq 1 = id
 decodeReq _ = fmap complement
 {-# NOINLINE decodeReq #-}
 
-gpio :: Signal Bit -> (Signal Bit,Signal (Maybe Bit))
+gpio :: Signal domain Bit -> (Signal domain Bit,Signal domain (Maybe Bit))
 gpio i = (i,pure <$> i)
 {-# NOINLINE gpio #-}

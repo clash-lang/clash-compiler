@@ -2,9 +2,11 @@ module MAC where
 
 import CLaSH.Prelude
 
-topEntity :: Integer
-          -> (Signal Integer, Signal Integer)
-          -> Signal Integer
+topEntity
+  :: SystemClockReset
+  => Integer
+  -> (Signal System Integer, Signal System Integer)
+  -> Signal System Integer
 topEntity i = macT <^> i
 
 macT s (x,y) = (s',o)

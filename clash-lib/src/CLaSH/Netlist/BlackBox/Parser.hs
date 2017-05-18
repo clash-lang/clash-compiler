@@ -68,10 +68,7 @@ pTagE :: Parser Element
 pTagE =  O                 <$  pToken "~RESULT"
      <|> I                 <$> (pToken "~ARG" *> pBrackets pNatural)
      <|> L                 <$> (pToken "~LIT" *> pBrackets pNatural)
-     <|> (Clk . Just)      <$> (pToken "~CLK" *> pBrackets pNatural)
-     <|> Clk Nothing       <$  pToken "~CLKO"
-     <|> (Rst . Just)      <$> (pToken "~RST" *> pBrackets pNatural)
-     <|> Rst Nothing       <$  pToken "~RSTO"
+     <|> N                 <$> (pToken "~NAME" *> pBrackets pNatural)
      <|> (Sym Text.empty)  <$> (pToken "~SYM" *> pBrackets pNatural)
      <|> Typ Nothing       <$  pToken "~TYPO"
      <|> (Typ . Just)      <$> (pToken "~TYP" *> pBrackets pNatural)
@@ -98,6 +95,8 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> (BV False)        <$> (pToken "~FROMBV" *> pBrackets pSigD) <*> pBrackets pTagE
      <|> IsLit             <$> (pToken "~ISLIT" *> pBrackets pNatural)
      <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
+     <|> IsGated           <$> (pToken "~ISGATED" *> pBrackets pNatural)
+     <|> IsSync            <$> (pToken "~ISSYNC" *> pBrackets pNatural)
      <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> And               <$> (pToken "~AND" *> listParser pTagE)
      <|> Vars              <$> (pToken "~VARS" *> pBrackets pNatural)

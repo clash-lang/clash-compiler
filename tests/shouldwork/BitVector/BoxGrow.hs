@@ -12,15 +12,18 @@ box0 grid =     (zeroesM :> ((zeroesN >:> grid) <:< zeroesN)) :< zeroesM
           zeroesM = replicate d8 0
 
 topEntity = box0
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 5 (Vec 6 Bit))
-testInput = signal (repeat (repeat 1))
-
-expectedOutput :: Signal (Vec 7 (Vec 8 Bit)) -> Signal Bool
-expectedOutput = outputVerifier ( ((0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :>
-                                  (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
-                                  (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
-                                  (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
-                                  (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
-                                  (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
-                                  (0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :> Nil) :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure (repeat (repeat 1))
+    expectedOutput = outputVerifier ( ((0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :>
+                                      (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
+                                      (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
+                                      (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
+                                      (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
+                                      (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
+                                      (0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :> Nil) :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done

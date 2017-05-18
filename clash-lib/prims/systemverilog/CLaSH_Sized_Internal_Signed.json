@@ -105,19 +105,19 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.plus#"
     , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.minus#"
     , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
-    , "templateE" : "~ARG[0] - ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] - ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Signed.times#"
     , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
     }
   }
 , { "BlackBox" :

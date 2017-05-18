@@ -156,7 +156,7 @@ controller (inp1, inp2, pipe, fromResMem) = (arg1, arg2, shift, toResMem)
 -- =============================================
 -- = Reducer: Wrap up all the above components =
 -- =============================================
-reducer :: (Signal DataInt, Signal ArrayIndex) -> Signal OutputSignal
+reducer :: SystemClockReset => (Signal System DataInt, Signal System ArrayIndex) -> Signal System OutputSignal
 reducer (dataIn,index) = redOut
   where
     (newDiscrVal,newDiscr)     = mealyB discriminator initDiscrState index

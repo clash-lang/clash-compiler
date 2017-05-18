@@ -1,0 +1,57 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.ROM.File.romFile#"
+    , "type" :
+"romFile# :: KnownNat m      -- ARG[0]
+          => Clock dom gated -- clk,  ARG[1]
+          -> SNat n          -- sz,   ARG[2]
+          -> FilePath        -- file, ARG[3]
+          -> Signal dom Int  -- rd,   ARG[4]
+          -> Signal dom (BitVector m)"
+    , "templateD" :
+"-- romFile begin
+~GENSYM[~COMPNAME_romFile][0] : block
+  type ~GENSYM[RomType][4] is array(natural range <>) of bit_vector(~LIT[0]-1 downto 0);
+
+  impure function ~GENSYM[InitRomFromFile][1] (RomFileName : in string) return ~SYM[4] is
+    FILE RomFile : text open read_mode is RomFileName;
+    variable RomFileLine : line;
+    variable ROM : ~SYM[4](0 to ~LIT[2]-1);
+  begin
+    for i in ROM'range loop
+      readline(RomFile,RomFileLine);
+      read(RomFileLine,ROM(i));
+    end loop;
+    return ROM;
+  end function;
+
+  signal ~GENSYM[ROM][2] : ~SYM[4](0 to ~LIT[2]-1) := ~SYM[1](~FILE[~LIT[3]]);
+  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[2]-1;~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[clk][5] : std_logic;
+  signal ~GENSYM[ce][6] : boolean; ~ELSE ~FI
+begin
+  ~SYM[3] <= to_integer(~ARG[4])
+  -- pragma translate_off
+                mod ~LIT[2]
+  -- pragma translate_on
+                ;
+  ~IF ~ISGATED[1] ~THEN
+  (~SYM[5],~SYM[6]) <= ~ARG[1];
+  ~GENSYM[romFileSync][7] : process (~SYM[5])
+  begin
+    if (rising_edge(~SYM[5])) then
+      if ~SYM[6] then
+        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+      end if;
+    end if;
+  end process;~ELSE
+  ~SYM[7] : process (~ARG[1])
+  begin
+    if (rising_edge(~ARG[1])) then
+      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+    end if;
+  end process;~FI
+end block;
+-- romFile end"
+    }
+  }
+]

@@ -32,15 +32,21 @@ datamem :: (KnownNat n, Integral i)
 datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
 datamem mem (addr,Just val) = (replace addr val mem,mem !! addr)
 
-topEntity :: Signal (OPC Word) -> Signal (Maybe Word)
+topEntity
+  :: SystemClockReset
+  => Signal System (OPC Word)
+  -> Signal System (Maybe Word)
 topEntity i = val
   where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
     initMem    = replicate (SNat :: SNat 8) 0
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (OPC Word)
-testInput = stimuliGenerator $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
-
-expectedOutput :: Signal (Maybe Word) -> Signal Bool
-expectedOutput = outputVerifier $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
+    expectedOutput = outputVerifier   $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
+    done           = expectedOutput (topEntity testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done

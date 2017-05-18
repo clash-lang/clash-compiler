@@ -10,6 +10,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module CLaSH.Netlist.Types where
 
 import Control.DeepSeq
@@ -32,6 +34,7 @@ import CLaSH.Core.TyCon                     (TyCon, TyConName)
 import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Primitives.Types               (PrimMap)
+import CLaSH.Signal.Internal                (ClockKind, ResetKind)
 import CLaSH.Util
 
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
@@ -100,9 +103,12 @@ data HWType
   | Sum      !Identifier [Identifier] -- ^ Sum type: Name and Constructor names
   | Product  !Identifier [HWType] -- ^ Product type: Name and field types
   | SP       !Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock    !Identifier !Integer -- ^ Clock type with specified name and period
-  | Reset    !Identifier !Integer -- ^ Reset type corresponding to clock with a specified name and period
+  | Clock    !Identifier !Integer !ClockKind -- ^ Clock type with specified name and period
+  | Reset    !Identifier !Integer !ResetKind -- ^ Reset type corresponding to clock with a specified name and period
   deriving (Eq,Ord,Show,Generic)
+
+instance Hashable ClockKind
+instance Hashable ResetKind
 
 instance Hashable HWType
 instance NFData HWType
@@ -175,8 +181,8 @@ data Bit
 -- | Context used to fill in the holes of a BlackBox template
 data BlackBoxContext
   = Context
-  { bbResult    :: (SyncExpr,HWType) -- ^ Result name and type
-  , bbInputs    :: [(SyncExpr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
+  { bbResult    :: (Expr,HWType) -- ^ Result name and type
+  , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
@@ -186,11 +192,6 @@ data BlackBoxContext
   deriving Show
 
 emptyBBContext :: BlackBoxContext
-emptyBBContext = Context (Left $ Identifier (pack "__EMPTY__") Nothing, Void) [] empty Nothing
-
--- | Either the name of the identifier, or a tuple of the identifier and the
--- corresponding clock
-type SyncIdentifier = Either Identifier (Identifier,(Identifier,Int))
-type SyncExpr       = Either Expr       (Expr,(Identifier,Integer))
+emptyBBContext = Context (Identifier (pack "__EMPTY__") Nothing, Void) [] empty Nothing
 
 makeLenses ''NetlistState

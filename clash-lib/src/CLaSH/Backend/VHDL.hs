@@ -42,6 +42,7 @@ import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBl
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
 
 #ifdef CABAL
@@ -183,6 +184,7 @@ mkTyPackage_ modName hwtys = do
     eqTypM (Signed _) (Signed _)         = True
     eqTypM (Unsigned _) (Unsigned _)     = True
     eqTypM (BitVector _) (BitVector _)   = True
+    eqTypM (Clock _ _ g) (Clock _ _ g')  = g == g'
     eqTypM ty1 ty2 = ty1 == ty2
 
 mkUsedTys :: HWType
@@ -220,6 +222,8 @@ normaliseType ty@(SP _ elTys)      = do
   return (BitVector (typeSize ty))
 normaliseType ty@(Index _)     = return (Unsigned (typeSize ty))
 normaliseType ty@(Sum _ _)     = return (Unsigned (typeSize ty))
+normaliseType (Clock nm rt Gated) =
+  return (Product "GatedClock" [Clock nm rt Source,Bool])
 normaliseType ty = return ty
 
 mkVecZ :: HWType -> HWType
@@ -359,6 +363,14 @@ funDec _ (BitVector _) = Just
     "end" <> semi
   )
 
+funDec _ (Clock {}) = Just
+  ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <> semi
+  , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic") <+> "return" <+> "std_logic_vector" <+> "is" <$>
+    "begin" <$>
+      indent 2 ("return" <+> "(0 => sl)" <> semi) <$>
+    "end" <> semi
+  )
+
 funDec syn t@(RTree _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi
   , "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <+> "is" <$>
@@ -439,8 +451,8 @@ vhdlType hwty = do
   where
     go :: HWType -> VHDLM Doc
     go Bool            = "boolean"
-    go (Clock _ _)     = "std_logic"
-    go (Reset _ _)     = "std_logic"
+    go (Clock {})      = "std_logic"
+    go (Reset {})      = "std_logic"
     go (BitVector n)   = case n of
                            0 -> "std_logic_vector (0 downto 1)"
                            _ -> "std_logic_vector" <> parens (int (n-1) <+> "downto 0")
@@ -474,8 +486,8 @@ vhdlTypeMark hwty = do
   go hwty'
   where
     go Bool            = "boolean"
-    go (Clock _ _)     = "std_logic"
-    go (Reset _ _)     = "std_logic"
+    go (Clock {})      = "std_logic"
+    go (Reset {})      = "std_logic"
     go (BitVector _)   = "std_logic_vector"
     go (Signed _)      = "signed"
     go (Unsigned _)    = "unsigned"
@@ -492,8 +504,8 @@ vhdlTypeMark hwty = do
 
 tyName :: HWType -> VHDLM Doc
 tyName Bool              = "boolean"
-tyName (Clock _ _)       = "std_logic"
-tyName (Reset _ _)       = "std_logic"
+tyName (Clock {})        = "std_logic"
+tyName (Reset {})        = "std_logic"
 tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
 tyName (RTree n elTy)    = "tree_of_" <> int n <> "_" <> tyName elTy
 tyName (BitVector n)     = "std_logic_vector_" <> int n
@@ -534,21 +546,21 @@ vhdlTypeErrValue t@(Vector n elTy)   = do
   case syn of
     Vivado -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
-                 rarrow <+> "'X'"))
+                 rarrow <+> "'-'"))
     _ -> vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (n-1) <+> rarrow <+> vhdlTypeErrValue elTy)
 vhdlTypeErrValue t@(RTree n elTy)    = do
   syn <-hdlSyn
   case syn of
     Vivado -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+>
                 "std_logic_vector'" <> parens (int 0 <+> "to" <+> int (typeSize elTy - 1) <+>
-                 rarrow <+> "'X'"))
+                 rarrow <+> "'-'"))
     _ -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> vhdlTypeErrValue elTy)
 vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhdlTypeErrValue elTys)
-vhdlTypeErrValue (Reset _ _)         = "'X'"
-vhdlTypeErrValue (Clock _ _)         = "'X'"
-vhdlTypeErrValue Void                = "std_logic_vector'(0 downto 1 => 'X')"
+vhdlTypeErrValue (Reset {})          = "'-'"
+vhdlTypeErrValue (Clock {})          = "'-'"
+vhdlTypeErrValue Void                = "std_logic_vector'(0 downto 1 => '-')"
 vhdlTypeErrValue String              = "\"ERROR\""
-vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'X'")
+vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")
 
 decls :: [Declaration] -> VHDLM Doc
 decls [] = empty
@@ -924,11 +936,17 @@ hex s = char 'x' <> dquotes (text (T.pack s))
 bit_char :: Bit -> VHDLM Doc
 bit_char H = char '1'
 bit_char L = char '0'
-bit_char U = char 'U'
+bit_char U = char '-'
 bit_char Z = char 'Z'
 
 toSLV :: HWType -> Expr -> VHDLM Doc
 toSLV Bool         e = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+toSLV (Clock {})    e = do
+  nm <- use modNm
+  text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
+toSLV (Reset {})    e = do
   nm <- use modNm
   text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
 toSLV (BitVector _) e = expr_ False e
@@ -1016,6 +1034,7 @@ punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VHDLM Doc
-encodingNote (Clock _ _) = "-- clock"
-encodingNote (Reset _ _) = "-- asynchronous reset: active low"
-encodingNote _           = empty
+encodingNote (Clock _ _ Gated) = "-- gated clock"
+encodingNote (Clock {})        = "-- clock"
+encodingNote (Reset {})        = "-- asynchronous reset: active high"
+encodingNote _                 = empty

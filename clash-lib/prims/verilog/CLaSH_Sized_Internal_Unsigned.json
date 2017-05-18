@@ -97,19 +97,19 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.plus#"
     , "type"      : "plus# :: Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.minus#"
     , "type"      : "minus# :: (KnownNat m, KnownNat n) => Unsigned m -> Unsigned n -> Unsigned (1 + Max m n)"
-    , "templateE" : "~ARG[2] - ~ARG[3]"
+    , "templateD" : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.times#"
     , "type"      : "times# :: Unsigned m -> Unsigned n -> Unsigned (m + n)"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
     }
   }
 , { "BlackBox" :

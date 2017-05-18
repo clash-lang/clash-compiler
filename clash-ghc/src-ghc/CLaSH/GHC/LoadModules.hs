@@ -101,8 +101,7 @@ loadModules
         , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
         , (CoreSyn.CoreBndr, Maybe TopEntity)      -- topEntity bndr + (maybe) TopEntity annotation
-        , Maybe CoreSyn.CoreBndr                   -- testInput bndr
-        , Maybe CoreSyn.CoreBndr                   -- expectedOutput bndr
+        , Maybe CoreSyn.CoreBndr                   -- testBench bndr
         , [FilePath]
         )
 loadModules hdl modName dflagsM = do
@@ -221,9 +220,8 @@ loadModules hdl modName dflagsM = do
 
     topEntM <- findCLaSHAnnotations rootBndrs
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
-        topEntities     = filter ((== "topEntity") . varNameString) rootBndrs
-        testInputs      = filter ((== "testInput") . varNameString) rootBndrs
-        expectedOutputs = filter ((== "expectedOutput") . varNameString) rootBndrs
+        topEntities = filter ((== "topEntity") . varNameString) rootBndrs
+        benches     = filter ((== "testBench") . varNameString) rootBndrs
     topEntity <- case topEntities of
       [] -> case topEntM of
               Just (l,r) -> return (l,Just r)
@@ -235,16 +233,12 @@ loadModules hdl modName dflagsM = do
                                                          (Outputable.showSDocUnsafe (ppr rootModule <> dot <> ppr l))
               Nothing -> return (x,Nothing)
       _ -> Panic.pgmError $ $(curLoc) ++  "Multiple 'topEntities' found."
-    testInput <- case testInputs of
+    bench <- case benches of
       []  -> return Nothing
       [x] -> return (Just x)
-      _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
-    expectedOutput <- case expectedOutputs of
-      []  -> return Nothing
-      [x] -> return (Just x)
-      _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testInput's found."
+      _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testBench's found."
 
-    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,testInput,expectedOutput,nub pFP)
+    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,bench,nub pFP)
 
 findCLaSHAnnotations :: GHC.GhcMonad m
                      => [CoreSyn.CoreBndr]

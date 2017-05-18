@@ -9,15 +9,18 @@ import Data.Bits
 
 topEntity :: Word -> Int
 topEntity = countTrailingZeros
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal Word
-testInput = stimuliGenerator $(listToVecTH [1::Word,3,8,50,0])
-
-expectedOutput :: Signal Int -> Signal Bool
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator $(listToVecTH [1::Word,3,8,50,0])
 #if WORD_SIZE_IN_BITS == 64
-expectedOutput = outputVerifier $(listToVecTH ([0,0,3,1,64]::[Int]))
+    expectedOutput = outputVerifier $(listToVecTH ([0,0,3,1,64]::[Int]))
 #elif WORD_SIZE_IN_BITS == 32
-expectedOutput = outputVerifier $(listToVecTH ([0,0,3,1,32]::[Int]))
+    expectedOutput = outputVerifier $(listToVecTH ([0,0,3,1,32]::[Int]))
 #else
 #error Unsupported word size
 #endif
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done

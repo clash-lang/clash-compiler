@@ -15,16 +15,19 @@ where
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
 import Data.HashMap.Strict              (HashMap,(!))
+import Data.Text.Lazy                   (pack)
 import Control.Monad.Trans.Except       (ExceptT (..), mapExceptT, runExceptT)
 import Unbound.Generics.LocallyNameless (name2String)
 
 import CLaSH.Core.DataCon               (DataCon (..))
 import CLaSH.Core.Pretty                (showDoc)
 import CLaSH.Core.TyCon                 (TyCon (..), TyConName, tyConDataCons)
-import CLaSH.Core.Type                  (Type (..), TypeView (..), tyView)
+import CLaSH.Core.Type
+  (LitTy (..), Type (..), TypeView (..), coreView, tyView)
 import CLaSH.Core.Util                  (tyNatSize)
 import CLaSH.Netlist.Util               (coreTypeToHWType)
 import CLaSH.Netlist.Types              (HWType(..))
+import CLaSH.Signal.Internal            (ClockKind (..), ResetKind (..))
 import CLaSH.Util                       (curLoc)
 
 ghcTypeToHWType :: Int
@@ -89,8 +92,20 @@ ghcTypeToHWType iw floatSupport = go
 
         "GHC.Prim.Any" -> return (BitVector 1)
 
-        "CLaSH.Signal.Internal.Signal'" ->
+        "CLaSH.Signal.Internal.Signal" ->
           ExceptT $ return $ coreTypeToHWType go m (args !! 1)
+
+        "CLaSH.Signal.Internal.Clock"
+          | [dom,clkKind] <- args
+          -> do (nm,rate) <- domain m dom
+                gated     <- clockKind m clkKind
+                return (Clock (pack nm) rate gated)
+
+        "CLaSH.Signal.Internal.Reset"
+          | [dom,rstKind] <- args
+          -> do (nm,rate)   <- domain m dom
+                synchronous <- resetKind m rstKind
+                return (Reset (pack nm) rate synchronous)
 
         "CLaSH.Sized.Internal.BitVector.BitVector" ->
           (BitVector . fromInteger) <$> mapExceptT (Just . coerce) (tyNatSize m (head args))
@@ -124,3 +139,38 @@ ghcTypeToHWType iw floatSupport = go
         _ -> ExceptT Nothing
 
     go _ _ = Nothing
+
+domain
+  :: HashMap TyConName TyCon
+  -> Type
+  -> ExceptT String Maybe (String,Integer)
+domain m (coreView m -> Just ty') = domain m ty'
+domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
+  | name2String tcNm == "CLaSH.Signal.Internal.Dom"
+  = do rate <- mapExceptT (Just . coerce) (tyNatSize m rateTy)
+       return (nm,rate)
+domain _ ty = fail $ "Can't translate domain: " ++ showDoc ty
+
+clockKind
+  :: HashMap TyConName TyCon
+  -> Type
+  -> ExceptT String Maybe ClockKind
+clockKind m (coreView m -> Just ty') = clockKind m ty'
+clockKind _ (tyView -> TyConApp tcNm [])
+  | name2String tcNm == "CLaSH.Signal.Internal.Source"
+  = return Source
+  | name2String tcNm == "CLaSH.Signal.Internal.Gated"
+  = return Gated
+clockKind _ ty = fail $ "Can't translate ClockKind" ++ showDoc ty
+
+resetKind
+  :: HashMap TyConName TyCon
+  -> Type
+  -> ExceptT String Maybe ResetKind
+resetKind m (coreView m -> Just ty') = resetKind m ty'
+resetKind _ (tyView -> TyConApp tcNm [])
+  | name2String tcNm == "CLaSH.Signal.Internal.Synchronous"
+  = return Synchronous
+  | name2String tcNm == "CLaSH.Signal.Internal.Asynchronous"
+  = return Asynchronous
+resetKind _ ty = fail $ "Can't translate ResetKind" ++ showDoc ty

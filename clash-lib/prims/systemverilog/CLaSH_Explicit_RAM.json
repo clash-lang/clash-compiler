@@ -1,0 +1,32 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.RAM.asyncRam#"
+    , "type" :
+"asyncRam#
+  :: HasCallStack      -- ARG[0]
+  => Clock wdom wgated -- ^ wclk, ARG[1]
+  -> Clock rdom rgated -- ^ rclk, ARG[2]
+  -> SNat n            -- ^ sz,   ARG[3]
+  -> Signal rdom Int   -- ^ rd,   ARG[4]
+  -> Signal wdom Bool  -- ^ en,   ARG[5]
+  -> Signal wdom Int   -- ^ wr,   ARG[6]
+  -> Signal wdom a     -- ^ din,  ARG[7]
+  -> Signal rdom a"
+    , "templateD" :
+"// asyncRam begin
+logic [~SIZE[~TYP[7]]-1:0] ~GENSYM[RAM][0] [0:~LIT[3]-1];~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_Ram][1]
+  if (~ARG[5] & ~ARG[1][0]) begin
+    ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
+  end
+end~ELSE
+always @(posedge ~ARG[1]) begin : ~SYM[1]
+  if (~ARG[5]) begin
+    ~SYM[0][~ARG[6]] <= ~TOBV[~ARG[7]][~TYP[7]];
+  end
+end~FI
+
+assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[4]\\]][~TYPO];
+// asyncRam end"
+    }
+  }
+]

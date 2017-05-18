@@ -5,9 +5,12 @@ import qualified Data.List as L
 
 topEntity :: Vec 3 Int -> Int
 topEntity xs = L.foldr (+) 0 (toList xs)
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 3 Int)
-testInput = pure (1 :> 2 :> 3 :> Nil)
-
-expectedOutput :: Signal Int -> Signal Bool
-expectedOutput = outputVerifier (6 :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure (1 :> 2 :> 3 :> Nil)
+    expectedOutput = outputVerifier (6 :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (systemClock (not <$> done')) systemReset done
