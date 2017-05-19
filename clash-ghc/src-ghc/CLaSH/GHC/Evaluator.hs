@@ -372,7 +372,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            (TyConApp intTcNm _) = tyView ty'
            (Just intTc) = HashMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  mkApps (Data intCon) [Left (Literal (IntegerLiteral (toInteger (n - 1))))]
+       in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))]
 
   "CLaSH.Sized.Vector.length"
     | isSubj
@@ -382,7 +382,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            (TyConApp intTcNm _) = tyView ty'
            (Just intTc) = HashMap.lookup intTcNm tcm
            [intCon] = tyConDataCons intTc
-       in  mkApps (Data intCon) [Left (Literal (IntegerLiteral (toInteger n)))]
+       in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))]
 
   _ -> e
 
