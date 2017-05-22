@@ -145,7 +145,11 @@ lambdaDrop bndrs topEntity = bndrs''
     --
     -- Also, if there's a bug in lambdaDrop, Clash will complain loudly because
     -- it will look for a function which has been deleted.
-    bndrs'' = List.foldl' (flip HashMap.delete) bndrs' (concat rcs)
+    --
+    -- Bug 1 discovered and fixed: topEntity itself can be part of a recursive
+    -- group, but it should not be deleted.
+    bndrs'' = List.foldl' (flip HashMap.delete) bndrs'
+                          (filter (/= topEntity) (concat rcs))
 
     addRC (ty,sp,tm) =
       let fv      = Lens.toListOf termFreeIds tm
