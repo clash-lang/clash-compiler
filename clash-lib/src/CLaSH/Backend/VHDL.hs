@@ -152,8 +152,8 @@ mkTyPackage_ modName hwtys = do
     { syn <- hdlSyn
     ; mkId <- mkBasicId
     ; let usedTys     = concatMap mkUsedTys hwtys
-          normTys     = nub $ map (mkVecZ . normaliseType) (hwtys ++ usedTys)
-          sortedTys   = topSortHWTys normTys
+    ; normTys <- nub A.<$> mapM (fmap mkVecZ . normaliseType) (hwtys ++ usedTys)
+    ; let sortedTys   = topSortHWTys normTys
           packageDec  = vcat $ mapM tyDec sortedTys
           (funDecs,funBodies) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM sortedTys
 
@@ -211,14 +211,16 @@ topSortHWTys hwtys = sorted
                              in mapMaybe (\ty -> liftM (ti,,()) (HashMap.lookup (mkVecZ ty) nodesI)) tys
     edge _                 = []
 
-normaliseType :: HWType -> HWType
-normaliseType (Vector n ty)    = Vector n (normaliseType ty)
-normaliseType (RTree d ty)     = RTree d (normaliseType ty)
-normaliseType (Product nm tys) = Product nm (map normaliseType tys)
-normaliseType ty@(SP _ _)      = BitVector (typeSize ty)
-normaliseType ty@(Index _)     = Unsigned (typeSize ty)
-normaliseType ty@(Sum _ _)     = Unsigned (typeSize ty)
-normaliseType ty = ty
+normaliseType :: HWType -> VHDLM HWType
+normaliseType (Vector n ty)    = Vector n A.<$> (normaliseType ty)
+normaliseType (RTree d ty)     = RTree d A.<$> (normaliseType ty)
+normaliseType (Product nm tys) = Product nm A.<$> (mapM normaliseType tys)
+normaliseType ty@(SP _ elTys)      = do
+  mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
+  return (BitVector (typeSize ty))
+normaliseType ty@(Index _)     = return (Unsigned (typeSize ty))
+normaliseType ty@(Sum _ _)     = return (Unsigned (typeSize ty))
+normaliseType ty = return ty
 
 mkVecZ :: HWType -> HWType
 mkVecZ (Vector _ elTy) = Vector 0 elTy
@@ -431,7 +433,7 @@ architecture c =
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc
 vhdlType hwty = do
-    let hwty' = normaliseType hwty
+    hwty' <- normaliseType hwty
     tyCache %= HashSet.insert hwty'
     go hwty'
   where
@@ -467,7 +469,7 @@ sigDecl d t = d <+> colon <+> vhdlType t
 -- | Convert a Netlist HWType to the root of a VHDL type
 vhdlTypeMark :: HWType -> VHDLM Doc
 vhdlTypeMark hwty = do
-  let hwty' = normaliseType hwty
+  hwty' <- normaliseType hwty
   tyCache %= HashSet.insert hwty'
   go hwty'
   where
@@ -499,7 +501,9 @@ tyName t@(Index _)       = "unsigned_" <> int (typeSize t)
 tyName (Signed n)        = "signed_" <> int n
 tyName (Unsigned n)      = "unsigned_" <> int n
 tyName t@(Sum _ _)       = "unsigned_" <> int (typeSize t)
-tyName t@(Product nm _)  = makeCached (normaliseType t) nameCache prodName
+tyName t@(Product nm _)  = do
+    tN <- normaliseType t
+    makeCached tN nameCache prodName
   where
     prodName = do
       seen <- use tySeen
