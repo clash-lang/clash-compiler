@@ -15,6 +15,7 @@ module CLaSH.GHCi.UI.Monad (
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..),
+        PromptFunction,
         BreakLocation(..),
         TickArray,
         getDynFlags,
@@ -43,12 +44,14 @@ import SrcLoc
 import Module
 import GHCi
 import GHCi.RemoteTypes
+import HsSyn (ImportDecl)
+import RdrName (RdrName)
 
 import Exception
 import Numeric
 import Data.Array
 import Data.IORef
-import System.CPUTime
+import Data.Time
 import System.Environment
 import System.IO
 import Control.Monad
@@ -67,8 +70,8 @@ data GHCiState = GHCiState
         progname       :: String,
         args           :: [String],
         evalWrapper    :: ForeignHValue, -- ^ of type @IO a -> IO a@
-        prompt         :: String,
-        prompt2        :: String,
+        prompt         :: PromptFunction,
+        prompt_cont    :: PromptFunction,
         editor         :: String,
         stop           :: String,
         options        :: [GHCiOption],
@@ -105,6 +108,26 @@ data GHCiState = GHCiState
             -- :load, :reload, and :add.  In between it may be modified
             -- by :module.
 
+        extra_imports  :: [ImportDecl RdrName],
+            -- ^ These are "always-on" imports, added to the
+            -- context regardless of what other imports we have.
+            -- This is useful for adding imports that are required
+            -- by setGHCiMonad.  Be careful adding things here:
+            -- you can create ambiguities if these imports overlap
+            -- with other things in scope.
+            --
+            -- NB. although this is not currently used by GHCi itself,
+            -- it was added to support other front-ends that are based
+            -- on the GHCi code.  Potentially we could also expose
+            -- this functionality via GHCi commands.
+
+        prelude_imports :: [ImportDecl RdrName],
+            -- ^ These imports are added to the context when
+            -- -XImplicitPrelude is on and we don't have a *-module
+            -- in the context.  They can also be overridden by another
+            -- import for the same module, e.g.
+            -- "import Prelude hiding (map)"
+
         ghc_e :: Bool, -- ^ True if this is 'ghc -e' (or runghc)
 
         short_help :: String,
@@ -136,6 +159,10 @@ data Command
    , cmdCompletionFunc :: CompletionFunc GHCi
      -- ^ 'CompletionFunc' for arguments
    }
+
+type PromptFunction = [String]
+                   -> Int
+                   -> GHCi SDoc
 
 data GHCiOption
         = ShowTiming            -- show time/allocs after evaluation
@@ -348,18 +375,18 @@ timeIt getAllocs action
   = do b <- lift $ isOptionSet ShowTiming
        if not b
           then action
-          else do time1   <- liftIO $ getCPUTime
+          else do time1   <- liftIO $ getCurrentTime
                   a <- action
                   let allocs = getAllocs a
-                  time2   <- liftIO $ getCPUTime
+                  time2   <- liftIO $ getCurrentTime
                   dflags  <- getDynFlags
-                  liftIO $ printTimes dflags allocs (time2 - time1)
+                  let period = time2 `diffUTCTime` time1
+                  liftIO $ printTimes dflags allocs (realToFrac period)
                   return a
 
-printTimes :: DynFlags -> Maybe Integer -> Integer -> IO ()
-printTimes dflags mallocs psecs
-   = do let secs = (fromIntegral psecs / (10^(12::Integer))) :: Float
-            secs_str = showFFloat (Just 2) secs
+printTimes :: DynFlags -> Maybe Integer -> Double -> IO ()
+printTimes dflags mallocs secs
+   = do let secs_str = showFFloat (Just 2) secs
         putStrLn (showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
                          case mallocs of

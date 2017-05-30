@@ -5,6 +5,12 @@ in instead of the defaults.
 */
 
 #include "PosixSource.h"
+
+/*
+ * This should be linked against Rts.h from the compiler which is compiling us.
+ * For instance, if we are compiling this file to produce the stage1 compiler,
+ * we should use Rts.h from stage0.
+ */
 #include "Rts.h"
 
 #include "HsFFI.h"
@@ -48,6 +54,8 @@ defaultsHook (void)
 void
 StackOverflowHook (StgWord stack_size)    /* in bytes */
 {
-    fprintf(stderr, "GHC stack-space overflow: current limit is %zu bytes.\nUse the `-K<size>' option to increase it.\n", (size_t)stack_size);
+    fprintf(stderr,
+            "GHC stack-space overflow: current limit is %zu bytes.\n"
+            "Use the `-K<size>' option to increase it.\n",
+            (size_t) stack_size);
 }
-
