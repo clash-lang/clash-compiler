@@ -37,6 +37,9 @@ import qualified IfaceSyn
 import qualified LoadIface
 import qualified Maybes
 import qualified MkCore
+#if MIN_VERSION_ghc(8,2,0)
+import qualified Module
+#endif
 import qualified MonadUtils
 import qualified Name
 import           Outputable  (showPpr, showSDoc, text)
@@ -46,7 +49,9 @@ import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
 import qualified Var
+#if !MIN_VERSION_ghc(8,2,0)
 import qualified VarSet
+#endif
 
 -- Internal Modules
 import           CLaSH.Util  ((***), curLoc, traceIf)
@@ -54,8 +59,13 @@ import           CLaSH.Util  ((***), curLoc, traceIf)
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
   hscEnv <- GHC.getSession
+#if MIN_VERSION_ghc(8,2,0)
+  let localEnv = TcRnTypes.IfLclEnv modName False (text "runIfl") Nothing
+                   Nothing UniqFM.emptyUFM UniqFM.emptyUFM
+#else
   let localEnv = TcRnTypes.IfLclEnv modName (text "runIfl")
                    UniqFM.emptyUFM UniqFM.emptyUFM
+#endif
   let globalEnv = TcRnTypes.IfGblEnv (text "CLaSH.runIfl") Nothing
   MonadUtils.liftIO $ TcRnMonad.initTcRnIf 'r' hscEnv globalEnv
                         localEnv action
@@ -65,7 +75,12 @@ loadDecl = TcIface.tcIfaceDecl False
 
 loadIface :: GHC.Module -> TcRnTypes.IfL (Maybe GHC.ModIface)
 loadIface foundMod = do
+#if MIN_VERSION_ghc(8,2,0)
+  ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface")
+                  (fst (Module.splitModuleInsts foundMod)) foundMod False
+#else
   ifaceFailM <- LoadIface.findAndReadIface (Outputable.text "loadIface") foundMod False
+#endif
   case ifaceFailM of
     Maybes.Succeeded (modInfo,_) -> return (Just modInfo)
     Maybes.Failed msg -> let msg' = concat [ $(curLoc)
@@ -88,7 +103,11 @@ loadExternalExprs ::
        )
 loadExternalExprs _   []           _       = return ([],[],[],[])
 loadExternalExprs hdl (expr:exprs) visited = do
+#if MIN_VERSION_ghc(8,2,0)
+  let fvs = CoreFVs.exprSomeFreeVarsList
+#else
   let fvs = VarSet.varSetElems $ CoreFVs.exprSomeFreeVars
+#endif
               (\v -> Var.isId v &&
                      isNothing (Id.isDataConId_maybe v) &&
                      v `notElem` visited
@@ -144,7 +163,11 @@ loadExprFromIface hdl bndr = do
         Just iface -> do
           let decls = map snd (GHC.mi_decls iface)
           let nameFun = GHC.getOccName $ Var.varName bndr
+#if MIN_VERSION_ghc(8,2,0)
+          let declM = filter ((== nameFun) . Name.nameOccName . IfaceSyn.ifName) decls
+#else
           let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
+#endif
           anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
           let primFPs = loadPrimitiveAnnotations hdl anns
           case declM of

@@ -48,7 +48,11 @@ import qualified Serialized
 import qualified TidyPgm
 import qualified TcRnMonad
 import qualified TcRnTypes
+#if MIN_VERSION_ghc(8,2,0)
+import qualified UniqDFM
+#else
 import qualified UniqFM
+#endif
 import qualified Var
 import qualified FamInst
 import qualified FamInstEnv
@@ -195,7 +199,11 @@ loadModules hdl modName dflagsM = do
                          ) modGraph2
 
     let (binders,modFamInstEnvs) = first concat $ unzip tidiedMods
+#if MIN_VERSION_ghc(8,2,0)
+        modFamInstEnvs'          = foldr UniqDFM.plusUDFM UniqDFM.emptyUDFM modFamInstEnvs
+#else
         modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
+#endif
 
     (externalBndrs,clsOps,unlocatable,pFP) <-
       loadExternalExprs hdl (map snd binders) (map fst binders)

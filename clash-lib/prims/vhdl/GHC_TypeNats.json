@@ -1,0 +1,7 @@
+[ { "BlackBox" :
+    { "name"      : "GHC.TypeNats.natVal"
+    , "type"      : "natVal :: forall n proxy. KnownNat n => proxy n -> Natural"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+]

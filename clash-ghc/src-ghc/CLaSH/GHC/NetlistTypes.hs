@@ -71,6 +71,7 @@ ghcTypeToHWType iw floatSupport = go
                     _    -> error $ $(curLoc) ++ "Word64 TC has unexpected amount of DCs"
              else return (Unsigned 64)
         "GHC.Integer.Type.Integer"      -> return (Signed iw)
+        "GHC.Natural.Natural"           -> return (Unsigned iw)
         "GHC.Prim.Char#"                -> return (Unsigned 21)
         "GHC.Prim.Int#"                 -> return (Signed iw)
         "GHC.Prim.Word#"                -> return (Unsigned iw)

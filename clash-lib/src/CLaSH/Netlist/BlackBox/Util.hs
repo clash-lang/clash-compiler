@@ -329,8 +329,10 @@ renderTag b (L n)           = let (s,_,_) = bbInputs b !! n
                                   e       = either id fst s
                               in  (displayT . renderOneLine) <$> expr False (mkLit e)
   where
-    mkLit (Literal (Just (Signed _,_)) i) = Literal Nothing i
+    mkLit (Literal (Just (Signed _,_)) i)   = Literal Nothing i
+    mkLit (Literal (Just (Unsigned _,_)) i) = Literal Nothing i
     mkLit (DataCon _ (DC (Void, _)) [Literal (Just (Signed _,_)) i]) = Literal Nothing i
+    mkLit (DataCon _ (DC (Void, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
     mkLit i                               = i
 
 renderTag _ (Sym t _) = return t

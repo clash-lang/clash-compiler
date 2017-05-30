@@ -6,6 +6,8 @@
   Builtin Type and Kind definitions
 -}
 
+{-# LANGUAGE CPP #-}
+
 module CLaSH.Core.TysPrim
   ( liftedTypeKind
   , typeNatKind
@@ -20,13 +22,17 @@ module CLaSH.Core.TysPrim
   , word64PrimTy
   , floatPrimTy
   , doublePrimTy
+  , naturalPrimTy
   , tysPrimMap
   )
 where
 
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
-import           Unbound.Generics.LocallyNameless (string2Name)
+import           Unbound.Generics.LocallyNameless (makeName, string2Name)
+
+import           PrelNames
+import           Unique                           (Unique, getKey)
 
 import           CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
@@ -51,20 +57,37 @@ liftedTypeKind = mkTyConTy liftedTypeKindTyConName
 typeNatKind    = mkTyConTy typeNatKindTyConName
 typeSymbolKind = mkTyConTy typeSymbolKindTyConName
 
+uniqueToInteger :: Unique -> Integer
+uniqueToInteger = toInteger . getKey
 
 intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
-  word64PrimTyConName, floatPrimTyConName, doublePrimTyConName :: TyConName
-intPrimTyConName     = string2Name "GHC.Prim.Int#"
-integerPrimTyConName = string2Name "GHC.Integer.Type.Integer"
+  word64PrimTyConName, floatPrimTyConName, doublePrimTyConName,
+  naturalPrimTyConName :: TyConName
+intPrimTyConName     = makeName "GHC.Prim.Int#"
+                                (uniqueToInteger intPrimTyConKey)
+integerPrimTyConName = makeName "GHC.Integer.Type.Integer"
+                                (uniqueToInteger integerTyConKey)
 stringPrimTyConName  = string2Name "String"
-charPrimTyConName    = string2Name "GHC.Prim.Char#"
+charPrimTyConName    = makeName "GHC.Prim.Char#"
+                                (uniqueToInteger charPrimTyConKey)
 voidPrimTyConName    = string2Name "VOID"
-wordPrimTyConName    = string2Name "GHC.Prim.Word#"
-int64PrimTyConName   = string2Name "GHC.Prim.Int64#"
-word64PrimTyConName  = string2Name "GHC.Prim.Word64#"
-floatPrimTyConName   = string2Name "GHC.Prim.Float#"
-doublePrimTyConName  = string2Name "GHC.Prim.Double#"
+wordPrimTyConName    = makeName "GHC.Prim.Word#"
+                                (uniqueToInteger wordPrimTyConKey)
+int64PrimTyConName   = makeName "GHC.Prim.Int64#"
+                                (uniqueToInteger int64PrimTyConKey)
+word64PrimTyConName  = makeName "GHC.Prim.Word64#"
+                                (uniqueToInteger word64PrimTyConKey)
+floatPrimTyConName   = makeName "GHC.Prim.Float#"
+                                (uniqueToInteger floatPrimTyConKey)
+doublePrimTyConName  = makeName "GHC.Prim.Double#"
+                                (uniqueToInteger doublePrimTyConKey)
+#if MIN_VERSION_ghc(8,2,0)
+naturalPrimTyConName = makeName "GHC.Natural.Natural"
+                                (uniqueToInteger naturalTyConKey)
+#else
+naturalPrimTyConName = string2Name "GHC.Natural.Natural"
+#endif
 
 liftedPrimTC :: TyConName
              -> TyCon
@@ -72,7 +95,7 @@ liftedPrimTC name = PrimTyCon name liftedTypeKind 0
 
 -- | Builtin Type
 intPrimTc, integerPrimTc, charPrimTc, stringPrimTc, voidPrimTc, wordPrimTc,
-  int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc :: TyCon
+  int64PrimTc, word64PrimTc, floatPrimTc, doublePrimTc, naturalPrimTc :: TyCon
 intPrimTc     = liftedPrimTC intPrimTyConName
 integerPrimTc = liftedPrimTC integerPrimTyConName
 charPrimTc    = liftedPrimTC charPrimTyConName
@@ -83,9 +106,10 @@ int64PrimTc   = liftedPrimTC int64PrimTyConName
 word64PrimTc  = liftedPrimTC word64PrimTyConName
 floatPrimTc   = liftedPrimTC floatPrimTyConName
 doublePrimTc  = liftedPrimTC doublePrimTyConName
+naturalPrimTc = liftedPrimTC naturalPrimTyConName
 
 intPrimTy, integerPrimTy, charPrimTy, stringPrimTy, voidPrimTy, wordPrimTy,
-  int64PrimTy, word64PrimTy, floatPrimTy, doublePrimTy :: Type
+  int64PrimTy, word64PrimTy, floatPrimTy, doublePrimTy, naturalPrimTy :: Type
 intPrimTy     = mkTyConTy intPrimTyConName
 integerPrimTy = mkTyConTy integerPrimTyConName
 charPrimTy    = mkTyConTy charPrimTyConName
@@ -96,6 +120,7 @@ int64PrimTy   = mkTyConTy int64PrimTyConName
 word64PrimTy  = mkTyConTy word64PrimTyConName
 floatPrimTy   = mkTyConTy floatPrimTyConName
 doublePrimTy  = mkTyConTy doublePrimTyConName
+naturalPrimTy = mkTyConTy naturalPrimTyConName
 
 tysPrimMap :: HashMap TyConName TyCon
 tysPrimMap = HashMap.fromList
@@ -113,4 +138,5 @@ tysPrimMap = HashMap.fromList
   , (word64PrimTyConName,word64PrimTc)
   , (floatPrimTyConName,floatPrimTc)
   , (doublePrimTyConName,doublePrimTc)
+  , (naturalPrimTyConName,naturalPrimTc)
   ]
