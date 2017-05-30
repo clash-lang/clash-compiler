@@ -49,8 +49,9 @@ import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
                    fromBranches)
 import Coercion   (Role(..),coercionType,coercionKind,mkCoercionType)
 import CoreFVs    (exprSomeFreeVars)
-import CoreSyn    (AltCon (..), Bind (..), CoreExpr,
-                   Expr (..), Unfolding (..), rhssOfAlts, unfoldingTemplate)
+import CoreSyn
+  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), collectArgs,
+   rhssOfAlts, unfoldingTemplate)
 import DataCon    (DataCon, dataConExTyVars,
                    dataConName, dataConRepArgTys,
                    dataConTag, dataConTyCon,
@@ -233,21 +234,55 @@ coreToTerm :: Bool
 coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
-    term (Var x)                 = do
+    term e
+      | (Var x,args) <- collectArgs e
+      , let nm = State.evalState (qualfiedNameString (varName x)) emptyGHC2CoreState
+      = go nm args
+      | otherwise
+      = term' e
+      where
+        -- Remove most Signal transformers
+        go "CLaSH.Signal.Internal.mapSignal#"  args
+          | length args == 5
+          = term (App (args!!3) (args!!4))
+        go "CLaSH.Signal.Internal.signal#"     args
+          | length args == 3
+          = term (args!!2)
+        go "CLaSH.Signal.Internal.appSignal#"  args
+          | length args == 5
+          = term (App (args!!3) (args!!4))
+        go "CLaSH.Signal.Internal.joinSignal#" args
+          | length args == 3
+          = term (args!!2)
+        go "CLaSH.Signal.Bundle.vecBundle#"    args
+          | length args == 4
+          = term (args!!3)
+        --- Remove `$`
+        go "GHC.Base.$"                        args
+          | length args == 5
+          = term (App (args!!3) (args!!4))
+        -- Remove most CallStack logic
+        go "GHC.Stack.Types.PushCallStack"     args = term (last args)
+        go "GHC.Stack.Types.FreezeCallStack"   args = term (last args)
+        go "GHC.Stack.withFrozenCallStack"     args
+          | length args == 3
+          = term (App (args!!2) (args!!1))
+        go _ _ = term' e
+    term' (Var x)                 = do
       srcsp' <- Reader.ask
       lift (var srcsp' x)
-    term (Lit l)                 = return $ C.Literal (coreToLiteral l)
-    term (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
-    term (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
-    term (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e))
+    term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
+    term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
+    term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
+    term' (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e))
                    | otherwise   = C.Lam   <$> (bind <$> lift (coreToId x) <*> addUsefull (getSrcSpan x) (term e))
-    term (Let (NonRec x e1) e2)  = do
+    term' (Let (NonRec x e1) e2)  = do
       x' <- lift (coreToId x)
       e1' <- addUsefull (getSrcSpan x) (term e1)
       e2' <- term e2
       return $ C.Letrec $ bind (rec [(x', embed e1')]) e2'
 
-    term (Let (Rec xes) e) = do
+    term' (Let (Rec xes) e) = do
       xes' <- mapM (\(x,b) -> (,) <$> lift (coreToId x)
                                   <*> addUsefull (getSrcSpan x)
                                                  (embed <$> term b))
@@ -255,8 +290,8 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
       e' <- term e
       return $ C.Letrec $ bind (rec xes') e'
 
-    term (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
-    term (Case e b ty alts) = do
+    term' (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
+    term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
                   $ rhssOfAlts alts
      b' <- lift (coreToId b)
@@ -269,7 +304,7 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
         return $ C.Letrec $ bind (rec [(b',embed e')]) ct
       else caseTerm e'
 
-    term (Cast e co) = do
+    term' (Cast e co) = do
       let (Pair ty1 ty2) = coercionKind co
       hasPrimCoM <- lift (hasPrimCo co)
       ty1_I <- lift (isIntegerTy ty1)
@@ -292,9 +327,9 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
                   )
 
         _ -> term e
-    term (Tick _ e)        = term e
-    term (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
-    term (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
+    term' (Tick _ e)        = term e
+    term' (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
+    term' (Coercion co)     = C.Prim (pack "_CO_") <$> lift (coreToType (coercionType co))
 
     var srcsp' x = do
         xVar   <- coreToVar x
@@ -321,6 +356,7 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
               | f == pack "CLaSH.Signal.Internal.joinSignal#" -> return (joinTerm xType)
               | f == pack "CLaSH.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
               | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
+              | f == pack "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
               return (C.Prim xNameS xType)
@@ -738,6 +774,31 @@ joinTerm :: C.Type
          -> C.Term
 joinTerm ty@(C.ForAllTy _) = signalTerm ty
 joinTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @forall a. CallStack -> (HasCallStack => a) -> a@
+--
+-- Generate the term
+--
+-- @/\(a:*)./\(callStack:CallStack).\(f:HasCallStack => a).f callStack@
+withFrozenCallStackTerm
+  :: C.Type
+  -> C.Term
+withFrozenCallStackTerm (C.ForAllTy tvATy) =
+  C.TyLam (bind aTV (
+  C.Lam   (bind callStackId (
+  C.Lam   (bind fId (
+  C.App (C.Var fTy fName) (C.Var callStackTy callStackName)))))))
+  where
+    (aTV,funTy) = runFreshM (unbind tvATy)
+    (C.FunTy callStackTy fTy) = C.tyView funTy
+    callStackName = string2Name "callStack"
+    fName         = string2Name "f"
+    callStackId   = C.Id callStackName (embed callStackTy)
+    fId           = C.Id fName (embed fTy)
+
+withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of
