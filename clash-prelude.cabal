@@ -84,6 +84,8 @@ Library
 
   default-language:   Haskell2010
   ghc-options:        -Wall -fexpose-all-unfoldings
+  if impl(ghc >= 8.2.0)
+    ghc-options:      -fno-worker-wrapper
 
   Exposed-modules:    CLaSH.Annotations.TopEntity
                       CLaSH.Annotations.Primitive
@@ -220,7 +222,7 @@ benchmark benchmark-clash-prelude
     build-depends:
       base              >= 4       && < 5,
       clash-prelude,
-      criterion         >= 1.1.1.0 && < 1.2,
+      criterion         >= 1.1.1.0 && < 1.3,
       deepseq           >= 1.4.0.1 && < 1.5,
       template-haskell  >= 2.9.0.0 && < 2.13
 
