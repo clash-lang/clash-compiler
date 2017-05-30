@@ -71,9 +71,6 @@ instance Ord Term where
   compare = acompare
 
 instance Alpha Term where
-  fvAny' c nfn (Var t n)  = fmap (Var t) $ fvAny' c nfn n
-  fvAny' c nfn t          = fmap to . gfvAny c nfn $ from t
-
   aeq' c (Var _ n)   (Var _ m)   = aeq' c n m
   aeq' _ (Prim t1 _) (Prim t2 _) = t1 == t2
   aeq' c t1          t2          = gaeq c (from t1) (from t2)
