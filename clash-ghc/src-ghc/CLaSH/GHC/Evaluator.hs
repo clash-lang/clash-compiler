@@ -22,6 +22,7 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
 import Data.Text                     (Text)
 -- import           Data.Word
+import           GHC.Int
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.Word
@@ -136,6 +137,17 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
        in  mkApps (Data tupDc) (map Right tyArgs ++
                    [ Left (Literal . WordLiteral . toInteger $ W# h)
                    , Left (Literal . WordLiteral . toInteger $ W# l)])
+
+  "GHC.Prim.subWordC#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           [tupDc] = tyConDataCons tupTc
+           !(W# a)  = fromInteger i
+           !(W# b)  = fromInteger j
+           !(# d, c #) = subWordC# a b
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . WordLiteral . toInteger $ W# d)
+                   , Left (Literal . IntLiteral . toInteger $ I# c)])
 
   "GHC.Prim.uncheckedShiftL#"
     | [ Literal (WordLiteral w)
