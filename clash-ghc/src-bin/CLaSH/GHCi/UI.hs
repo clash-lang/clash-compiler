@@ -2428,7 +2428,6 @@ setGHCContextFromGHCiState = do
 
 getImplicitPreludeImports :: [InteractiveImport] -> GHCi [InteractiveImport]
 getImplicitPreludeImports iidecls = do
-  dflags <- GHC.getInteractiveDynFlags
      -- allow :seti to override -XNoImplicitPrelude
   st <- getGHCiState
 
