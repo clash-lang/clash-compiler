@@ -4,9 +4,6 @@ flags:
 packages:
 - clash-prelude
 - clash-lib
-- clash-verilog
-- clash-systemverilog
-- clash-vhdl
 - clash-ghc
 - testsuite
 - location:
