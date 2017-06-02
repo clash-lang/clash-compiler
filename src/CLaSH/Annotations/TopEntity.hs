@@ -1,5 +1,6 @@
 {-|
-Copyright  :  (C) 2015-2016, University of Twente
+Copyright  :  (C) 2015-2016, University of Twente,
+                  2017     , Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -18,15 +19,27 @@ topEntity x = ...
 For example, given the following specification:
 
 @
-topEntity :: Signal Bit -> Signal (BitVector 8)
-topEntity key1 = leds
+import CLaSH.Prelude
+import CLaSH.Intel.ClockGen
+
+type Dom50 = Dom \"System\" 20000
+
+topEntity
+  :: Clock Dom50 Source
+  -> Reset Dom50 Asynchronous
+  -> Signal Dom50 Bit
+  -> Signal Dom50 (BitVector 8)
+topEntity clk rst key1 =
+    let  (pllOut,pllStable) = 'CLaSH.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
+         rstSync            = 'CLaSH.Signal.resetSynchroniser' pllOut ('CLaSH.Signal.unsafeToAsyncReset' pllStable)
+    in   'CLaSH.Signal.withClockReset' pllOut rstSync leds
   where
-    key1R = isRising 1 key1
-    leds  = mealy blinkerT (1,False,0) key1R
+    key1R  = 'CLaSH.Prelude.isRising' 1 key1
+    leds   = 'CLaSH.Prelude.mealy' blinkerT (1,False,0) key1R
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
-    -- clock frequency = 50e6   (50 MHz)
+    -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
     cnt_max = 16650000 -- 50e6 * 333e-3
 
@@ -44,31 +57,32 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
 The CλaSH compiler will normally generate the following @topEntity.vhdl@ file:
 
 @
--- Automatically generated VHDL
+-- Automatically generated VHDL-93
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
+use std.textio.all;
 use work.all;
-use work.types.all;
+use work.blinker_types.all;
 
-entity topEntity is
-  port(input_0         : in std_logic_vector(0 downto 0);
-       -- clock
-       system1000      : in std_logic;
-       -- asynchronous reset: active low
-       system1000_rstn : in std_logic;
-       output_0        : out std_logic_vector(7 downto 0));
+entity blinker_topentity is
+  port(-- clock
+       input_0  : in std_logic;
+       -- asynchronous reset: active high
+       input_1  : in std_logic;
+       input_2  : in std_logic_vector(0 downto 0);
+       output_0 : out std_logic_vector(7 downto 0));
 end;
 
-architecture structural of topEntity is
+architecture structural of blinker_topentity is
 begin
-  topEntity_0_inst : entity topEntity_0
+  blinker_topentity_0_inst : entity blinker_topentity_0
     port map
-      (key1_i1         => input_0
-      ,system1000      => system1000
-      ,system1000_rstn => system1000_rstn
-      ,topLet_o        => output_0);
+      (clk    => input_0
+      ,rst    => input_1
+      ,key1   => input_2
+      ,result => output_0);
 end;
 @
 
@@ -78,86 +92,47 @@ However, if we add the following 'TopEntity' annotation in the file:
 {\-\# ANN topEntity
   ('defTop'
     { t_name     = "blinker"
-    , t_inputs   = [\"KEY1\"]
+    , t_inputs   = [\"CLOCK_50\",\"KEY0\",\"KEY1\"]
     , t_outputs  = [\"LED\"]
-    , t_extraIn  = [ (\"CLOCK_50\", 1)
-                   , (\"KEY0\"    , 1)
-                   ]
-    , t_clocks   = [ 'altpll' "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) \#-\}
 @
 
 The CλaSH compiler will generate the following @blinker.vhdl@ file instead:
 
 @
--- Automatically generated VHDL
+-- Automatically generated VHDL-93
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
+use std.textio.all;
 use work.all;
-use work.types.all;
+use work.blinker_types.all;
 
 entity blinker is
-  port(KEY1     : in std_logic_vector(0 downto 0);
-       CLOCK_50 : in std_logic_vector(0 downto 0);
-       KEY0     : in std_logic_vector(0 downto 0);
+  port(-- clock
+       CLOCK_50 : in std_logic;
+       -- asynchronous reset: active high
+       KEY0     : in std_logic;
+       KEY1     : in std_logic_vector(0 downto 0);
        LED      : out std_logic_vector(7 downto 0));
 end;
 
 architecture structural of blinker is
-  signal system1000      : std_logic;
-  signal system1000_rstn : std_logic;
-  signal altpll50_locked : std_logic;
 begin
-  altpll50_inst : entity altpll50
+  blinker_topentity_inst : entity blinker_topentity
     port map
-      (inclk0 => CLOCK_50(0)
-      ,c0     => system1000
-      ,areset => not KEY0(0)
-      ,locked => altpll50_locked);
-
-  -- reset system1000_rstn is asynchronously asserted, but synchronously de-asserted
-  resetSync_n_0 : block
-    signal n_1 : std_logic;
-    signal n_2 : std_logic;
-  begin
-    process(system1000,altpll50_locked)
-    begin
-      if altpll50_locked = '0' then
-        n_1 <= '0';
-        n_2 <= '0';
-      elsif rising_edge(system1000) then
-        n_1 <= '1';
-        n_2 <= n_1;
-      end if;
-    end process;
-
-    system1000_rstn <= n_2;
-  end block;
-
-  topEntity_0_inst : entity topEntity_0
-    port map
-      (key1_i1         => KEY1
-      ,system1000      => system1000
-      ,system1000_rstn => system1000_rstn
-      ,topLet_o        => LED);
+      (clk    => CLOCK_50
+      ,rst    => KEY0
+      ,key1   => KEY1
+      ,result => LED);
 end;
 @
 
 Where we now have:
 
 * A top-level component that is called @blinker@.
-* Inputs and outputs that have a /user/-chosen name: @KEY1@, @LED@, etc.
-* An instantiated <https://www.altera.com/literature/ug/ug_altpll.pdf PLL>
-  component providing a stable clock signal from the free-running clock pin
-  @CLOCK_50@.
-* A reset that is /asynchronously/ asserted by the @lock@ signal originating from
-  the PLL, meaning that your design is kept in reset until the PLL is
-  providing a stable clock.
-  The reset is additionally /synchronously/ de-asserted to prevent
-  <http://en.wikipedia.org/wiki/Metastability_in_electronics metastability>
-  of your design due to unlucky timing of the de-assertion of the reset.
+* Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @LED@, etc.
 
 See the documentation of 'TopEntity' for the meaning of all its fields.
 -}
@@ -181,12 +156,13 @@ import Data.Data
 -- | TopEntity annotation
 data TopEntity
   = TopEntity
-  { t_name     :: String         -- ^ The name the top-level component should
-                                 -- have, put in a correspondingly named file.
-  , t_inputs   :: [String]       -- ^ List of names that are assigned in-order
-                                 -- to the inputs of the component.
-  , t_outputs  :: [String]       -- ^ List of names that are assigned in-order
-                                 -- to the outputs of the component.
+  { t_name     :: String
+  -- ^ The name the top-level component should have, put in a correspondingly
+  -- named file.
+  , t_inputs   :: [String]
+  -- ^ List of names that are assigned in-order to the inputs of the component.
+  , t_outputs  :: [String]
+  -- ^ List of names that are assigned in-order to the outputs of the component.
   , t_extraIn  :: [(String,Int)]
   -- ^ Extra input ports, where every tuple holds the name of the input port and
   -- the number of  bits are used for that input port.
