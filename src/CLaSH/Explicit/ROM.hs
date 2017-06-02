@@ -46,7 +46,7 @@ import CLaSH.Sized.Vector     (Vec, length, toList)
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
   :: KnownNat n
@@ -66,7 +66,7 @@ romPow2 = rom
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Prelude.BlockRam#usingrams"
+-- * See "CLaSH.Sized.Fixed#creatingdatafiles" and "CLaSH.Explicit.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
   :: (KnownNat n, Enum addr)

@@ -77,7 +77,7 @@ asyncRamPow2 = \wclk rclk rd wrM -> withFrozenCallStack
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- * See "CLaSH.Explicit.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRam
   :: (Enum addr, HasCallStack)

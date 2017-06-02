@@ -5,12 +5,8 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 This module defines the explicitly clocked counterparts of the functions
-defined in "CLaSH.Prelude".
-
-This module uses the explicitly clocked 'Signal'' synchronous signals, as
-opposed to the implicitly clocked 'Signal' used in "CLaSH.Prelude". Take a
-look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
-using explicitly clocked signals.
+defined in "CLaSH.Prelude". Take a look at "CLaSH.Signal.Explicit" to see how
+you can make multi-clock designs.
 -}
 
 {-# LANGUAGE DataKinds     #-}
@@ -91,6 +87,7 @@ module CLaSH.Explicit.Prelude
   , module CLaSH.Promoted.Nat
   , module CLaSH.Promoted.Nat.Literals
   , module CLaSH.Promoted.Nat.TH
+  , module CLaSH.Promoted.Symbol
     -- ** Template Haskell
   , Lift (..)
     -- ** Type classes
@@ -150,6 +147,7 @@ import CLaSH.Prelude.ROM.File       (asyncRomFile, asyncRomFilePow2)
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
+import CLaSH.Promoted.Symbol
 import CLaSH.Sized.BitVector
 import CLaSH.Sized.Fixed
 import CLaSH.Sized.Index
@@ -166,7 +164,7 @@ import CLaSH.XException
 >>> let windowD3 = windowD @2
 -}
 
--- | Give a window over a 'Signal''
+-- | Give a window over a 'Signal'
 --
 -- @
 -- window4
@@ -194,7 +192,7 @@ window clk rst x = res
                   in  registerB clk rst (repeat def) next
 {-# INLINABLE window #-}
 
--- | Give a delayed window over a 'Signal''
+-- | Give a delayed window over a 'Signal'
 --
 -- @
 -- windowD3 :: Clock domain gated -> Reset domain synchronous

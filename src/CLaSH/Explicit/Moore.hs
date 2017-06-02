@@ -14,7 +14,7 @@
 {-# LANGUAGE Safe #-}
 
 module CLaSH.Explicit.Moore
-  ( -- * Moore machine
+  ( -- * Moore machines with explicit clock and reset ports
     moore
   , mooreB
   , medvedev

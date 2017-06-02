@@ -14,7 +14,7 @@
 {-# LANGUAGE Safe #-}
 
 module CLaSH.Explicit.Mealy
-  ( -- * Mealy machine synchronised to the system clock
+  ( -- * Mealy machines with explicit clock and reset ports
     mealy
   , mealyB
   )
@@ -88,7 +88,7 @@ mealy clk rst f iS =
         in  o
 {-# INLINABLE mealy #-}
 
--- | A version of 'mealy'' that does automatic 'Bundle'ing
+-- | A version of 'mealy' that does automatic 'Bundle'ing
 --
 -- Given a function @f@ of type:
 --

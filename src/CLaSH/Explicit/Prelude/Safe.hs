@@ -7,12 +7,8 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 __This is the <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/safe-haskell.html Safe> API only of "CLaSH.Prelude.Explicit"__
 
 This module defines the explicitly clocked counterparts of the functions
-defined in "CLaSH.Prelude".
-
-This module uses the explicitly clocked 'Signal'' synchronous signals, as
-opposed to the implicitly clocked 'Signal' used in "CLaSH.Prelude". Take a
-look at "CLaSH.Signal.Explicit" to see how you can make multi-clock designs
-using explicitly clocked signals.
+defined in "CLaSH.Prelude". Take a look at "CLaSH.Signal.Explicit" to see how
+you can make multi-clock designs.
 -}
 
 {-# LANGUAGE DataKinds           #-}
@@ -81,6 +77,7 @@ module CLaSH.Explicit.Prelude.Safe
   , module CLaSH.Promoted.Nat
   , module CLaSH.Promoted.Nat.Literals
   , module CLaSH.Promoted.Nat.TH
+  , module CLaSH.Promoted.Symbol
     -- ** Type classes
     -- *** CLaSH
   , module CLaSH.Class.BitPack
@@ -132,6 +129,7 @@ import CLaSH.Prelude.ROM             (asyncRom, asyncRomPow2)
 import CLaSH.Promoted.Nat
 import CLaSH.Promoted.Nat.TH
 import CLaSH.Promoted.Nat.Literals
+import CLaSH.Promoted.Symbol
 import CLaSH.Sized.BitVector
 import CLaSH.Sized.Fixed
 import CLaSH.Sized.Index
@@ -171,7 +169,7 @@ registerB
 registerB clk rst i = unbundle Prelude.. register clk rst i Prelude.. bundle
 {-# INLINE registerB #-}
 
--- | Give a pulse when the 'Signal'' goes from 'minBound' to 'maxBound'
+-- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
   :: (Bounded a, Eq a)
   => Clock domain gated
@@ -185,7 +183,7 @@ isRising clk rst is s = liftA2 edgeDetect prev s
     edgeDetect old new = old == minBound && new == maxBound
 {-# INLINABLE isRising #-}
 
--- | Give a pulse when the 'Signal'' goes from 'maxBound' to 'minBound'
+-- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
   :: (Bounded a, Eq a)
   => Clock domain gated
@@ -200,8 +198,8 @@ isFalling clk rst is s = liftA2 edgeDetect prev s
 {-# INLINABLE isFalling #-}
 
 -- | Give a pulse every @n@ clock cycles. This is a useful helper function when
--- combined with functions like @'CLaSH.Signal.regEn'@ or @'CLaSH.Signal.mux'@,
--- in order to delay a register by a known amount.
+-- combined with functions like @'CLaSH.Explicit.Signal.regEn'@ or
+-- @'CLaSH.Explicit.Signal.mux'@, in order to delay a register by a known amount.
 riseEvery
   :: forall domain gated synchronous n
    . Clock domain gated

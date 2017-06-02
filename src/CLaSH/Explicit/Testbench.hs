@@ -38,10 +38,10 @@ import CLaSH.XException      (ShowX (..), XException)
 >>> let expectedOutput clk rst = outputVerifier clk rst $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Int]))
 -}
 
--- | Compares the first two 'Signal''s for equality and logs a warning when they
--- are not equal. The second 'Signal'' is considered the expected value. This
+-- | Compares the first two 'Signal's for equality and logs a warning when they
+-- are not equal. The second 'Signal' is considered the expected value. This
 -- function simply returns the third 'Signal'' unaltered as its result. This
--- function is used by 'outputVerifier''.
+-- function is used by 'outputVerifier'.
 --
 --
 -- __NB__: This function /can/ be used in synthesizable designs.

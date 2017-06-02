@@ -33,15 +33,18 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-topEntity :: Signal (Unsigned 3) -> Signal (Unsigned 9)
-topEntity rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
+topEntity
+  :: Clock  System Source
+  -> Signal System (Unsigned 3)
+  -> Signal System (Unsigned 9)
+topEntity clk rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
 @
 
 And see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity (systemClock (pure True)) (fromList [3..5])__
 [10,11,12]
 @
 
@@ -49,15 +52,18 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-topEntity2 :: Signal (Unsigned 3) -> Signal (Unsigned 6,Signed 3)
-topEntity2 rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
+topEntity2
+  :: Clock  System Source
+  -> Signal System (Unsigned 3)
+  -> Signal System (Unsigned 6,Signed 3)
+topEntity2 clk rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'romFile' clk d7 \"memory.bin\" rd
 @
 
 And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity2 (systemClock (pure True)) (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 -}
@@ -112,7 +118,7 @@ import CLaSH.Sized.Unsigned         (Unsigned)
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- * See "CLaSH.Explicit.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
@@ -147,17 +153,20 @@ romFilePow2 = \clk -> romFile clk (pow2SNat (SNat @ n))
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Prelude.ROM.File#usingromfiles" for more information on how
+-- * See "CLaSH.Explicit.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
   :: (KnownNat m, Enum addr)
-  => Clock domain gated        -- ^ 'Clock' to synchronize to
-  -> SNat n                    -- ^ Size of the ROM
-  -> FilePath                  -- ^ File describing the content of the
-                               -- ROM
-  -> Signal domain addr          -- ^ Read address @rd@
+  => Clock domain gated
+  -- ^ 'Clock' to synchronize to
+  -> SNat n
+  -- ^ Size of the ROM
+  -> FilePath
+  -- ^ File describing the content of the ROM
+  -> Signal domain addr
+  -- ^ Read address @rd@
   -> Signal domain (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile = \clk sz file rd -> romFile# clk sz file (fromEnum <$> rd)
@@ -166,11 +175,14 @@ romFile = \clk sz file rd -> romFile# clk sz file (fromEnum <$> rd)
 -- | romFile primitive
 romFile#
   :: KnownNat m
-  => Clock domain gated                -- ^ 'Clock' to synchronize to
-  -> SNat n                    -- ^ Size of the ROM
-  -> FilePath                  -- ^ File describing the content of the
-                               -- ROM
-  -> Signal domain Int           -- ^ Read address @rd@
+  => Clock domain gated
+  -- ^ 'Clock' to synchronize to
+  -> SNat n
+  -- ^ Size of the ROM
+  -> FilePath
+  -- ^ File describing the content of the ROM
+  -> Signal domain Int
+  -- ^ Read address @rd@
   -> Signal domain (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
 romFile# clk sz file rd = delay clk ((content !) <$> rd)

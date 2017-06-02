@@ -88,7 +88,7 @@ newtype DSignal (domain :: Domain) (delay :: Nat) a =
   deriving (Show,Default,Functor,Applicative,Num,Fractional,
             Foldable,Traversable,Arbitrary,CoArbitrary,Lift)
 
--- | Create a 'DSignal'' from a list
+-- | Create a 'DSignal' from a list
 --
 -- Every element in the list will correspond to a value of the signal for one
 -- clock cycle.
