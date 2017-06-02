@@ -33,8 +33,11 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 We can instantiate a BlockRAM using the content of the above file like so:
 
 @
-topEntity :: Signal (Unsigned 3) -> Signal (Unsigned 9)
-topEntity rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" rd (signal Nothing)
+topEntity
+  :: Clock  System Source
+  -> Signal System (Unsigned 3)
+  -> Signal System (Unsigned 9)
+topEntity clk rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
 In the example above, we basically treat the BlockRAM as an synchronous ROM.
@@ -42,7 +45,7 @@ We can see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity (systemClock (pure True)) (fromList [3..5])__
 [10,11,12]
 @
 
@@ -50,15 +53,18 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-topEntity2 :: Signal (Unsigned 3) -> Signal (Unsigned 6,Signed 3)
-topEntity2 rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" rd (signal Nothing)
+topEntity2
+  :: Clock  System Source
+  -> Signal System (Unsigned 3)
+  -> Signal System (Unsigned 6,Signed 3)
+topEntity2 clk rd = 'CLaSH.Class.BitPack.unpack' '<$>' 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
 And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity2 (systemClock (pure True)) (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 
@@ -129,22 +135,22 @@ import CLaSH.XException      (errorX, seqX)
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFilePow2' clk file) rd wrM@.
--- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
+-- * See "CLaSH.Explicit.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
--- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
+-- * See "CLaSH.Explicit.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
   :: forall dom gated n m
    . (KnownNat m, KnownNat n, HasCallStack)
-  => Clock dom gated           -- ^ 'Clock' to synchronize to
-  -> FilePath                  -- ^ File describing the initial
-                               -- content of the blockRAM
+  => Clock dom gated
+  -- ^ 'Clock' to synchronize to
+  -> FilePath
+  -- ^ File describing the initial content of the blockRAM
   -> Signal dom (Unsigned n)  -- ^ Read address @r@
   -> Signal dom (Maybe (Unsigned n, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous
-  -- clock cycle
+  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRamFilePow2 = \clk file rd wrM -> withFrozenCallStack
   (blockRamFile clk (pow2SNat (SNat @ n)) file rd wrM)
 {-# INLINE blockRamFilePow2 #-}
@@ -168,20 +174,23 @@ blockRamFilePow2 = \clk file rd wrM -> withFrozenCallStack
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- * See "CLaSH.Explicit.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamFile' clk size file) rd wrM@.
--- * See "CLaSH.Prelude.BlockRam.File#usingramfiles" for more information on how
+-- * See "CLaSH.Explicit.BlockRam.File#usingramfiles" for more information on how
 -- to instantiate a Block RAM with the contents of a data file.
 -- * See "CLaSH.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
   :: (KnownNat m, Enum addr, HasCallStack)
-  => Clock dom gated           -- ^ 'Clock' to synchronize to
-  -> SNat n                    -- ^ Size of the blockRAM
-  -> FilePath                  -- ^ File describing the initial
-                               -- content of the blockRAM
-  -> Signal dom addr          -- ^ Read address @r@
+  => Clock dom gated
+  -- ^ 'Clock' to synchronize to
+  -> SNat n
+  -- ^ Size of the blockRAM
+  -> FilePath
+  -- ^ File describing the initial content of the blockRAM
+  -> Signal dom addr
+  -- ^ Read address @r@
   -> Signal dom (Maybe (addr, BitVector m))
   -- ^ (write address @w@, value to write)
   -> Signal dom (BitVector m)
@@ -197,17 +206,22 @@ blockRamFile = \clk sz file rd wrM ->
 -- | blockRamFile primitive
 blockRamFile#
   :: (KnownNat m, HasCallStack)
-  => Clock dom gated           -- ^ 'Clock' to synchronize to
-  -> SNat n                    -- ^ Size of the blockRAM
-  -> FilePath                  -- ^ File describing the initial
-                               -- content of the blockRAM
-  -> Signal dom Int           -- ^ Read address @r@
-  -> Signal dom Bool          -- ^ Write enable
-  -> Signal dom Int           -- ^ Write address @w@
-  -> Signal dom (BitVector m) -- ^ Value to write (at address @w@)
+  => Clock dom gated
+  -- ^ 'Clock' to synchronize to
+  -> SNat n
+  -- ^ Size of the blockRAM
+  -> FilePath
+  -- ^ File describing the initial content of the blockRAM
+  -> Signal dom Int
+  -- ^ Read address @r@
+  -> Signal dom Bool
+  -- ^ Write enable
+  -> Signal dom Int
+  -- ^ Write address @w@
   -> Signal dom (BitVector m)
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous
-  -- clock cycle
+  -- ^ Value to write (at address @w@)
+  -> Signal dom (BitVector m)
+  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRamFile# (Clock# _ _ ena) _sz file rd wen =
     go ramI
        (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))

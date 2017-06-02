@@ -20,7 +20,7 @@ codes:
 {\-\# LANGUAGE RecordWildCards, TupleSections \#-\}
 module CPU where
 
-import CLaSH.Prelude
+import CLaSH.Explicit.Prelude
 
 type InstrAddr = Unsigned 8
 type MemAddr   = Unsigned 5
@@ -70,8 +70,10 @@ Next we define the CPU and its ALU:
 
 @
 cpu
-  :: Vec 7 Value          -- ^ Register bank
-  -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
+  :: Vec 7 Value
+  -- ^ Register bank
+  -> (Value,Instruction)
+  -- ^ (Memory output, Current instruction)
   -> ( Vec 7 Value
      , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
      )
@@ -119,10 +121,13 @@ We initially create a memory out of simple registers:
 dataMem
   :: Clock System gated
   -> Reset System synchronous
-  -> Signal MemAddr                 -- ^ Read address
-  -> Signal (Maybe (MemAddr,Value)) -- ^ (write address, data in)
-  -> Signal Value                   -- ^ data out
-dataMem clk rst rd wrM = 'CLaSH.Explicit.Mealy.mealy' clk rst dataMemT ('replicate' d32 0) (bundle (rd,wrM))
+  -> Signal MemAddr
+  -- ^ Read address
+  -> Signal (Maybe (MemAddr,Value))
+  -- ^ (write address, data in)
+  -> Signal Value
+  -- ^ data out
+dataMem clk rst rd wrM = 'CLaSH.Explicit.Mealy.mealy' clk rst dataMemT ('CLaSH.Sized.Vector.replicate' d32 0) (bundle (rd,wrM))
   where
     dataMemT mem (rd,wrM) = (mem',dout)
       where
@@ -144,8 +149,8 @@ system
 system instrs clk rst = memOut
   where
     memOut = dataMem clk rst rdAddr dout
-    (rdAddr,dout,ipntr) = 'CLaSH.Explicit.Mealy.mealyB' clk rst cpu ('replicate' d7 0) (memOut,instr)
-    instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
+    (rdAddr,dout,ipntr) = 'CLaSH.Explicit.Mealy.mealyB' clk rst cpu ('CLaSH.Sized.Vector.replicate' d7 0) (memOut,instr)
+    instr  = 'CLaSH.Explicit.Prelude.asyncRom' instrs '<$>' ipntr
 @
 
 Create a simple program that calculates the GCD of 4 and 6:
@@ -211,7 +216,7 @@ system2
 system2 instrs clk rst = memOut
   where
     memOut = 'CLaSH.Explicit.RAM.asyncRam' clk clk d32 rdAddr dout
-    (rdAddr,dout,ipntr) = 'mealyB' clk rst cpu ('replicate' d7 0) (memOut,instr)
+    (rdAddr,dout,ipntr) = 'mealyB' clk rst cpu ('CLaSH.Sized.Vector.replicate' d7 0) (memOut,instr)
     instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
 @
 
@@ -249,8 +254,10 @@ is loaded:
 
 @
 cpu2
-  :: (Vec 7 Value,Reg)    -- ^ (Register bank, Load reg addr)
-  -> (Value,Instruction)  -- ^ (Memory output, Current instruction)
+  :: (Vec 7 Value,Reg)
+  -- ^ (Register bank, Load reg addr)
+  -> (Value,Instruction)
+  -- ^ (Memory output, Current instruction)
   -> ( (Vec 7 Value,Reg)
      , (MemAddr, Maybe (MemAddr,Value), InstrAddr)
      )
@@ -299,8 +306,8 @@ system3
 system3 instrs clk rst = memOut
   where
     memOut = 'blockRam' clk (replicate d32 0) rdAddr dout
-    (rdAddr,dout,ipntr) = 'mealyB' clk rst cpu2 (('replicate' d7 0),Zero) (memOut,instr)
-    instr  = 'CLaSH.Prelude.ROM.asyncRom' instrs '<$>' ipntr
+    (rdAddr,dout,ipntr) = 'mealyB' clk rst cpu2 (('CLaSH.Sized.Vector.replicate' d7 0),Zero) (memOut,instr)
+    instr  = 'CLaSH.Explicit.Prelude.asyncRom' instrs '<$>' ipntr
 @
 
 We are, however, not done. We will also need to update our program. The reason
@@ -661,36 +668,33 @@ prog2 = -- 0 := 4
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- type ClkA = Clk \"A\" 100
---
--- clkA100 :: SClock ClkA
--- clkA100 = 'CLaSH.Signal.Explicit.sclock'
---
--- bram40 :: 'Signal'' ClkA ('Unsigned' 6)
---        -> 'Signal'' ClkA (Maybe ('Unsigned' 6, 'CLaSH.Sized.BitVector.Bit'))
---        -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit'
--- bram40 = 'blockRam'' clkA100 ('CLaSH.Sized.Vector.replicate' d40 1)
+-- bram40 :: 'Clock'  System gated
+--        -> 'Signal' System ('Unsigned' 6)
+--        -> 'Signal' System (Maybe ('Unsigned' 6, 'CLaSH.Sized.BitVector.Bit'))
+--        -> 'Signal' System 'CLaSH.Sized.BitVector.Bit'
+-- bram40 clk = 'blockRam' clk ('CLaSH.Sized.Vector.replicate' d40 1)
 -- @
 --
 -- Additional helpful information:
 --
--- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
+-- * See "CLaSH.Explicit.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRam' clk inits) rd wrM@.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRam' clk inits) rd wrM@.
 blockRam
   :: HasCallStack
   => Enum addr
-  => Clock dom gated  -- ^ 'Clock' to synchronize to
-  -> Vec n a          -- ^ Initial content of the BRAM, also
-                      -- determines the size, @n@, of the BRAM.
-                      --
-                      -- __NB__: __MUST__ be a constant.
-  -> Signal dom addr -- ^ Read address @r@
+  => Clock dom gated
+  -- ^ 'Clock' to synchronize to
+  -> Vec n a
+  -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM.
+   --
+   -- __NB__: __MUST__ be a constant.
+  -> Signal dom addr
+  -- ^ Read address @r@
   -> Signal dom (Maybe (addr, a))
   -- ^ (write address @w@, value to write)
   -> Signal dom a
-  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
-  -- cycle
+  -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
 blockRam = \clk content rd wrM ->
   let en       = isJust <$> wrM
       (wr,din) = unbundle (fromJust <$> wrM)
@@ -704,22 +708,17 @@ blockRam = \clk content rd wrM ->
 -- * __NB__: Initial output value is 'undefined'
 --
 -- @
--- type ClkA = Clk \"A\" 100
---
--- clkA100 :: SClock ClkA
--- clkA100 = 'CLaSH.Signal.Explicit.sclock'
---
--- bram32 :: 'Signal'' ClkA ('Unsigned' 5)
---        -> 'Signal'' ClkA (Maybe ('Unsigned' 5, 'CLaSH.Sized.BitVector.Bit'))
---        -> 'Signal'' ClkA 'CLaSH.Sized.BitVector.Bit'
--- bram32 = 'blockRamPow2'' clkA100 ('CLaSH.Sized.Vector.replicate' d32 1)
+-- bram32 :: 'Signal' System ('Unsigned' 5)
+--        -> 'Signal' System (Maybe ('Unsigned' 5, 'CLaSH.Sized.BitVector.Bit'))
+--        -> 'Signal' System 'CLaSH.Sized.BitVector.Bit'
+-- bram32 clk = 'blockRamPow2' clk ('CLaSH.Sized.Vector.replicate' d32 1)
 -- @
 --
 -- Additional helpful information:
 --
 -- * See "CLaSH.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
--- * Use the adapter 'readNew'' for obtaining write-before-read semantics like this: @readNew' clk (blockRamPow2' clk inits) rd wrM@.
+-- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' clk rst ('blockRamPow2' clk inits) rd wrM@.
 blockRamPow2
   :: (KnownNat n, HasCallStack)
   => Clock dom gated          -- ^ 'Clock' to synchronize to
@@ -774,11 +773,12 @@ readNew
   -> Clock domain gated
   -> (Signal domain addr -> Signal domain (Maybe (addr, a)) -> Signal domain a)
   -- ^ The @ram@ component
-  -> Signal domain addr              -- ^ Read address @r@
-  -> Signal domain (Maybe (addr, a)) -- ^ (Write address @w@, value to write)
+  -> Signal domain addr
+  -- ^ Read address @r@
+  -> Signal domain (Maybe (addr, a))
+  -- ^ (Write address @w@, value to write)
   -> Signal domain a
-  -- ^ Value of the @ram@ at address @r@ from the previous clock
-  -- cycle
+  -- ^ Value of the @ram@ at address @r@ from the previous clock cycle
 readNew rst clk ram rdAddr wrM = mux wasSame wasWritten $ ram rdAddr wrM
   where readNewT rd (Just (wr, wrdata)) = (wr == rd, wrdata)
         readNewT _  Nothing             = (False   , undefined)
