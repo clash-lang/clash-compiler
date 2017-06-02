@@ -21,7 +21,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions not-home #-}
 
 module CLaSH.Sized.Internal.BitVector
   ( -- * Datatypes

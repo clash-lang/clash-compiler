@@ -24,7 +24,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -- as to why we need this.
 {-# OPTIONS_GHC -fno-cpr-anal #-}
 
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions not-home #-}
 
 module CLaSH.Signal.Internal
   ( -- * Datatypes

@@ -30,25 +30,18 @@ script:
 matrix:
   fast_finish: true
   include:
-  - env: GHCVER=8.0.1
+  - env: GHCVER=8.2.1
     addons:
       apt:
         sources:
         - hvr-ghc
         packages:
-        - ghc-8.0.1
+        - ghc-8.2.1
         - libgmp-dev
-    compiler: ! ': # ghc-8.0.1'
+    compiler: ! ': # ghc-8.2.1'
 cache:
   directories:
   - ~/.stack
   - ~/.local
   - ~/.stack-work-cache
   apt: true
-notifications:
-  irc:
-    skip_join: true
-    channels:
-    - "irc.freenode.org#clash-lang"
-    template:
-    - "\x0313clash-prelude\x0F/\x0306%{branch}\x0F \x0314%{commit}\x0F %{message}\x0302\x1F%{build_url}\x0F"

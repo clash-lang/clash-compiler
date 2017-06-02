@@ -18,7 +18,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions not-home #-}
 
 module CLaSH.Sized.Internal.Unsigned
   ( -- * Datatypes
