@@ -13,3 +13,11 @@ altpll
   -> (Clock pllOut 'Source, Signal pllOut Bool)
 altpll _ clk (Async rst) = (unsafeCoerce (clockGate clk rst), unsafeCoerce rst)
 {-# NOINLINE altpll #-}
+
+alteraPll
+  :: SSymbol name
+  -> Clock pllIn 'Source
+  -> Reset pllIn 'Asynchronous
+  -> (Clock pllOut 'Source, Signal pllOut Bool)
+alteraPll _ clk (Async rst) = (unsafeCoerce (clockGate clk rst), unsafeCoerce rst)
+{-# NOINLINE alteraPll #-}

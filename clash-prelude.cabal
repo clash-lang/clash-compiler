@@ -152,6 +152,8 @@ Library
 
                       CLaSH.XException
 
+                      CLaSH.Xilinx.ClockGen
+
                       CLaSH.Tutorial
                       CLaSH.Examples
 
