@@ -129,9 +129,30 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.unsafeFromAsyncReset"
+    , "type" :
+"unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "CLaSH.Signal.Internal.unsafeToAsyncReset"
     , "type" :
 "unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.fromSyncReset"
+    , "type" :
+"fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.toSyncReset"
+    , "type" :
+"toSyncReset :: Signal domain Bool -> Reset domain Synchronous"
     , "templateE" : "~ARG[0]"
     }
   }
