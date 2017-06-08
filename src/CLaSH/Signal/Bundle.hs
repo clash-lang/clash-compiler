@@ -122,8 +122,8 @@ instance Bundle (Unsigned n)
 
 -- | Note that:
 --
--- > bundle   :: () -> Signal' clk ()
--- > unbundle :: Signal' clk () -> ()
+-- > bundle   :: () -> Signal domain ()
+-- > unbundle :: Signal domain () -> ()
 instance Bundle () where
   type Unbundled t () = t ::: ()
   -- ^ This is just to satisfy the injectivity annotation

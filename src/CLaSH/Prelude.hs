@@ -18,8 +18,11 @@
   To use the library:
 
   * Import "CLaSH.Prelude"
-  * Additionally import "CLaSH.Prelude.Explicit" if you want to design
-    explicitly clocked circuits in a multi-clock setting
+  * Alternatively, if you want to explicitly route clock and reset ports,
+    for more straightforward multi-clock designs, you can import the
+    "CLaSH.Explicit.Prelude" module. Note that you should not import
+    "CLaSH.Prelude" and "CLaSH.Explicit.Prelude" at the same time as they
+    have overlapping definitions.
 
   For now, "CLaSH.Prelude" is also the best starting point for exploring the
   library. A preliminary version of a tutorial can be found in "CLaSH.Tutorial".
@@ -164,8 +167,8 @@ import           CLaSH.XException
 
 {- $setup
 >>> :set -XDataKinds
->>> let window4 = window :: SystemClockReset => Signal System Int -> Vec 4 (Signal System Int)
->>> let windowD3 = windowD :: SystemClockReset => Signal System Int -> Vec 3 (Signal System Int)
+>>> let window4  = window  :: HasClockReset domain gated synchronous => Signal domain Int -> Vec 4 (Signal domain Int)
+>>> let windowD3 = windowD :: HasClockReset domain gated synchronous => Signal domain Int -> Vec 3 (Signal domain Int)
 -}
 
 {- $hiding
@@ -182,7 +185,7 @@ It instead exports the identically named functions defined in terms of
 -- | Give a window over a 'Signal'
 --
 -- > window4 :: HasClockReset domain gated synchronous
---           => Signal domain Int -> Vec 4 (Signal domain Int)
+-- >         => Signal domain Int -> Vec 4 (Signal domain Int)
 -- > window4 = window
 --
 -- >>> simulateB window4 [1::Int,2,3,4,5] :: [Vec 4 Int]
@@ -198,7 +201,7 @@ window = E.window hasClock hasReset
 -- | Give a delayed window over a 'Signal'
 --
 -- > windowD3 :: HasClockReset domain gated synchronous
---            => Signal domain Int -> Vec 3 (Signal domain Int)
+-- >          => Signal domain Int -> Vec 3 (Signal domain Int)
 -- > windowD3 = windowD
 --
 -- >>> simulateB windowD3 [1::Int,2,3,4] :: [Vec 3 Int]

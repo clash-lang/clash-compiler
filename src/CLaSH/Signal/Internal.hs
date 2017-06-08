@@ -114,15 +114,15 @@ import CLaSH.XException           (XException, errorX, seqX)
 
 -- * Signal
 
--- | A domain with a name (@Symbol@) and a clock period (@Nat@) in ps
+-- | A domain with a name (@Symbol@) and a clock period (@Nat@) in /ps/
 data Domain = Dom { domainName :: Symbol, clockPeriod :: Nat }
 
 infixr 5 :-
--- | A synchronized signal with samples of type @a@, explicitly synchronized to
--- a @domain@
---
--- __NB__: The constructor, @(':-')@, is __not__ synthesisable.
-data Signal (domain :: Domain) a = a :- Signal domain a
+-- | A synchronous signal with samples of type /a/, explicitly synchronized to
+-- a clock (and reset) /domain/
+data Signal (domain :: Domain) a
+  -- | The constructor, @(':-')@, is __not__ synthesisable.
+  = a :- Signal domain a
 
 instance Show a => Show (Signal domain a) where
   show (x :- xs) = show x ++ " " ++ show xs
@@ -279,6 +279,9 @@ clockGen = Clock
 -- type DomA = Dom \"A\" 1000
 -- rstA = asyncResetGen @DomA
 -- @
+--
+-- __NB__: Can only be used for components with an /active-high/ reset
+-- port, which all __clash-prelude__ components are.
 asyncResetGen :: Reset domain 'Asynchronous
 asyncResetGen = Async (True :- pure False)
 {-# NOINLINE asyncResetGen #-}
@@ -291,6 +294,9 @@ asyncResetGen = Async (True :- pure False)
 -- type DomA = Dom \"A\" 1000
 -- rstA = syncResetGen @DomA
 -- @
+--
+-- __NB__: Can only be used for components with an /active-high/ reset
+-- port, which all __clash-prelude__ components are.
 syncResetGen :: Reset domain 'Synchronous
 syncResetGen = Sync (True :- pure False)
 {-# NOINLINE syncResetGen #-}
@@ -299,7 +305,11 @@ syncResetGen = Sync (True :- pure False)
 data ResetKind = Synchronous | Asynchronous
   deriving (Eq,Ord,Show,Generic,NFData)
 
--- | A reset signal belonging to a @domain@
+-- | A reset signal belonging to a @domain@.
+--
+-- The underlying representation of resets is 'Bool'. Note that all components
+-- in the __clash-prelude__ package have an /active-high/ reset port, i.e., the
+-- component is reset when the reset port is 'True'.
 data Reset (domain :: Domain) (synchronous :: ResetKind) where
   Sync  :: Signal domain Bool -> Reset domain 'Synchronous
   Async :: Signal domain Bool -> Reset domain 'Asynchronous

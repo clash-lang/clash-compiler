@@ -32,8 +32,11 @@ Description:
   .
   * Import "CLaSH.Prelude"
   .
-  * Additionally import "CLaSH.Prelude.Explicit" if you want to design
-    explicitly clocked circuits in a multi-clock setting
+  * Alternatively, if you want to explicitly route clock and reset ports,
+    for more straightforward multi-clock designs, you can import the
+    "CLaSH.Explicit.Prelude" module. Note that you should not import
+    "CLaSH.Prelude" and "CLaSH.Explicit.Prelude" at the same time as they
+    have overlapping definitions.
   .
   A preliminary version of a tutorial can be found in "CLaSH.Tutorial", for a
   general overview of the library you should however check out "CLaSH.Prelude".
