@@ -41,7 +41,7 @@ import qualified Data.Vector as V
 
 import CLaSH.Explicit.Signal ((.&&.), unbundle, unsafeSynchronizer)
 import CLaSH.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
-import CLaSH.Signal.Internal (Clock (..), Signal (..))
+import CLaSH.Signal.Internal (Clock (..), Signal (..), clockEnable)
 import CLaSH.Sized.Unsigned  (Unsigned)
 import CLaSH.XException      (errorX)
 
@@ -113,14 +113,17 @@ asyncRam#
   -> Signal wdom Int  -- ^ Write address @w@
   -> Signal wdom a    -- ^ Value to write (at address @w@)
   -> Signal rdom a    -- ^ Value of the @RAM@ at address @r@
-asyncRam# wclk@(Clock# _ _ wgt) rclk sz rd en wr din =
+asyncRam# wclk rclk sz rd en wr din =
     unsafeSynchronizer wclk rclk dout
   where
     rd'  = unsafeSynchronizer rclk wclk rd
     ramI = V.replicate
               (snatToNum sz)
               (withFrozenCallStack (errorX "asyncRam#: initial value undefined"))
-    dout = go ramI rd' (en .&&. wgt) wr din
+    en'  = case clockEnable wclk of
+             Nothing  -> en
+             Just wgt -> en .&&. wgt
+    dout = go ramI rd' en' wr din
 
     go :: V.Vector a -> Signal wdom Int -> Signal wdom Bool
        -> Signal wdom Int -> Signal wdom a -> Signal wdom a

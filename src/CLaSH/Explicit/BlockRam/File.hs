@@ -45,7 +45,7 @@ We can see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity (systemClock (pure True)) (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity systemClock (fromList [3..5])__
 [10,11,12]
 @
 
@@ -64,7 +64,7 @@ And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 (systemClock (pure True)) (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity2 systemClock (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 
@@ -107,7 +107,7 @@ import System.IO.Unsafe      (unsafePerformIO)
 
 import CLaSH.Promoted.Nat    (SNat (..), pow2SNat)
 import CLaSH.Sized.BitVector (BitVector)
-import CLaSH.Signal.Internal (Clock (..), Signal (..), (.&&.))
+import CLaSH.Signal.Internal (Clock, Signal (..), (.&&.), clockEnable)
 import CLaSH.Signal.Bundle   (unbundle)
 import CLaSH.Sized.Unsigned  (Unsigned)
 import CLaSH.XException      (errorX, seqX)
@@ -222,15 +222,26 @@ blockRamFile#
   -- ^ Value to write (at address @w@)
   -> Signal dom (BitVector m)
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock cycle
-blockRamFile# (Clock# _ _ ena) _sz file rd wen =
+blockRamFile# clk _sz file rd wen = case clockEnable clk of
+  Nothing ->
     go ramI
+       (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
+       rd wen
+  Just ena ->
+    go' ramI
        (withFrozenCallStack (errorX "blockRamFile#: intial value undefined"))
        ena rd (wen .&&. ena)
   where
-    go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
+    -- no clock enable
+    go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
+      let ram' = upd ram e w d
+          o'   = ram V.! r
+      in  o `seqX` o :- go ram' o' rs en wr din
+    -- clock enable
+    go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e w d
           o'   = if re then ram V.! r else o
-      in  o `seqX` o :- go ram' o' res rs en wr din
+      in  o `seqX` o :- go' ram' o' res rs en wr din
 
     upd ram True  addr d = ram V.// [(addr,d)]
     upd ram False _    _ = ram

@@ -56,7 +56,7 @@ let mac s (x,y) = (s',s)
 -- topEntity clk rst = 'mealy' clk rst mac 0
 -- @
 --
--- >>> simulate (topEntity (systemClock (pure True)) systemReset) [(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate (topEntity systemClock systemReset) [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 -- ...
 --

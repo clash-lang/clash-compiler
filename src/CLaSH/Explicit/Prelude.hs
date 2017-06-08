@@ -173,7 +173,7 @@ import CLaSH.XException
 -- window4 = 'window'
 -- @
 --
--- >>> simulateB (window4 (systemClock (pure True)) systemReset) [1::Int,2,3,4,5] :: [Vec 4 Int]
+-- >>> simulateB (window4 systemClock systemReset) [1::Int,2,3,4,5] :: [Vec 4 Int]
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 -- ...
 window
@@ -200,7 +200,7 @@ window clk rst x = res
 -- windowD3 = 'windowD'
 -- @
 --
--- >>> simulateB (windowD3 (systemClock (pure True)) systemReset) [1::Int,2,3,4] :: [Vec 3 Int]
+-- >>> simulateB (windowD3 systemClock systemReset) [1::Int,2,3,4] :: [Vec 3 Int]
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD

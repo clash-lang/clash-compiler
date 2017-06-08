@@ -86,7 +86,7 @@ assert clk _rst msg checked expected returned =
 -- testInput clk rst = 'stimuliGenerator' clk rst $('CLaSH.Sized.Vector.listToVecTH' [(1::Int),3..21])
 -- @
 --
--- >>> sampleN 13 (testInput (systemClock (pure True)) systemReset)
+-- >>> sampleN 13 (testInput systemClock systemReset)
 -- [1,3,5,7,9,11,13,15,17,19,21,21,21]
 stimuliGenerator
   :: forall l domain gated synchronous a
@@ -124,7 +124,7 @@ stimuliGenerator clk rst samples =
 -- @
 --
 -- >>> import qualified Data.List as List
--- >>> sampleN 12 (expectedOutput (systemClock (pure True)) systemReset (fromList ([0..10] List.++ [10,10,10])))
+-- >>> sampleN 12 (expectedOutput systemClock systemReset (fromList ([0..10] List.++ [10,10,10])))
 -- <BLANKLINE>
 -- cycle(system10000): 0, outputVerifier
 -- expected value: 70, not equal to actual value: 0

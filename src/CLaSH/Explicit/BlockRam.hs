@@ -190,7 +190,7 @@ prog = -- 0 := 4
 And test our system:
 
 @
->>> sampleN 31 $ system prog (systemClock (pure True)) systemReset
+>>> sampleN 31 $ system prog systemClock systemReset
 [0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
@@ -227,7 +227,7 @@ output samples are also 'undefined'. We use the utility function 'printX' to con
 filter out the undefinedness and replace it with the string "X" in the few leading outputs.
 
 @
->>> printX $ sampleN 31 $ system2 prog (systemClock (pure True)) systemReset
+>>> printX $ sampleN 31 $ system2 prog systemClock systemReset
 [X,X,X,X,X,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
@@ -355,7 +355,7 @@ we need to disregard the first sample, because the initial output of a
 filter out the undefinedness and replace it with the string "X".
 
 @
->>> printX $ sampleN 33 $ system3 prog2 (systemClock (pure True)) systemReset
+>>> printX $ sampleN 33 $ system3 prog2 systemClock systemReset
 [X,0,0,0,0,0,4,4,4,4,4,4,4,4,6,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2]
 
 @
@@ -398,7 +398,7 @@ import GHC.TypeLits           (KnownNat, type (^))
 import Prelude                hiding (length)
 
 import CLaSH.Signal.Internal
-  (Clock (..), Reset, Signal (..), (.&&.), mux, register#)
+  (Clock, Reset, Signal (..), (.&&.), clockEnable, mux, register#)
 import CLaSH.Signal.Bundle    (unbundle)
 import CLaSH.Sized.Unsigned   (Unsigned)
 import CLaSH.Sized.Vector     (Vec, toList)
@@ -752,15 +752,26 @@ blockRam#
   -> Signal dom a
   -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
   -- cycle
-blockRam# (Clock# _ _ ena) content rd wen =
+blockRam# clk content rd wen = case clockEnable clk of
+  Nothing ->
     go (V.fromList (toList content))
+       (withFrozenCallStack (errorX "blockRam: intial value undefined"))
+       rd wen
+  Just ena ->
+    go' (V.fromList (toList content))
        (withFrozenCallStack (errorX "blockRam: intial value undefined"))
        ena rd (wen .&&. ena)
   where
-    go !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
+    -- no clock enable
+    go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
+      let ram' = upd ram e w d
+          o'   = ram V.! r
+      in  o `seqX` o :- go ram' o' rs en wr din
+    -- clock enable
+    go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
       let ram' = upd ram e w d
           o'   = if re then ram V.! r else o
-      in  o `seqX` o :- go ram' o' res rs en wr din
+      in  o `seqX` o :- go' ram' o' res rs en wr din
 
     upd ram True  addr d = ram V.// [(addr,d)]
     upd ram False _    _ = ram

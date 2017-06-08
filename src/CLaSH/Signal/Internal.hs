@@ -14,7 +14,6 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MagicHash             #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -31,10 +30,14 @@ module CLaSH.Signal.Internal
   ( -- * Datatypes
     Domain (..)
   , Signal (..)
-    -- * Clocks and resets
-  , Clock (..,Clock)
+    -- * Clocks
+  , Clock (..)
   , ClockKind (..)
+  , clockPeriod
+  , clockEnable
+    -- ** Clock gating
   , clockGate
+    -- * Resets
   , Reset (..)
   , ResetKind (..)
   , unsafeFromAsyncReset
@@ -47,6 +50,7 @@ module CLaSH.Signal.Internal
   , mux
     -- * Testbench functions
   , clockGen
+  , gatedClockGen
   , asyncResetGen
   , syncResetGen
     -- * Boolean connectives
@@ -96,7 +100,7 @@ import System.IO.Unsafe           (unsafeDupablePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
-import CLaSH.Promoted.Nat         (SNat (..), snatToInteger)
+import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
 import CLaSH.Promoted.Symbol      (SSymbol (..))
 import CLaSH.XException           (XException, errorX, seqX)
 
@@ -107,15 +111,15 @@ import CLaSH.XException           (XException, errorX, seqX)
 >>> import CLaSH.Promoted.Nat
 >>> import CLaSH.Promoted.Symbol
 >>> type System = Dom "System" 10000
->>> let systemClock = Clock @System (pure True)
->>> let systemReset = Async @System (True :- pure False)
+>>> let systemClock = clockGen @System
+>>> let systemReset = asyncResetGen @System
 >>> let register = register# systemClock systemReset
 -}
 
 -- * Signal
 
 -- | A domain with a name (@Symbol@) and a clock period (@Nat@) in /ps/
-data Domain = Dom { domainName :: Symbol, clockPeriod :: Nat }
+data Domain = Dom { domainName :: Symbol, clkPeriod :: Nat }
 
 infixr 5 :-
 -- | A synchronous signal with samples of type /a/, explicitly synchronized to
@@ -232,28 +236,42 @@ data ClockKind
 
 -- | A clock signal belonging to a @domain@
 data Clock (domain :: Domain) (gated :: ClockKind) where
-  Clock# :: SSymbol name
-         -> SNat period
-         -> Signal ('Dom name period) Bool
-         -> Clock  ('Dom name period) gated
+  Clock
+    :: (domain ~ ('Dom name period))
+    => SSymbol name
+    -> SNat    period
+    -> Clock domain 'Source
+  GatedClock
+    :: (domain ~ ('Dom name period))
+    => SSymbol name
+    -> SNat    period
+    -> Signal domain Bool
+    -> Clock  domain 'Gated
+
+-- | Get the clock period of a 'Clock' (in /ps/) as a 'Num'
+clockPeriod
+  :: Num a
+  => Clock domain gated
+  -> a
+clockPeriod (Clock _ period)        = snatToNum period
+clockPeriod (GatedClock _ period _) = snatToNum period
+
+-- | If the clock is gated, return 'Just' the /enable/ signal, 'Nothing'
+-- otherwise
+clockEnable
+  :: Clock domain gated
+  -> Maybe (Signal domain Bool)
+clockEnable Clock {}            = Nothing
+clockEnable (GatedClock _ _ en) = Just en
 
 instance Show (Clock domain gated) where
-  show (Clock# nm rt _) = show nm ++ show (snatToInteger rt)
-
--- | We can only "create" @Source@ clock signals
-pattern Clock
-  :: forall domain name period
-   . (KnownSymbol name, KnownNat period, domain ~ 'Dom name period)
-  => ()
-  => Signal domain Bool
-  -> Clock  domain 'Source
-pattern Clock en <- Clock# _nm _rt en
-  where
-    Clock en = Clock# SSymbol SNat en
+  show (Clock      nm period)   = show nm ++ show (snatToInteger period)
+  show (GatedClock nm period _) = show nm ++ show (snatToInteger period)
 
 -- | Clock gating primitive
 clockGate :: Clock domain gated -> Signal domain Bool -> Clock domain 'Gated
-clockGate (Clock# nm rt en) en' = Clock# nm rt (en .&&. en')
+clockGate (Clock nm rt)         en  = GatedClock nm rt en
+clockGate (GatedClock nm rt en) en' = GatedClock nm rt (en .&&. en')
 {-# NOINLINE clockGate #-}
 
 -- | Clock generator, for simulations and test benches.
@@ -266,10 +284,24 @@ clockGate (Clock# nm rt en) en' = Clock# nm rt (en .&&. en')
 -- @
 clockGen
   :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
-  => Signal domain Bool
-  -> Clock domain 'Source
-clockGen = Clock
+  => Clock domain 'Source
+clockGen = Clock SSymbol SNat
 {-# NOINLINE clockGen #-}
+
+-- | Clock generator, for simulations and test benches.
+--
+-- To be used like:
+--
+-- @
+-- type DomA = Dom \"A\" 1000
+-- clkA en = clockGen @DomA en
+-- @
+gatedClockGen
+  :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
+  => Signal domain Bool
+  -> Clock domain 'Gated
+gatedClockGen = GatedClock SSymbol SNat
+{-# NOINLINE gatedClockGen #-}
 
 -- | Asynchronous reset generator, for simulations and test benches.
 --
@@ -385,7 +417,10 @@ delay#
   => Clock  domain gated
   -> Signal domain a
   -> Signal domain a
-delay# (Clock# _ _ en) =
+delay# Clock {} =
+  \s -> withFrozenCallStack (errorX "delay: initial value undefined") :- s
+
+delay# (GatedClock _ _ en) =
     go (withFrozenCallStack (errorX "delay: initial value undefined")) en
   where
     go o (e :- es) as@(~(x :- xs)) =
@@ -400,7 +435,23 @@ register#
   -> a
   -> Signal domain a
   -> Signal domain a
-register# (Clock# _ _ ena) (Sync rst)  i =
+register# Clock {} (Sync rst) i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst
+  where
+    go o rt@(~(r :- rs)) as@(~(x :- xs)) =
+      let o' = if r then i else x
+          -- [Note: register strictness annotations]
+      in  o `seqX` o :- (rt `seq` as `seq` go o' rs xs)
+
+register# Clock {} (Async rst) i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst
+  where
+    go o ~(r :- rs) as@(~(x :- xs)) =
+      let o' = if r then i else o
+          -- [Note: register strictness annotations]
+      in  o' `seqX` o' :- (as `seq` go x rs xs)
+
+register# (GatedClock _ _ ena) (Sync rst)  i =
     go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
   where
     go o rt@(~(r :- rs)) ~(e :- es) as@(~(x :- xs)) =
@@ -409,14 +460,14 @@ register# (Clock# _ _ ena) (Sync rst)  i =
       in  o `seqX` o :- (rt `seq` as `seq` if e then go o' rs es xs
                                                 else go o  rs es xs)
 
-register# (Clock# _ _ ena) (Async rst) i =
-  go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
-    where
-      go o ~(r :- rs) ~(e :- es) as@(~(x :- xs)) =
-        let o' = if r then i else o
-            -- [Note: register strictness annotations]
-        in  o' `seqX` o' :- (as `seq` if e then go x  rs es xs
-                                           else go o' rs es xs)
+register# (GatedClock _ _ ena) (Async rst) i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
+  where
+    go o ~(r :- rs) ~(e :- es) as@(~(x :- xs)) =
+      let o' = if r then i else o
+          -- [Note: register strictness annotations]
+      in  o' `seqX` o' :- (as `seq` if e then go x  rs es xs
+                                         else go o' rs es xs)
 {-# NOINLINE register# #-}
 
 {-# INLINE mux #-}

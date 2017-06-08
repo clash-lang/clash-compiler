@@ -335,7 +335,7 @@ sample
   -- routed clock (and reset)
   -> [a]
 sample s =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (clockGen @System)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.sample s
 
@@ -356,7 +356,7 @@ sampleN
   -- routed clock (and reset)
   -> [a]
 sampleN n s =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.sampleN n s
 
@@ -374,7 +374,7 @@ sample_lazy
   -- routed clock (and reset)
   -> [a]
 sample_lazy s =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.sample_lazy s
 
@@ -394,7 +394,7 @@ sampleN_lazy
   -- routed clock (and reset)
   -> [a]
 sampleN_lazy n s =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.sampleN_lazy n s
 
@@ -417,7 +417,7 @@ simulate
   -> [a]
   -> [b]
 simulate f =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.simulate f
 
@@ -437,7 +437,7 @@ simulate_lazy
   -> [a]
   -> [b]
 simulate_lazy f =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.simulate_lazy f
 
@@ -458,7 +458,7 @@ simulateB
   -> [a]
   -> [b]
 simulateB f =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.simulateB f
 
@@ -479,7 +479,7 @@ simulateB_lazy
   -> [a]
   -> [b]
 simulateB_lazy f =
-  let ?clk = unsafeCoerce (Clock @System (pure True))
+  let ?clk = unsafeCoerce (Clock @System SSymbol SNat)
       ?rst = unsafeCoerce (Async @System (True :- pure False))
   in  S.simulateB_lazy f
 

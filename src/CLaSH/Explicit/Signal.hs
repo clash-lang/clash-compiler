@@ -73,7 +73,6 @@ import Control.DeepSeq       (NFData)
 import Data.Maybe            (isJust, fromJust)
 import GHC.Stack             (HasCallStack, withFrozenCallStack)
 
-import CLaSH.Promoted.Nat    (snatToNum)
 import CLaSH.Signal.Internal
 import CLaSH.Signal.Bundle   (Bundle (..))
 
@@ -83,8 +82,8 @@ import CLaSH.Signal.Bundle   (Bundle (..))
 >>> import qualified Data.List as L
 >>> type Dom2 = Dom "dom" 2
 >>> type Dom7 = Dom "dom" 7
->>> let clk2 = Clock @Dom2 (pure True)
->>> let clk7 = Clock @Dom7 (pure True)
+>>> let clk2 = clockGen @Dom2
+>>> let clk7 = clockGen @Dom7
 >>> let oversampling clkA clkB = delay clkB . unsafeSynchronizer clkA clkB . delay clkA
 >>> let almostId clkA clkB = delay clkB . unsafeSynchronizer clkA clkB . delay clkA . unsafeSynchronizer clkB clkA . delay clkB
 >>> let oscillate clk rst = let s = register clk rst False (not <$> s) in s
@@ -161,8 +160,7 @@ type System = 'Dom "system" 10000
 --
 -- __NB__: should only be used for simulation
 systemClock
-  :: Signal System Bool
-  -> Clock System 'Source
+  :: Clock System 'Source
 systemClock = clockGen
 
 -- | Reset generator for the 'System' clock domain.
@@ -239,7 +237,7 @@ freqCalc xs = map (`div` g) ys
 -- type Dom7 = 'Dom' \"dom\" 7
 --
 -- clk7 :: 'Clock' Dom7 Source
--- clk7 = 'Clock' (pure True)
+-- clk7 = 'clockGen'
 -- @
 --
 -- and
@@ -248,7 +246,7 @@ freqCalc xs = map (`div` g) ys
 -- type Dom2 = 'Dom' \"dom\" 2
 --
 -- clk2 :: 'Clock' Dom2 Source
--- clk2 = 'Clock' (pure True)
+-- clk2 = 'clockGen'
 -- @
 --
 -- Oversampling followed by compression is the identity function plus 2 initial
@@ -280,14 +278,15 @@ freqCalc xs = map (`div` g) ys
 -- [X,X,1,1,1,2,2,2,2,3,3,3,4,4,4,4,5,5,5,6,6,6,6,7,7,7,8,8,8,8,9,9,9,10,10,10,10]
 -- >>> printX (sampleN 12 (almostId clk2 clk7 (fromList [(1::Int)..10])))
 -- [X,X,1,2,3,4,5,6,7,8,9,10]
-unsafeSynchronizer :: Clock domain1 gated1 -- ^ 'Clock' of the incoming signal
-                   -> Clock domain2 gated2 -- ^ 'Clock' of the outgoing signal
-                   -> Signal domain1 a
-                   -> Signal domain2 a
-unsafeSynchronizer (Clock# _ period1 _) (Clock# _ period2 _) s = s'
+unsafeSynchronizer
+  :: Clock  domain1 gated1 -- ^ 'Clock' of the incoming signal
+  -> Clock  domain2 gated2 -- ^ 'Clock' of the outgoing signal
+  -> Signal domain1 a
+  -> Signal domain2 a
+unsafeSynchronizer clk1 clk2 s = s'
   where
-    t1    = snatToNum period1
-    t2    = snatToNum period2
+    t1    = clockPeriod clk1
+    t2    = clockPeriod clk2
     s' | t1 < t2   = compress   t2 t1 s
        | t1 > t2   = oversample t1 t2 s
        | otherwise = same s
@@ -331,7 +330,7 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- | \"@'delay' clk s@\" delays the values in 'Signal' /s/ for once cycle, the
 -- value at time 0 is /undefined/.
 --
--- >>> printX (sampleN 3 (delay (systemClock (pure True)) (fromList [1,2,3,4])))
+-- >>> printX (sampleN 3 (delay systemClock (fromList [1,2,3,4])))
 -- [X,1,2]
 delay
   :: HasCallStack
@@ -345,7 +344,7 @@ delay = \clk i -> withFrozenCallStack (delay# clk i)
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
 -- cycle, and sets the value to @i@ the moment the reset becomes 'False'.
 --
--- >>> sampleN 3 (register (systemClock (pure True)) systemReset 8 (fromList [1,2,3,4]))
+-- >>> sampleN 3 (register systemClock systemReset 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register
   :: HasCallStack
@@ -379,9 +378,9 @@ register = \clk rst initial i -> withFrozenCallStack
 --
 -- We get:
 --
--- >>> sampleN 8 (sometimes1 (systemClock (pure True)) systemReset)
+-- >>> sampleN 8 (sometimes1 systemClock systemReset)
 -- [Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
--- >>> sampleN 8 (count (systemClock (pure True)) systemReset)
+-- >>> sampleN 8 (count systemClock systemReset)
 -- [0,0,1,1,2,2,3,3]
 regMaybe
   :: HasCallStack
@@ -408,9 +407,9 @@ regMaybe = \clk rst initial iM -> withFrozenCallStack
 --
 -- We get:
 --
--- >>> sampleN 8 (oscillate (systemClock (pure True)) systemReset)
+-- >>> sampleN 8 (oscillate systemClock systemReset)
 -- [False,True,False,True,False,True,False,True]
--- >>> sampleN 8 (count (systemClock (pure True)) systemReset)
+-- >>> sampleN 8 (count systemClock systemReset)
 -- [0,0,1,1,2,2,3,3]
 regEn
   :: Clock domain clk
@@ -433,7 +432,7 @@ regEn = \clk rst initial en i -> withFrozenCallStack
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type /a/
 --
--- >>> simulateB (unbundle . register (systemClock (pure True)) systemReset (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- >>> simulateB (unbundle . register systemClock systemReset (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
@@ -450,7 +449,7 @@ simulateB f = simulate (bundle . f . unbundle)
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
 -- list of samples of type /a/
 --
--- >>> simulateB (unbundle . register (systemClock (pure True)) systemReset (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- >>> simulateB (unbundle . register systemClock systemReset (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
