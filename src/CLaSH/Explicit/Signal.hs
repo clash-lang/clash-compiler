@@ -36,16 +36,19 @@ module CLaSH.Explicit.Signal
   , register
   , regMaybe
   , regEn
-    -- * Testbench functions
+    -- * Simulation and testbench functions
   , clockGen
+  , tbClockGen
   , asyncResetGen
   , syncResetGen
+  , systemClock
+  , tbSystemClock
+  , systemReset
     -- * Boolean connectives
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
   , Bundle(..)
     -- * Simulation functions (not synthesisable)
-  , systemClock, systemReset
   , simulate
   , simulateB
     -- ** lazy versions
@@ -158,10 +161,19 @@ type System = 'Dom "system" 10000
 
 -- | Clock generator for the 'System' clock domain.
 --
--- __NB__: should only be used for simulation
+-- __NB__: should only be used for simulation, and __not__ for the /testBench/
+-- function. For the /testBench/ function, used 'tbSystemClock'
 systemClock
   :: Clock System 'Source
 systemClock = clockGen
+
+-- | Clock generator for the 'System' clock domain.
+--
+-- __NB__: can be used in the /testBench/ function
+tbSystemClock
+  :: Signal System Bool
+  -> Clock System 'Source
+tbSystemClock = tbClockGen
 
 -- | Reset generator for the 'System' clock domain.
 --

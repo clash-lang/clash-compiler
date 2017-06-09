@@ -55,10 +55,14 @@ module CLaSH.Signal
   , regMaybe
   , regEn
   , mux
-    -- * Testbench functions
+    -- * Simulation and testbench functions
   , clockGen
+  , tbClockGen
   , asyncResetGen
   , syncResetGen
+  , systemClock
+  , tbSystemClock
+  , systemReset
     -- * Boolean connectives
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
@@ -69,9 +73,6 @@ module CLaSH.Signal
     -- ** lazy versions
   , simulate_lazy
   , simulateB_lazy
-    -- ** Simulation clocks and resets
-  , systemClock
-  , systemReset
     -- * List \<-\> Signal conversion (not synthesisable)
   , sample
   , sampleN
@@ -99,7 +100,7 @@ import           Test.QuickCheck       (Property, property)
 import           Unsafe.Coerce         (unsafeCoerce)
 
 import           CLaSH.Explicit.Signal
-  (System, resetSynchroniser, systemClock, systemReset)
+  (System, resetSynchroniser, systemClock, systemReset, tbSystemClock)
 import qualified CLaSH.Explicit.Signal as S
 import           CLaSH.Promoted.Nat    (SNat (..))
 import           CLaSH.Promoted.Symbol (SSymbol (..))

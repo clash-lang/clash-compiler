@@ -48,9 +48,9 @@ module CLaSH.Signal.Internal
   , delay#
   , register#
   , mux
-    -- * Testbench functions
+    -- * Simulation and testbench functions
   , clockGen
-  , gatedClockGen
+  , tbClockGen
   , asyncResetGen
   , syncResetGen
     -- * Boolean connectives
@@ -274,7 +274,8 @@ clockGate (Clock nm rt)         en  = GatedClock nm rt en
 clockGate (GatedClock nm rt en) en' = GatedClock nm rt (en .&&. en')
 {-# NOINLINE clockGate #-}
 
--- | Clock generator, for simulations and test benches.
+-- | Clock generator for simulations. Do __not__ use this clock generator for
+-- for the /testBench/ function, use 'tbClockGen' instead.
 --
 -- To be used like:
 --
@@ -288,7 +289,7 @@ clockGen
 clockGen = Clock SSymbol SNat
 {-# NOINLINE clockGen #-}
 
--- | Clock generator, for simulations and test benches.
+-- | Clock generator to be used in the /testBench/ function.
 --
 -- To be used like:
 --
@@ -296,12 +297,12 @@ clockGen = Clock SSymbol SNat
 -- type DomA = Dom \"A\" 1000
 -- clkA en = clockGen @DomA en
 -- @
-gatedClockGen
+tbClockGen
   :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
   => Signal domain Bool
-  -> Clock domain 'Gated
-gatedClockGen = GatedClock SSymbol SNat
-{-# NOINLINE gatedClockGen #-}
+  -> Clock domain 'Source
+tbClockGen _ = Clock SSymbol SNat
+{-# NOINLINE tbClockGen #-}
 
 -- | Asynchronous reset generator, for simulations and test benches.
 --
