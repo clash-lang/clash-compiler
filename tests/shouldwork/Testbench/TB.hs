@@ -27,4 +27,4 @@ testBench = done'
                                      ,(Just (4,True), 0)
                                      ]::[(Maybe (Signed 8,Bool),Bit)]))
     done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

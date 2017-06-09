@@ -49,4 +49,4 @@ testBench = done'
     testInput      = stimuliGenerator $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
     expectedOutput = outputVerifier   $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
     done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

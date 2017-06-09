@@ -52,5 +52,5 @@ testBench = done
     testInput      = stimuliGenerator clk50 rst50 ((5,True):>(4,False):>(2,True):>Nil)
     expectedOutput = outputVerifier   clk50 rst50 (0:>4:>2:>0:>2:>Nil)
     done           = expectedOutput (topEntity clk50 rst50 (unbundle testInput))
-    clk50          = clockGen @System50 (not <$> done)
+    clk50          = tbClockGen @System50 (not <$> done)
     rst50          = asyncResetGen @System50

@@ -31,5 +31,5 @@ testBench = done'
     expectedOutput = outputVerifier (0 :> 3523407757 :> 2920022741 :> 1535101039 :>
                         903986498 :> 3095867074 :> 3755410077 :> Nil)
     done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
 

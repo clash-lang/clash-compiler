@@ -25,4 +25,4 @@ testBench = done'
     testInput      = stimuliGenerator $(listToVecTH ([0..20]::[BitVector 16]))
     expectedOutput = outputVerifier   $(listToVecTH ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

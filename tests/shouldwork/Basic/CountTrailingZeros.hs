@@ -23,4 +23,4 @@ testBench = done'
 #error Unsupported word size
 #endif
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

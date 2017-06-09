@@ -111,6 +111,32 @@ end process;~FI~FI
   :: (domain ~ Dom nm period -- ARG[0]
      ,KnownSymbol nm         -- ARG[1]
      ,KnownNat period)       -- ARG[2]
+  => Clock domain Source"
+    , "templateD" :
+"-- pragma translate_off
+~GENSYM[clkGen][0] : process is
+  constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
+begin
+  ~RESULT <= '0';
+  wait for 30 ps;
+  loop
+    ~RESULT <= not ~RESULT;
+    wait for ~SYM[1];
+    ~RESULT <= not ~RESULT;
+    wait for ~SYM[1];
+  end loop;
+  wait;
+end process;
+-- pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.tbClockGen"
+    , "type" :
+"tbClockGen
+  :: (domain ~ Dom nm period -- ARG[0]
+     ,KnownSymbol nm         -- ARG[1]
+     ,KnownNat period)       -- ARG[2]
   => Signal domain Bool      -- ARG[3]
   -> Clock domain Source"
     , "templateD" :

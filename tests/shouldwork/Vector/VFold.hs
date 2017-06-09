@@ -17,4 +17,4 @@ testBench = done'
     testInput      = pure (7 :> 3 :> 9 :> 1 :> Nil)
     expectedOutput = outputVerifier ((1:>3:>7:>9:>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

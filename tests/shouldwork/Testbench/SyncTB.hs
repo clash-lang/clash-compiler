@@ -24,8 +24,8 @@ testBench = done
                         ((undefined :> undefined :> Nil) ++ $(listToVecTH ([2,3,4,5,7,8,9,10]::[Integer])))
     done           = expectedOutput (topEntity clk2 clk7 clk9 testInput)
     done'          = not <$> done
-    clk2           = clockGen @Dom2 (unsafeSynchronizer clk9 clk2 done')
-    clk7           = clockGen @Dom7 (unsafeSynchronizer clk9 clk7 done')
-    clk9           = clockGen @Dom9 done'
+    clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 done')
+    clk7           = tbClockGen @Dom7 (unsafeSynchronizer clk9 clk7 done')
+    clk9           = tbClockGen @Dom9 done'
     rst7           = asyncResetGen @Dom7
     rst9           = asyncResetGen @Dom9

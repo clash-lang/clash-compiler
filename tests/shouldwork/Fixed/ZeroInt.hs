@@ -12,4 +12,4 @@ testBench = done'
     testInput      = pure (0.2,0.35)
     expectedOutput = outputVerifier $(listToVecTH [0.06640625 :: UFixed 0 8])
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

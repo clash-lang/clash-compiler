@@ -15,4 +15,4 @@ testBench = done'
     testInput      = stimuliGenerator $(listToVecTH [1::Word,3,8,50,0])
     expectedOutput = outputVerifier   $(listToVecTH ([1,2,1,3,0]::[Int]))
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (systemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
