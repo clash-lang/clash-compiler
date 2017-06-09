@@ -10,8 +10,8 @@ PLL and other clock-related components for Intel (Altera) FPGAs
 {-# LANGUAGE GADTs     #-}
 module CLaSH.Intel.ClockGen where
 
-import CLaSH.Explicit.Signal
 import CLaSH.Promoted.Symbol
+import CLaSH.Signal.Internal
 import Unsafe.Coerce
 
 -- | A clock source that corresponds to the Intel/Quartus \"ALTPLL\" component

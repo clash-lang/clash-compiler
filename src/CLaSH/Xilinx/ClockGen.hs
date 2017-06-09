@@ -10,8 +10,8 @@ PLL and other clock-related components for Xilinx FPGAs
 {-# LANGUAGE GADTs     #-}
 module CLaSH.Xilinx.ClockGen where
 
-import CLaSH.Explicit.Signal
 import CLaSH.Promoted.Symbol
+import CLaSH.Signal.Internal
 import Unsafe.Coerce
 
 -- | A clock source that corresponds to the Xilinx PLL/MMCM component created

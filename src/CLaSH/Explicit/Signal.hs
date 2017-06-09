@@ -3,6 +3,33 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+CλaSH has synchronous 'Signal's in the form of:
+
+@
+'Signal' (domain :: 'Domain') a
+@
+
+Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
+and /domain/ is the /clock-/ (and /reset-/) domain to which the memory elements
+manipulating these 'Signal's belong.
+
+The type-parameter, /domain/, is of the kind 'Domain' which has types of the
+following shape:
+
+@
+data Domain = Dom { domainName :: 'GHC.TypeLits.Symbol', clkPeriod :: 'GHC.TypeLits.Nat' }
+@
+
+Where /domainName/ is a type-level string ('GHC.TypeLits.Symbol') representing
+the name of the /clock-/ (and /reset-/) domain, and /clkPeriod/ is a type-level
+natural number ('GHC.TypeLits.Nat') representing the clock period (in __ps__)
+of the clock lines in the /clock-domain/.
+
+* __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
+so do __not__ do that!
+* __NB__: You should be judicious using a clock with period of @1@ as you can
+never create a clock that goes any faster!
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -14,23 +41,22 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Explicit.Signal
-  ( -- * Explicitly clocked synchronous signal
-    -- $relativeclocks
+  ( -- * Synchronous signal
     Signal, Domain (..), System
     -- * Clock
-  , Clock (Clock) , ClockKind (..)
+  , Clock, ClockKind (..)
   , freqCalc
     -- ** Synchronisation primitive
   , unsafeSynchronizer
     -- ** Glock gating
   , clockGate
     -- * Reset
-  , Reset (..), ResetKind (..)
+  , Reset, ResetKind (..)
   , unsafeFromAsyncReset
   , unsafeToAsyncReset
   , fromSyncReset
   , toSyncReset
-  , resetSynchroniser
+  , resetSynchronizer
     -- * Basic circuit functions
   , delay
   , register
@@ -106,57 +132,9 @@ countSometimes clk rst = s where
 
 -}
 
-{- $relativeclocks #relativeclocks#
-CλaSH supports explicitly clocked 'CLaSH.Signal's in the form of:
-
-@
-'Signal' (domain :: 'Domain') a
-@
-
-Where @a@ is the type of the elements, and @clk@ is the clock to which the
-signal is synchronised. The type-parameter, @clk@, is of the kind 'Clock' which
-has types of the following shape:
-
-@
-Clk \{\- name :: \-\} 'GHC.TypeLits.Symbol' \{\- period :: \-\} 'GHC.TypeLits.Nat'
-@
-
-Where @name@ is a type-level string ('GHC.TypeLits.Symbol') representing the the
-name of the clock, and @period@ is a type-level natural number ('GHC.TypeLits.Nat')
-representing the clock period. Two concrete instances of a 'Clk' could be:
-
-> type ClkA500  = Clk "A500" 500
-> type ClkB3250 = Clk "B3250" 3250
-
-The periods of these clocks are however dimension-less, they do not refer to any
-explicit time-scale (e.g. nano-seconds). The reason for the lack of an explicit
-time-scale is that the CλaSH compiler would not be able guarantee that the
-circuit can run at the specified frequency. The clock periods are just there to
-indicate relative frequency differences between two different clocks. That is, a
-signal:
-
-@
-'Signal'' ClkA500 a
-@
-
-is synchronized to a clock that runs 6.5 times faster than the clock to which
-the signal:
-
-@
-'Signal'' ClkB3250 a
-@
-
-is synchronized to.
-
-* __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
-so do __not__ do that!
-* __NB__: You should be judicious using a clock with period of @1@ as you can
-never create a clock that goes any faster!
--}
-
 -- **Clock
 
--- | A clock domain running at 100 MHz
+-- | A /clock/ (and /reset/) domain with clocks running at 100 MHz
 type System = 'Dom "system" 10000
 
 -- | Clock generator for the 'System' clock domain.
@@ -170,6 +148,21 @@ systemClock = clockGen
 -- | Clock generator for the 'System' clock domain.
 --
 -- __NB__: can be used in the /testBench/ function
+--
+-- === __Example__
+--
+-- @
+-- topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
+-- topEntity = concat
+--
+-- testBench :: Signal System Bool
+-- testBench = done'
+--   where
+--     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
+--     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     done           = expectedOutput (topEntity <$> testInput)
+--     done'          = withClockReset ('tbSystemClock' (not <\$\> done')) systemReset done
+-- @
 tbSystemClock
   :: Signal System Bool
   -> Clock System 'Source
@@ -177,15 +170,63 @@ tbSystemClock = tbClockGen
 
 -- | Reset generator for the 'System' clock domain.
 --
--- __NB__: should only be used for simulation
+-- __NB__: should only be used for simulation or the \testBench\ function.
+--
+-- === __Example__
+--
+-- @
+-- topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
+-- topEntity = concat
+--
+-- testBench :: Signal System Bool
+-- testBench = done'
+--   where
+--     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
+--     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     done           = expectedOutput (topEntity <$> testInput)
+--     done'          = withClockReset (tbSystemClock (not <\$\> done')) 'systemReset' done
+-- @
 systemReset :: Reset System 'Asynchronous
 systemReset = asyncResetGen
 
-resetSynchroniser
+-- | Normally, asynchronous resets can be both asynchronously asserted and
+-- de-asserted. Asynchronous de-assertion can induce meta-stability in the
+-- component which is being reset. To ensure this doesn't happen,
+-- 'resetSynchroniser' ensures that de-assertion of a reset happens
+-- synchronously. Assertion of the reset remains asynchronous.
+--
+-- Note that asynchronous assertion does not induce meta-stability in the
+-- component whose reset is asserted. However, when a component \"A\" in another
+-- clock or reset domain depends on the value of a component \"B\" being
+-- reset, then asynchronous assertion of the reset of component \"B"\ can induce
+-- meta-stability in component \"A\". To prevent this from happening you need
+-- to use a proper synchronizer, for example one of the synchronizers in
+-- "CLaSH.Explicit.Synchronizer"
+--
+-- __NB:__ Assumes the component(s) being reset have an /active-high/ reset port,
+-- which all components in __clash-prelude__ have.
+--
+-- === __Example__
+--
+-- @
+-- topEntity
+--   :: Clock  System Source
+--   -> Reset  System Asynchronous
+--   -> Signal System Bit
+--   -> Signal System (BitVector 8)
+-- topEntity clk rst key1 =
+--     let  (pllOut,pllStable) = altpll (SSymbol @ "altpll50") clk rst
+--          rstSync            = 'resetSynchronizer' pllOut (unsafeToAsyncReset pllStable)
+--     in   withClockReset pllOut rstSync leds
+--   where
+--     key1R  = isRising 1 key1
+--     leds   = mealy blinkerT (1,False,0) key1R
+-- @
+resetSynchronizer
   :: Clock domain gated
   -> Reset domain 'Asynchronous
   -> Reset domain 'Asynchronous
-resetSynchroniser clk rst  =
+resetSynchronizer clk rst  =
   let r1 = register clk rst True (pure False)
       r2 = register clk rst True r1
   in  unsafeToAsyncReset r2

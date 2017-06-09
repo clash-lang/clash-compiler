@@ -110,10 +110,13 @@ import CLaSH.XException           (XException, errorX, seqX)
 >>> :set -XTypeApplications
 >>> import CLaSH.Promoted.Nat
 >>> import CLaSH.Promoted.Symbol
+>>> import CLaSH.XException
 >>> type System = Dom "System" 10000
 >>> let systemClock = clockGen @System
 >>> let systemReset = asyncResetGen @System
->>> let register = register# systemClock systemReset
+>>> let register = register#
+>>> let registerS = register#
+>>> let registerA = register#
 -}
 
 -- * Signal
@@ -122,8 +125,33 @@ import CLaSH.XException           (XException, errorX, seqX)
 data Domain = Dom { domainName :: Symbol, clkPeriod :: Nat }
 
 infixr 5 :-
--- | A synchronous signal with samples of type /a/, explicitly synchronized to
--- a clock (and reset) /domain/
+{- | CλaSH has synchronous 'Signal's in the form of:
+
+@
+'Signal' (domain :: 'Domain') a
+@
+
+Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
+and /domain/ is the /clock-/ (and /reset-/) domain to which the memory elements
+manipulating these 'Signal's belong.
+
+The type-parameter, /domain/, is of the kind 'Domain' which has types of the
+following shape:
+
+@
+data Domain = Dom { domainName :: 'GHC.TypeLits.Symbol', clkPeriod :: 'GHC.TypeLits.Nat' }
+@
+
+Where /domainName/ is a type-level string ('GHC.TypeLits.Symbol') representing
+the name of the /clock-/ (and /reset-/) domain, and /clkPeriod/ is a type-level
+natural number ('GHC.TypeLits.Nat') representing the clock period (in __ps__)
+of the clock lines in the /clock-domain/.
+
+* __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
+so do __not__ do that!
+* __NB__: You should be judicious using a clock with period of @1@ as you can
+never create a clock that goes any faster!
+-}
 data Signal (domain :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesisable.
   = a :- Signal domain a
@@ -297,6 +325,37 @@ clockGen = Clock SSymbol SNat
 -- type DomA = Dom \"A\" 1000
 -- clkA en = clockGen @DomA en
 -- @
+--
+-- === __Example__
+--
+-- @
+-- type DomA1 = Dom \"A\" 1 -- fast, twice as fast as slow
+-- type DomB2 = Dom \"B\" 2 -- slow
+--
+-- topEntity
+--   :: Clock DomA1 Source
+--   -> Reset DomA1 Asynchronous
+--   -> Clock DomB2 Source
+--   -> Signal DomA1 (Unsigned 8)
+--   -> Signal DomB2 (Unsigned 8, Unsigned 8)
+-- topEntity clk1 rst1 clk2 i =
+--   let h = register clk1 rst1 0 (register clk1 rst1 0 i)
+--       l = register clk1 rst1 0 i
+--   in  unsafeSynchronizer clk1 clk2 (bundle (h,l))
+--
+-- testBench
+--   :: Signal DomB2 Bool
+-- testBench = done
+--   where
+--     testInput      = stimuliGenerator clkA1 rstA1 $(listToVecTH [1::Unsigned 8,2,3,4,5,6,7,8])
+--     expectedOutput = outputVerifier   clkB2 rstB2 $(listToVecTH [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
+--     done           = expectedOutput (topEntity clkA1 rstA1 clkB2 testInput)
+--     done'          = not \<$\> done
+--     clkA1          = 'tbClockGen' \@DomA1 (unsafeSynchronizer clkB2 clkA1 done')
+--     clkB2          = 'tbClockGen' \@DomB2 done'
+--     rstA1          = asyncResetGen \@DomA1
+--     rstB2          = asyncResetGen \@DomB2
+-- @
 tbClockGen
   :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
   => Signal domain Bool
@@ -304,7 +363,7 @@ tbClockGen
 tbClockGen _ = Clock SSymbol SNat
 {-# NOINLINE tbClockGen #-}
 
--- | Asynchronous reset generator, for simulations and test benches.
+-- | Asynchronous reset generator, for simulations and the /testBench/ function.
 --
 -- To be used like:
 --
@@ -315,11 +374,43 @@ tbClockGen _ = Clock SSymbol SNat
 --
 -- __NB__: Can only be used for components with an /active-high/ reset
 -- port, which all __clash-prelude__ components are.
+--
+-- === __Example__
+--
+-- @
+-- type Dom2 = Dom "dom" 2
+-- type Dom7 = Dom "dom" 7
+-- type Dom9 = Dom "dom" 9
+--
+-- topEntity
+--   :: Clock Dom2 Source
+--   -> Clock Dom7 Source
+--   -> Clock Dom9 Source
+--   -> Signal Dom7 Integer
+--   -> Signal Dom9 Integer
+-- topEntity clk2 clk7 clk9 i = delay clk9 (unsafeSynchronizer clk2 clk9 (delay clk2 (unsafeSynchronizer clk7 clk2 (delay clk7 i))))
+-- {-# NOINLINE topEntity #-}
+--
+-- testBench
+--   :: Signal Dom9 Bool
+-- testBench = done
+--   where
+--     testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..10])
+--     expectedOutput = outputVerifier   clk9 rst9
+--                         ((undefined :> undefined :> Nil) ++ $(listToVecTH ([2,3,4,5,7,8,9,10]::[Integer])))
+--     done           = expectedOutput (topEntity clk2 clk7 clk9 testInput)
+--     done'          = not \<$\> done
+--     clk2           = tbClockGen \@Dom2 (unsafeSynchronizer clk9 clk2 done')
+--     clk7           = tbClockGen \@Dom7 (unsafeSynchronizer clk9 clk7 done')
+--     clk9           = tbClockGen \@Dom9 done'
+--     rst7           = 'asyncResetGen' \@Dom7
+--     rst9           = 'asyncResetGen' \@Dom9
+-- @
 asyncResetGen :: Reset domain 'Asynchronous
 asyncResetGen = Async (True :- pure False)
 {-# NOINLINE asyncResetGen #-}
 
--- | Synchronous reset generator, for simulations and test benches.
+-- | Synchronous reset generator, for simulations and the /testBench/ function.
 --
 -- To be used like:
 --
@@ -335,7 +426,40 @@ syncResetGen = Sync (True :- pure False)
 {-# NOINLINE syncResetGen #-}
 
 -- | The \"kind\" of reset
-data ResetKind = Synchronous | Asynchronous
+--
+-- Given a situation where a reset is asserted, and then de-asserted at the
+-- active flank of the clock, we can observe the difference between a
+-- synchronous reset and an asynchronous reset:
+--
+-- === Synchronous reset
+--
+-- > registerS
+-- >   :: Clock domain gated -> Reset domain Synchronous
+-- >   -> Signal domain Int -> Signal domain Int
+-- > registerS = register
+--
+-- >>> printX (sampleN 4 (registerS (clockGen @System) (syncResetGen @System) 0 (fromList [1,2,3])))
+-- [X,0,2,3]
+--
+-- === Asynchronous reset
+--
+-- > registerA
+-- >   :: Clock domain gated -> Reset domain Asynchronous
+-- >   -> Signal domain Int -> Signal domain Int
+-- > registerA = register
+--
+-- >>> sampleN 4 (registerA (clockGen @System) (asyncResetGen @System) 0 (fromList [1,2,3]))
+-- [0,1,2,3]
+data ResetKind
+  = Synchronous
+  -- ^ Components with a synchronous reset port produce the reset value when:
+  --
+  --     * The reset is asserted during the active flank of the clock to which
+  --       the component is synchronized.
+  | Asynchronous
+  -- ^ Components with an asynchronous reset port produce the reset value when:
+  --
+  --     * Immediately when the reset is asserted.
   deriving (Eq,Ord,Show,Generic,NFData)
 
 -- | A reset signal belonging to a @domain@.
@@ -347,7 +471,7 @@ data Reset (domain :: Domain) (synchronous :: ResetKind) where
   Sync  :: Signal domain Bool -> Reset domain 'Synchronous
   Async :: Signal domain Bool -> Reset domain 'Asynchronous
 
--- | 'unsafeToAsyncReset#' is unsafe because it can introduce:
+-- | 'unsafeFromAsyncReset' is unsafe because it can introduce:
 --
 -- * meta-stability
 -- * combinational loops
@@ -359,6 +483,19 @@ unsafeFromAsyncReset (Async r) = r
 --
 -- * meta-stability
 -- * combinational loops
+--
+-- === __Example__
+--
+-- @
+-- resetSynchronizer
+--   :: Clock domain gated
+--   -> Reset domain 'Asynchronous
+--   -> Reset domain 'Asynchronous
+-- resetSynchronizer clk rst  =
+--   let r1 = register clk rst True (pure False)
+--       r2 = register clk rst True r1
+--   in  'unsafeToAsyncReset' r2
+-- @
 unsafeToAsyncReset :: Signal domain Bool -> Reset domain 'Asynchronous
 unsafeToAsyncReset r = Async r
 {-# NOINLINE unsafeToAsyncReset #-}
@@ -368,7 +505,7 @@ fromSyncReset :: Reset domain 'Synchronous -> Signal domain Bool
 fromSyncReset (Sync r) = r
 {-# NOINLINE fromSyncReset #-}
 
--- | it is afe to treat @Bool@ signals as synchronous resets
+-- | it is safe to treat @Bool@ signals as synchronous resets
 toSyncReset :: Signal domain Bool -> Reset domain 'Synchronous
 toSyncReset r = Sync r
 {-# NOINLINE toSyncReset #-}
@@ -635,7 +772,7 @@ fromList = Prelude.foldr headStrictSignal (errorX "finite list")
 -- | Simulate a (@'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register 8) [1, 2, 3]
+-- >>> simulate (register systemClock systemReset 8) [1, 2, 3]
 -- [8,1,2,3...
 -- ...
 --
@@ -694,7 +831,7 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 -- | Simulate a (@'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register 8) [1, 2, 3]
+-- >>> simulate (register systemClock systemReset 8) [1, 2, 3]
 -- [8,1,2,3...
 -- ...
 --

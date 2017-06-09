@@ -19,6 +19,8 @@ topEntity x = ...
 For example, given the following specification:
 
 @
+module Blinker where
+
 import CLaSH.Prelude
 import CLaSH.Intel.ClockGen
 

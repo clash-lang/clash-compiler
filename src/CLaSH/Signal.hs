@@ -3,6 +3,33 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+
+CλaSH has synchronous 'Signal's in the form of:
+
+@
+'Signal' (domain :: 'Domain') a
+@
+
+Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
+and /domain/ is the /clock-/ (and /reset-/) domain to which the memory elements
+manipulating these 'Signal's belong.
+
+The type-parameter, /domain/, is of the kind 'Domain' which has types of the
+following shape:
+
+@
+data Domain = Dom { domainName :: 'GHC.TypeLits.Symbol', clkPeriod :: 'GHC.TypeLits.Nat' }
+@
+
+Where /domainName/ is a type-level string ('GHC.TypeLits.Symbol') representing
+the name of the /clock-/ (and /reset-/) domain, and /clkPeriod/ is a type-level
+natural number ('GHC.TypeLits.Nat') representing the clock period (in __ps__)
+of the clock lines in the /clock-domain/.
+
+* __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
+so do __not__ do that!
+* __NB__: You should be judicious using a clock with period of @1@ as you can
+never create a clock that goes any faster!
 -}
 
 {-# LANGUAGE ConstraintKinds #-}
@@ -33,7 +60,7 @@ module CLaSH.Signal
   , unsafeToAsyncReset
   , fromSyncReset
   , toSyncReset
-  , resetSynchroniser
+  , resetSynchronizer
     -- * Implicit routing of clocks and resets
     -- $implicitclockandreset
 
@@ -100,7 +127,7 @@ import           Test.QuickCheck       (Property, property)
 import           Unsafe.Coerce         (unsafeCoerce)
 
 import           CLaSH.Explicit.Signal
-  (System, resetSynchroniser, systemClock, systemReset, tbSystemClock)
+  (System, resetSynchronizer, systemClock, systemReset, tbSystemClock)
 import qualified CLaSH.Explicit.Signal as S
 import           CLaSH.Promoted.Nat    (SNat (..))
 import           CLaSH.Promoted.Symbol (SSymbol (..))
@@ -133,7 +160,148 @@ countSometimes = s where
 -- * Implicit routing of clock and reset signals
 
 {- $implicitclockandreset #implicitclockandreset#
-Clocks and resets are by default implicitly routed.
+Clocks and resets are by default implicitly routed to their components. You can
+see from the type of a component whether it has implicitly routed clocks or
+resets:
+
+It has an implicitly routed clock when it has a:
+
+@
+f :: 'HasClock' domain gated => ...
+@
+
+Constraint.
+
+Or it has an implicitly routed reset when it has a:
+
+@
+g :: 'HasReset' domain synchronous => ...
+@
+
+Constraint.
+
+Or it has both an implicitly routed clock and an implicitly routed reset when it
+has a:
+
+@
+h :: 'HasClockReset' domain gated synchronous => ..
+@
+
+Constraint.
+
+Given a component with an explicit clock and reset port, you can have them
+implicitly routed using 'hasClock' and 'hasReset'. So given a:
+
+@
+f :: Clock domain gated -> Reset domain synchronous -> Signal domain a -> ...
+@
+
+You have have the clock and reset implicitly routed by:
+
+@
+-- g :: 'HasClockReset' domain gated synchronous => Signal domain a -> ...
+g = f 'hasClock' 'hasReset'
+@
+
+=== Assigning explicit clock and reset arguments to implicit clocks and resets
+
+Given a component:
+
+@
+f :: HasClockReset domain gated synchronous
+  => Signal domain Int
+  -> Signal domain Int
+@
+
+which has an implicitly routed clock and implicitly routed clock, we can use
+it in a function with explicit clock and reset arguments like so:
+
+@
+-- g :: Clock domain gated -> Reset domain synchronous -> Signal domain Int -> Signal domain Int
+g clk rst = 'withClockReset' clk rst f
+@
+
+Similarly, there are 'withClock' and 'withReset' to connect just implicit clocks
+or just implicit resets respectively.
+
+You will need to explicitly apply clocks and resets when you want to using
+components such as PPLs and 'resetSynchronizer':
+
+@
+topEntity
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System Int
+  -> Signal System Int
+topEntity clk rst =
+  let (pllOut,pllStable) = 'CLaSH.Intel.ClockGen.altpll' (SSymbol \@\"altpll50\") clk rst
+      rstSync            = 'resetSynchronizer' pllOut ('unsafeToAsyncReset' pllStable)
+  in  'withClockReset' pllOut rstSync f
+@
+
+=== Implicit parameters
+
+__TL;DR__ do __not__ use 'HasClock', 'HasReset', 'HasClockReset', 'hasClock',
+'hasReset', or 'SystemClockReset', when you have multiple /clock/ (or /reset/)
+domains.
+
+__Want to know:__
+
+Under the hood, CLaSH uses
+<https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#implicit-parameters Implicit Parameters>
+to implicitly route the clock and reset.
+
+This means that you cannot use the 'hasClock' and 'hasReset' functions when you
+are working with multiple /clock/ (and /reset/) domains. Because, given a:
+
+@
+f :: Clock domainA gatedA -> Clock domainB gatedB -> Signal domainA a -> Signal domainB b -> ..
+@
+
+and using 'hasClock' as we did above, we will get:
+
+@
+-- g :: HasClock domainB gatedB => Signal domainB a -> Signal domainB b -> ...
+g = f hasClock hasClock
+@
+
+That is, sub-components of /f/ will be synchronized to the same clock, where
+the idea was probably to synchronize them to different clocks.
+
+Trying to give different implicit clocks will also not work:
+
+@
+h :: forall domainA domainB gatedA gatedB a b
+   . (HasClock domainA gatedA, HasClock domainB gatedB)
+  => Signal domainA a -> Signal domainB b -> ...
+h = f (hasClock \@domainA) (hasClock \@domainB)
+@
+
+as it will result in a type error.
+
+In case you want to have implicitly routed clocks and resets for
+multi-/clock/ (and -/reset/) domain designs you will have to use to use
+<https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#implicit-parameters Implicit Parameters>
+directly:
+
+@
+-- k :: (?clkB::Clock domainB gatedB,?clkA::Clock domainA gatedA)
+--   => Signal domainA a -> Signal domainB b -> ...
+k = f ?clkA ?clkB
+@
+
+Note that you __cannot__ use /any/ of the functions that mention 'HasClock',
+'HasReset', or 'HasClockReset' constraints. So when you want to assign clock
+or reset arguments to your self-rolled implicit clocks and resets you will need
+to use the
+
+@
+let ?clkA = ...
+in  k
+@
+
+notation for binding
+<https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#implicit-parameters Implicit Parameters>.
 -}
 
 -- | A /constraint/ that indicates the component needs a 'Clock'
@@ -155,6 +323,7 @@ type HasClockReset domain gated synchronous =
 --
 -- You can implicitly route a clock by:
 --
+-- > g :: HaClock domain gated => Signal domain a -> ...
 -- > g = f hasClock
 --
 -- __NB__ all components with a `HasClock` /constraint/ are connected to
@@ -172,6 +341,7 @@ hasClock = ?clk
 --
 -- You can implicitly route a clock by:
 --
+-- > g :: HasReset domain synchronous => Signal domain a -> ...
 -- > g = f hasReset
 --
 -- __NB__ all components with a `HasReset` /constraint/ are connected to
@@ -210,6 +380,21 @@ withReset rst r
 
 -- | Explicitly connect a 'Clock' and 'Reset' to a component whose clock and
 -- reset are implicitly routed
+--
+-- === __Example__
+--
+-- @
+-- topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
+-- topEntity = concat
+--
+-- testBench :: Signal System Bool
+-- testBench = done'
+--   where
+--     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
+--     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
+--     done           = expectedOutput (topEntity <$> testInput)
+--     done'          = 'withClockReset' (tbSystemClock (not <\$\> done')) systemReset done
+-- @
 withClockReset
   :: Clock domain gated
   -- ^ The 'Clock' we want to connect

@@ -117,8 +117,16 @@ let sortVL xs = map fst sorted :< (snd (last sorted))
 
 >>> let mac = mealy macT 0
 >>> let topEntity = mac :: SystemClockReset => Signal System (Signed 9, Signed 9) -> Signal System (Signed 9)
->>> let testInput = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
->>> let expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
+>>> :{
+let testBench :: Signal System Bool
+    testBench = done'
+      where
+        testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+        expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
+        done           = expectedOutput (topEntity testInput)
+        done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+:}
+
 >>> :{
 let fibR :: Unsigned 64 -> Unsigned 64
     fibR 0 = 0
@@ -195,23 +203,23 @@ The CλaSH compiler and Prelude library for circuit design only work with the
 <http://haskell.org/ghc GHC> Haskell compiler version 8.0 (lower versions of
 GHC are not supported).
 
-  (1) Install __GHC 8.0__
+  (1) Install __GHC 8.2__
 
-      * Download and install <https://www.haskell.org/ghc/download_ghc_8_0_2 GHC for your platform>.
+      * Download and install <https://www.haskell.org/ghc/download_ghc_8_2_1 GHC for your platform>.
         Unix user can use @./configure prefix=\<LOCATION\>@ to set the installation
         location.
 
       * Make sure that the @bin@ directory of __GHC__ is in your @PATH@.
 
-    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_0_2>,
+    In case you cannot find what you are looking for on <https://www.haskell.org/ghc/download_ghc_8_2_1>,
     you can, /alternatively/, use the following instructions:
 
       * Ubuntu:
 
           * Run: @sudo add-apt-repository -y ppa:hvr/ghc@
           * Run: @sudo apt-get update@
-          * Run: @sudo apt-get install cabal-install-1.24 ghc-8.0.2 libtinfo-dev@
-          * Update your @PATH@ with: @\/opt\/ghc\/8.0.2\/bin@, @\/opt\/cabal\/1.24/bin@, and @\$HOME\/.cabal\/bin@
+          * Run: @sudo apt-get install cabal-install-2.0 ghc-8.2.1 libtinfo-dev@
+          * Update your @PATH@ with: @\/opt\/ghc\/bin@, @\/opt\/cabal\/bin@, and @\$HOME\/.cabal\/bin@
           * Run: @cabal update@
           * Skip step 2.
 
@@ -261,7 +269,7 @@ GHC are not supported).
   (4) Verify that everything is working by:
 
       * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/049e6e2eacb9b3b5ae8664b9b79979c321b322d9/examples/FIR.hs Fir.hs> example
-      * Run: @clash --interactive FIR.hs@
+      * Run: @clashi FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command
       * Execute, in the interpreter, the @:verilog@ command
       * Execute, in the interpreter, the @:systemverilog@ command
@@ -278,7 +286,7 @@ at the same time. If you followed the installation instructions, you already
 know how to start the CλaSH compiler in interpretive mode:
 
 @
-clash --interactive
+clashi
 @
 
 For those familiar with Haskell/GHC, this is indeed just @GHCi@, with three
@@ -362,7 +370,9 @@ combinational logic or (synchronous) sequential logic. We do this by examining
 the type of one of the sequential primitives, the @'register'@ function:
 
 @
-register :: ... => a -> 'Signal' domain a -> 'Signal' domain a
+register
+  :: 'HasClockReset' domain gated synchronous
+  => a -> 'Signal' domain a -> 'Signal' domain a
 register i s = ...
 @
 
@@ -438,9 +448,11 @@ circuit from a combinational circuit that has the same Mealy machine type /
 shape of @macT@:
 
 @
-mealy :: (s -> i -> (s,o))
-      -> s
-      -> ('Signal' i -> 'Signal' o)
+mealy
+  :: 'HasClockReset' domain gated synchronous
+  => (s -> i -> (s,o))
+  -> s
+  -> ('Signal' i -> 'Signal' o)
 mealy f initS = ...
 @
 
@@ -473,7 +485,10 @@ always be needed, you can always check the type with the @:t@ command and see
 if the function is monomorphic:
 
 @
-topEntity :: 'Signal' ('Signed' 9, 'Signed' 9) -> 'Signal' ('Signed' 9)
+topEntity
+  :: 'SystemClockReset'
+  => 'Signal' System ('Signed' 9, 'Signed' 9)
+  -> 'Signal' System ('Signed' 9)
 topEntity = mac
 @
 
@@ -494,7 +509,10 @@ macT acc (x,y) = (acc',o)
 
 mac = 'mealy' macT 0
 
-topEntity :: 'Signal' ('Signed' 9, 'Signed' 9) -> 'Signal' ('Signed' 9)
+topEntity
+  :: 'SystemClockReset'
+  => 'Signal' System ('Signed' 9, 'Signed' 9)
+  -> 'Signal' System ('Signed' 9)
 topEntity = mac
 @
 
@@ -515,62 +533,43 @@ containing the top level entity.
 
 {- $mac4
 There are multiple reasons as to why might you want to create a so-called
-/testbench/ for the VHDL:
+/testBench/ for the generated HDL:
 
   * You want to compare post-synthesis / post-place&route behaviour to that of
-    the behaviour of the original VHDL.
+    the behaviour of the original generated HDL.
   * Need representative stimuli for your dynamic power calculations
-  * Verify that the VHDL output of the CλaSH compiler has the same behaviour as
+  * Verify that the HDL output of the CλaSH compiler has the same behaviour as
     the Haskell / CλaSH specification.
 
-For these purposes, you can have CλaSH compiler generate a @MAC_testbench.vhdl@
-file which contains a stimulus generator and an expected output verifier. The
-CλaSH compiler looks for the following functions to generate these to aspects:
+For these purposes, you can have CλaSH compiler generate a @MAC_testBench.vhdl@
+file which contains the /testBench/. The CλaSH compiler looks for the
+\testBench\ function to generate this function.
 
-  1. @testInput@ for the stimulus generator.
-  2. @expectedOutput@ for the output verification.
-
-Given a @topEntity@ with the type:
+For example, you can test the earlier defined /topEntity/ by:
 
 @
-__topEntity__ :: 'Signal' a -> 'Signal' b
-@
+topEntity
+  :: 'SystemClockReset'
+  => 'Signal' System (Signed 9,Signed 9)
+  -> 'Signal' System (Signed 9)
+topEntity = mac
+{\-\# NOINLINE topEntity \#-\}
 
-Where @a@ and @b@ are placeholders for monomorphic types: the 'topEntity' is
-not allowed to be polymorphic. So given the above type for the 'topEntity', the
-type of 'testInput' should be:
-
-@
-__testInput__ :: 'Signal' a
-@
-
-And the type of @expectedOutput@ should be:
-
-@
-__expectedOutput__ :: 'Signal' b -> 'Signal' Bool
-@
-
-Where the 'expectedOutput' function should assert to 'True' once it has verified
-all expected values. The "CLaSH.Prelude" module contains two standard functions
-to serve the above purpose, but a user is free to use any CλaSH specification
-to describe these two functions. For this tutorial we will be using the
-functions specified in the "CLaSH.Prelude" module, which are @'stimuliGenerator'@
-and @'outputVerifier'@:
-
-@
-testInput :: 'Signal' ('Signed' 9,'Signed' 9)
-testInput = 'stimuliGenerator' $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
-
-expectedOutput :: 'Signal' ('Signed' 9) -> 'Signal' Bool
-expectedOutput = 'outputVerifier' $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
+testBench :: 'Signal' System Bool
+testBench = done'
+  where
+    testInput    = 'stimuliGenerator' $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
+    expectOutput = 'outputVerifier' $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
+    done         = expectOutput (topEntity testInput)
+    done'        = 'withClockReset' ('tbSystemClock' (not '<$>' done')) 'systemReset' done
 @
 
 This will create a stimulus generator that creates the same inputs as we used
 earlier for the simulation of the circuit, and creates an output verifier that
 compares against the results we got from our earlier simulation. We can even
-simulate the behaviour of the /testbench/:
+simulate the behaviour of the /testBench/:
 
->>> sampleN 7 $ expectedOutput (topEntity testInput)
+>>> sampleN 7 testBench
 [False,False,False,False
 cycle(system10000): 4, outputVerifier
 expected value: 14, not equal to actual value: 30
@@ -668,9 +667,11 @@ structure.
     position of the arguments and result:
 
     @
-    asStateM :: (i -> 'Control.Monad.State.Lazy.State' s o)
-             -> s
-             -> ('Signal' i -> 'Signal' o)
+    asStateM
+      :: 'HasClockReset' domain gated synchronous
+      => (i -> 'Control.Monad.State.Lazy.State' s o)
+      -> s
+      -> ('Signal' domain i -> 'Signal' domain o)
     asStateM f i = 'mealy' g i
       where
         g s x = let (o,s') = 'Control.Monad.State.Lazy.runState' (f x) s
@@ -697,7 +698,10 @@ fir coeffs x_t = y_t
     y_t = dotp coeffs xs
     xs  = 'window' x_t
 
-topEntity :: 'Signal' ('Signed' 16) -> 'Signal' ('Signed' 16)
+topEntity
+  :: 'SystemClockReset'
+  => 'Signal' System ('Signed' 16)
+  -> 'Signal' System ('Signed' 16)
 topEntity = fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil')
 @
 
@@ -738,25 +742,26 @@ output of @'Signal' o@. However, the type of @(a,b)@ in the definition of @g@ is
 @('Signal' Bool, 'Signal' Int)@. And the type of @(i1,b1)@ is of type
 @('Signal' Int, 'Signal' Bool)@.
 
-Syntactically, @'Signal' (Bool,Int)@ and @('Signal' Bool, 'Signal' Int)@ are /unequal/.
+Syntactically, @'Signal' domain (Bool,Int)@ and @('Signal' domain Bool,
+'Signal' domain Int)@ are /unequal/.
 So we need to make a conversion between the two, that is what 'bundle' and
 'unbundle' are for. In the above case 'bundle' gets the type:
 
 @
-__bundle__ :: ('Signal' Bool, 'Signal' Int) -> 'Signal' (Bool,Int)
+__bundle__ :: ('Signal' domain Bool, 'Signal' domain Int) -> 'Signal' domain (Bool,Int)
 @
 
 and 'unbundle':
 
 @
-__unbundle__ :: 'Signal' (Int,Bool) -> ('Signal' Int, 'Signal' Bool)
+__unbundle__ :: 'Signal' domain (Int,Bool) -> ('Signal' domain Int, 'Signal' domain Bool)
 @
 
 The /true/ types of these two functions are, however:
 
 @
-__bundle__   :: 'Bundle' a => 'Unbundled' a -> 'Signal' a
-__unbundle__ :: 'Bundle' a => 'Signal' a -> 'Unbundled' a
+__bundle__   :: 'Bundle' a => 'Unbundled' domain a -> 'Signal' domain a
+__unbundle__ :: 'Bundle' a => 'Signal' domain a -> 'Unbundled' domain a
 @
 
 'Unbundled' is an <http://www.haskell.org/ghc/docs/latest/html/users_guide/type-families.html#assoc-decl associated type family>
@@ -779,7 +784,7 @@ That is:
 
 @
 instance 'Bundle' (a,b) where
-  type 'Unbundled'' clk (a,b) = ('Signal'' clk a, 'Signal'' clk b)
+  type 'Unbundled' domain (a,b) = ('Signal' domain a, 'Signal' domain b)
   bundle   (a,b) = (,) '<$>' a '<*>' b
   unbundle tup   = (fst '<$>' tup, snd '<*>' tup)
 @
@@ -804,7 +809,7 @@ which does the bundling and unbundling for us:
 mealyB :: ('Bundle' i, 'Bundle' o)
        => (s -> i -> (s,o))
        -> s
-       -> ('Unbundled' i -> 'Unbundled' o)
+       -> ('Unbundled' domain i -> 'Unbundled' domain o)
 @
 
 Using 'mealyB' we can define @g@ as:
@@ -836,15 +841,29 @@ topEntity x = ...
 For example, given the following specification:
 
 @
-topEntity :: Signal Bit -> Signal (BitVector 8)
-topEntity key1 = leds
+module Blinker where
+
+import CLaSH.Prelude
+import CLaSH.Intel.ClockGen
+
+type Dom50 = Dom \"System\" 20000
+
+topEntity
+  :: Clock Dom50 Source
+  -> Reset Dom50 Asynchronous
+  -> Signal Dom50 Bit
+  -> Signal Dom50 (BitVector 8)
+topEntity clk rst key1 =
+    let  (pllOut,pllStable) = 'CLaSH.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
+         rstSync            = 'CLaSH.Signal.resetSynchroniser' pllOut ('CLaSH.Signal.unsafeToAsyncReset' pllStable)
+    in   'CLaSH.Signal.withClockReset' pllOut rstSync leds
   where
-    key1R = isRising 1 key1
-    leds  = mealy blinkerT (1,False,0) key1R
+    key1R  = 'CLaSH.Prelude.isRising' 1 key1
+    leds   = 'CLaSH.Prelude.mealy' blinkerT (1,False,0) key1R
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
-    -- clock frequency = 50e6   (50 MHz)
+    -- clock frequency = 50e6  (50 MHz)
     -- led update rate = 333e-3 (every 333ms)
     cnt_max = 16650000 -- 50e6 * 333e-3
 
@@ -857,36 +876,36 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
     leds' | cntr == 0 = if mode then complement leds
                                 else rotateL leds 1
           | otherwise = leds
-@
 
 The CλaSH compiler will normally generate the following @Blinker_topEntity.vhdl@ file:
 
 @
--- Automatically generated VHDL
+-- Automatically generated VHDL-93
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
+use std.textio.all;
 use work.all;
-use work.Blinker_types.all;
+use work.blinker_types.all;
 
-entity Blinker_topEntity is
-  port(input_0         : in std_logic_vector(0 downto 0);
-       -- clock
-       system1000      : in std_logic;
-       -- asynchronous reset: active low
-       system1000_rstn : in std_logic;
-       output_0        : out std_logic_vector(7 downto 0));
+entity blinker_topentity is
+  port(-- clock
+       input_0  : in std_logic;
+       -- asynchronous reset: active high
+       input_1  : in std_logic;
+       input_2  : in std_logic_vector(0 downto 0);
+       output_0 : out std_logic_vector(7 downto 0));
 end;
 
-architecture structural of Blinker_topEntity is
+architecture structural of blinker_topentity is
 begin
-  Blinker_topEntity_0_inst : entity Blinker_topEntity_0
+  blinker_topentity_0_inst : entity blinker_topentity_0
     port map
-      (key1_i1         => input_0
-      ,system1000      => system1000
-      ,system1000_rstn => system1000_rstn
-      ,topLet_o        => output_0);
+      (clk    => input_0
+      ,rst    => input_1
+      ,key1   => input_2
+      ,result => output_0);
 end;
 @
 
@@ -896,86 +915,47 @@ However, if we add the following 'TopEntity' annotation in the file:
 {\-\# ANN topEntity
   ('defTop'
     { t_name     = "blinker"
-    , t_inputs   = [\"KEY1\"]
+    , t_inputs   = [\"CLOCK_50\",\"KEY0\",\"KEY1\"]
     , t_outputs  = [\"LED\"]
-    , t_extraIn  = [ (\"CLOCK_50\", 1)
-                   , (\"KEY0\"    , 1)
-                   ]
-    , t_clocks   = [ 'altpll' "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) \#-\}
 @
 
 The CλaSH compiler will generate the following @blinker.vhdl@ file instead:
 
 @
--- Automatically generated VHDL
+-- Automatically generated VHDL-93
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.MATH_REAL.ALL;
+use std.textio.all;
 use work.all;
-use work.Blinker_types.all;
+use work.blinker_types.all;
 
 entity blinker is
-  port(KEY1     : in std_logic_vector(0 downto 0);
-       CLOCK_50 : in std_logic_vector(0 downto 0);
-       KEY0     : in std_logic_vector(0 downto 0);
+  port(-- clock
+       CLOCK_50 : in std_logic;
+       -- asynchronous reset: active high
+       KEY0     : in std_logic;
+       KEY1     : in std_logic_vector(0 downto 0);
        LED      : out std_logic_vector(7 downto 0));
 end;
 
 architecture structural of blinker is
-  signal system1000      : std_logic;
-  signal system1000_rstn : std_logic;
-  signal altpll50_locked : std_logic;
 begin
-  altpll50_inst : entity altpll50
+  blinker_topentity_inst : entity blinker_topentity
     port map
-      (inclk0 => CLOCK_50(0)
-      ,c0     => system1000
-      ,areset => not KEY0(0)
-      ,locked => altpll50_locked);
-
-  -- reset system1000_rstn is asynchronously asserted, but synchronously de-asserted
-  resetSync_n_0 : block
-    signal n_1 : std_logic;
-    signal n_2 : std_logic;
-  begin
-    process(system1000,altpll50_locked)
-    begin
-      if altpll50_locked = '0' then
-        n_1 <= '0';
-        n_2 <= '0';
-      elsif rising_edge(system1000) then
-        n_1 <= '1';
-        n_2 <= n_1;
-      end if;
-    end process;
-
-    system1000_rstn <= n_2;
-  end block;
-
-  Blinker_topEntity_0_inst : entity Blinker_topEntity_0
-    port map
-      (key1_i1         => KEY1
-      ,system1000      => system1000
-      ,system1000_rstn => system1000_rstn
-      ,topLet_o        => LED);
+      (clk    => CLOCK_50
+      ,rst    => KEY0
+      ,key1   => KEY1
+      ,result => LED);
 end;
 @
 
 Where we now have:
 
 * A top-level component that is called @blinker@.
-* Inputs and outputs that have a /user/-chosen name: @KEY1@, @LED@, etc.
-* An instantiated <https://www.altera.com/literature/ug/ug_altpll.pdf PLL>
-  component providing a stable clock signal from the free-running clock pin
-  @CLOCK_50@.
-* A reset that is /asynchronously/ asserted by the @lock@ signal originating from
-  the PLL, meaning that your design is kept in reset until the PLL is
-  providing a stable clock.
-  The reset is additionally /synchronously/ de-asserted to prevent
-  <http://en.wikipedia.org/wiki/Metastability_in_electronics metastability>
-  of your design due to unlucky timing of the de-assertion of the reset.
+* Inputs and outputs that have a /user/-chosen name: @CLOCK_50@, @KEY0@, @KEY1@, @LED@, etc.
 
 See the documentation of 'TopEntity' for the meaning of all its fields.
 -}
@@ -1314,11 +1294,11 @@ assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
 -}
 
 {- $multiclock #multiclock#
-CλaSH supports multi-clock designs, though perhaps in a slightly limited form.
-What is possible is:
+CλaSH supports designs multiple /clock/ (and /reset/) domains, though perhaps in
+a slightly limited form. What is possible is:
 
 * Explicitly assign clocks to memory primitives.
-* Synchronise between differently-clocked parts of your design in a type-safe
+* Synchronize between differently-clocked parts of your design in a type-safe
   way.
 
 What is /not/ possible is:
@@ -1348,50 +1328,55 @@ the code to build the FIFO synchroniser based on the design described in:
 <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>
 
 We start with enable a few options that will make writing the type-signatures for
-our components a bit easier. We'll also import the standard "CLaSH.Prelude"
-module, and the "CLaSH.Prelude.Explicit" module for our explicitly clocked
-synchronous functions:
+our components a bit easier. Instead of importting the standard "CLaSH.Prelude"
+module, we will import the "CLaSH.Explicit.Prelude" module where all our clocks
+and resets must be explicitly routed:
 
 @
 {\-\# LANGUAGE PartialTypeSignatures \#-\}
 {\-\# OPTIONS_GHC -fno-warn-partial-type-signatures \#-\}
 module MultiClockFifo where
 
-import CLaSH.Prelude
 import CLaSH.Prelude.Explicit
 import Data.Maybe             (isJust)
+import Data.Constraint.Nat    (leTrans)
 @
 
 Then we'll start with the /heart/ of the FIFO synchroniser, an asynchronous RAM
 in the form of 'asyncRam''. It's called an asynchronous RAM because the read
 port is not synchronised to any clock (though the write port is). Note that in
 CλaSH we don't really have asynchronous logic, there is only combinational and
-synchronous logic. As a consequence, we see in the type signature of 'asyncRam'':
+synchronous logic. As a consequence, we see in the type signature of
+'CLaSH.Explicit.asyncRam':
 
 @
-__asyncRam'__
-  :: _
-  => SClock wclk                   -- ^ Clock to which to synchronise the write port of the RAM
-  -> SClock rclk                   -- ^ Clock to which the read address signal __r__ is synchronised
-  -> SNat n                        -- ^ Size __n__ of the RAM
-  -> Signal' rclk addr             -- ^ Read address __r__
-  -> Signal' wclk (Maybe (addr,a)) -- ^ (write address @w@, value to write)
-  -> Signal' rclk a                -- ^ Value of the RAM at address __r__
+__asyncRam__
+  :: (Enum addr, HasCallStack)
+  => Clock wdom wgated
+   -- ^ 'Clock' to which to synchronise the write port of the RAM
+  -> Clock rdom rgated
+   -- ^ 'Clock' to which the read address signal, __r__, is synchronised
+  -> SNat n
+  -- ^ Size __n__ of the RAM
+  -> Signal rdom addr
+  -- ^ Read address __r__
+  -> Signal wdom (Maybe (addr, a))
+  -- ^ (write address __w__, value to write)
+  -> Signal rdom a
+   -- ^ Value of the __RAM__ at address __r__
 @
 
 that the signal containing the read address __r__ is synchronised to a different
 clock. That is, there is __no__ such thing as an @AsyncSignal@ in CλaSH.
 
-We continue by instantiating the 'asyncRam'':
+We continue by instantiating the 'CLaSH.Explicit.asyncRam':
 
 @
 fifoMem wclk rclk addrSize wfull raddr wdataM =
-  'asyncRam'' wclk rclk
+  'CLaSH.Explicit.asyncRam' wclk rclk
             ('pow2SNat' addrSize)
             raddr
-            ('mux' (not \<$\> wfull)
-                 wdataM
-                 (pure Nothing))
+            ('mux' wfull (pure Nothing) wdataM)
 @
 
 We see that we give it @2^addrSize@ elements, where @addrSize@ is the bit-size
@@ -1404,14 +1389,14 @@ asynchronous RAM, and creates the flags indicating whether the FIFO is full
 or empty. The address and flag generator is given in 'mealy' machine style:
 
 @
-ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) =
+ptrCompareT addrSize\@SNat flagGen (bin,ptr,flag) (s_ptr,inc) =
     ((bin',ptr',flag')
     ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
     bin' = bin + 'boolToBV' (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
-    addr = 'slice' (addrSize ``subSNat`` d1) d0 bin
+    addr = 'truncateB' bin
 
     flag' = flagGen ptr' s_ptr
 @
@@ -1432,9 +1417,17 @@ isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
 -- FIFO full: when next pntr == synchronized {~wptr[addrSize:addrSize-1],wptr[addrSize-2:0]}
-isFull addrSize ptr s_ptr =
-    ptr == 'complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
-                      'slice' (addrSize ``subSNat`` d2) d0  s_ptr
+isFull :: forall addrSize .
+          (2 <= addrSize)
+       => 'SNat' addrSize
+       -> 'BitVector' (addrSize + 1)
+       -> 'BitVector' (addrSize + 1)
+       -> Bool
+isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
+  Sub Dict ->
+    let a1 = 'SNat' \@(addrSize - 1)
+        a2 = 'SNat' \@(addrSize - 2)
+    in  ptr == ('complement' ('slice' addrSize a1 s_ptr) '++#' 'slice' a2 d0 s_ptr)
 
 wptrFullInit        = (0,0,False)
 @
@@ -1443,14 +1436,13 @@ We create a dual flip-flop synchroniser to be used to synchronise the
 Gray-encoded pointers between the two clock domains:
 
 @
-ptrSync clk1 clk2 = 'register'' clk2 0
-                  . 'register'' clk2 0
-                  . 'unsafeSynchronizer' clk1 clk2
+ptrSync clk1 clk2 rst2 =
+  'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'unsafeSynchronizer' clk1 clk2
 @
 
 It uses the 'unsafeSynchroniser' primitive, which is needed to go from one clock
 domain to the other. All synchronizers are specified in terms of
-'unsafeSynchronizer' (see for example the <src/CLaSH-Prelude-RAM.html#line-103 source of asyncRam#>).
+'unsafeSynchronizer' (see for example the <src/CLaSH-Prelude-RAM.html#line-103 source of asyncRam>).
 The 'unsafeSynchronizer' primitive is turned into a (bundle of) wire(s) by the
 CλaSH compiler, so developers must ensure that it is only used as part of a
 proper synchronizer.
@@ -1458,27 +1450,37 @@ proper synchronizer.
 Finally we combine all the component in:
 
 @
-fifo
-  :: _
-  => SNat (addrSize + 2)
-  -> SClock wclk
-  -> SClock rclk
-  -> Signal' rclk Bool
-  -> Signal' wclk (Maybe a)
-  -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
-fifo addrSize wclk rclk rinc wdataM = (rdata,rempty,wfull)
+asyncFIFOSynchronizer
+  :: (2 <= addrSize)
+  => SNat addrSize
+  -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
+  -- elements.
+  -> Clock wdomain wgated
+  -- ^ 'Clock' to which the write port is synchronised
+  -> Clock rdomain rgated
+  -- ^ 'Clock' to which the read port is synchronised
+  -> Reset wdomain synchronous
+  -> Reset rdomain synchronous
+  -> Signal rdomain Bool
+  -- ^ Read request
+  -> Signal wdomain (Maybe a)
+  -- ^ Element to insert
+  -> (Signal rdomain a, Signal rdomain Bool, Signal wdomain Bool)
+  -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
+asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst rinc wdataM =
+    (rdata,rempty,wfull)
   where
-    s_rptr = ptrSync rclk wclk rptr
-    s_wptr = ptrSync wclk rclk wptr
+    s_rptr = dualFlipFlopSynchronizer rclk wclk wrst 0 rptr
+    s_wptr = dualFlipFlopSynchronizer wclk rclk rrst 0 wptr
 
     rdata = fifoMem wclk rclk addrSize wfull raddr
-               (liftA2 (,) \<$\> (Just \<$\> waddr) \<*\> wdataM)
+              (liftA2 (,) \<$\> (pure \<$\> waddr) \<*\> wdataM)
 
-    (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT addrSize isEmpty) rptrEmptyInit
-                                  (s_wptr,rinc)
+    (rempty,raddr,rptr) = 'CLaSH.Explicit.Prelude.mealyB' rclk rrst (ptrCompareT addrSize isEmpty) rptrEmptyInit
+                                 (s_wptr,rinc)
 
-    (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT addrSize (isFull addrSize))
-                                  wptrFullInit (s_rptr,isJust \<$\> wdataM)
+    (wfull,waddr,wptr)  = 'CLaSH.Explicit.Prelude.mealyB' wclk wrst (ptrCompareT addrSize (isFull addrSize))
+                                 wptrFullInit (s_rptr,isJust \<$\> wdataM)
 @
 
 where we first specify the synchronisation of the read and the write pointers,
