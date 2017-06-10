@@ -15,7 +15,7 @@ type Dom50 = Dom "System" 20000
 topEntity :: Clock Dom50 Source -> Reset Dom50 Asynchronous -> Signal Dom50 Bit -> Signal Dom50 (BitVector 8)
 topEntity clk rst key1 =
     let  (pllOut,pllStable) = altpll (SSymbol @ "altpll50") clk rst
-         rstSync            = resetSynchroniser pllOut (unsafeToAsyncReset pllStable)
+         rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
     in   withClockReset pllOut rstSync leds
   where
     key1R  = isRising 1 key1
