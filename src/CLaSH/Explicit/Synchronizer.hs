@@ -9,15 +9,20 @@ Synchronizer circuits for safe clock domain crossings
 
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE PolyKinds             #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+#if !MIN_VERSION_constraints(0,9,0)
 {-# LANGUAGE AllowAmbiguousTypes   #-}
+{-# LANGUAGE PolyKinds             #-}
+#endif
 
+#if MIN_VERSION_constraints(0,9,0)
 {-# LANGUAGE Safe #-}
+#else
+{-# LANGUAGE Trustworthy #-}
+#endif
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}

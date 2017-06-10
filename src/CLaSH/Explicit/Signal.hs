@@ -231,43 +231,16 @@ resetSynchronizer clk rst  =
       r2 = register clk rst True r1
   in  unsafeToAsyncReset r2
 
--- | Calculate relative periods given a list of frequencies.
+-- | Calculate the period, in __ps__, given a frequency in __Hz__
 --
--- So for example, you have one part of your design connected to an ADC running
--- at 20 MHz, one part of your design connected to a DAC running at 36 MHz, and
--- the rest of your system is running at 50 MHz. What are the relative
--- (integer) clock periods in CλaSH, such that their ratios correspond to the
--- ratios between the actual clock frequencies.
+-- i.e. to calculate the clock period for a circuit to run at 240 MHz we get
 --
--- For this we use 'freqCalc':
---
--- >>> freqCalc [20,36,50]
--- [45,25,18]
---
--- So that we create the proper clocks:
---
--- @
--- type ADC20 = 'Clk' \"ADC\" 45
--- type DAC36 = 'Clk' \"DAC\" 25
--- type Sys50 = 'Clk' \"Sys\" 18
---
--- sys50 :: SClock Sys50
--- sys50 = 'sclock'
---
--- adc20 :: SClock ADC20
--- adc20 = 'sclock'
---
--- dac36 :: SClock DAC36
--- dac36 = 'sclock'
--- @
+-- >>> freqCalc 240e6
+-- 4167
 --
 -- __NB__: This function is /not/ synthesisable
-freqCalc :: [Integer] -> [Integer]
-freqCalc xs = map (`div` g) ys
-  where
-    p  = product xs
-    ys = map (p `div`) xs
-    g  = foldr1 gcd ys
+freqCalc :: Double -> Integer
+freqCalc freq = ceiling ((1.0 / freq) / 1.0e-12)
 
 -- ** Synchronisation primitive
 {-# NOINLINE unsafeSynchronizer #-}

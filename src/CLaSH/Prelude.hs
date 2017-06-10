@@ -17,7 +17,9 @@
 
   To use the library:
 
-  * Import "CLaSH.Prelude"
+  * Import "CLaSH.Prelude"; by default clock and reset lines are implicitly
+    routed for all the components found in "CLaSH.Prelude". You can read more
+    about implicit clock and reset lines in "CLaSH.Signal#implicitclockandreset"
   * Alternatively, if you want to explicitly route clock and reset ports,
     for more straightforward multi-clock designs, you can import the
     "CLaSH.Explicit.Prelude" module. Note that you should not import

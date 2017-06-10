@@ -876,6 +876,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
     leds' | cntr == 0 = if mode then complement leds
                                 else rotateL leds 1
           | otherwise = leds
+@
 
 The CλaSH compiler will normally generate the following @Blinker_topEntity.vhdl@ file:
 
@@ -960,7 +961,7 @@ Where we now have:
 See the documentation of 'TopEntity' for the meaning of all its fields.
 -}
 
-{- $primitives
+{- $primitives #primitives#
 There are times when you already have an existing piece of IP, or there are
 times where you need the VHDL to have a specific shape so that the VHDL
 synthesis tool can infer a specific component. In these specific cases you can
@@ -968,21 +969,22 @@ resort to defining your own VHDL primitives. Actually, most of the primitives
 in CλaSH are specified in the same way as you will read about in this section.
 There are perhaps 10 (at most) functions which are truly hard-coded into the
 CλaSH compiler. You can take a look at the files in
-<https://github.com/clash-lang/clash-compiler/tree/master/clash-vhdl/primitives>
-(or <https://github.com/clash-lang/clash-compiler/tree/master/clash-verilog/primitives>
-for the Verilog primitives or <https://github.com/clash-lang/clash-compiler/tree/master/clash-systemverilog/primitives>
+<https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/vhdl>
+(or <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/verilog>
+for the Verilog primitives or <https://github.com/clash-lang/clash-compiler/tree/master/clash-lib/prims/systemverilog>
 for the SystemVerilog primitives) if you want to know which functions are defined
-as \"regular\" primitives. The compiler looks for primitives in two locations:
+as \"regular\" primitives. The compiler looks for primitives in three locations:
 
 * The official install location: e.g.
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-vhdl\-<VERSION\>\/primitives@
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-verilog\-<VERSION\>\/primitives@
-  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-systemverilog\-<VERSION\>\/primitives@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/systemverilog@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/verilog@
+  * @$CABAL_DIR\/share\/\<GHC_VERSION\>\/clash-lib\-<VERSION\>\/prims\/vhdl@
 * The current directory (the location given by @pwd@)
+* The include directories specified on the command-line: @-i\<DIR\>@
 
-Where redefined primitives in the current directory will overwrite those in
-the official install location. For now, files containing primitive definitions
-must end in the @.json@ file-extension.
+Where redefined primitives in the current directory or include directories will
+overwrite those in the official install location. For now, files containing
+primitive definitions must have an @.json@ file-extension.
 
 CλaSH differentiates between two types of primitives, /expression/ primitives
 and /declaration/ primitives, corresponding to whether the primitive is a VHDL
@@ -1033,40 +1035,52 @@ The second kind of primitive that we will explore is the /declaration/ primitive
 We will use 'blockRam#' as an example, for which the Haskell/CλaSH code is:
 
 @
--- | blockRAM primitive
-blockRam# :: 'KnownNat' n
-          => 'SClock' clk       -- ^ 'Clock' to synchronize to
-          -> 'Vec' n a          -- ^ Initial content of the BRAM, also
-                              -- determines the size, @n@, of the BRAM.
-                              --
-                              -- __NB__: __MUST__ be a constant.
-          -> 'Signal'' clk Int  -- ^ Read address @r@
-          -> 'Signal'' clk Bool -- ^ Write enable
-          -> 'Signal'' clk Int  -- ^ Write address @w@
-          -> 'Signal'' clk a    -- ^ Value to write (at address @w@)
-          -> 'Signal'' clk a
-          -- ^ Value of the @blockRAM@ at address @r@ from the previous clock
-          -- cycle
-blockRam# clk content rd en wr din =
-    'register'' clk ('errorX' "blockRam#: intial value undefined") dout
-  where
-    szI  = 'length' content
-    dout = runST $ do
-      arr <- newListArray (0,szI-1) ('toList' content)
-      traverse (ramT arr) ('bundle' (rd,en,wr,din))
+import qualified Data.Vector           as V
+import           GHC.Stack             (HasCallStack, withFrozenCallStack)
 
-    ramT :: STArray s Int e -> (Int,Bool,Int,e) -> ST s e
-    ramT ram (r,e,w,d) = do
-      -- reading from address using an 'X' exception results in an 'X' result
-      r' <- unsafeIOToST $
-               catch (evaluate r >>= (return . Right))
-                     (\(err :: XException) -> return (Left (throw err)))
-      d' <- case r' of
-              Right r2 -> readArray ram r2
-              Left err -> return err
-      -- writing to an address using an 'X' exception makes everything 'X'
-      when e (writeArray ram w d)
-      return d'
+import CLaSH.Signal.Internal
+  (Clock, Signal (..), (.&&.), clockEnable)
+import CLaSH.Sized.Vector     (Vec, toList)
+import CLaSH.XException       (errorX, seqX)
+
+-- | blockRAM primitive
+blockRam#
+  :: HasCallStack
+  => 'Clock' dom gated -- ^ Clock to synchronize to
+  -> 'Vec' n a         -- ^ Initial content of the BRAM, also
+                     -- determines the size, @n@, of the BRAM.
+                     --
+                     -- __NB__: __MUST__ be a constant.
+  -> 'Signal' dom Int  -- ^ Read address /r/
+  -> 'Signal' dom Bool -- ^ Write enable
+  -> 'Signal' dom Int  -- ^ Write address /w/
+  -> 'Signal' dom a    -- ^ Value to write (at address /w/)
+  -> 'Signal' dom a
+  -- ^ Value of the /blockRAM/ at address /r/ from the previous clock
+  -- cycle
+blockRam# clk content rd wen = case 'CLaSH.Signal.Internal.clockEnable' clk of
+  Nothing ->
+    go (V.fromList ('toList' content))
+       (withFrozenCallStack ('errorX' "blockRam: intial value undefined"))
+       rd wen
+  Just ena ->
+    go' (V.fromList ('toList' content))
+        (withFrozenCallStack ('errorX' "blockRam: intial value undefined"))
+        ena rd (wen '.&&.' ena)
+  where
+    -- no clock enable
+    go !ram o (r :- rs) (e :- en) (w :- wr) (d :- din) =
+      let ram' = upd ram e w d
+          o'   = ram V.! r
+      in  o ``seqX`` o :- go ram' o' rs en wr din
+    -- clock enable
+    go' !ram o (re :- res) (r :- rs) (e :- en) (w :- wr) (d :- din) =
+      let ram' = upd ram e w d
+          o'   = if re then ram V.! r else o
+      in  o ``seqX`` o :- go' ram' o' res rs en wr din
+
+    upd ram True  addr d = ram V.// [(addr,d)]
+    upd ram False _    _ = ram
 {\-\# NOINLINE blockRam# \#-\}
 @
 
@@ -1074,52 +1088,72 @@ And for which the /declaration/ primitive is:
 
 @
 { \"BlackBox\" :
-    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
-    , "type" :
-"blockRam# :: KnownNat n       -- ARG[0]
-           => SClock clk       -- clk,  ARG[1]
-           -> Vec n a          -- init, ARG[2]
-           -> Signal' clk Int  -- rd,   ARG[3]
-           -> Signal' clk Bool -- wren, ARG[4]
-           -> Signal' clk Int  -- wr,   ARG[5]
-           -> Signal' clk a    -- din,  ARG[6]
-           -> Signal' clk a"
+  { "name" : "CLaSH.Explicit.BlockRam.blockRam#"
+  , "type" :
+"blockRam#
+  :: HasCallStack    --       ARG[0]
+  => Clock dom gated -- clk,  ARG[1]
+  -> Vec n a         -- init, ARG[2]
+  -> Signal dom Int  -- rd,   ARG[3]
+  -> Signal dom Bool -- wren, ARG[4]
+  -> Signal dom Int  -- wr,   ARG[5]
+  -> Signal dom a    -- din,  ARG[6]
+  -> Signal dom a"
     , "templateD" :
 "-- blockRam begin
 ~GENSYM[~COMPNAME_blockRam][0] : block
   signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
-  signal ~GENSYM[dout][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
+  signal ~GENSYM[~RESULT_q][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
   signal ~SYM[2] : ~TYP[6];~FI
-  signal ~GENSYM[rd][3] : integer range 0 to ~LIT[0] - 1;
-  signal ~GENSYM[wr][4] : integer range 0 to ~LIT[0] - 1;
+  signal ~GENSYM[rd][3] : integer range 0 to ~LENGTH[~TYP[2]] - 1;
+  signal ~GENSYM[wr][4] : integer range 0 to ~LENGTH[~TYP[2]] - 1;~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[clk][5] : std_logic;
+  signal ~GENSYM[ce][6] : std_logic;~ELSE ~FI
 begin
   ~SYM[3] <= to_integer(~ARG[3])
   -- pragma translate_off
-                mod ~LIT[0]
+                mod ~LENGTH[~TYP[2]]
   -- pragma translate_on
                 ;
-
   ~SYM[4] <= to_integer(~ARG[5])
   -- pragma translate_off
-                mod ~LIT[0]
+                mod ~LENGTH[~TYP[2]]
   -- pragma translate_on
                 ;
-
-  ~GENSYM[blockRam_sync][5] : process(~CLK[1])
+  ~IF ~ISGATED[1] ~THEN
+  (~SYM[5],~SYM[6]) <= ~ARG[1];
+  ~GENSYM[blockRam_sync][7] : process(~SYM[5])
   begin
-    if rising_edge(~CLK[1]) then
+    if rising_edge(~SYM[5]) then~IF ~VIVADO ~THEN
+      if ~SYM[6] then
+        if ~ARG[4] then
+          ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];
+        end if;
+        ~SYM[2] <= ~SYM[1](~SYM[3]);
+      end if;~ELSE
+      if ~ARG[4] and ~SYM[6] then
+        ~SYM[1](~SYM[4]) <= ~ARG[6];
+      end if;
+      if ~SYM[6] then
+        ~SYM[2] <= ~SYM[1](~SYM[3]);
+      end if;~FI
+    end if;
+  end process;~ELSE
+  ~SYM[7] : process(~ARG[1])
+  begin
+    if rising_edge(~ARG[1]) then
       if ~ARG[4] then~IF ~VIVADO ~THEN
         ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
         ~SYM[1](~SYM[4]) <= ~ARG[6];~FI
       end if;
       ~SYM[2] <= ~SYM[1](~SYM[3]);
     end if;
-  end process;~IF ~VIVADO ~THEN
+  end process;~FI~IF ~VIVADO ~THEN
   ~RESULT <= ~FROMBV[~SYM[2]][~TYPO];~ELSE
   ~RESULT <= ~SYM[2];~FI
 end block;
 -- blockRam end"
-    }
+  }
 }
 @
 
@@ -1129,17 +1163,11 @@ primitive we define a @template__D__@ field. Instead of discussing what the
 individual template holes mean in the above context, we will instead just give
 a general listing of the available template holes:
 
-* @~RESULT@: VHDL signal to which the result of a primitive must be assigned
+* @~RESULT@: Signal to which the result of a primitive must be assigned
   to. NB: Only used in a /declaration/ primitive.
 * @~ARG[N]@: @(N+1)@'th argument to the function.
 * @~LIT[N]@: @(N+1)@'th argument to the function An extra condition that must
   hold is that this @(N+1)@'th argument is an (integer) literal.
-* @~CLK[N]@: Clock signal to which the @(N+1)@'th argument is synchronized to.
-* @~CLKO@: Clock signal to which the result is synchronized to.
-* @~RST[N]@: Asynchronous reset signal to the clock to which the @(N+1)@'th
-  argument is synchronized to.
-* @~RSTO@: Asynchronous reset signal to the clock to which the result is
-  synchronized to.
 * @~TYP[N]@: VHDL type of the @(N+1)@'th argument.
 * @~TYPO@: VHDL type of the result.
 * @~TYPM[N]@: VHDL type/name/ of the @(N+1)@'th argument; used in /type/
@@ -1166,7 +1194,8 @@ a general listing of the available template holes:
 * @~IF \<CONDITION\> ~THEN \<THEN\> ~ELSE \<ELSE\> ~FI@: renders the \<ELSE\>
   part when \<CONDITION\> evaluates to /0/, and renders the \<THEN\> in all
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
-  @~DEPTH[\<HOLE\>]@, and @~VIVADO@.
+  @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N], @~ISGATED[N]@,
+  @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
 * @~VIVADO@: /1/ when CλaSH compiler is invoked with the @-clash-xilinx@ or
   @-clash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
   statement.
@@ -1178,6 +1207,26 @@ a general listing of the available template holes:
   expression in @\<HOLE\>@, which has a bit vector (@std_logic_vector@) type, is
   converted to type indicated by @\<TYPE\>@. The @\<TYPE\>@ hole indicates the
   must be either @~TYP[N]@, @~TYPO@, or @~TYPELEM[\<HOLE\>]@.
+* @~QSysIncludeName@: the generated name of the included QSys component.
+* @~FILEPATH[\<HOLE\>]@: The argument mentioned in @\<HOLE\>@ is a file which
+  must be copied to the location of the generated HDL.
+* @~GENERATE@: Verilog: create a /generate/ statement, except when already in
+  as /generate/ context.
+* @~ENDGENERATE@: Verilog: create an /endgenerate/ statement, except when already
+  in a /generate/ context.
+* @~ISLIT[N]@: Is the @(N+1)@'th argument to the function a literal.
+* @~ISVAR[N]@: Is the @(N+1)@'th argument to the function explicitly not a
+  literal
+* @~ISGATED[N]@: Is the @(N+1)@'th argument a gated clock, errors when called on
+  an argument which is not a 'Clock'.
+* @~ISSYNC[N]@: Is the @(N+1)@'th argument a synchronous reset, errors when
+  called on an argument which is not a 'Reset'.
+* @~AND[\<HOLE1\>,\<HOLE2\>,..]@: Logically /and/ the conditions in the @\<HOLE\>@'s
+* @~VARS[N]@: VHDL: Return the variables of the @(N+1)@'th argument.
+* @~NAME[N]@: Render the @(N+1)@'th string literal argument as an identifier
+  instead of a string literal. Fails when the @(N+1)@'th argument is not a
+  string literal.
+
 
 Some final remarks to end this section: VHDL primitives are there to instruct the
 CλaSH compiler to use the given VHDL template, instead of trying to do normal
@@ -1208,40 +1257,53 @@ and
 
 @
 { \"BlackBox\" :
-    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
-    , "type" :
-"blockRam# :: KnownNat n       -- ARG[0]
-           => SClock clk       -- clk,  ARG[1]
-           -> Vec n a          -- init, ARG[2]
-           -> Signal' clk Int  -- rd,   ARG[3]
-           -> Signal' clk Bool -- wren, ARG[4]
-           -> Signal' clk Int  -- wr,   ARG[5]
-           -> Signal' clk a    -- din,  ARG[6]
-           -> Signal' clk a"
+  { "name" : "CLaSH.Explicit.BlockRam.blockRam#"
+  , "type" :
+"blockRam#
+  :: HasCallStack    -- ARG[0]
+  => Clock dom gated -- clk,  ARG[1]
+  -> Vec n a         -- init, ARG[2]
+  -> Signal dom Int  -- rd,   ARG[3]
+  -> Signal dom Bool -- wren, ARG[4]
+  -> Signal dom Int  -- wr,   ARG[5]
+  -> Signal dom a    -- din,  ARG[6]
+  -> Signal dom a"
     , "templateD" :
 "// blockRam begin
-reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[0]-1];
-reg ~TYPO ~GENSYM[dout][1];
-
+reg ~TYPO ~GENSYM[RAM][0] [0:~LENGTH[~TYP[2]]-1];
+reg ~TYPO ~GENSYM[~RESULT_q][1];
 reg ~TYP[2] ~GENSYM[ram_init][2];
 integer ~GENSYM[i][3];
 initial begin
   ~SYM[2] = ~ARG[2];
-  for (~SYM[3]=0; ~SYM[3] < ~LIT[0]; ~SYM[3] = ~SYM[3] + 1) begin
-    ~SYM[0][~LIT[0]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3] = ~SYM[3] + 1) begin
+    ~SYM[0][~LENGTH[~TYP[2]]-1-~SYM[3]] = ~SYM[2][~SYM[3]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
   end
 end
-
-always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][4]
+~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_blockRam][4]~IF ~VIVADO ~THEN
+  if (~ARG[1][0]) begin
+    if (~ARG[4]) begin
+      ~SYM[0][~ARG[5]] <= ~ARG[6];
+    end
+    ~SYM[1] <= ~SYM[0][~ARG[3]];
+  end~ELSE
+  if (~ARG[4] & ~ARG[1][0]) begin
+    ~SYM[0][~ARG[5]] <= ~ARG[6];
+  end
+  if (~ARG[1][0]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[3]];
+  end~FI
+end~ELSE
+always @(posedge ~ARG[1]) begin : ~SYM[4]
   if (~ARG[4]) begin
     ~SYM[0][~ARG[5]] <= ~ARG[6];
   end
   ~SYM[1] <= ~SYM[0][~ARG[3]];
-end
-
+end~FI
 assign ~RESULT = ~SYM[1];
 // blockRam end"
-    }
+  }
 }
 @
 
@@ -1262,33 +1324,48 @@ and
 
 @
 { \"BlackBox\" :
-    { "name" : "CLaSH.Prelude.BlockRam.blockRam#"
-    , "type" :
-"blockRam# :: KnownNat n       -- ARG[0]
-           => SClock clk       -- clk,  ARG[1]
-           -> Vec n a          -- init, ARG[2]
-           -> Signal' clk Int  -- rd,   ARG[3]
-           -> Signal' clk Bool -- wren, ARG[4]
-           -> Signal' clk Int  -- wr,   ARG[5]
-           -> Signal' clk a    -- din,  ARG[6]
-           -> Signal' clk a"
+  { "name" : "CLaSH.Explicit.BlockRam.blockRam#"
+  , "type" :
+"blockRam#
+  :: HasCallStack    -- ARG[0]
+  => Clock dom gated -- clk,  ARG[1]
+  -> Vec n a         -- init, ARG[2]
+  -> Signal dom Int  -- rd,   ARG[3]
+  -> Signal dom Bool -- wren, ARG[4]
+  -> Signal dom Int  -- wr,   ARG[5]
+  -> Signal dom a    -- din,  ARG[6]
+  -> Signal dom a"
     , "templateD" :
 "// blockRam begin
 ~SIGD[~GENSYM[RAM][0]][2];
-logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[dout][1];
+logic [~SIZE[~TYP[6]]-1:0] ~GENSYM[~RESULT_q][1];
 initial begin
   ~SYM[0] = ~LIT[2];
-end
-always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_blockRam][2]
+end~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_blockRam][2]~IF ~VIVADO ~THEN
+  if (~ARG[1][0]) begin
+    if (~ARG[4]) begin
+      ~SYM[0][~ARG[5]] <= ~TOBV[~ARG[6]][~TYP[6]];
+    end
+    ~SYM[1] <= ~SYM[0][~ARG[3]];
+  end~ELSE
+  if (~ARG[4] & ~ARG[1][0]) begin
+    ~SYM[0][~ARG[5]] <= ~TOBV[~ARG[6]][~TYP[6]];
+  end
+  if (~ARG[1][0]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[3]];
+  end~FI
+end~ELSE
+always @(posedge ~ARG[1]) begin : ~SYM[2]
   if (~ARG[4]) begin
     ~SYM[0][~ARG[5]] <= ~TOBV[~ARG[6]][~TYP[6]];
   end
   ~SYM[1] <= ~SYM[0][~ARG[3]];
-end
+end~FI
 assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
 // blockRam end"
-    }
   }
+}
 @
 
 -}
@@ -1297,14 +1374,54 @@ assign ~RESULT = ~FROMBV[~SYM[1]][~TYP[6]];
 CλaSH supports designs multiple /clock/ (and /reset/) domains, though perhaps in
 a slightly limited form. What is possible is:
 
+* Create clock primitives, such as PPLs, which have an accompanying HDL primitive
+  (described in later on in this <#primitives tutorial>)
 * Explicitly assign clocks to memory primitives.
 * Synchronize between differently-clocked parts of your design in a type-safe
   way.
 
 What is /not/ possible is:
 
-* Generate a clock signal in module A, and assign this clock signal to a memory
-  primitive in module B.
+* Directly generate a clock signal in module A, and assign this clock signal to
+  a memory primitive in module B. For example, the following is not possible:
+
+  @
+  type SystemN n = Dom "systemN" n
+
+  pow2Clocks
+    :: Clock (SystemN n) Source
+    -> Reset (SystemN n) Asynchronous
+    -> (Clock (SystemN (16 * n)) Source
+       ,Clock (SystemN ( 8 * n)) Source
+       ,Clock (SystemN ( 4 * n)) Source
+       ,Clock (SystemN ( 2 * n)) Source
+       )
+  pow2Clocks clk rst = (cnt!3,cnt!2,cnt!1,cnt!0)
+    where
+      cnt = 'CLaSH.Explicit.Signal.register' clk rst 0 (cnt + 1)
+  @
+
+  As it is not possible to convert the the individual bits to a 'Clock'.
+
+  However! What is possible is to do the following:
+
+  @
+  pow2Clock'
+    :: forall n
+     . KnownNat n
+    => Clock (SystemN n) Source
+    -> Reset (SystemN n) Asynchronous
+    -> (Clock (SystemN (16 * n)) Source
+       ,Clock (SystemN ( 8 * n)) Source
+       ,Clock (SystemN ( 4 * n)) Source
+       ,Clock (SystemN ( 2 * n)) Source
+       )
+  pow2Clocks' clk rst = ('clockGen','clockGen','clockGen','clockGen')
+  {\-\# NOINLINE pow2Clocks' \#-\}
+  @
+
+  And then create a HDL primitive, as described in later on in
+  this <#primitives tutorial>, to implement the desired behaviour in HDL.
 
 What this means is that when CλaSH converts your design to VHDL/(System)Verilog,
 you end up with a top-level module/entity with multiple clock and reset ports
@@ -1328,13 +1445,11 @@ the code to build the FIFO synchroniser based on the design described in:
 <http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf>
 
 We start with enable a few options that will make writing the type-signatures for
-our components a bit easier. Instead of importting the standard "CLaSH.Prelude"
+our components a bit easier. Instead of importing the standard "CLaSH.Prelude"
 module, we will import the "CLaSH.Explicit.Prelude" module where all our clocks
 and resets must be explicitly routed:
 
 @
-{\-\# LANGUAGE PartialTypeSignatures \#-\}
-{\-\# OPTIONS_GHC -fno-warn-partial-type-signatures \#-\}
 module MultiClockFifo where
 
 import CLaSH.Prelude.Explicit
@@ -1347,15 +1462,15 @@ in the form of 'asyncRam''. It's called an asynchronous RAM because the read
 port is not synchronised to any clock (though the write port is). Note that in
 CλaSH we don't really have asynchronous logic, there is only combinational and
 synchronous logic. As a consequence, we see in the type signature of
-'CLaSH.Explicit.asyncRam':
+'CLaSH.Explicit.Prelude.asyncRam':
 
 @
 __asyncRam__
   :: (Enum addr, HasCallStack)
-  => Clock wdom wgated
-   -- ^ 'Clock' to which to synchronise the write port of the RAM
-  -> Clock rdom rgated
-   -- ^ 'Clock' to which the read address signal, __r__, is synchronised
+  => 'Clock' wdom wgated
+   -- ^ Clock to which to synchronise the write port of the RAM
+  -> 'Clock' rdom rgated
+   -- ^ Clock to which the read address signal, __r__, is synchronised
   -> SNat n
   -- ^ Size __n__ of the RAM
   -> Signal rdom addr
@@ -1369,11 +1484,11 @@ __asyncRam__
 that the signal containing the read address __r__ is synchronised to a different
 clock. That is, there is __no__ such thing as an @AsyncSignal@ in CλaSH.
 
-We continue by instantiating the 'CLaSH.Explicit.asyncRam':
+We continue by instantiating the 'CLaSH.Explicit.Prelude.asyncRam':
 
 @
 fifoMem wclk rclk addrSize wfull raddr wdataM =
-  'CLaSH.Explicit.asyncRam' wclk rclk
+  'CLaSH.Explicit.Prelude.asyncRam' wclk rclk
             ('pow2SNat' addrSize)
             raddr
             ('mux' wfull (pure Nothing) wdataM)
@@ -1437,7 +1552,7 @@ Gray-encoded pointers between the two clock domains:
 
 @
 ptrSync clk1 clk2 rst2 =
-  'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'unsafeSynchronizer' clk1 clk2
+  'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'CLaSH.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 @
 
 It uses the 'unsafeSynchroniser' primitive, which is needed to go from one clock
@@ -1455,12 +1570,12 @@ asyncFIFOSynchronizer
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.
-  -> Clock wdomain wgated
-  -- ^ 'Clock' to which the write port is synchronised
-  -> Clock rdomain rgated
-  -- ^ 'Clock' to which the read port is synchronised
-  -> Reset wdomain synchronous
-  -> Reset rdomain synchronous
+  -> 'Clock' wdomain wgated
+  -- ^ Clock to which the write port is synchronised
+  -> 'Clock' rdomain rgated
+  -- ^ Clock to which the read port is synchronised
+  -> 'Reset' wdomain synchronous
+  -> 'Reset' rdomain synchronous
   -> Signal rdomain Bool
   -- ^ Read request
   -> Signal wdomain (Maybe a)
@@ -1490,8 +1605,6 @@ flag generator and write address \/ pointer \/ flag generator.
 Ultimately, the whole file containing our FIFO design will look like this:
 
 @
-{\-\# LANGUAGE PartialTypeSignatures \#-\}
-{\-\# OPTIONS_GHC -fno-warn-partial-type-signatures \#-\}
 module MultiClockFifo where
 
 import CLaSH.Prelude
@@ -1499,21 +1612,19 @@ import CLaSH.Prelude.Explicit
 import Data.Maybe             (isJust)
 
 fifoMem wclk rclk addrSize wfull raddr wdataM =
-  'asyncRam'' wclk rclk
+  'CLaSH.Explicit.Prelude.asyncRam' wclk rclk
             ('pow2SNat' addrSize)
             raddr
-            ('mux' (not \<$\> wfull)
-                 wdataM
-                 (pure Nothing))
+            ('mux' wfull (pure Nothing) wdataM)
 
-ptrCompareT addrSize flagGen (bin,ptr,flag) (s_ptr,inc) =
+ptrCompareT addrSize\@SNat flagGen (bin,ptr,flag) (s_ptr,inc) =
     ((bin',ptr',flag')
     ,(flag,addr,ptr))
   where
     -- GRAYSTYLE2 pointer
     bin' = bin + 'boolToBV' (inc && not flag)
     ptr' = (bin' \`shiftR\` 1) \`xor\` bin'
-    addr = 'slice' (addrSize ``subSNat`` d1) d0 bin
+    addr = 'truncateB' bin
 
     flag' = flagGen ptr' s_ptr
 
@@ -1522,70 +1633,78 @@ isEmpty       = (==)
 rptrEmptyInit = (0,0,True)
 
 -- FIFO full: when next pntr == synchronized {~wptr[addrSize:addrSize-1],wptr[addrSize-2:0]}
-isFull addrSize ptr s_ptr =
-    ptr == 'complement' ('slice' addrSize (addrSize ``subSNat`` d1) s_ptr) '++#'
-                      'slice' (addrSize ``subSNat`` d2) d0  s_ptr
+isFull :: forall addrSize .
+          (2 <= addrSize)
+       => 'SNat' addrSize
+       -> 'BitVector' (addrSize + 1)
+       -> 'BitVector' (addrSize + 1)
+       -> Bool
+isFull addrSize@SNat ptr s_ptr = case leTrans @1 @2 @addrSize of
+  Sub Dict ->
+    let a1 = 'SNat' \@(addrSize - 1)
+        a2 = 'SNat' \@(addrSize - 2)
+    in  ptr == ('complement' ('slice' addrSize a1 s_ptr) '++#' 'slice' a2 d0 s_ptr)
 
 wptrFullInit        = (0,0,False)
 
 -- Dual flip-flop synchroniser
-ptrSync clk1 clk2 = 'register'' clk2 0
-                  . 'register'' clk2 0
-                  . 'unsafeSynchronizer' clk1 clk2
+ptrSync clk1 clk2 rst2 =
+  'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'CLaSH.Explicit.Signal.register' clk2 rst2 0 . 'CLaSH.Explicit.Signal.unsafeSynchronizer' clk1 clk2
 
 -- Async FIFO synchroniser
-fifo
-  :: _
-  => SNat (addrSize + 2)
-  -> SClock wclk
-  -> SClock rclk
-  -> Signal' rclk Bool
-  -> Signal' wclk (Maybe a)
-  -> (Signal' rclk a, Signal' rclk Bool, Signal' wclk Bool)
-fifo addrSize wclk rclk rinc wdataM = (rdata,rempty,wfull)
+asyncFIFOSynchronizer
+  :: (2 <= addrSize)
+  => SNat addrSize
+  -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
+  -- elements.
+  -> 'Clock' wdomain wgated
+  -- ^ Clock to which the write port is synchronised
+  -> 'Clock' rdomain rgated
+  -- ^ Clock to which the read port is synchronised
+  -> 'Reset' wdomain synchronous
+  -> 'Reset' rdomain synchronous
+  -> Signal rdomain Bool
+  -- ^ Read request
+  -> Signal wdomain (Maybe a)
+  -- ^ Element to insert
+  -> (Signal rdomain a, Signal rdomain Bool, Signal wdomain Bool)
+  -- ^ (Oldest element in the FIFO, @empty@ flag, @full@ flag)
+asyncFIFOSynchronizer addrSize\@SNat wclk rclk wrst rrst rinc wdataM =
+    (rdata,rempty,wfull)
   where
-    s_rptr = ptrSync rclk wclk rptr
-    s_wptr = ptrSync wclk rclk wptr
+    s_rptr = dualFlipFlopSynchronizer rclk wclk wrst 0 rptr
+    s_wptr = dualFlipFlopSynchronizer wclk rclk rrst 0 wptr
 
     rdata = fifoMem wclk rclk addrSize wfull raddr
-               (liftA2 (,) \<$\> (Just \<$\> waddr) \<*\> wdataM)
+              (liftA2 (,) \<$\> (pure \<$\> waddr) \<*\> wdataM)
 
-    (rempty,raddr,rptr) = 'mealyB'' rclk (ptrCompareT addrSize isEmpty) rptrEmptyInit
-                                  (s_wptr,rinc)
+    (rempty,raddr,rptr) = 'CLaSH.Explicit.Prelude.mealyB' rclk rrst (ptrCompareT addrSize isEmpty) rptrEmptyInit
+                                 (s_wptr,rinc)
 
-    (wfull,waddr,wptr)  = 'mealyB'' wclk (ptrCompareT addrSize (isFull addrSize))
-                                  wptrFullInit (s_rptr,isJust \<$\> wdataM)
+    (wfull,waddr,wptr)  = 'CLaSH.Explicit.Prelude.mealyB' wclk wrst (ptrCompareT addrSize (isFull addrSize))
+                                 wptrFullInit (s_rptr,isJust \<$\> wdataM)
 @
 
 == Instantiating a FIFO synchroniser
 
 Having finished our FIFO synchroniser it's time to instantiate with concrete
 clock domains. Let us assume we have part of our system connected to an ADC
-which runs at 20 MHz, and we have created an FFT component running at only 9 MHz,
-while the rest of our system runs at 50 MHz. What we want to do connect part
-of our design connected to the ADC, and running at 20 MHz, to part of our design
-connected to the FFT running at 9 MHz.
+which runs at 20 MHz, and we have created an FFT component running at only 9
+MHz. We want to connect part of our design connected to the ADC, and running
+at 20 MHz, to part of our design connected to the FFT running at 9 MHz.
 
-First, we must calculate the relative clock periods using 'freqCalc':
+We can calculate the clock periods using 'freqCalc':
 
->>> freqCalc [20,9,50]
-[45,100,18]
+>>> freqCalc 20e6
+50000
+>>> freqCalc 9e6
+111112
 
-We can then create the clocks:
+We can then create the clock and reset domains:
 
 @
-type ClkADC = 'Clk \"ADC\"    45
-type ClkFFT = 'Clk \"FFT\"    100
-type ClkSys = 'Clk \"System\" 18
-
-clkADC :: SClock ClkADC
-clkADC = sclock
-
-clkFFT :: SClock ClkFFT
-clkFFT = sclock
-
-clkSys :: SClock ClkSys
-clkSys = sclock
+type DomADC = 'Dom \"ADC\" 50000
+type DomFFT = 'Dom \"FFT\" 111112
 @
 
 and subsequently a 256-space FIFO synchroniser that safely bridges the ADC clock
@@ -1593,10 +1712,14 @@ domain and to the FFT clock domain:
 
 @
 adcToFFT
-  :: Signal' ClkFFT Bool
-  -> Signal' ClkADC (Maybe (SFixed 8 8))
-  -> (Signal' ClkFFT (SFixed 8 8), Signal' ClkFFT Bool, Signal' ClkADC Bool)
-adcToFFT = fifo d8 clkADC clkFFT
+  :: Clock DomADC wgated
+  -> Clock DomFFT rgated
+  -> Reset DomADC synchronous
+  -> Reset DomFFT synchronous
+  -> Signal DomFFT Bool
+  -> Signal DomADC (Maybe (SFixed 8 8))
+  -> (Signal DomFFT (SFixed 8 8), Signal DomFFT Bool, Signal DomADC Bool)
+adcToFFT = asyncFIFOSynchronizer d8
 @
 
 -}
@@ -1634,10 +1757,8 @@ A list of often encountered errors and their solutions:
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
 
-    NB: Use 'bundle'' when you are using explicitly clocked @'Signal''@s
-
-* __Type error: Couldn't match expected type @('Signal' a, 'Signal' b)@ with__
-  __ actual type @'Signal' (a,b)@__:
+* __Type error: Couldn't match expected type @('Signal' domain a, 'Signal' domain b)@ with__
+  __ actual type @'Signal' domain (a,b)@__:
 
     Product types (to which tuples belong) of signals and signals of product
     types are __isomorphic__ due to synchronicity principle, but are not
@@ -1658,8 +1779,6 @@ A list of often encountered errors and their solutions:
 
     * All tuples until and including 8-tuples
     * The 'Vec'tor type
-
-    NB: Use 'unbundle'' when you are using explicitly clocked @'Signal''@s
 
 * __CLaSH.Netlist(..): Not in normal form: \<REASON\>: \<EXPR\>__:
 
@@ -1695,18 +1814,14 @@ A list of often encountered errors and their solutions:
     annotation makes the error go away:
 
     @
-    topEntity :: 'Signal' ('Signed' 8) -> 'Signal' ('Signed' 8) -> 'Signal' ('Signed' 8)
+    topEntity
+      :: 'SystemClockReset'
+      => 'Signal' 'System' ('Signed' 8)
+      -> 'Signal' 'System' ('Signed' 8)
+      -> 'Signal' 'System' ('Signed' 8)
     topEntity x y = acc
       where
         acc = 'register' 3 (acc + x * y)
-    @
-
-    Or, alternatively:
-
-    @
-    topEntity x y = acc
-      where
-        acc = 'register' (3 :: 'Signed' 8) (acc + x * y)
     @
 
 * __CLaSH.Normalize.Transformations(155): InlineNonRep: \<FUNCTION\> already__
@@ -1716,14 +1831,6 @@ A list of often encountered errors and their solutions:
     @:t topEntity@ to check if the type is indeed polymorphic or higher-order.
     If it is, add a monomorphic type signature, and / or supply higher-order
     arguments.
-
-* __Can't make testbench for: \<LONG_VERBATIM_COMPONENT_DESCRIPTION\>__:
-
-    * Don't worry, it's actually only a warning.
-
-    * The @topEntity@ function does __not__ have exactly 1 argument. If your
-      @topEntity@ has no arguments, you're out of luck for now. If it has
-      multiple arguments, consider bundling them in a tuple.
 
 *  __\<*** Exception: \<\<loop\>\>__ or "blinking cursor"
 

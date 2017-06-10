@@ -305,12 +305,18 @@ notation for binding
 -}
 
 -- | A /constraint/ that indicates the component needs a 'Clock'
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 type HasClock domain gated       = (?clk :: Clock domain gated)
 
 -- | A /constraint/ that indicates the component needs a 'Reset'
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 type HasReset domain synchronous = (?rst :: Reset domain synchronous)
 
 -- | A /constraint/ that indicates the component needs a 'Clock' and 'Reset'
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 type HasClockReset domain gated synchronous =
   (HasClock domain gated, HasReset domain synchronous)
 
@@ -328,6 +334,8 @@ type HasClockReset domain gated synchronous =
 --
 -- __NB__ all components with a `HasClock` /constraint/ are connected to
 -- the same clock.
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 hasClock :: HasClock domain gated => Clock domain gated
 hasClock = ?clk
 {-# INLINE hasClock #-}
@@ -346,16 +354,22 @@ hasClock = ?clk
 --
 -- __NB__ all components with a `HasReset` /constraint/ are connected to
 -- the same reset.
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 hasReset :: HasReset domain synchronous => Reset domain synchronous
 hasReset = ?rst
 {-# INLINE hasReset #-}
 
 -- | A /constraint/ that indicates the component needs a normal 'Clock' and
 -- an asynchronous 'Reset' belonging to the 'System' domain.
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 type SystemClockReset = HasClockReset System 'Source 'Asynchronous
 
 -- | Explicitly connect a 'Clock' to a component whose clock is implicitly
 -- routed
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 withClock
   :: Clock domain gated
   -- ^ The 'Clock' we want to connect
@@ -368,6 +382,8 @@ withClock clk r
 
 -- | Explicit connect a 'Reset' to a component whose reset is implicitly
 -- routed
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 withReset
   :: Reset domain synchronous
   -- ^ The 'Reset' we want to connect
@@ -380,6 +396,8 @@ withReset rst r
 
 -- | Explicitly connect a 'Clock' and 'Reset' to a component whose clock and
 -- reset are implicitly routed
+--
+-- <CLaSH-Signal.html#implicitclockandreset Click here to read more about implicit clocks and resets>
 --
 -- === __Example__
 --
