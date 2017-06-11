@@ -30,6 +30,101 @@ of the clock lines in the /clock-domain/.
 so do __not__ do that!
 * __NB__: You should be judicious using a clock with period of @1@ as you can
 never create a clock that goes any faster!
+
+=== Explicit clocks and resets, and meta-stability #metastability#
+
+When <CLaSH-Signal.html#implicitclockandreset clocks and resets are implicitly routed>
+using the mechanisms provided by the __clash-prelude__, then clocks and resets
+are also implicitly unique.
+
+The protection against accidental
+<https://en.wikipedia.org/wiki/Metastability_in_electronics metastability>
+offered by CLaSH's /domain/ annotation on 'Signal's is based on the uniqueness
+of clocks and resets. But with explicit clock and reset lines, there are
+ways to (accidentally) introduce situations that are prone to metastability.
+
+There are four different clock and reset lines:
+
+@
+'Reset' domain 'Synchronous'
+'Reset' domain 'Asynchronous'
+'Clock' domain 'Source'
+'Clock' domain 'Gated'
+@
+
+We now go over the combinations over these clock and reset line combinations
+and explain when they can potentially introduce situations prone to
+meta-stability:
+
+    *   /Reset situation 1/:
+
+        @
+        f :: Reset domain Synchronous -> Reset domain Synchronous -> ..
+        f x y = ..
+        @
+
+        There are no problems here, because although /x/ and /y/ can have
+        different values, components to these reset lines are reset
+        /synchronously/, and there is no metastability situation.
+
+    *   /Reset situation 2/:
+
+        @
+        g :: Reset domain Asynchronous -> Reset domain Asynchronous -> ..
+        g x y = ..
+        @
+
+        This situation can be prone to metastability, because although /x/ and
+        /y/ belong to the same /domain/ according to their type, there is no
+        guarantee that they actually originate from the same source. This means
+        that one component can enter its reset state asynchronously to another
+        component, inducing metastability in the other component.
+
+        * The CLaSH compiler will give a warning whenever a function has a
+          type-signature similar to the one above.
+        * This is the reason why `unsafeFromAsyncReset` is prefixed with the
+          word /unsafe/.
+
+    *   /Reset situation 3/:
+
+        @
+        h :: Reset domain Asynchronous -> Reset domain Synchronous -> ..
+        h x y = ..
+        @
+
+        Also this situation is prone to metastability, because again, one
+        component can enter its reset state asynchronously to the other,
+        inducing metastability in the other component.
+
+          * The CLaSH compiler will give a warning whenever a function has a
+          type-signature similar to the one above.
+          * Although in a standalone context, converting between @'Reset' domain
+          'Synchronous'@ and @'Signal' domain 'Bool'@ would be safe from a
+          metastability point of view, it is not when we're in a context where
+          there are also asynchronous resets. That is why 'unsafeToSyncReset'
+          is prefixed with the word /unsafe/.
+
+    *   /Clock situations 1, 2, and 3/:
+
+        @
+        k :: Clock domain Source -> Clock domain source -> ..
+        k x y = ..
+
+        l :: Clock domain Source -> Clock domain Gated -> ..
+        l x y = ..
+
+        m :: Clock domain Gated -> Clock domain Gated -> ..
+        m x y = ..
+        @
+
+        All the above situations are potentially prone to metastability, because
+        even though /x/ and /y/ belong to the same /domain/ according to their
+        type, there is no guarantee that they actually originate from the same
+        source. They could hence be connected to completely unrelated clock
+        sources, and components can then induce metastable states in others.
+
+        * The CLaSH compiler will give a warning whenever a function has a
+        type-signature similar to one of the above three situations.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -55,7 +150,7 @@ module CLaSH.Explicit.Signal
   , unsafeFromAsyncReset
   , unsafeToAsyncReset
   , fromSyncReset
-  , toSyncReset
+  , unsafeToSyncReset
   , resetSynchronizer
     -- * Basic circuit functions
   , delay

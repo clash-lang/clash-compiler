@@ -43,7 +43,7 @@ module CLaSH.Signal.Internal
   , unsafeFromAsyncReset
   , unsafeToAsyncReset
   , fromSyncReset
-  , toSyncReset
+  , unsafeToSyncReset
     -- * Basic circuits
   , delay#
   , register#
@@ -473,15 +473,13 @@ data Reset (domain :: Domain) (synchronous :: ResetKind) where
 
 -- | 'unsafeFromAsyncReset' is unsafe because it can introduce:
 --
--- * meta-stability
--- * combinational loops
+-- * <CLaSH-Explicit-Signal.html#metastability meta-stability>
 unsafeFromAsyncReset :: Reset domain 'Asynchronous -> Signal domain Bool
 unsafeFromAsyncReset (Async r) = r
 {-# NOINLINE unsafeFromAsyncReset #-}
 
 -- | 'unsafeToAsyncReset' is unsafe because it can introduce:
 --
--- * meta-stability
 -- * combinational loops
 --
 -- === __Example__
@@ -505,10 +503,13 @@ fromSyncReset :: Reset domain 'Synchronous -> Signal domain Bool
 fromSyncReset (Sync r) = r
 {-# NOINLINE fromSyncReset #-}
 
--- | it is safe to treat @Bool@ signals as synchronous resets
-toSyncReset :: Signal domain Bool -> Reset domain 'Synchronous
-toSyncReset r = Sync r
-{-# NOINLINE toSyncReset #-}
+-- | 'unsafeToSyncReset' is unsafe because:
+--
+-- * It can lead to <CLaSH-Explicit-Signal.html#metastability meta-stability>
+-- issues in the presence of asynchronous resets.
+unsafeToSyncReset :: Signal domain Bool -> Reset domain 'Synchronous
+unsafeToSyncReset r = Sync r
+{-# NOINLINE unsafeToSyncReset #-}
 
 infixr 2 .||.
 -- | The above type is a generalisation for:

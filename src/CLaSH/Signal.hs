@@ -59,7 +59,7 @@ module CLaSH.Signal
   , unsafeFromAsyncReset
   , unsafeToAsyncReset
   , fromSyncReset
-  , toSyncReset
+  , unsafeToSyncReset
   , resetSynchronizer
     -- * Implicit routing of clocks and resets
     -- $implicitclockandreset
