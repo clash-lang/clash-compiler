@@ -176,9 +176,9 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.toSyncReset"
+    { "name"      : "CLaSH.Signal.Internal.unsafeToSyncReset"
     , "type" :
-"toSyncReset :: Signal domain Bool -> Reset domain Synchronous"
+"unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
     , "templateE" : "~ARG[0]"
     }
   }

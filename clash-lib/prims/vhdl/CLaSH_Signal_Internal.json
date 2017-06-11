@@ -182,7 +182,7 @@ end process;
 , { "BlackBox" :
     { "name"      : "CLaSH.Signal.Internal.unsafeFromAsyncReset"
     , "type" :
-"unsafeToAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
+"unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
     , "templateD" : "~RESULT <= true when ~ARG[0] = '1' else false;"
     }
   }
@@ -196,14 +196,14 @@ end process;
 , { "BlackBox" :
     { "name"      : "CLaSH.Signal.Internal.fromSyncReset"
     , "type" :
-"unsafeToAsyncReset :: Reset domain Synchronous -> Signal domain Bool"
+"fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
     , "templateD" : "~RESULT <= true when ~ARG[0] = '1' else false;"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.toSyncReset"
+    { "name"      : "CLaSH.Signal.Internal.unsafeToSyncReset"
     , "type" :
-"unsafeToAsyncReset :: Signal domain Bool -> Reset domain Synchronous"
+"unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
     , "templateD" : "~RESULT <= '1' when ~ARG[0] else '0';"
     }
   }
