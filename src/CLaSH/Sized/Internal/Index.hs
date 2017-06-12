@@ -66,6 +66,7 @@ where
 import Control.DeepSeq            (NFData (..))
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
+import Data.Function              (on)
 import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
@@ -82,7 +83,7 @@ import CLaSH.Class.Num            (ExtendingNum (..), SaturatingNum (..),
                                    SaturationMode (..))
 import CLaSH.Class.Resize         (Resize (..))
 import {-# SOURCE #-} CLaSH.Sized.Internal.BitVector (BitVector (BV))
-import CLaSH.Promoted.Nat         (SNat, snatToNum)
+import CLaSH.Promoted.Nat         (SNat, snatToNum, leToPlusKN)
 import CLaSH.XException           (ShowX (..), showsPrecXWith)
 
 -- | Arbitrary-bounded unsigned integer represented by @ceil(log_2(n))@ bits.
@@ -252,19 +253,28 @@ minus# (I a) (I b) =
 times# :: Index m -> Index n -> Index (((m - 1) * (n - 1)) + 1)
 times# (I a) (I b) = I (a * b)
 
-instance (KnownNat n, 1 <= (n*2), (n*2) <= (n^2)) => SaturatingNum (Index n) where
-  satPlus SatWrap a b = case plus# a b of
-    z | let m = fromInteger# (natVal (Proxy @ n))
-      , z >= m -> resize# (z - m)
-    z -> resize# z
-  satPlus SatZero a b = case plus# a b of
-    z | let m = fromInteger# (natVal (Proxy @ n))
-      , z >= m -> fromInteger# 0
-    z -> resize# z
-  satPlus _ a b = case plus# a b of
-    z | let m = fromInteger# (natVal (Proxy @ n))
-      , z >= m -> maxBound#
-    z -> resize# z
+instance (KnownNat n, 1 <= n) => SaturatingNum (Index n) where
+  satPlus SatWrap a b =
+    leToPlusKN @1 a $ \a' ->
+    leToPlusKN @1 b $ \b' ->
+      case plus# a' b' of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> resize# (z - m)
+        z -> resize# z
+  satPlus SatZero a b =
+    leToPlusKN @1 a $ \a' ->
+    leToPlusKN @1 b $ \b' ->
+      case plus# a' b' of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> fromInteger# 0
+        z -> resize# z
+  satPlus _ a b =
+    leToPlusKN @1 a $ \a' ->
+    leToPlusKN @1 b $ \b' ->
+      case plus# a' b' of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> maxBound#
+        z -> resize# z
 
   satMin SatWrap a b =
     if lt# a b
@@ -276,18 +286,27 @@ instance (KnownNat n, 1 <= (n*2), (n*2) <= (n^2)) => SaturatingNum (Index n) whe
        then fromInteger# 0
        else a -# b
 
-  satMult SatWrap a b = case times# a b of
-    z | let m = fromInteger# (natVal (Proxy @ n))
-      , z >= m -> resize# (z - m)
-    z -> resize# z
-  satMult SatZero a b = case times# a b of
-    z | let m = fromInteger# (natVal (Proxy @ n))
-      , z >= m -> fromInteger# 0
-    z -> resize# z
-  satMult _ a b = case times# a b of
-    z | let m = fromInteger# (natVal (Proxy @ n))
-      , z >= m -> maxBound#
-    z -> resize# z
+  satMult SatWrap a b =
+    leToPlusKN @1 a $ \a' ->
+    leToPlusKN @1 b $ \b' ->
+      case times# a' b' of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> resize# (z - m)
+        z -> resize# z
+  satMult SatZero a b =
+    leToPlusKN @1 a $ \a' ->
+    leToPlusKN @1 b $ \b' ->
+      case times# a' b' of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> fromInteger# 0
+        z -> resize# z
+  satMult _ a b =
+    leToPlusKN @1 a $ \a' ->
+    leToPlusKN @1 b $ \b' ->
+      case times# a' b' of
+        z | let m = fromInteger# (natVal (Proxy @ n))
+          , z >= m -> maxBound#
+        z -> resize# z
 
 instance KnownNat n => Real (Index n) where
   toRational = toRational . toInteger#

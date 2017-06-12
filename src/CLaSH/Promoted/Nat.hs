@@ -4,12 +4,16 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE GADTs          #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MagicHash      #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeOperators  #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE RankNTypes          #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -58,6 +62,9 @@ module CLaSH.Promoted.Nat
   , predBNat, div2BNat, div2Sub1BNat, log2BNat
     -- ** Normalisation
   , stripZeros
+    -- * Constraints
+  , leToPlus
+  , leToPlusKN
   )
 where
 
@@ -420,3 +427,24 @@ stripZeros (B0 BT) = BT
 stripZeros (B0 x)  = case stripZeros x of
   BT -> BT
   k  -> B0 k
+
+-- | Change constraints from the form (n + k) to the form (k <= n)
+-- This can be useful to simplify constraints
+leToPlus
+  :: forall (k :: Nat) (n :: Nat) f r
+   . (k <= n)
+  => f n
+  -> (forall m . f (m + k) -> r)
+  -> r
+leToPlus a f = f @ (n-k) a
+{-# INLINE leToPlus #-}
+
+-- | Same as 'leToPlus' with added 'KnownNat' constraints
+leToPlusKN
+  :: forall (k :: Nat) (n :: Nat) f r
+   . (k <= n, KnownNat n, KnownNat k)
+  => f n
+  -> (forall m . KnownNat m => f (m + k) -> r)
+  -> r
+leToPlusKN a f = f @ (n-k) a
+{-# INLINE leToPlusKN #-}
