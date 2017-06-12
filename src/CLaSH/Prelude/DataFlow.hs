@@ -17,6 +17,7 @@ Self-synchronising circuits based on data-flow principles.
 {-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
+{-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_HADDOCK show-extensions #-}
 
 module CLaSH.Prelude.DataFlow

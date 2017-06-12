@@ -101,10 +101,11 @@ import Control.DeepSeq            (NFData (..))
 import qualified Control.Lens     as Lens hiding (pattern (:>), pattern (:<))
 import Data.Default               (Default (..))
 import qualified Data.Foldable    as F
+import Data.Bifunctor.Flip        (Flip (..))
 import Data.Proxy                 (Proxy (..))
 import Data.Singletons.Prelude    (TyFun,Apply,type (@@))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-), type (*),
-                                   type (^), natVal)
+                                   type (^), type (<=), natVal)
 import GHC.Base                   (Int(I#),Int#,isTrue#)
 import GHC.Prim                   ((==#),(<#),(-#))
 import Language.Haskell.TH        (ExpQ)
@@ -119,8 +120,9 @@ import qualified Prelude          as P
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary (..))
 import Unsafe.Coerce              (unsafeCoerce)
 
-import CLaSH.Promoted.Nat         (SNat (..), UNat (..), pow2SNat, snatProxy,
-                                   snatToInteger, subSNat, withSNat, toUNat)
+import CLaSH.Promoted.Nat
+  (SNat (..), UNat (..), leToPlus, pow2SNat, snatProxy, snatToInteger, subSNat,
+   withSNat, toUNat)
 import CLaSH.Promoted.Nat.Literals (d1)
 import CLaSH.Sized.Internal.BitVector (Bit, BitVector, (++#), split#)
 import CLaSH.Sized.Index          (Index)
@@ -266,25 +268,25 @@ instance KnownNat n => Applicative (Vec n) where
   pure      = repeat
   fs <*> xs = zipWith ($) fs xs
 
-instance (KnownNat m, m ~ (n+1)) => F.Foldable (Vec m) where
-  fold      = fold mappend
-  foldMap f = fold mappend . map f
-  foldr     = foldr
-  foldl     = foldl
-  foldr1    = foldr1
-  foldl1    = foldl1
-  toList    = toList
-  null _    = False
-  length    = length
-  maximum   = fold (\x y -> if x >= y then x else y)
-  minimum   = fold (\x y -> if x <= y then x else y)
-  sum       = fold (+)
-  product   = fold (*)
+instance (KnownNat n, 1 <= n) => F.Foldable (Vec n) where
+  fold a      = leToPlus @1 (Flip a) (fold mappend . runFlip)
+  foldMap f a = leToPlus @1 (Flip (map f a)) (fold mappend . runFlip)
+  foldr       = foldr
+  foldl       = foldl
+  foldr1 f a  = leToPlus @1 (Flip a) (foldr1 f . runFlip)
+  foldl1 f a  = leToPlus @1 (Flip a) (foldl1 f . runFlip)
+  toList      = toList
+  null _      = False
+  length      = length
+  maximum a   = leToPlus @1 (Flip a) (fold (\x y -> if x >= y then x else y) . runFlip)
+  minimum a   = leToPlus @1 (Flip a) (fold (\x y -> if x <= y then x else y) . runFlip)
+  sum a       = leToPlus @1 (Flip a) (fold (+) . runFlip)
+  product a   = leToPlus @1 (Flip a) (fold (*) . runFlip)
 
 instance Functor (Vec n) where
   fmap = map
 
-instance (KnownNat m, m ~ (n+1)) => Traversable (Vec m) where
+instance (KnownNat n, 1 <= n) => Traversable (Vec n) where
   traverse = traverse#
 
 {-# NOINLINE traverse# #-}

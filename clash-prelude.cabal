@@ -174,6 +174,7 @@ Library
 
   Build-depends:      array                     >= 0.5.1.0 && < 0.6,
                       base                      >= 4.8.0.0 && < 5,
+                      bifunctors                >= 5.4.0   && < 6.0,
                       constraints               >= 0.8     && < 1.0,
                       data-binary-ieee754       >= 0.4.4   && < 0.6,
                       data-default              >= 0.5.3   && < 0.8,
