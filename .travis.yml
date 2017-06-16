@@ -36,7 +36,7 @@ script:
 matrix:
   fast_finish: true
   include:
-  - env: GHCVER=8.2.1 STACK_YAML="$(pwd)/stack-ghc821.yaml" STACKOPTS="--flag clash-testsuite:travisci"
+  - env: GHCVER=8.2.1 STACKOPTS="--flag clash-testsuite:travisci"
     addons:
       apt:
         sources:
