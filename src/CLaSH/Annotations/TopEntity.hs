@@ -148,6 +148,7 @@ See the documentation of 'TopEntity' for the meaning of all its fields.
 module CLaSH.Annotations.TopEntity
   ( -- * Data types
     TopEntity (..)
+  , PortName (..)
     -- * Convenience functions
   , defTop
   )
@@ -161,9 +162,9 @@ data TopEntity
   { t_name     :: String
   -- ^ The name the top-level component should have, put in a correspondingly
   -- named file.
-  , t_inputs   :: [String]
+  , t_inputs   :: [PortName]
   -- ^ List of names that are assigned in-order to the inputs of the component.
-  , t_outputs  :: [String]
+  , t_outputs  :: [PortName]
   -- ^ List of names that are assigned in-order to the outputs of the component.
   , t_extraIn  :: [(String,Int)]
   -- ^ Extra input ports, where every tuple holds the name of the input port and
@@ -184,6 +185,22 @@ data TopEntity
   -- * __Verilog__: @[n-1:0]@
   -- * __SystemVerilog__: @logic [n-1:0]@
   }
+  deriving (Data,Show,Read)
+
+data PortName
+  = PortName String
+  -- ^ You want a port, with the given name, for the entire argument\/type
+  --
+  -- The name can be left empty.
+  | PortField String [PortName]
+  -- ^ You want to assign ports to fields of an argument\/type
+  --
+  -- The first argument of 'Sub' is the name of:
+  --
+  --   * The signal/wire to which the individual ports are aggregated
+  --   * The prefix for any unnamed ports below the 'Sub'
+  --
+  -- The name can be left empty.
   deriving (Data,Show,Read)
 
 -- | Default 'TopEntity' which has no clocks, and no specified names for the
