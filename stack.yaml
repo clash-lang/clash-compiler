@@ -23,24 +23,12 @@ packages:
     commit: d4eefba5a61083e62b40962d052b82c4386883e7
   extra-dep: true
 - location:
-    git: https://github.com/DanielSchuessler/th-expand-syns.git
-    commit: 0a9420c9fe60c038f72a17cc262f30e09e56c9d5
-  extra-dep: true
-- location:
-    git: https://github.com/mboes/th-lift.git
-    commit: 671d6f967ba2f6b30398b40e8c04ee38d49fa4b0
-  extra-dep: true
-- location:
     git: https://github.com/goldfirere/th-desugar.git
-    commit: 97567a887c0fab84889bd22894151b3576bd616e
+    commit: f3f23bec71db8b13544773d0190fc028c1c716d2
   extra-dep: true
 - location:
-    git: https://github.com/RyanGlScott/singletons.git
-    commit: 784257ffe08324763a65f14c6e72776e935a4ea4
-  extra-dep: true
-- location:
-    git: https://github.com/christiaanb/cabal-doctest.git
-    commit: 3a009f5dcf16658ec5affc60885e3f64995e31f2
+    git: https://github.com/goldfirere/singletons.git
+    commit: f9910fef9084ad9e3ca6b4f713c882aff2eea7ac
   extra-dep: true
 extra-deps:
 - Glob-0.7.14
