@@ -346,7 +346,7 @@ funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
   -- Type functions can return higher-kinded types
   case drop (length tcSubstLhs) args of
     []    -> return tyRhs
-    -- So don't forget to apply the arguments not consumed type the type
+    -- So don't forget to apply the arguments not consumed by the type
     -- function application!
     --
     -- Forgetting leads to: #232
