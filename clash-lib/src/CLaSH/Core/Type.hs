@@ -52,6 +52,7 @@ where
 import           Control.DeepSeq                         as DS
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
+import           Data.List                               (foldl')
 import           Data.Maybe                              (isJust, mapMaybe)
 import           GHC.Base                                (isTrue#,(==#))
 import           GHC.Generics                            (Generic(..))
@@ -342,7 +343,14 @@ funSubsts :: HashMap TyConName TyCon -> ([Type],Type) -> [Type] -> Maybe Type
 funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
   tySubts <- foldl (funSubst tcm) (Just []) (zip tcSubstLhs args)
   let tyRhs = substTys tySubts tcSubstRhs
-  return tyRhs
+  -- Type functions can return higher-kinded types
+  case drop (length tcSubstLhs) args of
+    []    -> return tyRhs
+    -- So don't forget to apply the arguments not consumed type the type
+    -- function application!
+    --
+    -- Forgetting leads to: #232
+    args' -> return (foldl' AppTy tyRhs args')
 
 -- Given a LHS matching type, and a RHS to-match type, check if LHS and RHS
 -- are a match. If they do match, and the LHS is a variable, return a
