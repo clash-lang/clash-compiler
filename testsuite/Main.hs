@@ -40,7 +40,7 @@ main =
       ,runTest "examples"             defBuild [] "Sprockell"    (Just ("topEntity",False))
       ,runTest "examples"             defBuild [] "Windows"      (Just ("topEntity",False)) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      (Just ("testBench",True))  -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest ("examples" </> "i2c") defBuild ["-O2"] "I2C"          (Just ("topEntity",False))
+      ,runTest ("examples" </> "i2c") defBuild ["-O2"] "I2C"     (Just ("i2c"      ,False))
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"

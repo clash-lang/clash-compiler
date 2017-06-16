@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module I2C.ByteMaster  where
+module I2C.ByteMaster (byteMaster) where
 
 import CLaSH.Prelude
 
@@ -31,6 +31,13 @@ makeLenses ''ByteMasterS
 type ByteMasterI = (Bool,Bool,Bool,Bool,Bool,Bool,BitVector 8,BitRespSig)
 type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
+byteMaster
+  :: SystemClockReset
+  => Unbundled System ByteMasterI
+  -> Unbundled System ByteMasterO
+byteMaster = mealyB byteMasterT byteMasterInit
+{-# NOINLINE byteMaster #-}
+
 {-# INLINE byteMasterInit #-}
 byteMasterInit :: ByteMasterS
 byteMasterInit
@@ -45,7 +52,6 @@ byteMasterInit
   , _ackOut     = True
   }
 
-{-# NOINLINE byteMasterT #-}
 byteMasterT :: ByteMasterS -> ByteMasterI -> (ByteMasterS, ByteMasterO)
 byteMasterT s@(ByteS {_srState = ShiftRegister {..}, ..})
             (rst,start,stop,read,write,ackIn,din,~(coreAck,al,coreRxd)) = swap $ flip runState s $ do

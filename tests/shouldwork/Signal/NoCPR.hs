@@ -6,10 +6,12 @@ import           CLaSH.Prelude
 
 {-# ANN example
   (defTop { t_name = "example"
-          , t_inputs = [ "a"
+          , t_inputs = [ PortName "a"
                        ]
-          , t_outputs = [ "b"
-                        , "c"
+          , t_outputs = [ PortField ""
+                            [ PortName "b"
+                            , PortName "c"
+                            ]
                         ]
           }
   )#-}

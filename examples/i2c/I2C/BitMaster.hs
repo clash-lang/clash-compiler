@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module I2C.BitMaster where
+module I2C.BitMaster (bitMaster) where
 
 import CLaSH.Prelude
 
@@ -28,6 +28,12 @@ makeLenses ''BitMasterS
 type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
+bitMaster
+  :: SystemClockReset
+  => Unbundled System BitMasterI
+  -> Unbundled System BitMasterO
+bitMaster = mealyB bitMasterT bitMasterInit
+
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _busState       = busStartState
                             , _dout           = high       -- dout register
@@ -37,7 +43,7 @@ bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _cnt            = 0          -- clock divider counter (synthesis)
                             }
 
-{-# NOINLINE bitMasterT #-}
+
 bitMasterT :: BitMasterS -> BitMasterI -> (BitMasterS, BitMasterO)
 bitMasterT s@(BitS { _stateMachine = StateMachine  {..}
                    , _busState     = BusStatusCtrl {..}
