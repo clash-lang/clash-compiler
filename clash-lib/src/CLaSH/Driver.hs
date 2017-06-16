@@ -88,7 +88,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   putStrLn $ "Normalisation took " ++ show prepNormDiff
 
   -- 2. Generate netlist for topEntity
-  let modName   = takeWhile (/= '.') (name2String topEntity)
+  let modName   = takeWhile (/= '.') (name2String topEntity) ++ maybe "" (("_" ++) . t_name) annM
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
       hdlState' = setModName modName
@@ -137,7 +137,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
       hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : testBench)
       dir = fromMaybe "." (opt_hdlDir opts) </>
             CLaSH.Backend.name hdlState' </>
-            takeWhile (/= '.') (name2String topEntity)
+            takeWhile (/= '.') (name2String topEntity) </>
+            maybe "" (t_name) annM
   prepareDir (opt_cleanhdl opts) (extension hdlState') dir
   mapM_ (writeHDL dir) hdlDocs
   copyDataFiles (opt_importPaths opts) dir dfiles'
