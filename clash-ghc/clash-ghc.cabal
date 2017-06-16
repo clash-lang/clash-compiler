@@ -57,14 +57,14 @@ executable clash
   default-language:   Haskell2010
   Main-Is:            src-ghc/Batch.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall
+  GHC-Options:        -Wall -dynamic
   default-language:   Haskell2010
 
 executable clashi
   default-language:   Haskell2010
   Main-Is:            src-ghc/Interactive.hs
   Build-Depends:      base, clash-ghc
-  GHC-Options:        -Wall
+  GHC-Options:        -Wall -dynamic
   default-language:   Haskell2010
 
 library
