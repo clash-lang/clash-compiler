@@ -427,8 +427,6 @@ entity c = do
     ports l = sequence
             $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
-              | (i,ty) <- hiddenPorts c ] ++
               [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
               | (i,ty) <- outputs c ]
 

@@ -6,8 +6,9 @@
   Module that connects all the parts of the CLaSH compiler library
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
+{-# LANGUAGE TemplateHaskell          #-}
 
 module CLaSH.Driver where
 
@@ -52,21 +53,45 @@ import           CLaSH.Rewrite.Types              (extra)
 import           CLaSH.Util                       (first, second)
 
 -- | Create a set of target HDL files for a set of functions
-generateHDL :: forall backend . Backend backend
-            => BindingMap -- ^ Set of functions
-            -> Maybe backend
-            -> PrimMap (Text.Text) -- ^ Primitive / BlackBox Definitions
-            -> HashMap TyConName TyCon -- ^ TyCon cache
-            -> IntMap TyConName -- ^ Tuple TyCon cache
-            -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
-            -> (HashMap TyConName TyCon -> Bool -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
-            -> (TmName,Maybe TopEntity) -- ^ topEntity bndr + (maybe) TopEntity annotation
-            -> Maybe TmName -- ^ testBench bndr
-            -> CLaSHOpts -- ^ Debug information level for the normalization process
-            -> (Clock.UTCTime,Clock.UTCTime)
-            -> IO ()
-generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,annM) benchM opts (startTime,prepTime) = do
-  let primMap' = (HM.map parsePrimitive :: PrimMap Text.Text -> PrimMap BlackBoxTemplate) primMap
+generateHDL
+  :: forall backend . Backend backend
+  => BindingMap
+  -- ^ Set of functions
+  -> Maybe backend
+  -> PrimMap (Text.Text)
+  -- ^ Primitive / BlackBox Definitions
+  -> HashMap TyConName TyCon
+  -- ^ TyCon cache
+  -> IntMap TyConName
+  -- ^ Tuple TyCon cache
+  -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+  -- ^ Hardcoded 'Type' -> 'HWType' translator
+  -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
+  -- ^ Hardcoded evaluator (delta-reduction)
+  -> [( TmName
+      , Type
+      , Maybe TopEntity
+      , Maybe TmName
+      )]
+  -- ^ topEntity bndr
+  -- + (maybe) TopEntity annotation
+  -- + (maybe) testBench bndr
+  -> CLaSHOpts
+  -- ^ Debug information level for the normalization process
+  -> (Clock.UTCTime,Clock.UTCTime)
+  -> IO ()
+generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
+  opts (startTime,prepTime) = go prepTime topEntities where
+
+  primMap' = HM.map parsePrimitive primMap
+
+  -- No more TopEntities to process
+  go prevTime [] = putStrLn $ "Total compilation took " ++
+                              show (Clock.diffUTCTime prevTime startTime)
+
+  -- Process the next TopEntity
+  go prevTime ((topEntity,_,annM,benchM):topEntities') = do
+  putStrLn $ "Compiling: " ++ name2String topEntity
 
   (supplyN,supplyTB) <- Supply.splitSupply
                       . snd
@@ -81,10 +106,12 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
       rcs        = concat $ mkRecursiveComponents cg
       rcsMap     = HML.fromList
                  $ map (\(t,_) -> (t,t `elem` rcs)) cg
-      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval primMap' rcsMap [topEntity] doNorm
+      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans
+                              tcm tupTcm eval primMap' rcsMap
+                              (map (\(x,_,_,_) -> x) topEntities) doNorm
 
   normTime <- transformedBindings `deepseq` Clock.getCurrentTime
-  let prepNormDiff = Clock.diffUTCTime normTime prepTime
+  let prepNormDiff = Clock.diffUTCTime normTime prevTime
   putStrLn $ "Normalisation took " ++ show prepNormDiff
 
   -- 2. Generate netlist for topEntity
@@ -98,7 +125,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
                         (Text.pack . t_name)
                         annM
 
-  (netlist,dfiles,seen) <- genNetlist transformedBindings primMap' tcm
+  (netlist,dfiles,seen) <- genNetlist transformedBindings topEntities primMap' tcm
                                  typeTrans modName [] iw mkId (HM.empty,[topNm]) topEntity
 
   netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -115,11 +142,11 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
                      let normChecked = checkNonRecursive tb norm
                      cleanupGraph tb normChecked
         transformedBindings' = runNormalization opts supplyTB bindingsMap
-                                                typeTrans tcm tupTcm eval
-                                                primMap' rcsMap' [topEntity] doNorm'
+                                 typeTrans tcm tupTcm eval primMap' rcsMap'
+                                 (map (\(x,_,_,_) -> x) topEntities) doNorm'
         transformedBindings2 = HM.union transformedBindings transformedBindings'
 
-    (testbench,dfiles',_) <- genNetlist transformedBindings2 primMap' tcm
+    (testbench,dfiles',_) <- genNetlist transformedBindings2 topEntities primMap' tcm
                                         typeTrans modName dfiles iw mkId seen tb
     return (testbench,dfiles')
 
@@ -129,7 +156,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
 
   -- 4. Generate topEntity wrapper
   let topComponent = head
-                   $ filter (\(_,Component cName _ _ _ _) ->
+                   $ filter (\(_,Component cName _ _ _) ->
                                 Text.isSuffixOf (genComponentName [topNm] mkId modName topEntity)
                                   cName)
                             netlist
@@ -144,8 +171,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
   copyDataFiles (opt_importPaths opts) dir dfiles'
 
   endTime <- hdlDocs `seq` Clock.getCurrentTime
-  let startEndDiff = Clock.diffUTCTime endTime startTime
-  putStrLn $ "Total compilation took " ++ show startEndDiff
+  go endTime topEntities'
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
 parsePrimitive (BlackBox pNm libM imps inc templT) =

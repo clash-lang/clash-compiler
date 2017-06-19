@@ -14,10 +14,9 @@
 
 module CLaSH.Driver.TopWrapper where
 
-import           Data.Text.Lazy       (append, pack)
+import Data.Text.Lazy              (append, pack)
 
-import CLaSH.Annotations.TopEntity    (TopEntity (..), PortName (..))
-
+import CLaSH.Annotations.TopEntity (TopEntity (..), PortName (..))
 import CLaSH.Netlist.Types
   (Component (..), Declaration (..), Expr (..), Identifier, HWType (..),
    Modifier (..), PortDirection(..))
@@ -32,14 +31,11 @@ mkTopWrapper :: (Identifier -> Identifier)
 mkTopWrapper mkId teM modName topComponent
   = Component
   { componentName = maybe (mkId (pack modName `append` "_topEntity")) (pack . t_name) teM
-  , inputs        = inputs3 ++ extraIn teM
-  , outputs       = outputs3 ++ extraOut teM
-  , hiddenPorts   = topHidden
+  , inputs        = inputs3
+  , outputs       = outputs3
   , declarations  = concat [wrappers,topCompDecl:unwrappers]
   }
   where
-    topHidden = hiddenPorts topComponent
-
     -- input ports
     iPortSupply    = maybe (repeat Nothing)
                            (extendPorts . t_inputs)
@@ -68,9 +64,6 @@ mkTopWrapper mkId teM modName topComponent
                         (inputs topComponent)
                         idsI
                 ++
-                map (\(p,t) -> (p,In,t,Identifier p Nothing))
-                    topHidden
-                ++
                 zipWith (\(p,t) o -> (p,Out,t,Identifier o Nothing))
                         (outputs topComponent)
                         idsO)
@@ -90,15 +83,6 @@ appendNumber
   -> (Identifier,HWType)
 appendNumber (nm,hwty) i =
   (nm `append` "_" `append` pack (show i),hwty)
-
--- | Create extra input ports for the wrapper
-extraIn :: Maybe TopEntity -> [(Identifier,HWType)]
-extraIn = maybe [] ((map (pack *** BitVector)) . t_extraIn)
-
--- | Create extra output ports for the wrapper
-extraOut :: Maybe TopEntity -> [(Identifier,HWType)]
-extraOut = maybe [] ((map (pack *** BitVector)) . t_extraOut)
-
 
 portName
   :: String

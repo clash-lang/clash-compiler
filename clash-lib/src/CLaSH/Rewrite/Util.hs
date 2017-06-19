@@ -6,9 +6,10 @@
   Utilities for rewriting: e.g. inlining, specialisation, etc.
 -}
 
-{-# LANGUAGE Rank2Types        #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE Rank2Types               #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 module CLaSH.Rewrite.Util where
 
@@ -22,6 +23,7 @@ import qualified Control.Monad.Writer        as Writer
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
+import qualified Data.HashSet                as HashSet
 import qualified Data.List                   as List
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
@@ -552,6 +554,13 @@ specialise' :: Lens' extra (Map.Map (TmName, Int, Either Term Type) (TmName,Type
             -> RewriteMonad extra Term
 specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = do
   lvl <- Lens.view dbgLevel
+
+  -- Don't specialise TopEntities
+  topEnts <- Lens.view topEntities
+  if f `HashSet.member` topEnts
+  then traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showDoc f) (return e)
+  else do -- NondecreasingIndentation
+
   -- Create binders and variable references for free variables in 'specArg'
   (specBndrs,specVars) <- specArgBndrsAndVars ctx specArg
   let argLen  = length args

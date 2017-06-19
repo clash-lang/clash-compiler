@@ -18,6 +18,7 @@ module CLaSH.GHC.GHC2Core
   , coreToTerm
   , coreToId
   , coreToName
+  , modNameM
   , qualfiedNameString
   , makeAllTyCons
   , emptyGHC2CoreState

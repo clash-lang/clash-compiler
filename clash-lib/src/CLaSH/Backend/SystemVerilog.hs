@@ -428,24 +428,22 @@ module_ c = do
   where
     ports = sequence
           $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty <$> text i | (i,hwty) <- hiddenPorts c] ++
             [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
 
-    inputPorts = case (inputs c ++ hiddenPorts c) of
+    inputPorts = case inputs c of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "input" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
-    outputPorts = case (outputs c) of
+    outputPorts = case outputs c of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
   let iport = map fst $ inputs c
-      hport = map fst $ hiddenPorts c
       oport = map fst $ outputs c
       nets  = mapMaybe (\case {NetDecl i _ -> Just i; _ -> Nothing}) $ declarations c
-  idSeen .= concat [iport,hport,oport,nets]
+  idSeen .= concat [iport,oport,nets]
   oports .= oport
 
 mkUniqueId :: Identifier -> SystemVerilogM Identifier

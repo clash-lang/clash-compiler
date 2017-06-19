@@ -22,10 +22,11 @@ topEntity clk1 rst1 clk2 i =
   let h = register clk1 rst1 0 (register clk1 rst1 0 i)
       l = register clk1 rst1 0 i
   in  unsafeSynchronizer clk1 clk2 (bundle (h,l))
+{-# ANN topEntity (TestBench 'tb) #-}
 
-testBench
+tb
   :: Signal DomB2 Bool
-testBench = done
+tb = done
   where
     testInput      = stimuliGenerator clkA1 rstA1 $(listToVecTH [1::Unsigned 8,2,3,4,5,6,7,8])
     expectedOutput = outputVerifier   clkB2 rstB2 $(listToVecTH [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])

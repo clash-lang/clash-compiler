@@ -46,6 +46,7 @@ import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
 import qualified Data.HashMap.Lazy           as HashMap
+import qualified Data.HashSet                as HashSet
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
 import qualified Data.Set                    as Set
@@ -540,8 +541,8 @@ inlineClosed _ e = return e
 inlineSmall :: NormRewrite
 inlineSmall _ e@(collectArgs -> (Var _ f,args)) = do
   untranslatable <- isUntranslatable e
-  topEnts <- Lens.use (extra.topEntities)
-  if untranslatable || f `elem` topEnts
+  topEnts <- Lens.view topEntities
+  if untranslatable || f `HashSet.member` topEnts
     then return e
     else do
       bndrs <- Lens.use bindings

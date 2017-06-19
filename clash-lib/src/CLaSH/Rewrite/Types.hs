@@ -21,6 +21,7 @@ import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.HashMap.Strict                   (HashMap)
+import Data.HashSet                          (HashSet)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import Unbound.Generics.LocallyNameless      (Fresh (..))
@@ -94,6 +95,8 @@ data RewriteEnv
   -- ^ Hardcoded evaluator (delta-reduction)}
   , _allowZero      :: Bool
   -- ^ Zero bit wide things are representable
+  , _topEntities    :: HashSet TmName
+  -- ^ Functions that are considered TopEntities
   }
 
 makeLenses ''RewriteEnv

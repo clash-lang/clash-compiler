@@ -28,11 +28,38 @@ makeLenses ''BitMasterS
 type BitMasterI = (Bool,Bool,Unsigned 16,BitCtrlSig,I2CIn)
 type BitMasterO = (BitRespSig,Bool,I2COut)
 
+{-# ANN bitMaster
+  (defTop
+    { t_name     = "bitMaster"
+    , t_inputs   = [ PortField ""
+                      [ PortName "clk"
+                      , PortName "arst"
+                      ]
+                   , PortField ""
+                      [ PortName "rst"
+                      , PortName "ena"
+                      , PortName "clkCnt"
+                      , PortField ""
+                          [ PortName "cmd"
+                          , PortName "din" ]
+                      , PortName "i2cI" ]
+                   ]
+    , t_outputs  = [ PortField ""
+                     [ PortField ""
+                        [ PortName "cmdAck"
+                        , PortName "al"
+                        , PortName "dout" ]
+                     , PortName "busy"
+                     , PortName "i2cO"
+                     ]
+                   ]
+    }) #-}
 bitMaster
   :: SystemClockReset
   => Unbundled System BitMasterI
   -> Unbundled System BitMasterO
 bitMaster = mealyB bitMasterT bitMasterInit
+{-# NOINLINE bitMaster #-}
 
 bitMasterInit = BitS { _stateMachine   = stateMachineStart
                             , _busState       = busStartState

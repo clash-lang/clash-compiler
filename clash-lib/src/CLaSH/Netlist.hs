@@ -15,14 +15,12 @@ import           Control.Exception                (throw)
 import           Control.Lens                     ((.=),(^.),_1,_2)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.State.Strict       (runStateT)
-import           Control.Monad.Writer.Strict      (listen, runWriterT, tell)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex)
-import           Data.Set                         (toList,fromList)
 import qualified Data.Text.Lazy                   as Text
 import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
                                                   runFreshMT, unbind, unembed,
@@ -30,13 +28,14 @@ import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
 
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
+import           CLaSH.Annotations.TopEntity      (TopEntity)
 import           CLaSH.Core.DataCon               (DataCon (..))
 import           CLaSH.Core.FreeVars              (typeFreeVars)
 import           CLaSH.Core.Literal               (Literal (..))
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Term                  (Pat (..), Term (..), TmName)
 import qualified CLaSH.Core.Term                  as Core
-import           CLaSH.Core.Type                  (Type (..))
+import           CLaSH.Core.Type                  (Type (..), splitFunTys)
 import           CLaSH.Core.TyCon                 (TyConName, TyCon)
 import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
@@ -54,6 +53,8 @@ import           CLaSH.Util
 -- @topEntity@ at the top.
 genNetlist :: HashMap TmName (Type,SrcSpan,Term)
            -- ^ Global binders
+           -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
+           -- ^ All the TopEntities
            -> PrimMap BlackBoxTemplate
            -- ^ Primitive definitions
            -> HashMap TyConName TyCon
@@ -73,13 +74,21 @@ genNetlist :: HashMap TmName (Type,SrcSpan,Term)
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmName (SrcSpan,Component), [Identifier]))
-genNetlist globals primMap tcm typeTrans modName dfiles iw mkId seen topEntity = do
-  (_,s) <- runNetlistMonad globals primMap tcm typeTrans modName dfiles iw mkId seen $ genComponent topEntity
+genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen topEntity = do
+  (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
+              modName dfiles iw mkId seen $ genComponent topEntity
   return (HashMap.elems $ _components s, _dataFiles s, (_components s, _seenComps s))
+  where
+    mkTopEntityMap
+      :: [(TmName,Type,Maybe TopEntity,Maybe TmName)]
+      -> HashMap TmName (Type, Maybe TopEntity)
+    mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (a,(b,c)))
 
 -- | Run a NetlistMonad action in a given environment
 runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
                 -- ^ Global binders
+                -> HashMap TmName (Type, Maybe TopEntity)
+                -- ^ TopEntity annotations
                 -> PrimMap BlackBoxTemplate
                 -- ^ Primitive Definitions
                 -> HashMap TyConName TyCon
@@ -99,13 +108,12 @@ runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s p tcm typeTrans modName dfiles iw mkId (seen,seenIds_)
+runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId (seen,seenIds_)
   = runFreshMT
   . flip runStateT s'
-  . (fmap fst . runWriterT)
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names
+    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names tops
     (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.keys s)
 
 genNames :: (Identifier -> Identifier)
@@ -132,15 +140,7 @@ genComponent compName = do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
     Just (_,_,expr_) -> do
-      c@(_,Component _ clks _ _ _) <- makeCached compName components $ genComponentT compName expr_
-      -- This might seem redundant, because you think `genComponentT` already
-      -- added those clocks, right? wrong!
-      --
-      -- `makeCached` stores the value returned by a monadic action, so when
-      -- we use a cached result, its clocks weren't added to the current
-      -- writer which is keeping track of used clock ports.
-      tell (fromList clks)
-      return c
+      makeCached compName components $ genComponentT compName expr_
 
 -- | Generate a component for a given function
 genComponentT :: TmName -- ^ Name of the function
@@ -177,11 +177,11 @@ genComponentT compName componentExpr = do
                         NetDecl (Text.pack . name2String $ varName id_)
                                 (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
                      ) $ filter ((/= result) . varName . fst) binders
-  (decls,clks) <- listen $ concat <$> mapM (uncurry mkDeclarations . second unembed) binders
+  decls <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
   let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (Text.pack $ name2String result, resType)
-      component      = Component componentName' (toList clks) compInps [compOutp] (netDecls ++ decls)
+      component      = Component componentName' compInps [compOutp] (netDecls ++ decls)
   return (sp,component)
 
 
@@ -327,29 +327,44 @@ mkFunApp :: Id -- ^ LHS of the let-binder
          -> [Term] -- ^ Function arguments
          -> NetlistMonad [Declaration]
 mkFunApp dst fun args = do
-  normalized <- Lens.use bindings
-  case HashMap.lookup fun normalized of
-    Just _ -> do
-      (_,Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
-      if length args == length compInps
-        then do tcm <- Lens.use tcCache
-                argTys                <- mapM (termType tcm) args
-                let dstId = Text.pack . name2String $ varName dst
-                (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
-                (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
-                let hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
-                    inpAssigns    = zipWith (\(i,t) e -> (i,In,t,e)) compInps argExprs'
-                    outpAssign    = (fst compOutp,Out,snd compOutp,Identifier dstId Nothing)
-                    instLabel     = Text.concat [compName, Text.pack "_", dstId]
-                    instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
-                tell (fromList hidden)
-                return (argDecls ++ argDecls' ++ [instDecl])
-        else error $ $(curLoc) ++ "under-applied normalized function"
-    Nothing -> case args of
-      [] -> do
+  topAnns <- Lens.use topEntityAnns
+  tcm     <- Lens.use tcCache
+  case HashMap.lookup fun topAnns of
+    Just (ty,annM)
+      | let (fArgTys,fResTy) = splitFunTys tcm ty
+      , length fArgTys == length args
+      -> do
         let dstId = Text.pack . name2String $ varName dst
-        return [Assignment dstId (Identifier (Text.pack $ name2String fun) Nothing)]
-      _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
+        (argExprs,argDecls) <- second concat . unzip <$>
+                                 mapM (\(e,t) -> mkExpr False (Left dstId) t e)
+                                 (zip args fArgTys)
+        argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
+        dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
+        instDecls <- mkTopUnWrapper fun annM (dstId,dstHWty) (zip argExprs argHWTys)
+        return (argDecls ++ instDecls)
+
+      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
+    _ -> do
+      normalized <- Lens.use bindings
+      case HashMap.lookup fun normalized of
+        Just _ -> do
+          (_,Component compName compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
+          if length args == length compInps
+            then do argTys                <- mapM (termType tcm) args
+                    let dstId = Text.pack . name2String $ varName dst
+                    (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
+                    (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
+                    let inpAssigns    = zipWith (\(i,t) e -> (i,In,t,e)) compInps argExprs'
+                        outpAssign    = (fst compOutp,Out,snd compOutp,Identifier dstId Nothing)
+                        instLabel     = Text.concat [compName, Text.pack "_", dstId]
+                        instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
+                    return (argDecls ++ argDecls' ++ [instDecl])
+            else error $ $(curLoc) ++ "under-applied normalized function"
+        Nothing -> case args of
+          [] -> do
+            let dstId = Text.pack . name2String $ varName dst
+            return [Assignment dstId (Identifier (Text.pack $ name2String fun) Nothing)]
+          _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
 
 toSimpleVar :: Id
             -> (Expr,Type)
