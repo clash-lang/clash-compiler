@@ -149,12 +149,14 @@ module CLaSH.Annotations.TopEntity
   ( -- * Data types
     TopEntity (..)
   , PortName (..)
+  , TestBench (..)
     -- * Convenience functions
   , defTop
   )
 where
 
-import Data.Data
+import qualified Language.Haskell.TH as TH
+import           Data.Data
 
 -- | TopEntity annotation
 data TopEntity
@@ -202,6 +204,24 @@ data PortName
   --
   -- The name can be left empty.
   deriving (Data,Show,Read)
+
+-- | Tell what binder is the 'TestBench' for a 'TopEntity' binder.
+--
+-- So in the following example, /f/ is the 'TopEntity', and /g/ is the
+-- 'TestBench'
+--
+-- @
+-- f :: Bool -> Bool
+-- f = ...
+-- {\-\# ANN f (defTop {t_name = "f"}) \#-\}
+-- {\-\# ANN f (TestBench \'g) \#-\}
+--
+-- g :: Signal Bool
+-- g = ...
+-- @
+data TestBench
+  = TestBench TH.Name
+  deriving (Data,Show)
 
 -- | Default 'TopEntity' which has no clocks, and no specified names for the
 -- input and output ports. Also has no clock sources:
