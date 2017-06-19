@@ -6,7 +6,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -33,6 +36,7 @@ import Data.Word
 import Foreign.C.Types                (CUShort)
 import GHC.TypeLits                   (KnownNat, Nat, type (+))
 import Numeric.Half                   (Half (..))
+import GHC.Generics
 import Prelude                        hiding (map)
 
 import CLaSH.Class.Resize             (zeroExtend)
@@ -48,12 +52,25 @@ import CLaSH.Sized.Internal.BitVector (unsafeToInteger, split#)
 class BitPack a where
   -- | Number of 'CLaSH.Sized.BitVector.Bit's needed to represents elements
   -- of type @a@
+  --
+  -- Can be derived using `GHC.Generics`:
+  --
+  -- > {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+  -- >
+  -- > import CLaSH.Prelude
+  -- > import GHC.Generics
+  -- >
+  -- > data MyProductType = MyProductType { a :: Int, b :: Bool }
+  -- >   deriving (Generic, BitPack)
   type BitSize a :: Nat
+  type BitSize a = GBitSize (Rep a)
   -- | Convert element of type @a@ to a 'BitVector'
   --
   -- >>> pack (-5 :: Signed 6)
   -- 11_1011
   pack   :: a -> BitVector (BitSize a)
+  default pack :: (Generic a, GBitPack (Rep a)) => a -> BitVector (GBitSize (Rep a))
+  pack = gpack . from
   -- | Convert a 'BitVector' to an element of type @a@
   --
   -- >>> pack (-5 :: Signed 6)
@@ -64,6 +81,8 @@ class BitPack a where
   -- >>> pack (59 :: Unsigned 6)
   -- 11_1011
   unpack :: BitVector (BitSize a) -> a
+  default unpack :: (Generic a, GBitPack (Rep a)) => BitVector (GBitSize (Rep a)) -> a
+  unpack = to . gunpack
 
 {-# INLINE bitCoerce #-}
 -- | Coerce a value from one type to another through its bit representation.
@@ -238,6 +257,28 @@ instance (BitPack a, KnownNat (BitSize a)) => BitPack (Maybe a) where
   unpack x = case split# x of
     (c,rest) | c == low  -> Nothing
              | otherwise -> Just (unpack rest)
+
+class GBitPack f where
+  type GBitSize f :: Nat
+  gpack :: f a -> BitVector (GBitSize f)
+  gunpack :: BitVector (GBitSize f) -> f a
+
+instance (GBitPack a) => GBitPack (M1 m d a) where
+  type GBitSize (M1 m d a) = GBitSize a
+  gpack (M1 m1)            = gpack m1
+  gunpack b                = M1 (gunpack b)
+
+instance (KnownNat (GBitSize g), GBitPack f, GBitPack g) => GBitPack (f :*: g) where
+  type GBitSize (f :*: g) = GBitSize f + GBitSize g
+  gpack (m :*: ms)        = gpack m ++# gpack ms
+  gunpack b               = gunpack front :*: gunpack back
+    where
+      (front, back) = split# b
+
+instance (BitPack c) => GBitPack (K1 i c) where
+  type GBitSize (K1 i c) = BitSize c
+  gpack (K1 i)           = pack i
+  gunpack b              = K1 (unpack b)
 
 -- | Zero-extend a 'Bool'ean value to a 'BitVector' of the appropriate size.
 --
