@@ -168,24 +168,6 @@ data TopEntity
   -- ^ List of names that are assigned in-order to the inputs of the component.
   , t_outputs  :: [PortName]
   -- ^ List of names that are assigned in-order to the outputs of the component.
-  , t_extraIn  :: [(String,Int)]
-  -- ^ Extra input ports, where every tuple holds the name of the input port and
-  -- the number of  bits are used for that input port.
-  --
-  -- So given a bit-width @n@, the port has type:
-  --
-  -- * __VHDL__: @std_logic_vector (n-1 downto 0)@
-  -- * __Verilog__: @[n-1:0]@
-  -- * __SystemVerilog__: @logic [n-1:0]@
-  , t_extraOut :: [(String,Int)]
-  -- ^ Extra output ports, where every tuple holds the name of the output port
-  -- and the number of bits are used for that output port.
-  --
-  -- So given a bit-width @n@, the port has type:
-  --
-  -- * __VHDL__: @std_logic_vector (n-1 downto 0)@
-  -- * __Verilog__: @[n-1:0]@
-  -- * __SystemVerilog__: @logic [n-1:0]@
   }
   deriving (Data,Show,Read)
 
@@ -227,12 +209,10 @@ data TestBench
 -- input and output ports. Also has no clock sources:
 --
 -- >>> defTop
--- TopEntity {t_name = "topentity", t_inputs = [], t_outputs = [], t_extraIn = [], t_extraOut = []}
+-- TopEntity {t_name = "topentity", t_inputs = [], t_outputs = []}
 defTop :: TopEntity
 defTop = TopEntity
   { t_name     = "topentity"
   , t_inputs   = []
   , t_outputs  = []
-  , t_extraIn  = []
-  , t_extraOut = []
   }
