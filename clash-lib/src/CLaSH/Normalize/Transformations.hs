@@ -102,9 +102,28 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     inlineTest :: Term -> (Var Term, Embed Term) -> RewriteMonad extra Bool
     inlineTest e (id_@(Id idName _), exprE)
       = let e' = unembed exprE
-        in  not <$> ((||) <$> (elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure e'))
-                          -- See: [Note] join points and void wrappers
-                          <*> pure (isJoinPointIn id_ e && not (isVoidWrapper e')))
+        in  not . or <$> sequence -- We do __NOT__ inline:
+              [ -- 1. recursive let-binders
+                elem idName <$> (Lens.toListOf <$> localFreeIds <*> pure e')
+                -- 2. join points (which are not void-wrappers)
+              , pure (isJoinPointIn id_ e && not (isVoidWrapper e'))
+                -- 3. binders that are used more than once in the body, because
+                --    it makes CSE a whole lot more difficult.
+              , (>1) <$> freeOccurances
+              ]
+      where
+        -- The number of free occurrences of the binder in the entire
+        -- let-expression
+        freeOccurances :: RewriteMonad extra Int
+        freeOccurances = case e of
+          Letrec b -> do
+            -- It is safe to use unsafeUnbind because the expression @e@ is
+            -- the original let-expression, unbound and bound again, so no
+            -- bound variables have changed.
+            let (_,res) = unsafeUnbind b
+            fvOcc <-Lens.toListOf <$> localFreeIds <*> pure res
+            return (length $ filter (== idName) fvOcc)
+          _ -> return 0
 
     inlineTest _ _ = return True
 
