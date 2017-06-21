@@ -8,11 +8,14 @@
 
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module CLaSH.Netlist.Types where
+module CLaSH.Netlist.Types
+  (Declaration (..,NetDecl), module CLaSH.Netlist.Types)
+where
 
 import Control.DeepSeq
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
@@ -60,6 +63,7 @@ data NetlistState
   , _seenComps      :: [Identifier]
   , _componentNames :: HashMap TmName Identifier
   , _topEntityAnns  :: HashMap TmName (Type, Maybe TopEntity)
+  , _hdlDir         :: FilePath
   }
 
 -- | Signal reference
@@ -127,10 +131,15 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl !Identifier !Identifier [(Identifier,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
+  | InstDecl !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
   | BlackBoxD !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl !Identifier !HWType -- ^ Signal declaration
+  | NetDecl' !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
+
+pattern NetDecl :: Identifier -> HWType -> Declaration
+pattern NetDecl d ty <- NetDecl' d (Right ty)
+  where
+    NetDecl d ty = NetDecl' d (Right ty)
 
 data PortDirection = In | Out
   deriving Show
@@ -153,6 +162,7 @@ data Expr
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
   | BlackBoxE !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | ConvBV     (Maybe Identifier) HWType Bool Expr
   deriving Show
 
 -- | Literals used in an expression

@@ -4,6 +4,7 @@ module Main (main) where
 import Test.Tasty
 import Test.Tasty.Program
 
+import           Data.Char        (toLower)
 import qualified Data.List        as List
 import qualified System.Directory as Directory
 import           System.FilePath  ((</>),(<.>))
@@ -25,21 +26,21 @@ main =
   defaultMain $ testGroup "tests"
     [ testGroup "examples"
       [runTest "examples"             defBuild [] "ALU"          ([""],"ALU_topEntity",False)
-      -- ,runTest "examples"             VHDL     [] "Blinker"      (["blinker"],"blinker",False)
-      -- ,runTest "examples"             defBuild [] "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
-      -- ,runTest "examples"             defBuild [] "Calculator"   ([""],"Calculator_testBench",True )
-      -- ,runTest "examples"             defBuild [] "CochleaPlus"  ([""],"CochleaPlus_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      -- ,runTest "examples"             defBuild [] "DDR"          ([""],"DDR_tb",True )
-      -- ,runTest "examples"             defBuild [] "FIR"          ([""],"FIR_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      -- ,runTest "examples"             defBuild [] "Fifo"         ([""],"Fifo_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      -- ,runTest "examples"             defBuild [] "MAC"          ([""],"MAC_testBench",True)
-      -- ,runTest "examples"             defBuild [] "MatrixVect"   ([""],"MatrixVect_testBench",True)
-      -- ,runTest "examples"             defBuild [] "Queens"       ([""],"Queens_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      -- ,runTest "examples"             defBuild [] "Reducer"      ([""],"Reducer_topEntity",False)
-      -- ,runTest "examples"             defBuild [] "Sprockell"    ([""],"Sprockell_topEntity",False)
-      -- ,runTest "examples"             defBuild [] "Windows"      ([""],"Windows_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      -- ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      ([""],"CRC32_testBench",True)  -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest ("examples" </> "i2c") Verilog ["-O2"] "I2C"     (["i2c","bitMaster","byteMaster"],"i2c",False)
+      ,runTest "examples"             VHDL     [] "Blinker"      (["blinker"],"blinker",False)
+      ,runTest "examples"             defBuild [] "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
+      ,runTest "examples"             defBuild [] "Calculator"   ([""],"Calculator_testBench",True )
+      ,runTest "examples"             defBuild [] "CochleaPlus"  ([""],"CochleaPlus_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest "examples"             defBuild [] "DDR"          ([""],"DDR_tb",True )
+      ,runTest "examples"             defBuild [] "FIR"          ([""],"FIR_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest "examples"             defBuild [] "Fifo"         ([""],"Fifo_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest "examples"             defBuild [] "MAC"          ([""],"MAC_testBench",True)
+      ,runTest "examples"             defBuild [] "MatrixVect"   ([""],"MatrixVect_testBench",True)
+      ,runTest "examples"             defBuild [] "Queens"       ([""],"Queens_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest "examples"             defBuild [] "Reducer"      ([""],"Reducer_topEntity",False)
+      ,runTest "examples"             defBuild [] "Sprockell"    ([""],"Sprockell_topEntity",False)
+      ,runTest "examples"             defBuild [] "Windows"      ([""],"Windows_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      ([""],"CRC32_testBench",True)  -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest ("examples" </> "i2c") defBuild ["-O2"] "I2C"     (["i2c","bitMaster","byteMaster"],"i2c",False)
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
@@ -179,23 +180,31 @@ clashHDL t env extraArgs modName =
 
 ghdlImport
   :: FilePath
-  -- ^ Directory with the VHDL files
+  -- ^ Working directory
+  -> [FilePath]
+  -- ^ Directories with the VHDL files
   -> TestTree
-ghdlImport dir = withResource (return dir) (const (return ()))
-    (\d -> testProgram "GHDL (import)" "ghdl" ("-i":"--workdir=work":"--std=93":vhdlFiles d) (Just dir) False False)
+ghdlImport env subdirs = withResource (return env) (const (return ()))
+    (\d -> testProgram "GHDL (import)" "ghdl"
+      ("-i":"--workdir=work":"--std=93":concatMap (vhdlFiles d) subdirs) (Just env) False False)
   where
-    vhdlFiles :: IO FilePath -> [FilePath]
-    vhdlFiles d =  Unsafe.unsafePerformIO
-                $  filter (List.isSuffixOf "vhdl")
-               <$> (Directory.getDirectoryContents =<< d)
+    vhdlFiles :: IO FilePath -> FilePath -> [FilePath]
+    vhdlFiles d subdir =  map (subdir </>)
+                       .  Unsafe.unsafePerformIO
+                       $  filter (List.isSuffixOf "vhdl")
+                      <$> (Directory.getDirectoryContents . (</> subdir) =<< d)
 
 ghdlMake
   :: FilePath
-  -- ^ Directory with the VHDL files
+  -- ^ Working directory
+  -> [FilePath]
+  -- ^ Directories with the VHDL files
   -> String
   -- ^ Name of the components we want to build
   -> TestTree
-ghdlMake env entName = testProgram "GHDL (make)" "ghdl" ["-m","--workdir=work","--std=93",entName] (Just env) False False
+ghdlMake env subdirs entName =
+  testProgram "GHDL (make)" "ghdl"
+    ["-m","--workdir=work","--std=93","-o",map toLower (noConflict entName subdirs),entName] (Just env) False False
 
 ghdlSim
   :: FilePath
@@ -203,7 +212,8 @@ ghdlSim
   -> String
   -- ^ Name of the testbench executable
   -> TestTree
-ghdlSim env tbName = testProgram "GHDL (sim)" "ghdl" ["-r","--workdir=work","--std=93",tbName,"--assert-level=error"] (Just env) False False
+ghdlSim env tbName = testProgram "GHDL (sim)" "ghdl"
+  ["-r","--workdir=work","--std=93",tbName,"--assert-level=error"] (Just env) False False
 
 iverilog
   :: FilePath
@@ -213,8 +223,10 @@ iverilog
   -> String
   -- ^ Name of the component we want to build
   -> TestTree
-iverilog dir subdirs entName = withResource (return dir) (const (return ()))
-    (\d -> testProgram "iverilog" "iverilog" ("-g2":"-s":entName:"-o":noConflict entName subdirs:concatMap (verilogFiles d) subdirs) (Just dir) False False)
+iverilog env subdirs entName = withResource (return env) (const (return ()))
+    (\d -> testProgram "iverilog" "iverilog"
+              ("-g2":"-s":entName:"-o":noConflict entName subdirs:
+               concatMap (verilogFiles d) subdirs) (Just env) False False)
   where
     verilogFiles :: IO FilePath -> FilePath -> [FilePath]
     verilogFiles d subdir =  map (subdir </>)
@@ -242,19 +254,22 @@ vvp env entName = testProgram "vvp" "vvp" [entName] (Just env) False True
 
 vlog
   :: FilePath
+  -- ^ Working directory
+  -> [FilePath]
   -- ^ Directory with the SystemVerilog files
-  -> String
-  -- ^ Prefix of the types.sv file
   -> TestTree
-vlog dir modName = testGroup "vlog"
-  [ testProgram "vlib" "vlib" ["work"] (Just dir) False False
-  , testProgram "vlog" "vlog" ["-sv","-work","work",modName ++ "_types.sv","*.sv"] (Just dir) False False
+vlog env subdirs = testGroup "vlog"
+  [ testProgram "vlib" "vlib" ["work"] (Just env) False False
+  , testProgram "vlog" "vlog" ("-sv":"-work":"work":typFiles ++ allFiles) (Just env) False False
   ]
+  where
+    typFiles = map (\d -> d </> "*_types.sv") subdirs
+    allFiles = map (\d -> d </> "*.sv") subdirs
 
 vsim :: FilePath -> String -> TestTree
-vsim dir entName =
+vsim env entName =
   testProgram "vsim" "vsim"
-    ["-batch","-do",doScript,entName] (Just dir) False False
+    ["-batch","-do",doScript,entName] (Just env) False False
   where
     doScript = List.intercalate ";"
       [ "run -all"
@@ -272,19 +287,19 @@ runTest :: FilePath
         -> String
         -> ([String],String,Bool)
         -> TestTree
-runTest env VHDL extraArgs modName (subdir,entName,doSim) = withResource aquire release (const grp)
+runTest env VHDL extraArgs modName (subdirs,entName,doSim) = withResource aquire release (const grp)
   where
     vhdlDir   = env </> "vhdl"
-    modDir    = vhdlDir </> modName </> head subdir
+    modDir    = vhdlDir </> modName
     workdir   = modDir </> "work"
     aquire    = Directory.createDirectoryIfMissing True workdir
     release _ = Directory.removeDirectoryRecursive vhdlDir
 
     grp       = testGroup modName $
                   [ clashHDL VHDL env extraArgs modName
-                  , ghdlImport modDir
-                  , ghdlMake modDir entName
-                  ] ++ if doSim then [ghdlSim modDir entName] else []
+                  , ghdlImport modDir subdirs
+                  , ghdlMake modDir subdirs entName
+                  ] ++ if doSim then [ghdlSim modDir (noConflict entName subdirs)] else []
 
 runTest env Verilog extraArgs modName (subdirs,entName,doSim) =
     withResource (return ()) release (const grp)
@@ -298,17 +313,16 @@ runTest env Verilog extraArgs modName (subdirs,entName,doSim) =
                    , iverilog modDir subdirs entName
                    ] ++ if doSim then [vvp modDir (noConflict entName subdirs)] else []
 
-runTest env SystemVerilog extraArgs modName (subdir,entName,doSim) =
+runTest env SystemVerilog extraArgs modName (subdirs,entName,doSim) =
     withResource (return ()) release (const grp)
   where
     svDir     = env </> "systemverilog"
-    subdir'   = head subdir
-    modDir    = svDir </> modName </> subdir'
+    modDir    = svDir </> modName
     release _ = Directory.removeDirectoryRecursive svDir
 
     grp       = testGroup modName $
                   [ clashHDL SystemVerilog env extraArgs modName
-                  , vlog modDir (modName ++ if null subdir' then "" else "_" ++ subdir')
+                  , vlog modDir subdirs
                   ] ++ if doSim then [vsim modDir entName] else []
 
 runTest env Both extraArgs modName entNameM = testGroup "VHDL & Verilog"

@@ -60,11 +60,11 @@ mkTopWrapper mkId teM modName topComponent
     topCompDecl =
       InstDecl (componentName topComponent)
                (componentName topComponent `append` "_inst")
-               (zipWith (\(p,t) i -> (p,In,t,Identifier i Nothing))
+               (zipWith (\(p,t) i -> (Identifier p Nothing,In,t,Identifier i Nothing))
                         (inputs topComponent)
                         idsI
                 ++
-                zipWith (\(p,t) o -> (p,Out,t,Identifier o Nothing))
+                zipWith (\(p,t) o -> (Identifier p Nothing,Out,t,Identifier o Nothing))
                         (outputs topComponent)
                         idsO)
 
@@ -106,15 +106,17 @@ mkInput pM = case pM of
           inputs2  = map (mkInput Nothing) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
           netdecl  = NetDecl i hwty
-          netassgn = Assignment i (mkVectorChain sz hwty' ids)
+          ids'     = map (`Identifier` Nothing) ids
+          netassgn = Assignment i (mkVectorChain sz hwty' ids')
 
       RTree d hwty' -> (ports,netdecl:netassgn:decls,i)
         where
           inputs1  = map (appendNumber (i,hwty')) [0..((2^d)-1)]
           inputs2  = map (mkInput Nothing) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
+          ids'     = map (`Identifier` Nothing) ids
           netdecl  = NetDecl i hwty
-          netassgn = Assignment i (mkRTreeChain d hwty' ids)
+          netassgn = Assignment i (mkRTreeChain d hwty' ids')
 
       Product _ hwtys -> (ports,netdecl:netassgn:decls,i)
         where
@@ -135,7 +137,8 @@ mkInput pM = case pM of
           inputs2  = zipWith mkInput (extendPorts ps) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
           netdecl  = NetDecl pN hwty
-          netassgn = Assignment pN (mkVectorChain sz hwty' ids)
+          ids'     = map (`Identifier` Nothing) ids
+          netassgn = Assignment pN (mkVectorChain sz hwty' ids')
 
       RTree d hwty' -> (ports,netdecl:netassgn:decls,pN)
         where
@@ -143,7 +146,8 @@ mkInput pM = case pM of
           inputs2  = zipWith mkInput (extendPorts ps) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
           netdecl  = NetDecl pN hwty
-          netassgn = Assignment pN (mkRTreeChain d hwty' ids)
+          ids'     = map (`Identifier` Nothing) ids
+          netassgn = Assignment pN (mkRTreeChain d hwty' ids')
 
       Product _ hwtys -> (ports,netdecl:netassgn:decls,pN)
         where
@@ -160,28 +164,28 @@ mkInput pM = case pM of
 -- | Create a Vector chain for a list of 'Identifier's
 mkVectorChain :: Int
               -> HWType
-              -> [Identifier]
+              -> [Expr]
               -> Expr
 mkVectorChain _ elTy []      = DataCon (Vector 0 elTy) VecAppend []
-mkVectorChain _ elTy [i]     = DataCon (Vector 1 elTy) VecAppend
-                                [Identifier i Nothing]
-mkVectorChain sz elTy (i:is) = DataCon (Vector sz elTy) VecAppend
-                                [ Identifier i Nothing
-                                , mkVectorChain (sz-1) elTy is
+mkVectorChain _ elTy [e]     = DataCon (Vector 1 elTy) VecAppend
+                                [e]
+mkVectorChain sz elTy (e:es) = DataCon (Vector sz elTy) VecAppend
+                                [ e
+                                , mkVectorChain (sz-1) elTy es
                                 ]
 
 -- | Create a RTree chain for a list of 'Identifier's
 mkRTreeChain :: Int
              -> HWType
-             -> [Identifier]
+             -> [Expr]
              -> Expr
-mkRTreeChain _ elTy [i] = DataCon (RTree 0 elTy) RTreeAppend
-                                  [Identifier i Nothing]
-mkRTreeChain d elTy is =
-  let (isL,isR) = splitAt (length is `div` 2) is
+mkRTreeChain _ elTy [e] = DataCon (RTree 0 elTy) RTreeAppend
+                                  [e]
+mkRTreeChain d elTy es =
+  let (esL,esR) = splitAt (length es `div` 2) es
   in  DataCon (RTree d elTy) RTreeAppend
-        [ mkRTreeChain (d-1) elTy isL
-        , mkRTreeChain (d-1) elTy isR
+        [ mkRTreeChain (d-1) elTy esL
+        , mkRTreeChain (d-1) elTy esR
         ]
 
 -- | Generate output port mappings

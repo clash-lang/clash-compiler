@@ -30,7 +30,8 @@ import qualified System.Directory                 as Directory
 import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
-import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc)
+import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc, text)
+import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
 import           Unbound.Generics.LocallyNameless (name2String)
 
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
@@ -115,7 +116,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   putStrLn $ "Normalisation took " ++ show prepNormDiff
 
   -- 2. Generate netlist for topEntity
-  let modName   = takeWhile (/= '.') (name2String topEntity) ++ maybe "" (("_" ++) . t_name) annM
+  let modName   = maybe (takeWhile (/= '.') (name2String topEntity)) t_name annM
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
       hdlState' = setModName modName
@@ -124,9 +125,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       topNm     = maybe (mkId (Text.pack $ modName ++ "_topEntity"))
                         (Text.pack . t_name)
                         annM
+      hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
+                  CLaSH.Backend.name hdlState' </>
+                  takeWhile (/= '.') (name2String topEntity)
 
   (netlist,dfiles,seen) <- genNetlist transformedBindings topEntities primMap' tcm
-                                 typeTrans modName [] iw mkId (HM.empty,[topNm]) topEntity
+                                 typeTrans modName [] iw mkId (HM.empty,[topNm])
+                                 hdlDir topEntity
 
   netlistTime <- netlist `deepseq` Clock.getCurrentTime
   let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -147,7 +152,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
         transformedBindings2 = HM.union transformedBindings transformedBindings'
 
     (testbench,dfiles',_) <- genNetlist transformedBindings2 topEntities primMap' tcm
-                                        typeTrans modName dfiles iw mkId seen tb
+                                        typeTrans modName dfiles iw mkId seen hdlDir tb
     return (testbench,dfiles')
 
   testBenchTime <- testBench `seq` Clock.getCurrentTime
@@ -162,10 +167,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                             netlist
       topWrapper = mkTopWrapper mkId annM modName (snd topComponent)
       hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : testBench)
-      dir = fromMaybe "." (opt_hdlDir opts) </>
-            CLaSH.Backend.name hdlState' </>
-            takeWhile (/= '.') (name2String topEntity) </>
-            maybe "" (t_name) annM
+      dir = hdlDir </> maybe "" (t_name) annM
   prepareDir (opt_cleanhdl opts) (extension hdlState') dir
   mapM_ (writeHDL dir) hdlDocs
   copyDataFiles (opt_importPaths opts) dir dfiles'
@@ -198,7 +200,13 @@ createHDL backend modName components = flip evalState backend $ do
   typesPkg <- mkTyPackage modName hwtys
   let hdl   = map (first (<.> CLaSH.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
       qincs = map (first (<.> "qsys")) (concat incs)
-  return (hdl ++ qincs)
+      top   = snd (head components)
+  topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (inputs top)
+  topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (outputs top)
+  let man   = ( Text.unpack (componentName top) <.> "manifest"
+              , text (Text.pack (show (Manifest topInTypes topOutTypes))))
+
+  return (man:hdl ++ qincs)
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.

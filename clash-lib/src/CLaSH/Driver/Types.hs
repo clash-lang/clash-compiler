@@ -14,6 +14,7 @@ where
 
 import Control.Exception (Exception)
 import Data.HashMap.Lazy (HashMap)
+import Data.Text.Lazy    (Text)
 
 import SrcLoc            (SrcSpan, noSrcSpan)
 
@@ -47,3 +48,10 @@ instance Show CLaSHException where
   show (CLaSHException _ s eM) = s ++ "\n" ++ maybe "" id eM
 
 instance Exception CLaSHException
+
+data Manifest
+  = Manifest
+  { portInTypes  :: [Text]
+  , portOutTypes :: [Text]
+  }
+  deriving (Show,Read)

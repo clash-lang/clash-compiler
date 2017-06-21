@@ -14,6 +14,7 @@ module CLaSH.Netlist where
 import           Control.Exception                (throw)
 import           Control.Lens                     ((.=),(^.),_1,_2)
 import qualified Control.Lens                     as Lens
+import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
 import           Data.Binary.IEEE754              (floatToWord, doubleToWord)
 import           Data.Char                        (ord)
@@ -22,13 +23,14 @@ import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex)
 import qualified Data.Text.Lazy                   as Text
+import           System.FilePath                  ((</>), (<.>))
 import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
                                                   runFreshMT, unbind, unembed,
                                                   unrebind)
 
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
-import           CLaSH.Annotations.TopEntity      (TopEntity)
+import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Core.DataCon               (DataCon (..))
 import           CLaSH.Core.FreeVars              (typeFreeVars)
 import           CLaSH.Core.Literal               (Literal (..))
@@ -71,12 +73,14 @@ genNetlist :: HashMap TmName (Type,SrcSpan,Term)
            -- ^ valid identifiers
            -> (HashMap TmName (SrcSpan,Component), [Identifier])
            -- ^ Seen components
+           -> FilePath
+           -- ^ HDL dir
            -> TmName
            -- ^ Name of the @topEntity@
            -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmName (SrcSpan,Component), [Identifier]))
-genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen topEntity = do
+genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen env topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
-              modName dfiles iw mkId seen $ genComponent topEntity
+              modName dfiles iw mkId seen env $ genComponent topEntity
   return (HashMap.elems $ _components s, _dataFiles s, (_components s, _seenComps s))
   where
     mkTopEntityMap
@@ -105,15 +109,17 @@ runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
                 -- ^ valid identifiers
                 -> (HashMap TmName (SrcSpan,Component), [Identifier])
                 -- ^ Seen components
+                -> FilePath
+                -- ^ HDL dir
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId (seen,seenIds_)
+runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId (seen,seenIds_) env
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names tops
+    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names tops env
     (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.keys s)
 
 genNames :: (Identifier -> Identifier)
@@ -340,7 +346,13 @@ mkFunApp dst fun args = do
                                  (zip args fArgTys)
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
         dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
-        instDecls <- mkTopUnWrapper fun annM (dstId,dstHWty) (zip argExprs argHWTys)
+        env  <- Lens.use hdlDir
+        manM <- traverse (\ann -> do
+                   let manFile = env </> t_name ann </> t_name ann <.> "manifest"
+                   read <$> liftIO (readFile manFile)
+                ) annM
+        instDecls <- mkTopUnWrapper fun ((,) <$> annM <*> manM) (dstId,dstHWty)
+                       (zip argExprs argHWTys)
         return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
@@ -354,8 +366,8 @@ mkFunApp dst fun args = do
                     let dstId = Text.pack . name2String $ varName dst
                     (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
                     (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
-                    let inpAssigns    = zipWith (\(i,t) e -> (i,In,t,e)) compInps argExprs'
-                        outpAssign    = (fst compOutp,Out,snd compOutp,Identifier dstId Nothing)
+                    let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
+                        outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
                         instLabel     = Text.concat [compName, Text.pack "_", dstId]
                         instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
                     return (argDecls ++ argDecls' ++ [instDecl])
