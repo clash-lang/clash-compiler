@@ -50,6 +50,7 @@ where
 
 -- External import
 import           Control.DeepSeq                         as DS
+import           Data.Hashable                           (Hashable)
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.List                               (foldl')
@@ -83,7 +84,7 @@ data Type
   | ForAllTy !(Bind TyVar Type) -- ^ Polymorphic Type
   | AppTy    !Type !Type        -- ^ Type Application
   | LitTy    !LitTy             -- ^ Type literal
-  deriving (Show,Generic,NFData)
+  deriving (Show,Generic,NFData,Hashable)
 
 -- | An easier view on types
 data TypeView
@@ -96,13 +97,13 @@ data TypeView
 data ConstTy
   = TyCon !TyConName -- ^ TyCon type
   | Arrow            -- ^ Function type
-  deriving (Show,Generic,NFData,Alpha)
+  deriving (Show,Generic,NFData,Alpha,Hashable)
 
 -- | Literal Types
 data LitTy
   = NumTy !Integer
   | SymTy !String
-  deriving (Show,Generic,NFData,Alpha)
+  deriving (Show,Generic,NFData,Alpha,Hashable)
 
 -- | The level above types
 type Kind       = Type

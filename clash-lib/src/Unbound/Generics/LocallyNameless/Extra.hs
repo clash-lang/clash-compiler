@@ -31,15 +31,14 @@ import Unbound.Generics.LocallyNameless.Alpha  (Alpha (..), NamePatFind (..),
 #else
 import Unbound.Generics.LocallyNameless.Alpha  (Alpha (..))
 #endif
-#if !MIN_VERSION_unbound_generics(0,2,0)
 import Unbound.Generics.LocallyNameless.Bind   (Bind (..))
 import Unbound.Generics.LocallyNameless.Embed  (Embed (..))
-#endif
 import Unbound.Generics.LocallyNameless.Name   (Name (..))
 #if !MIN_VERSION_unbound_generics(0,2,0)
-import Unbound.Generics.LocallyNameless.Rebind (Rebind (..))
-import Unbound.Generics.LocallyNameless.Rec    (Rec,unrec)
+import Unbound.Generics.LocallyNameless.Rec    (unrec)
 #endif
+import Unbound.Generics.LocallyNameless.Rebind (Rebind (..))
+import Unbound.Generics.LocallyNameless.Rec    (Rec)
 import Unbound.Generics.LocallyNameless.Subst  (Subst (..))
 
 #if !MIN_VERSION_unbound_generics(0,2,0)
@@ -58,6 +57,11 @@ instance Subst b (Ratio a) where
 instance Hashable (Name a) where
   hashWithSalt salt (Fn str int) = hashWithSalt salt (hashWithSalt (hash int) str)
   hashWithSalt salt (Bn i0  i1)  = hashWithSalt salt (hash i0 `hashWithSalt` i1)
+
+instance (Hashable a, Hashable b) => Hashable (Bind a b)
+instance Hashable a => Hashable (Embed a)
+instance (Hashable a, Hashable b) => Hashable (Rebind a b)
+instance Hashable a => Hashable (Rec a)
 
 #if !MIN_VERSION_unbound_generics(0,2,0)
 instance (Ord a) => Ord (Embed a) where

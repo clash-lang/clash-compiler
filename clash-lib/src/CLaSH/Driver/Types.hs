@@ -51,7 +51,8 @@ instance Exception CLaSHException
 
 data Manifest
   = Manifest
-  { portInTypes  :: [Text]
+  { manifestHash :: Int
+  , portInTypes  :: [Text]
   , portOutTypes :: [Text]
   }
   deriving (Show,Read)

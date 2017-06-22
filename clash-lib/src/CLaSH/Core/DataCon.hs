@@ -26,6 +26,7 @@ where
 #endif
 
 import Control.DeepSeq                        (NFData(..))
+import Data.Hashable                          (Hashable)
 import GHC.Generics                           (Generic)
 import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst(..))
 import Unbound.Generics.LocallyNameless.Extra ()
@@ -51,7 +52,7 @@ data DataCon
                              -- these type variables are not part of the result
                              -- of the DataCon, but only of the arguments.
   , dcArgTys     :: [Type]   -- ^ Argument types
-  } deriving (Generic,NFData)
+  } deriving (Generic,NFData,Hashable)
 
 instance Show DataCon where
   show = show . dcName

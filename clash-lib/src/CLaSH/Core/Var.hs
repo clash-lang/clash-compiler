@@ -19,6 +19,7 @@ module CLaSH.Core.Var
 where
 
 import Control.DeepSeq                  (NFData (..))
+import Data.Hashable                    (Hashable)
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
 import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..))
@@ -39,7 +40,7 @@ data Var a
   { varName :: Name a
   , varType :: Embed Type
   }
-  deriving (Eq,Show,Generic,NFData)
+  deriving (Eq,Show,Generic,NFData,Hashable)
 
 -- | Term variable
 type Id    = Var Term

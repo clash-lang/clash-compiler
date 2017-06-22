@@ -14,9 +14,11 @@ module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
+import           Control.Exception                (tryJust)
 import           Control.Lens                     ((.=))
-import           Control.Monad                    (when, unless)
+import           Control.Monad                    (join, guard, when, unless)
 import           Control.Monad.State              (evalState, get)
+import           Data.Hashable                    (hash)
 import qualified Data.HashMap.Lazy                as HML
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HM
@@ -30,6 +32,7 @@ import qualified System.Directory                 as Directory
 import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
+import           System.IO.Error                  (isDoesNotExistError)
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc, text)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
 import           Unbound.Generics.LocallyNameless (name2String)
@@ -94,6 +97,31 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   go prevTime ((topEntity,_,annM,benchM):topEntities') = do
   putStrLn $ "Compiling: " ++ name2String topEntity
 
+  let modName   = maybe (takeWhile (/= '.') (name2String topEntity)) t_name annM
+      iw        = opt_intWidth opts
+      hdlsyn    = opt_hdlSyn opts
+      hdlState' = setModName modName
+                $ fromMaybe (initBackend iw hdlsyn :: backend) hdlState
+      hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
+                        CLaSH.Backend.name hdlState' </>
+                        takeWhile (/= '.') (name2String topEntity)
+
+  modHashM <- fmap join $ flip traverse annM $ \ann -> do
+    let manFile = hdlDir </> t_name ann </> t_name ann <.> "manifest"
+    manM <- fmap read . either (const Nothing) Just <$>
+            tryJust (guard . isDoesNotExistError) (readFile manFile)
+    flip traverse manM $ \man -> do
+      let cg   = callGraph [] bindingsMap (fromMaybe topEntity benchM)
+          getTm (_,_,tm) = tm
+          cgBs = map (getTm . (bindingsMap HM.!) . fst) cg
+          cgBsHash = hash cgBs
+      return (manifestHash man == cgBsHash,cgBsHash)
+  let sameHash = maybe False fst modHashM
+
+  if sameHash
+  then do { putStrLn ("Using cached result for: " ++ name2String topEntity)
+          ; go startTime topEntities'}
+  else do
   (supplyN,supplyTB) <- Supply.splitSupply
                       . snd
                       . Supply.freshId
@@ -116,18 +144,10 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   putStrLn $ "Normalisation took " ++ show prepNormDiff
 
   -- 2. Generate netlist for topEntity
-  let modName   = maybe (takeWhile (/= '.') (name2String topEntity)) t_name annM
-      iw        = opt_intWidth opts
-      hdlsyn    = opt_hdlSyn opts
-      hdlState' = setModName modName
-                $ fromMaybe (initBackend iw hdlsyn :: backend) hdlState
-      mkId      = evalState mkBasicId hdlState'
+  let mkId      = evalState mkBasicId hdlState'
       topNm     = maybe (mkId (Text.pack $ modName ++ "_topEntity"))
                         (Text.pack . t_name)
                         annM
-      hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
-                  CLaSH.Backend.name hdlState' </>
-                  takeWhile (/= '.') (name2String topEntity)
 
   (netlist,dfiles,seen) <- genNetlist transformedBindings topEntities primMap' tcm
                                  typeTrans modName [] iw mkId (HM.empty,[topNm])
@@ -166,7 +186,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                                   cName)
                             netlist
       topWrapper = mkTopWrapper mkId annM modName (snd topComponent)
-      hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : testBench)
+      hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : testBench) (snd <$> modHashM)
       dir = hdlDir </> maybe "" (t_name) annM
   prepareDir (opt_cleanhdl opts) (extension hdlState') dir
   mapM_ (writeHDL dir) hdlDocs
@@ -187,12 +207,18 @@ parsePrimitive (BlackBox pNm libM imps inc templT) =
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 
 -- | Pretty print Components to HDL Documents
-createHDL :: Backend backend
-           => backend     -- ^ Backend
-           -> String
-           -> [(SrcSpan,Component)] -- ^ List of components
-           -> [(String,Doc)]
-createHDL backend modName components = flip evalState backend $ do
+createHDL
+  :: Backend backend
+  => backend
+  -- ^ Backend
+  -> String
+  -- ^ Module hierarchy root
+  -> [(SrcSpan,Component)]
+  -- ^ List of components
+  -> Maybe Int
+  -- ^ module hash
+  -> [(String,Doc)]
+createHDL backend modName components modHashM = flip evalState backend $ do
   -- (hdlNms,hdlDocs) <- unzip <$> mapM genHDL components
   -- let hdlNmDocs = zip hdlNms hdlDocs
   (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
@@ -203,8 +229,9 @@ createHDL backend modName components = flip evalState backend $ do
       top   = snd (head components)
   topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (inputs top)
   topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (outputs top)
-  let man   = ( Text.unpack (componentName top) <.> "manifest"
-              , text (Text.pack (show (Manifest topInTypes topOutTypes))))
+  let modHash = fromMaybe 0 modHashM
+      man     = ( Text.unpack (componentName top) <.> "manifest"
+                , text (Text.pack (show (Manifest modHash topInTypes topOutTypes))))
 
   return (man:hdl ++ qincs)
 
