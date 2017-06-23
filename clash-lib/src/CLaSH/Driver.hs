@@ -137,10 +137,11 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                    <$> Supply.newSupply
   let topEntityNames = map (\(x,_,_,_) -> x) topEntities
 
-  topTime <- if sameTopHash
+  (topTime,manifest') <- if sameTopHash
     then do
       putStrLn ("Using cached result for: " ++ name2String topEntity)
-      Clock.getCurrentTime
+      topTime <- Clock.getCurrentTime
+      return (topTime,manifest)
     else do
       -- 1. Normalise topEntity
       let transformedBindings = normalizeEntity bindingsMap primMap' tcm tupTcm
@@ -167,15 +168,16 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                 cName)
               netlist
           topWrapper = mkTopWrapper mkId annM modName (snd topComponent)
-          hdlDocs    = createHDL hdlState' modName
-                        ((noSrcSpan,topWrapper) : netlist)
-                        (Text.unpack topNm, Right manifest)
-          dir        = hdlDir </> maybe "" t_name annM
+          (hdlDocs,manifest')  = createHDL hdlState' modName
+                                   ((noSrcSpan,topWrapper) : netlist)
+                                   (Text.unpack topNm, Right manifest)
+          dir = hdlDir </> maybe "" t_name annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
 
-      hdlDocs `seq` Clock.getCurrentTime
+      topTime <- hdlDocs `seq` Clock.getCurrentTime
+      return (topTime,manifest')
 
   benchTime <- case benchM of
     Just tb | not sameBenchHash -> do
@@ -201,9 +203,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
-      let hdlDocs    = createHDL hdlState2 modName' netlist
-                        (Text.unpack topNm, Left manifest)
-          dir        = hdlDir </> maybe "" t_name annM </> modName'
+      let (hdlDocs,_) = createHDL hdlState2 modName' netlist
+                           (Text.unpack topNm, Left manifest')
+          dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
@@ -246,7 +248,9 @@ createHDL
   -- + Either:
   --   * Left manifest:  Only write/update the hashes of the @manifest@
   --   * Right manifest: Update all fields of the @manifest@
-  -> [(String,Doc)]
+  -> ([(String,Doc)],Manifest)
+  -- ^ The pretty-printed HDL documents
+  -- + The update manifest file
 createHDL backend modName components (topName,manifestE) = flip evalState backend $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
   hwtys <- HashSet.toList <$> extractTypes <$> get
@@ -262,7 +266,7 @@ createHDL backend modName components (topName,manifestE) = flip evalState backen
     ) manifestE
   let manDoc = ( topName <.> "manifest"
                , text (Text.pack (show manifest)))
-  return (manDoc:topFiles)
+  return (manDoc:topFiles,manifest)
 
 -- | Prepares the directory for writing HDL files. This means creating the
 --   dir if it does not exist and removing all existing .hdl files from it.
