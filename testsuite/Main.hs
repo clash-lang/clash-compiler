@@ -149,7 +149,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VFold"     (["","VFold_testBench"],"VFold_testBench_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMapAccum" ([""],"VMapAccum_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMerge"    (["","VMerge_testBench"],"VMerge_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReplace"  ([""],"VReplace_testBench",False)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReplace"  (["","VReplace_testBench"],"VReplace_testBench_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReverse"  (["","VReverse_testBench"],"VReverse_testBench_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VRotate"   (["","VRotate_testBench"],"VRotate_testBench_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VScan"     ([""],"VScan_topEntity",False)
