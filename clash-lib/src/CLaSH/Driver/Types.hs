@@ -51,7 +51,7 @@ instance Exception CLaSHException
 
 data Manifest
   = Manifest
-  { manifestHash :: Int
+  { manifestHash :: (Int,Maybe Int)
   , portInTypes  :: [Text]
   , portOutTypes :: [Text]
   }

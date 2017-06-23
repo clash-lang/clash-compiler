@@ -30,7 +30,7 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
 
 {-# ANN bitMaster
   (defTop
-    { t_name     = "bitMaster"
+    { t_name     = "bitmaster"
     , t_inputs   = [ PortField ""
                       [ PortName "clk"
                       , PortName "arst"

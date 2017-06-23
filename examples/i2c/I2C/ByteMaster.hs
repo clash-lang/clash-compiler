@@ -33,7 +33,7 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
 
 {-# ANN byteMaster
   (defTop
-    { t_name     = "byteMaster"
+    { t_name     = "bytemaster"
     , t_inputs   = [ PortField ""
                       [ PortName "clk"
                       , PortName "arst"
