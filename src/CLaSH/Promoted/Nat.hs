@@ -196,31 +196,37 @@ subUNat UZero     _         = error "impossible: 0 + (n + 1) ~ 0"
 addSNat :: SNat a -> SNat b -> SNat (a+b)
 addSNat SNat SNat = SNat
 {-# INLINE addSNat #-}
+infixl 6 `addSNat`
 
 -- | Subtract two singleton natural numbers
 subSNat :: SNat (a+b) -> SNat b -> SNat a
 subSNat SNat SNat = SNat
 {-# INLINE subSNat #-}
+infixl 6 `subSNat`
 
 -- | Multiply two singleton natural numbers
 mulSNat :: SNat a -> SNat b -> SNat (a*b)
 mulSNat SNat SNat = SNat
 {-# INLINE mulSNat #-}
+infixl 7 `mulSNat`
 
 -- | Power of two singleton natural numbers
 powSNat :: SNat a -> SNat b -> SNat (a^b)
 powSNat SNat SNat = SNat
 {-# NOINLINE powSNat #-}
+infixr 8 `powSNat`
 
 -- | Division of two singleton natural numbers
 divSNat :: (1 <= b) => SNat a -> SNat b -> SNat (Div a b)
 divSNat SNat SNat = SNat
 {-# INLINE divSNat #-}
+infixl 7 `divSNat`
 
 -- | Modulo of two singleton natural numbers
 modSNat :: (1 <= b) => SNat a -> SNat b -> SNat (Mod a b)
 modSNat SNat SNat = SNat
 {-# INLINE modSNat #-}
+infixl 7 `modSNat`
 
 -- | Floor of the logarithm of a natural number
 flogBaseSNat :: (2 <= base, 1 <= x)
