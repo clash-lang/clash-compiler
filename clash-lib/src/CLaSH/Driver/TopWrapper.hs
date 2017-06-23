@@ -1,5 +1,6 @@
 {-|
-  Copyright  :  (C) 2015-2016, University of Twente
+  Copyright  :  (C) 2015-2016, University of Twente,
+                         2017, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
