@@ -916,8 +916,8 @@ However, if we add the following 'TopEntity' annotation in the file:
 {\-\# ANN topEntity
   ('defTop'
     { t_name     = "blinker"
-    , t_inputs   = [\"CLOCK_50\",\"KEY0\",\"KEY1\"]
-    , t_outputs  = [\"LED\"]
+    , t_inputs   = [PortName \"CLOCK_50\", PortName \"KEY0\", PortName \"KEY1\"]
+    , t_outputs  = [PortName \"LED\"]
     }) \#-\}
 @
 

@@ -94,8 +94,10 @@ However, if we add the following 'TopEntity' annotation in the file:
 {\-\# ANN topEntity
   ('defTop'
     { t_name     = "blinker"
-    , t_inputs   = [\"CLOCK_50\",\"KEY0\",\"KEY1\"]
-    , t_outputs  = [\"LED\"]
+    , t_inputs   = [ PortName \"CLOCK_50\"
+                   , PortName \"KEY0\"
+                   , PortName \"KEY1\" ]
+    , t_outputs  = [ PortName \"LED\" ]
     }) \#-\}
 @
 
@@ -173,20 +175,96 @@ data TopEntity
   }
   deriving (Data,Show,Read,Generic)
 
+-- | Give port names for arguments/results.
+--
+-- Give a data type and function:
+--
+-- @
+-- data T = MkT Int Bool
+--
+-- {\-\# ANN topEntity (defTop {t_name = \"f\",}) \#-\}
+-- f :: Int -> T -> (T,Bool)
+-- f a b = ...
+-- @
+--
+-- Clash would normally generate the following VHDL entity:
+--
+-- @
+-- entity f is
+--   port(input_0      : in signed(63 downto 0);
+--        input_1_0    : in signed(63 downto 0);
+--        input_1_1    : in boolean;
+--        output_0_0_0 : out signed(63 downto 0);
+--        output_0_0_1 : out boolean;
+--        output_0_1   : out boolean);
+-- end;
+-- @
+--
+-- However, we can change this by using 'PortName's. So by:
+--
+-- @
+-- {\-\# ANN topEntity
+--    (defTop
+--       { t_name = \"f\"
+--       , t_inputs = [ PortName \"a\"
+--                    , PortName \"b\" ]
+--       , t_outputs = [ PortName \"res\" ]}) \#-\}
+-- f :: Int -> T -> (T,Bool)
+-- f a b = ...
+-- @
+--
+-- we get:
+--
+-- @
+-- entity f is
+--   port(a   : in signed(63 downto 0);
+--        b   : in f_types.t;
+--        res : out f_types.tup2);
+-- end;
+-- @
+--
+-- If we want to name fields for tuples/records we have to use 'PortField'
+--
+-- @
+-- {\-\# ANN topEntity
+--    (defTop
+--       { t_name = \"f\"
+--       , t_inputs = [ PortName \"a\"
+--                    , PortField \"\" [ PortName \"b\", PortName \"c\" ] ]
+--       , t_outputs = [ PortField \"res\" [PortName \"q\"]]}) \#-\}
+-- f :: Int -> T -> (T,Bool)
+-- f a b = ...
+-- @
+--
+-- So that we get:
+--
+-- @
+-- entity f is
+--   port(a     : in signed(63 downto 0);
+--        b     : in signed(63 downto 0);
+--        c     : in boolean;
+--        q     : out f_types.t;
+--        res_1 : out boolean);
+-- end;
+-- @
+--
+-- Notice how we didn't name the second field of the result, and the second
+-- output port got 'PortField' name, \"res\", as a prefix for its name.
 data PortName
   = PortName String
   -- ^ You want a port, with the given name, for the entire argument\/type
   --
-  -- The name can be left empty.
+  -- You can use an empty String ,\"\" , in case you want an auto-generated name.
   | PortField String [PortName]
   -- ^ You want to assign ports to fields of an argument\/type
   --
-  -- The first argument of 'Sub' is the name of:
+  -- The first argument of 'PortField' is the name of:
   --
-  --   * The signal/wire to which the individual ports are aggregated
-  --   * The prefix for any unnamed ports below the 'Sub'
+  -- 1. The signal/wire to which the individual ports are aggregated.
   --
-  -- The name can be left empty.
+  -- 2. The prefix for any unnamed ports below the 'PortField'
+  --
+  -- You can use an empty String ,\"\" , in case you want an auto-generated name.
   deriving (Data,Show,Read,Generic)
 
 -- | Tell what binder is the 'TestBench' for a 'TopEntity' binder.
