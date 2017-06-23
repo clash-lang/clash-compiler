@@ -140,6 +140,7 @@ See the documentation of 'TopEntity' for the meaning of all its fields.
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric      #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -155,6 +156,7 @@ module CLaSH.Annotations.TopEntity
   )
 where
 
+import           GHC.Generics
 import qualified Language.Haskell.TH as TH
 import           Data.Data
 
@@ -169,7 +171,7 @@ data TopEntity
   , t_outputs  :: [PortName]
   -- ^ List of names that are assigned in-order to the outputs of the component.
   }
-  deriving (Data,Show,Read)
+  deriving (Data,Show,Read,Generic)
 
 data PortName
   = PortName String
@@ -185,7 +187,7 @@ data PortName
   --   * The prefix for any unnamed ports below the 'Sub'
   --
   -- The name can be left empty.
-  deriving (Data,Show,Read)
+  deriving (Data,Show,Read,Generic)
 
 -- | Tell what binder is the 'TestBench' for a 'TopEntity' binder.
 --
