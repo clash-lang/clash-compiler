@@ -50,10 +50,21 @@ instance Show CLaSHException where
 
 instance Exception CLaSHException
 
+-- | Information about the generated HDL between (sub)runs of the compiler
 data Manifest
   = Manifest
   { manifestHash :: (Int,Maybe Int)
+    -- ^ Hash of the TopEntity and all its dependencies
+    --   + (maybe) Hash of the TestBench and all its dependencies
   , portInTypes  :: [Text]
+    -- ^ The rendered versions of the types of the input ports of the TopEntity
+    --
+    -- Used when dealing with multiple @TopEntity@s who have different names
+    -- for types which are structurally equal
   , portOutTypes :: [Text]
+    -- ^ The rendered versions of the types of the output ports of the TopEntity
+    --
+    -- Used when dealing with multiple @TopEntity@s who have different names
+    -- for types which are structurally equal
   }
   deriving (Show,Read)

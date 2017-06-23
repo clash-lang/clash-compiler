@@ -98,6 +98,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   go prevTime ((topEntity,_,annM,benchM):topEntities') = do
   putStrLn $ "Compiling: " ++ name2String topEntity
 
+  -- Some initial setup
   let modName   = maybe (takeWhile (/= '.') (name2String topEntity)) t_name annM
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
@@ -241,6 +242,10 @@ createHDL
   -> [(SrcSpan,Component)]
   -- ^ List of components
   -> (String, Either Manifest Manifest)
+  -- ^ Name of the manifest file
+  -- + Either:
+  --   * Left manifest:  Only write/update the hashes of the @manifest@
+  --   * Right manifest: Update all fields of the @manifest@
   -> [(String,Doc)]
 createHDL backend modName components (topName,manifestE) = flip evalState backend $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
