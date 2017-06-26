@@ -172,6 +172,8 @@ loadModules hdl modName dflagsM = do
     GHC.setTargets [target]
     modGraph <- GHC.depanal [] False
     let modGraph' = map disableOptimizationsFlags modGraph
+        -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
+        -- are in topological order, i.e. the root module is last.
         modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
     tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
                                  ; tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
@@ -223,6 +225,9 @@ loadModules hdl modName dflagsM = do
                             . Var.varName)
                            (map fst binders)
 
+    -- Because tidiedMods is in topological order, binders is also, and hence
+    -- allAnn is in topological order. This means that the "root" 'topEntity'
+    -- will be compiled last.
     allAnn   <- findTopEntityAnnotations (map fst binders)
     benchAnn <- findTestBenchAnnotations (map fst binders)
     topAnn   <- findTopEntityAnnotations rootBndrs
