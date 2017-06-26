@@ -69,7 +69,9 @@ class BitPack a where
   -- >>> pack (-5 :: Signed 6)
   -- 11_1011
   pack   :: a -> BitVector (BitSize a)
-  default pack :: (Generic a, GBitPack (Rep a)) => a -> BitVector (GBitSize (Rep a))
+  default pack
+    :: (Generic a, GBitPack (Rep a), GBitSize (Rep a) ~ BitSize a)
+    => a -> BitVector (BitSize a)
   pack = gpack . from
   -- | Convert a 'BitVector' to an element of type @a@
   --
@@ -81,7 +83,9 @@ class BitPack a where
   -- >>> pack (59 :: Unsigned 6)
   -- 11_1011
   unpack :: BitVector (BitSize a) -> a
-  default unpack :: (Generic a, GBitPack (Rep a)) => BitVector (GBitSize (Rep a)) -> a
+  default unpack
+    :: (Generic a, GBitPack (Rep a), GBitSize (Rep a) ~ BitSize a)
+    => BitVector (BitSize a) -> a
   unpack = to . gunpack
 
 {-# INLINE bitCoerce #-}
