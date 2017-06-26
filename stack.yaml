@@ -30,6 +30,10 @@ packages:
     git: https://github.com/goldfirere/singletons.git
     commit: f9910fef9084ad9e3ca6b4f713c882aff2eea7ac
   extra-dep: true
+- location:
+    git: https://github.com/tibbe/hashable.git
+    commit: 339ae0ad3250c4d6b703e2fc781ce81a190c8d23
+  extra-dep: true
 system-ghc: true
 extra-deps:
 - Glob-0.8.0
@@ -78,7 +82,6 @@ extra-deps:
 - free-4.12.4
 - ghc-paths-0.1.0.9
 - half-0.2.2.3
-- hashable-1.2.6.0
 - hspec-2.4.3
 - hspec-core-2.4.3
 - hspec-discover-2.4.3
@@ -144,4 +147,4 @@ extra-deps:
 - vector-th-unbox-0.2.1.6
 - void-0.7.2
 - wl-pprint-text-1.1.1.0
-resolver: ghc-8.2.0.20170523
+resolver: ghc-8.2.0.20170623
