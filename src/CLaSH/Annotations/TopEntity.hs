@@ -4,16 +4,49 @@ Copyright  :  (C) 2015-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-The 'TopEntity' annotations described in this module make it easier to put your
-design on an FPGA.
+'TopEntity' annotations allow us to control hierarchy and naming aspects of the
+CλaSH compiler, specifically, they allow us to:
 
-We can exert some control how the top level function is created by the CλaSH
-compiler by annotating the @topEntity@ function with a 'TopEntity' annotation.
-You apply these annotations using the @ANN@ pragma like so:
+    * Assign names to entities (VHDL) \/ modules ((System)Verilog), and their
+      ports.
+    * Put generated HDL files of a logical (sub)entity in their own directory.
+    * Use cached versions of generated HDL, i.e., prevent recompilation of
+      (sub)entities that have not changed since the last run. Caching is based
+      on a @.manifest@ which is generated alongside the HDL; deleting this file
+      means deleting the cache; changing this file will result in /undefined/
+      behaviour.
+
+Functions with a 'TopEntity' annotation do must adhere to the following
+restrictions:
+
+    * Although functions with a 'TopEntity' annotation can of course depend
+      on functions with another 'TopEntity' annotation, they must not be
+      mutually recursive.
+    * Functions with a 'TopEntity' annotation must be completely /monomorphic/
+      and /first-order/, and cannot have any /non-representable/ arguments or
+      result.
+
+Also take the following into account when using 'TopEntity' annotations.
+
+    * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
+      machinery does not understand 'TopEntity' annotations and it might
+      subsequently decide to inline those functions. You should therefor also
+      add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
+      a 'TopEntity' functions.
+    * Functions with a 'TopEntity' annotation will not be specialised
+      on constants.
+
+Finally, the root module, the module which you pass as an argument to the
+CλaSH compiler must either have:
+
+    * A function with a 'TopEntity' annotation.
+    * A function called /topEntity/.
+
+You apply 'TopEntity' annotations to functions using an @ANN@ pragma:
 
 @
-{\-\# ANN topEntity (TopEntity {t_name = ..., ...  }) \#-\}
-topEntity x = ...
+{\-\# ANN f (TopEntity {t_name = ..., ...  }) \#-\}
+f x = ...
 @
 
 For example, given the following specification:
@@ -56,7 +89,8 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The CλaSH compiler will normally generate the following @topEntity.vhdl@ file:
+The CλaSH compiler would normally generate the following
+@blinker_topentity.vhdl@ file:
 
 @
 -- Automatically generated VHDL-93

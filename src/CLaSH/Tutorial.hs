@@ -268,7 +268,7 @@ GHC are not supported).
 
   (4) Verify that everything is working by:
 
-      * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/049e6e2eacb9b3b5ae8664b9b79979c321b322d9/examples/FIR.hs Fir.hs> example
+      * Downloading the <https://raw.githubusercontent.com/clash-lang/clash-compiler/36a60d7979012b39bcaac66ec7048a7ec7167fbe/examples/FIR.hs Fir.hs> example
       * Run: @clashi FIR.hs@
       * Execute, in the interpreter, the @:vhdl@ command
       * Execute, in the interpreter, the @:verilog@ command
@@ -527,13 +527,13 @@ Our 'topEntity' meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
 a directory called 'vhdl', which contains a directory called @MAC@, which
 ultimately contains all the generated VHDL files. You can now load these files
-into your favourite VHDL synthesis tool, marking @MAC_topEntity.vhdl@ as the file
+into your favourite VHDL synthesis tool, marking @mac_topentity.vhdl@ as the file
 containing the top level entity.
 -}
 
 {- $mac4
 There are multiple reasons as to why might you want to create a so-called
-/testBench/ for the generated HDL:
+/test bench/ for the generated HDL:
 
   * You want to compare post-synthesis / post-place&route behaviour to that of
     the behaviour of the original generated HDL.
@@ -541,9 +541,13 @@ There are multiple reasons as to why might you want to create a so-called
   * Verify that the HDL output of the CλaSH compiler has the same behaviour as
     the Haskell / CλaSH specification.
 
-For these purposes, you can have CλaSH compiler generate a @MAC_testBench.vhdl@
-file which contains the /testBench/. The CλaSH compiler looks for the
-\testBench\ function to generate this function.
+For these purposes, you can have CλaSH compiler generate a /test bench/. In
+order for the CλaSH compiler to do this you need to do one of the following:
+
+  * Create a function called /testBench/ in the root module.
+  * Annotate your /topEntity/ function (or function with a
+    <CLaSH-Tutorial.html#g:12 TopEntity> annotation)
+    with a 'TestBench' annotation.
 
 For example, you can test the earlier defined /topEntity/ by:
 
@@ -588,9 +592,14 @@ keep on expecting the last sample, 14. In the VHDL testbench these errors won't
 show, as the the global clock will be stopped after 4 ticks.
 
 You should now again run @:vhdl@ in the interpreter; this time the compiler
-will take a bit longer to generate all the circuits. After it is finished you
-can load all the files in your favourite VHDL simulation tool. Once all files
-are loaded into the VHDL simulator, run the simulation on the @testbench@ entity.
+will take a bit longer to generate all the circuits. Inside the @.\/vhdl\/MAC@
+directory you will now also find a /mac_testbench/ subdirectory containing all
+the @vhdl@ files for the /test bench/
+
+
+After compilation is finished you  load all the files in your favourite VHDL
+simulation tool. Once all files are loaded into the VHDL simulator, run the
+simulation on the @mac_testbench_testbench@ entity.
 On questasim / modelsim: doing a @run -all@ will finish once the output verifier
 will assert its output to @true@. The generated testbench, modulo the clock
 signal generator(s), is completely synthesizable. This means that if you want to
@@ -826,12 +835,45 @@ or construction of product types, then use 'mealyB'.
 -}
 
 {- $annotations
-The 'TopEntity' annotations described in this section make it easier to put your
-CλaSH design on an FPGA.
+'TopEntity' annotations allow us to control hierarchy and naming aspects of the
+CλaSH compiler, specifically, they allow us to:
 
-We can exert some control how the top level function is created by the CλaSH
-compiler by annotating the @topEntity@ function with a 'TopEntity' annotation.
-You apply these annotations using the @ANN@ pragma like so:
+    * Assign names to entities (VHDL) \/ modules ((System)Verilog), and their
+      ports.
+    * Put generated HDL files of a logical (sub)entity in their own directory.
+    * Use cached versions of generated HDL, i.e., prevent recompilation of
+      (sub)entities that have not changed since the last run. Caching is based
+      on a @.manifest@ which is generated alongside the HDL; deleting this file
+      means deleting the cache; changing this file will result in /undefined/
+      behaviour.
+
+Functions with a 'TopEntity' annotation do must adhere to the following
+restrictions:
+
+    * Although functions with a 'TopEntity' annotation can of course depend
+      on functions with another 'TopEntity' annotation, they must not be
+      mutually recursive.
+    * Functions with a 'TopEntity' annotation must be completely /monomorphic/
+      and /first-order/, and cannot have any /non-representable/ arguments or
+      result.
+
+Also take the following into account when using 'TopEntity' annotations.
+
+    * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
+      machinery does not understand 'TopEntity' annotations and it might
+      subsequently decide to inline those functions. You should therefor also
+      add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
+      a 'TopEntity' functions.
+    * Functions with a 'TopEntity' annotation will not be specialised
+      on constants.
+
+Finally, the root module, the module which you pass as an argument to the
+CλaSH compiler must either have:
+
+    * A function with a 'TopEntity' annotation.
+    * A function called /topEntity/.
+
+You apply 'TopEntity' annotations to functions using an @ANN@ pragma:
 
 @
 {\-\# ANN topEntity (TopEntity {t_name = ..., ...  }) \#-\}
@@ -878,7 +920,7 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The CλaSH compiler will normally generate the following @Blinker_topEntity.vhdl@ file:
+The CλaSH compiler will normally generate the following @blinker_topEntity.vhdl@ file:
 
 @
 -- Automatically generated VHDL-93
