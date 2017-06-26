@@ -15,6 +15,7 @@ matrixVector m v = map (`dotProduct` v) m
 
 topEntity :: Vec 3 (Signed 16) -> Vec 3 (Signed 16)
 topEntity = matrixVector matrix
+{-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done'

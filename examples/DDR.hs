@@ -22,6 +22,7 @@ topEntity clk1 rst1 clk2 i =
   let h = register clk1 rst1 0 (register clk1 rst1 0 i)
       l = register clk1 rst1 0 i
   in  unsafeSynchronizer clk1 clk2 (bundle (h,l))
+{-# NOINLINE topEntity #-}
 {-# ANN topEntity (TestBench 'tb) #-}
 
 tb
