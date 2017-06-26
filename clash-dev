@@ -1,2 +1,2 @@
 #!/bin/sh
-stack exec --system-ghc --stack-yaml=stack-ghc821.yaml -- ghci -fobject-code -optP-include -optP./clash-lib/$(stack exec --system-ghc --stack-yaml=stack-ghc821.yaml -- printenv HASKELL_DIST_DIR)/build/autogen/cabal_macros.h -iclash-lib/src -iclash-ghc/src-ghc -package ghc -Wall -Werror CLaSH.hs
+stack exec -- ghci -fobject-code -optP-include -optP./clash-lib/$(stack exec -- printenv HASKELL_DIST_DIR)/build/autogen/cabal_macros.h -iclash-lib/src -iclash-ghc/src-ghc -package ghc -Wall -Werror CLaSH.hs
