@@ -5,11 +5,13 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE ViewPatterns #-}
+
 module CLaSH.GHC.GenerateBindings
   (generateBindings)
 where
 
-import           Control.Lens            ((%~),(&),(^.),_1)
+import           Control.Lens            ((%~),(&),(^.),_1,_2)
 import           Control.Monad.State     (State)
 import qualified Control.Monad.State     as State
 import           Data.Either             (lefts, rights)
@@ -35,9 +37,10 @@ import qualified SrcLoc                  as GHC
 import           CLaSH.Annotations.TopEntity (TopEntity)
 import           CLaSH.Annotations.Primitive (HDL)
 import           CLaSH.Core.FreeVars     (termFreeIds)
-import           CLaSH.Core.Term         (Term (..), TmName)
+import           CLaSH.Core.Name         (Name (..), string2SystemName)
+import           CLaSH.Core.Term         (Term (..), TmName, TmOccName)
 import           CLaSH.Core.Type         (Type, TypeView (..), mkFunTy, splitFunForallTy, tyView)
-import           CLaSH.Core.TyCon        (TyCon, TyConName)
+import           CLaSH.Core.TyCon        (TyCon, TyConName, TyConOccName)
 import           CLaSH.Core.TysPrim      (tysPrimMap)
 import           CLaSH.Core.Subst        (substTms)
 import           CLaSH.Core.Util         (mkLams, mkTyLams, termType)
@@ -59,7 +62,7 @@ generateBindings ::
   -> HDL
   -> String
   -> Maybe  (GHC.DynFlags)
-  -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
+  -> IO (BindingMap,HashMap TyConOccName TyCon,IntMap TyConName
         ,[( TmName          -- topEntity bndr
           , Type            -- type of the topEntity bndr
           , Maybe TopEntity -- (maybe) TopEntity annotation
@@ -72,7 +75,7 @@ generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = 
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
-      clsMap                        = HashMap.map (\(ty,i) -> (ty,GHC.noSrcSpan,mkClassSelector allTcCache ty i)) clsVMap
+      clsMap                        = HashMap.map (\(nm,ty,i) -> (nm,ty,GHC.noSrcSpan,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
       topEntities'                  =
         flip State.evalState tcMap' $ mapM (\(topEnt,annM,benchM) -> do
@@ -80,74 +83,82 @@ generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = 
           benchM' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) benchM
           return (topEnt',annM,benchM')) topEntities
       droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEntities'
-      topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup topEnt droppedAndRetypedBindings of
-                                              Just (ty,_,_) -> (topEnt,ty,annM,benchM)
+      topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup (nameOcc topEnt) droppedAndRetypedBindings of
+                                              Just (_,ty,_,_) -> (topEnt,ty,annM,benchM)
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
   return (droppedAndRetypedBindings,allTcCache,tupTcCache,topEntities'',primMap)
 
-dropAndRetypeBindings :: HashMap TyConName TyCon
-                      -> BindingMap
-                      -> [(TmName,Maybe TopEntity,Maybe TmName)]
-                      -> BindingMap
+dropAndRetypeBindings
+  :: HashMap TyConOccName TyCon
+  -> BindingMap
+  -> [(TmName,Maybe TopEntity,Maybe TmName)]
+  -> BindingMap
 dropAndRetypeBindings allTcCache = foldl' dropAndRetypeBinding
   where
     dropAndRetypeBinding allBindings (topEnt,_,benchM) = bBindings
       where
-        topEntity = do e <- HashMap.lookup topEnt allBindings
-                       return (topEnt,e)
+        topEntity = do e <- HashMap.lookup (nameOcc topEnt) allBindings
+                       return (nameOcc topEnt,e)
         bench     = do t <- benchM
-                       e <- HashMap.lookup t allBindings
-                       return (t,e)
+                       e <- HashMap.lookup (nameOcc t) allBindings
+                       return (nameOcc t,e)
 
         tBindings = maybe allBindings (dropAndRetype allBindings) topEntity
         bBindings = maybe tBindings (dropAndRetype tBindings) bench
         dropAndRetype d (t,_) = snd (retype allTcCache ([],lambdaDrop d t) t)
 
 -- | clean up cast-removal mess
-retype :: HashMap TyConName TyCon
-       -> ([TmName], BindingMap) -- (visited, bindings)
-       -> TmName                 -- top
-       -> ([TmName], BindingMap)
-retype tcm (visited,bindings) current = (visited', HashMap.insert current (ty',sp,tm') bindings')
+retype
+  :: HashMap TyConOccName TyCon
+  -> ([TmOccName], BindingMap) -- (visited, bindings)
+  -> TmOccName                 -- top
+  -> ([TmOccName], BindingMap)
+retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty',sp,tm') bindings')
   where
-    (_,sp,tm)            = bindings HashMap.! current
+    (nm,_,sp,tm)         = bindings HashMap.! current
     used                 = Set.toList $ Lens.setOf termFreeIds tm
     (visited',bindings') = foldl (retype tcm) (current:visited,bindings) (filter (`notElem` visited) used)
-    usedTys              = map ((^. _1) . (bindings' HashMap.!)) used
-    usedVars             = zipWith Var usedTys used
+    used'                = map ((^. _1) . (bindings' HashMap.!)) used
+    usedTys              = map ((^. _2) . (bindings' HashMap.!)) used
+    usedVars             = zipWith Var usedTys used'
     tm'                  = substTms (zip used usedVars) tm
     ty'                  = runFreshM (termType tcm tm')
 
-mkBindings :: Bool
-           -> PrimMap a
-           -> [(GHC.CoreBndr, GHC.CoreExpr)] -- Binders
-           -> [(GHC.CoreBndr,Int)]           -- Class operations
-           -> [GHC.CoreBndr]                 -- Unlocatable Expressions
-           -> State GHC2CoreState
-                    ( BindingMap
-                    , HashMap TmName (Type,Int)
-                    )
+mkBindings
+  :: Bool
+  -> PrimMap a
+  -> [(GHC.CoreBndr, GHC.CoreExpr)]
+  -- Binders
+  -> [(GHC.CoreBndr,Int)]
+  -- Class operations
+  -> [GHC.CoreBndr]
+  -- Unlocatable Expressions
+  -> State GHC2CoreState
+           ( BindingMap
+           , HashMap TmOccName (TmName,Type,Int)
+           )
 mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\(v,e) -> do
                           let sp = GHC.getSrcSpan v
                           tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
                           v' <- coreToId v
-                          return (varName v', (unembed (varType v'), sp, tm))
+                          return (nameOcc (varName v'), (varName v',unembed (varType v'), sp, tm))
                        ) bindings
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v
                           let ty = unembed $ varType v'
-                          return (varName v', (ty,i))
+                          return (nameOcc (varName v'), (varName v',ty,i))
                        ) clsOps
 
   return (HashMap.fromList bindingsList, HashMap.fromList clsOpList)
 
-mkClassSelector :: HashMap TyConName TyCon
-                -> Type
-                -> Int
-                -> Term
+mkClassSelector
+  :: HashMap TyConOccName TyCon
+  -> Type
+  -> Int
+  -> Term
 mkClassSelector tcm ty sel = newExpr
   where
     ((tvs,dictTy:_),_) = first (lefts *** rights)
@@ -156,14 +167,14 @@ mkClassSelector tcm ty sel = newExpr
                        $ splitFunForallTy ty
     newExpr = case tyView dictTy of
       (TyConApp _ _) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
-                          (dcId,dcVar) <- mkInternalVar "dict" dictTy
+                          (dcId,dcVar) <- mkInternalVar (string2SystemName "dict") dictTy
                           selE         <- mkSelectorCase "mkClassSelector" tcm dcVar 1 sel
                           return (mkTyLams (mkLams selE [dcId]) tvs)
       (FunTy arg res) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
-                           (dcId,dcVar) <- mkInternalVar "dict" (mkFunTy arg res)
+                           (dcId,dcVar) <- mkInternalVar (string2SystemName "dict") (mkFunTy arg res)
                            return (mkTyLams (mkLams dcVar [dcId]) tvs)
       (OtherType oTy) -> runFreshM $ flip State.evalStateT (0 :: Int) $ do
-                           (dcId,dcVar) <- mkInternalVar "dict" oTy
+                           (dcId,dcVar) <- mkInternalVar (string2SystemName "dict") oTy
                            return (mkTyLams (mkLams dcVar [dcId]) tvs)
 
 mkTupTyCons :: GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
@@ -172,5 +183,5 @@ mkTupTyCons tcMap = (tcMap'',tupTcCache)
     tupTyCons        = map (GHC.tupleTyCon GHC.Boxed) [2..62]
     (tcNames,tcMap') = State.runState (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique qualfiedNameString tc) tupTyCons) tcMap
     tupTcCache       = IM.fromList (zip [2..62] tcNames)
-    tupHM            = HashMap.fromList (zip tcNames tupTyCons)
+    tupHM            = HashMap.fromList (zip (map nameOcc tcNames) tupTyCons)
     tcMap''          = tcMap' & tyConMap %~ (`HashMap.union` tupHM)

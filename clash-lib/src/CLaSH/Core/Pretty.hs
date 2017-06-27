@@ -24,12 +24,12 @@ import Text.PrettyPrint                 (Doc, char, comma, empty, equals, hang,
                                          hsep, integer, parens, punctuate,
                                          render, sep, text, vcat, ($$), ($+$),
                                          (<+>), (<>), nest, float, double)
-import Unbound.Generics.LocallyNameless (Embed (..), LFresh, Name, lunbind,
-                                         name2String, runLFreshM, unembed,
-                                         unrebind, unrec)
+import Unbound.Generics.LocallyNameless
+  (Embed (..), LFresh, lunbind, runLFreshM, unembed, unrebind, unrec)
 
 import CLaSH.Core.DataCon               (DataCon (..))
 import CLaSH.Core.Literal               (Literal (..))
+import CLaSH.Core.Name                  (Name (..), OccName, name2String)
 import CLaSH.Core.Term                  (Pat (..), Term (..))
 import CLaSH.Core.TyCon                 (TyCon (..), TyConName, isTupleTyConLike)
 import CLaSH.Core.Type                  (ConstTy (..), Kind, LitTy (..),
@@ -58,8 +58,11 @@ prettyParen :: Bool -> Doc -> Doc
 prettyParen False = id
 prettyParen True  = parens
 
-instance Pretty (Name a) where
+instance Pretty (OccName a) where
   pprPrec _ = return . text . show
+
+instance Pretty (Name a) where
+  pprPrec p = pprPrec p . nameOcc
 
 instance Pretty a => Pretty [a] where
   pprPrec prec xs = do

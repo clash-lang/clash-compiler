@@ -17,7 +17,6 @@ module CLaSH.Netlist.Util where
 import           Control.Error           (hush)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
-import qualified Control.Monad           as Monad
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
@@ -25,9 +24,9 @@ import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (Text,append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
-import           Unbound.Generics.LocallyNameless (Embed, Fresh, bind, embed, makeName,
-                                          name2Integer, name2String, unbind,
-                                          unembed, unrec)
+import           Unbound.Generics.LocallyNameless
+  (Embed, Fresh, embed, unbind, unembed, unrec)
+import qualified Unbound.Generics.LocallyNameless as Unbound
 
 import           CLaSH.Annotations.TopEntity (PortName (..), TopEntity (..))
 import           CLaSH.Driver.TopWrapper
@@ -35,10 +34,12 @@ import           CLaSH.Driver.TopWrapper
 import           CLaSH.Driver.Types      (Manifest (..))
 import           CLaSH.Core.DataCon      (DataCon (..))
 import           CLaSH.Core.FreeVars     (termFreeIds, typeFreeVars)
+import           CLaSH.Core.Name         (Name (..), appendToName, name2String)
 import           CLaSH.Core.Pretty       (showDoc)
-import           CLaSH.Core.Subst        (substTys)
-import           CLaSH.Core.Term         (LetBinding, Term (..), TmName)
-import           CLaSH.Core.TyCon        (TyCon (..), TyConName, tyConDataCons)
+import           CLaSH.Core.Subst        (substTms, substTys)
+import           CLaSH.Core.Term         (LetBinding, Term (..), TmName, TmOccName)
+import           CLaSH.Core.TyCon
+  (TyCon (..), TyConName, TyConOccName, tyConDataCons)
 import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView, splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType, tyNatSize)
@@ -58,7 +59,7 @@ mkBasicId n = do
 -- and a variable reference that is the body of the let-binding. Returns a
 -- String containing the error is the term was not in a normalized form.
 splitNormalized :: Fresh m
-                => HashMap TyConName TyCon
+                => HashMap TyConOccName TyCon
                 -> Term
                 -> m (Either String ([Id],[LetBinding],Id))
 splitNormalized tcm expr = do
@@ -78,8 +79,8 @@ splitNormalized tcm expr = do
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType :: String
-                       -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
-                       -> HashMap TyConName TyCon
+                       -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+                       -> HashMap TyConOccName TyCon
                        -> Type
                        -> HWType
 unsafeCoreTypeToHWType loc builtInTranslation m = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation m
@@ -96,7 +97,7 @@ coreTypeToHWTypeM :: Type
 coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
 
 -- | Returns the name and period of the clock corresponding to a type
-synchronizedClk :: HashMap TyConName TyCon -- ^ TyCon cache
+synchronizedClk :: HashMap TyConOccName TyCon -- ^ TyCon cache
                 -> Type
                 -> Maybe (Identifier,Integer)
 synchronizedClk tcm ty
@@ -112,9 +113,9 @@ synchronizedClk tcm ty
         Just (_,[LitTy (SymTy s),litTy])
           | Right i <- runExcept (tyNatSize tcm litTy) -> Just (pack s,i)
         _ -> error $ $(curLoc) ++ "Clock period not a simple literal: " ++ showDoc ty
-      _                               -> case tyConDataCons (tcm HashMap.! tyCon) of
+      _                               -> case tyConDataCons (tcm HashMap.! nameOcc tyCon) of
                                            [dc] -> let argTys   = dcArgTys dc
-                                                       argTVs   = dcUnivTyVars dc
+                                                       argTVs   = map nameOcc (dcUnivTyVars dc)
                                                        argSubts = zip argTVs args
                                                        args'    = map (substTys argSubts) argTys
                                                    in case args' of
@@ -127,8 +128,8 @@ synchronizedClk tcm ty
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Returns a string containing the error message when the Core
 -- type is not translatable.
-coreTypeToHWType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
-                 -> HashMap TyConName TyCon
+coreTypeToHWType :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+                 -> HashMap TyConOccName TyCon
                  -> Type
                  -> Either String HWType
 coreTypeToHWType builtInTranslation m (builtInTranslation m -> Just hty) = hty
@@ -137,8 +138,8 @@ coreTypeToHWType builtInTranslation m ty@(tyView -> TyConApp tc args) = mkADT bu
 coreTypeToHWType _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
-mkADT :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
-      -> HashMap TyConName TyCon -- ^ TyCon cache
+mkADT :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
+      -> HashMap TyConOccName TyCon -- ^ TyCon cache
       -> String -- ^ String representation of the Core type for error messages
       -> TyConName -- ^ The TyCon
       -> [Type] -- ^ Its applied arguments
@@ -147,13 +148,13 @@ mkADT _ m tyString tc _
   | isRecursiveTy m tc
   = Left $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! tc) of
+mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! nameOcc tc) of
   []  -> Left $ $(curLoc) ++ "Can't translate empty type: " ++ tyString
   dcs -> do
     let tcName       = pack $ name2String tc
         argTyss      = map dcArgTys dcs
         argTVss      = map dcUnivTyVars dcs
-        argSubts     = map (`zip` args) argTVss
+        argSubts     = map ((`zip` args) . map nameOcc) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
     argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m)) substArgTyss
     case (dcs,argHTyss) of
@@ -168,8 +169,8 @@ mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! tc
                                                 ) dcs elemHTys
 
 -- | Simple check if a TyCon is recursively defined.
-isRecursiveTy :: HashMap TyConName TyCon -> TyConName -> Bool
-isRecursiveTy m tc = case tyConDataCons (m HashMap.! tc) of
+isRecursiveTy :: HashMap TyConOccName TyCon -> TyConName -> Bool
+isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
     []  -> False
     dcs -> let argTyss      = map dcArgTys dcs
                argTycons    = (map fst . catMaybes) $ (concatMap . map) splitTyConAppM argTyss
@@ -177,9 +178,9 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! tc) of
 
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
-representableType :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+representableType :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                   -> Bool -- ^ Allow zero-bit things
-                  -> HashMap TyConName TyCon
+                  -> HashMap TyConOccName TyCon
                   -> Type
                   -> Bool
 representableType builtInTranslation allowZero m = either (const False) isRepresentable . coreTypeToHWType builtInTranslation m
@@ -264,15 +265,19 @@ mkUniqueNormalized (args,binds,res) = do
   ([res1],subst') <- mkUnique subst [res]
   let bndrs = map fst binds
       exprs = map (unembed . snd) binds
-      usesOutput = concatMap (filter (== varName res) . Lens.toListOf termFreeIds) exprs
+      usesOutput = concatMap (filter ( == (nameOcc . varName) res)
+                                     . Lens.toListOf termFreeIds
+                                     ) exprs
   -- If the let-binder carrying the result is used in a feedback loop
   -- rename the let-binder to "<X>_rec", and assign the "<X>_rec" to
   -- "<X>". We do this because output ports in most HDLs cannot be read.
   (res2,subst'',extraBndr) <- case usesOutput of
-    [] -> return (varName res1,(res,res1):subst',[] :: [(Id, Embed Term)])
+    [] -> return (varName res1
+                 ,(nameOcc $ varName res, Var (unembed $ varType res1) (varName res1)):subst'
+                 ,[] :: [(Id, Embed Term)])
     _  -> do
       ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res1]
-      return (varName res3,(res,res3):subst'
+      return (varName res3,(nameOcc $ varName res,Var (unembed $ varType res3) (varName res3)):subst'
              ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
   -- Replace occurences of "<X>" by "<X>_rec"
   let resN    = varName res
@@ -281,45 +286,30 @@ mkUniqueNormalized (args,binds,res) = do
   -- Make let-binders unique
   (bndrsL',substL) <- mkUnique subst'' bndrsL
   (bndrsR',substR) <- mkUnique substL  bndrsR
-  -- Replace old IDs by update unique IDs in the RHSs of the let-binders
-  exprs' <- fmap (map embed) $ Monad.foldM subsBndrs exprs substR
+  -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
+  let exprs' = map (embed . substTms substR) exprs
   -- Return the uniquely named arguments, let-binders, and result
   return (args',zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,varName res1)
-  where
-    subsBndrs :: [Term] -> (Id,Id) -> NetlistMonad [Term]
-    subsBndrs es (f,r) = mapM (subsBndr f r) es
-
-    subsBndr :: Id -> Id -> Term -> NetlistMonad Term
-    subsBndr f r e = case e of
-      Var t v | v == varName f -> return . Var t $ varName r
-      App e1 e2                -> App <$> subsBndr f r e1
-                                      <*> subsBndr f r e2
-      Case scrut ty alts       -> Case <$> subsBndr f r scrut
-                                       <*> pure ty
-                                       <*> mapM ( return
-                                                . uncurry bind
-                                                <=< secondM (subsBndr f r)
-                                                <=< unbind
-                                                ) alts
-      _ -> return e
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
-mkUnique :: [(Id,Id)] -- ^ Existing substitution
+mkUnique :: [(TmOccName,Term)] -- ^ Existing substitution
          -> [Id]      -- ^ IDs to make unique
-         -> NetlistMonad ([Id],[(Id,Id)])
+         -> NetlistMonad ([Id],[(TmOccName,Term)])
          -- ^ (Unique IDs, update substitution)
 mkUnique = go []
   where
-    go :: [Id] -> [(Id,Id)] -> [Id] -> NetlistMonad ([Id],[(Id,Id)])
+    go :: [Id] -> [(TmOccName,Term)] -> [Id] -> NetlistMonad ([Id],[(TmOccName,Term)])
     go processed subst []     = return (reverse processed,subst)
     go processed subst (i:is) = do
       iN <- mkUniqueIdentifier . pack . name2String $ varName i
       let iN_unpacked = unpack iN
           i'          = modifyVarName (repName iN_unpacked) i
-      go (i':processed) ((i,i'):subst) is
+      go (i':processed)
+         ((nameOcc . varName $ i,Var (unembed $ varType i') (varName i')):subst)
+         is
 
-    repName s n = makeName s (name2Integer n)
+    repName s (Name sort _ loc) = Name sort (Unbound.string2Name s) loc
 
 mkUniqueIdentifier :: Identifier
                    -> NetlistMonad Identifier
@@ -342,12 +332,6 @@ mkUniqueIdentifier nm = do
          else do
           seenIds %= (i':)
           return i'
-
--- | Append a string to a name
-appendToName :: TmName
-             -> String
-             -> TmName
-appendToName n s = makeName (name2String n ++ s) (name2Integer n)
 
 -- | Preserve the Netlist '_varEnv' and '_varCount' when executing a monadic action
 preserveVarEnv :: NetlistMonad a

@@ -17,11 +17,11 @@ import Data.Functor.Identity            (Identity (..))
 import Data.HashMap.Strict              (HashMap,(!))
 import Data.Text.Lazy                   (pack)
 import Control.Monad.Trans.Except       (ExceptT (..), mapExceptT, runExceptT)
-import Unbound.Generics.LocallyNameless (name2String)
 
 import CLaSH.Core.DataCon               (DataCon (..))
+import CLaSH.Core.Name                  (Name (..), name2String)
 import CLaSH.Core.Pretty                (showDoc)
-import CLaSH.Core.TyCon                 (TyCon (..), TyConName, tyConDataCons)
+import CLaSH.Core.TyCon                 (TyCon (..), TyConOccName, tyConDataCons)
 import CLaSH.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, tyView)
 import CLaSH.Core.Util                  (tyNatSize)
@@ -30,11 +30,12 @@ import CLaSH.Netlist.Types              (HWType(..))
 import CLaSH.Signal.Internal            (ClockKind (..), ResetKind (..))
 import CLaSH.Util                       (curLoc)
 
-ghcTypeToHWType :: Int
-                -> Bool
-                -> HashMap TyConName TyCon
-                -> Type
-                -> Maybe (Either String HWType)
+ghcTypeToHWType
+  :: Int
+  -> Bool
+  -> HashMap TyConOccName TyCon
+  -> Type
+  -> Maybe (Either String HWType)
 ghcTypeToHWType iw floatSupport = go
   where
     go m ty@(tyView -> TyConApp tc args) = runExceptT $
@@ -44,7 +45,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Int.Int32"                 -> return (Signed 32)
         "GHC.Int.Int64"                 ->
           if iw < 64
-             then case tyConDataCons (m ! tc) of
+             then case tyConDataCons (m ! nameOcc tc) of
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
                         | name2String nm == "GHC.Prim.Int#"   ->
@@ -61,7 +62,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Word.Word32"               -> return (Unsigned 32)
         "GHC.Word.Word64"               ->
           if iw < 64
-             then case tyConDataCons (m ! tc) of
+             then case tyConDataCons (m ! nameOcc tc) of
                     [dc] -> case dcArgTys dc of
                       [tyView -> TyConApp nm _]
                         | name2String nm == "GHC.Prim.Word#"   ->
@@ -141,7 +142,7 @@ ghcTypeToHWType iw floatSupport = go
     go _ _ = Nothing
 
 domain
-  :: HashMap TyConName TyCon
+  :: HashMap TyConOccName TyCon
   -> Type
   -> ExceptT String Maybe (String,Integer)
 domain m (coreView m -> Just ty') = domain m ty'
@@ -152,7 +153,7 @@ domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
 domain _ ty = fail $ "Can't translate domain: " ++ showDoc ty
 
 clockKind
-  :: HashMap TyConName TyCon
+  :: HashMap TyConOccName TyCon
   -> Type
   -> ExceptT String Maybe ClockKind
 clockKind m (coreView m -> Just ty') = clockKind m ty'
@@ -164,7 +165,7 @@ clockKind _ (tyView -> TyConApp tcNm [])
 clockKind _ ty = fail $ "Can't translate ClockKind" ++ showDoc ty
 
 resetKind
-  :: HashMap TyConName TyCon
+  :: HashMap TyConOccName TyCon
   -> Type
   -> ExceptT String Maybe ResetKind
 resetKind m (coreView m -> Just ty') = resetKind m ty'

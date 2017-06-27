@@ -24,7 +24,9 @@ module CLaSH.Core.Type
   , Kind
   , KindOrType
   , KiName
+  , KiOccName
   , TyName
+  , TyOccName
   , TyVar
   , tyView
   , coreView
@@ -65,12 +67,11 @@ import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           acompare,aeq,bind,embed,
                                                           gacompare,gaeq,gfvAny,
                                                           runFreshM,unbind)
-import           Unbound.Generics.LocallyNameless.Name   (Name (..),name2String,
-                                                          string2Name)
 import           Unbound.Generics.LocallyNameless.Extra  ()
 
 -- Local imports
 import           CLaSH.Core.DataCon
+import           CLaSH.Core.Name
 import           CLaSH.Core.Subst
 import {-# SOURCE #-} CLaSH.Core.Term
 import           CLaSH.Core.TyCon
@@ -113,8 +114,10 @@ type KindOrType = Type
 
 -- | Reference to a Type
 type TyName     = Name Type
+type TyOccName  = OccName Type
 -- | Reference to a Kind
 type KiName     = Name Kind
+type KiOccName  = OccName Kind
 
 instance Alpha Type where
   fvAny' c nfn (VarTy t n) = fmap (VarTy t) $ fvAny' c nfn n
@@ -136,7 +139,7 @@ instance Subst a ConstTy where
 
 instance Subst Term Type
 instance Subst Type Type where
-  isvar (VarTy _ v) = Just (SubstName v)
+  isvar (VarTy _ v) = Just (SubstName (nameOcc v))
   isvar _           = Nothing
 
 instance Eq Type where
@@ -158,14 +161,14 @@ tyView t = OtherType t
 -- transparent, and type functions are evaluated to WHNF (when possible).
 --
 -- Only strips away one "layer".
-coreView :: HashMap TyConName TyCon -> Type -> Maybe Type
+coreView :: HashMap TyConOccName TyCon -> Type -> Maybe Type
 coreView tcMap ty = case tyView ty of
   TyConApp tcNm args
     | name2String tcNm == "CLaSH.Signal.Internal.Signal"
     , [_,elTy] <- args
     -> Just elTy
     | otherwise
-    -> case tcMap HashMap.! tcNm of
+    -> case tcMap HashMap.! nameOcc tcNm of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
            -> Just (newTyConInstRhs nt args)
          _ -> reduceTypeFamily tcMap ty
@@ -174,9 +177,10 @@ coreView tcMap ty = case tyView ty of
 -- | Instantiate and Apply the RHS/Original of a NewType with the given
 -- list of argument types
 newTyConInstRhs :: ([TyName],Type) -> [Type] -> Type
-newTyConInstRhs (tvs,ty) tys = foldl AppTy (substTys (zip tvs tys1) ty) tys2
+newTyConInstRhs (tvs,ty) tys = foldl AppTy (substTys (zip tvs' tys1) ty) tys2
   where
     (tys1, tys2) = splitAtList tvs tys
+    tvs'         = map nameOcc tvs
 
 -- | Make a function type of an argument and result type
 mkFunTy :: Type -> Type -> Type
@@ -197,12 +201,12 @@ splitTyConAppM (tyView -> TyConApp tc args) = Just (tc,args)
 splitTyConAppM _                            = Nothing
 
 -- | Is a type a Superkind?
-isSuperKind :: HashMap TyConName TyCon -> Type -> Bool
-isSuperKind tcMap (ConstTy (TyCon ((tcMap HashMap.!) -> SuperKindTyCon {}))) = True
+isSuperKind :: HashMap TyConOccName TyCon -> Type -> Bool
+isSuperKind tcMap (ConstTy (TyCon (((tcMap HashMap.!) . nameOcc) -> SuperKindTyCon {}))) = True
 isSuperKind _ _ = False
 
 -- | Determine the kind of a type
-typeKind :: HashMap TyConName TyCon -> Type -> Kind
+typeKind :: HashMap TyConOccName TyCon -> Type -> Kind
 typeKind _ (VarTy k _)          = k
 typeKind m (ForAllTy b)         = let (_,ty) = runFreshM $ unbind b
                                   in typeKind m ty
@@ -213,7 +217,7 @@ typeKind m (tyView -> FunTy _arg res)
   | otherwise       = liftedTypeKind
   where k = typeKind m res
 
-typeKind m (tyView -> TyConApp tc args) = foldl kindFunResult (tyConKind (m HashMap.! tc)) args
+typeKind m (tyView -> TyConApp tc args) = foldl kindFunResult (tyConKind (m HashMap.! nameOcc tc)) args
 
 typeKind m (AppTy fun arg)      = kindFunResult (typeKind m fun) arg
 typeKind _ (ConstTy ct)         = error $ $(curLoc) ++ "typeKind: naked ConstTy: " ++ show ct
@@ -223,7 +227,7 @@ kindFunResult (tyView -> FunTy _ res) _ = res
 
 kindFunResult (ForAllTy b) arg =
   let (kv,ki) = runFreshM . unbind $ b
-  in  substKindWith (zip [varName kv] [arg]) ki
+  in  substKindWith (zip [nameOcc (varName kv)] [arg]) ki
 
 kindFunResult k tys =
   error $ $(curLoc) ++ "kindFunResult: " ++ show (k,tys)
@@ -235,14 +239,14 @@ isPolyTy (tyView -> FunTy _ res) = isPolyTy res
 isPolyTy _                       = False
 
 -- | Split a function type in an argument and result type
-splitFunTy :: HashMap TyConName TyCon
+splitFunTy :: HashMap TyConOccName TyCon
            -> Type
            -> Maybe (Type, Type)
 splitFunTy m (coreView m -> Just ty)   = splitFunTy m ty
 splitFunTy _ (tyView -> FunTy arg res) = Just (arg,res)
 splitFunTy _ _ = Nothing
 
-splitFunTys :: HashMap TyConName TyCon
+splitFunTys :: HashMap TyConOccName TyCon
             -> Type
             -> ([Type],Type)
 splitFunTys m ty = go [] ty ty
@@ -264,7 +268,7 @@ splitFunForallTy = go []
 
 -- | Split a poly-function type in a: list of type-binders and argument types,
 -- and the result type. Looks through 'Signal' and type functions.
-splitCoreFunForallTy :: HashMap TyConName TyCon
+splitCoreFunForallTy :: HashMap TyConOccName TyCon
                      -> Type
                      -> ([Either TyVar Type], Type)
 splitCoreFunForallTy tcm ty = go [] ty ty
@@ -281,7 +285,7 @@ isPolyFunTy :: Type
 isPolyFunTy = not . null . fst . splitFunForallTy
 
 -- | Is a type a polymorphic or function type under 'coreView'?
-isPolyFunCoreTy :: HashMap TyConName TyCon
+isPolyFunCoreTy :: HashMap TyConOccName TyCon
                 -> Type
                 -> Bool
 isPolyFunCoreTy m (coreView m -> Just ty) = isPolyFunCoreTy m ty
@@ -291,13 +295,13 @@ isPolyFunCoreTy _ ty = case tyView ty of
   _ -> False
 
 -- | Is a type a function type?
-isFunTy :: HashMap TyConName TyCon
+isFunTy :: HashMap TyConOccName TyCon
         -> Type
         -> Bool
 isFunTy m = isJust . splitFunTy m
 
 -- | Apply a function type to an argument type and get the result type
-applyFunTy :: HashMap TyConName TyCon
+applyFunTy :: HashMap TyConOccName TyCon
            -> Type
            -> Type
            -> Type
@@ -307,14 +311,14 @@ applyFunTy _ _ _ = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
 -- | Substitute the type variable of a type ('ForAllTy') with another type
 applyTy :: Fresh m
-        => HashMap TyConName TyCon
+        => HashMap TyConOccName TyCon
         -> Type
         -> KindOrType
         -> m Type
 applyTy tcm (coreView tcm -> Just ty) arg = applyTy tcm ty arg
 applyTy _   (ForAllTy b) arg = do
   (tv,ty) <- unbind b
-  return (substTy (varName tv) arg ty)
+  return (substTy (nameOcc (varName tv)) arg ty)
 applyTy _ ty arg = error ($(curLoc) ++ "applyTy: not a forall type:\n" ++ show ty ++ "\nArg:\n" ++ show arg)
 
 -- | Split a type application in the applied type and the argument types
@@ -332,7 +336,7 @@ splitTyAppM = fmap (second reverse) . go []
 
 -- Given a set of type functions, and list of argument types, get the first
 -- type function that matches, and return its substituted RHS type.
-findFunSubst :: HashMap TyConName TyCon -> [([Type],Type)] -> [Type] -> Maybe Type
+findFunSubst :: HashMap TyConOccName TyCon -> [([Type],Type)] -> [Type] -> Maybe Type
 findFunSubst _   [] _ = Nothing
 findFunSubst tcm (tcSubst:rest) args = case funSubsts tcm tcSubst args of
   Just ty -> Just ty
@@ -341,7 +345,7 @@ findFunSubst tcm (tcSubst:rest) args = case funSubsts tcm tcSubst args of
 -- Given a ([LHS match type], RHS type) representing a type function, and
 -- a set of applied types. Match LHS with args, and when successful, return
 -- a substituted RHS
-funSubsts :: HashMap TyConName TyCon -> ([Type],Type) -> [Type] -> Maybe Type
+funSubsts :: HashMap TyConOccName TyCon -> ([Type],Type) -> [Type] -> Maybe Type
 funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
   tySubts <- foldl (funSubst tcm) (Just []) (zip tcSubstLhs args)
   let tyRhs = substTys tySubts tcSubstRhs
@@ -357,11 +361,15 @@ funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
 -- Given a LHS matching type, and a RHS to-match type, check if LHS and RHS
 -- are a match. If they do match, and the LHS is a variable, return a
 -- substitution
-funSubst :: HashMap TyConName TyCon -> Maybe [(TyName,Type)] -> (Type,Type) -> Maybe [(TyName,Type)]
+funSubst
+  :: HashMap TyConOccName TyCon
+  -> Maybe [(TyOccName,Type)]
+  -> (Type,Type)
+  -> Maybe [(TyOccName,Type)]
 funSubst _   Nothing  = const Nothing
 funSubst tcm (Just s) = uncurry go
   where
-    go (VarTy _ nmF) ty = case lookup nmF s of
+    go (VarTy _ (nameOcc -> nmF)) ty = case lookup nmF s of
       Nothing -> Just ((nmF,ty):s)
       -- Given, for example, the type family definition:
       --
@@ -394,7 +402,7 @@ CLaSH hence follows the Haskell way, and only evaluates type family arguments
 to (WH)NF when the formal parameter is _not_ a type variable.
 -}
 
-reduceTypeFamily :: HashMap TyConName TyCon -> Type -> Maybe Type
+reduceTypeFamily :: HashMap TyConOccName TyCon -> Type -> Maybe Type
 reduceTypeFamily tcm (tyView -> TyConApp tc tys)
 #if MIN_VERSION_ghc(8,2,0)
   | name2String tc == "GHC.TypeNats.+"
@@ -434,10 +442,10 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   | name2String tc == "GHC.TypeLits.<=?"
 #endif
   , [i1, i2] <- mapMaybe (litView tcm) tys
-  , Just (FunTyCon {tyConKind = tck}) <- HashMap.lookup tc tcm
+  , Just (FunTyCon {tyConKind = tck}) <- HashMap.lookup (nameOcc tc) tcm
   , (_,tyView -> TyConApp boolTcNm []) <- splitFunTys tcm tck
-  , Just boolTc <- HashMap.lookup boolTcNm tcm
-  = let [falseTc,trueTc] = map ((\(Fn s i) -> Fn s i) . dcName) (tyConDataCons boolTc)
+  , Just boolTc <- HashMap.lookup (nameOcc boolTcNm) tcm
+  = let [falseTc,trueTc] = map (coerceName . dcName) (tyConDataCons boolTc)
     in  if i1 <= i2 then Just (mkTyConApp trueTc [] )
                     else Just (mkTyConApp falseTc [])
 
@@ -483,12 +491,12 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
   , i2 > 0
   = Just (LitTy (NumTy (i1 `mod` i2)))
 
-  | Just (FunTyCon {tyConSubst = tcSubst}) <- HashMap.lookup tc tcm
+  | Just (FunTyCon {tyConSubst = tcSubst}) <- HashMap.lookup (nameOcc tc) tcm
   = findFunSubst tcm tcSubst tys
 
 reduceTypeFamily _ _ = Nothing
 
-litView :: HashMap TyConName TyCon -> Type -> Maybe Integer
+litView :: HashMap TyConOccName TyCon -> Type -> Maybe Integer
 litView _ (LitTy (NumTy i))                = Just i
 litView m (reduceTypeFamily m -> Just ty') = litView m ty'
 litView _ _ = Nothing
@@ -496,5 +504,5 @@ litView _ _ = Nothing
 -- | The type of GHC.Err.undefined :: forall a . a
 undefinedTy :: Type
 undefinedTy =
-  let aNm = string2Name "a"
+  let aNm = string2SystemName "a"
   in  ForAllTy (bind (TyVar aNm (embed liftedTypeKind)) (VarTy liftedTypeKind aNm))

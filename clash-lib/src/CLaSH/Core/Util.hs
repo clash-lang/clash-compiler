@@ -18,35 +18,34 @@ import qualified Data.HashMap.Lazy             as HashMap
 import Data.HashMap.Lazy                       (HashMap)
 import qualified Data.HashSet                  as HashSet
 import Data.Maybe                              (fromJust, mapMaybe)
-import Unbound.Generics.LocallyNameless        (Fresh, bind, embed, rebind,
-                                                string2Name, unbind, unembed,
-                                                unrebind, unrec)
-import Unbound.Generics.LocallyNameless.Name   (name2String)
+import Unbound.Generics.LocallyNameless
+  (Fresh, bind, embed, rebind, unbind, unembed, unrebind, unrec)
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import CLaSH.Core.DataCon                      (DataCon, dcType, dataConInstArgTys)
 import CLaSH.Core.Literal                      (literalType)
+import CLaSH.Core.Name
+  (Name (..), name2String, string2SystemName)
 import CLaSH.Core.Pretty                       (showDoc)
-import CLaSH.Core.Term                         (LetBinding, Pat (..), Term (..),
-                                                TmName)
-import CLaSH.Core.Type                         (Kind, LitTy (..), TyName,
-                                                Type (..), TypeView (..), applyTy,
-                                                coreView, isFunTy, isPolyFunCoreTy,
-                                                mkFunTy, splitFunTy, tyView)
-import CLaSH.Core.TyCon                        (TyCon (..), TyConName,
-                                                tyConDataCons)
+import CLaSH.Core.Term
+  (LetBinding, Pat (..), Term (..), TmName, TmOccName)
+import CLaSH.Core.Type
+  (Kind, LitTy (..), TyName, TyOccName, Type (..), TypeView (..), applyTy,
+   coreView, isFunTy, isPolyFunCoreTy, mkFunTy, splitFunTy, tyView)
+import CLaSH.Core.TyCon
+  (TyCon (..), TyConOccName, tyConDataCons)
 import CLaSH.Core.TysPrim                      (typeNatKind)
 import CLaSH.Core.Var                          (Id, TyVar, Var (..), varType)
 import CLaSH.Util
 
 -- | Type environment/context
-type Gamma = HashMap TmName Type
+type Gamma = HashMap TmOccName Type
 -- | Kind environment/context
-type Delta = HashMap TyName Kind
+type Delta = HashMap TyOccName Kind
 
 -- | Determine the type of a term
 termType :: Fresh m
-         => HashMap TyConName TyCon
+         => HashMap TyConOccName TyCon
          -> Term
          -> m Type
 termType m e = case e of
@@ -91,7 +90,7 @@ collectBndrs = go []
 
 -- | Get the result type of a polymorphic function given a list of arguments
 applyTypeToArgs :: Fresh m
-                => HashMap TyConName TyCon
+                => HashMap TyConOccName TyCon
                 -> Type
                 -> [Either Term Type]
                 -> m Type
@@ -166,14 +165,14 @@ mkTyApps = foldl TyApp
 
 -- | Does a term have a function type?
 isFun :: Fresh m
-      => HashMap TyConName TyCon
+      => HashMap TyConOccName TyCon
       -> Term
       -> m Bool
 isFun m t = fmap (isFunTy m) $ (termType m) t
 
 -- | Does a term have a function or polymorphic type?
 isPolyFun :: Fresh m
-          => HashMap TyConName TyCon
+          => HashMap TyConOccName TyCon
           -> Term
           -> m Bool
 isPolyFun m t = isPolyFunCoreTy m <$> termType m t
@@ -311,20 +310,20 @@ extractElems consCon resTy s maxN = go maxN
              go (n-1) (Var restTy restBNm)
 
       where
-        elBNm     = string2Name ("el" ++ s:show (maxN-n))
-        restBNm   = string2Name ("rest" ++ s:show (maxN-n))
+        elBNm     = string2SystemName ("el" ++ s:show (maxN-n))
+        restBNm   = string2SystemName ("rest" ++ s:show (maxN-n))
         elVar     = Var resTy elBNm
         pat       = DataPat (embed consCon) (rebind [mTV] [co,el,rest])
-        elPatNm   = string2Name "el"
-        restPatNm = string2Name "rest"
+        elPatNm   = string2SystemName "el"
+        restPatNm = string2SystemName "rest"
         lhs       = Case e resTy  [bind pat (Var resTy  elPatNm)]
         rhs       = Case e restTy [bind pat (Var restTy restPatNm)]
 
-        mName = string2Name "m"
+        mName = string2SystemName "m"
         mTV   = TyVar mName (embed typeNatKind)
         tys   = [(LitTy (NumTy n)),resTy,(LitTy (NumTy (n-1)))]
         (Just idTys) = dataConInstArgTys consCon tys
-        [co,el,rest] = zipWith Id [string2Name "_co_",elPatNm, restPatNm]
+        [co,el,rest] = zipWith Id [string2SystemName "_co_",elPatNm, restPatNm]
                                   (map embed idTys)
         restTy = last (fromJust (dataConInstArgTys consCon tys))
 
@@ -344,36 +343,36 @@ extractTElems lrCon brCon resTy s maxN = go maxN [0..(2^(maxN+1))-2] [0..(2^maxN
     go :: Integer -> [Int] -> [Int] -> Term -> ([Term],[LetBinding])
     go 0 _ ks e = ([elVar],[(Id elBNm (embed resTy), embed lhs)])
       where
-        elBNm   = string2Name ("el" ++ s:show (head ks))
+        elBNm   = string2SystemName ("el" ++ s:show (head ks))
         elVar   = Var resTy elBNm
         pat     = DataPat (embed lrCon) (rebind [] [co,el])
-        elPatNm = string2Name "el"
+        elPatNm = string2SystemName "el"
         lhs     = Case e resTy [bind pat (Var resTy elPatNm)]
 
         tys          = [LitTy (NumTy 0),resTy]
         (Just idTys) = dataConInstArgTys lrCon tys
-        [co,el]      = zipWith Id [string2Name "_co_",elPatNm]
+        [co,el]      = zipWith Id [string2SystemName "_co_",elPatNm]
                                   (map embed idTys)
 
     go n bs ks e = (lVars ++ rVars,(Id ltBNm (embed brTy),embed ltLhs):
                                    (Id rtBNm (embed brTy),embed rtLhs):
                                    (lBinds ++ rBinds))
       where
-        ltBNm = string2Name ("lt" ++ s:show b0)
-        rtBNm = string2Name ("rt" ++ s:show b1)
+        ltBNm = string2SystemName ("lt" ++ s:show b0)
+        rtBNm = string2SystemName ("rt" ++ s:show b1)
         ltVar = Var brTy ltBNm
         rtVar = Var brTy rtBNm
         pat   = DataPat (embed brCon) (rebind [mTV] [co,lt,rt])
-        ltPatNm = string2Name "lt"
-        rtPatNm = string2Name "rt"
+        ltPatNm = string2SystemName "lt"
+        rtPatNm = string2SystemName "rt"
         ltLhs   = Case e brTy [bind pat (Var brTy ltPatNm)]
         rtLhs   = Case e brTy [bind pat (Var brTy rtPatNm)]
 
-        mName = string2Name "m"
+        mName = string2SystemName "m"
         mTV = TyVar mName (embed typeNatKind)
         tys = [LitTy (NumTy n),resTy,LitTy (NumTy (n-1))]
         (Just idTys) = dataConInstArgTys brCon tys
-        [co,lt,rt] = zipWith Id [string2Name "_co_",ltPatNm,rtPatNm]
+        [co,lt,rt] = zipWith Id [string2SystemName "_co_",ltPatNm,rtPatNm]
                                 (map embed idTys)
         brTy = last idTys
         (kL,kR) = splitAt (length ks `div` 2) ks
@@ -422,13 +421,13 @@ mkRTree lrCon brCon resTy = go
 --   * Vec n (Signal' clk a)
 --   * data Wrap = W (Signal clk' Int)
 --   * etc.
-isSignalType :: HashMap TyConName TyCon -> Type -> Bool
+isSignalType :: HashMap TyConOccName TyCon -> Type -> Bool
 isSignalType tcm ty = go HashSet.empty ty
   where
     go tcSeen (tyView -> TyConApp tcNm args) = case name2String tcNm of
       "CLaSH.Signal.Internal.Signal"  -> True
       _ | tcNm `HashSet.member` tcSeen -> False -- Do not follow rec types
-        | otherwise -> case HashMap.lookup tcNm tcm of
+        | otherwise -> case HashMap.lookup (nameOcc tcNm) tcm of
             Just tc -> let dcs         = tyConDataCons tc
                            dcInsArgTys = concat
                                        $ mapMaybe (`dataConInstArgTys` args) dcs
@@ -440,7 +439,7 @@ isSignalType tcm ty = go HashSet.empty ty
     go _ _ = False
 
 isClockOrReset
-  :: HashMap TyConName TyCon
+  :: HashMap TyConOccName TyCon
   -> Type
   -> Bool
 isClockOrReset m (coreView m -> Just ty) = isClockOrReset m ty
@@ -450,7 +449,7 @@ isClockOrReset _ (tyView -> TyConApp tcNm _) = case name2String tcNm of
   _ -> False
 isClockOrReset _ _ = False
 
-tyNatSize :: HMS.HashMap TyConName TyCon
+tyNatSize :: HMS.HashMap TyConOccName TyCon
           -> Type
           -> Except String Integer
 tyNatSize m (coreView m -> Just ty) = tyNatSize m ty

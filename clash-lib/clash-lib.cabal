@@ -130,6 +130,7 @@ Library
                       CLaSH.Core.DataCon
                       CLaSH.Core.FreeVars
                       CLaSH.Core.Literal
+                      CLaSH.Core.Name
                       CLaSH.Core.Pretty
                       CLaSH.Core.Subst
                       CLaSH.Core.Term
@@ -171,5 +172,6 @@ Library
 
   Other-Modules:      CLaSH.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
+                      GHC.SrcLoc.Extra
                       Paths_clash_lib
                       Unbound.Generics.LocallyNameless.Extra

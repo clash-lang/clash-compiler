@@ -19,14 +19,14 @@ import Data.Text.Lazy    (Text)
 
 import SrcLoc            (SrcSpan, noSrcSpan)
 
-import CLaSH.Core.Term   (Term,TmName)
+import CLaSH.Core.Term   (Term,TmName,TmOccName)
 import CLaSH.Core.Type   (Type)
 
 import CLaSH.Rewrite.Types (DebugLevel)
 import CLaSH.Netlist.BlackBox.Types (HdlSyn)
 
 -- | Global function binders
-type BindingMap = HashMap TmName (Type,SrcSpan,Term)
+type BindingMap = HashMap TmOccName (TmName,Type,SrcSpan,Term)
 
 data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_specLimit   :: Int

@@ -7,14 +7,14 @@
 module CLaSH.Netlist (genComponent,mkExpr,mkDcApplication) where
 
 import CLaSH.Core.DataCon   (DataCon)
-import CLaSH.Core.Term      (Term,TmName)
+import CLaSH.Core.Term      (Term,TmOccName)
 import CLaSH.Core.Type      (Type)
 import CLaSH.Core.Var       (Id)
 import CLaSH.Driver.Types   (SrcSpan)
 import CLaSH.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
                              Declaration)
 
-genComponent :: TmName
+genComponent :: TmOccName
              -> NetlistMonad (SrcSpan,Component)
 
 mkExpr :: Bool

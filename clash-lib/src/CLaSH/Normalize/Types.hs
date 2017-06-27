@@ -17,7 +17,7 @@ import Data.Map            (Map)
 
 import SrcLoc (SrcSpan)
 
-import CLaSH.Core.Term        (Term, TmName)
+import CLaSH.Core.Term        (Term, TmName, TmOccName)
 import CLaSH.Core.Type        (Type)
 import CLaSH.Netlist.BlackBox.Types (BlackBoxTemplate)
 import CLaSH.Primitives.Types (PrimMap)
@@ -27,19 +27,19 @@ import CLaSH.Util
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: HashMap TmName (Type,SrcSpan,Term)
+  { _normalized          :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
   -- ^ Global binders
-  , _specialisationCache :: Map (TmName,Int,Either Term Type) (TmName,Type)
+  , _specialisationCache :: Map (TmOccName,Int,Either Term Type) (TmName,Type)
   -- ^ Cache of previously specialised functions:
   --
   -- * Key: (name of the original function, argument position, specialised term/type)
   --
   -- * Elem: (name of specialised function,type of specialised function)
-  , _specialisationHistory :: HashMap TmName Int
+  , _specialisationHistory :: HashMap TmOccName Int
   -- ^ Cache of how many times a function was specialized
   , _specialisationLimit :: !Int
   -- ^ Number of time a function 'f' can be specialized
-  , _inlineHistory   :: HashMap TmName (HashMap TmName Int)
+  , _inlineHistory   :: HashMap TmOccName (HashMap TmOccName Int)
   -- ^ Cache of function where inlining took place:
   --
   -- * Key: function where inlining took place
@@ -51,7 +51,7 @@ data NormalizeState
   -- ^ Size of a function below which it is always inlined if it is not
   -- recursive
   , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
-  , _recursiveComponents :: HashMap TmName Bool
+  , _recursiveComponents :: HashMap TmOccName Bool
   -- ^ Map telling whether a components is part of a recursive group
   }
 

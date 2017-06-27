@@ -17,7 +17,7 @@ module CLaSH.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust)
-import           Control.Lens                     ((^.), _3)
+import           Control.Lens                     ((^.), _4)
 import           Control.Monad                    (guard, when, unless)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
@@ -37,14 +37,14 @@ import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc, text)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
-import           Unbound.Generics.LocallyNameless (name2String)
 
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Annotations.TopEntity.Extra ()
 import           CLaSH.Backend
-import           CLaSH.Core.Term                  (Term, TmName)
+import           CLaSH.Core.Name                  (Name (..), name2String)
+import           CLaSH.Core.Term                  (Term, TmName, TmOccName)
 import           CLaSH.Core.Type                  (Type)
-import           CLaSH.Core.TyCon                 (TyCon, TyConName)
+import           CLaSH.Core.TyCon                 (TyCon, TyConName, TyConOccName)
 import           CLaSH.Driver.TopWrapper
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                    (genComponentName, genNetlist)
@@ -65,13 +65,13 @@ generateHDL
   -> Maybe backend
   -> PrimMap (Text.Text)
   -- ^ Primitive / BlackBox Definitions
-  -> HashMap TyConName TyCon
+  -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
+  -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
   -- ^ Hardcoded evaluator (delta-reduction)
   -> [( TmName
       , Type
@@ -114,8 +114,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
   -- Calculate the hash over the callgraph and the topEntity annotation
   (sameTopHash,sameBenchHash,manifest) <- do
-    let topHash    = hash (annM,callGraphBindings bindingsMap topEntity)
-        benchHashM = fmap (hash . (annM,) . callGraphBindings bindingsMap) benchM
+    let topHash    = hash (annM,callGraphBindings bindingsMap (nameOcc topEntity))
+        benchHashM = fmap (hash . (annM,) . callGraphBindings bindingsMap . nameOcc) benchM
         manifestI  = Manifest (topHash,benchHashM) [] []
 
         manFile = maybe (hdlDir </> Text.unpack topNm <.> "manifest")
@@ -135,7 +135,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                     . snd
                     . Supply.freshId
                    <$> Supply.newSupply
-  let topEntityNames = map (\(x,_,_,_) -> x) topEntities
+  let topEntityNames = map (\(x,_,_,_) -> nameOcc x) topEntities
 
   (topTime,manifest') <- if sameTopHash
     then do
@@ -146,7 +146,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       -- 1. Normalise topEntity
       let transformedBindings = normalizeEntity bindingsMap primMap' tcm tupTcm
                                   typeTrans eval topEntityNames opts supplyN
-                                  topEntity
+                                  (nameOcc topEntity)
 
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime prevTime
@@ -155,7 +155,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
                               tcm typeTrans modName [] iw mkId (HM.empty,[topNm])
-                              hdlDir topEntity
+                              hdlDir (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -188,7 +188,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
       -- 1. Normalise testBench
       let transformedBindings = normalizeEntity bindingsMap primMap' tcm tupTcm
-                                  typeTrans eval topEntityNames opts supplyTB tb
+                                  typeTrans eval topEntityNames opts supplyTB (nameOcc tb)
       normTime <- transformedBindings `deepseq` Clock.getCurrentTime
       let prepNormDiff = Clock.diffUTCTime normTime topTime
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
@@ -196,7 +196,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
                               tcm typeTrans modName' [] iw mkId (HM.empty,[topNm])
-                              hdlDir tb
+                              hdlDir (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -322,36 +322,36 @@ copyDataFiles idirs dir = mapM_ (copyFile' idirs)
 callGraphBindings
   :: BindingMap
   -- ^ All bindings
-  -> TmName
+  -> TmOccName
   -- ^ Root of the call graph
   -> [Term]
-callGraphBindings bindingsMap tm = map ((^. _3) . (bindingsMap HM.!) . fst) cg
+callGraphBindings bindingsMap tm = map ((^. _4) . (bindingsMap HM.!) . fst) cg
   where
     cg = callGraph [] bindingsMap tm
 
 -- | Normalize a complete hierarchy
 normalizeEntity
-  :: HashMap TmName (Type, SrcSpan, Term)
+  :: HashMap TmOccName (TmName, Type, SrcSpan, Term)
   -- ^ All bindings
   -> PrimMap BlackBoxTemplate
   -- ^ BlackBox HDL templates
-  -> HashMap TyConName TyCon
+  -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> (HashMap TyConName TyCon -> Bool -> Term -> Term)
+  -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
   -- ^ Hardcoded evaluator (delta-reduction)
-  -> [TmName]
+  -> [TmOccName]
   -- ^ TopEntities
   -> CLaSHOpts
   -- ^ Debug information level for the normalization process
   -> Supply.Supply
   -- ^ Unique supply
-  -> TmName
+  -> TmOccName
   -- ^ root of the hierarchy
-  -> HashMap TmName (Type, SrcSpan, Term)
+  -> HashMap TmOccName (TmName, Type, SrcSpan, Term)
 normalizeEntity bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where

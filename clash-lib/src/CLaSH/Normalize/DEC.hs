@@ -55,15 +55,16 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 
-import           Unbound.Generics.LocallyNameless (Bind, bind, embed, fv, unbind,
-                                                   unembed, unrec)
+import           Unbound.Generics.LocallyNameless
+  (Bind, bind, embed, fv, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
 -- internal
 import CLaSH.Core.DataCon    (DataCon, dcTag)
 import CLaSH.Core.FreeVars   (termFreeIds, typeFreeVars)
+import CLaSH.Core.Name       (Name (..), string2SystemName)
 import CLaSH.Core.Literal    (Literal (..))
-import CLaSH.Core.Term       (LetBinding, Pat (..), Term (..), TmName)
+import CLaSH.Core.Term       (LetBinding, Pat (..), Term (..), TmOccName)
 import CLaSH.Core.TyCon      (tyConDataCons)
 import CLaSH.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import CLaSH.Core.Util       (collectArgs, mkApps, termType)
@@ -115,7 +116,7 @@ allEqual (x:xs) = all (== x) xs
 -- of an expression. Also substitute truly disjoint applications of globals by a
 -- reference to a lifted out application.
 collectGlobals ::
-     Set TmName
+     Set TmOccName
   -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
@@ -173,7 +174,7 @@ collectGlobals _ _ _ e = return (e,[])
 -- of a list of application arguments. Also substitute truly disjoint
 -- applications of globals by a reference to a lifted out application.
 collectGlobalsArgs ::
-     Set TmName
+     Set TmOccName
   -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
@@ -195,7 +196,7 @@ collectGlobalsArgs inScope substitution seen args = do
 -- of a list of alternatives. Also substitute truly disjoint applications of
 -- globals by a reference to a lifted out application.
 collectGlobalsAlts ::
-     Set TmName
+     Set TmOccName
   -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
@@ -220,7 +221,7 @@ collectGlobalsAlts inScope substitution seen scrut alts = do
 -- of a list of let-bindings. Also substitute truly disjoint applications of
 -- globals by a reference to a lifted out application.
 collectGlobalsLbs ::
-     Set TmName
+     Set TmOccName
   -> [(Term,Term)] -- ^ Substitution of (applications of) a global
                    -- binder by a reference to a lifted term.
   -> [Term] -- ^ List of already seen global binders
@@ -250,7 +251,7 @@ collectGlobalsLbs inScope substitution seen lbs = do
 -- and the body is an application of the term applied to the common arguments of
 -- the case tree, and projections of let-binding corresponding to the uncommon
 -- argument positions.
-mkDisjointGroup :: Set TmName -- ^ Current free variables.
+mkDisjointGroup :: Set TmOccName -- ^ Current free variables.
                 -> (Term,([Term],CaseTree [(Either Term Type)]))
                    -- ^ Case-tree of arguments belonging to the applied term.
                 -> RewriteMonad NormalizeState (Term,[Term])
@@ -309,13 +310,13 @@ disJointSelProj argTys cs = do
         tupTcm <- Lens.view tupleTcCache
         let m            = length tys
             Just tupTcNm = IM.lookup m tupTcm
-            Just tupTc   = HashMap.lookup tupTcNm tcm
+            Just tupTc   = HashMap.lookup (nameOcc tupTcNm) tcm
             [tupDc]      = tyConDataCons tupTc
             (tyIxs,tys') = unzip tys
             tupTy        = mkTyConApp tupTcNm tys'
             cs'          = fmap (\es -> map (es !!) tyIxs) cs
             djCase       = genCase tupTy (Just tupDc) tys' cs'
-        (scrutId,scrutVar) <- mkInternalVar "tupIn" tupTy
+        (scrutId,scrutVar) <- mkInternalVar (string2SystemName "tupIn") tupTy
         projections <- mapM (mkSelectorCase ($(curLoc) ++ "disJointSelProj")
                                             tcm scrutVar (dcTag tupDc)) [0..m-1]
         return (Just (scrutId,embed djCase),projections)
@@ -330,7 +331,7 @@ disJointSelProj argTys cs = do
       | otherwise = p : tranOrUnTran (n+1) ((ut,s):uts) projs
 
 
-isCommon :: Set TmName -> [Either Term Type] -> Bool
+isCommon :: Set TmOccName -> [Either Term Type] -> Bool
 isCommon _   []             = True
 isCommon _   (Right ty:tys) = Set.null (Lens.setOf typeFreeVars ty) &&
                               allEqual (Right ty:tys)
@@ -384,13 +385,18 @@ genCase ty dcM argTys = go
 --
 -- * All non-power-of-two multiplications
 -- * All division-like operations with a non-power-of-two divisor
-interestingToLift :: Set TmName -- ^ in scope
-                  -> (Term -> Term) -- ^ Evaluator
-                  -> Term -- ^ Term in function position
-                  -> [Either Term Type] -- ^ Arguments
-                  -> Maybe Term
+interestingToLift
+  :: Set TmOccName
+  -- ^ in scope
+  -> (Term -> Term)
+  -- ^ Evaluator
+  -> Term
+  -- ^ Term in function position
+  -> [Either Term Type]
+  -- ^ Arguments
+  -> Maybe Term
 interestingToLift inScope _ e@(Var _ nm) _ =
-  if nm `Set.member` inScope
+  if nameOcc nm `Set.member` inScope
      then Just e
      else Nothing
 interestingToLift inScope eval e@(Prim nm pty) args =

@@ -31,9 +31,9 @@ import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 import SrcLoc                               (SrcSpan)
 
 import CLaSH.Annotations.TopEntity          (TopEntity)
-import CLaSH.Core.Term                      (Term, TmName)
+import CLaSH.Core.Term                      (Term, TmName, TmOccName)
 import CLaSH.Core.Type                      (Type)
-import CLaSH.Core.TyCon                     (TyCon, TyConName)
+import CLaSH.Core.TyCon                     (TyCon, TyConOccName)
 import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Primitives.Types               (PrimMap)
@@ -49,21 +49,22 @@ newtype NetlistMonad a =
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
+  { _bindings       :: HashMap TmOccName (TmName,Type,SrcSpan,Term) -- ^ Global binders
   , _varEnv         :: Gamma -- ^ Type environment/context
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: HashMap TmName (SrcSpan,Component) -- ^ Cached components
+  , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
-  , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
-  , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
+  , _typeTranslator :: HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)
+  -- ^ Hardcoded Type -> HWType translator
+  , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int
   , _mkBasicIdFn    :: Identifier -> Identifier
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
-  , _componentNames :: HashMap TmName Identifier
-  , _topEntityAnns  :: HashMap TmName (Type, Maybe TopEntity)
+  , _componentNames :: HashMap TmOccName Identifier
+  , _topEntityAnns  :: HashMap TmOccName (Type, Maybe TopEntity)
   , _hdlDir         :: FilePath
   }
 

@@ -10,6 +10,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module CLaSH.Netlist.BlackBox where
 
@@ -24,12 +25,13 @@ import           Data.Text.Lazy                (append,fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
-import           Unbound.Generics.LocallyNameless (embed, name2String, string2Name,
-                                                unembed)
+import           Unbound.Generics.LocallyNameless (embed, unembed)
 
 -- import           CLaSH.Backend                 as N
 import           CLaSH.Core.DataCon            as D (dcTag)
 import           CLaSH.Core.Literal            as L (Literal (..))
+import           CLaSH.Core.Name
+  (Name (..), NameSort (..), name2String, string2SystemName)
 import           CLaSH.Core.Pretty             (showDoc)
 import           CLaSH.Core.Term               as C (Term (..))
 import           CLaSH.Core.Type               as C (Type (..), ConstTy (..),
@@ -168,7 +170,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           case args of
             [Right (ConstTy (TyCon tcN)), Left (C.Literal (IntLiteral i))] -> do
               tcm <- Lens.use tcCache
-              let dcs = tyConDataCons (tcm HashMap.! tcN)
+              let dcs = tyConDataCons (tcm HashMap.! nameOcc tcN)
                   dc  = dcs !! fromInteger i
               (exprN,dcDecls) <- mkDcApplication hwTy dst dc []
               return (exprN,dcDecls)
@@ -212,13 +214,14 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
       Left dstL -> case mkDec of
         False -> do
           let nm' = Text.unpack dstL
-              id_ = Id (string2Name nm') (embed ty)
+              id_ = Id (string2SystemName nm') (embed ty)
           return (id_,dstL,[])
         True -> do
           let nm' = append dstL "_app_arg"
           nm'' <- mkUniqueIdentifier nm'
+          let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Derived }
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
-          let id_ = Id (string2Name (Text.unpack nm'')) (embed ty)
+          let id_ = Id nm3 (embed ty)
               idDecl = NetDecl nm'' hwTy
           return (id_,nm'',[idDecl])
       Right dstR -> return (dstR,Text.pack . name2String . varName $ dstR,[])
@@ -264,7 +267,7 @@ mkFunInput resId e = do
                       dcAss  = Assignment (pack "~RESULT") dcApp
                   return (Right dcAss)
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-            Var _ fun -> do
+            Var _ (nameOcc -> fun) -> do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do

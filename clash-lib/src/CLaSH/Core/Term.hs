@@ -16,6 +16,7 @@
 module CLaSH.Core.Term
   ( Term (..)
   , TmName
+  , TmOccName
   , LetBinding
   , Pat (..)
   )
@@ -26,12 +27,13 @@ import Control.DeepSeq
 import Data.Hashable                           (Hashable)
 import Data.Text                               (Text)
 import GHC.Generics
-import Unbound.Generics.LocallyNameless
+import Unbound.Generics.LocallyNameless        hiding (Name)
 import Unbound.Generics.LocallyNameless.Extra  ()
 
 -- Internal Modules
 import CLaSH.Core.DataCon                      (DataCon)
 import CLaSH.Core.Literal                      (Literal)
+import CLaSH.Core.Name                         (Name (..), OccName)
 import {-# SOURCE #-} CLaSH.Core.Type          (Type)
 import CLaSH.Core.Var                          (Id, TyVar)
 
@@ -52,6 +54,7 @@ data Term
 
 -- | Term reference
 type TmName     = Name Term
+type TmOccName  = OccName Term
 -- | Binding in a LetRec construct
 type LetBinding = (Id, Embed Term)
 
@@ -85,7 +88,7 @@ instance Subst Type Pat
 instance Subst Term Pat
 
 instance Subst Term Term where
-  isvar (Var _ x) = Just (SubstName x)
+  isvar (Var _ x) = Just (SubstName (nameOcc x))
   isvar _         = Nothing
 
 instance Subst Type Term

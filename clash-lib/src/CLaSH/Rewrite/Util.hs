@@ -16,7 +16,7 @@ module CLaSH.Rewrite.Util where
 
 import           Control.DeepSeq
 import           Control.Exception           (throw)
-import           Control.Lens                (Lens', (%=), (+=), (^.),_1,_3)
+import           Control.Lens                (Lens', (%=), (+=), (^.),_2,_4)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
@@ -31,10 +31,9 @@ import           Data.Maybe                  (catMaybes,isJust,mapMaybe)
 import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
-import           Unbound.Generics.LocallyNameless     (Fresh, bind,
-                                              embed, makeName, name2String,
-                                              rebind, rec, string2Name, unbind,
-                                              unembed, unrec)
+import           Unbound.Generics.LocallyNameless
+  (Fresh, bind, embed, rebind, rec, unbind, unembed, unrec)
+import qualified Unbound.Generics.LocallyNameless as Unbound
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           SrcLoc                      (SrcSpan)
@@ -42,11 +41,13 @@ import           SrcLoc                      (SrcSpan)
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               typeFreeVars)
+import           CLaSH.Core.Name
 import           CLaSH.Core.Pretty           (showDoc)
 import           CLaSH.Core.Subst            (substTm)
-import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..),
-                                              TmName)
-import           CLaSH.Core.TyCon            (TyCon, TyConName, tyConDataCons)
+import           CLaSH.Core.Term
+  (LetBinding, Pat (..), Term (..), TmName, TmOccName)
+import           CLaSH.Core.TyCon
+  (TyCon, TyConOccName, tyConDataCons)
 import           CLaSH.Core.Type             (KindOrType, Type (..),
                                               TypeView (..), coreView,
                                               typeKind, tyView)
@@ -174,10 +175,10 @@ contextEnv = go HML.empty HML.empty
 
     go gamma delta (_:ctx) = go gamma delta ctx
 
-    addToGamma gamma (Id idName ty) = HML.insert idName (unembed ty) gamma
+    addToGamma gamma (Id idName ty) = HML.insert (nameOcc idName) (unembed ty) gamma
     addToGamma _     _              = error $ $(curLoc) ++ "Adding TyVar to Gamma"
 
-    addToDelta delta (TyVar tvName ki) = HML.insert tvName (unembed ki) delta
+    addToDelta delta (TyVar tvName ki) = HML.insert (nameOcc tvName) (unembed ki) delta
     addToDelta _     _                 = error $ $(curLoc) ++ "Adding Id to Delta"
 
 closestLetBinder :: [CoreContext] -> Maybe Id
@@ -185,10 +186,10 @@ closestLetBinder [] = Nothing
 closestLetBinder (LetBinding id_ _:_) = Just id_
 closestLetBinder (_:ctx)              = closestLetBinder ctx
 
-mkDerivedName :: [CoreContext] -> String -> String
+mkDerivedName :: [CoreContext] -> String -> TmName
 mkDerivedName ctx sf = case closestLetBinder ctx of
-  Just id_ -> ((++ ('_':sf)) . name2String . varName) id_
-  _ -> sf
+  Just id_ -> appendToName (varName id_) sf
+  _ -> string2SystemName sf
 
 -- | Create a complete type and kind context out of the global binders and the
 -- transformation context
@@ -196,14 +197,14 @@ mkEnv :: [CoreContext]
       -> RewriteMonad extra (Gamma, Delta)
 mkEnv ctx = do
   let (gamma,delta) = contextEnv ctx
-  tsMap             <- fmap (HML.map (^. _1)) $ Lens.use bindings
+  tsMap             <- fmap (HML.map (^. _2)) $ Lens.use bindings
   let gamma'        = tsMap `HML.union` gamma
   return (gamma',delta)
 
 -- | Make a new binder and variable reference for a term
 mkTmBinderFor :: (Fresh m, MonadUnique m)
-              => HashMap TyConName TyCon -- ^ TyCon cache
-              -> String -- ^ Name of the new binder
+              => HashMap TyConOccName TyCon -- ^ TyCon cache
+              -> Name a -- ^ Name of the new binder
               -> Term -- ^ Term to bind
               -> m (Id, Term)
 mkTmBinderFor tcm name e = do
@@ -212,25 +213,25 @@ mkTmBinderFor tcm name e = do
 
 -- | Make a new binder and variable reference for either a term or a type
 mkBinderFor :: (Monad m, MonadUnique m, Fresh m)
-            => HashMap TyConName TyCon -- ^ TyCon cache
-            -> String -- ^ Name of the new binder
+            => HashMap TyConOccName TyCon -- ^ TyCon cache
+            -> Name a -- ^ Name of the new binder
             -> Either Term Type -- ^ Type or Term to bind
             -> m (Either (Id,Term) (TyVar,Type))
 mkBinderFor tcm name (Left term) =
-  Left <$> (mkInternalVar name =<< termType tcm term)
+  Left <$> (mkInternalVar (coerceName name) =<< termType tcm term)
 
 mkBinderFor tcm name (Right ty) = do
-  name'     <- fmap (makeName name . toInteger) getUniqueM
+  name' <- cloneVar (coerceName name)
   let kind  = typeKind tcm ty
   return $ Right (TyVar name' (embed kind), VarTy kind name')
 
 -- | Make a new, unique, identifier and corresponding variable reference
 mkInternalVar :: (Monad m, MonadUnique m)
-              => String -- ^ Name of the identifier
+              => TmName -- ^ Name of the identifier
               -> KindOrType
               -> m (Id,Term)
 mkInternalVar name ty = do
-  name' <- fmap (makeName name . toInteger) getUniqueM
+  name' <- cloneVar name
   return (Id name' (embed ty),Var ty name')
 
 -- | Inline the binders in a let-binding that have a certain property
@@ -310,7 +311,8 @@ tailCalls id_ expr = case expr of
 -- introduced argument 'w' is not used by 'f'
 isVoidWrapper :: Term -> Bool
 isVoidWrapper (Lam b) = case unsafeUnbind b of
-  (bndr,e@(collectArgs -> (Var _ _,_))) -> varName bndr `notElem` Lens.toListOf termFreeIds e
+  (bndr,e@(collectArgs -> (Var _ _,_)))
+    -> nameOcc (varName bndr) `notElem` Lens.toListOf termFreeIds e
   _ -> False
 isVoidWrapper _ = False
 
@@ -325,11 +327,11 @@ substituteBinders [] others res = (others,res)
 substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others' res'
   where
     val      = unembed valE
-    bndrName = varName bndr
+    bndrName = nameOcc (varName bndr)
     selfRef  = bndrName `elem` Lens.toListOf termFreeIds val
     (res',rest',others') = if selfRef
       then (res,rest,(bndr,valE):others)
-      else ( substTm (varName bndr) val res
+      else ( substTm bndrName val res
            , map (second ( embed
                          . substTm bndrName val
                          . unembed)
@@ -343,7 +345,7 @@ substituteBinders ((bndr,valE):rest) others res = substituteBinders rest' others
 -- | Calculate the /local/ free variable of an expression: the free variables
 -- that are not bound in the global environment.
 localFreeIds :: (Applicative f, Lens.Contravariant f)
-             => RewriteMonad extra ((TmName -> f TmName) -> Term -> f Term)
+             => RewriteMonad extra ((TmOccName -> f TmOccName) -> Term -> f Term)
 localFreeIds = do
   globalBndrs <- Lens.use bindings
   return ((termFreeIds . Lens.filtered (not . (`HML.member` globalBndrs))))
@@ -391,11 +393,13 @@ liftBinding :: Gamma
 liftBinding gamma delta (Id idName tyE,eE) = do
   let e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  let localFTVs = List.nub $ Lens.toListOf termFreeTyVars e
-  localFVs <- List.nub <$> (Lens.toListOf <$> localFreeIds <*> pure e)
-  let localFTVkinds = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k delta) localFTVs
-      localFVs'     = filter (/= idName) localFVs
-      localFVtys'   = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") k gamma) localFVs'
+  let localFTVs = map (\nm -> Name Derived nm noSrcSpan)
+                . List.nub $ Lens.toListOf termFreeTyVars e
+  localFVs <- map (\nm -> Name Derived nm noSrcSpan) . List.nub <$>
+                  (Lens.toListOf <$> localFreeIds <*> pure e)
+  let localFTVkinds = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") (nameOcc k) delta) localFTVs
+      localFVs'     = filter ((/= (nameOcc idName)) . nameOcc) localFVs
+      localFVtys'   = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") (nameOcc k) gamma) localFVs'
   -- Abstract expression over its local FVs
       boundFTVs = zipWith mkTyVar localFTVkinds localFTVs
       boundFVs  = zipWith mkId localFVtys' localFVs'
@@ -403,7 +407,9 @@ liftBinding gamma delta (Id idName tyE,eE) = do
   tcm       <- Lens.view tcCache
   newBodyTy <- termType tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
   (cf,sp)   <- Lens.use curFun
-  newBodyId <- fmap (makeName (name2String cf ++ "_" ++ name2String idName) . toInteger) getUniqueM
+  -- newBodyId <- fmap (makeName (name2String cf ++ "_" ++ name2String idName) . toInteger) getUniqueM
+  newBodyId <- cloneVar (appendToName cf ("_" ++ name2String idName))
+
   -- Make a new expression, consisting of the the lifted function applied to
   -- its free variables
   let newExpr = mkTmApps
@@ -411,20 +417,20 @@ liftBinding gamma delta (Id idName tyE,eE) = do
                             (zipWith VarTy localFTVkinds localFTVs))
                   (zipWith Var localFVtys' localFVs')
   -- Substitute the recursive calls by the new expression
-      e' = substTm idName newExpr e
+      e' = substTm (nameOcc idName) newExpr e
   -- Create a new body that abstracts over the free variables
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . (^. _3))) <$> Lens.use bindings
+  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . (^. _4))) <$> Lens.use bindings
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
-             bindings %= HMS.insert newBodyId (newBodyTy,sp,newBody)
+             bindings %= HMS.insert (nameOcc newBodyId) (newBodyId,newBodyTy,sp,newBody)
              -- Return the new binder
              return (Id idName tyE, embed newExpr)
     -- If it does, use the existing binder
-    ((k,(aeqTy,_,_)):_) ->
+    ((_,(k,aeqTy,_,_)):_) ->
       let newExpr' = mkTmApps
                       (mkTyApps (Var aeqTy k)
                                 (zipWith VarTy localFTVkinds localFTVs))
@@ -451,19 +457,23 @@ addGlobalBind :: TmName
               -> SrcSpan
               -> Term
               -> RewriteMonad extra ()
-addGlobalBind vId ty sp body = (ty,body) `deepseq` bindings %= HMS.insert vId (ty,sp,body)
+addGlobalBind vId ty sp body =
+  (ty,body) `deepseq` bindings %= HMS.insert (nameOcc vId) (vId,ty,sp,body)
 
 -- | Create a new name out of the given name, but with another unique
-cloneVar :: TmName
-         -> RewriteMonad extra TmName
-cloneVar name = fmap (makeName (name2String name) . toInteger) getUniqueM
-
+cloneVar
+  :: (Monad m, MonadUnique m)
+  => Name a
+  -> m (Name a)
+cloneVar (Name sort nm loc) = do
+  i <- toInteger <$> getUniqueM
+  return (Name sort (Unbound.makeName (Unbound.name2String nm) i) loc)
 
 -- | Test whether a term is a variable reference to a local binder
 isLocalVar :: Term
            -> RewriteMonad extra Bool
 isLocalVar (Var _ name)
-  = fmap (not . HML.member name)
+  = fmap (not . HML.member (nameOcc name))
   $ Lens.use bindings
 isLocalVar _ = return False
 
@@ -498,12 +508,12 @@ isLambdaBodyCtx _           = False
 mkWildValBinder :: (Monad m, MonadUnique m)
                 => Type
                 -> m Id
-mkWildValBinder = fmap fst . mkInternalVar "wild"
+mkWildValBinder = fmap fst . mkInternalVar (string2SystemName "wild")
 
 -- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
 mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
                => String -- ^ Name of the caller of this function
-               -> HashMap TyConName TyCon -- ^ TyCon cache
+               -> HashMap TyConOccName TyCon -- ^ TyCon cache
                -> Term -- ^ Subject of the case-composition
                -> Int -- n'th DataCon
                -> Int -- n'th field
@@ -514,7 +524,7 @@ mkSelectorCase caller tcm scrut dcI fieldI = do
   where
     go (coreView tcm -> Just ty')   = go ty'
     go scrutTy@(tyView -> TyConApp tc args) =
-      case tyConDataCons (tcm HMS.! tc) of
+      case tyConDataCons (tcm HMS.! nameOcc tc) of
         [] -> cantCreate $(curLoc) ("TyCon has no DataCons: " ++ show tc ++ " " ++ showDoc tc) scrutTy
         dcs | dcI > length dcs -> cantCreate $(curLoc) "DC index exceeds max" scrutTy
             | otherwise -> do
@@ -525,7 +535,7 @@ mkSelectorCase caller tcm scrut dcI fieldI = do
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
               let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
-              selBndr <- mkInternalVar "sel" ty
+              selBndr <- mkInternalVar (string2SystemName "sel") ty
               let bndrs  = take fieldI wildBndrs ++ [fst selBndr] ++ drop (fieldI+1) wildBndrs
                   pat    = DataPat (embed dc) (rebind [] bndrs)
                   retVal = Case scrut ty [ bind pat (snd selBndr) ]
@@ -535,8 +545,8 @@ mkSelectorCase caller tcm scrut dcI fieldI = do
     cantCreate loc info scrutTy = error $ loc ++ "Can't create selector " ++ show (caller,dcI,fieldI) ++ " for: (" ++ showDoc scrut ++ " :: " ++ showDoc scrutTy ++ ")\nAdditional info: " ++ info
 
 -- | Specialise an application on its argument
-specialise :: Lens' extra (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
-           -> Lens' extra (HashMap TmName Int) -- ^ Lens into the specialisation history
+specialise :: Lens' extra (Map.Map (TmOccName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
+           -> Lens' extra (HashMap TmOccName Int) -- ^ Lens into the specialisation history
            -> Lens' extra Int -- ^ Lens into the specialisation limit
            -> Rewrite extra
 specialise specMapLbl specHistLbl specLimitLbl ctx e = case e of
@@ -545,8 +555,8 @@ specialise specMapLbl specHistLbl specLimitLbl ctx e = case e of
   _             -> return e
 
 -- | Specialise an application on its argument
-specialise' :: Lens' extra (Map.Map (TmName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
-            -> Lens' extra (HashMap TmName Int) -- ^ Lens into specialisation history
+specialise' :: Lens' extra (Map.Map (TmOccName, Int, Either Term Type) (TmName,Type)) -- ^ Lens into previous specialisations
+            -> Lens' extra (HashMap TmOccName Int) -- ^ Lens into specialisation history
             -> Lens' extra Int -- ^ Lens into the specialisation limit
             -> [CoreContext] -- Transformation context
             -> Term -- ^ Original term
@@ -558,7 +568,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
 
   -- Don't specialise TopEntities
   topEnts <- Lens.view topEntities
-  if f `HashSet.member` topEnts
+  if nameOcc f `HashSet.member` topEnts
   then traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showDoc f) (return e)
   else do -- NondecreasingIndentation
 
@@ -567,25 +577,25 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
   let argLen  = length args
       specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
   -- Determine if 'f' has already been specialized on 'specArg'
-  specM <- Map.lookup (f,argLen,specAbs) <$> Lens.use (extra.specMapLbl)
+  specM <- Map.lookup (nameOcc f,argLen,specAbs) <$> Lens.use (extra.specMapLbl)
   case specM of
     -- Use previously specialized function
     Just (fname,fty) ->
-      traceIf (lvl >= DebugApplied) ("Using previous specialization of " ++ showDoc f ++ " on " ++ (either showDoc showDoc) specAbs ++ ": " ++ showDoc fname) $
+      traceIf (lvl >= DebugApplied) ("Using previous specialization of " ++ showDoc (nameOcc f) ++ " on " ++ (either showDoc showDoc) specAbs ++ ": " ++ showDoc fname) $
         changed $ mkApps (Var fty fname) (args ++ specVars)
     -- Create new specialized function
     Nothing -> do
       -- Determine if we can specialize f
-      bodyMaybe <- fmap (HML.lookup f) $ Lens.use bindings
+      bodyMaybe <- fmap (HML.lookup (nameOcc f)) $ Lens.use bindings
       case bodyMaybe of
-        Just (_,sp,bodyTm) -> do
+        Just (_,_,sp,bodyTm) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
-          specHistM <- HML.lookup f <$> Lens.use (extra.specHistLbl)
+          specHistM <- HML.lookup (nameOcc f) <$> Lens.use (extra.specHistLbl)
           specLim   <- Lens.use (extra . specLimitLbl)
           if maybe False (> specLim) specHistM
             then throw (CLaSHException
                         sp
-                        (unlines [ "Hit specialisation limit " ++ show specLim ++ " on function `" ++ showDoc f ++ "'.\n"
+                        (unlines [ "Hit specialisation limit " ++ show specLim ++ " on function `" ++ showDoc (nameOcc f) ++ "'.\n"
                                  , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
                                  , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
                                  , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showDoc showDoc) specArg
@@ -596,13 +606,13 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
               -- Make new binders for existing arguments
               tcm                 <- Lens.view tcCache
               (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
-                                     mapM (mkBinderFor tcm "pTS") args
+                                     mapM (mkBinderFor tcm (string2SystemName "pTS")) args
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
               newf <- mkFunction f sp newBody
               -- Remember specialization
-              (extra.specHistLbl) %= HML.insertWith (+) f 1
-              (extra.specMapLbl)  %= Map.insert (f,argLen,specAbs) newf
+              (extra.specHistLbl) %= HML.insertWith (+) (nameOcc f) 1
+              (extra.specMapLbl)  %= Map.insert (nameOcc f,argLen,specAbs) newf
               -- use specialized function
               let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specVars)
               newf `deepseq` changed newExpr
@@ -615,14 +625,12 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   let newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialised function
-  existing <- HML.filter ((== newBody) . (^. _3)) <$> Lens.use bindings
+  existing <- HML.filter ((== newBody) . (^. _4)) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case HML.toList existing of
     [] -> do (cf,sp) <- Lens.use curFun
-             mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) sp newBody
-    ((k,(kTy,_,_)):_) -> return (k,kTy)
-  -- cf <- Lens.use curFun
-  -- newf <- mkFunction (string2Name (name2String cf ++ "_" ++ "specF")) newBody
+             mkFunction (appendToName cf "_specF") sp newBody
+    ((_,(k,kTy,_,_)):_) -> return (k,kTy)
   -- Create specialized argument
   let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars
   -- Use specialized argument
@@ -641,8 +649,10 @@ specArgBndrsAndVars ctx specArg = do
   (gamma,delta) <- mkEnv ctx
   let (specTyBndrs,specTyVars) = unzip
                  $ map (\tv -> let ki = HML.lookupDefault (error $ $(curLoc) ++ show tv ++ " not found") tv delta
-                               in  (Right $ TyVar tv (embed ki), Right $ VarTy ki tv)) specFTVs
+                                   tv' = Name Derived tv noSrcSpan
+                               in  (Right $ TyVar tv' (embed ki), Right $ VarTy ki tv')) specFTVs
       (specTmBndrs,specTmVars) = unzip
                  $ map (\tm -> let ty = HML.lookupDefault (error $ $(curLoc) ++ show tm ++ " not found") tm gamma
-                               in  (Left $ Id tm (embed ty), Left $ Var ty tm)) specFVs
+                                   tm' = Name Derived tm noSrcSpan
+                               in  (Left $ Id tm' (embed ty), Left $ Var ty tm')) specFVs
   return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)

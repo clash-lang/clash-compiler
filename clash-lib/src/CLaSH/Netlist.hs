@@ -13,7 +13,7 @@
 module CLaSH.Netlist where
 
 import           Control.Exception                (throw)
-import           Control.Lens                     ((.=),(^.),_1,_2)
+import           Control.Lens                     ((.=),(^.),_1,_2,_3)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
@@ -25,9 +25,8 @@ import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex)
 import qualified Data.Text.Lazy                   as Text
 import           System.FilePath                  ((</>), (<.>))
-import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
-                                                  runFreshMT, unbind, unembed,
-                                                  unrebind)
+import           Unbound.Generics.LocallyNameless
+  (Embed (..), runFreshMT, unbind, unembed, unrebind)
 
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
@@ -35,11 +34,14 @@ import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Core.DataCon               (DataCon (..))
 import           CLaSH.Core.FreeVars              (typeFreeVars)
 import           CLaSH.Core.Literal               (Literal (..))
+import           CLaSH.Core.Name                  (Name(..), name2String)
 import           CLaSH.Core.Pretty                (showDoc)
-import           CLaSH.Core.Term                  (Pat (..), Term (..), TmName)
+import           CLaSH.Core.Term
+  (Pat (..), Term (..), TmName, TmOccName)
 import qualified CLaSH.Core.Term                  as Core
 import           CLaSH.Core.Type                  (Type (..), splitFunTys)
-import           CLaSH.Core.TyCon                 (TyConName, TyCon)
+import           CLaSH.Core.TyCon
+  (TyCon, TyConOccName)
 import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
 import           CLaSH.Driver.Types               (CLaSHException (..))
@@ -54,15 +56,15 @@ import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: HashMap TmName (Type,SrcSpan,Term)
+genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
            -- ^ Global binders
            -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
            -- ^ All the TopEntities
            -> PrimMap BlackBoxTemplate
            -- ^ Primitive definitions
-           -> HashMap TyConName TyCon
+           -> HashMap TyConOccName TyCon
            -- ^ TyCon cache
-           -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+           -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
            -> String
            -- ^ Name of the module containing the @topEntity@
@@ -72,13 +74,13 @@ genNetlist :: HashMap TmName (Type,SrcSpan,Term)
            -- ^ Int/Word/Integer bit-width
            -> (Identifier -> Identifier)
            -- ^ valid identifiers
-           -> (HashMap TmName (SrcSpan,Component), [Identifier])
+           -> (HashMap TmOccName (SrcSpan,Component), [Identifier])
            -- ^ Seen components
            -> FilePath
            -- ^ HDL dir
-           -> TmName
+           -> TmOccName
            -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmName (SrcSpan,Component), [Identifier]))
+           -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmOccName (SrcSpan,Component), [Identifier]))
 genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen env topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
               modName dfiles iw mkId seen env $ genComponent topEntity
@@ -86,19 +88,19 @@ genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen env to
   where
     mkTopEntityMap
       :: [(TmName,Type,Maybe TopEntity,Maybe TmName)]
-      -> HashMap TmName (Type, Maybe TopEntity)
-    mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (a,(b,c)))
+      -> HashMap TmOccName (Type, Maybe TopEntity)
+    mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (nameOcc a,(b,c)))
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
+runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
                 -- ^ Global binders
-                -> HashMap TmName (Type, Maybe TopEntity)
+                -> HashMap TmOccName (Type, Maybe TopEntity)
                 -- ^ TopEntity annotations
                 -> PrimMap BlackBoxTemplate
                 -- ^ Primitive Definitions
-                -> HashMap TyConName TyCon
+                -> HashMap TyConOccName TyCon
                 -- ^ TyCon cache
-                -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+                -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
                 -> String
                 -- ^ Name of the module containing the @topEntity@
@@ -108,7 +110,7 @@ runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
                 -- ^ Int/Word/Integer bit-width
                 -> (Identifier -> Identifier)
                 -- ^ valid identifiers
-                -> (HashMap TmName (SrcSpan,Component), [Identifier])
+                -> (HashMap TmOccName (SrcSpan,Component), [Identifier])
                 -- ^ Seen components
                 -> FilePath
                 -- ^ HDL dir
@@ -121,42 +123,47 @@ runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId (seen,seenIds_) en
   . runNetlist
   where
     s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names tops env
-    (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.keys s)
+    (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (Identifier -> Identifier)
          -> String
          -> [Identifier]
-         -> HashMap TmName Identifier
+         -> HashMap TmOccName Identifier
          -> [TmName]
-         -> ([Identifier], HashMap TmName Identifier)
+         -> ([Identifier], HashMap TmOccName Identifier)
 genNames mkId modName = go
   where
     go s m []       = (s,m)
     go s m (nm:nms) = let nm' = genComponentName s mkId modName nm
                           s'  = nm':s
-                          m'  = HashMap.insert nm nm' m
+                          m'  = HashMap.insert (nameOcc nm) nm' m
                       in  go s' m' nms
 
 -- | Generate a component for a given function (caching)
-genComponent :: TmName -- ^ Name of the function
-             -> NetlistMonad (SrcSpan,Component)
+genComponent
+  :: TmOccName
+  -- ^ Name of the function
+  -> NetlistMonad (SrcSpan,Component)
 genComponent compName = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
-    Just (_,_,expr_) -> do
+    Just (_,_,_,expr_) -> do
       makeCached compName components $ genComponentT compName expr_
 
 -- | Generate a component for a given function
-genComponentT :: TmName -- ^ Name of the function
-              -> Term -- ^ Corresponding term
-              -> NetlistMonad (SrcSpan,Component)
+genComponentT
+  :: TmOccName
+  -- ^ Name of the function
+  -> Term
+  -- ^ Corresponding term
+  -> NetlistMonad (SrcSpan,Component)
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName' <- (HashMap.! compName) <$> Lens.use componentNames
-  sp <- ((^. _2) . (HashMap.! compName)) <$> Lens.use bindings
+  sp <- ((^. _3) . (HashMap.! compName)) <$> Lens.use bindings
   curCompNm .= (componentName',sp)
 
   tcm <- Lens.use tcCache
@@ -168,16 +175,16 @@ genComponentT compName componentExpr = do
                                    }
 
   let ids = HashMap.fromList
-          $ map (\(Id v (Embed t)) -> (v,t))
+          $ map (\(Id v (Embed t)) -> (nameOcc v,t))
           $ arguments ++ map fst binders
 
-  gamma <- (ids `HashMap.union`) . HashMap.map (^. _1)
+  gamma <- (ids `HashMap.union`) . HashMap.map (^. _2)
            <$> Lens.use bindings
 
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) result ids
+  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) (nameOcc result) ids
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
   let netDecls = map (\(id_,_) ->
@@ -251,7 +258,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
         DataPat (Embed dc) ids -> let (exts,tms) = unrebind ids
                                       tmsTys     = map (unembed . varType) tms
                                       tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
-                                      extNms     = map varName exts
+                                      extNms     = map (nameOcc.varName) exts
                                       tms'       = if any (`elem` tmsFVs) extNms
                                                       then throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
                                                       else tms
@@ -329,14 +336,15 @@ mkDeclarations bndr app =
       return (declsApp ++ assn)
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
-mkFunApp :: Id -- ^ LHS of the let-binder
-         -> TmName -- ^ Name of the applied function
-         -> [Term] -- ^ Function arguments
-         -> NetlistMonad [Declaration]
+mkFunApp
+  :: Id -- ^ LHS of the let-binder
+  -> TmName -- ^ Name of the applied function
+  -> [Term] -- ^ Function arguments
+  -> NetlistMonad [Declaration]
 mkFunApp dst fun args = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
-  case HashMap.lookup fun topAnns of
+  case HashMap.lookup (nameOcc fun) topAnns of
     Just (ty,annM)
       | let (fArgTys,fResTy) = splitFunTys tcm ty
       , length fArgTys == length args
@@ -359,9 +367,9 @@ mkFunApp dst fun args = do
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
     _ -> do
       normalized <- Lens.use bindings
-      case HashMap.lookup fun normalized of
+      case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
-          (_,Component compName compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
+          (_,Component compName compInps [compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
           if length args == length compInps
             then do argTys                <- mapM (termType tcm) args
                     let dstId = Text.pack . name2String $ varName dst

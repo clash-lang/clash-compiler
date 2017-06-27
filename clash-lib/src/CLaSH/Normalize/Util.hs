@@ -11,7 +11,7 @@
 
 module CLaSH.Normalize.Util where
 
-import           Control.Lens            ((%=),(^.),_3)
+import           Control.Lens            ((%=),(^.),_4)
 import qualified Control.Lens            as Lens
 import           Data.Function           (on)
 import qualified Data.Graph              as Graph
@@ -27,9 +27,9 @@ import           SrcLoc                  (SrcSpan)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Var          (Var (Id))
-import           CLaSH.Core.Term         (Term (..), TmName)
+import           CLaSH.Core.Term         (Term (..), TmName, TmOccName)
 import           CLaSH.Core.Type         (Type)
-import           CLaSH.Core.TyCon        (TyCon, TyConName)
+import           CLaSH.Core.TyCon        (TyCon, TyConOccName)
 import           CLaSH.Core.Util
   (collectArgs, isClockOrReset, isPolyFun, termType)
 import           CLaSH.Normalize.Types
@@ -37,18 +37,24 @@ import           CLaSH.Rewrite.Types     (bindings,extra,tcCache)
 import           CLaSH.Rewrite.Util      (specialise)
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
-alreadyInlined :: TmName -- ^ Function we want to inline
-               -> TmName -- ^ Function in which we want to perform the inlining
-               -> NormalizeMonad (Maybe Int)
+alreadyInlined
+  :: TmOccName
+  -- ^ Function we want to inline
+  -> TmOccName
+  -- ^ Function in which we want to perform the inlining
+  -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
   inlinedHM <- Lens.use inlineHistory
   case HashMap.lookup cf inlinedHM of
     Nothing       -> return Nothing
     Just inlined' -> return (HashMap.lookup f inlined')
 
-addNewInline :: TmName -- ^ Function we want to inline
-             -> TmName -- ^ Function in which we want to perform the inlining
-             -> NormalizeMonad ()
+addNewInline
+  :: TmOccName
+  -- ^ Function we want to inline
+  -> TmOccName
+  -- ^ Function in which we want to perform the inlining
+  -> NormalizeMonad ()
 addNewInline f cf =
   inlineHistory %= HashMap.insertWith
                      (\_ hm -> HashMap.insertWith (+) f 1 hm)
@@ -61,7 +67,7 @@ specializeNorm = specialise specialisationCache specialisationHistory specialisa
 
 -- | Determine if a term is closed
 isClosed :: Fresh m
-         => HashMap TyConName TyCon
+         => HashMap TyConOccName TyCon
          -> Term
          -> m Bool
 isClosed tcm = fmap not . isPolyFun tcm
@@ -82,7 +88,7 @@ isConstantNotClockReset e = do
      then return False
      else return (isConstant e)
 
-isRecursiveBndr :: TmName -> NormalizeSession Bool
+isRecursiveBndr :: TmOccName -> NormalizeSession Bool
 isRecursiveBndr f = do
   cg <- Lens.use (extra.recursiveComponents)
   case HashMap.lookup f cg of
@@ -98,21 +104,27 @@ isRecursiveBndr f = do
       return isR
 
 -- | Create a call graph for a set of global binders, given a root
-callGraph :: [TmName] -- ^ List of functions that should not be inspected
-          -> HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
-          -> TmName -- ^ Root of the call graph
-          -> [(TmName,[TmName])]
+callGraph
+  :: [TmOccName]
+  -- ^ List of functions that should not be inspected
+  -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
+  -- ^ Global binders
+  -> TmOccName
+  -- ^ Root of the call graph
+  -> [(TmOccName,[TmOccName])]
 callGraph visited bindingMap root
   | Just rootTm <- HashMap.lookup root bindingMap
-  = let  used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _3)
+  = let  used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _4)
          node   = (root,used)
          other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
     in   node : other
 callGraph _ _ _ = []
 
 -- | Determine the sets of recursive components given the edges of a callgraph
-mkRecursiveComponents :: [(TmName,[TmName])] -- ^ [(calling function,[called function])]
-                    -> [[TmName]]
+mkRecursiveComponents
+  :: [(TmOccName,[TmOccName])]
+  -- ^ [(calling function,[called function])]
+  -> [[TmOccName]]
 mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs)))
                          . Maybe.catMaybes
                          . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
@@ -135,9 +147,9 @@ mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs))
 -- exact opposite. This is a problem because global (mutual) recursive functions
 -- describe an infinite structure when viewed with a structural lens, which
 -- cannot be realised as a circuit.
-lambdaDrop :: HashMap TmName (Type,SrcSpan,Term)
-           -> TmName
-           -> HashMap TmName (Type,SrcSpan,Term)
+lambdaDrop :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
+           -> TmOccName
+           -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
 lambdaDrop bndrs topEntity = bndrs''
   where
     depGraph = callGraph [] bndrs topEntity
@@ -161,7 +173,7 @@ lambdaDrop bndrs topEntity = bndrs''
     bndrs'' = List.foldl' (flip HashMap.delete) bndrs'
                           (filter (/= topEntity) (concat rcs))
 
-    addRC (ty,sp,tm) =
+    addRC (nm,ty,sp,tm) =
       let fv      = Lens.toListOf termFreeIds tm
           -- Only interested in the recursive components which are used in this
           -- function
@@ -170,7 +182,7 @@ lambdaDrop bndrs topEntity = bndrs''
           bnds    = map mkBind (concat (map (uncurry zip) rcsTms'))
           newTm   = Letrec (bind (rec bnds) tm)
       in  case bnds of
-            [] -> (ty,sp,tm)
-            _  -> (ty,sp,newTm)
+            [] -> (nm,ty,sp,tm)
+            _  -> (nm,ty,sp,newTm)
 
-    mkBind (nm,(ty,_,tm)) = (Id nm (embed ty),embed tm)
+    mkBind (_,(nm,ty,_,tm)) = (Id nm (embed ty),embed tm)
