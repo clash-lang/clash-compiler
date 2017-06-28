@@ -143,7 +143,7 @@ module CLaSH.Explicit.Signal
   , freqCalc
     -- ** Synchronisation primitive
   , unsafeSynchronizer
-    -- ** Glock gating
+    -- ** Clock gating
   , clockGate
     -- * Reset
   , Reset, ResetKind (..)
