@@ -51,7 +51,7 @@ type OccName a = Unbound.Name a
 data NameSort
   = User
   | System
-  | Derived
+  | Internal
   deriving (Eq,Ord,Show,Generic,NFData,Hashable)
 
 instance Typeable a => Alpha (Name a) where
@@ -76,6 +76,9 @@ string2OccName = Unbound.string2Name
 string2SystemName :: String -> Name a
 string2SystemName nm = Name System (string2OccName nm) noSrcSpan
 
+string2InternalName :: String -> Name a
+string2InternalName nm = Name Internal (string2OccName ('#':nm)) noSrcSpan
+
 makeOccName :: String -> Integer -> OccName a
 makeOccName = Unbound.makeName
 
@@ -89,6 +92,8 @@ coerceName nm = nm {nameOcc = go (nameOcc nm)}
     go _                = error "Trying to coerce bound name"
 
 appendToName :: Name a -> String -> Name a
-appendToName (Name _ n loc) s = Name Derived n' loc
+appendToName (Name sort nm loc) s = Name Internal nm' loc
   where
-    n' = Unbound.makeName (Unbound.name2String n ++ s) (Unbound.name2Integer n)
+    n   = Unbound.name2String nm
+    n'  = case sort of {Internal -> n; _ -> '#':n}
+    nm' = Unbound.makeName (n' ++ s) (Unbound.name2Integer nm)

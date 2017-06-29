@@ -188,8 +188,8 @@ closestLetBinder (_:ctx)              = closestLetBinder ctx
 
 mkDerivedName :: [CoreContext] -> String -> TmName
 mkDerivedName ctx sf = case closestLetBinder ctx of
-  Just id_ -> appendToName (varName id_) sf
-  _ -> string2SystemName sf
+  Just id_ -> appendToName (varName id_) ('_':sf)
+  _ -> string2InternalName sf
 
 -- | Create a complete type and kind context out of the global binders and the
 -- transformation context
@@ -393,9 +393,9 @@ liftBinding :: Gamma
 liftBinding gamma delta (Id idName tyE,eE) = do
   let e  = unembed eE
   -- Get all local FVs, excluding the 'idName' from the let-binding
-  let localFTVs = map (\nm -> Name Derived nm noSrcSpan)
+  let localFTVs = map (\nm -> Name Internal nm noSrcSpan)
                 . List.nub $ Lens.toListOf termFreeTyVars e
-  localFVs <- map (\nm -> Name Derived nm noSrcSpan) . List.nub <$>
+  localFVs <- map (\nm -> Name Internal nm noSrcSpan) . List.nub <$>
                   (Lens.toListOf <$> localFreeIds <*> pure e)
   let localFTVkinds = map (\k -> HML.lookupDefault (error $ $(curLoc) ++ show k ++ " not found") (nameOcc k) delta) localFTVs
       localFVs'     = filter ((/= (nameOcc idName)) . nameOcc) localFVs
@@ -508,7 +508,7 @@ isLambdaBodyCtx _           = False
 mkWildValBinder :: (Monad m, MonadUnique m)
                 => Type
                 -> m Id
-mkWildValBinder = fmap fst . mkInternalVar (string2SystemName "wild")
+mkWildValBinder = fmap fst . mkInternalVar (string2InternalName "wild")
 
 -- | Make a case-decomposition that extracts a field out of a (Sum-of-)Product type
 mkSelectorCase :: (Functor m, Monad m, MonadUnique m, Fresh m)
@@ -606,7 +606,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
               -- Make new binders for existing arguments
               tcm                 <- Lens.view tcCache
               (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
-                                     mapM (mkBinderFor tcm (string2SystemName "pTS")) args
+                                     mapM (mkBinderFor tcm (string2InternalName "pTS")) args
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
               newf <- mkFunction f sp newBody
@@ -649,10 +649,10 @@ specArgBndrsAndVars ctx specArg = do
   (gamma,delta) <- mkEnv ctx
   let (specTyBndrs,specTyVars) = unzip
                  $ map (\tv -> let ki = HML.lookupDefault (error $ $(curLoc) ++ show tv ++ " not found") tv delta
-                                   tv' = Name Derived tv noSrcSpan
+                                   tv' = Name Internal tv noSrcSpan
                                in  (Right $ TyVar tv' (embed ki), Right $ VarTy ki tv')) specFTVs
       (specTmBndrs,specTmVars) = unzip
                  $ map (\tm -> let ty = HML.lookupDefault (error $ $(curLoc) ++ show tm ++ " not found") tm gamma
-                                   tm' = Name Derived tm noSrcSpan
+                                   tm' = Name Internal tm noSrcSpan
                                in  (Left $ Id tm' (embed ty), Left $ Var ty tm')) specFVs
   return (specTyBndrs ++ specTmBndrs,specTyVars ++ specTmVars)

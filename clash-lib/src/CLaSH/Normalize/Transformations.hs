@@ -59,7 +59,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.DataCon          (DataCon (..))
 import           CLaSH.Core.Name
-  (Name (..), name2String, string2SystemName)
+  (Name (..), name2String, string2InternalName, string2SystemName)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               typeFreeVars)
 import           CLaSH.Core.Literal          (Literal (..))
@@ -912,7 +912,7 @@ etaExpansionTL ctx e
                  . splitFunTy tcm
                  <=< termType tcm
                  ) e
-        (newIdB,newIdV) <- mkInternalVar (string2SystemName "arg") argTy
+        (newIdB,newIdV) <- mkInternalVar (string2InternalName "arg") argTy
         e' <- etaExpansionTL (LamBody newIdB:ctx) (App e newIdV)
         changed . Lam $ bind newIdB e'
       else return e
@@ -1314,7 +1314,7 @@ disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts@(_:_:_)) = do
                    (Prim nm' _,_) -> unpack nm'
                    _             -> "complex_expression_"
           nm'' = (reverse . List.takeWhile (/='.') . reverse) nm ++ "Out"
-      mkInternalVar (string2SystemName nm'') ty
+      mkInternalVar (string2InternalName nm'') ty
 
     l2m = go []
       where

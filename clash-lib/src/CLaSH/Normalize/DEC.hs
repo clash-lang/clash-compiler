@@ -62,7 +62,7 @@ import qualified Unbound.Generics.LocallyNameless as Unbound
 -- internal
 import CLaSH.Core.DataCon    (DataCon, dcTag)
 import CLaSH.Core.FreeVars   (termFreeIds, typeFreeVars)
-import CLaSH.Core.Name       (Name (..), string2SystemName)
+import CLaSH.Core.Name       (Name (..), string2InternalName)
 import CLaSH.Core.Literal    (Literal (..))
 import CLaSH.Core.Term       (LetBinding, Pat (..), Term (..), TmOccName)
 import CLaSH.Core.TyCon      (tyConDataCons)
@@ -316,7 +316,7 @@ disJointSelProj argTys cs = do
             tupTy        = mkTyConApp tupTcNm tys'
             cs'          = fmap (\es -> map (es !!) tyIxs) cs
             djCase       = genCase tupTy (Just tupDc) tys' cs'
-        (scrutId,scrutVar) <- mkInternalVar (string2SystemName "tupIn") tupTy
+        (scrutId,scrutVar) <- mkInternalVar (string2InternalName "tupIn") tupTy
         projections <- mapM (mkSelectorCase ($(curLoc) ++ "disJointSelProj")
                                             tcm scrutVar (dcTag tupDc)) [0..m-1]
         return (Just (scrutId,embed djCase),projections)

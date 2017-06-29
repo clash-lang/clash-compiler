@@ -142,7 +142,7 @@ reduceImap n argElTy resElTy fun arg = do
                              $ extractElems consCon argElTy 'I' n arg
         (Right idxTy:_,_) <- splitFunForallTy <$> termType tcm fun
         let (TyConApp idxTcNm _) = tyView idxTy
-            nTv              = string2SystemName "n"
+            nTv              = string2InternalName "n"
             -- fromInteger# :: KnownNat n => Integer -> Index n
             idxFromIntegerTy = ForAllTy (bind (TyVar nTv (embed typeNatKind))
                                          (foldr mkFunTy
@@ -185,18 +185,19 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
       = let (Just apDictTc)    = HashMap.lookup (nameOcc apDictTcNm) tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-            apDictIds          = zipWith Id (map string2SystemName ["functorDict"
-                                                             ,"pure"
-                                                             ,"ap"
-                                                             ,"apConstL"
-                                                             ,"apConstR"])
+            apDictIds          = zipWith Id (map string2InternalName
+                                                 ["functorDict"
+                                                 ,"pure"
+                                                 ,"ap"
+                                                 ,"apConstL"
+                                                 ,"apConstR"])
                                             (map embed apDictIdTys)
 
             (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
             (Just funcDictTc) = HashMap.lookup (nameOcc funcDictTcNm) tcm
             [funcDictCon] = tyConDataCons funcDictTc
             (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
-            funcDicIds    = zipWith Id (map string2SystemName ["fmap","fmapConst"])
+            funcDicIds    = zipWith Id (map string2InternalName ["fmap","fmapConst"])
                                        (map embed funcDictIdTys)
 
             apPat    = DataPat (embed apDictCon) (rebind [] apDictIds)
@@ -204,21 +205,21 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
 
             -- Extract the 'pure' function from the Applicative dictionary
             pureTy = apDictIdTys!!1
-            pureTm = Case dict pureTy [bind apPat (Var pureTy (string2SystemName "pure"))]
+            pureTm = Case dict pureTy [bind apPat (Var pureTy (string2InternalName "pure"))]
 
             -- Extract the '<*>' function from the Applicative dictionary
             apTy   = apDictIdTys!!2
-            apTm   = Case dict apTy [bind apPat (Var apTy (string2SystemName "ap"))]
+            apTm   = Case dict apTy [bind apPat (Var apTy (string2InternalName "ap"))]
 
             -- Extract the Functor dictionary from the Applicative dictionary
             funcTy = (head apDictIdTys)
             funcTm = Case dict funcTy
-                               [bind apPat (Var funcTy (string2SystemName "functorDict"))]
+                               [bind apPat (Var funcTy (string2InternalName "functorDict"))]
 
             -- Extract the 'fmap' function from the Functor dictionary
             fmapTy = (head funcDictIdTys)
-            fmapTm = Case (Var funcTy (string2SystemName "functorDict")) fmapTy
-                          [bind fnPat (Var fmapTy (string2SystemName "fmap"))]
+            fmapTm = Case (Var funcTy (string2InternalName "functorDict")) fmapTy
+                          [bind fnPat (Var fmapTy (string2InternalName "fmap"))]
 
             (vars,elems) = second concat . unzip
                          $ extractElems consCon aTy 'T' n arg

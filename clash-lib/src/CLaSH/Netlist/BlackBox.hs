@@ -178,12 +178,12 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             [Right _, Left scrut] -> do
               tcm     <- Lens.use tcCache
               scrutTy <- termType tcm scrut
-              (scrutExpr,scrutDecls) <- mkExpr False (Left "tte_rhs") scrutTy scrut
+              (scrutExpr,scrutDecls) <- mkExpr False (Left "#tte_rhs") scrutTy scrut
               case scrutExpr of
                 Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                 _ -> do
                   scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-                  tmpRhs <- mkUniqueIdentifier Extended (pack "tte_rhs")
+                  tmpRhs <- mkUniqueIdentifier Extended (pack "#tte_rhs")
                   let netDeclRhs   = NetDecl tmpRhs scrutHTy
                       netAssignRhs = Assignment tmpRhs scrutExpr
                   return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
@@ -196,11 +196,11 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             tcm      <- Lens.use tcCache
             scrutTy  <- termType tcm scrut
             scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-            (scrutExpr,scrutDecls) <- mkExpr False (Left "dtt_rhs") scrutTy scrut
+            (scrutExpr,scrutDecls) <- mkExpr False (Left "#dtt_rhs") scrutTy scrut
             case scrutExpr of
               Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
               _ -> do
-                tmpRhs  <- mkUniqueIdentifier Extended "dtt_rhs"
+                tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
                 let netDeclRhs   = NetDecl tmpRhs scrutHTy
                     netAssignRhs = Assignment tmpRhs scrutExpr
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
@@ -220,7 +220,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
         True -> do
           nm'  <- extendIdentifier Extended dstL "_app_arg"
           nm'' <- mkUniqueIdentifier Extended nm'
-          let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Derived }
+          let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Internal }
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_ = Id nm3 (embed ty)
               idDecl = NetDecl nm'' hwTy
