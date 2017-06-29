@@ -72,8 +72,10 @@ genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
            -- ^ Set of collected data-files
            -> Int
            -- ^ Int/Word/Integer bit-width
-           -> (Identifier -> Identifier)
+           -> (IdType -> Identifier -> Identifier)
            -- ^ valid identifiers
+           -> (IdType -> Identifier -> Identifier -> Identifier)
+           -- ^ extend valid identifiers
            -> (HashMap TmOccName (SrcSpan,Component), [Identifier])
            -- ^ Seen components
            -> FilePath
@@ -81,9 +83,9 @@ genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
            -> TmOccName
            -- ^ Name of the @topEntity@
            -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmOccName (SrcSpan,Component), [Identifier]))
-genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen env topEntity = do
+genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId extId seen env topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
-              modName dfiles iw mkId seen env $ genComponent topEntity
+              modName dfiles iw mkId extId seen env $ genComponent topEntity
   return (HashMap.elems $ _components s, _dataFiles s, (_components s, _seenComps s))
   where
     mkTopEntityMap
@@ -108,8 +110,10 @@ runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
                 -- ^ Set of collected data-files
                 -> Int
                 -- ^ Int/Word/Integer bit-width
-                -> (Identifier -> Identifier)
+                -> (IdType -> Identifier -> Identifier)
                 -- ^ valid identifiers
+                -> (IdType -> Identifier -> Identifier -> Identifier)
+                -- ^ extend valid identifiers
                 -> (HashMap TmOccName (SrcSpan,Component), [Identifier])
                 -- ^ Seen components
                 -> FilePath
@@ -117,15 +121,15 @@ runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId (seen,seenIds_) env
+runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId extId (seen,seenIds_) env
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names tops env
+    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
     (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
-genNames :: (Identifier -> Identifier)
+genNames :: (IdType -> Identifier -> Identifier)
          -> String
          -> [Identifier]
          -> HashMap TmOccName Identifier
@@ -199,22 +203,22 @@ genComponentT compName componentExpr = do
   return (sp,component)
 
 
-genComponentName :: [Identifier] -> (Identifier -> Identifier) -> String -> TmName -> Identifier
+genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> String -> TmName -> Identifier
 genComponentName seen mkId prefix nm =
-  let i = mkId . stripDollarPrefixes . last
+  let i = mkId Basic . stripDollarPrefixes . last
         . Text.splitOn (Text.pack ".") . Text.pack
         $ name2String nm
       i' = if Text.null i
               then Text.pack "Component"
               else i
-      i'' = mkId (Text.pack (prefix ++ "_") `Text.append` i')
+      i'' = mkId Basic (Text.pack (prefix ++ "_") `Text.append` i')
   in  if i'' `elem` seen
          then go 0 i''
          else i''
   where
     go :: Integer -> Identifier -> Identifier
     go n i =
-      let i' = mkId (i `Text.append` Text.pack ('_':show n))
+      let i' = mkId Basic (i `Text.append` Text.pack ('_':show n))
       in  if i' `elem` seen
              then go (n+1) i
              else i'
@@ -243,12 +247,14 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
   (selId,decls) <- case scrut of
     (Var _ scrutNm) -> return (Text.pack $ name2String scrutNm,[])
     _ -> do
-       let scrutId = Text.pack . (++ "_case_scrut") . name2String $ varName bndr
+       scrutId <- extendIdentifier Extended
+                    (Text.pack (name2String (varName bndr)))
+                    (Text.pack "_case_scrut")
        (newExpr, newDecls) <- mkExpr False (Left scrutId) scrutTy scrut
        case newExpr of
          (Identifier newId Nothing) -> return (newId,newDecls)
          _ -> do
-          scrutId' <- mkUniqueIdentifier scrutId
+          scrutId' <- mkUniqueIdentifier Extended scrutId
           let scrutDecl = NetDecl scrutId' sHwTy
               scrutAssn = Assignment scrutId' newExpr
           return (scrutId',newDecls ++ [scrutDecl,scrutAssn])
@@ -279,7 +285,9 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
-  let scrutId = Text.pack . (++ "_case_scrut") . name2String $ varName bndr
+  scrutId <- extendIdentifier Extended
+               (Text.pack (name2String (varName bndr)))
+               (Text.pack "_case_scrut")
   (_,sp) <- Lens.use curCompNm
   (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
@@ -289,7 +297,9 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
-      let altId = Text.pack . (++ "_case_alt") . name2String $ varName bndr
+      altId <- extendIdentifier Extended
+                 (Text.pack (name2String (varName bndr)))
+                 (Text.pack "_case_alt")
       (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
@@ -377,8 +387,8 @@ mkFunApp dst fun args = do
                     (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
                     let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                         outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
-                        instLabel     = Text.concat [compName, Text.pack "_", dstId]
-                        instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
+                    instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
+                    let instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
                     return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
@@ -392,8 +402,10 @@ toSimpleVar :: Id
             -> NetlistMonad (Expr,[Declaration])
 toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
 toSimpleVar dst (e,ty) = do
-  let argNm = Text.pack . (++ "_app_arg") . name2String $ varName dst
-  argNm' <- mkUniqueIdentifier argNm
+  argNm <- extendIdentifier Extended
+             (Text.pack (name2String (varName dst)))
+             (Text.pack "_app_arg")
+  argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   let argDecl = NetDecl argNm' hTy
       argAssn = Assignment argNm' e
@@ -451,7 +463,7 @@ mkDcApplication dstHType bndr dc args = do
   argTys              <- mapM (termType tcm) args
   let isSP (SP _ _) = True
       isSP _        = False
-  let argNm = either id (Text.pack . (++ "_app_arg") . name2String . varName) bndr
+  argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_app_arg")) bndr
   (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr (isSP dstHType) (Left argNm) t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of

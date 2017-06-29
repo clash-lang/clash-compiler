@@ -18,20 +18,21 @@ module CLaSH.Driver.TopWrapper where
 import Data.Text.Lazy              (append, pack)
 
 import CLaSH.Annotations.TopEntity (TopEntity (..), PortName (..))
+import CLaSH.Netlist.Id            (IdType (..))
 import CLaSH.Netlist.Types
   (Component (..), Declaration (..), Expr (..), Identifier, HWType (..),
    Modifier (..), PortDirection(..))
 import CLaSH.Util
 
 -- | Create a wrapper around a component, potentially initiating clock sources
-mkTopWrapper :: (Identifier -> Identifier)
+mkTopWrapper :: (IdType -> Identifier -> Identifier)
              -> Maybe TopEntity -- ^ TopEntity specifications
              -> String          -- ^ Name of the module containing the @topEntity@
              -> Component       -- ^ Entity to wrap
              -> Component
 mkTopWrapper mkId teM modName topComponent
   = Component
-  { componentName = maybe (mkId (pack modName `append` "_topEntity")) (pack . t_name) teM
+  { componentName = maybe (mkId Basic (pack modName `append` "_topEntity")) (pack . t_name) teM
   , inputs        = inputs3
   , outputs       = outputs3
   , declarations  = concat [wrappers,topCompDecl:unwrappers]

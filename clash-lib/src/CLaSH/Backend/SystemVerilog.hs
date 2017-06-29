@@ -28,7 +28,7 @@ import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nubBy)
-import           Data.Maybe                           (catMaybes,mapMaybe)
+import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.Text.Lazy                       (pack,unpack)
 import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
@@ -41,9 +41,9 @@ import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Id                     (mkBasicId')
+import           CLaSH.Netlist.Id                     (IdType (..), mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
@@ -103,10 +103,29 @@ instance Backend SystemVerilogState where
   toBV hty id_    = toSLV hty (Identifier id_ Nothing)
   fromBV hty id_  = simpleFromSLV hty id_
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . mkBasicId' True)
+  mkIdentifier    = return go
+    where
+      go Basic    nm = filterReserved (mkBasicId' True nm)
+      go Extended (rmSlash -> nm) = case go Basic nm of
+        nm' | nm /= nm' -> Text.concat ["\\",nm," "]
+            |otherwise  -> nm'
+  extendIdentifier = return go
+    where
+      go Basic nm ext = filterReserved (mkBasicId' True (nm `Text.append` ext))
+      go Extended (rmSlash -> nm) ext =
+        let nmExt = nm `Text.append` ext
+        in  case go Basic nm ext of
+              nm' | nm' /= nmExt -> Text.concat ["\\",nmExt," "]
+                  | otherwise    -> nm'
+
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+
+rmSlash :: Identifier -> Identifier
+rmSlash nm = fromMaybe nm $ do
+  nm1 <- Text.stripPrefix "\\" nm
+  Text.stripSuffix " " nm1
 
 type SystemVerilogM a = State SystemVerilogState a
 
@@ -449,7 +468,7 @@ addSeen c = do
 
 mkUniqueId :: Identifier -> SystemVerilogM Identifier
 mkUniqueId i = do
-  mkId <- mkBasicId
+  mkId <- mkIdentifier <*> pure Extended
   seen <- use idSeen
   let i' = mkId i
   case i `elem` seen of
@@ -514,7 +533,7 @@ tyName t@(Product nm _)  = makeCached t nameCache prodName
   where
     prodName = do
       seen <- use tySeen
-      mkId <- mkBasicId
+      mkId <- mkIdentifier <*> pure Basic
       let nm'  = (mkId . last . Text.splitOn ".") nm
           nm'' = if Text.null nm'
                     then "product"
@@ -579,7 +598,7 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
     ; p   <- use oports
     ; if syn == Vivado && id_ `elem` p
          then do
-              { regId <- mkUniqueId (Text.append id_ "_reg")
+              { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
               ; verilogType ty <+> text regId <> semi <$>
                 "always_comb begin" <$>
                 indent 2 ("if" <> parens (expr_ True scrut) <$>
@@ -604,7 +623,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     ; p <- use oports
     ; if syn == Vivado && id_ `elem` p
          then do
-           { regId <- mkUniqueId (Text.append id_ "_reg")
+           { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
            ; verilogType ty <+> text regId <> semi <$>
              "always_comb begin" <$>
              indent 2 ("case" <> parens (expr_ True scrut) <$>

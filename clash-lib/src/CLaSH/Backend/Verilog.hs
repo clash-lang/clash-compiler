@@ -22,7 +22,7 @@ import           Control.Lens                         ((+=),(-=),(.=),(%=), make
 import           Control.Monad.State                  (State)
 import           Data.Hashable                        (Hashable (..))
 import qualified Data.HashSet                         as HashSet
-import           Data.Maybe                           (catMaybes,mapMaybe)
+import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.Text.Lazy                       (pack, unpack)
 import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
@@ -35,9 +35,9 @@ import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn)
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Id                     (mkBasicId')
+import           CLaSH.Netlist.Id                     (IdType (..), mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (curLoc, (<:>))
 
@@ -92,10 +92,29 @@ instance Backend VerilogState where
   toBV _          = text
   fromBV _        = text
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . mkBasicId' True)
+  mkIdentifier    = return go
+    where
+      go Basic    nm = filterReserved (mkBasicId' True nm)
+      go Extended (rmSlash -> nm) = case go Basic nm of
+        nm' | nm /= nm' -> Text.concat ["\\",nm," "]
+            |otherwise  -> nm'
+  extendIdentifier = return go
+    where
+      go Basic nm ext = filterReserved (mkBasicId' True (nm `Text.append` ext))
+      go Extended (rmSlash -> nm) ext =
+        let nmExt = nm `Text.append` ext
+        in  case go Basic nm ext of
+              nm' | nm' /= nmExt -> Text.concat ["\\",nmExt," "]
+                  | otherwise    -> nm'
+
   setModName _    = id
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+
+rmSlash :: Identifier -> Identifier
+rmSlash nm = fromMaybe nm $ do
+  nm1 <- Text.stripPrefix "\\" nm
+  Text.stripSuffix " " nm1
 
 type VerilogM a = State VerilogState a
 
@@ -166,7 +185,7 @@ addSeen c = do
 
 mkUniqueId :: Identifier -> VerilogM Identifier
 mkUniqueId i = do
-  mkId <- mkBasicId
+  mkId <- mkIdentifier <*> pure Extended
   seen <- use idSeen
   let i' = mkId i
   case i `elem` seen of
@@ -231,7 +250,7 @@ inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
 inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
-    { regId <- mkUniqueId (Text.append id_ "_reg")
+    { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
     ; "reg" <+> verilogType ty <+> text regId <> semi <$>
       "always @(*) begin" <$>
       indent 2 ("if" <> parens (expr_ True scrut) <$>
@@ -246,7 +265,7 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
 
 
 inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
-    { regId <- mkUniqueId (Text.append id_ "_reg")
+    { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
     ; "reg" <+> verilogType ty <+> text regId <> semi <$>
       "always @(*) begin" <$>
       indent 2 ("case" <> parens (expr_ True scrut) <$>

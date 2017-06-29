@@ -50,6 +50,7 @@ import           CLaSH.Driver.Types
 import           CLaSH.Netlist                    (genComponentName, genNetlist)
 import           CLaSH.Netlist.BlackBox.Parser    (runParse)
 import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
+import           CLaSH.Netlist.Id                 (IdType (..))
 import           CLaSH.Netlist.Types              (Component (..), HWType)
 import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
@@ -107,8 +108,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       hdlDir    = fromMaybe "." (opt_hdlDir opts) </>
                         CLaSH.Backend.name hdlState' </>
                         takeWhile (/= '.') (name2String topEntity)
-      mkId      = evalState mkBasicId hdlState'
-      topNm     = maybe (mkId (Text.pack $ modName ++ "_topEntity"))
+      mkId      = evalState mkIdentifier hdlState'
+      extId     = evalState extendIdentifier hdlState'
+      topNm     = maybe (mkId Basic (Text.pack $ modName ++ "_topEntity"))
                         (Text.pack . t_name)
                         annM
 
@@ -154,7 +156,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
-                              tcm typeTrans modName [] iw mkId (HM.empty,[topNm])
+                              tcm typeTrans modName [] iw mkId extId (HM.empty,[topNm])
                               hdlDir (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -195,7 +197,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
-                              tcm typeTrans modName' [] iw mkId (HM.empty,[topNm])
+                              tcm typeTrans modName' [] iw mkId extId (HM.empty,[topNm])
                               hdlDir (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime

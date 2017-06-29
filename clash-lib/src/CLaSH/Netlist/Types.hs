@@ -36,6 +36,7 @@ import CLaSH.Core.Type                      (Type)
 import CLaSH.Core.TyCon                     (TyCon, TyConOccName)
 import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Netlist.BlackBox.Types
+import CLaSH.Netlist.Id                     (IdType)
 import CLaSH.Primitives.Types               (PrimMap)
 import CLaSH.Signal.Internal                (ClockKind, ResetKind)
 import CLaSH.Util
@@ -60,7 +61,8 @@ data NetlistState
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int
-  , _mkBasicIdFn    :: Identifier -> Identifier
+  , _mkIdentifierFn :: IdType -> Identifier -> Identifier
+  , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
   , _componentNames :: HashMap TmOccName Identifier

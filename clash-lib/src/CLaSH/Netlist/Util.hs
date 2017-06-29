@@ -23,7 +23,6 @@ import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (Text,append,pack,unpack)
-import qualified Data.Text.Lazy          as Text
 import           Unbound.Generics.LocallyNameless
   (Embed, Fresh, embed, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
@@ -44,16 +43,20 @@ import           CLaSH.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView, splitTyConAppM, tyView)
 import           CLaSH.Core.Util         (collectBndrs, termType, tyNatSize)
 import           CLaSH.Core.Var          (Id, Var (..), modifyVarName)
+import           CLaSH.Netlist.Id        (IdType (..))
 import           CLaSH.Netlist.Types     as HW
 import           CLaSH.Util
 
-mkBasicId :: Identifier -> NetlistMonad Identifier
-mkBasicId n = do
-  f  <- Lens.use mkBasicIdFn
-  let n' = f n
-  if Text.null n'
-     then return (pack "x")
-     else return n'
+mkIdentifier :: IdType -> Identifier -> NetlistMonad Identifier
+mkIdentifier typ nm = Lens.use mkIdentifierFn <*> pure typ <*> pure nm
+
+extendIdentifier
+  :: IdType
+  -> Identifier
+  -> Identifier
+  -> NetlistMonad Identifier
+extendIdentifier typ nm ext =
+  Lens.use extendIdentifierFn <*> pure typ <*> pure nm <*> pure ext
 
 -- | Split a normalized term into: a list of arguments, a list of let-bindings,
 -- and a variable reference that is the body of the let-binding. Returns a
@@ -276,7 +279,7 @@ mkUniqueNormalized (args,binds,res) = do
                  ,(nameOcc $ varName res, Var (unembed $ varType res1) (varName res1)):subst'
                  ,[] :: [(Id, Embed Term)])
     _  -> do
-      ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res1]
+      ([res3],_) <- mkUnique [] [modifyVarName (`appendToName` "_rec") res]
       return (varName res3,(nameOcc $ varName res,Var (unembed $ varType res3) (varName res3)):subst'
              ,[(res1,embed $ Var (unembed $ varType res) (varName res3))])
   -- Replace occurences of "<X>" by "<X>_rec"
@@ -293,16 +296,19 @@ mkUniqueNormalized (args,binds,res) = do
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
-mkUnique :: [(TmOccName,Term)] -- ^ Existing substitution
-         -> [Id]      -- ^ IDs to make unique
-         -> NetlistMonad ([Id],[(TmOccName,Term)])
-         -- ^ (Unique IDs, update substitution)
+mkUnique
+  :: [(TmOccName,Term)]
+  -- ^ Existing substitution
+  -> [Id]
+  -- ^ IDs to make unique
+  -> NetlistMonad ([Id],[(TmOccName,Term)])
+  -- ^ (Unique IDs, update substitution)
 mkUnique = go []
   where
     go :: [Id] -> [(TmOccName,Term)] -> [Id] -> NetlistMonad ([Id],[(TmOccName,Term)])
     go processed subst []     = return (reverse processed,subst)
     go processed subst (i:is) = do
-      iN <- mkUniqueIdentifier . pack . name2String $ varName i
+      iN <- mkUniqueIdentifier Extended . pack . name2String $ varName i
       let iN_unpacked = unpack iN
           i'          = modifyVarName (repName iN_unpacked) i
       go (i':processed)
@@ -311,12 +317,14 @@ mkUnique = go []
 
     repName s (Name sort _ loc) = Name sort (Unbound.string2Name s) loc
 
-mkUniqueIdentifier :: Identifier
-                   -> NetlistMonad Identifier
-mkUniqueIdentifier nm = do
+mkUniqueIdentifier
+  :: IdType
+  -> Identifier
+  -> NetlistMonad Identifier
+mkUniqueIdentifier typ nm = do
   seen  <- Lens.use seenIds
   seenC <- Lens.use seenComps
-  i     <- mkBasicId nm
+  i     <- mkIdentifier typ nm
   let s = seenC ++ seen
   if i `elem` s
      then go 0 s i
@@ -326,7 +334,7 @@ mkUniqueIdentifier nm = do
   where
     go :: Integer -> [Identifier] -> Identifier -> NetlistMonad Identifier
     go n s i = do
-      i' <- mkBasicId (i `append` pack ('_':show n))
+      i' <- extendIdentifier typ i (pack ('_':show n))
       if i' `elem` s
          then go (n+1) s i
          else do
@@ -375,7 +383,7 @@ mkTopUnWrapper topEntity annManM dstId args = do
   -- component name
   let modName = takeWhile (/= '.') (name2String topEntity) ++
                 maybe "" (("_" ++) . t_name) annM
-  topName <- mkBasicId (pack modName `append` "_topEntity")
+  topName <- extendIdentifier Basic (pack modName) "_topEntity"
   let topName' = maybe topName (pack . t_name) annM
       topM     = fmap (const topName') annM
 
@@ -399,10 +407,11 @@ mkTopUnWrapper topEntity annManM dstId args = do
   (_,(outputs1,unwrappers,idsO)) <- mkTopOutput topM outTys (head oPortSupply) output
   let outpAssign = Assignment (fst dstId) (resBV topM idsO)
 
+  instLabel <- extendIdentifier Basic topName' ("_" `append` fst dstId)
   let topCompDecl =
         InstDecl
           topName'
-          (topName' `append` "_" `append` fst dstId)
+          instLabel
           (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) inputs3 ++
            map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) outputs1)
 
@@ -485,7 +494,7 @@ mkTopInput topM itys pM = case pM of
   where
     -- No @PortName@
     go itys' (i,hwty) = do
-      i' <- mkUniqueIdentifier i
+      i' <- mkUniqueIdentifier Basic i
       let iDecl = NetDecl i' hwty
       case hwty of
         Vector sz hwty' -> do
@@ -520,14 +529,14 @@ mkTopInput topM itys pM = case pM of
     -- With a @PortName@
     go' (PortName p) (ity:itys') (i,hwty) = do
       let pN = portName p i
-      pN' <- mkUniqueIdentifier pN
+      pN' <- mkUniqueIdentifier Basic pN
       return (itys',([(pN,pN',hwty)],[NetDecl' pN' (Left ity)],Right (pN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
     go' (PortField p ps) itys' (i,hwty) = do
       let pN = portName p i
-      pN' <- mkUniqueIdentifier pN
+      pN' <- mkUniqueIdentifier Basic pN
       let pDecl = NetDecl pN' hwty
       case hwty of
         Vector sz hwty' -> do
@@ -585,7 +594,7 @@ mkTopOutput topM otys pM = case pM of
   where
     -- No @PortName@
     go otys' (o,hwty) = do
-      o' <- mkUniqueIdentifier o
+      o' <- mkUniqueIdentifier Basic o
       let oDecl = NetDecl o' hwty
       case hwty of
         Vector sz hwty' -> do
@@ -617,14 +626,14 @@ mkTopOutput topM otys pM = case pM of
     -- With a @PortName@
     go' (PortName p) (oty:otys') (o,hwty) = do
       let pN = portName p o
-      pN' <- mkUniqueIdentifier pN
+      pN' <- mkUniqueIdentifier Basic pN
       return (otys',([(pN,pN',hwty)],[NetDecl' pN' (Left oty)],Right (pN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
     go' (PortField p ps) otys' (o,hwty) = do
       let pN = portName p o
-      pN' <- mkUniqueIdentifier pN
+      pN' <- mkUniqueIdentifier Basic pN
       let pDecl = NetDecl pN' hwty
       case hwty of
         Vector sz hwty' -> do

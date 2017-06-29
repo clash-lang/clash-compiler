@@ -21,7 +21,7 @@ import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
-import           Data.Text.Lazy                (append,fromStrict, pack)
+import           Data.Text.Lazy                (fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
@@ -44,6 +44,7 @@ import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication,
                                                 mkExpr)
 import           CLaSH.Netlist.BlackBox.Types  as B
 import           CLaSH.Netlist.BlackBox.Util   as B
+import           CLaSH.Netlist.Id              (IdType (..))
 import           CLaSH.Netlist.Types           as N
 import           CLaSH.Netlist.Util            as N
 import           CLaSH.Normalize.Util          (isConstant)
@@ -62,7 +63,7 @@ mkBlackBoxContext resId args = do
     (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
-    res   <- (`N.Identifier` Nothing) <$> mkBasicId (pack $ name2String (V.varName resId))
+    res   <- (`N.Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String (V.varName resId))
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) imps funs Nothing
@@ -109,7 +110,7 @@ mkArgument bndr e = do
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
                 ,Void,False),[])
       Just hwTy -> case collectArgs e of
-        (Var _ v,[]) -> do vT <- (`Identifier` Nothing) <$> mkBasicId (pack $ name2String v)
+        (Var _ v,[]) -> do vT <- (`Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String v)
                            return ((vT,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
@@ -182,7 +183,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 Identifier id_ Nothing -> return (DataTag hwTy (Left id_),scrutDecls)
                 _ -> do
                   scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
-                  tmpRhs <- mkUniqueIdentifier (pack "tte_rhs")
+                  tmpRhs <- mkUniqueIdentifier Extended (pack "tte_rhs")
                   let netDeclRhs   = NetDecl tmpRhs scrutHTy
                       netAssignRhs = Assignment tmpRhs scrutExpr
                   return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
@@ -199,7 +200,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
             case scrutExpr of
               Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
               _ -> do
-                tmpRhs  <- mkUniqueIdentifier "dtt_rhs"
+                tmpRhs  <- mkUniqueIdentifier Extended "dtt_rhs"
                 let netDeclRhs   = NetDecl tmpRhs scrutHTy
                     netAssignRhs = Assignment tmpRhs scrutExpr
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
@@ -217,8 +218,8 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               id_ = Id (string2SystemName nm') (embed ty)
           return (id_,dstL,[])
         True -> do
-          let nm' = append dstL "_app_arg"
-          nm'' <- mkUniqueIdentifier nm'
+          nm'  <- extendIdentifier Extended dstL "_app_arg"
+          nm'' <- mkUniqueIdentifier Extended nm'
           let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Derived }
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_ = Id nm3 (embed ty)

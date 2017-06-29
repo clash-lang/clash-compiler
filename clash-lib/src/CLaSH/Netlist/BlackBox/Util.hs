@@ -39,6 +39,7 @@ import           CLaSH.Backend                        (Backend (..))
 import           CLaSH.Driver.Types                   (CLaSHException (..))
 import           CLaSH.Netlist.BlackBox.Parser
 import           CLaSH.Netlist.BlackBox.Types
+import           CLaSH.Netlist.Id                     (IdType (..))
 import           CLaSH.Netlist.Types
   (HWType (..), Identifier, BlackBoxContext (..), Expr (..), Literal (..),
    NetlistMonad, Modifier (..))
@@ -92,7 +93,7 @@ setSym bbCtx l = evalStateT (mapM setSym' l) IntMap.empty
         symM <- IntMap.lookup i <$> get
         case symM of
           Nothing -> do
-            t <- lift (mkUniqueIdentifier (Text.pack "n"))
+            t <- lift (mkUniqueIdentifier Basic (Text.pack "n"))
             modify (IntMap.insert i t)
             return (Sym t i)
           Just t -> return (Sym t i)
@@ -100,7 +101,7 @@ setSym bbCtx l = evalStateT (mapM setSym' l) IntMap.empty
         symM <- IntMap.lookup i <$> get
         case symM of
           Nothing -> do
-            t' <- lift (mkUniqueIdentifier (concatT t))
+            t' <- lift (mkUniqueIdentifier Basic (concatT t))
             modify (IntMap.insert i t')
             return (GenSym [C t'] i)
           Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
