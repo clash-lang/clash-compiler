@@ -606,7 +606,10 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
               -- Make new binders for existing arguments
               tcm                 <- Lens.view tcCache
               (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
-                                     mapM (mkBinderFor tcm (string2InternalName "pTS")) args
+                                     Monad.zipWithM
+                                       (mkBinderFor tcm)
+                                       (unsafeCollectBndrs bodyTm ++ repeat (string2InternalName "pTS"))
+                                       args
               -- Create specialized functions
               let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
               newf <- mkFunction f sp newBody
@@ -617,6 +620,13 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
               let newExpr = mkApps ((uncurry . flip) Var newf) (args ++ specVars)
               newf `deepseq` changed newExpr
         Nothing -> return e
+  where
+    unsafeCollectBndrs :: Term -> [Name a]
+    unsafeCollectBndrs = map (either (coerceName . varName) (coerceName . varName)) . go []
+      where
+        go bs (Lam b)   = let (v,e')  = unsafeUnbind b in go (Left v:bs)   e'
+        go bs (TyLam b) = let (tv,e') = unsafeUnbind b in go (Right tv:bs) e'
+        go bs _         = reverse bs
 
 specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
