@@ -155,6 +155,9 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       ] <- reduceTerms tcm isSubj args
     -> Literal (WordLiteral (w `shiftL` fromInteger i))
 
+  "GHC.Classes.geInt" | Just (i,j) <- intCLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >= j)
+
   "GHC.Integer.Logarithms.integerLogBase#"
     | Just (a,b) <- integerLiterals tcm isSubj args
     , Just c <- flogBase a b
@@ -492,6 +495,13 @@ integerLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
 intLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 intLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntLiteral i), Literal (IntLiteral j)] -> Just (i,j)
+  _ -> Nothing
+
+intCLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+intCLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
+  ([collectArgs -> (Data _,[Left (Literal (IntLiteral i))])
+   ,collectArgs -> (Data _,[Left (Literal (IntLiteral j))])])
+    -> Just (i,j)
   _ -> Nothing
 
 wordLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
