@@ -495,7 +495,7 @@ mkTopInput topM itys pM = case pM of
     -- No @PortName@
     go itys' (i,hwty) = do
       i' <- mkUniqueIdentifier Basic i
-      let iDecl = NetDecl i' hwty
+      let iDecl = NetDecl Nothing i' hwty
       case hwty of
         Vector sz hwty' -> do
           let inputs1 = map (appendNumber (i,hwty')) [0..sz-1]
@@ -530,14 +530,14 @@ mkTopInput topM itys pM = case pM of
     go' (PortName p) (ity:itys') (i,hwty) = do
       let pN = portName p i
       pN' <- mkUniqueIdentifier Basic pN
-      return (itys',([(pN,pN',hwty)],[NetDecl' pN' (Left ity)],Right (pN',hwty)))
+      return (itys',([(pN,pN',hwty)],[NetDecl' Nothing pN' (Left ity)],Right (pN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
     go' (PortField p ps) itys' (i,hwty) = do
       let pN = portName p i
       pN' <- mkUniqueIdentifier Basic pN
-      let pDecl = NetDecl pN' hwty
+      let pDecl = NetDecl Nothing pN' hwty
       case hwty of
         Vector sz hwty' -> do
           let inputs1 = map (appendNumber (pN,hwty')) [0..sz-1]
@@ -595,7 +595,7 @@ mkTopOutput topM otys pM = case pM of
     -- No @PortName@
     go otys' (o,hwty) = do
       o' <- mkUniqueIdentifier Basic o
-      let oDecl = NetDecl o' hwty
+      let oDecl = NetDecl Nothing o' hwty
       case hwty of
         Vector sz hwty' -> do
           let outputs1 = map (appendNumber (o,hwty')) [0..sz-1]
@@ -627,14 +627,14 @@ mkTopOutput topM otys pM = case pM of
     go' (PortName p) (oty:otys') (o,hwty) = do
       let pN = portName p o
       pN' <- mkUniqueIdentifier Basic pN
-      return (otys',([(pN,pN',hwty)],[NetDecl' pN' (Left oty)],Right (pN',hwty)))
+      return (otys',([(pN,pN',hwty)],[NetDecl' Nothing pN' (Left oty)],Right (pN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
     go' (PortField p ps) otys' (o,hwty) = do
       let pN = portName p o
       pN' <- mkUniqueIdentifier Basic pN
-      let pDecl = NetDecl pN' hwty
+      let pDecl = NetDecl Nothing pN' hwty
       case hwty of
         Vector sz hwty' -> do
           let outputs1 = map (appendNumber (pN,hwty')) [0..sz-1]

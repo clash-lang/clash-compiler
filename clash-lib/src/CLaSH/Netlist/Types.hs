@@ -137,13 +137,13 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
   | BlackBoxD !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl' !Identifier (Either Identifier HWType) -- ^ Signal declaration
+  | NetDecl' (Maybe Identifier) !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
 
-pattern NetDecl :: Identifier -> HWType -> Declaration
-pattern NetDecl d ty <- NetDecl' d (Right ty)
+pattern NetDecl :: Maybe Identifier -> Identifier -> HWType -> Declaration
+pattern NetDecl note d ty <- NetDecl' note d (Right ty)
   where
-    NetDecl d ty = NetDecl' d (Right ty)
+    NetDecl note d ty = NetDecl' note d (Right ty)
 
 data PortDirection = In | Out
   deriving Show

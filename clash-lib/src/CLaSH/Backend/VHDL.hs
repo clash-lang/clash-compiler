@@ -671,8 +671,10 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
-  "signal" <+> fill l (text id_) <+> colon <+> either text vhdlType ty
+decl l (NetDecl' noteM id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+  maybe id addNote noteM ("signal" <+> fill l (text id_) <+> colon <+> either text vhdlType ty)
+  where
+    addNote n = ("--" <+> text n <$>)
 
 decl _ _ = return Nothing
 

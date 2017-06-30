@@ -28,7 +28,8 @@ import           System.FilePath                  ((</>), (<.>))
 import           Unbound.Generics.LocallyNameless
   (Embed (..), runFreshMT, unbind, unembed, unrebind)
 
-import           SrcLoc                           (SrcSpan,noSrcSpan)
+import           Outputable                       (ppr, showSDocUnsafe)
+import           SrcLoc                           (SrcSpan,isGoodSrcSpan,noSrcSpan)
 
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Core.DataCon               (DataCon (..))
@@ -192,7 +193,8 @@ genComponentT compName componentExpr = do
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
   let netDecls = map (\(id_,_) ->
-                        NetDecl (Text.pack . name2String $ varName id_)
+                        NetDecl (addSrcNote (nameLoc (varName id_)))
+                                (Text.pack . name2String $ varName id_)
                                 (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
                      ) $ filter ((/= result) . varName . fst) binders
   decls <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
@@ -201,6 +203,10 @@ genComponentT compName componentExpr = do
       compOutp       = (Text.pack $ name2String result, resType)
       component      = Component componentName' compInps [compOutp] (netDecls ++ decls)
   return (sp,component)
+  where
+    addSrcNote loc = if isGoodSrcSpan loc
+                        then Just (Text.pack (showSDocUnsafe (ppr loc)))
+                        else Nothing
 
 
 genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> String -> TmName -> Identifier
@@ -255,7 +261,7 @@ mkDeclarations bndr e@(Case scrut _ [alt]) = do
          (Identifier newId Nothing) -> return (newId,newDecls)
          _ -> do
           scrutId' <- mkUniqueIdentifier Extended scrutId
-          let scrutDecl = NetDecl scrutId' sHwTy
+          let scrutDecl = NetDecl Nothing scrutId' sHwTy
               scrutAssn = Assignment scrutId' newExpr
           return (scrutId',newDecls ++ [scrutDecl,scrutAssn])
   let dstId    = Text.pack . name2String $ varName bndr
@@ -407,7 +413,7 @@ toSimpleVar dst (e,ty) = do
              (Text.pack "_app_arg")
   argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  let argDecl = NetDecl argNm' hTy
+  let argDecl = NetDecl Nothing argNm' hTy
       argAssn = Assignment argNm' e
   return (Identifier argNm' Nothing,[argDecl,argAssn])
 

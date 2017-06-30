@@ -184,7 +184,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
                 _ -> do
                   scrutHTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
                   tmpRhs <- mkUniqueIdentifier Extended (pack "#tte_rhs")
-                  let netDeclRhs   = NetDecl tmpRhs scrutHTy
+                  let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                       netAssignRhs = Assignment tmpRhs scrutExpr
                   return (DataTag hwTy (Left tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
             _ -> error $ $(curLoc) ++ "tagToEnum: " ++ show (map (either showDoc showDoc) args)
@@ -201,7 +201,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               Identifier id_ Nothing -> return (DataTag scrutHTy (Right id_),scrutDecls)
               _ -> do
                 tmpRhs  <- mkUniqueIdentifier Extended "#dtt_rhs"
-                let netDeclRhs   = NetDecl tmpRhs scrutHTy
+                let netDeclRhs   = NetDecl Nothing tmpRhs scrutHTy
                     netAssignRhs = Assignment tmpRhs scrutExpr
                 return (DataTag scrutHTy (Right tmpRhs),[netDeclRhs,netAssignRhs] ++ scrutDecls)
           _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showDoc showDoc) args)
@@ -223,7 +223,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Internal }
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_ = Id nm3 (embed ty)
-              idDecl = NetDecl nm'' hwTy
+              idDecl = NetDecl Nothing nm'' hwTy
           return (id_,nm'',[idDecl])
       Right dstR -> return (dstR,Text.pack . name2String . varName $ dstR,[])
 

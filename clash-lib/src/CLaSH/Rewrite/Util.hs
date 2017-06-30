@@ -99,7 +99,7 @@ apply name rewrite ctx expr = do
                            , "\nto: ", show (afterFTV,afterFV)
                            ]
                   )
-    traceIf ( beforeTy /= afterTy)
+    traceIf (lvl >= DebugAll && beforeTy /= afterTy)
             ( concat [ $(curLoc)
                      , "Error when applying rewrite ", name
                      , " to:\n" , before
@@ -535,7 +535,7 @@ mkSelectorCase caller tcm scrut dcI fieldI = do
             else do
               wildBndrs <- mapM mkWildValBinder fieldTys
               let ty = indexNote ($(curLoc) ++ "No DC field#: " ++ show fieldI) fieldTys fieldI
-              selBndr <- mkInternalVar (string2SystemName "sel") ty
+              selBndr <- mkInternalVar (string2InternalName "sel") ty
               let bndrs  = take fieldI wildBndrs ++ [fst selBndr] ++ drop (fieldI+1) wildBndrs
                   pat    = DataPat (embed dc) (rebind [] bndrs)
                   retVal = Case scrut ty [ bind pat (snd selBndr) ]

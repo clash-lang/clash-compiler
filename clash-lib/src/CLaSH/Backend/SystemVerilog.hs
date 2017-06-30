@@ -462,7 +462,7 @@ addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
   let iport = map fst $ inputs c
       oport = map fst $ outputs c
-      nets  = mapMaybe (\case {NetDecl' i _ -> Just i; _ -> Nothing}) $ declarations c
+      nets  = mapMaybe (\case {NetDecl' _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
   oports .= oport
 
@@ -579,8 +579,12 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' id_ (Right ty)) = Just A.<$> sigDecl (text id_) ty
-decl (NetDecl' id_ (Left ty))  = Just A.<$> text ty <+> text id_
+decl (NetDecl' noteM id_ tyE) =
+  Just A.<$> maybe id addNote noteM (typ tyE)
+  where
+    typ (Left  ty) = text ty <+> text id_
+    typ (Right ty) = sigDecl (text id_) ty
+    addNote n = ("//" <+> text n <$>)
 
 decl _ = return Nothing
 
@@ -666,7 +670,7 @@ inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
-inst_ (NetDecl' _ _) = return Nothing
+inst_ (NetDecl' _ _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?

@@ -543,9 +543,9 @@ coreToName :: (b -> Name)
            -> State GHC2CoreState (C.Name a)
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
-  let nm = Unbound.makeName ns (toInteger . getKey . toUnique $ v)
-  return (C.Name C.User nm (getSrcSpan (toName v)))
-  -- return (Unbound.makeName ns (toInteger . getKey . toUnique $ v))
+  let nm  = Unbound.makeName ns (toInteger . getKey . toUnique $ v)
+      loc = getSrcSpan (toName v)
+  return (C.Name C.User nm loc)
 
 qualfiedNameString :: Name
                    -> State GHC2CoreState String
