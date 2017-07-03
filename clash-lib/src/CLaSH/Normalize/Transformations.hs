@@ -840,7 +840,12 @@ collectANF ctx (Case subj ty alts) = do
     (binds,alts') <- fmap (first concat . unzip) $ mapM (lift . doAlt subj') alts
 
     tell (bndr ++ binds)
-    return (Case subj' ty alts')
+    case alts' of
+      [unsafeUnbind -> (DataPat _ (unrebind -> ([],xs)),altExpr)]
+        | let altFreeIds = Lens.setOf termFreeIds altExpr
+        , Set.null (Set.intersection (Set.fromList (map (nameOcc.varName) xs)) altFreeIds)
+        -> return altExpr
+      _ -> return (Case subj' ty alts')
   where
     doAlt :: Term -> Bind Pat Term -> RewriteMonad NormalizeState ([LetBinding],Bind Pat Term)
     -- See NOTE [unsafeUnbind]
