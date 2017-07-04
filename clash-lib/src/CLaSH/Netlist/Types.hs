@@ -196,10 +196,13 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,BlackBoxContext)
+  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,WireOrReg,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
-  -- * (Blackbox Template,Partial Blackbox Concext)
+  -- * ( Blackbox Template
+  --   , Whether the result should be /reg/ or a /wire/ (Verilog only)
+  --   , Partial Blackbox Context
+  --   )
   , bbQsysIncName :: Maybe Identifier
   }
   deriving Show

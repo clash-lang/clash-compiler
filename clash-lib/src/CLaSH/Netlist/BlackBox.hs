@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -143,11 +144,12 @@ mkPrimitive :: Bool -- ^ Put BlackBox expression in parenthesis
 mkPrimitive bbEParen bbEasD dst nm args ty = do
   bbM <- HashMap.lookup nm <$> Lens.use primitives
   case bbM of
-    Just p@(P.BlackBox {}) -> do
+    Just p@(P.BlackBox {outputReg = wr}) -> do
       case template p of
         (Left tempD) -> do
           let pNm = name p
-          (dst',dstNm,dstDecl) <- resBndr True dst
+              wr' = if wr then Reg else Wire
+          (dst',dstNm,dstDecl) <- resBndr True wr' dst
           (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
           bbDecl <- N.BlackBoxD pNm (library p) (imports p) (qsysInclude p) <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
           return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ [bbDecl])
@@ -155,13 +157,13 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
           let pNm = name p
           if bbEasD
             then do
-              (dst',dstNm,dstDecl) <- resBndr True dst
+              (dst',dstNm,dstDecl) <- resBndr True Wire dst
               (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
               bbTempl <- prepareBlackBox pNm tempE bbCtx
               let tmpAssgn = Assignment dstNm (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen)
               return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ [tmpAssgn])
             else do
-              (dst',_,_) <- resBndr False dst
+              (dst',_,_) <- resBndr False Wire dst
               (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
               bbTempl <- prepareBlackBox pNm tempE bbCtx
               return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls)
@@ -210,20 +212,20 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
   where
-    resBndr :: Bool -> (Either Identifier Id) -> NetlistMonad (Id,Identifier,[Declaration])
-    resBndr mkDec dst' = case dst' of
+    resBndr :: Bool -> WireOrReg -> (Either Identifier Id) -> NetlistMonad (Id,Identifier,[Declaration])
+    resBndr mkDec wr dst' = case dst' of
       Left dstL -> case mkDec of
         False -> do
           let nm' = Text.unpack dstL
               id_ = Id (string2SystemName nm') (embed ty)
           return (id_,dstL,[])
         True -> do
-          nm'  <- extendIdentifier Extended dstL "_app_arg"
+          nm'  <- extendIdentifier Extended dstL "_res"
           nm'' <- mkUniqueIdentifier Extended nm'
           let nm3 = (string2SystemName (Text.unpack nm'')) { nameSort = Internal }
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
           let id_ = Id nm3 (embed ty)
-              idDecl = NetDecl Nothing nm'' hwTy
+              idDecl = NetDecl' Nothing wr nm'' (Right hwTy)
           return (id_,nm'',[idDecl])
       Right dstR -> return (dstR,Text.pack . name2String . varName $ dstR,[])
 
@@ -232,7 +234,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
 -- a function
 mkFunInput :: Id   -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
-           -> NetlistMonad ((Either BlackBoxTemplate Declaration,BlackBoxContext),[Declaration])
+           -> NetlistMonad ((Either BlackBoxTemplate Declaration,WireOrReg,BlackBoxContext),[Declaration])
 mkFunInput resId e = do
   let (appE,args) = collectArgs e
   (bbCtx,dcls) <- mkBlackBoxContext resId (lefts args)
@@ -241,7 +243,7 @@ mkFunInput resId e = do
               bbM <- fmap (HashMap.lookup nm) $ Lens.use primitives
               (_,sp) <- Lens.use curCompNm
               let templ = case bbM of
-                            Just p@(P.BlackBox {}) -> Left (name p, template p)
+                            Just (P.BlackBox {..}) -> Left (name, outputReg, template)
                             _ -> throw (CLaSHException sp ($(curLoc) ++ "No blackbox found for: " ++ unpack nm) Nothing)
               return templ
             Data dc -> do
@@ -282,17 +284,17 @@ mkFunInput resId e = do
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
-    Left (_, Left templ') -> do
+    Left (_, oreg, Left templ') -> do
       l   <- instantiateCompName templ'
       l'  <- setSym bbCtx l
       l'' <- collectFilePaths bbCtx l'
-      return ((Left l'',bbCtx),dcls)
-    Left (_, Right templ') -> do
+      return ((Left l'',if oreg then Reg else Wire,bbCtx),dcls)
+    Left (_, _, Right templ') -> do
       templ'' <- prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
-      return ((Right ass, bbCtx),dcls)
+      return ((Right ass,Wire,bbCtx),dcls)
     Right decl ->
-      return ((Right decl,bbCtx),dcls)
+      return ((Right decl,Wire,bbCtx),dcls)
 
 instantiateCompName :: BlackBoxTemplate
                     -> NetlistMonad BlackBoxTemplate

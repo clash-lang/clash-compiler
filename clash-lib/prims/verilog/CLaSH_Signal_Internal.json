@@ -6,20 +6,18 @@
   => Clock domain gated       -- ARG[1]
   -> Signal clk a             -- ARG[2]
   -> Signal clk a"
+    , "outputReg" : true
     , "templateD" :
-"// register begin
-reg ~SIGD[~GENSYM[~RESULT_q][0]][2];~IF ~ISGATED[1] ~THEN
+"// delay begin~IF ~ISGATED[1] ~THEN
 always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_delay][1]
   if (~ARG[1][0]) begin
-    ~SYM[0] <= ~ARG[2];
+    ~RESULT <= ~ARG[2];
   end
 end~ELSE
 always @(posedge ~ARG[1]) begin : ~SYM[1]
-  ~SYM[0] <= ~ARG[2];
+  ~RESULT <= ~ARG[2];
 end~FI
-
-assign ~RESULT = ~SYM[0];
-// register end"
+// delay end"
     }
   }
 , { "BlackBox" :
@@ -32,25 +30,23 @@ assign ~RESULT = ~SYM[0];
   -> a                        -- ARG[3]
   -> Signal clk a             -- ARG[4]
   -> Signal clk a"
+    , "outputReg" : true
     , "templateD" :
-"// register begin
-reg ~SIGD[~GENSYM[~RESULT_q][0]][3];~IF ~ISGATED[1] ~THEN
+"// register begin~IF ~ISGATED[1] ~THEN
 always @(posedge ~ARG[1][1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~GENSYM[~COMPNAME_register][1]
   if (~ARG[2]) begin
-    ~SYM[0] <= ~ARG[3];
+    ~RESULT <= ~ARG[3];
   end else if (~ARG[1][0]) begin
-    ~SYM[0] <= ~ARG[4];
+    ~RESULT <= ~ARG[4];
   end
 end~ELSE
 always @(posedge ~ARG[1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~SYM[1]
   if (~ARG[2]) begin
-    ~SYM[0] <= ~ARG[3];
+    ~RESULT <= ~ARG[3];
   end else begin
-    ~SYM[0] <= ~ARG[4];
+    ~RESULT <= ~ARG[4];
   end
 end~FI
-
-assign ~RESULT = ~SYM[0];
 // register end"
     }
   }

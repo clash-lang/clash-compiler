@@ -97,6 +97,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
      <|> IsGated           <$> (pToken "~ISGATED" *> pBrackets pNatural)
      <|> IsSync            <$> (pToken "~ISSYNC" *> pBrackets pNatural)
+     <|> OutputWireReg     <$> (pToken "~OUTPUTWIREREG" *> pBrackets pNatural)
      <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> And               <$> (pToken "~AND" *> listParser pTagE)
      <|> Vars              <$> (pToken "~VARS" *> pBrackets pNatural)

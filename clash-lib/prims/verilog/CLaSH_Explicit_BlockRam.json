@@ -10,10 +10,10 @@
   -> Signal dom Int  -- wr,   ARG[5]
   -> Signal dom a    -- din,  ARG[6]
   -> Signal dom a"
+    , "outputReg" : true
     , "templateD" :
 "// blockRam begin
 reg ~TYPO ~GENSYM[RAM][0] [0:~LENGTH[~TYP[2]]-1];
-reg ~TYPO ~GENSYM[~RESULT_q][1];
 
 reg ~TYP[2] ~GENSYM[ram_init][2];
 integer ~GENSYM[i][3];
@@ -29,23 +29,21 @@ always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_blockRam][4]~IF ~VIVADO ~
     if (~ARG[4]) begin
       ~SYM[0][~ARG[5]] <= ~ARG[6];
     end
-    ~SYM[1] <= ~SYM[0][~ARG[3]];
+    ~RESULT <= ~SYM[0][~ARG[3]];
   end~ELSE
   if (~ARG[4] & ~ARG[1][0]) begin
     ~SYM[0][~ARG[5]] <= ~ARG[6];
   end
   if (~ARG[1][0]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[3]];
+    ~RESULT <= ~SYM[0][~ARG[3]];
   end~FI
 end~ELSE
 always @(posedge ~ARG[1]) begin : ~SYM[4]
   if (~ARG[4]) begin
     ~SYM[0][~ARG[5]] <= ~ARG[6];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[3]];
+  ~RESULT <= ~SYM[0][~ARG[3]];
 end~FI
-
-assign ~RESULT = ~SYM[1];
 // blockRam end"
     }
   }

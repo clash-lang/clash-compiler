@@ -47,6 +47,7 @@ data Element = C   !Text         -- ^ Constant
              | IsVar !Int
              | IsGated !Int
              | IsSync !Int
+             | OutputWireReg !Int
              | Vars !Int
              | GenSym [Element] !Int
              | SigD [Element] !(Maybe Int)

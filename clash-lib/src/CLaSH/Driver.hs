@@ -226,13 +226,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   go benchTime topEntities'
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
-parsePrimitive (BlackBox pNm libM imps inc templT) =
+parsePrimitive (BlackBox pNm oReg libM imps inc templT) =
   let (templ,err) = either (first Left . runParse) (first Right . runParse) templT
       inc'        = case fmap (second runParse) inc of
                       Just (x,(t,[])) -> Just (x,t)
                       _ -> Nothing
   in  case err of
-        [] -> BlackBox pNm libM imps inc' templ
+        [] -> BlackBox pNm oReg libM imps inc' templ
         _  -> error $ "Errors in template for: " ++ show pNm ++ ":\n" ++ show err
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 

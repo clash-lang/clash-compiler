@@ -453,7 +453,7 @@ removeUnusedExpr :: NormRewrite
 removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (BlackBox pNm _ _ inc templ) -> do
+    Just (BlackBox pNm _ _ _ inc templ) -> do
       let usedArgs = if pNm `elem` ["CLaSH.Sized.Internal.Signed.fromInteger#"
                                    ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
                                    ,"CLaSH.Sized.Internal.BitVector.fromInteger#"

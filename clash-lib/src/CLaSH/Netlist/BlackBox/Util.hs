@@ -171,7 +171,7 @@ renderElem :: Backend backend
 renderElem b (D (Decl n (l:ls))) = do
     (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
     is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
-    let Just (templ,pCtx)    = IntMap.lookup n (bbFunctions b)
+    let Just (templ,_,pCtx)  = IntMap.lookup n (bbFunctions b)
         b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
     templ' <- case templ of
                 Left t  -> return t
@@ -381,6 +381,9 @@ renderTag b (FilePath e)    = case e of
 renderTag b QSysIncludeName = case bbQsysIncName b of
   Just nm -> return nm
   _ -> error $ $(curLoc) ++ "~QSYSINCLUDENAME used where no 'qysInclude' was specified in the primitive definition"
+renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
+  Just (_,rw,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
+  _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
 renderTag _ e = do e' <- prettyElem e
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
@@ -470,6 +473,7 @@ prettyElem (SigD es mI) = do
            (((text "~SIGD" <> brackets (text es')) <>) . int)
            mI)
 prettyElem (Vars i) = (displayT . renderOneLine) <$> (text "~VARS" <> brackets (int i))
+prettyElem (OutputWireReg i) = (displayT . renderOneLine) <$> (text "~RESULTWIREREG" <> brackets (int i))
 
 usedArguments :: BlackBoxTemplate
               -> [Int]

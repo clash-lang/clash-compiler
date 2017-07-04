@@ -70,18 +70,16 @@ assign ~RESULT = ~SYM[0][~ARG[2]];
              -> Int         -- ARG[2]
              -> Bit         -- ARG[3]
              -> BitVector n"
+    , "outputReg" : true
     , "templateD" :
 "// replaceBit start
-reg ~TYPO ~GENSYM[bv][0];
 wire ~TYP[3] ~GENSYM[din][1];
 assign ~SYM[1] = ~ARG[3];
 
 always @(*) begin
-  ~SYM[0] = ~ARG[1];
-  ~SYM[0][~ARG[2]] = ~SYM[1];
+  ~RESULT = ~ARG[1];
+  ~RESULT[~ARG[2]] = ~SYM[1];
 end
-
-assign ~RESULT = ~SYM[0];
 // replaceBit end"
     }
   }
@@ -93,18 +91,16 @@ assign ~RESULT = ~SYM[0];
            -> SNat n                -- ARG[2]
            -> BitVector (m + 1 - n) -- ARG[3]
            -> BitVector (m + 1 + i)"
+    , "outputReg" : true
     , "templateD" :
 "// setSlice begin
-reg ~SIGD[~GENSYM[bv][0]][0];
 wire ~TYP[3] ~GENSYM[din][1];
 assign ~SYM[1] = ~ARG[3]
 
 always @(*) begin
-  ~SYM[0] = ~ARG[0];
-  ~SYM[0][~LIT[1] : ~LIT[2]] = ~SYM[1];
+  ~RESULT = ~ARG[0];
+  ~RESULT[~LIT[1] : ~LIT[2]] = ~SYM[1];
 end
-
-assign ~RESULT = ~SYM[0];
 // setSlice end"
     }
   }

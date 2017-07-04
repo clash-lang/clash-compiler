@@ -7,6 +7,7 @@
   Create Netlists out of normalized CoreHW Terms
 -}
 
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE ViewPatterns    #-}
@@ -206,6 +207,7 @@ genComponentT compName componentExpr = do
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad Declaration
 mkNetDecl (id_,tm) = do
   hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType id_))
+  wr   <- wireOrReg (unembed tm)
   return $ NetDecl' (addSrcNote (nameLoc nm))
              wr
              (Text.pack (name2String nm))
@@ -213,9 +215,15 @@ mkNetDecl (id_,tm) = do
 
   where
     nm = varName id_
-    wr = case unembed tm of
-           Case _ _ (_:_:_) -> Reg
-           _ -> Wire
+
+    wireOrReg :: Term -> NetlistMonad WireOrReg
+    wireOrReg (Case _ _ (_:_:_)) = return Reg
+    wireOrReg (collectArgs -> (Prim nm' _,_)) = do
+      bbM <- HashMap.lookup nm' <$> Lens.use primitives
+      case bbM of
+        Just (BlackBox {..}) | outputReg -> return Reg
+        _ -> return Wire
+    wireOrReg _ = return Wire
 
     addSrcNote loc = if isGoodSrcSpan loc
                         then Just (Text.pack (showSDocUnsafe (ppr loc)))

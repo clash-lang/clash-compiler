@@ -117,7 +117,7 @@ genvar ~GENSYM[i][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]
   wire ~TYPEL[~TYP[1]] ~GENSYM[map_in][3];
-  wire ~TYPEL[~TYPO] ~GENSYM[map_out][4];
+  ~OUTPUTWIREREG[0] ~TYPEL[~TYPO] ~GENSYM[map_out][4];
 
   assign ~SYM[3] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
   ~INST 0
@@ -143,7 +143,7 @@ genvar ~GENSYM[i][1];
 for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
   wire [~SIZE[~INDEXTYPE[~LIT[0]]]-1:0] ~GENSYM[map_index][3];
   wire ~TYPEL[~TYP[2]] ~GENSYM[map_in][4];
-  wire ~TYPEL[~TYPO] ~GENSYM[map_out][5];
+  ~OUTPUTWIREREG[1] ~TYPEL[~TYPO] ~GENSYM[map_out][5];
 
   assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1];
   assign ~SYM[4] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
@@ -173,7 +173,7 @@ genvar ~GENSYM[i][2];
 for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][6]
   wire ~TYPEL[~TYP[1]] ~GENSYM[zipWith_in1][3];
   wire ~TYPEL[~TYP[2]] ~GENSYM[zipWith_in2][4];
-  wire ~TYPEL[~TYPO] ~SYM[5];
+  ~OUTPUTWIREREG[0] ~TYPEL[~TYPO] ~SYM[5];
 
   assign ~SYM[3] = ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
   assign ~SYM[4] = ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
@@ -204,7 +204,7 @@ genvar ~GENSYM[i][3];
 for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]
   wire ~TYPEL[~TYP[2]] ~GENSYM[foldr_in1][5];
   wire ~TYPO ~GENSYM[foldr_in2][6];
-  wire ~TYPO ~GENSYM[foldr_out][7];
+  ~OUTPUTWIREREG[0] ~TYPO ~GENSYM[foldr_out][7];
 
   assign ~SYM[5] = ~SYM[2][(~LENGTH[~TYP[2]]-1-~SYM[3])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   assign ~SYM[6] = ~SYM[0][~SYM[3]+1];
@@ -270,7 +270,7 @@ if (~SYM[4] != 0) begin : ~GENSYM[make_tree][7]
     for (~SYM[6] = 0; ~SYM[6] < (2**~SYM[5]); ~SYM[6] = ~SYM[6]+1) begin : ~GENSYM[tree_depth_loop][12]
       wire ~TYPO ~GENSYM[fold_in1][8];
       wire ~TYPO ~GENSYM[fold_in2][9];
-      wire ~TYPO ~GENSYM[fold_out][10];
+      ~OUTPUTWIREREG[0] ~TYPO ~GENSYM[fold_out][10];
 
       assign ~SYM[8] = ~SYM[0][~SYM[13](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])];
       assign ~SYM[9] = ~SYM[0][~SYM[13](~SYM[4]+1,~SYM[5]+2)+(2*~SYM[6])+1];
