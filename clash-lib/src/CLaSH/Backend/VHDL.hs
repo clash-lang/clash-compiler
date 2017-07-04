@@ -529,7 +529,7 @@ entity c = do
             $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
               [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
-              | (i,ty) <- outputs c ]
+              | (_,(i,ty)) <- outputs c ]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -671,7 +671,7 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+decl l (NetDecl' noteM _ id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
   maybe id addNote noteM ("signal" <+> fill l (text id_) <+> colon <+> either text vhdlType ty)
   where
     addNote n = ("--" <+> text n <$>)

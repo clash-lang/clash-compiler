@@ -263,7 +263,7 @@ createHDL backend modName components (topName,manifestE) = flip evalState backen
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
       topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (inputs top)
-      topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (outputs top)
+      topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd . snd) (outputs top)
       return (m {portInTypes = topInTypes, portOutTypes = topOutTypes})
     ) manifestE
   let manDoc = ( topName <.> "manifest"

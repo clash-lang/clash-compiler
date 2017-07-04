@@ -166,7 +166,7 @@ module_ c = do
   where
     ports = sequence
           $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
+            [ encodingNote hwty <$> text i | (_,(i,hwty)) <- outputs c]
 
     inputPorts = case inputs c of
                    [] -> empty
@@ -174,33 +174,18 @@ module_ c = do
 
     outputPorts = case outputs c of
                    [] -> empty
-                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
+                   p  -> vcat (punctuate semi (sequence [ "output" <+> wireOrReg wr <+> sigDecl (text i) ty | (wr,(i,ty)) <- p ])) <> semi
+
+wireOrReg :: WireOrReg -> VerilogM Doc
+wireOrReg Wire = "wire"
+wireOrReg Reg  = "reg"
 
 addSeen :: Component -> VerilogM ()
 addSeen c = do
   let iport = map fst $ inputs c
-      oport = map fst $ outputs c
-      nets  = mapMaybe (\case {NetDecl' _ i _ -> Just i; _ -> Nothing}) $ declarations c
+      oport = map (fst.snd) $ outputs c
+      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
-
-mkUniqueId :: Identifier -> VerilogM Identifier
-mkUniqueId i = do
-  mkId <- mkIdentifier <*> pure Extended
-  seen <- use idSeen
-  let i' = mkId i
-  case i `elem` seen of
-    True  -> go mkId seen i' 0
-    False -> do idSeen %= (i':)
-                return i'
-  where
-    go :: (Identifier -> Identifier) -> [Identifier] -> Identifier
-       -> Int -> VerilogM Identifier
-    go mkId seen i' n = do
-      let i'' = mkId (Text.append i' (Text.pack ('_':show n)))
-      case i'' `elem` seen of
-        True  -> go mkId seen i' (n+1)
-        False -> do idSeen %= (i'':)
-                    return i''
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
@@ -235,8 +220,8 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' noteM id_ tyE) =
-  Just A.<$> maybe id addNote noteM ("wire" <+> tyDec tyE)
+decl (NetDecl' noteM wr id_ tyE) =
+  Just A.<$> maybe id addNote noteM (wireOrReg wr <+> tyDec tyE)
   where
     tyDec (Left  ty) = text ty <+> text id_
     tyDec (Right ty) = sigDecl (text id_) ty
@@ -253,31 +238,23 @@ inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
-    { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
-    ; "reg" <+> verilogType ty <+> text regId <> semi <$>
-      "always @(*) begin" <$>
-      indent 2 ("if" <> parens (expr_ True scrut) <$>
-                  (indent 2 $ text regId <+> equals <+> expr_ False t <> semi) <$>
-               "else" <$>
-                  (indent 2 $ text regId <+> equals <+> expr_ False f <> semi)) <$>
-      "end" <$>
-      "assign" <+> text id_ <+> equals <+> text regId <> semi
-    }
+inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
+   "always @(*) begin" <$>
+   indent 2 ("if" <> parens (expr_ True scrut) <$>
+               (indent 2 $ text id_ <+> equals <+> expr_ False t <> semi) <$>
+            "else" <$>
+               (indent 2 $ text id_ <+> equals <+> expr_ False f <> semi)) <$>
+   "end"
   where
     (t,f) = if b then (l,r) else (r,l)
 
 
-inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
-    { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
-    ; "reg" <+> verilogType ty <+> text regId <> semi <$>
-      "always @(*) begin" <$>
-      indent 2 ("case" <> parens (expr_ True scrut) <$>
-                  (indent 2 $ vcat $ punctuate semi (conds regId es)) <> semi <$>
-                "endcase") <$>
-      "end" <$>
-      "assign" <+> text id_ <+> equals <+> text regId <> semi
-    }
+inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
+    "always @(*) begin" <$>
+    indent 2 ("case" <> parens (expr_ True scrut) <$>
+                (indent 2 $ vcat $ punctuate semi (conds id_ es)) <> semi <$>
+              "endcase") <$>
+    "end"
   where
     conds :: Identifier -> [(Maybe Literal,Expr)] -> VerilogM [Doc]
     conds _ []                = return []
@@ -306,7 +283,7 @@ inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
-inst_ (NetDecl' _ _ _) = return Nothing
+inst_ (NetDecl' _ _ _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?

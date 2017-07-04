@@ -530,7 +530,7 @@ mkTopInput topM itys pM = case pM of
     go' (PortName p) (ity:itys') (i,hwty) = do
       let pN = portName p i
       pN' <- mkUniqueIdentifier Basic pN
-      return (itys',([(pN,pN',hwty)],[NetDecl' Nothing pN' (Left ity)],Right (pN',hwty)))
+      return (itys',([(pN,pN',hwty)],[NetDecl' Nothing Wire pN' (Left ity)],Right (pN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
@@ -627,7 +627,7 @@ mkTopOutput topM otys pM = case pM of
     go' (PortName p) (oty:otys') (o,hwty) = do
       let pN = portName p o
       pN' <- mkUniqueIdentifier Basic pN
-      return (otys',([(pN,pN',hwty)],[NetDecl' Nothing pN' (Left oty)],Right (pN',hwty)))
+      return (otys',([(pN,pN',hwty)],[NetDecl' Nothing Wire pN' (Left oty)],Right (pN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 

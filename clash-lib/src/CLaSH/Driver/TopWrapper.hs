@@ -21,7 +21,7 @@ import CLaSH.Annotations.TopEntity (TopEntity (..), PortName (..))
 import CLaSH.Netlist.Id            (IdType (..))
 import CLaSH.Netlist.Types
   (Component (..), Declaration (..), Expr (..), Identifier, HWType (..),
-   Modifier (..), PortDirection(..))
+   Modifier (..), PortDirection(..), WireOrReg (..))
 import CLaSH.Util
 
 -- | Create a wrapper around a component, potentially initiating clock sources
@@ -34,7 +34,7 @@ mkTopWrapper mkId teM modName topComponent
   = Component
   { componentName = maybe (mkId Basic (pack modName `append` "_topEntity")) (pack . t_name) teM
   , inputs        = inputs3
-  , outputs       = outputs3
+  , outputs       = zip (repeat Wire) outputs3
   , declarations  = concat [wrappers,topCompDecl:unwrappers]
   }
   where
@@ -49,11 +49,11 @@ mkTopWrapper mkId teM modName topComponent
     (inputs3,wrappers,idsI) = concatPortDecls inputs2
 
     -- output ports
+    oTop           = map snd (outputs topComponent)
     oPortSupply    = maybe (repeat Nothing)
                            ((++ repeat Nothing) . map Just . t_outputs)
                            teM
-    outputs1       = map (first (const "output"))
-                         (outputs topComponent)
+    outputs1       = map (first (const "output")) oTop
     outputs2       = zipWith mkOutput oPortSupply
                              (zipWith appendNumber outputs1 [0..])
     (outputs3,unwrappers,idsO) = concatPortDecls outputs2
@@ -67,7 +67,7 @@ mkTopWrapper mkId teM modName topComponent
                         idsI
                 ++
                 zipWith (\(p,t) o -> (Identifier p Nothing,Out,t,Identifier o Nothing))
-                        (outputs topComponent)
+                        oTop
                         idsO)
 
 extendPorts :: [PortName] -> [Maybe PortName]

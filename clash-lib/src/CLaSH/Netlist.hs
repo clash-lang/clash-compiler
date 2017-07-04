@@ -9,6 +9,7 @@
 
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 module CLaSH.Netlist where
 
@@ -192,22 +193,33 @@ genComponentT compName componentExpr = do
   let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) (nameOcc result) ids
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
-  let netDecls = map (\(id_,_) ->
-                        NetDecl (addSrcNote (nameLoc (varName id_)))
-                                (Text.pack . name2String $ varName id_)
-                                (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
-                     ) $ filter ((/= result) . varName . fst) binders
-  decls <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
+  netDecls <- mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+  decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
+
+  (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
   let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (Text.pack $ name2String result, resType)
-      component      = Component componentName' compInps [compOutp] (netDecls ++ decls)
+      component      = Component componentName' compInps [(rw,compOutp)] (netDecls ++ decls)
   return (sp,component)
+
+mkNetDecl :: (Id, Embed Term) -> NetlistMonad Declaration
+mkNetDecl (id_,tm) = do
+  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType id_))
+  return $ NetDecl' (addSrcNote (nameLoc nm))
+             wr
+             (Text.pack (name2String nm))
+             (Right hwTy)
+
   where
+    nm = varName id_
+    wr = case unembed tm of
+           Case _ _ (_:_:_) -> Reg
+           _ -> Wire
+
     addSrcNote loc = if isGoodSrcSpan loc
                         then Just (Text.pack (showSDocUnsafe (ppr loc)))
                         else Nothing
-
 
 genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> String -> TmName -> Identifier
 genComponentName seen mkId prefix nm =
@@ -385,7 +397,7 @@ mkFunApp dst fun args = do
       normalized <- Lens.use bindings
       case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
-          (_,Component compName compInps [compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
+          (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
           if length args == length compInps
             then do argTys                <- mapM (termType tcm) args
                     let dstId = Text.pack . name2String $ varName dst
