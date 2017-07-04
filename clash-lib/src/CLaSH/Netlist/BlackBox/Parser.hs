@@ -69,6 +69,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> I                 <$> (pToken "~ARG" *> pBrackets pNatural)
      <|> L                 <$> (pToken "~LIT" *> pBrackets pNatural)
      <|> N                 <$> (pToken "~NAME" *> pBrackets pNatural)
+     <|> Var               <$> (pToken "~VAR" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> (Sym Text.empty)  <$> (pToken "~SYM" *> pBrackets pNatural)
      <|> Typ Nothing       <$  pToken "~TYPO"
      <|> (Typ . Just)      <$> (pToken "~TYP" *> pBrackets pNatural)

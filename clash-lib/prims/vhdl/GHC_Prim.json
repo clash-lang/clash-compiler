@@ -769,12 +769,10 @@ end block;
     return ~SYM[2](3,a(0 to 5));
   end function;
 
-  signal ~GENSYM[s][4] : ~TYP[0];
-  signal ~GENSYM[s_reversed][5] : ~TYP[0];
+  signal ~GENSYM[w_reversed][5] : ~TYP[0];
 begin
-  ~SYM[4] <= ~ARG[0];
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
-    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[7]);
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
   end generate;
 ~IF ~IW64 ~THEN
   ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 56)),~SIZE[~TYPO]);
@@ -824,12 +822,10 @@ end block;
     return ~SYM[2](4,b(0 to 7));
   end function;
 
-  signal ~GENSYM[s][4] : ~TYP[0];
-  signal ~GENSYM[s_reversed][5] : ~TYP[0];
+  signal ~GENSYM[w_reversed][5] : ~TYP[0];
 begin
-  ~SYM[4] <= ~ARG[0];
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
-    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[7]);
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
   end generate;
 ~IF ~IW64 ~THEN
   ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 48)),~SIZE[~TYPO]);
@@ -881,12 +877,10 @@ end block;
     return ~SYM[2](5,c(0 to 9));
   end function;
 
-  signal ~GENSYM[s][4] : ~TYP[0];
-  signal ~GENSYM[s_reversed][5] : ~TYP[0];
+  signal ~GENSYM[w_reversed][5] : ~TYP[0];
 begin
-  ~SYM[4] <= ~ARG[0];
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
-    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[3]);
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[3]);
   end generate;
 ~IF ~IW64 ~THEN
   ~RESULT <= resize(~SYM[3](~SYM[5](63 downto 32)),~SIZE[~TYPO]);
@@ -940,12 +934,10 @@ end block;
     return ~SYM[2](6,d(0 to 11));
   end function;
 
-  signal ~GENSYM[s][4] : ~TYP[0];
-  signal ~GENSYM[s_reversed][5] : ~TYP[0];
+  signal ~GENSYM[w_reversed][5] : ~TYP[0];
 begin
-  ~SYM[4] <= ~ARG[0];
-  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~SYM[4]'range generate
-    ~SYM[5](~SYM[4]'high - ~SYM[7]) <= ~SYM[4](~SYM[7]);
+  ~GENSYM[reverse_loop][6] : for ~GENSYM[n][7] in ~VAR[w][0]'range generate
+    ~SYM[5](~VAR[w][0]'high - ~SYM[7]) <= ~VAR[w][0](~SYM[7]);
   end generate;
 
   ~RESULT <= resize(~SYM[3](~SYM[5]),~SIZE[~TYPO]);
@@ -1011,12 +1003,10 @@ end block;
   end function;
 ~FI
 
-  signal ~GENSYM[s][5] : ~TYP[0];
-  signal ~GENSYM[s_reversed][6] : ~TYP[0];
+  signal ~GENSYM[w_reversed][6] : ~TYP[0];
 begin
-  ~SYM[5] <= ~ARG[0];
-  ~GENSYM[reverse_loop][7] : for ~GENSYM[n][8] in ~SYM[5]'range generate
-    ~SYM[6](~SYM[5]'high - ~SYM[8]) <= ~SYM[5](~SYM[8]);
+  ~GENSYM[reverse_loop][7] : for ~GENSYM[n][8] in ~VAR[w][0]'range generate
+    ~SYM[6](~VAR[w][0]'high - ~SYM[8]) <= ~VAR[w][0](~SYM[8]);
   end generate;
 ~IF ~IW64 ~THEN
   ~RESULT <= resize(~SYM[3](~SYM[6]),~SIZE[~TYPO]);
@@ -1031,14 +1021,9 @@ end block;
     { "name"      : "GHC.Prim.byteSwap16#"
     , "type"      : "byteSwap16# :: Word# -> Word#"
     , "templateD" :
-"-- byteSwap16 begin
-~GENSYM[byteSwap16][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];~IF ~IW64 ~THEN
-  ~RESULT <= ~SYM[1](63 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);~ELSE
-  ~RESULT <= ~SYM[1](31 downto 16) & ~SYM[1](7 downto 0) & ~SYM[1](15 downto 8);~FI
-end block;
+"-- byteSwap16 begin~IF ~IW64 ~THEN
+~RESULT <= ~VAR[w][0](63 downto 16) & ~VAR[w][0](7 downto 0) & ~VAR[w][0](15 downto 8);~ELSE
+~RESULT <= ~VAR[w][0](31 downto 16) & ~VAR[w][0](7 downto 0) & ~VAR[w][0](15 downto 8);~FI
 -- byteSwap16 end"
     }
   }
@@ -1046,16 +1031,11 @@ end block;
     { "name"      : "GHC.Prim.byteSwap32#"
     , "type"      : "byteSwap32# :: Word# -> Word#"
     , "templateD" :
-"-- byteSwap32 begin
-~GENSYM[byteSwap32][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];~IF ~IW64 ~THEN
-  ~RESULT <= ~SYM[1](63 downto 32) & ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-                                   & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);~ELSE
-  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);~FI
-end block;
+"-- byteSwap32 begin~IF ~IW64 ~THEN
+~RESULT <= ~VAR[w][0](63 downto 32) & ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+                                    & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~ELSE
+~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~FI
 -- byteSwap32 end"
     }
   }
@@ -1064,15 +1044,10 @@ end block;
     , "type"      : "byteSwap64# :: Word# -> Word#"
     , "templateD" :
 "-- byteSwap64 begin
-~GENSYM[byteSwap64][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24)
-           & ~SYM[1](39 downto 32) & ~SYM[1](47 downto 40)
-           & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);
-end block;
+~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24)
+         & ~VAR[w][0](39 downto 32) & ~VAR[w][0](47 downto 40)
+         & ~VAR[w][0](55 downto 48) & ~VAR[w][0](63 downto 56);
 -- byteSwap64 end"
     }
   }
@@ -1080,103 +1055,50 @@ end block;
     { "name"      : "GHC.Prim.byteSwap#"
     , "type"      : "byteSwap# :: Word# -> Word#"
     , "templateD" :
-"-- byteSwap begin
-~GENSYM[byteSwap][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];~IF ~IW64 ~THEN
-  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24)
-           & ~SYM[1](39 downto 32) & ~SYM[1](47 downto 40)
-           & ~SYM[1](55 downto 48) & ~SYM[1](63 downto 56);~ELSE
-  ~RESULT <= ~SYM[1](7  downto 0 ) & ~SYM[1](15 downto 8)
-           & ~SYM[1](23 downto 16) & ~SYM[1](31 downto 24);~FI
-end block;
+"-- byteSwap begin ~IF ~IW64 ~THEN
+~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24)
+         & ~VAR[w][0](39 downto 32) & ~VAR[w][0](47 downto 40)
+         & ~VAR[w][0](55 downto 48) & ~VAR[w][0](63 downto 56);~ELSE
+~RESULT <= ~VAR[w][0](7  downto 0 ) & ~VAR[w][0](15 downto 8)
+         & ~VAR[w][0](23 downto 16) & ~VAR[w][0](31 downto 24);~FI
 -- byteSwap end"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Int#"
     , "type"      : "narrow8Int# :: Int# -> Int#"
-    , "templateD" :
-"-- narrow8Int begin
-~GENSYM[narrow8Int][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= resize(~SYM[1](7 downto 0),~SIZE[~TYPO]);
-end block;
--- narrow8Int end"
+    , "templateE" : "resize(~VAR[i][0](7 downto 0),~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow16Int#"
     , "type"      : "narrow16Int# :: Int# -> Int#"
-    , "templateD" :
-"-- narrow16Int begin
-~GENSYM[narrow16Int][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= resize(~SYM[1](15 downto 0),~SIZE[~TYPO]);
-end block;
--- narrow16Int end"
+    , "templateE" : "resize(~VAR[i][0](15 downto 0),~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow32Int#"
     , "type"      : "narrow32Int# :: Int# -> Int#"
-    , "templateD" :
-"-- narrow32Int begin
-~GENSYM[narrow32Int][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= resize(~SYM[1](31 downto 0),~SIZE[~TYPO]);
-end block;
--- narrow32Int end"
+    , "templateE" : "resize(~VAR[i][0](31 downto 0),~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow8Word#"
     , "type"      : "narrow8Word# :: Word# -> Word#"
-    , "templateD" :
-"-- narrow8Word begin
-~GENSYM[narrow8Word][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= resize(~SYM[1](7 downto 0),~SIZE[~TYPO]);
-end block;
--- narrow8Word end"
+    , "templateE" : "resize(~VAR[w][0](7 downto 0),~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow16Word#"
     , "type"      : "narrow16Word# :: Word# -> Word#"
-    , "templateD" :
-"-- narrow16Word begin
-~GENSYM[narrow16Word][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= resize(~SYM[1](15 downto 0),~SIZE[~TYPO]);
-end block;
--- narrow16Word end"
+    , "templateE" : "resize(~VAR[w][0](15 downto 0),~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
     { "name"      : "GHC.Prim.narrow32Word#"
     , "type"      : "narrow32Word# :: Word# -> Word#"
-    , "templateD" :
-"-- narrow32Word begin
-~GENSYM[narrow32Word][0] : block
-  signal ~GENSYM[s][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= resize(~SYM[1](31 downto 0),~SIZE[~TYPO]);
-end block;
--- narrow32Word end"
+    , "templateE" : "resize(~VAR[w][0](31 downto 0),~SIZE[~TYPO])"
     }
   }
 , { "Primitive" :

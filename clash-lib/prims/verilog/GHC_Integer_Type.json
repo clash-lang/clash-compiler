@@ -45,17 +45,12 @@
     , "type"      : "divInteger :: Integer -> Integer -> Integer"
     , "templateD" :
 "// divInteger begin
-wire ~SIGD[~GENSYM[quot_res][0]][0];
-wire ~SIGD[~GENSYM[dividend][1]][0];
-wire ~SIGD[~GENSYM[divider][2]][1];
-
 // divide (rounds towards zero)
-assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+wire ~SIGD[~GENSYM[quot_res][0]][0];
+assign ~SYM[0] = ~VAR[dividend][0] / ~VAR[divider][1];
 
 // round toward minus infinity
-assign ~SYM[1] = ~ARG[0];
-assign ~SYM[2] = ~ARG[1];
-assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ? ~SYM[0] : ~SYM[0] - ~SIZE[~TYPO]'sd1;
+assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ? ~SYM[0] : ~SYM[0] - ~SIZE[~TYPO]'sd1;
 // divInteger end"
     }
   }
@@ -64,19 +59,14 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ? ~SYM[0] 
     , "type"      : "modInteger :: Integer -> Integer -> Integer"
     , "templateD" :
 "// modInteger begin
-wire ~SIGD[~GENSYM[rem_res][0]][0];
-wire ~SIGD[~GENSYM[dividend][1]][0];
-wire ~SIGD[~GENSYM[divider][2]][1];
-assign ~SYM[1] = ~ARG[0];
-assign ~SYM[2] = ~ARG[1];
-
 // remainder
-assign ~SYM[0] = ~SYM[1] % ~SYM[2];
+wire ~SIGD[~GENSYM[rem_res][0]][0];
+assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];
 
 // modulo
-assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
+assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?
                  ~SYM[0] :
-                 (~SYM[1] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~SYM[2]);
+                 ((~VAR[dividend][0] == ~SIZE[~TYPO]'sd0) ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
 // modInteger end"
     }
   }

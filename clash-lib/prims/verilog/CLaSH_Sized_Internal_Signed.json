@@ -136,19 +136,14 @@
     { "name"      : "CLaSH.Sized.Internal.Signed.div#"
     , "type"      : "div# :: Signed n -> Signed n -> Signed n"
     , "templateD" :
-"// divInt begin
-wire ~SIGD[~GENSYM[quot_res][0]][0];
-wire ~SIGD[~GENSYM[dividend][1]][0];
-wire ~SIGD[~GENSYM[divider][2]][1];
-
+"// divSigned begin
 // divide (rounds towards zero)
-assign ~SYM[0] = ~ARG[0] / ~ARG[1];
+wire ~SIGD[~GENSYM[quot_res][0]][1];
+assign ~SYM[0] = ~VAR[dividend][1] / ~VAR[divider][2];
 
 // round toward minus infinity
-assign ~SYM[1] = ~ARG[0];
-assign ~SYM[2] = ~ARG[1];
-assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ? ~SYM[0] : ~SYM[0] - ~SIZE[~TYPO]'sd1;
-// divInt end"
+assign ~RESULT = (~VAR[dividend][1][~LIT[0]-1] == ~VAR[divider][2][~LIT[0]-1]) ? ~SYM[0] : ~SYM[0] - ~LIT[0]'sd1;
+// divSigned end"
     }
   }
 , { "BlackBox" :
@@ -156,19 +151,14 @@ assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ? ~SYM[0] 
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
     , "templateD" :
 "// modSigned begin
-wire ~SIGD[~GENSYM[rem_res][0]][0];
-wire ~SIGD[~GENSYM[dividend][1]][0];
-wire ~SIGD[~GENSYM[divider][2]][1];
-assign ~SYM[1] = ~ARG[0];
-assign ~SYM[2] = ~ARG[1];
-
 // remainder
-assign ~SYM[0] = ~SYM[1] % ~SYM[2];
+~SIGD[~GENSYM[rem_res][0]][0];
+assign ~SYM[0] = ~VAR[dividend][0] % ~VAR[divider][1];
 
 // modulo
-assign ~RESULT = (~SYM[1][~SIZE[~TYPO]-1] == ~SYM[2][~SIZE[~TYPO]-1]) ?
+assign ~RESULT = (~VAR[dividend][0][~SIZE[~TYPO]-1] == ~VAR[divider][1][~SIZE[~TYPO]-1]) ?
                  ~SYM[0] :
-                 (~SYM[1] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~SYM[2]);
+                 (~VAR[dividend][0] == ~SIZE[~TYPO]'sd0 ? ~SIZE[~TYPO]'sd0 : ~SYM[0] + ~VAR[divider][1]);
 // modSigned end"
     }
   }
@@ -243,15 +233,13 @@ assign ~RESULT = $signed(~SYM[0][~LIT[0]-1 : 0]);
     , "templateD" :
 "// resize begin
 ~GENERATE
-if (~LIT[1] < ~LIT[0]) begin
-  // truncate, sign preserving
-  wire ~SIGD[~GENSYM[s][0]][2];
-  assign ~SYM[0] = ~ARG[2];
-  assign ~RESULT = $signed({~SYM[0][~LIT[0]-1],~SYM[0][(~LIT[1]-2):0]});
-end else begin
-  // sign-extend
-  assign ~RESULT = $signed(~ARG[2]);
-end
+  if (~LIT[1] < ~LIT[0]) begin
+    // truncate, sign preserving
+    assign ~RESULT = $signed({~VAR[s][2][~LIT[0]-1],~VAR[s][2][(~LIT[1]-2):0]});
+  end else begin
+    // sign-extend
+    assign ~RESULT = $signed(~VAR[s][2]);
+  end
 ~ENDGENERATE
 // resize end"
     }

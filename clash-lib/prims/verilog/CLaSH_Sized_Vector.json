@@ -1,49 +1,25 @@
 [ { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.head"
     , "type"      : "head :: Vec (n + 1) a -> a"
-    , "templateD" :
-"// head begin
-wire ~SIGD[~GENSYM[vec][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]];
-// head end"
+    , "templateE" : "~VAR[vec][0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.tail"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
-    , "templateD" :
-"// tail begin
-wire ~SIGD[~GENSYM[vec][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1 : 0];
-// tail end"
+    , "templateE" : "~VAR[vec][0][~SIZE[~TYPO]-1 : 0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.last"
     , "type"      : "Vec (n + 1) a -> a"
-    , "templateD" :
-"// last begin
-wire ~SIGD[~GENSYM[vec][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = ~SYM[0][~SIZE[~TYPO]-1:0];
-// last end"
+    , "templateE" : "~VAR[vec][0][~SIZE[~TYPO]-1:0]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Vector.init"
     , "type"      : "Vec (n + 1) a -> Vec n a"
-    , "templateD" :
-"// init begin
-wire ~SIGD[~GENSYM[vec][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]];
-// init end"
+    , "templateE" : "~VAR[vec][0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]]"
     }
   }
 , { "BlackBox" :
@@ -57,14 +33,11 @@ assign ~RESULT = ~SYM[0][~SIZE[~TYP[0]]-1 : ~SIZE[~TYPEL[~TYP[0]]]];
         -> Vec n a"
     , "templateD" :
 "// select begin
-wire ~SIGD[~GENSYM[vec][0]][4];
-assign ~SYM[0] = ~ARG[4];
-
 wire ~TYPEL[~TYPO] ~SYM[1] [0:~LENGTH[~TYP[4]]-1];
 genvar ~GENSYM[i][2];
 ~GENERATE
 for (~SYM[2]=0; ~SYM[2] < ~LENGTH[~TYP[4]]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][3]
-  assign ~SYM[1][(~LENGTH[~TYP[4]]-1)-~SYM[2]] = ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
+  assign ~SYM[1][(~LENGTH[~TYP[4]]-1)-~SYM[2]] = ~VAR[vec][4][~SYM[2]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
 end
 ~ENDGENERATE
 
@@ -110,16 +83,13 @@ end
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "// map begin
-wire ~SIGD[~GENSYM[vec][0]][1];
-assign ~SYM[0] = ~ARG[1];
-
 genvar ~GENSYM[i][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[map][2]
   wire ~TYPEL[~TYP[1]] ~GENSYM[map_in][3];
   ~OUTPUTWIREREG[0] ~TYPEL[~TYPO] ~GENSYM[map_out][4];
 
-  assign ~SYM[3] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
+  assign ~SYM[3] = ~VAR[vec][1][~SYM[1]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
   ~INST 0
     ~OUTPUT <= ~SYM[4]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~TYPEL[~TYP[1]]~
@@ -135,9 +105,6 @@ end
     , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "// imap begin
-wire ~SIGD[~GENSYM[vec][0]][2];
-assign ~SYM[0] = ~ARG[2];
-
 genvar ~GENSYM[i][1];
 ~GENERATE
 for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[imap][2]
@@ -146,7 +113,7 @@ for (~SYM[1]=0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM
   ~OUTPUTWIREREG[1] ~TYPEL[~TYPO] ~GENSYM[map_out][5];
 
   assign ~SYM[3] = ~LENGTH[~TYPO] - 1 - ~SYM[1];
-  assign ~SYM[4] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
+  assign ~SYM[4] = ~VAR[vec][2][~SYM[1]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   ~INST 1
     ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~INDEXTYPE[~LIT[0]]~
@@ -163,11 +130,6 @@ end
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
 "// zipWith start
-wire ~SIGD[~GENSYM[vec1][0]][1];
-wire ~SIGD[~GENSYM[vec2][1]][2];
-assign ~SYM[0] = ~ARG[1];
-assign ~SYM[1] = ~ARG[2];
-
 genvar ~GENSYM[i][2];
 ~GENERATE
 for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[zipWith][6]
@@ -175,8 +137,8 @@ for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENS
   wire ~TYPEL[~TYP[2]] ~GENSYM[zipWith_in2][4];
   ~OUTPUTWIREREG[0] ~TYPEL[~TYPO] ~SYM[5];
 
-  assign ~SYM[3] = ~SYM[0][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
-  assign ~SYM[4] = ~SYM[1][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
+  assign ~SYM[3] = ~VAR[vec1][1][~SYM[2]*~SIZE[~TYPEL[~TYP[1]]]+:~SIZE[~TYPEL[~TYP[1]]]];
+  assign ~SYM[4] = ~VAR[vec2][2][~SYM[2]*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   ~INST 0
     ~OUTPUT <= ~SYM[5]~ ~TYPEL[~TYPO]~
     ~INPUT  <= ~SYM[3]~ ~TYPEL[~TYP[1]]~
@@ -196,9 +158,6 @@ end
 wire ~TYPO ~GENSYM[intermediate][0] [0:~LENGTH[~TYP[2]]];
 assign ~SYM[0][~LENGTH[~TYP[2]]] = ~ARG[1];
 
-wire ~TYP[2] ~GENSYM[xs][2];
-assign ~SYM[2] = ~ARG[2];
-
 genvar ~GENSYM[i][3];
 ~GENERATE
 for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[foldr][4]
@@ -206,7 +165,7 @@ for (~SYM[3]=0; ~SYM[3] < ~LENGTH[~TYP[2]]; ~SYM[3]=~SYM[3]+1) begin : ~GENSYM[f
   wire ~TYPO ~GENSYM[foldr_in2][6];
   ~OUTPUTWIREREG[0] ~TYPO ~GENSYM[foldr_out][7];
 
-  assign ~SYM[5] = ~SYM[2][(~LENGTH[~TYP[2]]-1-~SYM[3])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
+  assign ~SYM[5] = ~VAR[xs][2][(~LENGTH[~TYP[2]]-1-~SYM[3])*~SIZE[~TYPEL[~TYP[2]]]+:~SIZE[~TYPEL[~TYP[2]]]];
   assign ~SYM[6] = ~SYM[0][~SYM[3]+1];
   ~INST 0
     ~OUTPUT <= ~SYM[7]~ ~TYP[1]~
@@ -231,12 +190,11 @@ assign ~RESULT = ~ARG[1];
 "// fold begin
 // put flat input array into the first half of the intermediate array
 wire ~TYPO ~GENSYM[intermediate][0] [0:(2*~LENGTH[~TYP[1]])-2];
-wire ~TYP[1] ~GENSYM[vecflat][1];
-assign ~SYM[1] = ~ARG[1];
+
 genvar ~GENSYM[i][2];
 ~GENERATE
 for (~SYM[2]=0; ~SYM[2] < ~LENGTH[~TYP[1]]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][3]
-  assign ~SYM[0][(~LENGTH[~TYP[1]]-1)-~SYM[2]] = ~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  assign ~SYM[0][(~LENGTH[~TYP[1]]-1)-~SYM[2]] = ~VAR[vecflat][1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
 end
 ~ENDGENERATE
 
@@ -297,12 +255,10 @@ assign ~RESULT = ~SYM[0][(2*~LENGTH[~TYP[1]])-2];
 "// indexVec begin
 wire ~TYPO ~GENSYM[vec][0] [0:~LIT[0]-1];
 
-wire ~TYP[1] ~GENSYM[vecflat][1];
-assign ~SYM[1] = ~ARG[1];
 genvar ~GENSYM[i][2];
 ~GENERATE
 for (~SYM[2]=0; ~SYM[2] < ~LIT[0]; ~SYM[2]=~SYM[2]+1) begin : ~GENSYM[mk_array][3]
-  assign ~SYM[0][(~LIT[0]-1)-~SYM[2]] = ~SYM[1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
+  assign ~SYM[0][(~LIT[0]-1)-~SYM[2]] = ~VAR[vecflat][1][~SYM[2]*~SIZE[~TYPO]+:~SIZE[~TYPO]];
 end
 ~ENDGENERATE
 
@@ -315,14 +271,11 @@ assign ~RESULT = ~SYM[0][~ARG[2]];
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
 "// replaceVec start
-wire ~TYP[1] ~GENSYM[vecflat][0];
-assign ~SYM[0] = ~ARG[1];
-
 reg ~TYP[3] ~GENSYM[vec][1] [0:~LIT[0]-1];
 integer ~GENSYM[i][2];
 always @(*) begin
   for (~SYM[2]=0;~SYM[2]<~LIT[0];~SYM[2]=~SYM[2]+1) begin
-    ~SYM[1][~LIT[0]-1-~SYM[2]] = ~SYM[0][~SYM[2]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
+    ~SYM[1][~LIT[0]-1-~SYM[2]] = ~VAR[vecflat][1][~SYM[2]*~SIZE[~TYP[3]]+:~SIZE[~TYP[3]]];
   end
   ~SYM[1][~ARG[2]] = ~ARG[3];
 end
@@ -359,15 +312,12 @@ end
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
     , "templateD" :
 "// transpose begin
-wire ~SIGD[~GENSYM[matrix][0]][1];
-assign ~SYM[0] = ~ARG[1];
-
 genvar ~GENSYM[row_index][1];
 genvar ~GENSYM[col_index][2];
 ~GENERATE
 for (~SYM[1] = 0; ~SYM[1] < ~LENGTH[~TYP[1]]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[transpose_outer][3]
   for (~SYM[2] = 0; ~SYM[2] < ~LENGTH[~TYPO]; ~SYM[2] = ~SYM[2] + 1) begin : ~GENSYM[transpose_inner][4]
-    assign ~RESULT[((~SYM[2]*~SIZE[~TYPEL[~TYPO]])+(~SYM[1]*~SIZE[~TYPEL[~TYPEL[~TYPO]]]))+:~SIZE[~TYPEL[~TYPEL[~TYPO]]]] = ~SYM[0][((~SYM[1]*~SIZE[~TYPEL[~TYP[1]]])+(~SYM[2]*~SIZE[~TYPEL[~TYPEL[~TYPO]]]))+:~SIZE[~TYPEL[~TYPEL[~TYPO]]]];
+    assign ~RESULT[((~SYM[2]*~SIZE[~TYPEL[~TYPO]])+(~SYM[1]*~SIZE[~TYPEL[~TYPEL[~TYPO]]]))+:~SIZE[~TYPEL[~TYPEL[~TYPO]]]] = ~VAR[matrix][1][((~SYM[1]*~SIZE[~TYPEL[~TYP[1]]])+(~SYM[2]*~SIZE[~TYPEL[~TYPEL[~TYPO]]]))+:~SIZE[~TYPEL[~TYPEL[~TYPO]]]];
   end
 end
 ~ENDGENERATE
@@ -379,13 +329,10 @@ end
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
 "// reverse begin
-wire ~SIGD[~GENSYM[vec][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
 genvar ~GENSYM[i][1];
 ~GENERATE
 for (~SYM[1] = 0; ~SYM[1] < ~LENGTH[~TYPO]; ~SYM[1] = ~SYM[1] + 1) begin : ~GENSYM[reverse][2]
-  assign ~RESULT[(~LENGTH[~TYPO] - 1 - ~SYM[1])*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~SYM[0][~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
+  assign ~RESULT[(~LENGTH[~TYPO] - 1 - ~SYM[1])*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]] = ~VAR[vec][0][~SYM[1]*~SIZE[~TYPEL[~TYPO]]+:~SIZE[~TYPEL[~TYPO]]];
 end
 ~ENDGENERATE
 // reverse end"
@@ -420,17 +367,14 @@ end
     , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "templateD" :
 "// rotateLeftS begin
-wire ~TYP[1] ~GENSYM[vec][1];
 localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
-
-assign ~SYM[1] = ~ARG[1];
 
 ~GENERATE
 if (~SYM[2] == 0) begin : ~GENSYM[no_shift][3]
-  assign ~RESULT = ~SYM[1];
+  assign ~RESULT = ~VAR[vec][1];
 end else begin : ~GENSYM[do_shift][4]
-  assign ~RESULT = {~SYM[1][((~LIT[0]-~SYM[2])*~SIZE[~TYPEL[~TYPO]])-1 : 0]
-                   ,~SYM[1][~SIZE[~TYPO]-1 : (~LIT[0]-~SYM[2])*~SIZE[~TYPEL[~TYPO]]]
+  assign ~RESULT = {~VAR[vec][1][((~LIT[0]-~SYM[2])*~SIZE[~TYPEL[~TYPO]])-1 : 0]
+                   ,~VAR[vec][1][~SIZE[~TYPO]-1 : (~LIT[0]-~SYM[2])*~SIZE[~TYPEL[~TYPO]]]
                    };
 end
 ~ENDGENERATE
@@ -442,17 +386,14 @@ end
     , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "templateD" :
 "// rotateRightS begin
-wire ~TYP[1] ~GENSYM[vec][1];
 localparam ~GENSYM[shift_amount][2] = ~LIT[2] % ~LIT[0];
-
-assign ~SYM[1] = ~ARG[1];
 
 ~GENERATE
 if (~SYM[2] == 0) begin : ~GENSYM[no_shift][3]
-  assign ~RESULT = ~SYM[1];
+  assign ~RESULT = ~VAR[vec][1];
 end else begin : ~GENSYM[do_shift][4]
-  assign ~RESULT = {~SYM[1][(~SYM[2]*~SIZE[~TYPEL[~TYPO]])-1 : 0]
-                   ,~SYM[1][~SIZE[~TYPO]-1 : ~SYM[2]*~SIZE[~TYPEL[~TYPO]]]
+  assign ~RESULT = {~VAR[vec][1][(~SYM[2]*~SIZE[~TYPEL[~TYPO]])-1 : 0]
+                   ,~VAR[vec][1][~SIZE[~TYPO]-1 : ~SYM[2]*~SIZE[~TYPEL[~TYPO]]]
                    };
 end
 ~ENDGENERATE

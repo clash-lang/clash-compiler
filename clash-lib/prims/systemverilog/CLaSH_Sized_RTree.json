@@ -7,25 +7,13 @@
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.RTree.textract"
     , "type"      : "textract :: RTree 0 a -> a"
-    , "templateD" :
-"// textract begin
-~SIGD[~GENSYM[tree][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = ~FROMBV[~SYM[0][\\0\\]][~TYPO];
-// textract end"
+    , "templateE" : "~FROMBV[~VAR[tree][0][\\0\\]][~TYPO]"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.RTree.tsplit"
     , "type"      : "tsplit:: RTree (d+1) a -> (RTree d a,RTree d a)"
-    , "templateD" :
-"// tsplit begin
-~SIGD[~GENSYM[tree][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = ~TOBV[~SYM[0]][~TYP[0]];
-// tsplit end"
+    , "templateE" : "~TOBV[~VAR[tree][0]][~TYP[0]]"
     }
   }
 ]

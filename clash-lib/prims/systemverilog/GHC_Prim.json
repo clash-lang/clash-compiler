@@ -1627,11 +1627,9 @@ assign ~RESULT = $unsigned(~SYM[7]);
     { "name"      : "GHC.Prim.byteSwap16#"
     , "type"      : "byteSwap16# :: Word# -> Word#"
     , "templateD" :
-"// byteSwap16 begin
-~SIGDO[~GENSYM[w][0]];
-assign ~SYM[0] = ~ARG[0];~IF ~IW64 ~THEN
-assign ~RESULT = {~SYM[0][63:16],~SYM[0][7:0],~SYM[0][15:8]};~ELSE
-assign ~RESULT = {~SYM[0][31:16],~SYM[0][7:0],~SYM[0][15:8]};~FI
+"// byteSwap16 begin~IF ~IW64 ~THEN
+assign ~RESULT = {~VAR[w][0][63:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~ELSE
+assign ~RESULT = {~VAR[w][0][31:16],~VAR[w][0][7:0],~VAR[w][0][15:8]};~FI
 // byteSwap16 end"
     }
   }
@@ -1639,11 +1637,9 @@ assign ~RESULT = {~SYM[0][31:16],~SYM[0][7:0],~SYM[0][15:8]};~FI
     { "name"      : "GHC.Prim.byteSwap32#"
     , "type"      : "byteSwap32# :: Word# -> Word#"
     , "templateD" :
-"// byteSwap32 begin
-~SIGDO[~GENSYM[w][0]];
-assign ~SYM[0] = ~ARG[0];~IF ~IW64 ~THEN
-assign ~RESULT = {~SYM[0][63:32],~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};~ELSE
-assign ~RESULT = {~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};~FI
+"// byteSwap32 begin~IF ~IW64 ~THEN
+assign ~RESULT = {~VAR[w][0][63:32],~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~ELSE
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
 // byteSwap32 end"
     }
   }
@@ -1652,10 +1648,8 @@ assign ~RESULT = {~SYM[0][7:0],~SYM[0][15:8],~SYM[0][23:16],~SYM[0][31:24]};~FI
     , "type"      : "byteSwap64# :: Word# -> Word#"
     , "templateD" :
 "// byteSwap64 begin
-~SIGDO[~GENSYM[w][1]];
-assign ~SYM[1] = ~ARG[0];
-assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
-                 ,~SYM[1][39:32],~SYM[1][47:40],~SYM[1][55:48],~SYM[1][63:56]};
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
+                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};
 // byteSwap64 end"
     }
   }
@@ -1663,12 +1657,10 @@ assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
     { "name"      : "GHC.Prim.byteSwap#"
     , "type"      : "byteSwap# :: Word# -> Word#"
     , "templateD" :
-"// byteSwap begin
-~SIGDO[~GENSYM[w][1]];
-assign ~SYM[1] = ~ARG[0];~IF ~IW64 ~THEN
-assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]
-                 ,~SYM[1][39:32],~SYM[1][47:40],~SYM[1][55:48],~SYM[1][63:56]};~ELSE
-assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]};~FI
+"// byteSwap begin~IF ~IW64 ~THEN
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]
+                 ,~VAR[w][0][39:32],~VAR[w][0][47:40],~VAR[w][0][55:48],~VAR[w][0][63:56]};~ELSE
+assign ~RESULT = {~VAR[w][0][7:0],~VAR[w][0][15:8],~VAR[w][0][23:16],~VAR[w][0][31:24]};~FI
 // byteSwap end"
     }
   }
@@ -1677,10 +1669,7 @@ assign ~RESULT = {~SYM[1][7:0],~SYM[1][15:8],~SYM[1][23:16],~SYM[1][31:24]};~FI
     , "type"      : "narrow8Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow8Int begin
-~SIGD[~GENSYM[s][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = $signed(~SYM[0][7:0]);
+assign ~RESULT = $signed(~VAR[i][0][7:0]);
 // narrow8Int end"
     }
   }
@@ -1689,10 +1678,7 @@ assign ~RESULT = $signed(~SYM[0][7:0]);
     , "type"      : "narrow16Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow16Int begin
-~SIGD[~GENSYM[s][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = $signed(~SYM[0][15:0]);
+assign ~RESULT = $signed(~VAR[i][0][15:0]);
 // narrow16Int end"
     }
   }
@@ -1701,10 +1687,7 @@ assign ~RESULT = $signed(~SYM[0][15:0]);
     , "type"      : "narrow32Int# :: Int# -> Int#"
     , "templateD" :
 "// narrow32Int begin
-~SIGD[~GENSYM[s][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = $signed(~SYM[0][31:0]);
+assign ~RESULT = $signed(~VAR[i][0][31:0]);
 // narrow32Int end"
     }
   }
@@ -1713,10 +1696,7 @@ assign ~RESULT = $signed(~SYM[0][31:0]);
     , "type"      : "narrow8Int# :: Word# -> Word#"
     , "templateD" :
 "// narrow8Word begin
-~SIGD[~GENSYM[w][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = $unsigned(~SYM[0][7:0]);
+assign ~RESULT = $unsigned(~VAR[w][0][7:0]);
 // narrow8Word end"
     }
   }
@@ -1725,10 +1705,7 @@ assign ~RESULT = $unsigned(~SYM[0][7:0]);
     , "type"      : "narrow16Word# :: Word# -> Word#"
     , "templateD" :
 "// narrow16Word begin
-~SIGD[~GENSYM[w][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = $unsigned(~SYM[0][15:0]);
+assign ~RESULT = $unsigned(~VAR[w][0][15:0]);
 // narrow16Word end"
     }
   }
@@ -1737,10 +1714,7 @@ assign ~RESULT = $unsigned(~SYM[0][15:0]);
     , "type"      : "narrow32Int# :: Word# -> Word#"
     , "templateD" :
 "// narrow32Word begin
-~SIGD[~GENSYM[w][0]][0];
-assign ~SYM[0] = ~ARG[0];
-
-assign ~RESULT = $unsigned(~SYM[0][31:0]);
+assign ~RESULT = $unsigned(~VAR[w][0][31:0]);
 // narrow32Word end"
     }
   }

@@ -82,12 +82,14 @@ mkBlackBoxContext resId args = do
 prepareBlackBox :: TextS.Text
                 -> BlackBoxTemplate
                 -> BlackBoxContext
-                -> NetlistMonad BlackBoxTemplate
+                -> NetlistMonad (BlackBoxTemplate,[Declaration])
 prepareBlackBox pNm templ bbCtx =
   if verifyBlackBoxContext bbCtx templ
-     then instantiateCompName >=>
-          setSym bbCtx >=>
-          collectFilePaths bbCtx $ templ
+     then do
+        t1 <- instantiateCompName templ
+        (t2,decls) <- setSym bbCtx t1
+        t3 <- collectFilePaths bbCtx t2
+        return (t3,decls)
      else do
        (_,sp) <- Lens.use curCompNm
        templ' <- prettyBlackBox templ
@@ -111,8 +113,9 @@ mkArgument bndr e = do
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
                 ,Void,False),[])
       Just hwTy -> case collectArgs e of
-        (Var _ v,[]) -> do vT <- (`Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String v)
-                           return ((vT,hwTy,False),[])
+        (C.Var _ v,[]) -> do
+          vT <- (`Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String v)
+          return ((vT,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
@@ -151,22 +154,23 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
               wr' = if wr then Reg else Wire
           (dst',dstNm,dstDecl) <- resBndr True wr' dst
           (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-          bbDecl <- N.BlackBoxD pNm (library p) (imports p) (qsysInclude p) <$> prepareBlackBox pNm tempD bbCtx <*> pure bbCtx
-          return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ [bbDecl])
+          (templ,templDecl) <- prepareBlackBox pNm tempD bbCtx
+          let bbDecl = N.BlackBoxD pNm (library p) (imports p) (qsysInclude p) templ bbCtx
+          return (Identifier dstNm Nothing,dstDecl ++ ctxDcls ++ templDecl ++ [bbDecl])
         (Right tempE) -> do
           let pNm = name p
           if bbEasD
             then do
               (dst',dstNm,dstDecl) <- resBndr True Wire dst
               (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-              bbTempl <- prepareBlackBox pNm tempE bbCtx
+              (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
               let tmpAssgn = Assignment dstNm (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen)
-              return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ [tmpAssgn])
+              return (Identifier dstNm Nothing, dstDecl ++ ctxDcls ++ templDecl ++ [tmpAssgn])
             else do
               (dst',_,_) <- resBndr False Wire dst
               (bbCtx,ctxDcls) <- mkBlackBoxContext dst' (lefts args)
-              bbTempl <- prepareBlackBox pNm tempE bbCtx
-              return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls)
+              (bbTempl,templDecl) <- prepareBlackBox pNm tempE bbCtx
+              return (BlackBoxE pNm (library p) (imports p) (qsysInclude p) bbTempl bbCtx bbEParen,ctxDcls ++ templDecl)
     Just (P.Primitive pNm _)
       | pNm == "GHC.Prim.tagToEnum#" -> do
           hwTy <- N.unsafeCoreTypeToHWTypeM $(curLoc) ty
@@ -270,7 +274,7 @@ mkFunInput resId e = do
                       dcAss  = Assignment (pack "~RESULT") dcApp
                   return (Right dcAss)
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
-            Var _ (nameOcc -> fun) -> do
+            C.Var _ (nameOcc -> fun) -> do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
@@ -286,9 +290,9 @@ mkFunInput resId e = do
   case templ of
     Left (_, oreg, Left templ') -> do
       l   <- instantiateCompName templ'
-      l'  <- setSym bbCtx l
+      (l',templDecl)  <- setSym bbCtx l
       l'' <- collectFilePaths bbCtx l'
-      return ((Left l'',if oreg then Reg else Wire,bbCtx),dcls)
+      return ((Left l'',if oreg then Reg else Wire,bbCtx),dcls ++ templDecl)
     Left (_, _, Right templ') -> do
       templ'' <- prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
