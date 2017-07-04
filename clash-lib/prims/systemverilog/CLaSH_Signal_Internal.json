@@ -76,7 +76,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #30 forever begin
+  #3000 forever begin
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
     ~RESULT = ~ ~RESULT;
@@ -101,7 +101,7 @@ end
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #30 while (~ARG[3]) begin
+  #3000 while (~ARG[3]) begin
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
     ~RESULT = ~ ~RESULT;
@@ -121,7 +121,7 @@ end
 "// pragma translate_off
 initial begin
   #1  ~RESULT = 1;
-  #19 ~RESULT = 0;
+  #1999 ~RESULT = 0;
 end
 // pragma translate_on"
     }
@@ -133,7 +133,7 @@ end
 "// pragma translate_off
 initial begin
   #1  ~RESULT = 1;
-  #30 ~RESULT = 0;
+  #3099 ~RESULT = 0;
 end
 // pragma translate_on"
     }

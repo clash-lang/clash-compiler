@@ -118,7 +118,7 @@ end process;~FI~FI
   constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
 begin
   ~RESULT <= '0';
-  wait for 30 ps;
+  wait for 3000 ps;
   loop
     ~RESULT <= not ~RESULT;
     wait for ~SYM[1];
@@ -145,7 +145,7 @@ end process;
   constant ~GENSYM[half_period][1] : time := ~LIT[2]0 ps / 2;
 begin
   ~RESULT <= '0';
-  wait for 30 ps;
+  wait for 3000 ps;
   while ~ARG[3] loop
     ~RESULT <= not ~RESULT;
     wait for ~SYM[1];
@@ -164,7 +164,7 @@ end process;
     , "templateD" :
 "-- pragma translate_off
 ~RESULT <= '1',
-           '0' after 20 ps;
+           '0' after 2000 ps;
 -- pragma translate_on"
     }
   }
@@ -175,7 +175,7 @@ end process;
     , "templateD" :
 "-- pragma translate_off
 ~RESULT <= '1',
-           '0' after 31 ps;
+           '0' after 3100 ps;
 -- pragma translate_on"
     }
   }
