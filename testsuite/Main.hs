@@ -28,36 +28,36 @@ main =
       [runTest "examples"             defBuild [] "ALU"          ([""],"ALU_topEntity",False)
       ,runTest "examples"             VHDL     [] "Blinker"      (["blinker"],"blinker",False)
       ,runTest "examples"             defBuild [] "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
-      ,runTest "examples"             defBuild [] "Calculator"   (["","Calculator_testBench"],"Calculator_testBench_testBench",True )
+      ,runTest "examples"             defBuild [] "Calculator"   (["","Calculator_testBench"],"Calculator_testBench",True )
       ,runTest "examples"             defBuild [] "CochleaPlus"  ([""],"CochleaPlus_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest "examples"             defBuild [] "FIR"          (["","FIR_testBench"],"FIR_testBench_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest "examples"             defBuild [] "FIR"          (["","FIR_testBench"],"FIR_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest "examples"             defBuild [] "Fifo"         ([""],"Fifo_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest "examples"             defBuild [] "MAC"          (["","MAC_testBench"],"MAC_testBench_testBench",True)
-      ,runTest "examples"             defBuild [] "MatrixVect"   (["","MatrixVect_testBench"],"MatrixVect_testBench_testBench",True)
+      ,runTest "examples"             defBuild [] "MAC"          (["","MAC_testBench"],"MAC_testBench",True)
+      ,runTest "examples"             defBuild [] "MatrixVect"   (["","MatrixVect_testBench"],"MatrixVect_testBench",True)
       ,runTest "examples"             defBuild [] "Queens"       ([""],"Queens_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest "examples"             defBuild [] "Reducer"      ([""],"Reducer_topEntity",False)
       ,runTest "examples"             defBuild [] "Sprockell"    ([""],"Sprockell_topEntity",False)
       ,runTest "examples"             defBuild [] "Windows"      ([""],"Windows_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      (["","CRC32_testBench"],"CRC32_testBench_testBench",True)  -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+      ,runTest ("examples" </> "crc32") defBuild [] "CRC32"      (["","CRC32_testBench"],"CRC32_testBench",True)  -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest ("examples" </> "i2c") defBuild ["-O2"] "I2C"     (["i2c","bitmaster","bytemaster"],"i2c",False)
       ]
     , testGroup "unit-tests"
         [ testGroup "Basic"
             [ runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "BangData"            ([""],"BangData_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Trace"               ([""],"Trace_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ByteSwap32"          (["","ByteSwap32_testBench"],"ByteSwap32_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CharTest"            (["","CharTest_testBench"],"CharTest_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ClassOps"            (["","ClassOps_testBench"],"ClassOps_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CountTrailingZeros"  (["","CountTrailingZeros_testBench"],"CountTrailingZeros_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ByteSwap32"          (["","ByteSwap32_testBench"],"ByteSwap32_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CharTest"            (["","CharTest_testBench"],"CharTest_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ClassOps"            (["","ClassOps_testBench"],"ClassOps_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CountTrailingZeros"  (["","CountTrailingZeros_testBench"],"CountTrailingZeros_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "DivMod"              ([""],"DivMod_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"IrrefError_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop"          ([""],"LambdaDrop_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","LotOfStates_testBench"],"LotOfStates_testBench_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","LotOfStates_testBench"],"LotOfStates_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives"    ([""],"NestedPrimitives_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NestedPrimitives2"   ([""],"NestedPrimitives2_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NORX"                (["","NORX_testBench"],"NORX_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "NORX"                (["","NORX_testBench"],"NORX_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "PatError"            ([""],"PatError_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "PopCount"            (["","PopCount_testBench"],"PopCount_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "PopCount"            (["","PopCount_testBench"],"PopCount_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "RecordSumOfProducts" ([""],"RecordSumOfProducts_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "Shift"               ([""],"Shift_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "SimpleConstructor"   ([""],"SimpleConstructor_topEntity",False)
@@ -66,8 +66,8 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TwoFunctions"        ([""],"TwoFunctions_topEntity",False)
             ]
         , testGroup "BitVector"
-            [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box"     (["","Box_testBench"],"Box_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow" (["","BoxGrow_testBench"],"BoxGrow_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box"     (["","Box_testBench"],"Box_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "BoxGrow" (["","BoxGrow_testBench"],"BoxGrow_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "RePack"  ([""],"RePack_topEntity",False)
             ]
         , testGroup "BoxedFunctions"
@@ -78,27 +78,27 @@ main =
             , runTest ("tests" </> "shouldwork" </> "CSignal") defBuild [] "MAC"           ([""],"MAC_topEntity",False)
             ]
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-            [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)
             ]
         , testGroup "Fixed"
-            [ runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "Mixer"      (["","Mixer_testBench"],"Mixer_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "SFixedTest" (["","SFixedTest_testBench"],"SFixedTest_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "Mixer"      (["","Mixer_testBench"],"Mixer_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "SFixedTest" (["","SFixedTest_testBench"],"SFixedTest_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "SatWrap"    ([""],"SatWrap_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "ZeroInt"    (["","ZeroInt_testBench"],"ZeroInt_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "ZeroInt"    (["","ZeroInt_testBench"],"ZeroInt_testBench",True)
             ]
         , testGroup "Floating"
             [ runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-clash-float-support"] "FloatPack" ([""],"FloatPack_topEntity",False)
             ]
         , testGroup "HOPrim"
-            [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","HOImap_testBench"],"HOImap_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap"   (["","TestMap_testBench"],"TestMap_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Transpose" (["","Transpose_testBench"],"Transpose_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun"    (["","VecFun_testBench"],"VecFun_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","HOImap_testBench"],"HOImap_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "TestMap"   (["","TestMap_testBench"],"TestMap_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "Transpose" (["","Transpose_testBench"],"Transpose_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "VecFun"    (["","VecFun_testBench"],"VecFun_testBench",True)
             ]
         , testGroup "Numbers"
-            [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"  (["","Bounds_testBench"],"Bounds_testBench_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"  (["","Resize_testBench"],"Resize_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2" (["","Resize2_testBench"],"Resize2_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Bounds"  (["","Bounds_testBench"],"Bounds_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize"  (["","Resize_testBench"],"Resize_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "Resize2" (["","Resize2_testBench"],"Resize2_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Numbers") defBuild [] "SatMult" ([""],"SatMult_topEntity",False)
             ]
         , testGroup "Polymorphism"
@@ -111,48 +111,48 @@ main =
             ]
         , testGroup "Signal"
             [ runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "AlwaysHigh"   ([""],"AlwaysHigh_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamFile" (["","BlockRamFile_testBench"],"BlockRamFile_testBench_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamFile" (["","BlockRamFile_testBench"],"BlockRamFile_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "MAC"          ([""],"MAC_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "NoCPR"        (["example"],"example",False)
-            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Ram"          (["","Ram_testBench"],"Ram_testBench_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Rom"          (["","Rom_testBench"],"Rom_testBench_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RomFile"      (["","RomFile_testBench"],"RomFile_testBench_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Ram"          (["","Ram_testBench"],"Ram_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "Rom"          (["","Rom_testBench"],"Rom_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
+            , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "RomFile"      (["","RomFile_testBench"],"RomFile_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "SigP"         ([""],"SigP_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             ]
         , testGroup "Testbench" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/1152
-            [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-clash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Testbench") defBuild [] "SyncTB"                    (["","SyncTB_testBench"],"SyncTB_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-clash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Testbench") defBuild [] "SyncTB"                    (["","SyncTB_testBench"],"SyncTB_testBench",True)
             ]
         , testGroup "Vector"
-            [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat"    (["","Concat_testBench"],"Concat_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold"     (["","DFold_testBench"],"DFold_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold2"    (["","DFold2_testBench"],"DFold2_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DTFold"    (["","DTFold_testBench"],"DTFold_testBench_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Concat"    (["","Concat_testBench"],"Concat_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold"     (["","DFold_testBench"],"DFold_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DFold2"    (["","DFold2_testBench"],"DFold2_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "DTFold"    (["","DTFold_testBench"],"DTFold_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "EnumTypes" ([""],"EnumTypes_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FindIndex" (["","FindIndex_testBench"],"FindIndex_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Fold"      (["","Fold_testBench"],"Fold_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Foldr"     (["","Foldr_testBench"],"Foldr_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "FindIndex" (["","FindIndex_testBench"],"FindIndex_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Fold"      (["","Fold_testBench"],"Fold_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Foldr"     (["","Foldr_testBench"],"Foldr_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOClock"   ([""],"HOClock_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/115
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOCon"     ([""],"HOCon_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "HOPrim"    ([""],"HOPrim_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Minimum"   (["","Minimum_testBench"],"Minimum_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Minimum"   (["","Minimum_testBench"],"Minimum_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "MovingAvg" ([""],"MovingAvg_topEntity", False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/115
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "PatHOCon"  ([""],"PatHOCon_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Scatter"   (["","Scatter_testBench"],"Scatter_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Scatter"   (["","Scatter_testBench"],"Scatter_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Split"     ([""],"Split_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "ToList"    (["","ToList_testBench"],"ToList_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Unconcat"  (["","Unconcat_testBench"],"Unconcat_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "ToList"    (["","ToList_testBench"],"ToList_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "Unconcat"  (["","Unconcat_testBench"],"Unconcat_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VACC"      ([""],"VACC_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VIndex"    ([""],"VIndex_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VFold"     (["","VFold_testBench"],"VFold_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VFold"     (["","VFold_testBench"],"VFold_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMapAccum" ([""],"VMapAccum_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMerge"    (["","VMerge_testBench"],"VMerge_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReplace"  (["","VReplace_testBench"],"VReplace_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReverse"  (["","VReverse_testBench"],"VReverse_testBench_testBench",True)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VRotate"   (["","VRotate_testBench"],"VRotate_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VMerge"    (["","VMerge_testBench"],"VMerge_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReplace"  (["","VReplace_testBench"],"VReplace_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VReverse"  (["","VReverse_testBench"],"VReverse_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VRotate"   (["","VRotate_testBench"],"VRotate_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VScan"     ([""],"VScan_topEntity",False)
-            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VSelect"   (["","VSelect_testBench"],"VSelect_testBench_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VSelect"   (["","VSelect_testBench"],"VSelect_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VZip"      ([""],"VZip_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecConst"  ([""],"VecConst_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Vector") defBuild [] "VecOfSum"  ([""],"VecOfSum_topEntity",False)

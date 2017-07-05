@@ -24,6 +24,7 @@ import CLaSH.Core.Type   (Type)
 
 import CLaSH.Rewrite.Types (DebugLevel)
 import CLaSH.Netlist.BlackBox.Types (HdlSyn)
+import CLaSH.Netlist.Types (Identifier)
 
 -- | Global function binders
 type BindingMap = HashMap TmOccName (TmName,Type,SrcSpan,Term)
@@ -66,5 +67,9 @@ data Manifest
     --
     -- Used when dealing with multiple @TopEntity@s who have different names
     -- for types which are structurally equal
+  , componentNames :: [Identifier]
+    -- ^ Names of all the generated components for the @TopEntity@ (does not
+    -- include the names of the components of the @TestBench@ accompanying
+    -- the @TopEntity@).
   }
   deriving (Show,Read)

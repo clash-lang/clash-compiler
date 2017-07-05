@@ -87,16 +87,16 @@ generateHDL
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
 generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
-  opts (startTime,prepTime) = go prepTime topEntities where
+  opts (startTime,prepTime) = go prepTime [] topEntities where
 
   primMap' = HM.map parsePrimitive primMap
 
   -- No more TopEntities to process
-  go prevTime [] = putStrLn $ "Total compilation took " ++
+  go prevTime _ [] = putStrLn $ "Total compilation took " ++
                               show (Clock.diffUTCTime prevTime startTime)
 
   -- Process the next TopEntity
-  go prevTime ((topEntity,_,annM,benchM):topEntities') = do
+  go prevTime seen ((topEntity,_,annM,benchM):topEntities') = do
   putStrLn $ "Compiling: " ++ name2String topEntity
 
   -- Some initial setup
@@ -118,7 +118,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   (sameTopHash,sameBenchHash,manifest) <- do
     let topHash    = hash (annM,callGraphBindings bindingsMap (nameOcc topEntity))
         benchHashM = fmap (hash . (annM,) . callGraphBindings bindingsMap . nameOcc) benchM
-        manifestI  = Manifest (topHash,benchHashM) [] []
+        manifestI  = Manifest (topHash,benchHashM) [] [] []
 
         manFile = maybe (hdlDir </> Text.unpack topNm <.> "manifest")
                         (\ann -> hdlDir </> t_name ann </> t_name ann <.> "manifest")
@@ -139,11 +139,11 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                    <$> Supply.newSupply
   let topEntityNames = map (\(x,_,_,_) -> nameOcc x) topEntities
 
-  (topTime,manifest') <- if sameTopHash
+  (topTime,manifest',seen') <- if sameTopHash
     then do
       putStrLn ("Using cached result for: " ++ name2String topEntity)
       topTime <- Clock.getCurrentTime
-      return (topTime,manifest)
+      return (topTime,manifest,componentNames manifest ++ seen)
     else do
       -- 1. Normalise topEntity
       let transformedBindings = normalizeEntity bindingsMap primMap' tcm tupTcm
@@ -155,9 +155,9 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
-                              tcm typeTrans modName [] iw mkId extId (HM.empty,[topNm])
-                              hdlDir (nameOcc topEntity)
+      (netlist,dfiles,seen') <- genNetlist transformedBindings topEntities primMap'
+                                tcm typeTrans [] iw mkId extId (topNm:seen)
+                                hdlDir (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = Clock.diffUTCTime netlistTime normTime
@@ -166,7 +166,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       -- 3. Generate topEntity wrapper
       let topComponent = head $
             filter (\(_,Component cName _ _ _) ->
-              Text.isSuffixOf (genComponentName [topNm] mkId modName topEntity)
+              Text.isSuffixOf (genComponentName [topNm] mkId topEntity)
                 cName)
               netlist
           topWrapper = mkTopWrapper mkId annM modName (snd topComponent)
@@ -179,13 +179,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       copyDataFiles (opt_importPaths opts) dir dfiles
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
-      return (topTime,manifest')
+      return (topTime,manifest',seen')
 
   benchTime <- case benchM of
     Just tb | not sameBenchHash -> do
       putStrLn $ "Compiling: " ++ name2String tb
 
-      let modName'  = Text.unpack (genComponentName [] mkId modName tb)
+      let modName'  = Text.unpack (genComponentName [] mkId tb)
           hdlState2 = setModName modName' hdlState'
 
       -- 1. Normalise testBench
@@ -197,7 +197,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
-                              tcm typeTrans modName' [] iw mkId extId (HM.empty,[topNm])
+                              tcm typeTrans [] iw mkId extId seen'
                               hdlDir (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -223,7 +223,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
     Nothing -> return topTime
 
-  go benchTime topEntities'
+  go benchTime seen' topEntities'
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
 parsePrimitive (BlackBox pNm oReg libM imps inc templT) =
@@ -264,7 +264,8 @@ createHDL backend modName components (topName,manifestE) = flip evalState backen
   manifest <- either return (\m -> do
       topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (inputs top)
       topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd . snd) (outputs top)
-      return (m {portInTypes = topInTypes, portOutTypes = topOutTypes})
+      let compNames = map (componentName.snd) components
+      return (m {portInTypes = topInTypes, portOutTypes = topOutTypes, componentNames = compNames})
     ) manifestE
   let manDoc = ( topName <.> "manifest"
                , text (Text.pack (show manifest)))

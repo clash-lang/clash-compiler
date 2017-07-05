@@ -24,7 +24,7 @@ import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
-import           Data.List                        (elemIndex)
+import           Data.List                        (elemIndex, intersperse)
 import qualified Data.Text.Lazy                   as Text
 import           System.FilePath                  ((</>), (<.>))
 import           Unbound.Generics.LocallyNameless
@@ -69,8 +69,6 @@ genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
            -- ^ TyCon cache
            -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
-           -> String
-           -- ^ Name of the module containing the @topEntity@
            -> [(String,FilePath)]
            -- ^ Set of collected data-files
            -> Int
@@ -79,17 +77,17 @@ genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
            -- ^ valid identifiers
            -> (IdType -> Identifier -> Identifier -> Identifier)
            -- ^ extend valid identifiers
-           -> (HashMap TmOccName (SrcSpan,Component), [Identifier])
+           -> [Identifier]
            -- ^ Seen components
            -> FilePath
            -- ^ HDL dir
            -> TmOccName
            -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmOccName (SrcSpan,Component), [Identifier]))
-genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId extId seen env topEntity = do
+           -> IO ([(SrcSpan,Component)],[(String,FilePath)],[Identifier])
+genNetlist globals tops primMap tcm typeTrans dfiles iw mkId extId seen env topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
-              modName dfiles iw mkId extId seen env $ genComponent topEntity
-  return (HashMap.elems $ _components s, _dataFiles s, (_components s, _seenComps s))
+             dfiles iw mkId extId seen env $ genComponent topEntity
+  return (HashMap.elems $ _components s, _dataFiles s, _seenComps s)
   where
     mkTopEntityMap
       :: [(TmName,Type,Maybe TopEntity,Maybe TmName)]
@@ -107,8 +105,6 @@ runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
                 -- ^ TyCon cache
                 -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
-                -> String
-                -- ^ Name of the module containing the @topEntity@
                 -> [(String,FilePath)]
                 -- ^ Set of collected data-files
                 -> Int
@@ -117,31 +113,30 @@ runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
                 -- ^ valid identifiers
                 -> (IdType -> Identifier -> Identifier -> Identifier)
                 -- ^ extend valid identifiers
-                -> (HashMap TmOccName (SrcSpan,Component), [Identifier])
+                -> [Identifier]
                 -- ^ Seen components
                 -> FilePath
                 -- ^ HDL dir
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId extId (seen,seenIds_) env
+runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
-    (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
+    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
+    (seenIds',names) = genNames mkId seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)
-         -> String
          -> [Identifier]
          -> HashMap TmOccName Identifier
          -> [TmName]
          -> ([Identifier], HashMap TmOccName Identifier)
-genNames mkId modName = go
+genNames mkId = go
   where
     go s m []       = (s,m)
-    go s m (nm:nms) = let nm' = genComponentName s mkId modName nm
+    go s m (nm:nms) = let nm' = genComponentName s mkId nm
                           s'  = nm':s
                           m'  = HashMap.insert (nameOcc nm) nm' m
                       in  go s' m' nms
@@ -229,18 +224,14 @@ mkNetDecl (id_,tm) = do
                         then Just (Text.pack (showSDocUnsafe (ppr loc)))
                         else Nothing
 
-genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> String -> TmName -> Identifier
-genComponentName seen mkId prefix nm =
-  let i = mkId Basic . stripDollarPrefixes . last
-        . Text.splitOn (Text.pack ".") . Text.pack
-        $ name2String nm
-      i' = if Text.null i
-              then Text.pack "Component"
-              else i
-      i'' = mkId Basic (Text.pack (prefix ++ "_") `Text.append` i')
-  in  if i'' `elem` seen
-         then go 0 i''
-         else i''
+genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> TmName -> Identifier
+genComponentName seen mkId nm =
+  let nm' = Text.splitOn (Text.pack ".") (Text.pack (name2String nm))
+      fn  = mkId Basic (stripDollarPrefixes (last nm'))
+      fn' = if Text.null fn then Text.pack "Component" else fn
+      nm2 = Text.concat (intersperse (Text.pack "_") (init nm' ++ [fn']))
+      nm3 = mkId Basic nm2
+  in  if nm3 `elem` seen then go 0 nm3 else nm3
   where
     go :: Integer -> Identifier -> Identifier
     go n i =
