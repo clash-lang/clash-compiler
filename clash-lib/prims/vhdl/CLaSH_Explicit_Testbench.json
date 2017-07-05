@@ -29,18 +29,25 @@
   end;
   signal ~GENSYM[actual][2] : ~TYP[5];
   signal ~GENSYM[expected][3] : ~TYP[6];
+~IF ~ISGATED[2] ~THEN
+  signal ~GENSYM[clk][4] : std_logic;
+  signal ~GENSYM[ce][5]  : boolean;
+~ELSE ~FI
   -- pragma translate_on
 begin
   -- pragma translate_off
   ~SYM[2] <= ~ARG[5];
   ~SYM[3] <= ~ARG[6];
-  process(~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE,~ARG[3]~FI) is
+  process(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI~IF ~ISSYNC[3] ~THEN ~ELSE,~ARG[3]~FI) is
   begin
-    if (rising_edge(~ARG[2])~IF ~ISSYNC[3] ~THEN ~ELSE or falling_edge(~ARG[3])~FI) then
+    if (rising_edge(~IF ~ISGATED[2] ~THEN~SYM[4]~ELSE~ARG[2]~FI)~IF ~ISSYNC[3] ~THEN ~ELSE or falling_edge(~ARG[3])~FI) then
       assert (std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
     end if;
   end process;
   -- pragma translate_on
+~IF ~ISGATED[2] ~THEN
+  (~SYM[4],~SYM[5]) <= ~ARG[2];
+~ELSE ~FI
   ~RESULT <= ~ARG[7];
 end block;
 -- assert end"
