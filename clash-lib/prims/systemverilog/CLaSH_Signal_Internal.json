@@ -120,7 +120,7 @@ end
     , "templateD" :
 "// pragma translate_off
 initial begin
-  #1  ~RESULT = 1;
+  #1    ~RESULT = 1;
   #1999 ~RESULT = 0;
 end
 // pragma translate_on"
@@ -131,9 +131,10 @@ end
     , "type" : "asyncResetGen :: Reset domain Synchronous"
     , "templateD" :
 "// pragma translate_off
+localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
 initial begin
-  #1  ~RESULT = 1;
-  #3099 ~RESULT = 0;
+  #1 ~RESULT = 1;
+  #~SYM[1] ~RESULT = 0;
 end
 // pragma translate_on"
     }

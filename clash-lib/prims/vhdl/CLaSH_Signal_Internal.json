@@ -171,11 +171,13 @@ end process;
 , { "BlackBox" :
     { "name"      : "CLaSH.Signal.Internal.syncResetGen"
     , "type" :
-"asyncResetGen :: Reset domain 'Synchronous"
+"syncResetGen :: ( domain ~ 'Dom n clkPeriod
+                 , KnownNat clkPeriod )
+              => Reset domain 'Synchronous"
     , "templateD" :
 "-- pragma translate_off
 ~RESULT <= '1',
-           '0' after 3100 ps;
+           '0' after (2999 ps + ~LIT[1]0 ps);
 -- pragma translate_on"
     }
   }

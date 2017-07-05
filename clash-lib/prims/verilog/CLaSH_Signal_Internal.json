@@ -146,9 +146,10 @@ assign ~RESULT = ~SYM[0];
     , "templateD" :
 "// pragma translate_off
 reg ~TYPO ~GENSYM[rst][0];
+localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
 initial begin
-  #1    ~SYM[0] = 1;
-  #3099 ~SYM[0] = 0;
+  #1 ~SYM[0] = 1;
+  #~SYM[1] ~SYM[0] = 0;
 end
 assign ~RESULT = ~SYM[0];
 // pragma translate_on"
