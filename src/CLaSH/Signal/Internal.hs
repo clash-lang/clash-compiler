@@ -421,7 +421,9 @@ asyncResetGen = Async (True :- pure False)
 --
 -- __NB__: Can only be used for components with an /active-high/ reset
 -- port, which all __clash-prelude__ components are.
-syncResetGen :: Reset domain 'Synchronous
+syncResetGen :: ( domain ~ 'Dom n clkPeriod
+                , KnownNat clkPeriod )
+             => Reset domain 'Synchronous
 syncResetGen = Sync (True :- pure False)
 {-# NOINLINE syncResetGen #-}
 
