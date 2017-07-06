@@ -1,3 +1,20 @@
+{-|
+
+We simulate DDR signal by using 'Signal's which have exactly half the period
+(or double the speed) of our normal 'Signal's.
+
+The primives in this module can be used to produce of consume DDR signals.
+
+DDR signals are not meant to be used internally in a design,
+but only to communicate with the outside world.
+
+In some cases hardware specific DDR IN registers can be infered by synthesis tools
+from these generic primitives. But to be sure your design will synthesize to
+dedicated hardware resources use the functions from "CLaSH.Intel.DDR"
+or "CLaSH.Xilinx.DDR".
+
+-}
+
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -6,7 +23,7 @@
 
 
 module CLaSH.Explicit.DDR
-  ( -- * DDR primitives
+  (
     ddrIn
   , ddrOut
     -- * Internal
@@ -23,6 +40,8 @@ import CLaSH.Signal.Internal
 
 {- | DDR input primitive
 
+Consumes a DDR input signal and produces a regular signal containing a pair of values.
+
 -}
 ddrIn :: ( HasCallStack
          , fast ~ 'Dom n pFast
@@ -31,7 +50,7 @@ ddrIn :: ( HasCallStack
       -> Reset slow synchronous     -- ^ reset
       -> (a, a, a)                  -- ^ reset values
       -> Signal fast a              -- ^ DDR input signal
-      -> Signal slow (a,a)
+      -> Signal slow (a,a)          -- ^ normal speed output pairs
 ddrIn clk rst (i0,i1,i2) = withFrozenCallStack $ ddrIn# clk rst i0 i1 i2
 
 
@@ -103,6 +122,7 @@ ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 xs
 
 {- | DDR output primitive
 
+Produces a DDR output signal from a normal signal of pairs of input.
 -}
 ddrOut :: ( HasCallStack
           , fast ~ 'Dom n pFast
@@ -110,8 +130,8 @@ ddrOut :: ( HasCallStack
        => Clock slow gated            -- ^ clock
        -> Reset slow synchronous      -- ^ reset
        -> a                           -- ^ reset value
-       -> Signal slow (a,a)           -- ^ normal speed input pair
-       -> Signal fast a               -- ^ DDR output
+       -> Signal slow (a,a)           -- ^ normal speed input pairs
+       -> Signal fast a               -- ^ DDR output signal
 ddrOut clk rst i0 = uncurry (withFrozenCallStack $ ddrOut# clk rst i0) . unbundle
 
 
