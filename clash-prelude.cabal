@@ -91,6 +91,7 @@ Library
 
                       CLaSH.Explicit.BlockRam
                       CLaSH.Explicit.BlockRam.File
+                      CLaSH.Explicit.DDR
                       CLaSH.Explicit.Mealy
                       CLaSH.Explicit.Moore
                       CLaSH.Explicit.RAM
