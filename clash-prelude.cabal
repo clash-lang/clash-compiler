@@ -105,6 +105,7 @@ Library
                       CLaSH.Explicit.Testbench
 
                       CLaSH.Intel.ClockGen
+                      CLaSH.Intel.DDR
 
                       CLaSH.NamedTypes
 
@@ -149,6 +150,7 @@ Library
                       CLaSH.XException
 
                       CLaSH.Xilinx.ClockGen
+                      CLaSH.Xilinx.DDR
 
                       CLaSH.Tutorial
                       CLaSH.Examples
