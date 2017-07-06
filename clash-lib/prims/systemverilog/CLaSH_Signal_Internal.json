@@ -101,14 +101,14 @@ end
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #3000 while (~ARG[3]) begin
+  #3000 forever begin
+    if (~ ~ARG[3]) begin
+      $finish;
+    end
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
-  end
-  if (~ ~ARG[3]) begin
-    $finish;
   end
 end
 // pragma translate_on"

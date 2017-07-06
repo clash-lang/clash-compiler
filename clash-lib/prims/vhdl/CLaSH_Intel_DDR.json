@@ -1,0 +1,101 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Intel.DDR.altddioIn"
+    , "type" :
+"altddioIn
+  :: ( HasCallStack               -- ARG[0]
+     , fast ~ Dom n pFast         -- ARG[1]
+     , slow ~ Dom n (2*pFast)     -- ARG[2]
+     , KnownNat m )               -- ARG[3]
+  => SSymbol deviceFamily         -- ARG[4]
+  -> Clock slow gated             -- ARG[5]
+  -> Reset slow synchronous       -- ARG[6]
+  -> Signal fast (BitVector m)    -- ARG[7]
+  -> Signal slow (BitVector m,BitVector m)"
+    , "libraries" : ["altera_mf"]
+    , "imports" : ["altera_mf.altera_mf_components.all"]
+    , "templateD" :
+"-- altddioIn begin
+~GENSYM[~COMPNAME_ALTDDIO_IN][0] : block
+  signal ~GENSYM[dataout_l][1] : ~TYP[7];
+  signal ~GENSYM[dataout_h][2] : ~TYP[7];~IF ~ISGATED[5] ~THEN
+  signal ~GENSYM[clk][4] : std_logic;
+  signal ~GENSYM[ce][5]  : boolean;
+  signal ~GENSYM[ce_logic][6]: std_logic;~ELSE ~FI
+begin~IF ~ISGATED[5] ~THEN
+  (~SYM[4],~SYM[5]) <= ~ARG[5];
+  ~SYM[6] <= '1' when (~SYM[5]) else '0';~ELSE ~FI
+  ~GENSYM[~COMPNAME_ALTDDIO_IN][7] : ALTDDIO_IN
+  GENERIC MAP (
+    intended_device_family => ~LIT[4],
+    invert_input_clocks => \"OFF\",
+    lpm_hint => \"UNUSED\",
+    lpm_type => \"altddio_in\",
+    power_up_high => \"OFF\",
+    width => ~SIZE[~TYP[7]]
+  )
+  PORT MAP (~IF ~ISSYNC[6] ~THEN
+    sclr      => ~ARG[6],~ELSE
+    aclr      => ~ARG[6],~FI
+    datain    => ~ARG[7],~IF ~ISGATED[5] ~THEN
+    inclock   => ~SYM[4],
+    inclocken => ~SYM[6],~ELSE
+    inclock   => ~ARG[5],~FI
+    dataout_h => ~SYM[2],
+    dataout_l => ~SYM[1]
+  );
+  ~RESULT <= (~SYM[1],~SYM[2]);
+end block;
+-- altddioIn end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Intel.DDR.altddioOut#"
+    , "type" :
+"altddioOut#
+  :: ( HasCallStack             -- ARG[0]
+     , fast ~ Dom n pFast       -- ARG[1]
+     , slow ~ Dom n (2*pFast)   -- ARG[2]
+     , KnownNat m )             -- ARG[3]
+  => SSymbol deviceFamily       -- ARG[4]
+  -> Clock slow gated           -- ARG[5]
+  -> Reset slow synchronous     -- ARG[6]
+  -> Signal slow (BitVector m)  -- ARG[7]
+  -> Signal slow (BitVector m)  -- ARG[8]
+  -> Signal fast (BitVector m)"
+    , "libraries" : ["altera_mf"]
+    , "imports" : ["altera_mf.altera_mf_components.all"]
+    , "templateD" :
+"-- altddioOut begin
+~GENSYM[~COMPNAME_ALTDDIO_OUT][0] : block ~IF ~ISGATED[5] ~THEN
+  signal ~GENSYM[clk][1]            : std_logic;
+  signal ~GENSYM[ce][2]             : boolean;
+  signal ~GENSYM[ce_logic][3]       : std_logic; ~ELSE ~FI
+begin~IF ~ISGATED[5] ~THEN
+  (~SYM[1],~SYM[2]) <= ~ARG[5];
+  ~SYM[3] <= '1' when (~SYM[2]) else '0'; ~ELSE ~FI
+  ~GENSYM[~COMPNAME_ALTDDIO_OUT][7] : ALTDDIO_OUT
+    GENERIC MAP (
+      extend_oe_disable => \"OFF\",
+      intended_device_family => ~LIT[4],
+      invert_output => \"OFF\",
+      lpm_hint => \"UNUSED\",
+      lpm_type => \"altddio_out\",
+      oe_reg => \"UNREGISTERED\",
+      power_up_high => \"OFF\",
+      width => ~SIZE[~TYPO]
+    )
+    PORT MAP (~IF ~ISSYNC[6] ~THEN
+      sclr       => ~ARG[6],~ELSE
+      aclr       => ~ARG[6],~FI ~IF ~ISGATED[5] ~THEN
+      outclock   => ~SYM[1],
+      outclocken => ~SYM[3],~ELSE
+      outclock   => ~ARG[5],~FI
+      datain_h   => ~ARG[7],
+      datain_l   => ~ARG[8],
+      dataout    => ~RESULT
+    );
+end block;
+-- altddioOut end"
+    }
+  }
+]

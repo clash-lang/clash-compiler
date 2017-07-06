@@ -110,14 +110,14 @@ reg ~TYPO ~GENSYM[clk][0];
 localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
 always begin
   ~SYM[0] = 0;
-  #3000 while (~ARG[3]) begin
+  #3000 forever begin
+    if (~ ~ARG[3]) begin
+      $finish;
+    end
     ~SYM[0] = ~ ~SYM[0];
     #~SYM[1];
     ~SYM[0] = ~ ~SYM[0];
     #~SYM[1];
-  end
-  if (~ ~ARG[3]) begin
-    $finish;
   end
 end
 assign ~RESULT = ~SYM[0];
