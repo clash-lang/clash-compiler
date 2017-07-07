@@ -1,4 +1,7 @@
 {-|
+Copyright  :  (C) 2017, Google Inc
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 We simulate DDR signal by using 'Signal's which have exactly half the period
 (or double the speed) of our normal 'Signal's.
@@ -12,7 +15,6 @@ In some cases hardware specific DDR IN registers can be infered by synthesis too
 from these generic primitives. But to be sure your design will synthesize to
 dedicated hardware resources use the functions from "CLaSH.Intel.DDR"
 or "CLaSH.Xilinx.DDR".
-
 -}
 
 {-# LANGUAGE DataKinds           #-}
@@ -21,10 +23,8 @@ or "CLaSH.Xilinx.DDR".
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-
 module CLaSH.Explicit.DDR
-  (
-    ddrIn
+  ( ddrIn
   , ddrOut
     -- * Internal
   , ddrIn#
@@ -38,92 +38,99 @@ import CLaSH.Explicit.Prelude
 import CLaSH.Signal.Internal
 
 
-{- | DDR input primitive
-
-Consumes a DDR input signal and produces a regular signal containing a pair of values.
-
--}
-ddrIn :: ( HasCallStack
-         , fast ~ 'Dom n pFast
-         , slow ~ 'Dom n (2*pFast))
-      => Clock slow gated           -- ^ clock
-      -> Reset slow synchronous     -- ^ reset
-      -> (a, a, a)                  -- ^ reset values
-      -> Signal fast a              -- ^ DDR input signal
-      -> Signal slow (a,a)          -- ^ normal speed output pairs
+-- | DDR input primitive
+--
+-- Consumes a DDR input signal and produces a regular signal containing a pair
+-- of values.
+ddrIn
+  :: ( HasCallStack
+     , fast ~ 'Dom n pFast
+     , slow ~ 'Dom n (2*pFast))
+  => Clock slow gated
+  -- ^ clock
+  -> Reset slow synchronous
+  -- ^ reset
+  -> (a, a, a)
+  -- ^ reset values
+  -> Signal fast a
+  -- ^ DDR input signal
+  -> Signal slow (a,a)
+  -- ^ normal speed output pairs
 ddrIn clk rst (i0,i1,i2) = withFrozenCallStack $ ddrIn# clk rst i0 i1 i2
 
 
 -- For details about all the seq's en seqX's
 -- see the [Note: register strictness annotations] in CLaSH.Signal.Internal
-ddrIn# :: forall a slow fast n pFast gated synchronous.
-          ( HasCallStack
-          , fast ~ 'Dom n pFast
-          , slow ~ 'Dom n (2*pFast))
-       => Clock slow gated
-       -> Reset slow synchronous
-       -> a
-       -> a
-       -> a
-       -> Signal fast a
-       -> Signal slow (a,a)
-ddrIn# (Clock {}) (Sync rst) i0 i1 i2 xs
-  = go ((errorX "ddrIn: initial value 0 undefined")
-       ,(errorX "ddrIn: initial value 1 undefined")
-       ,(errorX "ddrIn: initial value 2 undefined"))
-       rst
-       xs
-    where
-        go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
-        go (o0,o1,o2) rt@(~(r :- rs)) as@(~(x0 :- x1 :- xs)) =
-          let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
-          in o0 `seqX` o1 `seqX` (o0,o1) :- (rt `seq` as `seq` go (o0',o1',o2') rs xs)
-ddrIn# (Clock {}) (Async rst) i0 i1 i2 xs
-  = go ((errorX "ddrIn: initial value 0 undefined")
-       ,(errorX "ddrIn: initial value 1 undefined")
-       ,(errorX "ddrIn: initial value 2 undefined"))
-       rst
-       xs
-    where
-        go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
-        go (o0,o1,o2) ~(r :- rs) as@(~(x0 :- x1 :- xs)) =
-          let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
-          in o0' `seqX` o1' `seqX`(o0',o1') :- (as `seq` go (o2',x0,x1) rs xs)
-ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 xs
-  = go ((errorX "ddrIn: initial value 0 undefined")
-       ,(errorX "ddrIn: initial value 1 undefined")
-       ,(errorX "ddrIn: initial value 2 undefined"))
-       rst
-       ena
-       xs
-    where
-        go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
-        go (o0,o1,o2) rt@(~(r :- rs)) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
-          let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
-          in o0 `seqX` o1 `seqX` (o0,o1)
-               :- (rt `seq` as `seq` if e then go (o0',o1',o2') rs es xs
-                                          else go (o0 ,o1 ,o2)    rs es xs)
-ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 xs
-  = go ((errorX "ddrIn: initial value 0 undefined")
-       ,(errorX "ddrIn: initial value 1 undefined")
-       ,(errorX "ddrIn: initial value 2 undefined"))
-       rst
-       ena
-       xs
-    where
-        go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
-        go (o0,o1,o2) ~(r :- rs) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
-          let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
-          in o0' `seqX` o1' `seqX` (o0',o1')
-               :- (as `seq` if e then go (o2',x0 ,x1)   rs es xs
-                                 else go (o0',o1',o2') rs es xs)
+ddrIn#
+  :: forall a slow fast n pFast gated synchronous
+   . ( HasCallStack
+     , fast ~ 'Dom n pFast
+     , slow ~ 'Dom n (2*pFast))
+  => Clock slow gated
+  -> Reset slow synchronous
+  -> a
+  -> a
+  -> a
+  -> Signal fast a
+  -> Signal slow (a,a)
+ddrIn# (Clock {}) (Sync rst) i0 i1 i2 xs =
+  go ((errorX "ddrIn: initial value 0 undefined")
+     ,(errorX "ddrIn: initial value 1 undefined")
+     ,(errorX "ddrIn: initial value 2 undefined"))
+     rst
+     xs
+  where
+    go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
+    go (o0,o1,o2) rt@(~(r :- rs)) as@(~(x0 :- x1 :- xs)) =
+      let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
+      in o0 `seqX` o1 `seqX` (o0,o1) :- (rt `seq` as `seq` go (o0',o1',o2') rs xs)
 
+ddrIn# (Clock {}) (Async rst) i0 i1 i2 xs =
+  go ((errorX "ddrIn: initial value 0 undefined")
+     ,(errorX "ddrIn: initial value 1 undefined")
+     ,(errorX "ddrIn: initial value 2 undefined"))
+     rst
+     xs
+  where
+    go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
+    go (o0,o1,o2) ~(r :- rs) as@(~(x0 :- x1 :- xs)) =
+      let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
+      in o0' `seqX` o1' `seqX`(o0',o1') :- (as `seq` go (o2',x0,x1) rs xs)
+
+ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 xs =
+  go ((errorX "ddrIn: initial value 0 undefined")
+     ,(errorX "ddrIn: initial value 1 undefined")
+     ,(errorX "ddrIn: initial value 2 undefined"))
+     rst
+     ena
+     xs
+  where
+    go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
+    go (o0,o1,o2) rt@(~(r :- rs)) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
+      let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
+      in o0 `seqX` o1 `seqX` (o0,o1)
+           :- (rt `seq` as `seq` if e then go (o0',o1',o2') rs es xs
+                                      else go (o0 ,o1 ,o2)    rs es xs)
+
+ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 xs =
+  go ((errorX "ddrIn: initial value 0 undefined")
+     ,(errorX "ddrIn: initial value 1 undefined")
+     ,(errorX "ddrIn: initial value 2 undefined"))
+     rst
+     ena
+     xs
+  where
+    go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
+    go (o0,o1,o2) ~(r :- rs) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
+      let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
+      in o0' `seqX` o1' `seqX` (o0',o1')
+           :- (as `seq` if e then go (o2',x0 ,x1)   rs es xs
+                             else go (o0',o1',o2') rs es xs)
 {-# NOINLINE ddrIn# #-}
 
-{- | DDR output primitive
-
-Produces a DDR output signal from a normal signal of pairs of input.
--}
+-- | DDR output primitive
+--
+-- Produces a DDR output signal from a normal signal of pairs of input.
 ddrOut :: ( HasCallStack
           , fast ~ 'Dom n pFast
           , slow ~ 'Dom n (2*pFast))
@@ -155,5 +162,4 @@ ddrOut# clk rst i0 xs ys =
     xs' = register clk rst i0 xs
     ys' = register clk rst i0 ys
     zipSig (x :- xs) (y :- ys) = x :- y :- zipSig xs ys
-
 {-# NOINLINE ddrOut# #-}
