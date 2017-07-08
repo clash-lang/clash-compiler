@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -22,6 +23,7 @@ where
 
 -- External Modules
 import Control.DeepSeq
+import Data.Hashable                           (Hashable)
 import Data.Text                               (Text)
 import GHC.Generics
 import Unbound.Generics.LocallyNameless
@@ -46,7 +48,7 @@ data Term
   | Letrec  !(Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
   | Case    !Term !Type [Bind Pat Term]     -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
-  deriving (Show,Generic,NFData)
+  deriving (Show,Generic,NFData,Hashable)
 
 -- | Term reference
 type TmName     = Name Term
@@ -62,7 +64,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Eq,Show,Generic,NFData,Alpha)
+  deriving (Eq,Show,Generic,NFData,Alpha,Hashable)
 
 instance Eq Term where
   (==) = aeq

@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -18,6 +19,7 @@ module CLaSH.Core.Literal
 where
 
 import Control.DeepSeq                        (NFData (..))
+import Data.Hashable                          (Hashable)
 import GHC.Generics                           (Generic)
 import Unbound.Generics.LocallyNameless.Extra ()
 import Unbound.Generics.LocallyNameless       (Alpha (..), Subst (..))
@@ -42,7 +44,7 @@ data Literal
   | DoubleLiteral   !Rational
   | CharLiteral     !Char
   | NaturalLiteral  !Integer
-  deriving (Eq,Ord,Show,Generic,NFData)
+  deriving (Eq,Ord,Show,Generic,NFData,Hashable)
 
 instance Alpha Literal where
   fvAny' _ _ l = pure l

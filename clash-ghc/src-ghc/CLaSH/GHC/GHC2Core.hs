@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2013-2016, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -18,6 +19,7 @@ module CLaSH.GHC.GHC2Core
   , coreToTerm
   , coreToId
   , coreToName
+  , modNameM
   , qualfiedNameString
   , makeAllTyCons
   , emptyGHC2CoreState

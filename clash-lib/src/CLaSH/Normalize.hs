@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -16,6 +17,7 @@ import qualified Control.Lens                     as Lens
 import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
+import qualified Data.HashSet                     as HashSet
 import           Data.IntMap.Strict               (IntMap)
 import           Data.List
   (groupBy, intersect, mapAccumL, sortBy)
@@ -47,9 +49,9 @@ import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types           (PrimMap)
 import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
-import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteEnv (..), RewriteState (..),
-                                                   bindings, curFun, dbgLevel,
-                                                   tcCache, extra, typeTranslator)
+import           CLaSH.Rewrite.Types
+  (DebugLevel (..), RewriteEnv (..), RewriteState (..), bindings, curFun,
+    dbgLevel, extra, tcCache, topEntities, typeTranslator)
 import           CLaSH.Rewrite.Util               (isUntranslatableType,
                                                    runRewrite,
                                                    runRewriteSession)
@@ -90,6 +92,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   tupTcm
                   eval
                   (opt_allowZero opts)
+                  (HashSet.fromList topEnts)
 
     rwState   = RewriteState
                   0
@@ -109,7 +112,6 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   (opt_inlineBelow opts)
                   primMap
                   rcsMap
-                  topEnts
 
 
 normalize :: [TmName]
@@ -152,12 +154,16 @@ normalize' nm = do
                               (return ())
               _ -> return ()
             prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
-            let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
+            topEnts  <- Lens.view topEntities
+            let toNormalize = filter (not . (`HashSet.member` topEnts))
+                            $ filter (`notElem` (nm:prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
          else do
             let usedBndrs = Lens.toListOf termFreeIds tm
             prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
-            let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
+            topEnts  <- Lens.view topEntities
+            let toNormalize = filter (not . (`HashSet.member` topEnts))
+                            $ filter (`notElem` (nm:prevNorm)) usedBndrs
             lvl <- Lens.view dbgLevel
             traceIf (lvl >= DebugFinal)
                     (concat [$(curLoc), "Expr belonging to bndr: ", nmS, " (:: "

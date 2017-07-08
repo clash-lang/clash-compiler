@@ -4,6 +4,7 @@ import CLaSH.Prelude
 
 topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
 topEntity = concat
+{-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done'

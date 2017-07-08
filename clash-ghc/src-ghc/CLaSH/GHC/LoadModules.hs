@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2013-2016, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -22,11 +23,13 @@ where
 #endif
 
 -- External Modules
+import           Control.Arrow                (second)
 import           Data.Generics.Uniplate.DataOnly (transform)
-import           Data.List                    (foldl', nub)
+import           Data.List                    (foldl', lookup, nub)
+import           Data.Maybe                   (listToMaybe)
 import           Data.Word                    (Word8)
 import           CLaSH.Annotations.Primitive  (HDL)
-import           CLaSH.Annotations.TopEntity  (TopEntity)
+import           CLaSH.Annotations.TopEntity  (TopEntity, TestBench (..))
 import           System.Exit                  (ExitCode (..))
 import           System.IO                    (hGetLine)
 import           System.IO.Error              (tryIOError)
@@ -58,12 +61,13 @@ import qualified FamInst
 import qualified FamInstEnv
 import qualified Name
 import qualified Module
-import           Outputable                   ((<>),dot,ppr)
+import           Outputable                   (ppr)
 import qualified Outputable
 import qualified OccName
 import qualified GHC.LanguageExtensions       as LangExt
 
 -- Internal Modules
+import           CLaSH.GHC.GHC2Core           (modNameM)
 import           CLaSH.GHC.LoadInterfaceFiles
 import           CLaSH.Util                   (curLoc,first)
 
@@ -96,12 +100,13 @@ loadModules
   :: HDL
   -> String
   -> Maybe (DynFlags.DynFlags)
-  -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)]   -- Binders
-        , [(CoreSyn.CoreBndr,Int)]                 -- Class operations
-        , [CoreSyn.CoreBndr]                       -- Unlocatable Expressions
+  -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)] -- Binders
+        , [(CoreSyn.CoreBndr,Int)]               -- Class operations
+        , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
-        , (CoreSyn.CoreBndr, Maybe TopEntity)      -- topEntity bndr + (maybe) TopEntity annotation
-        , Maybe CoreSyn.CoreBndr                   -- testBench bndr
+        , [( CoreSyn.CoreBndr                    -- topEntity bndr
+           , Maybe TopEntity                     -- (maybe) TopEntity annotation
+           , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
         , [FilePath]
         )
 loadModules hdl modName dflagsM = do
@@ -167,6 +172,8 @@ loadModules hdl modName dflagsM = do
     GHC.setTargets [target]
     modGraph <- GHC.depanal [] False
     let modGraph' = map disableOptimizationsFlags modGraph
+        -- 'topSortModuleGraph' ensures that modGraph2, and hence tidiedMods
+        -- are in topological order, i.e. the root module is last.
         modGraph2 = Digraph.flattenSCCs (GHC.topSortModuleGraph True modGraph' Nothing)
     tidiedMods <- mapM (\m -> do { pMod  <- parseModule m
                                  ; tcMod <- GHC.typecheckModule (removeStrictnessAnnotations pMod)
@@ -218,42 +225,75 @@ loadModules hdl modName dflagsM = do
                             . Var.varName)
                            (map fst binders)
 
-    topEntM <- findCLaSHAnnotations rootBndrs
+    -- Because tidiedMods is in topological order, binders is also, and hence
+    -- allAnn is in topological order. This means that the "root" 'topEntity'
+    -- will be compiled last.
+    allAnn   <- findTopEntityAnnotations (map fst binders)
+    benchAnn <- findTestBenchAnnotations (map fst binders)
+    topAnn   <- findTopEntityAnnotations rootBndrs
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
         topEntities = filter ((== "topEntity") . varNameString) rootBndrs
         benches     = filter ((== "testBench") . varNameString) rootBndrs
-    topEntity <- case topEntities of
-      [] -> case topEntM of
-              Just (l,r) -> return (l,Just r)
-              _ -> Panic.pgmError $ "No 'topEntity', nor function with a 'TopEntity' annotation found in root module: " ++
-                                    (Outputable.showSDocUnsafe (ppr rootModule))
-      [x] -> case topEntM of
-              Just (l,r) | l == x    -> return (l,Just r)
-                         | otherwise -> Panic.pgmError $ "'TopEntity' annotation applied to a function that is not named 'topEntity' while a 'topEntity' function is present: " ++
-                                                         (Outputable.showSDocUnsafe (ppr rootModule <> dot <> ppr l))
-              Nothing -> return (x,Nothing)
-      _ -> Panic.pgmError $ $(curLoc) ++  "Multiple 'topEntities' found."
-    bench <- case benches of
-      []  -> return Nothing
-      [x] -> return (Just x)
-      _  -> Panic.pgmError $ $(curLoc) ++ "Multiple 'testBench's found."
+        mergeBench (x,y) = (x,y,lookup x benchAnn)
+        allAnn'     = map mergeBench allAnn
+    topEntities' <- case topEntities of
+      [] -> case topAnn of
+        [] -> Panic.pgmError $ "No 'topEntity', nor function with a 'TopEntity' annotation found in root module: " ++
+                                (Outputable.showSDocUnsafe (ppr rootModule))
+        _ -> return allAnn'
+      [x] -> case lookup x topAnn of
+        Nothing -> case lookup x benchAnn of
+          Nothing -> return ((x,Nothing,listToMaybe benches):allAnn')
+          Just y  -> return ((x,Nothing,Just y):allAnn')
+        Just _  -> return allAnn'
+      _ -> Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntity,bench,nub pFP)
+    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub pFP)
 
-findCLaSHAnnotations :: GHC.GhcMonad m
-                     => [CoreSyn.CoreBndr]
-                     -> m (Maybe (CoreSyn.CoreBndr,TopEntity))
-findCLaSHAnnotations bndrs = do
+findTopEntityAnnotations
+  :: GHC.GhcMonad m
+  => [CoreSyn.CoreBndr]
+  -> m [(CoreSyn.CoreBndr,Maybe TopEntity)]
+findTopEntityAnnotations bndrs = do
   let deserializer = Serialized.deserializeWithData :: ([Word8] -> TopEntity)
       targets      = map (Annotations.NamedTarget . Var.varName) bndrs
 
   anns <- mapM (GHC.findGlobalAnns deserializer) targets
   let annBndrs = filter (not . null . snd) (zip bndrs anns)
-  case annBndrs of
-    []  -> return Nothing
-    [(x,[y])] -> return (Just (x,y))
-    [(x,_)] -> Panic.pgmError $ "Root module contains a function with multiple 'TopEntity' annotation: " ++ Outputable.showSDocUnsafe (ppr x)
-    xs  -> Panic.pgmError $ "Root module contains multiple functions with a 'TopEntity' annotation: " ++ Outputable.showSDocUnsafe (ppr (map fst xs))
+  case filter ((> 1) . length . snd) annBndrs of
+    [] -> return (map (second listToMaybe) annBndrs)
+    as -> Panic.pgmError $
+            "The following functions have multiple 'TopEntity' annotations: " ++
+            Outputable.showSDocUnsafe (ppr (map fst as))
+
+findTestBenchAnnotations
+  :: GHC.GhcMonad m
+  => [CoreSyn.CoreBndr]
+  -> m [(CoreSyn.CoreBndr,CoreSyn.CoreBndr)]
+findTestBenchAnnotations bndrs = do
+  let deserializer = Serialized.deserializeWithData :: ([Word8] -> TestBench)
+      targets      = map (Annotations.NamedTarget . Var.varName) bndrs
+
+  anns <- mapM (GHC.findGlobalAnns deserializer) targets
+  let annBndrs  = filter (not . null . snd) (zip bndrs anns)
+      annBndrs' = case filter ((> 1) . length . snd) annBndrs of
+        [] -> map (second head) annBndrs
+        as -> Panic.pgmError $
+          "The following functions have multiple 'TestBench' annotations: " ++
+          Outputable.showSDocUnsafe (ppr (map fst as))
+  return (map (second findTB) annBndrs')
+  where
+    findTB :: TestBench -> CoreSyn.CoreBndr
+    findTB (TestBench tb) = case listToMaybe (filter (eqNm tb) bndrs) of
+      Just tb' -> tb'
+      Nothing  -> Panic.pgmError $
+        "TestBench named: " ++ show tb ++ " not found"
+
+    eqNm thNm bndr = show thNm == qualNm
+      where
+        bndrNm  = Var.varName bndr
+        qualNm  = maybe occName (\modName -> modName ++ ('.':occName)) (modNameM bndrNm)
+        occName = OccName.occNameString (Name.nameOccName bndrNm)
 
 parseModule :: GHC.GhcMonad m => GHC.ModSummary -> m GHC.ParsedModule
 parseModule modSum = do

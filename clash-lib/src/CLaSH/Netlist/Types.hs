@@ -1,5 +1,6 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2012-2016, University of Twente,
+                         2017, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -8,19 +9,20 @@
 
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module CLaSH.Netlist.Types where
+module CLaSH.Netlist.Types
+  (Declaration (..,NetDecl), module CLaSH.Netlist.Types)
+where
 
 import Control.DeepSeq
 import Control.Monad.State.Strict           (MonadIO, MonadState, StateT)
-import Control.Monad.Writer.Strict          (MonadWriter, WriterT)
 import Data.Hashable
 import Data.HashMap.Lazy                    (HashMap)
 import Data.IntMap.Lazy                     (IntMap, empty)
-import Data.Set                             (Set)
 import qualified Data.Text                  as S
 import Data.Text.Lazy                       (Text, pack)
 import GHC.Generics                         (Generic)
@@ -28,6 +30,7 @@ import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 
 import SrcLoc                               (SrcSpan)
 
+import CLaSH.Annotations.TopEntity          (TopEntity)
 import CLaSH.Core.Term                      (Term, TmName)
 import CLaSH.Core.Type                      (Type)
 import CLaSH.Core.TyCon                     (TyCon, TyConName)
@@ -40,13 +43,8 @@ import CLaSH.Util
 -- | Monad that caches generated components (StateT) and remembers hidden inputs
 -- of components that are being generated (WriterT)
 newtype NetlistMonad a =
-  NetlistMonad { runNetlist :: WriterT
-                               (Set (Identifier,HWType))
-                               (StateT NetlistState (FreshMT IO))
-                               a
-               }
-  deriving (Functor, Monad, Applicative, MonadWriter (Set (Identifier,HWType)),
-            MonadState NetlistState, Fresh, MonadIO)
+  NetlistMonad { runNetlist :: StateT NetlistState (FreshMT IO) a }
+  deriving (Functor, Monad, Applicative, MonadState NetlistState, Fresh, MonadIO)
 
 -- | State of the NetlistMonad
 data NetlistState
@@ -65,6 +63,8 @@ data NetlistState
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
   , _componentNames :: HashMap TmName Identifier
+  , _topEntityAnns  :: HashMap TmName (Type, Maybe TopEntity)
+  , _hdlDir         :: FilePath
   }
 
 -- | Signal reference
@@ -74,7 +74,6 @@ type Identifier = Text
 data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
-  , hiddenPorts   :: [(Identifier,HWType)] -- ^ Ports that have no correspondence the original function definition
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
   , outputs       :: [(Identifier,HWType)] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
@@ -83,8 +82,8 @@ data Component
 
 instance NFData Component where
   rnf c = case c of
-    Component nm hi inps outps decls -> rnf nm `seq` rnf hi `seq` rnf inps `seq`
-                                        rnf outps `seq` rnf decls
+    Component nm inps outps decls -> rnf nm    `seq` rnf inps `seq`
+                                     rnf outps `seq` rnf decls
 
 -- | Size indication of a type (e.g. bit-size or number of elements)
 type Size = Int
@@ -133,10 +132,15 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl !Identifier !Identifier [(Identifier,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
+  | InstDecl !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
   | BlackBoxD !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl !Identifier !HWType -- ^ Signal declaration
+  | NetDecl' !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
+
+pattern NetDecl :: Identifier -> HWType -> Declaration
+pattern NetDecl d ty <- NetDecl' d (Right ty)
+  where
+    NetDecl d ty = NetDecl' d (Right ty)
 
 data PortDirection = In | Out
   deriving Show
@@ -159,6 +163,7 @@ data Expr
   | Identifier !Identifier   !(Maybe Modifier) -- ^ Signal reference
   | DataTag    !HWType       !(Either Identifier Identifier) -- ^ @Left e@: tagToEnum#, @Right e@: dataToTag#
   | BlackBoxE !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate !BlackBoxContext !Bool -- ^ Instantiation of a BlackBox expression
+  | ConvBV     (Maybe Identifier) HWType Bool Expr
   deriving Show
 
 -- | Literals used in an expression

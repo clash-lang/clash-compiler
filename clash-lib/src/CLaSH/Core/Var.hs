@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -19,6 +20,7 @@ module CLaSH.Core.Var
 where
 
 import Control.DeepSeq                  (NFData (..))
+import Data.Hashable                    (Hashable)
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
 import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..))
@@ -39,7 +41,7 @@ data Var a
   { varName :: Name a
   , varType :: Embed Type
   }
-  deriving (Eq,Show,Generic,NFData)
+  deriving (Eq,Show,Generic,NFData,Hashable)
 
 -- | Term variable
 type Id    = Var Term

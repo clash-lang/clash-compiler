@@ -1,5 +1,6 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2012-2016, University of Twente,
+                         2017, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -21,6 +22,7 @@ import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.HashMap.Strict                   (HashMap)
+import Data.HashSet                          (HashSet)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import Unbound.Generics.LocallyNameless      (Fresh (..))
@@ -94,6 +96,8 @@ data RewriteEnv
   -- ^ Hardcoded evaluator (delta-reduction)}
   , _allowZero      :: Bool
   -- ^ Zero bit wide things are representable
+  , _topEntities    :: HashSet TmName
+  -- ^ Functions that are considered TopEntities
   }
 
 makeLenses ''RewriteEnv

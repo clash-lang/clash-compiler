@@ -16,6 +16,7 @@ topEntity
   => Signal System (Signed 9,Signed 9)
   -> Signal System (Signed 9)
 topEntity = mac
+{-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
 testBench = done'

@@ -1,5 +1,6 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2012-2016, University of Twente,
+                         2017, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -52,7 +53,6 @@ data NormalizeState
   , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _recursiveComponents :: HashMap TmName Bool
   -- ^ Map telling whether a components is part of a recursive group
-  , _topEntities :: [TmName]
   }
 
 makeLenses ''NormalizeState

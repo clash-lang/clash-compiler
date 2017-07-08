@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2015-2016, University of Twente
+  Copyright   :  (C) 2015-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -428,24 +429,22 @@ module_ c = do
   where
     ports = sequence
           $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty <$> text i | (i,hwty) <- hiddenPorts c] ++
             [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
 
-    inputPorts = case (inputs c ++ hiddenPorts c) of
+    inputPorts = case inputs c of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "input" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
-    outputPorts = case (outputs c) of
+    outputPorts = case outputs c of
                    [] -> empty
                    p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
 
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
   let iport = map fst $ inputs c
-      hport = map fst $ hiddenPorts c
       oport = map fst $ outputs c
-      nets  = mapMaybe (\case {NetDecl i _ -> Just i; _ -> Nothing}) $ declarations c
-  idSeen .= concat [iport,hport,oport,nets]
+      nets  = mapMaybe (\case {NetDecl' i _ -> Just i; _ -> Nothing}) $ declarations c
+  idSeen .= concat [iport,oport,nets]
   oports .= oport
 
 mkUniqueId :: Identifier -> SystemVerilogM Identifier
@@ -561,7 +560,8 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl id_ ty) = Just A.<$> sigDecl (text id_) ty
+decl (NetDecl' id_ (Right ty)) = Just A.<$> sigDecl (text id_) ty
+decl (NetDecl' id_ (Left ty))  = Just A.<$> text ty <+> text id_
 
 decl _ = return Nothing
 
@@ -629,7 +629,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
 inst_ (InstDecl nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
   where
-    pms' = tupled $ sequence [dot <> text i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
+    pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]
 
 inst_ (BlackBoxD _ _ _ Nothing bs bbCtx) = do
   t <- renderBlackBox bs bbCtx
@@ -647,7 +647,7 @@ inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
-inst_ (NetDecl _ _) = return Nothing
+inst_ (NetDecl' _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
@@ -806,6 +806,30 @@ expr_ _ (DataTag (RTree 0 _) (Right _)) = do
 expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- use intWidth
   int iw <> "'sd1"
+
+expr_ b (ConvBV topM t True e) = do
+  nm <- use modNm
+  let nm' = text (pack nm)
+  case t of
+    Vector {} ->
+      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_to_lv" <> parens (expr_ False e))
+    RTree {} ->
+      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_to_lv" <> parens (expr_ False e))
+    _ -> expr b e
+
+expr_ b (ConvBV topM t False e) = do
+  nm <- use modNm
+  let nm' = text (pack nm)
+  case t of
+    Vector {} ->
+      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_from_lv" <> parens (expr_ False e))
+    RTree {} ->
+      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_from_lv" <> parens (expr_ False e))
+    _ -> expr b e
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

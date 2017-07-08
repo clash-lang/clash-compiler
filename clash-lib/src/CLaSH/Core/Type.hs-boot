@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2012-2016, University of Twente
+  Copyright   :  (C) 2012-2016, University of Twente,
+                          2017, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -11,6 +12,7 @@
 module CLaSH.Core.Type where
 
 import Control.DeepSeq                  (NFData)
+import Data.Hashable                    (Hashable)
 import GHC.Generics                     (Generic)
 import Unbound.Generics.LocallyNameless (Alpha,Name,Subst)
 
@@ -30,5 +32,6 @@ instance Alpha    Type
 instance Subst    Type Type
 instance Subst    Term Type
 instance NFData   Type
+instance Hashable Type
 
 mkTyConTy :: TyConName -> Type

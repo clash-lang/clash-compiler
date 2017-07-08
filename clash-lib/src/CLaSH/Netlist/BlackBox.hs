@@ -1,5 +1,6 @@
 {-|
-  Copyright  :  (C) 2012-2016, University of Twente
+  Copyright  :  (C) 2012-2016, University of Twente,
+                         2017, Google Inc.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -267,13 +268,12 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (_,Component compName hidden compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
-                  let hiddenAssigns = map (\(i,t) -> (i,In,t,Identifier i Nothing)) hidden
-                      inpAssigns    = zipWith (\(i,t) e' -> (i,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
-                      outpAssign    = (fst compOutp,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
+                  (_,Component compName compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
+                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                      outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
-                      instDecl      = InstDecl compName instLabel (outpAssign:hiddenAssigns ++ inpAssigns)
+                      instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
                   return (Right instDecl)
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
