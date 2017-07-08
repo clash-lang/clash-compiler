@@ -4,16 +4,49 @@ Copyright  :  (C) 2015-2016, University of Twente,
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
-The 'TopEntity' annotations described in this module make it easier to put your
-design on an FPGA.
+'TopEntity' annotations allow us to control hierarchy and naming aspects of the
+CλaSH compiler, specifically, they allow us to:
 
-We can exert some control how the top level function is created by the CλaSH
-compiler by annotating the @topEntity@ function with a 'TopEntity' annotation.
-You apply these annotations using the @ANN@ pragma like so:
+    * Assign names to entities (VHDL) \/ modules ((System)Verilog), and their
+      ports.
+    * Put generated HDL files of a logical (sub)entity in their own directory.
+    * Use cached versions of generated HDL, i.e., prevent recompilation of
+      (sub)entities that have not changed since the last run. Caching is based
+      on a @.manifest@ which is generated alongside the HDL; deleting this file
+      means deleting the cache; changing this file will result in /undefined/
+      behaviour.
+
+Functions with a 'TopEntity' annotation do must adhere to the following
+restrictions:
+
+    * Although functions with a 'TopEntity' annotation can of course depend
+      on functions with another 'TopEntity' annotation, they must not be
+      mutually recursive.
+    * Functions with a 'TopEntity' annotation must be completely /monomorphic/
+      and /first-order/, and cannot have any /non-representable/ arguments or
+      result.
+
+Also take the following into account when using 'TopEntity' annotations.
+
+    * The CλaSH compiler is based on the GHC Haskell compiler, and the GHC
+      machinery does not understand 'TopEntity' annotations and it might
+      subsequently decide to inline those functions. You should therefor also
+      add a @{\-\# NOINLINE f \#-\}@ pragma to the functions which you give
+      a 'TopEntity' functions.
+    * Functions with a 'TopEntity' annotation will not be specialised
+      on constants.
+
+Finally, the root module, the module which you pass as an argument to the
+CλaSH compiler must either have:
+
+    * A function with a 'TopEntity' annotation.
+    * A function called /topEntity/.
+
+You apply 'TopEntity' annotations to functions using an @ANN@ pragma:
 
 @
-{\-\# ANN topEntity (TopEntity {t_name = ..., ...  }) \#-\}
-topEntity x = ...
+{\-\# ANN f (TopEntity {t_name = ..., ...  }) \#-\}
+f x = ...
 @
 
 For example, given the following specification:
@@ -56,7 +89,8 @@ blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
           | otherwise = leds
 @
 
-The CλaSH compiler will normally generate the following @topEntity.vhdl@ file:
+The CλaSH compiler would normally generate the following
+@blinker_topentity.vhdl@ file:
 
 @
 -- Automatically generated VHDL-93
@@ -94,8 +128,10 @@ However, if we add the following 'TopEntity' annotation in the file:
 {\-\# ANN topEntity
   ('defTop'
     { t_name     = "blinker"
-    , t_inputs   = [\"CLOCK_50\",\"KEY0\",\"KEY1\"]
-    , t_outputs  = [\"LED\"]
+    , t_inputs   = [ PortName \"CLOCK_50\"
+                   , PortName \"KEY0\"
+                   , PortName \"KEY1\" ]
+    , t_outputs  = [ PortName \"LED\" ]
     }) \#-\}
 @
 
@@ -140,6 +176,7 @@ See the documentation of 'TopEntity' for the meaning of all its fields.
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric      #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -148,12 +185,16 @@ See the documentation of 'TopEntity' for the meaning of all its fields.
 module CLaSH.Annotations.TopEntity
   ( -- * Data types
     TopEntity (..)
+  , PortName (..)
+  , TestBench (..)
     -- * Convenience functions
   , defTop
   )
 where
 
-import Data.Data
+import           GHC.Generics
+import qualified Language.Haskell.TH as TH
+import           Data.Data
 
 -- | TopEntity annotation
 data TopEntity
@@ -161,41 +202,131 @@ data TopEntity
   { t_name     :: String
   -- ^ The name the top-level component should have, put in a correspondingly
   -- named file.
-  , t_inputs   :: [String]
+  , t_inputs   :: [PortName]
   -- ^ List of names that are assigned in-order to the inputs of the component.
-  , t_outputs  :: [String]
+  , t_outputs  :: [PortName]
   -- ^ List of names that are assigned in-order to the outputs of the component.
-  , t_extraIn  :: [(String,Int)]
-  -- ^ Extra input ports, where every tuple holds the name of the input port and
-  -- the number of  bits are used for that input port.
-  --
-  -- So given a bit-width @n@, the port has type:
-  --
-  -- * __VHDL__: @std_logic_vector (n-1 downto 0)@
-  -- * __Verilog__: @[n-1:0]@
-  -- * __SystemVerilog__: @logic [n-1:0]@
-  , t_extraOut :: [(String,Int)]
-  -- ^ Extra output ports, where every tuple holds the name of the output port
-  -- and the number of bits are used for that output port.
-  --
-  -- So given a bit-width @n@, the port has type:
-  --
-  -- * __VHDL__: @std_logic_vector (n-1 downto 0)@
-  -- * __Verilog__: @[n-1:0]@
-  -- * __SystemVerilog__: @logic [n-1:0]@
   }
-  deriving (Data,Show,Read)
+  deriving (Data,Show,Read,Generic)
+
+-- | Give port names for arguments/results.
+--
+-- Give a data type and function:
+--
+-- @
+-- data T = MkT Int Bool
+--
+-- {\-\# ANN topEntity (defTop {t_name = \"f\",}) \#-\}
+-- f :: Int -> T -> (T,Bool)
+-- f a b = ...
+-- @
+--
+-- Clash would normally generate the following VHDL entity:
+--
+-- @
+-- entity f is
+--   port(input_0      : in signed(63 downto 0);
+--        input_1_0    : in signed(63 downto 0);
+--        input_1_1    : in boolean;
+--        output_0_0_0 : out signed(63 downto 0);
+--        output_0_0_1 : out boolean;
+--        output_0_1   : out boolean);
+-- end;
+-- @
+--
+-- However, we can change this by using 'PortName's. So by:
+--
+-- @
+-- {\-\# ANN topEntity
+--    (defTop
+--       { t_name = \"f\"
+--       , t_inputs = [ PortName \"a\"
+--                    , PortName \"b\" ]
+--       , t_outputs = [ PortName \"res\" ]}) \#-\}
+-- f :: Int -> T -> (T,Bool)
+-- f a b = ...
+-- @
+--
+-- we get:
+--
+-- @
+-- entity f is
+--   port(a   : in signed(63 downto 0);
+--        b   : in f_types.t;
+--        res : out f_types.tup2);
+-- end;
+-- @
+--
+-- If we want to name fields for tuples/records we have to use 'PortField'
+--
+-- @
+-- {\-\# ANN topEntity
+--    (defTop
+--       { t_name = \"f\"
+--       , t_inputs = [ PortName \"a\"
+--                    , PortField \"\" [ PortName \"b\", PortName \"c\" ] ]
+--       , t_outputs = [ PortField \"res\" [PortName \"q\"]]}) \#-\}
+-- f :: Int -> T -> (T,Bool)
+-- f a b = ...
+-- @
+--
+-- So that we get:
+--
+-- @
+-- entity f is
+--   port(a     : in signed(63 downto 0);
+--        b     : in signed(63 downto 0);
+--        c     : in boolean;
+--        q     : out f_types.t;
+--        res_1 : out boolean);
+-- end;
+-- @
+--
+-- Notice how we didn't name the second field of the result, and the second
+-- output port got 'PortField' name, \"res\", as a prefix for its name.
+data PortName
+  = PortName String
+  -- ^ You want a port, with the given name, for the entire argument\/type
+  --
+  -- You can use an empty String ,\"\" , in case you want an auto-generated name.
+  | PortField String [PortName]
+  -- ^ You want to assign ports to fields of an argument\/type
+  --
+  -- The first argument of 'PortField' is the name of:
+  --
+  -- 1. The signal/wire to which the individual ports are aggregated.
+  --
+  -- 2. The prefix for any unnamed ports below the 'PortField'
+  --
+  -- You can use an empty String ,\"\" , in case you want an auto-generated name.
+  deriving (Data,Show,Read,Generic)
+
+-- | Tell what binder is the 'TestBench' for a 'TopEntity' binder.
+--
+-- So in the following example, /f/ is the 'TopEntity', and /g/ is the
+-- 'TestBench'
+--
+-- @
+-- f :: Bool -> Bool
+-- f = ...
+-- {\-\# ANN f (defTop {t_name = "f"}) \#-\}
+-- {\-\# ANN f (TestBench \'g) \#-\}
+--
+-- g :: Signal Bool
+-- g = ...
+-- @
+data TestBench
+  = TestBench TH.Name
+  deriving (Data,Show)
 
 -- | Default 'TopEntity' which has no clocks, and no specified names for the
 -- input and output ports. Also has no clock sources:
 --
 -- >>> defTop
--- TopEntity {t_name = "topentity", t_inputs = [], t_outputs = [], t_extraIn = [], t_extraOut = []}
+-- TopEntity {t_name = "topentity", t_inputs = [], t_outputs = []}
 defTop :: TopEntity
 defTop = TopEntity
   { t_name     = "topentity"
   , t_inputs   = []
   , t_outputs  = []
-  , t_extraIn  = []
-  , t_extraOut = []
   }
