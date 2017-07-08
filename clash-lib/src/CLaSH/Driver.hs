@@ -13,6 +13,7 @@ module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
+import           Control.Lens                     ((.=))
 import           Control.Monad                    (when, unless)
 import           Control.Monad.State              (evalState, get)
 import qualified Data.HashMap.Lazy                as HML
@@ -36,7 +37,6 @@ import           CLaSH.Backend
 import           CLaSH.Core.Term                  (Term, TmName)
 import           CLaSH.Core.Type                  (Type)
 import           CLaSH.Core.TyCon                 (TyCon, TyConName)
-import           CLaSH.Driver.TestbenchGen
 import           CLaSH.Driver.TopWrapper
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                    (genComponentName, genNetlist)
@@ -45,8 +45,10 @@ import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Types              (Component (..), HWType)
 import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
+import           CLaSH.Normalize.Types            (normalized)
 import           CLaSH.Normalize.Util             (callGraph, mkRecursiveComponents)
 import           CLaSH.Primitives.Types
+import           CLaSH.Rewrite.Types              (extra)
 import           CLaSH.Util                       (first, second)
 
 -- | Create a set of target HDL files for a set of functions
@@ -59,12 +61,11 @@ generateHDL :: forall backend . Backend backend
             -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded 'Type' -> 'HWType' translator
             -> (HashMap TyConName TyCon -> Bool -> Term -> Term) -- ^ Hardcoded evaluator (delta-reduction)
             -> (TmName,Maybe TopEntity) -- ^ topEntity bndr + (maybe) TopEntity annotation
-            -> Maybe TmName -- ^ testInput bndr
-            -> Maybe TmName -- ^ expectedOutput bndr
+            -> Maybe TmName -- ^ testBench bndr
             -> CLaSHOpts -- ^ Debug information level for the normalization process
             -> (Clock.UTCTime,Clock.UTCTime)
             -> IO ()
-generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,annM) testInpM expOutM opts (startTime,prepTime) = do
+generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,annM) benchM opts (startTime,prepTime) = do
   let primMap' = (HM.map parsePrimitive :: PrimMap Text.Text -> PrimMap BlackBoxTemplate) primMap
 
   (supplyN,supplyTB) <- Supply.splitSupply
@@ -72,6 +73,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
                       . Supply.freshId
                      <$> Supply.newSupply
 
+  -- 1. Normalise topEntity
   let doNorm     = do norm <- normalize [topEntity]
                       let normChecked = checkNonRecursive topEntity norm
                       cleanupGraph topEntity normChecked
@@ -79,12 +81,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
       rcs        = concat $ mkRecursiveComponents cg
       rcsMap     = HML.fromList
                  $ map (\(t,_) -> (t,t `elem` rcs)) cg
-      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval primMap' rcsMap doNorm
+      transformedBindings = runNormalization opts supplyN bindingsMap typeTrans tcm tupTcm eval primMap' rcsMap [topEntity] doNorm
 
   normTime <- transformedBindings `deepseq` Clock.getCurrentTime
   let prepNormDiff = Clock.diffUTCTime normTime prepTime
   putStrLn $ "Normalisation took " ++ show prepNormDiff
 
+  -- 2. Generate netlist for topEntity
   let modName   = takeWhile (/= '.') (name2String topEntity)
       iw        = opt_intWidth opts
       hdlsyn    = opt_hdlSyn opts
@@ -96,33 +99,42 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval (topEntity,an
                         annM
 
   (netlist,dfiles,seen) <- genNetlist transformedBindings primMap' tcm
-                                 typeTrans Nothing modName [] iw mkId [topNm] topEntity
+                                 typeTrans modName [] iw mkId (HM.empty,[topNm]) topEntity
 
   netlistTime <- netlist `deepseq` Clock.getCurrentTime
   let normNetDiff = Clock.diffUTCTime netlistTime normTime
   putStrLn $ "Netlist generation took " ++ show normNetDiff
 
-  let topComponent = head
-                   $ filter (\(_,Component cName _ _ _ _) ->
-                                Text.isSuffixOf (genComponentName [topNm] mkId modName topEntity)
-                                  cName)
-                            netlist
+  -- 3. Generate testbench
+  (testBench,dfiles') <- flip (maybe (return (netlist,dfiles))) benchM $ \tb -> do
+    let cg'     = callGraph [] bindingsMap tb
+        rcs'    = concat $ mkRecursiveComponents cg'
+        rcsMap' = HML.fromList (map (\(t,_) -> (t,t `elem` rcs')) cg')
+        doNorm' = do extra.normalized .= transformedBindings -- don't renormalize the topEntity
+                     norm <- normalize [tb]
+                     let normChecked = checkNonRecursive tb norm
+                     cleanupGraph tb normChecked
+        transformedBindings' = runNormalization opts supplyTB bindingsMap
+                                                typeTrans tcm tupTcm eval
+                                                primMap' rcsMap' [topEntity] doNorm'
+        transformedBindings2 = HM.union transformedBindings transformedBindings'
 
-  (testBench,dfiles') <- genTestBench opts supplyTB primMap'
-                             typeTrans tcm tupTcm eval mkId seen bindingsMap
-                             testInpM
-                             expOutM
-                             modName
-                             dfiles
-                             (snd topComponent)
-
+    (testbench,dfiles',_) <- genNetlist transformedBindings2 primMap' tcm
+                                        typeTrans modName dfiles iw mkId seen tb
+    return (testbench,dfiles')
 
   testBenchTime <- testBench `seq` Clock.getCurrentTime
   let netTBDiff = Clock.diffUTCTime testBenchTime netlistTime
   putStrLn $ "Testbench generation took " ++ show netTBDiff
 
-  let topWrapper = mkTopWrapper primMap' mkId annM modName iw (snd topComponent)
-      hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : netlist ++ testBench)
+  -- 4. Generate topEntity wrapper
+  let topComponent = head
+                   $ filter (\(_,Component cName _ _ _ _) ->
+                                Text.isSuffixOf (genComponentName [topNm] mkId modName topEntity)
+                                  cName)
+                            netlist
+      topWrapper = mkTopWrapper mkId annM modName (snd topComponent)
+      hdlDocs = createHDL hdlState' modName ((noSrcSpan,topWrapper) : testBench)
       dir = fromMaybe "." (opt_hdlDir opts) </>
             CLaSH.Backend.name hdlState' </>
             takeWhile (/= '.') (name2String topEntity)

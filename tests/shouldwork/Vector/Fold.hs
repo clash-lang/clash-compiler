@@ -4,9 +4,12 @@ import CLaSH.Prelude
 
 topEntity :: Vec 8 Int -> Int
 topEntity = fold (+)
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 8 Int)
-testInput = pure (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
-
-expectedOutput :: Signal Int -> Signal Bool
-expectedOutput = outputVerifier (36 :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure (1:>2:>3:>4:>5:>6:>7:>8:>Nil)
+    expectedOutput = outputVerifier (36 :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

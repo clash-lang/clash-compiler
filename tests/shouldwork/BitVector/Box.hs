@@ -10,9 +10,12 @@ topEntity vec = (pack  tup
   where
     tup :: (Vec 8 Bit, Vec 8 Bit)
     tup = unpack vec
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (BitVector 16)
-testInput = signal (0x00FF)
-
-expectedOutput :: Signal (BitVector 16,BitVector 8,Vec 8 Bit) -> Signal Bool
-expectedOutput = outputVerifier ((0x00FF,0x0F,1:>1:>1:>1:>0:>0:>0:>0:>Nil):>Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure (0x00FF)
+    expectedOutput = outputVerifier ((0x00FF,0x0F,1:>1:>1:>1:>0:>0:>0:>0:>Nil):>Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

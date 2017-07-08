@@ -45,25 +45,28 @@ h x y = (x `xor` y) `xor` ((x .&. y) `shiftL` 1)
 
 topEntity :: Vec 16 W -> Vec 16 W
 topEntity = norx
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 16 (Unsigned 32))
-testInput = stimuliGenerator ((0:>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil):>Nil)
-
-expectedOutput :: Signal (Vec 16 (Unsigned 32)) -> Signal Bool
-expectedOutput = outputVerifier   ((   0x99a0283a
-                                    :> 0x16c4b42e
-                                    :> 0x6e7fa00b
-                                    :> 0x7d075c66
-                                    :> 0x65c1af81
-                                    :> 0xee254c00
-                                    :> 0x126631b6
-                                    :> 0xf8915260
-                                    :> 0x083181d5
-                                    :> 0x85dc0152
-                                    :> 0x1a44a1f3
-                                    :> 0x7ba61b1a
-                                    :> 0x37dde5df
-                                    :> 0x078203d3
-                                    :> 0x9b3c0701
-                                    :> 0x9ce6be37
-                                    :> Nil) :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator ((0:>1:>2:>3:>4:>5:>6:>7:>8:>9:>10:>11:>12:>13:>14:>15:>Nil):>Nil)
+    expectedOutput = outputVerifier   ((   0x99a0283a
+                                        :> 0x16c4b42e
+                                        :> 0x6e7fa00b
+                                        :> 0x7d075c66
+                                        :> 0x65c1af81
+                                        :> 0xee254c00
+                                        :> 0x126631b6
+                                        :> 0xf8915260
+                                        :> 0x083181d5
+                                        :> 0x85dc0152
+                                        :> 0x1a44a1f3
+                                        :> 0x7ba61b1a
+                                        :> 0x37dde5df
+                                        :> 0x078203d3
+                                        :> 0x9b3c0701
+                                        :> 0x9ce6be37
+                                        :> Nil) :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

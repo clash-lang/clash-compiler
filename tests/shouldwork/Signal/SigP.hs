@@ -2,5 +2,8 @@ module SigP where
 
 import CLaSH.Prelude
 
-topEntity :: Signal (Bool, Bool) -> (Signal Bool, Signal Bool)
+topEntity
+  :: SystemClockReset
+  => Signal System (Bool, Bool)
+  -> (Signal System Bool, Signal System Bool)
 topEntity = unbundle . register (False,False)

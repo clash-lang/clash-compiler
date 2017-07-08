@@ -9,13 +9,18 @@ macT acc (x,y) = (acc',o)
     acc' = ma acc (x,y)
     o    = acc
 
-mac = macT <^> 0
+mac = macT `mealy` 0
 
-topEntity :: (Signal (Signed 9),Signal (Signed 9)) -> Signal (Signed 9)
+topEntity
+  :: SystemClockReset
+  => Signal System (Signed 9,Signed 9)
+  -> Signal System (Signed 9)
 topEntity = mac
 
-testInput :: Signal (Signed 9,Signed 9)
-testInput = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
-
-expectedOutput :: Signal (Signed 9) -> Signal Bool
-expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+    expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
+    done           = expectedOutput (topEntity testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

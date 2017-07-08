@@ -30,9 +30,10 @@ import           CLaSH.Core.Var          (Var (Id))
 import           CLaSH.Core.Term         (Term (..), TmName)
 import           CLaSH.Core.Type         (Type)
 import           CLaSH.Core.TyCon        (TyCon, TyConName)
-import           CLaSH.Core.Util         (collectArgs, isPolyFun)
+import           CLaSH.Core.Util
+  (collectArgs, isClockOrReset, isPolyFun, termType)
 import           CLaSH.Normalize.Types
-import           CLaSH.Rewrite.Types     (bindings,extra)
+import           CLaSH.Rewrite.Types     (bindings,extra,tcCache)
 import           CLaSH.Rewrite.Util      (specialise)
 
 -- | Determine if a function is already inlined in the context of the 'NetlistMonad'
@@ -73,6 +74,14 @@ isConstant e = case collectArgs e of
   (Literal _,_)    -> True
   _                -> False
 
+isConstantNotClockReset :: Term -> NormalizeSession Bool
+isConstantNotClockReset e = do
+  tcm <- Lens.view tcCache
+  eTy <- termType tcm e
+  if isClockOrReset tcm eTy
+     then return False
+     else return (isConstant e)
+
 isRecursiveBndr :: TmName -> NormalizeSession Bool
 isRecursiveBndr f = do
   cg <- Lens.use (extra.recursiveComponents)
@@ -93,12 +102,13 @@ callGraph :: [TmName] -- ^ List of functions that should not be inspected
           -> HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
           -> TmName -- ^ Root of the call graph
           -> [(TmName,[TmName])]
-callGraph visited bindingMap root = node:other
-  where
-    rootTm = Maybe.fromMaybe (error $ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _3)
-    node   = (root,used)
-    other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
+callGraph visited bindingMap root
+  | Just rootTm <- HashMap.lookup root bindingMap
+  = let  used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _3)
+         node   = (root,used)
+         other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
+    in   node : other
+callGraph _ _ _ = []
 
 -- | Determine the sets of recursive components given the edges of a callgraph
 mkRecursiveComponents :: [(TmName,[TmName])] -- ^ [(calling function,[called function])]

@@ -14,26 +14,4 @@ assign ~RESULT = ~FROMBV[~SYM[0][\\~ARG[2]\\]][~TYPO];
 // asyncRom end"
     }
   }
-, { "BlackBox" :
-    { "name" : "CLaSH.Prelude.ROM.rom#"
-    , "type" :
-"rom# :: KnownNat n      -- ARG[0]
-      => SClock clk      -- clk,  ARG[1]
-      -> Vec n a         -- init, ARG[2]
-      -> Signal' clk Int -- rd,   ARG[3]
-      -> Signal' clk a"
-    , "templateD" :
-"// rom begin
-~SIGD[~GENSYM[ROM][0]][2];
-assign ~SYM[0] = ~ARG[2];
-
-logic [~SIZE[~TYPO]-1:0] ~GENSYM[dout][1];
-always @(posedge ~CLK[1]) begin : ~GENSYM[~COMPNAME_rom][2]
-  ~SYM[1] <= ~SYM[0][~ARG[3]];
-end
-
-assign ~RESULT = ~FROMBV[~SYM[1]][~TYPO];
-// rom end"
-    }
-  }
 ]

@@ -1,0 +1,49 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.Testbench.assert"
+    , "type" :
+"assert
+  :: (Eq a,Show a)            -- (ARG[0],ARG[1])
+  => Clock domain gated       -- ARG[2]
+  -> Reset domain synchronous -- ARG[3]
+  -> String                   -- ARG[4]
+  -> Signal domain a          -- Checked value (ARG[5])
+  -> Signal domain a          -- Expected value (ARG[6])
+  -> Signal domain b          -- Return valued (ARG[7])
+  -> Signal domain b"
+    , "templateD" :
+"-- assert begin
+~GENSYM[assert][0] : block
+  -- pragma translate_off
+  function ~GENSYM[slv2string][1] (slv : std_logic_vector) return STRING is
+     variable result : string (1 to slv'length);
+     variable res_l : string (1 to 3);
+     variable r : integer;
+   begin
+     r := 1;
+     for i in slv'range loop
+        res_l := std_logic'image(slv(i));
+        result(r) := res_l(2);
+        r := r + 1;
+     end loop;
+     return result;
+  end;
+  signal ~GENSYM[actual][2] : ~TYP[5];
+  signal ~GENSYM[expected][3] : ~TYP[6];
+  -- pragma translate_on
+begin
+  -- pragma translate_off
+  ~SYM[2] <= ~ARG[5];
+  ~SYM[3] <= ~ARG[6];
+  process(~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE,~ARG[3]~FI) is
+  begin
+    if (rising_edge(~ARG[2])~IF ~ISSYNC[3] ~THEN ~ELSE or falling_edge(~ARG[3])~FI) then
+      assert (std_match(toSLV(~SYM[2]),toSLV(~SYM[3]))) report (~LIT[4] & \", expected: \" & ~SYM[1](toSLV(~SYM[3])) & \", actual: \" & ~SYM[1](toSLV(~SYM[2]))) severity error;
+    end if;
+  end process;
+  -- pragma translate_on
+  ~RESULT <= ~ARG[7];
+end block;
+-- assert end"
+    }
+  }
+]

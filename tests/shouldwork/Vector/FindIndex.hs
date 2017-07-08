@@ -4,9 +4,12 @@ import CLaSH.Prelude
 
 topEntity :: Vec 7 (Unsigned 8) -> Maybe (Index 7)
 topEntity = findIndex (> 3)
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 7 (Unsigned 8))
-testInput = pure (1:>3:>2:>4:>3:>5:>6:>Nil)
-
-expectedOutput :: Signal (Maybe (Index 7)) -> Signal Bool
-expectedOutput = outputVerifier ((Just 3) :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure (1:>3:>2:>4:>3:>5:>6:>Nil)
+    expectedOutput = outputVerifier ((Just 3) :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

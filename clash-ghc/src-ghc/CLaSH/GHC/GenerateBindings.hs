@@ -59,11 +59,10 @@ generateBindings ::
   -> Maybe  (GHC.DynFlags)
   -> IO (BindingMap,HashMap TyConName TyCon,IntMap TyConName
         ,(TmName, Maybe TopEntity) -- topEntity bndr + (maybe) TopEntity annotation
-        ,Maybe TmName              -- testInput bndr
-        ,Maybe TmName              -- expectedOutput bndr
+        ,Maybe TmName              -- testBench bndr
         ,PrimMap Text)             -- The primitives found in '.' and 'primDir'
 generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),testInpM,expOutM,pFP) <- loadModules hdl modName dflagsM
+  (bindings,clsOps,unlocatable,fiEnvs,(topEnt,topEntAnn),benchM,pFP) <- loadModules hdl modName dflagsM
   primMap <- generatePrimMap (pFP ++ (primDir:importDirs))
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
@@ -71,36 +70,30 @@ generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = 
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
       clsMap                        = HashMap.map (\(ty,i) -> (ty,GHC.noSrcSpan,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
-      (topEnt',testInpM',expOutM')  = flip State.evalState tcMap' $ do
+      (topEnt',benchM')             = flip State.evalState tcMap' $ do
                                           topEnt'' <- coreToName GHC.varName GHC.varUnique qualfiedNameString topEnt
-                                          testInpM'' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) testInpM
-                                          expOutM'' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) expOutM
-                                          return (topEnt'',testInpM'',expOutM'')
-      droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEnt' testInpM' expOutM'
+                                          benchM'' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) benchM
+                                          return (topEnt'',benchM'')
+      droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEnt' benchM'
 
-  return (droppedAndRetypedBindings,allTcCache,tupTcCache,(topEnt',topEntAnn),testInpM',expOutM',primMap)
+  return (droppedAndRetypedBindings,allTcCache,tupTcCache,(topEnt',topEntAnn),benchM',primMap)
 
 dropAndRetypeBindings :: HashMap TyConName TyCon
                       -> BindingMap
                       -> TmName        -- ^ topEntity
-                      -> Maybe TmName  -- ^ testInput
-                      -> Maybe TmName  -- ^ expectedOutput
+                      -> Maybe TmName  -- ^ testBench
                       -> BindingMap
 
-dropAndRetypeBindings allTcCache allBindings topEnt testInpM expOutM = oBindings
+dropAndRetypeBindings allTcCache allBindings topEnt benchM = bBindings
   where
     topEntity = do e <- HashMap.lookup topEnt allBindings
                    return (topEnt,e)
-    testInput = do t <- testInpM
+    bench     = do t <- benchM
                    e <- HashMap.lookup t allBindings
                    return (t,e)
-    expectedOut = do t <- expOutM
-                     e <- HashMap.lookup t allBindings
-                     return (t,e)
 
     tBindings = maybe allBindings (dropAndRetype allBindings) topEntity
-    iBindings = maybe tBindings (dropAndRetype tBindings) testInput
-    oBindings = maybe iBindings (dropAndRetype iBindings) expectedOut
+    bBindings = maybe tBindings (dropAndRetype tBindings) bench
     dropAndRetype d (t,_) = snd (retype allTcCache ([],lambdaDrop d t) t)
 
 -- | clean up cast-removal mess

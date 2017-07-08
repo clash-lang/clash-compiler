@@ -15,9 +15,12 @@ cordic angle
 
 topEntity :: SFixed 3 8 -> SFixed 3 8
 topEntity = cordic
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (SFixed 3 8)
-testInput = stimuliGenerator (0.7853981633974483 :> Nil)
-
-expectedOutput :: Signal (SFixed 3 8) -> Signal Bool
-expectedOutput = outputVerifier (0.59765625 :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator (0.7853981633974483 :> Nil)
+    expectedOutput = outputVerifier   (0.59765625 :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

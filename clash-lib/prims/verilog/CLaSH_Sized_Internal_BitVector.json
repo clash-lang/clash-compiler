@@ -244,19 +244,19 @@ assign ~RESULT = 1'b0;
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.plus#"
     , "type"      : "plus# :: BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "templateE" : "~ARG[0] + ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] + ~ARG[1];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.minus#"
     , "type"      : "minus# :: (KnownNat m, KnownNat n) => BitVector m -> BitVector n -> BitVector (Max m n + 1)"
-    , "templateE" : "~ARG[2] - ~ARG[3]"
+    , "templateD" : "assign ~RESULT = ~ARG[2] - ~ARG[3];"
     }
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.times#"
     , "type"      : "times# :: KnownNat (m + n) => BitVector m -> BitVector n -> BitVector (m + n)"
-    , "templateE" : "~ARG[0] * ~ARG[1]"
+    , "templateD" : "assign ~RESULT = ~ARG[0] * ~ARG[1];"
     }
   }
 , { "BlackBox" :

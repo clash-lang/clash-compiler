@@ -13,6 +13,7 @@ data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)
 data DbS = DbS { dbS :: DbState }
 
 
+topEntity :: SystemClockReset => Signal System Bit -> Signal System Bit
 topEntity = walkState <^> DbS (DbInitDisp 0)
 
 walkState :: DbS

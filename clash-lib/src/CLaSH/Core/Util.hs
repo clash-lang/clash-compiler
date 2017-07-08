@@ -426,7 +426,7 @@ isSignalType :: HashMap TyConName TyCon -> Type -> Bool
 isSignalType tcm ty = go HashSet.empty ty
   where
     go tcSeen (tyView -> TyConApp tcNm args) = case name2String tcNm of
-      "CLaSH.Signal.Internal.Signal'"  -> True
+      "CLaSH.Signal.Internal.Signal"  -> True
       _ | tcNm `HashSet.member` tcSeen -> False -- Do not follow rec types
         | otherwise -> case HashMap.lookup tcNm tcm of
             Just tc -> let dcs         = tyConDataCons tc
@@ -438,6 +438,17 @@ isSignalType tcm ty = go HashSet.empty ty
                                      ++ " not found.") False
 
     go _ _ = False
+
+isClockOrReset
+  :: HashMap TyConName TyCon
+  -> Type
+  -> Bool
+isClockOrReset m (coreView m -> Just ty) = isClockOrReset m ty
+isClockOrReset _ (tyView -> TyConApp tcNm _) = case name2String tcNm of
+  "CLaSH.Signal.Internal.Clock" -> True
+  "CLaSH.Signal.Internal.Reset" -> True
+  _ -> False
+isClockOrReset _ _ = False
 
 tyNatSize :: HMS.HashMap TyConName TyCon
           -> Type

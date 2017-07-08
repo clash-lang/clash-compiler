@@ -18,17 +18,18 @@ actual
     :> toInteger (unFixed (minBound :: UFixed 3 4)) :> toInteger (unFixed (maxBound :: UFixed 3 4))
     :> Nil
 
-topEntity :: Signal () -> Signal Integer
+topEntity :: SystemClockReset => Signal System () -> Signal System Integer
 topEntity = mealy loop actual
+{-# NOINLINE topEntity #-}
 
 loop :: Vec (n+2) a -> () -> (Vec (n+2) a, a)
 --loop (x:>xs) _ = (xs :< last xs, x)
 loop xs _ = (xs <<+ last xs, head xs)
 
-
-expectedOutput :: Signal Integer -> Signal Bool
-expectedOutput = outputVerifier expected
-
-
-testInput :: Signal ()
-testInput  = signal ()
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = pure ()
+    expectedOutput = outputVerifier expected
+    done           = expectedOutput (topEntity testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

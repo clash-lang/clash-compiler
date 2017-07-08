@@ -1,22 +1,25 @@
 module Blinker where
 
 import CLaSH.Prelude
+import CLaSH.Promoted.Symbol
+import CLaSH.Intel.ClockGen
+
+type Dom50 = Dom "System" 20000
 
 {-# ANN topEntity
   (defTop
     { t_name     = "blinker"
-    , t_inputs   = ["KEY1"]
+    , t_inputs   = ["CLOCK_50","KEY0","KEY1"]
     , t_outputs  = ["LED"]
-    , t_extraIn  = [ ("CLOCK_50", 1)
-                   , ("KEY0"    , 1)
-                   ]
-    , t_clocks   = [ altpll "altpll50" "CLOCK_50(0)" "not KEY0(0)" ]
     }) #-}
-topEntity :: Signal Bit -> Signal (BitVector 8)
-topEntity key1 = leds
+topEntity :: Clock Dom50 Source -> Reset Dom50 Asynchronous -> Signal Dom50 Bit -> Signal Dom50 (BitVector 8)
+topEntity clk rst key1 =
+    let  (pllOut,pllStable) = altpll (SSymbol @ "altpll50") clk rst
+         rstSync            = resetSynchronizer pllOut (unsafeToAsyncReset pllStable)
+    in   withClockReset pllOut rstSync leds
   where
-    key1R = isRising 1 key1
-    leds  = mealy blinkerT (1,False,0) key1R
+    key1R  = isRising 1 key1
+    leds   = mealy blinkerT (1,False,0) key1R
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where

@@ -1,0 +1,28 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.ROM.rom#"
+    , "type" :
+"rom# :: KnownNat n      -- ARG[0]
+      => Clock dom gated -- clk,  ARG[1]
+      -> Vec n a         -- init, ARG[2]
+      -> Signal dom Int  -- rd,   ARG[3]
+      -> Signal dom a"
+    , "templateD" :
+"// rom begin
+~SIGD[~GENSYM[ROM][0]][2];
+assign ~SYM[0] = ~ARG[2];
+
+logic [~SIZE[~TYPO]-1:0] ~GENSYM[~RESULT_q][1];~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_rom][2]
+  if (~ARG[1][0]) begin
+    ~SYM[1] <= ~SYM[0][~ARG[3]];
+  end
+end~ELSE
+always @(posedge ~ARG[1]) begin : ~SYM[2]
+  ~SYM[1] <= ~SYM[0][~ARG[3]];
+end~FI
+
+assign ~RESULT = ~FROMBV[~SYM[1]][~TYPO];
+// rom end"
+    }
+  }
+]

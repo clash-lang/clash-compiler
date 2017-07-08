@@ -17,9 +17,12 @@ populationCount bv = dtfold (Proxy :: Proxy IIndex)
 
 topEntity :: BitVector 16 -> Index 17
 topEntity = populationCount
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (BitVector 16)
-testInput = stimuliGenerator $(listToVecTH ([0..20]::[BitVector 16]))
-
-expectedOutput :: Signal (Index 17) -> Signal Bool
-expectedOutput = outputVerifier $(listToVecTH ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator $(listToVecTH ([0..20]::[BitVector 16]))
+    expectedOutput = outputVerifier   $(listToVecTH ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

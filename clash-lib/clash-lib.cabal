@@ -1,5 +1,5 @@
 Name:                 clash-lib
-Version:              0.7.1
+Version:              0.99
 Synopsis:             CAES Language for Synchronous Hardware - As a Library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -48,7 +48,8 @@ License:              BSD2
 License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
-Copyright:            Copyright © 2012-2016, University of Twente, 2017, QBayLogic
+Copyright:            Copyright © 2012-2016, University of Twente,
+                                  2017, QBayLogic, Google Inc.
 Category:             Hardware
 Build-type:           Simple
 
@@ -96,7 +97,7 @@ Library
                       attoparsec              >= 0.10.4.0 && < 0.14,
                       base                    >= 4.8      && < 5,
                       bytestring              >= 0.10.0.2 && < 0.11,
-                      clash-prelude           >= 0.11.1   && < 0.12,
+                      clash-prelude           >= 0.11.1   && < 1.0,
                       concurrent-supply       >= 0.1.7    && < 0.2,
                       containers              >= 0.5.0.0  && < 0.6,
                       data-binary-ieee754     >= 0.4.4    && < 0.6,
@@ -139,7 +140,6 @@ Library
                       CLaSH.Core.Var
 
                       CLaSH.Driver
-                      CLaSH.Driver.TestbenchGen
                       CLaSH.Driver.TopWrapper
                       CLaSH.Driver.Types
 

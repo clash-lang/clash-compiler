@@ -1,53 +1,187 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Signal.Internal.register#"
+    { "name" : "CLaSH.Signal.Internal.delay#"
     , "type" :
-"register# :: SClock clk     -- ARG[0]
-           -> a              -- ARG[1]
-           -> Signal' clk a  -- ARG[2]
-           -> Signal' clk a"
+"delay#
+  :: HasCallStack             -- ARG[0]
+  => Clock domain gated       -- ARG[1]
+  -> Signal clk a             -- ARG[2]
+  -> Signal clk a"
     , "templateD" :
 "// register begin
-reg ~SIGD[~GENSYM[dout][0]][2];
-
-always @(posedge ~CLK[0] or negedge ~RST[0]) begin : ~GENSYM[~COMPNAME_register][1]
-  if (~ ~RST[0]) begin
-    ~SYM[0] <= ~ARG[1];
-  end else begin
+reg ~SIGD[~GENSYM[~RESULT_q][0]][2];~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]) begin : ~GENSYM[~COMPNAME_delay][1]
+  if (~ARG[1][0]) begin
     ~SYM[0] <= ~ARG[2];
   end
-end
+end~ELSE
+always @(posedge ~ARG[1]) begin : ~SYM[1]
+  ~SYM[0] <= ~ARG[2];
+end~FI
 
 assign ~RESULT = ~SYM[0];
 // register end"
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Signal.Internal.regEn#"
+    { "name" : "CLaSH.Signal.Internal.register#"
     , "type" :
-"regEn# :: SClock clk       -- ARG[0]
-        -> a                -- ARG[1]
-        -> Signal' clk Bool -- ARG[2]
-        -> Signal' clk a    -- ARG[3]
-        -> Signal' clk a"
+"register#
+  :: HasCallStack             -- ARG[0]
+  => Clock domain gated       -- ARG[1]
+  -> Reset domain synchronous -- ARG[2]
+  -> a                        -- ARG[3]
+  -> Signal clk a             -- ARG[4]
+  -> Signal clk a"
     , "templateD" :
-"// regEn begin
-reg ~SIGD[~GENSYM[dout][0]][3];
-
-always @(posedge ~CLK[0] or negedge ~RST[0]) begin : ~GENSYM[~COMPNAME_regEn][1]
-  if (~ ~RST[0]) begin
-    ~SYM[0] <= ~ARG[1];
-  end else begin
-    if (~ARG[2]) begin
-      ~SYM[0] <= ~ARG[3];
-    end
+"// register begin
+reg ~SIGD[~GENSYM[~RESULT_q][0]][3];~IF ~ISGATED[1] ~THEN
+always @(posedge ~ARG[1][1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~GENSYM[~COMPNAME_register][1]
+  if (~ARG[2]) begin
+    ~SYM[0] <= ~ARG[3];
+  end else if (~ARG[1][0]) begin
+    ~SYM[0] <= ~ARG[4];
   end
-end
+end~ELSE
+always @(posedge ~ARG[1]~IF ~ISSYNC[2] ~THEN ~ELSE or posedge ~ARG[2]~FI) begin : ~SYM[1]
+  if (~ARG[2]) begin
+    ~SYM[0] <= ~ARG[3];
+  end else begin
+    ~SYM[0] <= ~ARG[4];
+  end
+end~FI
 
 assign ~RESULT = ~SYM[0];
-// regEn end"
+// register end"
     }
   }
-
+, { "BlackBox" :
+    { "name" : "CLaSH.Signal.Internal.clockGate"
+    , "type" :
+"clockGate
+  :: Clock domain gated -- ARG[0]
+  -> Signal domain Bool -- ARG[1]
+  -> Clcok domain 'Gated"
+    , "templateD" :
+"// clockGate begin ~IF ~ISGATED[0] ~THEN
+assign ~RESULT = {~ARG[0][1],~ARG[0][0] & ~ARG[1]};~ELSE
+assign ~RESULT = {~ARG[0],~ARG[1]};~FI
+// clockGate end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.clockGen"
+    , "type" :
+"clockGen
+  :: (domain ~ Dom nm period -- ARG[0]
+     ,KnownSymbol nm         -- ARG[1]
+     ,KnownNat period)       -- ARG[2]
+  => Clock domain Source"
+    , "templateD" :
+"// pragma translate_off
+reg ~TYPO ~GENSYM[clk][0];
+// 1 = 0.1ps
+localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
+always begin
+  ~SYM[0] = 0;
+  #30 forever begin
+    ~SYM[0] = ~ ~SYM[0];
+    #~SYM[1];
+    ~SYM[0] = ~ ~SYM[0];
+    #~SYM[1];
+  end
+end
+assign ~RESULT = ~SYM[0];
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.tbClockGen"
+    , "type" :
+"tbClockGen
+  :: (domain ~ Dom nm period -- ARG[0]
+     ,KnownSymbol nm         -- ARG[1]
+     ,KnownNat period)       -- ARG[2]
+  => Signal domain Bool      -- ARG[3]
+  -> Clock domain Source"
+    , "templateD" :
+"// pragma translate_off
+reg ~TYPO ~GENSYM[clk][0];
+// 1 = 0.1ps
+localparam ~GENSYM[half_period][1] = (~LIT[2]0 / 2);
+always begin
+  ~SYM[0] = 0;
+  #30 while (~ARG[3]) begin
+    ~SYM[0] = ~ ~SYM[0];
+    #~SYM[1];
+    ~SYM[0] = ~ ~SYM[0];
+    #~SYM[1];
+  end
+  if (~ ~ARG[3]) begin
+    $finish;
+  end
+end
+assign ~RESULT = ~SYM[0];
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.asyncResetGen"
+    , "type" :
+"asyncResetGen :: Reset domain 'Asynchronous"
+    , "templateD" :
+"// pragma translate_off
+reg ~TYPO ~GENSYM[rst][0];
+initial begin
+  #1  ~SYM[0] = 1;
+  #19 ~SYM[0] = 0;
+end
+assign ~RESULT = ~SYM[0];
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.syncResetGen"
+    , "type" :
+"asyncResetGen :: Reset domain 'Synchronous"
+    , "templateD" :
+"// pragma translate_off
+reg ~TYPO ~GENSYM[rst][0];
+initial begin
+  #1  ~SYM[0] = 1;
+  #30 ~SYM[0] = 0;
+end
+assign ~RESULT = ~SYM[0];
+// pragma translate_on"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.unsafeFromAsyncReset"
+    , "type" :
+"unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.unsafeToAsyncReset"
+    , "type" :
+"unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.fromSyncReset"
+    , "type" :
+"fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
+    , "templateE" : "~ARG[0]"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Signal.Internal.unsafeToSyncReset"
+    , "type" :
+"unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
+    , "templateE" : "~ARG[0]"
+    }
+  }
 , { "Primitive" :
     { "name"      : "CLaSH.Signal.Internal.signal#"
     , "primType"  : "Function"

@@ -4,4 +4,10 @@
     , "templateE" : "~ARG[1]"
     }
   }
+, { "BlackBox" :
+    { "name"      : "CLaSH.XException.errorX"
+    , "type"      : "errorX :: HasCallStack -> String -> a"
+    , "templateE" : "~ERRORO"
+    }
+  }
 ]

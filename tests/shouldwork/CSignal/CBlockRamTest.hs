@@ -1,15 +1,11 @@
 module CBlockRamTest where
 
-import CLaSH.Prelude
-import CLaSH.Prelude.Explicit
+import CLaSH.Explicit.Prelude
 
-type Clk10 = Clk "clk" 10
+type DomA10 = Dom "A" 10
 
-clk10 :: SClock Clk10
-clk10 = sclock
-
-
-topEntity :: Signal' Clk10 (Unsigned 7)
-          -> Signal' Clk10 (Maybe (Unsigned 7,Vec 4 Bit))
-          -> Signal' Clk10 (Vec 4 Bit)
-topEntity = blockRam' clk10 (replicate d128 (repeat high))
+topEntity :: Clock  DomA10 Source
+          -> Signal DomA10 (Unsigned 7)
+          -> Signal DomA10 (Maybe (Unsigned 7,Vec 4 Bit))
+          -> Signal DomA10 (Vec 4 Bit)
+topEntity clk = blockRam clk (replicate d128 (repeat high))

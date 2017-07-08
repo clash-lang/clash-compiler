@@ -52,7 +52,10 @@ c_frm (ws,ts,hist) vs = ((ws',ts',hist'),y)
     ws' = vs
     y   = hist'
 
-topEntity :: Signal (Vec 6 Integer) -> Signal (Vec 12 Integer)
+topEntity
+  :: SystemClockReset
+  => Signal System (Vec 6 Integer)
+  -> Signal System (Vec 12 Integer)
 topEntity = c_frm `mealy` (c_ws0,c_ts0,c_hist0)
 
 -- Haskell

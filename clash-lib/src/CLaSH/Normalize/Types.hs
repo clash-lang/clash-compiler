@@ -52,6 +52,7 @@ data NormalizeState
   , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _recursiveComponents :: HashMap TmName Bool
   -- ^ Map telling whether a components is part of a recursive group
+  , _topEntities :: [TmName]
   }
 
 makeLenses ''NormalizeState

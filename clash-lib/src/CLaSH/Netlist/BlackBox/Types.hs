@@ -18,11 +18,9 @@ data Element = C   !Text         -- ^ Constant
              | D   !Decl         -- ^ Component instantiation hole
              | O                 -- ^ Output hole
              | I   !Int          -- ^ Input hole
+             | N   !Int          -- ^ Name hole
              | L   !Int          -- ^ Literal hole
              | Sym !Text !Int    -- ^ Symbol hole
-             | Clk !(Maybe Int)  -- ^ Clock hole (Maybe clk corresponding to
-                                 -- input, clk corresponding to output if Nothing)
-             | Rst !(Maybe Int)  -- ^ Reset hole
              | Typ !(Maybe Int)  -- ^ Type declaration hole
              | TypM !(Maybe Int) -- ^ Type root hole
              | Err !(Maybe Int)  -- ^ Error value hole
@@ -47,6 +45,8 @@ data Element = C   !Text         -- ^ Constant
              | BV !Bool [Element] !Element -- ^ Convert to (True)/from(False) a bit-vector
              | IsLit !Int
              | IsVar !Int
+             | IsGated !Int
+             | IsSync !Int
              | Vars !Int
              | GenSym [Element] !Int
              | SigD [Element] !(Maybe Int)

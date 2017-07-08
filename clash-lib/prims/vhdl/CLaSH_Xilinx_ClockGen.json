@@ -1,0 +1,62 @@
+[ { "BlackBox" :
+    { "name"      : "CLaSH.Xilinx.ClockGen.clockWizard"
+    , "type"      :
+"clockWizard
+  :: SSymbol name               -- ARG[0]
+  -> Clock  pllIn 'Source       -- ARG[1]
+  -> Reset  pllIn 'Asynchronous -- ARG[2]
+  -> (Clock pllOut 'Source, Signal pllOut Bool)"
+    , "templateD" :
+"-- clockWizard begin
+~GENSYM[clockWizard][0] : block
+  signal ~GENSYM[pllOut][1]  : std_logic;
+  signal ~GENSYM[locked][2]  : std_logic;
+  signal ~GENSYM[pllLock][3] : boolean;
+
+  component ~NAME[0]
+    port (CLK_IN1  : in std_logic;
+          RESET    : in std_logic;
+          CLK_OUT1 : out std_logic;
+          LOCKED   : out std_logic);
+  end component;
+begin
+  ~GENSYM[clockWizard_inst][4] : component ~NAME[0] port map (~ARG[1],~ARG[2],~SYM[1],~SYM[2]);
+  ~SYM[3] <= true when ~SYM[2] = '1' else false;
+  ~RESULT <= (~SYM[1],~SYM[3]);
+end block;
+-- clockWizard end"
+    }
+  }
+, { "BlackBox" :
+    { "name"      : "CLaSH.Xilinx.ClockGen.clockWizardDifferential"
+    , "type"      :
+"clockWizardDifferential
+  :: SSymbol name              -- ARG[0]
+  -> Clock pllIn 'Source       -- ARG[1]
+  -> Clock pllIn 'Source       -- ARG[2]
+  -> Reset pllIn 'Asynchronous -- ARG[3]
+  -> (Clock pllOut 'Source, Signal pllOut Bool)"
+    , "templateD" :
+"-- clockWizardDifferential begin
+~GENSYM[clockWizardDifferential][0] : block
+  signal ~GENSYM[pllOut][1]  : std_logic;
+  signal ~GENSYM[locked][2]  : std_logic;
+  signal ~GENSYM[pllLock][3] : boolean;
+
+  component ~NAME[0]
+    port (CLK_IN1_D_clk_n : in std_logic;
+          CLK_IN1_D_clk_p : in std_logic;
+          RESET           : in std_logic;
+          CLK_OUT1        : out std_logic;
+          LOCKED          : out std_logic);
+  end component;
+begin
+  ~GENSYM[clockWizardDifferential_inst][4] : component ~NAME[0]
+    port map (~ARG[1],~ARG[2],~ARG[3],~SYM[1],~SYM[2]);
+  ~SYM[3] <= true when ~SYM[2] = '1' else false;
+  ~RESULT <= (~SYM[1],~SYM[3]);
+end block;
+-- clockWizardDifferential end"
+    }
+  }
+]

@@ -37,6 +37,7 @@ import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBl
 import           CLaSH.Netlist.Id                     (mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
 import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (curLoc, (<:>))
 
 #ifdef CABAL
@@ -186,9 +187,15 @@ mkUniqueId i = do
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
   Signed n -> "signed" <+> brackets (int (n-1) <> colon <> int 0)
+  Clock _ _ Gated -> verilogType (gatedClockType t)
   Clock {} -> empty
   Reset {} -> empty
   _        -> brackets (int (typeSize t -1) <> colon <> int 0)
+
+gatedClockType :: HWType -> HWType
+gatedClockType (Clock nm rt Gated) = Product "GatedClock" [Clock nm rt Source,Bool]
+gatedClockType ty = ty
+{-# INLINE gatedClockType #-}
 
 sigDecl :: VerilogM Doc -> HWType -> VerilogM Doc
 sigDecl d t = verilogType t <+> d
@@ -523,6 +530,7 @@ punctuate' :: Monad m => m Doc -> m [Doc] -> m Doc
 punctuate' s d = vcat (punctuate s d) <> s
 
 encodingNote :: HWType -> VerilogM Doc
-encodingNote (Clock _ _) = "// clock"
-encodingNote (Reset _ _) = "// asynchronous reset: active low"
-encodingNote _           = empty
+encodingNote (Clock _ _ Gated) = "// gated clock"
+encodingNote (Clock {})        = "// clock"
+encodingNote (Reset {})        = "// asynchronous reset: active high"
+encodingNote _                 = empty

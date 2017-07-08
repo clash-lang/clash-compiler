@@ -1,26 +1,31 @@
 module SyncTB where
 
-import CLaSH.Prelude
-import CLaSH.Prelude.Explicit
+import CLaSH.Explicit.Prelude
 
-type Clk2 = Clk "clk" 2
-type Clk7 = Clk "clk" 7
-type Clk9 = Clk "clk" 9
+type Dom2 = Dom "dom" 2
+type Dom7 = Dom "dom" 7
+type Dom9 = Dom "dom" 9
 
-clk2 :: SClock Clk2
-clk2 = sclock
+topEntity
+  :: Clock Dom2 Source
+  -> Clock Dom7 Source
+  -> Clock Dom9 Source
+  -> Signal Dom7 Integer
+  -> Signal Dom9 Integer
+topEntity clk2 clk7 clk9 i = delay clk9 (unsafeSynchronizer clk2 clk9 (delay clk2 (unsafeSynchronizer clk7 clk2 (delay clk7 i))))
+{-# NOINLINE topEntity #-}
 
-clk7 :: SClock Clk7
-clk7 = sclock
-
-clk9 :: SClock Clk9
-clk9 = sclock
-
-topEntity :: Signal' Clk7 Integer -> Signal' Clk9 Integer
-topEntity i = register' clk9 70 (unsafeSynchronizer clk2 clk9 (register' clk2 99 (unsafeSynchronizer clk7 clk2 (register' clk7 50 i))))
-
-testInput :: Signal' Clk7 Integer
-testInput = stimuliGenerator' clk7 $(listToVecTH [(1::Integer)..10])
-
-expectedOutput :: Signal' Clk9 Integer -> Signal' Clk9 Bool
-expectedOutput = outputVerifier' clk9 $(listToVecTH ([70,99,2,3,4,5,7,8,9,10]::[Integer]))
+testBench
+  :: Signal Dom9 Bool
+testBench = done
+  where
+    testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..10])
+    expectedOutput = outputVerifier   clk9 rst9
+                        ((undefined :> undefined :> Nil) ++ $(listToVecTH ([2,3,4,5,7,8,9,10]::[Integer])))
+    done           = expectedOutput (topEntity clk2 clk7 clk9 testInput)
+    done'          = not <$> done
+    clk2           = tbClockGen @Dom2 (unsafeSynchronizer clk9 clk2 done')
+    clk7           = tbClockGen @Dom7 (unsafeSynchronizer clk9 clk7 done')
+    clk9           = tbClockGen @Dom9 done'
+    rst7           = asyncResetGen @Dom7
+    rst9           = asyncResetGen @Dom9

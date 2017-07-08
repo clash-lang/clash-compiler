@@ -24,37 +24,4 @@ end block;
 -- asyncRom end"
     }
   }
-, { "BlackBox" :
-    { "name" : "CLaSH.Prelude.ROM.rom#"
-    , "type" :
-"rom# :: KnownNat n      -- ARG[0]
-      => SClock clk      -- clk,  ARG[1]
-      -> Vec n a         -- init, ARG[2]
-      -> Signal' clk Int -- rd,   ARG[3]
-      -> Signal' clk a"
-    , "templateD" :
-"-- rom begin
-~GENSYM[~COMPNAME_rom][0] : block
-  signal ~GENSYM[ROM][1] : ~TYP[2];
-  signal ~GENSYM[rd][2] : integer range 0 to ~LIT[0]-1;
-begin
-  ~SYM[1] <= ~ARG[2];
-
-  ~SYM[2] <= to_integer(~ARG[3])
-  -- pragma translate_off
-                mod ~LIT[0]
-  -- pragma translate_on
-                ;
-
-  ~GENSYM[romSync][3] : process (~CLK[1])
-  begin
-    if (rising_edge(~CLK[1])) then~IF ~VIVADO ~THEN
-      ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO];~ELSE
-      ~RESULT <= ~SYM[1](~SYM[2]);~FI
-    end if;
-  end process;
-end block;
--- rom end"
-    }
-  }
 ]

@@ -17,7 +17,8 @@ import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
 import           Data.IntMap.Strict               (IntMap)
-import           Data.List                        (mapAccumL,intersect)
+import           Data.List
+  (groupBy, intersect, mapAccumL, sortBy)
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
@@ -36,8 +37,9 @@ import           CLaSH.Core.Util                  (collectArgs, mkApps, termType
 import           CLaSH.Core.Var                   (Id,varName)
 import           CLaSH.Driver.Types               (CLaSHOpts (..))
 import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
-import           CLaSH.Netlist.Types              (HWType)
-import           CLaSH.Netlist.Util               (splitNormalized)
+import           CLaSH.Netlist.Types              (HWType (..))
+import           CLaSH.Netlist.Util
+  (splitNormalized, unsafeCoreTypeToHWType)
 import           CLaSH.Normalize.Strategy
 import           CLaSH.Normalize.Transformations  (bindConstantVar, caseCon,
                                                    reduceConst, topLet )
@@ -47,10 +49,11 @@ import           CLaSH.Primitives.Types           (PrimMap)
 import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           CLaSH.Rewrite.Types              (DebugLevel (..), RewriteEnv (..), RewriteState (..),
                                                    bindings, curFun, dbgLevel,
-                                                   tcCache, extra)
+                                                   tcCache, extra, typeTranslator)
 import           CLaSH.Rewrite.Util               (isUntranslatableType,
                                                    runRewrite,
                                                    runRewriteSession)
+import CLaSH.Signal.Internal                      (ResetKind (..))
 import           CLaSH.Util
 
 -- | Run a NormalizeSession in a given environment
@@ -72,10 +75,12 @@ runNormalization :: CLaSHOpts
                  -- ^ Primitive Definitions
                  -> HashMap TmName Bool
                  -- ^ Map telling whether a components is part of a recursive group
+                 -> [TmName]
+                 -- ^ topEntities
                  -> NormalizeSession a
                  -- ^ NormalizeSession to run
                  -> a
-runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap
+runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
     rwEnv     = RewriteEnv
@@ -104,6 +109,7 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap
                   (opt_inlineBelow opts)
                   primMap
                   rcsMap
+                  topEnts
 
 
 normalize :: [TmName]
@@ -138,6 +144,13 @@ normalize' nm = do
                             , ") remains recursive after normalization:\n"
                             , showDoc (tmNorm ^. _3) ])
                     (return ())
+            tyTrans <- Lens.view typeTranslator
+            case clockResetErrors tyTrans tcm ty of
+              msgs@(_:_) -> traceIf True (concat (nmS:" (:: ":showDoc (tmNorm ^. _1)
+                              :")\nhas potentially dangerous meta-stability issues:\n\n"
+                              :msgs))
+                              (return ())
+              _ -> return ()
             prevNorm <- fmap HashMap.keys $ Lens.use (extra.normalized)
             let toNormalize = filter (`notElem` (nm:prevNorm)) usedBndrs
             return (toNormalize,(nm,tmNorm))
@@ -189,11 +202,11 @@ checkNonRecursive topEntity norm =
 cleanupGraph :: TmName
              -> (HashMap TmName (Type,SrcSpan,Term))
              -> NormalizeSession (HashMap TmName (Type,SrcSpan,Term))
-cleanupGraph topEntity norm = do
-  let ct = mkCallTree [] norm topEntity
-  ctFlat <- flattenCallTree ct
-  return (HashMap.fromList $ snd $ callTreeToList [] ctFlat)
-
+cleanupGraph topEntity norm
+  | Just ct <- mkCallTree [] norm topEntity
+  = do ctFlat <- flattenCallTree ct
+       return (HashMap.fromList $ snd $ callTreeToList [] ctFlat)
+cleanupGraph _ norm = return norm
 
 data CallTree = CLeaf   (TmName,(Type,SrcSpan,Term))
               | CBranch (TmName,(Type,SrcSpan,Term)) [CallTree]
@@ -201,14 +214,15 @@ data CallTree = CLeaf   (TmName,(Type,SrcSpan,Term))
 mkCallTree :: [TmName] -- ^ Visited
            -> HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
            -> TmName -- ^ Root of the call graph
-           -> CallTree
-mkCallTree visited bindingMap root = case used of
-                            [] -> CLeaf   (root,rootTm)
-                            _  -> CBranch (root,rootTm) other
-  where
-    rootTm = Maybe.fromMaybe (error $ $(curLoc) ++ show root ++ " is not a global binder") $ HashMap.lookup root bindingMap
-    used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _3)
-    other  = map (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
+           -> Maybe CallTree
+mkCallTree visited bindingMap root
+  | Just rootTm <- HashMap.lookup root bindingMap
+  = let used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _3)
+        other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
+    in  case used of
+          [] -> Just (CLeaf   (root,rootTm))
+          _  -> Just (CBranch (root,rootTm) other)
+mkCallTree _ _ _ = Nothing
 
 stripArgs :: [TmName]
           -> [Id]
@@ -274,3 +288,59 @@ callTreeToList visited (CBranch (nm,(ty,sp,tm)) used)
   | otherwise         = (visited',(nm,(ty,sp,tm)):(concat others))
   where
     (visited',others) = mapAccumL callTreeToList (nm:visited) used
+
+-- | CLaSH's clock and reset domain annotations prevent most accidental
+-- meta-stability situations. That is, unless the developer uses the
+-- functions marked "unsafe", the type system will prevent things like
+-- illegal clock domain crossing, or improper use of asynchronous resets.
+--
+-- However, this all depends on clock and resets being unique. With explicit
+-- clocks and resets, it is possible to have multiple clock and reset arguments
+-- that are annotated with the same domain. If these arguments aren't connected
+-- to the same source, we can still get metastability due to either illegal
+-- clock domain crossing, or improper use of asynchronous resets.
+--
+-- The following situations are reported:
+-- * There are 2 or more clock arguments in scope that have the same clock
+--   domain annotation.
+-- * There are 2 or more reset arguments in scope that have the same reset
+--   domain annotation, and at least one of them is an asynchronous reset.
+clockResetErrors
+  :: (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+  -> HashMap TyConName TyCon
+  -> Type
+  -> [String]
+clockResetErrors tyTran tcm ty =
+   (Maybe.mapMaybe reportClock clks ++ Maybe.mapMaybe reportResets rsts)
+  where
+    (args,_)  = splitCoreFunForallTy tcm ty
+    (_,args') = partitionEithers args
+    hwArgs    = zip (map (unsafeCoreTypeToHWType $(curLoc) tyTran tcm) args') args'
+    clks      = groupBy ((==) `on` fst) . sortBy (compare `on` fst)
+              $ [ ((nm,i),ty') | (Clock nm i _,ty') <- hwArgs]
+    rsts      = groupBy ((==) `on` (fst.fst)) . sortBy (compare `on` (fst.fst))
+              $ [ (((nm,i),s),ty') | (Reset nm i s,ty') <- hwArgs]
+
+    reportClock clks'
+      | length clks' >= 2
+      = Just
+      $ concat ["The following clocks:\n"
+               ,concatMap (\c -> "* " ++ showDoc (snd c) ++ "\n") clks'
+               ,"belong to the same clock domain and should be connected to "
+               ,"the same clock source in order to prevent meta-stability "
+               ,"issues."
+               ]
+      | otherwise
+      = Nothing
+
+    reportResets rsts'
+      | length rsts' >= 2
+      , any (\((_,sync),_) -> sync == Asynchronous) rsts'
+      = Just
+      $ concat ["The following resets:\n"
+               ,concatMap (\c -> "* " ++ showDoc (snd c) ++ "\n") rsts'
+               ,"belong to the same reset domain, and one or more of these "
+               ,"resets is Asynchronous. Ensure that these resets are "
+               ,"synchronized in order to prevent meta-stability issues."
+               ]
+    reportResets _ = Nothing

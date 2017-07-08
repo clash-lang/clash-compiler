@@ -7,11 +7,12 @@ topEntity = scatter defvec to
   where
     defvec = replicate d5 99
     to = 0 :> 4 :> 2 :> 3 :> 1 :> Nil
+{-# NOINLINE topEntity #-}
 
-testInput :: Signal (Vec 5 (Unsigned 10))
-testInput = stimuliGenerator
-  ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :> Nil)
-
-expectedOutput :: Signal (Vec 5 (Unsigned 10)) -> Signal Bool
-expectedOutput = outputVerifier
-  ((1 :> 5 :> 3 :> 4 :> 2 :> Nil) :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator ((1 :> 2 :> 3 :> 4 :> 5 :> Nil) :> Nil)
+    expectedOutput = outputVerifier   ((1 :> 5 :> 3 :> 4 :> 2 :> Nil) :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

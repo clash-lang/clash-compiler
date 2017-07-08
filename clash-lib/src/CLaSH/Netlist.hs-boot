@@ -15,7 +15,6 @@ import CLaSH.Netlist.Types  (Expr, HWType, Identifier, NetlistMonad, Component,
                              Declaration)
 
 genComponent :: TmName
-             -> Maybe Int
              -> NetlistMonad (SrcSpan,Component)
 
 mkExpr :: Bool

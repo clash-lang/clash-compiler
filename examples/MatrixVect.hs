@@ -13,11 +13,13 @@ vector = 2 :> 3 :> 4 :> Nil
 dotProduct xs ys = foldr (+) 0 (zipWith (*) xs ys)
 matrixVector m v = map (`dotProduct` v) m
 
-topEntity :: Vec 3 (Signal (Signed 16)) -> Vec 3 (Signal (Signed 16))
-topEntity = (\s i -> ((),matrixVector matrix i)) <^> ()
+topEntity :: Vec 3 (Signed 16) -> Vec 3 (Signed 16)
+topEntity = matrixVector matrix
 
-testInput :: Signal (Vec 3 (Signed 16))
-testInput = stimuliGenerator ((2 :> 3 :> 4 :> Nil) :> Nil)
-
-expectedOutput :: Signal (Vec 3 (Signed 16)) -> Signal Bool
-expectedOutput = outputVerifier ((20 :> 47 :> 74 :> Nil) :> Nil)
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator ((2 :> 3 :> 4 :> Nil) :> Nil)
+    expectedOutput = outputVerifier   ((20 :> 47 :> 74 :> Nil) :> Nil)
+    done           = expectedOutput (topEntity <$> testInput)
+    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done

@@ -1904,13 +1904,13 @@ makeHDL backend optsRef srcs = do
                   backend' = backend iw syn
               primDir <- CLaSH.Backend.primDir backend'
               forM_ srcs $ \src -> do
-                (bindingsMap,tcm,tupTcm,topEnt,testInpM,expOutM,primMap) <-
+                (bindingsMap,tcm,tupTcm,topEnt,benchM,primMap) <-
                   generateBindings (opt_errorInvalidCoercions opts') primDir idirs (CLaSH.Backend.hdlKind backend') src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
                 CLaSH.Driver.generateHDL bindingsMap (Just backend') primMap tcm
-                  tupTcm (ghcTypeToHWType iw fp) reduceConstant topEnt testInpM expOutM opts' (startTime,prepTime)
+                  tupTcm (ghcTypeToHWType iw fp) reduceConstant topEnt benchM opts' (startTime,prepTime)
 
 makeVHDL :: IORef CLaSHOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (CLaSH.Backend.initBackend :: Int -> HdlSyn -> VHDLState)

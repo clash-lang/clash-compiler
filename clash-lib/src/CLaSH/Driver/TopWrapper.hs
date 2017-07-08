@@ -13,52 +13,35 @@
 
 module CLaSH.Driver.TopWrapper where
 
-import           Data.Char            (isDigit)
-import qualified Data.HashMap.Lazy    as HashMap
 import           Data.List            (mapAccumL)
-import           Data.Maybe           (mapMaybe)
-import           Data.Text.Lazy       (Text, append, pack, unpack)
-import           System.IO.Unsafe     (unsafePerformIO)
+import           Data.Text.Lazy       (append, pack)
 
-import CLaSH.Annotations.TopEntity    (TopEntity (..), ClockSource (..))
+import CLaSH.Annotations.TopEntity    (TopEntity (..))
 
-import CLaSH.Netlist                  (runNetlistMonad)
-import CLaSH.Netlist.BlackBox         (prepareBlackBox)
-import CLaSH.Netlist.BlackBox.Types   (BlackBoxTemplate)
-import CLaSH.Netlist.Types            (BlackBoxContext (..), Component (..),
-                                       Declaration (..), Expr (..), Identifier,
-                                       HWType (..), Modifier (..), NetlistMonad,
-                                       PortDirection(..), emptyBBContext)
-import CLaSH.Primitives.Types         (PrimMap, Primitive (..))
+import CLaSH.Netlist.Types
+  (Component (..), Declaration (..), Expr (..), Identifier, HWType (..),
+   Modifier (..), PortDirection(..))
 import CLaSH.Util
 
 -- | Create a wrapper around a component, potentially initiating clock sources
-mkTopWrapper :: PrimMap BlackBoxTemplate
-             -> (Identifier -> Identifier)
+mkTopWrapper :: (Identifier -> Identifier)
              -> Maybe TopEntity -- ^ TopEntity specifications
              -> String          -- ^ Name of the module containing the @topEntity@
-             -> Int             -- ^ Int/Word/Integer bit-width
              -> Component       -- ^ Entity to wrap
              -> Component
-mkTopWrapper primMap mkId teM modName iw topComponent
+mkTopWrapper mkId teM modName topComponent
   = Component
   { componentName = maybe (mkId (pack modName `append` "_topEntity")) (pack . t_name) teM
   , inputs        = inputs'' ++ extraIn teM
   , outputs       = outputs'' ++ extraOut teM
-  , hiddenPorts   = case maybe [] t_clocks teM of
-                      [] -> originalHidden
-                      _  -> filter (`notElem` (mapMaybe isNetDecl clkDecls))
-                                   originalHidden
-  , declarations  = concat [ clkDecls
-                           , wrappers
+  , hiddenPorts   = originalHidden
+  , declarations  = concat [ wrappers
                            , instDecl:unwrappers
                            ]
   }
   where
     iNameSupply                = maybe [] (map pack . t_inputs) teM
     originalHidden             = hiddenPorts topComponent
-
-    clkDecls                   = mkClocks primMap originalHidden iw teM
 
     inputs'                    = map (first (const "input"))
                                      (inputs topComponent)
@@ -91,9 +74,6 @@ mkTopWrapper primMap mkId teM modName iw topComponent
                          zipWith (\(p,t) i -> (p,Out,t,Identifier i Nothing))
                                  (outputs topComponent)
                                  idsO)
-
-    isNetDecl (NetDecl nm ty) = Just (nm,ty)
-    isNetDecl _               = Nothing
 
 -- | Create extra input ports for the wrapper
 extraIn :: Maybe TopEntity -> [(Identifier,HWType)]
@@ -246,101 +226,6 @@ mkOutput nms (i,hwty) cnt = case hwty of
   where
     iName = append i (pack ("_" ++ show cnt))
 
--- | Create clock generators
-mkClocks :: PrimMap BlackBoxTemplate -> [(Identifier,HWType)] -> Int -> Maybe TopEntity -> [Declaration]
-mkClocks primMap hidden iw teM = concat
-    [ clockGens
-    , resets
-    ]
-  where
-    (clockGens,clkLocks) = maybe ([],[])
-                                 (first concat . unzip . map mkClock . t_clocks)
-                                 teM
-    resets               = mkResets primMap hidden iw clkLocks
-
 stringToVar :: String -> Expr
 stringToVar = (`Identifier` Nothing) . pack
 
--- | Create a single clock generator
-mkClock :: ClockSource -> ([Declaration],(Identifier,[String],Bool))
-mkClock (ClockSource {..}) = (clkDecls ++ [lockedDecl,instDecl],(lockedName,clks,c_sync))
-  where
-    c_nameT      = pack c_name
-    lockedName   = append c_nameT "_locked"
-    lockedDecl   = NetDecl lockedName (Reset lockedName 0)
-    (ports,clks) = clockPorts c_inp c_outp
-    clkDecls     = map mkClockDecl clks
-    instDecl     = InstDecl c_nameT (append c_nameT "_inst")
-                 $ concat [ ports
-                          , maybe [] ((:[]) . (\(i,e) -> (pack i,In,Reset "" 0,stringToVar e)))
-                                  c_reset
-                          , [(pack c_lock,Out,Reset "" 0,Identifier lockedName Nothing)]
-                          ]
-
-mkClockDecl :: String -> Declaration
-mkClockDecl s = NetDecl (pack s) (Clock (pack name) (read rate))
-  where
-    (name,rate) = span (not . isDigit) s
-
-
--- | Create a single clock path
-clockPorts :: [(String,String)] -> [(String,String)]
-           -> ([(Identifier,PortDirection,HWType,Expr)],[String])
-clockPorts inp outp = (inPorts ++ outPorts,clks)
-  where
-    inPorts  = map (\(i,e) -> (pack i,In,Clock "" 0,stringToVar e)) inp
-    outPorts = map (\(i,e) -> (pack i,Out,Clock "" 0,stringToVar e)) outp
-    clks  = map snd outp
-
--- | Generate resets
-mkResets :: PrimMap BlackBoxTemplate
-         -> [(Identifier,HWType)]
-         -> Int
-         -> [(Identifier,[String],Bool)]
-         -> [Declaration]
-mkResets primMap hidden iw = unsafeRunNetlist iw . fmap concat . mapM assingReset
-  where
-    assingReset (lock,clks,doSync) = concat <$> mapM connectReset matched
-      where
-        matched = filter match hidden
-        match (_,(Reset nm r)) = elem (unpack nm ++ show r) clks
-        match _                = False
-
-        connectReset (rst,(Reset nm r)) = if doSync
-            then return [NetDecl rst (Reset nm r), Assignment rst (Identifier lock Nothing)]
-            else genSyncReset primMap lock rst nm r
-        connectReset _ = return []
-
--- | Generate a reset synchroniser that synchronously de-asserts an
--- asynchronous reset signal
-genSyncReset :: PrimMap BlackBoxTemplate
-             -> Identifier
-             -> Identifier
-             -> Text
-             -> Integer
-             -> NetlistMonad [Declaration]
-genSyncReset primMap lock rst nm r = do
-  let resetType = Reset rst 0
-      ctx = emptyBBContext
-              { bbResult = (Right ((Identifier rst Nothing),(nm,r)), resetType)
-              , bbInputs = [(Left (Identifier lock Nothing),resetType,False)]
-              }
-      bbName = "CLaSH.TopWrapper.syncReset"
-  resetGenDecl <- case HashMap.lookup bbName primMap of
-        Just (BlackBox _ lib imps Nothing (Left templ)) -> do
-          templ' <- prepareBlackBox bbName templ ctx
-          return (BlackBoxD bbName lib imps Nothing templ' ctx)
-        pM -> error $ $(curLoc) ++ ("Can't make reset sync for: " ++ show pM)
-
-  return [NetDecl rst (Reset nm r),resetGenDecl]
-
--- | The 'NetListMonad' is a transformer stack with 'IO' at the bottom.
--- So we must use 'unsafePerformIO'.
-unsafeRunNetlist :: Int
-                 -> NetlistMonad a
-                 -> a
-unsafeRunNetlist iw
-  = unsafePerformIO
-  . fmap fst
-  . runNetlistMonad HashMap.empty HashMap.empty
-      HashMap.empty (\_ _ -> Nothing) "" [] iw id []
