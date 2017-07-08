@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2013-2016, University of Twente
+  Copyright   :  (C) 2013-2016, University of Twente,
+                     2017     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -54,9 +55,8 @@ module CLaSH.Prelude.Safe
     -- * BlockRAM primitives
   , blockRam
   , blockRamPow2
-    -- * BlockRAM read/write conflict resolution
+    -- ** BlockRAM read/write conflict resolution
   , readNew
-  , readNew'
     -- * Utility functions
   , isRising
   , isFalling
@@ -101,7 +101,7 @@ module CLaSH.Prelude.Safe
   , module Data.Bits
       -- ** Exceptions
   , module CLaSH.XException
-  , undefined
+  , E.undefined
     -- ** Named types
   , module CLaSH.NamedTypes
     -- ** Haskell Prelude
@@ -110,50 +110,45 @@ module CLaSH.Prelude.Safe
   )
 where
 
-import Control.Applicative
-import Data.Bits
-import GHC.Stack
-import GHC.TypeLits
-import GHC.TypeLits.Extra
-import Prelude                     hiding ((++), (!!), concat, drop, foldl,
-                                           foldl1, foldr, foldr1, head, init,
-                                           iterate, last, length, map, repeat,
-                                           replicate, reverse, scanl, scanr,
-                                           splitAt, tail, take, unzip, unzip3,
-                                           zip, zip3, zipWith, zipWith3,
-                                           undefined)
+import           Control.Applicative
+import           Data.Bits
+import           GHC.TypeLits
+import           GHC.TypeLits.Extra
+import           Prelude hiding
+  ((++), (!!), concat, drop, foldl, foldl1, foldr, foldr1, head, init, iterate,
+   last, length, map, repeat, replicate, reverse, scanl, scanr, splitAt, tail,
+   take, unzip, unzip3, zip, zip3, zipWith, zipWith3, undefined)
 
-import CLaSH.Annotations.TopEntity
-import CLaSH.Class.BitPack
-import CLaSH.Class.Num
-import CLaSH.Class.Resize
-import CLaSH.NamedTypes
-import CLaSH.Prelude.BitIndex
-import CLaSH.Prelude.BitReduction
-import CLaSH.Prelude.BlockRam      (blockRam, blockRamPow2, readNew, readNew')
-import CLaSH.Prelude.Explicit.Safe (registerB', isRising', isFalling',
-                                    oscillate', riseEvery')
-import CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
-import CLaSH.Prelude.Moore         (moore, mooreB)
-import CLaSH.Prelude.RAM           (asyncRam,asyncRamPow2)
-import CLaSH.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
-import CLaSH.Prelude.DataFlow
-import CLaSH.Promoted.Nat
-import CLaSH.Promoted.Nat.TH
-import CLaSH.Promoted.Nat.Literals
-import CLaSH.Sized.BitVector
-import CLaSH.Sized.Fixed
-import CLaSH.Sized.Index
-import CLaSH.Sized.RTree
-import CLaSH.Sized.Signed
-import CLaSH.Sized.Unsigned
-import CLaSH.Sized.Vector
-import CLaSH.Signal
-import CLaSH.Signal.Delayed
-import CLaSH.Signal.Explicit       (systemClock)
-import CLaSH.XException
+import           CLaSH.Annotations.TopEntity
+import           CLaSH.Class.BitPack
+import           CLaSH.Class.Num
+import           CLaSH.Class.Resize
+import           CLaSH.NamedTypes
+import           CLaSH.Prelude.BitIndex
+import           CLaSH.Prelude.BitReduction
+import           CLaSH.Prelude.BlockRam
+import qualified CLaSH.Explicit.Prelude.Safe as E
+import           CLaSH.Prelude.Mealy         (mealy, mealyB, (<^>))
+import           CLaSH.Prelude.Moore         (moore, mooreB)
+import           CLaSH.Prelude.RAM           (asyncRam,asyncRamPow2)
+import           CLaSH.Prelude.ROM           (asyncRom,asyncRomPow2,rom,romPow2)
+import           CLaSH.Prelude.DataFlow
+import           CLaSH.Promoted.Nat
+import           CLaSH.Promoted.Nat.TH
+import           CLaSH.Promoted.Nat.Literals
+import           CLaSH.Sized.BitVector
+import           CLaSH.Sized.Fixed
+import           CLaSH.Sized.Index
+import           CLaSH.Sized.RTree
+import           CLaSH.Sized.Signed
+import           CLaSH.Sized.Unsigned
+import           CLaSH.Sized.Vector
+import           CLaSH.Signal
+import           CLaSH.Signal.Delayed
+import           CLaSH.XException
 
 {- $setup
+>>> :set -XTypeApplications
 >>> let rP = registerB (8,8)
 -}
 
@@ -167,36 +162,43 @@ It instead exports the identically named functions defined in terms of
 'CLaSH.Sized.Vector.Vec' at "CLaSH.Sized.Vector".
 -}
 
-{-# INLINE registerB #-}
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
--- > rP :: (Signal Int,Signal Int) -> (Signal Int, Signal Int)
+-- > rP :: HasClockAndReset System gated synchronous
+-- >    => (Signal System Int, Signal System Int)
+-- >    -> (Signal System Int, Signal System Int)
 -- > rP = registerB (8,8)
 --
 -- >>> simulateB rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
-registerB :: Bundle a => a -> Unbundled a -> Unbundled a
-registerB = registerB' systemClock
+registerB
+  :: (HasClockReset domain gated synchronous, Bundle a)
+  => a
+  -> Unbundled domain a
+  -> Unbundled domain a
+registerB = E.registerB hasClock hasReset
 infixr 3 `registerB`
+{-# INLINE registerB #-}
 
-{-# INLINE isRising #-}
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
-isRising :: (Bounded a, Eq a)
-         => a -- ^ Starting value
-         -> Signal a
-         -> Signal Bool
-isRising = isRising' systemClock
+isRising
+  :: (HasClockReset domain gated synchronous, Bounded a, Eq a)
+  => a -- ^ Starting value
+  -> Signal domain a
+  -> Signal domain Bool
+isRising = E.isRising hasClock hasReset
+{-# INLINE isRising #-}
 
-{-# INLINE isFalling #-}
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
-isFalling :: (Bounded a, Eq a)
-          => a -- ^ Starting value
-          -> Signal a
-          -> Signal Bool
-isFalling = isFalling' systemClock
+isFalling
+  :: (HasClockReset domain gated synchronous, Bounded a, Eq a)
+  => a -- ^ Starting value
+  -> Signal domain a
+  -> Signal domain Bool
+isFalling = E.isFalling hasClock hasReset
+{-# INLINE isFalling #-}
 
-{-# INLINE riseEvery #-}
 -- | Give a pulse every @n@ clock cycles. This is a useful helper function when
 -- combined with functions like @'CLaSH.Signal.regEn'@ or @'CLaSH.Signal.mux'@,
 -- in order to delay a register by a known amount.
@@ -214,10 +216,13 @@ isFalling = isFalling' systemClock
 -- @
 -- counter = 'CLaSH.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
 -- @
-riseEvery :: KnownNat n => SNat n -> Signal Bool
-riseEvery = riseEvery' systemClock
+riseEvery
+  :: HasClockReset domain gated synchronous
+  => SNat n
+  -> Signal domain Bool
+riseEvery = E.riseEvery hasClock hasReset
+{-# INLINE riseEvery #-}
 
-{-# INLINE oscillate #-}
 -- | Oscillate a @'Bool'@ for a given number of cycles. This is a convenient
 -- function when combined with something like @'regEn'@, as it allows you to
 -- easily hold a register value for a given number of cycles. The input @'Bool'@
@@ -239,8 +244,10 @@ riseEvery = riseEvery' systemClock
 -- >>> let sample' = sampleN 200
 -- >>> sample' (oscillate False d1) == sample' osc'
 -- True
-oscillate :: KnownNat n => Bool -> SNat n -> Signal Bool
-oscillate = oscillate' systemClock
-
-undefined :: HasCallStack => a
-undefined = errorX "undefined"
+oscillate
+  :: HasClockReset domain gated synchronous
+  => Bool
+  -> SNat n
+  -> Signal domain Bool
+oscillate = E.oscillate hasClock hasReset
+{-# INLINE oscillate #-}

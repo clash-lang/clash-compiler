@@ -1,5 +1,6 @@
 {-|
-Copyright  :  (C) 2016, University of Twente, 2017, QBayLogic
+Copyright  :  (C) 2016, University of Twente,
+                  2017, QBayLogic, Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -202,6 +203,9 @@ instance (ShowX a, ShowX b, ShowX c, ShowX d, ShowX e, ShowX f, ShowX g, ShowX h
 
 instance {-# OVERLAPPABLE #-} ShowX a => ShowX [a] where
   showsPrecX _ = showListX
+
+instance ShowX Char where
+  showsPrecX = showsPrecXWith showsPrec
 
 instance ShowX Bool
 

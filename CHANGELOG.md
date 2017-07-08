@@ -1,5 +1,9 @@
 # Changelog for [`clash-prelude` package](http://hackage.haskell.org/package/clash-prelude)
 
+## 0.99
+* New features:
+  * Explicit clock and reset lines
+
 ## 0.11.2
 * New features:
   * Add `riseEvery`: Give a pulse every @n@ clock cycles. (Thanks to @thoughtpolice)

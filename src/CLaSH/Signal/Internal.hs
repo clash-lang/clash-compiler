@@ -1,11 +1,14 @@
 {-|
-Copyright  :  (C) 2013-2016, University of Twente
+Copyright  :  (C) 2013-2016, University of Twente,
+                  2017     , Google Inc.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE KindSignatures        #-}
@@ -21,20 +24,37 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -- as to why we need this.
 {-# OPTIONS_GHC -fno-cpr-anal #-}
 
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions not-home #-}
 
 module CLaSH.Signal.Internal
   ( -- * Datatypes
-    Clock (..)
-  , SClock (..)
-  , Signal' (..)
+    Domain (..)
+  , Signal (..)
+    -- * Clocks
+  , Clock (..)
+  , ClockKind (..)
+  , clockPeriod
+  , clockEnable
+    -- ** Clock gating
+  , clockGate
+    -- * Resets
+  , Reset (..)
+  , ResetKind (..)
+  , unsafeFromAsyncReset
+  , unsafeToAsyncReset
+  , fromSyncReset
+  , unsafeToSyncReset
     -- * Basic circuits
+  , delay#
   , register#
-  , regEn#
   , mux
-  , signal
+    -- * Simulation and testbench functions
+  , clockGen
+  , tbClockGen
+  , asyncResetGen
+  , syncResetGen
     -- * Boolean connectives
-  , (.&&.), (.||.), not1
+  , (.&&.), (.||.)
     -- * Simulation functions (not synthesisable)
   , simulate
     -- ** lazy version
@@ -53,7 +73,7 @@ module CLaSH.Signal.Internal
     -- ** 'Eq'-like
   , (.==.), (./=.)
     -- ** 'Ord'-like
-  , compare1, (.<.), (.<=.), (.>=.), (.>.)
+  , (.<.), (.<=.), (.>=.), (.>.)
     -- ** 'Functor'
   , mapSignal#
     -- ** 'Applicative'
@@ -63,25 +83,6 @@ module CLaSH.Signal.Internal
   , foldr#
     -- ** 'Traversable'
   , traverse#
-    -- ** 'Enum'-like
-  , fromEnum1
-    -- ** 'Rational'-like
-  , toRational1
-    -- ** 'Integral'-like
-  , toInteger1
-    -- ** 'Bits'-like
-  , testBit1
-  , popCount1
-  , shift1
-  , rotate1
-  , setBit1
-  , clearBit1
-  , shiftL1
-  , unsafeShiftL1
-  , shiftR1
-  , unsafeShiftR1
-  , rotateL1
-  , rotateR1
   -- * EXTREMELY EXPERIMENTAL
   , joinSignal#
   )
@@ -90,72 +91,97 @@ where
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, force)
 import Control.Exception          (catch, evaluate, throw)
-import Data.Bits                  (Bits (..))
 import Data.Default               (Default (..))
-import GHC.TypeLits               (Nat, Symbol)
+import GHC.Generics               (Generic)
+import GHC.Stack                  (HasCallStack, withFrozenCallStack)
+import GHC.TypeLits               (KnownNat, KnownSymbol, Nat, Symbol)
 import Language.Haskell.TH.Syntax (Lift (..))
 import System.IO.Unsafe           (unsafeDupablePerformIO)
 import Test.QuickCheck            (Arbitrary (..), CoArbitrary(..), Property,
                                    property)
 
-import CLaSH.Promoted.Nat         (SNat, snatToInteger)
-import CLaSH.Promoted.Symbol      (SSymbol, ssymbolToString)
+import CLaSH.Promoted.Nat         (SNat (..), snatToInteger, snatToNum)
+import CLaSH.Promoted.Symbol      (SSymbol (..))
 import CLaSH.XException           (XException, errorX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
 >>> :set -XMagicHash
+>>> :set -XTypeApplications
 >>> import CLaSH.Promoted.Nat
 >>> import CLaSH.Promoted.Symbol
->>> type SystemClock = Clk "System" 1000
->>> type Signal a = Signal' SystemClock a
->>> let register = register# (SClock SSymbol SNat :: SClock SystemClock)
+>>> import CLaSH.XException
+>>> type System = Dom "System" 10000
+>>> let systemClock = clockGen @System
+>>> let systemReset = asyncResetGen @System
+>>> let register = register#
+>>> let registerS = register#
+>>> let registerA = register#
 -}
 
--- | A clock with a name ('Symbol') and period ('Nat')
-data Clock = Clk Symbol Nat
+-- * Signal
 
--- | Singleton value for a type-level 'Clock' with the given @name@ and @period@
-data SClock (clk :: Clock)
-  where
-    SClock :: SSymbol name -> SNat period -> SClock ('Clk name period)
-
-instance Show (SClock clk) where
-  show (SClock nm r) = ssymbolToString nm ++ show (snatToInteger r)
+-- | A domain with a name (@Symbol@) and a clock period (@Nat@) in /ps/
+data Domain = Dom { domainName :: Symbol, clkPeriod :: Nat }
 
 infixr 5 :-
--- | A synchronized signal with samples of type @a@, explicitly synchronized to
--- a clock @clk@
---
--- __NB__: The constructor, @(':-')@, is __not__ synthesisable.
-data Signal' (clk :: Clock) a = a :- Signal' clk a
+{- | CλaSH has synchronous 'Signal's in the form of:
 
-instance Show a => Show (Signal' clk a) where
+@
+'Signal' (domain :: 'Domain') a
+@
+
+Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
+and /domain/ is the /clock-/ (and /reset-/) domain to which the memory elements
+manipulating these 'Signal's belong.
+
+The type-parameter, /domain/, is of the kind 'Domain' which has types of the
+following shape:
+
+@
+data Domain = Dom { domainName :: 'GHC.TypeLits.Symbol', clkPeriod :: 'GHC.TypeLits.Nat' }
+@
+
+Where /domainName/ is a type-level string ('GHC.TypeLits.Symbol') representing
+the name of the /clock-/ (and /reset-/) domain, and /clkPeriod/ is a type-level
+natural number ('GHC.TypeLits.Nat') representing the clock period (in __ps__)
+of the clock lines in the /clock-domain/.
+
+* __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
+so do __not__ do that!
+* __NB__: You should be judicious using a clock with period of @1@ as you can
+never create a clock that goes any faster!
+-}
+data Signal (domain :: Domain) a
+  -- | The constructor, @(':-')@, is __not__ synthesisable.
+  = a :- Signal domain a
+
+instance Show a => Show (Signal domain a) where
   show (x :- xs) = show x ++ " " ++ show xs
 
-instance Lift a => Lift (Signal' clk a) where
+instance Lift a => Lift (Signal domain a) where
   lift ~(x :- _) = [| signal# x |]
 
-instance Default a => Default (Signal' clk a) where
+instance Default a => Default (Signal domain a) where
   def = signal# def
 
-instance Functor (Signal' clk) where
+instance Functor (Signal domain) where
   fmap = mapSignal#
 
 {-# NOINLINE mapSignal# #-}
-mapSignal# :: (a -> b) -> Signal' clk a -> Signal' clk b
+mapSignal# :: (a -> b) -> Signal domain a -> Signal domain b
 mapSignal# f (a :- as) = f a :- mapSignal# f as
 
-instance Applicative (Signal' clk) where
+instance Applicative (Signal domain) where
   pure  = signal#
   (<*>) = appSignal#
 
 {-# NOINLINE signal# #-}
-signal# :: a -> Signal' clk a
+signal# :: a -> Signal domain a
 signal# a = let s = a :- s in s
 
 {-# NOINLINE appSignal# #-}
-appSignal# :: Signal' clk (a -> b) -> Signal' clk a -> Signal' clk b
+appSignal# :: Signal domain (a -> b) -> Signal domain a -> Signal domain b
 appSignal# (f :- fs) xs@(~(a :- as)) = f a :- (xs `seq` appSignal# fs as) -- See [NOTE: Lazy ap]
 
 {- NOTE: Lazy ap
@@ -187,13 +213,13 @@ of the second argument is evaluated as soon as the tail of the result is evaluat
 -- There is a good reason there is no 'Monad' instance for 'Signal''.
 --
 -- Is currently treated as 'id' by the CLaSH compiler.
-joinSignal# :: Signal' clk (Signal' clk a) -> Signal' clk a
+joinSignal# :: Signal domain (Signal domain a) -> Signal domain a
 joinSignal# ~(xs :- xss) = head# xs :- joinSignal# (mapSignal# tail# xss)
   where
     head# (x' :- _ )  = x'
     tail# (_  :- xs') = xs'
 
-instance Num a => Num (Signal' clk a) where
+instance Num a => Num (Signal domain a) where
   (+)         = liftA2 (+)
   (-)         = liftA2 (-)
   (*)         = liftA2 (*)
@@ -208,7 +234,7 @@ instance Num a => Num (Signal' clk a) where
 --
 -- * The function @f@ should be /lazy/ in its second argument.
 -- * The @z@ element will never be used.
-instance Foldable (Signal' clk) where
+instance Foldable (Signal domain) where
   foldr = foldr#
 
 {-# NOINLINE foldr# #-}
@@ -218,15 +244,272 @@ instance Foldable (Signal' clk) where
 --
 -- * The function @f@ should be /lazy/ in its second argument.
 -- * The @z@ element will never be used.
-foldr# :: (a -> b -> b) -> b -> Signal' clk a -> b
+foldr# :: (a -> b -> b) -> b -> Signal domain a -> b
 foldr# f z (a :- s) = a `f` (foldr# f z s)
 
-instance Traversable (Signal' clk) where
+instance Traversable (Signal domain) where
   traverse = traverse#
 
 {-# NOINLINE traverse# #-}
-traverse# :: Applicative f => (a -> f b) -> Signal' clk a -> f (Signal' clk b)
+traverse# :: Applicative f => (a -> f b) -> Signal domain a -> f (Signal domain b)
 traverse# f (a :- s) = (:-) <$> f a <*> traverse# f s
+
+-- * Clocks and resets
+
+-- | Distinction between gated and ungated clocks
+data ClockKind
+  = Source -- ^ A clock signal coming straight from the clock source
+  | Gated  -- ^ A clock signal that has been gated
+  deriving (Eq,Ord,Show,Generic,NFData)
+
+-- | A clock signal belonging to a @domain@
+data Clock (domain :: Domain) (gated :: ClockKind) where
+  Clock
+    :: (domain ~ ('Dom name period))
+    => SSymbol name
+    -> SNat    period
+    -> Clock domain 'Source
+  GatedClock
+    :: (domain ~ ('Dom name period))
+    => SSymbol name
+    -> SNat    period
+    -> Signal domain Bool
+    -> Clock  domain 'Gated
+
+-- | Get the clock period of a 'Clock' (in /ps/) as a 'Num'
+clockPeriod
+  :: Num a
+  => Clock domain gated
+  -> a
+clockPeriod (Clock _ period)        = snatToNum period
+clockPeriod (GatedClock _ period _) = snatToNum period
+
+-- | If the clock is gated, return 'Just' the /enable/ signal, 'Nothing'
+-- otherwise
+clockEnable
+  :: Clock domain gated
+  -> Maybe (Signal domain Bool)
+clockEnable Clock {}            = Nothing
+clockEnable (GatedClock _ _ en) = Just en
+
+instance Show (Clock domain gated) where
+  show (Clock      nm period)   = show nm ++ show (snatToInteger period)
+  show (GatedClock nm period _) = show nm ++ show (snatToInteger period)
+
+-- | Clock gating primitive
+clockGate :: Clock domain gated -> Signal domain Bool -> Clock domain 'Gated
+clockGate (Clock nm rt)         en  = GatedClock nm rt en
+clockGate (GatedClock nm rt en) en' = GatedClock nm rt (en .&&. en')
+{-# NOINLINE clockGate #-}
+
+-- | Clock generator for simulations. Do __not__ use this clock generator for
+-- for the /testBench/ function, use 'tbClockGen' instead.
+--
+-- To be used like:
+--
+-- @
+-- type DomA = Dom \"A\" 1000
+-- clkA = clockGen @DomA
+-- @
+clockGen
+  :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
+  => Clock domain 'Source
+clockGen = Clock SSymbol SNat
+{-# NOINLINE clockGen #-}
+
+-- | Clock generator to be used in the /testBench/ function.
+--
+-- To be used like:
+--
+-- @
+-- type DomA = Dom \"A\" 1000
+-- clkA en = clockGen @DomA en
+-- @
+--
+-- === __Example__
+--
+-- @
+-- type DomA1 = Dom \"A\" 1 -- fast, twice as fast as slow
+-- type DomB2 = Dom \"B\" 2 -- slow
+--
+-- topEntity
+--   :: Clock DomA1 Source
+--   -> Reset DomA1 Asynchronous
+--   -> Clock DomB2 Source
+--   -> Signal DomA1 (Unsigned 8)
+--   -> Signal DomB2 (Unsigned 8, Unsigned 8)
+-- topEntity clk1 rst1 clk2 i =
+--   let h = register clk1 rst1 0 (register clk1 rst1 0 i)
+--       l = register clk1 rst1 0 i
+--   in  unsafeSynchronizer clk1 clk2 (bundle (h,l))
+--
+-- testBench
+--   :: Signal DomB2 Bool
+-- testBench = done
+--   where
+--     testInput      = stimuliGenerator clkA1 rstA1 $(listToVecTH [1::Unsigned 8,2,3,4,5,6,7,8])
+--     expectedOutput = outputVerifier   clkB2 rstB2 $(listToVecTH [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
+--     done           = expectedOutput (topEntity clkA1 rstA1 clkB2 testInput)
+--     done'          = not \<$\> done
+--     clkA1          = 'tbClockGen' \@DomA1 (unsafeSynchronizer clkB2 clkA1 done')
+--     clkB2          = 'tbClockGen' \@DomB2 done'
+--     rstA1          = asyncResetGen \@DomA1
+--     rstB2          = asyncResetGen \@DomB2
+-- @
+tbClockGen
+  :: (domain ~ 'Dom nm period, KnownSymbol nm, KnownNat period)
+  => Signal domain Bool
+  -> Clock domain 'Source
+tbClockGen _ = Clock SSymbol SNat
+{-# NOINLINE tbClockGen #-}
+
+-- | Asynchronous reset generator, for simulations and the /testBench/ function.
+--
+-- To be used like:
+--
+-- @
+-- type DomA = Dom \"A\" 1000
+-- rstA = asyncResetGen @DomA
+-- @
+--
+-- __NB__: Can only be used for components with an /active-high/ reset
+-- port, which all __clash-prelude__ components are.
+--
+-- === __Example__
+--
+-- @
+-- type Dom2 = Dom "dom" 2
+-- type Dom7 = Dom "dom" 7
+-- type Dom9 = Dom "dom" 9
+--
+-- topEntity
+--   :: Clock Dom2 Source
+--   -> Clock Dom7 Source
+--   -> Clock Dom9 Source
+--   -> Signal Dom7 Integer
+--   -> Signal Dom9 Integer
+-- topEntity clk2 clk7 clk9 i = delay clk9 (unsafeSynchronizer clk2 clk9 (delay clk2 (unsafeSynchronizer clk7 clk2 (delay clk7 i))))
+-- {-# NOINLINE topEntity #-}
+--
+-- testBench
+--   :: Signal Dom9 Bool
+-- testBench = done
+--   where
+--     testInput      = stimuliGenerator clk7 rst7 $(listToVecTH [(1::Integer)..10])
+--     expectedOutput = outputVerifier   clk9 rst9
+--                         ((undefined :> undefined :> Nil) ++ $(listToVecTH ([2,3,4,5,7,8,9,10]::[Integer])))
+--     done           = expectedOutput (topEntity clk2 clk7 clk9 testInput)
+--     done'          = not \<$\> done
+--     clk2           = tbClockGen \@Dom2 (unsafeSynchronizer clk9 clk2 done')
+--     clk7           = tbClockGen \@Dom7 (unsafeSynchronizer clk9 clk7 done')
+--     clk9           = tbClockGen \@Dom9 done'
+--     rst7           = 'asyncResetGen' \@Dom7
+--     rst9           = 'asyncResetGen' \@Dom9
+-- @
+asyncResetGen :: Reset domain 'Asynchronous
+asyncResetGen = Async (True :- pure False)
+{-# NOINLINE asyncResetGen #-}
+
+-- | Synchronous reset generator, for simulations and the /testBench/ function.
+--
+-- To be used like:
+--
+-- @
+-- type DomA = Dom \"A\" 1000
+-- rstA = syncResetGen @DomA
+-- @
+--
+-- __NB__: Can only be used for components with an /active-high/ reset
+-- port, which all __clash-prelude__ components are.
+syncResetGen :: Reset domain 'Synchronous
+syncResetGen = Sync (True :- pure False)
+{-# NOINLINE syncResetGen #-}
+
+-- | The \"kind\" of reset
+--
+-- Given a situation where a reset is asserted, and then de-asserted at the
+-- active flank of the clock, we can observe the difference between a
+-- synchronous reset and an asynchronous reset:
+--
+-- === Synchronous reset
+--
+-- > registerS
+-- >   :: Clock domain gated -> Reset domain Synchronous
+-- >   -> Signal domain Int -> Signal domain Int
+-- > registerS = register
+--
+-- >>> printX (sampleN 4 (registerS (clockGen @System) (syncResetGen @System) 0 (fromList [1,2,3])))
+-- [X,0,2,3]
+--
+-- === Asynchronous reset
+--
+-- > registerA
+-- >   :: Clock domain gated -> Reset domain Asynchronous
+-- >   -> Signal domain Int -> Signal domain Int
+-- > registerA = register
+--
+-- >>> sampleN 4 (registerA (clockGen @System) (asyncResetGen @System) 0 (fromList [1,2,3]))
+-- [0,1,2,3]
+data ResetKind
+  = Synchronous
+  -- ^ Components with a synchronous reset port produce the reset value when:
+  --
+  --     * The reset is asserted during the active flank of the clock to which
+  --       the component is synchronized.
+  | Asynchronous
+  -- ^ Components with an asynchronous reset port produce the reset value when:
+  --
+  --     * Immediately when the reset is asserted.
+  deriving (Eq,Ord,Show,Generic,NFData)
+
+-- | A reset signal belonging to a @domain@.
+--
+-- The underlying representation of resets is 'Bool'. Note that all components
+-- in the __clash-prelude__ package have an /active-high/ reset port, i.e., the
+-- component is reset when the reset port is 'True'.
+data Reset (domain :: Domain) (synchronous :: ResetKind) where
+  Sync  :: Signal domain Bool -> Reset domain 'Synchronous
+  Async :: Signal domain Bool -> Reset domain 'Asynchronous
+
+-- | 'unsafeFromAsyncReset' is unsafe because it can introduce:
+--
+-- * <CLaSH-Explicit-Signal.html#metastability meta-stability>
+unsafeFromAsyncReset :: Reset domain 'Asynchronous -> Signal domain Bool
+unsafeFromAsyncReset (Async r) = r
+{-# NOINLINE unsafeFromAsyncReset #-}
+
+-- | 'unsafeToAsyncReset' is unsafe because it can introduce:
+--
+-- * combinational loops
+--
+-- === __Example__
+--
+-- @
+-- resetSynchronizer
+--   :: Clock domain gated
+--   -> Reset domain 'Asynchronous
+--   -> Reset domain 'Asynchronous
+-- resetSynchronizer clk rst  =
+--   let r1 = register clk rst True (pure False)
+--       r2 = register clk rst True r1
+--   in  'unsafeToAsyncReset' r2
+-- @
+unsafeToAsyncReset :: Signal domain Bool -> Reset domain 'Asynchronous
+unsafeToAsyncReset r = Async r
+{-# NOINLINE unsafeToAsyncReset #-}
+
+-- | It is safe to treat synchronous resets as @Bool@ signals
+fromSyncReset :: Reset domain 'Synchronous -> Signal domain Bool
+fromSyncReset (Sync r) = r
+{-# NOINLINE fromSyncReset #-}
+
+-- | 'unsafeToSyncReset' is unsafe because:
+--
+-- * It can lead to <CLaSH-Explicit-Signal.html#metastability meta-stability>
+-- issues in the presence of asynchronous resets.
+unsafeToSyncReset :: Signal domain Bool -> Reset domain 'Synchronous
+unsafeToSyncReset r = Sync r
+{-# NOINLINE unsafeToSyncReset #-}
 
 infixr 2 .||.
 -- | The above type is a generalisation for:
@@ -250,42 +533,81 @@ infixr 3 .&&.
 (.&&.) :: Applicative f => f Bool -> f Bool -> f Bool
 (.&&.) = liftA2 (&&)
 
--- | The above type is a generalisation for:
+-- [Note: register strictness annotations]
 --
--- @
--- __not1__ :: 'CLaSH.Signal.Signal' 'Bool' -> 'CLaSH.Signal.Signal' 'Bool'
--- @
+-- In order to produce the first (current) value of the register's output
+-- signal, 'o', we don't need to know the shape of either input (enable or
+-- value-in).  This is important, because both values might be produced from
+-- the output in a feedback loop, so we can't know their shape (pattern
+-- match) them until we have produced output.
 --
--- It is a version of 'not' that operates on 'CLaSH.Signal.Signal's of 'Bool'
-not1 :: Functor f => f Bool -> f Bool
-not1 = fmap not
-{-# DEPRECATED not1 "'not1' will be removed in clash-prelude-1.0, use \"fmap not\" instead." #-}
+-- Thus, we use lazy pattern matching to delay inspecting the shape of
+-- either argument until output has been produced.
+--
+-- However, both arguments need to be evaluated to WHNF as soon as possible
+-- to avoid a space-leak.  Below, we explicitly reduce the value-in signal
+-- using 'seq' as the tail of our output signal is produced.  On the other
+-- hand, because the value of the tail depends on the value of the enable
+-- signal 'e', it will be forced by the 'if'/'then' statement and we don't
+-- need to 'seq' it explicitly.
 
-{-# NOINLINE register# #-}
-register# :: SClock clk -> a -> Signal' clk a -> Signal' clk a
-register# _ i s = i :- s
+delay#
+  :: HasCallStack
+  => Clock  domain gated
+  -> Signal domain a
+  -> Signal domain a
+delay# Clock {} =
+  \s -> withFrozenCallStack (errorX "delay: initial value undefined") :- s
 
-{-# NOINLINE regEn# #-}
-regEn# :: SClock clk -> a -> Signal' clk Bool -> Signal' clk a -> Signal' clk a
-regEn# _ = go
+delay# (GatedClock _ _ en) =
+    go (withFrozenCallStack (errorX "delay: initial value undefined")) en
   where
-    -- In order to produce the first (current) value of the register's output
-    -- signal, 'o', we don't need to know the shape of either input (enable or
-    -- value-in).  This is important, because both values might be produced from
-    -- the output in a feedback loop, so we can't know their shape (pattern
-    -- match) them until we have produced output.
-    --
-    -- Thus, we use lazy pattern matching to delay inspecting the shape of
-    -- either argument until output has been produced.
-    --
-    -- However, both arguments need to be evaluated to WHNF as soon as possible
-    -- to avoid a space-leak.  Below, we explicitly reduce the value-in signal
-    -- using 'seq' as the tail of our output signal is produced.  On the other
-    -- hand, because the value of the tail depends on the value of the enable
-    -- signal 'e', it will be forced by the 'if'/'then' statement and we don't
-    -- need to 'seq' it explicitly.
-    go o ~(e :- es) as@(~(x :- xs)) =
+    go o (e :- es) as@(~(x :- xs)) =
+      -- See [Note: register strictness annotations]
       o `seqX` o :- (as `seq` if e then go x es xs else go o es xs)
+{-# NOINLINE delay# #-}
+
+register#
+  :: HasCallStack
+  => Clock domain gated
+  -> Reset domain synchronous
+  -> a
+  -> Signal domain a
+  -> Signal domain a
+register# Clock {} (Sync rst) i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst
+  where
+    go o rt@(~(r :- rs)) as@(~(x :- xs)) =
+      let o' = if r then i else x
+          -- [Note: register strictness annotations]
+      in  o `seqX` o :- (rt `seq` as `seq` go o' rs xs)
+
+register# Clock {} (Async rst) i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst
+  where
+    go o ~(r :- rs) as@(~(x :- xs)) =
+      let o' = if r then i else o
+          -- [Note: register strictness annotations]
+      in  o' `seqX` o' :- (as `seq` go x rs xs)
+
+register# (GatedClock _ _ ena) (Sync rst)  i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
+  where
+    go o rt@(~(r :- rs)) ~(e :- es) as@(~(x :- xs)) =
+      let o' = if r then i else x
+          -- [Note: register strictness annotations]
+      in  o `seqX` o :- (rt `seq` as `seq` if e then go o' rs es xs
+                                                else go o  rs es xs)
+
+register# (GatedClock _ _ ena) (Async rst) i =
+    go (withFrozenCallStack (errorX "register: initial value undefined")) rst ena
+  where
+    go o ~(r :- rs) ~(e :- es) as@(~(x :- xs)) =
+      let o' = if r then i else o
+          -- [Note: register strictness annotations]
+      in  o' `seqX` o' :- (as `seq` if e then go x  rs es xs
+                                         else go o' rs es xs)
+{-# NOINLINE register# #-}
 
 {-# INLINE mux #-}
 -- | The above type is a generalisation for:
@@ -298,20 +620,6 @@ regEn# _ = go
 -- when @b@ is 'False'.
 mux :: Applicative f => f Bool -> f a -> f a -> f a
 mux = liftA3 (\b t f -> if b then t else f)
-
-{-# INLINE signal #-}
--- | The above type is a generalisation for:
---
--- @
--- __signal__ :: a -> 'CLaSH.Signal.Signal' a
--- @
---
--- Create a constant 'CLaSH.Signal.Signal' from a combinational value
---
--- >>> sampleN 5 (signal 4 :: Signal Int)
--- [4,4,4,4,4]
-signal :: Applicative f => a -> f a
-signal = pure
 
 infix 4 .==.
 -- | The above type is a generalisation for:
@@ -334,17 +642,6 @@ infix 4 ./=.
 -- It is a version of ('/=') that returns a 'CLaSH.Signal.Signal' of 'Bool'
 (./=.) :: (Eq a, Applicative f) => f a -> f a -> f Bool
 (./=.) = liftA2 (/=)
-
--- | The above type is a generalisation for:
---
--- @
--- __compare1__ :: 'Ord' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Ordering'
--- @
---
--- It is a version of 'compare' that returns a 'CLaSH.Signal.Signal' of 'Ordering'
-compare1 :: (Ord a, Applicative f) => f a -> f a -> f Ordering
-compare1 = liftA2 compare
-{-# DEPRECATED compare1 "'compare1' will be removed in clash-prelude-1.0, use \"liftA2 compare\" instead." #-}
 
 infix 4 .<.
 -- | The above type is a generalisation for:
@@ -390,181 +687,15 @@ infix 4 .>=.
 (.>=.) :: (Ord a, Applicative f) => f a -> f a -> f Bool
 (.>=.) = liftA2 (>=)
 
--- | The above type is a generalisation for:
---
--- @
--- __fromEnum1__ :: 'Enum' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int'
--- @
---
--- It is a version of 'fromEnum' that returns a CLaSH.Signal.Signal' of 'Int'
-fromEnum1 :: (Enum a, Functor f) => f a -> f Int
-fromEnum1 = fmap fromEnum
-{-# DEPRECATED fromEnum1 "'fromEnum1' will be removed in clash-prelude-1.0, use \"fmap fromEnum\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __toRational1__ :: 'Real' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Rational'
--- @
---
--- It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Rational'
-toRational1 :: (Real a, Functor f) => f a -> f Rational
-toRational1 = fmap toRational
-{-# DEPRECATED toRational1 "'toRational1' will be removed in clash-prelude-1.0, use \"fmap toRational\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __toInteger1__ :: 'Integral' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Integer'
--- @
---
--- It is a version of 'toRational' that returns a 'CLaSH.Signal.Signal' of 'Integer'
-toInteger1 :: (Integral a, Functor f) => f a -> f Integer
-toInteger1 = fmap toInteger
-{-# DEPRECATED toInteger1 "'toInteger1' will be removed in clash-prelude-1.0, use \"fmap toInteger\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __testBit1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'Bool'
--- @
---
--- It is a version of 'testBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing
--- argument, and a result of 'CLaSH.Signal.Signal' of 'Bool'
-testBit1 :: (Bits a, Applicative f) => f a -> f Int -> f Bool
-testBit1 = liftA2 testBit
-{-# DEPRECATED testBit1 "'testBit1' will be removed in clash-prelude-1.0, use \"liftA2 testBit\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __popCount1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int'
--- @
---
---  It is a version of 'popCount' that returns a 'CLaSH.Signal.Signal' of 'Int'
-popCount1 :: (Bits a, Functor f) => f a -> f Int
-popCount1 = fmap popCount
-{-# DEPRECATED popCount1 "'popCount1' will be removed in clash-prelude-1.0, use \"fmap popCount\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __shift1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'shift' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-shift1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-shift1 = liftA2 shift
-{-# DEPRECATED shift1 "'shift1' will be removed in clash-prelude-1.0, use \"liftA2 shift\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __rotate1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'rotate' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-rotate1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-rotate1 = liftA2 rotate
-{-# DEPRECATED rotate1 "'rotate1' will be removed in clash-prelude-1.0, use \"liftA2 rotate\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __setBit1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'setBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-setBit1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-setBit1 = liftA2 setBit
-{-# DEPRECATED setBit1 "'setBit1' will be removed in clash-prelude-1.0, use \"liftA2 setBit\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __clearBit1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'clearBit' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-clearBit1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-clearBit1 = liftA2 clearBit
-{-# DEPRECATED clearBit1 "'clearBit1' will be removed in clash-prelude-1.0, use \"liftA2 clearBit\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __shiftL1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'shiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-shiftL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-shiftL1 = liftA2 shiftL
-{-# DEPRECATED shiftL1 "'shiftL1' will be removed in clash-prelude-1.0, use \"liftA2 shiftL\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __unsafeShiftL1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'unsafeShiftL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-unsafeShiftL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-unsafeShiftL1 = liftA2 unsafeShiftL
-{-# DEPRECATED unsafeShiftL1 "'unsafeShiftL1' will be removed in clash-prelude-1.0, use \"liftA2 unsafeShiftL\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __shiftR1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'shiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-shiftR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-shiftR1 = liftA2 shiftR
-{-# DEPRECATED shiftR1 "'shiftR1' will be removed in clash-prelude-1.0, use \"liftA2 shiftR\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __unsafeShiftR1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'unsafeShiftR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-unsafeShiftR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-unsafeShiftR1 = liftA2 unsafeShiftR
-{-# DEPRECATED unsafeShiftR1 "'unsafeShiftR1' will be removed in clash-prelude-1.0, use \"liftA2 unsafeShiftR\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __rotateL1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'rotateL' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-rotateL1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-rotateL1 = liftA2 rotateL
-{-# DEPRECATED rotateL1 "'rotateL1' will be removed in clash-prelude-1.0, use \"liftA2 rotateL\" instead." #-}
-
--- | The above type is a generalisation for:
---
--- @
--- __rotateR1__ :: 'Bits' a => 'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' 'Int' -> 'CLaSH.Signal.Signal' 'a'
--- @
---
--- It is a version of 'rotateR' that has a 'CLaSH.Signal.Signal' of 'Int' as indexing argument
-rotateR1 :: (Bits a, Applicative f) => f a -> f Int -> f a
-rotateR1 = liftA2 rotateR
-{-# DEPRECATED rotateR1 "'rotateR1' will be removed in clash-prelude-1.0, use \"liftA2 rotateR\" instead." #-}
-
-instance Fractional a => Fractional (Signal' clk a) where
+instance Fractional a => Fractional (Signal domain a) where
   (/)          = liftA2 (/)
   recip        = fmap recip
   fromRational = signal# . fromRational
 
-instance Arbitrary a => Arbitrary (Signal' clk a) where
+instance Arbitrary a => Arbitrary (Signal domain a) where
   arbitrary = liftA2 (:-) arbitrary arbitrary
 
-instance CoArbitrary a => CoArbitrary (Signal' clk a) where
+instance CoArbitrary a => CoArbitrary (Signal domain a) where
   coarbitrary xs gen = do
     n <- arbitrary
     coarbitrary (take (abs n) (sample_lazy xs)) gen
@@ -588,7 +719,7 @@ forceNoException x = catch (evaluate (force x)) (\(e :: XException) -> return (t
 headStrictCons :: NFData a => a -> [a] -> [a]
 headStrictCons x xs = unsafeDupablePerformIO ((:) <$> forceNoException x <*> pure xs)
 
-headStrictSignal :: NFData a => a -> Signal' clk a -> Signal' clk a
+headStrictSignal :: NFData a => a -> Signal domain a -> Signal domain a
 headStrictSignal x xs = unsafeDupablePerformIO ((:-) <$> forceNoException x <*> pure xs)
 
 -- | The above type is a generalisation for:
@@ -634,7 +765,7 @@ sampleN n = take n . sample
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-fromList :: NFData a => [a] -> Signal' clk a
+fromList :: NFData a => [a] -> Signal domain a
 fromList = Prelude.foldr headStrictSignal (errorX "finite list")
 
 -- * Simulation functions (not synthesisable)
@@ -642,12 +773,12 @@ fromList = Prelude.foldr headStrictSignal (errorX "finite list")
 -- | Simulate a (@'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register 8) [1, 2, 3]
+-- >>> simulate (register systemClock systemReset 8) [1, 2, 3]
 -- [8,1,2,3...
 -- ...
 --
 -- __NB__: This function is not synthesisable
-simulate :: (NFData a, NFData b) => (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]
+simulate :: (NFData a, NFData b) => (Signal domain1 a -> Signal domain2 b) -> [a] -> [b]
 simulate f = sample . f . fromList
 
 -- | The above type is a generalisation for:
@@ -693,7 +824,7 @@ sampleN_lazy n = take n . sample_lazy
 -- [1,2]
 --
 -- __NB__: This function is not synthesisable
-fromList_lazy :: [a] -> Signal' clk a
+fromList_lazy :: [a] -> Signal domain a
 fromList_lazy = Prelude.foldr (:-) (error "finite list")
 
 -- * Simulation functions (not synthesisable)
@@ -701,10 +832,10 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 -- | Simulate a (@'CLaSH.Signal.Signal' a -> 'CLaSH.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register 8) [1, 2, 3]
+-- >>> simulate (register systemClock systemReset 8) [1, 2, 3]
 -- [8,1,2,3...
 -- ...
 --
 -- __NB__: This function is not synthesisable
-simulate_lazy :: (Signal' clk1 a -> Signal' clk2 b) -> [a] -> [b]
+simulate_lazy :: (Signal domain1 a -> Signal domain2 b) -> [a] -> [b]
 simulate_lazy f = sample_lazy . f . fromList_lazy

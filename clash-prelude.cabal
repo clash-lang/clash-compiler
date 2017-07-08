@@ -1,5 +1,5 @@
 Name:                 clash-prelude
-Version:              0.11.2
+Version:              0.99
 Synopsis:             CAES Language for Synchronous Hardware - Prelude library
 Description:
   CλaSH (pronounced ‘clash’) is a functional hardware description language that
@@ -32,8 +32,11 @@ Description:
   .
   * Import "CLaSH.Prelude"
   .
-  * Additionally import "CLaSH.Prelude.Explicit" if you want to design
-    explicitly clocked circuits in a multi-clock setting
+  * Alternatively, if you want to explicitly route clock and reset ports,
+    for more straightforward multi-clock designs, you can import the
+    "CLaSH.Explicit.Prelude" module. Note that you should not import
+    "CLaSH.Prelude" and "CLaSH.Explicit.Prelude" at the same time as they
+    have overlapping definitions.
   .
   A preliminary version of a tutorial can be found in "CLaSH.Tutorial", for a
   general overview of the library you should however check out "CLaSH.Prelude".
@@ -45,7 +48,7 @@ License-file:         LICENSE
 Author:               Christiaan Baaij
 Maintainer:           Christiaan Baaij <christiaan.baaij@gmail.com>
 Copyright:            Copyright © 2013-2016, University of Twente,
-                                  2017, QBayLogic
+                                  2017, QBayLogic, Google Inc.
 Category:             Hardware
 Build-type:           Simple
 
@@ -73,12 +76,6 @@ flag benchmarks
   default: True
   manual: True
 
-flag doclinks
-  description:
-    Create hyperlinks to non-dependent packages using `-fdoclinks`.
-  default: False
-  manual: True
-
 Library
   HS-Source-Dirs:     src
 
@@ -94,6 +91,22 @@ Library
                       CLaSH.Class.Num
                       CLaSH.Class.Resize
 
+                      CLaSH.Explicit.BlockRam
+                      CLaSH.Explicit.BlockRam.File
+                      CLaSH.Explicit.Mealy
+                      CLaSH.Explicit.Moore
+                      CLaSH.Explicit.RAM
+                      CLaSH.Explicit.ROM
+                      CLaSH.Explicit.ROM.File
+                      CLaSH.Explicit.Prelude
+                      CLaSH.Explicit.Prelude.Safe
+                      CLaSH.Explicit.Signal
+                      CLaSH.Explicit.Signal.Delayed
+                      CLaSH.Explicit.Synchronizer
+                      CLaSH.Explicit.Testbench
+
+                      CLaSH.Intel.ClockGen
+
                       CLaSH.NamedTypes
 
                       CLaSH.Prelude
@@ -102,15 +115,12 @@ Library
                       CLaSH.Prelude.BlockRam
                       CLaSH.Prelude.BlockRam.File
                       CLaSH.Prelude.DataFlow
-                      CLaSH.Prelude.Explicit
-                      CLaSH.Prelude.Explicit.Safe
                       CLaSH.Prelude.Mealy
                       CLaSH.Prelude.Moore
                       CLaSH.Prelude.RAM
                       CLaSH.Prelude.ROM
                       CLaSH.Prelude.ROM.File
                       CLaSH.Prelude.Safe
-                      CLaSH.Prelude.Synchronizer
                       CLaSH.Prelude.Testbench
 
                       CLaSH.Promoted.Nat
@@ -122,8 +132,6 @@ Library
                       CLaSH.Signal
                       CLaSH.Signal.Bundle
                       CLaSH.Signal.Delayed
-                      CLaSH.Signal.Delayed.Explicit
-                      CLaSH.Signal.Explicit
                       CLaSH.Signal.Internal
 
                       CLaSH.Sized.BitVector
@@ -140,6 +148,8 @@ Library
                       CLaSH.Sized.Internal.Unsigned
 
                       CLaSH.XException
+
+                      CLaSH.Xilinx.ClockGen
 
                       CLaSH.Tutorial
                       CLaSH.Examples
@@ -190,11 +200,8 @@ Library
                       reflection                >= 2       && < 2.2,
                       singletons                >= 1.0     && < 3.0,
                       template-haskell          >= 2.9.0.0 && < 2.13,
+                      transformers              >= 0.4.2.0 && < 0.6,
                       vector                    >= 0.11    && < 1.0
-
-  if flag(doclinks)
-    CPP-Options:      -DDOCLINKS
-    build-depends:    transformers              >= 0.4.2.0
 
 test-suite doctests
   type:             exitcode-stdio-1.0

@@ -21,7 +21,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions not-home #-}
 
 module CLaSH.Sized.Internal.BitVector
   ( -- * Datatypes
@@ -577,7 +577,7 @@ instance Resize BitVector where
   resize     = resize#
   zeroExtend = extend
   signExtend = \ bv -> (case msb# bv of 0 -> id
-                                        1 -> complement) 0 ++# bv
+                                        _ -> complement) 0 ++# bv
   truncateB  = resize#
 
 {-# NOINLINE resize# #-}
