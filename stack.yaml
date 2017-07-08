@@ -70,7 +70,7 @@ extra-deps:
 - free-4.12.4
 - ghc-paths-0.1.0.9
 - half-0.2.2.3
-- hashable-1.2.6.0
+- hashable-1.2.6.1
 - hspec-2.4.3
 - hspec-core-2.4.3
 - hspec-discover-2.4.3
