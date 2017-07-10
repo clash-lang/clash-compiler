@@ -27,16 +27,32 @@ begin
   begin
     if (rising_edge(~SYM[3])) then
       if ~SYM[4] then~IF ~VIVADO ~THEN
-        ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO];~ELSE
-        ~RESULT <= ~SYM[1](~SYM[2]);~FI
+        ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO]
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;~ELSE
+        ~RESULT <= ~SYM[1](~SYM[2])
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;~FI
       end if;
     end if;
   end process;~ELSE
   ~SYM[5] : process (~ARG[1])
   begin
     if (rising_edge(~ARG[1])) then~IF ~VIVADO ~THEN
-      ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO];~ELSE
-      ~RESULT <= ~SYM[1](~SYM[2]);~FI
+      ~RESULT <= ~FROMBV[~SYM[1](~SYM[2])][~TYPO]
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;~ELSE
+      ~RESULT <= ~SYM[1](~SYM[2])
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;~FI
     end if;
   end process;~FI
 end block;

@@ -54,7 +54,11 @@ begin
         if ~ARG[6] then
           ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
         end if;
-        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]));
+        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;~ELSE
@@ -64,7 +68,11 @@ begin
       if ~ARG[6] then
         ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
       end if;
-      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]));
+      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     end if;
   end process;~FI ~ELSE ~IF ~ISGATED[2] ~THEN
   (~SYM[7],~SYM[8]) <= ~ARG[2];
@@ -75,7 +83,11 @@ begin
         ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
       end if;
       if ~SYM[8] then
-        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]));
+        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;~ELSE
@@ -85,7 +97,11 @@ begin
       if ~ARG[6] then
         ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
       end if;
-      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]));
+      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     end if;
   end process;~FI ~FI
 end block;

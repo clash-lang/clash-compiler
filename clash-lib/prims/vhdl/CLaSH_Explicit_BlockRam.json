@@ -39,7 +39,11 @@ begin
         if ~ARG[4] then
           ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];
         end if;
-        ~RESULT <= fromSLV(~SYM[1](~SYM[3]));
+        ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;~ELSE
@@ -49,7 +53,11 @@ begin
       if ~ARG[4] then
         ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];
       end if;
-      ~RESULT <= fromSLV(~SYM[1](~SYM[3]));
+      ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     end if;
   end process;~FI ~ELSE ~IF ~ISGATED[1] ~THEN
   (~SYM[5],~SYM[6]) <= ~ARG[1];
@@ -60,7 +68,11 @@ begin
         ~SYM[1](~SYM[4]) <= ~ARG[6];
       end if;
       if ~SYM[6] then
-        ~RESULT <= ~SYM[1](~SYM[3]);
+        ~RESULT <= ~SYM[1](~SYM[3])
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;~ELSE
@@ -70,7 +82,11 @@ begin
       if ~ARG[4] then
         ~SYM[1](~SYM[4]) <= ~ARG[6];
       end if;
-      ~RESULT <= ~SYM[1](~SYM[3]);
+      ~RESULT <= ~SYM[1](~SYM[3])
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     end if;
   end process;~FI ~FI
 end block;
