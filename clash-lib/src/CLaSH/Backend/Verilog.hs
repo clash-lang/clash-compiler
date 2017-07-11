@@ -104,7 +104,9 @@ instance Backend VerilogState where
       go Extended (rmSlash -> nm) ext =
         let nmExt = nm `Text.append` ext
         in  case go Basic nm ext of
-              nm' | nm' /= nmExt -> Text.concat ["\\",nmExt," "]
+              nm' | nm' /= nmExt -> case Text.head nmExt of
+                      '#' -> Text.concat ["\\",nmExt," "]
+                      _   -> Text.concat ["\\#",nmExt," "]
                   | otherwise    -> nm'
 
   setModName _    = id

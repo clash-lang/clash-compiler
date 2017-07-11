@@ -106,7 +106,9 @@ instance Backend VHDLState where
       go Extended (rmSlash -> nm) ext =
         let nmExt = nm `T.append` ext
         in  case go Basic nm ext of
-              nm' | nm' /= nmExt -> T.concat ["\\",nmExt,"\\"]
+              nm' | nm' /= nmExt -> case T.head nmExt of
+                      '#' -> T.concat ["\\",nmExt,"\\"]
+                      _   -> T.concat ["\\#",nmExt,"\\"]
                   | otherwise    -> nm'
 
   setModName nm s = s {_modNm = nm}
