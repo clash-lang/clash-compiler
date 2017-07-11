@@ -818,6 +818,16 @@ expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
   iw <- use intWidth
   "resize" <> parens (text id_ <> "," <> int iw)
 
+expr_ b (Identifier id_ (Just (Nested m1 m2))) = case (m1,m2) of
+  (Indexed (Vector n elTy,1,2),Indexed (Vector _ _,1,1)) ->
+    expr_ b (Identifier id_ (Just (Indexed (Vector n elTy,10,1))))
+  (Indexed ((RTree d elTy),1,n),Indexed ((RTree _ _),0,1)) -> do
+    let n' = case n of {1 -> 0; _ -> 1}
+    expr_ b (Identifier id_ (Just (Indexed (RTree d elTy,10,n'))))
+  _ -> do
+    k <- expr_ b (Identifier id_ (Just m1))
+    expr_ b (Identifier (displayT (renderOneLine k)) (Just m2))
+
 expr_ _ (Identifier id_ (Just _)) = text id_
 
 expr_ b (DataCon _ (DC (Void, -1)) [e]) =  expr_ b e

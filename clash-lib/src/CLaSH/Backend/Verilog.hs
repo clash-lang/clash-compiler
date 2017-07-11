@@ -285,16 +285,14 @@ inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
 
 inst_ (NetDecl' _ _ _ _) = return Nothing
 
--- | Turn a Netlist expression into a SystemVerilog expression
-expr_ :: Bool -- ^ Enclose in parenthesis?
-      -> Expr -- ^ Expr to convert
-      -> VerilogM Doc
-expr_ _ (Literal sizeM lit) = exprLit sizeM lit
-
-expr_ _ (Identifier id_ Nothing) = text id_
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
+-- | Calculate the beginning and end index into a variable, to get the
+-- desired field.
+modifier
+  :: Int
+  -- ^ Offset, only used when we have nested modifiers
+  -> Modifier
+  -> Maybe (Int,Int)
+modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offset)
   where
     argTys   = snd $ args !! dcI
     argTy    = argTys !! fI
@@ -303,8 +301,7 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
     start    = typeSize ty - 1 - conSize ty - other
     end      = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ argTys),_,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
+modifier offset (Indexed (ty@(Product _ argTys),_,fI)) = Just (start+offset,end+offset)
   where
     argTy   = argTys !! fI
     argSize = typeSize argTy
@@ -312,37 +309,34 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ argTys),_,fI)))) =
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,1)))) =
-    text id_ <> brackets (int start <> colon <> int end)
+modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,end+offset)
   where
     argSize = typeSize argTy
     start   = typeSize ty - 1
     end     = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,2)))) =
-    text id_ <> brackets (int start <> colon <> int 0)
+modifier offset (Indexed (ty@(Vector _ argTy),1,2)) = Just (start+offset,offset)
   where
     argSize = typeSize argTy
     start   = typeSize ty - argSize - 1
 
-expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 _),0,1)))) = text id_
+modifier offset (Indexed (ty@(RTree 0 _),0,1)) = Just (start+offset,offset)
+  where
+    start   = typeSize ty - 1
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ _),1,1)))) =
-    text id_ <> brackets (int start <> colon <> int end)
+modifier offset (Indexed (ty@(RTree _ _),1,1)) = Just (start+offset,end+offset)
   where
     start   = typeSize ty - 1
     end     = typeSize ty `div` 2
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ _),1,2)))) =
-    text id_ <> brackets (int start <> colon <> int 0)
+modifier offset (Indexed (ty@(RTree _ _),1,2)) = Just (start+offset,offset)
   where
     start   = (typeSize ty `div` 2) - 1
 
 -- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
 -- Vector's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),10,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
+modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+offset)
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
@@ -351,19 +345,35 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),10,fI)))) =
 -- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
 -- RTree's don't have a 10'th constructor, this is just so that we can
 -- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ argTy),10,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
+modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+offset)
   where
     argSize = typeSize argTy
     start   = typeSize ty - (fI * argSize) - 1
     end     = start - argSize + 1
 
-expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int start <> colon <> int end)
+modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset)
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-expr_ _ (Identifier id_ (Just _))                      = text id_
+modifier offset (Nested m1 m2) = do
+  case modifier offset m1 of
+    Nothing    -> modifier offset m2
+    Just (_,e) -> modifier e m2
+
+modifier _ _ = Nothing
+
+-- | Turn a Netlist expression into a SystemVerilog expression
+expr_ :: Bool -- ^ Enclose in parenthesis?
+      -> Expr -- ^ Expr to convert
+      -> VerilogM Doc
+expr_ _ (Literal sizeM lit) = exprLit sizeM lit
+
+expr_ _ (Identifier id_ Nothing) = text id_
+
+expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
+  Nothing          -> text id_
+  Just (start,end) -> text id_ <> brackets (int start <> colon <> int end)
 
 expr_ b (DataCon _ (DC (Void, -1)) [e]) = expr_ b e
 

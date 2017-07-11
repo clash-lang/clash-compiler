@@ -37,6 +37,7 @@ module CLaSH.Normalize.Transformations
   , caseFlat
   , disjointExpressionConsolidation
   , removeUnusedExpr
+  , inlineCleanup
   )
 where
 
@@ -59,14 +60,14 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.DataCon          (DataCon (..))
 import           CLaSH.Core.Name
-  (Name (..), name2String, string2InternalName, string2SystemName)
+  (Name (..), NameSort (..), name2String, string2InternalName, string2SystemName)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
                                               typeFreeVars)
 import           CLaSH.Core.Literal          (Literal (..))
 import           CLaSH.Core.Pretty           (showDoc)
-import           CLaSH.Core.Subst            (substTm, substTms, substTyInTm,
-                                              substTysinTm)
-import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..))
+import           CLaSH.Core.Subst
+  (substBndr, substTm, substTms, substTyInTm, substTysinTm)
+import           CLaSH.Core.Term             (LetBinding, Pat (..), Term (..), TmOccName)
 import           CLaSH.Core.Type             (TypeView (..), applyFunTy,
                                               applyTy, isPolyFunCoreTy,
                                               splitFunTy, typeKind,
@@ -84,7 +85,7 @@ import           CLaSH.Normalize.DEC
 import           CLaSH.Normalize.PrimitiveReductions
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
-import           CLaSH.Primitives.Types      (Primitive (..))
+import           CLaSH.Primitives.Types      (Primitive (..), PrimMap)
 import           CLaSH.Rewrite.Combinators
 import           CLaSH.Rewrite.Types
 import           CLaSH.Rewrite.Util
@@ -1327,3 +1328,73 @@ disjointExpressionConsolidation ctx e@(Case _scrut _ty _alts@(_:_:_)) = do
         go xs (y:ys) = (xs ++ ys) : go (xs ++ [y]) ys
 
 disjointExpressionConsolidation _ e = return e
+
+-- | Given a function in the desired normal form, inline all the following
+-- let-bindings:
+--
+-- Let-bindings with an internal name that is only used once, where it binds:
+--   * a primitive that will be translated to an HDL expression (as opposed to
+--     a HDL declaration)
+--   * a projection case-expression (1 alternative)
+--   * a data constructor
+inlineCleanup :: NormRewrite
+inlineCleanup _ (Letrec b) = do
+  prims <- Lens.use (extra.primitives)
+  let (bindsR,body) = unsafeUnbind b
+      binds         = unrec bindsR
+      -- For all let-bindings, count the number of times they are referenced.
+      -- We only inline let-bindings which are referenced only once, otherwise
+      -- we would lose sharing.
+      allOccs       = List.foldl' (HashMap.unionWith (+)) HashMap.empty
+                    $ map ( List.foldl' countOcc HashMap.empty
+                          . Lens.toListOf termFreeIds . unembed . snd) binds
+      (il,keep)     = List.partition (isInteresting allOccs prims) binds
+      keep'         = inlineBndrs keep il
+  if null il then return  (Letrec b)
+             else changed (Letrec (bind (rec keep') body))
+  where
+    -- Count the number of occurrences of a variable
+    countOcc
+      :: HashMap.HashMap TmOccName Int
+      -> TmOccName
+      -> HashMap.HashMap TmOccName Int
+    countOcc m nm = HashMap.insertWith (+) nm (1::Int) m
+
+    -- Determine whether a let-binding is interesting to inline
+    isInteresting
+      :: HashMap.HashMap TmOccName Int
+      -> PrimMap a
+      -> (Id,Embed Term)
+      -> Bool
+    isInteresting allOccs prims (id_,(fst.collectArgs.unembed) -> tm)
+      | nameSort (varName id_) /= User
+      , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
+      , occ < 2
+      = case tm of
+          Prim nm _
+            | Just p@(BlackBox {}) <- HashMap.lookup nm prims
+            , Right _ <- template p
+            -> True
+          Case _ _ [_] -> True
+          Data _ -> True
+          _ -> False
+
+    isInteresting _ _ _ = False
+
+    -- Inline let-bindings we want to inline into let-bindings we want to keep.
+    inlineBndrs
+      :: [(Id, Embed Term)]
+      -- let-bindings we keep
+      -> [(Id, Embed Term)]
+      -- let-bindings we want to inline
+      -> [(Id, Embed Term)]
+    inlineBndrs keep [] = keep
+    inlineBndrs keep (((nameOcc . varName) -> nm,unembed -> tm):il) =
+      inlineBndrs (map (substBndr nm tm) keep)
+                  (map (substBndr nm tm) il)
+      -- We must not forget to inline the /current/ @to-inline@ let-binding into
+      -- the list of /remaining/ @to-inline@ let-bindings, because it might
+      -- only occur in /remaining/ @to-inline@ bindings. If we don't, we would
+      -- introduce free variables, because the @to-inline@ bindings are removed.
+
+inlineCleanup _ e = return e

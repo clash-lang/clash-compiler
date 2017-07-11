@@ -19,6 +19,7 @@ module CLaSH.Core.Term
   , TmOccName
   , LetBinding
   , Pat (..)
+  , Alt
   )
 where
 
@@ -48,7 +49,7 @@ data Term
   | App     !Term !Term                     -- ^ Application
   | TyApp   !Term !Type                     -- ^ Type-application
   | Letrec  !(Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
-  | Case    !Term !Type [Bind Pat Term]     -- ^ Case-expression: subject, type of
+  | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
   deriving (Show,Generic,NFData,Hashable)
 
@@ -68,6 +69,8 @@ data Pat
   | DefaultPat
   -- ^ Default pattern
   deriving (Eq,Show,Generic,NFData,Alpha,Hashable)
+
+type Alt = Bind Pat Term
 
 instance Eq Term where
   (==) = aeq

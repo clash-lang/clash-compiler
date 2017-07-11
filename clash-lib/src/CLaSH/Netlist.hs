@@ -40,12 +40,12 @@ import           CLaSH.Core.Literal               (Literal (..))
 import           CLaSH.Core.Name                  (Name(..), name2String)
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Term
-  (Pat (..), Term (..), TmName, TmOccName)
+  (Alt, Pat (..), Term (..), TmName, TmOccName)
 import qualified CLaSH.Core.Term                  as Core
 import           CLaSH.Core.Type                  (Type (..), splitFunTys)
 import           CLaSH.Core.TyCon
   (TyCon, TyConOccName)
-import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
+import           CLaSH.Core.Util                  (collectArgs, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
 import           CLaSH.Driver.Types               (CLaSHException (..))
 import           CLaSH.Netlist.BlackBox
@@ -53,7 +53,6 @@ import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types              as HW
 import           CLaSH.Netlist.Util
-import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types           as P
 import           CLaSH.Util
 
@@ -250,53 +249,7 @@ mkDeclarations _ e@(Case _ _ []) = do
   (_,sp) <- Lens.use curCompNm
   throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported:\n\n" ++ showDoc e) Nothing)
 
-mkDeclarations bndr e@(Case scrut _ [alt]) = do
-  (pat,v) <- unbind alt
-  (_,sp) <- Lens.use curCompNm
-  (varTy,varTm) <- case v of
-                     (Var t n) -> return (t,n)
-                     _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: RHS of case-projection is not a variable:\n\n" ++ showDoc e) Nothing)
-  typeTrans    <- Lens.use typeTranslator
-  tcm          <- Lens.use tcCache
-  scrutTy      <- termType tcm scrut
-  let sHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy
-      vHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm varTy
-  (selId,decls) <- case scrut of
-    (Var _ scrutNm) -> return (Text.pack $ name2String scrutNm,[])
-    _ -> do
-       scrutId <- extendIdentifier Extended
-                    (Text.pack (name2String (varName bndr)))
-                    (Text.pack "_case_scrut")
-       (newExpr, newDecls) <- mkExpr False (Left scrutId) scrutTy scrut
-       case newExpr of
-         (Identifier newId Nothing) -> return (newId,newDecls)
-         _ -> do
-          scrutId' <- mkUniqueIdentifier Extended scrutId
-          let scrutDecl = NetDecl Nothing scrutId' sHwTy
-              scrutAssn = Assignment scrutId' newExpr
-          return (scrutId',newDecls ++ [scrutDecl,scrutAssn])
-  let dstId    = Text.pack . name2String $ varName bndr
-      altVarId = Text.pack $ name2String varTm
-      modifier = case pat of
-        DataPat (Embed dc) ids -> let (exts,tms) = unrebind ids
-                                      tmsTys     = map (unembed . varType) tms
-                                      tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
-                                      extNms     = map (nameOcc.varName) exts
-                                      tms'       = if any (`elem` tmsFVs) extNms
-                                                      then throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
-                                                      else tms
-                                  in case elemIndex (Id varTm (Embed varTy)) tms' of
-                                       Nothing -> Nothing
-                                       Just fI
-                                        | sHwTy /= vHwTy -> Just (Indexed (sHwTy,dcTag dc - 1,fI))
-                                        -- When element and subject have the same HW-type,
-                                        -- then the projections is just the identity
-                                        | otherwise      -> Just (DC (Void,0))
-        _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
-      extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
-  return (decls ++ [Assignment dstId extractExpr])
-
-mkDeclarations bndr (Case scrut altTy alts) = do
+mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) = do
   alts'                  <- reorderPats <$> mapM unbind alts
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
@@ -336,7 +289,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
     mkScrutExpr sp scrutHTy pat scrutE = case pat of
       DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
                               in case scrutE of
-                                  Identifier scrutId _ -> Identifier scrutId modifier
+                                  Identifier scrutId Nothing -> Identifier scrutId modifier
                                   _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
       _ -> scrutE
 
@@ -458,16 +411,83 @@ mkExpr bbEasD bndr ty app = do
   hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
   case appF of
-    Data dc
-      | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy bndr dc tmArgs
-      | otherwise                                  ->
-        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments:\n\n" ++ showDoc app) Nothing)
+    Data dc -> mkDcApplication hwTy bndr dc tmArgs
     Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (Text.pack $ name2String f) Nothing,[])
       | otherwise ->
         throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showDoc app) Nothing)
+    Case scrut ty' [alt] -> mkProjection bndr scrut ty' alt
     _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: application of a Let/Lam/Case:\n\n" ++ showDoc app) Nothing)
+
+-- | Generate an expression that projects a field out of a data-constructor.
+--
+-- Works for both product types, as sum-of-product types.
+mkProjection
+  :: Either Identifier Id
+  -- ^ The signal to which the projection is (potentially) assigned
+  -> Term
+  -- ^ The subject/scrutinee of the projection
+  -> Type
+  -- ^ The type of the result
+  -> Alt
+  -- ^ The field to be projected
+  -> NetlistMonad (Expr, [Declaration])
+mkProjection bndr scrut altTy alt = do
+  tcm <- Lens.use tcCache
+  scrutTy <- termType tcm scrut
+  let e = Case scrut scrutTy [alt]
+  (pat,v) <- unbind alt
+  (_,sp) <- Lens.use curCompNm
+  varTm <- case v of
+    (Var _ n) -> return n
+    _ -> throw (CLaSHException sp ($(curLoc) ++
+                "Not in normal form: RHS of case-projection is not a variable:\n\n"
+                 ++ showDoc e) Nothing)
+  sHwTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+  vHwTy <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
+  (selId,modM,decls) <- do
+    scrutNm <- either return
+                 (\b -> extendIdentifier Extended
+                          (Text.pack (name2String (varName b)))
+                          (Text.pack ("_case_scrut")))
+                 bndr
+    (scrutExpr,newDecls) <- mkExpr False (Left scrutNm) scrutTy scrut
+    case scrutExpr of
+      Identifier newId modM
+        | Nothing <- modM          -> return (newId,modM,newDecls)
+        | Just (Indexed _) <- modM -> return (newId,modM,newDecls)
+      _ -> do
+        scrutNm' <- mkUniqueIdentifier Extended scrutNm
+        let scrutDecl = NetDecl Nothing scrutNm' sHwTy
+            scrutAssn = Assignment scrutNm' scrutExpr
+        return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
+
+  let altVarId = Text.pack $ name2String varTm
+      modifier = case pat of
+        DataPat (Embed dc) ids ->
+          let (exts,tms) = unrebind ids
+              tmsTys     = map (unembed . varType) tms
+              tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
+              extNms     = map (nameOcc.varName) exts
+              tms'       = if any (`elem` tmsFVs) extNms
+                              then throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
+                              else tms
+          in case elemIndex (Id varTm (Embed altTy)) tms' of
+               Nothing -> Nothing
+               Just fI
+                | sHwTy /= vHwTy -> nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
+                -- When element and subject have the same HW-type,
+                -- then the projections is just the identity
+                | otherwise      -> nestModifier modM (Just (DC (Void,0)))
+        _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
+      extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+  return (extractExpr,decls)
+  where
+    nestModifier Nothing  m          = m
+    nestModifier m Nothing           = m
+    nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
+
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder

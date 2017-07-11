@@ -7,11 +7,13 @@
   Capture-free substitution function for CoreHW
 -}
 
+{-# LANGUAGE ViewPatterns #-}
+
 module CLaSH.Core.Subst where
 
-import Unbound.Generics.LocallyNameless (subst, substs)
+import Unbound.Generics.LocallyNameless (embed, subst, substs, unembed)
 
-import CLaSH.Core.Term                  (Term, TmOccName)
+import CLaSH.Core.Term                  (LetBinding, Term, TmOccName)
 import {-# SOURCE #-} CLaSH.Core.Type   (KiOccName, Kind, TyOccName, Type)
 
 -- | Substitutes types in a type
@@ -58,3 +60,7 @@ substTms :: [(TmOccName,Term)]
          -> Term
          -> Term
 substTms = substs
+
+-- | Substitutes a term in a let-binding
+substBndr :: TmOccName -> Term -> LetBinding -> LetBinding
+substBndr nm tm (id_,unembed -> tm') = (id_,embed (substTm nm tm tm'))

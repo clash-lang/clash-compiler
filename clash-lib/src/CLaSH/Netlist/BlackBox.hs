@@ -41,8 +41,8 @@ import           CLaSH.Core.TyCon              as C (tyConDataCons)
 import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
 import           CLaSH.Driver.Types            (CLaSHException (..))
-import {-# SOURCE #-} CLaSH.Netlist            (genComponent, mkDcApplication,
-                                                mkExpr)
+import {-# SOURCE #-} CLaSH.Netlist
+  (genComponent, mkDcApplication, mkExpr, mkProjection)
 import           CLaSH.Netlist.BlackBox.Types  as B
 import           CLaSH.Netlist.BlackBox.Util   as B
 import           CLaSH.Netlist.Id              (IdType (..))
@@ -132,6 +132,9 @@ mkArgument bndr e = do
         (Data dc, args) -> do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
           return ((exprN,hwTy,isConstant e),dcDecls)
+        (Case scrut ty' [alt],[]) -> do
+          (projection,decls) <- mkProjection (Left bndr) scrut ty' alt
+          return ((projection,hwTy,False),decls)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
                   ,hwTy,False),[])

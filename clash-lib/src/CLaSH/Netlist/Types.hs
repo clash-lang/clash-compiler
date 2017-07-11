@@ -162,6 +162,7 @@ data Modifier
   | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
   | VecAppend -- ^ See the expression in the context of a Vector append operation
   | RTreeAppend -- ^ See the expression in the context of a Tree append operation
+  | Nested Modifier Modifier
   deriving Show
 
 -- | Expression used in RHS of a declaration
