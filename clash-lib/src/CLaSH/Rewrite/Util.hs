@@ -51,10 +51,9 @@ import           CLaSH.Core.TyCon
 import           CLaSH.Core.Type             (KindOrType, Type (..),
                                               TypeView (..), coreView,
                                               typeKind, tyView)
-import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
-                                              mkAbstraction, mkApps, mkId,
-                                              mkLams, mkTmApps, mkTyApps,
-                                              mkTyLams, mkTyVar, termType)
+import           CLaSH.Core.Util
+  (Delta, Gamma, collectArgs, isPolyFun, mkAbstraction, mkApps, mkId, mkLams,
+   mkTmApps, mkTyApps, mkTyLams, mkTyVar, termType)
 import           CLaSH.Core.Var              (Id, TyVar, Var (..))
 import           CLaSH.Driver.Types          (CLaSHException (..))
 import           CLaSH.Netlist.Util          (representableType)
@@ -610,9 +609,31 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
                                        (mkBinderFor tcm)
                                        (unsafeCollectBndrs bodyTm ++ repeat (string2InternalName "pTS"))
                                        args
+              -- Determine name the resulting specialised function, and the
+              -- form of the specialised-on argument
+              (fName,specArg') <- case specArg of
+                Left a@(collectArgs -> (Var _ g,gArgs)) -> do
+                  polyFun <- isPolyFun tcm a
+                  if polyFun
+                    then do
+                      -- In case we are specialising on an argument that is a
+                      -- global function then we use that function's name as the
+                      -- name of the specialised higher-order function.
+                      -- Additionally, we will return the body of the global
+                      -- function, instead of a variable reference to the
+                      -- global function.
+                      --
+                      -- This will turn things like @mealy g k@ into a new
+                      -- binding @g'@ where both the body of @mealy@ and @g@
+                      -- are inlined, meaning the state-transition-function
+                      -- and the memory element will be in a single function.
+                      gTmM <- fmap (HML.lookup (nameOcc g)) $ Lens.use bindings
+                      return (g,maybe specArg (Left . (`mkApps` gArgs) . (^. _4)) gTmM)
+                    else return (f,specArg)
+                _ -> return (f,specArg)
               -- Create specialized functions
-              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
-              newf <- mkFunction f sp newBody
+              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
+              newf <- mkFunction fName sp newBody
               -- Remember specialization
               (extra.specHistLbl) %= HML.insertWith (+) (nameOcc f) 1
               (extra.specMapLbl)  %= Map.insert (nameOcc f,argLen,specAbs) newf
