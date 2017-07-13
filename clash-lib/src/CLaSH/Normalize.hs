@@ -12,7 +12,7 @@
 module CLaSH.Normalize where
 
 import           Control.Concurrent.Supply        (Supply)
-import           Control.Lens                     ((.=),(^.),_2,_4)
+import           Control.Lens                     ((.=),(^.),_2,_5)
 import qualified Control.Lens                     as Lens
 import           Data.Either                      (partitionEithers)
 import           Data.HashMap.Strict              (HashMap)
@@ -27,6 +27,7 @@ import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Unbound.Generics.LocallyNameless (unembed)
 
+import           BasicTypes                       (InlineSpec)
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
 import           CLaSH.Core.FreeVars              (termFreeIds)
@@ -39,7 +40,8 @@ import           CLaSH.Core.TyCon
   (TyCon, TyConName, TyConOccName)
 import           CLaSH.Core.Util                  (collectArgs, mkApps, termType)
 import           CLaSH.Core.Var                   (Id,varName)
-import           CLaSH.Driver.Types               (CLaSHOpts (..))
+import           CLaSH.Driver.Types
+  (BindingMap, CLaSHOpts (..), DebugLevel (..))
 import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Types              (HWType (..))
 import           CLaSH.Netlist.Util
@@ -52,8 +54,8 @@ import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types           (PrimMap)
 import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
 import           CLaSH.Rewrite.Types
-  (DebugLevel (..), RewriteEnv (..), RewriteState (..), bindings, curFun,
-    dbgLevel, extra, tcCache, topEntities, typeTranslator)
+  (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
+   tcCache, topEntities, typeTranslator)
 import           CLaSH.Rewrite.Util               (isUntranslatableType,
                                                    runRewrite,
                                                    runRewriteSession)
@@ -61,29 +63,30 @@ import CLaSH.Signal.Internal                      (ResetKind (..))
 import           CLaSH.Util
 
 -- | Run a NormalizeSession in a given environment
-runNormalization :: CLaSHOpts
-                 -- ^ Level of debug messages to print
-                 -> Supply
-                 -- ^ UniqueSupply
-                 -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
-                 -- ^ Global Binders
-                 -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
-                 -- ^ Hardcoded Type -> HWType translator
-                 -> HashMap TyConOccName TyCon
-                 -- ^ TyCon cache
-                 -> IntMap TyConName
-                 -- ^ Tuple TyCon cache
-                 -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
-                 -- ^ Hardcoded evaluator (delta-reduction)
-                 -> PrimMap BlackBoxTemplate
-                 -- ^ Primitive Definitions
-                 -> HashMap TmOccName Bool
-                 -- ^ Map telling whether a components is part of a recursive group
-                 -> [TmOccName]
-                 -- ^ topEntities
-                 -> NormalizeSession a
-                 -- ^ NormalizeSession to run
-                 -> a
+runNormalization
+  :: CLaSHOpts
+  -- ^ Level of debug messages to print
+  -> Supply
+  -- ^ UniqueSupply
+  -> BindingMap
+  -- ^ Global Binders
+  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -- ^ Hardcoded Type -> HWType translator
+  -> HashMap TyConOccName TyCon
+  -- ^ TyCon cache
+  -> IntMap TyConName
+  -- ^ Tuple TyCon cache
+  -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
+  -- ^ Hardcoded evaluator (delta-reduction)
+  -> PrimMap BlackBoxTemplate
+  -- ^ Primitive Definitions
+  -> HashMap TmOccName Bool
+  -- ^ Map telling whether a components is part of a recursive group
+  -> [TmOccName]
+  -- ^ topEntities
+  -> NormalizeSession a
+  -- ^ NormalizeSession to run
+  -> a
 runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap topEnts
   = runRewriteSession rwEnv rwState
   where
@@ -116,21 +119,23 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   rcsMap
 
 
-normalize :: [TmOccName]
-          -> NormalizeSession (HashMap TmOccName (TmName,Type,SrcSpan,Term))
+normalize
+  :: [TmOccName]
+  -> NormalizeSession BindingMap
 normalize []  = return HashMap.empty
 normalize top = do
   (new,topNormalized) <- unzip <$> mapM normalize' top
   newNormalized <- normalize (concat new)
   return (HashMap.union (HashMap.fromList topNormalized) newNormalized)
 
-normalize' :: TmOccName
-           -> NormalizeSession ([TmOccName],(TmOccName,(TmName,Type,SrcSpan,Term)))
+normalize'
+  :: TmOccName
+  -> NormalizeSession ([TmOccName],(TmOccName,(TmName,Type,SrcSpan,InlineSpec,Term)))
 normalize' nm = do
   exprM <- HashMap.lookup nm <$> Lens.use bindings
   let nmS = showDoc nm
   case exprM of
-    Just (nm',ty,sp,tm) -> do
+    Just (nm',ty,sp,inl,tm) -> do
       tcm <- Lens.view tcCache
       let (_,resTy) = splitCoreFunForallTy tcm ty
       resTyRep <- not <$> isUntranslatableType resTy
@@ -140,13 +145,13 @@ normalize' nm = do
                         curFun .= (nm',sp)
                         tm' <- rewriteExpr ("normalization",normalization) (nmS,tm)
                         ty' <- termType tcm tm'
-                        return (nm',ty',sp,tm')
-            let usedBndrs = Lens.toListOf termFreeIds (tmNorm ^. _4)
+                        return (nm',ty',sp,inl,tm')
+            let usedBndrs = Lens.toListOf termFreeIds (tmNorm ^. _5)
             traceIf (nm `elem` usedBndrs)
                     (concat [ $(curLoc),"Expr belonging to bndr: ",nmS ," (:: "
                             , showDoc (tmNorm ^. _2)
                             , ") remains recursive after normalization:\n"
-                            , showDoc (tmNorm ^. _4) ])
+                            , showDoc (tmNorm ^. _5) ])
                     (return ())
             tyTrans <- Lens.view typeTranslator
             case clockResetErrors tyTrans tcm ty of
@@ -172,7 +177,7 @@ normalize' nm = do
                             , showDoc ty
                             , ") has a non-representable return type."
                             , " Not normalising:\n", showDoc tm] )
-                    (return (toNormalize,(nm,(nm',ty,sp,tm))))
+                    (return (toNormalize,(nm,(nm',ty,sp,inl,tm))))
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
 -- | Rewrite a term according to the provided transformation
@@ -197,9 +202,9 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) = do
 checkNonRecursive
   :: TmOccName
   -- ^ @topEntity@
-  -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
+  -> BindingMap
   -- ^ List of normalized binders
-  -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
+  -> BindingMap
 checkNonRecursive topEntity norm =
   let cg = callGraph [] norm topEntity
   in  case mkRecursiveComponents cg of
@@ -212,28 +217,28 @@ checkNonRecursive topEntity norm =
 --   * Inlining functions that simply \"wrap\" another function
 cleanupGraph
   :: TmOccName
-  -> (HashMap TmOccName (TmName,Type,SrcSpan,Term))
-  -> NormalizeSession (HashMap TmOccName (TmName,Type,SrcSpan,Term))
+  -> BindingMap
+  -> NormalizeSession BindingMap
 cleanupGraph topEntity norm
   | Just ct <- mkCallTree [] norm topEntity
   = do ctFlat <- flattenCallTree ct
        return (HashMap.fromList $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
-data CallTree = CLeaf   (TmOccName,(TmName,Type,SrcSpan,Term))
-              | CBranch (TmOccName,(TmName,Type,SrcSpan,Term)) [CallTree]
+data CallTree = CLeaf   (TmOccName,(TmName,Type,SrcSpan,InlineSpec,Term))
+              | CBranch (TmOccName,(TmName,Type,SrcSpan,InlineSpec,Term)) [CallTree]
 
 mkCallTree
   :: [TmOccName]
   -- ^ Visited
-  -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
+  -> BindingMap
   -- ^ Global binders
   -> TmOccName
   -- ^ Root of the call graph
   -> Maybe CallTree
 mkCallTree visited bindingMap root
   | Just rootTm <- HashMap.lookup root bindingMap
-  = let used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _4)
+  = let used   = Set.toList $ Lens.setOf termFreeIds $ (rootTm ^. _5)
         other  = Maybe.mapMaybe (mkCallTree (root:visited) bindingMap) (filter (`notElem` visited) used)
     in  case used of
           [] -> Just (CLeaf   (root,rootTm))
@@ -262,7 +267,7 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((TmOccName,Term),[CallTree]))
-flattenNode c@(CLeaf (nm,(_,_,_,e))) = do
+flattenNode c@(CLeaf (nm,(_,_,_,_,e))) = do
   tcm  <- Lens.view tcCache
   norm <- splitNormalized tcm e
   case norm of
@@ -272,7 +277,7 @@ flattenNode c@(CLeaf (nm,(_,_,_,e))) = do
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),[]))
         Nothing        -> return (Left c)
     _ -> return (Left c)
-flattenNode b@(CBranch (nm,(_,_,_,e)) us) = do
+flattenNode b@(CBranch (nm,(_,_,_,_,e)) us) = do
   tcm  <- Lens.view tcCache
   norm <- splitNormalized tcm e
   case norm of
@@ -287,25 +292,25 @@ flattenCallTree
   :: CallTree
   -> NormalizeSession CallTree
 flattenCallTree c@(CLeaf _) = return c
-flattenCallTree (CBranch (nm,(nm',ty,sp,tm)) used) = do
+flattenCallTree (CBranch (nm,(nm',ty,sp,inl,tm)) used) = do
   flattenedUsed   <- mapM flattenCallTree used
   (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
   let (toInline,il_used) = unzip il_ct
   newExpr <- case toInline of
                [] -> return tm
                _  -> rewriteExpr ("bindConstants",(repeatR (topdownR $ (bindConstantVar >-> caseCon >-> reduceConst))) !-> topdownSucR topLet) (showDoc nm, substTms toInline tm)
-  return (CBranch (nm,(nm',ty,sp,newExpr)) (newUsed ++ (concat il_used)))
+  return (CBranch (nm,(nm',ty,sp,inl,newExpr)) (newUsed ++ (concat il_used)))
 
 callTreeToList
   :: [TmOccName]
   -> CallTree
-  -> ([TmOccName],[(TmOccName,(TmName,Type,SrcSpan,Term))])
-callTreeToList visited (CLeaf (nm,(nm',ty,sp,tm)))
+  -> ([TmOccName],[(TmOccName,(TmName,Type,SrcSpan,InlineSpec,Term))])
+callTreeToList visited (CLeaf (nm,bndr))
   | nm `elem` visited = (visited,[])
-  | otherwise         = (nm:visited,[(nm,(nm',ty,sp,tm))])
-callTreeToList visited (CBranch (nm,(nm',ty,sp,tm)) used)
+  | otherwise         = (nm:visited,[(nm,bndr)])
+callTreeToList visited (CBranch (nm,bndr) used)
   | nm `elem` visited = (visited,[])
-  | otherwise         = (visited',(nm,(nm',ty,sp,tm)):(concat others))
+  | otherwise         = (visited',(nm,bndr):(concat others))
   where
     (visited',others) = mapAccumL callTreeToList (nm:visited) used
 

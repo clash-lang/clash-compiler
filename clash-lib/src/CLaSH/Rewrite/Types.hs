@@ -34,6 +34,7 @@ import CLaSH.Core.Term           (Term, TmName, TmOccName)
 import CLaSH.Core.Type           (Type)
 import CLaSH.Core.TyCon          (TyCon, TyConName, TyConOccName)
 import CLaSH.Core.Var            (Id, TyVar)
+import CLaSH.Driver.Types        (BindingMap, DebugLevel)
 import CLaSH.Netlist.Types       (HWType)
 import CLaSH.Util
 
@@ -57,7 +58,7 @@ data RewriteState extra
   = RewriteState
   { _transformCounter :: {-# UNPACK #-} !Int
   -- ^ Number of applied transformations
-  , _bindings         :: !(HashMap TmOccName (TmName,Type,SrcSpan,Term))
+  , _bindings         :: !BindingMap
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
@@ -71,14 +72,7 @@ data RewriteState extra
 
 makeLenses ''RewriteState
 
--- | Debug Message Verbosity
-data DebugLevel
-  = DebugNone    -- ^ Don't show debug messages
-  | DebugFinal   -- ^ Show completely normalized expressions
-  | DebugName    -- ^ Names of applied transformations
-  | DebugApplied -- ^ Show sub-expressions after a successful rewrite
-  | DebugAll     -- ^ Show all sub-expressions on which a rewrite is attempted
-  deriving (Eq,Ord,Read)
+
 
 -- | Read-only environment of a rewriting session
 data RewriteEnv

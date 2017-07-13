@@ -78,6 +78,7 @@ import           CLaSH.Core.Util
    isSignalType, isVar, mkApps, mkLams, mkTmApps, mkVec, termSize, termType,
    tyNatSize)
 import           CLaSH.Core.Var              (Id, Var (..))
+import           CLaSH.Driver.Types          (DebugLevel (..))
 import           CLaSH.Netlist.BlackBox.Util (usedArguments)
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -228,7 +229,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
-          (True,Just (_,_,_,scrutBody)) -> do
+          (True,Just (_,_,_,_,scrutBody)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
@@ -534,7 +535,7 @@ inlineClosed _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,_,_,body) -> do
+          Just (_,_,_,_,body) -> do
             isRecBndr <- isRecursiveBndr f
             if isRecBndr
                then return e
@@ -551,7 +552,7 @@ inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,body) -> do
+        Just (_,_,_,_,body) -> do
           isRecBndr <- isRecursiveBndr f
           if isRecBndr
              then return e
@@ -573,7 +574,7 @@ inlineSmall _ e@(collectArgs -> (Var _ (nameOcc -> f),args)) = do
       sizeLimit <- Lens.use (extra.inlineBelow)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,body) -> do
+        Just (_,_,_,_,body) -> do
           isRecBndr <- isRecursiveBndr f
           if not isRecBndr && termSize body < sizeLimit
              then changed (mkApps body args)
@@ -934,7 +935,7 @@ recToLetRec [] e = do
   tcm         <- Lens.view tcCache
   normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
-    (Right (args,bndrs,res), Just (_,bodyTy,_,_)) -> do
+    (Right (args,bndrs,res), Just (_,bodyTy,_,_,_)) -> do
       let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)
           (toInline,others) = List.partition ((==) appF . unembed . snd) bndrs
           resV              = idToVar res
@@ -966,7 +967,7 @@ inlineHO _ e@(App _ _)
                 else do
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
-                    Just (_,_,_,body) -> do
+                    Just (_,_,_,_,body) -> do
                       zoomExtra (addNewInline f cf)
                       changed (mkApps body args)
                     _ -> return e

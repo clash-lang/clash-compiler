@@ -17,17 +17,25 @@ import Control.Exception (Exception)
 import Data.HashMap.Lazy (HashMap)
 import Data.Text.Lazy    (Text)
 
+import BasicTypes        (InlineSpec)
 import SrcLoc            (SrcSpan, noSrcSpan)
 
 import CLaSH.Core.Term   (Term,TmName,TmOccName)
 import CLaSH.Core.Type   (Type)
 
-import CLaSH.Rewrite.Types (DebugLevel)
 import CLaSH.Netlist.BlackBox.Types (HdlSyn)
-import CLaSH.Netlist.Types (Identifier)
 
 -- | Global function binders
-type BindingMap = HashMap TmOccName (TmName,Type,SrcSpan,Term)
+type BindingMap = HashMap TmOccName (TmName,Type,SrcSpan,InlineSpec,Term)
+
+-- | Debug Message Verbosity
+data DebugLevel
+  = DebugNone    -- ^ Don't show debug messages
+  | DebugFinal   -- ^ Show completely normalized expressions
+  | DebugName    -- ^ Names of applied transformations
+  | DebugApplied -- ^ Show sub-expressions after a successful rewrite
+  | DebugAll     -- ^ Show all sub-expressions on which a rewrite is attempted
+  deriving (Eq,Ord,Read)
 
 data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_specLimit   :: Int
@@ -67,7 +75,7 @@ data Manifest
     --
     -- Used when dealing with multiple @TopEntity@s who have different names
     -- for types which are structurally equal
-  , componentNames :: [Identifier]
+  , componentNames :: [Text]
     -- ^ Names of all the generated components for the @TopEntity@ (does not
     -- include the names of the components of the @TestBench@ accompanying
     -- the @TopEntity@).

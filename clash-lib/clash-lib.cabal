@@ -172,6 +172,7 @@ Library
 
   Other-Modules:      CLaSH.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
+                      GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra
                       Paths_clash_lib
                       Unbound.Generics.LocallyNameless.Extra

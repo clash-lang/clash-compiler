@@ -17,7 +17,7 @@ module CLaSH.Driver where
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
 import           Control.Exception                (tryJust)
-import           Control.Lens                     ((^.), _4)
+import           Control.Lens                     ((^.), _5)
 import           Control.Monad                    (guard, when, unless)
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
@@ -37,6 +37,8 @@ import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
 import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc, text)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
+
+import           GHC.BasicTypes.Extra             ()
 
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Annotations.TopEntity.Extra ()
@@ -328,13 +330,13 @@ callGraphBindings
   -> TmOccName
   -- ^ Root of the call graph
   -> [Term]
-callGraphBindings bindingsMap tm = map ((^. _4) . (bindingsMap HM.!) . fst) cg
+callGraphBindings bindingsMap tm = map ((^. _5) . (bindingsMap HM.!) . fst) cg
   where
     cg = callGraph [] bindingsMap tm
 
 -- | Normalize a complete hierarchy
 normalizeEntity
-  :: HashMap TmOccName (TmName, Type, SrcSpan, Term)
+  :: BindingMap
   -- ^ All bindings
   -> PrimMap BlackBoxTemplate
   -- ^ BlackBox HDL templates
@@ -354,7 +356,7 @@ normalizeEntity
   -- ^ Unique supply
   -> TmOccName
   -- ^ root of the hierarchy
-  -> HashMap TmOccName (TmName, Type, SrcSpan, Term)
+  -> BindingMap
 normalizeEntity bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where

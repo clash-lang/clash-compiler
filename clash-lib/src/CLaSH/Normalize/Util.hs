@@ -11,7 +11,7 @@
 
 module CLaSH.Normalize.Util where
 
-import           Control.Lens            ((%=),(^.),_4)
+import           Control.Lens            ((%=),(^.),_5)
 import qualified Control.Lens            as Lens
 import           Data.Function           (on)
 import qualified Data.Graph              as Graph
@@ -23,15 +23,13 @@ import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless (Fresh, bind, embed, rec)
 
-import           SrcLoc                  (SrcSpan)
-
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Var          (Var (Id))
-import           CLaSH.Core.Term         (Term (..), TmName, TmOccName)
-import           CLaSH.Core.Type         (Type)
+import           CLaSH.Core.Term         (Term (..), TmOccName)
 import           CLaSH.Core.TyCon        (TyCon, TyConOccName)
 import           CLaSH.Core.Util
   (collectArgs, isClockOrReset, isPolyFun, termType)
+import           CLaSH.Driver.Types      (BindingMap)
 import           CLaSH.Normalize.Types
 import           CLaSH.Rewrite.Types     (bindings,extra,tcCache)
 import           CLaSH.Rewrite.Util      (specialise)
@@ -107,14 +105,14 @@ isRecursiveBndr f = do
 callGraph
   :: [TmOccName]
   -- ^ List of functions that should not be inspected
-  -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
+  -> BindingMap
   -- ^ Global binders
   -> TmOccName
   -- ^ Root of the call graph
   -> [(TmOccName,[TmOccName])]
 callGraph visited bindingMap root
   | Just rootTm <- HashMap.lookup root bindingMap
-  = let  used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _4)
+  = let  used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _5)
          node   = (root,used)
          other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
     in   node : other
@@ -147,9 +145,10 @@ mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs))
 -- exact opposite. This is a problem because global (mutual) recursive functions
 -- describe an infinite structure when viewed with a structural lens, which
 -- cannot be realised as a circuit.
-lambdaDrop :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
-           -> TmOccName
-           -> HashMap TmOccName (TmName,Type,SrcSpan,Term)
+lambdaDrop
+  :: BindingMap
+  -> TmOccName
+  -> BindingMap
 lambdaDrop bndrs topEntity = bndrs''
   where
     depGraph = callGraph [] bndrs topEntity
@@ -173,7 +172,7 @@ lambdaDrop bndrs topEntity = bndrs''
     bndrs'' = List.foldl' (flip HashMap.delete) bndrs'
                           (filter (/= topEntity) (concat rcs))
 
-    addRC (nm,ty,sp,tm) =
+    addRC (nm,ty,sp,inl,tm) =
       let fv      = Lens.toListOf termFreeIds tm
           -- Only interested in the recursive components which are used in this
           -- function
@@ -182,7 +181,7 @@ lambdaDrop bndrs topEntity = bndrs''
           bnds    = map mkBind (concat (map (uncurry zip) rcsTms'))
           newTm   = Letrec (bind (rec bnds) tm)
       in  case bnds of
-            [] -> (nm,ty,sp,tm)
-            _  -> (nm,ty,sp,newTm)
+            [] -> (nm,ty,sp,inl,tm)
+            _  -> (nm,ty,sp,inl,newTm)
 
-    mkBind (_,(nm,ty,_,tm)) = (Id nm (embed ty),embed tm)
+    mkBind (_,(nm,ty,_,_,tm)) = (Id nm (embed ty),embed tm)

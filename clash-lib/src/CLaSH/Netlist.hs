@@ -47,7 +47,8 @@ import           CLaSH.Core.TyCon
   (TyCon, TyConOccName)
 import           CLaSH.Core.Util                  (collectArgs, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
-import           CLaSH.Driver.Types               (CLaSHException (..))
+import           CLaSH.Driver.Types
+  (BindingMap, CLaSHException (..))
 import           CLaSH.Netlist.BlackBox
 import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Id
@@ -58,7 +59,7 @@ import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
+genNetlist :: BindingMap
            -- ^ Global binders
            -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
            -- ^ All the TopEntities
@@ -94,7 +95,7 @@ genNetlist globals tops primMap tcm typeTrans dfiles iw mkId extId seen env topE
     mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (nameOcc a,(b,c)))
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
+runNetlistMonad :: BindingMap
                 -- ^ Global binders
                 -> HashMap TmOccName (Type, Maybe TopEntity)
                 -- ^ TopEntity annotations
@@ -151,7 +152,7 @@ genComponent compName = do
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
-    Just (_,_,_,expr_) -> do
+    Just (_,_,_,_,expr_) -> do
       makeCached compName components $ genComponentT compName expr_
 
 -- | Generate a component for a given function
