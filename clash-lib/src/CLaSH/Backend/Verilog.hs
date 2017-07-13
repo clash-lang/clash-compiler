@@ -361,7 +361,11 @@ modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset)
 modifier offset (Nested m1 m2) = do
   case modifier offset m1 of
     Nothing    -> modifier offset m2
-    Just (_,e) -> modifier e m2
+    Just (s,e) -> case modifier e m2 of
+      -- In case the second modifier is `Nothing` that means we want the entire
+      -- thing calculated by the first modifier
+      Nothing -> Just (s,e)
+      m       -> m
 
 modifier _ _ = Nothing
 
