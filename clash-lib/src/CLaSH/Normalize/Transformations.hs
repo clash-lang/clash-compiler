@@ -58,6 +58,8 @@ import           Unbound.Generics.LocallyNameless
   (Bind, Embed (..), bind, embed, rec, unbind, unembed, unrebind, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           BasicTypes                  (InlineSpec (..))
+
 import           CLaSH.Core.DataCon          (DataCon (..))
 import           CLaSH.Core.Name
   (Name (..), NameSort (..), name2String, string2InternalName, string2SystemName)
@@ -535,9 +537,9 @@ inlineClosed _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,_,_,_,body) -> do
+          Just (_,_,_,inl,body) -> do
             isRecBndr <- isRecursiveBndr f
-            if isRecBndr
+            if isRecBndr || inl == NoInline
                then return e
                else changed (mkApps body args)
           _ -> return e
@@ -552,9 +554,9 @@ inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,_,body) -> do
+        Just (_,_,_,inl,body) -> do
           isRecBndr <- isRecursiveBndr f
-          if isRecBndr
+          if isRecBndr || inl == NoInline
              then return e
              else changed body
         _ -> return e
@@ -574,9 +576,9 @@ inlineSmall _ e@(collectArgs -> (Var _ (nameOcc -> f),args)) = do
       sizeLimit <- Lens.use (extra.inlineBelow)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,_,body) -> do
+        Just (_,_,_,inl,body) -> do
           isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && termSize body < sizeLimit
+          if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
              then changed (mkApps body args)
              else return e
         _ -> return e

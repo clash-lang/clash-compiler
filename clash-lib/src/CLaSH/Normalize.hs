@@ -27,7 +27,7 @@ import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
 import           Unbound.Generics.LocallyNameless (unembed)
 
-import           BasicTypes                       (InlineSpec)
+import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
 import           CLaSH.Core.FreeVars              (termFreeIds)
