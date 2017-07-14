@@ -377,7 +377,7 @@ funDec _ t@(Product _ elTys) = Just
 
     elTyFromSLV = forM (zip starts ends)
                        (\(s,e) -> "fromSLV" <>
-                          parens ("slv" <> parens (int s <+> "to" <+> int e)))
+                          parens ("islv" <> parens (int s <+> "to" <+> int e)))
 
 funDec syn t@(Vector _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi <$>
@@ -446,8 +446,9 @@ funDec _ (Clock {}) = Just
       indent 2 ("return" <+> "(0 => sl)" <> semi) <$>
     "end" <> semi <$>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <+> "is" <$>
+      indent 2 "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <$>
     "begin" <$>
-      indent 2 ("return" <+> "slv(0)" <> semi) <$>
+      indent 2 ("return" <+> "islv(0)" <> semi) <$>
     "end" <> semi
   )
 
