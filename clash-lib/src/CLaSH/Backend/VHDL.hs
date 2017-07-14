@@ -620,6 +620,7 @@ tyName t@(Product nm _)  = do
     makeCached tN nameCache prodName
   where
     prodName = do
+      tyCache %= HashSet.insert t
       seen <- use tySeen
       mkId <- mkIdentifier <*> pure Basic
       let nm'  = (mkId . last . T.splitOn ".") nm
