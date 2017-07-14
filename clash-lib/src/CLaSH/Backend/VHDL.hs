@@ -976,10 +976,12 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
-expr_ _ (ConvBV topM _ True e) = do
+expr_ _ (ConvBV topM hwty True e) = do
   nm <- use modNm
-  maybe (text (T.pack nm) <> "_types" ) ((<> "_types") . text) topM <> dot <>
-    "toSLV" <> parens (expr_ False e)
+  case topM of
+    Nothing -> text (T.pack nm) <> "_types" <> dot <> "toSLV" <>
+               parens (vhdlTypeMark hwty <> "'" <> parens (expr_ False e))
+    Just t  -> text t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
 expr_ _ (ConvBV topM _ False e) = do
   nm <- use modNm
