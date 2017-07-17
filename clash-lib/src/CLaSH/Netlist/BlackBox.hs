@@ -113,9 +113,7 @@ mkArgument bndr e = do
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
                 ,Void,False),[])
       Just hwTy -> case collectArgs e of
-        (C.Var _ v,[]) -> do
-          vT <- (`Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String v)
-          return ((vT,hwTy,False),[])
+        (C.Var _ v,[]) -> return ((Identifier (pack (name2String v)) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])

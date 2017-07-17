@@ -47,7 +47,6 @@ import           CLaSH.Core.Name                  (Name (..), name2String)
 import           CLaSH.Core.Term                  (Term, TmName, TmOccName)
 import           CLaSH.Core.Type                  (Type)
 import           CLaSH.Core.TyCon                 (TyCon, TyConName, TyConOccName)
-import           CLaSH.Driver.TopWrapper
 import           CLaSH.Driver.Types
 import           CLaSH.Netlist                    (genComponentName, genNetlist)
 import           CLaSH.Netlist.BlackBox.Parser    (runParse)
@@ -120,7 +119,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   (sameTopHash,sameBenchHash,manifest) <- do
     let topHash    = hash (annM,callGraphBindings bindingsMap (nameOcc topEntity))
         benchHashM = fmap (hash . (annM,) . callGraphBindings bindingsMap . nameOcc) benchM
-        manifestI  = Manifest (topHash,benchHashM) [] [] []
+        manifestI  = Manifest (topHash,benchHashM) [] [] [] [] []
 
         manFile = maybe (hdlDir </> Text.unpack topNm <.> "manifest")
                         (\ann -> hdlDir </> t_name ann </> t_name ann <.> "manifest")
@@ -158,7 +157,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
 
       -- 2. Generate netlist for topEntity
       (netlist,dfiles,seen') <- genNetlist transformedBindings topEntities primMap'
-                                tcm typeTrans [] iw mkId extId (topNm:seen)
+                                tcm typeTrans [] iw mkId extId seen
                                 hdlDir (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -166,14 +165,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Netlist generation took " ++ show normNetDiff
 
       -- 3. Generate topEntity wrapper
-      let topComponent = head $
-            filter (\(_,Component cName _ _ _) ->
-              Text.isSuffixOf (genComponentName [topNm] mkId topEntity)
+      let topComponent = snd . head $
+            filter (\(_,Component cName _ _ _) -> maybe
+              (Text.isSuffixOf (genComponentName [] mkId topEntity))
+              (\te n -> n == Text.pack (t_name te)) annM
                 cName)
               netlist
-          topWrapper = mkTopWrapper mkId annM modName (snd topComponent)
-          (hdlDocs,manifest')  = createHDL hdlState' modName
-                                   ((noSrcSpan,topWrapper) : netlist)
+          (hdlDocs,manifest')  = createHDL hdlState' modName netlist topComponent
                                    (Text.unpack topNm, Right manifest)
           dir = hdlDir </> maybe "" t_name annM
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
@@ -207,7 +205,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_) = createHDL hdlState2 modName' netlist
+      let (hdlDocs,_) = createHDL hdlState2 modName' netlist undefined
                            (Text.unpack topNm, Left manifest')
           dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir
@@ -247,6 +245,8 @@ createHDL
   -- ^ Module hierarchy root
   -> [(SrcSpan,Component)]
   -- ^ List of components
+  -> Component
+  -- ^ Top component
   -> (String, Either Manifest Manifest)
   -- ^ Name of the manifest file
   -- + Either:
@@ -255,19 +255,25 @@ createHDL
   -> ([(String,Doc)],Manifest)
   -- ^ The pretty-printed HDL documents
   -- + The update manifest file
-createHDL backend modName components (topName,manifestE) = flip evalState backend $ do
+createHDL backend modName components top (topName,manifestE) = flip evalState backend $ do
   (hdlNmDocs,incs) <- unzip <$> mapM (uncurry (genHDL modName)) components
   hwtys <- HashSet.toList <$> extractTypes <$> get
   typesPkg <- mkTyPackage modName hwtys
   let hdl   = map (first (<.> CLaSH.Backend.extension backend)) (typesPkg ++ hdlNmDocs)
       qincs = map (first (<.> "qsys")) (concat incs)
-      top   = snd (head components)
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
+      let topInNames  = map fst (inputs top)
       topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (inputs top)
+      let topOutNames = map (fst . snd) (outputs top)
       topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd . snd) (outputs top)
       let compNames = map (componentName.snd) components
-      return (m {portInTypes = topInTypes, portOutTypes = topOutTypes, componentNames = compNames})
+      return (m { portInNames    = topInNames
+                , portInTypes    = topInTypes
+                , portOutNames   = topOutNames
+                , portOutTypes   = topOutTypes
+                , componentNames = compNames
+                })
     ) manifestE
   let manDoc = ( topName <.> "manifest"
                , text (Text.pack (show manifest)))

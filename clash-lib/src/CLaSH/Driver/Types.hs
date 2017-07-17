@@ -65,11 +65,13 @@ data Manifest
   { manifestHash :: (Int,Maybe Int)
     -- ^ Hash of the TopEntity and all its dependencies
     --   + (maybe) Hash of the TestBench and all its dependencies
+  , portInNames  :: [Text]
   , portInTypes  :: [Text]
     -- ^ The rendered versions of the types of the input ports of the TopEntity
     --
     -- Used when dealing with multiple @TopEntity@s who have different names
     -- for types which are structurally equal
+  , portOutNames :: [Text]
   , portOutTypes :: [Text]
     -- ^ The rendered versions of the types of the output ports of the TopEntity
     --

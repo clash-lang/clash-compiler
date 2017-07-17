@@ -141,7 +141,6 @@ Library
                       CLaSH.Core.Var
 
                       CLaSH.Driver
-                      CLaSH.Driver.TopWrapper
                       CLaSH.Driver.Types
 
                       CLaSH.Netlist

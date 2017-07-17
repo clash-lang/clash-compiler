@@ -15,7 +15,7 @@
 module CLaSH.Netlist where
 
 import           Control.Exception                (throw)
-import           Control.Lens                     ((.=),(^.),_1,_2,_3)
+import           Control.Lens                     ((.=),(^.),_1,_3)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
@@ -125,7 +125,7 @@ runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
+    s' = NetlistState s 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
     (seenIds',names) = genNames mkId seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
 genNames :: (IdType -> Identifier -> Identifier)
@@ -164,39 +164,36 @@ genComponentT
   -> NetlistMonad (SrcSpan,Component)
 genComponentT compName componentExpr = do
   varCount .= 0
-  componentName' <- (HashMap.! compName) <$> Lens.use componentNames
+  componentName1 <- (HashMap.! compName) <$> Lens.use componentNames
+  topEntMM <- fmap snd . HashMap.lookup compName <$> Lens.use topEntityAnns
+  let componentName2 = maybe componentName1
+                             (maybe componentName1 (Text.pack . t_name))
+                             topEntMM
   sp <- ((^. _3) . (HashMap.! compName)) <$> Lens.use bindings
-  curCompNm .= (componentName',sp)
+  curCompNm .= (componentName2,sp)
 
   tcm <- Lens.use tcCache
+
   seenIds .= []
-  (arguments,binders,result) <- do { normalizedM <- splitNormalized tcm componentExpr
-                                   ; case normalizedM of
-                                       Right normalized -> mkUniqueNormalized normalized
-                                       Left err         -> throw (CLaSHException sp err Nothing)
-                                   }
-
-  let ids = HashMap.fromList
-          $ map (\(Id v (Embed t)) -> (nameOcc v,t))
-          $ arguments ++ map fst binders
-
-  gamma <- (ids `HashMap.union`) . HashMap.map (^. _2)
-           <$> Lens.use bindings
-
-  varEnv .= gamma
-
-  typeTrans    <- Lens.use typeTranslator
-  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) (nameOcc result) ids
-      argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
+  (compInps,argWrappers,compOutps,resUnwrappers,binders,result) <- do
+    normalizedM <- splitNormalized tcm componentExpr
+    case normalizedM of
+      Right normalized -> mkUniqueNormalized topEntMM normalized
+      Left err         -> throw (CLaSHException sp err Nothing)
 
   netDecls <- mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
   decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
   (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
-  let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
-      compOutp       = (Text.pack $ name2String result, resType)
-      component      = Component componentName' compInps [(rw,compOutp)] (netDecls ++ decls)
+  let (compOutps',resUnwrappers') = case compOutps of
+        [oport] -> ([(rw,oport)],resUnwrappers)
+        _       -> let NetDecl n res resTy = head resUnwrappers
+                   in  (map (Wire,) compOutps
+                       ,NetDecl' n rw res (Right resTy):tail resUnwrappers
+                       )
+      component      = Component componentName2 compInps compOutps'
+                         (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
   return (sp,component)
 
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad Declaration
@@ -337,11 +334,15 @@ mkFunApp dst fun args = do
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
         dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
         env  <- Lens.use hdlDir
-        manM <- traverse (\ann -> do
-                   let manFile = env </> t_name ann </> t_name ann <.> "manifest"
-                   read <$> liftIO (readFile manFile)
-                ) annM
-        instDecls <- mkTopUnWrapper fun ((,) <$> annM <*> manM) (dstId,dstHWty)
+        manFile <- case annM of
+          Just ann -> return (env </> t_name ann </> t_name ann <.> "manifest")
+          Nothing  -> do
+            let modName = takeWhile (/= '.') (name2String fun)
+            topName <- extendIdentifier Basic (Text.pack modName)
+                         (Text.pack "_topEntity")
+            return (env </> (Text.unpack topName) <.> "manifest")
+        man <- read <$> liftIO (readFile manFile)
+        instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
                        (zip argExprs argHWTys)
         return (argDecls ++ instDecls)
 

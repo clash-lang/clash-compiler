@@ -34,7 +34,6 @@ import CLaSH.Annotations.TopEntity          (TopEntity)
 import CLaSH.Core.Term                      (TmOccName)
 import CLaSH.Core.Type                      (Type)
 import CLaSH.Core.TyCon                     (TyCon, TyConOccName)
-import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Driver.Types                   (BindingMap)
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Netlist.Id                     (IdType)
@@ -52,7 +51,6 @@ newtype NetlistMonad a =
 data NetlistState
   = NetlistState
   { _bindings       :: BindingMap -- ^ Global binders
-  , _varEnv         :: Gamma -- ^ Type environment/context
   , _varCount       :: !Int -- ^ Number of signal declarations
   , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
