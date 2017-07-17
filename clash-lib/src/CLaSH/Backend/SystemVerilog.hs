@@ -846,10 +846,12 @@ expr_ b (ConvBV topM t True e) = do
   nm <- use modNm
   let nm' = text (pack nm)
   case t of
-    Vector {} ->
+    Vector {} -> do
+      tyCache %= HashSet.insert t
       braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
         tyName t <> "_to_lv" <> parens (expr_ False e))
-    RTree {} ->
+    RTree {} -> do
+      tyCache %= HashSet.insert t
       braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
         tyName t <> "_to_lv" <> parens (expr_ False e))
     _ -> expr b e
@@ -858,10 +860,12 @@ expr_ b (ConvBV topM t False e) = do
   nm <- use modNm
   let nm' = text (pack nm)
   case t of
-    Vector {} ->
+    Vector {} -> do
+      tyCache %= HashSet.insert t
       braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
         tyName t <> "_from_lv" <> parens (expr_ False e))
-    RTree {} ->
+    RTree {} -> do
+      tyCache %= HashSet.insert t
       braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
         tyName t <> "_from_lv" <> parens (expr_ False e))
     _ -> expr b e
