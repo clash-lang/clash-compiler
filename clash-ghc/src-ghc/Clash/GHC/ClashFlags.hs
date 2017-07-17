@@ -40,6 +40,7 @@ flagsClash r = [
     defFlag "fclash-debug"                   $ SepArg (setDebugLevel r)
   , defFlag "fclash-hdldir"                  $ SepArg (setHdlDir r)
   , defFlag "fclash-hdlsyn"                  $ SepArg (setHdlSyn r)
+  , defFlag "fclash-nocache"                 $ NoArg (liftEwM (setNoCache r))
   , defFlag "fclash-noclean"                 $ NoArg (liftEwM (setNoClean r))
   , defFlag "fclash-spec-limit"              $ IntSuffix (liftEwM . setSpecLimit r)
   , defFlag "fclash-inline-limit"            $ IntSuffix (liftEwM . setInlineLimit r)
@@ -80,6 +81,9 @@ setDebugLevel :: IORef ClashOpts
 setDebugLevel r s = case readMaybe s of
   Just dbgLvl -> liftEwM $ modifyIORef r (\c -> c {opt_dbgLevel = dbgLvl})
   Nothing     -> addWarn (s ++ " is an invalid debug level")
+
+setNoCache :: IORef ClashOpts -> IO ()
+setNoCache r = modifyIORef r (\c -> c {opt_cachehdl = False})
 
 setNoClean :: IORef ClashOpts -> IO ()
 setNoClean r = modifyIORef r (\c -> c {opt_cleanhdl = False})
