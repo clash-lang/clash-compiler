@@ -848,12 +848,12 @@ expr_ b (ConvBV topM t True e) = do
   case t of
     Vector {} -> do
       tyCache %= HashSet.insert t
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_to_lv" <> parens (expr_ False e))
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_to_lv" <> parens (expr_ False e)
     RTree {} -> do
       tyCache %= HashSet.insert t
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_to_lv" <> parens (expr_ False e))
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_to_lv" <> parens (expr_ False e)
     _ -> expr b e
 
 expr_ b (ConvBV topM t False e) = do
@@ -862,12 +862,12 @@ expr_ b (ConvBV topM t False e) = do
   case t of
     Vector {} -> do
       tyCache %= HashSet.insert t
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_from_lv" <> parens (expr_ False e))
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_from_lv" <> parens (expr_ False e)
     RTree {} -> do
       tyCache %= HashSet.insert t
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_from_lv" <> parens (expr_ False e))
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_from_lv" <> parens (expr_ False e)
     _ -> expr b e
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
