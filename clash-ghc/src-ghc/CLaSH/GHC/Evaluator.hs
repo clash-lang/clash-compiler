@@ -452,6 +452,15 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
         myshift :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
         myshift _ u i = Unsigned.unsafeToInteger (Unsigned.shiftL# u i)
 
+  "CLaSH.Sized.Internal.Unsigned.shiftR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n"
+    | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
+      -> let val :: Integer
+             val = reifyNat kn (\p -> myshift p (U i) (fromInteger j))
+      in mkApps unsignedConPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+      where
+        myshift :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
+        myshift _ u i = Unsigned.unsafeToInteger (Unsigned.shiftR# u i)
+
 
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
