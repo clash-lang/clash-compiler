@@ -1031,6 +1031,10 @@ reduceConst _ e@(App _ _)
     reduceConstant <- Lens.view evaluator
     case reduceConstant tcm False e of
       e'@(Literal _) -> changed e'
+      e'@(collectArgs -> (Prim nm _, _))
+        | isFromInt nm
+        , e /= e'
+        -> changed e'
       e'@(collectArgs -> (Data _,_)) -> changed e'
       _              -> return e
 

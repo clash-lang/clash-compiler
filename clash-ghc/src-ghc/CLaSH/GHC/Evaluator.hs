@@ -20,11 +20,14 @@ import           Data.Bits           (shiftL,shiftR)
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List           as List
-import Data.Text                     (Text)
+import           Data.Proxy          (Proxy)
+import           Data.Reflection     (reifyNat)
+import           Data.Text           (Text)
 -- import           Data.Word
 import           GHC.Int
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
+import           GHC.TypeLits        (KnownNat)
 import           GHC.Word
 import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed)
 
@@ -43,6 +46,8 @@ import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
 import           CLaSH.Core.Var      (Var (..))
 import           CLaSH.Util          (clogBase, flogBase, curLoc)
 
+import qualified CLaSH.Sized.Internal.Unsigned as Unsigned
+import CLaSH.Sized.Internal.Unsigned (Unsigned(..))
 reduceConstant :: HashMap.HashMap TyConOccName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.eqChar#" | Just (i,j) <- charLiterals tcm isSubj args
@@ -437,6 +442,20 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Right mb <- runExcept (tyNatSize tcm litTy)
     -> let maxB = (2 ^ mb) - 1
        in  mkApps unsignedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral maxB))]
+
+  "CLaSH.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
+    | (Right nTy : _) <- args
+    , Right kn <- runExcept (tyNatSize tcm nTy)
+    , [ _
+      , (collectArgs -> (Prim _ _,[Right _, Left _, Left (Literal (IntegerLiteral i)) ]))
+      , (collectArgs -> (Prim _ _, [Left (Literal (IntLiteral j))] ))
+      ] <- reduceTerms tcm isSubj args
+      -> let val :: Integer
+             val = reifyNat kn (\p -> shiftLU p (U i) (fromInteger j))
+      in mkApps unsignedConPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+      where
+        shiftLU :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
+        shiftLU _ u i = Unsigned.unsafeToInteger (Unsigned.shiftL# u i)
 
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
