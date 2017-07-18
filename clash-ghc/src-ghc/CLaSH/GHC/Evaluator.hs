@@ -478,21 +478,18 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
-      -> let val :: Integer
-             val = reifyNat kn (\p -> myshift p (U i) (fromInteger j))
-      in mkApps unsignedConPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      in mkUnsignedLit nTy kn val
       where
-        myshift :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        myshift _ u i = Unsigned.unsafeToInteger (Unsigned.shiftL# u i)
-
-  "CLaSH.Sized.Internal.Unsigned.shiftR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n"
+        op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
+        op _ u i = toInteger (Unsigned.shiftL# u i)
+  "CLaSH.Sized.Internal.Unsigned.shiftR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
-      -> let val :: Integer
-             val = reifyNat kn (\p -> myshift p (U i) (fromInteger j))
-      in mkApps unsignedConPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      in mkUnsignedLit nTy kn val
       where
-        myshift :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        myshift _ u i = Unsigned.unsafeToInteger (Unsigned.shiftR# u i)
+        op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
+        op _ u i = toInteger (Unsigned.shiftR# u i)
 
 
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
