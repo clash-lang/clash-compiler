@@ -395,8 +395,8 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.shiftR#"
-    , "type"      : "shiftR# :: BitVector n -> Int -> BitVector n"
-    , "templateE" : "std_logic_vector(shift_right(unsigned(~ARG[0]),to_integer(~ARG[1])))"
+    , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
+    , "templateE" : "std_logic_vector(shift_right(unsigned(~ARG[1]),to_integer(~ARG[2])))"
     }
   }
 , { "BlackBox" :
