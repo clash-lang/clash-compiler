@@ -358,7 +358,7 @@ xor# (U v1) (U v2) = U (v1 `xor` v2)
 complement# :: KnownNat n => Unsigned n -> Unsigned n
 complement# (U i) = fromInteger_INLINE (complement i)
 
-shiftL#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
+shiftL#, shiftR#, rotateL#, rotateR# :: KnownNat n => Unsigned n -> Int -> Unsigned n
 {-# NOINLINE shiftL# #-}
 shiftL# (U v) i
   | i < 0     = error
@@ -366,7 +366,9 @@ shiftL# (U v) i
   | otherwise = fromInteger_INLINE (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
-shiftR# :: Unsigned n -> Int -> Unsigned n
+-- shiftR# doesn't need the KnownNat constraint
+-- But having the same type signature for all shift and rotate functions
+-- makes implementing the Evaluator easier.
 shiftR# (U v) i
   | i < 0     = error
               $ "'shiftR undefined for negative number: " ++ show i

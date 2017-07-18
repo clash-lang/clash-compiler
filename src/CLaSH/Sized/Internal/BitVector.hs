@@ -529,8 +529,8 @@ xor# (BV v1) (BV v2) = BV (v1 `xor` v2)
 complement# :: KnownNat n => BitVector n -> BitVector n
 complement# (BV v1) = fromInteger_INLINE (complement v1)
 
-shiftL#, rotateL#, rotateR# :: KnownNat n
-                            => BitVector n -> Int -> BitVector n
+shiftL#, shiftR#, rotateL#, rotateR#
+  :: KnownNat n => BitVector n -> Int -> BitVector n
 
 {-# NOINLINE shiftL# #-}
 shiftL# (BV v) i
@@ -539,7 +539,6 @@ shiftL# (BV v) i
   | otherwise = fromInteger_INLINE (shiftL v i)
 
 {-# NOINLINE shiftR# #-}
-shiftR# :: BitVector n -> Int -> BitVector n
 shiftR# (BV v) i
   | i < 0     = error
               $ "'shiftR undefined for negative number: " ++ show i
