@@ -16,7 +16,7 @@ module CLaSH.GHC.Evaluator where
 
 import           Control.Monad.Trans.Except (runExcept)
 import qualified Data.Bifunctor      as Bifunctor
-import           Data.Bits           (shiftL,shiftR)
+import           Data.Bits
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Maybe          (catMaybes)
@@ -504,6 +504,46 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , [i,j] <- unsignedLiterals' tcm isSubj args
     -> mkUnsignedLit nTy kn (i * j)
 
+  "CLaSH.Sized.Internal.Unsigned.negate#"
+    | Just (nTy, kn) <- extractKnownNat tcm args
+    , [i] <- unsignedLiterals' tcm isSubj args
+    -> let val = reifyNat kn (\p -> op p (fromInteger i))
+    in mkUnsignedLit nTy kn val
+    where
+      op :: KnownNat n => Proxy n -> Unsigned n -> Integer
+      op _ u = toInteger (Unsigned.negate# u)
+
+  "CLaSH.Sized.Internal.Unsigned.and#"
+    | Just (i,j) <- unsignedLiterals tcm isSubj args
+    , Just (nTy, kn) <- extractKnownNat tcm args
+    -> mkUnsignedLit nTy kn (i .&. j)
+  "CLaSH.Sized.Internal.Unsigned.or#"
+    | Just (i,j) <- unsignedLiterals tcm isSubj args
+    , Just (nTy, kn) <- extractKnownNat tcm args
+    -> mkUnsignedLit nTy kn (i .|. j)
+  "CLaSH.Sized.Internal.Unsigned.xor#"
+    | Just (i,j) <- unsignedLiterals tcm isSubj args
+    , Just (nTy, kn) <- extractKnownNat tcm args
+    -> mkUnsignedLit nTy kn (i `xor` j)
+
+  "CLaSH.Sized.Internal.Unsigned.complement#"
+    | [i] <- unsignedLiterals' tcm isSubj args
+    , Just (nTy, kn) <- extractKnownNat tcm args
+    -> let val = reifyNat kn (\p -> op p (fromInteger i))
+    in mkUnsignedLit nTy kn val
+    where
+      op :: KnownNat n => Proxy n -> Unsigned n -> Integer
+      op _ u = toInteger (Unsigned.complement# u)
+
+  "CLaSH.Sized.Internal.Unsigned.lt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i <  j)
+  "CLaSH.Sized.Internal.Unsigned.le#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i <= j)
+  "CLaSH.Sized.Internal.Unsigned.gt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >  j)
+  "CLaSH.Sized.Internal.Unsigned.ge#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >= j)
+
   "CLaSH.Sized.Internal.Unsigned.eq#" | Just (i,j) <- unsignedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
 
@@ -700,7 +740,7 @@ extractKnownNat tcm args = case args of
 mkSizedLit
   :: Term    -- type constructor?
   -> Type    -- forall n.
-  -> Integer -- KnownNat
+  -> Integer -- KnownNat n
   -> Integer -- value
   -> Term
 mkSizedLit conPrim nTy kn val = mkApps conPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
