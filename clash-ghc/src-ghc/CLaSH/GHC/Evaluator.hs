@@ -444,18 +444,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
        in  mkApps unsignedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral maxB))]
 
   "CLaSH.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
-    | (Right nTy : _) <- args
-    , Right kn <- runExcept (tyNatSize tcm nTy)
-    , [ _
-      , (collectArgs -> (Prim _ _,[Right _, Left _, Left (Literal (IntegerLiteral i)) ]))
-      , (collectArgs -> (Prim _ _, [Left (Literal (IntLiteral j))] ))
-      ] <- reduceTerms tcm isSubj args
+    | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val :: Integer
-             val = reifyNat kn (\p -> shiftLU p (U i) (fromInteger j))
+             val = reifyNat kn (\p -> myshift p (U i) (fromInteger j))
       in mkApps unsignedConPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
       where
-        shiftLU :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        shiftLU _ u i = Unsigned.unsafeToInteger (Unsigned.shiftL# u i)
+        myshift :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
+        myshift _ u i = Unsigned.unsafeToInteger (Unsigned.shiftL# u i)
+
 
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
@@ -541,6 +537,21 @@ sizedLiterals szCon tcm isSubj args
         | nm  == szCon
         , nm' == szCon -> Just (i,j)
       _ -> Nothing
+
+sizedLitIntLit :: Text -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type,Integer,Integer,Integer)
+sizedLitIntLit szCon tcm isSubj args
+  = case args of
+      (Right nTy : _) | Right kn <- runExcept (tyNatSize tcm nTy)
+                      , [ _
+                        , (collectArgs -> (Prim nm _, [Right _, Left _, Left (Literal (IntegerLiteral i)) ]))
+                        , (collectArgs -> (Prim _ _, [Left (Literal (IntLiteral j))] ))
+                        ] <- reduceTerms tcm isSubj args
+                      , nm == szCon
+                      -> Just (nTy,kn,i,j)
+      _ -> Nothing
+
+unsignedLitIntLit :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type, Integer, Integer, Integer)
+unsignedLitIntLit = sizedLitIntLit "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
 bitVectorLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 bitVectorLiterals = sizedLiterals "CLaSH.Sized.Internal.BitVector.fromInteger#"
