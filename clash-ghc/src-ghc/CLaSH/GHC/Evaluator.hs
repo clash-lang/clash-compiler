@@ -38,8 +38,8 @@ import           CLaSH.Core.Name     (Name (..), string2SystemName)
 import           CLaSH.Core.Pretty   (showDoc)
 import           CLaSH.Core.Term     (Term (..))
 import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
-                                      TypeView (..), tyView, mkFunTy,
-                                      mkTyConApp, splitFunForallTy)
+                                      TypeView (..), mkFunTy,
+                                      mkTyConApp, splitFunForallTy, tyView)
 import           CLaSH.Core.TyCon    (TyCon, TyConOccName, tyConDataCons)
 import           CLaSH.Core.TysPrim
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
@@ -404,14 +404,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.BitVector.shiftL#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkBvLit nTy kn val
+      in mkBvLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
         op _ u i = toInteger (BitVector.shiftL# u i)
   "CLaSH.Sized.Internal.BitVector.shiftR#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkBvLit nTy kn val
+      in mkBvLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
         op _ u i = toInteger (BitVector.shiftR# u i)
@@ -419,14 +419,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.BitVector.rotateL#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkBvLit nTy kn val
+      in mkBvLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
         op _ u i = toInteger (BitVector.rotateL# u i)
   "CLaSH.Sized.Internal.BitVector.rotateR#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkBvLit nTy kn val
+      in mkBvLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
         op _ u i = toInteger (BitVector.rotateR# u i)
@@ -444,28 +444,26 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToBoolLiteral tcm ty (i /= j)
 
   "CLaSH.Sized.Internal.Signed.minBound#"
-    | [Right litTy,kn] <- args
-    , Right mb <- runExcept (tyNatSize tcm litTy)
+    | Just (litTy,mb) <- extractKnownNat tcm args
     -> let minB = negate (2 ^ (mb - 1))
-       in  mkApps signedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral minB))]
+       in  mkSignedLit ty litTy mb minB
 
   "CLaSH.Sized.Internal.Signed.maxBound#"
-    | [Right litTy,kn] <- args
-    , Right mb <- runExcept (tyNatSize tcm litTy)
+    | Just (litTy,mb) <- extractKnownNat tcm args
     -> let maxB = (2 ^ (mb - 1)) - 1
-       in  mkApps signedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral maxB))]
+       in mkSignedLit ty litTy mb maxB
 
   "CLaSH.Sized.Internal.Signed.shiftL#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkSignedLit nTy kn val
+      in mkSignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
         op _ u i = toInteger (Signed.shiftL# u i)
   "CLaSH.Sized.Internal.Signed.shiftR#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkSignedLit nTy kn val
+      in mkSignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
         op _ u i = toInteger (Signed.shiftR# u i)
@@ -473,14 +471,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Signed.rotateL#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkSignedLit nTy kn val
+      in mkSignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
         op _ u i = toInteger (Signed.rotateL# u i)
   "CLaSH.Sized.Internal.Signed.rotateR#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkSignedLit nTy kn val
+      in mkSignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
         op _ u i = toInteger (Signed.rotateR# u i)
@@ -491,24 +489,25 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , nm' == "CLaSH.Sized.Internal.Signed.fromInteger#"
     -> integerToIntegerLiteral i
 
+-- TODO use prelude functions for wrapping behavoir
   "CLaSH.Sized.Internal.Unsigned.+#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i,j] <- unsignedLiterals' tcm isSubj args
-    -> mkUnsignedLit nTy kn (i + j)
+    -> mkUnsignedLit ty nTy kn (i + j)
   "CLaSH.Sized.Internal.Unsigned.-#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i,j] <- unsignedLiterals' tcm isSubj args
-    -> mkUnsignedLit nTy kn (i - j)
+    -> mkUnsignedLit ty nTy kn (i - j)
   "CLaSH.Sized.Internal.Unsigned.*#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i,j] <- unsignedLiterals' tcm isSubj args
-    -> mkUnsignedLit nTy kn (i * j)
+    -> mkUnsignedLit ty nTy kn (i * j)
 
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
     -> let val = reifyNat kn (\p -> op p (fromInteger i))
-    in mkUnsignedLit nTy kn val
+    in mkUnsignedLit ty nTy kn val
     where
       op :: KnownNat n => Proxy n -> Unsigned n -> Integer
       op _ u = toInteger (Unsigned.negate# u)
@@ -516,21 +515,21 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Unsigned.and#"
     | Just (i,j) <- unsignedLiterals tcm isSubj args
     , Just (nTy, kn) <- extractKnownNat tcm args
-    -> mkUnsignedLit nTy kn (i .&. j)
+    -> mkUnsignedLit ty nTy kn (i .&. j)
   "CLaSH.Sized.Internal.Unsigned.or#"
     | Just (i,j) <- unsignedLiterals tcm isSubj args
     , Just (nTy, kn) <- extractKnownNat tcm args
-    -> mkUnsignedLit nTy kn (i .|. j)
+    -> mkUnsignedLit ty nTy kn (i .|. j)
   "CLaSH.Sized.Internal.Unsigned.xor#"
     | Just (i,j) <- unsignedLiterals tcm isSubj args
     , Just (nTy, kn) <- extractKnownNat tcm args
-    -> mkUnsignedLit nTy kn (i `xor` j)
+    -> mkUnsignedLit ty nTy kn (i `xor` j)
 
   "CLaSH.Sized.Internal.Unsigned.complement#"
     | [i] <- unsignedLiterals' tcm isSubj args
     , Just (nTy, kn) <- extractKnownNat tcm args
     -> let val = reifyNat kn (\p -> op p (fromInteger i))
-    in mkUnsignedLit nTy kn val
+    in mkUnsignedLit ty nTy kn val
     where
       op :: KnownNat n => Proxy n -> Unsigned n -> Integer
       op _ u = toInteger (Unsigned.complement# u)
@@ -551,28 +550,25 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToBoolLiteral tcm ty (i /= j)
 
   "CLaSH.Sized.Internal.Unsigned.minBound#"
-    | [Right nTy] <- args
-    , Right len <- runExcept (tyNatSize tcm nTy)
-    -> let kn = Left (Literal (IntegerLiteral (toInteger len)))
-       in  mkApps unsignedConPrim [Right nTy,kn,Left (Literal (IntegerLiteral 0))]
+    | Just (nTy,len) <- extractKnownNat tcm args
+    -> mkUnsignedLit ty nTy len 0
 
   "CLaSH.Sized.Internal.Unsigned.maxBound#"
-    | [Right litTy,kn] <- args
-    , Right mb <- runExcept (tyNatSize tcm litTy)
+    | Just (litTy,mb) <- extractKnownNat tcm args
     -> let maxB = (2 ^ mb) - 1
-       in  mkApps unsignedConPrim [Right litTy,kn,Left (Literal (IntegerLiteral maxB))]
+       in  mkUnsignedLit ty litTy mb maxB
 
   "CLaSH.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkUnsignedLit nTy kn val
+      in mkUnsignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
         op _ u i = toInteger (Unsigned.shiftL# u i)
   "CLaSH.Sized.Internal.Unsigned.shiftR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkUnsignedLit nTy kn val
+      in mkUnsignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
         op _ u i = toInteger (Unsigned.shiftR# u i)
@@ -580,14 +576,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Unsigned.rotateL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkUnsignedLit nTy kn val
+      in mkUnsignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
         op _ u i = toInteger (Unsigned.rotateL# u i)
   "CLaSH.Sized.Internal.Unsigned.rotateR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
-      in mkUnsignedLit nTy kn val
+      in mkUnsignedLit ty nTy kn val
       where
         op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
         op _ u i = toInteger (Unsigned.rotateR# u i)
@@ -728,24 +724,31 @@ bvLitIntLit       = sizedLitIntLit "CLaSH.Sized.Internal.BitVector.fromInteger#"
 signedLitIntLit   = sizedLitIntLit "CLaSH.Sized.Internal.Signed.fromInteger#"
 unsignedLitIntLit = sizedLitIntLit "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
--- Extract n an KnownNat n fromargument list to function of type
---   forall n. KnownNat n => f
+-- From an argument list to function of type
+--   forall n. KnownNat n => ...
+-- extract (nTy,nInt)
+-- where nTy is the Type of n
+-- and   nInt is its value as an Integer
 extractKnownNat :: HashMap.HashMap TyConOccName TyCon -> [Either a Type] -> Maybe (Type, Integer)
 extractKnownNat tcm args = case args of
-  (Right nTy : _) | Right kn <- runExcept (tyNatSize tcm nTy)
-    -> Just (nTy, kn)
+  (Right nTy : _) | Right nInt <- runExcept (tyNatSize tcm nTy)
+    -> Just (nTy, nInt)
   _ -> Nothing
 
 -- Construct a constant value term of a sized type
 mkSizedLit
-  :: Term    -- type constructor?
+  :: (Type -> Term)    -- type constructor?
+  -> Type    -- ????
   -> Type    -- forall n.
   -> Integer -- KnownNat n
   -> Integer -- value
   -> Term
-mkSizedLit conPrim nTy kn val = mkApps conPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+mkSizedLit conPrim ty nTy kn val
+  = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+  where
+    (_,sTy) = splitFunForallTy ty
 
-mkBvLit, mkSignedLit, mkUnsignedLit :: Type -> Integer -> Integer -> Term
+mkBvLit, mkSignedLit, mkUnsignedLit :: Type -> Type -> Integer -> Integer -> Term
 mkBvLit       = mkSizedLit bvConPrim
 mkSignedLit   = mkSizedLit signedConPrim
 mkUnsignedLit = mkSizedLit unsignedConPrim
@@ -770,41 +773,44 @@ integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integ
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
 
-bvConPrim :: Term
-bvConPrim = Prim "CLaSH.Sized.Internal.BitVector.fromInteger#" (ForAllTy (bind nTV funTy))
+bvConPrim :: Type -> Term
+bvConPrim (tyView -> TyConApp bvTcNm _)
+  = Prim "CLaSH.Sized.Internal.BitVector.fromInteger#" (ForAllTy (bind nTV funTy))
+  where
+#if MIN_VERSION_ghc(8,2,0)
+    funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp bvTcNm [nVar]]
+#else
+    funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp bvTcNm [nVar]]
+#endif
+    nName      = string2SystemName "n"
+    nVar       = VarTy typeNatKind nName
+    nTV        = TyVar nName (embed typeNatKind)
+bvConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
+
+signedConPrim :: Type -> Term
+signedConPrim (tyView -> TyConApp signedTcNm _)
+  = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind nTV funTy))
   where
 #if MIN_VERSION_ghc(8,2,0)
     funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
 #else
     funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
 #endif
-    signedTcNm = string2SystemName "CLaSH.Sized.Internal.BitVector.Signed"
     nName      = string2SystemName "n"
     nVar       = VarTy typeNatKind nName
     nTV        = TyVar nName (embed typeNatKind)
+signedConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
-signedConPrim :: Term
-signedConPrim = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind nTV funTy))
-  where
-#if MIN_VERSION_ghc(8,2,0)
-    funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
-#else
-    funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
-#endif
-    signedTcNm = string2SystemName "CLaSH.Sized.Internal.Signed.Signed"
-    nName      = string2SystemName "n"
-    nVar       = VarTy typeNatKind nName
-    nTV        = TyVar nName (embed typeNatKind)
-
-unsignedConPrim :: Term
-unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.fromInteger#" (ForAllTy (bind nTV funTy))
+unsignedConPrim :: Type -> Term
+unsignedConPrim (tyView -> TyConApp unsignedTcNm _)
+  = Prim "CLaSH.Sized.Internal.Unsigned.fromInteger#" (ForAllTy (bind nTV funTy))
   where
 #if MIN_VERSION_ghc(8,2,0)
     funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp unsignedTcNm [nVar]]
 #else
     funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp unsignedTcNm [nVar]]
 #endif
-    unsignedTcNm = string2SystemName "CLaSH.Sized.Internal.Unsigned.Unsigned"
     nName        = string2SystemName "n"
     nVar         = VarTy typeNatKind nName
     nTV          = TyVar nName (embed typeNatKind)
+unsignedConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
