@@ -549,6 +549,13 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            val = i .&. bitsKeep
     in mkUnsignedLit ty mTy km val
 
+
+  "CLaSH.Sized.Internal.Unsigned.plus#" -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
+    | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> let resTy = runFreshM (termType tcm e)
+           (TyConApp _ [resSizeTy]) = tyView resTy
+           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+       in  mkUnsignedLit resTy resSizeTy resSizeInt (i+j)
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
