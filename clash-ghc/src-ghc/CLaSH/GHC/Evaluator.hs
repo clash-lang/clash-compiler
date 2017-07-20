@@ -510,6 +510,15 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            [intCon] = tyConDataCons intTc
        in  mkApps (Data intCon) [Left (Literal (IntLiteral kn))]
 
+  "CLaSH.Sized.Internal.Unsigned.pack#"
+    | Just (nTy, kn) <- extractKnownNat tcm args
+    , [i] <- unsignedLiterals' tcm isSubj args
+    -> mkBvLit ty nTy kn i
+  "CLaSH.Sized.Internal.Unsigned.unpack#"
+    | Just (nTy, kn) <- extractKnownNat tcm args
+    , [i] <- bvLiterals' tcm isSubj args
+    -> mkUnsignedLit ty nTy kn i
+
   "CLaSH.Sized.Internal.Unsigned.+#"
     | Just (_, kn) <- extractKnownNat tcm args
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm isSubj args)
@@ -735,6 +744,10 @@ unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
 unsignedLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
 unsignedLiterals' = sizedLiterals' "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+
+bvLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
+bvLiterals' = sizedLiterals' "CLaSH.Sized.Internal.BitVector.fromInteger#"
+
 
 -- Tries to match literal arguments to a function like
 --   (Unsigned.shiftL#  :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n)
