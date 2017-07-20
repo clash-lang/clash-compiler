@@ -556,6 +556,15 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            (TyConApp _ [resSizeTy]) = tyView resTy
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
        in  mkUnsignedLit resTy resSizeTy resSizeInt (i+j)
+
+  "CLaSH.Sized.Internal.Unsigned.minus#"
+    | [i,j] <- unsignedLiterals' tcm isSubj args
+    -> let resTy = runFreshM (termType tcm e)
+           (TyConApp _ [resSizeTy]) = tyView resTy
+           Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
+           val = reifyNat resSizeInt (runSizedF (Unsigned.-#) i j)
+      in  mkUnsignedLit resTy resSizeTy resSizeInt val
+
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
@@ -907,9 +916,18 @@ liftSized2 :: (KnownNat n, Integral (sized n))
            -> [Either Term Type]
            -> Proxy n
            -> Maybe Term
-liftSized2 extractLitArgs mkLit f ty tcm isSubj args _
+liftSized2 extractLitArgs mkLit f ty tcm isSubj args p
   | Just (nTy, kn) <- extractKnownNat tcm args
   , [i,j] <- extractLitArgs tcm isSubj args
-  = let val = toInteger $ f (fromInteger i) (fromInteger j)
+  = let val = runSizedF f i j p
     in Just $ mkLit ty nTy kn val
   | otherwise = Nothing
+
+runSizedF
+  :: (KnownNat n, Integral (sized n))
+  => (sized n -> sized n -> sized n)
+  -> Integer
+  -> Integer
+  -> Proxy n
+  -> Integer
+runSizedF f i j _ = toInteger $ f (fromInteger i) (fromInteger j)
