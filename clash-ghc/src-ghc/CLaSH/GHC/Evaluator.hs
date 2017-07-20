@@ -699,6 +699,9 @@ indexLiterals = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
 signedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 signedLiterals = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
 
+signedLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
+signedLiterals' = sizedLiterals' "CLaSH.Sized.Internal.Signed.fromInteger#"
+
 unsignedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
@@ -814,3 +817,42 @@ unsignedConPrim (tyView -> TyConApp unsignedTcNm _)
     nVar         = VarTy typeNatKind nName
     nTV          = TyVar nName (embed typeNatKind)
 unsignedConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
+
+
+-- Lift a
+liftUnsigned2 :: KnownNat n
+              => Proxy n
+              -> (Unsigned n -> Unsigned n -> Unsigned n)
+              -> Type
+              -> HashMap.HashMap TyConOccName TyCon
+              -> Bool
+              -> [Either Term Type]
+              -> Maybe Term
+liftUnsigned2 = liftSized2 unsignedLiterals' mkUnsignedLit
+
+liftSigned2 :: KnownNat n
+              => Proxy n
+              -> (Signed n -> Signed n -> Signed n)
+              -> Type
+              -> HashMap.HashMap TyConOccName TyCon
+              -> Bool
+              -> [Either Term Type]
+              -> Maybe Term
+liftSigned2 = liftSized2 signedLiterals' mkSignedLit
+
+liftSized2 :: (KnownNat n, Integral (sized n))
+           => (HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer])
+           -> (Type -> Type -> Integer -> Integer -> Term)
+           -> Proxy n
+           -> (sized n -> sized n -> sized n)
+           -> Type
+           -> HashMap.HashMap TyConOccName TyCon
+           -> Bool
+           -> [Either Term Type]
+           -> Maybe Term
+liftSized2 extractLitArgs mkLit _ f ty tcm isSubj args
+  | Just (nTy, kn) <- extractKnownNat tcm args
+  , [i,j] <- extractLitArgs tcm isSubj args
+  = let val = toInteger $ f (fromInteger i) (fromInteger j)
+    in Just $ mkLit ty nTy kn val
+  | otherwise = Nothing
