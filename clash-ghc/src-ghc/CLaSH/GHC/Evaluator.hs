@@ -403,33 +403,33 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Internal.BitVector.shiftL#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
-        op _ u i = toInteger (BitVector.shiftL# u i)
+        op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (BitVector.shiftL# u i)
   "CLaSH.Sized.Internal.BitVector.shiftR#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
-        op _ u i = toInteger (BitVector.shiftR# u i)
+        op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (BitVector.shiftR# u i)
 
   "CLaSH.Sized.Internal.BitVector.rotateL#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
-        op _ u i = toInteger (BitVector.rotateL# u i)
+        op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (BitVector.rotateL# u i)
   "CLaSH.Sized.Internal.BitVector.rotateR#"
     | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
-        op _ u i = toInteger (BitVector.rotateR# u i)
+        op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (BitVector.rotateR# u i)
 
   "CLaSH.Sized.Internal.Index.eq#" | Just (i,j) <- indexLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
@@ -455,33 +455,33 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Internal.Signed.shiftL#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkSignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
-        op _ u i = toInteger (Signed.shiftL# u i)
+        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Signed.shiftL# u i)
   "CLaSH.Sized.Internal.Signed.shiftR#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkSignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
-        op _ u i = toInteger (Signed.shiftR# u i)
+        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Signed.shiftR# u i)
 
   "CLaSH.Sized.Internal.Signed.rotateL#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkSignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
-        op _ u i = toInteger (Signed.rotateL# u i)
+        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Signed.rotateL# u i)
   "CLaSH.Sized.Internal.Signed.rotateR#"
     | Just (nTy,kn,i,j) <- signedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkSignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Signed n -> Int -> Integer
-        op _ u i = toInteger (Signed.rotateR# u i)
+        op :: KnownNat n => Signed n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Signed.rotateR# u i)
 
   "CLaSH.Sized.Internal.Signed.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
@@ -506,11 +506,11 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
-    -> let val = reifyNat kn (\p -> op p (fromInteger i))
+    -> let val = reifyNat kn (op (fromInteger i))
     in mkUnsignedLit ty nTy kn val
     where
-      op :: KnownNat n => Proxy n -> Unsigned n -> Integer
-      op _ u = toInteger (Unsigned.negate# u)
+      op :: KnownNat n => Unsigned n -> Proxy n -> Integer
+      op u _ = toInteger (Unsigned.negate# u)
 
   "CLaSH.Sized.Internal.Unsigned.and#"
     | Just (i,j) <- unsignedLiterals tcm isSubj args
@@ -528,11 +528,11 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Unsigned.complement#"
     | [i] <- unsignedLiterals' tcm isSubj args
     , Just (nTy, kn) <- extractKnownNat tcm args
-    -> let val = reifyNat kn (\p -> op p (fromInteger i))
+    -> let val = reifyNat kn (op (fromInteger i))
     in mkUnsignedLit ty nTy kn val
     where
-      op :: KnownNat n => Proxy n -> Unsigned n -> Integer
-      op _ u = toInteger (Unsigned.complement# u)
+      op :: KnownNat n => Unsigned n -> Proxy n -> Integer
+      op u _ = toInteger (Unsigned.complement# u)
 
   "CLaSH.Sized.Internal.Unsigned.lt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i <  j)
@@ -560,33 +560,33 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkUnsignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        op _ u i = toInteger (Unsigned.shiftL# u i)
+        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Unsigned.shiftL# u i)
   "CLaSH.Sized.Internal.Unsigned.shiftR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkUnsignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        op _ u i = toInteger (Unsigned.shiftR# u i)
+        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Unsigned.shiftR# u i)
 
   "CLaSH.Sized.Internal.Unsigned.rotateL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkUnsignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        op _ u i = toInteger (Unsigned.rotateL# u i)
+        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Unsigned.rotateL# u i)
   "CLaSH.Sized.Internal.Unsigned.rotateR#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
-      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkUnsignedLit ty nTy kn val
       where
-        op :: KnownNat n => Proxy n -> Unsigned n -> Int -> Integer
-        op _ u i = toInteger (Unsigned.rotateR# u i)
+        op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
+        op u i _ = toInteger (Unsigned.rotateR# u i)
 
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
     | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
@@ -821,36 +821,36 @@ unsignedConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 -- Lift a
 liftUnsigned2 :: KnownNat n
-              => Proxy n
-              -> (Unsigned n -> Unsigned n -> Unsigned n)
+              => (Unsigned n -> Unsigned n -> Unsigned n)
               -> Type
               -> HashMap.HashMap TyConOccName TyCon
               -> Bool
               -> [Either Term Type]
+              -> Proxy n
               -> Maybe Term
 liftUnsigned2 = liftSized2 unsignedLiterals' mkUnsignedLit
 
 liftSigned2 :: KnownNat n
-              => Proxy n
-              -> (Signed n -> Signed n -> Signed n)
+              => (Signed n -> Signed n -> Signed n)
               -> Type
               -> HashMap.HashMap TyConOccName TyCon
               -> Bool
               -> [Either Term Type]
+              -> Proxy n
               -> Maybe Term
 liftSigned2 = liftSized2 signedLiterals' mkSignedLit
 
 liftSized2 :: (KnownNat n, Integral (sized n))
            => (HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer])
            -> (Type -> Type -> Integer -> Integer -> Term)
-           -> Proxy n
            -> (sized n -> sized n -> sized n)
            -> Type
            -> HashMap.HashMap TyConOccName TyCon
            -> Bool
            -> [Either Term Type]
+           -> Proxy n
            -> Maybe Term
-liftSized2 extractLitArgs mkLit _ f ty tcm isSubj args
+liftSized2 extractLitArgs mkLit f ty tcm isSubj args _
   | Just (nTy, kn) <- extractKnownNat tcm args
   , [i,j] <- extractLitArgs tcm isSubj args
   = let val = toInteger $ f (fromInteger i) (fromInteger j)
