@@ -540,6 +540,15 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | Just (_, kn) <- extractKnownNat tcm args
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm isSubj args)
     -> val
+
+  "CLaSH.Sized.Internal.Unsigned.resize#" -- forall n m . KnownNat m => Unsigned n -> Unsigned m
+    | (Right _ : Right mTy : _) <- args
+    , Right km <- runExcept (tyNatSize tcm mTy)
+    , [i] <- unsignedLiterals' tcm isSubj args
+    -> let bitsKeep = (bit (fromInteger km)) - 1
+           val = i .&. bitsKeep
+    in mkUnsignedLit ty mTy km val
+
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
