@@ -502,6 +502,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , nm' == "CLaSH.Sized.Internal.Signed.fromInteger#"
     -> integerToIntegerLiteral i
 
+  "CLaSH.Sized.Internal.Unsigned.size#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    -> let ty' = runFreshM (termType tcm e)
+           (TyConApp intTcNm _) = tyView ty'
+           (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
+           [intCon] = tyConDataCons intTc
+       in  mkApps (Data intCon) [Left (Literal (IntLiteral kn))]
+
   "CLaSH.Sized.Internal.Unsigned.+#"
     | Just (_, kn) <- extractKnownNat tcm args
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm isSubj args)
@@ -515,6 +523,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.*#) ty tcm isSubj args)
     -> val
 
+  "CLaSH.Sized.Internal.Unsigned.quot#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.quot#) ty tcm isSubj args)
+    -> val
+  "CLaSH.Sized.Internal.Unsigned.rem#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm isSubj args)
+    -> val
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
