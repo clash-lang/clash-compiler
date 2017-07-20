@@ -443,6 +443,19 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Signed.neq#" | Just (i,j) <- signedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i /= j)
 
+  "CLaSH.Sized.Internal.Signed.+#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftSigned2 (Signed.+#) ty tcm isSubj args)
+    -> val
+  "CLaSH.Sized.Internal.Signed.-#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftSigned2 (Signed.-#) ty tcm isSubj args)
+    -> val
+  "CLaSH.Sized.Internal.Signed.*#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftSigned2 (Signed.*#) ty tcm isSubj args)
+    -> val
+
   "CLaSH.Sized.Internal.Signed.minBound#"
     | Just (litTy,mb) <- extractKnownNat tcm args
     -> let minB = negate (2 ^ (mb - 1))
@@ -489,19 +502,18 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , nm' == "CLaSH.Sized.Internal.Signed.fromInteger#"
     -> integerToIntegerLiteral i
 
--- TODO use prelude functions for wrapping behavoir
   "CLaSH.Sized.Internal.Unsigned.+#"
-    | Just (nTy, kn) <- extractKnownNat tcm args
-    , [i,j] <- unsignedLiterals' tcm isSubj args
-    -> mkUnsignedLit ty nTy kn (i + j)
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm isSubj args)
+    -> val
   "CLaSH.Sized.Internal.Unsigned.-#"
-    | Just (nTy, kn) <- extractKnownNat tcm args
-    , [i,j] <- unsignedLiterals' tcm isSubj args
-    -> mkUnsignedLit ty nTy kn (i - j)
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.-#) ty tcm isSubj args)
+    -> val
   "CLaSH.Sized.Internal.Unsigned.*#"
-    | Just (nTy, kn) <- extractKnownNat tcm args
-    , [i,j] <- unsignedLiterals' tcm isSubj args
-    -> mkUnsignedLit ty nTy kn (i * j)
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.*#) ty tcm isSubj args)
+    -> val
 
   "CLaSH.Sized.Internal.Unsigned.negate#"
     | Just (nTy, kn) <- extractKnownNat tcm args
