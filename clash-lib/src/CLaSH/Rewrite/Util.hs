@@ -429,7 +429,16 @@ liftBinding gamma delta (Id idName tyE,eE) = do
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
              bindings %= HMS.insert (nameOcc newBodyId)
-                                    (newBodyId,newBodyTy,sp,EmptyInlineSpec,newBody)
+                                    -- We mark this function as internal so that
+                                    -- it can be inlined at the very end of
+                                    -- the normalisation pipeline as part of the
+                                    -- flattening pass. We don't inline
+                                    -- right away because we are lifting this
+                                    -- function at this moment for a reason!
+                                    -- (termination, CSE and DEC oppertunities,
+                                    -- ,etc.)
+                                    (newBodyId {nameSort = Internal}
+                                    ,newBodyTy,sp,EmptyInlineSpec,newBody)
              -- Return the new binder
              return (Id idName tyE, embed newExpr)
     -- If it does, use the existing binder
@@ -671,7 +680,14 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case HML.toList existing of
     [] -> do (cf,sp) <- Lens.use curFun
-             mkFunction (appendToName cf "_specF") sp EmptyInlineSpec newBody
+             -- We mark this function as @System@ because we do not want the
+             -- flattening pass at the end of the normalisation pipeline to
+             -- inline this function again: HDL templates of HO primitives only
+             -- understand top-level binders or HDL templates of other
+             -- primitives; they do not cope with lambda's so we need to make
+             -- sure this function is not inlined.
+             mkFunction ((appendToName cf "_specF") {nameSort = System})
+                        sp EmptyInlineSpec newBody
     ((_,(k,kTy,_,_,_)):_) -> return (k,kTy)
   -- Create specialized argument
   let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars

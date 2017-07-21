@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 module CLaSH.Normalize where
 
@@ -31,7 +32,7 @@ import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
 import           CLaSH.Core.FreeVars              (termFreeIds)
-import           CLaSH.Core.Name                  (Name (..))
+import           CLaSH.Core.Name                  (Name (..), NameSort (..))
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Subst                 (substTms)
 import           CLaSH.Core.Term                  (Term (..), TmName, TmOccName)
@@ -47,12 +48,12 @@ import           CLaSH.Netlist.Types              (HWType (..))
 import           CLaSH.Netlist.Util
   (splitNormalized, unsafeCoreTypeToHWType)
 import           CLaSH.Normalize.Strategy
-import           CLaSH.Normalize.Transformations  (bindConstantVar, caseCon,
-                                                   reduceConst, topLet )
+import           CLaSH.Normalize.Transformations
+  (appProp, bindConstantVar, caseCon, flattenLet, reduceConst, topLet)
 import           CLaSH.Normalize.Types
 import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types           (PrimMap)
-import           CLaSH.Rewrite.Combinators        ((>->),(!->),repeatR,topdownR)
+import           CLaSH.Rewrite.Combinators        ((>->),(!->))
 import           CLaSH.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), bindings, curFun, dbgLevel, extra,
    tcCache, topEntities, typeTranslator)
@@ -267,6 +268,8 @@ stripArgs _ _ _ = Nothing
 flattenNode
   :: CallTree
   -> NormalizeSession (Either CallTree ((TmOccName,Term),[CallTree]))
+flattenNode (CLeaf (nm,(nameSort -> Internal,_,_,_,e))) =
+  return (Right ((nm,e),[]))
 flattenNode c@(CLeaf (nm,(_,_,_,_,e))) = do
   tcm  <- Lens.view tcCache
   norm <- splitNormalized tcm e
@@ -277,6 +280,8 @@ flattenNode c@(CLeaf (nm,(_,_,_,_,e))) = do
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),[]))
         Nothing        -> return (Left c)
     _ -> return (Left c)
+flattenNode (CBranch (nm,(nameSort -> Internal,_,_,_,e)) us) =
+  return (Right ((nm,e),us))
 flattenNode b@(CBranch (nm,(_,_,_,_,e)) us) = do
   tcm  <- Lens.view tcCache
   norm <- splitNormalized tcm e
@@ -298,8 +303,12 @@ flattenCallTree (CBranch (nm,(nm',ty,sp,inl,tm)) used) = do
   let (toInline,il_used) = unzip il_ct
   newExpr <- case toInline of
                [] -> return tm
-               _  -> rewriteExpr ("bindConstants",(repeatR (topdownR $ (bindConstantVar >-> caseCon >-> reduceConst))) !-> topdownSucR topLet) (showDoc nm, substTms toInline tm)
+               _  -> rewriteExpr ("flattenExpr",flatten) (showDoc nm, substTms toInline tm)
   return (CBranch (nm,(nm',ty,sp,inl,newExpr)) (newUsed ++ (concat il_used)))
+  where
+    flatten =
+      innerMost (appProp >-> bindConstantVar >-> caseCon >-> reduceConst >-> flattenLet) !->
+      topdownSucR topLet
 
 callTreeToList
   :: [TmOccName]
