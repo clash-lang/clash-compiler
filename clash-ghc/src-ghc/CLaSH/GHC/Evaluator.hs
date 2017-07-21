@@ -404,29 +404,28 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.BitVector.shiftL#"
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in mkBvLit ty nTy kn val
+      in mkBitVectorLit ty nTy kn val
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.shiftL# u i)
   "CLaSH.Sized.Internal.BitVector.shiftR#"
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in mkBvLit ty nTy kn val
+      in mkBitVectorLit ty nTy kn val
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.shiftR# u i)
-
   "CLaSH.Sized.Internal.BitVector.rotateL#"
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in mkBvLit ty nTy kn val
+      in mkBitVectorLit ty nTy kn val
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.rotateL# u i)
   "CLaSH.Sized.Internal.BitVector.rotateR#"
     | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
-      in mkBvLit ty nTy kn val
+      in mkBitVectorLit ty nTy kn val
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.rotateR# u i)
@@ -453,7 +452,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Signed.pack#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- signedLiterals' tcm isSubj args
-    -> mkBvLit ty nTy kn i
+    -> mkBitVectorLit ty nTy kn i
   "CLaSH.Sized.Internal.Signed.unpack#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- bitVectorLiterals' tcm isSubj args
@@ -654,7 +653,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.Unsigned.pack#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
-    -> mkBvLit ty nTy kn i
+    -> mkBitVectorLit ty nTy kn i
   "CLaSH.Sized.Internal.Unsigned.unpack#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- bitVectorLiterals' tcm isSubj args
@@ -955,15 +954,15 @@ mkSizedLit conPrim ty nTy kn val
   where
     (_,sTy) = splitFunForallTy ty
 
-mkBvLit, mkSignedLit, mkUnsignedLit
+mkBitVectorLit, mkSignedLit, mkUnsignedLit
   :: Type    -- result type
   -> Type    -- forall n.
   -> Integer -- KnownNat n
   -> Integer -- value
   -> Term
-mkBvLit       = mkSizedLit bvConPrim
-mkSignedLit   = mkSizedLit signedConPrim
-mkUnsignedLit = mkSizedLit unsignedConPrim
+mkBitVectorLit = mkSizedLit bvConPrim
+mkSignedLit    = mkSizedLit signedConPrim
+mkUnsignedLit  = mkSizedLit unsignedConPrim
 
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
@@ -1049,14 +1048,14 @@ liftSigned2 :: KnownNat n
               -> (Proxy n -> Maybe Term)
 liftSigned2 = liftSized2 signedLiterals' mkSignedLit
 
-liftBv2 :: KnownNat n
+liftBitVector2 :: KnownNat n
               => (BitVector n -> BitVector n -> BitVector n)
               -> Type
               -> HashMap.HashMap TyConOccName TyCon
               -> Bool
               -> [Either Term Type]
               -> (Proxy n -> Maybe Term)
-liftBv2 = liftSized2 bitVectorLiterals' mkBvLit
+liftBitVector2 = liftSized2 bitVectorLiterals' mkBitVectorLit
 
 liftSized2 :: (KnownNat n, Integral (sized n))
            => -- | literal argument extraction function
