@@ -773,6 +773,12 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
     _ -> text id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> parens (int 1 <+> "to" <+> int (n-1))
 
+-- This is a "Hack", we cannot construct trees with a negative depth. This is
+-- here so that we can recognise merged RTree modifiers. See the code in
+-- @CLaSH.Backend.nestM@ which construct these tree modifiers.
+expr_ _ (Identifier id_ (Just (Indexed (RTree (-1) _,l,r)))) =
+  text id_ <> parens (int l <+> "to" <+> int (r-1))
+
 expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
   syn <- hdlSyn
   case syn of
@@ -822,12 +828,8 @@ expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
   iw <- use intWidth
   "resize" <> parens (text id_ <> "," <> int iw)
 
-expr_ b (Identifier id_ (Just (Nested m1 m2))) = case (m1,m2) of
-  (Indexed (Vector n elTy,1,2),Indexed (Vector _ _,1,1)) ->
-    expr_ b (Identifier id_ (Just (Indexed (Vector n elTy,10,1))))
-  (Indexed ((RTree d elTy),1,n),Indexed ((RTree _ _),0,1)) -> do
-    let n' = case n of {1 -> 0; _ -> 1}
-    expr_ b (Identifier id_ (Just (Indexed (RTree d elTy,10,n'))))
+expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
+  Just m3 -> expr_ b (Identifier id_ (Just m3))
   _ -> do
     k <- expr_ b (Identifier id_ (Just m1))
     expr_ b (Identifier (displayT (renderOneLine k)) (Just m2))
