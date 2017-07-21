@@ -486,7 +486,23 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
         op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> Integer
         op bv i b _ = toInteger (BitVector.replaceBit# bv i b)
 
--- TODO: setSlice#, slice#, split#
+-- TODO: setSlice#, slice#
+  "CLaSH.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
+    | (Right nTy : Right mTy : _) <- args
+    , Right n <-  runExcept (tyNatSize tcm nTy)
+    , Right m <-  runExcept (tyNatSize tcm mTy)
+    , [i] <- bitVectorLiterals' tcm isSubj args
+    -> let resTy = runFreshM (termType tcm e)
+           (TyConApp tupTcNm tyArgs) = tyView resTy
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           bvTy : _ = tyArgs
+           valM = i `shiftR` fromInteger n
+           valN = i .&. mask
+           mask = bit (fromInteger n) - 1
+    in mkApps (Data tupDc) (map Right tyArgs ++
+                [ Left (mkBitVectorLit bvTy mTy m valM)
+                , Left (mkBitVectorLit bvTy nTy n valN)])
 
   "CLaSH.Sized.Internal.BitVector.msb#" -- :: forall n. KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' tcm isSubj args
