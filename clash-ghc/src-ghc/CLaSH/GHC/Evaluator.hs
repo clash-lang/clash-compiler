@@ -502,6 +502,9 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , nm' == "CLaSH.Sized.Internal.Signed.fromInteger#"
     -> integerToIntegerLiteral i
 
+-----------
+-- Unsigned
+-----------
   "CLaSH.Sized.Internal.Unsigned.size#"
     | Just (_, kn) <- extractKnownNat tcm args
     -> let ty' = runFreshM (termType tcm e)
@@ -510,6 +513,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            [intCon] = tyConDataCons intTc
        in  mkApps (Data intCon) [Left (Literal (IntLiteral kn))]
 
+-- BitPack
   "CLaSH.Sized.Internal.Unsigned.pack#"
     | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
@@ -519,6 +523,32 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , [i] <- bvLiterals' tcm isSubj args
     -> mkUnsignedLit ty nTy kn i
 
+-- Eq
+  "CLaSH.Sized.Internal.Unsigned.eq#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i == j)
+  "CLaSH.Sized.Internal.Unsigned.neq#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i /= j)
+
+-- Ord
+  "CLaSH.Sized.Internal.Unsigned.lt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i <  j)
+  "CLaSH.Sized.Internal.Unsigned.ge#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >= j)
+  "CLaSH.Sized.Internal.Unsigned.gt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >  j)
+  "CLaSH.Sized.Internal.Unsigned.le#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i <= j)
+
+-- Bounded
+  "CLaSH.Sized.Internal.Unsigned.minBound#"
+    | Just (nTy,len) <- extractKnownNat tcm args
+    -> mkUnsignedLit ty nTy len 0
+  "CLaSH.Sized.Internal.Unsigned.maxBound#"
+    | Just (litTy,mb) <- extractKnownNat tcm args
+    -> let maxB = (2 ^ mb) - 1
+       in  mkUnsignedLit ty litTy mb maxB
+
+-- Num
   "CLaSH.Sized.Internal.Unsigned.+#"
     | Just (_, kn) <- extractKnownNat tcm args
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.+#) ty tcm isSubj args)
@@ -531,25 +561,16 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | Just (_, kn) <- extractKnownNat tcm args
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.*#) ty tcm isSubj args)
     -> val
-
-  "CLaSH.Sized.Internal.Unsigned.quot#"
-    | Just (_, kn) <- extractKnownNat tcm args
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.quot#) ty tcm isSubj args)
-    -> val
-  "CLaSH.Sized.Internal.Unsigned.rem#"
-    | Just (_, kn) <- extractKnownNat tcm args
-    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm isSubj args)
-    -> val
-
-  "CLaSH.Sized.Internal.Unsigned.resize#" -- forall n m . KnownNat m => Unsigned n -> Unsigned m
-    | (Right _ : Right mTy : _) <- args
-    , Right km <- runExcept (tyNatSize tcm mTy)
+  "CLaSH.Sized.Internal.Unsigned.negate#"
+    | Just (nTy, kn) <- extractKnownNat tcm args
     , [i] <- unsignedLiterals' tcm isSubj args
-    -> let bitsKeep = (bit (fromInteger km)) - 1
-           val = i .&. bitsKeep
-    in mkUnsignedLit ty mTy km val
+    -> let val = reifyNat kn (op (fromInteger i))
+    in mkUnsignedLit ty nTy kn val
+    where
+      op :: KnownNat n => Unsigned n -> Proxy n -> Integer
+      op u _ = toInteger (Unsigned.negate# u)
 
-
+-- ExtendingNum
   "CLaSH.Sized.Internal.Unsigned.plus#" -- :: Unsigned m -> Unsigned n -> Unsigned (Max m n + 1)
     | Just (i,j) <- unsignedLiterals tcm isSubj args
     -> let resTy = runFreshM (termType tcm e)
@@ -572,15 +593,22 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            Right resSizeInt = runExcept (tyNatSize tcm resSizeTy)
        in  mkUnsignedLit resTy resSizeTy resSizeInt (i*j)
 
-  "CLaSH.Sized.Internal.Unsigned.negate#"
-    | Just (nTy, kn) <- extractKnownNat tcm args
-    , [i] <- unsignedLiterals' tcm isSubj args
-    -> let val = reifyNat kn (op (fromInteger i))
-    in mkUnsignedLit ty nTy kn val
-    where
-      op :: KnownNat n => Unsigned n -> Proxy n -> Integer
-      op u _ = toInteger (Unsigned.negate# u)
+-- Integral
+  "CLaSH.Sized.Internal.Unsigned.quot#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.quot#) ty tcm isSubj args)
+    -> val
+  "CLaSH.Sized.Internal.Unsigned.rem#"
+    | Just (_, kn) <- extractKnownNat tcm args
+    , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm isSubj args)
+    -> val
+  "CLaSH.Sized.Internal.Unsigned.toInteger#"
+    | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
+      (map (reduceConstant tcm isSubj) . Either.lefts) args
+    , nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+    -> integerToIntegerLiteral i
 
+-- Bits
   "CLaSH.Sized.Internal.Unsigned.and#"
     | Just (i,j) <- unsignedLiterals tcm isSubj args
     , Just (nTy, kn) <- extractKnownNat tcm args
@@ -603,30 +631,6 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       op :: KnownNat n => Unsigned n -> Proxy n -> Integer
       op u _ = toInteger (Unsigned.complement# u)
 
-  "CLaSH.Sized.Internal.Unsigned.lt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
-    -> boolToBoolLiteral tcm ty (i <  j)
-  "CLaSH.Sized.Internal.Unsigned.le#" | Just (i,j) <- unsignedLiterals tcm isSubj args
-    -> boolToBoolLiteral tcm ty (i <= j)
-  "CLaSH.Sized.Internal.Unsigned.gt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
-    -> boolToBoolLiteral tcm ty (i >  j)
-  "CLaSH.Sized.Internal.Unsigned.ge#" | Just (i,j) <- unsignedLiterals tcm isSubj args
-    -> boolToBoolLiteral tcm ty (i >= j)
-
-  "CLaSH.Sized.Internal.Unsigned.eq#" | Just (i,j) <- unsignedLiterals tcm isSubj args
-    -> boolToBoolLiteral tcm ty (i == j)
-
-  "CLaSH.Sized.Internal.Unsigned.neq#" | Just (i,j) <- unsignedLiterals tcm isSubj args
-    -> boolToBoolLiteral tcm ty (i /= j)
-
-  "CLaSH.Sized.Internal.Unsigned.minBound#"
-    | Just (nTy,len) <- extractKnownNat tcm args
-    -> mkUnsignedLit ty nTy len 0
-
-  "CLaSH.Sized.Internal.Unsigned.maxBound#"
-    | Just (litTy,mb) <- extractKnownNat tcm args
-    -> let maxB = (2 ^ mb) - 1
-       in  mkUnsignedLit ty litTy mb maxB
-
   "CLaSH.Sized.Internal.Unsigned.shiftL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
@@ -641,7 +645,6 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       where
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.shiftR# u i)
-
   "CLaSH.Sized.Internal.Unsigned.rotateL#" -- :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n
     | Just (nTy,kn,i,j) <- unsignedLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
@@ -657,11 +660,15 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
         op :: KnownNat n => Unsigned n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (Unsigned.rotateR# u i)
 
-  "CLaSH.Sized.Internal.Unsigned.toInteger#"
-    | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
-      (map (reduceConstant tcm isSubj) . Either.lefts) args
-    , nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-    -> integerToIntegerLiteral i
+-- Resize
+  "CLaSH.Sized.Internal.Unsigned.resize#" -- forall n m . KnownNat m => Unsigned n -> Unsigned m
+    | (Right _ : Right mTy : _) <- args
+    , Right km <- runExcept (tyNatSize tcm mTy)
+    , [i] <- unsignedLiterals' tcm isSubj args
+    -> let bitsKeep = (bit (fromInteger km)) - 1
+           val = i .&. bitsKeep
+    in mkUnsignedLit ty mTy km val
+
 
   "CLaSH.Sized.RTree.treplicate"
     | isSubj
