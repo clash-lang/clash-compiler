@@ -419,14 +419,16 @@ mkExpr bbEasD bndr ty app = do
       | null tmArgs -> return (Identifier (Text.pack $ name2String f) Nothing,[])
       | otherwise ->
         throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showDoc app) Nothing)
-    Case scrut ty' [alt] -> mkProjection bndr scrut ty' alt
+    Case scrut ty' [alt] -> mkProjection bbEasD bndr scrut ty' alt
     _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: application of a Let/Lam/Case:\n\n" ++ showDoc app) Nothing)
 
 -- | Generate an expression that projects a field out of a data-constructor.
 --
 -- Works for both product types, as sum-of-product types.
 mkProjection
-  :: Either Identifier Id
+  :: Bool
+  -- ^ Projection must bind to a simple variable
+  -> Either Identifier Id
   -- ^ The signal to which the projection is (potentially) assigned
   -> Term
   -- ^ The subject/scrutinee of the projection
@@ -435,7 +437,7 @@ mkProjection
   -> Alt
   -- ^ The field to be projected
   -> NetlistMonad (Expr, [Declaration])
-mkProjection bndr scrut altTy alt = do
+mkProjection mkDec bndr scrut altTy alt = do
   tcm <- Lens.use tcCache
   scrutTy <- termType tcm scrut
   let e = Case scrut scrutTy [alt]
@@ -456,9 +458,7 @@ mkProjection bndr scrut altTy alt = do
                  bndr
     (scrutExpr,newDecls) <- mkExpr False (Left scrutNm) scrutTy scrut
     case scrutExpr of
-      Identifier newId modM
-        | Nothing <- modM          -> return (newId,modM,newDecls)
-        | Just (Indexed _) <- modM -> return (newId,modM,newDecls)
+      Identifier newId modM -> return (newId,modM,newDecls)
       _ -> do
         scrutNm' <- mkUniqueIdentifier Extended scrutNm
         let scrutDecl = NetDecl Nothing scrutNm' sHwTy
@@ -484,7 +484,13 @@ mkProjection bndr scrut altTy alt = do
                 | otherwise      -> nestModifier modM (Just (DC (Void,0)))
         _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
       extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
-  return (extractExpr,decls)
+  case bndr of
+    Left scrutNm | mkDec -> do
+      scrutNm' <- mkUniqueIdentifier Extended scrutNm
+      let scrutDecl = NetDecl Nothing scrutNm' vHwTy
+          scrutAssn = Assignment scrutNm' extractExpr
+      return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
+    _ -> return (extractExpr,decls)
   where
     nestModifier Nothing  m          = m
     nestModifier m Nothing           = m

@@ -131,7 +131,7 @@ mkArgument bndr e = do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
           return ((exprN,hwTy,isConstant e),dcDecls)
         (Case scrut ty' [alt],[]) -> do
-          (projection,decls) <- mkProjection (Left bndr) scrut ty' alt
+          (projection,decls) <- mkProjection False (Left bndr) scrut ty' alt
           return ((projection,hwTy,False),decls)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing

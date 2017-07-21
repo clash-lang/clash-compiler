@@ -30,7 +30,8 @@ mkDcApplication :: HWType
                 -> NetlistMonad (Expr,[Declaration])
 
 mkProjection
-  :: Either Identifier Id
+  :: Bool
+  -> Either Identifier Id
   -> Term
   -> Type
   -> Alt
