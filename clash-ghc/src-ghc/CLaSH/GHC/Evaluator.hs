@@ -964,6 +964,30 @@ mkBitVectorLit = mkSizedLit bvConPrim
 mkSignedLit    = mkSizedLit signedConPrim
 mkUnsignedLit  = mkSizedLit unsignedConPrim
 
+-- Construct a constant term of a sized type
+mkSizedLit'
+  :: (Type -> Term)    -- type constructor?
+  -> (Type     -- result type
+     ,Type     -- forall n.
+     ,Integer) -- KnownNat n
+  -> Integer -- value
+  -> Term
+mkSizedLit' conPrim (ty,nTy,kn) val
+  = mkApps (conPrim sTy) [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
+  where
+    (_,sTy) = splitFunForallTy ty
+
+mkBitVectorLit', mkSignedLit', mkUnsignedLit'
+  :: (Type     -- result type
+     ,Type     -- forall n.
+     ,Integer) -- KnownNat n
+  -> Integer -- value
+  -> Term
+mkBitVectorLit' = mkSizedLit' bvConPrim
+mkSignedLit'    = mkSizedLit' signedConPrim
+mkUnsignedLit'  = mkSizedLit' unsignedConPrim
+
+
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
 
@@ -1086,3 +1110,10 @@ runSizedF
   -> Integer                           -- ^ second argument
   -> (Proxy n -> Integer)
 runSizedF f i j _ = toInteger $ f (fromInteger i) (fromInteger j)
+
+extractTySizeInfo :: HashMap.HashMap TyConOccName TyCon -> Term -> (Type, Type, Integer)
+extractTySizeInfo tcm e = (resTy,resSizeTy,resSize)
+  where
+    resTy = runFreshM (termType tcm e)
+    (TyConApp _ [resSizeTy]) = tyView resTy
+    Right resSize = runExcept (tyNatSize tcm resSizeTy)
