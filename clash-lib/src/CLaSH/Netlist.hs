@@ -255,7 +255,7 @@ mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) = do
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
   scrutId <- extendIdentifier Extended
                (Text.pack (name2String (varName bndr)))
-               (Text.pack "_case_scrut")
+               (Text.pack "_selection")
   (_,sp) <- Lens.use curCompNm
   (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
@@ -267,7 +267,7 @@ mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) = do
     mkCondExpr scrutHTy (pat,alt) = do
       altId <- extendIdentifier Extended
                  (Text.pack (name2String (varName bndr)))
-                 (Text.pack "_case_alt")
+                 (Text.pack "_sel_alt")
       (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
@@ -376,7 +376,7 @@ toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
 toSimpleVar dst (e,ty) = do
   argNm <- extendIdentifier Extended
              (Text.pack (name2String (varName dst)))
-             (Text.pack "_app_arg")
+             (Text.pack "_fun_arg")
   argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   let argDecl = NetDecl Nothing argNm' hTy
@@ -454,7 +454,7 @@ mkProjection mkDec bndr scrut altTy alt = do
     scrutNm <- either return
                  (\b -> extendIdentifier Extended
                           (Text.pack (name2String (varName b)))
-                          (Text.pack ("_case_scrut")))
+                          (Text.pack ("_projection")))
                  bndr
     (scrutExpr,newDecls) <- mkExpr False (Left scrutNm) scrutTy scrut
     case scrutExpr of
@@ -506,7 +506,7 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
 mkDcApplication dstHType bndr dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
-  argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_app_argDC")) bndr
+  argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_dc_arg")) bndr
   (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of
