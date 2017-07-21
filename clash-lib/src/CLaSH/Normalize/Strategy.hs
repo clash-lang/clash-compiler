@@ -28,7 +28,11 @@ normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
     evalConst  = topdownR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
-    cleanup    = topdownSucR (apply "inlineCleanup" inlineCleanup)
+    cleanup    = topdownSucR (apply "inlineCleanup" inlineCleanup) !->
+                 innerMost (applyMany [("caseCon"        , caseCon)
+                                      ,("bindConstantVar", bindConstantVar)
+                                      ,("letFlat"        , flattenLet)])
+                 >-> rmDeadcode >-> letTL
 
 
 constantPropgation :: NormRewrite

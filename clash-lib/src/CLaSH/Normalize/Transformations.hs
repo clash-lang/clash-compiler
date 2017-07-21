@@ -38,6 +38,7 @@ module CLaSH.Normalize.Transformations
   , disjointExpressionConsolidation
   , removeUnusedExpr
   , inlineCleanup
+  , flattenLet
   )
 where
 
@@ -1373,13 +1374,13 @@ inlineCleanup _ (Letrec b) = do
       -> Bool
     isInteresting allOccs prims bodyFVs (id_,(fst.collectArgs.unembed) -> tm)
       | nameSort (varName id_) /= User
-      , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
-      , occ < 2
       , nameOcc (varName id_) `notElem` bodyFVs
       = case tm of
           Prim nm _
             | Just p@(BlackBox {}) <- HashMap.lookup nm prims
             , Right _ <- template p
+            , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
+            , occ < 2
             -> True
           Case _ _ [_] -> True
           Data _ -> True
@@ -1404,3 +1405,43 @@ inlineCleanup _ (Letrec b) = do
       -- introduce free variables, because the @to-inline@ bindings are removed.
 
 inlineCleanup _ e = return e
+
+-- | Flatten's letrecs after `inlineCleanup`
+--
+-- `inlineCleanup` sometimes exposes additional possibilities for `caseCon`,
+-- which then introduces let-bindings in what should be ANF. This transformation
+-- flattens those nested let-bindings again.
+--
+-- NB: must only be called in the cleaning up phase.
+flattenLet :: NormRewrite
+flattenLet _ (Letrec b) = do
+  let (binds,body) = unsafeUnbind b
+  binds' <- concat <$> mapM go (unrec binds)
+  case binds' of
+    -- inline binders into the body when there's only a single binder
+    [(id',e')] -> do
+      let fvs = Lens.toListOf termFreeIds (unembed e')
+          nm  = nameOcc (varName id')
+      if nm `elem` fvs
+         -- Except when the binder is recursive!
+         then return (Letrec (bind (rec binds') body))
+         else changed (substTm nm (unembed e') body)
+    _ -> return (Letrec (bind (rec binds') body))
+  where
+    go :: LetBinding -> NormalizeSession [LetBinding]
+    go (id_,e) = case unembed e of
+      Letrec b' -> do
+        let (binds,body) = unsafeUnbind b'
+        case unrec binds of
+          -- inline binders into the body when there's only a single binder
+          [(id',e')] -> do
+            let fvs = Lens.toListOf termFreeIds (unembed e')
+                nm  = nameOcc (varName id')
+            if nm `elem` fvs
+               -- Except when the binder is recursive!
+               then changed [(id',e'),(id_,embed body)]
+               else changed [(id_,embed (substTm nm (unembed e') body))]
+          bs -> changed (bs ++ [(id_,embed body)])
+      _ -> return [(id_,e)]
+
+flattenLet _ e = return e
