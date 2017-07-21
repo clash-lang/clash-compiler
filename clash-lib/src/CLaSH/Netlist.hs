@@ -506,10 +506,8 @@ mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
 mkDcApplication dstHType bndr dc args = do
   tcm                 <- Lens.use tcCache
   argTys              <- mapM (termType tcm) args
-  let isSP (SP _ _) = True
-      isSP _        = False
-  argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_app_arg")) bndr
-  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr (isSP dstHType) (Left argNm) t e) (zip args argTys)
+  argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_app_argDC")) bndr
+  (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left argNm) t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of
     -- Is the DC just a newtype wrapper?
