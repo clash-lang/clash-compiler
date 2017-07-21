@@ -402,14 +402,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToBoolLiteral tcm ty (i /= j)
 
   "CLaSH.Sized.Internal.BitVector.shiftL#"
-    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.shiftL# u i)
   "CLaSH.Sized.Internal.BitVector.shiftR#"
-    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
@@ -417,14 +417,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
         op u i _ = toInteger (BitVector.shiftR# u i)
 
   "CLaSH.Sized.Internal.BitVector.rotateL#"
-    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
         op :: KnownNat n => BitVector n -> Int -> Proxy n -> Integer
         op u i _ = toInteger (BitVector.rotateL# u i)
   "CLaSH.Sized.Internal.BitVector.rotateR#"
-    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+    | Just (nTy,kn,i,j) <- bitVectorLitIntLit tcm isSubj args
       -> let val = reifyNat kn (op (fromInteger i) (fromInteger j))
       in mkBvLit ty nTy kn val
       where
@@ -520,7 +520,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> mkBvLit ty nTy kn i
   "CLaSH.Sized.Internal.Unsigned.unpack#"
     | Just (nTy, kn) <- extractKnownNat tcm args
-    , [i] <- bvLiterals' tcm isSubj args
+    , [i] <- bitVectorLiterals' tcm isSubj args
     -> mkUnsignedLit ty nTy kn i
 
 -- Eq
@@ -751,14 +751,7 @@ sizedLiterals szCon tcm isSubj args
 
 sizedLiterals' :: Text -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
 sizedLiterals' szCon tcm isSubj args
-  -- = [ i | i <- maybeToList (sized), arg <- reduceTerms tcm isSubj args]
   = catMaybes $ map (sizedLiteral szCon) $ reduceTerms tcm isSubj args
-    -- case reduceTerms tcm isSubj args of
-    --   ([ collectArgs -> (Prim nm  _,[Right _, Left _, Left (Literal (IntegerLiteral i))])
-    --    , collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral j))])])
-    --     | nm  == szCon
-    --     , nm' == szCon -> Just (i,j)
-    --   _ -> Nothing
 
 sizedLiteral :: Text -> Term -> Maybe Integer
 sizedLiteral szCon term = case collectArgs term of
@@ -766,26 +759,20 @@ sizedLiteral szCon term = case collectArgs term of
   _ -> Nothing
 
 
-bitVectorLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+bitVectorLiterals, indexLiterals, signedLiterals, unsignedLiterals
+  :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 bitVectorLiterals = sizedLiterals "CLaSH.Sized.Internal.BitVector.fromInteger#"
+indexLiterals     = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
+signedLiterals    = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
+unsignedLiterals  = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
-indexLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-indexLiterals = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
+bitVectorLiterals', indexLiterals', signedLiterals', unsignedLiterals'
+  :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
+bitVectorLiterals' = sizedLiterals' "CLaSH.Sized.Internal.BitVector.fromInteger#"
+indexLiterals'     = sizedLiterals' "CLaSH.Sized.Internal.Index.fromInteger#"
+signedLiterals'    = sizedLiterals' "CLaSH.Sized.Internal.Signed.fromInteger#"
+unsignedLiterals'  = sizedLiterals' "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
-signedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-signedLiterals = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
-
-signedLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
-signedLiterals' = sizedLiterals' "CLaSH.Sized.Internal.Signed.fromInteger#"
-
-unsignedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-
-unsignedLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
-unsignedLiterals' = sizedLiterals' "CLaSH.Sized.Internal.Unsigned.fromInteger#"
-
-bvLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
-bvLiterals' = sizedLiterals' "CLaSH.Sized.Internal.BitVector.fromInteger#"
 
 
 -- Tries to match literal arguments to a function like
@@ -802,10 +789,10 @@ sizedLitIntLit szCon tcm isSubj args
                       -> Just (nTy,kn,i,j)
       _ -> Nothing
 
-bvLitIntLit, signedLitIntLit, unsignedLitIntLit :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type,Integer,Integer,Integer)
-bvLitIntLit       = sizedLitIntLit "CLaSH.Sized.Internal.BitVector.fromInteger#"
-signedLitIntLit   = sizedLitIntLit "CLaSH.Sized.Internal.Signed.fromInteger#"
-unsignedLitIntLit = sizedLitIntLit "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+bitVectorLitIntLit, signedLitIntLit, unsignedLitIntLit :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type,Integer,Integer,Integer)
+bitVectorLitIntLit = sizedLitIntLit "CLaSH.Sized.Internal.BitVector.fromInteger#"
+signedLitIntLit    = sizedLitIntLit "CLaSH.Sized.Internal.Signed.fromInteger#"
+unsignedLitIntLit  = sizedLitIntLit "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
 -- From an argument list to function of type
 --   forall n. KnownNat n => ...
@@ -818,10 +805,10 @@ extractKnownNat tcm args = case args of
     -> Just (nTy, nInt)
   _ -> Nothing
 
--- Construct a constant value term of a sized type
+-- Construct a constant term of a sized type
 mkSizedLit
   :: (Type -> Term)    -- type constructor?
-  -> Type    -- ????
+  -> Type    -- result type
   -> Type    -- forall n.
   -> Integer -- KnownNat n
   -> Integer -- value
@@ -831,7 +818,12 @@ mkSizedLit conPrim ty nTy kn val
   where
     (_,sTy) = splitFunForallTy ty
 
-mkBvLit, mkSignedLit, mkUnsignedLit :: Type -> Type -> Integer -> Integer -> Term
+mkBvLit, mkSignedLit, mkUnsignedLit
+  :: Type    -- result type
+  -> Type    -- forall n.
+  -> Integer -- KnownNat n
+  -> Integer -- value
+  -> Term
 mkBvLit       = mkSizedLit bvConPrim
 mkSignedLit   = mkSizedLit signedConPrim
 mkUnsignedLit = mkSizedLit unsignedConPrim
@@ -899,15 +891,16 @@ unsignedConPrim (tyView -> TyConApp unsignedTcNm _)
 unsignedConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 
--- Lift a
+-- |  Lift a binary function over 'Unsigned' values to be used as literal Evaluator
+--
+--
 liftUnsigned2 :: KnownNat n
               => (Unsigned n -> Unsigned n -> Unsigned n)
               -> Type
               -> HashMap.HashMap TyConOccName TyCon
               -> Bool
               -> [Either Term Type]
-              -> Proxy n
-              -> Maybe Term
+              -> (Proxy n -> Maybe Term)
 liftUnsigned2 = liftSized2 unsignedLiterals' mkUnsignedLit
 
 liftSigned2 :: KnownNat n
@@ -916,20 +909,29 @@ liftSigned2 :: KnownNat n
               -> HashMap.HashMap TyConOccName TyCon
               -> Bool
               -> [Either Term Type]
-              -> Proxy n
-              -> Maybe Term
+              -> (Proxy n -> Maybe Term)
 liftSigned2 = liftSized2 signedLiterals' mkSignedLit
 
+liftBv2 :: KnownNat n
+              => (BitVector n -> BitVector n -> BitVector n)
+              -> Type
+              -> HashMap.HashMap TyConOccName TyCon
+              -> Bool
+              -> [Either Term Type]
+              -> (Proxy n -> Maybe Term)
+liftBv2 = liftSized2 bitVectorLiterals' mkBvLit
+
 liftSized2 :: (KnownNat n, Integral (sized n))
-           => (HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer])
-           -> (Type -> Type -> Integer -> Integer -> Term)
+           => -- | literal argument extraction function
+              (HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer])
+           -> -- | literal contruction function
+              (Type -> Type -> Integer -> Integer -> Term)
            -> (sized n -> sized n -> sized n)
            -> Type
            -> HashMap.HashMap TyConOccName TyCon
            -> Bool
            -> [Either Term Type]
-           -> Proxy n
-           -> Maybe Term
+           -> (Proxy n -> Maybe Term)
 liftSized2 extractLitArgs mkLit f ty tcm isSubj args p
   | Just (nTy, kn) <- extractKnownNat tcm args
   , [i,j] <- extractLitArgs tcm isSubj args
@@ -937,11 +939,14 @@ liftSized2 extractLitArgs mkLit f ty tcm isSubj args p
     in Just $ mkLit ty nTy kn val
   | otherwise = Nothing
 
+-- | Helper to run a function over sized types on integers
+--
+-- This only works on function of type (sized n -> sized n -> sized n)
+-- The resulting function must be executed with reifyNat
 runSizedF
   :: (KnownNat n, Integral (sized n))
-  => (sized n -> sized n -> sized n)
-  -> Integer
-  -> Integer
-  -> Proxy n
-  -> Integer
+  => (sized n -> sized n -> sized n)   -- ^ function to run
+  -> Integer                           -- ^ first  argument
+  -> Integer                           -- ^ second argument
+  -> (Proxy n -> Integer)
 runSizedF f i j _ = toInteger $ f (fromInteger i) (fromInteger j)
