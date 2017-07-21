@@ -1351,7 +1351,8 @@ inlineCleanup _ (Letrec b) = do
       allOccs       = List.foldl' (HashMap.unionWith (+)) HashMap.empty
                     $ map ( List.foldl' countOcc HashMap.empty
                           . Lens.toListOf termFreeIds . unembed . snd) binds
-      (il,keep)     = List.partition (isInteresting allOccs prims) binds
+      bodyFVs       = Lens.toListOf termFreeIds body
+      (il,keep)     = List.partition (isInteresting  allOccs prims bodyFVs) binds
       keep'         = inlineBndrs keep il
   if null il then return  (Letrec b)
              else changed (Letrec (bind (rec keep') body))
@@ -1367,12 +1368,14 @@ inlineCleanup _ (Letrec b) = do
     isInteresting
       :: HashMap.HashMap TmOccName Int
       -> PrimMap a
+      -> [TmOccName]
       -> (Id,Embed Term)
       -> Bool
-    isInteresting allOccs prims (id_,(fst.collectArgs.unembed) -> tm)
+    isInteresting allOccs prims bodyFVs (id_,(fst.collectArgs.unembed) -> tm)
       | nameSort (varName id_) /= User
       , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
       , occ < 2
+      , nameOcc (varName id_) `notElem` bodyFVs
       = case tm of
           Prim nm _
             | Just p@(BlackBox {}) <- HashMap.lookup nm prims
@@ -1382,7 +1385,7 @@ inlineCleanup _ (Letrec b) = do
           Data _ -> True
           _ -> False
 
-    isInteresting _ _ _ = False
+    isInteresting _ _ _ _ = False
 
     -- Inline let-bindings we want to inline into let-bindings we want to keep.
     inlineBndrs
