@@ -16,8 +16,10 @@ type BlackBoxTemplate = [Element]
 -- | Elements of a blackbox context
 data Element = C   !Text         -- ^ Constant
              | D   !Decl         -- ^ Component instantiation hole
-             | O                 -- ^ Output hole
-             | I   !Int          -- ^ Input hole
+             | O   !Bool
+             -- ^ Output hole; @Bool@ asserts escape marker stripping
+             | I   !Bool !Int
+             -- ^ Input hole; @Bool@ asserts escape marker stripping
              | N   !Int          -- ^ Name hole
              | L   !Int          -- ^ Literal hole
              | Var [Element] !Int    --

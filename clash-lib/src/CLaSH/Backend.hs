@@ -5,11 +5,14 @@
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module CLaSH.Backend where
 
 import Data.HashSet                         (HashSet)
+import Data.Maybe                           (fromMaybe)
+import qualified Data.Text.Lazy             as T
 import Data.Text.Lazy                       (Text)
 import Control.Monad.State                  (State)
 import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
@@ -80,6 +83,10 @@ class Backend state where
   setSrcSpan       :: SrcSpan -> State state ()
   -- | getSrcSpan
   getSrcSpan       :: State state SrcSpan
+  -- | Block of declarations
+  blockDecl        :: Text -> [Declaration] -> State state Doc
+  -- | unextend/unescape identifier
+  unextend         :: State state (Identifier -> Identifier)
 
 -- | Try to merge nested modifiers into a single modifier, needed by the VHDL
 -- and SystemVerilog backend.
@@ -123,3 +130,16 @@ nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
   = Just (Indexed (RTree d t1,10,l+k))
 
 nestM _ _ = Nothing
+
+-- | Replace a normal HDL template placeholder with an unescaped/unextended
+-- template placeholder.
+--
+-- Needed when the the place-holder is filled with an escaped/extended identifier
+-- inside an escaped/extended identifier and we want to strip the escape
+-- /extension markers. Otherwise we end up with illegal identifiers.
+escapeTemplate :: Identifier -> Identifier
+escapeTemplate "~RESULT" = "~ERESULT"
+escapeTemplate t = fromMaybe t $ do
+  t1 <- T.stripPrefix "~ARG[" t
+  n  <- T.stripSuffix "]" t1
+  pure (T.concat ["~EARG[",n,"]"])

@@ -33,6 +33,7 @@ import qualified Data.Text.Lazy                       as T
 import           Prelude                              hiding ((<$>))
 import qualified System.FilePath
 import           Text.Printf
+import           Text.PrettyPrint.Leijen.Text         (isEmpty)
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Annotations.Primitive          (HDL (..))
@@ -103,7 +104,7 @@ instance Backend VHDLState where
   extendIdentifier = return go
     where
       go Basic nm ext = filterReserved (T.toLower (mkBasicId' True (nm `T.append` ext)))
-      go Extended (rmSlash -> nm) ext =
+      go Extended ((rmSlash . escapeTemplate) -> nm) ext =
         let nmExt = nm `T.append` ext
         in  case go Basic nm ext of
               nm' | nm' /= nmExt -> case T.head nmExt of
@@ -114,11 +115,23 @@ instance Backend VHDLState where
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+  blockDecl nm ds = do
+    decs   <- decls ds
+    if isEmpty decs
+       then insts ds
+       else nest 2
+              (text nm <+> colon <+> "block" <$$>
+               pure decs) <$$>
+            nest 2
+              ("begin" <$$>
+                insts ds) <$$>
+            "end block" <> semi
+  unextend = return rmSlash
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
   nm1 <- T.stripPrefix "\\" nm
-  T.stripSuffix "\\" nm1
+  pure (T.filter (not . (== '\\')) nm1)
 
 type VHDLM a = State VHDLState a
 

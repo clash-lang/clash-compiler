@@ -196,7 +196,7 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,WireOrReg,BlackBoxContext)
+  , bbFunctions :: IntMap (Either BlackBoxTemplate (Identifier,[Declaration]),WireOrReg,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
   -- * ( Blackbox Template

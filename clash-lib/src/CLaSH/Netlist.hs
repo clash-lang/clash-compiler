@@ -247,7 +247,34 @@ mkDeclarations _ e@(Case _ _ []) = do
   (_,sp) <- Lens.use curCompNm
   throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported:\n\n" ++ showDoc e) Nothing)
 
-mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) = do
+mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) =
+  mkSelection bndr scrut altTy alts
+
+mkDeclarations bndr app =
+  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
+  in case appF of
+    Var _ f
+      | null tyArgs -> mkFunApp bndr f args
+      | otherwise   -> do
+        (_,sp) <- Lens.use curCompNm
+        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showDoc app) Nothing)
+    _ -> do
+      (exprApp,declsApp) <- mkExpr False (Right bndr) (unembed $ varType bndr) app
+      let dstId = Text.pack . name2String $ varName bndr
+          assn  = case exprApp of
+                    Identifier _ Nothing -> []
+                    _ -> [Assignment dstId exprApp]
+      return (declsApp ++ assn)
+
+-- | Generate a declaration that selects an alternative based on the value of
+-- the scrutinee
+mkSelection
+  :: Id
+  -> Term
+  -> Type
+  -> [Alt]
+  -> NetlistMonad [Declaration]
+mkSelection bndr scrut altTy alts = do
   alts'                  <- reorderPats <$> mapM unbind alts
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
@@ -296,22 +323,6 @@ mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) = do
     reorderPats :: [(Pat,Term)] -> [(Pat,Term)]
     reorderPats ((DefaultPat,e):alts') = alts' ++ [(DefaultPat,e)]
     reorderPats alts'                  = alts'
-
-mkDeclarations bndr app =
-  let (appF,(args,tyArgs)) = second partitionEithers $ collectArgs app
-  in case appF of
-    Var _ f
-      | null tyArgs -> mkFunApp bndr f args
-      | otherwise   -> do
-        (_,sp) <- Lens.use curCompNm
-        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showDoc app) Nothing)
-    _ -> do
-      (exprApp,declsApp) <- mkExpr False (Right bndr) (unembed $ varType bndr) app
-      let dstId = Text.pack . name2String $ varName bndr
-          assn  = case exprApp of
-                    Identifier _ Nothing -> []
-                    _ -> [Assignment dstId exprApp]
-      return (declsApp ++ assn)
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
 mkFunApp

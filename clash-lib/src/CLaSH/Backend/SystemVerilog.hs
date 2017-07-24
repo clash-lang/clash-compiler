@@ -106,7 +106,7 @@ instance Backend SystemVerilogState where
   mkIdentifier    = return go
     where
       go Basic    nm = filterReserved (mkBasicId' True nm)
-      go Extended (rmSlash -> nm) = case go Basic nm of
+      go Extended (rmSlash . escapeTemplate -> nm) = case go Basic nm of
         nm' | nm /= nm' -> Text.concat ["\\",nm," "]
             |otherwise  -> nm'
   extendIdentifier = return go
@@ -123,11 +123,15 @@ instance Backend SystemVerilogState where
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+  blockDecl _ ds  =
+    decls ds <$>
+    insts ds
+  unextend = return rmSlash
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
   nm1 <- Text.stripPrefix "\\" nm
-  Text.stripSuffix " " nm1
+  pure (Text.filter (not . (== ' ')) nm1)
 
 type SystemVerilogM a = State SystemVerilogState a
 
