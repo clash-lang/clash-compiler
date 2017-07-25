@@ -279,7 +279,8 @@ flattenNode c@(CLeaf (nm,(_,_,_,_,e))) = do
       case stripArgs (map (nameOcc.varName) ids) (reverse ids) (reverse args) of
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),[]))
         Nothing        -> return (Right ((nm,e),[]))
-    _ -> return (Left c)
+    _ | isCheapFunction e -> return (Right ((nm,e),[]))
+      | otherwise         -> return (Left c)
 flattenNode (CBranch (nm,(nameSort -> Internal,_,_,_,e)) us) =
   return (Right ((nm,e),us))
 flattenNode b@(CBranch (nm,(_,_,_,_,e)) us) = do
@@ -291,7 +292,8 @@ flattenNode b@(CBranch (nm,(_,_,_,_,e)) us) = do
       case stripArgs (map (nameOcc.varName) ids) (reverse ids) (reverse args) of
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),us))
         Nothing        -> return (Right ((nm,e),us))
-    _ -> return (Left b)
+    _ | isCheapFunction e -> return (Right ((nm,e),us))
+      | otherwise         -> return (Left b)
 
 flattenCallTree
   :: CallTree
@@ -304,11 +306,23 @@ flattenCallTree (CBranch (nm,(nm',ty,sp,inl,tm)) used) = do
   newExpr <- case toInline of
                [] -> return tm
                _  -> rewriteExpr ("flattenExpr",flatten) (showDoc nm, substTms toInline tm)
-  return (CBranch (nm,(nm',ty,sp,inl,newExpr)) (newUsed ++ (concat il_used)))
+  let allUsed = newUsed ++ concat il_used
+  -- inline all components when the resulting expression after flattening
+  -- is still considered "cheap". This happens often at the topEntity which
+  -- wraps another functions and has some selectors and data-constructors.
+  if isCheapFunction newExpr
+     then do
+        let (toInline',allUsed') = unzip (map goCheap allUsed)
+        newExpr' <- rewriteExpr ("flattenCheap",flatten) (showDoc nm, substTms toInline' newExpr)
+        return (CBranch (nm,(nm',ty,sp,inl,newExpr')) (concat allUsed'))
+     else return (CBranch (nm,(nm',ty,sp,inl,newExpr)) allUsed)
   where
     flatten =
       innerMost (appProp >-> bindConstantVar >-> caseCon >-> reduceConst >-> flattenLet) !->
       topdownSucR topLet
+
+    goCheap (CLeaf   (nm2,(_,_,_,_,e)))    = ((nm2,e),[])
+    goCheap (CBranch (nm2,(_,_,_,_,e)) us) = ((nm2,e),us)
 
 callTreeToList
   :: [TmOccName]

@@ -64,3 +64,16 @@ type NormalizeSession = RewriteMonad NormalizeState
 
 -- | A 'Transform' action in the context of the 'RewriteMonad' and 'NormalizeMonad'
 type NormRewrite = Rewrite NormalizeState
+
+-- | Description of a @Term@ in terms of the type "components" the @Term@ has.
+--
+-- Is used as a performance/size metric.
+data TermClassification
+  = TermClassification
+  { _function   :: !Int -- ^ Number of functions
+  , _primitive  :: !Int -- ^ Number of primitives
+  , _selection  :: !Int -- ^ Number of selections/multiplexers
+  }
+  deriving Show
+
+makeLenses ''TermClassification

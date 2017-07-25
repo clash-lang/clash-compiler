@@ -6,12 +6,14 @@
   Utility functions used by the normalisation transformations
 -}
 
+{-# LANGUAGE BangPatterns    #-}
 {-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module CLaSH.Normalize.Util where
 
-import           Control.Lens            ((%=),(^.),_5)
+import           Control.Lens            ((&),(+~),(%=),(^.),_5)
 import qualified Control.Lens            as Lens
 import           Data.Function           (on)
 import qualified Data.Graph              as Graph
@@ -21,7 +23,9 @@ import qualified Data.List               as List
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
-import           Unbound.Generics.LocallyNameless (Fresh, bind, embed, rec)
+import           Unbound.Generics.LocallyNameless
+  (Fresh, bind, embed, rec, unembed ,unrec)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
 import           CLaSH.Core.Var          (Var (Id))
@@ -185,3 +189,41 @@ lambdaDrop bndrs topEntity = bndrs''
             _  -> (nm,ty,sp,inl,newTm)
 
     mkBind (_,(nm,ty,_,_,tm)) = (Id nm (embed ty),embed tm)
+
+-- | Give a "performance/size" classification of a function in normal form.
+classifyFunction
+  :: Term
+  -> TermClassification
+classifyFunction = go (TermClassification 0 0 0)
+  where
+    go !c (Lam b)    = let (_,e) = unsafeUnbind b in go c e
+    go !c (TyLam b)  = let (_,e) = unsafeUnbind b in go c e
+    go !c (Letrec b) =
+      let (bndsR,_) = unsafeUnbind b
+          es        = map (unembed . snd) (unrec bndsR)
+      in  List.foldl' go c es
+    go !c e@(App _ _) = case fst (collectArgs e) of
+      Prim _ _ -> c & primitive +~ 1
+      Var _ _  -> c & function +~ 1
+      _ -> c
+    go !c (Case _ _ alts) = case alts of
+      (_:_:_) -> c & selection  +~ 1
+      _ -> c
+    go c _ = c
+
+-- | Determine whether a function adds a lot of hardware or not.
+--
+-- It is considered expensive when it has 2 or more of the following components:
+--
+-- * functions
+-- * primitives
+-- * selections (multiplexers)
+isCheapFunction
+  :: Term
+  -> Bool
+isCheapFunction tm = case classifyFunction tm of
+  TermClassification {..}
+    | _function  <= 1 -> _primitive <= 0 && _selection <= 0
+    | _primitive <= 1 -> _function  <= 0 && _selection <= 0
+    | _selection <= 1 -> _function  <= 0 && _primitive <= 0
+    | otherwise       -> False
