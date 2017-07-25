@@ -278,7 +278,7 @@ flattenNode c@(CLeaf (nm,(_,_,_,_,e))) = do
       let (fun,args) = collectArgs (unembed bExpr)
       case stripArgs (map (nameOcc.varName) ids) (reverse ids) (reverse args) of
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),[]))
-        Nothing        -> return (Left c)
+        Nothing        -> return (Right ((nm,e),[]))
     _ -> return (Left c)
 flattenNode (CBranch (nm,(nameSort -> Internal,_,_,_,e)) us) =
   return (Right ((nm,e),us))
@@ -290,7 +290,7 @@ flattenNode b@(CBranch (nm,(_,_,_,_,e)) us) = do
       let (fun,args) = collectArgs (unembed bExpr)
       case stripArgs (map (nameOcc.varName) ids) (reverse ids) (reverse args) of
         Just remainder -> return (Right ((nm,mkApps fun (reverse remainder)),us))
-        Nothing        -> return (Left b)
+        Nothing        -> return (Right ((nm,e),us))
     _ -> return (Left b)
 
 flattenCallTree
