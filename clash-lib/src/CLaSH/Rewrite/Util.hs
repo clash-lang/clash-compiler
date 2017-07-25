@@ -680,13 +680,7 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case HML.toList existing of
     [] -> do (cf,sp) <- Lens.use curFun
-             -- We mark this function as @System@ because we do not want the
-             -- flattening pass at the end of the normalisation pipeline to
-             -- inline this function again: HDL templates of HO primitives only
-             -- understand top-level binders or HDL templates of other
-             -- primitives; they do not cope with lambda's so we need to make
-             -- sure this function is not inlined.
-             mkFunction ((appendToName cf "_specF") {nameSort = System})
+             mkFunction (appendToName cf "_specF")
                         sp EmptyInlineSpec newBody
     ((_,(k,kTy,_,_,_)):_) -> return (k,kTy)
   -- Create specialized argument
