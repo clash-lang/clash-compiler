@@ -46,8 +46,11 @@ import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
 import           CLaSH.Core.Var      (Var (..))
 import           CLaSH.Util          (clogBase, flogBase, curLoc)
 
-import qualified CLaSH.Sized.Internal.Unsigned as Unsigned
-import CLaSH.Sized.Internal.Unsigned (Unsigned(..))
+import qualified CLaSH.Sized.Internal.BitVector as BitVector
+import qualified CLaSH.Sized.Internal.Unsigned  as Unsigned
+import CLaSH.Sized.Internal.BitVector(BitVector(..))
+import CLaSH.Sized.Internal.Unsigned (Unsigned (..))
+
 reduceConstant :: HashMap.HashMap TyConOccName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.eqChar#" | Just (i,j) <- charLiterals tcm isSubj args
@@ -395,6 +398,36 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "CLaSH.Sized.Internal.BitVector.neq#" | Just (i,j) <- bitVectorLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i /= j)
 
+  "CLaSH.Sized.Internal.BitVector.shiftL#"
+    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      in mkBvLit nTy kn val
+      where
+        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
+        op _ u i = toInteger (BitVector.shiftL# u i)
+  "CLaSH.Sized.Internal.BitVector.shiftR#"
+    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      in mkBvLit nTy kn val
+      where
+        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
+        op _ u i = toInteger (BitVector.shiftR# u i)
+
+  "CLaSH.Sized.Internal.BitVector.rotateL#"
+    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      in mkBvLit nTy kn val
+      where
+        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
+        op _ u i = toInteger (BitVector.rotateL# u i)
+  "CLaSH.Sized.Internal.BitVector.rotateR#"
+    | Just (nTy,kn,i,j) <- bvLitIntLit tcm isSubj args
+      -> let val = reifyNat kn (\p -> op p (fromInteger i) (fromInteger j))
+      in mkBvLit nTy kn val
+      where
+        op :: KnownNat n => Proxy n -> BitVector n -> Int -> Integer
+        op _ u i = toInteger (BitVector.rotateR# u i)
+
   "CLaSH.Sized.Internal.Index.eq#" | Just (i,j) <- indexLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
 
@@ -547,6 +580,20 @@ sizedLiterals szCon tcm isSubj args
         , nm' == szCon -> Just (i,j)
       _ -> Nothing
 
+bitVectorLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+bitVectorLiterals = sizedLiterals "CLaSH.Sized.Internal.BitVector.fromInteger#"
+
+indexLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+indexLiterals = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
+
+signedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+signedLiterals = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
+
+unsignedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+
+
+-- Tries to match literal arguments to a function like (Unsigned.shiftL#  :: forall n. KnownNat n => Unsigned n -> Int -> Unsigned n)
 sizedLitIntLit :: Text -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type,Integer,Integer,Integer)
 sizedLitIntLit szCon tcm isSubj args
   = case args of
@@ -559,20 +606,24 @@ sizedLitIntLit szCon tcm isSubj args
                       -> Just (nTy,kn,i,j)
       _ -> Nothing
 
-unsignedLitIntLit :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type, Integer, Integer, Integer)
+bvLitIntLit, signedLitIntLit, unsignedLitIntLit :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Type,Integer,Integer,Integer)
+bvLitIntLit       = sizedLitIntLit "CLaSH.Sized.Internal.BitVector.fromInteger#"
+signedLitIntLit   = sizedLitIntLit "CLaSH.Sized.Internal.Signed.fromInteger#"
 unsignedLitIntLit = sizedLitIntLit "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
-bitVectorLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-bitVectorLiterals = sizedLiterals "CLaSH.Sized.Internal.BitVector.fromInteger#"
+-- Construct a constant value term of a sized type
+mkSizedLit
+  :: Term    -- type constructor?
+  -> Type    -- forall n.
+  -> Integer -- KnownNat
+  -> Integer -- value
+  -> Term
+mkSizedLit conPrim nTy kn val = mkApps conPrim [Right nTy,Left (Literal (NaturalLiteral kn)),Left (Literal (IntegerLiteral ( val)))]
 
-indexLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-indexLiterals = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
-
-signedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-signedLiterals = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
-
-unsignedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
-unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
+mkBvLit, mkSignedLit, mkUnsignedLit :: Type -> Integer -> Integer -> Term
+mkBvLit       = mkSizedLit bvConPrim
+mkSignedLit   = mkSizedLit signedConPrim
+mkUnsignedLit = mkSizedLit unsignedConPrim
 
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
@@ -593,6 +644,19 @@ integerToWordLiteral = Literal . WordLiteral . toInteger . (fromInteger :: Integ
 
 integerToIntegerLiteral :: Integer -> Term
 integerToIntegerLiteral = Literal . IntegerLiteral
+
+bvConPrim :: Term
+bvConPrim = Prim "CLaSH.Sized.Internal.BitVector.fromInteger#" (ForAllTy (bind nTV funTy))
+  where
+#if MIN_VERSION_ghc(8,2,0)
+    funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
+#else
+    funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
+#endif
+    signedTcNm = string2SystemName "CLaSH.Sized.Internal.BitVector.Signed"
+    nName      = string2SystemName "n"
+    nVar       = VarTy typeNatKind nName
+    nTV        = TyVar nName (embed typeNatKind)
 
 signedConPrim :: Term
 signedConPrim = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind nTV funTy))
