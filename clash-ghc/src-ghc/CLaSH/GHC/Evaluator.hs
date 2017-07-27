@@ -30,13 +30,14 @@ import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
 import           GHC.Word
-import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed)
+import           Unbound.Generics.LocallyNameless
+  (bind, embed, rebind, runFreshM)
 
-import           CLaSH.Core.DataCon  (DataCon (..))
+import           CLaSH.Core.DataCon  (DataCon (..), dataConInstArgTys)
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Name     (Name (..), string2SystemName)
 import           CLaSH.Core.Pretty   (showDoc)
-import           CLaSH.Core.Term     (Term (..))
+import           CLaSH.Core.Term     (Pat (..), Term (..))
 import           CLaSH.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView, undefinedTy)
@@ -1165,13 +1166,18 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            [lrCon,brCon] = tyConDataCons treeTc
        in  mkRTree lrCon brCon argTy len (replicate (2^len) (last $ Either.lefts args))
 
-  "CLaSH.Sized.Vector.replicate"
+---------
+-- Vector
+---------
+  "CLaSH.Sized.Vector.length"
     | isSubj
-    , (TyConApp vecTcNm [lenTy,argTy]) <- tyView (runFreshM (termType tcm e))
-    , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
-           [nilCon,consCon] = tyConDataCons vecTc
-       in  mkVec nilCon consCon argTy len (replicate (fromInteger len) (last $ Either.lefts args))
+    , [nTy, _] <- Either.rights args
+    , Right n <-runExcept (tyNatSize tcm nTy)
+    -> let ty' = runFreshM (termType tcm e)
+           (TyConApp intTcNm _) = tyView ty'
+           (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
+           [intCon] = tyConDataCons intTc
+       in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))]
 
   "CLaSH.Sized.Vector.maxIndex"
     | isSubj
@@ -1183,16 +1189,180 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            [intCon] = tyConDataCons intTc
        in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))]
 
-  "CLaSH.Sized.Vector.length"
+-- Indexing
+  "CLaSH.Sized.Vector.index_int"
     | isSubj
-    , [nTy, _] <- Either.rights args
-    , Right n <-runExcept (tyNatSize tcm nTy)
-    -> let ty' = runFreshM (termType tcm e)
-           (TyConApp intTcNm _) = tyView ty'
-           (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
-           [intCon] = tyConDataCons intTc
-       in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))]
+    -> e
+  "CLaSH.Sized.Vector.head"
+    | isSubj
+    , [(Data _,vArgs)] <- map collectArgs (reduceTerms tcm isSubj args)
+    -> reduceConstant tcm isSubj (Either.lefts vArgs !! 1)
+  "CLaSH.Sized.Vector.last"
+    | isSubj
+    , [(Data _,vArgs)] <- map collectArgs (reduceTerms tcm isSubj args)
+    , (Right _ : Right aTy : Right nTy : _) <- vArgs
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> if n == 0
+          then reduceConstant tcm isSubj (Either.lefts vArgs !! 1)
+          else reduceConstant tcm isSubj
+                (mkApps (Prim nm ty) [Right (LitTy (NumTy (n-1)))
+                                     ,Right aTy
+                                     ,Left (Either.lefts vArgs !! 2)
+                                     ])
+-- - Sub-vectors
+  "CLaSH.Sized.Vector.tail"
+    | isSubj
+    , [(Data _,vArgs)] <- map collectArgs (reduceTerms tcm isSubj args)
+    -> reduceConstant tcm isSubj (Either.lefts vArgs !! 2)
+  "CLaSH.Sized.Vector.init"
+    | isSubj
+    , [(Data consCon,vArgs)] <- map collectArgs (reduceTerms tcm isSubj args)
+    , (Right _ : Right aTy : Right nTy : _) <- vArgs
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> if n == 0
+          then reduceConstant tcm isSubj (Either.lefts vArgs !! 2)
+          else mkVecCons consCon aTy n
+                  (Either.lefts vArgs !! 1)
+                  (mkApps (Prim nm ty) [Right (LitTy (NumTy (n-1)))
+                                       ,Right aTy
+                                       ,Left (Either.lefts vArgs !! 2)])
+  "CLaSH.Sized.Vector.select"
+    | isSubj
+    -> e
+-- - Splitting
+  "CLaSH.Sized.Vector.splitAt"
+    | isSubj
+    , (Data snatDc,(Right mTy:_)) <- collectArgs (reduceConstant tcm isSubj
+                                                    (head (Either.lefts args)))
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    -> let (_:Right nTy:Right aTy:_) = args
+           -- Get the tuple data-constructor
+           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc)       = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc]            = tyConDataCons tupTc
+           -- Get the vector data-constructors
+           TyConApp vecTcNm _ = tyView (head tyArgs)
+           Just vecTc         = HashMap.lookup (nameOcc vecTcNm) tcm
+           [nilCon,consCon]   = tyConDataCons vecTc
+           -- Recursive call to @splitAt@
+           splitAtRec v =
+            mkApps (Prim nm ty)
+                   [Right (LitTy (NumTy (m-1)))
+                   ,args !! 1
+                   ,args !! 2
+                   ,Left (mkApps (Data snatDc)
+                                 [ Right (LitTy (NumTy (m-1)))
+                                 , Left  (Literal (NaturalLiteral (m-1)))])
+                   ,Left v
+                   ]
+           -- Projection either the first or second field of the recursive
+           -- call to @splitAt@
+           splitAtSelR v = Case (splitAtRec v) (last tyArgs)
+           m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
+           nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
+           lNm     = string2SystemName "l"
+           rNm     = string2SystemName "r"
+           lId     = Id lNm (embed m1VecTy)
+           rId     = Id rNm (embed nVecTy)
+           tupPat  = (DataPat (embed tupDc) (rebind [] [lId,rId]))
+           lAlt    = bind tupPat (Var m1VecTy lNm)
+           rAlt    = bind tupPat (Var nVecTy rNm)
 
+       in case m of
+         -- (Nil,v)
+         0 -> mkApps (Data tupDc) $ (map Right tyArgs) ++
+                [ Left (mkVecNil nilCon aTy )
+                , Left (last (Either.lefts args))
+                ]
+         -- (x:xs) <- v
+         m' | (Data _,vArgs) <- collectArgs (reduceConstant tcm isSubj
+                                               (last (Either.lefts args)))
+            -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
+            -> mkApps (Data tupDc) $ (map Right tyArgs) ++
+                 [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
+                           (splitAtSelR (Either.lefts vArgs !! 2) [lAlt]))
+                 , Left (splitAtSelR (Either.lefts vArgs !! 2) [rAlt])
+                 ]
+         -- v doesn't reduce to a data-constructor
+         _  -> e
+
+  "CLaSH.Sized.Vector.unconcat"
+    | isSubj
+    -> e
+-- Construction
+-- - initialisation
+  "CLaSH.Sized.Vector.replicate"
+    | isSubj
+    , (TyConApp vecTcNm [lenTy,argTy]) <- tyView (runFreshM (termType tcm e))
+    , Right len <- runExcept (tyNatSize tcm lenTy)
+    -> let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
+           [nilCon,consCon] = tyConDataCons vecTc
+       in  mkVec nilCon consCon argTy len (replicate (fromInteger len) (last $ Either.lefts args))
+-- - Concatenation
+  "CLaSH.Sized.Vector.++"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.concat"
+    | isSubj
+    -> e
+-- Modifying vectors
+  "CLaSH.Sized.Vector.replace_int"
+    | isSubj
+    -> e
+-- - specialised permutations
+  "CLaSH.Sized.Vector.reverse"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.transpose"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.rotateLeftS"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.rotateRightS"
+    | isSubj
+    -> e
+-- Element-wise operations
+-- - mapping
+  "CLaSH.Sized.Vector.map"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.imap"
+    | isSubj
+    -> e
+-- - Zipping
+  "CLaSH.Sized.Vector.zipWith"
+    | isSubj
+    -> e
+-- Folding
+  "CLaSH.Sized.Vector.foldr"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.fold"
+    | isSubj
+    -> e
+-- - Specialised folds
+  "CLaSH.Sized.Vector.dfold"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.dtfold"
+    | isSubj
+    -> e
+-- Misc
+  "CLaSH.Sized.Vector.lazyV"
+    | isSubj
+    -> e
+-- Traversable
+  "CLaSH.Sized.Vector.traverse#"
+    | isSubj
+    -> e
+-- BitPack
+  "CLaSH.Sized.Vector.concatBitVector"
+    | isSubj
+    -> e
+  "CLaSH.Sized.Vector.unconcatBitVector"
+    | isSubj
+    -> e
   _ -> e
 
 reduceConstant _ _ e = e
@@ -1350,6 +1520,41 @@ mkIndexLit' res@(rTy,_,kn) val
 mkSignedLit'    = mkSizedLit' signedConPrim
 mkUnsignedLit'  = mkSizedLit' unsignedConPrim
 
+-- | Create a vector of supplied elements
+mkVecCons
+  :: DataCon -- ^ The Cons (:>) constructor
+  -> Type    -- ^ Element type
+  -> Integer -- ^ Length of the vector
+  -> Term    -- ^ head of the vector
+  -> Term    -- ^ tail of the vector
+  -> Term
+mkVecCons consCon resTy n h t =
+  mkApps (Data consCon) [Right (LitTy (NumTy n))
+                        ,Right resTy
+                        ,Right (LitTy (NumTy (n-1)))
+                        ,Left (Prim "_CO_" consCoTy)
+                        ,Left h
+                        ,Left t]
+
+  where
+    args = dataConInstArgTys consCon [LitTy (NumTy n),resTy,LitTy (NumTy (n-1))]
+    Just (consCoTy : _) = args
+
+-- | Create an empty vector
+mkVecNil
+  :: DataCon
+  -- ^ The Nil constructor
+  -> Type
+  -- ^ The element type
+  -> Term
+mkVecNil nilCon resTy =
+  mkApps (Data nilCon) [Right (LitTy (NumTy 0))
+                       ,Right resTy
+                       ,Left  (Prim "_CO_" nilCoTy)
+                       ]
+  where
+    args = dataConInstArgTys nilCon [LitTy (NumTy 0),resTy]
+    Just (nilCoTy : _ ) = args
 
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
