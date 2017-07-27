@@ -37,9 +37,9 @@ import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Name     (Name (..), string2SystemName)
 import           CLaSH.Core.Pretty   (showDoc)
 import           CLaSH.Core.Term     (Term (..))
-import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
-                                      TypeView (..), mkFunTy,
-                                      mkTyConApp, splitFunForallTy, tyView)
+import           CLaSH.Core.Type
+  (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
+   splitFunForallTy, tyView, undefinedTy)
 import           CLaSH.Core.TyCon    (TyCon, TyConOccName, tyConDataCons)
 import           CLaSH.Core.TysPrim
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
@@ -690,13 +690,103 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            val = i .&. bitsKeep
     in mkBitVectorLit ty mTy km val
 
+--------
+-- Index
+--------
+-- BitPack
+  "CLaSH.Sized.Internal.Index.pack#"
+    | (Right nTy : _) <- args
+    , Right _ <- runExcept (tyNatSize tcm nTy)
+    , [i] <- indexLiterals' tcm isSubj args
+    -> let resTyInfo = extractTySizeInfo tcm e
+       in  mkBitVectorLit' resTyInfo i
+  "CLaSH.Sized.Internal.Index.unpack#"
+    | Just (nTy,kn) <- extractKnownNat tcm args
+    , [i] <- bitVectorLiterals' tcm isSubj args
+    -> mkIndexLit ty nTy kn i
 
+-- Eq
   "CLaSH.Sized.Internal.Index.eq#" | Just (i,j) <- indexLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i == j)
-
   "CLaSH.Sized.Internal.Index.neq#" | Just (i,j) <- indexLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i /= j)
 
+-- Ord
+  "CLaSH.Sized.Internal.Index.lt#"
+    | Just (i,j) <- indexLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i < j)
+  "CLaSH.Sized.Internal.Index.ge#"
+    | Just (i,j) <- indexLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >= j)
+  "CLaSH.Sized.Internal.Index.gt#"
+    | Just (i,j) <- indexLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i > j)
+  "CLaSH.Sized.Internal.Index.le#"
+    | Just (i,j) <- indexLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i <= j)
+
+-- Bounded
+  "CLaSH.Sized.Internal.Index.maxBound#"
+    | Just (nTy,mb) <- extractKnownNat tcm args
+    -> mkIndexLit ty nTy mb (mb - 1)
+
+-- Num
+  "CLaSH.Sized.Internal.Index.+#"
+    | Just (nTy,kn) <- extractKnownNat tcm args
+    , [i,j] <- indexLiterals' tcm isSubj args
+    -> mkIndexLit ty nTy kn (i + j)
+  "CLaSH.Sized.Internal.Index.-#"
+    | Just (nTy,kn) <- extractKnownNat tcm args
+    , [i,j] <- indexLiterals' tcm isSubj args
+    -> mkIndexLit ty nTy kn (i - j)
+  "CLaSH.Sized.Internal.Index.*#"
+    | Just (nTy,kn) <- extractKnownNat tcm args
+    , [i,j] <- indexLiterals' tcm isSubj args
+    -> mkIndexLit ty nTy kn (i * j)
+
+-- ExtendingNum
+  "CLaSH.Sized.Internal.Index.plus#"
+    | (Right mTy : Right nTy : _) <- args
+    , Right _ <- runExcept (tyNatSize tcm mTy)
+    , Right _ <- runExcept (tyNatSize tcm nTy)
+    , Just (i,j) <- indexLiterals tcm isSubj args
+    -> let resTyInfo = extractTySizeInfo tcm e
+       in  mkIndexLit' resTyInfo (i + j)
+  "CLaSH.Sized.Internal.Index.minus#"
+    | (Right mTy : Right nTy : _) <- args
+    , Right _ <- runExcept (tyNatSize tcm mTy)
+    , Right _ <- runExcept (tyNatSize tcm nTy)
+    , Just (i,j) <- indexLiterals tcm isSubj args
+    -> let resTyInfo = extractTySizeInfo tcm e
+       in  mkIndexLit' resTyInfo (i - j)
+  "CLaSH.Sized.Internal.Index.times#"
+    | (Right mTy : Right nTy : _) <- args
+    , Right _ <- runExcept (tyNatSize tcm mTy)
+    , Right _ <- runExcept (tyNatSize tcm nTy)
+    , Just (i,j) <- indexLiterals tcm isSubj args
+    -> let resTyInfo = extractTySizeInfo tcm e
+       in  mkIndexLit' resTyInfo (i * j)
+
+-- Integral
+  "CLaSH.Sized.Internal.Index.quot#"
+    | Just (nTy,kn) <- extractKnownNat tcm args
+    , Just (i,j) <- indexLiterals tcm isSubj args
+    -> mkIndexLit ty nTy kn (i `quot` j)
+  "CLaSH.Sized.Internal.Index.rem#"
+    | Just (nTy,kn) <- extractKnownNat tcm args
+    , Just (i,j) <- indexLiterals tcm isSubj args
+    -> mkIndexLit ty nTy kn (i `rem` j)
+  "CLaSH.Sized.Internal.Index.toInteger#"
+    | [collectArgs -> (Prim nm' _,[Right _, Left _, Left (Literal (IntegerLiteral i))])] <-
+      (map (reduceConstant tcm isSubj) . Either.lefts) args
+    , nm' == "CLaSH.Sized.Internal.Index.fromInteger#"
+    -> integerToIntegerLiteral i
+
+-- Resize
+  "CLaSH.Sized.Internal.Index.resize#"
+    | Just (mTy,m) <- extractKnownNat tcm args
+    , [i] <- indexLiterals' tcm isSubj args
+    -> mkIndexLit ty mTy m i
 
 ---------
 -- Signed
@@ -1215,13 +1305,19 @@ mkSizedLit conPrim ty nTy kn val
   where
     (_,sTy) = splitFunForallTy ty
 
-mkBitVectorLit, mkSignedLit, mkUnsignedLit
+mkBitVectorLit, mkIndexLit, mkSignedLit, mkUnsignedLit
   :: Type    -- result type
   -> Type    -- forall n.
   -> Integer -- KnownNat n
   -> Integer -- value
   -> Term
 mkBitVectorLit = mkSizedLit bvConPrim
+mkIndexLit rTy nTy kn val
+  | val >= 0
+  , val < kn
+  = mkSizedLit indexConPrim rTy nTy kn val
+  | otherwise
+  = mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right rTy]
 mkSignedLit    = mkSizedLit signedConPrim
 mkUnsignedLit  = mkSizedLit unsignedConPrim
 
@@ -1238,13 +1334,19 @@ mkSizedLit' conPrim (ty,nTy,kn) val
   where
     (_,sTy) = splitFunForallTy ty
 
-mkBitVectorLit', mkSignedLit', mkUnsignedLit'
+mkBitVectorLit', mkIndexLit', mkSignedLit', mkUnsignedLit'
   :: (Type     -- result type
      ,Type     -- forall n.
      ,Integer) -- KnownNat n
   -> Integer -- value
   -> Term
 mkBitVectorLit' = mkSizedLit' bvConPrim
+mkIndexLit' res@(rTy,_,kn) val
+  | val >= 0
+  , val < kn
+  = mkSizedLit' indexConPrim res val
+  | otherwise
+  = mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right rTy]
 mkSignedLit'    = mkSizedLit' signedConPrim
 mkUnsignedLit'  = mkSizedLit' unsignedConPrim
 
@@ -1282,6 +1384,20 @@ bvConPrim (tyView -> TyConApp bvTcNm _)
     nVar       = VarTy typeNatKind nName
     nTV        = TyVar nName (embed typeNatKind)
 bvConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
+
+indexConPrim :: Type -> Term
+indexConPrim (tyView -> TyConApp indexTcNm _)
+  = Prim "CLaSH.Sized.Internal.Index.fromInteger#" (ForAllTy (bind nTV funTy))
+  where
+#if MIN_VERSION_ghc(8,2,0)
+    funTy        = foldr1 mkFunTy [naturalPrimTy,integerPrimTy,mkTyConApp indexTcNm [nVar]]
+#else
+    funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp indexTcNm [nVar]]
+#endif
+    nName      = string2SystemName "n"
+    nVar       = VarTy typeNatKind nName
+    nTV        = TyVar nName (embed typeNatKind)
+indexConPrim _ = error $ $(curLoc) ++ "called with incorrect type"
 
 signedConPrim :: Type -> Term
 signedConPrim (tyView -> TyConApp signedTcNm _)
