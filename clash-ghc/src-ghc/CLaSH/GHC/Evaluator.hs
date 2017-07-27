@@ -47,6 +47,7 @@ import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
 import           CLaSH.Core.Var      (Var (..))
 import           CLaSH.Util          (clogBase, flogBase, curLoc)
 
+import CLaSH.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified CLaSH.Sized.Internal.BitVector as BitVector
 import qualified CLaSH.Sized.Internal.Signed    as Signed
 import qualified CLaSH.Sized.Internal.Unsigned  as Unsigned
@@ -485,8 +486,27 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       where
         op :: KnownNat n => BitVector n -> Int -> Bit -> Proxy n -> Integer
         op bv i b _ = toInteger (BitVector.replaceBit# bv i b)
-
--- TODO: setSlice#, slice#
+  "CLaSH.Sized.Internal.BitVector.setSlice#"
+  -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
+  -- -> BitVector (m + 1 + i)
+    | (Right mTy : Right _ : Right nTy : _) <- args
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    , [i,j] <- bitVectorLiterals' tcm isSubj args
+    -> let val = BitVector.unsafeToInteger
+               $ BitVector.setSlice# (BV i) (unsafeSNat m) (unsafeSNat n) (BV j)
+           resTyInfo = extractTySizeInfo tcm e
+       in  mkBitVectorLit' resTyInfo val
+  "CLaSH.Sized.Internal.BitVector.slice#"
+  -- :: BitVector (m + 1 + i) -> SNat m -> SNat n -> BitVector (m + 1 - n)
+    | (Right mTy : Right _ : Right nTy : _) <- args
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    , [i] <- bitVectorLiterals' tcm isSubj args
+    -> let val = BitVector.unsafeToInteger
+               $ BitVector.slice# (BV i) (unsafeSNat m) (unsafeSNat n)
+           resTyInfo = extractTySizeInfo tcm e
+       in  mkBitVectorLit' resTyInfo val
   "CLaSH.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
     | (Right nTy : Right mTy : _) <- args
     , Right n <-  runExcept (tyNatSize tcm nTy)
