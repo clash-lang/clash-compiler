@@ -183,6 +183,24 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Classes.geInt" | Just (i,j) <- intCLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i >= j)
 
+  "GHC.Classes.&&"
+    | [(Data lCon,[])
+      ,(Data rCon,[])] <- map collectArgs (reduceTerms tcm isSubj args)
+    -> boolToBoolLiteral tcm ty
+         ((name2String (dcName lCon) == "GHC.Types.True") &&
+          (name2String (dcName rCon) == "GHC.Types.True"))
+
+  "GHC.Classes.||"
+    | [(Data lCon,[])
+      ,(Data rCon,[])] <- map collectArgs (reduceTerms tcm isSubj args)
+    -> boolToBoolLiteral tcm ty
+         ((name2String (dcName lCon) == "GHC.Types.True") ||
+          (name2String (dcName rCon) == "GHC.Types.True"))
+
+  "GHC.Classes.not"
+    | [(Data bCon,[])] <- map collectArgs (reduceTerms tcm isSubj args)
+    -> boolToBoolLiteral tcm ty (name2String (dcName bCon) == "GHC.Types.False")
+
   "GHC.Integer.Logarithms.integerLogBase#"
     | Just (a,b) <- integerLiterals tcm isSubj args
     , Just c <- flogBase a b
