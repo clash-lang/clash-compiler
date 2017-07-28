@@ -19,7 +19,7 @@ import qualified Data.Bifunctor      as Bifunctor
 import           Data.Bits
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
-import           Data.Maybe          (catMaybes)
+import           Data.Maybe          (catMaybes, fromMaybe)
 import qualified Data.List           as List
 import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
@@ -31,21 +31,33 @@ import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
 import           GHC.Word
 import           Unbound.Generics.LocallyNameless
-  (bind, embed, rebind, runFreshM)
+  (bind, embed, rebind, runFreshM, makeName)
+
+import           BasicTypes          (Boxity (..))
+import           Name                (getSrcSpan, nameOccName, occNameString)
+import           PrelNames
+  (typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatSubTyFamNameKey)
+import           SrcLoc              (wiredInSrcSpan)
+import qualified TyCon
+import           TysWiredIn          (tupleTyCon)
+import           Unique              (getKey)
 
 import           CLaSH.Core.DataCon  (DataCon (..), dataConInstArgTys)
 import           CLaSH.Core.Literal  (Literal (..))
-import           CLaSH.Core.Name     (Name (..), string2SystemName)
+import           CLaSH.Core.Name
+  (Name (..), NameSort (..), name2String, string2SystemName)
 import           CLaSH.Core.Pretty   (showDoc)
 import           CLaSH.Core.Term     (Pat (..), Term (..))
 import           CLaSH.Core.Type
   (Type (..), ConstTy (..), LitTy (..), TypeView (..), mkFunTy, mkTyConApp,
    splitFunForallTy, tyView, undefinedTy)
-import           CLaSH.Core.TyCon    (TyCon, TyConOccName, tyConDataCons)
+import           CLaSH.Core.TyCon
+  (TyCon, TyConName, TyConOccName, tyConDataCons)
 import           CLaSH.Core.TysPrim
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
                                       tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
+import           CLaSH.GHC.GHC2Core  (modNameM)
 import           CLaSH.Util          (clogBase, flogBase, curLoc)
 
 import CLaSH.Promoted.Nat.Unsafe (unsafeSNat)
@@ -1192,7 +1204,28 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -- Indexing
   "CLaSH.Sized.Vector.index_int"
     | isSubj
-    -> e
+    , (nTy : aTy : _)  <- Either.rights args
+    , (_ : xs : i : _) <- Either.lefts args
+    , (Data intDc, [Left (Literal (IntLiteral i'))]) <- collectArgs (reduceConstant tcm isSubj i)
+    -> if i' < 0
+          then mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right aTy]
+          else case collectArgs (reduceConstant tcm isSubj xs) of
+                 (Data _,vArgs)  -> case runExcept (tyNatSize tcm nTy) of
+                    Right 0  -> mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right aTy]
+                    Right n' ->
+                      if i' == 0
+                         then reduceConstant tcm isSubj (Either.lefts vArgs !! 1)
+                         else reduceConstant tcm isSubj
+                                (mkApps (Prim nm ty)
+                                        [Right (LitTy (NumTy (n'-1)))
+                                        ,Right aTy
+                                        ,Left (Literal (NaturalLiteral (n'-1)))
+                                        ,Left (Either.lefts vArgs !! 2)
+                                        ,Left (mkApps (Data intDc)
+                                                      [Left (Literal (IntLiteral (i'-1)))])
+                                        ])
+                    _ -> e
+                 _ -> e
   "CLaSH.Sized.Vector.head"
     | isSubj
     , [(Data _,vArgs)] <- map collectArgs (reduceTerms tcm isSubj args)
@@ -1288,7 +1321,49 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "CLaSH.Sized.Vector.unconcat"
     | isSubj
-    -> e
+    , (kn : snat : v : _)  <- Either.lefts args
+    , (nTy : mTy : aTy :_) <- Either.rights args
+    , Literal (NaturalLiteral n) <- reduceConstant tcm isSubj kn
+    -> let ( Either.rights -> argTys, tyView -> TyConApp vecTcNm _) =
+              splitFunForallTy ty
+           Just vecTc = HashMap.lookup (nameOcc vecTcNm) tcm
+           [nilCon,consCon]   = tyConDataCons vecTc
+           tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
+           (Just tupTc)       = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc]            = tyConDataCons tupTc
+           TyConApp snatTcNm _ = tyView (argTys !! 1)
+           n1mTy  = mkTyConApp typeNatMul
+                        [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)]
+                        ,mTy]
+           splitAtCall =
+            mkApps (Prim "CLaSH.Sized.Vector.splitAt" (splitAtTy snatTcNm vecTcNm))
+                   [Right mTy
+                   ,Right n1mTy
+                   ,Right aTy
+                   ,Left snat
+                   ,Left v
+                   ]
+           mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
+           n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
+           asNm     = string2SystemName "as"
+           bsNm     = string2SystemName "bs"
+           asId     = Id asNm (embed mVecTy)
+           bsId     = Id bsNm (embed n1mVecTy)
+           tupPat   = (DataPat (embed tupDc) (rebind [] [asId,bsId]))
+           asAlt    = bind tupPat (Var mVecTy asNm)
+           bsAlt    = bind tupPat (Var n1mVecTy bsNm)
+
+       in  case n of
+         0 -> mkVecNil  nilCon mVecTy
+         _ -> mkVecCons consCon mVecTy n
+                (Case splitAtCall mVecTy [asAlt])
+                (mkApps (Prim nm ty)
+                    [Right (LitTy (NumTy (n-1)))
+                    ,Right mTy
+                    ,Right aTy
+                    ,Left (Literal (NaturalLiteral (n-1)))
+                    ,Left snat
+                    ,Left (Case splitAtCall n1mVecTy [bsAlt])])
 -- Construction
 -- - initialisation
   "CLaSH.Sized.Vector.replicate"
@@ -1301,18 +1376,100 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -- - Concatenation
   "CLaSH.Sized.Vector.++"
     | isSubj
-    -> e
+    , (Data dc,vArgs) <- collectArgs (reduceConstant tcm isSubj
+                                       (head (Either.lefts args)))
+    , (Right nTy : Right aTy : _) <- vArgs
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> reduceConstant tcm isSubj (last (Either.lefts args))
+         n' | (_ : _ : Right mTy : _) <- args
+            , Right m <- runExcept (tyNatSize tcm mTy)
+            -> -- x : (xs ++ ys)
+               mkVecCons dc aTy (n' + m) (Either.lefts vArgs !! 1)
+                 (mkApps (Prim nm ty) [Right (LitTy (NumTy (n'-1)))
+                                      ,Right aTy
+                                      ,Right mTy
+                                      ,Left (Either.lefts vArgs !! 2)
+                                      ,Left (last (Either.lefts args))
+                                      ])
+         _ -> e
   "CLaSH.Sized.Vector.concat"
     | isSubj
-    -> e
+    , (nTy : mTy : aTy : _)  <- Either.rights args
+    , (xs : _)               <- Either.lefts args
+    , (Data dc,vArgs) <- collectArgs (reduceConstant tcm isSubj xs)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+        0 -> mkVecNil dc aTy
+        _ | (_ : h : t : _)      <- Either.lefts  vArgs
+          , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+          -> reduceConstant tcm isSubj $
+             mkApps (Prim "CLaSH.Sized.Vector.++" (vecAppendTy vecTcNm))
+                    [Right mTy
+                    ,Right aTy
+                    ,Right $ mkTyConApp typeNatMul
+                      [mkTyConApp typeNatSub [nTy,LitTy (NumTy 1)], mTy]
+                    ,Left h
+                    ,Left $ mkApps (Prim nm ty)
+                      [ Right (LitTy (NumTy (n-1)))
+                      , Right mTy
+                      , Right aTy
+                      , Left t
+                      ]
+                    ]
+        _ -> e
+
 -- Modifying vectors
   "CLaSH.Sized.Vector.replace_int"
     | isSubj
-    -> e
+    , (nTy : aTy : _)  <- Either.rights args
+    , (_ : xs : i : a : _) <- Either.lefts args
+    , (Data intDc, [Left (Literal (IntLiteral i'))]) <- collectArgs (reduceConstant tcm isSubj i)
+    -> if i' < 0
+          then mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right aTy]
+          else case collectArgs (reduceConstant tcm isSubj xs) of
+                 (Data vecTcNm,vArgs) -> case runExcept (tyNatSize tcm nTy) of
+                    Right 0  -> mkApps (Prim "GHC.Err.undefined" undefinedTy) [Right aTy]
+                    Right n' ->
+                      if i' == 0
+                         then mkVecCons vecTcNm aTy n' a (Either.lefts vArgs !! 2)
+                         else mkVecCons vecTcNm aTy n' (Either.lefts vArgs !! 1)
+                                (mkApps (Prim nm ty)
+                                        [Right (LitTy (NumTy (n'-1)))
+                                        ,Right aTy
+                                        ,Left (Literal (NaturalLiteral (n'-1)))
+                                        ,Left (Either.lefts vArgs !! 2)
+                                        ,Left (mkApps (Data intDc)
+                                                      [Left (Literal (IntLiteral (i'-1)))])
+                                        ,Left a
+                                        ])
+                    _ -> e
+                 _ -> e
+
 -- - specialised permutations
   "CLaSH.Sized.Vector.reverse"
     | isSubj
-    -> e
+    , (nTy : aTy : _)  <- Either.rights args
+    , [(Data vecDc,vArgs)] <- map collectArgs (reduceTerms tcm isSubj args)
+    -> case runExcept (tyNatSize tcm nTy) of
+         Right 0 -> mkVecNil vecDc aTy
+         Right n
+           | (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+           , let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
+           , let [nilCon,consCon] = tyConDataCons vecTc
+           -> reduceConstant tcm isSubj $
+              mkApps (Prim "CLaSH.Sized.Vector.++" (vecAppendTy vecTcNm))
+                [Right (LitTy (NumTy (n-1)))
+                ,Right aTy
+                ,Right (LitTy (NumTy 1))
+                ,Left (mkApps (Prim nm ty)
+                              [Right (LitTy (NumTy (n-1)))
+                              ,Right aTy
+                              ,Left (Either.lefts vArgs !! 2)
+                              ])
+                ,Left (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
+                ]
+         _ -> e
   "CLaSH.Sized.Vector.transpose"
     | isSubj
     -> e
@@ -1326,14 +1483,54 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -- - mapping
   "CLaSH.Sized.Vector.map"
     | isSubj
-    -> e
+    , (Data dc,vArgs) <- collectArgs (reduceConstant tcm isSubj
+                                       (Either.lefts args !! 1))
+    , (aTy : bTy : nTy : _) <- Either.rights args
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> mkVecNil dc bTy
+         n' -> mkVecCons dc bTy n'
+                 (mkApps (Either.lefts args !! 0) [Left (Either.lefts vArgs !! 1)])
+                 (mkApps (Prim nm ty) [Right aTy
+                                      ,Right bTy
+                                      ,Right (LitTy (NumTy (n' - 1)))
+                                      ,Left (Either.lefts args !! 0)
+                                      ,Left (Either.lefts vArgs !! 2)])
   "CLaSH.Sized.Vector.imap"
     | isSubj
     -> e
+
 -- - Zipping
   "CLaSH.Sized.Vector.zipWith"
     | isSubj
-    -> e
+    , (aTy : bTy : cTy : nTy : _) <- Either.rights args
+    , (f : xs : ys : _)   <- Either.lefts args
+    , (Data dc,vArgs) <- collectArgs (reduceConstant tcm isSubj xs)
+    , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> mkVecNil  dc cTy
+         n' -> mkVecCons dc cTy n'
+                 (mkApps f
+                            [Left (Either.lefts vArgs !! 1)
+                            ,Left (mkApps (Prim "CLaSH.Sized.Vector.head" (vecHeadTy vecTcNm))
+                                    [Right (LitTy (NumTy (n'-1)))
+                                    ,Right bTy
+                                    ,Left  ys
+                                    ])
+                            ])
+                 (mkApps (Prim nm ty) [Right aTy
+                                      ,Right bTy
+                                      ,Right cTy
+                                      ,Right (LitTy (NumTy (n' - 1)))
+                                      ,Left f
+                                      ,Left (Either.lefts vArgs !! 2)
+                                      ,Left (mkApps (Prim "CLaSH.Sized.Vector.tail" (vecTailTy vecTcNm))
+                                                    [Right (LitTy (NumTy (n'-1)))
+                                                    ,Right bTy
+                                                    ,Left ys
+                                                    ])])
+
 -- Folding
   "CLaSH.Sized.Vector.foldr"
     | isSubj
@@ -1699,3 +1896,129 @@ extractTySizeInfo tcm e = (resTy,resSizeTy,resSize)
     resTy = runFreshM (termType tcm e)
     (TyConApp _ [resSizeTy]) = tyView resTy
     Right resSize = runExcept (tyNatSize tcm resSizeTy)
+
+vecHeadTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecHeadTy vecNm =
+    ForAllTy (bind nTV (
+    ForAllTy (bind aTV (
+    mkFunTy
+      (mkTyConApp vecNm [mkTyConApp typeNatAdd
+                           [VarTy typeNatKind (string2SystemName "n")
+                           ,LitTy (NumTy 1)]
+                        ,VarTy liftedTypeKind (string2SystemName "a")
+                        ])
+      (VarTy liftedTypeKind (string2SystemName "a"))))))
+  where
+    aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
+    nTV = TyVar (string2SystemName "n") (embed typeNatKind)
+
+vecTailTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecTailTy vecNm =
+    ForAllTy (bind nTV (
+    ForAllTy (bind aTV (
+    mkFunTy
+      (mkTyConApp vecNm [mkTyConApp typeNatAdd
+                           [VarTy typeNatKind (string2SystemName "n")
+                           ,LitTy (NumTy 1)]
+                        ,VarTy liftedTypeKind (string2SystemName "a")
+                        ])
+      (mkTyConApp vecNm [VarTy typeNatKind    (string2SystemName "n")
+                        ,VarTy liftedTypeKind (string2SystemName "a")
+                        ])))))
+  where
+    nTV = TyVar (string2SystemName "n") (embed typeNatKind)
+    aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
+
+splitAtTy
+  :: TyConName
+  -- ^ SNat TyCon name
+  -> TyConName
+  -- ^ Vec TyCon name
+  -> Type
+splitAtTy snatNm vecNm =
+  ForAllTy (bind mTV (
+  ForAllTy (bind nTV (
+  ForAllTy (bind aTV (
+  mkFunTy
+    (mkTyConApp snatNm [VarTy typeNatKind (string2SystemName "m")])
+    (mkFunTy
+      (mkTyConApp vecNm
+                  [mkTyConApp typeNatAdd
+                    [VarTy typeNatKind (string2SystemName "m")
+                    ,VarTy typeNatKind (string2SystemName "n")]
+                  ,VarTy liftedTypeKind (string2SystemName "a")])
+      (mkTyConApp tupNm
+                  [mkTyConApp vecNm
+                              [VarTy typeNatKind (string2SystemName "m")
+                              ,VarTy liftedTypeKind (string2SystemName "a")]
+                  ,mkTyConApp vecNm
+                              [VarTy typeNatKind (string2SystemName "n")
+                              ,VarTy liftedTypeKind (string2SystemName "a")]]))))))))
+  where
+    mTV   = TyVar (string2SystemName "m") (embed typeNatKind)
+    nTV   = TyVar (string2SystemName "n") (embed typeNatKind)
+    aTV   = TyVar (string2SystemName "a") (embed liftedTypeKind)
+    tupNm = ghcTyconToTyConName (tupleTyCon Boxed 2)
+
+vecAppendTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecAppendTy vecNm =
+    ForAllTy (bind nTV (
+    ForAllTy (bind aTV (
+    ForAllTy (bind mTV (
+    mkFunTy
+      (mkTyConApp vecNm [VarTy typeNatKind    (string2SystemName "n")
+                        ,VarTy liftedTypeKind (string2SystemName "a")
+                        ])
+      (mkFunTy
+         (mkTyConApp vecNm [VarTy typeNatKind    (string2SystemName "m")
+                           ,VarTy liftedTypeKind (string2SystemName "a")
+                           ])
+         (mkTyConApp vecNm [mkTyConApp typeNatAdd
+                              [VarTy typeNatKind (string2SystemName "n")
+                              ,VarTy typeNatKind (string2SystemName "m")]
+                           ,VarTy liftedTypeKind (string2SystemName "a")
+                           ]))))))))
+  where
+    nTV = TyVar (string2SystemName "n") (embed typeNatKind)
+    aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
+    mTV = TyVar (string2SystemName "m") (embed typeNatKind)
+
+typeNatAdd :: TyConName
+typeNatAdd = Name User
+                  (makeName "GHC.TypeNats.+"
+                            (toInteger (getKey typeNatAddTyFamNameKey)))
+                  wiredInSrcSpan
+
+
+typeNatMul :: TyConName
+typeNatMul = Name User
+                  (makeName "GHC.TypeNats.*"
+                            (toInteger (getKey typeNatMulTyFamNameKey)))
+                  wiredInSrcSpan
+
+typeNatSub :: TyConName
+typeNatSub = Name User
+                  (makeName "GHC.TypeNats.-"
+                            (toInteger (getKey typeNatSubTyFamNameKey)))
+                  wiredInSrcSpan
+
+ghcTyconToTyConName
+  :: TyCon.TyCon
+  -> TyConName
+ghcTyconToTyConName tc =
+    Name User
+         (makeName n' (toInteger (getKey (TyCon.tyConUnique tc))))
+         (getSrcSpan n)
+  where
+    n'      = fromMaybe "_INTERNAL_" (modNameM n) ++ ('.':occName)
+    occName = occNameString $ nameOccName n
+    n       = TyCon.tyConName tc
