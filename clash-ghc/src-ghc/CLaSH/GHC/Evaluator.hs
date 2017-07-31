@@ -89,21 +89,25 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.ord#" | [i] <- charLiterals' tcm isSubj args
     -> integerToIntLiteral (toInteger $ ord i)
 
+----------------
+-- GHC.Prim.Int#
+----------------
+-- TODO?:
+-- mulIntMayOflo#, addIntC#,subIntC#,
+-- int2Word#,int2Float#,int2Double#,word2Float#,word2Double#,
+-- uncheckedIShiftRL#
+
   "GHC.Prim.+#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i+j)
-
   "GHC.Prim.-#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i-j)
-
   "GHC.Prim.*#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i*j)
 
   "GHC.Prim.quotInt#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i `quot` j)
-
   "GHC.Prim.remInt#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i `rem` j)
-
   "GHC.Prim.quotRemInt#" | Just (i,j) <- intLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
@@ -113,30 +117,45 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                     [Left (integerToIntLiteral q), Left (integerToIntLiteral r)])
        in  ret
 
+  "GHC.Prim.andI#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> integerToIntLiteral (i .&. j)
+  "GHC.Prim.orI#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> integerToIntLiteral (i .|. j)
+  "GHC.Prim.xorI#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> integerToIntLiteral (i `xor` j)
+  "GHC.Prim.notI#" | [i] <- intLiterals' tcm isSubj args
+    -> integerToIntLiteral (complement i)
+
   "GHC.Prim.negateInt#"
     | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral (negate i)
 
   "GHC.Prim.>#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i > j)
-
   "GHC.Prim.>=#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i >= j)
-
   "GHC.Prim.==#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i == j)
-
   "GHC.Prim./=#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i /= j)
-
   "GHC.Prim.<#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i < j)
-
   "GHC.Prim.<=#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i <= j)
 
   "GHC.Prim.chr#" | [i] <- intLiterals' tcm isSubj args
     -> charToCharLiteral (chr $ fromInteger i)
+
+  "GHC.Prim.uncheckedIShiftL#"
+    | [ Literal (IntLiteral i)
+      , Literal (IntLiteral s)
+      ] <- reduceTerms tcm isSubj args
+    -> Literal (WordLiteral (i `shiftL` fromInteger s))
+  "GHC.Prim.uncheckedIShiftRA#"
+    | [ Literal (IntLiteral i)
+      , Literal (IntLiteral s)
+      ] <- reduceTerms tcm isSubj args
+    -> Literal (WordLiteral (i `shiftR` fromInteger s))
 
   "GHC.Prim.eqWord#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> boolToIntLiteral (i == j)
