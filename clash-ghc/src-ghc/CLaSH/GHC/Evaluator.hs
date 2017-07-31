@@ -93,9 +93,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -- GHC.Prim.Int#
 ----------------
 -- TODO?:
--- mulIntMayOflo#, addIntC#,subIntC#,
--- int2Float#,int2Double#,word2Float#,word2Double#,
--- uncheckedIShiftRL#
+-- int2Float#,int2Double#,word2Float#,word2Double#
 
   "GHC.Prim.+#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i+j)
@@ -103,6 +101,13 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> integerToIntLiteral (i-j)
   "GHC.Prim.*#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i*j)
+
+  "GHC.Prim.mulIntMayOflo#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> let !(I# a)  = fromInteger i
+           !(I# b)  = fromInteger j
+           c :: Int#
+           c = mulIntMayOflo# a b
+       in  integerToIntLiteral (toInteger $ I# c)
 
   "GHC.Prim.quotInt#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i `quot` j)
@@ -129,6 +134,27 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.negateInt#"
     | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral (negate i)
+
+  "GHC.Prim.addIntC#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(I# a)  = fromInteger i
+           !(I# b)  = fromInteger j
+           !(# d, c #) = addIntC# a b
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . IntLiteral . toInteger $ I# d)
+                   , Left (Literal . IntLiteral . toInteger $ I# c)])
+  "GHC.Prim.subIntC#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(I# a)  = fromInteger i
+           !(I# b)  = fromInteger j
+           !(# d, c #) = subIntC# a b
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . IntLiteral . toInteger $ I# d)
+                   , Left (Literal . IntLiteral . toInteger $ I# c)])
 
   "GHC.Prim.>#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i > j)
@@ -160,6 +186,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       , Literal (IntLiteral s)
       ] <- reduceTerms tcm isSubj args
     -> Literal (WordLiteral (i `shiftR` fromInteger s))
+  "GHC.Prim.uncheckedIShiftRL#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> let !(I# a)  = fromInteger i
+           !(I# b)  = fromInteger j
+           c :: Int#
+           c = uncheckedIShiftRL# a b
+       in  integerToIntLiteral (toInteger $ I# c)
 
 -----------------
 -- GHC.Prim.Word#
