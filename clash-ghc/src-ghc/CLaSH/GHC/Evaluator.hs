@@ -1572,12 +1572,81 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | isSubj
     -> e
 -- BitPack
-  "CLaSH.Sized.Vector.concatBitVector"
+  "CLaSH.Sized.Vector.concatBitVector#"
     | isSubj
-    -> e
-  "CLaSH.Sized.Vector.unconcatBitVector"
+    , (nTy : mTy : _) <- Either.rights args
+    , (_  : km  : v : _) <- Either.lefts args
+    , (Data _,vArgs) <- collectArgs (reduceConstant tcm isSubj v)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> let resTyInfo = extractTySizeInfo tcm e
+               in  mkBitVectorLit' resTyInfo 0
+         n' | Right m <- runExcept (tyNatSize tcm mTy)
+            , (_,tyView -> TyConApp bvTcNm _) <- splitFunForallTy ty
+            -> reduceConstant tcm isSubj $
+               mkApps (Prim "CLaSH.Sized.Internal.BitVector.++#" (bvAppendTy bvTcNm))
+                 [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
+                 , Right mTy
+                 , Left (Literal (NaturalLiteral ((n'-1)*m)))
+                 , Left (Either.lefts vArgs !! 1)
+                 , Left (mkApps (Prim nm ty)
+                                [ Right (LitTy (NumTy (n'-1)))
+                                , Right mTy
+                                , Left (Literal (NaturalLiteral (n'-1)))
+                                , Left km
+                                , Left (Either.lefts vArgs !! 2)
+                                ])
+                 ]
+         _ -> e
+  "CLaSH.Sized.Vector.unconcatBitVector#"
     | isSubj
-    -> e
+    , (nTy : mTy : _)      <- Either.rights args
+    , (_  : km  : bv : _) <- Either.lefts args
+    , (_,tyView -> TyConApp vecTcNm [_,bvMTy]) <- splitFunForallTy ty
+    , TyConApp bvTcNm _ <- tyView bvMTy
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0 ->
+          let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
+              [nilCon,_] = tyConDataCons vecTc
+          in  mkVecNil nilCon (mkTyConApp bvTcNm [mTy])
+         n' | Right m <- runExcept (tyNatSize tcm mTy) ->
+          let Just vecTc  = HashMap.lookup (nameOcc vecTcNm) tcm
+              [_,consCon] = tyConDataCons vecTc
+              tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
+              Just tupTc  = HashMap.lookup (nameOcc tupTcNm) tcm
+              [tupDc]     = tyConDataCons tupTc
+              splitCall   =
+                mkApps (Prim "CLaSH.Sized.Internal.BitVector.split#"
+                             (bvSplitTy bvTcNm))
+                       [ Right (mkTyConApp typeNatMul [LitTy (NumTy (n'-1)),mTy])
+                       , Right mTy
+                       , Left (Literal (NaturalLiteral ((n'-1)*m)))
+                       , Left bv
+                       ]
+              mBVTy       = mkTyConApp bvTcNm [mTy]
+              n1BVTy      = mkTyConApp bvTcNm
+                              [mkTyConApp typeNatMul
+                                [LitTy (NumTy (n'-1))
+                                ,mTy]]
+              xNm         = string2SystemName "x"
+              bvNm        = string2SystemName "bv'"
+              xId         = Id xNm (embed mBVTy)
+              bvId        = Id bvNm (embed n1BVTy)
+              tupPat      = DataPat (embed tupDc) (rebind [] [xId,bvId])
+              xAlt        = bind tupPat (Var mBVTy xNm)
+              bvAlt       = bind tupPat (Var n1BVTy bvNm)
+
+          in  mkVecCons consCon (mkTyConApp bvTcNm [mTy]) n'
+                (Case splitCall mBVTy [xAlt])
+                (mkApps (Prim nm ty)
+                        [ Right (LitTy (NumTy (n'-1)))
+                        , Right mTy
+                        , Left (Literal (NaturalLiteral (n'-1)))
+                        , Left km
+                        , Left (Case splitCall n1BVTy [bvAlt])
+                        ])
+         _ -> e
   _ -> e
 
 reduceConstant _ _ e = e
@@ -2009,6 +2078,42 @@ vecAppendTy vecNm =
     nTV = TyVar (string2SystemName "n") (embed typeNatKind)
     aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
     mTV = TyVar (string2SystemName "m") (embed typeNatKind)
+
+bvAppendTy
+  :: TyConName
+  -- ^ BitVector TyCon Name
+  -> Type
+bvAppendTy bvNm =
+  ForAllTy (bind mTV (
+  ForAllTy (bind nTV (
+  mkFunTy naturalPrimTy (mkFunTy
+    (mkTyConApp bvNm [VarTy typeNatKind (string2SystemName "n")])
+    (mkFunTy
+      (mkTyConApp bvNm [VarTy typeNatKind (string2SystemName "m")])
+      (mkTyConApp bvNm [mkTyConApp typeNatAdd
+                          [VarTy typeNatKind (string2SystemName "n")
+                          ,VarTy typeNatKind (string2SystemName "m")]])))))))
+  where
+    mTV = TyVar (string2SystemName "m") (embed typeNatKind)
+    nTV = TyVar (string2SystemName "n") (embed typeNatKind)
+
+bvSplitTy
+  :: TyConName
+  -- ^ BitVector TyCon Name
+  -> Type
+bvSplitTy bvNm =
+  ForAllTy (bind nTV (
+  ForAllTy (bind mTV (
+  mkFunTy naturalPrimTy (mkFunTy
+    (mkTyConApp bvNm [mkTyConApp typeNatAdd
+                                 [VarTy typeNatKind (string2SystemName "m")
+                                 ,VarTy typeNatKind (string2SystemName "n")]])
+    (mkTyConApp tupNm [mkTyConApp bvNm [VarTy typeNatKind (string2SystemName "m")]
+                      ,mkTyConApp bvNm [VarTy typeNatKind (string2SystemName "n")]]))))))
+  where
+    nTV   = TyVar (string2SystemName "n") (embed typeNatKind)
+    mTV   = TyVar (string2SystemName "m") (embed typeNatKind)
+    tupNm = ghcTyconToTyConName (tupleTyCon Boxed 2)
 
 typeNatAdd :: TyConName
 typeNatAdd = Name User
