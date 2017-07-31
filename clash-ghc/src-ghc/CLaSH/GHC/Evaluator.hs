@@ -1773,7 +1773,35 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                        ]
   "CLaSH.Sized.Vector.rotateLeftS"
     | isSubj
-    -> e
+    , (nTy : aTy : _ : _) <- Either.rights args
+    , (kn : xs : d : _) <- Either.lefts args
+    , (Data dc,vArgs) <- collectArgs (reduceConstant tcm isSubj xs)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> mkVecNil dc aTy
+         n' | (snatDc,[_,Left d']) <- collectArgs (reduceConstant tcm isSubj d)
+            , Literal (NaturalLiteral d2) <- reduceConstant tcm isSubj d'
+            -> case (d2 `mod` n) of
+                 0  -> reduceConstant tcm isSubj xs
+                 d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
+                           (Just vecTc)     = HashMap.lookup (nameOcc vecTcNm) tcm
+                           [nilCon,consCon] = tyConDataCons vecTc
+                       in  reduceConstant tcm isSubj $
+                           mkApps (Prim nm ty)
+                                  [Right nTy
+                                  ,Right aTy
+                                  ,Right (LitTy (NumTy (d3-1)))
+                                  ,Left kn
+                                  ,Left (mkApps (Prim "CLaSH.Sized.Vector.++" (vecAppendTy vecTcNm))
+                                                [Right (LitTy (NumTy (n'-1)))
+                                                ,Right aTy
+                                                ,Right (LitTy (NumTy 1))
+                                                ,Left  (Either.lefts vArgs !! 2)
+                                                ,Left  (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])])
+                                  ,Left (mkApps snatDc [Right (LitTy (NumTy (d3-1)))
+                                                       ,Left  (Literal (NaturalLiteral (d3-1)))])
+                                  ]
+         _  -> e
   "CLaSH.Sized.Vector.rotateRightS"
     | isSubj
     -> e
