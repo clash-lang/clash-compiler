@@ -1804,7 +1804,36 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
          _  -> e
   "CLaSH.Sized.Vector.rotateRightS"
     | isSubj
-    -> e
+    , (nTy : aTy : _ : _) <- Either.rights args
+    , (kn : xs : d : _) <- Either.lefts args
+    , (Data dc,_) <- collectArgs (reduceConstant tcm isSubj xs)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> mkVecNil dc aTy
+         n' | (snatDc,[_,Left d']) <- collectArgs (reduceConstant tcm isSubj d)
+            , Literal (NaturalLiteral d2) <- reduceConstant tcm isSubj d'
+            -> case (d2 `mod` n) of
+                 0  -> reduceConstant tcm isSubj xs
+                 d3 -> let (_,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
+                       in  reduceConstant tcm isSubj $
+                           mkApps (Prim nm ty)
+                                  [Right nTy
+                                  ,Right aTy
+                                  ,Right (LitTy (NumTy (d3-1)))
+                                  ,Left kn
+                                  ,Left (mkVecCons dc aTy n
+                                          (mkApps (Prim "CLaSH.Sized.Vector.last" (vecHeadTy vecTcNm))
+                                                  [Right (LitTy (NumTy (n'-1)))
+                                                  ,Right aTy
+                                                  ,Left  xs])
+                                          (mkApps (Prim "CLaSH.Sized.Vector.init" (vecTailTy vecTcNm))
+                                                  [Right (LitTy (NumTy (n'-1)))
+                                                  ,Right aTy
+                                                  ,Left xs]))
+                                  ,Left (mkApps snatDc [Right (LitTy (NumTy (d3-1)))
+                                                       ,Left  (Literal (NaturalLiteral (d3-1)))])
+                                  ]
+         _  -> e
 -- Element-wise operations
 -- - mapping
   "CLaSH.Sized.Vector.map"
