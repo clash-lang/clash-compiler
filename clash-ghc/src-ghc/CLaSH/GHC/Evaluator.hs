@@ -164,8 +164,6 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -----------------
 -- GHC.Prim.Word#
 -----------------
--- TODO? quotRemWord2
-
   "GHC.Prim.plusWord#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> integerToWordLiteral (i+j)
 
@@ -219,6 +217,17 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            ret     = mkApps (Data tupDc) (map Right tyArgs ++
                     [Left (integerToWordLiteral q), Left (integerToWordLiteral r)])
        in  ret
+  "GHC.Prim.quotRemWord2#" | [i,j,k] <- wordLiterals' tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(W# a)  = fromInteger i
+           !(W# b)  = fromInteger j
+           !(W# c)  = fromInteger k
+           !(# x, y #) = quotRemWord2# a b c
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . WordLiteral . toInteger $ W# x)
+                   , Left (Literal . WordLiteral . toInteger $ W# y)])
 
   "GHC.Prim.and#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> integerToWordLiteral (i .&. j)
