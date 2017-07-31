@@ -1488,9 +1488,44 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                 ,Left (mkVec nilCon consCon aTy 1 [Either.lefts vArgs !! 1])
                 ]
          _ -> e
-  "CLaSH.Sized.Vector.transpose"
+  "CLaSH.Sized.Vector.transpose" -- :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)
     | isSubj
-    -> e
+    , (nTy : mTy : aTy : _) <- Either.rights args
+    , (kn : xss : _) <- Either.lefts args
+    , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+    , (Data _, vArgs) <- collectArgs (reduceConstant tcm isSubj xss)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    -> case m of
+      0 -> let (Just vecTc)     = HashMap.lookup (nameOcc vecTcNm) tcm
+               [nilCon,consCon] = tyConDataCons vecTc
+           in  mkVec nilCon consCon (mkTyConApp vecTcNm [mTy,aTy]) n
+                (replicate (fromInteger n) (mkVec nilCon consCon aTy 0 []))
+      m' -> let (Just vecTc)     = HashMap.lookup (nameOcc vecTcNm) tcm
+                [_,consCon] = tyConDataCons vecTc
+                Just (consCoTy : _) = dataConInstArgTys consCon
+                                        [mTy,aTy,LitTy (NumTy (m'-1))]
+            in  reduceConstant tcm isSubj $
+                mkApps (Prim "CLaSH.Sized.Vector.zipWith" (vecZipWithTy vecTcNm))
+                       [ Right aTy
+                       , Right (mkTyConApp vecTcNm [LitTy (NumTy (m'-1)),aTy])
+                       , Right (mkTyConApp vecTcNm [mTy,aTy])
+                       , Right nTy
+                       , Left  (mkApps (Data consCon)
+                                       [Right mTy
+                                       ,Right aTy
+                                       ,Right (LitTy (NumTy (m'-1)))
+                                       ,Left (Prim "_CO_" consCoTy)
+                                       ])
+                       , Left  (Either.lefts vArgs !! 1)
+                       , Left  (mkApps (Prim nm ty)
+                                       [ Right nTy
+                                       , Right (LitTy (NumTy (m'-1)))
+                                       , Right aTy
+                                       , Left  kn
+                                       , Left  (Either.lefts vArgs !! 2)
+                                       ])
+                       ]
   "CLaSH.Sized.Vector.rotateLeftS"
     | isSubj
     -> e
@@ -2078,6 +2113,33 @@ vecAppendTy vecNm =
     nTV = TyVar (string2SystemName "n") (embed typeNatKind)
     aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
     mTV = TyVar (string2SystemName "m") (embed typeNatKind)
+
+vecZipWithTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+vecZipWithTy vecNm =
+  ForAllTy (bind aTV (
+  ForAllTy (bind bTV (
+  ForAllTy (bind cTV (
+  ForAllTy (bind nTV (
+  mkFunTy
+    (mkFunTy aTy (mkFunTy bTy cTy))
+    (mkFunTy
+      (mkTyConApp vecNm [nTy,aTy])
+      (mkFunTy
+        (mkTyConApp vecNm [nTy,bTy])
+        (mkTyConApp vecNm [nTy,cTy])))))))))))
+  where
+    aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
+    bTV = TyVar (string2SystemName "b") (embed liftedTypeKind)
+    cTV = TyVar (string2SystemName "c") (embed liftedTypeKind)
+    nTV = TyVar (string2SystemName "n") (embed typeNatKind)
+    aTy = VarTy liftedTypeKind (string2SystemName "a")
+    bTy = VarTy liftedTypeKind (string2SystemName "b")
+    cTy = VarTy liftedTypeKind (string2SystemName "c")
+    nTy = VarTy liftedTypeKind (string2SystemName "n")
+
 
 bvAppendTy
   :: TyConName
