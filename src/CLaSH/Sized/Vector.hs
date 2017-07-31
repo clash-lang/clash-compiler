@@ -1932,30 +1932,26 @@ instance (KnownNat n, KnownNat (BitSize a), BitPack a) => BitPack (Vec n a) wher
   pack   = concatBitVector# . map pack
   unpack = map unpack . unconcatBitVector#
 
-concatBitVector# :: KnownNat m
-                 => Vec n (BitVector m)
-                 -> BitVector (n * m)
-concatBitVector# = concatBitVector' . reverse
-  where
-    concatBitVector' :: KnownNat m
-                     => Vec n (BitVector m)
-                     -> BitVector (n * m)
-    concatBitVector' Nil           = 0
-    concatBitVector' (x `Cons` xs) = concatBitVector' xs ++# x
+concatBitVector#
+  :: (KnownNat n, KnownNat m)
+  => Vec n (BitVector m)
+  -> BitVector (n * m)
+concatBitVector# Nil           = 0
+concatBitVector# (x `Cons` xs) = x ++# concatBitVector# xs
 {-# NOINLINE concatBitVector# #-}
 
-unconcatBitVector# :: (KnownNat n, KnownNat m)
-                   => BitVector (n * m)
-                   -> Vec n (BitVector m)
-unconcatBitVector# bv = withSNat (\s -> ucBV (toUNat s) bv)
+unconcatBitVector#
+  :: forall n m
+   . (KnownNat n, KnownNat m)
+  => BitVector (n * m)
+  -> Vec n (BitVector m)
+unconcatBitVector# = go (toUNat (SNat @ n))
+  where
+    go :: KnownNat x => UNat x -> BitVector (x * m) -> Vec x (BitVector m)
+    go UZero     _  = Nil
+    go (USucc n) bv = let (x :: BitVector m,bv') = split# bv
+                      in  x :> go n bv'
 {-# NOINLINE unconcatBitVector# #-}
-
-ucBV :: forall n m . KnownNat m
-     => UNat n -> BitVector (n * m) -> Vec n (BitVector m)
-ucBV UZero     _  = Nil
-ucBV (USucc n) bv = let (bv',x :: BitVector m) = split# bv
-                    in  ucBV n bv' :< x
-{-# INLINE ucBV #-}
 
 -- | Convert a 'BitVector' to a 'Vec' of 'Bit's.
 --
