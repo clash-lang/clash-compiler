@@ -164,7 +164,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -----------------
 -- GHC.Prim.Word#
 -----------------
+-- TODO? quotRemWord2
 
+  "GHC.Prim.plusWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i+j)
 
   "GHC.Prim.subWordC#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -188,6 +191,11 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                    [ Left (Literal . WordLiteral . toInteger $ W# h)
                    , Left (Literal . WordLiteral . toInteger $ W# l)])
 
+  "GHC.Prim.minusWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i-j)
+  "GHC.Prim.timesWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i*j)
+
   "GHC.Prim.timesWord2#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
            (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
@@ -199,17 +207,97 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                    [ Left (Literal . WordLiteral . toInteger $ W# h)
                    , Left (Literal . WordLiteral . toInteger $ W# l)])
 
+  "GHC.Prim.quotWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i `quot` j)
+  "GHC.Prim.remWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i `rem` j)
+  "GHC.Prim.quotRemWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           (q,r)   = quotRem i j
+           ret     = mkApps (Data tupDc) (map Right tyArgs ++
+                    [Left (integerToWordLiteral q), Left (integerToWordLiteral r)])
+       in  ret
+
+  "GHC.Prim.and#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i .&. j)
+  "GHC.Prim.or#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i .|. j)
+  "GHC.Prim.xor#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> integerToWordLiteral (i `xor` j)
+  "GHC.Prim.not#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral (complement i)
+
   "GHC.Prim.uncheckedShiftL#"
     | [ Literal (WordLiteral w)
       , Literal (IntLiteral  i)
       ] <- reduceTerms tcm isSubj args
     -> Literal (WordLiteral (w `shiftL` fromInteger i))
+  "GHC.Prim.uncheckedShiftRL#"
+    | [ Literal (WordLiteral w)
+      , Literal (IntLiteral  i)
+      ] <- reduceTerms tcm isSubj args
+    -> Literal (WordLiteral (w `shiftR` fromInteger i))
 
+  "GHC.Prim.word2Int#"
+    | [Literal (WordLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . IntLiteral . toInteger $ (fromInteger :: Integer -> Int) i -- for overflow behaviour
+
+  "GHC.Prim.gtWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i > j)
+  "GHC.Prim.geWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i >= j)
   "GHC.Prim.eqWord#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> boolToIntLiteral (i == j)
-
   "GHC.Prim.neWord#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> boolToIntLiteral (i /= j)
+  "GHC.Prim.ltWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i < j)
+  "GHC.Prim.leWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i <= j)
+
+  "GHC.Prim.popCnt8#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word8) $ i
+  "GHC.Prim.popCnt16#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word16) $ i
+  "GHC.Prim.popCnt32#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word32) $ i
+  "GHC.Prim.popCnt64#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word64) $ i
+  "GHC.Prim.popCnt#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . popCount . (fromInteger :: Integer -> Word) $ i
+
+  "GHC.Prim.clz8#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word8) $ i
+  "GHC.Prim.clz16#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word16) $ i
+  "GHC.Prim.clz32#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word32) $ i
+  "GHC.Prim.clz64#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word64) $ i
+  "GHC.Prim.clz#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countLeadingZeros . (fromInteger :: Integer -> Word) $ i
+
+  "GHC.Prim.ctz8#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 8 - 1)
+  "GHC.Prim.ctz16#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 16 - 1)
+  "GHC.Prim.ctz32#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i .&. (bit 32 - 1)
+  "GHC.Prim.ctz64#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word64) $ i .&. (bit 64 - 1)
+  "GHC.Prim.ctz#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . countTrailingZeros . (fromInteger :: Integer -> Word) $ i
+
+  "GHC.Prim.byteSwap16#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . byteSwap16 . (fromInteger :: Integer -> Word16) $ i
+  "GHC.Prim.byteSwap32#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . byteSwap32 . (fromInteger :: Integer -> Word32) $ i
+  "GHC.Prim.byteSwap64#" | [i] <- wordLiterals' tcm isSubj args
+    -> integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
+  "GHC.Prim.byteSwap#" | [i] <- wordLiterals' tcm isSubj args -- assume 64bits
+    -> integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
 
   "GHC.Prim.tagToEnum#"
     | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
@@ -373,6 +461,41 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+
+  "GHC.Types.W#"
+    | isSubj
+    , [Literal (WordLiteral c)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+            (Just wordTc) = HashMap.lookup (nameOcc wordTcNm) tcm
+            [wordDc] = tyConDataCons wordTc
+        in  mkApps (Data wordDc) [Left (Literal (WordLiteral c))]
+  "GHC.Word.W8#"
+    | isSubj
+    , [Literal (WordLiteral c)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+            (Just wordTc) = HashMap.lookup (nameOcc wordTcNm) tcm
+            [wordDc] = tyConDataCons wordTc
+        in  mkApps (Data wordDc) [Left (Literal (WordLiteral c))]
+  "GHC.Word.W16#"
+    | isSubj
+    , [Literal (WordLiteral c)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+            (Just wordTc) = HashMap.lookup (nameOcc wordTcNm) tcm
+            [wordDc] = tyConDataCons wordTc
+        in  mkApps (Data wordDc) [Left (Literal (WordLiteral c))]
+  "GHC.Word.W32#"
+    | isSubj
+    , [Literal (WordLiteral c)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+            (Just wordTc) = HashMap.lookup (nameOcc wordTcNm) tcm
+            [wordDc] = tyConDataCons wordTc
+        in  mkApps (Data wordDc) [Left (Literal (WordLiteral c))]
+  "GHC.Word.W64#"
+    | [Literal (WordLiteral c)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp wordTcNm []) = splitFunForallTy ty
+            (Just wordTc) = HashMap.lookup (nameOcc wordTcNm) tcm
+            [wordDc] = tyConDataCons wordTc
+        in  mkApps (Data wordDc) [Left (Literal (WordLiteral c))]
 
   "GHC.Float.$w$sfromRat''" -- XXX: Very fragile
     | [Literal (IntLiteral _minEx)
@@ -1791,6 +1914,12 @@ wordLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type]
 wordLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
   [Literal (WordLiteral i), Literal (WordLiteral j)] -> Just (i,j)
   _ -> Nothing
+wordLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
+wordLiterals' tcm isSubj args = catMaybes $ (map (wordLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+  where
+    wordLiteral x = case x of
+      Literal (WordLiteral i) -> Just i
+      _ -> Nothing
 
 charLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Char,Char)
 charLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
