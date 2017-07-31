@@ -396,6 +396,9 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
          ((name2String (dcName lCon) == "GHC.Types.True") ||
           (name2String (dcName rCon) == "GHC.Types.True"))
 
+  "GHC.Classes.divInt#" | Just (i,j) <- intLiterals tcm isSubj args
+    -> integerToIntLiteral (i `div` j)
+
   "GHC.Classes.not"
     | [(Data bCon,[])] <- map collectArgs (reduceTerms tcm isSubj args)
     -> boolToBoolLiteral tcm ty (name2String (dcName bCon) == "GHC.Types.False")
