@@ -1601,7 +1601,32 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 -- Misc
   "CLaSH.Sized.Vector.lazyV"
     | isSubj
-    -> e
+    , (nTy : aTy : _) <- Either.rights args
+    , (_ : xs : _) <- Either.lefts args
+    , (_,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0  -> let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
+                   [nilCon,_]   = tyConDataCons vecTc
+               in  mkVecNil nilCon aTy
+         n' -> let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
+                   [_,consCon]  = tyConDataCons vecTc
+               in  mkVecCons consCon aTy n'
+                     (mkApps (Prim "CLaSH.Sized.Vector.head" (vecHeadTy vecTcNm))
+                             [ Right (LitTy (NumTy (n' - 1)))
+                             , Right aTy
+                             , Left  xs
+                             ])
+                     (mkApps (Prim nm ty)
+                             [ Right (LitTy (NumTy (n' - 1)))
+                             , Right aTy
+                             , Left  (Literal (NaturalLiteral (n'-1)))
+                             , Left  (mkApps (Prim "CLaSH.Sized.Vector.tail" (vecTailTy vecTcNm))
+                                             [ Right (LitTy (NumTy (n'-1)))
+                                             , Right aTy
+                                             , Left  xs
+                                             ])
+                             ])
 -- Traversable
   "CLaSH.Sized.Vector.traverse#"
     | isSubj
