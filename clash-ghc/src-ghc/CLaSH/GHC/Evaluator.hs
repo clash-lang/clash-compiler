@@ -92,9 +92,6 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 ----------------
 -- GHC.Prim.Int#
 ----------------
--- TODO?:
--- int2Float#,int2Double#,word2Float#,word2Double#
-
   "GHC.Prim.+#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i+j)
   "GHC.Prim.-#" | Just (i,j) <- intLiterals tcm isSubj args
@@ -175,6 +172,20 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.int2Word#"
     | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     -> Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behaviour
+
+  "GHC.Prim.int2Float#"
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . FloatLiteral  . toRational $ (fromInteger i :: Float)
+  "GHC.Prim.int2Double#"
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . DoubleLiteral . toRational $ (fromInteger i :: Double)
+
+  "GHC.Prim.word2Float#"
+    | [Literal (WordLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . FloatLiteral  . toRational $ (fromInteger i :: Float)
+  "GHC.Prim.word2Double#"
+    | [Literal (WordLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . DoubleLiteral . toRational $ (fromInteger i :: Double)
 
   "GHC.Prim.uncheckedIShiftL#"
     | [ Literal (IntLiteral i)
