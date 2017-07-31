@@ -340,6 +340,35 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.byteSwap#" | [i] <- wordLiterals' tcm isSubj args -- assume 64bits
     -> integerToWordLiteral . toInteger . byteSwap64 . (fromInteger :: Integer -> Word64) $ i
 
+------------
+-- Narrowing
+------------
+  "GHC.Prim.narrow8Int#" | [i] <- intLiterals' tcm isSubj args
+    -> let !(I# a)  = fromInteger i
+           b = narrow8Int# a
+       in  Literal . IntLiteral . toInteger $ I# b
+  "GHC.Prim.narrow16Int#" | [i] <- intLiterals' tcm isSubj args
+    -> let !(I# a)  = fromInteger i
+           b = narrow16Int# a
+       in  Literal . IntLiteral . toInteger $ I# b
+  "GHC.Prim.narrow32Int#" | [i] <- intLiterals' tcm isSubj args
+    -> let !(I# a)  = fromInteger i
+           b = narrow32Int# a
+       in  Literal . IntLiteral . toInteger $ I# b
+  "GHC.Prim.narrow8Word#" | [i] <- wordLiterals' tcm isSubj args
+    -> let !(W# a)  = fromInteger i
+           b = narrow8Word# a
+       in  Literal . WordLiteral . toInteger $ W# b
+  "GHC.Prim.narrow16Word#" | [i] <- wordLiterals' tcm isSubj args
+    -> let !(W# a)  = fromInteger i
+           b = narrow16Word# a
+       in  Literal . WordLiteral . toInteger $ W# b
+  "GHC.Prim.narrow32Word#" | [i] <- wordLiterals' tcm isSubj args
+    -> let !(W# a)  = fromInteger i
+           b = narrow32Word# a
+       in  Literal . WordLiteral . toInteger $ W# b
+
+
   "GHC.Prim.tagToEnum#"
     | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
       map (Bifunctor.bimap (reduceConstant tcm isSubj) id) args
