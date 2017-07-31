@@ -94,7 +94,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 ----------------
 -- TODO?:
 -- mulIntMayOflo#, addIntC#,subIntC#,
--- int2Word#,int2Float#,int2Double#,word2Float#,word2Double#,
+-- int2Float#,int2Double#,word2Float#,word2Double#,
 -- uncheckedIShiftRL#
 
   "GHC.Prim.+#" | Just (i,j) <- intLiterals tcm isSubj args
@@ -146,6 +146,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.chr#" | [i] <- intLiterals' tcm isSubj args
     -> charToCharLiteral (chr $ fromInteger i)
 
+  "GHC.Prim.int2Word#"
+    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    -> Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behaviour
+
   "GHC.Prim.uncheckedIShiftL#"
     | [ Literal (IntLiteral i)
       , Literal (IntLiteral s)
@@ -157,24 +161,21 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       ] <- reduceTerms tcm isSubj args
     -> Literal (WordLiteral (i `shiftR` fromInteger s))
 
-  "GHC.Prim.eqWord#" | Just (i,j) <- wordLiterals tcm isSubj args
-    -> boolToIntLiteral (i == j)
+-----------------
+-- GHC.Prim.Word#
+-----------------
 
-  "GHC.Prim.neWord#" | Just (i,j) <- wordLiterals tcm isSubj args
-    -> boolToIntLiteral (i /= j)
 
-  "GHC.Prim.tagToEnum#"
-    | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
-      map (Bifunctor.bimap (reduceConstant tcm isSubj) id) args
-    -> let dc = do { tc <- HashMap.lookup (nameOcc tcN) tcm
-                   ; let dcs = tyConDataCons tc
-                   ; List.find ((== (i+1)) . toInteger . dcTag) dcs
-                   }
-       in maybe e Data dc
-
-  "GHC.Prim.int2Word#"
-    | [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
-    -> Literal . WordLiteral . toInteger $ (fromInteger :: Integer -> Word) i -- for overflow behaviour
+  "GHC.Prim.subWordC#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(W# a)  = fromInteger i
+           !(W# b)  = fromInteger j
+           !(# d, c #) = subWordC# a b
+       in  mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . WordLiteral . toInteger $ W# d)
+                   , Left (Literal . IntLiteral . toInteger $ I# c)])
 
   "GHC.Prim.plusWord2#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
@@ -198,22 +199,27 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                    [ Left (Literal . WordLiteral . toInteger $ W# h)
                    , Left (Literal . WordLiteral . toInteger $ W# l)])
 
-  "GHC.Prim.subWordC#" | Just (i,j) <- wordLiterals tcm isSubj args
-    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
-           [tupDc] = tyConDataCons tupTc
-           !(W# a)  = fromInteger i
-           !(W# b)  = fromInteger j
-           !(# d, c #) = subWordC# a b
-       in  mkApps (Data tupDc) (map Right tyArgs ++
-                   [ Left (Literal . WordLiteral . toInteger $ W# d)
-                   , Left (Literal . IntLiteral . toInteger $ I# c)])
-
   "GHC.Prim.uncheckedShiftL#"
     | [ Literal (WordLiteral w)
       , Literal (IntLiteral  i)
       ] <- reduceTerms tcm isSubj args
     -> Literal (WordLiteral (w `shiftL` fromInteger i))
+
+  "GHC.Prim.eqWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i == j)
+
+  "GHC.Prim.neWord#" | Just (i,j) <- wordLiterals tcm isSubj args
+    -> boolToIntLiteral (i /= j)
+
+  "GHC.Prim.tagToEnum#"
+    | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
+      map (Bifunctor.bimap (reduceConstant tcm isSubj) id) args
+    -> let dc = do { tc <- HashMap.lookup (nameOcc tcN) tcm
+                   ; let dcs = tyConDataCons tc
+                   ; List.find ((== (i+1)) . toInteger . dcTag) dcs
+                   }
+       in maybe e Data dc
+
 
   "GHC.Classes.geInt" | Just (i,j) <- intCLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i >= j)
