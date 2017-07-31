@@ -17,7 +17,7 @@ module CLaSH.GHC.Evaluator where
 import           Control.Monad.Trans.Except (runExcept)
 import qualified Data.Bifunctor      as Bifunctor
 import           Data.Bits
-import           Data.Char           (ord)
+import           Data.Char           (chr,ord)
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Maybe          (catMaybes, fromMaybe)
@@ -134,6 +134,9 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Prim.<=#" | Just (i,j) <- intLiterals tcm isSubj args
     -> boolToIntLiteral (i <= j)
+
+  "GHC.Prim.chr#" | [i] <- intLiterals' tcm isSubj args
+    -> charToCharLiteral (chr $ fromInteger i)
 
   "GHC.Prim.eqWord#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> boolToIntLiteral (i == j)
@@ -329,6 +332,14 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [Literal (NaturalLiteral n), _] <- reduceTerms tcm isSubj args
     -> Literal (NaturalLiteral n)
 #endif
+
+  "GHC.Types.C#"
+    | isSubj
+    , [Literal (CharLiteral c)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp charTcNm []) = splitFunForallTy ty
+            (Just charTc) = HashMap.lookup (nameOcc charTcNm) tcm
+            [charDc] = tyConDataCons charTc
+        in  mkApps (Data charDc) [Left (Literal (CharLiteral c))]
 
   "GHC.Types.I#"
     | isSubj
@@ -1737,6 +1748,13 @@ intLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntLiteral i), Literal (IntLiteral j)] -> Just (i,j)
   _ -> Nothing
 
+intLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
+intLiterals' tcm isSubj args = catMaybes $ (map (intLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+  where
+    intLiteral x = case x of
+      Literal (IntLiteral i) -> Just i
+      _ -> Nothing
+
 intCLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 intCLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   ([collectArgs -> (Data _,[Left (Literal (IntLiteral i))])
@@ -1930,6 +1948,9 @@ boolToBoolLiteral tcm ty b =
      [falseDc,trueDc] = tyConDataCons boolTc
      retDc = if b then trueDc else falseDc
  in  Data retDc
+
+charToCharLiteral :: Char -> Term
+charToCharLiteral = Literal . CharLiteral
 
 integerToIntLiteral :: Integer -> Term
 integerToIntLiteral = Literal . IntLiteral . toInteger . (fromInteger :: Integer -> Int) -- for overflow behaviour
