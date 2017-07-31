@@ -17,6 +17,7 @@ module CLaSH.GHC.Evaluator where
 import           Control.Monad.Trans.Except (runExcept)
 import qualified Data.Bifunctor      as Bifunctor
 import           Data.Bits
+import           Data.Char           (ord)
 import qualified Data.Either         as Either
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Maybe          (catMaybes, fromMaybe)
@@ -70,11 +71,23 @@ import CLaSH.Sized.Internal.Unsigned (Unsigned (..))
 
 reduceConstant :: HashMap.HashMap TyConOccName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
+-----------------
+-- GHC.Prim.Char#
+-----------------
+  "GHC.Prim.gtChar#" | Just (i,j) <- charLiterals tcm isSubj args
+    -> boolToIntLiteral (i > j)
+  "GHC.Prim.geChar#" | Just (i,j) <- charLiterals tcm isSubj args
+    -> boolToIntLiteral (i >= j)
   "GHC.Prim.eqChar#" | Just (i,j) <- charLiterals tcm isSubj args
     -> boolToIntLiteral (i == j)
-
   "GHC.Prim.neChar#" | Just (i,j) <- charLiterals tcm isSubj args
     -> boolToIntLiteral (i /= j)
+  "GHC.Prim.ltChar#" | Just (i,j) <- charLiterals tcm isSubj args
+    -> boolToIntLiteral (i < j)
+  "GHC.Prim.leChar#" | Just (i,j) <- charLiterals tcm isSubj args
+    -> boolToIntLiteral (i <= j)
+  "GHC.Prim.ord#" | [i] <- charLiterals' tcm isSubj args
+    -> integerToIntLiteral (toInteger $ ord i)
 
   "GHC.Prim.+#" | Just (i,j) <- intLiterals tcm isSubj args
     -> integerToIntLiteral (i+j)
@@ -1740,6 +1753,13 @@ charLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type]
 charLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
   [Literal (CharLiteral i), Literal (CharLiteral j)] -> Just (i,j)
   _ -> Nothing
+
+charLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Char]
+charLiterals' tcm isSubj args = catMaybes $ (map (charLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+  where
+    charLiteral x = case x of
+      Literal (CharLiteral c) -> Just c
+      _ -> Nothing
 
 sizedLiterals :: Text -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 sizedLiterals szCon tcm isSubj args
