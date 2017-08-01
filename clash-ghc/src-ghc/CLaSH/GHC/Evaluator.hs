@@ -711,6 +711,34 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
             (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+  "GHC.Int.I8#"
+    | isSubj
+    , [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
+            [intDc] = tyConDataCons intTc
+        in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+  "GHC.Int.I16#"
+    | isSubj
+    , [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
+            [intDc] = tyConDataCons intTc
+        in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+  "GHC.Int.I32#"
+    | isSubj
+    , [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
+            [intDc] = tyConDataCons intTc
+        in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
+  "GHC.Int.I64#"
+    | isSubj
+    , [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
+    ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
+            (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
+            [intDc] = tyConDataCons intTc
+        in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
 
   "GHC.Types.W#"
     | isSubj
