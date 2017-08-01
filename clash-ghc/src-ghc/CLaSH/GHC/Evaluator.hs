@@ -467,6 +467,85 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                    [ Left (Literal . IntLiteral  . toInteger $ I# p)
                    , Left (Literal . IntLiteral  . toInteger $ I# q)])
 
+--------
+-- Float
+--------
+  "GHC.Prim.gtFloat#"  | Just r <- liftFFI gtFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.geFloat#"  | Just r <- liftFFI geFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.eqFloat#"  | Just r <- liftFFI eqFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.neFloat#"  | Just r <- liftFFI neFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.ltFloat#"  | Just r <- liftFFI ltFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.leFloat#"  | Just r <- liftFFI leFloat#  tcm isSubj args
+    -> r
+
+  "GHC.Prim.plusFloat#"  | Just r <- liftFFF plusFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.minusFloat#"  | Just r <- liftFFF minusFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.timesFloat#"  | Just r <- liftFFF timesFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.divideFloat#"  | Just r <- liftFFF divideFloat#  tcm isSubj args
+    -> r
+
+  "GHC.Prim.negateFloat#"  | Just r <- liftFF negateFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.fabsFloat#"  | Just r <- liftFF fabsFloat#  tcm isSubj args
+    -> r
+
+  "GHC.Prim.float2Int#" | [i] <- floatLiterals' tcm isSubj args
+    -> let !(F# a) = fromRational i
+           r = float2Int# a
+       in  Literal . IntLiteral . toInteger $ I# r
+
+  "GHC.Prim.expFloat#"  | Just r <- liftFF expFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.logFloat#"  | Just r <- liftFF logFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.sqrtFloat#"  | Just r <- liftFF sqrtFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.sinFloat#"  | Just r <- liftFF sinFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.cosFloat#"  | Just r <- liftFF cosFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.tanFloat#"  | Just r <- liftFF tanFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.asinFloat#"  | Just r <- liftFF asinFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.acosFloat#"  | Just r <- liftFF acosFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.atanFloat#"  | Just r <- liftFF atanFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.sinhFloat#"  | Just r <- liftFF sinhFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.coshFloat#"  | Just r <- liftFF coshFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.tanhFloat#"  | Just r <- liftFF tanhFloat#  tcm isSubj args
+    -> r
+  "GHC.Prim.powerFloat#"  | Just r <- liftFFF powerFloat#  tcm isSubj args
+    -> r
+
+  "GHC.Prim.float2Double#" | [i] <- floatLiterals' tcm isSubj args
+    -> let !(F# a) = fromRational i
+           r = float2Double# a
+       in  Literal . DoubleLiteral . toRational $ D# r
+
+-- decodeFloat_Int# :: Float# -> (#Int#, Int##)
+  "GHC.Prim.decodeFloat_Int#" | [i] <- floatLiterals' tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(F# a) = fromRational i
+           !(# p, q #) = decodeFloat_Int# a
+       in mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
+                   , Left (Literal . IntLiteral  . toInteger $ I# q)])
+
+
   "GHC.Prim.tagToEnum#"
     | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
       map (Bifunctor.bimap (reduceConstant tcm isSubj) id) args
@@ -2555,6 +2634,37 @@ runDD f i
   = let !(D# a) = fromRational i
         r = f a
     in  Literal . DoubleLiteral . toRational $ D# r
+
+liftFFI :: (Float# -> Float# -> Int#) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe Term
+liftFFI f tcm isSubj args = case floatLiterals' tcm isSubj args of
+  [i,j] -> Just $ runFFI f i j
+  _     -> Nothing
+liftFFF :: (Float# -> Float# -> Float#) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe Term
+liftFFF f tcm isSubj args = case floatLiterals' tcm isSubj args of
+  [i,j] -> Just $ runFFF f i j
+  _     -> Nothing
+liftFF  :: (Float# -> Float#) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe Term
+liftFF  f tcm isSubj args = case floatLiterals' tcm isSubj args of
+  [i]   -> Just $ runFF f i
+  _     -> Nothing
+runFFI :: (Float# -> Float# -> Int#) -> Rational -> Rational -> Term
+runFFI f i j
+  = let !(F# a) = fromRational i
+        !(F# b) = fromRational j
+        r = f a b
+    in  Literal . IntLiteral . toInteger $ I# r
+runFFF :: (Float# -> Float# -> Float#) -> Rational -> Rational -> Term
+runFFF f i j
+  = let !(F# a) = fromRational i
+        !(F# b) = fromRational j
+        r = f a b
+    in  Literal . FloatLiteral . toRational $ F# r
+runFF :: (Float# -> Float#) -> Rational -> Term
+runFF f i
+  = let !(F# a) = fromRational i
+        r = f a
+    in  Literal . FloatLiteral . toRational $ F# r
+
 
 vecHeadTy
   :: TyConName
