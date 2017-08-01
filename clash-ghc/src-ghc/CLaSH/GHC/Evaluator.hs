@@ -2070,6 +2070,23 @@ reduceConstant _ _ e = e
 reduceTerms :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Term]
 reduceTerms tcm isSubj = map (reduceConstant tcm isSubj) . Either.lefts
 
+typedLiterals' :: (Term -> Maybe a) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [a]
+typedLiterals' typedLiteral tcm isSubj args = catMaybes $ (map (typedLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+
+doubleLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Rational]
+doubleLiterals' = typedLiterals' doubleLiteral
+  where
+    doubleLiteral x = case x of
+      Literal (DoubleLiteral i) -> Just i
+      _ -> Nothing
+
+floatLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Rational]
+floatLiterals' = typedLiterals' floatLiteral
+  where
+    floatLiteral x = case x of
+      Literal (FloatLiteral i) -> Just i
+      _ -> Nothing
+
 integerLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 integerLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntegerLiteral i), Literal (IntegerLiteral j)] -> Just (i,j)
@@ -2081,7 +2098,7 @@ intLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   _ -> Nothing
 
 intLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
-intLiterals' tcm isSubj args = catMaybes $ (map (intLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+intLiterals' = typedLiterals' intLiteral
   where
     intLiteral x = case x of
       Literal (IntLiteral i) -> Just i
@@ -2099,7 +2116,7 @@ wordLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.le
   [Literal (WordLiteral i), Literal (WordLiteral j)] -> Just (i,j)
   _ -> Nothing
 wordLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
-wordLiterals' tcm isSubj args = catMaybes $ (map (wordLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+wordLiterals' = typedLiterals' wordLiteral
   where
     wordLiteral x = case x of
       Literal (WordLiteral i) -> Just i
@@ -2111,7 +2128,7 @@ charLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.le
   _ -> Nothing
 
 charLiterals' :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Char]
-charLiterals' tcm isSubj args = catMaybes $ (map (charLiteral . reduceConstant tcm isSubj) . Either.lefts) args
+charLiterals' = typedLiterals' charLiteral
   where
     charLiteral x = case x of
       Literal (CharLiteral c) -> Just c
@@ -2127,8 +2144,7 @@ sizedLiterals szCon tcm isSubj args
       _ -> Nothing
 
 sizedLiterals' :: Text -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Integer]
-sizedLiterals' szCon tcm isSubj args
-  = catMaybes $ map (sizedLiteral szCon) $ reduceTerms tcm isSubj args
+sizedLiterals' szCon = typedLiterals' (sizedLiteral szCon)
 
 sizedLiteral :: Text -> Term -> Maybe Integer
 sizedLiteral szCon term = case collectArgs term of
