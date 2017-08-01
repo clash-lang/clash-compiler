@@ -1853,7 +1853,50 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                                       ,Left (Either.lefts vArgs !! 2)])
   "CLaSH.Sized.Vector.imap"
     | isSubj
-    -> e
+    , (nTy : aTy : bTy : _) <- Either.rights args
+    , (tyArgs,tyView -> TyConApp vecTcNm _) <- splitFunForallTy ty
+    , let (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 1)
+    , TyConApp indexTcNm _ <- tyView (Either.rights tyArgs' !! 0)
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> reduceConstant tcm isSubj $
+       mkApps (Prim "CLaSH.Sized.Vector.imap_go" (vecImapGoTy vecTcNm indexTcNm))
+              [Right nTy
+              ,Right nTy
+              ,Right aTy
+              ,Right bTy
+              ,Left (mkIndexLit (Either.rights tyArgs' !! 0) nTy n 0)
+              ,Left (Either.lefts args !! 1)
+              ,Left (Either.lefts args !! 2)
+              ]
+
+  "CLaSH.Sized.Vector.imap_go"
+    | isSubj
+    , (nTy : mTy : aTy : bTy : _) <- Either.rights args
+    , (n : f : xs : _) <- Either.lefts args
+    , (Data dc,vArgs) <- collectArgs (reduceConstant tcm isSubj xs)
+    , Right n' <- runExcept (tyNatSize tcm nTy)
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    -> case m of
+         0  -> mkVecNil dc bTy
+         m' -> let (tyArgs,_) = splitFunForallTy ty
+                   TyConApp indexTcNm _ = tyView (Either.rights tyArgs !! 0)
+               in  mkVecCons dc bTy m'
+                 (mkApps f [Left n,Left (Either.lefts vArgs !! 1)])
+                 (mkApps (Prim nm ty)
+                         [Right nTy
+                         ,Right (LitTy (NumTy (m'-1)))
+                         ,Right aTy
+                         ,Right bTy
+                         ,Left (mkApps (Prim "CLaSH.Sized.Internal.Index.+#" (indexAddTy indexTcNm))
+                                       [Right nTy
+                                       ,Left (Literal (NaturalLiteral n'))
+                                       ,Left n
+                                       ,Left (mkIndexLit (Either.rights tyArgs !! 0) nTy n' 1)
+                                       ])
+                         ,Left f
+                         ,Left (Either.lefts vArgs !! 2)
+                         ])
+    | isSubj -> error "imap_go"
 
 -- - Zipping
   "CLaSH.Sized.Vector.zipWith"
@@ -2488,7 +2531,47 @@ vecZipWithTy vecNm =
     aTy = VarTy liftedTypeKind (string2SystemName "a")
     bTy = VarTy liftedTypeKind (string2SystemName "b")
     cTy = VarTy liftedTypeKind (string2SystemName "c")
-    nTy = VarTy liftedTypeKind (string2SystemName "n")
+    nTy = VarTy typeNatKind (string2SystemName "n")
+
+vecImapGoTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> TyConName
+  -- ^ Index TyCon name
+  -> Type
+vecImapGoTy vecTcNm indexTcNm =
+  ForAllTy (bind nTV (
+  ForAllTy (bind mTV (
+  ForAllTy (bind aTV (
+  ForAllTy (bind bTV (
+  mkFunTy indexTy
+    (mkFunTy fTy
+       (mkFunTy vecATy vecBTy))))))))))
+  where
+    nTV = TyVar (string2SystemName "n") (embed typeNatKind)
+    mTV = TyVar (string2SystemName "m") (embed typeNatKind)
+    aTV = TyVar (string2SystemName "a") (embed liftedTypeKind)
+    bTV = TyVar (string2SystemName "b") (embed liftedTypeKind)
+    indexTy = mkTyConApp indexTcNm [nTy]
+    nTy = VarTy typeNatKind (string2SystemName "n")
+    mTy = VarTy typeNatKind (string2SystemName "m")
+    fTy = mkFunTy indexTy (mkFunTy aTy bTy)
+    aTy = VarTy liftedTypeKind (string2SystemName "a")
+    bTy = VarTy liftedTypeKind (string2SystemName "b")
+    vecATy = mkTyConApp vecTcNm [mTy,aTy]
+    vecBTy = mkTyConApp vecTcNm [mTy,bTy]
+
+indexAddTy
+  :: TyConName
+  -- ^ Index TyCon name
+  -> Type
+indexAddTy indexTcNm =
+  ForAllTy (bind nTV (
+  mkFunTy naturalPrimTy (mkFunTy indexTy (mkFunTy indexTy indexTy))))
+  where
+    nTV     = TyVar (string2SystemName "n") (embed typeNatKind)
+    indexTy = mkTyConApp indexTcNm [VarTy typeNatKind (string2SystemName "n")]
+
 
 
 bvAppendTy
