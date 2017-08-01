@@ -128,6 +128,7 @@ Library
                       CLaSH.Backend.VHDL
 
                       CLaSH.Core.DataCon
+                      CLaSH.Core.Evaluator
                       CLaSH.Core.FreeVars
                       CLaSH.Core.Literal
                       CLaSH.Core.Name

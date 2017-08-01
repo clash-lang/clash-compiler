@@ -30,6 +30,7 @@ import Unbound.Generics.LocallyNameless.Name (Name (..))
 
 import SrcLoc (SrcSpan)
 
+import CLaSH.Core.Evaluator      (PrimEvaluator)
 import CLaSH.Core.Term           (Term, TmName, TmOccName)
 import CLaSH.Core.Type           (Type)
 import CLaSH.Core.TyCon          (TyCon, TyConName, TyConOccName)
@@ -86,7 +87,7 @@ data RewriteEnv
   -- ^ TyCon cache
   , _tupleTcCache   :: IntMap TyConName
   -- ^ Tuple TyCon cache
-  , _evaluator      :: HashMap TyConOccName TyCon -> Bool -> Term -> Term
+  , _evaluator      :: PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)}
   , _allowZero      :: Bool
   -- ^ Zero bit wide things are representable

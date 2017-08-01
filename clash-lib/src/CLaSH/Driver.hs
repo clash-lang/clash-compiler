@@ -44,6 +44,7 @@ import           GHC.BasicTypes.Extra             ()
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Annotations.TopEntity.Extra ()
 import           CLaSH.Backend
+import           CLaSH.Core.Evaluator             (PrimEvaluator)
 import           CLaSH.Core.Name                  (Name (..), name2String)
 import           CLaSH.Core.Term                  (Term, TmName, TmOccName)
 import           CLaSH.Core.Type                  (Type)
@@ -74,7 +75,7 @@ generateHDL
   -- ^ Tuple TyCon cache
   -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
+  -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
   -> [( TmName
       , Type
@@ -358,7 +359,7 @@ normalizeEntity
   -- ^ Tuple TyCon cache
   -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
-  -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
+  -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
   -> [TmOccName]
   -- ^ TopEntities

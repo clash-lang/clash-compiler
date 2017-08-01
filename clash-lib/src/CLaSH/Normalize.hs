@@ -31,6 +31,7 @@ import           Unbound.Generics.LocallyNameless (unembed)
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
 
+import           CLaSH.Core.Evaluator             (PrimEvaluator)
 import           CLaSH.Core.FreeVars              (termFreeIds)
 import           CLaSH.Core.Name                  (Name (..), NameSort (..))
 import           CLaSH.Core.Pretty                (showDoc)
@@ -77,7 +78,7 @@ runNormalization
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Bool -> Term -> Term)
+  -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
   -> PrimMap BlackBoxTemplate
   -- ^ Primitive Definitions

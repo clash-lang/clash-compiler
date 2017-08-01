@@ -43,6 +43,7 @@ module CLaSH.Normalize.Transformations
   )
 where
 
+import           Control.Concurrent.Supply   (splitSupply)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
@@ -63,6 +64,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           BasicTypes                  (InlineSpec (..))
 
 import           CLaSH.Core.DataCon          (DataCon (..))
+import           CLaSH.Core.Evaluator        (whnf')
 import           CLaSH.Core.Name
   (Name (..), NameSort (..), name2String, string2InternalName, string2SystemName)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
@@ -283,9 +285,13 @@ caseCon _ c@(Case (Literal l) _ alts) = do
 caseCon ctx e@(Case subj ty alts)
   | isConstant subj = do
     tcm <- Lens.view tcCache
+    bndrs <- Lens.use bindings
+    primEval <- Lens.view evaluator
+    ids <- Lens.use uniqSupply
+    let (ids1,ids2) = splitSupply ids
+    uniqSupply Lens..= ids2
     lvl <- Lens.view dbgLevel
-    reduceConstant <- Lens.view evaluator
-    case reduceConstant tcm True subj of
+    case whnf' primEval bndrs tcm ids1 True subj of
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj' -> case collectArgs subj' of
         (Data _,_) -> caseCon ctx (Case subj' ty alts)
@@ -1041,8 +1047,12 @@ reduceConst _ e@(App _ _)
   , isPrim conPrim
   = do
     tcm <- Lens.view tcCache
-    reduceConstant <- Lens.view evaluator
-    case reduceConstant tcm False e of
+    bndrs <- Lens.use bindings
+    primEval <- Lens.view evaluator
+    ids <- Lens.use uniqSupply
+    let (ids1,ids2) = splitSupply ids
+    uniqSupply Lens..= ids2
+    case whnf' primEval bndrs tcm ids1 False e of
       e'@(Literal _) -> changed e'
       e'@(collectArgs -> (Prim nm _, _))
         | isFromInt nm

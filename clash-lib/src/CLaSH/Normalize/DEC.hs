@@ -42,6 +42,7 @@ module CLaSH.Normalize.DEC
 where
 
 -- external
+import           Control.Concurrent.Supply        (splitSupply)
 import qualified Control.Lens                     as Lens
 import           Data.Bits                        ((.&.),complement)
 import qualified Data.Either                      as Either
@@ -61,6 +62,7 @@ import qualified Unbound.Generics.LocallyNameless as Unbound
 
 -- internal
 import CLaSH.Core.DataCon    (DataCon, dcTag)
+import CLaSH.Core.Evaluator  (whnf')
 import CLaSH.Core.FreeVars   (termFreeIds, typeFreeVars)
 import CLaSH.Core.Name       (Name (..), string2InternalName)
 import CLaSH.Core.Literal    (Literal (..))
@@ -70,7 +72,8 @@ import CLaSH.Core.Type       (Type, isPolyFunTy, mkTyConApp, splitFunForallTy)
 import CLaSH.Core.Util       (collectArgs, mkApps, termType)
 import CLaSH.Normalize.Types (NormalizeState)
 import CLaSH.Normalize.Util  (isConstant)
-import CLaSH.Rewrite.Types   (RewriteMonad, evaluator, tcCache, tupleTcCache)
+import CLaSH.Rewrite.Types
+  (RewriteMonad, bindings, evaluator, tcCache, tupleTcCache, uniqSupply)
 import CLaSH.Rewrite.Util    (mkInternalVar, mkSelectorCase,
                               isUntranslatableType)
 import CLaSH.Util
@@ -133,13 +136,18 @@ collectGlobals inScope substitution seen (Case scrut ty alts) = do
 collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
   | not (isConstant e) = do
     tcm <- Lens.view tcCache
-    eval <- Lens.view evaluator
+    bndrs <- Lens.use bindings
+    primEval <- Lens.view evaluator
+    ids <- Lens.use uniqSupply
+    let (ids1,ids2) = splitSupply ids
+    uniqSupply Lens..= ids2
+    let eval = whnf' primEval bndrs tcm ids1 False
     eTy <- termType tcm e
     untran <- isUntranslatableType eTy
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound
       -- in our desired normal form.
-      False -> case interestingToLift inScope (eval tcm False) fun args of
+      False -> case interestingToLift inScope eval fun args of
         Just fun' | fun' `notElem` seen -> do
           (args',collected) <- collectGlobalsArgs inScope substitution
                                                   (fun':seen) args
