@@ -413,10 +413,10 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> let !(D# a) = fromRational i
            r = double2Int# a
        in  Literal . IntLiteral . toInteger $ I# r
-  "GHC.Prim.double2Float#" | [i] <- doubleLiterals' tcm isSubj args
-    -> let !(D# a) = fromRational i
-           r = double2Float# a
-       in  Literal . FloatLiteral . toRational $ F# r
+  "GHC.Prim.double2Float#"
+    | [Literal (DoubleLiteral d)] <- reduceTerms tcm isSubj args
+    -> Literal (FloatLiteral (toRational (fromRational d :: Float)))
+
 
   "GHC.Prim.expDouble#" | Just r <- liftDD expDouble# tcm isSubj args
     -> r
@@ -804,15 +804,6 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Integer.Type.doubleFromInteger"
     | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> Literal (DoubleLiteral (toRational (fromInteger i :: Double)))
-
-  "GHC.Prim.double2Float#"
-    | [Literal (DoubleLiteral d)] <- reduceTerms tcm isSubj args
-    -> Literal (FloatLiteral (toRational (fromRational d :: Float)))
-
-  "GHC.Prim.divideFloat#"
-    | [Literal (FloatLiteral f1)
-      ,Literal (FloatLiteral f2)] <- reduceTerms tcm isSubj args
-    -> Literal (FloatLiteral (toRational (fromRational f1 / fromRational f2 :: Float)))
 
   "GHC.Base.eqString"
     | [(_,[Left (Literal (StringLiteral s1))])
