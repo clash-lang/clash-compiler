@@ -26,6 +26,7 @@ import           Data.Proxy          (Proxy)
 import           Data.Reflection     (reifyNat)
 import           Data.Text           (Text)
 -- import           Data.Word
+import           GHC.Float
 import           GHC.Int
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
@@ -379,6 +380,92 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
            b = narrow32Word# a
        in  Literal . WordLiteral . toInteger $ W# b
 
+----------
+-- Double#
+----------
+  "GHC.Prim.>##"  | Just r <- liftDDI (>##)  tcm isSubj args
+    -> r
+  "GHC.Prim.>=##" | Just r <- liftDDI (>=##) tcm isSubj args
+    -> r
+  "GHC.Prim.==##" | Just r <- liftDDI (==##) tcm isSubj args
+    -> r
+  "GHC.Prim./=##" | Just r <- liftDDI (/=##) tcm isSubj args
+    -> r
+  "GHC.Prim.<##"  | Just r <- liftDDI (<##)  tcm isSubj args
+    -> r
+  "GHC.Prim.<=##" | Just r <- liftDDI (<=##) tcm isSubj args
+    -> r
+  "GHC.Prim.+##"  | Just r <- liftDDD (+##)  tcm isSubj args
+    -> r
+  "GHC.Prim.-##"  | Just r <- liftDDD (-##)  tcm isSubj args
+    -> r
+  "GHC.Prim.*##"  | Just r <- liftDDD (*##)  tcm isSubj args
+    -> r
+  "GHC.Prim./##"  | Just r <- liftDDD (/##)  tcm isSubj args
+    -> r
+
+  "GHC.Prim.negateDouble#" | Just r <- liftDD negateDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.fabsDouble#" | Just r <- liftDD fabsDouble# tcm isSubj args
+    -> r
+
+  "GHC.Prim.double2Int#" | [i] <- doubleLiterals' tcm isSubj args
+    -> let !(D# a) = fromRational i
+           r = double2Int# a
+       in  Literal . IntLiteral . toInteger $ I# r
+  "GHC.Prim.double2Float#" | [i] <- doubleLiterals' tcm isSubj args
+    -> let !(D# a) = fromRational i
+           r = double2Float# a
+       in  Literal . FloatLiteral . toRational $ F# r
+
+  "GHC.Prim.expDouble#" | Just r <- liftDD expDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.logDouble#" | Just r <- liftDD logDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.sqrtDouble#" | Just r <- liftDD sqrtDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.sinDouble#" | Just r <- liftDD sinDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.cosDouble#" | Just r <- liftDD cosDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.tanDouble#" | Just r <- liftDD tanDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.asinDouble#" | Just r <- liftDD asinDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.acosDouble#" | Just r <- liftDD acosDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.atanDouble#" | Just r <- liftDD atanDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.sinhDouble#" | Just r <- liftDD sinhDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.coshDouble#" | Just r <- liftDD coshDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.tanhDouble#" | Just r <- liftDD tanhDouble# tcm isSubj args
+    -> r
+  "GHC.Prim.**##" | Just r <- liftDDD (**##) tcm isSubj args
+    -> r
+-- decodeDouble_2Int# :: Double# -> (#Int#, Word#, Word#, Int##)
+  "GHC.Prim.decodeDouble_2Int#" | [i] <- doubleLiterals' tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(D# a) = fromRational i
+           !(# p, q, r, s #) = decodeDouble_2Int# a
+       in mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
+                   , Left (Literal . WordLiteral . toInteger $ W# q)
+                   , Left (Literal . WordLiteral . toInteger $ W# r)
+                   , Left (Literal . IntLiteral  . toInteger $ I# s)])
+-- decodeDouble_Int64# :: Double# -> (#Int#, Int##)
+  "GHC.Prim.decodeDouble_Int64#" | [i] <- doubleLiterals' tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(D# a) = fromRational i
+           !(# p, q #) = decodeDouble_Int64# a
+       in mkApps (Data tupDc) (map Right tyArgs ++
+                   [ Left (Literal . IntLiteral  . toInteger $ I# p)
+                   , Left (Literal . IntLiteral  . toInteger $ I# q)])
 
   "GHC.Prim.tagToEnum#"
     | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
@@ -2438,6 +2525,36 @@ extractTySizeInfo tcm e = (resTy,resSizeTy,resSize)
     resTy = runFreshM (termType tcm e)
     (TyConApp _ [resSizeTy]) = tyView resTy
     Right resSize = runExcept (tyNatSize tcm resSizeTy)
+
+liftDDI :: (Double# -> Double# -> Int#) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe Term
+liftDDI f tcm isSubj args = case doubleLiterals' tcm isSubj args of
+  [i,j] -> Just $ runDDI f i j
+  _     -> Nothing
+liftDDD :: (Double# -> Double# -> Double#) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe Term
+liftDDD f tcm isSubj args = case doubleLiterals' tcm isSubj args of
+  [i,j] -> Just $ runDDD f i j
+  _     -> Nothing
+liftDD  :: (Double# -> Double#) -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe Term
+liftDD  f tcm isSubj args = case doubleLiterals' tcm isSubj args of
+  [i]   -> Just $ runDD f i
+  _     -> Nothing
+runDDI :: (Double# -> Double# -> Int#) -> Rational -> Rational -> Term
+runDDI f i j
+  = let !(D# a) = fromRational i
+        !(D# b) = fromRational j
+        r = f a b
+    in  Literal . IntLiteral . toInteger $ I# r
+runDDD :: (Double# -> Double# -> Double#) -> Rational -> Rational -> Term
+runDDD f i j
+  = let !(D# a) = fromRational i
+        !(D# b) = fromRational j
+        r = f a b
+    in  Literal . DoubleLiteral . toRational $ D# r
+runDD :: (Double# -> Double#) -> Rational -> Term
+runDD f i
+  = let !(D# a) = fromRational i
+        r = f a
+    in  Literal . DoubleLiteral . toRational $ D# r
 
 vecHeadTy
   :: TyConName
