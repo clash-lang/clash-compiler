@@ -6,6 +6,7 @@
 
 {-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -45,6 +46,7 @@ import qualified TyCon
 import           TysWiredIn          (tupleTyCon)
 import           Unique              (getKey)
 
+import           CLaSH.Class.BitPack (pack,unpack)
 import           CLaSH.Core.DataCon  (DataCon (..), dataConInstArgTys)
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Name
@@ -843,6 +845,30 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       ,(_,[Left (Literal (StringLiteral s2))])
       ] <- map collectArgs (Either.lefts args)
     -> boolToBoolLiteral tcm ty (s1 == s2)
+
+
+  "CLaSH.Class.BitPack.packDouble#" -- :: Double -> BitVector 64
+    | rTerms <- reduceTerms tcm isSubj args
+    , App _ (e2) : _ <- rTerms
+    , Literal (DoubleLiteral i) <- reduceConstant tcm isSubj e2
+    -> let resTyInfo = extractTySizeInfo tcm e
+    in mkBitVectorLit' resTyInfo (BitVector.unsafeToInteger $ (pack :: Double -> BitVector 64) $ fromRational i)
+
+  "CLaSH.Class.BitPack.packFloat#" -- :: Float -> BitVector 32
+    | rTerms <- reduceTerms tcm isSubj args
+    , App _ (e2) : _ <- rTerms
+    , Literal (FloatLiteral i) <- reduceConstant tcm isSubj e2
+    -> let resTyInfo = extractTySizeInfo tcm e
+    in mkBitVectorLit' resTyInfo (BitVector.unsafeToInteger $ (pack :: Float -> BitVector 32) $ fromRational i)
+
+  "CLaSH.Class.BitPack.unpackFloat#"
+    | [i] <- bitVectorLiterals' tcm isSubj args
+    -> Literal (FloatLiteral (toRational $ (unpack :: BitVector 32 -> Float) (fromInteger i)))
+
+  "CLaSH.Class.BitPack.unpackDouble#"
+    | [i] <- bitVectorLiterals' tcm isSubj args
+    -> Literal (DoubleLiteral (toRational $ (unpack :: BitVector 64 -> Double) (fromInteger i)))
+
 
   "CLaSH.Promoted.Nat.powSNat"
     | [Right a, Right b] <- (map (runExcept . tyNatSize tcm) . Either.rights) args
