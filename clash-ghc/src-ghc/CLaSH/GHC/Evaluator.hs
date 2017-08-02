@@ -602,7 +602,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Integer.Type.timesInteger" | Just (i,j) <- integerLiterals tcm isSubj args
     -> integerToIntegerLiteral (i*j)
 
-  "GHC.Integer.Type.negateInteger#"
+  "GHC.Integer.Type.negateInteger"
     | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral (negate i)
 
