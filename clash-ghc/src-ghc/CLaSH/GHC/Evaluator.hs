@@ -192,12 +192,12 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [ Literal (IntLiteral i)
       , Literal (IntLiteral s)
       ] <- reduceTerms tcm isSubj args
-    -> Literal (WordLiteral (i `shiftL` fromInteger s))
+    -> integerToIntLiteral (i `shiftL` fromInteger s)
   "GHC.Prim.uncheckedIShiftRA#"
     | [ Literal (IntLiteral i)
       , Literal (IntLiteral s)
       ] <- reduceTerms tcm isSubj args
-    -> Literal (WordLiteral (i `shiftR` fromInteger s))
+    -> integerToIntLiteral (i `shiftR` fromInteger s)
   "GHC.Prim.uncheckedIShiftRL#" | Just (i,j) <- intLiterals tcm isSubj args
     -> let !(I# a)  = fromInteger i
            !(I# b)  = fromInteger j
