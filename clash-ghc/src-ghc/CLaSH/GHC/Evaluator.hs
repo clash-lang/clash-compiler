@@ -28,6 +28,7 @@ import           Data.Text           (Text)
 -- import           Data.Word
 import           GHC.Float
 import           GHC.Int
+import           GHC.Integer         (decodeDoubleInteger,encodeDoubleInteger)
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
@@ -593,6 +594,33 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [Literal (IntegerLiteral i)] <- reduceTerms tcm isSubj args
     -> integerToIntLiteral i
 
+  "GHC.Integer.Type.decodeDoubleInteger" -- :: Double# -> (#Integer, Int##)
+    | [Literal (DoubleLiteral i)] <- reduceTerms tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           !(D# a)  = fromRational i
+           !(# b, c #) = decodeDoubleInteger a
+    in mkApps (Data tupDc) (map Right tyArgs ++
+                [ Left (integerToIntegerLiteral b)
+                , Left (integerToIntLiteral . toInteger $ I# c)])
+
+  "GHC.Integer.Type.encodeDoubleInteger" -- :: Integer -> Int# -> Double#
+    | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
+    -> let !(I# k) = fromInteger j
+           r = encodeDoubleInteger i k
+    in  Literal . DoubleLiteral . toRational $ D# r
+
+  "GHC.Integer.Type.quotRemInteger" -- :: Integer -> Integer -> (#Integer, Integer#)
+    | [Literal (IntegerLiteral i), Literal (IntegerLiteral j)] <- reduceTerms tcm isSubj args
+    -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc] = tyConDataCons tupTc
+           (q,r) = quotRem i j
+    in mkApps (Data tupDc) (map Right tyArgs ++
+                [ Left (integerToIntegerLiteral q)
+                , Left (integerToIntegerLiteral r)])
+
   "GHC.Integer.Type.plusInteger" | Just (i,j) <- integerLiterals tcm isSubj args
     -> integerToIntegerLiteral (i+j)
 
@@ -680,6 +708,11 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Natural.NatS#"
     | [Literal (WordLiteral w)] <- reduceTerms tcm isSubj args
     -> Literal (NaturalLiteral w)
+
+  "GHC.Real.$wf" -- XXX: Very fragile, internal function f in implementation of (^) in GHC.Real
+  -- :: Integer -> Int# -> Integer
+    | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
+    -> integerToIntegerLiteral $ i ^ j
 
   "GHC.TypeLits.natVal"
 #if MIN_VERSION_ghc(8,2,0)
