@@ -711,10 +711,18 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | [Literal (WordLiteral w)] <- reduceTerms tcm isSubj args
     -> Literal (NaturalLiteral w)
 
-  "GHC.Real.$wf" -- XXX: Very fragile, internal function f in implementation of (^) in GHC.Real
-  -- :: Integer -> Int# -> Integer
+  -- GHC.Real.^  -- XXX: Very fragile
+  -- ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
+  "GHC.Real.^_f"  -- :: Integer -> Integer -> Integer
+    | [Literal (IntegerLiteral i), Literal (IntegerLiteral j)] <- reduceTerms tcm isSubj args
+    -> integerToIntegerLiteral $ i ^ j
+  "GHC.Real.$wf"  -- :: Integer -> Int# -> Integer
     | [Literal (IntegerLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
     -> integerToIntegerLiteral $ i ^ j
+  "GHC.Real.$wf1" -- :: Int# -> Int# -> Int#
+    | [Literal (IntLiteral i), Literal (IntLiteral j)] <- reduceTerms tcm isSubj args
+    -> integerToIntLiteral $ i ^ j
+
 
   "GHC.TypeLits.natVal"
 #if MIN_VERSION_ghc(8,2,0)
