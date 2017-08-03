@@ -1355,13 +1355,13 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     -> boolToBoolLiteral tcm ty (i /= j)
 
 -- Ord
-  "CLaSH.Sized.Internal.Unsigned.lt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+  "CLaSH.Sized.Internal.Signed.lt#" | Just (i,j) <- signedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i <  j)
-  "CLaSH.Sized.Internal.Unsigned.ge#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+  "CLaSH.Sized.Internal.Signed.ge#" | Just (i,j) <- signedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i >= j)
-  "CLaSH.Sized.Internal.Unsigned.gt#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+  "CLaSH.Sized.Internal.Signed.gt#" | Just (i,j) <- signedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i >  j)
-  "CLaSH.Sized.Internal.Unsigned.le#" | Just (i,j) <- unsignedLiterals tcm isSubj args
+  "CLaSH.Sized.Internal.Signed.le#" | Just (i,j) <- signedLiterals tcm isSubj args
     -> boolToBoolLiteral tcm ty (i <= j)
 
 -- Bounded
