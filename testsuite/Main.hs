@@ -88,6 +88,7 @@ main =
             ]
         , testGroup "Floating"
             [ runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-clash-float-support"] "FloatPack" ([""],"FloatPack_topEntity",False)
+            , runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-clash-float-support"] "FloatConstFolding" (["","FloatConstFolding_testBench"],"FloatConstFolding_testBench",True)
             ]
         , testGroup "HOPrim"
             [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","HOImap_testBench"],"HOImap_testBench",True)
