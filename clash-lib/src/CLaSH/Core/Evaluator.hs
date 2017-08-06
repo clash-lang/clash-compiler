@@ -53,7 +53,7 @@ data StackFrame
   | Apply  Id
   | Instantiate Type
   | PrimApply  Text Type [Type] [Value] [Term]
-  | Scrutinise [Alt]
+  | Scrutinise Type [Alt]
   deriving Show
 
 -- Values
@@ -110,7 +110,7 @@ whnf
   -> State
 whnf eval gbl tcm isSubj (h,k,e) =
     if isSubj
-       then go (h,Scrutinise []:k,e) -- See [Note: empty case expressions]
+       then go (h,Scrutinise undefined []:k,e) -- See [Note: empty case expressions]
        else go (h,k,e)
   where
     go s = case step eval gbl tcm s of
@@ -142,8 +142,10 @@ unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
   Apply id_ -> do
     e' <- lookup (nameOcc (varName id_)) h'
     unwindStack (h,k',App e e')
-  Scrutinise [] ->
+  Scrutinise _ [] ->
     unwindStack (h,k',e)
+  Scrutinise ty alts ->
+    unwindStack (h,k',Case e ty alts)
   _ -> error (show kf)
 
 {- [Note: forcing special primitives]
@@ -236,7 +238,7 @@ step eval gbl tcm (h, k, e) = case e of
   (App e1 e2)  -> let (h2,id_) = newLetBinding tcm h e2
                   in  Just (h2,Apply id_:k,e1)
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
-  (Case scrut _ alts) -> Just (h,Scrutinise alts:k,scrut)
+  (Case scrut ty alts) -> Just (h,Scrutinise ty alts:k,scrut)
   (Letrec bs)   -> Just (allocate h k bs)
 
 newLetBinding
@@ -302,7 +304,7 @@ unwind eval gbl tcm h k v = do
     Apply x                      -> return (apply  h k' v x)
     Instantiate ty               -> return (instantiate h k' v ty)
     PrimApply nm ty tys vals tms -> primop eval gbl tcm h k' nm ty tys vals v tms
-    Scrutinise alts              -> return (scrutinise h k' v alts)
+    Scrutinise _ alts            -> return (scrutinise h k' v alts)
 
 -- | Update the Heap with the evaluated term
 update :: Heap -> Stack -> Id -> Value -> State
