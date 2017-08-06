@@ -2204,7 +2204,24 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- Folding
   "CLaSH.Sized.Vector.foldr"
     | isSubj
-    -> Nothing
+    , aTy : bTy : nTy : _ <- tys
+    , f : z : xs : _ <- args
+    , DC _ vArgs <- xs
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0 -> reduce (valToTerm z)
+         _ -> reduceWHNF $
+              mkApps (valToTerm f)
+                     [Left (Either.lefts vArgs !! 1)
+                     ,Left (mkApps (Prim nm ty)
+                                   [Right aTy
+                                   ,Right bTy
+                                   ,Right (LitTy (NumTy (n-1)))
+                                   ,Left  (valToTerm f)
+                                   ,Left  (valToTerm z)
+                                   ,Left  (Either.lefts vArgs !! 2)
+                                   ])
+                     ]
   "CLaSH.Sized.Vector.fold"
     | isSubj
     -> Nothing

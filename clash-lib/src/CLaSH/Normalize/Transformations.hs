@@ -283,7 +283,7 @@ caseCon _ c@(Case (Literal l) _ alts) = do
     equalLit _               = False
 
 caseCon ctx e@(Case subj ty alts)
-  | isConstant subj = do
+  | (Prim _ _,_) <- collectArgs subj = do
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     primEval <- Lens.view evaluator
@@ -308,7 +308,7 @@ caseCon ctx e@(Case subj ty alts)
         (Prim nm _,[])
           | nm `elem` ["EmptyCase"] ->
             changed (Prim nm ty)
-        _ -> traceIf (lvl > DebugNone)
+        _ -> traceIf (lvl > DebugNone && isConstant e)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
                      (caseOneAlt e)
 
