@@ -2228,7 +2228,36 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- - Specialised folds
   "CLaSH.Sized.Vector.dfold"
     | isSubj
-    -> Nothing
+    , pTy : kTy : aTy : _ <- tys
+    , _ : p : f : z : xs : _ <- args
+    , DC _ vArgs <- xs
+    , Right k' <- runExcept (tyNatSize tcm kTy)
+    -> case k'  of
+         0 -> reduce (valToTerm z)
+         _ -> let (tyArgs,_)  = splitFunForallTy ty
+                  (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 2)
+                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                  Just snatTc = HashMap.lookup (nameOcc snatTcNm) tcm
+                  [snatDc]    = tyConDataCons snatTc
+                  k'ty        = LitTy (NumTy (k'-1))
+              in  reduceWHNF $
+                  mkApps (valToTerm f)
+                         [Right k'ty
+                         ,Left (mkApps (Data snatDc)
+                                       [Right k'ty
+                                       ,Left (Literal (NaturalLiteral (k'-1)))])
+                         ,Left (Either.lefts vArgs !! 1)
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right pTy
+                                       ,Right k'ty
+                                       ,Right aTy
+                                       ,Left (Literal (NaturalLiteral (k'-1)))
+                                       ,Left (valToTerm p)
+                                       ,Left (valToTerm f)
+                                       ,Left (valToTerm z)
+                                       ,Left (Either.lefts vArgs !! 2)
+                                       ])
+                         ]
   "CLaSH.Sized.Vector.dtfold"
     | isSubj
     -> Nothing
