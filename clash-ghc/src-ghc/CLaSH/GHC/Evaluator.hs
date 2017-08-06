@@ -2256,7 +2256,66 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                          ]
   "CLaSH.Sized.Vector.dtfold"
     | isSubj
-    -> Nothing
+    , pTy : kTy : aTy : _ <- tys
+    , _ : p : f : g : xs : _ <- args
+    , DC _ vArgs <- xs
+    , Right k' <- runExcept (tyNatSize tcm kTy)
+    -> case k' of
+         0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts vArgs !! 1)])
+         _ -> let (tyArgs,_)  = splitFunForallTy ty
+                  TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 4)
+                  (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
+                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                  Just snatTc = HashMap.lookup (nameOcc snatTcNm) tcm
+                  [snatDc]    = tyConDataCons snatTc
+                  tupTcNm     = ghcTyconToTyConName (tupleTyCon Boxed 2)
+                  (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+                  [tupDc]     = tyConDataCons tupTc
+                  k'ty        = LitTy (NumTy (k'-1))
+                  k2ty        = LitTy (NumTy (2^(k'-1)))
+                  splitAtCall =
+                   mkApps (Prim "CLaSH.Sized.Vector.splitAt" (splitAtTy snatTcNm vecTcNm))
+                          [Right k2ty
+                          ,Right k2ty
+                          ,Right aTy
+                          ,Left (mkApps (Data snatDc)
+                                        [Right k2ty
+                                        ,Left (Literal (NaturalLiteral (2^(k'-1))))])
+                          ,Left (valToTerm xs)
+                          ]
+                  xsSVecTy = mkTyConApp vecTcNm [k2ty,aTy]
+                  xsLNm    = string2SystemName "xsL"
+                  xsRNm    = string2SystemName "xsR"
+                  xsLId    = Id xsLNm (embed k2ty)
+                  xsRId    = Id xsRNm (embed k2ty)
+                  tupPat   = (DataPat (embed tupDc) (rebind [] [xsLId,xsRId]))
+                  asAlt    = bind tupPat (Var k2ty xsLNm)
+                  bsAlt    = bind tupPat (Var k2ty xsRNm)
+              in  reduceWHNF $
+                  mkApps (valToTerm g)
+                         [Right k'ty
+                         ,Left (mkApps (Data snatDc)
+                                       [Right k'ty
+                                       ,Left (Literal (NaturalLiteral (k'-1)))])
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right pTy
+                                       ,Right k'ty
+                                       ,Right aTy
+                                       ,Left (Literal (NaturalLiteral (k'-1)))
+                                       ,Left (valToTerm p)
+                                       ,Left (valToTerm f)
+                                       ,Left (valToTerm g)
+                                       ,Left (Case splitAtCall xsSVecTy [asAlt])])
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right pTy
+                                       ,Right k'ty
+                                       ,Right aTy
+                                       ,Left (Literal (NaturalLiteral (k'-1)))
+                                       ,Left (valToTerm p)
+                                       ,Left (valToTerm f)
+                                       ,Left (valToTerm g)
+                                       ,Left (Case splitAtCall xsSVecTy [bsAlt])])
+                         ]
 -- Misc
   "CLaSH.Sized.Vector.lazyV"
     | isSubj
