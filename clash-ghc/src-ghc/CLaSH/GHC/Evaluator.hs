@@ -17,6 +17,8 @@
 
 module CLaSH.GHC.Evaluator where
 
+import           Control.Concurrent.Supply  (Supply,freshId)
+import           Control.Monad              (ap)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Bits
 import           Data.Char           (chr,ord)
@@ -35,8 +37,9 @@ import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.TypeLits        (KnownNat)
 import           GHC.Word
+import qualified Unbound.Generics.LocallyNameless.Name as U
 import           Unbound.Generics.LocallyNameless
-  (bind, embed, rebind, runFreshM, makeName)
+  (Fresh (..), bind, embed, rebind, runFreshM, makeName)
 
 import           BasicTypes          (Boxity (..))
 import           Name                (getSrcSpan, nameOccName, occNameString)
@@ -50,7 +53,7 @@ import           Unique              (getKey)
 import           CLaSH.Class.BitPack (pack,unpack)
 import           CLaSH.Core.DataCon  (DataCon (..), dataConInstArgTys)
 import           CLaSH.Core.Evaluator
-  (PrimEvaluator, Value (..), valToTerm, whnf)
+  (Heap (..), PrimEvaluator, Value (..), valToTerm, whnf)
 import           CLaSH.Core.Literal  (Literal (..))
 import           CLaSH.Core.Name
   (Name (..), NameSort (..), name2String, string2SystemName)
@@ -64,7 +67,9 @@ import           CLaSH.Core.TysPrim
 import           CLaSH.Core.Util     (mkApps,mkRTree,mkVec,tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
 import           CLaSH.GHC.GHC2Core  (modNameM)
-import           CLaSH.Util          (clogBase, flogBase, curLoc)
+import           CLaSH.Rewrite.Util  (mkSelectorCase)
+import           CLaSH.Util
+  (MonadUnique (..), clogBase, flogBase, curLoc)
 
 import CLaSH.Promoted.Nat.Unsafe (unsafeSNat)
 import qualified CLaSH.Sized.Internal.BitVector as BitVector
@@ -73,6 +78,29 @@ import qualified CLaSH.Sized.Internal.Unsigned  as Unsigned
 import CLaSH.Sized.Internal.BitVector(BitVector(..), Bit)
 import CLaSH.Sized.Internal.Signed   (Signed   (..))
 import CLaSH.Sized.Internal.Unsigned (Unsigned (..))
+
+newtype PrimEvalMonad a = PEM { runPEM :: Supply -> (a,Supply) }
+
+instance Functor PrimEvalMonad where
+  fmap f m = PEM (\s -> case runPEM m s of (a,s') -> (f a, s'))
+
+instance Applicative PrimEvalMonad where
+  pure  = return
+  (<*>) = ap
+
+instance Monad PrimEvalMonad where
+  return a = PEM (\s -> (a,s))
+  m >>= k  = PEM (\s -> case runPEM m s of (a,s') -> runPEM (k a) s')
+
+instance Fresh PrimEvalMonad where
+  fresh (U.Fn nm _)  =
+    PEM (\s -> case freshId s of
+                 (!i,!s') ->  let !i' = toInteger i
+                              in  (U.Fn nm i',s'))
+  fresh nm@(U.Bn {}) = PEM (\s -> (nm,s))
+
+instance MonadUnique PrimEvalMonad where
+  getUniqueM = PEM (\s -> case freshId s of (!i,!s') -> (i,s'))
 
 reduceConstant :: PrimEvaluator
 reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
@@ -2348,7 +2376,54 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
 -- Traversable
   "CLaSH.Sized.Vector.traverse#"
     | isSubj
-    -> Nothing
+    , aTy : fTy : bTy : nTy : _ <- tys
+    , apDict : f : xs : _ <- args
+    , DC dc vArgs <- xs
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0 -> let (pureF,ids') = runPEM (mkSelectorCase $(curLoc) tcm (valToTerm apDict) 1 1) ids
+              in  reduceWHNF' (Heap h' ids') $
+                  mkApps pureF
+                         [Right (mkTyConApp (vecTcNm) [nTy,bTy])
+                         ,Left  (mkVecNil dc bTy)]
+         _ -> let ((fmapF,apF),ids') = flip runPEM ids $ do
+                    fDict  <- mkSelectorCase $(curLoc) tcm (valToTerm apDict) 1 0
+                    fmapF' <- mkSelectorCase $(curLoc) tcm fDict 1 0
+                    apF'   <- mkSelectorCase $(curLoc) tcm (valToTerm apDict) 1 2
+                    return (fmapF',apF')
+                  n'ty = LitTy (NumTy (n-1))
+                  Just (consCoTy : _) = dataConInstArgTys dc [nTy,bTy,n'ty]
+              in  reduceWHNF' (Heap h' ids') $
+                  mkApps apF
+                         [Right (mkTyConApp vecTcNm [n'ty,bTy])
+                         ,Right (mkTyConApp vecTcNm [nTy,bTy])
+                         ,Left (mkApps fmapF
+                                       [Right bTy
+                                       ,Right (mkFunTy (mkTyConApp vecTcNm [n'ty,bTy])
+                                                       (mkTyConApp vecTcNm [nTy,bTy]))
+                                       ,Left (mkApps (Data dc)
+                                                     [Right nTy
+                                                     ,Right bTy
+                                                     ,Right n'ty
+                                                     ,Left (Prim "_CO_" consCoTy)])
+                                       ,Left (mkApps (valToTerm f)
+                                                     [Left (Either.lefts vArgs !! 1)])
+                                       ])
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right aTy
+                                       ,Right fTy
+                                       ,Right bTy
+                                       ,Right n'ty
+                                       ,Left (valToTerm apDict)
+                                       ,Left (valToTerm f)
+                                       ,Left (Either.lefts vArgs !! 2)
+                                       ])
+                         ]
+    where
+      (tyArgs,_)         = splitFunForallTy ty
+      TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 2)
+      Heap h' ids        = h
+
 -- BitPack
   "CLaSH.Sized.Vector.concatBitVector#"
     | isSubj
