@@ -1875,7 +1875,83 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                                        ,Left (Either.lefts vArgs !! 2)])
   "CLaSH.Sized.Vector.select"
     | isSubj
-    -> Nothing
+    , iTy : sTy : nTy : fTy : aTy : _ <- tys
+    , eq : f : s : n : xs : _ <- args
+    , Right n' <- runExcept (tyNatSize tcm nTy)
+    , Right f' <- runExcept (tyNatSize tcm fTy)
+    , Right i' <- runExcept (tyNatSize tcm iTy)
+    , Right s' <- runExcept (tyNatSize tcm sTy)
+    , DC _ vArgs <- xs
+    -> case n' of
+         0 -> reduce (mkVecNil nilCon aTy)
+         _ -> case f' of
+          0 -> let splitAtCall =
+                    mkApps (Prim "CLaSH.Sized.Vector.splitAt" (splitAtTy snatTcNm vecTcNm))
+                           [Right sTy
+                           ,Right (LitTy (NumTy (i'-s')))
+                           ,Right aTy
+                           ,Left (valToTerm s)
+                           ,Left (valToTerm xs)
+                           ]
+                   fVecTy = mkTyConApp vecTcNm [sTy,aTy]
+                   iVecTy = mkTyConApp vecTcNm [LitTy (NumTy (i'-s')),aTy]
+                   fNm    = string2SystemName "fxs"
+                   iNm    = string2SystemName "ixs"
+                   fId    = Id fNm (embed fVecTy)
+                   iId    = Id iNm (embed iVecTy)
+                   tupPat = (DataPat (embed tupDc) (rebind [] [fId,iId]))
+                   iAlt   = bind tupPat (Var iVecTy iNm)
+               in  reduce $
+                   mkVecCons consCon aTy n' (Either.lefts vArgs !! 1) $
+                   mkApps (Prim nm ty)
+                          [Right (LitTy (NumTy (i'-s')))
+                          ,Right sTy
+                          ,Right (LitTy (NumTy (n'-1)))
+                          ,Right (LitTy (NumTy 0))
+                          ,Right aTy
+                          ,Left (valToTerm eq)
+                          ,Left (Literal (NaturalLiteral 0))
+                          ,Left (valToTerm s)
+                          ,Left (Literal (NaturalLiteral (n'-1)))
+                          ,Left (Case splitAtCall iVecTy [iAlt])
+                          ]
+          _ -> let splitAtCall =
+                    mkApps (Prim "CLaSH.Sized.Vector.splitAt" (splitAtTy snatTcNm vecTcNm))
+                           [Right fTy
+                           ,Right iTy
+                           ,Right aTy
+                           ,Left (valToTerm f)
+                           ,Left (valToTerm xs)
+                           ]
+                   fVecTy = mkTyConApp vecTcNm [fTy,aTy]
+                   iVecTy = mkTyConApp vecTcNm [iTy,aTy]
+                   fNm    = string2SystemName "fxs"
+                   iNm    = string2SystemName "ixs"
+                   fId    = Id fNm (embed fVecTy)
+                   iId    = Id iNm (embed iVecTy)
+                   tupPat = (DataPat (embed tupDc) (rebind [] [fId,iId]))
+                   iAlt   = bind tupPat (Var iVecTy iNm)
+               in  reduceWHNF $
+                   mkApps (Prim nm ty)
+                     [Right iTy
+                     ,Right sTy
+                     ,Right nTy
+                     ,Right (LitTy (NumTy 0))
+                     ,Right aTy
+                     ,Left (valToTerm eq)
+                     ,Left (Literal (NaturalLiteral 0))
+                     ,Left (valToTerm s)
+                     ,Left (valToTerm n)
+                     ,Left (Case splitAtCall iVecTy [iAlt])
+                     ]
+    where
+      (tyArgs,tyView -> TyConApp vecTcNm _) = splitFunForallTy ty
+      Just vecTc          = HashMap.lookup (nameOcc vecTcNm) tcm
+      [nilCon,consCon]    = tyConDataCons vecTc
+      TyConApp snatTcNm _ = tyView (Either.rights tyArgs !! 1)
+      tupTcNm            = ghcTyconToTyConName (tupleTyCon Boxed 2)
+      (Just tupTc)       = HashMap.lookup (nameOcc tupTcNm) tcm
+      [tupDc]            = tyConDataCons tupTc
 -- - Splitting
   "CLaSH.Sized.Vector.splitAt"
     | isSubj
