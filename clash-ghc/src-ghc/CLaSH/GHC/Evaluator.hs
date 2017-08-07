@@ -2248,7 +2248,109 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                      ]
   "CLaSH.Sized.Vector.fold"
     | isSubj
-    -> Nothing
+    , aTy : nTy : _ <- tys
+    , f : vs : _ <- args
+    , DC _ vArgs <- vs
+    , Right n <- runExcept (tyNatSize tcm nTy)
+    -> case n of
+         0 -> reduceWHNF (Either.lefts vArgs !! 1)
+         _ -> let (tyArgs,_)         = splitFunForallTy ty
+                  TyConApp vecTcNm _ = tyView (Either.rights tyArgs !! 1)
+                  tupTcNm      = ghcTyconToTyConName (tupleTyCon Boxed 2)
+                  (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+                  [tupDc]      = tyConDataCons tupTc
+                  n'     = n+1
+                  m      = n' `div` 2
+                  n1     = n' - m
+                  mTy    = LitTy (NumTy m)
+                  m'ty   = LitTy (NumTy (m-1))
+                  n1mTy  = LitTy (NumTy n1)
+                  n1m'ty = LitTy (NumTy (n1-1))
+                  splitAtCall =
+                   mkApps (Prim "CLaSH.Sized.Vector.fold_split" (foldSplitAtTy vecTcNm))
+                          [Right mTy
+                          ,Right n1mTy
+                          ,Right aTy
+                          ,Left (Literal (NaturalLiteral m))
+                          ,Left (valToTerm vs)
+                          ]
+                  mVecTy   = mkTyConApp vecTcNm [mTy,aTy]
+                  n1mVecTy = mkTyConApp vecTcNm [n1mTy,aTy]
+                  asNm     = string2SystemName "as"
+                  bsNm     = string2SystemName "bs"
+                  asId     = Id asNm (embed mVecTy)
+                  bsId     = Id bsNm (embed n1mVecTy)
+                  tupPat   = (DataPat (embed tupDc) (rebind [] [asId,bsId]))
+                  asAlt    = bind tupPat (Var mVecTy asNm)
+                  bsAlt    = bind tupPat (Var n1mVecTy bsNm)
+              in  reduceWHNF $
+                  mkApps (valToTerm f)
+                         [Left (mkApps (Prim nm ty)
+                                       [Right aTy
+                                       ,Right m'ty
+                                       ,Left (valToTerm f)
+                                       ,Left (Case splitAtCall mVecTy [asAlt])
+                                       ])
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right aTy
+                                       ,Right n1m'ty
+                                       ,Left  (valToTerm f)
+                                       ,Left  (Case splitAtCall n1mVecTy [bsAlt])
+                                       ])
+                         ]
+
+
+  "CLaSH.Sized.Vector.fold_split"
+    | isSubj
+    , mTy : nTy : aTy : _ <- tys
+    , Right m <- runExcept (tyNatSize tcm mTy)
+    -> let -- Get the tuple data-constructor
+           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
+           (Just tupTc)       = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc]            = tyConDataCons tupTc
+           -- Get the vector data-constructors
+           TyConApp vecTcNm _ = tyView (head tyArgs)
+           Just vecTc         = HashMap.lookup (nameOcc vecTcNm) tcm
+           [nilCon,consCon]   = tyConDataCons vecTc
+           -- Recursive call to @splitAt@
+           splitAtRec v =
+            mkApps (Prim nm ty)
+                   [Right (LitTy (NumTy (m-1)))
+                   ,Right nTy
+                   ,Right aTy
+                   ,Left (Literal (NaturalLiteral (m-1)))
+                   ,Left v
+                   ]
+           -- Projection either the first or second field of the recursive
+           -- call to @splitAt@
+           splitAtSelR v = Case (splitAtRec v) (last tyArgs)
+           m1VecTy = mkTyConApp vecTcNm [LitTy (NumTy (m-1)),aTy]
+           nVecTy  = mkTyConApp vecTcNm [nTy,aTy]
+           lNm     = string2SystemName "l"
+           rNm     = string2SystemName "r"
+           lId     = Id lNm (embed m1VecTy)
+           rId     = Id rNm (embed nVecTy)
+           tupPat  = (DataPat (embed tupDc) (rebind [] [lId,rId]))
+           lAlt    = bind tupPat (Var m1VecTy lNm)
+           rAlt    = bind tupPat (Var nVecTy rNm)
+       in case m of
+         -- (Nil,v)
+         0 -> reduce $
+              mkApps (Data tupDc) $ (map Right tyArgs) ++
+                [ Left (mkVecNil nilCon aTy)
+                , Left (valToTerm (last args))
+                ]
+         -- (x:xs) <- v
+         m' | DC _ vArgs <- last args
+            -- (x:fst (splitAt (m-1) xs),snd (splitAt (m-1) xs))
+            -> reduce $
+               mkApps (Data tupDc) $ (map Right tyArgs) ++
+                 [ Left (mkVecCons consCon aTy m' (Either.lefts vArgs !! 1)
+                           (splitAtSelR (Either.lefts vArgs !! 2) [lAlt]))
+                 , Left (splitAtSelR (Either.lefts vArgs !! 2) [rAlt])
+                 ]
+         -- v doesn't reduce to a data-constructor
+         _  -> Nothing
 -- - Specialised folds
   "CLaSH.Sized.Vector.dfold"
     | isSubj
@@ -2998,6 +3100,35 @@ splitAtTy snatNm vecNm =
   ForAllTy (bind aTV (
   mkFunTy
     (mkTyConApp snatNm [VarTy typeNatKind (string2SystemName "m")])
+    (mkFunTy
+      (mkTyConApp vecNm
+                  [mkTyConApp typeNatAdd
+                    [VarTy typeNatKind (string2SystemName "m")
+                    ,VarTy typeNatKind (string2SystemName "n")]
+                  ,VarTy liftedTypeKind (string2SystemName "a")])
+      (mkTyConApp tupNm
+                  [mkTyConApp vecNm
+                              [VarTy typeNatKind (string2SystemName "m")
+                              ,VarTy liftedTypeKind (string2SystemName "a")]
+                  ,mkTyConApp vecNm
+                              [VarTy typeNatKind (string2SystemName "n")
+                              ,VarTy liftedTypeKind (string2SystemName "a")]]))))))))
+  where
+    mTV   = TyVar (string2SystemName "m") (embed typeNatKind)
+    nTV   = TyVar (string2SystemName "n") (embed typeNatKind)
+    aTV   = TyVar (string2SystemName "a") (embed liftedTypeKind)
+    tupNm = ghcTyconToTyConName (tupleTyCon Boxed 2)
+
+foldSplitAtTy
+  :: TyConName
+  -- ^ Vec TyCon name
+  -> Type
+foldSplitAtTy vecNm =
+  ForAllTy (bind mTV (
+  ForAllTy (bind nTV (
+  ForAllTy (bind aTV (
+  mkFunTy
+    naturalPrimTy
     (mkFunTy
       (mkTyConApp vecNm
                   [mkTyConApp typeNatAdd
