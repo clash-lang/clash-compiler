@@ -66,7 +66,7 @@ data Value
   -- ^ Data constructors
   | Lit Literal
   -- ^ Literals
-  | PrimVal  Text Type [Either Term Type]
+  | PrimVal  Text Type [Type] [Value]
   -- ^ Clash's number types are represented by their "fromInteger#" primitive
   -- function. So some primitives are values.
   deriving Show
@@ -133,10 +133,12 @@ isScrut _ = False
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
 unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
-  PrimApply nm ty tys vals tms ->
-    unwindStack (h,k',valToTerm (PrimVal nm ty (map Right tys ++
-                                                map (Left . valToTerm) vals ++
-                                                map Left (tms ++ [e]))))
+  PrimApply nm ty tys vs tms ->
+    unwindStack
+      (h,k'
+      ,foldl' App
+              (foldl' App (foldl' TyApp (Prim nm ty) tys) (map valToTerm vs))
+              (e:tms))
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
   Apply id_ -> do
@@ -196,16 +198,7 @@ step eval gbl tcm (h, k, e) = case e of
     | (Prim nm ty,args) <- collectArgs e
     , (tys,_) <- splitFunForallTy ty
     -> case compare (length args) (length tys) of
-         EQ | nm `elem` ["CLaSH.Sized.Internal.BitVector.fromInteger#"
-                        ,"CLaSH.Sized.Internal.Index.fromInteger#"
-                        ,"CLaSH.Sized.Internal.Signed.fromInteger#"
-                        ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
-                        ,"GHC.CString.unpackCString#"
-                        ]
-               -- The above primitives are actually values, and not operations.
-            -> unwind eval gbl tcm h k (PrimVal nm ty args)
-            | otherwise
-            -> let (e':es)    = lefts args
+         EQ -> let (e':es) = lefts args
                in  Just (h,PrimApply nm ty (rights args) [] es:k,e')
          LT -> let (h2,e') = mkAbstr (h,e) (drop (length args) tys)
                in  step eval gbl tcm (h2,k,e')
@@ -222,13 +215,12 @@ step eval gbl tcm (h, k, e) = case e of
     | (Prim nm ty',args) <- collectArgs e
     , (tys,_) <- splitFunForallTy ty'
     -> case compare (length args) (length tys) of
-         EQ | nm `elem` ["CLaSH.Transformations.removedArg"
-                        ]
-              -- The above primitives are actually values, and not operations.
-            -> unwind eval gbl tcm h k (PrimVal nm ty' args)
-            | otherwise
-            -> case lefts args of
-              [] -> eval (isScrut k) gbl tcm h k nm ty' (rights args) []
+         EQ -> case lefts args of
+              [] | nm `elem` ["CLaSH.Transformations.removedArg"]
+                 -- The above primitives are actually values, and not operations.
+                 -> unwind eval gbl tcm h k (PrimVal nm ty' (rights args) [])
+                 | otherwise
+                 -> eval (isScrut k) gbl tcm h k nm ty' (rights args) []
               (e':es) -> Just (h,PrimApply nm ty' (rights args) [] es:k,e')
          LT -> let (h2,e') = mkAbstr (h,e) (drop (length args) tys)
                in  step eval gbl tcm (h2,k,e')
@@ -314,11 +306,13 @@ update (Heap h ids) k x v = (Heap (insert (nameOcc (varName x)) v' h) ids,k,v')
 
 valToTerm :: Value -> Term
 valToTerm v = case v of
-  Lambda b           -> Lam b
-  TyLambda b         -> TyLam b
-  DC dc pxs          -> foldl' (\e a -> either (App e) (TyApp e) a) (Data dc) pxs
-  Lit l              -> Literal l
-  PrimVal nm ty args -> foldl' (\e a -> either (App e) (TyApp e) a) (Prim nm ty) args
+  Lambda b             -> Lam b
+  TyLambda b           -> TyLam b
+  DC dc pxs            -> foldl' (\e a -> either (App e) (TyApp e) a)
+                                 (Data dc) pxs
+  Lit l                -> Literal l
+  PrimVal nm ty tys vs -> foldl' App (foldl' TyApp (Prim nm ty) tys)
+                                 (map valToTerm vs)
 
 toVar :: Id -> Term
 toVar x = Var (unembed (varType x)) (varName x)
@@ -362,8 +356,17 @@ primop
   -> [Term]
   -- ^ The remaining terms which must be evaluated to a value
   -> Maybe State
-primop eval gbl tcm h k nm ty tys vs v [] =
-  eval (isScrut k) gbl tcm h k nm ty tys (vs ++ [v])
+primop eval gbl tcm h k nm ty tys vs v []
+  | nm `elem` ["CLaSH.Sized.Internal.BitVector.fromInteger#"
+              ,"CLaSH.Sized.Internal.Index.fromInteger#"
+              ,"CLaSH.Sized.Internal.Signed.fromInteger#"
+              ,"CLaSH.Sized.Internal.Unsigned.fromInteger#"
+              ,"GHC.CString.unpackCString#"
+              ,"CLaSH.Transformations.removedArg"
+              ]
+              -- The above primitives are actually values, and not operations.
+  = unwind eval gbl tcm h k (PrimVal nm ty tys (vs ++ [v]))
+  | otherwise = eval (isScrut k) gbl tcm h k nm ty tys (vs ++ [v])
 primop _ _ _ h k nm ty tys vs v (e:es) =
   Just (h,PrimApply nm ty tys (vs ++ [v]) es:k,e)
 

@@ -855,8 +855,8 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce (Literal (DoubleLiteral (toRational (fromInteger i :: Double))))
 
   "GHC.Base.eqString"
-    | [PrimVal _ _ [Left (Literal (StringLiteral s1))]
-      ,PrimVal _ _ [Left (Literal (StringLiteral s2))]
+    | [PrimVal _ _ _ [Lit (StringLiteral s1)]
+      ,PrimVal _ _ _ [Lit (StringLiteral s2)]
       ] <- args
     -> reduce (boolToBoolLiteral tcm ty (s1 == s2))
     | otherwise -> error (show args)
@@ -1003,9 +1003,9 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
   "CLaSH.Sized.Internal.BitVector.replaceBit#" -- :: :: KnownNat n => BitVector n -> Int -> Bit -> BitVector n
     | Just (_, n) <- extractKnownNat tcm tys
     , [ _
-      , PrimVal bvNm _ [Right _, Left _, Left (Literal (IntegerLiteral bv))]
-      , valArgs -> Just [Left (Literal (IntLiteral i))]
-      , PrimVal bNm  _ [Right _, Left _, Left (Literal (IntegerLiteral b))]
+      , PrimVal bvNm _ _ [_, Lit (IntegerLiteral bv)]
+      , valArgs -> Just [Literal (IntLiteral i)]
+      , PrimVal bNm  _ _ [_, Lit (IntegerLiteral b)]
       ] <- args
     , bvNm == "CLaSH.Sized.Internal.BitVector.fromInteger#"
     , bNm  == "CLaSH.Sized.Internal.BitVector.fromInteger#"
@@ -1157,8 +1157,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Just val <- reifyNat kn (liftBitVector2 (BitVector.rem#) ty tcm tys args)
     -> reduce val
   "CLaSH.Sized.Internal.BitVector.toInteger#"
-    | [PrimVal nm' _ [Right _, Left _, Left (Literal (IntegerLiteral i))]] <-
-      args
+    | [PrimVal nm' _ _ [_, Lit (IntegerLiteral i)]] <- args
     , nm' == "CLaSH.Sized.Internal.BitVector.fromInteger#"
     -> reduce (integerToIntegerLiteral i)
 
@@ -1310,8 +1309,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Just (i,j) <- indexLiterals args
     -> (h,k,) <$> mkIndexLit ty nTy kn (i `rem` j)
   "CLaSH.Sized.Internal.Index.toInteger#"
-    | [PrimVal nm' _ [Right _, Left _, Left (Literal (IntegerLiteral i))]] <-
-      args
+    | [PrimVal nm' _ _ [_, Lit (IntegerLiteral i)]] <- args
     , nm' == "CLaSH.Sized.Internal.Index.fromInteger#"
     -> reduce (integerToIntegerLiteral i)
 
@@ -1440,8 +1438,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Just val <- reifyNat kn (liftSigned2 (Signed.mod#) ty tcm tys args)
     -> reduce val
   "CLaSH.Sized.Internal.Signed.toInteger#"
-    | [PrimVal nm' _ [Right _, Left _, Left (Literal (IntegerLiteral i))]] <-
-      args
+    | [PrimVal nm' _ _ [_, Lit (IntegerLiteral i)]] <- args
     , nm' == "CLaSH.Sized.Internal.Signed.fromInteger#"
     -> reduce (integerToIntegerLiteral i)
 
@@ -1628,8 +1625,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Just val <- reifyNat kn (liftUnsigned2 (Unsigned.rem#) ty tcm tys args)
     -> reduce val
   "CLaSH.Sized.Internal.Unsigned.toInteger#"
-    | [PrimVal nm'  _[Right _, Left _, Left (Literal (IntegerLiteral i))]] <-
-      args
+    | [PrimVal nm' _ _ [_, Lit (IntegerLiteral i)]] <- args
     , nm' == "CLaSH.Sized.Internal.Unsigned.fromInteger#"
     -> reduce (integerToIntegerLiteral i)
 
@@ -2445,8 +2441,8 @@ charLiterals' = typedLiterals' charLiteral
 sizedLiterals :: Text -> [Value] -> Maybe (Integer,Integer)
 sizedLiterals szCon args
   = case args of
-      ([ PrimVal nm  _ [Right _, Left _, Left (Literal (IntegerLiteral i))]
-       , PrimVal nm' _ [Right _, Left _, Left (Literal (IntegerLiteral j))]])
+      ([ PrimVal nm  _ _ [_, Lit (IntegerLiteral i)]
+       , PrimVal nm' _ _ [_, Lit (IntegerLiteral j)]])
         | nm  == szCon
         , nm' == szCon -> Just (i,j)
       _ -> Nothing
@@ -2456,7 +2452,7 @@ sizedLiterals' szCon = typedLiterals' (sizedLiteral szCon)
 
 sizedLiteral :: Text -> Value -> Maybe Integer
 sizedLiteral szCon val = case val of
-  PrimVal nm  _ [Right _, Left _, Left (Literal (IntegerLiteral i))] | nm == szCon -> Just i
+  PrimVal nm  _ _ [_, Lit (IntegerLiteral i)] | nm == szCon -> Just i
   _ -> Nothing
 
 
@@ -2476,9 +2472,9 @@ unsignedLiterals'  = sizedLiterals' "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
 valArgs
   :: Value
-  -> Maybe [Either Term Type]
-valArgs (PrimVal _ _ args) = Just args
-valArgs (DC _ args)        = Just args
+  -> Maybe [Term]
+valArgs (PrimVal _ _ _ vs) = Just (map valToTerm vs)
+valArgs (DC _ args)        = Just (Either.lefts args)
 valArgs _                  = Nothing
 
 
@@ -2490,8 +2486,8 @@ sizedLitIntLit
 sizedLitIntLit szCon tcm tys args
   | Just (nTy,kn) <- extractKnownNat tcm tys
   , [_
-    ,PrimVal nm _ [Right _, Left _, Left (Literal (IntegerLiteral i))]
-    ,valArgs -> Just [Left (Literal (IntLiteral j))]
+    ,PrimVal nm _ _ [_,Lit (IntegerLiteral i)]
+    ,valArgs -> Just [Literal (IntLiteral j)]
     ] <- args
   , nm == szCon
   = Just (nTy,kn,i,j)
