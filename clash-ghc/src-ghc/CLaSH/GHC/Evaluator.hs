@@ -1718,6 +1718,71 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
            val = i .&. bitsKeep
     in reduce (mkUnsignedLit ty mTy km val)
 
+--------
+-- RTree
+--------
+  "CLaSH.Sized.RTree.textract"
+    | isSubj
+    , [DC _ tArgs] <- args
+    -> reduceWHNF (Either.lefts tArgs !! 1)
+
+  "CLaSH.Sized.RTree.tsplit"
+    | isSubj
+    , dTy : aTy : _ <- tys
+    , [DC _ tArgs] <- args
+    , (tyArgs,tyView -> TyConApp tupTcNm _) <- splitFunForallTy ty
+    , TyConApp treeTcNm _ <- tyView (Either.rights tyArgs !! 0)
+    -> let (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
+           [tupDc]      = tyConDataCons tupTc
+       in  reduce $
+           mkApps (Data tupDc)
+                  [Right (mkTyConApp treeTcNm [dTy,aTy])
+                  ,Right (mkTyConApp treeTcNm [dTy,aTy])
+                  ,Left (Either.lefts tArgs !! 1)
+                  ,Left (Either.lefts tArgs !! 2)
+                  ]
+
+  "CLaSH.Sized.RTree.tdfold"
+    | isSubj
+    , pTy : kTy : aTy : _ <- tys
+    , _ : p : f : g : ts : _ <- args
+    , DC _ tArgs <- ts
+    , Right k' <- runExcept (tyNatSize tcm kTy)
+    -> case k' of
+         0 -> reduceWHNF (mkApps (valToTerm f) [Left (Either.lefts tArgs !! 1)])
+         _ -> let k'ty = LitTy (NumTy (k'-1))
+                  (tyArgs,_)  = splitFunForallTy ty
+                  (tyArgs',_) = splitFunForallTy (Either.rights tyArgs !! 3)
+                  TyConApp snatTcNm _ = tyView (Either.rights tyArgs' !! 0)
+                  Just snatTc = HashMap.lookup (nameOcc snatTcNm) tcm
+                  [snatDc]    = tyConDataCons snatTc
+              in  reduceWHNF $
+                  mkApps (valToTerm g)
+                         [Right k'ty
+                         ,Left (mkApps (Data snatDc)
+                                       [Right k'ty
+                                       ,Left (Literal (NaturalLiteral (k'-1)))])
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right pTy
+                                       ,Right k'ty
+                                       ,Right aTy
+                                       ,Left (Literal (NaturalLiteral (k'-1)))
+                                       ,Left (valToTerm p)
+                                       ,Left (valToTerm f)
+                                       ,Left (valToTerm g)
+                                       ,Left (Either.lefts tArgs !! 1)
+                                       ])
+                         ,Left (mkApps (Prim nm ty)
+                                       [Right pTy
+                                       ,Right k'ty
+                                       ,Right aTy
+                                       ,Left (Literal (NaturalLiteral (k'-1)))
+                                       ,Left (valToTerm p)
+                                       ,Left (valToTerm f)
+                                       ,Left (valToTerm g)
+                                       ,Left (Either.lefts tArgs !! 2)
+                                       ])
+                         ]
 
   "CLaSH.Sized.RTree.treplicate"
     | isSubj
