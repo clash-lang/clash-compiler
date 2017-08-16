@@ -17,7 +17,6 @@ before_install:
 - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo
   '?')]"
 - stack +RTS -N2 -RTS --version
-- ghc --version
 install:
 - if [ "$STACK_SOLVER" = "YES" ]; then rm -f stack.yaml; stack update; stack init
   --solver; fi; stack --no-terminal --skip-ghc-check list-dependencies|sort > installplan.txt;
@@ -40,10 +39,8 @@ matrix:
     addons:
       apt:
         sources:
-        - hvr-ghc
         - pgavin-ghdl
         packages:
-        - ghc-8.2.1
         - libgmp-dev
         - ghdl
         - gperf
