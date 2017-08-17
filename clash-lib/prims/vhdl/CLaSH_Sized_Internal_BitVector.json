@@ -148,17 +148,15 @@ begin
   ~RESULT(0) <= ~ARG[1](~SYM[1]);
 end block;~ELSE
 ~SYM[0] : block
-  signal ~GENSYM[bv][2] : ~TYP[1];
   signal ~SYM[1] : integer range 0 to ~LIT[0]-1;
 begin
-  ~SYM[2] <= ~ARG[1];
   ~SYM[1] <= to_integer(~ARG[2])
   -- pragma translate_off
                mod ~LIT[0]
   -- pragma translate_on
                ;
 
-  ~RESULT(0) <= ~SYM[2](~SYM[1]);
+  ~RESULT(0) <= ~VAR[bv][1](~SYM[1]);
 end block;~FI
 -- indexBitVector end"
     }
@@ -172,7 +170,7 @@ end block;~FI
              -> Bit         -- ARG[3]
              -> BitVector n"
     , "templateD" :
-"-- replaceBit begin~IF ~ISVAR[3] ~THEN
+"-- replaceBit begin
 ~GENSYM[replaceBit][0] : block
   signal ~GENSYM[vec_index][1] : integer range 0 to ~LIT[0]-1;
 begin
@@ -182,33 +180,14 @@ begin
   -- pragma translate_on
                ;
 
-  process(~SYM[1]~VARS[1]~VARS[3])
+  process(~SYM[1],~VAR[b][3]~VARS[1])
     variable ~GENSYM[ivec][2] : ~TYP[1];
   begin
     ~SYM[2] := ~ARG[1];
-    ~SYM[2](~SYM[1]) := ~ARG[3](0);
+    ~SYM[2](~SYM[1]) := ~VAR[b][3](0);
     ~RESULT <= ~SYM[2];
   end process;
-end block;~ELSE
-~SYM[0] : block
-  signal ~SYM[1] : integer range 0 to ~LIT[0]-1;
-  signal ~GENSYM[b][3] : ~TYP[3];
-begin
-  ~SYM[1] <= to_integer(~ARG[2])
-  -- pragma translate_off
-               mod ~LIT[0]
-  -- pragma translate_on
-               ;
-  ~SYM[3] <= ~ARG[3];
-
-  process(~SYM[1],~SYM[3]~VARS[1])
-    variable ~SYM[2] : ~TYP[1];
-  begin
-    ~SYM[2] := ~ARG[1];
-    ~SYM[2](~SYM[1]) := ~SYM[3](0);
-    ~RESULT <= ~SYM[2];
-  end process;
-end block;~FI
+end block;
 -- replaceBit end"
     }
   }
@@ -221,26 +200,14 @@ end block;~FI
            -> BitVector (m + 1 - n) -- ARG[3]
            -> BitVector (m + 1 + i)"
     , "templateD" :
-"-- setSlice begin~IF ~ISVAR[0] ~THEN
-~GENSYM[setSlice][0] : process(~ARG[0]~VARS[3])
+"-- setSlice begin
+~GENSYM[setSlice][0] : process(~VAR[bv][0]~VARS[3])
   variable ~GENSYM[ivec][1] : ~TYP[0];
 begin
   ~SYM[1] := ~ARG[0];
-  ~SYM[1](~LIT[1] downto ~LIT[2]) := ~ARG[3];
+  ~SYM[1](~LIT[1] downto ~LIT[2]) := ~VAR[bv][3];
   ~RESULT <= ~SYM[1];
-end process;~ELSE
-~SYM[0] : block
-  signal ~GENSYM[bv][2] : ~TYP[0];
-begin
-  ~SYM[2] <= ~ARG[0];
-  process(~SYM[2]~VARS[3])
-    variable ~SYM[1] : ~TYP[0];
-  begin
-    ~SYM[1] := ~SYM[2];
-    ~SYM[1](~LIT[1] downto ~LIT[2]) := ARG[3];
-    ~RESULT <= ~SYM[1];
-  end process;
-end block;~FI
+end process;
 -- setSlice end"
     }
   }
@@ -251,16 +218,7 @@ end block;~FI
         -> SNat m                -- ARG[1]
         -> SNat n                -- ARG[2]
         -> BitVector (m + 1 - n)"
-    , "templateD" :
-"-- slice begin~IF ~ISVAR[0] ~THEN
-~RESULT <= ~ARG[0](~LIT[1] downto ~LIT[2]);~ELSE
-~GENSYM[slice][0] : block
-  signal ~GENSYM[bv][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](~LIT[1] downto ~LIT[2]);
-end block;~FI
--- slice end"
+    , "templateE" : "~VAR[bv][0](~LIT[1] downto ~LIT[2])"
     }
   }
 , { "BlackBox" :
@@ -269,20 +227,7 @@ end block;~FI
 "split# :: KnownNat n        -- ARG[0]
         => BitVector (m + n) -- ARG[1]
         -> (BitVector m, BitVector n)"
-    , "templateD" :
-"-- split begin~IF ~ISVAR[1] ~THEN
-~RESULT <= (~ARG[1](~ARG[1]'high downto ~LIT[0])
-           ,~ARG[1](~LIT[0]-1 downto 0)
-           );~ELSE
-~GENSYM[split][0]: block
-  signal ~GENSYM[bv][1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~RESULT <= (~SYM[1](~SYM[1]'high downto ~LIT[0])
-             ,~SYM[1](~LIT[0]-1 downto 0)
-             );
-end block;~FI
--- split end"
+    , "templateE" : "(~VAR[bv][1](~VAR[bv][1]'high downto ~LIT[0]),~VAR[bv][1](~LIT[0]-1 downto 0))"
     }
   }
 , { "BlackBox" :
@@ -291,17 +236,7 @@ end block;~FI
 "msb# :: KnownNat n  -- ARG[0]
       => BitVector n -- ARG[1]
       -> Bit"
-    , "templateD" :
-"-- msb begin~IF ~LIT[0] ~THEN ~IF ~ISVAR[1] ~THEN
-~RESULT <= ~ARG[1](~ARG[1]'high downto ~ARG[1]'high);~ELSE
-~GENSYM[msb][0] : block
-  signal ~GENSYM[bv][1] : ~TYP[1];
-begin
-  ~SYM[1] <= ~ARG[1];
-  ~RESULT <= ~SYM[1](~SYM[1]'high downto ~SYM[1]'high);
-end block;~FI~ELSE
-~RESULT <= \"0\";~FI
--- msb end"
+    , "templateE" : "~IF ~LIT[0] ~THEN ~VAR[bv][1](~VAR[bv][1]'high downto ~VAR[bv][1]'high) ~ELSE \"0\" ~FI"
     }
   }
 , { "BlackBox" :
@@ -309,17 +244,7 @@ end block;~FI~ELSE
     , "type" :
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
-    , "templateD" :
-"-- lsb begin~IF ~SIZE[~TYP[0]] ~THEN ~IF ~ISVAR[0] ~THEN
-~RESULT <= ~ARG[0](0 downto 0);~ELSE
-~GENSYM[lsb][0] : block
-  signal ~GENSYM[bv][1] : ~TYP[0];
-begin
-  ~SYM[1] <= ~ARG[0];
-  ~RESULT <= ~SYM[1](0 downto 0);
-end block;~FI~ELSE
-~RESULT <= \"0\";~FI
--- lsb end"
+    , "templateE" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0](0 downto 0) ~ELSE \"0\" ~FI"
     }
   }
 , { "BlackBox" :

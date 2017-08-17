@@ -8,8 +8,8 @@
 
 module CLaSH.Core.Term where
 
-import GHC.Generics                     (Generic)
-import Unbound.Generics.LocallyNameless (Name)
+import GHC.Generics    (Generic)
+import CLaSH.Core.Name (Name)
 
 data Term
 type TmName = Name Term

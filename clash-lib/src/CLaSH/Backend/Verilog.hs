@@ -22,7 +22,7 @@ import           Control.Lens                         ((+=),(-=),(.=),(%=), make
 import           Control.Monad.State                  (State)
 import           Data.Hashable                        (Hashable (..))
 import qualified Data.HashSet                         as HashSet
-import           Data.Maybe                           (catMaybes,mapMaybe)
+import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.Text.Lazy                       (pack, unpack)
 import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
@@ -35,9 +35,9 @@ import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn)
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Id                     (mkBasicId')
+import           CLaSH.Netlist.Id                     (IdType (..), mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (curLoc, (<:>))
 
@@ -92,10 +92,31 @@ instance Backend VerilogState where
   toBV _          = text
   fromBV _        = text
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . mkBasicId' True)
+  mkIdentifier    = return go
+    where
+      go Basic    nm = filterReserved (mkBasicId' True nm)
+      go Extended (rmSlash -> nm) = case go Basic nm of
+        nm' | nm /= nm' -> Text.concat ["\\",nm," "]
+            |otherwise  -> nm'
+  extendIdentifier = return go
+    where
+      go Basic nm ext = filterReserved (mkBasicId' True (nm `Text.append` ext))
+      go Extended (rmSlash -> nm) ext =
+        let nmExt = nm `Text.append` ext
+        in  case go Basic nm ext of
+              nm' | nm' /= nmExt -> case Text.head nmExt of
+                      '#' -> Text.concat ["\\",nmExt," "]
+                      _   -> Text.concat ["\\#",nmExt," "]
+                  | otherwise    -> nm'
+
   setModName _    = id
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+
+rmSlash :: Identifier -> Identifier
+rmSlash nm = fromMaybe nm $ do
+  nm1 <- Text.stripPrefix "\\" nm
+  Text.stripSuffix " " nm1
 
 type VerilogM a = State VerilogState a
 
@@ -147,7 +168,7 @@ module_ c = do
   where
     ports = sequence
           $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
+            [ encodingNote hwty <$> text i | (_,(i,hwty)) <- outputs c]
 
     inputPorts = case inputs c of
                    [] -> empty
@@ -155,33 +176,18 @@ module_ c = do
 
     outputPorts = case outputs c of
                    [] -> empty
-                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
+                   p  -> vcat (punctuate semi (sequence [ "output" <+> wireOrReg wr <+> sigDecl (text i) ty | (wr,(i,ty)) <- p ])) <> semi
+
+wireOrReg :: WireOrReg -> VerilogM Doc
+wireOrReg Wire = "wire"
+wireOrReg Reg  = "reg"
 
 addSeen :: Component -> VerilogM ()
 addSeen c = do
   let iport = map fst $ inputs c
-      oport = map fst $ outputs c
-      nets  = mapMaybe (\case {NetDecl' i _ -> Just i; _ -> Nothing}) $ declarations c
+      oport = map (fst.snd) $ outputs c
+      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
-
-mkUniqueId :: Identifier -> VerilogM Identifier
-mkUniqueId i = do
-  mkId <- mkBasicId
-  seen <- use idSeen
-  let i' = mkId i
-  case i `elem` seen of
-    True  -> go mkId seen i' 0
-    False -> do idSeen %= (i':)
-                return i'
-  where
-    go :: (Identifier -> Identifier) -> [Identifier] -> Identifier
-       -> Int -> VerilogM Identifier
-    go mkId seen i' n = do
-      let i'' = mkId (Text.append i' (Text.pack ('_':show n)))
-      case i'' `elem` seen of
-        True  -> go mkId seen i' (n+1)
-        False -> do idSeen %= (i'':)
-                    return i''
 
 verilogType :: HWType -> VerilogM Doc
 verilogType t = case t of
@@ -216,8 +222,12 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> VerilogM (Maybe Doc)
-decl (NetDecl' id_ (Right ty)) = Just A.<$> "wire" <+> sigDecl (text id_) ty
-decl (NetDecl' id_ (Left ty))  = Just A.<$> "wire" <+> text ty <+> text id_
+decl (NetDecl' noteM wr id_ tyE) =
+  Just A.<$> maybe id addNote noteM (wireOrReg wr <+> tyDec tyE)
+  where
+    tyDec (Left  ty) = text ty <+> text id_
+    tyDec (Right ty) = sigDecl (text id_) ty
+    addNote n = ("//" <+> text n <$>)
 
 decl _ = return Nothing
 
@@ -230,31 +240,23 @@ inst_ :: Declaration -> VerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
   "assign" <+> text id_ <+> equals <+> expr_ False e <> semi
 
-inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $ do
-    { regId <- mkUniqueId (Text.append id_ "_reg")
-    ; "reg" <+> verilogType ty <+> text regId <> semi <$>
-      "always @(*) begin" <$>
-      indent 2 ("if" <> parens (expr_ True scrut) <$>
-                  (indent 2 $ text regId <+> equals <+> expr_ False t <> semi) <$>
-               "else" <$>
-                  (indent 2 $ text regId <+> equals <+> expr_ False f <> semi)) <$>
-      "end" <$>
-      "assign" <+> text id_ <+> equals <+> text regId <> semi
-    }
+inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
+   "always @(*) begin" <$>
+   indent 2 ("if" <> parens (expr_ True scrut) <$>
+               (indent 2 $ text id_ <+> equals <+> expr_ False t <> semi) <$>
+            "else" <$>
+               (indent 2 $ text id_ <+> equals <+> expr_ False f <> semi)) <$>
+   "end"
   where
     (t,f) = if b then (l,r) else (r,l)
 
 
-inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
-    { regId <- mkUniqueId (Text.append id_ "_reg")
-    ; "reg" <+> verilogType ty <+> text regId <> semi <$>
-      "always @(*) begin" <$>
-      indent 2 ("case" <> parens (expr_ True scrut) <$>
-                  (indent 2 $ vcat $ punctuate semi (conds regId es)) <> semi <$>
-                "endcase") <$>
-      "end" <$>
-      "assign" <+> text id_ <+> equals <+> text regId <> semi
-    }
+inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
+    "always @(*) begin" <$>
+    indent 2 ("case" <> parens (expr_ True scrut) <$>
+                (indent 2 $ vcat $ punctuate semi (conds id_ es)) <> semi <$>
+              "endcase") <$>
+    "end"
   where
     conds :: Identifier -> [(Maybe Literal,Expr)] -> VerilogM [Doc]
     conds _ []                = return []
@@ -283,7 +285,89 @@ inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
-inst_ (NetDecl' _ _) = return Nothing
+inst_ (NetDecl' _ _ _ _) = return Nothing
+
+-- | Calculate the beginning and end index into a variable, to get the
+-- desired field.
+modifier
+  :: Int
+  -- ^ Offset, only used when we have nested modifiers
+  -> Modifier
+  -> Maybe (Int,Int)
+modifier offset (Indexed (ty@(SP _ args),dcI,fI)) = Just (start+offset,end+offset)
+  where
+    argTys   = snd $ args !! dcI
+    argTy    = argTys !! fI
+    argSize  = typeSize argTy
+    other    = otherSize argTys (fI-1)
+    start    = typeSize ty - 1 - conSize ty - other
+    end      = start - argSize + 1
+
+modifier offset (Indexed (ty@(Product _ argTys),_,fI)) = Just (start+offset,end+offset)
+  where
+    argTy   = argTys !! fI
+    argSize = typeSize argTy
+    otherSz = otherSize argTys (fI - 1)
+    start   = typeSize ty - 1 - otherSz
+    end     = start - argSize + 1
+
+modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,end+offset)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - 1
+    end     = start - argSize + 1
+
+modifier offset (Indexed (ty@(Vector _ argTy),1,2)) = Just (start+offset,offset)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - argSize - 1
+
+modifier offset (Indexed (ty@(RTree 0 _),0,1)) = Just (start+offset,offset)
+  where
+    start   = typeSize ty - 1
+
+modifier offset (Indexed (ty@(RTree _ _),1,1)) = Just (start+offset,end+offset)
+  where
+    start   = typeSize ty - 1
+    end     = typeSize ty `div` 2
+
+modifier offset (Indexed (ty@(RTree _ _),1,2)) = Just (start+offset,offset)
+  where
+    start   = (typeSize ty `div` 2) - 1
+
+-- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
+-- Vector's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+modifier offset (Indexed (ty@(Vector _ argTy),10,fI)) = Just (start+offset,end+offset)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - (fI * argSize) - 1
+    end     = start - argSize + 1
+
+-- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
+-- RTree's don't have a 10'th constructor, this is just so that we can
+-- recognize the particular case
+modifier offset (Indexed (ty@(RTree _ argTy),10,fI)) = Just (start+offset,end+offset)
+  where
+    argSize = typeSize argTy
+    start   = typeSize ty - (fI * argSize) - 1
+    end     = start - argSize + 1
+
+modifier offset (DC (ty@(SP _ _),_)) = Just (start+offset,end+offset)
+  where
+    start = typeSize ty - 1
+    end   = typeSize ty - conSize ty
+
+modifier offset (Nested m1 m2) = do
+  case modifier offset m1 of
+    Nothing    -> modifier offset m2
+    Just (s,e) -> case modifier e m2 of
+      -- In case the second modifier is `Nothing` that means we want the entire
+      -- thing calculated by the first modifier
+      Nothing -> Just (s,e)
+      m       -> m
+
+modifier _ _ = Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
@@ -293,77 +377,9 @@ expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 
 expr_ _ (Identifier id_ Nothing) = text id_
 
-expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
-  where
-    argTys   = snd $ args !! dcI
-    argTy    = argTys !! fI
-    argSize  = typeSize argTy
-    other    = otherSize argTys (fI-1)
-    start    = typeSize ty - 1 - conSize ty - other
-    end      = start - argSize + 1
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ argTys),_,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
-  where
-    argTy   = argTys !! fI
-    argSize = typeSize argTy
-    otherSz = otherSize argTys (fI - 1)
-    start   = typeSize ty - 1 - otherSz
-    end     = start - argSize + 1
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,1)))) =
-    text id_ <> brackets (int start <> colon <> int end)
-  where
-    argSize = typeSize argTy
-    start   = typeSize ty - 1
-    end     = start - argSize + 1
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),1,2)))) =
-    text id_ <> brackets (int start <> colon <> int 0)
-  where
-    argSize = typeSize argTy
-    start   = typeSize ty - argSize - 1
-
-expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 _),0,1)))) = text id_
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ _),1,1)))) =
-    text id_ <> brackets (int start <> colon <> int end)
-  where
-    start   = typeSize ty - 1
-    end     = typeSize ty `div` 2
-
-expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ _),1,2)))) =
-    text id_ <> brackets (int start <> colon <> int 0)
-  where
-    start   = (typeSize ty `div` 2) - 1
-
--- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
--- Vector's don't have a 10'th constructor, this is just so that we can
--- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed (ty@(Vector _ argTy),10,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
-  where
-    argSize = typeSize argTy
-    start   = typeSize ty - (fI * argSize) - 1
-    end     = start - argSize + 1
-
--- This is a HACK for CLaSH.Driver.TopWrapper.mkOutput
--- RTree's don't have a 10'th constructor, this is just so that we can
--- recognize the particular case
-expr_ _ (Identifier id_ (Just (Indexed (ty@(RTree _ argTy),10,fI)))) =
-    text id_ <> brackets (int start <> colon <> int end)
-  where
-    argSize = typeSize argTy
-    start   = typeSize ty - (fI * argSize) - 1
-    end     = start - argSize + 1
-
-expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int start <> colon <> int end)
-  where
-    start = typeSize ty - 1
-    end   = typeSize ty - conSize ty
-
-expr_ _ (Identifier id_ (Just _))                      = text id_
+expr_ _ (Identifier id_ (Just m)) = case modifier 0 m of
+  Nothing          -> text id_
+  Just (start,end) -> text id_ <> brackets (int start <> colon <> int end)
 
 expr_ b (DataCon _ (DC (Void, -1)) [e]) = expr_ b e
 

@@ -69,6 +69,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> I                 <$> (pToken "~ARG" *> pBrackets pNatural)
      <|> L                 <$> (pToken "~LIT" *> pBrackets pNatural)
      <|> N                 <$> (pToken "~NAME" *> pBrackets pNatural)
+     <|> Var               <$> (pToken "~VAR" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> (Sym Text.empty)  <$> (pToken "~SYM" *> pBrackets pNatural)
      <|> Typ Nothing       <$  pToken "~TYPO"
      <|> (Typ . Just)      <$> (pToken "~TYP" *> pBrackets pNatural)
@@ -97,6 +98,7 @@ pTagE =  O                 <$  pToken "~RESULT"
      <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
      <|> IsGated           <$> (pToken "~ISGATED" *> pBrackets pNatural)
      <|> IsSync            <$> (pToken "~ISSYNC" *> pBrackets pNatural)
+     <|> OutputWireReg     <$> (pToken "~OUTPUTWIREREG" *> pBrackets pNatural)
      <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> And               <$> (pToken "~AND" *> listParser pTagE)
      <|> Vars              <$> (pToken "~VARS" *> pBrackets pNatural)

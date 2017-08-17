@@ -29,7 +29,7 @@ where
 import Control.DeepSeq                        (NFData(..))
 import Data.Hashable                          (Hashable)
 import GHC.Generics                           (Generic)
-import Unbound.Generics.LocallyNameless       (Alpha(..),Name,Subst(..))
+import Unbound.Generics.LocallyNameless       (Alpha(..),Subst(..))
 import Unbound.Generics.LocallyNameless.Extra ()
 #if MIN_VERSION_unbound_generics(0,3,0)
 import Data.Monoid                            (All (..))
@@ -37,6 +37,7 @@ import Unbound.Generics.LocallyNameless       (NthPatFind (..),
                                                NamePatFind (..))
 #endif
 
+import CLaSH.Core.Name                        (Name (..))
 import {-# SOURCE #-} CLaSH.Core.Type         (TyName, Type)
 import CLaSH.Util
 
@@ -117,4 +118,4 @@ dataConInstArgTys (MkData { dcArgTys     = arg_tys
   = Nothing
 
   where
-    tyvars = univ_tvs ++ ex_tvs
+    tyvars = map nameOcc (univ_tvs ++ ex_tvs)

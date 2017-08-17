@@ -27,7 +27,7 @@ import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (mapAccumL,nub,nubBy)
-import           Data.Maybe                           (catMaybes,mapMaybe)
+import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
 import           Prelude                              hiding ((<$>))
@@ -40,9 +40,9 @@ import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Id                     (mkBasicId')
+import           CLaSH.Netlist.Id                     (IdType (..), mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Netlist.Util                   hiding (mkIdentifier)
 import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
 
@@ -94,10 +94,31 @@ instance Backend VHDLState where
     text (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (text id_)
   fromBV hty id_  = fromSLV hty id_ (typeSize hty - 1) 0
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . T.toLower . mkBasicId' True)
+  mkIdentifier    = return go
+    where
+      go Basic    nm = filterReserved (T.toLower (mkBasicId' True nm))
+      go Extended (rmSlash -> nm) = case go Basic nm of
+        nm' | nm /= nm' -> T.concat ["\\",nm,"\\"]
+            |otherwise  -> nm'
+  extendIdentifier = return go
+    where
+      go Basic nm ext = filterReserved (T.toLower (mkBasicId' True (nm `T.append` ext)))
+      go Extended (rmSlash -> nm) ext =
+        let nmExt = nm `T.append` ext
+        in  case go Basic nm ext of
+              nm' | nm' /= nmExt -> case T.head nmExt of
+                      '#' -> T.concat ["\\",nmExt,"\\"]
+                      _   -> T.concat ["\\#",nmExt,"\\"]
+                  | otherwise    -> nm'
+
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+
+rmSlash :: Identifier -> Identifier
+rmSlash nm = fromMaybe nm $ do
+  nm1 <- T.stripPrefix "\\" nm
+  T.stripSuffix "\\" nm1
 
 type VHDLM a = State VHDLState a
 
@@ -152,7 +173,7 @@ mkTyPackage_ :: String
              -> VHDLM [(String,Doc)]
 mkTyPackage_ modName hwtys = do
     { syn <- hdlSyn
-    ; mkId <- mkBasicId
+    ; mkId <- mkIdentifier <*> pure Basic
     ; let usedTys     = concatMap mkUsedTys hwtys
     ; normTys <- nub A.<$> mapM (fmap mkVecZ . normaliseType) (hwtys ++ usedTys)
     ; let sortedTys   = topSortHWTys normTys
@@ -174,7 +195,7 @@ mkTyPackage_ modName hwtys = do
     packageBodyDec funBodies = case funBodies of
       [] -> empty
       _  -> do
-        { mkId <- mkBasicId
+        { mkId <- mkIdentifier <*> pure Basic
         ; linebreak <$>
          "package" <+> "body" <+> text (mkId (T.pack modName `T.append` "_types")) <+> "is" <$>
            indent 2 (vcat (sequence funBodies)) <$>
@@ -480,7 +501,7 @@ funDec _ _ = Nothing
 
 tyImports :: String -> VHDLM Doc
 tyImports nm = do
-  mkId <- mkBasicId
+  mkId <- mkIdentifier <*> pure Basic
   libs <- use libraries
   packs <- use packages
   punctuate' semi $ sequence
@@ -510,7 +531,7 @@ entity c = do
             $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
               | (i,ty) <- inputs c ] ++
               [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
-              | (i,ty) <- outputs c ]
+              | (_,(i,ty)) <- outputs c ]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -599,7 +620,7 @@ tyName t@(Product nm _)  = do
   where
     prodName = do
       seen <- use tySeen
-      mkId <- mkBasicId
+      mkId <- mkIdentifier <*> pure Basic
       let nm'  = (mkId . last . T.splitOn ".") nm
           nm'' = if T.null nm'
                     then "product"
@@ -652,8 +673,10 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
-  "signal" <+> fill l (text id_) <+> colon <+> either text vhdlType ty
+decl l (NetDecl' noteM _ id_ ty) = Just A.<$> (,fromIntegral (T.length id_)) A.<$>
+  maybe id addNote noteM ("signal" <+> fill l (text id_) <+> colon <+> either text vhdlType ty)
+  where
+    addNote n = ("--" <+> text n <$>)
 
 decl _ _ = return Nothing
 
@@ -796,6 +819,16 @@ expr_ _ (Identifier id_ (Just (Indexed ((Signed _ ),_,_))))  = do
 expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
   iw <- use intWidth
   "resize" <> parens (text id_ <> "," <> int iw)
+
+expr_ b (Identifier id_ (Just (Nested m1 m2))) = case (m1,m2) of
+  (Indexed (Vector n elTy,1,2),Indexed (Vector _ _,1,1)) ->
+    expr_ b (Identifier id_ (Just (Indexed (Vector n elTy,10,1))))
+  (Indexed ((RTree d elTy),1,n),Indexed ((RTree _ _),0,1)) -> do
+    let n' = case n of {1 -> 0; _ -> 1}
+    expr_ b (Identifier id_ (Just (Indexed (RTree d elTy,10,n'))))
+  _ -> do
+    k <- expr_ b (Identifier id_ (Just m1))
+    expr_ b (Identifier (displayT (renderOneLine k)) (Just m2))
 
 expr_ _ (Identifier id_ (Just _)) = text id_
 

@@ -23,9 +23,9 @@ import Control.DeepSeq                  (NFData (..))
 import Data.Hashable                    (Hashable)
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
-import Unbound.Generics.LocallyNameless (Alpha,Embed,Name,Subst(..))
-import Unbound.Generics.LocallyNameless.Extra ()
+import Unbound.Generics.LocallyNameless (Alpha,Embed,Subst(..))
 
+import CLaSH.Core.Name                  (Name)
 import {-# SOURCE #-} CLaSH.Core.Term   (Term)
 import {-# SOURCE #-} CLaSH.Core.Type   (Kind, Type)
 

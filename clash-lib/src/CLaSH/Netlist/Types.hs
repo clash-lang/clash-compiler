@@ -31,11 +31,12 @@ import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 import SrcLoc                               (SrcSpan)
 
 import CLaSH.Annotations.TopEntity          (TopEntity)
-import CLaSH.Core.Term                      (Term, TmName)
+import CLaSH.Core.Term                      (Term, TmName, TmOccName)
 import CLaSH.Core.Type                      (Type)
-import CLaSH.Core.TyCon                     (TyCon, TyConName)
+import CLaSH.Core.TyCon                     (TyCon, TyConOccName)
 import CLaSH.Core.Util                      (Gamma)
 import CLaSH.Netlist.BlackBox.Types
+import CLaSH.Netlist.Id                     (IdType)
 import CLaSH.Primitives.Types               (PrimMap)
 import CLaSH.Signal.Internal                (ClockKind, ResetKind)
 import CLaSH.Util
@@ -49,21 +50,23 @@ newtype NetlistMonad a =
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: HashMap TmName (Type,SrcSpan,Term) -- ^ Global binders
+  { _bindings       :: HashMap TmOccName (TmName,Type,SrcSpan,Term) -- ^ Global binders
   , _varEnv         :: Gamma -- ^ Type environment/context
   , _varCount       :: !Int -- ^ Number of signal declarations
-  , _components     :: HashMap TmName (SrcSpan,Component) -- ^ Cached components
+  , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
-  , _typeTranslator :: HashMap TyConName TyCon -> Type -> Maybe (Either String HWType) -- ^ Hardcoded Type -> HWType translator
-  , _tcCache        :: HashMap TyConName TyCon -- ^ TyCon cache
+  , _typeTranslator :: HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)
+  -- ^ Hardcoded Type -> HWType translator
+  , _tcCache        :: HashMap TyConOccName TyCon -- ^ TyCon cache
   , _curCompNm      :: !(Identifier,SrcSpan)
   , _dataFiles      :: [(String,FilePath)]
   , _intWidth       :: Int
-  , _mkBasicIdFn    :: Identifier -> Identifier
+  , _mkIdentifierFn :: IdType -> Identifier -> Identifier
+  , _extendIdentifierFn :: IdType -> Identifier -> Identifier -> Identifier
   , _seenIds        :: [Identifier]
   , _seenComps      :: [Identifier]
-  , _componentNames :: HashMap TmName Identifier
-  , _topEntityAnns  :: HashMap TmName (Type, Maybe TopEntity)
+  , _componentNames :: HashMap TmOccName Identifier
+  , _topEntityAnns  :: HashMap TmOccName (Type, Maybe TopEntity)
   , _hdlDir         :: FilePath
   }
 
@@ -75,7 +78,7 @@ data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
   , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(Identifier,HWType)] -- ^ Output ports
+  , outputs       :: [(WireOrReg,(Identifier,HWType))] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving Show
@@ -134,13 +137,18 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
   | BlackBoxD !S.Text [S.Text] [S.Text] (Maybe (S.Text,BlackBoxTemplate)) !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl' !Identifier (Either Identifier HWType) -- ^ Signal declaration
+  | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
 
-pattern NetDecl :: Identifier -> HWType -> Declaration
-pattern NetDecl d ty <- NetDecl' d (Right ty)
+data WireOrReg = Wire | Reg
+  deriving (Show,Generic)
+
+instance NFData WireOrReg
+
+pattern NetDecl :: Maybe Identifier -> Identifier -> HWType -> Declaration
+pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
   where
-    NetDecl d ty = NetDecl' d (Right ty)
+    NetDecl note d ty = NetDecl' note Wire d (Right ty)
 
 data PortDirection = In | Out
   deriving Show
@@ -154,6 +162,7 @@ data Modifier
   | DC (HWType,Int) -- ^ See expression in a DataCon context: (Type of the expression, DataCon tag)
   | VecAppend -- ^ See the expression in the context of a Vector append operation
   | RTreeAppend -- ^ See the expression in the context of a Tree append operation
+  | Nested Modifier Modifier
   deriving Show
 
 -- | Expression used in RHS of a declaration
@@ -188,10 +197,13 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,BlackBoxContext)
+  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,WireOrReg,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
-  -- * (Blackbox Template,Partial Blackbox Concext)
+  -- * ( Blackbox Template
+  --   , Whether the result should be /reg/ or a /wire/ (Verilog only)
+  --   , Partial Blackbox Context
+  --   )
   , bbQsysIncName :: Maybe Identifier
   }
   deriving Show

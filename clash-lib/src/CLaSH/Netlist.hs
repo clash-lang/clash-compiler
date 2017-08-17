@@ -7,13 +7,15 @@
   Create Netlists out of normalized CoreHW Terms
 -}
 
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 module CLaSH.Netlist where
 
 import           Control.Exception                (throw)
-import           Control.Lens                     ((.=),(^.),_1,_2)
+import           Control.Lens                     ((.=),(^.),_1,_2,_3)
 import qualified Control.Lens                     as Lens
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (runStateT)
@@ -22,25 +24,28 @@ import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
-import           Data.List                        (elemIndex)
+import           Data.List                        (elemIndex, intersperse)
 import qualified Data.Text.Lazy                   as Text
 import           System.FilePath                  ((</>), (<.>))
-import           Unbound.Generics.LocallyNameless (Embed (..), name2String,
-                                                  runFreshMT, unbind, unembed,
-                                                  unrebind)
+import           Unbound.Generics.LocallyNameless
+  (Embed (..), runFreshMT, unbind, unembed, unrebind)
 
-import           SrcLoc                           (SrcSpan,noSrcSpan)
+import           Outputable                       (ppr, showSDocUnsafe)
+import           SrcLoc                           (SrcSpan,isGoodSrcSpan,noSrcSpan)
 
 import           CLaSH.Annotations.TopEntity      (TopEntity (..))
 import           CLaSH.Core.DataCon               (DataCon (..))
 import           CLaSH.Core.FreeVars              (typeFreeVars)
 import           CLaSH.Core.Literal               (Literal (..))
+import           CLaSH.Core.Name                  (Name(..), name2String)
 import           CLaSH.Core.Pretty                (showDoc)
-import           CLaSH.Core.Term                  (Pat (..), Term (..), TmName)
+import           CLaSH.Core.Term
+  (Alt, Pat (..), Term (..), TmName, TmOccName)
 import qualified CLaSH.Core.Term                  as Core
 import           CLaSH.Core.Type                  (Type (..), splitFunTys)
-import           CLaSH.Core.TyCon                 (TyConName, TyCon)
-import           CLaSH.Core.Util                  (collectArgs, isVar, termType)
+import           CLaSH.Core.TyCon
+  (TyCon, TyConOccName)
+import           CLaSH.Core.Util                  (collectArgs, termType)
 import           CLaSH.Core.Var                   (Id, Var (..))
 import           CLaSH.Driver.Types               (CLaSHException (..))
 import           CLaSH.Netlist.BlackBox
@@ -48,115 +53,118 @@ import           CLaSH.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           CLaSH.Netlist.Id
 import           CLaSH.Netlist.Types              as HW
 import           CLaSH.Netlist.Util
-import           CLaSH.Normalize.Util
 import           CLaSH.Primitives.Types           as P
 import           CLaSH.Util
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.
-genNetlist :: HashMap TmName (Type,SrcSpan,Term)
+genNetlist :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
            -- ^ Global binders
            -> [(TmName,Type,Maybe TopEntity,Maybe TmName)]
            -- ^ All the TopEntities
            -> PrimMap BlackBoxTemplate
            -- ^ Primitive definitions
-           -> HashMap TyConName TyCon
+           -> HashMap TyConOccName TyCon
            -- ^ TyCon cache
-           -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+           -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
            -- ^ Hardcoded Type -> HWType translator
-           -> String
-           -- ^ Name of the module containing the @topEntity@
            -> [(String,FilePath)]
            -- ^ Set of collected data-files
            -> Int
            -- ^ Int/Word/Integer bit-width
-           -> (Identifier -> Identifier)
+           -> (IdType -> Identifier -> Identifier)
            -- ^ valid identifiers
-           -> (HashMap TmName (SrcSpan,Component), [Identifier])
+           -> (IdType -> Identifier -> Identifier -> Identifier)
+           -- ^ extend valid identifiers
+           -> [Identifier]
            -- ^ Seen components
            -> FilePath
            -- ^ HDL dir
-           -> TmName
+           -> TmOccName
            -- ^ Name of the @topEntity@
-           -> IO ([(SrcSpan,Component)],[(String,FilePath)],(HashMap TmName (SrcSpan,Component), [Identifier]))
-genNetlist globals tops primMap tcm typeTrans modName dfiles iw mkId seen env topEntity = do
+           -> IO ([(SrcSpan,Component)],[(String,FilePath)],[Identifier])
+genNetlist globals tops primMap tcm typeTrans dfiles iw mkId extId seen env topEntity = do
   (_,s) <- runNetlistMonad globals (mkTopEntityMap tops) primMap tcm typeTrans
-              modName dfiles iw mkId seen env $ genComponent topEntity
-  return (HashMap.elems $ _components s, _dataFiles s, (_components s, _seenComps s))
+             dfiles iw mkId extId seen env $ genComponent topEntity
+  return (HashMap.elems $ _components s, _dataFiles s, _seenComps s)
   where
     mkTopEntityMap
       :: [(TmName,Type,Maybe TopEntity,Maybe TmName)]
-      -> HashMap TmName (Type, Maybe TopEntity)
-    mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (a,(b,c)))
+      -> HashMap TmOccName (Type, Maybe TopEntity)
+    mkTopEntityMap = HashMap.fromList . map (\(a,b,c,_) -> (nameOcc a,(b,c)))
 
 -- | Run a NetlistMonad action in a given environment
-runNetlistMonad :: HashMap TmName (Type,SrcSpan,Term)
+runNetlistMonad :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
                 -- ^ Global binders
-                -> HashMap TmName (Type, Maybe TopEntity)
+                -> HashMap TmOccName (Type, Maybe TopEntity)
                 -- ^ TopEntity annotations
                 -> PrimMap BlackBoxTemplate
                 -- ^ Primitive Definitions
-                -> HashMap TyConName TyCon
+                -> HashMap TyConOccName TyCon
                 -- ^ TyCon cache
-                -> (HashMap TyConName TyCon -> Type -> Maybe (Either String HWType))
+                -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                 -- ^ Hardcode Type -> HWType translator
-                -> String
-                -- ^ Name of the module containing the @topEntity@
                 -> [(String,FilePath)]
                 -- ^ Set of collected data-files
                 -> Int
                 -- ^ Int/Word/Integer bit-width
-                -> (Identifier -> Identifier)
+                -> (IdType -> Identifier -> Identifier)
                 -- ^ valid identifiers
-                -> (HashMap TmName (SrcSpan,Component), [Identifier])
+                -> (IdType -> Identifier -> Identifier -> Identifier)
+                -- ^ extend valid identifiers
+                -> [Identifier]
                 -- ^ Seen components
                 -> FilePath
                 -- ^ HDL dir
                 -> NetlistMonad a
                 -- ^ Action to run
                 -> IO (a, NetlistState)
-runNetlistMonad s tops p tcm typeTrans modName dfiles iw mkId (seen,seenIds_) env
+runNetlistMonad s tops p tcm typeTrans dfiles iw mkId extId seenIds_ env
   = runFreshMT
   . flip runStateT s'
   . runNetlist
   where
-    s' = NetlistState s HashMap.empty 0 seen p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId [] seenIds' names tops env
-    (seenIds',names) = genNames mkId modName seenIds_ HashMap.empty (HashMap.keys s)
+    s' = NetlistState s HashMap.empty 0 HashMap.empty p typeTrans tcm (Text.empty,noSrcSpan) dfiles iw mkId extId [] seenIds' names tops env
+    (seenIds',names) = genNames mkId seenIds_ HashMap.empty (HashMap.elems (HashMap.map (^. _1) s))
 
-genNames :: (Identifier -> Identifier)
-         -> String
+genNames :: (IdType -> Identifier -> Identifier)
          -> [Identifier]
-         -> HashMap TmName Identifier
+         -> HashMap TmOccName Identifier
          -> [TmName]
-         -> ([Identifier], HashMap TmName Identifier)
-genNames mkId modName = go
+         -> ([Identifier], HashMap TmOccName Identifier)
+genNames mkId = go
   where
     go s m []       = (s,m)
-    go s m (nm:nms) = let nm' = genComponentName s mkId modName nm
+    go s m (nm:nms) = let nm' = genComponentName s mkId nm
                           s'  = nm':s
-                          m'  = HashMap.insert nm nm' m
+                          m'  = HashMap.insert (nameOcc nm) nm' m
                       in  go s' m' nms
 
 -- | Generate a component for a given function (caching)
-genComponent :: TmName -- ^ Name of the function
-             -> NetlistMonad (SrcSpan,Component)
+genComponent
+  :: TmOccName
+  -- ^ Name of the function
+  -> NetlistMonad (SrcSpan,Component)
 genComponent compName = do
   compExprM <- fmap (HashMap.lookup compName) $ Lens.use bindings
   case compExprM of
     Nothing -> do
       (_,sp) <- Lens.use curCompNm
       throw (CLaSHException sp ($(curLoc) ++ "No normalized expression found for: " ++ show compName) Nothing)
-    Just (_,_,expr_) -> do
+    Just (_,_,_,expr_) -> do
       makeCached compName components $ genComponentT compName expr_
 
 -- | Generate a component for a given function
-genComponentT :: TmName -- ^ Name of the function
-              -> Term -- ^ Corresponding term
-              -> NetlistMonad (SrcSpan,Component)
+genComponentT
+  :: TmOccName
+  -- ^ Name of the function
+  -> Term
+  -- ^ Corresponding term
+  -> NetlistMonad (SrcSpan,Component)
 genComponentT compName componentExpr = do
   varCount .= 0
   componentName' <- (HashMap.! compName) <$> Lens.use componentNames
-  sp <- ((^. _2) . (HashMap.! compName)) <$> Lens.use bindings
+  sp <- ((^. _3) . (HashMap.! compName)) <$> Lens.use bindings
   curCompNm .= (componentName',sp)
 
   tcm <- Lens.use tcCache
@@ -168,46 +176,65 @@ genComponentT compName componentExpr = do
                                    }
 
   let ids = HashMap.fromList
-          $ map (\(Id v (Embed t)) -> (v,t))
+          $ map (\(Id v (Embed t)) -> (nameOcc v,t))
           $ arguments ++ map fst binders
 
-  gamma <- (ids `HashMap.union`) . HashMap.map (^. _1)
+  gamma <- (ids `HashMap.union`) . HashMap.map (^. _2)
            <$> Lens.use bindings
 
   varEnv .= gamma
 
   typeTrans    <- Lens.use typeTranslator
-  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) result ids
+  let resType  = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm $ HashMap.lookupDefault (error $ $(curLoc) ++ "resType" ++ show (result,HashMap.keys ids)) (nameOcc result) ids
       argTypes = map (\(Id _ (Embed t)) -> unsafeCoreTypeToHWType $(curLoc) typeTrans tcm t) arguments
 
-  let netDecls = map (\(id_,_) ->
-                        NetDecl (Text.pack . name2String $ varName id_)
-                                (unsafeCoreTypeToHWType $(curLoc) typeTrans tcm . unembed $ varType id_)
-                     ) $ filter ((/= result) . varName . fst) binders
-  decls <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
+  netDecls <- mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+  decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
+
+  (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
   let compInps       = zip (map (Text.pack . name2String . varName) arguments) argTypes
       compOutp       = (Text.pack $ name2String result, resType)
-      component      = Component componentName' compInps [compOutp] (netDecls ++ decls)
+      component      = Component componentName' compInps [(rw,compOutp)] (netDecls ++ decls)
   return (sp,component)
 
+mkNetDecl :: (Id, Embed Term) -> NetlistMonad Declaration
+mkNetDecl (id_,tm) = do
+  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType id_))
+  wr   <- wireOrReg (unembed tm)
+  return $ NetDecl' (addSrcNote (nameLoc nm))
+             wr
+             (Text.pack (name2String nm))
+             (Right hwTy)
 
-genComponentName :: [Identifier] -> (Identifier -> Identifier) -> String -> TmName -> Identifier
-genComponentName seen mkId prefix nm =
-  let i = mkId . stripDollarPrefixes . last
-        . Text.splitOn (Text.pack ".") . Text.pack
-        $ name2String nm
-      i' = if Text.null i
-              then Text.pack "Component"
-              else i
-      i'' = mkId (Text.pack (prefix ++ "_") `Text.append` i')
-  in  if i'' `elem` seen
-         then go 0 i''
-         else i''
+  where
+    nm = varName id_
+
+    wireOrReg :: Term -> NetlistMonad WireOrReg
+    wireOrReg (Case _ _ (_:_:_)) = return Reg
+    wireOrReg (collectArgs -> (Prim nm' _,_)) = do
+      bbM <- HashMap.lookup nm' <$> Lens.use primitives
+      case bbM of
+        Just (BlackBox {..}) | outputReg -> return Reg
+        _ -> return Wire
+    wireOrReg _ = return Wire
+
+    addSrcNote loc = if isGoodSrcSpan loc
+                        then Just (Text.pack (showSDocUnsafe (ppr loc)))
+                        else Nothing
+
+genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> TmName -> Identifier
+genComponentName seen mkId nm =
+  let nm' = Text.splitOn (Text.pack ".") (Text.pack (name2String nm))
+      fn  = mkId Basic (stripDollarPrefixes (last nm'))
+      fn' = if Text.null fn then Text.pack "Component" else fn
+      nm2 = Text.concat (intersperse (Text.pack "_") (init nm' ++ [fn']))
+      nm3 = mkId Basic nm2
+  in  if nm3 `elem` seen then go 0 nm3 else nm3
   where
     go :: Integer -> Identifier -> Identifier
     go n i =
-      let i' = mkId (i `Text.append` Text.pack ('_':show n))
+      let i' = mkId Basic (i `Text.append` Text.pack ('_':show n))
       in  if i' `elem` seen
              then go (n+1) i
              else i'
@@ -222,57 +249,15 @@ mkDeclarations _ e@(Case _ _ []) = do
   (_,sp) <- Lens.use curCompNm
   throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Case-decompositions with an empty list of alternatives not supported:\n\n" ++ showDoc e) Nothing)
 
-mkDeclarations bndr e@(Case scrut _ [alt]) = do
-  (pat,v) <- unbind alt
-  (_,sp) <- Lens.use curCompNm
-  (varTy,varTm) <- case v of
-                     (Var t n) -> return (t,n)
-                     _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: RHS of case-projection is not a variable:\n\n" ++ showDoc e) Nothing)
-  typeTrans    <- Lens.use typeTranslator
-  tcm          <- Lens.use tcCache
-  scrutTy      <- termType tcm scrut
-  let sHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm scrutTy
-      vHwTy = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm varTy
-  (selId,decls) <- case scrut of
-    (Var _ scrutNm) -> return (Text.pack $ name2String scrutNm,[])
-    _ -> do
-       let scrutId = Text.pack . (++ "_case_scrut") . name2String $ varName bndr
-       (newExpr, newDecls) <- mkExpr False (Left scrutId) scrutTy scrut
-       case newExpr of
-         (Identifier newId Nothing) -> return (newId,newDecls)
-         _ -> do
-          scrutId' <- mkUniqueIdentifier scrutId
-          let scrutDecl = NetDecl scrutId' sHwTy
-              scrutAssn = Assignment scrutId' newExpr
-          return (scrutId',newDecls ++ [scrutDecl,scrutAssn])
-  let dstId    = Text.pack . name2String $ varName bndr
-      altVarId = Text.pack $ name2String varTm
-      modifier = case pat of
-        DataPat (Embed dc) ids -> let (exts,tms) = unrebind ids
-                                      tmsTys     = map (unembed . varType) tms
-                                      tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
-                                      extNms     = map varName exts
-                                      tms'       = if any (`elem` tmsFVs) extNms
-                                                      then throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
-                                                      else tms
-                                  in case elemIndex (Id varTm (Embed varTy)) tms' of
-                                       Nothing -> Nothing
-                                       Just fI
-                                        | sHwTy /= vHwTy -> Just (Indexed (sHwTy,dcTag dc - 1,fI))
-                                        -- When element and subject have the same HW-type,
-                                        -- then the projections is just the identity
-                                        | otherwise      -> Just (DC (Void,0))
-        _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
-      extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
-  return (decls ++ [Assignment dstId extractExpr])
-
-mkDeclarations bndr (Case scrut altTy alts) = do
+mkDeclarations bndr (Case scrut altTy alts@(_:_:_)) = do
   alts'                  <- reorderPats <$> mapM unbind alts
   tcm                    <- Lens.use tcCache
   scrutTy                <- termType tcm scrut
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
-  let scrutId = Text.pack . (++ "_case_scrut") . name2String $ varName bndr
+  scrutId <- extendIdentifier Extended
+               (Text.pack (name2String (varName bndr)))
+               (Text.pack "_case_scrut")
   (_,sp) <- Lens.use curCompNm
   (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
@@ -282,7 +267,9 @@ mkDeclarations bndr (Case scrut altTy alts) = do
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
-      let altId = Text.pack . (++ "_case_alt") . name2String $ varName bndr
+      altId <- extendIdentifier Extended
+                 (Text.pack (name2String (varName bndr)))
+                 (Text.pack "_case_alt")
       (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
       (,altDecls) <$> case pat of
         DefaultPat           -> return (Nothing,altExpr)
@@ -302,7 +289,7 @@ mkDeclarations bndr (Case scrut altTy alts) = do
     mkScrutExpr sp scrutHTy pat scrutE = case pat of
       DataPat (Embed dc) _ -> let modifier = Just (DC (scrutHTy,dcTag dc - 1))
                               in case scrutE of
-                                  Identifier scrutId _ -> Identifier scrutId modifier
+                                  Identifier scrutId Nothing -> Identifier scrutId modifier
                                   _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Not a variable reference or primitive as subject of a case-statement:\n\n" ++ show scrutE) Nothing)
       _ -> scrutE
 
@@ -329,14 +316,15 @@ mkDeclarations bndr app =
       return (declsApp ++ assn)
 
 -- | Generate a list of Declarations for a let-binder where the RHS is a function application
-mkFunApp :: Id -- ^ LHS of the let-binder
-         -> TmName -- ^ Name of the applied function
-         -> [Term] -- ^ Function arguments
-         -> NetlistMonad [Declaration]
+mkFunApp
+  :: Id -- ^ LHS of the let-binder
+  -> TmName -- ^ Name of the applied function
+  -> [Term] -- ^ Function arguments
+  -> NetlistMonad [Declaration]
 mkFunApp dst fun args = do
   topAnns <- Lens.use topEntityAnns
   tcm     <- Lens.use tcCache
-  case HashMap.lookup fun topAnns of
+  case HashMap.lookup (nameOcc fun) topAnns of
     Just (ty,annM)
       | let (fArgTys,fResTy) = splitFunTys tcm ty
       , length fArgTys == length args
@@ -359,9 +347,9 @@ mkFunApp dst fun args = do
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
     _ -> do
       normalized <- Lens.use bindings
-      case HashMap.lookup fun normalized of
+      case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
-          (_,Component compName compInps [compOutp] _) <- preserveVarEnv $ genComponent fun
+          (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
           if length args == length compInps
             then do argTys                <- mapM (termType tcm) args
                     let dstId = Text.pack . name2String $ varName dst
@@ -369,8 +357,8 @@ mkFunApp dst fun args = do
                     (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
                     let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                         outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
-                        instLabel     = Text.concat [compName, Text.pack "_", dstId]
-                        instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
+                    instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
+                    let instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
                     return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
@@ -384,10 +372,12 @@ toSimpleVar :: Id
             -> NetlistMonad (Expr,[Declaration])
 toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
 toSimpleVar dst (e,ty) = do
-  let argNm = Text.pack . (++ "_app_arg") . name2String $ varName dst
-  argNm' <- mkUniqueIdentifier argNm
+  argNm <- extendIdentifier Extended
+             (Text.pack (name2String (varName dst)))
+             (Text.pack "_app_arg")
+  argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  let argDecl = NetDecl argNm' hTy
+  let argDecl = NetDecl Nothing argNm' hTy
       argAssn = Assignment argNm' e
   return (Identifier argNm' Nothing,[argDecl,argAssn])
 
@@ -421,16 +411,83 @@ mkExpr bbEasD bndr ty app = do
   hwTy    <- unsafeCoreTypeToHWTypeM $(curLoc) ty
   (_,sp) <- Lens.use curCompNm
   case appF of
-    Data dc
-      | all (\e -> isConstant e || isVar e) tmArgs -> mkDcApplication hwTy bndr dc tmArgs
-      | otherwise                                  ->
-        throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: DataCon-application with non-Simple arguments:\n\n" ++ showDoc app) Nothing)
+    Data dc -> mkDcApplication hwTy bndr dc tmArgs
     Prim nm _ -> mkPrimitive False bbEasD bndr nm args ty
     Var _ f
       | null tmArgs -> return (Identifier (Text.pack $ name2String f) Nothing,[])
       | otherwise ->
         throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: top-level binder in argument position:\n\n" ++ showDoc app) Nothing)
+    Case scrut ty' [alt] -> mkProjection bndr scrut ty' alt
     _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: application of a Let/Lam/Case:\n\n" ++ showDoc app) Nothing)
+
+-- | Generate an expression that projects a field out of a data-constructor.
+--
+-- Works for both product types, as sum-of-product types.
+mkProjection
+  :: Either Identifier Id
+  -- ^ The signal to which the projection is (potentially) assigned
+  -> Term
+  -- ^ The subject/scrutinee of the projection
+  -> Type
+  -- ^ The type of the result
+  -> Alt
+  -- ^ The field to be projected
+  -> NetlistMonad (Expr, [Declaration])
+mkProjection bndr scrut altTy alt = do
+  tcm <- Lens.use tcCache
+  scrutTy <- termType tcm scrut
+  let e = Case scrut scrutTy [alt]
+  (pat,v) <- unbind alt
+  (_,sp) <- Lens.use curCompNm
+  varTm <- case v of
+    (Var _ n) -> return n
+    _ -> throw (CLaSHException sp ($(curLoc) ++
+                "Not in normal form: RHS of case-projection is not a variable:\n\n"
+                 ++ showDoc e) Nothing)
+  sHwTy <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
+  vHwTy <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
+  (selId,modM,decls) <- do
+    scrutNm <- either return
+                 (\b -> extendIdentifier Extended
+                          (Text.pack (name2String (varName b)))
+                          (Text.pack ("_case_scrut")))
+                 bndr
+    (scrutExpr,newDecls) <- mkExpr False (Left scrutNm) scrutTy scrut
+    case scrutExpr of
+      Identifier newId modM
+        | Nothing <- modM          -> return (newId,modM,newDecls)
+        | Just (Indexed _) <- modM -> return (newId,modM,newDecls)
+      _ -> do
+        scrutNm' <- mkUniqueIdentifier Extended scrutNm
+        let scrutDecl = NetDecl Nothing scrutNm' sHwTy
+            scrutAssn = Assignment scrutNm' scrutExpr
+        return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
+
+  let altVarId = Text.pack $ name2String varTm
+      modifier = case pat of
+        DataPat (Embed dc) ids ->
+          let (exts,tms) = unrebind ids
+              tmsTys     = map (unembed . varType) tms
+              tmsFVs     = concatMap (Lens.toListOf typeFreeVars) tmsTys
+              extNms     = map (nameOcc.varName) exts
+              tms'       = if any (`elem` tmsFVs) extNms
+                              then throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Pattern binds existential variables:\n\n" ++ showDoc e) Nothing)
+                              else tms
+          in case elemIndex (Id varTm (Embed altTy)) tms' of
+               Nothing -> Nothing
+               Just fI
+                | sHwTy /= vHwTy -> nestModifier modM (Just (Indexed (sHwTy,dcTag dc - 1,fI)))
+                -- When element and subject have the same HW-type,
+                -- then the projections is just the identity
+                | otherwise      -> nestModifier modM (Just (DC (Void,0)))
+        _ -> throw (CLaSHException sp ($(curLoc) ++ "Not in normal form: Unexpected pattern in case-projection:\n\n" ++ showDoc e) Nothing)
+      extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+  return (extractExpr,decls)
+  where
+    nestModifier Nothing  m          = m
+    nestModifier m Nothing           = m
+    nestModifier (Just m1) (Just m2) = Just (Nested m1 m2)
+
 
 -- | Generate an expression for a DataCon application occurring on the RHS of a let-binder
 mkDcApplication :: HWType -- ^ HWType of the LHS of the let-binder
@@ -443,7 +500,7 @@ mkDcApplication dstHType bndr dc args = do
   argTys              <- mapM (termType tcm) args
   let isSP (SP _ _) = True
       isSP _        = False
-  let argNm = either id (Text.pack . (++ "_app_arg") . name2String . varName) bndr
+  argNm <- either return (\b -> extendIdentifier Extended (Text.pack (name2String (varName b))) (Text.pack "_app_arg")) bndr
   (argExprs,argDecls) <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr (isSP dstHType) (Left argNm) t e) (zip args argTys)
   argHWTys            <- mapM coreTypeToHWTypeM argTys
   fmap (,argDecls) $! case (argHWTys,argExprs) of

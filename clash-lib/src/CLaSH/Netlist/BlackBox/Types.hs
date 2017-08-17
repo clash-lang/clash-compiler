@@ -20,6 +20,7 @@ data Element = C   !Text         -- ^ Constant
              | I   !Int          -- ^ Input hole
              | N   !Int          -- ^ Name hole
              | L   !Int          -- ^ Literal hole
+             | Var [Element] !Int    --
              | Sym !Text !Int    -- ^ Symbol hole
              | Typ !(Maybe Int)  -- ^ Type declaration hole
              | TypM !(Maybe Int) -- ^ Type root hole
@@ -47,6 +48,7 @@ data Element = C   !Text         -- ^ Constant
              | IsVar !Int
              | IsGated !Int
              | IsSync !Int
+             | OutputWireReg !Int
              | Vars !Int
              | GenSym [Element] !Int
              | SigD [Element] !(Maybe Int)

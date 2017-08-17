@@ -17,7 +17,7 @@ import CLaSH.Rewrite.Util
 -- | Normalisation transformation
 normalization :: NormRewrite
 normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec
+                bindConst >-> letTL >-> evalConst >-!-> cse >-!-> recLetRec >-> cleanup
   where
     etaTL      = apply "etaTL" etaExpansionTL !-> innerMost (apply "applicationPropagation" appProp)
     anf        = topdownR (apply "nonRepANF" nonRepANF) >-> apply "ANF" makeANF
@@ -28,6 +28,7 @@ normalization = rmDeadcode >-> constantPropgation >-> etaTL >-> rmUnusedExpr >-!
     bindConst  = topdownR (apply "bindConstantVar" bindConstantVar)
     evalConst  = topdownR (apply "evalConst" reduceConst)
     cse        = topdownR (apply "CSE" simpleCSE)
+    cleanup    = topdownSucR (apply "inlineCleanup" inlineCleanup)
 
 
 constantPropgation :: NormRewrite

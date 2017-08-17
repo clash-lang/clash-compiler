@@ -13,6 +13,7 @@ import Text.PrettyPrint.Leijen.Text.Monadic (Doc)
 
 import SrcLoc (SrcSpan)
 
+import CLaSH.Netlist.Id
 import CLaSH.Netlist.Types
 import CLaSH.Netlist.BlackBox.Types
 
@@ -66,8 +67,10 @@ class Backend state where
   fromBV           :: HWType -> Text -> State state Doc
   -- | Synthesis tool we're generating HDL for
   hdlSyn           :: State state HdlSyn
-  -- | mkBasicId
-  mkBasicId        :: State state (Identifier -> Identifier)
+  -- | mkIdentifier
+  mkIdentifier     :: State state (IdType -> Identifier -> Identifier)
+  -- | mkIdentifier
+  extendIdentifier :: State state (IdType -> Identifier -> Identifier -> Identifier)
   -- | setModName
   setModName       :: ModName -> state -> state
   -- | setSrcSpan

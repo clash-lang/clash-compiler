@@ -6,7 +6,8 @@
 
 module CLaSH.Core.TyCon where
 
-import Unbound.Generics.LocallyNameless (Name)
+import CLaSH.Core.Name (Name, OccName)
 
 data TyCon
 type TyConName = Name TyCon
+type TyConOccName = OccName TyCon

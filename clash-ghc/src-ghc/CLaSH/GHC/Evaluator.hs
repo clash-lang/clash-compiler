@@ -26,24 +26,24 @@ import           GHC.Int
 import           GHC.Prim
 import           GHC.Real            (Ratio (..))
 import           GHC.Word
-import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed,
-                                                   string2Name)
+import           Unbound.Generics.LocallyNameless (runFreshM, bind, embed)
 
 import           CLaSH.Core.DataCon  (DataCon (..))
 import           CLaSH.Core.Literal  (Literal (..))
+import           CLaSH.Core.Name     (Name (..), string2SystemName)
 import           CLaSH.Core.Pretty   (showDoc)
 import           CLaSH.Core.Term     (Term (..))
 import           CLaSH.Core.Type     (Type (..), ConstTy (..), LitTy (..),
                                       TypeView (..), tyView, mkFunTy,
                                       mkTyConApp, splitFunForallTy)
-import           CLaSH.Core.TyCon    (TyCon, TyConName, tyConDataCons)
+import           CLaSH.Core.TyCon    (TyCon, TyConOccName, tyConDataCons)
 import           CLaSH.Core.TysPrim
 import           CLaSH.Core.Util     (collectArgs,mkApps,mkRTree,mkVec,termType,
                                       tyNatSize)
 import           CLaSH.Core.Var      (Var (..))
 import           CLaSH.Util          (clogBase, flogBase, curLoc)
 
-reduceConstant :: HashMap.HashMap TyConName TyCon -> Bool -> Term -> Term
+reduceConstant :: HashMap.HashMap TyConOccName TyCon -> Bool -> Term -> Term
 reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.eqChar#" | Just (i,j) <- charLiterals tcm isSubj args
     -> boolToIntLiteral (i == j)
@@ -68,7 +68,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Prim.quotRemInt#" | Just (i,j) <- intLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
            [tupDc] = tyConDataCons tupTc
            (q,r)   = quotRem i j
            ret     = mkApps (Data tupDc) (map Right tyArgs ++
@@ -106,7 +106,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
   "GHC.Prim.tagToEnum#"
     | [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] <-
       map (Bifunctor.bimap (reduceConstant tcm isSubj) id) args
-    -> let dc = do { tc <- HashMap.lookup tcN tcm
+    -> let dc = do { tc <- HashMap.lookup (nameOcc tcN) tcm
                    ; let dcs = tyConDataCons tc
                    ; List.find ((== (i+1)) . toInteger . dcTag) dcs
                    }
@@ -118,7 +118,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Prim.plusWord2#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -129,7 +129,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Prim.timesWord2#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -140,7 +140,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Prim.subWordC#" | Just (i,j) <- wordLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
-           (Just tupTc) = HashMap.lookup tupTcNm tcm
+           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
            [tupDc] = tyConDataCons tupTc
            !(W# a)  = fromInteger i
            !(W# b)  = fromInteger j
@@ -154,6 +154,9 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
       , Literal (IntLiteral  i)
       ] <- reduceTerms tcm isSubj args
     -> Literal (WordLiteral (w `shiftL` fromInteger i))
+
+  "GHC.Classes.geInt" | Just (i,j) <- intCLiterals tcm isSubj args
+    -> boolToBoolLiteral tcm ty (i >= j)
 
   "GHC.Integer.Logarithms.integerLogBase#"
     | Just (a,b) <- integerLiterals tcm isSubj args
@@ -195,7 +198,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
   "GHC.Integer.Type.divModInteger" | Just (i,j) <- integerLiterals tcm isSubj args
     -> let (_,tyView -> TyConApp ubTupTcNm [liftedKi,_,intTy,_]) = splitFunForallTy ty
-           (Just ubTupTc) = HashMap.lookup ubTupTcNm tcm
+           (Just ubTupTc) = HashMap.lookup (nameOcc ubTupTcNm) tcm
            [ubTupDc] = tyConDataCons ubTupTc
            (d,m) = divMod i j
        in  mkApps (Data ubTupDc) [ Right liftedKi, Right liftedKi
@@ -275,7 +278,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | isSubj
     , [Literal (IntLiteral i)] <- reduceTerms tcm isSubj args
     ->  let (_,tyView -> TyConApp intTcNm []) = splitFunForallTy ty
-            (Just intTc) = HashMap.lookup intTcNm tcm
+            (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
             [intDc] = tyConDataCons intTc
         in  mkApps (Data intDc) [Left (Literal (IntLiteral i))]
 
@@ -330,7 +333,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
                  2 -> 1 `shiftL` (fromInteger b)
                  _ -> a ^ b
            (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           (Just snatTc) = HashMap.lookup (nameOcc snatTcNm) tcm
            [snatDc] = tyConDataCons snatTc
        in  mkApps (Data snatDc) [ Right (LitTy (NumTy c))
 #if MIN_VERSION_ghc(8,2,0)
@@ -344,7 +347,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Just c <- flogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           (Just snatTc) = HashMap.lookup (nameOcc snatTcNm) tcm
            [snatDc] = tyConDataCons snatTc
        in  mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
 #if MIN_VERSION_ghc(8,2,0)
@@ -358,7 +361,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Just c <- clogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           (Just snatTc) = HashMap.lookup (nameOcc snatTcNm) tcm
            [snatDc] = tyConDataCons snatTc
        in  mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
 #if MIN_VERSION_ghc(8,2,0)
@@ -372,7 +375,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Just c <- flogBase a b
     , let c' = toInteger c
     -> let (_,tyView -> TyConApp snatTcNm _) = splitFunForallTy ty
-           (Just snatTc) = HashMap.lookup snatTcNm tcm
+           (Just snatTc) = HashMap.lookup (nameOcc snatTcNm) tcm
            [snatDc] = tyConDataCons snatTc
        in  mkApps (Data snatDc) [ Right (LitTy (NumTy c'))
 #if MIN_VERSION_ghc(8,2,0)
@@ -445,7 +448,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | isSubj
     , (TyConApp treeTcNm [lenTy,argTy]) <- tyView (runFreshM (termType tcm e))
     , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just treeTc) = HashMap.lookup treeTcNm tcm
+    -> let (Just treeTc) = HashMap.lookup (nameOcc treeTcNm) tcm
            [lrCon,brCon] = tyConDataCons treeTc
        in  mkRTree lrCon brCon argTy len (replicate (2^len) (last $ Either.lefts args))
 
@@ -453,7 +456,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     | isSubj
     , (TyConApp vecTcNm [lenTy,argTy]) <- tyView (runFreshM (termType tcm e))
     , Right len <- runExcept (tyNatSize tcm lenTy)
-    -> let (Just vecTc) = HashMap.lookup vecTcNm tcm
+    -> let (Just vecTc) = HashMap.lookup (nameOcc vecTcNm) tcm
            [nilCon,consCon] = tyConDataCons vecTc
        in  mkVec nilCon consCon argTy len (replicate (fromInteger len) (last $ Either.lefts args))
 
@@ -463,7 +466,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Right n <- runExcept (tyNatSize tcm nTy)
     -> let ty' = runFreshM (termType tcm e)
            (TyConApp intTcNm _) = tyView ty'
-           (Just intTc) = HashMap.lookup intTcNm tcm
+           (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
            [intCon] = tyConDataCons intTc
        in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger (n - 1))))]
 
@@ -473,7 +476,7 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
     , Right n <-runExcept (tyNatSize tcm nTy)
     -> let ty' = runFreshM (termType tcm e)
            (TyConApp intTcNm _) = tyView ty'
-           (Just intTc) = HashMap.lookup intTcNm tcm
+           (Just intTc) = HashMap.lookup (nameOcc intTcNm) tcm
            [intCon] = tyConDataCons intTc
        in  mkApps (Data intCon) [Left (Literal (IntLiteral (toInteger n)))]
 
@@ -481,30 +484,37 @@ reduceConstant tcm isSubj e@(collectArgs -> (Prim nm ty, args)) = case nm of
 
 reduceConstant _ _ e = e
 
-reduceTerms :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> [Term]
+reduceTerms :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> [Term]
 reduceTerms tcm isSubj = map (reduceConstant tcm isSubj) . Either.lefts
 
-integerLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+integerLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 integerLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntegerLiteral i), Literal (IntegerLiteral j)] -> Just (i,j)
   _ -> Nothing
 
-intLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+intLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 intLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
   [Literal (IntLiteral i), Literal (IntLiteral j)] -> Just (i,j)
   _ -> Nothing
 
-wordLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+intCLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+intCLiterals tcm isSubj args = case reduceTerms tcm isSubj args of
+  ([collectArgs -> (Data _,[Left (Literal (IntLiteral i))])
+   ,collectArgs -> (Data _,[Left (Literal (IntLiteral j))])])
+    -> Just (i,j)
+  _ -> Nothing
+
+wordLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 wordLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
   [Literal (WordLiteral i), Literal (WordLiteral j)] -> Just (i,j)
   _ -> Nothing
 
-charLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Char,Char)
+charLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Char,Char)
 charLiterals tcm isSubj args = case (map (reduceConstant tcm isSubj) . Either.lefts) args of
   [Literal (CharLiteral i), Literal (CharLiteral j)] -> Just (i,j)
   _ -> Nothing
 
-sizedLiterals :: Text -> HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+sizedLiterals :: Text -> HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 sizedLiterals szCon tcm isSubj args
   = case reduceTerms tcm isSubj args of
       ([ collectArgs -> (Prim nm  _,[Right _, Left _, Left (Literal (IntegerLiteral i))])
@@ -513,25 +523,25 @@ sizedLiterals szCon tcm isSubj args
         , nm' == szCon -> Just (i,j)
       _ -> Nothing
 
-bitVectorLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+bitVectorLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 bitVectorLiterals = sizedLiterals "CLaSH.Sized.Internal.BitVector.fromInteger#"
 
-indexLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+indexLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 indexLiterals = sizedLiterals "CLaSH.Sized.Internal.Index.fromInteger#"
 
-signedLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+signedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 signedLiterals = sizedLiterals "CLaSH.Sized.Internal.Signed.fromInteger#"
 
-unsignedLiterals :: HashMap.HashMap TyConName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
+unsignedLiterals :: HashMap.HashMap TyConOccName TyCon -> Bool -> [Either Term Type] -> Maybe (Integer,Integer)
 unsignedLiterals = sizedLiterals "CLaSH.Sized.Internal.Unsigned.fromInteger#"
 
 boolToIntLiteral :: Bool -> Term
 boolToIntLiteral b = if b then Literal (IntLiteral 1) else Literal (IntLiteral 0)
 
-boolToBoolLiteral :: HashMap.HashMap TyConName TyCon -> Type -> Bool -> Term
+boolToBoolLiteral :: HashMap.HashMap TyConOccName TyCon -> Type -> Bool -> Term
 boolToBoolLiteral tcm ty b =
  let (_,tyView -> TyConApp boolTcNm []) = splitFunForallTy ty
-     (Just boolTc) = HashMap.lookup boolTcNm tcm
+     (Just boolTc) = HashMap.lookup (nameOcc boolTcNm) tcm
      [falseDc,trueDc] = tyConDataCons boolTc
      retDc = if b then trueDc else falseDc
  in  Data retDc
@@ -553,8 +563,8 @@ signedConPrim = Prim "CLaSH.Sized.Internal.Signed.fromInteger#" (ForAllTy (bind 
 #else
     funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp signedTcNm [nVar]]
 #endif
-    signedTcNm = string2Name "CLaSH.Sized.Internal.Signed.Signed"
-    nName      = string2Name "n"
+    signedTcNm = string2SystemName "CLaSH.Sized.Internal.Signed.Signed"
+    nName      = string2SystemName "n"
     nVar       = VarTy typeNatKind nName
     nTV        = TyVar nName (embed typeNatKind)
 
@@ -566,7 +576,7 @@ unsignedConPrim = Prim "CLaSH.Sized.Internal.Unsigned.fromInteger#" (ForAllTy (b
 #else
     funTy        = foldr1 mkFunTy [integerPrimTy,integerPrimTy,mkTyConApp unsignedTcNm [nVar]]
 #endif
-    unsignedTcNm = string2Name "CLaSH.Sized.Internal.Unsigned.Unsigned"
-    nName        = string2Name "n"
+    unsignedTcNm = string2SystemName "CLaSH.Sized.Internal.Unsigned.Unsigned"
+    nName        = string2SystemName "n"
     nVar         = VarTy typeNatKind nName
     nTV          = TyVar nName (embed typeNatKind)

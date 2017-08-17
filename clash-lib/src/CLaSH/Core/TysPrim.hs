@@ -27,22 +27,23 @@ module CLaSH.Core.TysPrim
   )
 where
 
+import           Control.Arrow                    (first)
 import           Data.HashMap.Strict              (HashMap)
 import qualified Data.HashMap.Strict              as HashMap
-import           Unbound.Generics.LocallyNameless (makeName, string2Name)
 
 import           PrelNames
 import           Unique                           (Unique, getKey)
 
+import           CLaSH.Core.Name
 import           CLaSH.Core.TyCon
 import {-# SOURCE #-} CLaSH.Core.Type
 
 -- | Builtin Name
 tySuperKindTyConName, liftedTypeKindTyConName, typeNatKindTyConName, typeSymbolKindTyConName :: TyConName
-tySuperKindTyConName      = string2Name "BOX"
-liftedTypeKindTyConName   = string2Name "*"
-typeNatKindTyConName      = string2Name "Nat"
-typeSymbolKindTyConName   = string2Name "Symbol"
+tySuperKindTyConName      = string2SystemName "BOX"
+liftedTypeKindTyConName   = string2SystemName "*"
+typeNatKindTyConName      = string2SystemName "Nat"
+typeSymbolKindTyConName   = string2SystemName "Symbol"
 
 -- | Builtin Kind
 liftedTypeKindtc, tySuperKindtc, typeNatKindtc, typeSymbolKindtc :: TyCon
@@ -64,29 +65,29 @@ intPrimTyConName, integerPrimTyConName, charPrimTyConName, stringPrimTyConName,
   voidPrimTyConName, wordPrimTyConName, int64PrimTyConName,
   word64PrimTyConName, floatPrimTyConName, doublePrimTyConName,
   naturalPrimTyConName :: TyConName
-intPrimTyConName     = makeName "GHC.Prim.Int#"
+intPrimTyConName     = makeSystemName "GHC.Prim.Int#"
                                 (uniqueToInteger intPrimTyConKey)
-integerPrimTyConName = makeName "GHC.Integer.Type.Integer"
+integerPrimTyConName = makeSystemName "GHC.Integer.Type.Integer"
                                 (uniqueToInteger integerTyConKey)
-stringPrimTyConName  = string2Name "String"
-charPrimTyConName    = makeName "GHC.Prim.Char#"
+stringPrimTyConName  = string2SystemName "String"
+charPrimTyConName    = makeSystemName "GHC.Prim.Char#"
                                 (uniqueToInteger charPrimTyConKey)
-voidPrimTyConName    = string2Name "VOID"
-wordPrimTyConName    = makeName "GHC.Prim.Word#"
+voidPrimTyConName    = string2SystemName "VOID"
+wordPrimTyConName    = makeSystemName "GHC.Prim.Word#"
                                 (uniqueToInteger wordPrimTyConKey)
-int64PrimTyConName   = makeName "GHC.Prim.Int64#"
+int64PrimTyConName   = makeSystemName "GHC.Prim.Int64#"
                                 (uniqueToInteger int64PrimTyConKey)
-word64PrimTyConName  = makeName "GHC.Prim.Word64#"
+word64PrimTyConName  = makeSystemName "GHC.Prim.Word64#"
                                 (uniqueToInteger word64PrimTyConKey)
-floatPrimTyConName   = makeName "GHC.Prim.Float#"
+floatPrimTyConName   = makeSystemName "GHC.Prim.Float#"
                                 (uniqueToInteger floatPrimTyConKey)
-doublePrimTyConName  = makeName "GHC.Prim.Double#"
+doublePrimTyConName  = makeSystemName "GHC.Prim.Double#"
                                 (uniqueToInteger doublePrimTyConKey)
 #if MIN_VERSION_ghc(8,2,0)
-naturalPrimTyConName = makeName "GHC.Natural.Natural"
+naturalPrimTyConName = makeSystemName "GHC.Natural.Natural"
                                 (uniqueToInteger naturalTyConKey)
 #else
-naturalPrimTyConName = string2Name "GHC.Natural.Natural"
+naturalPrimTyConName = string2SystemName "GHC.Natural.Natural"
 #endif
 
 liftedPrimTC :: TyConName
@@ -122,8 +123,8 @@ floatPrimTy   = mkTyConTy floatPrimTyConName
 doublePrimTy  = mkTyConTy doublePrimTyConName
 naturalPrimTy = mkTyConTy naturalPrimTyConName
 
-tysPrimMap :: HashMap TyConName TyCon
-tysPrimMap = HashMap.fromList
+tysPrimMap :: HashMap TyConOccName TyCon
+tysPrimMap = HashMap.fromList $ map (first nameOcc)
   [ (tySuperKindTyConName,tySuperKindtc)
   , (liftedTypeKindTyConName,liftedTypeKindtc)
   , (typeNatKindTyConName,typeNatKindtc)

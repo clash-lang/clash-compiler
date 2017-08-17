@@ -14,8 +14,9 @@ module CLaSH.Core.Type where
 import Control.DeepSeq                  (NFData)
 import Data.Hashable                    (Hashable)
 import GHC.Generics                     (Generic)
-import Unbound.Generics.LocallyNameless (Alpha,Name,Subst)
+import Unbound.Generics.LocallyNameless (Alpha,Subst)
 
+import                CLaSH.Core.Name
 import {-# SOURCE #-} CLaSH.Core.Term
 import {-# SOURCE #-} CLaSH.Core.TyCon
 
@@ -23,7 +24,9 @@ data Type
 
 type Kind   = Type
 type TyName = Name Type
+type TyOccName = OccName Type
 type KiName = Name Kind
+type KiOccName = OccName Kind
 
 instance Eq       Type
 instance Generic  Type

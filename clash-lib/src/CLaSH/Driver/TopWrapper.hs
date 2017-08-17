@@ -18,22 +18,23 @@ module CLaSH.Driver.TopWrapper where
 import Data.Text.Lazy              (append, pack)
 
 import CLaSH.Annotations.TopEntity (TopEntity (..), PortName (..))
+import CLaSH.Netlist.Id            (IdType (..))
 import CLaSH.Netlist.Types
   (Component (..), Declaration (..), Expr (..), Identifier, HWType (..),
-   Modifier (..), PortDirection(..))
+   Modifier (..), PortDirection(..), WireOrReg (..))
 import CLaSH.Util
 
 -- | Create a wrapper around a component, potentially initiating clock sources
-mkTopWrapper :: (Identifier -> Identifier)
+mkTopWrapper :: (IdType -> Identifier -> Identifier)
              -> Maybe TopEntity -- ^ TopEntity specifications
              -> String          -- ^ Name of the module containing the @topEntity@
              -> Component       -- ^ Entity to wrap
              -> Component
 mkTopWrapper mkId teM modName topComponent
   = Component
-  { componentName = maybe (mkId (pack modName `append` "_topEntity")) (pack . t_name) teM
+  { componentName = maybe (mkId Basic (pack modName `append` "_topEntity")) (pack . t_name) teM
   , inputs        = inputs3
-  , outputs       = outputs3
+  , outputs       = zip (repeat Wire) outputs3
   , declarations  = concat [wrappers,topCompDecl:unwrappers]
   }
   where
@@ -48,11 +49,11 @@ mkTopWrapper mkId teM modName topComponent
     (inputs3,wrappers,idsI) = concatPortDecls inputs2
 
     -- output ports
+    oTop           = map snd (outputs topComponent)
     oPortSupply    = maybe (repeat Nothing)
                            ((++ repeat Nothing) . map Just . t_outputs)
                            teM
-    outputs1       = map (first (const "output"))
-                         (outputs topComponent)
+    outputs1       = map (first (const "output")) oTop
     outputs2       = zipWith mkOutput oPortSupply
                              (zipWith appendNumber outputs1 [0..])
     (outputs3,unwrappers,idsO) = concatPortDecls outputs2
@@ -66,7 +67,7 @@ mkTopWrapper mkId teM modName topComponent
                         idsI
                 ++
                 zipWith (\(p,t) o -> (Identifier p Nothing,Out,t,Identifier o Nothing))
-                        (outputs topComponent)
+                        oTop
                         idsO)
 
 extendPorts :: [PortName] -> [Maybe PortName]
@@ -106,7 +107,7 @@ mkInput pM = case pM of
           inputs1  = map (appendNumber (i,hwty')) [0..(sz-1)]
           inputs2  = map (mkInput Nothing) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
-          netdecl  = NetDecl i hwty
+          netdecl  = NetDecl Nothing i hwty
           ids'     = map (`Identifier` Nothing) ids
           netassgn = Assignment i (mkVectorChain sz hwty' ids')
 
@@ -116,7 +117,7 @@ mkInput pM = case pM of
           inputs2  = map (mkInput Nothing) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
           ids'     = map (`Identifier` Nothing) ids
-          netdecl  = NetDecl i hwty
+          netdecl  = NetDecl Nothing i hwty
           netassgn = Assignment i (mkRTreeChain d hwty' ids')
 
       Product _ hwtys -> (ports,netdecl:netassgn:decls,i)
@@ -125,7 +126,7 @@ mkInput pM = case pM of
           inputs2  = map (mkInput Nothing) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
           ids'     = map (`Identifier` Nothing) ids
-          netdecl  = NetDecl i hwty
+          netdecl  = NetDecl Nothing i hwty
           netassgn = Assignment i (DataCon hwty (DC (hwty,0)) ids')
 
       _ -> ([(i,hwty)],[],i)
@@ -137,7 +138,7 @@ mkInput pM = case pM of
           inputs1  = map (appendNumber (pN,hwty')) [0..(sz-1)]
           inputs2  = zipWith mkInput (extendPorts ps) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
-          netdecl  = NetDecl pN hwty
+          netdecl  = NetDecl Nothing pN hwty
           ids'     = map (`Identifier` Nothing) ids
           netassgn = Assignment pN (mkVectorChain sz hwty' ids')
 
@@ -146,7 +147,7 @@ mkInput pM = case pM of
           inputs1  = map (appendNumber (pN,hwty')) [0..((2^d)-1)]
           inputs2  = zipWith mkInput (extendPorts ps) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
-          netdecl  = NetDecl pN hwty
+          netdecl  = NetDecl Nothing pN hwty
           ids'     = map (`Identifier` Nothing) ids
           netassgn = Assignment pN (mkRTreeChain d hwty' ids')
 
@@ -156,7 +157,7 @@ mkInput pM = case pM of
           inputs2  = zipWith mkInput (extendPorts ps) inputs1
           (ports,decls,ids) = concatPortDecls inputs2
           ids'     = map (`Identifier` Nothing) ids
-          netdecl  = NetDecl pN hwty
+          netdecl  = NetDecl Nothing pN hwty
           netassgn = Assignment pN (DataCon hwty (DC (hwty,0)) ids')
 
       _ -> ([(pN,hwty)],[],pN)
@@ -204,7 +205,7 @@ mkOutput pM = case pM of
           outputs1 = map (appendNumber (o,hwty')) [0..(sz-1)]
           outputs2 = map (mkOutput Nothing) outputs1
           (ports,decls,ids) = concatPortDecls outputs2
-          netdecl  = NetDecl o hwty
+          netdecl  = NetDecl Nothing o hwty
           assigns  = zipWith (assingId o hwty 10) ids [0..]
 
       RTree d hwty' -> (ports,netdecl:assigns ++ decls,o)
@@ -212,7 +213,7 @@ mkOutput pM = case pM of
           outputs1 = map (appendNumber (o,hwty')) [0..((2^d)-1)]
           outputs2 = map (mkOutput Nothing) outputs1
           (ports,decls,ids) = concatPortDecls outputs2
-          netdecl  = NetDecl o hwty
+          netdecl  = NetDecl Nothing o hwty
           assigns  = zipWith (assingId o hwty 10) ids [0..]
 
       Product _ hwtys -> (ports,netdecl:assigns ++ decls,o)
@@ -220,7 +221,7 @@ mkOutput pM = case pM of
           outputs1 = zipWith appendNumber (map (o,) hwtys) [0..]
           outputs2 = map (mkOutput Nothing) outputs1
           (ports,decls,ids) = concatPortDecls outputs2
-          netdecl  = NetDecl o hwty
+          netdecl  = NetDecl Nothing o hwty
           assigns  = zipWith (assingId o hwty 0) ids [0..]
 
       _ -> ([(o,hwty)],[],o)
@@ -232,7 +233,7 @@ mkOutput pM = case pM of
           outputs1 = map (appendNumber (pN,hwty')) [0..(sz-1)]
           outputs2 = zipWith mkOutput (extendPorts ps) outputs1
           (ports,decls,ids) = concatPortDecls outputs2
-          netdecl  = NetDecl pN hwty
+          netdecl  = NetDecl Nothing pN hwty
           assigns  = zipWith (assingId pN hwty 10) ids [0..]
 
       RTree d hwty' -> (ports,netdecl:assigns ++ decls,pN)
@@ -240,7 +241,7 @@ mkOutput pM = case pM of
           outputs1 = map (appendNumber (pN,hwty')) [0..((2^d)-1)]
           outputs2 = zipWith mkOutput (extendPorts ps) outputs1
           (ports,decls,ids) = concatPortDecls outputs2
-          netdecl  = NetDecl pN hwty
+          netdecl  = NetDecl Nothing pN hwty
           assigns  = zipWith (assingId pN hwty 10) ids [0..]
 
       Product _ hwtys -> (ports,netdecl:assigns ++ decls,pN)
@@ -248,7 +249,7 @@ mkOutput pM = case pM of
           outputs1 = zipWith appendNumber (map (pN,) hwtys) [0..]
           outputs2 = zipWith mkOutput (extendPorts ps) outputs1
           (ports,decls,ids) = concatPortDecls outputs2
-          netdecl  = NetDecl pN hwty
+          netdecl  = NetDecl Nothing pN hwty
           assigns  = zipWith (assingId pN hwty 0) ids [0..]
 
       _ -> ([(pN,hwty)],[],pN)

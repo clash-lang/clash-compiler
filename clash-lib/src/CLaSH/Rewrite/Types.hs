@@ -30,9 +30,9 @@ import Unbound.Generics.LocallyNameless.Name (Name (..))
 
 import SrcLoc (SrcSpan)
 
-import CLaSH.Core.Term           (Term, TmName)
+import CLaSH.Core.Term           (Term, TmName, TmOccName)
 import CLaSH.Core.Type           (Type)
-import CLaSH.Core.TyCon          (TyCon, TyConName)
+import CLaSH.Core.TyCon          (TyCon, TyConName, TyConOccName)
 import CLaSH.Core.Var            (Id, TyVar)
 import CLaSH.Netlist.Types       (HWType)
 import CLaSH.Util
@@ -57,7 +57,7 @@ data RewriteState extra
   = RewriteState
   { _transformCounter :: {-# UNPACK #-} !Int
   -- ^ Number of applied transformations
-  , _bindings         :: !(HashMap TmName (Type,SrcSpan,Term))
+  , _bindings         :: !(HashMap TmOccName (TmName,Type,SrcSpan,Term))
   -- ^ Global binders
   , _uniqSupply       :: !Supply
   -- ^ Supply of unique numbers
@@ -85,18 +85,18 @@ data RewriteEnv
   = RewriteEnv
   { _dbgLevel       :: DebugLevel
   -- ^ Lvl at which we print debugging messages
-  , _typeTranslator :: HashMap TyConName TyCon -> Type
+  , _typeTranslator :: HashMap TyConOccName TyCon -> Type
                     -> Maybe (Either String HWType)
   -- ^ Hardcode Type -> HWType translator
-  , _tcCache        :: HashMap TyConName TyCon
+  , _tcCache        :: HashMap TyConOccName TyCon
   -- ^ TyCon cache
   , _tupleTcCache   :: IntMap TyConName
   -- ^ Tuple TyCon cache
-  , _evaluator      :: HashMap TyConName TyCon -> Bool -> Term -> Term
+  , _evaluator      :: HashMap TyConOccName TyCon -> Bool -> Term -> Term
   -- ^ Hardcoded evaluator (delta-reduction)}
   , _allowZero      :: Bool
   -- ^ Zero bit wide things are representable
-  , _topEntities    :: HashSet TmName
+  , _topEntities    :: HashSet TmOccName
   -- ^ Functions that are considered TopEntities
   }
 

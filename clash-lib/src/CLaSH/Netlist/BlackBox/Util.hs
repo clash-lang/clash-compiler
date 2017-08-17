@@ -15,11 +15,9 @@
 
 module CLaSH.Netlist.BlackBox.Util where
 
---import           Control.Lens                         (at, use, (%=), (+=), _1,
---                                                       _2)
 import           Control.Exception                    (throw)
-import           Control.Monad.State                  (State, StateT, evalStateT,
-                                                       lift, modify, get)
+import           Control.Lens                         (_1,_2,(%=),use)
+import           Control.Monad.State                  (State, StateT (..), lift)
 import           Data.Bool                            (bool)
 import           Data.Foldable                        (foldrM)
 import qualified Data.IntMap                          as IntMap
@@ -39,6 +37,7 @@ import           CLaSH.Backend                        (Backend (..))
 import           CLaSH.Driver.Types                   (CLaSHException (..))
 import           CLaSH.Netlist.BlackBox.Parser
 import           CLaSH.Netlist.BlackBox.Types
+import           CLaSH.Netlist.Id                     (IdType (..))
 import           CLaSH.Netlist.Types
   (HWType (..), Identifier, BlackBoxContext (..), Expr (..), Literal (..),
    NetlistMonad, Modifier (..))
@@ -80,28 +79,44 @@ extractLiterals = map (\case (e,_,_) -> e)
 setSym
   :: BlackBoxContext
   -> BlackBoxTemplate
-  -> NetlistMonad BlackBoxTemplate
-setSym bbCtx l = evalStateT (mapM setSym' l) IntMap.empty
+  -> NetlistMonad (BlackBoxTemplate,[N.Declaration])
+setSym bbCtx l = do
+    (a,(_,decls)) <- runStateT (mapM setSym' l) (IntMap.empty,IntMap.empty)
+    return (a,concatMap snd (IntMap.elems decls))
   where
     setSym' :: Element
-            -> StateT (IntMap.IntMap Identifier)
+            -> StateT ( IntMap.IntMap Identifier
+                      , IntMap.IntMap (Identifier,[N.Declaration]))
                       NetlistMonad
                       Element
     setSym' e = case e of
+      Var nm i | i < length (bbInputs bbCtx) -> case bbInputs bbCtx !! i of
+        (Identifier nm' Nothing,_,_) -> return (Var [C nm'] i)
+        (e',hwTy,_) -> do
+          varM <- IntMap.lookup i <$> use _2
+          case varM of
+            Nothing -> do
+              nm' <- lift (mkUniqueIdentifier Extended (concatT (C "#":nm)))
+              let decls = [N.NetDecl Nothing nm' hwTy
+                          ,N.Assignment nm' e'
+                          ]
+              _2 %= (IntMap.insert i (nm',decls))
+              return (Var [C nm'] i)
+            Just (nm',_) -> return (Var [C nm'] i)
       Sym _ i -> do
-        symM <- IntMap.lookup i <$> get
+        symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t <- lift (mkUniqueIdentifier (Text.pack "n"))
-            modify (IntMap.insert i t)
+            t <- lift (mkUniqueIdentifier Extended (Text.pack "#n"))
+            _1 %= (IntMap.insert i t)
             return (Sym t i)
           Just t -> return (Sym t i)
       GenSym t i -> do
-        symM <- IntMap.lookup i <$> get
+        symM <- IntMap.lookup i <$> use _1
         case symM of
           Nothing -> do
-            t' <- lift (mkUniqueIdentifier (concatT t))
-            modify (IntMap.insert i t')
+            t' <- lift (mkUniqueIdentifier Basic (concatT t))
+            _1 %= (IntMap.insert i t')
             return (GenSym [C t'] i)
           Just _ -> error ("Symbol #" ++ show (t,i) ++ " is already defined")
       D (Decl n l') -> D <$> (Decl n <$> mapM (combineM (mapM setSym') (mapM setSym')) l')
@@ -162,25 +177,52 @@ renderBlackBox l bbCtx
   = fmap Text.concat
   $ mapM (renderElem bbCtx) l
 
+-- | Assign @Var@ holes in the context of a primitive HDL template that is
+-- passed as an argument of a higher-order HDL template. For the general case,
+-- use 'setSym'
+--
+-- This functions errors when the @Var@ hole cannot be filled with a variable,
+-- as it is (currently) impossible to create unique names this late in the
+-- pipeline.
+setSimpleVar
+  :: BlackBoxContext
+  -> BlackBoxTemplate
+  -> BlackBoxTemplate
+setSimpleVar bbCtx = map go
+  where
+    go e = case e of
+      Var _ i
+        | i < length (bbInputs bbCtx)
+        , (Identifier nm' Nothing,_,_) <- bbInputs bbCtx !! i
+        -> Var [C nm'] i
+        | otherwise
+        -> error $ $(curLoc) ++ "You can only pass variables to function arguments in a higher-order primitive"
+      D (Decl n l') -> D (Decl n (map (map go *** map go) l'))
+      IF c t f      -> IF c (map go t) (map go f)
+      SigD e' m     -> SigD (map go e') m
+      BV t e' m     -> BV t (map go e') m
+      _             -> e
+
 -- | Render a single template element
 renderElem :: Backend backend
            => BlackBoxContext
            -> Element
            -> State backend Text
 renderElem b (D (Decl n (l:ls))) = do
-    (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
-    is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
-    let Just (templ,pCtx)    = IntMap.lookup n (bbFunctions b)
-        b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
-    templ' <- case templ of
-                Left t  -> return t
-                Right d -> do Just inst' <- inst d
-                              return . parseFail . displayT $ renderCompact inst'
-    if verifyBlackBoxContext b' templ'
-      then Text.concat <$> mapM (renderElem b') templ'
-      else do
-        sp <- getSrcSpan
-        throw (CLaSHException sp ($(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ) Nothing)
+  (o,oTy,_) <- idToExpr <$> combineM (lineToIdentifier b) (return . lineToType b) l
+  is <- mapM (fmap idToExpr . combineM (lineToIdentifier b) (return . lineToType b)) ls
+  let Just (templ,_,pCtx)  = IntMap.lookup n (bbFunctions b)
+      b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
+  templ' <- case templ of
+              Left t  -> return t
+              Right d -> do Just inst' <- inst d
+                            return . parseFail . displayT $ renderCompact inst'
+  let t2 = setSimpleVar b' templ'
+  if verifyBlackBoxContext b' t2
+    then Text.concat <$> mapM (renderElem b') t2
+    else do
+      sp <- getSrcSpan
+      throw (CLaSHException sp ($(curLoc) ++ "\nCan't match context:\n" ++ show b' ++ "\nwith template:\n" ++ show templ) Nothing)
 
 renderElem b (SigD e m) = do
   e' <- Text.concat <$> mapM (renderElem b) e
@@ -315,6 +357,7 @@ renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
     mkLit (DataCon _ (DC (Void, _)) [Literal (Just (Unsigned _,_)) i]) = Literal Nothing i
     mkLit i                               = i
 
+renderTag _ (Var [C t] _) = return t
 renderTag _ (Sym t _) = return t
 
 renderTag b (BV True es e) = do
@@ -380,6 +423,9 @@ renderTag b (FilePath e)    = case e of
 renderTag b QSysIncludeName = case bbQsysIncName b of
   Just nm -> return nm
   _ -> error $ $(curLoc) ++ "~QSYSINCLUDENAME used where no 'qysInclude' was specified in the primitive definition"
+renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
+  Just (_,rw,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
+  _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
 renderTag _ e = do e' <- prettyElem e
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
@@ -403,6 +449,9 @@ prettyElem O = return "~RESULT"
 prettyElem (I i) = (displayT . renderOneLine) <$> (text "~ARG" <> brackets (int i))
 prettyElem (L i) = (displayT . renderOneLine) <$> (text "~LIT" <> brackets (int i))
 prettyElem (N i) = (displayT . renderOneLine) <$> (text "~NAME" <> brackets (int i))
+prettyElem (Var es i) = do
+  es' <- prettyBlackBox es
+  (displayT .renderOneLine) <$> (text "~VAR" <> brackets (text es') <> brackets (int i))
 prettyElem (Sym _ i) = (displayT . renderOneLine) <$> (text "~SYM" <> brackets (int i))
 prettyElem (Typ Nothing) = return "~TYPO"
 prettyElem (Typ (Just i)) = (displayT . renderOneLine) <$> (text "~TYP" <> brackets (int i))
@@ -469,6 +518,7 @@ prettyElem (SigD es mI) = do
            (((text "~SIGD" <> brackets (text es')) <>) . int)
            mI)
 prettyElem (Vars i) = (displayT . renderOneLine) <$> (text "~VARS" <> brackets (int i))
+prettyElem (OutputWireReg i) = (displayT . renderOneLine) <$> (text "~RESULTWIREREG" <> brackets (int i))
 
 usedArguments :: BlackBoxTemplate
               -> [Int]
@@ -479,6 +529,7 @@ usedArguments = nub . concatMap go
       I i -> [i]
       L i -> [i]
       N i -> [i]
+      Var _ i -> [i]
       IndexType e -> go e
       FilePath e -> go e
       IF b esT esF -> go b ++ usedArguments esT ++ usedArguments esF

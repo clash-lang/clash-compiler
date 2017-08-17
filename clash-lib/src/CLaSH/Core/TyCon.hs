@@ -15,6 +15,7 @@
 module CLaSH.Core.TyCon
   ( TyCon (..)
   , TyConName
+  , TyConOccName
   , AlgTyConRhs (..)
   , mkKindTyCon
   , isTupleTyConLike
@@ -31,7 +32,6 @@ import Control.DeepSeq
 import GHC.Generics
 import Unbound.Generics.LocallyNameless       (Alpha(..))
 import Unbound.Generics.LocallyNameless.Extra ()
-import Unbound.Generics.LocallyNameless.Name  (Name,name2String)
 #if MIN_VERSION_unbound_generics(0,3,0)
 import Data.Monoid                            (All (..))
 import Unbound.Generics.LocallyNameless       (NthPatFind (..),
@@ -40,6 +40,7 @@ import Unbound.Generics.LocallyNameless       (NthPatFind (..),
 
 -- Internal Imports
 import CLaSH.Core.DataCon                     (DataCon)
+import CLaSH.Core.Name
 import {-# SOURCE #-} CLaSH.Core.Type         (Kind, TyName, Type)
 import CLaSH.Util
 
@@ -85,6 +86,7 @@ instance Ord TyCon where
 
 -- | TyCon reference
 type TyConName = Name TyCon
+type TyConOccName = OccName TyCon
 
 -- | The RHS of an Algebraic Datatype
 data AlgTyConRhs

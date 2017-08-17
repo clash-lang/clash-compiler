@@ -17,7 +17,11 @@ begin
   begin
     if rising_edge(~SYM[1]) then
       if ~SYM[2] then
-        ~RESULT <= ~ARG[2];
+        ~RESULT <= ~ARG[2]
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;
@@ -25,7 +29,11 @@ end block;~ELSE
 ~SYM[0] : process(~ARG[1])
 begin
   if rising_edge(~ARG[1]) then
-    ~RESULT <= ~ARG[2];
+    ~RESULT <= ~ARG[2]
+    -- pragma translate_off
+    after 1 ps
+    -- pragma translate_on
+    ;
   end if;
 end process;~FI
 -- register end"
@@ -52,9 +60,17 @@ begin
   begin
     if rising_edge(~SYM[1]) then
       if ~ARG[2] = '1' then
-        ~RESULT <= ~ARG[3];
+        ~RESULT <= ~ARG[3]
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       elsif ~SYM[2] then
-        ~RESULT <= ~ARG[4];
+        ~RESULT <= ~ARG[4]
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;~ELSE
@@ -64,7 +80,11 @@ begin
       ~RESULT <= ~ARG[3];
     elsif rising_edge(~SYM[1]) then
       if ~SYM[2] then
-        ~RESULT <= ~ARG[4];
+        ~RESULT <= ~ARG[4]
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
     end if;
   end process;~FI
@@ -73,18 +93,34 @@ end block;~ELSE ~IF ~ISSYNC[2] ~THEN
 begin
   if rising_edge(~ARG[1]) then
     if ~ARG[2] = '1' then
-      ~RESULT <= ~ARG[3];
+      ~RESULT <= ~ARG[3]
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     else
-      ~RESULT <= ~ARG[4];
+      ~RESULT <= ~ARG[4]
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     end if;
   end if;
 end process;~ELSE
 ~SYM[0] : process(~ARG[1],~ARG[2]~VARS[3])
 begin
   if ~ARG[2] = '1' then
-    ~RESULT <= ~ARG[3];
+    ~RESULT <= ~ARG[3]
+    -- pragma translate_off
+    after 1 ps
+    -- pragma translate_on
+    ;
   elsif rising_edge(~ARG[1]) then
-    ~RESULT <= ~ARG[4];
+    ~RESULT <= ~ARG[4]
+    -- pragma translate_off
+    after 1 ps
+    -- pragma translate_on
+    ;
   end if;
 end process;~FI~FI
 -- register end"

@@ -42,9 +42,8 @@ import qualified Data.HashMap.Strict         as HSM
 import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
 import           Data.Text                   (isInfixOf,pack)
 import qualified Data.Traversable            as T
-import           Unbound.Generics.LocallyNameless     (bind, embed, rebind, rec,
-                                              runFreshM, string2Name, unbind,
-                                              unembed)
+import           Unbound.Generics.LocallyNameless
+  (bind, embed, rebind, rec, runFreshM, unbind, unembed)
 import qualified Unbound.Generics.LocallyNameless     as Unbound
 
 -- GHC API
@@ -102,6 +101,7 @@ import VarSet     (isEmptyVarSet)
 -- Local imports
 import qualified CLaSH.Core.DataCon          as C
 import qualified CLaSH.Core.Literal          as C
+import qualified CLaSH.Core.Name             as C
 import qualified CLaSH.Core.Term             as C
 import qualified CLaSH.Core.TyCon            as C
 import qualified CLaSH.Core.Type             as C
@@ -115,7 +115,7 @@ instance Hashable Name where
 
 data GHC2CoreState
   = GHC2CoreState
-  { _tyConMap :: HashMap C.TyConName TyCon
+  { _tyConMap :: HashMap C.TyConOccName TyCon
   , _nameMap  :: HashMap Name String
   }
 
@@ -124,9 +124,10 @@ makeLenses ''GHC2CoreState
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState = GHC2CoreState HSM.empty HSM.empty
 
-makeAllTyCons :: GHC2CoreState
-              -> FamInstEnvs
-              -> HashMap C.TyConName C.TyCon
+makeAllTyCons
+  :: GHC2CoreState
+  -> FamInstEnvs
+  -> HashMap C.TyConOccName C.TyCon
 makeAllTyCons hm fiEnvs = go hm hm
   where
     go old new
@@ -347,7 +348,7 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
     var srcsp' x = do
         xVar   <- coreToVar x
         xPrim  <- coreToPrimVar x
-        let xNameS = pack $ Unbound.name2String xPrim
+        let xNameS = pack $ C.name2String xPrim
         xType  <- coreToType (varType x)
         case isDataConId_maybe x of
           Just dc -> case HashMap.lookup xNameS primMap of
@@ -498,7 +499,7 @@ coreToType' (TyConApp tc args)
                         foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
                       _ -> do
                         tcName <- coreToName tyConName tyConUnique qualfiedNameString tc
-                        tyConMap %= (HSM.insert tcName tc)
+                        tyConMap %= (HSM.insert (C.nameOcc tcName) tc)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 #if MIN_VERSION_ghc(8,2,0)
 coreToType' (ForAllTy (TvBndr tv _) ty) = C.ForAllTy <$> (bind <$> coreToTyVar tv <*> coreToType ty)
@@ -528,21 +529,23 @@ coreToId i =
   C.Id <$> (coreToVar i) <*> (embed <$> coreToType (varType i))
 
 coreToVar :: Var
-          -> State GHC2CoreState (Unbound.Name a)
+          -> State GHC2CoreState (C.Name a)
 coreToVar = coreToName varName varUnique qualfiedNameStringM
 
 coreToPrimVar :: Var
-              -> State GHC2CoreState (Unbound.Name C.Term)
+              -> State GHC2CoreState (C.Name C.Term)
 coreToPrimVar = coreToName varName varUnique qualfiedNameString
 
 coreToName :: (b -> Name)
            -> (b -> Unique)
            -> (Name -> State GHC2CoreState String)
            -> b
-           -> State GHC2CoreState (Unbound.Name a)
+           -> State GHC2CoreState (C.Name a)
 coreToName toName toUnique toString v = do
   ns <- toString (toName v)
-  return (Unbound.makeName ns (toInteger . getKey . toUnique $ v))
+  let nm  = Unbound.makeName ns (toInteger . getKey . toUnique $ v)
+      loc = getSrcSpan (toName v)
+  return (C.Name C.User nm loc)
 
 qualfiedNameString :: Name
                    -> State GHC2CoreState String
@@ -593,8 +596,8 @@ mapSignalTerm (C.ForAllTy tvATy) =
       }
     (C.FunTy _ funTy'') = C.tyView funTy
     (C.FunTy aTy bTy)   = C.tyView funTy''
-    fName = string2Name "f"
-    xName = string2Name "x"
+    fName = C.string2SystemName "f"
+    xName = C.string2SystemName "x"
     fTy   = C.mkFunTy aTy bTy
     fId   = C.Id fName (embed fTy)
     xId   = C.Id xName (embed aTy)
@@ -622,7 +625,7 @@ signalTerm (C.ForAllTy tvATy) =
       ; return (aTV',clkTV',funTy')
       }
     (C.FunTy _ aTy) = C.tyView funTy
-    xName = string2Name "x"
+    xName = C.string2SystemName "x"
     xId   = C.Id xName (embed aTy)
 
 signalTerm ty = error $ $(curLoc) ++ show ty
@@ -658,8 +661,8 @@ appSignalTerm (C.ForAllTy tvClkTy) =
       }
     (C.FunTy _ funTy'') = C.tyView funTy
     (C.FunTy aTy bTy)   = C.tyView funTy''
-    fName = string2Name "f"
-    xName = string2Name "x"
+    fName = C.string2SystemName "f"
+    xName = C.string2SystemName "x"
     fTy   = C.mkFunTy aTy bTy
     fId   = C.Id fName (embed fTy)
     xId   = C.Id xName (embed aTy)
@@ -694,7 +697,7 @@ vecUnwrapTerm (C.ForAllTy tvTTy) =
       ; return (tTV',nTV',aTV',funTy')
       }
     (C.FunTy _ vsTy) = C.tyView funTy
-    vsName           = string2Name "vs"
+    vsName           = C.string2SystemName "vs"
     vsId             = C.Id vsName   (embed vsTy)
 
 vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
@@ -734,9 +737,9 @@ traverseTerm (C.ForAllTy tvFTy) =
     (C.FunTy dictTy funTy1) = C.tyView funTy
     (C.FunTy gTy    funTy2) = C.tyView funTy1
     (C.FunTy xTy    _)      = C.tyView funTy2
-    dictName = string2Name "dict"
-    gName    = string2Name "g"
-    xName    = string2Name "x"
+    dictName = C.string2SystemName "dict"
+    gName    = C.string2SystemName "g"
+    xName    = C.string2SystemName "x"
     dictId   = C.Id dictName (embed dictTy)
     gId      = C.Id gName (embed gTy)
     xId      = C.Id xName (embed xTy)
@@ -774,8 +777,8 @@ dollarTerm (C.ForAllTy tvRTy) =
       }
     (C.FunTy fTy funTy'') = C.tyView funTy
     (C.FunTy aTy _)       = C.tyView funTy''
-    fName = string2Name "f"
-    xName = string2Name "x"
+    fName = C.string2SystemName "f"
+    xName = C.string2SystemName "x"
     fId   = C.Id fName (embed fTy)
     xId   = C.Id xName (embed aTy)
 
@@ -811,8 +814,8 @@ withFrozenCallStackTerm (C.ForAllTy tvATy) =
   where
     (aTV,funTy) = runFreshM (unbind tvATy)
     (C.FunTy callStackTy fTy) = C.tyView funTy
-    callStackName = string2Name "callStack"
-    fName         = string2Name "f"
+    callStackName = C.string2SystemName "callStack"
+    fName         = C.string2SystemName "f"
     callStackId   = C.Id callStackName (embed callStackTy)
     fId           = C.Id fName (embed fTy)
 

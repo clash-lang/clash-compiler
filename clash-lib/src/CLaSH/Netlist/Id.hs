@@ -11,7 +11,8 @@
 {-# LANGUAGE ViewPatterns      #-}
 
 module CLaSH.Netlist.Id
-  ( mkBasicId'
+  ( IdType (..)
+  , mkBasicId'
   , stripDollarPrefixes
   )
 where
@@ -22,6 +23,8 @@ where
 
 import Data.Char      (isAsciiLower,isAsciiUpper,isDigit)
 import Data.Text.Lazy as Text
+
+data IdType = Basic | Extended
 
 mkBasicId' :: Bool
            -> Text

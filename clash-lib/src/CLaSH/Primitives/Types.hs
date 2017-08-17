@@ -26,10 +26,19 @@ type PrimMap a = HashMap S.Text (Primitive a)
 data Primitive a
   -- | A primitive that has a template that can be filled out by the backend render
   = BlackBox
-  { name     :: !S.Text -- ^ Name of the primitive
+  { name     :: !S.Text
+    -- ^ Name of the primitive
+  , outputReg :: Bool
+    -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
+    -- (@False@); when not specified in the /.json/ file, the value will default
+    -- to @False@ (i.e. /wire/).
   , library  :: [S.Text]
+    -- ^ VHDL only: add /library/ declarations for the given names
   , imports  :: [S.Text]
+    -- ^ VHDL only: add /use/ declarations for the given names
   , qsysInclude :: Maybe (S.Text,a)
+    -- ^ Intel/Quartus only: create a /.qsys/ file from the given template.
+    -- Defaults to @Nothing@ when not specified in the /.json/ file
   , template :: !(Either a a) -- ^ Either a /declaration/ or an /expression/ template.
   }
   -- | A primitive that carries additional information
@@ -43,6 +52,7 @@ instance FromJSON (Primitive Text) where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
       "BlackBox"  -> BlackBox <$> conVal .: "name"
+                              <*> conVal .:? "outputReg" .!= False
                               <*> conVal .:? "libraries" .!= []
                               <*> conVal .:? "imports" .!= []
                               <*> (conVal .:? "qsysInclude" >>= parseInclude)

@@ -28,7 +28,7 @@ import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
 import           Data.List                            (nubBy)
-import           Data.Maybe                           (catMaybes,mapMaybe)
+import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.Text.Lazy                       (pack,unpack)
 import qualified Data.Text.Lazy                       as Text
 import           Prelude                              hiding ((<$>))
@@ -41,9 +41,9 @@ import           CLaSH.Backend
 import           CLaSH.Driver.Types                   (SrcSpan, noSrcSpan)
 import           CLaSH.Netlist.BlackBox.Types         (HdlSyn (..))
 import           CLaSH.Netlist.BlackBox.Util          (extractLiterals, renderBlackBox)
-import           CLaSH.Netlist.Id                     (mkBasicId')
+import           CLaSH.Netlist.Id                     (IdType (..), mkBasicId')
 import           CLaSH.Netlist.Types                  hiding (_intWidth, intWidth)
-import           CLaSH.Netlist.Util                   hiding (mkBasicId)
+import           CLaSH.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           CLaSH.Signal.Internal                (ClockKind (..))
 import           CLaSH.Util                           (curLoc, makeCached, (<:>))
 
@@ -103,10 +103,31 @@ instance Backend SystemVerilogState where
   toBV hty id_    = toSLV hty (Identifier id_ Nothing)
   fromBV hty id_  = simpleFromSLV hty id_
   hdlSyn          = use hdlsyn
-  mkBasicId       = return (filterReserved . mkBasicId' True)
+  mkIdentifier    = return go
+    where
+      go Basic    nm = filterReserved (mkBasicId' True nm)
+      go Extended (rmSlash -> nm) = case go Basic nm of
+        nm' | nm /= nm' -> Text.concat ["\\",nm," "]
+            |otherwise  -> nm'
+  extendIdentifier = return go
+    where
+      go Basic nm ext = filterReserved (mkBasicId' True (nm `Text.append` ext))
+      go Extended (rmSlash -> nm) ext =
+        let nmExt = nm `Text.append` ext
+        in  case go Basic nm ext of
+              nm' | nm' /= nmExt -> case Text.head nmExt of
+                      '#' -> Text.concat ["\\",nmExt," "]
+                      _   -> Text.concat ["\\#",nmExt," "]
+                  | otherwise    -> nm'
+
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+
+rmSlash :: Identifier -> Identifier
+rmSlash nm = fromMaybe nm $ do
+  nm1 <- Text.stripPrefix "\\" nm
+  Text.stripSuffix " " nm1
 
 type SystemVerilogM a = State SystemVerilogState a
 
@@ -429,7 +450,7 @@ module_ c = do
   where
     ports = sequence
           $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty <$> text i | (i,hwty) <- outputs c]
+            [ encodingNote hwty <$> text i | (_,(i,hwty)) <- outputs c]
 
     inputPorts = case inputs c of
                    [] -> empty
@@ -437,19 +458,19 @@ module_ c = do
 
     outputPorts = case outputs c of
                    [] -> empty
-                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
+                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (_,(i,ty)) <- p ])) <> semi
 
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
   let iport = map fst $ inputs c
-      oport = map fst $ outputs c
-      nets  = mapMaybe (\case {NetDecl' i _ -> Just i; _ -> Nothing}) $ declarations c
+      oport = map (fst.snd) $ outputs c
+      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
   oports .= oport
 
 mkUniqueId :: Identifier -> SystemVerilogM Identifier
 mkUniqueId i = do
-  mkId <- mkBasicId
+  mkId <- mkIdentifier <*> pure Extended
   seen <- use idSeen
   let i' = mkId i
   case i `elem` seen of
@@ -514,7 +535,7 @@ tyName t@(Product nm _)  = makeCached t nameCache prodName
   where
     prodName = do
       seen <- use tySeen
-      mkId <- mkBasicId
+      mkId <- mkIdentifier <*> pure Basic
       let nm'  = (mkId . last . Text.splitOn ".") nm
           nm'' = if Text.null nm'
                     then "product"
@@ -560,8 +581,12 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' id_ (Right ty)) = Just A.<$> sigDecl (text id_) ty
-decl (NetDecl' id_ (Left ty))  = Just A.<$> text ty <+> text id_
+decl (NetDecl' noteM _ id_ tyE) =
+  Just A.<$> maybe id addNote noteM (typ tyE)
+  where
+    typ (Left  ty) = text ty <+> text id_
+    typ (Right ty) = sigDecl (text id_) ty
+    addNote n = ("//" <+> text n <$>)
 
 decl _ = return Nothing
 
@@ -579,7 +604,7 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
     ; p   <- use oports
     ; if syn == Vivado && id_ `elem` p
          then do
-              { regId <- mkUniqueId (Text.append id_ "_reg")
+              { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
               ; verilogType ty <+> text regId <> semi <$>
                 "always_comb begin" <$>
                 indent 2 ("if" <> parens (expr_ True scrut) <$>
@@ -604,7 +629,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     ; p <- use oports
     ; if syn == Vivado && id_ `elem` p
          then do
-           { regId <- mkUniqueId (Text.append id_ "_reg")
+           { regId <- mkUniqueId =<< (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
            ; verilogType ty <+> text regId <> semi <$>
              "always_comb begin" <$>
              indent 2 ("case" <> parens (expr_ True scrut) <$>
@@ -647,7 +672,7 @@ inst_ (BlackBoxD _ _ _ (Just (nm,inc)) bs bbCtx) = do
   includes %= ((unpack nm', inc''):)
   fmap Just (string t)
 
-inst_ (NetDecl' _ _) = return Nothing
+inst_ (NetDecl' _ _ _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?
@@ -705,6 +730,16 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
   where
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
+
+expr_ b (Identifier id_ (Just (Nested m1 m2))) = case (m1,m2) of
+  (Indexed (Vector n elTy,1,2),Indexed (Vector _ _,1,1)) ->
+    expr_ b (Identifier id_ (Just (Indexed (Vector n elTy,10,1))))
+  (Indexed ((RTree d elTy),1,n),Indexed ((RTree _ _),0,1)) -> do
+    let n' = case n of {1 -> 0; _ -> 1}
+    expr_ b (Identifier id_ (Just (Indexed (RTree d elTy,10,n'))))
+  _ -> do
+    k <- expr_ b (Identifier id_ (Just m1))
+    expr_ b (Identifier (displayT (renderOneLine k)) (Just m2))
 
 expr_ _ (Identifier id_ (Just _))                      = text id_
 

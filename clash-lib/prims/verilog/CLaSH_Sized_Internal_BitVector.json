@@ -53,13 +53,7 @@
         => BitVector n -- ARG[1]
         -> Int         -- ARG[2]
         -> Bit"
-    , "templateD" :
-"// indexBit begin
-wire ~TYP[1] ~GENSYM[bv][0];
-assign ~SYM[0] = ~ARG[1];
-
-assign ~RESULT = ~SYM[0][~ARG[2]];
-// indexBit end"
+    , "templateE" : "~VAR[bv][1][~ARG[2]]"
     }
   }
 , { "BlackBox" :
@@ -70,18 +64,13 @@ assign ~RESULT = ~SYM[0][~ARG[2]];
              -> Int         -- ARG[2]
              -> Bit         -- ARG[3]
              -> BitVector n"
+    , "outputReg" : true
     , "templateD" :
 "// replaceBit start
-reg ~TYPO ~GENSYM[bv][0];
-wire ~TYP[3] ~GENSYM[din][1];
-assign ~SYM[1] = ~ARG[3];
-
 always @(*) begin
-  ~SYM[0] = ~ARG[1];
-  ~SYM[0][~ARG[2]] = ~SYM[1];
+  ~RESULT = ~ARG[1];
+  ~RESULT[~ARG[2]] = ~VAR[din][3];
 end
-
-assign ~RESULT = ~SYM[0];
 // replaceBit end"
     }
   }
@@ -93,18 +82,13 @@ assign ~RESULT = ~SYM[0];
            -> SNat n                -- ARG[2]
            -> BitVector (m + 1 - n) -- ARG[3]
            -> BitVector (m + 1 + i)"
+    , "outputReg" : true
     , "templateD" :
 "// setSlice begin
-reg ~SIGD[~GENSYM[bv][0]][0];
-wire ~TYP[3] ~GENSYM[din][1];
-assign ~SYM[1] = ~ARG[3]
-
 always @(*) begin
-  ~SYM[0] = ~ARG[0];
-  ~SYM[0][~LIT[1] : ~LIT[2]] = ~SYM[1];
+  ~RESULT = ~ARG[0];
+  ~RESULT[~LIT[1] : ~LIT[2]] = ~VAR[din][3];
 end
-
-assign ~RESULT = ~SYM[0];
 // setSlice end"
     }
   }
@@ -115,12 +99,7 @@ assign ~RESULT = ~SYM[0];
         -> SNat m                -- ARG[1]
         -> SNat n                -- ARG[2]
         -> BitVector (m + 1 - n)"
-    , "templateD" :
-"// slice begin
-wire ~SIGD[~GENSYM[bv][0]][0];
-assign ~SYM[0] = ~ARG[0];
-assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
-// slice end"
+    , "templateE" : "~VAR[bv][0][~LIT[1] : ~LIT[2]]"
     }
   }
 , { "BlackBox" :
@@ -138,14 +117,7 @@ assign ~RESULT = ~SYM[0][~LIT[1] : ~LIT[2]];
 "msb# :: KnownNat n  -- ARG[0]
       => BitVector n -- ARG[1]
       -> Bit"
-    , "templateD" :
-"// msb begin~IF ~LIT[0] ~THEN
-wire ~SIGD[~GENSYM[bv][0]][1];
-assign ~SYM[0] = ~ARG[1];
-assign ~RESULT = ~SYM[0][~LIT[0]-1];
-~ELSE
-assign ~RESULT = 1'b0;
-~FI// msb end"
+    , "templateE" : "~IF ~LIT[0] ~THEN ~VAR[bv][1][~LIT[0]-1] ~ELSE 1'b0 ~FI"
     }
   }
 , { "BlackBox" :
@@ -153,14 +125,7 @@ assign ~RESULT = 1'b0;
     , "type" :
 "lsb# :: BitVector n -- ARG[0]
       -> Bit"
-    , "templateD" :
-"// lsb begin~IF ~SIZE[~TYP[0]] ~THEN
-wire ~SIGD[~GENSYM[bv][0]][0];
-assign ~SYM[0] = ~ARG[0];
-assign ~RESULT = ~SYM[0][0];
-~ELSE
-assign ~RESULT = 1'b0;
-~FI// lsb end"
+    , "templateE" : "~IF ~SIZE[~TYP[0]] ~THEN ~VAR[bv][0][0] ~ELSE 1'b0 ~FI"
     }
   }
 , { "BlackBox" :

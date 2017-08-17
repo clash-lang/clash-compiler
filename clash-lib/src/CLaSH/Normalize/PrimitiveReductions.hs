@@ -38,11 +38,11 @@ module CLaSH.Normalize.PrimitiveReductions where
 import qualified Control.Lens                     as Lens
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.Maybe                       as Maybe
-import           Unbound.Generics.LocallyNameless (bind, embed, rec, rebind,
-                                                   string2Name)
+import           Unbound.Generics.LocallyNameless (bind, embed, rec, rebind)
 
 import           CLaSH.Core.DataCon               (DataCon, dataConInstArgTys)
 import           CLaSH.Core.Literal               (Literal (..))
+import           CLaSH.Core.Name
 import           CLaSH.Core.Pretty                (showDoc)
 import           CLaSH.Core.Term                  (Term (..), Pat (..))
 import           CLaSH.Core.Type                  (LitTy (..), Type (..),
@@ -81,7 +81,7 @@ reduceZipWith n lhsElTy rhsElTy resElTy fun lhsArg rhsArg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let (varsL,elemsL)   = second concat . unzip
                              $ extractElems consCon lhsElTy 'L' n lhsArg
@@ -109,7 +109,7 @@ reduceMap n argElTy resElTy fun arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let (vars,elems)     = second concat . unzip
                              $ extractElems consCon argElTy 'A' n arg
@@ -135,14 +135,14 @@ reduceImap n argElTy resElTy fun arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
         let (vars,elems)     = second concat . unzip
                              $ extractElems consCon argElTy 'I' n arg
         (Right idxTy:_,_) <- splitFunForallTy <$> termType tcm fun
         let (TyConApp idxTcNm _) = tyView idxTy
-            nTv              = string2Name "n"
+            nTv              = string2InternalName "n"
             -- fromInteger# :: KnownNat n => Integer -> Index n
             idxFromIntegerTy = ForAllTy (bind (TyVar nTv (embed typeNatKind))
                                          (foldr mkFunTy
@@ -180,23 +180,24 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
   where
     go tcm apDictTcNm (coreView tcm -> Just ty') = go tcm apDictTcNm ty'
     go tcm apDictTcNm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
-      = let (Just apDictTc)    = HashMap.lookup apDictTcNm tcm
+      = let (Just apDictTc)    = HashMap.lookup (nameOcc apDictTcNm) tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-            apDictIds          = zipWith Id (map string2Name ["functorDict"
-                                                             ,"pure"
-                                                             ,"ap"
-                                                             ,"apConstL"
-                                                             ,"apConstR"])
+            apDictIds          = zipWith Id (map string2InternalName
+                                                 ["functorDict"
+                                                 ,"pure"
+                                                 ,"ap"
+                                                 ,"apConstL"
+                                                 ,"apConstR"])
                                             (map embed apDictIdTys)
 
             (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
-            (Just funcDictTc) = HashMap.lookup funcDictTcNm tcm
+            (Just funcDictTc) = HashMap.lookup (nameOcc funcDictTcNm) tcm
             [funcDictCon] = tyConDataCons funcDictTc
             (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
-            funcDicIds    = zipWith Id (map string2Name ["fmap","fmapConst"])
+            funcDicIds    = zipWith Id (map string2InternalName ["fmap","fmapConst"])
                                        (map embed funcDictIdTys)
 
             apPat    = DataPat (embed apDictCon) (rebind [] apDictIds)
@@ -204,21 +205,21 @@ reduceTraverse n aTy fTy bTy dict fun arg = do
 
             -- Extract the 'pure' function from the Applicative dictionary
             pureTy = apDictIdTys!!1
-            pureTm = Case dict pureTy [bind apPat (Var pureTy (string2Name "pure"))]
+            pureTm = Case dict pureTy [bind apPat (Var pureTy (string2InternalName "pure"))]
 
             -- Extract the '<*>' function from the Applicative dictionary
             apTy   = apDictIdTys!!2
-            apTm   = Case dict apTy [bind apPat (Var apTy (string2Name "ap"))]
+            apTm   = Case dict apTy [bind apPat (Var apTy (string2InternalName "ap"))]
 
             -- Extract the Functor dictionary from the Applicative dictionary
             funcTy = (head apDictIdTys)
             funcTm = Case dict funcTy
-                               [bind apPat (Var funcTy (string2Name "functorDict"))]
+                               [bind apPat (Var funcTy (string2InternalName "functorDict"))]
 
             -- Extract the 'fmap' function from the Functor dictionary
             fmapTy = (head funcDictIdTys)
-            fmapTm = Case (Var funcTy (string2Name "functorDict")) fmapTy
-                          [bind fnPat (Var fmapTy (string2Name "fmap"))]
+            fmapTm = Case (Var funcTy (string2InternalName "functorDict")) fmapTy
+                          [bind fnPat (Var fmapTy (string2InternalName "fmap"))]
 
             (vars,elems) = second concat . unzip
                          $ extractElems consCon aTy 'T' n arg
@@ -301,7 +302,7 @@ reduceFoldr n aTy fun start arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon] <- tyConDataCons vecTc
       = let (vars,elems)     = second concat . unzip
                              $ extractElems consCon aTy 'G' n arg
@@ -325,7 +326,7 @@ reduceFold n aTy fun arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = let (vars,elems)     = second concat . unzip
                              $ extractElems consCon aTy 'F' n arg
@@ -356,14 +357,14 @@ reduceDFold n aTy fun start arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = do
         let  (vars,elems)     = second concat . unzip
                          $ extractElems consCon aTy 'D' n arg
         (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm fun
         let (TyConApp snatTcNm _) = tyView snTy
-            (Just snatTc)         = HashMap.lookup snatTcNm tcm
+            (Just snatTc)         = HashMap.lookup (nameOcc snatTcNm) tcm
             [snatDc]              = tyConDataCons snatTc
             lbody = doFold (buildSNat snatDc) (n-1) vars
             lb    = Letrec (bind (rec (init elems)) lbody)
@@ -392,7 +393,7 @@ reduceHead n aTy vArg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = let (vars,elems)  = second concat . unzip
                           $ extractElems consCon aTy 'H' n vArg
@@ -414,7 +415,7 @@ reduceTail n aTy vArg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = let (_,elems)    = second concat . unzip
                          $ extractElems consCon aTy 'L' n vArg
@@ -437,7 +438,7 @@ reduceLast n aTy vArg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = let (_,elems)    = unzip
                          $ extractElems consCon aTy 'L' n vArg
@@ -461,7 +462,7 @@ reduceInit n aTy vArg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon]  <- tyConDataCons vecTc
       = let (_,elems)    = unzip
                          $ extractElems consCon aTy 'L' n vArg
@@ -491,7 +492,7 @@ reduceAppend n m aTy lArg rArg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = let (vars,elems) = second concat . unzip
                          $ extractElems consCon aTy 'C' n lArg
@@ -515,7 +516,7 @@ reduceUnconcat n 0 aTy arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let nilVec           = mkVec nilCon consCon aTy 0 []
             innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
@@ -540,7 +541,7 @@ reduceTranspose n 0 aTy arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let nilVec           = mkVec nilCon consCon aTy 0 []
             innerVecTy       = mkTyConApp vecTcNm [LitTy (NumTy 0), aTy]
@@ -561,7 +562,7 @@ reduceReplicate n aTy eTy arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc)     <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc)     <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [nilCon,consCon] <- tyConDataCons vecTc
       = let retVec = mkVec nilCon consCon aTy n (replicate (fromInteger n) arg)
         in  changed retVec
@@ -583,13 +584,13 @@ reduceDTFold n aTy lrFun brFun arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp vecTcNm _)
-      | (Just vecTc) <- HashMap.lookup vecTcNm tcm
+      | (Just vecTc) <- HashMap.lookup (nameOcc vecTcNm) tcm
       , [_,consCon]  <- tyConDataCons vecTc
       = do let (vars,elems) = second concat . unzip
                             $ extractElems consCon aTy 'T' (2^n) arg
            (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
            let (TyConApp snatTcNm _) = tyView snTy
-               (Just snatTc)         = HashMap.lookup snatTcNm tcm
+               (Just snatTc)         = HashMap.lookup (nameOcc snatTcNm) tcm
                [snatDc]              = tyConDataCons snatTc
                lbody = doFold (buildSNat snatDc) (n-1) vars
                lb    = Letrec (bind (rec (init elems)) lbody)
@@ -625,12 +626,12 @@ reduceTFold n aTy lrFun brFun arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
-      | (Just treeTc) <- HashMap.lookup treeTcNm tcm
+      | (Just treeTc) <- HashMap.lookup (nameOcc treeTcNm) tcm
       , [lrCon,brCon] <- tyConDataCons treeTc
       = do let (vars,elems)     = extractTElems lrCon brCon aTy 'T' n arg
            (_ltv:Right snTy:_,_) <- splitFunForallTy <$> termType tcm brFun
            let (TyConApp snatTcNm _) = tyView snTy
-               (Just snatTc)         = HashMap.lookup snatTcNm tcm
+               (Just snatTc)         = HashMap.lookup (nameOcc snatTcNm) tcm
                [snatDc]              = tyConDataCons snatTc
                lbody = doFold (buildSNat snatDc) (n-1) vars
                lb    = Letrec (bind (rec elems) lbody)
@@ -660,7 +661,7 @@ reduceTReplicate n aTy eTy arg = do
   where
     go tcm (coreView tcm -> Just ty') = go tcm ty'
     go tcm (tyView -> TyConApp treeTcNm _)
-      | (Just treeTc) <- HashMap.lookup treeTcNm tcm
+      | (Just treeTc) <- HashMap.lookup (nameOcc treeTcNm) tcm
       , [lrCon,brCon] <- tyConDataCons treeTc
       = let retVec = mkRTree lrCon brCon aTy n (replicate (2^n) arg)
         in  changed retVec

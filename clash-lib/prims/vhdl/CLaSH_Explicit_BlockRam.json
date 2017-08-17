@@ -13,13 +13,11 @@
     , "templateD" :
 "-- blockRam begin
 ~GENSYM[~COMPNAME_blockRam][0] : block
-  signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];~IF ~VIVADO ~THEN
-  signal ~GENSYM[~RESULT_q][2] : std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
-  signal ~SYM[2] : ~TYP[6];~FI
-  signal ~GENSYM[rd][3] : integer range 0 to ~LENGTH[~TYP[2]] - 1;
-  signal ~GENSYM[wr][4] : integer range 0 to ~LENGTH[~TYP[2]] - 1;~IF ~ISGATED[1] ~THEN
+  signal ~GENSYM[RAM][1] : ~TYP[2] := ~LIT[2];
+  signal ~GENSYM[rd][3]  : integer range 0 to ~LENGTH[~TYP[2]] - 1;
+  signal ~GENSYM[wr][4]  : integer range 0 to ~LENGTH[~TYP[2]] - 1;~IF ~ISGATED[1] ~THEN
   signal ~GENSYM[clk][5] : std_logic;
-  signal ~GENSYM[ce][6] : std_logic;~ELSE ~FI
+  signal ~GENSYM[ce][6]  : boolean;~ELSE ~FI
 begin
   ~SYM[3] <= to_integer(~ARG[3])
   -- pragma translate_off
@@ -32,39 +30,67 @@ begin
                 mod ~LENGTH[~TYP[2]]
   -- pragma translate_on
                 ;
-  ~IF ~ISGATED[1] ~THEN
+~IF ~VIVADO ~THEN ~IF ~ISGATED[1] ~THEN
   (~SYM[5],~SYM[6]) <= ~ARG[1];
   ~GENSYM[blockRam_sync][7] : process(~SYM[5])
   begin
-    if rising_edge(~SYM[5]) then~IF ~VIVADO ~THEN
+    if rising_edge(~SYM[5]) then
       if ~SYM[6] then
         if ~ARG[4] then
           ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];
         end if;
-        ~SYM[2] <= ~SYM[1](~SYM[3]);
-      end if;~ELSE
-      if ~ARG[4] and ~SYM[6] then
-        ~SYM[1](~SYM[4]) <= ~ARG[6];
+        ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
       end if;
-      if ~SYM[6] then
-        ~SYM[2] <= ~SYM[1](~SYM[3]);
-      end if;~FI
     end if;
   end process;~ELSE
   ~SYM[7] : process(~ARG[1])
   begin
     if rising_edge(~ARG[1]) then
-      if ~ARG[4] then~IF ~VIVADO ~THEN
-        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];~ELSE
-        ~SYM[1](~SYM[4]) <= ~ARG[6];~FI
+      if ~ARG[4] then
+        ~SYM[1](~SYM[4]) <= ~TOBV[~ARG[6]][~TYP[6]];
       end if;
-      ~SYM[2] <= ~SYM[1](~SYM[3]);
+      ~RESULT <= fromSLV(~SYM[1](~SYM[3]))
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
     end if;
-  end process;~FI~IF ~VIVADO ~THEN
-  ~RESULT <= ~FROMBV[~SYM[2]][~TYPO];~ELSE
-  ~RESULT <= ~SYM[2];~FI
+  end process;~FI ~ELSE ~IF ~ISGATED[1] ~THEN
+  (~SYM[5],~SYM[6]) <= ~ARG[1];
+  ~SYM[7] : process(~SYM[5])
+  begin
+    if rising_edge(~SYM[5]) then
+      if ~ARG[4] and ~SYM[6] then
+        ~SYM[1](~SYM[4]) <= ~ARG[6];
+      end if;
+      if ~SYM[6] then
+        ~RESULT <= ~SYM[1](~SYM[3])
+        -- pragma translate_off
+        after 1 ps
+        -- pragma translate_on
+        ;
+      end if;
+    end if;
+  end process;~ELSE
+  ~SYM[7] : process(~ARG[1])
+  begin
+    if rising_edge(~ARG[1]) then
+      if ~ARG[4] then
+        ~SYM[1](~SYM[4]) <= ~ARG[6];
+      end if;
+      ~RESULT <= ~SYM[1](~SYM[3])
+      -- pragma translate_off
+      after 1 ps
+      -- pragma translate_on
+      ;
+    end if;
+  end process;~FI ~FI
 end block;
--- blockRam end"
+--end blockRam"
     }
   }
 ]

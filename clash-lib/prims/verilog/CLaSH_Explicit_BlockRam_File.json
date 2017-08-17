@@ -11,10 +11,10 @@
   -> Signal dom Int            -- wr,   ARG[7]
   -> Signal dom (BitVector m)  -- din,  ARG[8]
   -> Signal dom (BitVector m)"
+    , "outputReg" : true
     , "templateD" :
 "// blockRamFile begin
 reg ~TYPO ~GENSYM[RAM][0] [0:~LIT[3]-1];
-reg ~TYPO ~GENSYM[~RESULT_q][1];
 
 initial begin
   $readmemb(~FILE[~LIT[4]],~SYM[0]);
@@ -25,23 +25,21 @@ always @(posedge ~ARG[2][1]) begin : ~GENSYM[~COMPNAME_blockRamFile][2]~IF ~VIVA
     if (~ARG[6]) begin
       ~SYM[0][~ARG[7]] <= ~ARG[8];
     end
-    ~SYM[1] <= ~SYM[0][~ARG[5]];
+    ~RESULT <= ~SYM[0][~ARG[5]];
   end~ELSE
   if (~ARG[6] & ~ARG[2][0]) begin
     ~SYM[0][~ARG[7]] <= ~ARG[8];
   end
   if (~ARG[2][0]) begin
-    ~SYM[1] <= ~SYM[0][~ARG[5]];
+    ~RESULT <= ~SYM[0][~ARG[5]];
   end~FI
 end~ELSE
 always @(posedge ~ARG[2]) begin : ~SYM[2]
   if (~ARG[6]) begin
     ~SYM[0][~ARG[7]] <= ~ARG[8];
   end
-  ~SYM[1] <= ~SYM[0][~ARG[5]];
+  ~RESULT <= ~SYM[0][~ARG[5]];
 end~FI
-
-assign ~RESULT = ~SYM[1];
 // blockRamFile end"
     }
   }
