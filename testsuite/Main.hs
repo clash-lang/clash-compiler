@@ -30,7 +30,6 @@ main =
       ,runTest "examples"             defBuild [] "BlockRamTest" ([""],"BlockRamTest_topEntity",False)
       ,runTest "examples"             defBuild [] "Calculator"   (["","Calculator_testBench"],"Calculator_testBench_testBench",True )
       ,runTest "examples"             defBuild [] "CochleaPlus"  ([""],"CochleaPlus_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
-      ,runTest "examples"             defBuild [] "DDR"          (["","DDR_tb"],"DDR_tb_tb",True )
       ,runTest "examples"             defBuild [] "FIR"          (["","FIR_testBench"],"FIR_testBench_testBench",True ) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest "examples"             defBuild [] "Fifo"         ([""],"Fifo_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
       ,runTest "examples"             defBuild [] "MAC"          (["","MAC_testBench"],"MAC_testBench_testBench",True)

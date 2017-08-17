@@ -1,0 +1,128 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.DDR.ddrIn#"
+    , "type" :
+"ddrIn# :: forall a slow fast n pFast gated synchronous.
+           ( HasCallStack                         -- ARG[0]
+           , fast ~ Dom n pFast                   -- ARG[1]
+           , slow ~ Dom n (2*pFast))              -- ARG[2]
+        => Clock slow gated                       -- ARG[3]
+        -> Reset slow synchronous                 -- ARG[4]
+        -> a                                      -- ARG[5]
+        -> a                                      -- ARG[6]
+        -> a                                      -- ARG[7]
+        -> Signal fast a                          -- ARG[8]
+        -> Signal slow (a,a)"
+    , "templateD" :
+"// ddrIn begin
+~SIGD[~GENSYM[data_Pos][1]][8];
+~SIGD[~GENSYM[data_Neg][2]][8];
+~SIGD[~GENSYM[data_Neg_Latch][3]][8];
+~IF ~ISGATED[3] ~THEN
+always @(posedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrIn_pos][6]
+  if (~ARG[4]) begin
+    ~SYM[1] <= ~ARG[6];
+  end else if (~ARG[3][0]) begin
+    ~SYM[1] <= ~ARG[8];
+  end
+end~ELSE
+always @(posedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[6]
+  if (~ARG[4]) begin
+    ~SYM[1] <= ~ARG[6];
+  end else begin
+    ~SYM[1] <= ~ARG[8];
+  end
+end~FI
+~IF ~ISGATED[3] ~THEN
+always @(negedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrIn_neg][7]
+  if (~ARG[4]) begin
+    ~SYM[2] <= ~ARG[7];
+  end else if (~ARG[3][0]) begin
+    ~SYM[2] <= ~ARG[8];
+  end
+end~ELSE
+always @(negedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[7]
+  if (~ARG[4]) begin
+    ~SYM[2] <= ~ARG[7];
+  end else begin
+    ~SYM[2] <= ~ARG[8];
+  end
+end~FI
+~IF ~ISGATED[3] ~THEN
+always @(posedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrIn_neg_latch][8]
+  if (~ARG[4]) begin
+    ~SYM[3] <= ~ARG[5];
+  end else if (~ARG[3][0]) begin
+    ~SYM[3] <= ~SYM[2];
+  end
+end~ELSE
+always @(posedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[8]
+  if (~ARG[4]) begin
+    ~SYM[3] <= ~ARG[5];
+  end else begin
+    ~SYM[3] <= ~SYM[2];
+  end
+end~FI
+
+assign ~RESULT = {~SYM[3], ~SYM[1]};
+// ddrIn end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Explicit.DDR.ddrOut#"
+    , "type" :
+"ddrOut# :: ( HasCallStack               -- ARG[0]
+            , fast ~ Dom n pFast         -- ARG[1]
+            , slow ~ Dom n (2*pFast))    -- ARG[2]
+         => Clock slow gated             -- ARG[3]
+         -> Reset slow synchronous       -- ARG[4]
+         -> a                            -- ARG[5]
+         -> Signal slow a                -- ARG[6]
+         -> Signal slow a                -- ARG[7]
+         -> Signal fast a"
+    , "templateD" :
+"// ddrOut begin
+~SIGD[~GENSYM[data_Pos][1]][5];
+~SIGD[~GENSYM[data_Neg][2]][5];
+~IF ~ISGATED[3] ~THEN
+always @(posedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_pos][5]
+  if (~ARG[4]) begin
+    ~SYM[1] <= ~ARG[5];
+  end else if (~ARG[3][0]) begin
+    ~SYM[1] <= ~ARG[6];
+  end
+end~ELSE
+always @(posedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[5]
+  if (~ARG[4]) begin
+    ~SYM[1] <= ~ARG[5];
+  end else begin
+    ~SYM[1] <= ~ARG[6];
+  end
+end~FI
+~IF ~ISGATED[3] ~THEN
+always @(posedge ~ARG[3][1]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~GENSYM[~COMPNAME_ddrOut_neg][6]
+  if (~ARG[4]) begin
+    ~SYM[2] <= ~ARG[5];
+  end else if (~ARG[3][0]) begin
+    ~SYM[2] <= ~ARG[7];
+  end
+end~ELSE
+always @(posedge ~ARG[3]~IF ~ISSYNC[4] ~THEN ~ELSE or posedge ~ARG[4]~FI) begin : ~SYM[6]
+  if (~ARG[4]) begin
+    ~SYM[2] <= ~ARG[5];
+  end else begin
+    ~SYM[2] <= ~ARG[7];
+  end
+end~FI
+
+always @(*) begin ~IF ~ISGATED[3] ~THEN
+  if (~ARG[3][1]) begin~ELSE
+  if (~ARG[3]) begin~FI
+    ~RESULT = ~SYM[1];
+  end else begin
+    ~RESULT = ~SYM[2];
+  end
+end
+// ddrOut end"
+    }
+  }
+]

@@ -13,7 +13,7 @@
     , "templateD" :
 "// assert begin
 // pragma translate_off
-always @(posedge ~ARG[2]~IF ~ISSYNC[3] ~THEN ~ELSE or negedge ~ARG[3]~FI) begin
+always @(posedge ~IF ~ISGATED[2] ~THEN ~ARG[2][1] ~ELSE ~ARG[2] ~FI~IF ~ISSYNC[3] ~THEN ~ELSE or negedge ~ARG[3]~FI) begin
   if (~ARG[5] !== ~ARG[6]) begin
     $display(\"@%0tns: %s, expected: %b, actual: %b\", $time, ~LIT[4], ~ARG[6], ~ARG[5]);
     $finish;

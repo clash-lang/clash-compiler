@@ -637,7 +637,8 @@ vhdlTypeErrValue t@(RTree n elTy)    = do
     _ -> vhdlTypeMark t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> vhdlTypeErrValue elTy)
 vhdlTypeErrValue t@(Product _ elTys) = vhdlTypeMark t <> "'" <> tupled (mapM vhdlTypeErrValue elTys)
 vhdlTypeErrValue (Reset {})          = "'-'"
-vhdlTypeErrValue (Clock {})          = "'-'"
+vhdlTypeErrValue (Clock _ _ Source)  = "'-'"
+vhdlTypeErrValue (Clock _ _ Gated)   = "('-',false)"
 vhdlTypeErrValue Void                = "std_logic_vector'(0 downto 1 => '-')"
 vhdlTypeErrValue String              = "\"ERROR\""
 vhdlTypeErrValue t                   = vhdlTypeMark t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> "'-'")

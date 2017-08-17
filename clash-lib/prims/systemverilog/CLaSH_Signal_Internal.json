@@ -76,7 +76,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #30 forever begin
+  #3000 forever begin
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
     ~RESULT = ~ ~RESULT;
@@ -101,14 +101,14 @@ end
 localparam ~GENSYM[half_period][0] = (~LIT[2]0 / 2);
 always begin
   ~RESULT = 0;
-  #30 while (~ARG[3]) begin
+  #3000 forever begin
+    if (~ ~ARG[3]) begin
+      $finish;
+    end
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
     ~RESULT = ~ ~RESULT;
     #~SYM[0];
-  end
-  if (~ ~ARG[3]) begin
-    $finish;
   end
 end
 // pragma translate_on"
@@ -120,8 +120,8 @@ end
     , "templateD" :
 "// pragma translate_off
 initial begin
-  #1  ~RESULT = 1;
-  #19 ~RESULT = 0;
+  #1    ~RESULT = 1;
+  #1999 ~RESULT = 0;
 end
 // pragma translate_on"
     }
@@ -131,9 +131,10 @@ end
     , "type" : "asyncResetGen :: Reset domain Synchronous"
     , "templateD" :
 "// pragma translate_off
+localparam ~GENSYM[reset_period][1] = 2998 + ~LIT[1]0;
 initial begin
-  #1  ~RESULT = 1;
-  #30 ~RESULT = 0;
+  #1 ~RESULT = 1;
+  #~SYM[1] ~RESULT = 0;
 end
 // pragma translate_on"
     }

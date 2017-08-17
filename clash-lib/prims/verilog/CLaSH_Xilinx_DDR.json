@@ -1,0 +1,92 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Xilinx.DDR.iddr"
+    , "type" :
+"iddr
+  :: ( HasCallStack               -- ARG[0]
+     , fast ~ Dom n pFast         -- ARG[1]
+     , slow ~ Dom n (2*pFast)     -- ARG[2]
+     , KnownNat m )               -- ARG[3]
+  -> Clock slow gated             -- ARG[4]
+  -> Reset slow synchronous       -- ARG[5]
+  -> Signal fast (BitVector m)    -- ARG[6]
+  -> Signal slow (BitVector m,BitVector m)"
+    , "templateD" :
+"// iddr begin
+wire ~SIGD[~GENSYM[dataout_l][1]][6];
+wire ~SIGD[~GENSYM[dataout_h][2]][6];
+wire ~SIGD[~GENSYM[d][3]][6];
+assign ~SYM[3] = ~ARG[6];
+
+genvar ~GENSYM[i][8];
+~GENERATE
+for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddri_array][7]
+  IDDR #(
+    .DDR_CLK_EDGE(\"SAME_EDGE\"),
+    .INIT_Q1(1'b0),
+    .INIT_Q2(1'b0),
+    .SRTYPE(~IF ~ISSYNC[5] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
+  ) ~GENSYM[~COMPNAME_IDDR][9] (
+    .Q1(~SYM[1][~SYM[8]]),
+    .Q2(~SYM[2][~SYM[8]]),~IF ~ISGATED[6] ~THEN
+    .C(~ARG[4][1]),
+    .CE(~ARG[4][0]),~ELSE
+    .C(~ARG[4]),
+    .CE(1'b1),~FI
+    .D(~SYM[3][~SYM[8]]),
+    .R(~ARG[5]),
+    .S(1'b0)
+  );
+end
+~ENDGENERATE
+
+assign ~RESULT = {~SYM[2],~SYM[1]};
+// iddr end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Xilinx.DDR.oddr#"
+    , "type" :
+"oddr#
+  :: ( slow ~ Dom n (2*pFast)           -- ARG[0]
+     , fast ~ Dom n pFast               -- ARG[1]
+     , KnownNat m )                     -- ARG[2]
+  => Clock slow gated                   -- ARG[3]
+  -> Reset slow synchronous             -- ARG[4]
+  -> Signal slow (BitVector m)          -- ARG[5]
+  -> Signal slow (BitVector m)          -- ARG[6]
+  -> Signal fast (BitVector m)"
+    , "templateD" :
+"// oddr begin
+wire ~SIGD[~GENSYM[datain_l][1]][6];
+wire ~SIGD[~GENSYM[datain_h][2]][6];
+wire ~SIGD[~GENSYM[q][3]][6];
+
+assign ~SYM[1] = ~ARG[5];
+assign ~SYM[2] = ~ARG[6];
+
+genvar ~GENSYM[i][8];
+~GENERATE
+for (~SYM[8]=0; ~SYM[8] < ~SIZE[~TYP[6]]; ~SYM[8]=~SYM[8]+1) begin : ~GENSYM[ddro_array][7]
+  ODDR #(
+    .DDR_CLK_EDGE(\"SAME_EDGE\"),
+    .INIT(1'b0),
+    .SRTYPE(~IF ~ISSYNC[4] ~THEN \"SYNC\" ~ELSE \"ASYNC\" ~FI)
+  ) ~GENSYM[~COMPNAME_ODDR][9] (
+    .Q(~SYM[3][~SYM[8]]),~IF ~ISGATED[3] ~THEN
+    .C(~ARG[3][1]),
+    .CE(~ARG[3][0]),~ELSE
+    .C(~ARG[3]),
+    .CE(1'b1),~FI
+    .D1(~SYM[1][~SYM[8]]),
+    .D2(~SYM[2][~SYM[8]]),
+    .R(~ARG[4]),
+    .S(1'b0)
+  );
+end
+~ENDGENERATE
+
+assign ~RESULT = ~SYM[3];
+// oddr end"
+    }
+  }
+]

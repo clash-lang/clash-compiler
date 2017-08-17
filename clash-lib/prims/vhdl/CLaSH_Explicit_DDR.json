@@ -1,0 +1,292 @@
+[ { "BlackBox" :
+    { "name" : "CLaSH.Explicit.DDR.ddrIn#"
+    , "type" :
+"ddrIn# :: forall a slow fast n pFast gated synchronous.
+           ( HasCallStack                         -- ARG[0]
+           , fast ~ Dom n pFast                   -- ARG[1]
+           , slow ~ Dom n (2*pFast))              -- ARG[2]
+        => Clock slow gated                       -- ARG[3]
+        -> Reset slow synchronous                 -- ARG[4]
+        -> a                                      -- ARG[5]
+        -> a                                      -- ARG[6]
+        -> a                                      -- ARG[7]
+        -> Signal fast a                          -- ARG[8]
+        -> Signal slow (a,a)"
+    , "templateD" :
+"-- ddrIn begin
+~GENSYM[~COMPNAME_ddrIn][0] : block
+  signal ~GENSYM[data_Pos][1]       : ~TYP[8];
+  signal ~GENSYM[data_Neg][2]       : ~TYP[8];
+  signal ~GENSYM[data_Neg_Latch][3] : ~TYP[8];
+~IF ~ISGATED[3] ~THEN
+  signal ~GENSYM[clk][4]            : std_logic;
+  signal ~GENSYM[ce][5]             : boolean;
+~ELSE ~FI
+begin
+~IF ~ISGATED[3] ~THEN
+ ~IF ~ISSYNC[4] ~THEN
+  -- gated sync
+  -------------
+  ~GENSYM[~COMPNAME_ddrIn_pos][6] : process(~SYM[4])
+  begin
+    if rising_edge(~SYM[4]) then
+      if ~ARG[4] = '1' then
+        ~SYM[1] <= ~ARG[6];
+      elsif ~SYM[5] then
+        ~SYM[1] <= ~ARG[8];
+      end if;
+    end if;
+  end process;
+
+  ~GENSYM[~COMPNAME_ddrIn_neg][7] : process(~SYM[4])
+  begin
+    if falling_edge(~SYM[4]) then
+      if ~ARG[4] = '1' then
+        ~SYM[2] <= ~ARG[7];
+      elsif ~SYM[5] then
+        ~SYM[2] <= ~ARG[8];
+      end if;
+    end if;
+  end process;
+
+  ~GENSYM[~COMPNAME_ddrIn_neg_latch][8] : process(~SYM[4])
+  begin
+    if rising_edge(~SYM[4]) then
+      if ~ARG[4] = '1' then
+        ~SYM[3] <= ~ARG[5];
+      elsif ~SYM[5] then
+        ~SYM[3] <= ~SYM[2];
+      end if;
+    end if;
+  end process;
+ ~ELSE
+  -- gated async
+  --------------
+  ~SYM[6] : process(~SYM[4],~ARG[4]~VARS[8])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[1] <= ~ARG[6];
+    elsif ~SYM[5] and rising_edge(~SYM[4]) then
+      ~SYM[1] <= ~ARG[8];
+    end if;
+  end process;
+
+  ~SYM[7] : process(~SYM[4],~ARG[4]~VARS[8])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[2] <= ~ARG[7];
+    elsif ~SYM[5] and falling_edge(~SYM[4]) then
+      ~SYM[2] <= ~ARG[8];
+    end if;
+  end process;
+
+  ~SYM[8] : process(~SYM[4],~ARG[4],~SYM[2])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[3] <= ~ARG[5];
+    elsif ~SYM[5] and rising_edge(~SYM[4]) then
+      ~SYM[3] <= ~SYM[2];
+    end if;
+  end process;
+ ~FI
+~ELSE
+ ~IF ~ISSYNC[4] ~THEN
+  -- ungated sync
+  ---------------
+  ~SYM[6] : process(~ARG[3])
+  begin
+    if rising_edge(~ARG[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[1] <= ~ARG[6];
+      else
+        ~SYM[1] <= ~ARG[8];
+      end if;
+    end if;
+  end process;
+
+  ~SYM[7] : process(~ARG[3])
+  begin
+    if falling_edge(~ARG[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[2] <= ~ARG[7];
+      else
+        ~SYM[2] <= ~ARG[8];
+      end if;
+    end if;
+  end process;
+
+  ~SYM[8] : process(~ARG[3])
+  begin
+    if rising_edge(~ARG[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[3] <= ~ARG[5];
+      else
+        ~SYM[3] <= ~SYM[2];
+      end if;
+    end if;
+  end process;
+ ~ELSE
+  -- ungated async
+  ----------------
+  ~SYM[6] : process(~ARG[3],~ARG[4]~VARS[8])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[1] <= ~ARG[6];
+    elsif rising_edge(~ARG[3]) then
+      ~SYM[1] <= ~ARG[8];
+    end if;
+  end process;
+
+  ~SYM[7] : process(~ARG[3],~ARG[4]~VARS[8])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[2] <= ~ARG[7];
+    elsif falling_edge(~ARG[3]) then
+      ~SYM[2] <= ~ARG[8];
+    end if;
+  end process;
+
+  ~SYM[8] : process(~ARG[3],~ARG[4],~SYM[2])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[3] <= ~ARG[5];
+    elsif rising_edge(~ARG[3]) then
+      ~SYM[3] <= ~SYM[2];
+    end if;
+  end process;
+ ~FI
+~FI
+  ~RESULT <= (~SYM[3], ~SYM[1]);
+~IF ~ISGATED[3] ~THEN
+  (~SYM[4],~SYM[5]) <= ~ARG[3];
+~ELSE ~FI
+end block;
+-- ddrIn end"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "CLaSH.Explicit.DDR.ddrOut#"
+    , "type" :
+"ddrOut# :: ( HasCallStack               -- ARG[0]
+            , fast ~ Dom n pFast         -- ARG[1]
+            , slow ~ Dom n (2*pFast))    -- ARG[2]
+         => Clock slow gated             -- ARG[3]
+         -> Reset slow synchronous       -- ARG[4]
+         -> a                            -- ARG[5]
+         -> Signal slow a                -- ARG[6]
+         -> Signal slow a                -- ARG[7]
+         -> Signal fast a"
+    , "templateD" :
+"-- ddrOut begin
+~GENSYM[~COMPNAME_ddrIn][0] : block
+  signal ~GENSYM[data_Pos][1] : ~TYP[5];
+  signal ~GENSYM[data_Neg][2] : ~TYP[5];
+~IF ~ISGATED[3] ~THEN
+  signal ~GENSYM[clk][3]      : std_logic;
+  signal ~GENSYM[ce][4]       : boolean;
+~ELSE ~FI
+begin
+~IF ~ISGATED[3] ~THEN
+ ~IF ~ISSYNC[4] ~THEN
+  -- gated sync
+  -------------
+  ~GENSYM[~COMPNAME_ddrOut_pos][5] : process(~SYM[3])
+  begin
+    if rising_edge(~SYM[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[1] <= ~ARG[5];
+      elsif ~SYM[4] then
+        ~SYM[1] <= ~ARG[6];
+      end if;
+    end if;
+  end process;
+
+  ~GENSYM[~COMPNAME_ddrOut_neg][6] : process(~SYM[3])
+  begin
+    if rising_edge(~SYM[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[2] <= ~ARG[5];
+      elsif ~SYM[4] then
+        ~SYM[2] <= ~ARG[7];
+      end if;
+    end if;
+  end process;
+ ~ELSE
+  -- gated async
+  --------------
+  ~SYM[5] : process(~SYM[3],~ARG[4]~VARS[6])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[1] <= ~ARG[5];
+    elsif rising_edge(~SYM[3]) then
+      ~SYM[1] <= ~ARG[6];
+    end if;
+  end process;
+
+  ~SYM[6] : process(~SYM[3],~ARG[4]~VARS[7])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[2] <= ~ARG[5];
+    elsif rising_edge(~SYM[3]) then
+      ~SYM[2] <= ~ARG[7];
+    end if;
+  end process;
+ ~FI
+~ELSE
+ ~IF ~ISSYNC[4] ~THEN
+  -- ungated sync
+  ---------------
+  ~SYM[5] : process(~ARG[3])
+  begin
+    if rising_edge(~ARG[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[1] <= ~ARG[5];
+      else
+        ~SYM[1] <= ~ARG[6];
+      end if;
+    end if;
+  end process;
+
+  ~SYM[6] : process(~ARG[3])
+  begin
+    if rising_edge(~ARG[3]) then
+      if ~ARG[4] = '1' then
+        ~SYM[2] <= ~ARG[5];
+      else
+        ~SYM[2] <= ~ARG[7];
+      end if;
+    end if;
+  end process;
+ ~ELSE
+  -- ungated async
+  ----------------
+  ~SYM[5] : process(~ARG[3],~ARG[4]~VARS[6])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[1] <= ~ARG[5];
+    elsif rising_edge(~ARG[3]) then
+      ~SYM[1] <= ~ARG[6];
+    end if;
+  end process;
+
+  ~SYM[6] : process(~ARG[3],~ARG[4]~VARS[7])
+  begin
+    if ~ARG[4] = '1' then
+      ~SYM[2] <= ~ARG[5];
+    elsif rising_edge(~ARG[3]) then
+      ~SYM[2] <= ~ARG[7];
+    end if;
+  end process;
+ ~FI
+~FI
+~IF ~ISGATED[3] ~THEN
+  (~SYM[3],~SYM[4]) <= ~ARG[3];
+  ~RESULT <= ~SYM[1] when (~SYM[3] = '1' and ~SYM[4]) else ~SYM[2];
+~ELSE
+  ~RESULT <= ~SYM[1] when (~ARG[3] = '1') else ~SYM[2];
+~FI
+end block;
+-- ddrOut end"
+    }
+  }
+]
