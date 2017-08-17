@@ -91,6 +91,7 @@ Library
 
                       CLaSH.Explicit.BlockRam
                       CLaSH.Explicit.BlockRam.File
+                      CLaSH.Explicit.DDR
                       CLaSH.Explicit.Mealy
                       CLaSH.Explicit.Moore
                       CLaSH.Explicit.RAM
@@ -104,6 +105,7 @@ Library
                       CLaSH.Explicit.Testbench
 
                       CLaSH.Intel.ClockGen
+                      CLaSH.Intel.DDR
 
                       CLaSH.NamedTypes
 
@@ -148,6 +150,7 @@ Library
                       CLaSH.XException
 
                       CLaSH.Xilinx.ClockGen
+                      CLaSH.Xilinx.DDR
 
                       CLaSH.Tutorial
                       CLaSH.Examples
