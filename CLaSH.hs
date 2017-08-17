@@ -5,7 +5,6 @@
 
 import CLaSH.Driver
 import CLaSH.Driver.Types
-import CLaSH.Rewrite.Types hiding (topEntities)
 import CLaSH.GHC.Evaluator
 import CLaSH.GHC.GenerateBindings
 import CLaSH.GHC.NetlistTypes

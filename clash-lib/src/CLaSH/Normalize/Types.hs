@@ -15,10 +15,9 @@ import Control.Monad.State.Strict (State)
 import Data.HashMap.Strict (HashMap)
 import Data.Map            (Map)
 
-import SrcLoc (SrcSpan)
-
 import CLaSH.Core.Term        (Term, TmName, TmOccName)
 import CLaSH.Core.Type        (Type)
+import CLaSH.Driver.Types     (BindingMap)
 import CLaSH.Netlist.BlackBox.Types (BlackBoxTemplate)
 import CLaSH.Primitives.Types (PrimMap)
 import CLaSH.Rewrite.Types    (Rewrite, RewriteMonad)
@@ -27,7 +26,7 @@ import CLaSH.Util
 -- | State of the 'NormalizeMonad'
 data NormalizeState
   = NormalizeState
-  { _normalized          :: HashMap TmOccName (TmName,Type,SrcSpan,Term)
+  { _normalized          :: BindingMap
   -- ^ Global binders
   , _specialisationCache :: Map (TmOccName,Int,Either Term Type) (TmName,Type)
   -- ^ Cache of previously specialised functions:
@@ -65,3 +64,16 @@ type NormalizeSession = RewriteMonad NormalizeState
 
 -- | A 'Transform' action in the context of the 'RewriteMonad' and 'NormalizeMonad'
 type NormRewrite = Rewrite NormalizeState
+
+-- | Description of a @Term@ in terms of the type "components" the @Term@ has.
+--
+-- Is used as a performance/size metric.
+data TermClassification
+  = TermClassification
+  { _function   :: !Int -- ^ Number of functions
+  , _primitive  :: !Int -- ^ Number of primitives
+  , _selection  :: !Int -- ^ Number of selections/multiplexers
+  }
+  deriving Show
+
+makeLenses ''TermClassification

@@ -65,8 +65,10 @@ pInput = pTokenWS "~INPUT" *> pTokenWS "<=" *> ((,) <$> (pBlackBoxE <* pTokenWS 
 
 -- | Parse an Expression element
 pTagE :: Parser Element
-pTagE =  O                 <$  pToken "~RESULT"
-     <|> I                 <$> (pToken "~ARG" *> pBrackets pNatural)
+pTagE =  O True            <$  pToken "~ERESULT"
+     <|> O False           <$  pToken "~RESULT"
+     <|> I True            <$> (pToken "~EARG" *> pBrackets pNatural)
+     <|> I False           <$> (pToken "~ARG" *> pBrackets pNatural)
      <|> L                 <$> (pToken "~LIT" *> pBrackets pNatural)
      <|> N                 <$> (pToken "~NAME" *> pBrackets pNatural)
      <|> Var               <$> (pToken "~VAR" *> pBrackets pSigD) <*> pBrackets pNatural

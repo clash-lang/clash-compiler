@@ -101,7 +101,7 @@ instance Backend VerilogState where
   extendIdentifier = return go
     where
       go Basic nm ext = filterReserved (mkBasicId' True (nm `Text.append` ext))
-      go Extended (rmSlash -> nm) ext =
+      go Extended (rmSlash . escapeTemplate -> nm) ext =
         let nmExt = nm `Text.append` ext
         in  case go Basic nm ext of
               nm' | nm' /= nmExt -> case Text.head nmExt of
@@ -112,11 +112,15 @@ instance Backend VerilogState where
   setModName _    = id
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+  blockDecl _ ds  =
+    decls ds <$>
+    insts ds
+  unextend = return rmSlash
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
   nm1 <- Text.stripPrefix "\\" nm
-  Text.stripSuffix " " nm1
+  pure (Text.filter (not . (== ' ')) nm1)
 
 type VerilogM a = State VerilogState a
 

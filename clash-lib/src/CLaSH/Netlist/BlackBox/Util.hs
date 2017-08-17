@@ -55,7 +55,7 @@ verifyBlackBoxContext :: BlackBoxContext -- ^ Blackbox to verify
                       -> Bool
 verifyBlackBoxContext bbCtx = all verify'
   where
-    verify' (I n)           = n < length (bbInputs bbCtx)
+    verify' (I _ n)         = n < length (bbInputs bbCtx)
     verify' (L n)           = case indexMaybe (bbInputs bbCtx) n of
                                 Just (_,_,b) -> b
                                 _            -> False
@@ -128,7 +128,7 @@ setSym bbCtx l = do
     concatT :: [Element] -> Text
     concatT = Text.concat
             . map (\case { C t -> t
-                         ; O  | Identifier t _ <- fst (bbResult bbCtx)
+                         ; O _ | Identifier t _ <- fst (bbResult bbCtx)
                                -> t
                          ; _   -> error "unexpected element in GENSYM"})
 
@@ -214,9 +214,9 @@ renderElem b (D (Decl n (l:ls))) = do
   let Just (templ,_,pCtx)  = IntMap.lookup n (bbFunctions b)
       b' = pCtx { bbResult = (o,oTy), bbInputs = bbInputs pCtx ++ is }
   templ' <- case templ of
-              Left t  -> return t
-              Right d -> do Just inst' <- inst d
-                            return . parseFail . displayT $ renderCompact inst'
+              Left t        -> return t
+              Right (nm,ds) -> do block <- blockDecl nm ds
+                                  return . parseFail . displayT $ renderCompact block
   let t2 = setSimpleVar b' templ'
   if verifyBlackBoxContext b' t2
     then Text.concat <$> mapM (renderElem b') t2
@@ -333,9 +333,13 @@ renderTag :: Backend backend
           -> Element
           -> State backend Text
 renderTag _ (C t)           = return t
-renderTag b O               = fmap (displayT . renderOneLine) . expr False . fst $ bbResult b
-renderTag b (I n)           = let (e,_,_) = bbInputs b !! n
-                              in  (displayT . renderOneLine) <$> expr False e
+renderTag b (O esc)         = do
+  escape <- if esc then unextend else pure id
+  fmap (escape . displayT . renderOneLine) . expr False . fst $ bbResult b
+renderTag b (I esc n)       = do
+  let (e,_,_) = bbInputs b !! n
+  escape <- if esc then unextend else pure id
+  (escape . displayT . renderOneLine) <$> expr False e
 renderTag b (N n)           = let (e,_,_) = bbInputs b !! n
                               in  toName e
   where
@@ -445,8 +449,8 @@ prettyElem (D (Decl i args)) = do
         text "~OUTPUT" <+> text "=>" <+> text (fst (head args')) <+> text (snd (head args')) <+> text "~" <$$>
         vcat (mapM (\(a,b) -> text "~INPUT" <+> text "=>" <+> text a <+> text b <+> text "~") (tail args')))
       PP.<$$> text "~INST")
-prettyElem O = return "~RESULT"
-prettyElem (I i) = (displayT . renderOneLine) <$> (text "~ARG" <> brackets (int i))
+prettyElem (O b) = if b then return "~ERESULT" else return "~RESULT"
+prettyElem (I b i) = (displayT . renderOneLine) <$> (if b then text "~EARG" else text "~ARG" <> brackets (int i))
 prettyElem (L i) = (displayT . renderOneLine) <$> (text "~LIT" <> brackets (int i))
 prettyElem (N i) = (displayT . renderOneLine) <$> (text "~NAME" <> brackets (int i))
 prettyElem (Var es i) = do
@@ -526,7 +530,7 @@ usedArguments = nub . concatMap go
   where
     go x = case x of
       D (Decl i args) -> i : concatMap (\(a,b) -> usedArguments a ++ usedArguments b) args
-      I i -> [i]
+      I _ i -> [i]
       L i -> [i]
       N i -> [i]
       Var _ i -> [i]

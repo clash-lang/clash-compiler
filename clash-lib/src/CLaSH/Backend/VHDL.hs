@@ -33,6 +33,7 @@ import qualified Data.Text.Lazy                       as T
 import           Prelude                              hiding ((<$>))
 import qualified System.FilePath
 import           Text.Printf
+import           Text.PrettyPrint.Leijen.Text         (isEmpty)
 import           Text.PrettyPrint.Leijen.Text.Monadic
 
 import           CLaSH.Annotations.Primitive          (HDL (..))
@@ -103,7 +104,7 @@ instance Backend VHDLState where
   extendIdentifier = return go
     where
       go Basic nm ext = filterReserved (T.toLower (mkBasicId' True (nm `T.append` ext)))
-      go Extended (rmSlash -> nm) ext =
+      go Extended ((rmSlash . escapeTemplate) -> nm) ext =
         let nmExt = nm `T.append` ext
         in  case go Basic nm ext of
               nm' | nm' /= nmExt -> case T.head nmExt of
@@ -114,11 +115,23 @@ instance Backend VHDLState where
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+  blockDecl nm ds = do
+    decs   <- decls ds
+    if isEmpty decs
+       then insts ds
+       else nest 2
+              (text nm <+> colon <+> "block" <$$>
+               pure decs) <$$>
+            nest 2
+              ("begin" <$$>
+                insts ds) <$$>
+            "end block" <> semi
+  unextend = return rmSlash
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
   nm1 <- T.stripPrefix "\\" nm
-  T.stripSuffix "\\" nm1
+  pure (T.filter (not . (== '\\')) nm1)
 
 type VHDLM a = State VHDLState a
 
@@ -377,7 +390,7 @@ funDec _ t@(Product _ elTys) = Just
 
     elTyFromSLV = forM (zip starts ends)
                        (\(s,e) -> "fromSLV" <>
-                          parens ("slv" <> parens (int s <+> "to" <+> int e)))
+                          parens ("islv" <> parens (int s <+> "to" <+> int e)))
 
 funDec syn t@(Vector _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> vhdlTypeMark t) <+> "return std_logic_vector" <> semi <$>
@@ -446,8 +459,9 @@ funDec _ (Clock {}) = Just
       indent 2 ("return" <+> "(0 => sl)" <> semi) <$>
     "end" <> semi <$>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic" <+> "is" <$>
+      indent 2 "alias islv : std_logic_vector(0 to slv'length - 1) is slv;" <$>
     "begin" <$>
-      indent 2 ("return" <+> "slv(0)" <> semi) <$>
+      indent 2 ("return" <+> "islv(0)" <> semi) <$>
     "end" <> semi
   )
 
@@ -619,6 +633,7 @@ tyName t@(Product nm _)  = do
     makeCached tN nameCache prodName
   where
     prodName = do
+      tyCache %= HashSet.insert t
       seen <- use tySeen
       mkId <- mkIdentifier <*> pure Basic
       let nm'  = (mkId . last . T.splitOn ".") nm
@@ -771,6 +786,12 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
     _ -> text id_ <> parens (int 0)
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> parens (int 1 <+> "to" <+> int (n-1))
 
+-- This is a "Hack", we cannot construct trees with a negative depth. This is
+-- here so that we can recognise merged RTree modifiers. See the code in
+-- @CLaSH.Backend.nestM@ which construct these tree modifiers.
+expr_ _ (Identifier id_ (Just (Indexed (RTree (-1) _,l,r)))) =
+  text id_ <> parens (int l <+> "to" <+> int (r-1))
+
 expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
   syn <- hdlSyn
   case syn of
@@ -820,12 +841,8 @@ expr_ _ (Identifier id_ (Just (Indexed ((Unsigned _),_,_)))) = do
   iw <- use intWidth
   "resize" <> parens (text id_ <> "," <> int iw)
 
-expr_ b (Identifier id_ (Just (Nested m1 m2))) = case (m1,m2) of
-  (Indexed (Vector n elTy,1,2),Indexed (Vector _ _,1,1)) ->
-    expr_ b (Identifier id_ (Just (Indexed (Vector n elTy,10,1))))
-  (Indexed ((RTree d elTy),1,n),Indexed ((RTree _ _),0,1)) -> do
-    let n' = case n of {1 -> 0; _ -> 1}
-    expr_ b (Identifier id_ (Just (Indexed (RTree d elTy,10,n'))))
+expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
+  Just m3 -> expr_ b (Identifier id_ (Just m3))
   _ -> do
     k <- expr_ b (Identifier id_ (Just m1))
     expr_ b (Identifier (displayT (renderOneLine k)) (Just m2))
@@ -974,10 +991,12 @@ expr_ _ (DataTag (RTree _ _) (Right _)) = do
   iw <- use intWidth
   "to_signed" <> parens (int 1 <> "," <> int iw)
 
-expr_ _ (ConvBV topM _ True e) = do
+expr_ _ (ConvBV topM hwty True e) = do
   nm <- use modNm
-  maybe (text (T.pack nm) <> "_types" ) ((<> "_types") . text) topM <> dot <>
-    "toSLV" <> parens (expr_ False e)
+  case topM of
+    Nothing -> text (T.pack nm) <> "_types" <> dot <> "toSLV" <>
+               parens (vhdlTypeMark hwty <> "'" <> parens (expr_ False e))
+    Just t  -> text t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
 expr_ _ (ConvBV topM _ False e) = do
   nm <- use modNm

@@ -26,7 +26,7 @@ import           Data.Text.Lazy                (fromStrict, pack)
 import qualified Data.Text.Lazy                as Text
 import           Data.Text                     (unpack)
 import qualified Data.Text                     as TextS
-import           Unbound.Generics.LocallyNameless (embed, unembed)
+import           Unbound.Generics.LocallyNameless (embed, unbind, unembed)
 
 -- import           CLaSH.Backend                 as N
 import           CLaSH.Core.DataCon            as D (dcTag)
@@ -34,6 +34,7 @@ import           CLaSH.Core.Literal            as L (Literal (..))
 import           CLaSH.Core.Name
   (Name (..), NameSort (..), name2String, string2SystemName)
 import           CLaSH.Core.Pretty             (showDoc)
+import           CLaSH.Core.Subst              (substTm)
 import           CLaSH.Core.Term               as C (Term (..))
 import           CLaSH.Core.Type               as C (Type (..), ConstTy (..),
                                                 splitFunTys)
@@ -42,7 +43,8 @@ import           CLaSH.Core.Util               (collectArgs, isFun, termType)
 import           CLaSH.Core.Var                as V (Id, Var (..))
 import           CLaSH.Driver.Types            (CLaSHException (..))
 import {-# SOURCE #-} CLaSH.Netlist
-  (genComponent, mkDcApplication, mkExpr, mkProjection)
+  (genComponent, mkDcApplication, mkDeclarations, mkExpr, mkNetDecl,
+   mkProjection, mkSelection)
 import           CLaSH.Netlist.BlackBox.Types  as B
 import           CLaSH.Netlist.BlackBox.Util   as B
 import           CLaSH.Netlist.Id              (IdType (..))
@@ -64,7 +66,7 @@ mkBlackBoxContext resId args = do
     (funs,funDecls) <- mapAccumLM (addFunction tcm) IntMap.empty (zip args [0..])
 
     -- Make context result
-    res   <- (`N.Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String (V.varName resId))
+    let res = Identifier resNm Nothing
     resTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed $ V.varType resId)
 
     return ( Context (res,resTy) imps funs Nothing
@@ -113,9 +115,7 @@ mkArgument bndr e = do
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
                 ,Void,False),[])
       Just hwTy -> case collectArgs e of
-        (C.Var _ v,[]) -> do
-          vT <- (`Identifier` Nothing) <$> mkIdentifier Extended (pack $ name2String v)
-          return ((vT,hwTy,False),[])
+        (C.Var _ v,[]) -> return ((Identifier (pack (name2String v)) Nothing,hwTy,False),[])
         (C.Literal (IntegerLiteral i),[]) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (IntLiteral i), []) -> return ((N.Literal (Just (Signed iw,iw)) (N.NumLit i),hwTy,True),[])
         (C.Literal (WordLiteral w), []) -> return ((N.Literal (Just (Unsigned iw,iw)) (N.NumLit w),hwTy,True),[])
@@ -133,7 +133,7 @@ mkArgument bndr e = do
           (exprN,dcDecls) <- mkDcApplication hwTy (Left bndr) dc (lefts args)
           return ((exprN,hwTy,isConstant e),dcDecls)
         (Case scrut ty' [alt],[]) -> do
-          (projection,decls) <- mkProjection (Left bndr) scrut ty' alt
+          (projection,decls) <- mkProjection False (Left bndr) scrut ty' alt
           return ((projection,hwTy,False),decls)
         _ ->
           return ((Identifier (error ($(curLoc) ++ "Forced to evaluate unexpected function argument: " ++ eTyMsg)) Nothing
@@ -241,7 +241,7 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
 -- a function
 mkFunInput :: Id   -- ^ Identifier binding the encompassing primitive/blackbox application
            -> Term -- ^ The function argument term
-           -> NetlistMonad ((Either BlackBoxTemplate Declaration,WireOrReg,BlackBoxContext),[Declaration])
+           -> NetlistMonad ((Either BlackBoxTemplate (Identifier,[Declaration]),WireOrReg,BlackBoxContext),[Declaration])
 mkFunInput resId e = do
   let (appE,args) = collectArgs e
   (bbCtx,dcls) <- mkBlackBoxContext resId (lefts args)
@@ -265,17 +265,17 @@ mkFunInput resId e = do
                       dcInps   = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp    = DataCon resHTy (DC (resHTy,dcI)) dcInps
                       dcAss    = Assignment (pack "~RESULT") dcApp
-                  return (Right dcAss)
+                  return (Right (("",[dcAss]),Wire))
                 Just resHTy@(Product _ dcArgs) -> do
                   let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..(length dcArgs - 1)]]
                       dcApp  = DataCon resHTy (DC (resHTy,0)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
-                  return (Right dcAss)
+                  return (Right (("",[dcAss]),Wire))
                 Just resHTy@(Vector _ _) -> do
                   let dcInps = [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(1::Int)..2] ]
                       dcApp  = DataCon resHTy (DC (resHTy,1)) dcInps
                       dcAss  = Assignment (pack "~RESULT") dcApp
-                  return (Right dcAss)
+                  return (Right (("",[dcAss]),Wire))
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
             C.Var _ (nameOcc -> fun) -> do
               normalized <- Lens.use bindings
@@ -287,8 +287,9 @@ mkFunInput resId e = do
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
                       instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
-                  return (Right instDecl)
+                  return (Right (("",[instDecl]),Wire))
                 Nothing -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
+            C.Lam _ -> go 0 appE
             _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e
   case templ of
     Left (_, oreg, Left templ') -> do
@@ -299,9 +300,65 @@ mkFunInput resId e = do
     Left (_, _, Right templ') -> do
       templ'' <- prettyBlackBox templ'
       let ass = Assignment (pack "~RESULT") (Identifier templ'' Nothing)
-      return ((Right ass,Wire,bbCtx),dcls)
-    Right decl ->
-      return ((Right decl,Wire,bbCtx),dcls)
+      return ((Right ("",[ass]),Wire,bbCtx),dcls)
+    Right (decl,wr) ->
+      return ((Right decl,wr,bbCtx),dcls)
+  where
+    go n (Lam b) = do
+      (id_,e') <- unbind b
+      let nm  = varName id_
+          e'' = substTm (nameOcc nm)
+                        (C.Var (unembed (varType id_))
+                               (string2SystemName ("~ARG[" ++ show n ++ "]")))
+                        e'
+      go (n+(1::Int)) e''
+
+    go _ (C.Var _ nm) = do
+      let assn = Assignment (pack "~RESULT") (Identifier (pack (name2String nm)) Nothing)
+      return (Right (("",[assn]),Wire))
+
+    go _ (Case scrut ty [alt]) = do
+      (projection,decls) <- mkProjection False (Left "#bb_res") scrut ty alt
+      let assn = Assignment (pack "~RESULT") projection
+      nm <- if null decls
+               then return ""
+               else mkUniqueIdentifier Basic "projection"
+      return (Right ((nm,decls ++ [assn]),Wire))
+
+    go _ (Case scrut ty alts@(_:_:_)) = do
+      let resId'  = resId {varName = string2SystemName "~RESULT"}
+      selectionDecls <- mkSelection resId' scrut ty alts
+      nm <- mkUniqueIdentifier Basic "selection"
+      return (Right ((nm,selectionDecls),Reg))
+
+    go _ e'@(App _ _) = do
+      tcm <- Lens.use tcCache
+      eType <- termType tcm e'
+      (appExpr,appDecls) <- mkExpr False (Left "#bb_res") eType e'
+      let assn = Assignment (pack "~RESULT") appExpr
+      nm <- if null appDecls
+               then return ""
+               else mkUniqueIdentifier Basic "block"
+      return (Right ((nm,appDecls ++ [assn]),Wire))
+
+    go _ e'@(Letrec _) = do
+      tcm <- Lens.use tcCache
+      normE <- splitNormalized tcm e'
+      ([],[],_,[],binders,result)  <- case normE of
+        Right norm -> mkUniqueNormalized Nothing norm
+        Left err -> error err
+      let binders' = map (\(id_,tm) -> (goR result id_,tm)) binders
+      netDecls <- mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
+      decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders'
+      (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+      nm <- mkUniqueIdentifier Basic "fun"
+      return (Right ((nm,netDecls ++ decls),rw))
+      where
+        goR r id_ | varName id_ == r = id_ {varName = string2SystemName "~RESULT"}
+                  | otherwise        = id_
+
+    go _ e' = error $ $(curLoc) ++ "Cannot make function input for: " ++ showDoc e'
+
 
 instantiateCompName :: BlackBoxTemplate
                     -> NetlistMonad BlackBoxTemplate

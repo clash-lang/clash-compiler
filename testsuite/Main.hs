@@ -203,7 +203,7 @@ ghdlMake
   -> TestTree
 ghdlMake env subdirs entName =
   testProgram "GHDL (make)" "ghdl"
-    ["-m","--workdir=work","--std=93","-o",map toLower (noConflict entName subdirs),entName] (Just env) False False
+    ["-m","--workdir=work","-o",map toLower (noConflict entName subdirs),entName] (Just env) False False
 
 ghdlSim
   :: FilePath
@@ -212,7 +212,7 @@ ghdlSim
   -- ^ Name of the testbench executable
   -> TestTree
 ghdlSim env tbName = testProgram "GHDL (sim)" "ghdl"
-  ["-r","--workdir=work","--std=93",tbName,"--assert-level=error"] (Just env) False False
+  ["-r","--workdir=work",tbName,"--assert-level=error"] (Just env) False False
 
 iverilog
   :: FilePath

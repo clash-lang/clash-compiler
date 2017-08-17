@@ -16,7 +16,8 @@ module CLaSH.Rewrite.Util where
 
 import           Control.DeepSeq
 import           Control.Exception           (throw)
-import           Control.Lens                (Lens', (%=), (+=), (^.),_2,_4)
+import           Control.Lens
+  (Lens', (%=), (+=), (^.), _2, _4, _5)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
@@ -36,6 +37,7 @@ import           Unbound.Generics.LocallyNameless
 import qualified Unbound.Generics.LocallyNameless as Unbound
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           BasicTypes                  (InlineSpec (..))
 import           SrcLoc                      (SrcSpan)
 
 import           CLaSH.Core.DataCon          (dataConInstArgTys)
@@ -51,12 +53,12 @@ import           CLaSH.Core.TyCon
 import           CLaSH.Core.Type             (KindOrType, Type (..),
                                               TypeView (..), coreView,
                                               typeKind, tyView)
-import           CLaSH.Core.Util             (Delta, Gamma, collectArgs,
-                                              mkAbstraction, mkApps, mkId,
-                                              mkLams, mkTmApps, mkTyApps,
-                                              mkTyLams, mkTyVar, termType)
+import           CLaSH.Core.Util
+  (Delta, Gamma, collectArgs, isPolyFun, mkAbstraction, mkApps, mkId, mkLams,
+   mkTmApps, mkTyApps, mkTyLams, mkTyVar, termType)
 import           CLaSH.Core.Var              (Id, TyVar, Var (..))
-import           CLaSH.Driver.Types          (CLaSHException (..))
+import           CLaSH.Driver.Types
+  (CLaSHException (..), DebugLevel (..))
 import           CLaSH.Netlist.Util          (representableType)
 import           CLaSH.Rewrite.Types
 import           CLaSH.Util
@@ -422,15 +424,25 @@ liftBinding gamma delta (Id idName tyE,eE) = do
       newBody = mkTyLams (mkLams e' boundFVs) boundFTVs
 
   -- Check if an alpha-equivalent global binder already exists
-  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . (^. _4))) <$> Lens.use bindings
+  aeqExisting <- (HMS.toList . HMS.filter ((== newBody) . (^. _5))) <$> Lens.use bindings
   case aeqExisting of
     -- If it doesn't, create a new binder
     [] -> do -- Add the created function to the list of global bindings
-             bindings %= HMS.insert (nameOcc newBodyId) (newBodyId,newBodyTy,sp,newBody)
+             bindings %= HMS.insert (nameOcc newBodyId)
+                                    -- We mark this function as internal so that
+                                    -- it can be inlined at the very end of
+                                    -- the normalisation pipeline as part of the
+                                    -- flattening pass. We don't inline
+                                    -- right away because we are lifting this
+                                    -- function at this moment for a reason!
+                                    -- (termination, CSE and DEC oppertunities,
+                                    -- ,etc.)
+                                    (newBodyId {nameSort = Internal}
+                                    ,newBodyTy,sp,EmptyInlineSpec,newBody)
              -- Return the new binder
              return (Id idName tyE, embed newExpr)
     -- If it does, use the existing binder
-    ((_,(k,aeqTy,_,_)):_) ->
+    ((_,(k,aeqTy,_,_,_)):_) ->
       let newExpr' = mkTmApps
                       (mkTyApps (Var aeqTy k)
                                 (zipWith VarTy localFTVkinds localFTVs))
@@ -440,25 +452,32 @@ liftBinding gamma delta (Id idName tyE,eE) = do
 liftBinding _ _ _ = error $ $(curLoc) ++ "liftBinding: invalid core, expr bound to tyvar"
 
 -- | Make a global function for a name-term tuple
-mkFunction :: TmName -- ^ Name of the function
-           -> SrcSpan
-           -> Term -- ^ Term bound to the function
-           -> RewriteMonad extra (TmName,Type) -- ^ Name with a proper unique and the type of the function
-mkFunction bndr sp body = do
+mkFunction
+  :: TmName
+  -- ^ Name of the function
+  -> SrcSpan
+  -> InlineSpec
+  -> Term
+  -- ^ Term bound to the function
+  -> RewriteMonad extra (TmName,Type)
+  -- ^ Name with a proper unique and the type of the function
+mkFunction bndr sp inl body = do
   tcm    <- Lens.view tcCache
   bodyTy <- termType tcm body
   bodyId <- cloneVar bndr
-  addGlobalBind bodyId bodyTy sp body
+  addGlobalBind bodyId bodyTy sp inl body
   return (bodyId,bodyTy)
 
 -- | Add a function to the set of global binders
-addGlobalBind :: TmName
-              -> Type
-              -> SrcSpan
-              -> Term
-              -> RewriteMonad extra ()
-addGlobalBind vId ty sp body =
-  (ty,body) `deepseq` bindings %= HMS.insert (nameOcc vId) (vId,ty,sp,body)
+addGlobalBind
+  :: TmName
+  -> Type
+  -> SrcSpan
+  -> InlineSpec
+  -> Term
+  -> RewriteMonad extra ()
+addGlobalBind vId ty sp inl body =
+  (ty,body) `deepseq` bindings %= HMS.insert (nameOcc vId) (vId,ty,sp,inl,body)
 
 -- | Create a new name out of the given name, but with another unique
 cloneVar
@@ -588,7 +607,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
       -- Determine if we can specialize f
       bodyMaybe <- fmap (HML.lookup (nameOcc f)) $ Lens.use bindings
       case bodyMaybe of
-        Just (_,_,sp,bodyTm) -> do
+        Just (_,_,sp,inl,bodyTm) -> do
           -- Determine if we see a sequence of specialisations on a growing argument
           specHistM <- HML.lookup (nameOcc f) <$> Lens.use (extra.specHistLbl)
           specLim   <- Lens.use (extra . specLimitLbl)
@@ -610,9 +629,31 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
                                        (mkBinderFor tcm)
                                        (unsafeCollectBndrs bodyTm ++ repeat (string2InternalName "pTS"))
                                        args
+              -- Determine name the resulting specialised function, and the
+              -- form of the specialised-on argument
+              (fName,inl',specArg') <- case specArg of
+                Left a@(collectArgs -> (Var _ g,gArgs)) -> do
+                  polyFun <- isPolyFun tcm a
+                  if polyFun
+                    then do
+                      -- In case we are specialising on an argument that is a
+                      -- global function then we use that function's name as the
+                      -- name of the specialised higher-order function.
+                      -- Additionally, we will return the body of the global
+                      -- function, instead of a variable reference to the
+                      -- global function.
+                      --
+                      -- This will turn things like @mealy g k@ into a new
+                      -- binding @g'@ where both the body of @mealy@ and @g@
+                      -- are inlined, meaning the state-transition-function
+                      -- and the memory element will be in a single function.
+                      gTmM <- fmap (HML.lookup (nameOcc g)) $ Lens.use bindings
+                      return (g,maybe inl (^. _4) gTmM, maybe specArg (Left . (`mkApps` gArgs) . (^. _5)) gTmM)
+                    else return (f,inl,specArg)
+                _ -> return (f,inl,specArg)
               -- Create specialized functions
-              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg])) (boundArgs ++ specBndrs)
-              newf <- mkFunction f sp newBody
+              let newBody = mkAbstraction (mkApps bodyTm (argVars ++ [specArg'])) (boundArgs ++ specBndrs)
+              newf <- mkFunction fName sp inl' newBody
               -- Remember specialization
               (extra.specHistLbl) %= HML.insertWith (+) (nameOcc f) 1
               (extra.specMapLbl)  %= Map.insert (nameOcc f,argLen,specAbs) newf
@@ -635,12 +676,13 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   let newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialised function
-  existing <- HML.filter ((== newBody) . (^. _4)) <$> Lens.use bindings
+  existing <- HML.filter ((== newBody) . (^. _5)) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case HML.toList existing of
     [] -> do (cf,sp) <- Lens.use curFun
-             mkFunction (appendToName cf "_specF") sp newBody
-    ((_,(k,kTy,_,_)):_) -> return (k,kTy)
+             mkFunction (appendToName cf "_specF")
+                        sp EmptyInlineSpec newBody
+    ((_,(k,kTy,_,_,_)):_) -> return (k,kTy)
   -- Create specialized argument
   let newArg  = Left $ mkApps ((uncurry . flip) Var newf) specVars
   -- Use specialized argument

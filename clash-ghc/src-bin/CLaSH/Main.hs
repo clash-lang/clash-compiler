@@ -92,10 +92,10 @@ import qualified CLaSH.Backend
 import           CLaSH.Backend.SystemVerilog (SystemVerilogState)
 import           CLaSH.Backend.VHDL    (VHDLState)
 import           CLaSH.Backend.Verilog (VerilogState)
-import           CLaSH.Driver.Types (CLaSHOpts (..), CLaSHException (..))
+import           CLaSH.Driver.Types
+  (CLaSHOpts (..), CLaSHException (..), DebugLevel (..))
 import           CLaSH.GHC.CLaSHFlags
 import           CLaSH.Netlist.BlackBox.Types (HdlSyn (..))
-import           CLaSH.Rewrite.Types (DebugLevel (..))
 import           CLaSH.Util (clashLibVersion)
 import           CLaSH.GHC.LoadModules (ghcLibDir)
 

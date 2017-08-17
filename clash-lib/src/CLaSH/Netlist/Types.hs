@@ -31,10 +31,10 @@ import Unbound.Generics.LocallyNameless              (Fresh, FreshMT)
 import SrcLoc                               (SrcSpan)
 
 import CLaSH.Annotations.TopEntity          (TopEntity)
-import CLaSH.Core.Term                      (Term, TmName, TmOccName)
+import CLaSH.Core.Term                      (TmOccName)
 import CLaSH.Core.Type                      (Type)
 import CLaSH.Core.TyCon                     (TyCon, TyConOccName)
-import CLaSH.Core.Util                      (Gamma)
+import CLaSH.Driver.Types                   (BindingMap)
 import CLaSH.Netlist.BlackBox.Types
 import CLaSH.Netlist.Id                     (IdType)
 import CLaSH.Primitives.Types               (PrimMap)
@@ -50,8 +50,7 @@ newtype NetlistMonad a =
 -- | State of the NetlistMonad
 data NetlistState
   = NetlistState
-  { _bindings       :: HashMap TmOccName (TmName,Type,SrcSpan,Term) -- ^ Global binders
-  , _varEnv         :: Gamma -- ^ Type environment/context
+  { _bindings       :: BindingMap -- ^ Global binders
   , _varCount       :: !Int -- ^ Number of signal declarations
   , _components     :: HashMap TmOccName (SrcSpan,Component) -- ^ Cached components
   , _primitives     :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
@@ -197,7 +196,7 @@ data BlackBoxContext
   = Context
   { bbResult    :: (Expr,HWType) -- ^ Result name and type
   , bbInputs    :: [(Expr,HWType,Bool)] -- ^ Argument names, types, and whether it is a literal
-  , bbFunctions :: IntMap (Either BlackBoxTemplate Declaration,WireOrReg,BlackBoxContext)
+  , bbFunctions :: IntMap (Either BlackBoxTemplate (Identifier,[Declaration]),WireOrReg,BlackBoxContext)
   -- ^ Function arguments (subset of inputs):
   --
   -- * ( Blackbox Template

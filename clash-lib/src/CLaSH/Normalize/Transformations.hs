@@ -38,6 +38,7 @@ module CLaSH.Normalize.Transformations
   , disjointExpressionConsolidation
   , removeUnusedExpr
   , inlineCleanup
+  , flattenLet
   )
 where
 
@@ -57,6 +58,8 @@ import           Data.Text                   (Text, unpack)
 import           Unbound.Generics.LocallyNameless
   (Bind, Embed (..), bind, embed, rec, unbind, unembed, unrebind, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+
+import           BasicTypes                  (InlineSpec (..))
 
 import           CLaSH.Core.DataCon          (DataCon (..))
 import           CLaSH.Core.Name
@@ -78,6 +81,7 @@ import           CLaSH.Core.Util
    isSignalType, isVar, mkApps, mkLams, mkTmApps, mkVec, termSize, termType,
    tyNatSize)
 import           CLaSH.Core.Var              (Id, Var (..))
+import           CLaSH.Driver.Types          (DebugLevel (..))
 import           CLaSH.Netlist.BlackBox.Util (usedArguments)
 import           CLaSH.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -228,7 +232,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
-          (True,Just (_,_,_,scrutBody)) -> do
+          (True,Just (_,_,_,_,scrutBody)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
             changed $ Case (mkApps scrutBody args) altsTy alts
           _ -> return e
@@ -534,9 +538,9 @@ inlineClosed _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,_,_,body) -> do
+          Just (_,_,_,inl,body) -> do
             isRecBndr <- isRecursiveBndr f
-            if isRecBndr
+            if isRecBndr || inl == NoInline
                then return e
                else changed (mkApps body args)
           _ -> return e
@@ -551,9 +555,9 @@ inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,body) -> do
+        Just (_,_,_,inl,body) -> do
           isRecBndr <- isRecursiveBndr f
-          if isRecBndr
+          if isRecBndr || inl == NoInline
              then return e
              else changed body
         _ -> return e
@@ -573,9 +577,9 @@ inlineSmall _ e@(collectArgs -> (Var _ (nameOcc -> f),args)) = do
       sizeLimit <- Lens.use (extra.inlineBelow)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,body) -> do
+        Just (_,_,_,inl,body) -> do
           isRecBndr <- isRecursiveBndr f
-          if not isRecBndr && termSize body < sizeLimit
+          if not isRecBndr && inl /= NoInline && termSize body < sizeLimit
              then changed (mkApps body args)
              else return e
         _ -> return e
@@ -934,7 +938,7 @@ recToLetRec [] e = do
   tcm         <- Lens.view tcCache
   normalizedE <- splitNormalized tcm e
   case (normalizedE,bodyM) of
-    (Right (args,bndrs,res), Just (_,bodyTy,_,_)) -> do
+    (Right (args,bndrs,res), Just (_,bodyTy,_,_,_)) -> do
       let appF              = mkTmApps (Var bodyTy fn) (map idToVar args)
           (toInline,others) = List.partition ((==) appF . unembed . snd) bndrs
           resV              = idToVar res
@@ -966,7 +970,7 @@ inlineHO _ e@(App _ _)
                 else do
                   bodyMaybe <- fmap (HashMap.lookup f) $ Lens.use bindings
                   case bodyMaybe of
-                    Just (_,_,_,body) -> do
+                    Just (_,_,_,_,body) -> do
                       zoomExtra (addNewInline f cf)
                       changed (mkApps body args)
                     _ -> return e
@@ -1348,7 +1352,8 @@ inlineCleanup _ (Letrec b) = do
       allOccs       = List.foldl' (HashMap.unionWith (+)) HashMap.empty
                     $ map ( List.foldl' countOcc HashMap.empty
                           . Lens.toListOf termFreeIds . unembed . snd) binds
-      (il,keep)     = List.partition (isInteresting allOccs prims) binds
+      bodyFVs       = Lens.toListOf termFreeIds body
+      (il,keep)     = List.partition (isInteresting  allOccs prims bodyFVs) binds
       keep'         = inlineBndrs keep il
   if null il then return  (Letrec b)
              else changed (Letrec (bind (rec keep') body))
@@ -1364,22 +1369,24 @@ inlineCleanup _ (Letrec b) = do
     isInteresting
       :: HashMap.HashMap TmOccName Int
       -> PrimMap a
+      -> [TmOccName]
       -> (Id,Embed Term)
       -> Bool
-    isInteresting allOccs prims (id_,(fst.collectArgs.unembed) -> tm)
+    isInteresting allOccs prims bodyFVs (id_,(fst.collectArgs.unembed) -> tm)
       | nameSort (varName id_) /= User
-      , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
-      , occ < 2
+      , nameOcc (varName id_) `notElem` bodyFVs
       = case tm of
           Prim nm _
             | Just p@(BlackBox {}) <- HashMap.lookup nm prims
             , Right _ <- template p
+            , Just occ <- HashMap.lookup (nameOcc (varName id_)) allOccs
+            , occ < 2
             -> True
           Case _ _ [_] -> True
           Data _ -> True
           _ -> False
 
-    isInteresting _ _ _ = False
+    isInteresting _ _ _ _ = False
 
     -- Inline let-bindings we want to inline into let-bindings we want to keep.
     inlineBndrs
@@ -1398,3 +1405,43 @@ inlineCleanup _ (Letrec b) = do
       -- introduce free variables, because the @to-inline@ bindings are removed.
 
 inlineCleanup _ e = return e
+
+-- | Flatten's letrecs after `inlineCleanup`
+--
+-- `inlineCleanup` sometimes exposes additional possibilities for `caseCon`,
+-- which then introduces let-bindings in what should be ANF. This transformation
+-- flattens those nested let-bindings again.
+--
+-- NB: must only be called in the cleaning up phase.
+flattenLet :: NormRewrite
+flattenLet _ (Letrec b) = do
+  let (binds,body) = unsafeUnbind b
+  binds' <- concat <$> mapM go (unrec binds)
+  case binds' of
+    -- inline binders into the body when there's only a single binder
+    [(id',e')] -> do
+      let fvs = Lens.toListOf termFreeIds (unembed e')
+          nm  = nameOcc (varName id')
+      if nm `elem` fvs
+         -- Except when the binder is recursive!
+         then return (Letrec (bind (rec binds') body))
+         else changed (substTm nm (unembed e') body)
+    _ -> return (Letrec (bind (rec binds') body))
+  where
+    go :: LetBinding -> NormalizeSession [LetBinding]
+    go (id_,e) = case unembed e of
+      Letrec b' -> do
+        let (binds,body) = unsafeUnbind b'
+        case unrec binds of
+          -- inline binders into the body when there's only a single binder
+          [(id',e')] -> do
+            let fvs = Lens.toListOf termFreeIds (unembed e')
+                nm  = nameOcc (varName id')
+            if nm `elem` fvs
+               -- Except when the binder is recursive!
+               then changed [(id',e'),(id_,embed body)]
+               else changed [(id_,embed (substTm nm (unembed e') body))]
+          bs -> changed (bs ++ [(id_,embed body)])
+      _ -> return [(id_,e)]
+
+flattenLet _ e = return e

@@ -7,6 +7,7 @@
   Utilities for converting Core Type/Term to Netlist datatypes
 -}
 
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
@@ -17,19 +18,19 @@ module CLaSH.Netlist.Util where
 import           Control.Error           (hush)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
+import           Control.Monad           (zipWithM)
 import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import           Data.Maybe              (catMaybes,fromMaybe)
-import           Data.Text.Lazy          (Text,append,pack,unpack)
+import           Data.List               (unzip4)
+import           Data.Maybe              (catMaybes,fromMaybe,listToMaybe)
+import           Data.Text.Lazy          (append,pack,unpack)
 import           Unbound.Generics.LocallyNameless
   (Embed, Fresh, embed, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
 import           CLaSH.Annotations.TopEntity (PortName (..), TopEntity (..))
-import           CLaSH.Driver.TopWrapper
-  (appendNumber, extendPorts, mkRTreeChain, mkVectorChain, portName)
 import           CLaSH.Driver.Types      (Manifest (..))
 import           CLaSH.Core.DataCon      (DataCon (..))
 import           CLaSH.Core.FreeVars     (termFreeIds, typeFreeVars)
@@ -259,14 +260,23 @@ termHWTypeM e = do
 
 -- | Uniquely rename all the variables and their references in a normalized
 -- term
-mkUniqueNormalized :: ([Id],[LetBinding],Id)
-                   -> NetlistMonad ([Id],[LetBinding],TmName)
-mkUniqueNormalized (args,binds,res) = do
+mkUniqueNormalized
+  :: Maybe (Maybe TopEntity)
+  -> ([Id],[LetBinding],Id)
+  -> NetlistMonad
+      ([(Identifier,HWType)]
+      ,[Declaration]
+      ,[(Identifier,HWType)]
+      ,[Declaration]
+      ,[LetBinding]
+      ,TmName)
+mkUniqueNormalized topMM (args,binds,res) = do
   -- Make arguments unique
-  (args',subst)   <- mkUnique []    args
+  (iports,iwrappers,substArgs) <- mkUniqueArguments topMM args
   -- Make result unique
-  ([res1],subst') <- mkUnique subst [res]
-  let bndrs = map fst binds
+  (oports,owrappers,res1,substRes) <- mkUniqueResult topMM res
+  let subst' = substRes:substArgs
+      bndrs = map fst binds
       exprs = map (unembed . snd) binds
       usesOutput = concatMap (filter ( == (nameOcc . varName) res)
                                      . Lens.toListOf termFreeIds
@@ -292,7 +302,71 @@ mkUniqueNormalized (args,binds,res) = do
   -- Replace old IDs by updated unique IDs in the RHSs of the let-binders
   let exprs' = map (embed . substTms substR) exprs
   -- Return the uniquely named arguments, let-binders, and result
-  return (args',zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,varName res1)
+  return (iports,iwrappers,oports,owrappers,zip (bndrsL' ++ r:bndrsR') exprs' ++ extraBndr,varName res1)
+
+mkUniqueArguments
+  :: Maybe (Maybe TopEntity)
+  -> [Id]
+  -> NetlistMonad
+       ([(Identifier,HWType)]
+       ,[Declaration]
+       ,[(TmOccName,Term)]
+       )
+mkUniqueArguments Nothing args = do
+  (args',subst) <- mkUnique [] args
+  ports <- mapM idToPort args'
+  return (ports,[],subst)
+
+mkUniqueArguments (Just teM) args = do
+  let iPortSupply = maybe (repeat Nothing) (extendPorts . t_inputs) teM
+  (ports,decls,subst) <- unzip3 <$> zipWithM go iPortSupply args
+  let ports' = concat ports
+  return (ports', concat decls, subst)
+  where
+    go pM var = do
+      tcm       <- Lens.use tcCache
+      typeTrans <- Lens.use typeTranslator
+      let i    = varName var
+          i'   = pack (name2String i)
+          ty   = unembed (varType var)
+          hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
+      (ports,decls,_,pN) <- mkInput pM (i',hwty)
+      return (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i)))
+
+mkUniqueResult
+  :: Maybe (Maybe TopEntity)
+  -> Id
+  -> NetlistMonad ([(Identifier,HWType)],[Declaration],Id,(TmOccName,Term))
+mkUniqueResult Nothing res = do
+  ([res'],[subst]) <- mkUnique [] [res]
+  port <- idToPort res'
+  return ([port],[],res',subst)
+
+mkUniqueResult (Just teM) res = do
+  tcm       <- Lens.use tcCache
+  typeTrans <- Lens.use typeTranslator
+  let o    = varName res
+      o'   = pack (name2String o)
+      ty   = unembed (varType res)
+      hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
+      oPortSupply = maybe Nothing (listToMaybe . t_outputs) teM
+  (ports,decls,pN) <- mkOutput oPortSupply (o',hwty)
+  let pO = repName (unpack pN) o
+  return (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
+
+idToPort :: Id -> NetlistMonad (Identifier,HWType)
+idToPort var = do
+      tcm <- Lens.use tcCache
+      typeTrans <- Lens.use typeTranslator
+      let i  = varName var
+          ty = unembed (varType var)
+      return
+        ( pack $ name2String i
+        , unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
+        )
+
+repName :: String -> Name a -> Name a
+repName s (Name sort _ loc) = Name sort (Unbound.string2Name s) loc
 
 -- | Make a set of IDs unique; also returns a substitution from old ID to new
 -- updated unique ID.
@@ -314,8 +388,6 @@ mkUnique = go []
       go (i':processed)
          ((nameOcc . varName $ i,Var (unembed $ varType i') (varName i')):subst)
          is
-
-    repName s (Name sort _ loc) = Name sort (Unbound.string2Name s) loc
 
 mkUniqueIdentifier
   :: IdType
@@ -347,14 +419,12 @@ preserveVarEnv :: NetlistMonad a
 preserveVarEnv action = do
   -- store state
   vCnt  <- Lens.use varCount
-  vEnv  <- Lens.use varEnv
   vComp <- Lens.use curCompNm
   vSeen <- Lens.use seenIds
   -- perform action
   val <- action
   -- restore state
   varCount  .= vCnt
-  varEnv    .= vEnv
   curCompNm .= vComp
   seenIds   .= vSeen
   return val
@@ -364,21 +434,226 @@ dcToLiteral Bool 1 = BoolLit False
 dcToLiteral Bool 2 = BoolLit True
 dcToLiteral _ i    = NumLit (toInteger i-1)
 
+-- * TopEntity Annotations
+
+extendPorts :: [PortName] -> [Maybe PortName]
+extendPorts ps = map Just ps ++ repeat Nothing
+
+appendNumber
+  :: (Identifier,HWType)
+  -> Int
+  -> (Identifier,HWType)
+appendNumber (nm,hwty) i =
+  (nm `append` "_" `append` pack (show i),hwty)
+
+portName
+  :: String
+  -> Identifier
+  -> Identifier
+portName [] i = i
+portName x  _ = pack x
+
+appendIdentifier
+  :: (Identifier,HWType)
+  -> Int
+  -> NetlistMonad (Identifier,HWType)
+appendIdentifier (nm,hwty) i =
+  (,hwty) <$> extendIdentifier Extended nm (pack ('_':show i))
+
+uniquePortName
+  :: String
+  -> Identifier
+  -> NetlistMonad Identifier
+uniquePortName [] i = mkUniqueIdentifier Extended i
+uniquePortName x  _ = do
+  let x' = pack x
+  seenIds %= (x':)
+  return x'
+
+mkInput
+  :: Maybe PortName
+  -> (Identifier,HWType)
+  -> NetlistMonad ([(Identifier,HWType)],[Declaration],Expr,Identifier)
+mkInput pM = case pM of
+  Nothing -> go
+  Just p  -> go' p
+  where
+    go (i,hwty) = do
+      i' <- mkUniqueIdentifier Extended i
+      case hwty of
+        Vector sz hwty' -> do
+          arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
+          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
+          let netdecl  = NetDecl Nothing i' hwty
+              vecExpr  = mkVectorChain sz hwty' exprs
+              netassgn = Assignment i' vecExpr
+          return (concat ports,[netdecl,netassgn],vecExpr,i')
+
+        RTree d hwty' -> do
+          arguments <- mapM (appendIdentifier (i',hwty')) [0..2^d-1]
+          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
+          let netdecl  = NetDecl Nothing i' hwty
+              trExpr   = mkRTreeChain d hwty' exprs
+              netassgn = Assignment i' trExpr
+          return (concat ports,[netdecl,netassgn],trExpr,i')
+
+        Product _ hwtys -> do
+          arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
+          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
+          let netdecl  = NetDecl Nothing i' hwty
+              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
+              netassgn = Assignment i' dcExpr
+          return (concat ports,[netdecl,netassgn],dcExpr,i')
+
+        _ -> return ([(i',hwty)],[],Identifier i' Nothing,i')
+
+
+    go' (PortName p) (i,hwty) = do
+      pN <- uniquePortName p i
+      return ([(pN,hwty)],[],Identifier pN Nothing,pN)
+
+    go' (PortField p ps) (i,hwty) = do
+      pN <- uniquePortName p i
+      case hwty of
+        Vector sz hwty' -> do
+          arguments <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          let netdecl  = NetDecl Nothing pN hwty
+              vecExpr  = mkVectorChain sz hwty' exprs
+              netassgn = Assignment pN vecExpr
+          return (concat ports,[netdecl,netassgn],vecExpr,pN)
+
+        RTree d hwty' -> do
+          arguments <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          let netdecl  = NetDecl Nothing pN hwty
+              trExpr  = mkRTreeChain d hwty' exprs
+              netassgn = Assignment pN trExpr
+          return (concat ports,[netdecl,netassgn],trExpr,pN)
+
+        Product _ hwtys -> do
+          arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          let netdecl  = NetDecl Nothing pN hwty
+              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
+              netassgn = Assignment pN dcExpr
+          return (concat ports,[netdecl,netassgn],dcExpr,pN)
+
+        _ -> return ([(pN,hwty)],[],Identifier pN Nothing,pN)
+
+-- | Create a Vector chain for a list of 'Identifier's
+mkVectorChain :: Int
+              -> HWType
+              -> [Expr]
+              -> Expr
+mkVectorChain _ elTy []      = DataCon (Vector 0 elTy) VecAppend []
+mkVectorChain _ elTy [e]     = DataCon (Vector 1 elTy) VecAppend
+                                [e]
+mkVectorChain sz elTy (e:es) = DataCon (Vector sz elTy) VecAppend
+                                [ e
+                                , mkVectorChain (sz-1) elTy es
+                                ]
+
+-- | Create a RTree chain for a list of 'Identifier's
+mkRTreeChain :: Int
+             -> HWType
+             -> [Expr]
+             -> Expr
+mkRTreeChain _ elTy [e] = DataCon (RTree 0 elTy) RTreeAppend
+                                  [e]
+mkRTreeChain d elTy es =
+  let (esL,esR) = splitAt (length es `div` 2) es
+  in  DataCon (RTree d elTy) RTreeAppend
+        [ mkRTreeChain (d-1) elTy esL
+        , mkRTreeChain (d-1) elTy esR
+        ]
+
+-- | Generate output port mappings
+mkOutput
+  :: Maybe PortName
+  -> (Identifier,HWType)
+  -> NetlistMonad ([(Identifier,HWType)],[Declaration],Identifier)
+mkOutput pM = case pM of
+  Nothing -> go
+  Just p  -> go' p
+  where
+    go (o,hwty) = do
+      o' <- mkUniqueIdentifier Extended o
+      case hwty of
+        Vector sz hwty' -> do
+          results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
+          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) results
+          let netdecl = NetDecl Nothing o' hwty
+              assigns = zipWith (assignId o' hwty 10) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,o')
+
+        RTree d hwty' -> do
+          results <- mapM (appendIdentifier (o',hwty')) [0..2^d-1]
+          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) results
+          let netdecl = NetDecl Nothing o' hwty
+              assigns = zipWith (assignId o' hwty 10) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,o')
+
+        Product _ hwtys -> do
+          results <- zipWithM appendIdentifier (map (o,) hwtys) [0..]
+          (ports,decls,ids) <- unzip3 <$> mapM (mkOutput Nothing) results
+          let netdecl = NetDecl Nothing o' hwty
+              assigns = zipWith (assignId o' hwty 0) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,o')
+
+        _ -> return ([(o',hwty)],[],o')
+
+    go' (PortName p) (o,hwty) = do
+      pN <- uniquePortName p o
+      return ([(pN,hwty)],[],pN)
+
+    go' (PortField p ps) (o,hwty) = do
+      pN <- uniquePortName p o
+      case hwty of
+        Vector sz hwty' -> do
+          results <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
+          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput (extendPorts ps) results
+          let netdecl = NetDecl Nothing pN hwty
+              assigns = zipWith (assignId pN hwty 10) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,pN)
+
+        RTree d hwty' -> do
+          results <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
+          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput (extendPorts ps) results
+          let netdecl = NetDecl Nothing pN hwty
+              assigns = zipWith (assignId pN hwty 10) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,pN)
+
+        Product _ hwtys -> do
+          results <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput (extendPorts ps) results
+          let netdecl = NetDecl Nothing pN hwty
+              assigns = zipWith (assignId pN hwty 0) ids [0..]
+          return (concat ports,netdecl:assigns ++ concat decls,pN)
+
+        _ -> return ([(pN,hwty)],[],pN)
+
+    assignId p hwty con i n =
+      Assignment i (Identifier p (Just (Indexed (hwty,con,n))))
+
 -- | Instantiate a TopEntity, and add the proper type-conversions where needed
 mkTopUnWrapper
   :: TmName
   -- ^ Name of the TopEntity component
-  -> Maybe (TopEntity,Manifest)
-  -- ^ (maybe) a corresponding @TopEntity@ annotation and @Manifest@
+  -> Maybe TopEntity
+  -- ^ (maybe) a corresponding @TopEntity@ annotation
+  -> Manifest
+  -- ^ a corresponding @Manifest@
   -> (Identifier,HWType)
   -- ^ The name and type of the signal to which to assign the result
   -> [(Expr,HWType)]
   -- ^ The arguments
   -> NetlistMonad [Declaration]
-mkTopUnWrapper topEntity annManM dstId args = do
-  let annM   = fst <$> annManM
-      inTys  = maybe [] (portInTypes . snd) annManM
-      outTys = maybe [] (portOutTypes . snd) annManM
+mkTopUnWrapper topEntity annM man dstId args = do
+  let inTys    = portInTypes man
+      outTys   = portOutTypes man
+      inNames  = portInNames man
+      outNames = portOutNames man
 
   -- component name
   let modName = takeWhile (/= '.') (name2String topEntity) ++
@@ -391,20 +666,21 @@ mkTopUnWrapper topEntity annManM dstId args = do
   let iPortSupply = maybe (repeat Nothing)
                         (extendPorts . t_inputs)
                         annM
-
-      inputs1 = map (first (const "input")) args
-  (_,inputs2) <- mapAccumLM (\acc (p,i) -> mkTopInput topM acc p i) inTys
-                  (zip iPortSupply (zipWith appendNumber inputs1 [0..]))
-  let (inputs3,wrappers,idsI) = concatPortDecls inputs2
-      inpAssigns              = zipWith (argBV topM) idsI (map fst args)
+  arguments <- zipWithM appendIdentifier (map (first (const "input")) args) [0..]
+  (_,arguments1) <- mapAccumLM (\acc (p,i) -> mkTopInput topM acc p i)
+                      (zip inNames inTys)
+                      (zip iPortSupply arguments)
+  let (iports,wrappers,idsI) = unzip3 arguments1
+      inpAssigns             = zipWith (argBV topM) idsI (map fst args)
 
   -- output
   let oPortSupply = maybe (repeat Nothing)
                         (extendPorts . t_outputs)
                         annM
 
-      output = ("output_0",snd dstId)
-  (_,(outputs1,unwrappers,idsO)) <- mkTopOutput topM outTys (head oPortSupply) output
+      result = ("result",snd dstId)
+  (_,(oports,unwrappers,idsO)) <- mkTopOutput topM (zip outNames outTys)
+                                    (head oPortSupply) result
   let outpAssign = Assignment (fst dstId) (resBV topM idsO)
 
   instLabel <- extendIdentifier Basic topName' ("_" `append` fst dstId)
@@ -412,16 +688,16 @@ mkTopUnWrapper topEntity annManM dstId args = do
         InstDecl
           topName'
           instLabel
-          (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) inputs3 ++
-           map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) outputs1)
+          (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++
+           map (\(p,o,t) -> (Identifier p Nothing,Out,t,Identifier o Nothing)) oports)
 
 
-  return (inpAssigns ++ wrappers ++ (topCompDecl:unwrappers) ++ [outpAssign])
+  return (inpAssigns ++ concat wrappers ++ (topCompDecl:unwrappers) ++ [outpAssign])
 
 -- | Convert between BitVector for an argument
 argBV
   :: Maybe Identifier
-  -- ^ (maybe) Name of the _TopEntity_ annotation
+  -- ^ (maybe) Name of the _TopEntity_
   -> Either Identifier (Identifier, HWType)
   -- ^ Either:
   --   * A /normal/ argument
@@ -430,13 +706,13 @@ argBV
   -> Declaration
 argBV _    (Left i)      e = Assignment i e
 argBV topM (Right (i,t)) e = Assignment i
-                           . doConv t (fmap Just            topM) False
+                           . doConv t (fmap Just topM)            False
                            $ doConv t (fmap (const Nothing) topM) True  e
 
 -- | Convert between BitVector for the result
 resBV
   :: Maybe Identifier
-  -- ^ (maybe) Name of the _TopEntity_ annotation
+  -- ^ (mabye) Name of the _TopEntity_
   -> Either Identifier (Identifier, HWType)
   -- ^ Either:
   --   * A /normal/ result
@@ -478,202 +754,208 @@ doConv hwty (Just topM) b e = case hwty of
 -- | Generate input port mappings for the TopEntity
 mkTopInput
   :: Maybe Identifier
-  -- ^ (maybe) Name of the _TopEntity_ annotation
-  -> [Text]
-  -- ^ /Rendered/ input port types
+  -- ^ (maybe) Name of the _TopEntity_
+  -> [(Identifier,Identifier)]
+  -- ^ /Rendered/ input port names and types
   -> Maybe PortName
   -- ^ (maybe) The @PortName@ of a _TopEntity_ annotation for this input
   -> (Identifier,HWType)
-  -> NetlistMonad ([Text]
+  -> NetlistMonad ([(Identifier,Identifier)]
                   ,([(Identifier,Identifier,HWType)]
                     ,[Declaration]
                     ,Either Identifier (Identifier,HWType)))
-mkTopInput topM itys pM = case pM of
-  Nothing -> go itys
-  Just p  -> go' p itys
+mkTopInput topM inps pM = case pM of
+  Nothing -> go inps
+  Just p  -> go' p inps
   where
     -- No @PortName@
-    go itys' (i,hwty) = do
+    go inps'@((iN,_):rest) (i,hwty) = do
       i' <- mkUniqueIdentifier Basic i
       let iDecl = NetDecl Nothing i' hwty
       case hwty of
         Vector sz hwty' -> do
-          let inputs1 = map (appendNumber (i,hwty')) [0..sz-1]
-          (itys'',inputs2) <- mapAccumLM go itys' inputs1
-          let (ports,decls,ids) = concatPortDecls inputs2
+          arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
+          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier i' (Just (Indexed (hwty,10,n)))
                           | n <- [0..]]
-          return (itys'',(ports,iDecl:assigns ++ decls,Left i'))
+          return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
 
         RTree d hwty' -> do
-          let inputs1 = map (appendNumber (i,hwty')) [0..2^d-1]
-          (itys'',inputs2) <- mapAccumLM go itys' inputs1
-          let (ports,decls,ids) = concatPortDecls inputs2
+          arguments <- mapM (appendIdentifier (i',hwty')) [0..2^d-1]
+          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier i' (Just (Indexed (hwty,10,n)))
                           | n <- [0..]]
-          return (itys'',(ports,iDecl:assigns ++ decls,Left i'))
+          return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
 
         Product _ hwtys -> do
-          let inputs1 = zipWith appendNumber (map (i,) hwtys) [0..]
-          (itys'',inputs2) <- mapAccumLM go itys' inputs1
-          let (ports,decls,ids) = concatPortDecls inputs2
+          arguments <- zipWithM appendIdentifier (map (i,) hwtys) [0..]
+          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
-                          [ Identifier i' (Just (Indexed (hwty,10,n)))
+                          [ Identifier i' (Just (Indexed (hwty,0,n)))
                           | n <- [0..]]
-          return (itys'',(ports,iDecl:assigns ++ decls,Left i'))
+          return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
 
-        _ -> return (tail itys',([(i,i',hwty)],[iDecl],Left i'))
+        _ -> return (rest,([(iN,i',hwty)],[iDecl],Left i'))
+
+    go [] _ = error "This shouldn't happen"
 
     -- With a @PortName@
-    go' (PortName p) (ity:itys') (i,hwty) = do
-      let pN = portName p i
-      pN' <- mkUniqueIdentifier Basic pN
-      return (itys',([(pN,pN',hwty)],[NetDecl' Nothing Wire pN' (Left ity)],Right (pN',hwty)))
+    go' (PortName _) ((iN,iTy):inps') (_,hwty) = do
+      iN' <- mkUniqueIdentifier Extended iN
+      return (inps',([(iN,iN',hwty)]
+                    ,[NetDecl' Nothing Wire iN' (Left iTy)]
+                    ,Right (iN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
-    go' (PortField p ps) itys' (i,hwty) = do
+    go' (PortField p ps) inps' (i,hwty) = do
       let pN = portName p i
-      pN' <- mkUniqueIdentifier Basic pN
+      pN' <- mkUniqueIdentifier Extended pN
       let pDecl = NetDecl Nothing pN' hwty
       case hwty of
         Vector sz hwty' -> do
-          let inputs1 = map (appendNumber (pN,hwty')) [0..sz-1]
-          (itys'',inputs2) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') itys'
-                       (zip (extendPorts ps) inputs1)
-          let (ports,decls,ids) = concatPortDecls inputs2
+          arguments <- mapM (appendIdentifier (pN',hwty')) [0..sz-1]
+          (inps'',arguments1) <-
+            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+                       (zip (extendPorts ps) arguments)
+          let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier pN' (Just (Indexed (hwty,10,n)))
                           | n <- [0..]]
-          return (itys'',(ports,pDecl:assigns ++ decls,Left pN'))
+          return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
 
         RTree d hwty' -> do
-          let inputs1 = map (appendNumber (pN,hwty')) [0..2^d-1]
-          (itys'',inputs2) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') itys'
-                       (zip (extendPorts ps) inputs1)
-          let (ports,decls,ids) = concatPortDecls inputs2
+          arguments <- mapM (appendIdentifier (pN',hwty')) [0..2^d-1]
+          (inps'',arguments1) <-
+            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+                       (zip (extendPorts ps) arguments)
+          let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier pN' (Just (Indexed (hwty,10,n)))
                           | n <- [0..]]
-          return (itys'',(ports,pDecl:assigns ++ decls,Left pN'))
+          return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
 
         Product _ hwtys -> do
-          let inputs1 = zipWith appendNumber (map (pN,) hwtys) [0..]
-          (itys'',inputs2) <-
-            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') itys'
-                       (zip (extendPorts ps) inputs1)
-          let (ports,decls,ids) = concatPortDecls inputs2
+          arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
+          (inps'',arguments1) <-
+            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+                       (zip (extendPorts ps) arguments)
+          let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
                           [ Identifier pN' (Just (Indexed (hwty,0,n)))
                           | n <- [0..]]
-          return (itys'',(ports,pDecl:assigns ++ decls,Left pN'))
+          return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
 
-        _ -> return (tail itys',([(pN,pN',hwty)],[pDecl],Left pN'))
+        _ -> return (tail inps',([(pN,pN',hwty)],[pDecl],Left pN'))
 
 -- | Generate output port mappings for the TopEntity
 mkTopOutput
   :: Maybe Identifier
-  -- ^ (maybe) Name of the _TopEntity_ annotation
-  -> [Text]
-  -- ^ /Rendered/ output port types
+  -- ^ (maybe) Name of the _TopEntity_
+  -> [(Identifier,Identifier)]
+  -- ^ /Rendered/ output port names and types
   -> Maybe PortName
   -- ^ (maybe) The @PortName@ of a _TopEntity_ annotation for this output
   -> (Identifier,HWType)
-  -> NetlistMonad ([Text]
+  -> NetlistMonad ([(Identifier,Identifier)]
                   ,([(Identifier,Identifier,HWType)]
                    ,[Declaration]
                    ,Either Identifier (Identifier,HWType))
                   )
-mkTopOutput topM otys pM = case pM of
-  Nothing -> go otys
-  Just p  -> go' p otys
+mkTopOutput topM outps pM = case pM of
+  Nothing -> go outps
+  Just p  -> go' p outps
   where
     -- No @PortName@
-    go otys' (o,hwty) = do
-      o' <- mkUniqueIdentifier Basic o
+    go outps'@((oN,_):rest) (o,hwty) = do
+      o' <- mkUniqueIdentifier Extended o
       let oDecl = NetDecl Nothing o' hwty
       case hwty of
         Vector sz hwty' -> do
-          let outputs1 = map (appendNumber (o,hwty')) [0..sz-1]
-          (otys'',outputs2) <- mapAccumLM go otys' outputs1
-          let (ports,decls,ids) = concatPortDecls outputs2
+          results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
+          (outps'',results1) <- mapAccumLM go outps' results
+          let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment o' (mkVectorChain sz hwty' ids')
-          return (otys'',(ports,oDecl:netassgn:decls,Left o'))
+          return (outps'',(concat ports,oDecl:netassgn:concat decls,Left o'))
 
         RTree d hwty' -> do
-          let outputs1 = map (appendNumber (o,hwty')) [0..2^d-1]
-          (otys'',outputs2) <- mapAccumLM go otys' outputs1
-          let (ports,decls,ids) = concatPortDecls outputs2
+          results <- mapM (appendIdentifier (o',hwty')) [0..2^d-1]
+          (outps'',results1) <- mapAccumLM go outps' results
+          let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment o' (mkRTreeChain d hwty' ids')
-          return (otys'',(ports,oDecl:netassgn:decls,Left o'))
+          return (outps'',(concat ports,oDecl:netassgn:concat decls,Left o'))
 
         Product _ hwtys -> do
-          let outputs1 = zipWith appendNumber (map (o,) hwtys) [0..]
-          (otys'',outputs2) <- mapAccumLM go otys' outputs1
-          let (ports,decls,ids) = concatPortDecls outputs2
+          results <- zipWithM appendIdentifier (map (o',) hwtys) [0..]
+          (outps'',results1) <- mapAccumLM go outps' results
+          let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment o' (DataCon hwty (DC (hwty,0)) ids')
-          return (otys'',(ports,oDecl:netassgn:decls,Left o'))
+          return (outps'',(concat ports,oDecl:netassgn:concat decls,Left o'))
 
-        _ -> return (tail otys',([(o,o',hwty)],[oDecl],Left o'))
+        _ -> return (rest,([(oN,o',hwty)],[oDecl],Left o'))
+
+    go [] _ = error "This shouldn't happen"
 
     -- With a @PortName@
-    go' (PortName p) (oty:otys') (o,hwty) = do
-      let pN = portName p o
-      pN' <- mkUniqueIdentifier Basic pN
-      return (otys',([(pN,pN',hwty)],[NetDecl' Nothing Wire pN' (Left oty)],Right (pN',hwty)))
+    go' (PortName _) ((oN,oTy):outps') (_,hwty) = do
+      oN' <- mkUniqueIdentifier Extended oN
+      return (outps',([(oN,oN',hwty)]
+                     ,[NetDecl' Nothing Wire oN' (Left oTy)]
+                     ,Right (oN',hwty)))
 
     go' (PortName _) [] _ = error "This shouldnt happen"
 
-    go' (PortField p ps) otys' (o,hwty) = do
+    go' (PortField p ps) outps' (o,hwty) = do
       let pN = portName p o
-      pN' <- mkUniqueIdentifier Basic pN
+      pN' <- mkUniqueIdentifier Extended pN
       let pDecl = NetDecl Nothing pN' hwty
       case hwty of
         Vector sz hwty' -> do
-          let outputs1 = map (appendNumber (pN,hwty')) [0..sz-1]
-          (otys'',outputs2) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput topM acc p' o') otys'
-                       (zip (extendPorts ps) outputs1)
-          let (ports,decls,ids) = concatPortDecls outputs2
+          results <- mapM (appendIdentifier (pN',hwty')) [0..sz-1]
+          (outps'',results1) <-
+            mapAccumLM (\acc (p',o') -> mkTopOutput topM acc p' o') outps'
+                       (zip (extendPorts ps) results)
+          let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment pN' (mkVectorChain sz hwty' ids')
-          return (otys'',(ports,pDecl:netassgn:decls,Left pN'))
+          return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
 
         RTree d hwty' -> do
-          let outputs1 = map (appendNumber (pN,hwty')) [0..2^d-1]
-          (otys'',outputs2) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput topM acc p' o') otys'
-                       (zip (extendPorts ps) outputs1)
-          let (ports,decls,ids) = concatPortDecls outputs2
+          results <- mapM (appendIdentifier (pN',hwty')) [0..2^d-1]
+          (outps'',results1) <-
+            mapAccumLM (\acc (p',o') -> mkTopOutput topM acc p' o') outps'
+                       (zip (extendPorts ps) results)
+          let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment pN' (mkRTreeChain d hwty' ids')
-          return (otys'',(ports,pDecl:netassgn:decls,Left pN'))
+          return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
 
         Product _ hwtys -> do
-          let outputs1 = zipWith appendNumber (map (pN,) hwtys) [0..]
-          (otys'',outputs2) <-
-            mapAccumLM (\acc (p',o') -> mkTopOutput topM acc p' o') otys'
-                       (zip (extendPorts ps) outputs1)
-          let (ports,decls,ids) = concatPortDecls outputs2
+          results <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
+          (outps'',results1) <-
+            mapAccumLM (\acc (p',o') -> mkTopOutput topM acc p' o') outps'
+                       (zip (extendPorts ps) results)
+          let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
               netassgn = Assignment pN' (DataCon hwty (DC (hwty,0)) ids')
-          return (otys'',(ports,pDecl:netassgn:decls,Left pN'))
+          return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
 
-        _ -> return (tail otys',([(pN,pN',hwty)],[pDecl],Left pN'))
+        _ -> return (tail outps',([(pN,pN',hwty)],[pDecl],Left pN'))
 
-concatPortDecls
+concatPortDecls3
   :: [([(Identifier,Identifier,HWType)]
       ,[Declaration]
       ,Either Identifier (Identifier,HWType))]
   -> ([(Identifier,Identifier,HWType)]
      ,[Declaration]
      ,[Either Identifier (Identifier,HWType)])
-concatPortDecls portDecls = case unzip3 portDecls of
+concatPortDecls3 portDecls = case unzip3 portDecls of
   (ps,decls,ids) -> (concat ps, concat decls, ids)

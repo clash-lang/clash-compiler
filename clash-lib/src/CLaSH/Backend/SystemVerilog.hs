@@ -106,7 +106,7 @@ instance Backend SystemVerilogState where
   mkIdentifier    = return go
     where
       go Basic    nm = filterReserved (mkBasicId' True nm)
-      go Extended (rmSlash -> nm) = case go Basic nm of
+      go Extended (rmSlash . escapeTemplate -> nm) = case go Basic nm of
         nm' | nm /= nm' -> Text.concat ["\\",nm," "]
             |otherwise  -> nm'
   extendIdentifier = return go
@@ -123,11 +123,15 @@ instance Backend SystemVerilogState where
   setModName nm s = s {_modNm = nm}
   setSrcSpan      = (srcSpan .=)
   getSrcSpan      = use srcSpan
+  blockDecl _ ds  =
+    decls ds <$>
+    insts ds
+  unextend = return rmSlash
 
 rmSlash :: Identifier -> Identifier
 rmSlash nm = fromMaybe nm $ do
   nm1 <- Text.stripPrefix "\\" nm
-  Text.stripSuffix " " nm1
+  pure (Text.filter (not . (== ' ')) nm1)
 
 type SystemVerilogM a = State SystemVerilogState a
 
@@ -699,6 +703,12 @@ expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
 
 expr_ _ (Identifier id_ (Just (Indexed ((Vector n _),1,2)))) = text id_ <> brackets (int 1 <> colon <> int (n-1))
 
+-- This is a "Hack", we cannot construct trees with a negative depth. This is
+-- here so that we can recognise merged RTree modifiers. See the code in
+-- @CLaSH.Backend.nestM@ which construct these tree modifiers.
+expr_ _ (Identifier id_ (Just (Indexed (RTree (-1) _,l,r)))) =
+  text id_ <> brackets (int l <> colon <> int (r-1))
+
 expr_ _ (Identifier id_ (Just (Indexed ((RTree 0 elTy),0,1)))) = do
   id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int 0))
   simpleFromSLV elTy id'
@@ -731,12 +741,8 @@ expr_ _ (Identifier id_ (Just (DC (ty@(SP _ _),_)))) = text id_ <> brackets (int
     start = typeSize ty - 1
     end   = typeSize ty - conSize ty
 
-expr_ b (Identifier id_ (Just (Nested m1 m2))) = case (m1,m2) of
-  (Indexed (Vector n elTy,1,2),Indexed (Vector _ _,1,1)) ->
-    expr_ b (Identifier id_ (Just (Indexed (Vector n elTy,10,1))))
-  (Indexed ((RTree d elTy),1,n),Indexed ((RTree _ _),0,1)) -> do
-    let n' = case n of {1 -> 0; _ -> 1}
-    expr_ b (Identifier id_ (Just (Indexed (RTree d elTy,10,n'))))
+expr_ b (Identifier id_ (Just (Nested m1 m2))) = case nestM m1 m2 of
+  Just m3 -> expr_ b (Identifier id_ (Just m3))
   _ -> do
     k <- expr_ b (Identifier id_ (Just m1))
     expr_ b (Identifier (displayT (renderOneLine k)) (Just m2))
@@ -846,24 +852,28 @@ expr_ b (ConvBV topM t True e) = do
   nm <- use modNm
   let nm' = text (pack nm)
   case t of
-    Vector {} ->
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_to_lv" <> parens (expr_ False e))
-    RTree {} ->
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_to_lv" <> parens (expr_ False e))
+    Vector {} -> do
+      tyCache %= HashSet.insert t
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_to_lv" <> parens (expr_ False e)
+    RTree {} -> do
+      tyCache %= HashSet.insert t
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_to_lv" <> parens (expr_ False e)
     _ -> expr b e
 
 expr_ b (ConvBV topM t False e) = do
   nm <- use modNm
   let nm' = text (pack nm)
   case t of
-    Vector {} ->
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_from_lv" <> parens (expr_ False e))
-    RTree {} ->
-      braces (maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
-        tyName t <> "_from_lv" <> parens (expr_ False e))
+    Vector {} -> do
+      tyCache %= HashSet.insert t
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_from_lv" <> parens (expr_ False e)
+    RTree {} -> do
+      tyCache %= HashSet.insert t
+      maybe (nm' <> "_types::" ) ((<> "_types::") . text) topM <>
+        tyName t <> "_from_lv" <> parens (expr_ False e)
     _ -> expr b e
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty

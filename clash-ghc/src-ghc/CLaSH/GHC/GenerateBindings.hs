@@ -28,6 +28,7 @@ import           Unbound.Generics.LocallyNameless (runFreshM, unembed)
 import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
 import qualified DynFlags                as GHC
+import qualified IdInfo                  as GHC
 import qualified Name                    as GHC hiding (varName)
 import qualified TyCon                   as GHC
 import qualified TysWiredIn              as GHC
@@ -75,7 +76,7 @@ generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = 
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
-      clsMap                        = HashMap.map (\(nm,ty,i) -> (nm,ty,GHC.noSrcSpan,mkClassSelector allTcCache ty i)) clsVMap
+      clsMap                        = HashMap.map (\(nm,ty,i) -> (nm,ty,GHC.noSrcSpan,GHC.Inline,mkClassSelector allTcCache ty i)) clsVMap
       allBindings                   = bindingsMap `HashMap.union` clsMap
       topEntities'                  =
         flip State.evalState tcMap' $ mapM (\(topEnt,annM,benchM) -> do
@@ -84,7 +85,7 @@ generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = 
           return (topEnt',annM,benchM')) topEntities
       droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEntities'
       topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup (nameOcc topEnt) droppedAndRetypedBindings of
-                                              Just (_,ty,_,_) -> (topEnt,ty,annM,benchM)
+                                              Just (_,ty,_,_,_) -> (topEnt,ty,annM,benchM)
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
@@ -115,9 +116,9 @@ retype
   -> ([TmOccName], BindingMap) -- (visited, bindings)
   -> TmOccName                 -- top
   -> ([TmOccName], BindingMap)
-retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty',sp,tm') bindings')
+retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty',sp,inl,tm') bindings')
   where
-    (nm,_,sp,tm)         = bindings HashMap.! current
+    (nm,_,sp,inl,tm)     = bindings HashMap.! current
     used                 = Set.toList $ Lens.setOf termFreeIds tm
     (visited',bindings') = foldl (retype tcm) (current:visited,bindings) (filter (`notElem` visited) used)
     used'                = map ((^. _1) . (bindings' HashMap.!)) used
@@ -142,9 +143,10 @@ mkBindings
 mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\(v,e) -> do
                           let sp = GHC.getSrcSpan v
+                              inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
                           tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
                           v' <- coreToId v
-                          return (nameOcc (varName v'), (varName v',unembed (varType v'), sp, tm))
+                          return (nameOcc (varName v'), (varName v',unembed (varType v'), sp, inl, tm))
                        ) bindings
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v

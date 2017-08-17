@@ -4,10 +4,18 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-module CLaSH.Netlist (genComponent,mkExpr,mkDcApplication,mkProjection) where
+module CLaSH.Netlist
+  (genComponent
+  ,mkExpr
+  ,mkDcApplication
+  ,mkDeclarations
+  ,mkNetDecl
+  ,mkProjection
+  ,mkSelection
+  ) where
 
 import CLaSH.Core.DataCon   (DataCon)
-import CLaSH.Core.Term      (Alt,Term,TmOccName)
+import CLaSH.Core.Term      (Alt,LetBinding,Term,TmOccName)
 import CLaSH.Core.Type      (Type)
 import CLaSH.Core.Var       (Id)
 import CLaSH.Driver.Types   (SrcSpan)
@@ -30,8 +38,20 @@ mkDcApplication :: HWType
                 -> NetlistMonad (Expr,[Declaration])
 
 mkProjection
-  :: Either Identifier Id
+  :: Bool
+  -> Either Identifier Id
   -> Term
   -> Type
   -> Alt
   -> NetlistMonad (Expr, [Declaration])
+
+mkSelection
+  :: Id
+  -> Term
+  -> Type
+  -> [Alt]
+  -> NetlistMonad [Declaration]
+
+mkNetDecl :: LetBinding -> NetlistMonad Declaration
+
+mkDeclarations :: Id -> Term -> NetlistMonad [Declaration]
