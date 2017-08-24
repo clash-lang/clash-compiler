@@ -39,6 +39,7 @@ import           System.Process               (runInteractiveCommand,
 -- GHC API
 import qualified Annotations
 import qualified CoreSyn
+import qualified CoreFVs
 import qualified Digraph
 import           DynFlags                     (GeneralFlag (..))
 import qualified DynFlags
@@ -51,16 +52,17 @@ import qualified Serialized
 import qualified TidyPgm
 import qualified TcRnMonad
 import qualified TcRnTypes
+import qualified Unique
 #if MIN_VERSION_ghc(8,2,0)
 import qualified UniqDFM
 #else
 import qualified UniqFM
 #endif
+import qualified UniqSet
 import qualified Var
 import qualified FamInst
 import qualified FamInstEnv
 import qualified Name
-import qualified Module
 import           Outputable                   (ppr)
 import qualified Outputable
 import qualified OccName
@@ -69,7 +71,7 @@ import qualified GHC.LanguageExtensions       as LangExt
 -- Internal Modules
 import           CLaSH.GHC.GHC2Core           (modNameM)
 import           CLaSH.GHC.LoadInterfaceFiles
-import           CLaSH.Util                   (curLoc,first)
+import           CLaSH.Util                   (curLoc)
 
 ghcLibDir :: IO FilePath
 ghcLibDir = do
@@ -100,7 +102,7 @@ loadModules
   :: HDL
   -> String
   -> Maybe (DynFlags.DynFlags)
-  -> IO ( [(CoreSyn.CoreBndr, CoreSyn.CoreExpr)] -- Binders
+  -> IO ( [CoreSyn.CoreBind]                     -- Binders
         , [(CoreSyn.CoreBndr,Int)]               -- Class operations
         , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
         , FamInstEnv.FamInstEnvs
@@ -200,11 +202,13 @@ loadModules hdl modName dflagsM = do
                                  ; (tidy_guts,_) <- MonadUtils.liftIO $ TidyPgm.tidyProgram hsc_env simpl_guts
                                  ; let pgm        = HscTypes.cg_binds tidy_guts
                                  ; let modFamInstEnv = TcRnTypes.tcg_fam_inst_env $ fst $ GHC.tm_internals_ tcMod
-                                 ; return (CoreSyn.flattenBinds pgm,modFamInstEnv)
+                                 ; return (pgm,modFamInstEnv)
                                  }
                          ) modGraph2
 
-    let (binders,modFamInstEnvs) = first concat $ unzip tidiedMods
+    let (binders,modFamInstEnvs) = unzip tidiedMods
+        bindersC                 = concat binders
+        binderIds                = map fst (CoreSyn.flattenBinds bindersC)
 #if MIN_VERSION_ghc(8,2,0)
         modFamInstEnvs'          = foldr UniqDFM.plusUDFM UniqDFM.emptyUDFM modFamInstEnvs
 #else
@@ -212,28 +216,25 @@ loadModules hdl modName dflagsM = do
 #endif
 
     (externalBndrs,clsOps,unlocatable,pFP) <-
-      loadExternalExprs hdl (map snd binders) (map fst binders)
+      loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
 
     hscEnv <- GHC.getSession
     famInstEnvs <- TcRnMonad.liftIO $ TcRnMonad.initTcForLookup hscEnv FamInst.tcGetFamInstEnvs
 
+    -- Because tidiedMods is in topological order, binders is also, and hence
+    -- the binders belonging to the "root" module are the last binders
     let rootModule = GHC.ms_mod_name . last $ modGraph2
-        rootBndrs = filter (maybe False
-                                  ((== rootModule)
-                                   . Module.moduleName)
-                            . Name.nameModule_maybe
-                            . Var.varName)
-                           (map fst binders)
+        rootIds    = map fst . CoreSyn.flattenBinds $ last binders
 
     -- Because tidiedMods is in topological order, binders is also, and hence
     -- allAnn is in topological order. This means that the "root" 'topEntity'
     -- will be compiled last.
-    allAnn   <- findTopEntityAnnotations (map fst binders)
-    benchAnn <- findTestBenchAnnotations (map fst binders)
-    topAnn   <- findTopEntityAnnotations rootBndrs
+    allAnn   <- findTopEntityAnnotations binderIds
+    benchAnn <- findTestBenchAnnotations binderIds
+    topAnn   <- findTopEntityAnnotations rootIds
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
-        topEntities = filter ((== "topEntity") . varNameString) rootBndrs
-        benches     = filter ((== "testBench") . varNameString) rootBndrs
+        topEntities = filter ((== "topEntity") . varNameString) rootIds
+        benches     = filter ((== "testBench") . varNameString) rootIds
         mergeBench (x,y) = (x,y,lookup x benchAnn)
         allAnn'     = map mergeBench allAnn
     topEntities' <- case topEntities of
@@ -248,7 +249,37 @@ loadModules hdl modName dflagsM = do
         Just _  -> return allAnn'
       _ -> Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    return (binders ++ externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub pFP)
+    return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub pFP)
+
+-- | Given a set of bindings, make explicit non-recursive bindings and
+-- recursive binding groups.
+--
+-- Needed because:
+-- 1. GHC does not preserve this information in interface files,
+-- 2. Binders in CLaSH's BindingsMap are not allowed to be mutually recursive,
+--    only self-recursive.
+-- 3. CLaSH.GHC.GenerateBindings.mkBindings turns groups of mutually recursive
+--    bindings into self-recursive bindings which can go into the BindingsMap.
+makeRecursiveGroups
+  :: [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)]
+  -> [CoreSyn.CoreBind]
+makeRecursiveGroups
+  = map makeBind
+  . Digraph.stronglyConnCompFromEdgedVerticesUniq
+  . map makeNode
+  where
+    makeNode
+      :: (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
+      -> Digraph.Node Unique.Unique (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
+    makeNode (b,e) = ((b,e)
+                     ,Var.varUnique b
+                     ,UniqSet.nonDetKeysUniqSet (CoreFVs.exprFreeIds e))
+
+    makeBind
+      :: Digraph.SCC (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
+      -> CoreSyn.CoreBind
+    makeBind (Digraph.AcyclicSCC (b,e)) = CoreSyn.NonRec b e
+    makeBind (Digraph.CyclicSCC bs)     = CoreSyn.Rec bs
 
 findTopEntityAnnotations
   :: GHC.GhcMonad m

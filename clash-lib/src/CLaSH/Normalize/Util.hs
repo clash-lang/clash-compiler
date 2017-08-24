@@ -23,12 +23,10 @@ import qualified Data.List               as List
 import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
-import           Unbound.Generics.LocallyNameless
-  (Fresh, bind, embed, rec, unembed ,unrec)
+import           Unbound.Generics.LocallyNameless        (Fresh, unembed ,unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           CLaSH.Core.FreeVars     (termFreeIds)
-import           CLaSH.Core.Var          (Var (Id))
 import           CLaSH.Core.Term         (Term (..), TmOccName)
 import           CLaSH.Core.TyCon        (TyCon, TyConOccName)
 import           CLaSH.Core.Util
@@ -134,61 +132,6 @@ mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs))
                          $ map (\(n,es) -> (n,n,es)) cg
   where
     fs = map fst cg
-
--- | Let-binds mutually recursive functions at their call-sites. That is,
--- given a group of recursive top-level binders @rc@, and a function @f@ where
--- @any (`elem` FreeVars(f)) rc@, replace the body of @f@, @fBody@, by
--- @letrec rc in fBody@.
---
--- This transformation is performed to, where possible, transform global
--- mutually recursive bindings into: local let-recursive non-function-type
--- binders. Where the let-recursive non-function-type binders can be turned
--- into feedback loops.
---
--- We need this transformation because GHC has a transformation which does the
--- exact opposite. This is a problem because global (mutual) recursive functions
--- describe an infinite structure when viewed with a structural lens, which
--- cannot be realised as a circuit.
-lambdaDrop
-  :: BindingMap
-  -> TmOccName
-  -> BindingMap
-lambdaDrop bndrs topEntity = bndrs''
-  where
-    depGraph = callGraph [] bndrs topEntity
-    -- We only care about mutually recursive bindings, there is no point
-    -- lambda-dropping self-recursive bindings as they would be lifted again
-    -- in a later stage.
-    rcs     = filter ((>1).length) (mkRecursiveComponents depGraph)
-    -- Add the bodies to the recursive components.
-    rcsTms  = zipWith (,) rcs (map (map (bndrs HashMap.!)) rcs)
-    -- Add the recursive binders at call-sites
-    bndrs'  = HashMap.map addRC bndrs
-    -- Delete any of the remaining mutually recursive top-level binders, they
-    -- should no longer be needed because they are all let-bound at their
-    -- call-sites.
-    --
-    -- Also, if there's a bug in lambdaDrop, Clash will complain loudly because
-    -- it will look for a function which has been deleted.
-    --
-    -- Bug 1 discovered and fixed: topEntity itself can be part of a recursive
-    -- group, but it should not be deleted.
-    bndrs'' = List.foldl' (flip HashMap.delete) bndrs'
-                          (filter (/= topEntity) (concat rcs))
-
-    addRC (nm,ty,sp,inl,tm) =
-      let fv      = Lens.toListOf termFreeIds tm
-          -- Only interested in the recursive components which are used in this
-          -- function
-          rcsTms' = filter (any (`elem` fv) . fst) rcsTms
-          -- We create a single list of all the recursive bindings
-          bnds    = map mkBind (concat (map (uncurry zip) rcsTms'))
-          newTm   = Letrec (bind (rec bnds) tm)
-      in  case bnds of
-            [] -> (nm,ty,sp,inl,tm)
-            _  -> (nm,ty,sp,inl,newTm)
-
-    mkBind (_,(nm,ty,_,_,tm)) = (Id nm (embed ty),embed tm)
 
 -- | Give a "performance/size" classification of a function in normal form.
 classifyFunction

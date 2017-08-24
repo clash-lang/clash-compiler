@@ -5,6 +5,7 @@
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
+{-# LANGUAGE LambdaCase   #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module CLaSH.GHC.GenerateBindings
@@ -23,7 +24,7 @@ import           Data.List               (foldl')
 import           Data.Text.Lazy          (Text)
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
-import           Unbound.Generics.LocallyNameless (runFreshM, unembed)
+import           Unbound.Generics.LocallyNameless (bind,embed,rec,runFreshM,unembed)
 
 import qualified BasicTypes              as GHC
 import qualified CoreSyn                 as GHC
@@ -50,7 +51,6 @@ import           CLaSH.Driver.Types      (BindingMap)
 import           CLaSH.GHC.GHC2Core      (GHC2CoreState, tyConMap, coreToId, coreToName, coreToTerm,
                                           makeAllTyCons, qualfiedNameString, emptyGHC2CoreState)
 import           CLaSH.GHC.LoadModules   (loadModules)
-import           CLaSH.Normalize.Util    (lambdaDrop)
 import           CLaSH.Primitives.Types  (PrimMap)
 import           CLaSH.Primitives.Util   (generatePrimMap)
 import           CLaSH.Rewrite.Util      (mkInternalVar, mkSelectorCase)
@@ -83,22 +83,22 @@ generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = 
           topEnt' <- coreToName GHC.varName GHC.varUnique qualfiedNameString topEnt
           benchM' <- traverse (coreToName GHC.varName GHC.varUnique qualfiedNameString) benchM
           return (topEnt',annM,benchM')) topEntities
-      droppedAndRetypedBindings     = dropAndRetypeBindings allTcCache allBindings topEntities'
-      topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup (nameOcc topEnt) droppedAndRetypedBindings of
+      retypedBindings               = retypeBindings allTcCache allBindings topEntities'
+      topEntities''                 = map (\(topEnt,annM,benchM) -> case HashMap.lookup (nameOcc topEnt) retypedBindings of
                                               Just (_,ty,_,_,_) -> (topEnt,ty,annM,benchM)
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
-  return (droppedAndRetypedBindings,allTcCache,tupTcCache,topEntities'',primMap)
+  return (retypedBindings,allTcCache,tupTcCache,topEntities'',primMap)
 
-dropAndRetypeBindings
+retypeBindings
   :: HashMap TyConOccName TyCon
   -> BindingMap
   -> [(TmName,Maybe TopEntity,Maybe TmName)]
   -> BindingMap
-dropAndRetypeBindings allTcCache = foldl' dropAndRetypeBinding
+retypeBindings allTcCache = foldl' go
   where
-    dropAndRetypeBinding allBindings (topEnt,_,benchM) = bBindings
+    go allBindings (topEnt,_,benchM) = bBindings
       where
         topEntity = do e <- HashMap.lookup (nameOcc topEnt) allBindings
                        return (nameOcc topEnt,e)
@@ -106,9 +106,9 @@ dropAndRetypeBindings allTcCache = foldl' dropAndRetypeBinding
                        e <- HashMap.lookup (nameOcc t) allBindings
                        return (nameOcc t,e)
 
-        tBindings = maybe allBindings (dropAndRetype allBindings) topEntity
-        bBindings = maybe tBindings (dropAndRetype tBindings) bench
-        dropAndRetype d (t,_) = snd (retype allTcCache ([],lambdaDrop d t) t)
+        tBindings = maybe allBindings (retype' allBindings) topEntity
+        bBindings = maybe tBindings (retype' tBindings) bench
+        retype' d (t,_) = snd (retype allTcCache ([],d) t)
 
 -- | clean up cast-removal mess
 retype
@@ -130,7 +130,7 @@ retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty
 mkBindings
   :: Bool
   -> PrimMap a
-  -> [(GHC.CoreBndr, GHC.CoreExpr)]
+  -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]
   -- Class operations
@@ -141,12 +141,25 @@ mkBindings
            , HashMap TmOccName (TmName,Type,Int)
            )
 mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable = do
-  bindingsList <- mapM (\(v,e) -> do
-                          let sp = GHC.getSrcSpan v
-                              inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                          tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
-                          v' <- coreToId v
-                          return (nameOcc (varName v'), (varName v',unembed (varType v'), sp, inl, tm))
+  bindingsList <- mapM (\case
+                          GHC.NonRec v e -> do
+                            let sp = GHC.getSrcSpan v
+                                inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
+                            tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
+                            v' <- coreToId v
+                            return [(nameOcc (varName v'), (varName v',unembed (varType v'), sp, inl, tm))]
+                          GHC.Rec bs -> do
+                            tms <- mapM (\(v,e) -> do
+                                          let sp = GHC.getSrcSpan v
+                                          tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
+                                          v' <- coreToId v
+                                          return (v',sp,tm)
+                                        ) bs
+                            case tms of
+                              [(v,sp,tm)] -> return [(nameOcc (varName v), (varName v,unembed (varType v), sp, GHC.NoInline, tm))]
+                              _ ->
+                                return $ map (\(v,sp,e) -> (nameOcc (varName v),(varName v,unembed (varType v),sp,GHC.NoInline
+                                                  ,Letrec (bind (rec (map (\(x,_,y) -> (x,embed y)) tms)) e)))) tms
                        ) bindings
   clsOpList    <- mapM (\(v,i) -> do
                           v' <- coreToId v
@@ -154,7 +167,7 @@ mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable = do
                           return (nameOcc (varName v'), (varName v',ty,i))
                        ) clsOps
 
-  return (HashMap.fromList bindingsList, HashMap.fromList clsOpList)
+  return (HashMap.fromList (concat bindingsList), HashMap.fromList clsOpList)
 
 mkClassSelector
   :: HashMap TyConOccName TyCon

@@ -26,6 +26,8 @@ import CLaSH.Core.Type   (Type)
 import CLaSH.Netlist.BlackBox.Types (HdlSyn)
 
 -- | Global function binders
+--
+-- Global functions cannot be mutually recursive, only self-recursive
 type BindingMap = HashMap TmOccName (TmName,Type,SrcSpan,InlineSpec,Term)
 
 -- | Debug Message Verbosity

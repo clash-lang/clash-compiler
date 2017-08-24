@@ -16,7 +16,7 @@ where
 
 -- External Modules
 import           Data.Either (partitionEithers)
-import           Data.List   (elemIndex, partition)
+import           Data.List   (elemIndex, foldl', partition)
 import           Data.Maybe  (isJust, isNothing, mapMaybe)
 import           Data.Word   (Word8)
 
@@ -48,6 +48,7 @@ import qualified TcIface
 import qualified TcRnMonad
 import qualified TcRnTypes
 import qualified UniqFM
+import qualified UniqSet
 import qualified Var
 #if !MIN_VERSION_ghc(8,2,0)
 import qualified VarSet
@@ -94,55 +95,63 @@ loadIface foundMod = do
 loadExternalExprs ::
   GHC.GhcMonad m
   => HDL
-  -> [CoreSyn.CoreExpr]
-  -> [CoreSyn.CoreBndr]
+  -> UniqSet.UniqSet CoreSyn.CoreBndr
+  -> [CoreSyn.CoreBind]
   -> m ( [(CoreSyn.CoreBndr,CoreSyn.CoreExpr)] -- Binders
        , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
        , [CoreSyn.CoreBndr]                    -- Unlocatable
        , [FilePath]
        )
-loadExternalExprs _   []           _       = return ([],[],[],[])
-loadExternalExprs hdl (expr:exprs) visited = do
-#if MIN_VERSION_ghc(8,2,0)
-  let fvs = CoreFVs.exprSomeFreeVarsList
-#else
-  let fvs = VarSet.varSetElems $ CoreFVs.exprSomeFreeVars
-#endif
-              (\v -> Var.isId v &&
-                     isNothing (Id.isDataConId_maybe v) &&
-                     v `notElem` visited
-              ) expr
+loadExternalExprs hdl = go [] [] [] []
+  where
+    go locatedExprs clsOps unlocated pFP _ [] =
+      return (locatedExprs,clsOps,unlocated,pFP)
 
-  let (clsOps,fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
+    go locatedExprs clsOps unlocated pFP visited (CoreSyn.NonRec _ e:bs) = do
+      (locatedExprs',clsOps',unlocated',pFP',visited') <-
+        go' locatedExprs clsOps unlocated pFP visited [e]
+      go locatedExprs' clsOps' unlocated' pFP' visited' bs
 
-  ((locatedExprs,unlocated),pFP) <-
-     ((partitionEithers *** concat) . unzip) <$> mapM (loadExprFromIface hdl) fvs'
+    go locatedExprs clsOps unlocated pFP visited (CoreSyn.Rec bs:bs') = do
+      (locatedExprs',clsOps',unlocated',pFP',visited') <-
+        go' locatedExprs clsOps unlocated pFP visited (map snd bs)
+      go locatedExprs' clsOps' unlocated' pFP' visited' bs'
 
-  let visited' = concat [ map fst locatedExprs
-                        , unlocated
-                        , clsOps
-                        , visited
-                        ]
+    go' locatedExprs clsOps unlocated pFP visited [] =
+      return (locatedExprs,clsOps,unlocated,pFP,visited)
 
-  (locatedExprs', clsOps', unlocated',pFP') <-
-    loadExternalExprs
-      hdl
-      (exprs ++ map snd locatedExprs)
-      visited'
+    go' locatedExprs clsOps unlocated pFP visited (e:es) = do
+      let fvs = CoreFVs.exprSomeFreeVarsList
+                  (\v -> Var.isId v &&
+                         isNothing (Id.isDataConId_maybe v) &&
+                         not (v `UniqSet.elementOfUniqSet` visited)
+                  ) e
 
-  let clsOps'' = map
-       ( \v -> flip (maybe (error $ $(curLoc) ++ "Not a class op")) (Id.isClassOpId_maybe v) $ \c ->
-           let clsIds = Class.classAllSelIds c
-           in  maybe (error $ $(curLoc) ++ "Index not found")
-                     (v,)
-                     (elemIndex v clsIds)
-       ) clsOps
+          (clsOps',fvs') = partition (isJust . Id.isClassOpId_maybe) fvs
 
-  return ( locatedExprs ++ locatedExprs'
-         , clsOps''     ++ clsOps'
-         , unlocated    ++ unlocated'
-         , pFP          ++ pFP'
-         )
+          clsOps'' = map
+            ( \v -> flip (maybe (error $ $(curLoc) ++ "Not a class op")) (Id.isClassOpId_maybe v) $ \c ->
+                let clsIds = Class.classAllSelIds c
+                in  maybe (error $ $(curLoc) ++ "Index not found")
+                          (v,)
+                          (elemIndex v clsIds)
+            ) clsOps'
+
+      ((locatedExprs',unlocated'),pFP') <-
+         ((partitionEithers *** concat) . unzip) <$> mapM (loadExprFromIface hdl) fvs'
+
+      let visited' = foldl' UniqSet.addListToUniqSet visited
+                       [ map fst locatedExprs'
+                       , unlocated'
+                       , clsOps'
+                       ]
+
+      go' (locatedExprs'++locatedExprs)
+          (clsOps''++clsOps)
+          (unlocated'++unlocated)
+          (pFP'++pFP)
+          visited'
+          (es ++ map snd locatedExprs')
 
 loadExprFromIface ::
   GHC.GhcMonad m
