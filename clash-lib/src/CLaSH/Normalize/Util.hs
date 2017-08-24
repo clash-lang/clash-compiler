@@ -15,12 +15,9 @@ module CLaSH.Normalize.Util where
 
 import           Control.Lens            ((&),(+~),(%=),(^.),_5)
 import qualified Control.Lens            as Lens
-import           Data.Function           (on)
-import qualified Data.Graph              as Graph
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.List               as List
-import qualified Data.Maybe              as Maybe
 import qualified Data.Set                as Set
 import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless        (Fresh, unembed ,unrec)
@@ -88,20 +85,26 @@ isConstantNotClockReset e = do
      then return False
      else return (isConstant e)
 
-isRecursiveBndr :: TmOccName -> NormalizeSession Bool
+-- | Assert whether a name is a reference to a recursive binder.
+isRecursiveBndr
+  :: TmOccName
+  -> NormalizeSession Bool
 isRecursiveBndr f = do
   cg <- Lens.use (extra.recursiveComponents)
   case HashMap.lookup f cg of
     Just isR -> return isR
     Nothing -> do
-      bndrs <- Lens.use bindings
-      let cg'  = callGraph [] bndrs f
-          rcs  = concat $ mkRecursiveComponents cg'
-          isR  = f `elem` rcs
-          cg'' = HashMap.fromList
-               $ map (\(t,_) -> (t,t `elem` rcs)) cg'
-      (extra.recursiveComponents) %= HashMap.union cg''
-      return isR
+      fBodyM <- HashMap.lookup f <$> Lens.use bindings
+      case fBodyM of
+        Nothing -> return False
+        Just (_,_,_,_,fBody) -> do
+          -- There are no global mutually-recursive functions, only self-recursive
+          -- ones, so checking whether 'f' is part of the free variables of the
+          -- body of 'f' is sufficient.
+          let used = Lens.toListOf termFreeIds fBody
+              isR  = f `elem` used
+          (extra.recursiveComponents) %= HashMap.insert f isR
+          return isR
 
 -- | Create a call graph for a set of global binders, given a root
 callGraph
@@ -119,19 +122,6 @@ callGraph visited bindingMap root
          other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
     in   node : other
 callGraph _ _ _ = []
-
--- | Determine the sets of recursive components given the edges of a callgraph
-mkRecursiveComponents
-  :: [(TmOccName,[TmOccName])]
-  -- ^ [(calling function,[called function])]
-  -> [[TmOccName]]
-mkRecursiveComponents cg = map (List.sortBy (compare `on` (`List.elemIndex` fs)))
-                         . Maybe.catMaybes
-                         . map (\case {Graph.CyclicSCC vs -> Just vs; _ -> Nothing})
-                         . Graph.stronglyConnComp
-                         $ map (\(n,es) -> (n,n,es)) cg
-  where
-    fs = map fst cg
 
 -- | Give a "performance/size" classification of a function in normal form.
 classifyFunction

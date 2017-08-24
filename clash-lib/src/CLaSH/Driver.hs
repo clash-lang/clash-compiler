@@ -55,7 +55,7 @@ import           CLaSH.Netlist.Id                 (IdType (..))
 import           CLaSH.Netlist.Types              (Component (..), HWType)
 import           CLaSH.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
-import           CLaSH.Normalize.Util             (callGraph, mkRecursiveComponents)
+import           CLaSH.Normalize.Util             (callGraph)
 import           CLaSH.Primitives.Types
 import           CLaSH.Util                       (first, second)
 
@@ -366,13 +366,9 @@ normalizeEntity
 normalizeEntity bindingsMap primMap tcm tupTcm typeTrans eval topEntities
   opts supply tm = transformedBindings
   where
-    cg     = callGraph [] bindingsMap tm
-    rcs    = concat $ mkRecursiveComponents cg
-    rcsMap     = HML.fromList
-               $ map (\(t,_) -> (t,t `elem` rcs)) cg
     doNorm = do norm <- normalize [tm]
-                let normChecked = checkNonRecursive tm norm
+                let normChecked = checkNonRecursive norm
                 cleanupGraph tm normChecked
     transformedBindings = runNormalization opts supply bindingsMap
-                            typeTrans tcm tupTcm eval primMap rcsMap
+                            typeTrans tcm tupTcm eval primMap HML.empty
                             topEntities doNorm

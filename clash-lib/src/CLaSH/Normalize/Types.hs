@@ -51,7 +51,10 @@ data NormalizeState
   -- recursive
   , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _recursiveComponents :: HashMap TmOccName Bool
-  -- ^ Map telling whether a components is part of a recursive group
+  -- ^ Map telling whether a components is recursively defined.
+  --
+  -- NB: there are only no mutually-recursive component, only self-recursive
+  -- ones.
   }
 
 makeLenses ''NormalizeState

@@ -197,20 +197,21 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) = do
     (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
     return rewritten
 
--- | Check if the call graph (second argument), starting at the @topEnity@
--- (first argument) is non-recursive. Returns the list of normalized terms if
--- call graph is indeed non-recursive, errors otherwise.
+-- | Check whether the normalized bindings are non-recursive. Errors when one
+-- of the components is recursive.
 checkNonRecursive
-  :: TmOccName
-  -- ^ @topEntity@
-  -> BindingMap
+  :: BindingMap
   -- ^ List of normalized binders
   -> BindingMap
-checkNonRecursive topEntity norm =
-  let cg = callGraph [] norm topEntity
-  in  case mkRecursiveComponents cg of
-       []  -> norm
-       rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive cycles: " ++ show rcs
+checkNonRecursive norm = case Maybe.mapMaybe go (HashMap.toList norm) of
+    []  -> norm
+    rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive components: " ++ show rcs
+  where
+    go (nm,(_,_,_,_,tm)) =
+      let used = Lens.toListOf termFreeIds tm
+      in  if nm `elem` used
+             then Just (nm,tm)
+             else Nothing
 
 -- | Perform general \"clean up\" of the normalized (non-recursive) function
 -- hierarchy. This includes:
