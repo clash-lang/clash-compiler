@@ -336,9 +336,10 @@ callGraphBindings
   -> TmOccName
   -- ^ Root of the call graph
   -> [Term]
-callGraphBindings bindingsMap tm = map ((^. _5) . (bindingsMap HM.!) . fst) cg
+callGraphBindings bindingsMap tm =
+  map ((^. _5) . (bindingsMap HM.!)) (HM.keys cg)
   where
-    cg = callGraph [] bindingsMap tm
+    cg = callGraph bindingsMap tm
 
 -- | Normalize a complete hierarchy
 normalizeEntity

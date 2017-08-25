@@ -18,8 +18,6 @@ import qualified Control.Lens            as Lens
 import           Data.HashMap.Lazy       (HashMap)
 import qualified Data.HashMap.Lazy       as HashMap
 import qualified Data.List               as List
-import qualified Data.Set                as Set
-import qualified Data.Set.Lens           as Lens
 import           Unbound.Generics.LocallyNameless        (Fresh, unembed ,unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -106,22 +104,27 @@ isRecursiveBndr f = do
           (extra.recursiveComponents) %= HashMap.insert f isR
           return isR
 
+-- | A call graph counts the number of occurrences that a functions 'g' is used
+-- in 'f'.
+type CallGraph = HashMap TmOccName (HashMap TmOccName Word)
+
 -- | Create a call graph for a set of global binders, given a root
 callGraph
-  :: [TmOccName]
-  -- ^ List of functions that should not be inspected
-  -> BindingMap
-  -- ^ Global binders
+  :: BindingMap
   -> TmOccName
-  -- ^ Root of the call graph
-  -> [(TmOccName,[TmOccName])]
-callGraph visited bindingMap root
-  | Just rootTm <- HashMap.lookup root bindingMap
-  = let  used   = Set.toList $ Lens.setOf termFreeIds (rootTm ^. _5)
-         node   = (root,used)
-         other  = concatMap (callGraph (root:visited) bindingMap) (filter (`notElem` visited) used)
-    in   node : other
-callGraph _ _ _ = []
+  -> CallGraph
+callGraph bndrs = go HashMap.empty
+  where
+    go cg root
+      | Nothing     <- HashMap.lookup root cg
+      , Just rootTm <- HashMap.lookup root bndrs =
+      let used = List.foldl'
+                   (\m k -> HashMap.insertWith (+) k 1 m)
+                   HashMap.empty
+                   (Lens.toListOf termFreeIds (rootTm ^. _5))
+          cg'  = HashMap.insert root used cg
+      in  List.foldl' go cg' (HashMap.keys used)
+    go cg _ = cg
 
 -- | Give a "performance/size" classification of a function in normal form.
 classifyFunction
