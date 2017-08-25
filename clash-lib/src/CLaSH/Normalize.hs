@@ -115,7 +115,8 @@ runNormalization opts supply globals typeTrans tcm tupTcm eval primMap rcsMap to
                   (opt_specLimit opts)
                   HashMap.empty
                   (opt_inlineLimit opts)
-                  (opt_inlineBelow opts)
+                  (opt_inlineFunctionLimit opts)
+                  (opt_inlineConstantLimit opts)
                   primMap
                   rcsMap
 

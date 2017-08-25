@@ -41,7 +41,8 @@ data DebugLevel
 
 data CLaSHOpts = CLaSHOpts { opt_inlineLimit :: Int
                            , opt_specLimit   :: Int
-                           , opt_inlineBelow :: Int
+                           , opt_inlineFunctionLimit :: Word
+                           , opt_inlineConstantLimit :: Word
                            , opt_dbgLevel    :: DebugLevel
                            , opt_cleanhdl    :: Bool
                            , opt_intWidth    :: Int

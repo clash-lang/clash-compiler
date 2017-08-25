@@ -39,7 +39,8 @@ flagsClash :: IORef CLaSHOpts -> [Flag IO]
 flagsClash r = [
     defFlag "clash-inline-limit" (IntSuffix (liftEwM . setInlineLimit r))
   , defFlag "clash-spec-limit" (IntSuffix (liftEwM . setSpecLimit r))
-  , defFlag "clash-inline-below" (IntSuffix (liftEwM . setInlineBelow r))
+  , defFlag "clash-inline-function-limit" (IntSuffix (liftEwM . setInlineFunctionLimit r))
+  , defFlag "clash-inline-constant-limit" (IntSuffix (liftEwM . setInlineConstantLimit r))
   , defFlag "clash-debug" (SepArg (setDebugLevel r))
   , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
   , defFlag "clash-intwidth" (IntSuffix (setIntWidth r))
@@ -56,10 +57,17 @@ setInlineLimit :: IORef CLaSHOpts
                -> IO ()
 setInlineLimit r n = modifyIORef r (\c -> c {opt_inlineLimit = n})
 
-setInlineBelow :: IORef CLaSHOpts
-               -> Int
-               -> IO ()
-setInlineBelow r n = modifyIORef r (\c -> c {opt_inlineBelow = n})
+setInlineFunctionLimit
+  :: IORef CLaSHOpts
+  -> Int
+  -> IO ()
+setInlineFunctionLimit r n = modifyIORef r (\c -> c {opt_inlineFunctionLimit = toEnum n})
+
+setInlineConstantLimit
+  :: IORef CLaSHOpts
+  -> Int
+  -> IO ()
+setInlineConstantLimit r n = modifyIORef r (\c -> c {opt_inlineConstantLimit = toEnum n})
 
 setSpecLimit :: IORef CLaSHOpts
              -> Int

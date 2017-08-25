@@ -7,6 +7,7 @@
   Transformations of the Normalization process
 -}
 
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
@@ -521,7 +522,14 @@ removeUnusedExpr _ e = return e
 bindConstantVar :: NormRewrite
 bindConstantVar = inlineBinders test
   where
-    test _ (_,Embed e) = (||) <$> isLocalVar e <*> isConstantNotClockReset e
+    test _ (_,Embed e) = isLocalVar e >>= \case
+      True -> return True
+      _    -> isConstantNotClockReset e >>= \case
+        True -> Lens.use (extra.inlineConstantLimit) >>= \case
+          0 -> return True
+          n -> return (termSize e <= n)
+        _ -> return False
+    -- test _ _ = return False
 
 -- | Inline nullary/closed functions
 inlineClosed :: NormRewrite
@@ -574,7 +582,7 @@ inlineSmall _ e@(collectArgs -> (Var _ (nameOcc -> f),args)) = do
     then return e
     else do
       bndrs <- Lens.use bindings
-      sizeLimit <- Lens.use (extra.inlineBelow)
+      sizeLimit <- Lens.use (extra.inlineFunctionLimit)
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
         Just (_,_,_,inl,body) -> do

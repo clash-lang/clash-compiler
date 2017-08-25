@@ -46,9 +46,11 @@ data NormalizeState
   -- * Elem: (functions which were inlined, number of times inlined)
   , _inlineLimit     :: !Int
   -- ^ Number of times a function 'f' can be inlined in a function 'g'
-  , _inlineBelow     :: !Int
+  , _inlineFunctionLimit :: !Word
   -- ^ Size of a function below which it is always inlined if it is not
   -- recursive
+  , _inlineConstantLimit :: !Word
+  -- ^ Size of a constant below which it is always inlined; 0 = no limit
   , _primitives :: PrimMap BlackBoxTemplate -- ^ Primitive Definitions
   , _recursiveComponents :: HashMap TmOccName Bool
   -- ^ Map telling whether a components is recursively defined.

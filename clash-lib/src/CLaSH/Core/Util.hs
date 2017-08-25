@@ -220,7 +220,7 @@ varToId (Var ty nm) = Id nm (embed ty)
 varToId e           = error $ $(curLoc) ++ "varToId: not a var: " ++ showDoc e
 
 termSize :: Term
-         -> Int
+         -> Word
 termSize (Var _ _)   = 1
 termSize (Data _)    = 1
 termSize (Literal _) = 1
