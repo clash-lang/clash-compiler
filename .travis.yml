@@ -4,8 +4,8 @@ sudo: false
 language: c
 before_install:
 - ghdl --version
-- chmod +x install_iverilog.sh
-- ./install_iverilog.sh
+- chmod +x ./.travis/install_iverilog.sh
+- ./.travis/install_iverilog.sh
 - export PATH=$PATH:$HOME/iverilog/bin
 - vvp -V
 - export PATH=/opt/ghc/$GHCVER/bin:$PATH
