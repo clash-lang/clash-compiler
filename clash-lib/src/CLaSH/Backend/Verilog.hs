@@ -191,7 +191,7 @@ module_ c = addSeen c *> modVerilog <* (idSeen .= [])
 
     -- map a port to its verilog type, port name, and any encoding notes
     sigPort (wr2ty -> portTy) (nm, hwTy)
-      = portTy <+> verilogType hwTy <+> text nm <+> encodingNote hwTy
+      = portTy <+> verilogType' True hwTy <+> text nm <+> encodingNote hwTy
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
@@ -223,13 +223,34 @@ addSeen c = do
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
 
+-- render a type; by default, removing zero-sizes is an aesthetic operation
+-- and is only valid for decls (e.g. when rendering module ports), so don't
+-- do it by default to be safe
 verilogType :: HWType -> VerilogM Doc
-verilogType t = case t of
-  Signed n -> "signed" <+> brackets (int (n-1) <> colon <> int 0)
-  Clock _ _ Gated -> verilogType (gatedClockType t)
-  Clock {} -> empty
-  Reset {} -> empty
-  _        -> brackets (int (typeSize t -1) <> colon <> int 0)
+verilogType = verilogType' False
+
+verilogType' :: Bool -> HWType -> VerilogM Doc
+verilogType' isDecl t =
+  let -- if the size is zero, it's single bit, so if we're
+      -- emitting a decl, then we can skip it - but we can't
+      -- skip it when selecting other values (e.g a slice)
+      renderVerilogTySize l
+        | l == 0 && isDecl = empty
+        | otherwise        = brackets (int l <> colon <> int 0)
+
+      -- signed types have to be rendered specially
+      getVerilogTy (Signed n) = ("signed", n)
+      getVerilogTy _          = (empty,    typeSize t)
+
+  in case t of
+       -- special case: clocks and resets
+       Clock _ _ Gated -> verilogType' isDecl (gatedClockType t)
+       Clock {} -> empty
+       Reset {} -> empty
+
+       -- otherwise, print the type and prefix
+       ty | (prefix, sz) <- getVerilogTy ty
+         -> prefix <+> renderVerilogTySize (sz-1)
 
 gatedClockType :: HWType -> HWType
 gatedClockType (Clock nm rt Gated) = Product "GatedClock" [Clock nm rt Source,Bool]
