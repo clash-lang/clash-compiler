@@ -16,7 +16,7 @@ module CLaSH.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
 import           Control.DeepSeq
-import           Control.Exception                (tryJust)
+import           Control.Exception                (tryJust, bracket)
 import           Control.Lens                     ((^.), _5)
 import           Control.Monad                    (guard, when, unless)
 import           Control.Monad.State              (evalState, get)
@@ -29,13 +29,14 @@ import           Data.IntMap                      (IntMap)
 import           Data.Maybe                       (fromMaybe)
 import           Data.Text.Lazy                   (Text)
 import qualified Data.Text.Lazy                   as Text
+import qualified Data.Text.Lazy.IO                as Text
 import qualified Data.Time.Clock                  as Clock
 import qualified System.Directory                 as Directory
 import           System.FilePath                  ((</>), (<.>))
 import qualified System.FilePath                  as FilePath
 import qualified System.IO                        as IO
 import           System.IO.Error                  (isDoesNotExistError)
-import           Text.PrettyPrint.Leijen.Text     (Doc, hPutDoc, text)
+import           Text.PrettyPrint.Leijen.Text     (Doc, renderPretty, text)
 import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderOneLine)
 
 import           GHC.BasicTypes.Extra             ()
@@ -301,10 +302,14 @@ prepareDir cleanhdl ext dir = do
 -- | Writes a HDL file to the given directory
 writeHDL :: FilePath -> (String, Doc) -> IO ()
 writeHDL dir (cname, hdl) = do
-  handle <- IO.openFile (dir </> cname) IO.WriteMode
-  hPutDoc handle hdl
-  IO.hPutStr handle "\n"
-  IO.hClose handle
+  let rendered = displayT (renderPretty 0.4 120 hdl)
+      -- remove blank lines to keep things clean
+      clean = Text.unlines
+            . map (\t -> if Text.all (==' ') t then Text.empty else t)
+            . Text.lines
+  bracket (IO.openFile (dir </> cname) IO.WriteMode) IO.hClose $ \h -> do
+    Text.hPutStr h (clean rendered)
+    Text.hPutStr h (Text.pack "\n")
 
 copyDataFiles :: [FilePath] -> FilePath -> [(String,FilePath)] -> IO ()
 copyDataFiles idirs dir = mapM_ (copyFile' idirs)
