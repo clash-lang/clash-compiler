@@ -1,2 +1,0 @@
-#!/bin/sh 
-sudo docker.io run -t -i --name=clash clash /bin/bash

@@ -1,0 +1,12 @@
+-- there are no top level packages. any package can be checked out under the
+-- root directory (i.e. patched copies, or forks) and will automatically be
+-- preferred by the solver over other versions.
+packages: ./*/*.cabal
+
+-- only GHC 8.2.1 is supported, so mandate it.
+with-compiler: ghc-8.2.1
+
+-- index state, to go along with the cabal.project.freeze file. update the index
+-- state by running `cabal update` twice and looking at the index state it
+-- displays to you (as the second update will be a no-op)
+index-state: 2017-09-03T00:30:55Z
