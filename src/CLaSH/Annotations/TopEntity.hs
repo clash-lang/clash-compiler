@@ -127,11 +127,11 @@ However, if we add the following 'TopEntity' annotation in the file:
 @
 {\-\# ANN topEntity
   ('defTop'
-    { t_name     = "blinker"
-    , t_inputs   = [ PortName \"CLOCK_50\"
-                   , PortName \"KEY0\"
-                   , PortName \"KEY1\" ]
-    , t_outputs  = [ PortName \"LED\" ]
+    { t_name   = "blinker"
+    , t_inputs = [ PortName \"CLOCK_50\"
+                 , PortName \"KEY0\"
+                 , PortName \"KEY1\" ]
+    , t_output = PortName \"LED\"
     }) \#-\}
 @
 
@@ -199,15 +199,18 @@ import           Data.Data
 -- | TopEntity annotation
 data TopEntity
   = TopEntity
-  { t_name     :: String
+  { t_name    :: String
   -- ^ The name the top-level component should have, put in a correspondingly
   -- named file.
-  , t_inputs   :: [PortName]
+  , t_inputs  :: [PortName]
   -- ^ List of names that are assigned in-order to the inputs of the component.
-  , t_outputs  :: [PortName]
-  -- ^ List of names that are assigned in-order to the outputs of the component.
-  }
-  deriving (Data,Show,Read,Generic)
+  , t_output  :: PortName
+  -- ^ Name assigned in-order to the outputs of the component. As a Haskell
+  -- function can only truly return a single value -- with multiple values
+  -- \"wrapped\" by a tuple -- this field is not a list, but a single
+  -- @'PortName'@. Use @'PortField'@ to give names to the individual components
+  -- of the output tuple.
+  } deriving (Data,Show,Read,Generic)
 
 -- | Give port names for arguments/results.
 --
@@ -242,7 +245,7 @@ data TopEntity
 --       { t_name = \"f\"
 --       , t_inputs = [ PortName \"a\"
 --                    , PortName \"b\" ]
---       , t_outputs = [ PortName \"res\" ]}) \#-\}
+--       , t_output = PortName \"res\" }) \#-\}
 -- f :: Int -> T -> (T,Bool)
 -- f a b = ...
 -- @
@@ -265,7 +268,7 @@ data TopEntity
 --       { t_name = \"f\"
 --       , t_inputs = [ PortName \"a\"
 --                    , PortField \"\" [ PortName \"b\", PortName \"c\" ] ]
---       , t_outputs = [ PortField \"res\" [PortName \"q\"]]}) \#-\}
+--       , t_output = PortField \"res\" [PortName \"q\"] }) \#-\}
 -- f :: Int -> T -> (T,Bool)
 -- f a b = ...
 -- @
@@ -319,14 +322,14 @@ data TestBench
   = TestBench TH.Name
   deriving (Data,Show)
 
--- | Default 'TopEntity' which has no clocks, and no specified names for the
--- input and output ports. Also has no clock sources:
+-- | Default 'TopEntity' which has no specified names for the input and output
+-- ports.
 --
 -- >>> defTop
--- TopEntity {t_name = "topentity", t_inputs = [], t_outputs = []}
+-- TopEntity {t_name = "topentity", t_inputs = [], t_output = PortName ""}
 defTop :: TopEntity
 defTop = TopEntity
-  { t_name     = "topentity"
-  , t_inputs   = []
-  , t_outputs  = []
+  { t_name   = "topentity"
+  , t_inputs = []
+  , t_output = PortName ""
   }
