@@ -20,7 +20,7 @@
   To use the library:
 
   * Import "CLaSH.Prelude"
-  * Additionally import "CLaSH.Prelude.Explicit" if you want to design
+  * Additionally import "CLaSH.Explicit.Prelude" if you want to design
     explicitly clocked circuits in a multi-clock setting
 
   For now, "CLaSH.Prelude" is also the best starting point for exploring the

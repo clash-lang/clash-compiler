@@ -1480,7 +1480,7 @@ it assumes that you are familiar with the design of synchronizer circuits, and
 why a dual flip-flop synchroniser only works for bit-synchronisation and not
 word-synchronisation.
 The explicitly clocked versions of all synchronous functions and primitives can
-be found in "CLaSH.Prelude.Explicit", which also re-exports the functions in
+be found in "CLaSH.Explicit.Prelude", which also re-exports the functions in
 "CLaSH.Signal.Explicit". We will use those functions to create a FIFO where
 the read and write port are synchronised to different clocks. Below you can find
 the code to build the FIFO synchroniser based on the design described in:
@@ -1494,7 +1494,7 @@ and resets must be explicitly routed:
 @
 module MultiClockFifo where
 
-import CLaSH.Prelude.Explicit
+import CLaSH.Explicit.Prelude
 import Data.Maybe             (isJust)
 import Data.Constraint.Nat    (leTrans)
 @
@@ -1650,7 +1650,7 @@ Ultimately, the whole file containing our FIFO design will look like this:
 module MultiClockFifo where
 
 import CLaSH.Prelude
-import CLaSH.Prelude.Explicit
+import CLaSH.Explicit.Prelude
 import Data.Maybe             (isJust)
 
 fifoMem wclk rclk addrSize wfull raddr wdataM =
