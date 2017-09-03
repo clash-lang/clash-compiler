@@ -21,7 +21,7 @@ import I2C.Types
                    , PortName "ackIn"
                    , PortName "din"
                    , PortName "i2cI"]
-    , t_outputs  = [ PortField ""
+    , t_output   = PortField ""
                      [ PortName "dout"
                      , PortName "hostAck"
                      , PortName "busy"
@@ -29,7 +29,6 @@ import I2C.Types
                      , PortName "ackOut"
                      , PortField "" [PortName "i2cO_clk"]
                      ]
-                   ]
     }) #-}
 i2c rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
   where

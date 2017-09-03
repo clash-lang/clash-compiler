@@ -44,7 +44,7 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
                           , PortName "din" ]
                       , PortName "i2cI" ]
                    ]
-    , t_outputs  = [ PortField ""
+    , t_output   = PortField ""
                      [ PortField ""
                         [ PortName "cmdAck"
                         , PortName "al"
@@ -52,7 +52,6 @@ type BitMasterO = (BitRespSig,Bool,I2COut)
                      , PortName "busy"
                      , PortName "i2cO"
                      ]
-                   ]
     }) #-}
 bitMaster
   :: SystemClockReset

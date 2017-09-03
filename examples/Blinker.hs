@@ -8,11 +8,12 @@ type Dom50 = Dom "System" 20000
 
 {-# ANN topEntity
   (defTop
-    { t_name     = "blinker"
-    , t_inputs   = [PortName "CLOCK_50"
-                   ,PortName "KEY0"
-                   ,PortName "KEY1"]
-    , t_outputs  = [PortName "LED"]
+    { t_name   = "blinker"
+    , t_inputs = [ PortName "CLOCK_50"
+                 , PortName "KEY0"
+                 , PortName "KEY1"
+                 ]
+    , t_output = PortName "LED"
     }) #-}
 topEntity :: Clock Dom50 Source -> Reset Dom50 Asynchronous -> Signal Dom50 Bit -> Signal Dom50 (BitVector 8)
 topEntity clk rst key1 =
