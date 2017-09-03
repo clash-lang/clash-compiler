@@ -1,6 +1,8 @@
 dist*
 .stack-work
 cabal-dev
+cabal.project.local
+.ghc.environment.*
 *.o
 *.o-boot
 *.hi
