@@ -225,7 +225,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                              , "\nFunction " ++ show cf
                              , " will not reach a normal form, and compilation"
                              , " might fail."
-                             , "\nRun with '-clash-inline-limit=N' to increase"
+                             , "\nRun with '-fclash-inline-limit=N' to increase"
                              , " the inlining limit to N."
                              ])
                      (return e)

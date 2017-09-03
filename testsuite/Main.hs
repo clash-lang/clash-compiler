@@ -87,7 +87,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Fixed") defBuild [] "ZeroInt"    (["","ZeroInt_testBench"],"ZeroInt_testBench",True)
             ]
         , testGroup "Floating"
-            [ runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-clash-float-support"] "FloatPack" ([""],"FloatPack_topEntity",False)
+            [ runTest ("tests" </> "shouldwork" </> "Floating") defBuild ["-fclash-float-support"] "FloatPack" ([""],"FloatPack_topEntity",False)
             ]
         , testGroup "HOPrim"
             [ runTest ("tests" </> "shouldwork" </> "HOPrim") defBuild [] "HOImap"    (["","HOImap_testBench"],"HOImap_testBench",True)
@@ -121,7 +121,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Signal") defBuild [] "SigP"         ([""],"SigP_topEntity",False) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             ]
         , testGroup "Testbench" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/1152
-            [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-clash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-fclash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Testbench") defBuild [] "SyncTB"                    (["","SyncTB_testBench"],"SyncTB_testBench",True)
             ]
         , testGroup "Vector"
