@@ -48,13 +48,12 @@ type ByteMasterO = (Bool,Bool,BitVector 8,BitCtrlSig)
                       , PortName "din"
                       , PortName "bitResp" ]
                    ]
-    , t_outputs  = [ PortField ""
+    , t_output   = PortField ""
                      [ PortName "hostAck"
                      , PortName "ackOut"
                      , PortName "dout"
                      , PortName "bitCtrl"
                      ]
-                   ]
     }) #-}
 byteMaster
   :: SystemClockReset

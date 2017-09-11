@@ -8,11 +8,10 @@ import           CLaSH.Prelude
   (defTop { t_name = "example"
           , t_inputs = [ PortName "a"
                        ]
-          , t_outputs = [ PortField ""
-                            [ PortName "b"
-                            , PortName "c"
-                            ]
-                        ]
+          , t_output = PortField ""
+                         [ PortName "b"
+                         , PortName "c"
+                         ]
           }
   )#-}
 

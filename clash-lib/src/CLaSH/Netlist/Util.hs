@@ -349,7 +349,7 @@ mkUniqueResult (Just teM) res = do
       o'   = pack (name2String o)
       ty   = unembed (varType res)
       hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
-      oPortSupply = maybe Nothing (listToMaybe . t_outputs) teM
+      oPortSupply = fmap t_output teM
   (ports,decls,pN) <- mkOutput oPortSupply (o',hwty)
   let pO = repName (unpack pN) o
   return (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
@@ -675,7 +675,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
 
   -- output
   let oPortSupply = maybe (repeat Nothing)
-                        (extendPorts . t_outputs)
+                        (extendPorts . (:[]) . t_output)
                         annM
 
       result = ("result",snd dstId)
