@@ -61,7 +61,7 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
     -- they themselves check whether the to-be-inlined binder is recursive or not.
     transInlineSafe :: [(String,NormRewrite)]
     transInlineSafe =
-       [ ("inlineClosed"    , inlineClosed)
+       [ ("inlineWorkFree"  , inlineWorkFree)
        , ("inlineSmall"     , inlineSmall)
        , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
                                                   -- See: [Note] bottom-up traversal for liftNonRep

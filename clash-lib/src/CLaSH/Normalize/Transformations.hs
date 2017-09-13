@@ -29,7 +29,7 @@ module CLaSH.Normalize.Transformations
   , deadCode
   , topLet
   , recToLetRec
-  , inlineClosed
+  , inlineWorkFree
   , inlineHO
   , inlineSmall
   , simpleCSE
@@ -531,29 +531,42 @@ bindConstantVar = inlineBinders test
         _ -> return False
     -- test _ _ = return False
 
--- | Inline nullary/closed functions
-inlineClosed :: NormRewrite
-inlineClosed _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
-  | all (either isConstant (const True)) args
+-- | Inline work-free functions, i.e. fully applied functions that evaluate to
+-- a constant
+inlineWorkFree :: NormRewrite
+inlineWorkFree _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
   = do
     tcm <- Lens.view tcCache
     eTy <- termType tcm e
+    argsHaveWork <- or <$> mapM (either expressionHasWork
+                                        (const (pure False)))
+                                args
     untranslatable <- isUntranslatableType eTy
     let isSignal = isSignalType tcm eTy
-    if untranslatable || isSignal
+    if untranslatable || isSignal || argsHaveWork
       then return e
       else do
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,_,_,inl,body) -> do
+          Just (_,_,_,_,body) -> do
             isRecBndr <- isRecursiveBndr f
-            if isRecBndr || inl == NoInline
+            if isRecBndr
                then return e
                else changed (mkApps body args)
           _ -> return e
+  where
+    -- an expression is has work when it contains free local variables,
+    -- or has a Signal type, i.e. it does not evaluate to a work-free
+    -- constant.
+    expressionHasWork e' = do
+      fvIds <- Lens.toListOf <$> localFreeIds <*> pure e'
+      tcm   <- Lens.view tcCache
+      e'Ty  <- termType tcm e'
+      let isSignal = isSignalType tcm e'Ty
+      return (not (null fvIds) || isSignal)
 
-inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
+inlineWorkFree _ e@(Var fTy (nameOcc -> f)) = do
   tcm <- Lens.view tcCache
   let closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
@@ -563,15 +576,15 @@ inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,inl,body) -> do
+        Just (_,_,_,_,body) -> do
           isRecBndr <- isRecursiveBndr f
-          if isRecBndr || inl == NoInline
+          if isRecBndr
              then return e
              else changed body
         _ -> return e
     else return e
 
-inlineClosed _ e = return e
+inlineWorkFree _ e = return e
 
 -- | Inline small functions
 inlineSmall :: NormRewrite
