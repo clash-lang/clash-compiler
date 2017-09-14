@@ -347,10 +347,10 @@ end
 , { "BlackBox" :
     { "name" : "CLaSH.Sized.Vector.concatBitVector#"
     , "type" :
-"concatBitVector# :: KnownNat m           -- ARG[0]
-                  => Vec n (BitVector m)  -- ARG[1]
+"concatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
+                  => Vec n (BitVector m)      -- ARG[2]
                   -> BitVector (n * m)"
-    , "templateE" : "~ARG[1]"
+    , "templateE" : "~ARG[2]"
     }
   }
 , { "BlackBox" :

@@ -109,6 +109,7 @@ library
 
                       clash-lib                 >= 0.7.1    && < 1.0,
                       clash-prelude             >= 0.11.2   && < 1.0,
+                      concurrent-supply         >= 0.1.7    && < 0.2,
                       ghc-typelits-extra        >= 0.1.3    && < 0.3,
                       ghc-typelits-knownnat     >= 0.1.2    && < 0.4,
                       ghc-typelits-natnormalise >= 0.4.3    && < 0.6,
@@ -117,7 +118,9 @@ library
                       ghc-boot                  >= 8.0.2    && < 8.4,
                       ghc-prim                  >= 0.3.1.0  && < 0.6,
                       ghci                      >= 8.2.0    && < 8.4,
-                      uniplate                  >= 1.6.12   && < 1.8
+                      uniplate                  >= 1.6.12   && < 1.8,
+                      reflection                >= 2.1.2    && < 3.0,
+                      integer-gmp               >= 1.0.1.0  && < 2.0
 
   if os(windows)
     Build-Depends:    Win32                     >= 2.3.1    && < 2.6

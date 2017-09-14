@@ -347,13 +347,13 @@ end generate;
 , { "BlackBox" :
     { "name" : "CLaSH.Sized.Vector.concatBitVector#"
     , "type" :
-"concatBitVector# :: KnownNat m           -- ARG[0]
-                  => Vec n (BitVector m)  -- ARG[1]
+"concatBitVector# :: (KnownNat n,KnownNat m) -- (ARG[0],ARG[1])
+                  => Vec n (BitVector m)     -- ARG[2]
                   -> BitVector (n * m)"
     , "templateD" :
 "-- concatBitVector begin
-~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~VAR[vec][1]'range generate
-  ~RESULT(((~SYM[3] * ~LIT[0]) + ~LIT[0] - 1) downto (~SYM[3] * ~LIT[0])) <= ~TYPMO'(~VAR[vec][1](~VAR[vec][1]'high - ~SYM[3]));
+~GENSYM[concatBitVectorIter_loop][2] : for ~GENSYM[i][3] in ~VAR[vec][2]'range generate
+  ~RESULT(((~SYM[3] * ~LIT[1]) + ~LIT[1] - 1) downto (~SYM[3] * ~LIT[1])) <= ~TYPMO'(~VAR[vec][2](~VAR[vec][2]'high - ~SYM[3]));
 end generate;
 -- concatBitVector end"
     }

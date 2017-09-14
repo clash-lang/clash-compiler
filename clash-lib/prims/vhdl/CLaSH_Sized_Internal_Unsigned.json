@@ -164,8 +164,8 @@
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.Unsigned.shiftR#"
-    , "type"      : "shiftR# :: Unsigned n -> Int -> Unsigned n"
-    , "templateE" : "shift_right(~ARG[0],to_integer(~ARG[1]))"
+    , "type"      : "shiftR# :: KnownNat n => Unsigned n -> Int -> Unsigned n"
+    , "templateE" : "shift_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :

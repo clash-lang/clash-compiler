@@ -274,8 +274,8 @@ end
   }
 , { "BlackBox" :
     { "name"      : "CLaSH.Sized.Internal.BitVector.shiftR#"
-    , "type"      : "shiftR# :: BitVector n -> Int -> BitVector n"
-    , "templateE" : "~ARG[0] >> ~ARG[1]"
+    , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
+    , "templateE" : "~ARG[1] >> ~ARG[2]"
     }
   }
 , { "BlackBox" :

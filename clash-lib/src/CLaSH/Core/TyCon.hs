@@ -16,6 +16,7 @@ module CLaSH.Core.TyCon
   ( TyCon (..)
   , TyConName
   , TyConOccName
+  , TyConMap
   , AlgTyConRhs (..)
   , mkKindTyCon
   , isTupleTyConLike
@@ -29,6 +30,7 @@ where
 
 -- External Import
 import Control.DeepSeq
+import Data.HashMap.Lazy                      (HashMap)
 import GHC.Generics
 import Unbound.Generics.LocallyNameless       (Alpha(..))
 import Unbound.Generics.LocallyNameless.Extra ()
@@ -87,6 +89,7 @@ instance Ord TyCon where
 -- | TyCon reference
 type TyConName = Name TyCon
 type TyConOccName = OccName TyCon
+type TyConMap = HashMap TyConOccName TyCon
 
 -- | The RHS of an Algebraic Datatype
 data AlgTyConRhs

@@ -29,7 +29,7 @@ module CLaSH.Normalize.Transformations
   , deadCode
   , topLet
   , recToLetRec
-  , inlineClosed
+  , inlineWorkFree
   , inlineHO
   , inlineSmall
   , simpleCSE
@@ -43,6 +43,7 @@ module CLaSH.Normalize.Transformations
   )
 where
 
+import           Control.Concurrent.Supply   (splitSupply)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import           Control.Monad.Writer        (WriterT (..), lift, tell)
@@ -63,6 +64,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           BasicTypes                  (InlineSpec (..))
 
 import           CLaSH.Core.DataCon          (DataCon (..))
+import           CLaSH.Core.Evaluator        (whnf')
 import           CLaSH.Core.Name
   (Name (..), NameSort (..), name2String, string2InternalName, string2SystemName)
 import           CLaSH.Core.FreeVars         (termFreeIds, termFreeTyVars,
@@ -281,11 +283,15 @@ caseCon _ c@(Case (Literal l) _ alts) = do
     equalLit _               = False
 
 caseCon ctx e@(Case subj ty alts)
-  | isConstant subj = do
+  | (Prim _ _,_) <- collectArgs subj = do
     tcm <- Lens.view tcCache
+    bndrs <- Lens.use bindings
+    primEval <- Lens.view evaluator
+    ids <- Lens.use uniqSupply
+    let (ids1,ids2) = splitSupply ids
+    uniqSupply Lens..= ids2
     lvl <- Lens.view dbgLevel
-    reduceConstant <- Lens.view evaluator
-    case reduceConstant tcm True subj of
+    case whnf' primEval bndrs tcm ids1 True subj of
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj' -> case collectArgs subj' of
         (Data _,_) -> caseCon ctx (Case subj' ty alts)
@@ -302,7 +308,7 @@ caseCon ctx e@(Case subj ty alts)
         (Prim nm _,[])
           | nm `elem` ["EmptyCase"] ->
             changed (Prim nm ty)
-        _ -> traceIf (lvl > DebugNone)
+        _ -> traceIf (lvl > DebugNone && isConstant e)
                      ("Irreducible constant as case subject: " ++ showDoc subj ++ "\nCan be reduced to: " ++ showDoc subj')
                      (caseOneAlt e)
 
@@ -531,29 +537,42 @@ bindConstantVar = inlineBinders test
         _ -> return False
     -- test _ _ = return False
 
--- | Inline nullary/closed functions
-inlineClosed :: NormRewrite
-inlineClosed _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
-  | all (either isConstant (const True)) args
+-- | Inline work-free functions, i.e. fully applied functions that evaluate to
+-- a constant
+inlineWorkFree :: NormRewrite
+inlineWorkFree _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
   = do
     tcm <- Lens.view tcCache
     eTy <- termType tcm e
+    argsHaveWork <- or <$> mapM (either expressionHasWork
+                                        (const (pure False)))
+                                args
     untranslatable <- isUntranslatableType eTy
     let isSignal = isSignalType tcm eTy
-    if untranslatable || isSignal
+    if untranslatable || isSignal || argsHaveWork
       then return e
       else do
         bndrs <- Lens.use bindings
         case HashMap.lookup f bndrs of
           -- Don't inline recursive expressions
-          Just (_,_,_,inl,body) -> do
+          Just (_,_,_,_,body) -> do
             isRecBndr <- isRecursiveBndr f
-            if isRecBndr || inl == NoInline
+            if isRecBndr
                then return e
                else changed (mkApps body args)
           _ -> return e
+  where
+    -- an expression is has work when it contains free local variables,
+    -- or has a Signal type, i.e. it does not evaluate to a work-free
+    -- constant.
+    expressionHasWork e' = do
+      fvIds <- Lens.toListOf <$> localFreeIds <*> pure e'
+      tcm   <- Lens.view tcCache
+      e'Ty  <- termType tcm e'
+      let isSignal = isSignalType tcm e'Ty
+      return (not (null fvIds) || isSignal)
 
-inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
+inlineWorkFree _ e@(Var fTy (nameOcc -> f)) = do
   tcm <- Lens.view tcCache
   let closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
@@ -563,15 +582,15 @@ inlineClosed _ e@(Var fTy (nameOcc -> f)) = do
       bndrs <- Lens.use bindings
       case HashMap.lookup f bndrs of
         -- Don't inline recursive expressions
-        Just (_,_,_,inl,body) -> do
+        Just (_,_,_,_,body) -> do
           isRecBndr <- isRecursiveBndr f
-          if isRecBndr || inl == NoInline
+          if isRecBndr
              then return e
              else changed body
         _ -> return e
     else return e
 
-inlineClosed _ e = return e
+inlineWorkFree _ e = return e
 
 -- | Inline small functions
 inlineSmall :: NormRewrite
@@ -1028,9 +1047,17 @@ reduceConst _ e@(App _ _)
   , isPrim conPrim
   = do
     tcm <- Lens.view tcCache
-    reduceConstant <- Lens.view evaluator
-    case reduceConstant tcm False e of
+    bndrs <- Lens.use bindings
+    primEval <- Lens.view evaluator
+    ids <- Lens.use uniqSupply
+    let (ids1,ids2) = splitSupply ids
+    uniqSupply Lens..= ids2
+    case whnf' primEval bndrs tcm ids1 False e of
       e'@(Literal _) -> changed e'
+      e'@(collectArgs -> (Prim nm _, _))
+        | isFromInt nm
+        , e /= e'
+        -> changed e'
       e'@(collectArgs -> (Data _,_)) -> changed e'
       _              -> return e
 
