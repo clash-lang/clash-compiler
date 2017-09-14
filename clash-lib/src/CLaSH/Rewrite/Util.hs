@@ -618,7 +618,7 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
                                  , "The function `" ++ showDoc f ++ "' is most likely recursive, and looks like it is being indefinitely specialized on a growing argument.\n"
                                  , "Body of `" ++ showDoc f ++ "':\n" ++ showDoc bodyTm ++ "\n"
                                  , "Argument (in position: " ++ show argLen ++ ") that triggered termination:\n" ++ (either showDoc showDoc) specArg
-                                 , "Run with '-clash-spec-limit=N' to increase the specialisation limit to N."
+                                 , "Run with '-fclash-spec-limit=N' to increase the specialisation limit to N."
                                  ])
                         Nothing)
             else do

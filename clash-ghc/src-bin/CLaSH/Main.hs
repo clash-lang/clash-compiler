@@ -360,7 +360,7 @@ handleCLaSHException df opts e = case fromException e of
 
     showExtra False (Just _)   =
       blankLine $$
-      text "This error contains additional information, rerun with '-clash-error-extra' to show this information."
+      text "This error contains additional information, rerun with '-fclash-error-extra' to show this information."
     showExtra True  (Just msg) =
       blankLine $$
       text "Additional information:" $$ blankLine $$

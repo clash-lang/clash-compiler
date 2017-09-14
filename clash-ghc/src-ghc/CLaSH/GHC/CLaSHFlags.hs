@@ -37,19 +37,19 @@ parseCLaSHFlagsFull flagsAvialable args = do
 
 flagsClash :: IORef CLaSHOpts -> [Flag IO]
 flagsClash r = [
-    defFlag "clash-inline-limit" (IntSuffix (liftEwM . setInlineLimit r))
-  , defFlag "clash-spec-limit" (IntSuffix (liftEwM . setSpecLimit r))
-  , defFlag "clash-inline-function-limit" (IntSuffix (liftEwM . setInlineFunctionLimit r))
-  , defFlag "clash-inline-constant-limit" (IntSuffix (liftEwM . setInlineConstantLimit r))
-  , defFlag "clash-debug" (SepArg (setDebugLevel r))
-  , defFlag "clash-noclean" (NoArg (liftEwM (setNoClean r)))
-  , defFlag "clash-intwidth" (IntSuffix (setIntWidth r))
-  , defFlag "clash-hdldir" (SepArg (setHdlDir r))
-  , defFlag "clash-hdlsyn" (SepArg (setHdlSyn r))
-  , defFlag "clash-error-extra" (NoArg (liftEwM (setErrorExtra r)))
-  , defFlag "clash-float-support" (NoArg (liftEwM (setFloatSupport r)))
-  , defFlag "clash-allow-zero-width" (NoArg (liftEwM (setAllowZeroWidth r)))
-  , defFlag "clash-allow-invalid-coercions" (NoArg (liftEwM (setAllowInvalidCoercions r)))
+    defFlag "fclash-debug"                   $ SepArg (setDebugLevel r)
+  , defFlag "fclash-hdldir"                  $ SepArg (setHdlDir r)
+  , defFlag "fclash-hdlsyn"                  $ SepArg (setHdlSyn r)
+  , defFlag "fclash-noclean"                 $ NoArg (liftEwM (setNoClean r))
+  , defFlag "fclash-spec-limit"              $ IntSuffix (liftEwM . setSpecLimit r)
+  , defFlag "fclash-inline-limit"            $ IntSuffix (liftEwM . setInlineLimit r)
+  , defFlag "fclash-inline-function-limit"   $ IntSuffix (liftEwM . setInlineFunctionLimit r)
+  , defFlag "fclash-inline-constant-limit"   $ IntSuffix (liftEwM . setInlineConstantLimit r)
+  , defFlag "fclash-intwidth"                $ IntSuffix (setIntWidth r)
+  , defFlag "fclash-error-extra"             $ NoArg (liftEwM (setErrorExtra r))
+  , defFlag "fclash-float-support"           $ NoArg (liftEwM (setFloatSupport r))
+  , defFlag "fclash-allow-zero-width"        $ NoArg (liftEwM (setAllowZeroWidth r))
+  , defFlag "fclash-allow-invalid-coercions" $ NoArg (liftEwM (setAllowInvalidCoercions r))
   ]
 
 setInlineLimit :: IORef CLaSHOpts
