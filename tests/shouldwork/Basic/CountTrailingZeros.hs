@@ -3,7 +3,7 @@ module CountTrailingZeros where
 
 #include "MachDeps.h"
 
-import CLaSH.Prelude
+import Clash.Prelude
 import GHC.Word
 import Data.Bits
 

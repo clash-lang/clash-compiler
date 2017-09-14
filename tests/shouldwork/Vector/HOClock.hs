@@ -1,6 +1,6 @@
 module HOClock where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity
   :: SystemClockReset

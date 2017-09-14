@@ -1,6 +1,6 @@
 module Resize where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Signed 4 -> Signed 3
 topEntity = resize

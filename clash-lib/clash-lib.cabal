@@ -122,55 +122,55 @@ Library
                       uu-parsinglib           >= 2.8.1    && < 2.10,
                       wl-pprint-text          >= 1.1.0.0  && < 1.2
 
-  Exposed-modules:    CLaSH.Backend
-                      CLaSH.Backend.SystemVerilog
-                      CLaSH.Backend.Verilog
-                      CLaSH.Backend.VHDL
+  Exposed-modules:    Clash.Backend
+                      Clash.Backend.SystemVerilog
+                      Clash.Backend.Verilog
+                      Clash.Backend.VHDL
 
-                      CLaSH.Core.DataCon
-                      CLaSH.Core.Evaluator
-                      CLaSH.Core.FreeVars
-                      CLaSH.Core.Literal
-                      CLaSH.Core.Name
-                      CLaSH.Core.Pretty
-                      CLaSH.Core.Subst
-                      CLaSH.Core.Term
-                      CLaSH.Core.TyCon
-                      CLaSH.Core.Type
-                      CLaSH.Core.TysPrim
-                      CLaSH.Core.Util
-                      CLaSH.Core.Var
+                      Clash.Core.DataCon
+                      Clash.Core.Evaluator
+                      Clash.Core.FreeVars
+                      Clash.Core.Literal
+                      Clash.Core.Name
+                      Clash.Core.Pretty
+                      Clash.Core.Subst
+                      Clash.Core.Term
+                      Clash.Core.TyCon
+                      Clash.Core.Type
+                      Clash.Core.TysPrim
+                      Clash.Core.Util
+                      Clash.Core.Var
 
-                      CLaSH.Driver
-                      CLaSH.Driver.Types
+                      Clash.Driver
+                      Clash.Driver.Types
 
-                      CLaSH.Netlist
-                      CLaSH.Netlist.BlackBox
-                      CLaSH.Netlist.BlackBox.Parser
-                      CLaSH.Netlist.BlackBox.Types
-                      CLaSH.Netlist.BlackBox.Util
-                      CLaSH.Netlist.Id
-                      CLaSH.Netlist.Types
-                      CLaSH.Netlist.Util
+                      Clash.Netlist
+                      Clash.Netlist.BlackBox
+                      Clash.Netlist.BlackBox.Parser
+                      Clash.Netlist.BlackBox.Types
+                      Clash.Netlist.BlackBox.Util
+                      Clash.Netlist.Id
+                      Clash.Netlist.Types
+                      Clash.Netlist.Util
 
-                      CLaSH.Normalize
-                      CLaSH.Normalize.DEC
-                      CLaSH.Normalize.PrimitiveReductions
-                      CLaSH.Normalize.Strategy
-                      CLaSH.Normalize.Transformations
-                      CLaSH.Normalize.Types
-                      CLaSH.Normalize.Util
+                      Clash.Normalize
+                      Clash.Normalize.DEC
+                      Clash.Normalize.PrimitiveReductions
+                      Clash.Normalize.Strategy
+                      Clash.Normalize.Transformations
+                      Clash.Normalize.Types
+                      Clash.Normalize.Util
 
-                      CLaSH.Primitives.Types
-                      CLaSH.Primitives.Util
+                      Clash.Primitives.Types
+                      Clash.Primitives.Util
 
-                      CLaSH.Rewrite.Combinators
-                      CLaSH.Rewrite.Types
-                      CLaSH.Rewrite.Util
+                      Clash.Rewrite.Combinators
+                      Clash.Rewrite.Types
+                      Clash.Rewrite.Util
 
-                      CLaSH.Util
+                      Clash.Util
 
-  Other-Modules:      CLaSH.Annotations.TopEntity.Extra
+  Other-Modules:      Clash.Annotations.TopEntity.Extra
                       Data.Aeson.Extra
                       GHC.BasicTypes.Extra
                       GHC.SrcLoc.Extra

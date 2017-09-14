@@ -9,7 +9,7 @@ module Data.Aeson.Extra where
 import Data.Aeson           (FromJSON, Result (..), fromJSON, json)
 import Data.Attoparsec.Lazy (Result (..), parse)
 import Data.ByteString.Lazy (ByteString)
-import CLaSH.Util           (traceIf)
+import Clash.Util           (traceIf)
 
 -- | Parse a ByteString according to the given JSON template. Prints failures
 -- on @stdout@, and returns 'Nothing' if parsing fails.

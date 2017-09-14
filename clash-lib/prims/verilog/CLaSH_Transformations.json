@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Transformations.removedArg"
+    { "name"      : "Clash.Transformations.removedArg"
     , "type"      : "removedArg :: a"
     , "templateE" : "~ERRORO"
     }

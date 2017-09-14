@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Explicit.ROM.File.romFile#"
+    { "name" : "Clash.Explicit.ROM.File.romFile#"
     , "type" :
 "romFile# :: KnownNat m      -- ARG[0]
           => Clock dom gated -- clk,  ARG[1]

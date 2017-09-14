@@ -1,6 +1,6 @@
 module VRotate where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 5 Int -> (Vec 5 Int,Vec 5 Int)
 topEntity v = (rotateLeftS v d2,rotateRightS v d2)

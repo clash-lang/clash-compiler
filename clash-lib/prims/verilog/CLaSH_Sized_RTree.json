@@ -1,17 +1,17 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.RTree.treplicate"
+    { "name"      : "Clash.Sized.RTree.treplicate"
     , "type"      : "replicate :: SNat d -> a -> RTree d a"
     , "templateE" : "'{(2**~LIT[0]) {~ARG[1]}}"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.RTree.textract"
+    { "name"      : "Clash.Sized.RTree.textract"
     , "type"      : "textract :: RTree 0 a -> a"
     , "templateE" : "~VAR[tree][0][~SIZE[~TYP[0]]-1 -: ~SIZE[~TYPO]]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.RTree.tsplit"
+    { "name"      : "Clash.Sized.RTree.tsplit"
     , "type"      : "tsplit:: RTree (d+1) a -> (RTree d a,RTree d a)"
     , "templateE" : "~ARG[0]"
     }

@@ -1,29 +1,29 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.head"
+    { "name"      : "Clash.Sized.Vector.head"
     , "type"      : "head :: Vec (n + 1) a -> a"
     , "templateE" : "~IF ~VIVADO ~THEN fromSLV(~VAR[vec][0](0)) ~ELSE ~VAR[vec][0](0) ~FI"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.tail"
+    { "name"      : "Clash.Sized.Vector.tail"
     , "type"      : "tail :: Vec (n + 1) a -> Vec n a"
     , "templateE" : "~VAR[vec][0](1 to ~VAR[vec][0]'high)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.last"
+    { "name"      : "Clash.Sized.Vector.last"
     , "type"      : "Vec (n + 1) a -> a"
     , "templateE" : "~IF ~VIVADO ~THEN fromSLV(~VAR[vec][0](~VAR[vec][0]'high)) ~ELSE ~VAR[vec][0](~VAR[vec][0]'high) ~FI"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.init"
+    { "name"      : "Clash.Sized.Vector.init"
     , "type"      : "Vec (n + 1) a -> Vec n a"
     , "templateE" : "~VAR[vec][0](0 to ~VAR[vec][0]'high - 1)"
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Sized.Vector.select"
+    { "name" : "Clash.Sized.Vector.select"
     , "type" :
 "select :: (CmpNat (i + s) (s * n) ~ GT) -- ARG[0]
         => SNat f                        -- ARG[1]
@@ -40,13 +40,13 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.++"
+    { "name"      : "Clash.Sized.Vector.++"
     , "type"      : "(++) :: Vec n a -> Vec m a -> Vec (n + m) a"
     , "templateE" : "~TYPMO'(~TYPM[0]'(~ARG[0]) & ~TYPM[1]'(~ARG[1]))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.concat"
+    { "name"      : "Clash.Sized.Vector.concat"
     , "type"      : "concat :: Vec n (Vec m a) -> Vec (n * m) a"
     , "templateD" :
 "-- concat begin
@@ -59,13 +59,13 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.splitAt"
+    { "name"      : "Clash.Sized.Vector.splitAt"
     , "type"      : "splitAt :: SNat m -> Vec (m + n) a -> (Vec m a, Vec n a)"
     , "templateE" : "(~VAR[vec][1](0 to ~LIT[0]-1),~VAR[vec][1](~LIT[0] to ~VAR[vec][1]'high))"
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Sized.Vector.unconcat"
+    { "name" : "Clash.Sized.Vector.unconcat"
     , "type" :
 "unconcat :: KnownNat n     -- ARG[0]
           => SNat m         -- ARG[1]
@@ -82,7 +82,7 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.map"
+    { "name"      : "Clash.Sized.Vector.map"
     , "type"      : "map :: (a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "-- map begin
@@ -107,7 +107,7 @@ end generate;~FI
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.imap"
+    { "name"      : "Clash.Sized.Vector.imap"
     , "type"      : "imap :: KnownNat n => (Index n -> a -> b) -> Vec n a -> Vec n b"
     , "templateD" :
 "-- imap begin
@@ -143,7 +143,7 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.zipWith"
+    { "name"      : "Clash.Sized.Vector.zipWith"
     , "type"      : "zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c"
     , "templateD" :
 "-- zipWith begin
@@ -172,7 +172,7 @@ end generate;~FI
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.foldr"
+    { "name"      : "Clash.Sized.Vector.foldr"
     , "type"      : "foldr :: (a -> b -> b) -> b -> Vec n a -> b"
     , "templateD" :
 "-- foldr begin~IF ~LENGTH[~TYP[2]] ~THEN
@@ -207,7 +207,7 @@ end block;~ELSE
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.fold"
+    { "name"      : "Clash.Sized.Vector.fold"
     , "type"      : "fold :: (a -> a -> a) -> Vec (n+1) a -> a"
     , "comment"   : "THIS ONLY WORKS FOR POWER OF TWO LENGTH VECTORS"
     , "templateD" :
@@ -251,7 +251,7 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.index_int"
+    { "name"      : "Clash.Sized.Vector.index_int"
     , "type"      : "index_int :: KnownNat n => Vec n a -> Int -> a"
     , "templateD" :
 "-- index begin
@@ -270,7 +270,7 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.replace_int"
+    { "name"      : "Clash.Sized.Vector.replace_int"
     , "type"      : "replace_int :: KnownNat n => Vec n a -> Int -> a -> Vec n a"
     , "templateD" :
 "-- replace begin
@@ -296,25 +296,25 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.maxIndex"
+    { "name"      : "Clash.Sized.Vector.maxIndex"
     , "type"      : "maxIndex :: KnownNat n => Vec n a -> Int"
     , "templateE" : "to_signed(~LIT[0] - 1,~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.length"
+    { "name"      : "Clash.Sized.Vector.length"
     , "type"      : "length :: KnownNat n => Vec n a -> Int"
     , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.replicate"
+    { "name"      : "Clash.Sized.Vector.replicate"
     , "type"      : "replicate :: SNat n -> a -> Vec n a"
     , "templateE" : "~TYPMO'(0 to ~LIT[0]-1 => ~IF ~VIVADO ~THEN ~TOBV[~TYPM[1]'(~ARG[1])][~TYP[1]] ~ELSE ~ARG[1] ~FI)"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.transpose"
+    { "name"      : "Clash.Sized.Vector.transpose"
     , "type"      : "transpose :: KnownNat n => Vec m (Vec n a) -> Vec n (Vec m a)"
     , "templateD" :
 "-- transpose begin
@@ -328,7 +328,7 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.reverse"
+    { "name"      : "Clash.Sized.Vector.reverse"
     , "type"      : "reverse :: Vec n a -> Vec n a"
     , "templateD" :
 "-- reverse begin
@@ -339,13 +339,13 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.lazyV"
+    { "name"      : "Clash.Sized.Vector.lazyV"
     , "type"      : "lazyV :: KnownNat n => Vec n a -> Vec n a"
     , "templateE" : "~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Sized.Vector.concatBitVector#"
+    { "name" : "Clash.Sized.Vector.concatBitVector#"
     , "type" :
 "concatBitVector# :: (KnownNat n,KnownNat m) -- (ARG[0],ARG[1])
                   => Vec n (BitVector m)     -- ARG[2]
@@ -359,7 +359,7 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Sized.Vector.unconcatBitVector#"
+    { "name" : "Clash.Sized.Vector.unconcatBitVector#"
     , "type" :
 "unconcatBitVector# :: (KnownNat n, KnownNat m) -- (ARG[0],ARG[1])
                     => BitVector (n * m)        -- ARG[2]
@@ -373,7 +373,7 @@ end generate;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.rotateLeftS"
+    { "name"      : "Clash.Sized.Vector.rotateLeftS"
     , "type"      : "rotateLeftS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "templateD" :
 "-- rotateLeftS begin
@@ -393,7 +393,7 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Vector.rotateRightS"
+    { "name"      : "Clash.Sized.Vector.rotateRightS"
     , "type"      : "rotateRightS :: KnownNat n => Vec n a -> SNat d -> Vec n a"
     , "templateD" :
 "-- rotateRightS begin

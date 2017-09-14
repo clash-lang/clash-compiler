@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, UndecidableInstances #-}
 module TFold where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import GHC.TypeLits.Extra
 
 import Data.Proxy

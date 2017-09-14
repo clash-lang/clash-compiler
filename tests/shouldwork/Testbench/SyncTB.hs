@@ -1,6 +1,6 @@
 module SyncTB where
 
-import CLaSH.Explicit.Prelude
+import Clash.Explicit.Prelude
 
 type Dom2 = Dom "dom" 2
 type Dom7 = Dom "dom" 7

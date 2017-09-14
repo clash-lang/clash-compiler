@@ -1,6 +1,6 @@
 module BlockRamFile where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 zeroAt0
   :: HasClockReset domain gated synchronous

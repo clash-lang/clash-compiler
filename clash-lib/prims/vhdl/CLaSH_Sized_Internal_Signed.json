@@ -1,59 +1,59 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.size#"
+    { "name"      : "Clash.Sized.Internal.Signed.size#"
     , "type"      : "size# :: KnownNat n => Signed n -> Int"
     , "templateE" : "to_signed(~LIT[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.pack#"
+    { "name"      : "Clash.Sized.Internal.Signed.pack#"
     , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
     , "templateE" : "std_logic_vector(~ARG[1])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.unpack#"
+    { "name"      : "Clash.Sized.Internal.Signed.unpack#"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
     , "templateE" : "signed(~ARG[1])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.eq#"
+    { "name"      : "Clash.Sized.Internal.Signed.eq#"
     , "type"      : "eq# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] = ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.neq#"
+    { "name"      : "Clash.Sized.Internal.Signed.neq#"
     , "type"      : "neq# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] /= ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.lt#"
+    { "name"      : "Clash.Sized.Internal.Signed.lt#"
     , "type"      : "lt# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] < ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.ge#"
+    { "name"      : "Clash.Sized.Internal.Signed.ge#"
     , "type"      : "ge# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] >= ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.gt#"
+    { "name"      : "Clash.Sized.Internal.Signed.gt#"
     , "type"      : "gt# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] > ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.le#"
+    { "name"      : "Clash.Sized.Internal.Signed.le#"
     , "type"      : "le# :: Signed n -> Signed n -> Bool"
     , "templateE" : "~ARG[0] <= ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.minBound#"
+    { "name"      : "Clash.Sized.Internal.Signed.minBound#"
     , "type"      : "minBound# :: KnownNat n => Signed n"
     , "comment"   : "Generates incorrect VDHL for n=0"
     , "comment2"  : "the quantification with signed gives the array an ascending index"
@@ -61,7 +61,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.maxBound#"
+    { "name"      : "Clash.Sized.Internal.Signed.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => Signed n"
     , "comment"   : "Generates incorrect VDHL for n=0"
     , "comment2"  : "the quantification with signed gives the array an ascending index"
@@ -69,73 +69,73 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.+#"
+    { "name"      : "Clash.Sized.Internal.Signed.+#"
     , "type"      : "(+#) :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] + ~ARG[2]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.-#"
+    { "name"      : "Clash.Sized.Internal.Signed.-#"
     , "type"      : "(-#) :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] - ~ARG[2]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.*#"
+    { "name"      : "Clash.Sized.Internal.Signed.*#"
     , "type"      : "(*#) :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "resize(~ARG[1] * ~ARG[2], ~LIT[0])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.negate#"
+    { "name"      : "Clash.Sized.Internal.Signed.negate#"
     , "type"      : "negate# :: KnownNat n => Signed n -> Signed n"
     , "templateE" : "-~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.abs#"
+    { "name"      : "Clash.Sized.Internal.Signed.abs#"
     , "type"      : "abs# :: KnownNat n => Signed n -> Signed n"
     , "templateE" : "abs ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.fromInteger#"
+    { "name"      : "Clash.Sized.Internal.Signed.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> Signed (n :: Nat)"
     , "templateE" : "resize(~ARG[1],~LIT[0])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.plus#"
+    { "name"      : "Clash.Sized.Internal.Signed.plus#"
     , "type"      : "plus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
     , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) + resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.minus#"
+    { "name"      : "Clash.Sized.Internal.Signed.minus#"
     , "type"      : "minus# :: Signed m -> Signed n -> Signed (1 + Max m n)"
     , "templateE" : "resize(~ARG[0],~SIZE[~TYPO]) - resize(~ARG[1],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.times#"
+    { "name"      : "Clash.Sized.Internal.Signed.times#"
     , "type"      : "times# :: Signed m -> Signed n -> Signed (m + n)"
     , "templateE" : "~ARG[0] * ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.quot#"
+    { "name"      : "Clash.Sized.Internal.Signed.quot#"
     , "type"      : "quot# :: Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[0] / ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.rem#"
+    { "name"      : "Clash.Sized.Internal.Signed.rem#"
     , "type"      : "rem# :: Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[0] rem ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.div#"
+    { "name"      : "Clash.Sized.Internal.Signed.div#"
     , "type"      : "div# :: Signed n -> Signed n -> Signed n"
     , "templateD" :
 "-- divSigned begin
@@ -150,73 +150,73 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.mod#"
+    { "name"      : "Clash.Sized.Internal.Signed.mod#"
     , "type"      : "mod# :: Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[0] mod ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.toInteger#"
+    { "name"      : "Clash.Sized.Internal.Signed.toInteger#"
     , "type"      : "toInteger# :: Signed n -> Integer"
     , "templateE" : "resize(~ARG[0],~SIZE[~TYPO])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.and#"
+    { "name"      : "Clash.Sized.Internal.Signed.and#"
     , "type"      : "and# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] and ~ARG[2]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.or#"
+    { "name"      : "Clash.Sized.Internal.Signed.or#"
     , "type"      : "or# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] or ~ARG[2]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.xor#"
+    { "name"      : "Clash.Sized.Internal.Signed.xor#"
     , "type"      : "xor# :: KnownNat n => Signed n -> Signed n -> Signed n"
     , "templateE" : "~ARG[1] xor ~ARG[2]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.complement#"
+    { "name"      : "Clash.Sized.Internal.Signed.complement#"
     , "type"      : "complement# :: KnownNat n => Signed n -> Signed n"
     , "templateE" : "not ~ARG[1]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.shiftL#"
+    { "name"      : "Clash.Sized.Internal.Signed.shiftL#"
     , "type"      : "shiftL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateE" : "shift_left(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.shiftR#"
+    { "name"      : "Clash.Sized.Internal.Signed.shiftR#"
     , "type"      : "shiftR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateE" : "shift_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.rotateL#"
+    { "name"      : "Clash.Sized.Internal.Signed.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateE" : "rotate_left(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.rotateR#"
+    { "name"      : "Clash.Sized.Internal.Signed.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => Signed n -> Int -> Signed n"
     , "templateE" : "rotate_right(~ARG[1],to_integer(~ARG[2]))"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.resize#"
+    { "name"      : "Clash.Sized.Internal.Signed.resize#"
     , "type"      : "resize# :: (KnownNat n, KnownNat m) => Signed n -> Signed m"
     , "templateE" : "resize(~ARG[2],~LIT[1])"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Sized.Internal.Signed.truncateB#"
+    { "name"      : "Clash.Sized.Internal.Signed.truncateB#"
     , "type"      : "truncateB# :: KnownNat m => Signed (n + m) -> Signed m"
     , "templateE" : "~VAR[s][1](~LIT[0]-1 downto 0)"
     }

@@ -1,6 +1,6 @@
 module Fold where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 8 Int -> Int
 topEntity = fold (+)

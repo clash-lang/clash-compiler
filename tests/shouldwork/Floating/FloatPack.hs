@@ -1,6 +1,6 @@
 module FloatPack where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: (Float,Double,BitVector 32,BitVector 64)
           -> (BitVector 32, BitVector 64, Float, Double)

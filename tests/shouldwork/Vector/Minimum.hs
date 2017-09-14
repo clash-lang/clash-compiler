@@ -1,6 +1,6 @@
 module Minimum where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 3 Int -> Int
 topEntity = minimum

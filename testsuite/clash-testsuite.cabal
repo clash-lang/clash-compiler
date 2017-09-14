@@ -3,7 +3,7 @@
 
 name:                clash-testsuite
 version:             0.1.0.0
-synopsis:            CLaSH Testsuite
+synopsis:            Clash Testsuite
 -- description:
 homepage:            http://www.clash-lang.org/
 license:             BSD2

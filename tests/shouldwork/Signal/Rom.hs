@@ -1,6 +1,6 @@
 module Rom where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import qualified Data.List as L
 
 zeroAt0

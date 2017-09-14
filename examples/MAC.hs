@@ -1,6 +1,6 @@
 module MAC where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 ma acc (x,y) = acc + x * y
 

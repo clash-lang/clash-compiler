@@ -1,6 +1,6 @@
 module TestMap where
 
-import CLaSH.Explicit.Prelude
+import Clash.Explicit.Prelude
 
 type System50 = Dom "system" 50
 type Sig1 = Signal System50

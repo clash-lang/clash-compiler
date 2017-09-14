@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeOperators, TypeFamilies, FlexibleContexts, ExplicitForAll, ScopedTypeVariables #-}
 module Windows where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import qualified Data.List as L
 
 type Elm = Unsigned 16

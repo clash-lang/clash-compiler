@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Fifo where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 type Elm  = Unsigned 8
 type Pntr n = Unsigned (n + 1)

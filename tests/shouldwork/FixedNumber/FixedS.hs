@@ -1,6 +1,6 @@
 module FixedS where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 type SF = SFixed 4 20
 

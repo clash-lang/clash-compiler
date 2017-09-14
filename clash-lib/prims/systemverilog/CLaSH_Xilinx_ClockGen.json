@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Xilinx.ClockGen.clockWizard"
+    { "name"      : "Clash.Xilinx.ClockGen.clockWizard"
     , "type"      :
 "clockWizard
   :: SSymbol name               -- ARG[0]
@@ -17,7 +17,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Xilinx.ClockGen.clockWizardDifferential"
+    { "name"      : "Clash.Xilinx.ClockGen.clockWizardDifferential"
     , "type"      :
 "clockWizardDifferential
   :: SSymbol name               -- ARG[0]

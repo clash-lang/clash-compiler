@@ -1,6 +1,6 @@
 module CBlockRamTest where
 
-import CLaSH.Explicit.Prelude
+import Clash.Explicit.Prelude
 
 type DomA10 = Dom "A" 10
 

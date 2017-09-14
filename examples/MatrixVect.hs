@@ -1,6 +1,6 @@
 module MatrixVect where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import qualified Data.List as L
 
 row1 = 1 :> 2 :> 3 :> Nil

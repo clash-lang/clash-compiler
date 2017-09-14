@@ -1,6 +1,6 @@
 module ToList where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import qualified Data.List as L
 
 topEntity :: Vec 3 Int -> Int

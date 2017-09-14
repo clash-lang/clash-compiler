@@ -1,6 +1,6 @@
 module MovingAvg where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 windowN
   :: (Default a,KnownNat n, HasClockReset domain gated synchronous)

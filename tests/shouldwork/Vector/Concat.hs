@@ -1,6 +1,6 @@
 module Concat where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 2 (Vec 3 (Unsigned 8)) -> Vec 6 (Unsigned 8)
 topEntity = concat

@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Xilinx.DDR.iddr"
+    { "name" : "Clash.Xilinx.DDR.iddr"
     , "type" :
 "iddr
   :: ( HasCallStack               -- ARG[0]
@@ -44,7 +44,7 @@ assign ~RESULT = {~SYM[2],~SYM[1]};
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Xilinx.DDR.oddr#"
+    { "name" : "Clash.Xilinx.DDR.oddr#"
     , "type" :
 "oddr#
   :: ( slow ~ Dom n (2*pFast)           -- ARG[0]

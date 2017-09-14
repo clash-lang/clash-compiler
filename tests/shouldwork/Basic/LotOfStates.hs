@@ -1,6 +1,6 @@
 module LotOfStates where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 data States = S_0
             | S_1

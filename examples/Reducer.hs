@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Reducer where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 -- =======================================
 -- = System size configuration variables =

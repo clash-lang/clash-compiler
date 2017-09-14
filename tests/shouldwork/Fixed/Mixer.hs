@@ -1,6 +1,6 @@
 module Mixer where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 k               = 0.6
 piFHalf         = 1.5707963267948966 :: SFixed 3 8

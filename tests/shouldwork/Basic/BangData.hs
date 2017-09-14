@@ -1,7 +1,7 @@
 {-# LANGUAGE StrictData #-}
 module BangData where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 data BangData
   = BangData

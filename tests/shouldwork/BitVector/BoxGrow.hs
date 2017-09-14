@@ -1,6 +1,6 @@
 module BoxGrow where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 ys >:> xss = zipWith (:>) ys xss
 xss <:< ys = zipWith (:<) xss ys

@@ -10,7 +10,7 @@ module Main
   ) where
 
 import           System.Environment ( getArgs )
-import           CLaSH.Main         ( defaultMain )
+import           Clash.Main         ( defaultMain )
 
 main :: IO ()
 main = getArgs >>= defaultMain . ("--interactive":)

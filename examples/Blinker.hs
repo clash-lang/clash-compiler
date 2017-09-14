@@ -1,8 +1,8 @@
 module Blinker where
 
-import CLaSH.Prelude
-import CLaSH.Promoted.Symbol
-import CLaSH.Intel.ClockGen
+import Clash.Prelude
+import Clash.Promoted.Symbol
+import Clash.Intel.ClockGen
 
 type Dom50 = Dom "System" 20000
 

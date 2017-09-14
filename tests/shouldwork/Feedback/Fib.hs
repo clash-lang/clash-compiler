@@ -1,6 +1,6 @@
 module Fib where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 fib :: HasClockReset dom gated synchronous => Signal dom (Unsigned 64)
 fib = register 1 fib + register 0 (register 0 fib)

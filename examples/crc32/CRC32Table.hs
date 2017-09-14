@@ -1,6 +1,6 @@
 module CRC32Table where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 -- | Table of CRC32 values for all values an 8-bit number can have.
 --

@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module I2C.BitMaster.StateMachine where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Control.Lens hiding (Index)
 import Control.Monad.State
 

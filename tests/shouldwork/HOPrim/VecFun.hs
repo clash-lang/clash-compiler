@@ -1,6 +1,6 @@
 module VecFun where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity = work
 {-# NOINLINE topEntity #-}

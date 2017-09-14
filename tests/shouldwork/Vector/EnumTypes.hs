@@ -1,6 +1,6 @@
 module EnumTypes where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 data Valid = Valid | Invalid
 data Exec  = Exec  | NOP

@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 module DFold2 where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Data.Proxy
 
 topEntity :: Vec 4 (Vec 4 (Unsigned 8)) -> Vec 4 (Vec 4 (Unsigned 8))

@@ -1,6 +1,6 @@
 module FloatConstFolding where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Signal System (Float,Double,Signed 8,Signed 9)
 topEntity = pure ( resFloat

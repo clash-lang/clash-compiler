@@ -1,6 +1,6 @@
 module LambdaDrop where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Signal System (BitVector 2)
 topEntity = (++#) <$> outport1 <*> outport2

@@ -2,7 +2,7 @@
 
 module NoCPR where
 
-import           CLaSH.Prelude
+import           Clash.Prelude
 
 {-# ANN example
   (defTop { t_name = "example"

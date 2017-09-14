@@ -2,7 +2,7 @@
 
 module HOImap where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 -- apply input signal on function matching address
 -- other functions gets input nothing

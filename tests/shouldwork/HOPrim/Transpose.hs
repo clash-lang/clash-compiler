@@ -1,6 +1,6 @@
 module Transpose where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity = transposeV
 {-# NOINLINE topEntity #-}

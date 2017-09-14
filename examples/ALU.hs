@@ -1,6 +1,6 @@
 module ALU where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 data OPC = ADD | MUL | SUB
 

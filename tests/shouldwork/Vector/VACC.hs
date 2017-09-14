@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 module VACC where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 8 Bit -> Vec 16 Bit
 topEntity x = o ++ p ++ q ++ k ++ l

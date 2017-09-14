@@ -1,6 +1,6 @@
 module Scatter where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 5 (Unsigned 10) -> Vec 5 (Unsigned 10)
 topEntity = scatter defvec to

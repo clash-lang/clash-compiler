@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Explicit.Signal.unsafeSynchronizer"
+    { "name"      : "Clash.Explicit.Signal.unsafeSynchronizer"
     , "type" :
 "unsafeSynchronizer
   :: Clock dom1 g1

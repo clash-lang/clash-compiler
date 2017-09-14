@@ -1,7 +1,7 @@
 module DDRin where
 
-import CLaSH.Explicit.Prelude
-import CLaSH.Explicit.DDR
+import Clash.Explicit.Prelude
+import Clash.Explicit.DDR
 
 type DomReal = Dom "A" 2000 -- real clock domain
 type DomDDR  = Dom "A" 1000 -- fake doublespeed domain, used to model a ddr signal

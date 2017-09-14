@@ -1,5 +1,5 @@
 [ { "Primitive" :
-    { "name"      : "CLaSH.Signal.Bundle.vecBundle#"
+    { "name"      : "Clash.Signal.Bundle.vecBundle#"
     , "primType"  : "Function"
     }
   }

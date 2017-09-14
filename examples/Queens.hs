@@ -1,6 +1,6 @@
 module Queens where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Data.Maybe
 
 mem <~ (i,x)    = replace i x mem
