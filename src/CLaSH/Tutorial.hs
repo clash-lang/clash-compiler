@@ -1238,8 +1238,8 @@ a general listing of the available template holes:
   other cases. Valid @\<CONDITION\>@s are @~LENGTH[\<HOLE\>]@, @~SIZE[\<HOLE\>]@,
   @~DEPTH[\<HOLE\>]@, @~VIVADO@, @~IW64@, @~ISLIT[N]@, @~ISVAR[N], @~ISGATED[N]@,
   @~ISSYNC[N]@, and @~AND[\<HOLE1\>,\<HOLE2\>,..]@.
-* @~VIVADO@: /1/ when CλaSH compiler is invoked with the @-clash-xilinx@ or
-  @-clash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
+* @~VIVADO@: /1/ when CλaSH compiler is invoked with the @-fclash-xilinx@ or
+  @-fclash-vivado@ flag. To be used with in an @~IF .. ~THEN .. ~ElSE .. ~FI@
   statement.
 * @~FROMBV[\<HOLE\>][\<TYPE\>]@: create conversion code that so that the
   expression in @\<HOLE\>@ is converted to a bit vector (@std_logic_vector@).
@@ -2082,12 +2082,12 @@ Here is a list of Haskell features for which the CλaSH compiler has only
         * 'Int8'
         * 'Int16'
         * 'Int32'
-        * 'Int64' (not available when compiling with @-clash-intwidth=32@ on a 64-bit machine)
+        * 'Int64' (not available when compiling with @-fclash-intwidth=32@ on a 64-bit machine)
         * 'Word'
         * 'Word8'
         * 'Word16'
         * 'Word32'
-        * 'Word64' (not available when compiling with @-clash-intwidth=32@ on a 64-bit machine)
+        * 'Word64' (not available when compiling with @-fclash-intwidth=32@ on a 64-bit machine)
         * 'Char'
 
     There are several aspects of which you should take note:
@@ -2100,13 +2100,13 @@ Here is a list of Haskell features for which the CλaSH compiler has only
             machine, and the other has a 64-bit machine. In general, you should
             be avoiding 'Int' in such cases, but as a band-aid solution, you can
             force the CλaSH compiler to use a specific bit-width for `Int` and
-            `Word` using the @-clash-intwidth=N@ flag, where /N/ must either be
+            `Word` using the @-fclash-intwidth=N@ flag, where /N/ must either be
             /32/ or /64/.
 
-        *   When you use the @-clash-intwidth=32@ flag on a /64-bit/ machine,
+        *   When you use the @-fclash-intwidth=32@ flag on a /64-bit/ machine,
             the 'Word64' and 'Int64' types /cannot/ be translated. This
             restriction does /not/ apply to the other three combinations of
-            @-clash-intwidth@ flag and machine type.
+            @-fclash-intwidth@ flag and machine type.
 
         *   The translation of 'Integer' is not meaning-preserving. 'Integer' in
             Haskell is an arbitrary precision integer, something that cannot
@@ -2115,7 +2115,7 @@ Here is a list of Haskell features for which the CλaSH compiler has only
             as we do for 'Int' and 'Word'. As you have read in a previous
             bullet point, this number of bits is either 32 or 64, depending on
             the architecture of the machine the CλaSH compiler is running on, or
-            the setting of the @-clash-intwidth@ flag.
+            the setting of the @-fclash-intwidth@ flag.
 
             Consequently, you should use `Integer` with due diligence; be
             especially careful when using `fromIntegral` as it does a conversion
