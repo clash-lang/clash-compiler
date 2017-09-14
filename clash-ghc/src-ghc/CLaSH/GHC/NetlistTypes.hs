@@ -50,7 +50,7 @@ ghcTypeToHWType iw floatSupport = go
                       [tyView -> TyConApp nm _]
                         | name2String nm == "GHC.Prim.Int#"   ->
                             error $ unlines ["Int64 not supported in forced 32-bit mode on a 64-bit machine."
-                                            ,"Run CLaSH with `-clash-intwidth=64`."
+                                            ,"Run CLaSH with `-fclash-intwidth=64`."
                                             ]
                         | name2String nm == "GHC.Prim.Int64#" ->
                             return (Signed 64)
@@ -67,7 +67,7 @@ ghcTypeToHWType iw floatSupport = go
                       [tyView -> TyConApp nm _]
                         | name2String nm == "GHC.Prim.Word#"   ->
                             error $ unlines ["Word64 not supported in forced 32-bit mode on a 64-bit machine."
-                                            ,"Run CLaSH with `-clash-intwidth=64`."
+                                            ,"Run CLaSH with `-fclash-intwidth=64`."
                                             ]
                         | name2String nm == "GHC.Prim.Word64#" ->
                             return (Unsigned 64)
