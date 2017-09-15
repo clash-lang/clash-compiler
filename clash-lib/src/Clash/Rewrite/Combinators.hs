@@ -52,6 +52,10 @@ allR _ trans c (TyApp e ty) = do
   e' <- trans (TyAppC:c) e
   return $ TyApp e' ty
 
+allR _ trans c (Cast e ty1 ty2) = do
+  e' <- trans (CastBody:c) e
+  return $ Cast e' ty1 ty2
+
 allR rf trans c (Letrec b) = do
   (xesR,e) <- if rf then unbind b else return (unsafeUnbind b)
   let xes   = unrec xesR

@@ -64,6 +64,7 @@ termType m e = case e of
   Letrec b       -> do (_,e') <- unbind b
                        termType m e'
   Case _ ty _    -> return ty
+  Cast _ _ ty2   -> return ty2
 
 -- | Split a (Type)Application in the applied term and it arguments
 collectArgs :: Term
@@ -231,6 +232,7 @@ termSize (TyLam b)   = let (_,e) = unsafeUnbind b
                        in  termSize e
 termSize (App e1 e2) = termSize e1 + termSize e2
 termSize (TyApp e _) = termSize e
+termSize (Cast e _ _)= termSize e
 termSize (Letrec b)  = let (bndrsR,body) = unsafeUnbind b
                            bndrSzs       = map (termSize . unembed . snd) (unrec bndrsR)
                            bodySz        = termSize body
