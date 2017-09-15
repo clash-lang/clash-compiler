@@ -1,6 +1,6 @@
 module VecOfSum where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 data Sum = Empty
          | Half Integer Integer Integer Integer

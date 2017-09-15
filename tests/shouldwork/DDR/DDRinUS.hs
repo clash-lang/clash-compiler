@@ -1,6 +1,6 @@
 module DDRinUS where
 
-import CLaSH.Explicit.Prelude
+import Clash.Explicit.Prelude
 import DDRin
 
 topEntity = topEntityUS

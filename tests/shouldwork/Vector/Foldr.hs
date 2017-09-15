@@ -1,6 +1,6 @@
 module Foldr where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 4 (Unsigned 8) -> (Unsigned 8)
 topEntity = foldr div 1

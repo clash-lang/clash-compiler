@@ -1,6 +1,6 @@
 module CharTest where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Data.Char
 
 topEntity :: (Int,Char) -> (Int,Char,Char)

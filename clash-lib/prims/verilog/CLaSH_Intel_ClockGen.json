@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name"      : "CLaSH.Intel.ClockGen.altpll"
+    { "name"      : "Clash.Intel.ClockGen.altpll"
     , "type"      :
 "altpll
   :: SSymbol name               -- ARG[0]
@@ -17,7 +17,7 @@
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Intel.ClockGen.alteraPll"
+    { "name"      : "Clash.Intel.ClockGen.alteraPll"
     , "type"      :
 "alteraPll
   :: SSymbol name               -- ARG[0]

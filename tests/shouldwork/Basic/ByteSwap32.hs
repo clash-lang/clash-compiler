@@ -1,7 +1,7 @@
 {-# LANGUAGE MagicHash #-}
 module ByteSwap32 where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import GHC.Word
 import Data.Bits
 

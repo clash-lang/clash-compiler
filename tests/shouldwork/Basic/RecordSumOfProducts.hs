@@ -3,7 +3,7 @@
 
 module RecordSumOfProducts where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Control.Applicative
 
 data DbState = DbInitDisp (Unsigned 4) | DbWriteRam (Signed 14) (Signed 14)

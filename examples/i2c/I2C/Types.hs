@@ -1,6 +1,6 @@
 module I2C.Types where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 data I2CCommand = I2Cstart | I2Cstop | I2Cwrite | I2Cread | I2Cnop
   deriving (Eq, Ord)

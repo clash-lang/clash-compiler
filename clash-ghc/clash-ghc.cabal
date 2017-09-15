@@ -45,7 +45,7 @@ Extra-source-files:   README.md,
                       CHANGELOG.md,
                       LICENSE_GHC,
                       cbits/PosixSource.h,
-                      src-bin/CLaSH/GHCi/HsVersions.h
+                      src-bin/Clash/GHCi/HsVersions.h
 
 Cabal-version:        >=1.10
 
@@ -130,17 +130,17 @@ library
   Include-dirs:       cbits
   C-Sources:          cbits/hschooks.c
 
-  Exposed-Modules:    CLaSH.Main
-  Other-Modules:      CLaSH.GHCi.UI
-                      CLaSH.GHCi.UI.Info
-                      CLaSH.GHCi.UI.Monad
-                      CLaSH.GHCi.UI.Tags
+  Exposed-Modules:    Clash.Main
+  Other-Modules:      Clash.GHCi.UI
+                      Clash.GHCi.UI.Info
+                      Clash.GHCi.UI.Monad
+                      Clash.GHCi.UI.Tags
 
-                      CLaSH.GHC.CLaSHFlags
-                      CLaSH.GHC.Evaluator
-                      CLaSH.GHC.GenerateBindings
-                      CLaSH.GHC.GHC2Core
-                      CLaSH.GHC.LoadInterfaceFiles
-                      CLaSH.GHC.LoadModules
-                      CLaSH.GHC.NetlistTypes
+                      Clash.GHC.ClashFlags
+                      Clash.GHC.Evaluator
+                      Clash.GHC.GenerateBindings
+                      Clash.GHC.GHC2Core
+                      Clash.GHC.LoadInterfaceFiles
+                      Clash.GHC.LoadModules
+                      Clash.GHC.NetlistTypes
                       Paths_clash_ghc

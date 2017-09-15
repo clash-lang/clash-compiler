@@ -1,6 +1,6 @@
 module TwoFunctions where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 f :: Bool -> a -> a -> a
 f True  x y = x

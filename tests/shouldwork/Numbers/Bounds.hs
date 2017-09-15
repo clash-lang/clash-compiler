@@ -1,5 +1,5 @@
 module Bounds where
-import CLaSH.Prelude
+import Clash.Prelude
 
 
 expected

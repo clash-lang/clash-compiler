@@ -1,6 +1,6 @@
 module DDRoutGS where
 
-import CLaSH.Explicit.Prelude
+import Clash.Explicit.Prelude
 import DDRout
 
 topEntity = topEntityGS

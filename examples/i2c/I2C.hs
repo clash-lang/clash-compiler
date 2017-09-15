@@ -1,6 +1,6 @@
 module I2C where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 import I2C.BitMaster
 import I2C.ByteMaster

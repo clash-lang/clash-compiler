@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Explicit.RAM.asyncRam#"
+    { "name" : "Clash.Explicit.RAM.asyncRam#"
     , "type" :
 "asyncRam#
   :: HasCallStack      -- ARG[0]

@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module I2C.BitMaster (bitMaster) where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 import Control.Lens
 import Control.Monad

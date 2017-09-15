@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Explicit.BlockRam.blockRam#"
+    { "name" : "Clash.Explicit.BlockRam.blockRam#"
     , "type" :
 "blockRam#
   :: HasCallStack    -- ARG[0]

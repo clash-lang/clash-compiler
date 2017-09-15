@@ -1,6 +1,6 @@
 module ZeroInt where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: (UFixed 0 8,UFixed 0 8) -> UFixed 0 8
 topEntity = uncurry (*)

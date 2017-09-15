@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Intel.DDR.altddioIn"
+    { "name" : "Clash.Intel.DDR.altddioIn"
     , "type" :
 "altddioIn
   :: ( HasCallStack               -- ARG[0]
@@ -49,7 +49,7 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Intel.DDR.altddioOut#"
+    { "name" : "Clash.Intel.DDR.altddioOut#"
     , "type" :
 "altddioOut#
   :: ( HasCallStack             -- ARG[0]

@@ -1,7 +1,7 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables, Rank2Types #-}
 module LocalPoly where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity = f
 

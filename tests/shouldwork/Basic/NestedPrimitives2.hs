@@ -1,6 +1,6 @@
 module NestedPrimitives2 where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 5 (Vec 3 (Signed 32))
 topEntity = map (take d3) o

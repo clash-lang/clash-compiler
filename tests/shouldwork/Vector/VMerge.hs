@@ -1,6 +1,6 @@
 module VMerge where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: (Vec 2 Int,Vec 2 Int) -> Vec 4 Int
 topEntity (x,y) = merge x y

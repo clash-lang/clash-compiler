@@ -1,7 +1,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module DTFold where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Data.Singletons.Prelude
 import Data.Proxy
 

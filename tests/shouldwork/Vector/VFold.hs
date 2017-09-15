@@ -1,6 +1,6 @@
 module VFold where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 csSort = vfold (const csRow)
   where

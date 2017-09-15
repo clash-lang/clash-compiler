@@ -1,6 +1,6 @@
 module MAC where
 
-import CLaSH.Explicit.Prelude
+import Clash.Explicit.Prelude
 
 type DomA101 = Dom "A" 101
 

@@ -1,6 +1,6 @@
 module ClassOps where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: (Integer,Integer) -> Integer
 topEntity = uncurry mod

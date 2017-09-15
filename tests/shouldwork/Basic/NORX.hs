@@ -1,6 +1,6 @@
 module NORX where
 import Data.Bits
-import CLaSH.Prelude
+import Clash.Prelude
 
 type W = Unsigned 32
 

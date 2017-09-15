@@ -1,6 +1,6 @@
 module CRC32 where
 
-import CLaSH.Prelude
+import Clash.Prelude
 import Data.Char
 import qualified Data.List as L
 

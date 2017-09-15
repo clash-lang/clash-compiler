@@ -1,6 +1,6 @@
 module FindIndex where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 7 (Unsigned 8) -> Maybe (Index 7)
 topEntity = findIndex (> 3)

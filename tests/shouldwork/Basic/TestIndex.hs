@@ -1,5 +1,5 @@
 module TestIndex where
-import CLaSH.Prelude
+import Clash.Prelude
 
 type NrI = Index 8
 

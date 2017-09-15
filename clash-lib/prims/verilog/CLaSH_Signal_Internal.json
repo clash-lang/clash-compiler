@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Signal.Internal.delay#"
+    { "name" : "Clash.Signal.Internal.delay#"
     , "type" :
 "delay#
   :: HasCallStack             -- ARG[0]
@@ -21,7 +21,7 @@ end~FI
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Signal.Internal.register#"
+    { "name" : "Clash.Signal.Internal.register#"
     , "type" :
 "register#
   :: HasCallStack             -- ARG[0]
@@ -51,7 +51,7 @@ end~FI
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Signal.Internal.clockGate"
+    { "name" : "Clash.Signal.Internal.clockGate"
     , "type" :
 "clockGate
   :: Clock domain gated -- ARG[0]
@@ -65,7 +65,7 @@ assign ~RESULT = {~ARG[0],~ARG[1]};~FI
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.clockGen"
+    { "name"      : "Clash.Signal.Internal.clockGen"
     , "type" :
 "clockGen
   :: (domain ~ Dom nm period -- ARG[0]
@@ -91,7 +91,7 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.tbClockGen"
+    { "name"      : "Clash.Signal.Internal.tbClockGen"
     , "type" :
 "tbClockGen
   :: (domain ~ Dom nm period -- ARG[0]
@@ -121,7 +121,7 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.asyncResetGen"
+    { "name"      : "Clash.Signal.Internal.asyncResetGen"
     , "type" :
 "asyncResetGen :: Reset domain 'Asynchronous"
     , "templateD" :
@@ -136,7 +136,7 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.syncResetGen"
+    { "name"      : "Clash.Signal.Internal.syncResetGen"
     , "type" :
 "asyncResetGen :: Reset domain 'Synchronous"
     , "templateD" :
@@ -152,60 +152,60 @@ assign ~RESULT = ~SYM[0];
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.unsafeFromAsyncReset"
+    { "name"      : "Clash.Signal.Internal.unsafeFromAsyncReset"
     , "type" :
 "unsafeFromAsyncReset :: Reset domain Asynchronous -> Signal domain Bool"
     , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.unsafeToAsyncReset"
+    { "name"      : "Clash.Signal.Internal.unsafeToAsyncReset"
     , "type" :
 "unsafeToAsyncReset :: Signal domain Bool -> Reset domain Asynchronous"
     , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.fromSyncReset"
+    { "name"      : "Clash.Signal.Internal.fromSyncReset"
     , "type" :
 "fromSyncReset :: Reset domain Synchronous -> Signal domain Bool"
     , "templateE" : "~ARG[0]"
     }
   }
 , { "BlackBox" :
-    { "name"      : "CLaSH.Signal.Internal.unsafeToSyncReset"
+    { "name"      : "Clash.Signal.Internal.unsafeToSyncReset"
     , "type" :
 "unsafeToSyncReset :: Signal domain Bool -> Reset domain Synchronous"
     , "templateE" : "~ARG[0]"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.Internal.signal#"
+    { "name"      : "Clash.Signal.Internal.signal#"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.Internal.mapSignal#"
+    { "name"      : "Clash.Signal.Internal.mapSignal#"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.Internal.appSignal#"
+    { "name"      : "Clash.Signal.Internal.appSignal#"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.Internal.foldr#"
+    { "name"      : "Clash.Signal.Internal.foldr#"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.Internal.traverse#"
+    { "name"      : "Clash.Signal.Internal.traverse#"
     , "primType"  : "Function"
     }
   }
 , { "Primitive" :
-    { "name"      : "CLaSH.Signal.Internal.joinSignal#"
+    { "name"      : "Clash.Signal.Internal.joinSignal#"
     , "primType"  : "Function"
     }
   }

@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Prelude.ROM.File.asyncRomFile#"
+    { "name" : "Clash.Prelude.ROM.File.asyncRomFile#"
     , "type" :
 "asyncRomFile# :: KnownNat m -- ARG[0]
                => SNat n     -- sz,   ARG[1]

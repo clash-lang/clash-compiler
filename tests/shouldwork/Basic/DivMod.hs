@@ -1,6 +1,6 @@
 module DivMod where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: (Integer,Integer)
 topEntity = topEntity1 height depthInput filterHeight stride cycles

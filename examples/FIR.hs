@@ -1,6 +1,6 @@
 module FIR where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 dotp :: SaturatingNum a
      => Vec (n + 1) a

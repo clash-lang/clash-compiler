@@ -1,6 +1,6 @@
 module VZip where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 8 (Int,Int) -> Vec 8 (Int,Int)
 topEntity xs = zip ys zs

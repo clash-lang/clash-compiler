@@ -1,6 +1,6 @@
 module TB where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 type Inp   = (Signed 4,Outp)
 type Outp  = (Maybe (Signed 8,Bool),Bit)

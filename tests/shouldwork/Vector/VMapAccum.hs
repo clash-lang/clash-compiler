@@ -1,6 +1,6 @@
 module VMapAccum where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 ha a b = (a `xor` b, a .&. b)
 

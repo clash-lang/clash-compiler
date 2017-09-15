@@ -1,5 +1,5 @@
 [ { "BlackBox" :
-    { "name" : "CLaSH.Explicit.DDR.ddrIn#"
+    { "name" : "Clash.Explicit.DDR.ddrIn#"
     , "type" :
 "ddrIn# :: forall a slow fast n pFast gated synchronous.
            ( HasCallStack                         -- ARG[0]
@@ -165,7 +165,7 @@ end block;
     }
   }
 , { "BlackBox" :
-    { "name" : "CLaSH.Explicit.DDR.ddrOut#"
+    { "name" : "Clash.Explicit.DDR.ddrOut#"
     , "type" :
 "ddrOut# :: ( HasCallStack               -- ARG[0]
             , fast ~ Dom n pFast         -- ARG[1]

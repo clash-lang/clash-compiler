@@ -1,6 +1,6 @@
 module Box where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: BitVector 16 -> (BitVector 16,BitVector 8,Vec 8 Bit)
 topEntity vec = (pack  tup

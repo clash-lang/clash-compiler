@@ -163,7 +163,7 @@ main =
 
 clashHDL :: BuildTarget -> FilePath -> [String] -> String -> TestTree
 clashHDL t env extraArgs modName =
-  testProgram ("CLaSH(" ++ show t ++ ")")
+  testProgram ("Clash(" ++ show t ++ ")")
               "stack"
               (concat [["exec","clash","--"
                        ,case t of { VHDL -> "--vhdl"

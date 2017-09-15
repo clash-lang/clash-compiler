@@ -1,6 +1,6 @@
 module SatWrap where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity:: (SFixed 2 6) -> (SFixed 2 6) -> (SFixed 2 6)
 topEntity = satPlus SatWrap

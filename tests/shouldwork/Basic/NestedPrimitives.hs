@@ -1,6 +1,6 @@
 module NestedPrimitives where
 
-import CLaSH.Prelude
+import Clash.Prelude
 
 topEntity :: Vec 3 (Signed 16)
 topEntity = map resize o
