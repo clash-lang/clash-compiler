@@ -28,7 +28,6 @@ module Clash.GHC.GHC2Core
 where
 
 -- External Modules
-import           Control.Exception           (throw)
 import           Control.Lens                ((^.), (%~), (&), (%=))
 import           Control.Monad.Trans.Class   (lift)
 import           Control.Monad.Trans.Reader  (ReaderT)
@@ -50,7 +49,7 @@ import qualified Unbound.Generics.LocallyNameless     as Unbound
 -- GHC API
 import CoAxiom    (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs),
                    fromBranches)
-import Coercion   (Role(..),coercionType,coercionKind,mkCoercionType)
+import Coercion   (coercionType,coercionKind)
 import CoreFVs    (exprSomeFreeVars)
 import CoreSyn
   (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..), collectArgs,
@@ -71,9 +70,8 @@ import Name       (Name, nameModule_maybe,
                    nameOccName, nameUnique, getSrcSpan)
 import PrelNames  (tYPETyConKey)
 import OccName    (occNameString)
-import Outputable (showPpr, showSDocUnsafe)
+import Outputable (showPpr)
 import Pair       (Pair (..))
-import PprCore    (pprCoreExpr)
 import SrcLoc     (isGoodSrcSpan)
 import TyCon      (AlgTyConRhs (..), TyCon,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
@@ -246,7 +244,7 @@ coreToTerm :: Bool
            -> SrcSpan
            -> CoreExpr
            -> State GHC2CoreState C.Term
-coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
+coreToTerm _errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
     term e
@@ -325,22 +323,8 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
       ty1_I <- lift (isIntegerTy ty1)
       ty2_I <- lift (isIntegerTy ty2)
       case hasPrimCoM of
-        Just ty | ty1_I || ty2_I
-                , errorInvalidCoercions -> do
-          sp <- Reader.ask
-          throw (ClashException sp
-                  (unlines [ "Clash cannot translate the following cast:\n"
-                           , showSDocUnsafe (pprCoreExpr (Cast e co))
-                           , "\nbecause it contains the following coercion:\n"
-                           , showPpr unsafeGlobalDynFlags (if ty1_I then mkCoercionType Representational ty1 ty
-                                                                    else mkCoercionType Representational ty ty2)
-                           , "\nthat exposes the internal structure of the Clash primitive type: " ++ showPpr unsafeGlobalDynFlags ty
-                           , "This is most likely due to the use of 'seq' or BangPatterns on values of (newtype wrappers of) types: {BitVector,Index,Signed,Unsigned}"
-                           ])
-                  (Just (unlines ["The cast occurs in the following core expression:\n"
-                                 , showSDocUnsafe (pprCoreExpr coreExpr)]))
-                  )
-
+        Just _ | ty1_I || ty2_I
+          -> C.Cast <$> term e <*> lift (coreToType ty1) <*> lift (coreToType ty2)
         _ -> term e
     term' (Tick _ e)        = term e
     term' (Type t)          = C.Prim (pack "_TY_") <$> lift (coreToType t)
