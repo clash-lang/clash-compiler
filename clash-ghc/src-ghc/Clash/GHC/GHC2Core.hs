@@ -290,9 +290,9 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> lift (coreToType tyArg)
     term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
     term' (Lam x e) | isTyVar x   = C.TyLam <$> (bind <$> lift (coreToTyVar x) <*> addUsefull (getSrcSpan x) (term e))
-                   | otherwise   = C.Lam   <$> (bind <$> lift (coreToId x) <*> addUsefull (getSrcSpan x) (term e))
+                    | otherwise   = C.Lam   <$> (bind <$> lift (coreToId x)    <*> addUsefull (getSrcSpan x) (term e))
     term' (Let (NonRec x e1) e2)  = do
-      x' <- lift (coreToId x)
+      x'  <- lift (coreToId x)
       e1' <- addUsefull (getSrcSpan x) (term e1)
       e2' <- term e2
       return $ C.Letrec $ bind (rec [(x', embed e1')]) e2'
@@ -302,15 +302,15 @@ coreToTerm errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReade
                                   <*> addUsefull (getSrcSpan x)
                                                  (embed <$> term b))
                    xes
-      e' <- term e
+      e'   <- term e
       return $ C.Letrec $ bind (rec xes') e'
 
     term' (Case _ _ ty [])  = C.Prim (pack "EmptyCase") <$> lift (coreToType ty)
     term' (Case e b ty alts) = do
      let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (`elem` [b]))
                   $ rhssOfAlts alts
-     b' <- lift (coreToId b)
-     e' <- addUsefull (getSrcSpan b) (term e)
+     b'  <- lift (coreToId b)
+     e'  <- addUsefull (getSrcSpan b) (term e)
      ty' <- lift (coreToType ty)
      let caseTerm v = C.Case v ty' <$> mapM (addUsefull (getSrcSpan b) . alt) alts
      if usesBndr
