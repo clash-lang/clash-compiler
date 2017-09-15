@@ -6,8 +6,8 @@
 
 module BenchBitVector where
 
-import CLaSH.Sized.Internal.BitVector
-import CLaSH.Class.Num
+import Clash.Sized.Internal.BitVector
+import Clash.Class.Num
 import GHC.TypeLits                   (type (*))
 import Criterion                      (Benchmark, env, bench, nf)
 import Language.Haskell.TH.Syntax     (lift)

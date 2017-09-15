@@ -6,8 +6,8 @@
 
 module BenchSigned where
 
-import CLaSH.Sized.BitVector
-import CLaSH.Sized.Internal.Signed
+import Clash.Sized.BitVector
+import Clash.Sized.Internal.Signed
 import Criterion                   (Benchmark, env, bench, nf)
 import Language.Haskell.TH.Syntax  (lift)
 

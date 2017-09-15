@@ -6,9 +6,9 @@
 
 module BenchFixed where
 
-import CLaSH.Class.Num
-import CLaSH.Sized.Fixed
-import CLaSH.Sized.Unsigned
+import Clash.Class.Num
+import Clash.Sized.Fixed
+import Clash.Sized.Unsigned
 import Criterion                   (Benchmark, env, bench, nf)
 import Language.Haskell.TH.Syntax  (lift)
 

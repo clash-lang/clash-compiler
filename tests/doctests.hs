@@ -4,9 +4,9 @@ module Main where
 import Test.DocTest (doctest)
 
 main :: IO ()
-main = doctest (docTestOpts ++ ["-isrc","src/CLaSH/Prelude.hs"]) >>
-       doctest (docTestOpts ++ ["src/CLaSH/Tutorial.hs"]) >>
-       doctest (docTestOpts ++ ["src/CLaSH/Examples.hs"])
+main = doctest (docTestOpts ++ ["-isrc","src/Clash/Prelude.hs"]) >>
+       doctest (docTestOpts ++ ["src/Clash/Tutorial.hs"]) >>
+       doctest (docTestOpts ++ ["src/Clash/Examples.hs"])
 
 docTestOpts :: [String]
 docTestOpts =

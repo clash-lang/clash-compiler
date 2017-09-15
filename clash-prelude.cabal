@@ -30,17 +30,17 @@ Description:
   .
   To use the library:
   .
-  * Import "CLaSH.Prelude"
+  * Import "Clash.Prelude"
   .
   * Alternatively, if you want to explicitly route clock and reset ports,
     for more straightforward multi-clock designs, you can import the
-    "CLaSH.Explicit.Prelude" module. Note that you should not import
-    "CLaSH.Prelude" and "CLaSH.Explicit.Prelude" at the same time as they
+    "Clash.Explicit.Prelude" module. Note that you should not import
+    "Clash.Prelude" and "Clash.Explicit.Prelude" at the same time as they
     have overlapping definitions.
   .
-  A preliminary version of a tutorial can be found in "CLaSH.Tutorial", for a
-  general overview of the library you should however check out "CLaSH.Prelude".
-  Some circuit examples can be found in "CLaSH.Examples".
+  A preliminary version of a tutorial can be found in "Clash.Tutorial", for a
+  general overview of the library you should however check out "Clash.Prelude".
+  Some circuit examples can be found in "Clash.Examples".
 Homepage:             http://www.clash-lang.org/
 bug-reports:          http://github.com/clash-lang/clash-prelude/issues
 License:              BSD2
@@ -82,78 +82,78 @@ Library
   default-language:   Haskell2010
   ghc-options:        -Wall -fexpose-all-unfoldings -fno-worker-wrapper
 
-  Exposed-modules:    CLaSH.Annotations.TopEntity
-                      CLaSH.Annotations.Primitive
+  Exposed-modules:    Clash.Annotations.TopEntity
+                      Clash.Annotations.Primitive
 
-                      CLaSH.Class.BitPack
-                      CLaSH.Class.Num
-                      CLaSH.Class.Resize
+                      Clash.Class.BitPack
+                      Clash.Class.Num
+                      Clash.Class.Resize
 
-                      CLaSH.Explicit.BlockRam
-                      CLaSH.Explicit.BlockRam.File
-                      CLaSH.Explicit.DDR
-                      CLaSH.Explicit.Mealy
-                      CLaSH.Explicit.Moore
-                      CLaSH.Explicit.RAM
-                      CLaSH.Explicit.ROM
-                      CLaSH.Explicit.ROM.File
-                      CLaSH.Explicit.Prelude
-                      CLaSH.Explicit.Prelude.Safe
-                      CLaSH.Explicit.Signal
-                      CLaSH.Explicit.Signal.Delayed
-                      CLaSH.Explicit.Synchronizer
-                      CLaSH.Explicit.Testbench
+                      Clash.Explicit.BlockRam
+                      Clash.Explicit.BlockRam.File
+                      Clash.Explicit.DDR
+                      Clash.Explicit.Mealy
+                      Clash.Explicit.Moore
+                      Clash.Explicit.RAM
+                      Clash.Explicit.ROM
+                      Clash.Explicit.ROM.File
+                      Clash.Explicit.Prelude
+                      Clash.Explicit.Prelude.Safe
+                      Clash.Explicit.Signal
+                      Clash.Explicit.Signal.Delayed
+                      Clash.Explicit.Synchronizer
+                      Clash.Explicit.Testbench
 
-                      CLaSH.Intel.ClockGen
-                      CLaSH.Intel.DDR
+                      Clash.Intel.ClockGen
+                      Clash.Intel.DDR
 
-                      CLaSH.NamedTypes
+                      Clash.NamedTypes
 
-                      CLaSH.Prelude
-                      CLaSH.Prelude.BitIndex
-                      CLaSH.Prelude.BitReduction
-                      CLaSH.Prelude.BlockRam
-                      CLaSH.Prelude.BlockRam.File
-                      CLaSH.Prelude.DataFlow
-                      CLaSH.Prelude.Mealy
-                      CLaSH.Prelude.Moore
-                      CLaSH.Prelude.RAM
-                      CLaSH.Prelude.ROM
-                      CLaSH.Prelude.ROM.File
-                      CLaSH.Prelude.Safe
-                      CLaSH.Prelude.Testbench
+                      Clash.Prelude
+                      Clash.Prelude.BitIndex
+                      Clash.Prelude.BitReduction
+                      Clash.Prelude.BlockRam
+                      Clash.Prelude.BlockRam.File
+                      Clash.Prelude.DataFlow
+                      Clash.Prelude.Mealy
+                      Clash.Prelude.Moore
+                      Clash.Prelude.RAM
+                      Clash.Prelude.ROM
+                      Clash.Prelude.ROM.File
+                      Clash.Prelude.Safe
+                      Clash.Prelude.Testbench
 
-                      CLaSH.Promoted.Nat
-                      CLaSH.Promoted.Nat.Literals
-                      CLaSH.Promoted.Nat.TH
-                      CLaSH.Promoted.Nat.Unsafe
-                      CLaSH.Promoted.Symbol
+                      Clash.Promoted.Nat
+                      Clash.Promoted.Nat.Literals
+                      Clash.Promoted.Nat.TH
+                      Clash.Promoted.Nat.Unsafe
+                      Clash.Promoted.Symbol
 
-                      CLaSH.Signal
-                      CLaSH.Signal.Bundle
-                      CLaSH.Signal.Delayed
-                      CLaSH.Signal.Internal
+                      Clash.Signal
+                      Clash.Signal.Bundle
+                      Clash.Signal.Delayed
+                      Clash.Signal.Internal
 
-                      CLaSH.Sized.BitVector
-                      CLaSH.Sized.Fixed
-                      CLaSH.Sized.Index
-                      CLaSH.Sized.RTree
-                      CLaSH.Sized.Signed
-                      CLaSH.Sized.Unsigned
-                      CLaSH.Sized.Vector
+                      Clash.Sized.BitVector
+                      Clash.Sized.Fixed
+                      Clash.Sized.Index
+                      Clash.Sized.RTree
+                      Clash.Sized.Signed
+                      Clash.Sized.Unsigned
+                      Clash.Sized.Vector
 
-                      CLaSH.Sized.Internal.BitVector
-                      CLaSH.Sized.Internal.Index
-                      CLaSH.Sized.Internal.Signed
-                      CLaSH.Sized.Internal.Unsigned
+                      Clash.Sized.Internal.BitVector
+                      Clash.Sized.Internal.Index
+                      Clash.Sized.Internal.Signed
+                      Clash.Sized.Internal.Unsigned
 
-                      CLaSH.XException
+                      Clash.XException
 
-                      CLaSH.Xilinx.ClockGen
-                      CLaSH.Xilinx.DDR
+                      Clash.Xilinx.ClockGen
+                      Clash.Xilinx.DDR
 
-                      CLaSH.Tutorial
-                      CLaSH.Examples
+                      Clash.Tutorial
+                      Clash.Examples
 
   other-extensions:   CPP
                       BangPatterns
