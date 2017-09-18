@@ -66,6 +66,11 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
        , ("bindOrLiftNonRep", inlineOrLiftNonRep) -- See: [Note] bindNonRep before liftNonRep
                                                   -- See: [Note] bottom-up traversal for liftNonRep
        , ("reduceNonRepPrim", reduceNonRepPrim)
+
+
+       , ("splitCastWork"   , splitCastWork)
+       , ("inlineCast"      , inlineCast)
+       , ("eliminateCastCast",eliminateCastCast)
        ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable

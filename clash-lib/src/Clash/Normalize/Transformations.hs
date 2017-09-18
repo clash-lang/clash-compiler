@@ -41,13 +41,17 @@ module Clash.Normalize.Transformations
   , removeUnusedExpr
   , inlineCleanup
   , flattenLet
+  , splitCastWork
+  , inlineCast
+  , eliminateCastCast
   )
 where
 
 import           Control.Concurrent.Supply   (splitSupply)
+import           Control.Exception           (throw)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
-import           Control.Monad.Writer        (WriterT (..), lift, tell)
+import           Control.Monad.Writer        (WriterT (..), lift, listen, tell)
 import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
@@ -55,6 +59,7 @@ import qualified Data.HashMap.Lazy           as HashMap
 import qualified Data.HashSet                as HashSet
 import qualified Data.List                   as List
 import qualified Data.Maybe                  as Maybe
+import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
@@ -85,7 +90,7 @@ import           Clash.Core.Util
    isSignalType, isVar, mkApps, mkLams, mkTmApps, mkVec, termSize, termType,
    tyNatSize)
 import           Clash.Core.Var              (Id, Var (..))
-import           Clash.Driver.Types          (DebugLevel (..))
+import           Clash.Driver.Types          (DebugLevel (..), ClashException (..))
 import           Clash.Netlist.BlackBox.Util (usedArguments)
 import           Clash.Netlist.Util          (representableType,
                                               splitNormalized)
@@ -537,6 +542,64 @@ bindConstantVar = inlineBinders test
           n -> return (termSize e <= n)
         _ -> return False
     -- test _ _ = return False
+
+-- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
+-- These are the result of the 'splitCastWork' transformation.
+inlineCast :: NormRewrite
+inlineCast = inlineBinders test
+  where
+    test _ (_, Embed (Cast (Var _ _) _ _)) = return True
+    test _ _ = return False
+
+-- | Eliminate two back to back casts where the type going in and coming out are the same
+--
+-- @
+--   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
+-- @
+eliminateCastCast :: NormRewrite
+eliminateCastCast _ c@(Cast (Cast e tyA tyB) tyB' tyC)
+  | tyB == tyB' && tyA == tyC = changed e
+  | otherwise = throwError
+  where throwError = do
+          (nm,sp) <- Lens.use curFun
+          throw (ClashException sp ($(curLoc) ++ showDoc nm
+                  ++ ": Found 2 nested casts whose types don't line up:\n"
+                  ++ showDoc c)
+                Nothing)
+
+eliminateCastCast _ e = return e
+
+-- | Make a cast work-free by splitting the work of to a separate binding
+--
+-- @
+-- let x = cast (f a b)
+-- ==>
+-- let x  = cast x'
+--     x' = f a b
+-- @
+splitCastWork :: NormRewrite
+splitCastWork ctx unchanged@(Letrec b) = do
+  (v,e') <- unbind b
+  let vs = unrec v
+  (vss', Monoid.getAny -> hasChanged) <- listen (mapM splitCastLetBinding vs)
+  let vs' = concat vss'
+  if hasChanged then changed . Letrec $ bind (rec vs') (e')
+                else return unchanged
+  where
+    splitCastLetBinding :: LetBinding -> RewriteMonad extra [LetBinding]
+    splitCastLetBinding x@(nm, Embed e) = case e of
+      Cast (Var _ _) _ _    -> return [x]  -- already work-free
+      Cast (Cast _ _ _) _ _ -> return [x]  -- casts will be eliminated
+      Cast e' ty1 ty2 -> do
+        tcm <- Lens.view tcCache
+        (nm',var) <- mkTmBinderFor tcm (mkDerivedName ctx (name2String $ varName nm)) e'
+        changed [(nm',Embed e')
+                ,(nm, Embed $ Cast var ty1 ty2)
+                ]
+      _ -> return [x]
+
+splitCastWork _ e = return e
+
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant
