@@ -27,6 +27,7 @@ import qualified Data.HashMap.Lazy                as HashMap
 import           Data.List                        (elemIndex, intersperse)
 import qualified Data.Text.Lazy                   as Text
 import           System.FilePath                  ((</>), (<.>))
+import           Text.Read                        (readMaybe)
 import           Unbound.Generics.LocallyNameless
   (Embed (..), runFreshMT, unbind, unembed, unrebind)
 
@@ -352,7 +353,7 @@ mkFunApp dst fun args = do
             topName <- extendIdentifier Basic (Text.pack modName)
                          (Text.pack "_topEntity")
             return (env </> (Text.unpack topName) <.> "manifest")
-        man <- read <$> liftIO (readFile manFile)
+        Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
                        (zip argExprs argHWTys)
         return (argDecls ++ instDecls)
