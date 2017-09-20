@@ -1,0 +1,3 @@
+# Needed as an awkward work around to
+# https://github.com/rtfd/readthedocs.org/issues/2398
+Sphinx==1.6.3
