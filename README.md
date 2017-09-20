@@ -115,3 +115,4 @@ Or [use Nix](https://nixos.org/nix/download.html) to get a shell with the `clash
 ```bash
 nix-shell
 ```
+
