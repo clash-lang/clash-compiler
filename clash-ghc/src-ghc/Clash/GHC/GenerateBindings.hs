@@ -57,8 +57,7 @@ import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Util              ((***),first)
 
 generateBindings ::
-     Bool
-  -> FilePath
+     FilePath
   -> [FilePath]
   -> HDL
   -> String
@@ -69,10 +68,10 @@ generateBindings ::
           , Maybe TopEntity -- (maybe) TopEntity annotation
           , Maybe TmName)]  -- (maybe) associated testbench
         ,PrimMap Text)      -- The primitives found in '.' and 'primDir'
-generateBindings errorInvalidCoercions primDir importDirs hdl modName dflagsM = do
+generateBindings primDir importDirs hdl modName dflagsM = do
   (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP) <- loadModules hdl modName dflagsM
   primMap <- generatePrimMap (pFP ++ (primDir:importDirs))
-  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable) emptyGHC2CoreState
+  let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
       allTcCache                    = tysPrimMap `HashMap.union` tcCache
@@ -128,8 +127,7 @@ retype tcm (visited,bindings) current = (visited', HashMap.insert current (nm,ty
     ty'                  = runFreshM (termType tcm tm')
 
 mkBindings
-  :: Bool
-  -> PrimMap a
+  :: PrimMap a
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]
@@ -140,18 +138,18 @@ mkBindings
            ( BindingMap
            , HashMap TmOccName (TmName,Type,Int)
            )
-mkBindings errorInvalidCoercions primMap bindings clsOps unlocatable = do
+mkBindings primMap bindings clsOps unlocatable = do
   bindingsList <- mapM (\case
                           GHC.NonRec v e -> do
                             let sp = GHC.getSrcSpan v
                                 inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-                            tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
+                            tm <- coreToTerm primMap unlocatable sp e
                             v' <- coreToId v
                             return [(nameOcc (varName v'), (varName v',unembed (varType v'), sp, inl, tm))]
                           GHC.Rec bs -> do
                             tms <- mapM (\(v,e) -> do
                                           let sp = GHC.getSrcSpan v
-                                          tm <- coreToTerm errorInvalidCoercions primMap unlocatable sp e
+                                          tm <- coreToTerm primMap unlocatable sp e
                                           v' <- coreToId v
                                           return (v',sp,tm)
                                         ) bs

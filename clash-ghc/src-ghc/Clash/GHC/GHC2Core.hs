@@ -238,13 +238,12 @@ makeAlgTyConRhs algTcRhs = case algTcRhs of
   AbstractTyCon {} -> return Nothing
   TupleTyCon {}    -> error "Cannot handle tuple tycons"
 
-coreToTerm :: Bool
-           -> PrimMap a
+coreToTerm :: PrimMap a
            -> [Var]
            -> SrcSpan
            -> CoreExpr
            -> State GHC2CoreState C.Term
-coreToTerm _errorInvalidCoercions primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
+coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) srcsp
   where
     term :: CoreExpr -> ReaderT SrcSpan (State GHC2CoreState) C.Term
     term e

@@ -51,7 +51,6 @@ flagsClash r = [
   , defFlag "fclash-error-extra"             $ NoArg (liftEwM (setErrorExtra r))
   , defFlag "fclash-float-support"           $ NoArg (liftEwM (setFloatSupport r))
   , defFlag "fclash-allow-zero-width"        $ NoArg (liftEwM (setAllowZeroWidth r))
-  , defFlag "fclash-allow-invalid-coercions" $ NoArg (liftEwM (setAllowInvalidCoercions r))
   ]
 
 setInlineLimit :: IORef ClashOpts
@@ -119,6 +118,3 @@ setFloatSupport r = modifyIORef r (\c -> c {opt_floatSupport = True})
 
 setAllowZeroWidth :: IORef ClashOpts -> IO ()
 setAllowZeroWidth r = modifyIORef r (\c -> c {opt_allowZero = True})
-
-setAllowInvalidCoercions :: IORef ClashOpts -> IO ()
-setAllowInvalidCoercions r = modifyIORef r (\c -> c {opt_errorInvalidCoercions = False})
