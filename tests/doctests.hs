@@ -5,8 +5,8 @@ import Test.DocTest (doctest)
 
 main :: IO ()
 main = doctest (docTestOpts ++ ["-isrc","src/Clash/Prelude.hs"]) >>
-       doctest (docTestOpts ++ ["src/Clash/Tutorial.hs"]) >>
-       doctest (docTestOpts ++ ["src/Clash/Examples.hs"])
+       doctest (docTestOpts ++ ["-isrc","src/Clash/Tutorial.hs"]) >>
+       doctest (docTestOpts ++ ["-isrc","src/Clash/Examples.hs"])
 
 docTestOpts :: [String]
 docTestOpts =
