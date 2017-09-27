@@ -44,6 +44,7 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_inlineFunctionLimit :: Word
                            , opt_inlineConstantLimit :: Word
                            , opt_dbgLevel    :: DebugLevel
+                           , opt_cachehdl    :: Bool
                            , opt_cleanhdl    :: Bool
                            , opt_intWidth    :: Int
                            , opt_hdlDir      :: Maybe String

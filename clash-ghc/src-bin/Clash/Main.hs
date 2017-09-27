@@ -139,6 +139,7 @@ defaultMain = flip withArgs $ do
                              , opt_specLimit   = 20
                              , opt_inlineFunctionLimit = 15
                              , opt_inlineConstantLimit = 0
+                             , opt_cachehdl    = True
                              , opt_cleanhdl    = True
                              , opt_intWidth    = WORD_SIZE_IN_BITS
                              , opt_hdlDir      = Nothing

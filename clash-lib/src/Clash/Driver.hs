@@ -118,6 +118,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                         (Text.pack . t_name)
                         annM
 
+  unless (opt_cachehdl opts) $ putStrLn "Ignoring .manifest files"
+
   -- Calculate the hash over the callgraph and the topEntity annotation
   (sameTopHash,sameBenchHash,manifest) <- do
     let topHash    = hash (annM,callGraphBindings bindingsMap (nameOcc topEntity))
@@ -127,8 +129,10 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
         manFile = maybe (hdlDir </> Text.unpack topNm <.> "manifest")
                         (\ann -> hdlDir </> t_name ann </> t_name ann <.> "manifest")
                         annM
-    manM <- (>>= readMaybe) . either (const Nothing) Just <$>
-            tryJust (guard . isDoesNotExistError) (readFile manFile)
+    manM <- if not (opt_cachehdl opts)
+            then return Nothing -- ignore manifest file because -fclash-nocache
+            else (>>= readMaybe) . either (const Nothing) Just <$>
+              tryJust (guard . isDoesNotExistError) (readFile manFile)
     return (maybe (False,False,manifestI)
                   (\man -> (fst (manifestHash man) == topHash
                            ,snd (manifestHash man) == benchHashM
