@@ -32,6 +32,7 @@ script:
 - stack --no-terminal --skip-ghc-check build $STACKOPTS
 # - stack --no-terminal --skip-ghc-check sdist
 - stack exec clash-testsuite
+- stack haddock
 matrix:
   fast_finish: true
   include:
