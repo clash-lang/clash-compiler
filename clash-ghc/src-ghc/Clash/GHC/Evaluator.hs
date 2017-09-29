@@ -753,7 +753,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     -> reduce (Literal (NaturalLiteral w))
 
   -- GHC.Real.^  -- XXX: Very fragile
-  -- ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
+  --   ^_f, $wf, $wf1 are specialisations of the internal function f in the implementation of (^) in GHC.Real
   "GHC.Real.^_f"  -- :: Integer -> Integer -> Integer
     | [Lit (IntegerLiteral i), Lit (IntegerLiteral j)] <- args
     -> reduce (integerToIntegerLiteral $ i ^ j)
@@ -3093,10 +3093,10 @@ liftBitVector2 :: KnownNat n
 liftBitVector2 = liftSized2 bitVectorLiterals' mkBitVectorLit
 
 liftSized2 :: (KnownNat n, Integral (sized n))
-           => -- | literal argument extraction function
-              ([Value] -> [Integer])
-           -> -- | literal contruction function
-              (Type -> Type -> Integer -> Integer -> Term)
+           => ([Value] -> [Integer])
+              -- ^ literal argument extraction function
+           -> (Type -> Type -> Integer -> Integer -> Term)
+              -- ^ literal contruction function
            -> (sized n -> sized n -> sized n)
            -> Type
            -> TyConMap
