@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
-                     2017     , Google Inc.
+                     2017     , Myrtle Software Ltd, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 

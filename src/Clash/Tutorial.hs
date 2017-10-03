@@ -1,6 +1,6 @@
 {-|
 Copyright : © 2014-2016, Christiaan Baaij,
-              2017     , QBayLogic, Google Inc.
+              2017     , Myrtle Software Ltd, QBayLogic, Google Inc.
 Licence   : Creative Commons 4.0 (CC BY 4.0) (http://creativecommons.org/licenses/by/4.0/)
 -}
 
