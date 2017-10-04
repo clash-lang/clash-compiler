@@ -25,7 +25,7 @@ import           Data.Char                        (ord)
 import           Data.Either                      (lefts,partitionEithers)
 import           Data.HashMap.Lazy                (HashMap)
 import qualified Data.HashMap.Lazy                as HashMap
-import           Data.List                        (elemIndex, intersperse)
+import           Data.List                        (elemIndex)
 import qualified Data.Text.Lazy                   as Text
 import           System.FilePath                  ((</>), (<.>))
 import           Text.Read                        (readMaybe)
@@ -223,22 +223,6 @@ mkNetDecl (id_,tm) = do
                         then Just (Text.pack (showSDocUnsafe (ppr loc)))
                         else Nothing
 
-genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> TmName -> Identifier
-genComponentName seen mkId nm =
-  let nm' = Text.splitOn (Text.pack ".") (Text.pack (name2String nm))
-      fn  = mkId Basic (stripDollarPrefixes (last nm'))
-      fn' = if Text.null fn then Text.pack "Component" else fn
-      nm2 = Text.concat (intersperse (Text.pack "_") (init nm' ++ [fn']))
-      nm3 = mkId Basic nm2
-  in  if nm3 `elem` seen then go 0 nm3 else nm3
-  where
-    go :: Integer -> Identifier -> Identifier
-    go n i =
-      let i' = mkId Basic (i `Text.append` Text.pack ('_':show n))
-      in  if i' `elem` seen
-             then go (n+1) i
-             else i'
-
 -- | Generate a list of Declarations for a let-binder
 mkDeclarations :: Id -- ^ LHS of the let-binder
                -> Term -- ^ RHS of the let-binder
@@ -350,9 +334,8 @@ mkFunApp dst fun args = do
         manFile <- case annM of
           Just ann -> return (env </> t_name ann </> t_name ann <.> "manifest")
           Nothing  -> do
-            let modName = takeWhile (/= '.') (name2String fun)
-            topName <- extendIdentifier Basic (Text.pack modName)
-                         (Text.pack "_topEntity")
+            mkId <- Lens.use mkIdentifierFn
+            let topName = genComponentName [] mkId fun
             return (env </> (Text.unpack topName) <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
         instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)

@@ -52,10 +52,10 @@ import           Clash.Core.Term                  (Term, TmName, TmOccName)
 import           Clash.Core.Type                  (Type)
 import           Clash.Core.TyCon                 (TyCon, TyConName, TyConOccName)
 import           Clash.Driver.Types
-import           Clash.Netlist                    (genComponentName, genNetlist)
+import           Clash.Netlist                    (genNetlist)
+import           Clash.Netlist.Util               (genComponentName)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
-import           Clash.Netlist.Id                 (IdType (..))
 import           Clash.Netlist.Types              (Component (..), HWType)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
@@ -115,7 +115,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
                         takeWhile (/= '.') (name2String topEntity)
       mkId      = evalState mkIdentifier hdlState'
       extId     = evalState extendIdentifier hdlState'
-      topNm     = maybe (mkId Basic (Text.pack $ modName ++ "_topEntity"))
+      topName   = genComponentName [] mkId topEntity
+      topNm     = maybe topName
                         (Text.pack . t_name)
                         annM
 

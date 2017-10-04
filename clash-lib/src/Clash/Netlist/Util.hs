@@ -1,6 +1,6 @@
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
-                         2017, Google Inc.
+                    2017     , Google Inc., Myrtle Software Ltd
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -23,9 +23,10 @@ import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (unzip4)
+import           Data.List               (intersperse, unzip4)
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
+import qualified Data.Text.Lazy          as Text
 import           Unbound.Generics.LocallyNameless
   (Embed, Fresh, embed, unbind, unembed, unrec)
 import qualified Unbound.Generics.LocallyNameless as Unbound
@@ -44,7 +45,7 @@ import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView, splitTyConAppM, tyView)
 import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
 import           Clash.Core.Var          (Id, Var (..), modifyVarName)
-import           Clash.Netlist.Id        (IdType (..))
+import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
 import           Clash.Util
 
@@ -568,6 +569,22 @@ mkRTreeChain d elTy es =
         , mkRTreeChain (d-1) elTy esR
         ]
 
+genComponentName :: [Identifier] -> (IdType -> Identifier -> Identifier) -> TmName -> Identifier
+genComponentName seen mkId nm =
+  let nm' = Text.splitOn (Text.pack ".") (Text.pack (name2String nm))
+      fn  = mkId Basic (stripDollarPrefixes (last nm'))
+      fn' = if Text.null fn then Text.pack "Component" else fn
+      nm2 = Text.concat (intersperse (Text.pack "_") (init nm' ++ [fn']))
+      nm3 = mkId Basic nm2
+  in  if nm3 `elem` seen then go 0 nm3 else nm3
+  where
+    go :: Integer -> Identifier -> Identifier
+    go n i =
+      let i' = mkId Basic (i `Text.append` Text.pack ('_':show n))
+      in  if i' `elem` seen
+             then go (n+1) i
+             else i'
+
 -- | Generate output port mappings
 mkOutput
   :: Maybe PortName
@@ -656,10 +673,9 @@ mkTopUnWrapper topEntity annM man dstId args = do
       outNames = portOutNames man
 
   -- component name
-  let modName = takeWhile (/= '.') (name2String topEntity) ++
-                maybe "" (("_" ++) . t_name) annM
-  topName <- extendIdentifier Basic (pack modName) "_topEntity"
-  let topName' = maybe topName (pack . t_name) annM
+  mkId <- Lens.use mkIdentifierFn
+  let topName  = genComponentName [] mkId topEntity
+      topName' = maybe topName (pack . t_name) annM
       topM     = fmap (const topName') annM
 
   -- inputs
