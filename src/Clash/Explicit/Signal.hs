@@ -288,7 +288,7 @@ systemReset = asyncResetGen
 -- | Normally, asynchronous resets can be both asynchronously asserted and
 -- de-asserted. Asynchronous de-assertion can induce meta-stability in the
 -- component which is being reset. To ensure this doesn't happen,
--- 'resetSynchroniser' ensures that de-assertion of a reset happens
+-- 'resetSynchronizer' ensures that de-assertion of a reset happens
 -- synchronously. Assertion of the reset remains asynchronous.
 --
 -- Note that asynchronous assertion does not induce meta-stability in the
