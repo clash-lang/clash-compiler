@@ -185,19 +185,19 @@ pprPrecTyApp prec e ty = do
   ty' <- pprParendType ty
   return $ prettyParen (prec >= appPrec) $ e' $$ (char '@' <> ty')
 
-pprPrecLetrec :: LFresh m => Rational -> [(Id, Embed Term)] -> Term
-  -> m Doc
-pprPrecLetrec prec xes body
-  | [] <- xes = pprPrec prec body
-  | otherwise = do
-    body' <- pprPrec noPrec body
-    xes'  <- mapM (\(x,e) -> do
-                    x' <- pprBndr LetBind x
-                    e' <- pprPrec noPrec (unembed e)
-                    return $ x' $$ equals <+> e'
-                  ) xes
-    return $ prettyParen (prec > noPrec) $
-      hang (text "letrec") 2 (vcat xes') $$ text "in" <+> body'
+pprPrecLetrec :: LFresh m => Rational -> [(Id, Embed Term)] -> Term -> m Doc
+pprPrecLetrec prec xes body = do
+  body' <- pprPrec noPrec body
+  xes'  <- mapM (\(x,e) -> do
+                  x' <- pprBndr LetBind x
+                  e' <- pprPrec noPrec (unembed e)
+                  return $ x' $$ equals <+> e'
+                ) xes
+  let xes'' = case xes' of
+                [] -> [text "EmptyLetrec"]
+                _  -> xes'
+  return $ prettyParen (prec > noPrec) $
+    hang (text "letrec") 2 (vcat xes'') $$ text "in" <+> body'
 
 pprPrecCase :: LFresh m => Rational -> Term -> [(Pat,Term)] -> m Doc
 pprPrecCase prec e alts = do
