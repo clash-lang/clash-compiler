@@ -88,14 +88,39 @@ infixr 6 >-!->
   e' <- r1 c e
   deepseq e' (r2 c e')
 
+{-
+Note [topdown repeatR]
+~~~~~~~~~~~~~~~~~~~~~~
+In a topdown traversal we need to repeat the transformation r because
+if r replaces a parent node with one of its children
+we should still apply r to that child, before continuing with its children.
+
+Example: topdownR (inlineBinders (\_ _ -> return True))
+on:
+> letrec
+>   x = 1
+> in letrec
+>      y = 2
+>    in f x y
+
+inlineBinders would inline x and return:
+> letrec
+>   y = 2
+> in f 1 y
+
+Then we must repeat the transformation to let it also inline y.
+-}
+
 -- | Apply a transformation in a topdown traversal
-topdownR :: Fresh m => Transform m -> Transform m
-topdownR r = r >-> allR True (topdownR r)
+topdownR :: Rewrite m -> Rewrite m
+-- See Note [topdown repeatR]
+topdownR r = repeatR r >-> allR True (topdownR r)
 
 -- | Apply a transformation in a topdown traversal. Doesn't freshen bound
 -- variables
-unsafeTopdownR :: Fresh m => Transform m -> Transform m
-unsafeTopdownR r = r >-> allR False (unsafeTopdownR r)
+unsafeTopdownR :: Rewrite m -> Rewrite m
+-- See NOTE [topdown repeatR]
+unsafeTopdownR r = repeatR r >-> allR False (unsafeTopdownR r)
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Fresh m => Transform m -> Transform m
