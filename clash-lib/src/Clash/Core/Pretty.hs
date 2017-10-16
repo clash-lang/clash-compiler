@@ -183,7 +183,7 @@ pprPrecTyApp :: LFresh m => Rational -> Term -> Type -> m Doc
 pprPrecTyApp prec e ty = do
   e' <- pprPrec opPrec e
   ty' <- pprParendType ty
-  return $ prettyParen (prec >= appPrec) $ e' $$ (char '@' <> ty')
+  return $ prettyParen (prec >= appPrec) $ e' $$ nest 2 (char '@' <> ty')
 
 pprPrecLetrec :: LFresh m => Rational -> [(Id, Embed Term)] -> Term -> m Doc
 pprPrecLetrec prec xes body = do
