@@ -23,13 +23,31 @@
   :: SSymbol name               -- ARG[0]
   -> Clock  pllIn 'Source       -- ARG[1]
   -> Reset  pllIn 'Asynchronous -- ARG[2]
-  -> (Clock pllOut 'Source, Signal pllOut Bool)"
+  -> ( Clock pllOut0 'Source
+     , Clock pllOut1 'Source
+     , Clock pllOut2 'Source
+     , Clock pllOut3 'Source
+     , Clock pllOut4 'Source
+     , Clock pllOut5 'Source
+     , Clock pllOut6 'Source
+     , Clock pllOut7 'Source
+     , Clock pllOut8 'Source
+     , Signal pllOut0 Bool
+     )"
     , "templateD" :
 "// alteraPll begin
 ~NAME[0] ~GENSYM[alteraPll_inst][2]
 (.refclk   (~ARG[1])
 ,.rst      (~ARG[2])
-,.outclk_0 (~RESULT[1])
+,.outclk_0 (~RESULT[9])
+,.outclk_1 (~RESULT[8])
+,.outclk_2 (~RESULT[7])
+,.outclk_3 (~RESULT[6])
+,.outclk_4 (~RESULT[5])
+,.outclk_5 (~RESULT[4])
+,.outclk_6 (~RESULT[3])
+,.outclk_7 (~RESULT[2])
+,.outclk_8 (~RESULT[1])
 ,.locked   (~RESULT[0]));
 // alteraPll end"
     }

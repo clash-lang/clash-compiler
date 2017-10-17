@@ -34,24 +34,62 @@ end block;
   :: SSymbol name               -- ARG[0]
   -> Clock  pllIn 'Source       -- ARG[1]
   -> Reset  pllIn 'Asynchronous -- ARG[2]
-  -> (Clock pllOut 'Source, Signal pllOut Bool)"
+  -> ( Clock pllOut0 'Source
+     , Clock pllOut1 'Source
+     , Clock pllOut2 'Source
+     , Clock pllOut3 'Source
+     , Clock pllOut4 'Source
+     , Clock pllOut5 'Source
+     , Clock pllOut6 'Source
+     , Clock pllOut7 'Source
+     , Clock pllOut8 'Source
+     , Signal pllOut0 Bool
+     )"
     , "templateD" :
 "-- alteraPll begin
 ~GENSYM[alteraPll][0] : block
-  signal ~GENSYM[pllOut][1]  : std_logic;
-  signal ~GENSYM[locked][2]  : std_logic;
-  signal ~GENSYM[pllLock][3] : boolean;
+  signal ~GENSYM[pllOut0][1]  : std_logic;
+  signal ~GENSYM[pllOut1][2]  : std_logic;
+  signal ~GENSYM[pllOut2][3]  : std_logic;
+  signal ~GENSYM[pllOut3][4]  : std_logic;
+  signal ~GENSYM[pllOut4][5]  : std_logic;
+  signal ~GENSYM[pllOut5][6]  : std_logic;
+  signal ~GENSYM[pllOut6][7]  : std_logic;
+  signal ~GENSYM[pllOut7][8]  : std_logic;
+  signal ~GENSYM[pllOut8][9]  : std_logic;
+  signal ~GENSYM[locked][10]  : std_logic;
+  signal ~GENSYM[pllLock][11] : boolean;
 
   component ~NAME[0]
     port (refclk   : in std_logic;
           rst      : in std_logic;
           outclk_0 : out std_logic;
+          outclk_1 : out std_logic;
+          outclk_2 : out std_logic;
+          outclk_3 : out std_logic;
+          outclk_4 : out std_logic;
+          outclk_5 : out std_logic;
+          outclk_6 : out std_logic;
+          outclk_7 : out std_logic;
+          outclk_8 : out std_logic;
           locked   : out std_logic);
   end component;
 begin
-  ~GENSYM[alteraPll_inst][4] : component ~NAME[0] port map (~ARG[1],~ARG[2],~SYM[1],~SYM[2]);
-  ~SYM[3] <= true when ~SYM[2] = '1' else false;
-  ~RESULT <= (~SYM[1],~SYM[3]);
+  ~GENSYM[alteraPll_inst][12] : component ~NAME[0] port map ( ~ARG[1]
+                                                           , ~ARG[2]
+                                                           , ~SYM[1]
+                                                           , ~SYM[2]
+                                                           , ~SYM[3]
+                                                           , ~SYM[4]
+                                                           , ~SYM[5]
+                                                           , ~SYM[6]
+                                                           , ~SYM[7]
+                                                           , ~SYM[8]
+                                                           , ~SYM[9]
+                                                           , ~SYM[10]
+                                                           );
+  ~SYM[11] <= true when ~SYM[10] = '1' else false;
+  ~RESULT <= (~SYM[1],~SYM[2],~SYM[3],~SYM[4],~SYM[5],~SYM[6],~SYM[7],~SYM[8],~SYM[9],~SYM[11]);
 end block;
 -- alteraPll end"
     }
