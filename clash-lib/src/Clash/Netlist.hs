@@ -330,6 +330,7 @@ mkFunApp dst fun args = do
                                  (zip args fArgTys)
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
         dstHWty  <- unsafeCoreTypeToHWTypeM $(curLoc) fResTy
+        dstPortType <- return $ toPortType fResTy
         env  <- Lens.use hdlDir
         manFile <- case annM of
           Just ann -> return (env </> t_name ann </> t_name ann <.> "manifest")
@@ -338,8 +339,8 @@ mkFunApp dst fun args = do
             let topName = genComponentName [] mkId fun
             return (env </> (Text.unpack topName) <.> "manifest")
         Just man <- readMaybe <$> liftIO (readFile manFile)
-        instDecls <- mkTopUnWrapper fun annM man (dstId,dstHWty)
-                       (zip argExprs argHWTys)
+        instDecls <- mkTopUnWrapper fun annM man (dstPortType,dstId,dstHWty)
+                       (zip3 (map toPortType fArgTys) argExprs argHWTys)
         return (argDecls ++ instDecls)
 
       | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity"
@@ -347,14 +348,14 @@ mkFunApp dst fun args = do
       normalized <- Lens.use bindings
       case HashMap.lookup (nameOcc fun) normalized of
         Just _ -> do
-          (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent (nameOcc fun)
+          (_,Component compName compInps [snd -> (_, i, hwType)] _) <- preserveVarEnv $ genComponent (nameOcc fun)
           if length args == length compInps
             then do argTys                <- mapM (termType tcm) args
                     let dstId = Text.pack . name2String $ varName dst
                     (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) (zip args argTys)
                     (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs argTys)
-                    let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
-                        outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
+                    let inpAssigns    = zipWith (\(_,i_,t) e -> (Identifier i_ Nothing,In,t,e)) compInps argExprs'
+                        outpAssign    = (Identifier i Nothing,Out,hwType,Identifier dstId Nothing)
                     instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
                     let instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
                     return (argDecls ++ argDecls' ++ [instDecl])

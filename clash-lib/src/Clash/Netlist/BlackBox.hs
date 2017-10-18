@@ -282,9 +282,9 @@ mkFunInput resId e = do
               normalized <- Lens.use bindings
               case HashMap.lookup fun normalized of
                 Just _ -> do
-                  (_,Component compName compInps [snd -> compOutp] _) <- preserveVarEnv $ genComponent fun
-                  let inpAssigns    = zipWith (\(i,t) e' -> (Identifier i Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
-                      outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier (pack "~RESULT") Nothing)
+                  (_,Component compName compInps [snd -> (_, id_, hwType)] _) <- preserveVarEnv $ genComponent fun
+                  let inpAssigns    = zipWith (\(_,i_,t) e' -> (Identifier i_ Nothing,In,t,e')) compInps [ Identifier (pack ("~ARG[" ++ show x ++ "]")) Nothing | x <- [(0::Int)..] ]
+                      outpAssign    = (Identifier id_ Nothing,Out,hwType,Identifier (pack "~RESULT") Nothing)
                   i <- varCount <<%= (+1)
                   let instLabel     = Text.concat [compName,pack ("_" ++ show i)]
                       instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)

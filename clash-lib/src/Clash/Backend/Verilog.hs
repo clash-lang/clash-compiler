@@ -185,13 +185,13 @@ module_ c = addSeen c *> modVerilog <* (idSeen .= [])
     inPorts  = sequence [ sigPort Nothing   p | p       <- inputs c  ]
     outPorts = sequence [ sigPort (Just wr) p | (wr, p) <- outputs c ]
 
-    wr2ty Nothing     = "input"
-    wr2ty (Just Wire) = "output" <+> "wire"
-    wr2ty (Just Reg)  = "output" <+> "reg"
-
     -- map a port to its verilog type, port name, and any encoding notes
-    sigPort (wr2ty -> portTy) (nm, hwTy)
-      = portTy <+> verilogType' True hwTy <+> text nm <+> encodingNote hwTy
+    sigPort sPort (portType, nm, hwTy) = port <+> verilogType' True hwTy <+> text nm <+> encodingNote hwTy
+      where
+        port = case sPort of
+                  Nothing     -> getDirection "input" portType
+                  (Just Wire) -> (getDirection "output" portType) <+> "wire"
+                  (Just Reg)  -> (getDirection "output" portType) <+> "reg"
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
@@ -218,8 +218,8 @@ wireOrReg Reg  = "reg"
 
 addSeen :: Component -> VerilogM ()
 addSeen c = do
-  let iport = map fst $ inputs c
-      oport = map (fst.snd) $ outputs c
+  let iport = [id_ | (_, id_, _) <- inputs c]
+      oport = [id_ | (_, (_, id_, _)) <- outputs c]
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
 
