@@ -5,11 +5,12 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE KindSignatures             #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
 {-# LANGUAGE Trustworthy #-}
 
@@ -41,13 +42,13 @@ import           Clash.Explicit.Signal.Delayed
    unsafeFromSignal, antiDelay)
 import            Clash.Sized.Vector           (Vec)
 import            Clash.Signal
-  (HasClockReset, hasClock, hasReset)
+  (HiddenClockReset, hideClockReset)
 
 {- $setup
->>> :set -XDataKinds -XTypeOperators -XTypeApplications
+>>> :set -XDataKinds -XTypeOperators -XTypeApplications -XFlexibleContexts
 >>> import Clash.Prelude
 >>> let delay3 = delayed (0 :> 0 :> 0 :> Nil)
->>> let delay2 = delayedI :: HasClockReset domain gated synchronous => DSignal domain n Int -> DSignal domain (n + 2) Int
+>>> let delay2 = delayedI :: HiddenClockReset domain => DSignal domain n Int -> DSignal domain (n + 2) Int
 -}
 
 -- | Delay a 'DSignal' for @d@ periods.
@@ -60,11 +61,11 @@ import            Clash.Signal
 -- >>> sampleN 6 (toSignal (delay3 (dfromList [1..])))
 -- [0,0,0,1,2,3]
 delayed
-  :: (KnownNat d, HasClockReset domain gated synchronous)
+  :: (KnownNat d, HiddenClockReset domain)
   => Vec d a
   -> DSignal domain n a
   -> DSignal domain (n + d) a
-delayed = E.delayed hasClock hasReset
+delayed = hideClockReset E.delayed
 
 -- | Delay a 'DSignal' for @m@ periods, where @m@ is derived from the context.
 --
@@ -76,7 +77,7 @@ delayed = E.delayed hasClock hasReset
 -- >>> sampleN 6 (toSignal (delay2 (dfromList [1..])))
 -- [0,0,1,2,3,4]
 delayedI
-  :: (Default a, KnownNat d, HasClockReset domain gated synchronous)
+  :: (Default a, KnownNat d, HiddenClockReset domain)
   => DSignal domain n a
   -> DSignal domain (n + d) a
-delayedI = E.delayedI hasClock hasReset
+delayedI = hideClockReset E.delayedI

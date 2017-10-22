@@ -7,9 +7,10 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 ROMs
 -}
 
-{-# LANGUAGE DataKinds     #-}
-{-# LANGUAGE MagicHash     #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MagicHash        #-}
+{-# LANGUAGE TypeOperators    #-}
 
 {-# LANGUAGE Safe #-}
 
@@ -90,13 +91,13 @@ asyncRom# content rd = arr ! rd
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 rom
-  :: (KnownNat n, KnownNat m, HasClock domain gated)
+  :: (KnownNat n, KnownNat m, HiddenClock domain)
   => Vec n a               -- ^ ROM content
                            --
                            -- __NB:__ must be a constant
   -> Signal domain (Unsigned m)   -- ^ Read address @rd@
   -> Signal domain a              -- ^ The value of the ROM at address @rd@
-rom = E.rom hasClock
+rom = hideClock E.rom
 {-# INLINE rom #-}
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -109,11 +110,11 @@ rom = E.rom hasClock
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs
 romPow2
-  :: (KnownNat n, HasClock domain gated)
+  :: (KnownNat n, HiddenClock domain)
   => Vec (2^n) a         -- ^ ROM content
                          --
                          -- __NB:__ must be a constant
   -> Signal domain (Unsigned n) -- ^ Read address @rd@
   -> Signal domain a            -- ^ The value of the ROM at address @rd@
-romPow2 = E.romPow2 hasClock
+romPow2 = hideClock E.romPow2
 {-# INLINE romPow2 #-}

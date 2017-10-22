@@ -67,7 +67,7 @@ topEntity
 topEntity clk rst key1 =
     let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
          rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
-    in   'Clash.Signal.withClockReset' pllOut rstSync leds
+    in   'Clash.Signal.exposeClockReset' leds pllOut rstSync
   where
     key1R  = 'Clash.Prelude.isRising' 1 key1
     leds   = 'Clash.Prelude.mealy' blinkerT (1,False,0) key1R

@@ -33,8 +33,8 @@ For example, a data file @memory.bin@ containing the 9-bit unsigned number
 We can instantiate a BlockRAM using the content of the above file like so:
 
 @
-topEntity :: Signal (Unsigned 3) -> Signal (Unsigned 9)
-topEntity rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" rd (signal Nothing)
+f :: HiddenClock domain -> Signal domain (Unsigned 3) -> Signal domain (Unsigned 9)
+f rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
 In the example above, we basically treat the BlockRAM as an synchronous ROM.
@@ -42,7 +42,7 @@ We can see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ f (fromList [3..5])__
 [10,11,12]
 @
 
@@ -50,15 +50,15 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-topEntity2 :: Signal (Unsigned 3) -> Signal (Unsigned 6,Signed 3)
-topEntity2 rd = 'Clash.Class.BitPack.unpack' '<$>' 'blockRamFile' d7 \"memory.bin\" rd (signal Nothing)
+g :: HiddenClock domain -> Signal domain (Unsigned 3) -> Signal domain (Unsigned 6,Signed 3)
+g clk rd = 'Clash.Class.BitPack.unpack' '<$>' exposeClock 'blockRamFile' clk d7 \"memory.bin\" rd (signal Nothing)
 @
 
 And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ g (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 
@@ -66,6 +66,7 @@ __>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
 
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE MagicHash           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -89,7 +90,7 @@ import GHC.Stack                              (HasCallStack, withFrozenCallStack
 
 import qualified Clash.Explicit.BlockRam.File as E
 import           Clash.Promoted.Nat           (SNat)
-import           Clash.Signal                 (HasClock, Signal, hasClock)
+import           Clash.Signal                 (HiddenClock, Signal, hideClock)
 import           Clash.Sized.BitVector        (BitVector)
 import           Clash.Sized.Unsigned         (Unsigned)
 
@@ -120,8 +121,8 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFilePow2
-  :: forall domain gated n m
-   . (KnownNat m, KnownNat n, HasClock domain gated, HasCallStack)
+  :: forall domain n m
+   . (KnownNat m, KnownNat n, HiddenClock domain, HasCallStack)
   => FilePath
   -- ^ File describing the initial content of the blockRAM
   -> Signal domain (Unsigned n)
@@ -132,7 +133,7 @@ blockRamFilePow2
   -- ^ Value of the @blockRAM@ at address @r@ from the previous
   -- clock cycle
 blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
-  (E.blockRamFilePow2 hasClock fp rd wrM)
+  (hideClock E.blockRamFilePow2 fp rd wrM)
 {-# INLINE blockRamFilePow2 #-}
 
 -- | Create a blockRAM with space for @n@ elements
@@ -162,7 +163,7 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
-  :: (KnownNat m, Enum addr, HasClock domain gated, HasCallStack)
+  :: (KnownNat m, Enum addr, HiddenClock domain, HasCallStack)
   => SNat n
   -- ^ Size of the blockRAM
   -> FilePath
@@ -175,5 +176,5 @@ blockRamFile
   -- ^ Value of the @blockRAM@ at address @r@ from the previous
   -- clock cycle
 blockRamFile = \sz fp rd wrM -> withFrozenCallStack
-  (E.blockRamFile hasClock sz fp rd wrM)
+  (hideClock E.blockRamFile sz fp rd wrM)
 {-# INLINE blockRamFile #-}

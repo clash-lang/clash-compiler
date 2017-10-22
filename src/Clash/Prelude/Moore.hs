@@ -11,6 +11,8 @@
   requirements.
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
+
 {-# LANGUAGE Safe #-}
 
 module Clash.Prelude.Moore
@@ -29,8 +31,8 @@ import           Clash.Signal
 >>> :set -XDataKinds -XTypeApplications
 >>> import Clash.Prelude
 >>> :{
-let mac s (x,y) = x * y + s
-    topEntity = moore mac id 0
+let macT s (x,y) = x * y + s
+    mac = moore macT id 0
 :}
 
 -}
@@ -40,16 +42,16 @@ let mac s (x,y) = x * y + s
 -- a moore machine
 --
 -- @
--- mac :: Int        -- Current state
---     -> (Int,Int)  -- Input
---     -> Int        -- Updated state
--- mac s (x,y) = x * y + s
+-- macT :: Int        -- Current state
+--      -> (Int,Int)  -- Input
+--      -> Int        -- Updated state
+-- macT s (x,y) = x * y + s
 --
--- topEntity :: SystemClockAndReset => 'Signal' System (Int, Int) -> 'Signal' System Int
--- topEntity = 'moore' mac id 0
+-- mac :: HiddenClockReset domain => 'Signal' domain (Int, Int) -> 'Signal' domain Int
+-- mac = 'moore' mac id 0
 -- @
 --
--- >>> simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate mac [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 -- ...
 --
@@ -57,16 +59,18 @@ let mac s (x,y) = x * y + s
 -- combinational counterpart:
 --
 -- @
--- dualMac :: ('Signal' Int, 'Signal' Int)
---         -> ('Signal' Int, 'Signal' Int)
---         -> 'Signal' Int
+-- dualMac
+--   :: HiddenClockReset domain
+--   => ('Signal' domain Int, 'Signal' domain Int)
+--   -> ('Signal' domain Int, 'Signal' domain Int)
+--   -> 'Signal' domain Int
 -- dualMac (a,b) (x,y) = s1 + s2
 --   where
 --     s1 = 'moore' mac id 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'moore' mac id 0 ('Clash.Signal.bundle' (b,y))
 -- @
 moore
-  :: HasClockReset domain gated synchronous
+  :: HiddenClockReset domain
   => (s -> i -> s) -- ^ Transfer function in moore machine form:
                    -- @state -> input -> newstate@
   -> (s -> o)      -- ^ Output function in moore machine form:
@@ -75,14 +79,14 @@ moore
   -> (Signal domain i -> Signal domain o)
   -- ^ Synchronous sequential function with input and output matching that
   -- of the moore machine
-moore = E.moore hasClock hasReset
+moore = hideClockReset E.moore
 {-# INLINE moore #-}
 
 
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
 medvedev
-  :: HasClockReset domain gated synchronous
+  :: HiddenClockReset domain
   => (s -> i -> s)
   -> s
   -> (Signal domain i -> Signal domain s)
@@ -117,7 +121,7 @@ medvedev tr st = moore tr id st
 --     (i2,b2) = 'mooreB' t o 3 (i1,c)
 -- @
 mooreB
-  :: (Bundle i, Bundle o,HasClockReset domain gated synchronous)
+  :: (Bundle i, Bundle o,HiddenClockReset domain)
   => (s -> i -> s) -- ^ Transfer function in moore machine form:
                    -- @state -> input -> newstate@
   -> (s -> o)      -- ^ Output function in moore machine form:
@@ -126,12 +130,12 @@ mooreB
   -> (Unbundled domain i -> Unbundled domain o)
    -- ^ Synchronous sequential function with input and output matching that
    -- of the moore machine
-mooreB = E.mooreB hasClock hasReset
+mooreB = hideClockReset E.mooreB
 {-# INLINE mooreB #-}
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
 medvedevB
-  :: (Bundle i, Bundle s, HasClockReset domain gated synchronous)
+  :: (Bundle i, Bundle s, HiddenClockReset domain)
   => (s -> i -> s)
   -> s
   -> (Unbundled domain i -> Unbundled domain s)

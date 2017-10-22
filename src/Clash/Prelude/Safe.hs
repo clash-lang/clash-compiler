@@ -148,7 +148,7 @@ import           Clash.Signal.Delayed
 import           Clash.XException
 
 {- $setup
->>> :set -XTypeApplications
+>>> :set -XFlexibleContexts -XTypeApplications
 >>> let rP = registerB (8,8)
 -}
 
@@ -164,39 +164,39 @@ It instead exports the identically named functions defined in terms of
 
 -- | Create a 'register' function for product-type like signals (e.g. '(Signal a, Signal b)')
 --
--- > rP :: HasClockAndReset System gated synchronous
--- >    => (Signal System Int, Signal System Int)
--- >    -> (Signal System Int, Signal System Int)
+-- > rP :: HiddenClockReset domain
+-- >    => (Signal domain Int, Signal domain Int)
+-- >    -> (Signal domain Int, Signal domain Int)
 -- > rP = registerB (8,8)
 --
 -- >>> simulateB rP [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB
-  :: (HasClockReset domain gated synchronous, Bundle a)
+  :: (HiddenClockReset domain, Bundle a)
   => a
   -> Unbundled domain a
   -> Unbundled domain a
-registerB = E.registerB hasClock hasReset
+registerB = hideClockReset E.registerB
 infixr 3 `registerB`
 {-# INLINE registerB #-}
 
 -- | Give a pulse when the 'Signal' goes from 'minBound' to 'maxBound'
 isRising
-  :: (HasClockReset domain gated synchronous, Bounded a, Eq a)
+  :: (HiddenClockReset domain, Bounded a, Eq a)
   => a -- ^ Starting value
   -> Signal domain a
   -> Signal domain Bool
-isRising = E.isRising hasClock hasReset
+isRising = hideClockReset E.isRising
 {-# INLINE isRising #-}
 
 -- | Give a pulse when the 'Signal' goes from 'maxBound' to 'minBound'
 isFalling
-  :: (HasClockReset domain gated synchronous, Bounded a, Eq a)
+  :: (HiddenClockReset domain, Bounded a, Eq a)
   => a -- ^ Starting value
   -> Signal domain a
   -> Signal domain Bool
-isFalling = E.isFalling hasClock hasReset
+isFalling = hideClockReset E.isFalling
 {-# INLINE isFalling #-}
 
 -- | Give a pulse every @n@ clock cycles. This is a useful helper function when
@@ -217,10 +217,10 @@ isFalling = E.isFalling hasClock hasReset
 -- counter = 'Clash.Signal.regEn' 0 ('riseEvery' ('SNat' :: 'SNat' 10000000)) (counter + 1)
 -- @
 riseEvery
-  :: HasClockReset domain gated synchronous
+  :: HiddenClockReset domain
   => SNat n
   -> Signal domain Bool
-riseEvery = E.riseEvery hasClock hasReset
+riseEvery = hideClockReset E.riseEvery
 {-# INLINE riseEvery #-}
 
 -- | Oscillate a @'Bool'@ for a given number of cycles. This is a convenient
@@ -245,9 +245,9 @@ riseEvery = E.riseEvery hasClock hasReset
 -- >>> sample' (oscillate False d1) == sample' osc'
 -- True
 oscillate
-  :: HasClockReset domain gated synchronous
+  :: HiddenClockReset domain
   => Bool
   -> SNat n
   -> Signal domain Bool
-oscillate = E.oscillate hasClock hasReset
+oscillate = hideClockReset E.oscillate
 {-# INLINE oscillate #-}

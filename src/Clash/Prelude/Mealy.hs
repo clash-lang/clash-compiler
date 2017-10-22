@@ -11,6 +11,8 @@
   requirements.
 -}
 
+{-# LANGUAGE FlexibleContexts #-}
+
 {-# LANGUAGE Safe #-}
 
 module Clash.Prelude.Mealy
@@ -28,10 +30,10 @@ import           Clash.Signal
 >>> :set -XDataKinds -XTypeApplications
 >>> import Clash.Prelude
 >>> :{
-let mac s (x,y) = (s',s)
+let macT s (x,y) = (s',s)
       where
         s' = x * y + s
-    topEntity = mealy mac 0
+    mac = mealy macT 0
 :}
 
 -}
@@ -40,18 +42,19 @@ let mac s (x,y) = (s',s)
 -- a mealy machine
 --
 -- @
--- mac :: Int        -- Current state
---     -> (Int,Int)  -- Input
---     -> (Int,Int)  -- (Updated state, output)
--- mac s (x,y) = (s',s)
+-- macT
+--   :: Int        -- Current state
+--   -> (Int,Int)  -- Input
+--   -> (Int,Int)  -- (Updated state, output)
+-- macT s (x,y) = (s',s)
 --   where
 --     s' = x * y + s
 --
--- topEntity :: HasSystemClockAndReset => 'Signal' System (Int, Int) -> 'Signal' System Int
--- topEntity = 'mealy' mac 0
+-- mac :: HiddenClockReset domain => 'Signal' domain (Int, Int) -> 'Signal' domain Int
+-- mac = 'mealy' macT 0
 -- @
 --
--- >>> simulate topEntity [(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate mac [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 -- ...
 --
@@ -59,22 +62,24 @@ let mac s (x,y) = (s',s)
 -- combinational counterpart:
 --
 -- @
--- dualMac :: ('Signal' Int, 'Signal' Int)
---         -> ('Signal' Int, 'Signal' Int)
---         -> 'Signal' Int
+-- dualMac
+--   :: HiddenClockReset domain
+--   => ('Signal' domain Int, 'Signal' domain Int)
+--   -> ('Signal' domain Int, 'Signal' domain Int)
+--   -> 'Signal' domain Int
 -- dualMac (a,b) (x,y) = s1 + s2
 --   where
 --     s1 = 'mealy' mac 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'mealy' mac 0 ('Clash.Signal.bundle' (b,y))
 -- @
-mealy :: HasClockReset domain gated synchronous
+mealy :: HiddenClockReset domain
       => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                            -- @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state
       -> (Signal domain i -> Signal domain o)
       -- ^ Synchronous sequential function with input and output matching that
       -- of the mealy machine
-mealy = E.mealy hasClock hasReset
+mealy = hideClockReset E.mealy
 {-# INLINE mealy #-}
 
 -- | A version of 'mealy' that does automatic 'Bundle'ing
@@ -103,18 +108,18 @@ mealy = E.mealy hasClock hasReset
 --     (i1,b1) = 'mealyB' f 0 (a,b)
 --     (i2,b2) = 'mealyB' f 3 (i1,c)
 -- @
-mealyB :: (Bundle i, Bundle o, HasClockReset domain gated synchronous)
+mealyB :: (Bundle i, Bundle o, HiddenClockReset domain)
        => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                             -- @state -> input -> (newstate,output)@
        -> s                 -- ^ Initial state
        -> (Unbundled domain i -> Unbundled domain o)
        -- ^ Synchronous sequential function with input and output matching that
        -- of the mealy machine
-mealyB = E.mealyB hasClock hasReset
+mealyB = hideClockReset E.mealyB
 {-# INLINE mealyB #-}
 
 -- | Infix version of 'mealyB'
-(<^>) :: (Bundle i, Bundle o, HasClockReset domain gated synchronous)
+(<^>) :: (Bundle i, Bundle o, HiddenClockReset domain)
       => (s -> i -> (s,o)) -- ^ Transfer function in mealy machine form:
                            -- @state -> input -> (newstate,output)@
       -> s                 -- ^ Initial state

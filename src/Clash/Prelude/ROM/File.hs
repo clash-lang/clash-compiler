@@ -33,15 +33,15 @@ We can instantiate a synchronous ROM using the content of the above file like
 so:
 
 @
-topEntity :: Signal (Unsigned 3) -> Signal (Unsigned 9)
-topEntity rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
+f :: HiddenClock domain => Signal domain (Unsigned 3) -> Signal domain (Unsigned 9)
+f rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
 And see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ f (fromList [3..5])__
 [10,11,12]
 @
 
@@ -49,15 +49,15 @@ However, we can also interpret the same data as a tuple of a 6-bit unsigned
 number, and a 3-bit signed number:
 
 @
-topEntity2 :: Signal (Unsigned 3) -> Signal (Unsigned 6,Signed 3)
-topEntity2 rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
+g :: HiddenClock domain => Signal domain (Unsigned 3) -> Signal domain (Unsigned 6,Signed 3)
+g rd = 'Clash.Class.BitPack.unpack' '<$>' 'romFile' d7 \"memory.bin\" rd
 @
 
 And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ g (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 -}
@@ -258,13 +258,13 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: (KnownNat m, KnownNat n, HasClock domain gated)
+  :: (KnownNat m, KnownNat n, HiddenClock domain)
   => SNat n               -- ^ Size of the ROM
   -> FilePath             -- ^ File describing the content of the ROM
   -> Signal domain (Unsigned n)  -- ^ Read address @rd@
   -> Signal domain (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFile = E.romFile hasClock
+romFile = hideClock E.romFile
 {-# INLINE romFile #-}
 
 -- | A ROM with a synchronous read port, with space for 2^@n@ elements
@@ -291,11 +291,11 @@ romFile = E.romFile hasClock
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFilePow2
-  :: forall n m domain gated
-   . (KnownNat m, KnownNat n, HasClock domain gated)
+  :: forall n m domain
+   . (KnownNat m, KnownNat n, HiddenClock domain)
   => FilePath                    -- ^ File describing the content of the ROM
   -> Signal domain (Unsigned n)  -- ^ Read address @rd@
   -> Signal domain (BitVector m)
   -- ^ The value of the ROM at address @rd@ from the previous clock cycle
-romFilePow2 = E.romFilePow2 hasClock
+romFilePow2 = hideClock E.romFilePow2
 {-# INLINE romFilePow2 #-}

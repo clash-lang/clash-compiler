@@ -168,9 +168,9 @@ import           Clash.Signal.Delayed
 import           Clash.XException
 
 {- $setup
->>> :set -XDataKinds
->>> let window4  = window  :: HasClockReset domain gated synchronous => Signal domain Int -> Vec 4 (Signal domain Int)
->>> let windowD3 = windowD :: HasClockReset domain gated synchronous => Signal domain Int -> Vec 3 (Signal domain Int)
+>>> :set -XDataKinds -XFlexibleContexts
+>>> let window4  = window  :: HiddenClockReset domain => Signal domain Int -> Vec 4 (Signal domain Int)
+>>> let windowD3 = windowD :: HiddenClockReset domain => Signal domain Int -> Vec 3 (Signal domain Int)
 -}
 
 {- $hiding
@@ -186,7 +186,7 @@ It instead exports the identically named functions defined in terms of
 
 -- | Give a window over a 'Signal'
 --
--- > window4 :: HasClockReset domain gated synchronous
+-- > window4 :: HiddenClockReset domain
 -- >         => Signal domain Int -> Vec 4 (Signal domain Int)
 -- > window4 = window
 --
@@ -194,15 +194,15 @@ It instead exports the identically named functions defined in terms of
 -- [<1,0,0,0>,<2,1,0,0>,<3,2,1,0>,<4,3,2,1>,<5,4,3,2>...
 -- ...
 window
-  :: (KnownNat n, Default a, HasClockReset domain gated synchronous)
+  :: (KnownNat n, Default a, HiddenClockReset domain)
   => Signal domain a                -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal domain a)  -- ^ Window of at least size 1
-window = E.window hasClock hasReset
+window = hideClockReset E.window
 {-# INLINE window #-}
 
 -- | Give a delayed window over a 'Signal'
 --
--- > windowD3 :: HasClockReset domain gated synchronous
+-- > windowD3 :: HiddenClockReset domain
 -- >          => Signal domain Int -> Vec 3 (Signal domain Int)
 -- > windowD3 = windowD
 --
@@ -210,8 +210,8 @@ window = E.window hasClock hasReset
 -- [<0,0,0>,<1,0,0>,<2,1,0>,<3,2,1>,<4,3,2>...
 -- ...
 windowD
-  :: (KnownNat n, Default a, HasClockReset domain gated synchronous)
+  :: (KnownNat n, Default a, HiddenClockReset domain)
   => Signal domain a               -- ^ Signal to create a window over
   -> Vec (n + 1) (Signal domain a) -- ^ Window of at least size 1
-windowD = E.windowD hasClock hasReset
+windowD = hideClockReset E.windowD
 {-# INLINE windowD #-}

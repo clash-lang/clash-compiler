@@ -81,7 +81,7 @@ encoderCase enable binaryIn | enable =
     0x8000 -> 0xF
 encoderCase _ _ = 0
 
-upCounter :: HasClockReset domain gated synchronous
+upCounter :: HiddenClockReset domain
           => Signal domain Bool -> Signal domain (Unsigned 8)
 upCounter enable = s
   where
@@ -95,11 +95,11 @@ upCounterLdT s (ld,en,dIn) = (s',s)
        | en        = s + 1
        | otherwise = s
 
-upCounterLd :: HasClockReset domain gated synchronous
+upCounterLd :: HiddenClockReset domain
             => Signal domain (Bool,Bool,Unsigned 8) -> Signal domain (Unsigned 8)
 upCounterLd = mealy upCounterLdT 0
 
-upDownCounter :: HasClockReset domain gated synchronous
+upDownCounter :: HiddenClockReset domain
               => Signal domain Bool -> Signal domain (Unsigned 8)
 upDownCounter upDown = s
   where
@@ -110,7 +110,7 @@ lfsrF' s = pack feedback ++# slice d15 d1 s
   where
     feedback = s!5 `xor` s!3 `xor` s!2 `xor` s!0
 
-lfsrF :: HasClockReset domain gated synchronous
+lfsrF :: HiddenClockReset domain
       => BitVector 16 -> Signal domain Bit
 lfsrF seed = msb <$> r
   where r = register seed (lfsrF' <$> r)
@@ -126,16 +126,16 @@ lfsrGP taps regs = zipWith xorM taps (fb +>> regs)
     xorM i x | i         =  x `xor` fb
              | otherwise = x
 
-lfsrG :: HasClockReset domain gated synchronous => BitVector 16 -> Signal domain Bit
+lfsrG :: HiddenClockReset domain => BitVector 16 -> Signal domain Bit
 lfsrG seed = last (unbundle r)
   where r = register (unpack seed) (lfsrGP (unpack 0b0011010000000000) <$> r)
 
-grayCounter :: HasClockReset domain gated synchronous
+grayCounter :: HiddenClockReset domain
             => Signal domain Bool -> Signal domain (BitVector 8)
 grayCounter en = gray <$> upCounter en
   where gray xs = pack (msb xs) ++# xor (slice d7 d1 xs) (slice d6 d0 xs)
 
-oneHotCounter :: HasClockReset domain gated synchronous
+oneHotCounter :: HiddenClockReset domain
               => Signal domain Bool -> Signal domain (BitVector 8)
 oneHotCounter enable = s
   where
@@ -153,7 +153,7 @@ crcT bv dIn = replaceBit 0  dInXor
     rotated = rotateL bv 1
     fb      = msb bv
 
-crc :: HasClockReset domain gated synchronous
+crc :: HiddenClockReset domain
     => Signal domain Bool -> Signal domain Bool -> Signal domain Bit -> Signal domain (BitVector 16)
 crc enable ld dIn = s
   where
@@ -368,7 +368,10 @@ prop> \en decIn -> en ==> (encoderCase en (decoderCase en decIn) === decIn)
 Using `register`:
 
 @
-upCounter :: Signal Bool -> Signal (Unsigned 8)
+upCounter
+  :: HiddenClockReset domain
+  => Signal domain Bool
+  -> Signal domain (Unsigned 8)
 upCounter enable = s
   where
     s = `register` 0 (`mux` enable (s + 1) s)
@@ -379,7 +382,10 @@ upCounter enable = s
 Using `mealy`:
 
 @
-upCounterLd :: Signal (Bool,Bool,Unsigned 8) -> Unsigned 8
+upCounterLd
+  :: HiddenClockReset domain
+  => Signal domain (Bool,Bool,Unsigned 8)
+  -> Signal domain (Unsigned 8)
 upCounterLd = `mealy` upCounterLdT 0
 
 upCounterLdT s (ld,en,dIn) = (s',s)
@@ -394,7 +400,10 @@ upCounterLdT s (ld,en,dIn) = (s',s)
 Using `register` and `mux`:
 
 @
-upDownCounter :: Signal Bool -> Signal (Unsigned 8)
+upDownCounter
+  :: HiddenClockReset domain
+  => Signal domain Bool
+  -> Signal domain (Unsigned 8)
 upDownCounter upDown = s
   where
     s = `register` 0 (`mux` upDown (s + 1) (s - 1))
@@ -414,7 +423,10 @@ lfsrF' s = 'pack' feedback '++#' 'slice' d15 d1 s
   where
     feedback = s'!'5 ``xor`` s'!'3 ``xor`` s'!'2 ``xor`` s'!'0
 
-lfsrF :: BitVector 16 -> Signal Bit
+lfsrF
+  :: HiddenClockReset domain
+  => BitVector 16
+  -> Signal domain Bit
 lfsrF seed = 'msb' '<$>' r
   where r = 'register' seed (lfsrF' '<$>' r)
 @
@@ -433,7 +445,7 @@ lfsrGP taps regs = 'zipWith' xorM taps (fb '+>>' regs)
 Then we can instantiate a 16-bit LFSR as follows:
 
 @
-lfsrG :: BitVector 16 -> Signal Bit
+lfsrG :: HiddenClockReset domain => BitVector 16 -> Signal domain Bit
 lfsrG seed = 'last' ('unbundle' r)
   where r = 'register' ('unpack' seed) (lfsrGP ('unpack' 0b0011010000000000) '<$>' r)
 @
@@ -447,7 +459,10 @@ prop> testFor 100 (lfsrF 0xACE1 .==. lfsrG 0x4645)
 Using the previously defined @upCounter@:
 
 @
-grayCounter :: Signal Bool -> Signal (BitVector 8)
+grayCounter
+  :: HiddenClockReset domain
+  => Signal domain Bool
+  -> Signal domain (BitVector 8)
 grayCounter en = gray '<$>' upCounter en
   where gray xs = 'pack' ('msb' xs) '++#' 'xor' ('slice' d7 d1 xs) ('slice' d6 d0 xs)
 @
@@ -457,7 +472,10 @@ grayCounter en = gray '<$>' upCounter en
 Basically a barrel-shifter:
 
 @
-oneHotCounter :: Signal Bool -> Signal (BitVector 8)
+oneHotCounter
+  :: HiddenClockReset domain
+  => Signal domain Bool
+  -> Signal domain (BitVector 8)
 oneHotCounter enable = s
   where
     s = 'register' 1 ('mux' enable ('rotateL' '<$>' s '<*>' 1) s)
@@ -493,7 +511,12 @@ crcT bv dIn = 'replaceBit' 0  dInXor
     rotated = 'rotateL' bv 1
     fb      = 'msb' bv
 
-crc :: Signal Bool -> Signal Bool -> Signal Bit -> Signal (BitVector 16)
+crc
+  :: HiddenClockReset domain
+  => Signal domain Bool
+  -> Signal domain Bool
+  -> Signal domain Bit
+  -> Signal domain (BitVector 16)
 crc enable ld dIn = s
   where
     s = 'register' 0xFFFF ('mux' enable ('mux' ld 0xFFFF (crcT '<$>' s '<*>' dIn)) s)

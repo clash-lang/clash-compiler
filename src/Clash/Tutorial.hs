@@ -116,15 +116,20 @@ let sortVL xs = map fst sorted :< (snd (last sorted))
 :}
 
 >>> let mac = mealy macT 0
->>> let topEntity = mac :: SystemClockReset => Signal System (Signed 9, Signed 9) -> Signal System (Signed 9)
+>>> :{
+topEntity :: Clock System Source -> Reset System Asynchronous -> Signal System (Signed 9, Signed 9) -> Signal System (Signed 9)
+topEntity = exposeClockReset mac
+:}
+
 >>> :{
 let testBench :: Signal System Bool
-    testBench = done'
+    testBench = done
       where
         testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
         expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
-        done           = expectedOutput (topEntity testInput)
-        done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+        done           = exposeClockReset (expectedOutput (topEntity clk rst testInput)) clk rst
+        clk            = tbSystemClockGen (not <$> done)
+        rst            = systemResetGen
 :}
 
 >>> :{
@@ -371,7 +376,7 @@ the type of one of the sequential primitives, the @'register'@ function:
 
 @
 register
-  :: 'HasClockReset' domain gated synchronous
+  :: 'HiddenClockReset' domain gated synchronous
   => a -> 'Signal' domain a -> 'Signal' domain a
 register i s = ...
 @
@@ -449,7 +454,7 @@ shape of @macT@:
 
 @
 mealy
-  :: 'HasClockReset' domain gated synchronous
+  :: 'HiddenClockReset' domain gated synchronous
   => (s -> i -> (s,o))
   -> s
   -> ('Signal' i -> 'Signal' o)
@@ -486,10 +491,11 @@ if the function is monomorphic:
 
 @
 topEntity
-  :: 'SystemClockReset'
-  => 'Signal' System ('Signed' 9, 'Signed' 9)
+  :: 'Clock' System 'Source'
+  -> 'Reset' System 'Asynchronous'
+  -> 'Signal' System ('Signed' 9, 'Signed' 9)
   -> 'Signal' System ('Signed' 9)
-topEntity = mac
+topEntity = exposeClockReset mac
 @
 
 Which makes our circuit work on 9-bit signed integers. Including the above
@@ -510,10 +516,11 @@ macT acc (x,y) = (acc',o)
 mac = 'mealy' macT 0
 
 topEntity
-  :: 'SystemClockReset'
-  => 'Signal' System ('Signed' 9, 'Signed' 9)
+  :: 'Clock' System 'Source'
+  -> 'Reset' System 'Asynchronous'
+  -> 'Signal' System ('Signed' 9, 'Signed' 9)
   -> 'Signal' System ('Signed' 9)
-topEntity = mac
+topEntity = 'exposeClockReset' mac
 @
 
 The 'topEntity' function is the starting point for the CλaSH compiler to
@@ -522,6 +529,7 @@ following restrictions in order for the CλaSH compiler to work:
 
   * It must be completely monomorphic
   * It must be completely first-order
+  * The clock and reset arguments must be explicit
 
 Our 'topEntity' meets those restrictions, and so we can convert it successfully
 to VHDL by executing the @:vhdl@ command in the interpreter. This will create
@@ -553,19 +561,21 @@ For example, you can test the earlier defined /topEntity/ by:
 
 @
 topEntity
-  :: 'SystemClockReset'
-  => 'Signal' System (Signed 9,Signed 9)
-  -> 'Signal' System (Signed 9)
-topEntity = mac
+  :: 'Clock' System 'Source'
+  -> 'Reset' System 'Asynchronous'
+  -> 'Signal' System ('Signed' 9, 'Signed' 9)
+  -> 'Signal' System ('Signed' 9)
+topEntity = 'exposeClockReset' mac
 {\-\# NOINLINE topEntity \#-\}
 
 testBench :: 'Signal' System Bool
-testBench = done'
+testBench = done
   where
     testInput    = 'stimuliGenerator' $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
     expectOutput = 'outputVerifier' $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
-    done         = expectOutput (topEntity testInput)
-    done'        = 'withClockReset' ('tbSystemClockGen' (not '<$>' done')) 'systemResetGen' done
+    done         = 'exposeClockReset' (expectOutput (topEntity clk rst testInput)) clk rst
+    clk          = 'tbSystemClockGen' (not '<$>' done)
+    rst          = 'systemResetGen'
 @
 
 This will create a stimulus generator that creates the same inputs as we used
@@ -677,7 +687,7 @@ structure.
 
     @
     asStateM
-      :: 'HasClockReset' domain gated synchronous
+      :: 'HiddenClockReset' domain gated synchronous
       => (i -> 'Control.Monad.State.Lazy.State' s o)
       -> s
       -> ('Signal' domain i -> 'Signal' domain o)
@@ -708,10 +718,11 @@ fir coeffs x_t = y_t
     xs  = 'window' x_t
 
 topEntity
-  :: 'SystemClockReset'
-  => 'Signal' System ('Signed' 16)
+  :: 'Clock' System 'Source'
+  -> 'Reset' System 'Asynchronous'
   -> 'Signal' System ('Signed' 16)
-topEntity = fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil')
+  -> 'Signal' System ('Signed' 16)
+topEntity = exposeClockReset (fir (0 ':>' 1 ':>' 2 ':>' 3 ':>' 'Nil'))
 @
 
 Here we can see that, although the CλaSH compiler handles recursive function
@@ -898,7 +909,7 @@ topEntity
 topEntity clk rst key1 =
     let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
          rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
-    in   'Clash.Signal.withClockReset' pllOut rstSync leds
+    in   'Clash.Signal.exposeClockReset' leds pllOut rstSync
   where
     key1R  = 'Clash.Prelude.isRising' 1 key1
     leds   = 'Clash.Prelude.mealy' blinkerT (1,False,0) key1R
