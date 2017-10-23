@@ -191,7 +191,11 @@ module_ c = addSeen c *> modVerilog <* (idSeen .= [])
         port = case sPort of
                   Nothing     -> getDirection "input" portType
                   (Just Wire) -> (getDirection "output" portType) <+> "wire"
-                  (Just Reg)  -> (getDirection "output" portType) <+> "reg"
+                  (Just Reg)  -> case portType of
+                                    Bidirectional  -> error $ printf
+                                                       "`inout` cannot be of type `reg`, context: {sPort=%s, nm=%s, hwTy=%s}"
+                                                       (show sPort) (show nm) (show hwTy)
+                                    Unidirectional -> "output" <+> "reg"
 
     -- slightly more readable than 'tupled', makes the output Haskell-y-er
     commafy v = (comma <> space) <> pure v
