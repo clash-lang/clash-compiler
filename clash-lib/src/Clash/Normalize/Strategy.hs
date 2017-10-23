@@ -68,6 +68,8 @@ constantPropgation = propagate >-> repeatR inlineAndPropagate >->
        , ("reduceNonRepPrim", reduceNonRepPrim)
 
 
+       , ("caseCast"        , caseCast)
+       , ("letCast"         , letCast)
        , ("splitCastWork"   , splitCastWork)
        , ("inlineCast"      , inlineCast)
        , ("eliminateCastCast",eliminateCastCast)

@@ -43,6 +43,8 @@ module Clash.Normalize.Transformations
   , flattenLet
   , splitCastWork
   , inlineCast
+  , caseCast
+  , letCast
   , eliminateCastCast
   )
 where
@@ -542,6 +544,24 @@ bindConstantVar = inlineBinders test
           n -> return (termSize e <= n)
         _ -> return False
     -- test _ _ = return False
+
+-- | Push a cast over a case into it's alternatives
+caseCast :: NormRewrite
+caseCast _ (Cast (Case subj ty alts) ty1 ty2) = do
+  alts' <- mapM castAlt alts
+  changed $ Case subj ty alts'
+    where
+      castAlt alt = do
+        (pat,altExpr) <- unbind alt
+        return $ bind pat (Cast altExpr ty1 ty2)
+caseCast _ e = return e
+
+-- | Push a cast over a Letrec into it's body
+letCast :: NormRewrite
+letCast _ (Cast (Letrec b) ty1 ty2) = do
+  let (binds,body) = unsafeUnbind b
+  changed $ Letrec $ bind binds (Cast body ty1 ty2)
+letCast _ e = return e
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
