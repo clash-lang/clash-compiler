@@ -453,21 +453,21 @@ module_ c = do
     }
   where
     ports = sequence
-          $ [ encodingNote hwty <$> text i | (i,hwty) <- inputs c ] ++
-            [ encodingNote hwty <$> text i | (_,(i,hwty)) <- outputs c]
+          $ [ encodingNote hwty <$> text id_ | (_,id_,hwty) <- inputs c ] ++
+            [ encodingNote hwty <$> text id_ | (_,(_,id_,hwty)) <- outputs c]
 
     inputPorts = case inputs c of
                    [] -> empty
-                   p  -> vcat (punctuate semi (sequence [ "input" <+> sigDecl (text i) ty | (i,ty) <- p ])) <> semi
+                   p  -> vcat (punctuate semi (sequence [ getDirection "input" portType <+> sigDecl (text i) ty | (portType,i,ty) <- p ])) <> semi
 
     outputPorts = case outputs c of
                    [] -> empty
-                   p  -> vcat (punctuate semi (sequence [ "output" <+> sigDecl (text i) ty | (_,(i,ty)) <- p ])) <> semi
+                   p  -> vcat (punctuate semi (sequence [ getDirection "output" portType <+> sigDecl (text i) ty | (_,(portType,i,ty)) <- p ])) <> semi
 
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
-  let iport = map fst $ inputs c
-      oport = map (fst.snd) $ outputs c
+  let iport = [id_ | (_, id_, _) <- inputs c]
+      oport = [id_ | (_, (_, id_, _)) <- outputs c]
       nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   idSeen .= concat [iport,oport,nets]
   oports .= oport

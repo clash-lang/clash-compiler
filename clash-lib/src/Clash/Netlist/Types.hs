@@ -76,15 +76,15 @@ type Identifier = Text
 data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
-  , inputs        :: [(Identifier,HWType)] -- ^ Input ports
-  , outputs       :: [(WireOrReg,(Identifier,HWType))] -- ^ Output ports
+  , inputs        :: [(PortType,Identifier,HWType)] -- ^ Input ports
+  , outputs       :: [(WireOrReg,(PortType,Identifier,HWType))] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
   deriving Show
 
 instance NFData Component where
   rnf c = case c of
-    Component nm inps outps decls -> rnf nm    `seq` rnf inps `seq`
+    Component nm inps outps decls -> rnf nm `seq` rnf inps `seq`
                                      rnf outps `seq` rnf decls
 
 -- | Size indication of a type (e.g. bit-size or number of elements)
@@ -148,6 +148,12 @@ pattern NetDecl :: Maybe Identifier -> Identifier -> HWType -> Declaration
 pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
   where
     NetDecl note d ty = NetDecl' note Wire d (Right ty)
+
+-- Unidirectional implies either an `in` or `out` port, while bidirectional implies `inout`
+data PortType = Unidirectional | Bidirectional
+  deriving (Show,Generic)
+
+instance NFData PortType
 
 data PortDirection = In | Out
   deriving Show

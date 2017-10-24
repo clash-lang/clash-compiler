@@ -94,6 +94,9 @@ ghcTypeToHWType iw floatSupport = go
 
         "GHC.Prim.Any" -> return (BitVector 1)
 
+        "Clash.Signal.Internal.InOut" ->
+          ExceptT $ return $ coreTypeToHWType go m (args !! 1)
+
         "Clash.Signal.Internal.Signal" ->
           ExceptT $ return $ coreTypeToHWType go m (args !! 1)
 

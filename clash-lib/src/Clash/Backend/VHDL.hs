@@ -542,10 +542,10 @@ entity c = do
       "end" <> semi
   where
     ports l = sequence
-            $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "in" <+> vhdlType ty)
-              | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> "out" <+> vhdlType ty)
-              | (_,(i,ty)) <- outputs c ]
+            $ [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> getDirection "in" portType <+> vhdlType ty)
+              | (portType, i,ty) <- inputs c ] ++
+              [ (,fromIntegral $ T.length i) A.<$> (encodingNote ty <$> fill l (text i) <+> colon <+> getDirection "out" portType <+> vhdlType ty)
+              | (_,(portType, i,ty)) <- outputs c ]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
