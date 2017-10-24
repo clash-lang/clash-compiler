@@ -7,13 +7,13 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.pack#"
     , "type"      : "pack# :: KnownNat n => Signed n -> BitVector n"
-    , "templateE" : "~ARG[1]"
+    , "templateE" : "$unsigned(~ARG[1])"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.unpack#"
     , "type"      : "unpack# :: KnownNat n => BitVector n -> Signed n"
-    , "templateE" : "~ARG[1]"
+    , "templateE" : "$signed(~ARG[1])"
     }
   }
 , { "BlackBox" :
@@ -56,14 +56,14 @@
     { "name"      : "Clash.Sized.Internal.Signed.minBound#"
     , "type"      : "minBound# :: KnownNat n => Signed n"
     , "comment"   : "Generates incorrect SV for n=0"
-    , "templateE" : "{1'b1, {(~LIT[0]-1) {1'b0}}}"
+    , "templateE" : "$signed({1'b1, {(~LIT[0]-1) {1'b0}}})"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Signed.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => Signed n"
     , "comment"   : "Generates incorrect SV for n=0"
-    , "templateE" : "{1'b0, {(~LIT[0]-1) {1'b1}}}"
+    , "templateE" : "$signed({1'b0, {(~LIT[0]-1) {1'b1}}})"
     }
   }
 , { "BlackBox" :
