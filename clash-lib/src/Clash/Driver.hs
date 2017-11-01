@@ -271,10 +271,11 @@ createHDL backend modName components top (topName,manifestE) = flip evalState ba
       qincs = map (first (<.> "qsys")) (concat incs)
       topFiles = hdl ++ qincs
   manifest <- either return (\m -> do
+      let topName' = Text.pack topName
       let topInNames  = map fst (inputs top)
-      topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType . snd) (inputs top)
+      topInTypes  <- mapM (fmap (displayT . renderOneLine) . hdlType (External topName') . snd) (inputs top)
       let topOutNames = map (fst . snd) (outputs top)
-      topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType . snd . snd) (outputs top)
+      topOutTypes <- mapM (fmap (displayT . renderOneLine) . hdlType (External topName') . snd . snd) (outputs top)
       let compNames = map (componentName.snd) components
       return (m { portInNames    = topInNames
                 , portInTypes    = topInTypes

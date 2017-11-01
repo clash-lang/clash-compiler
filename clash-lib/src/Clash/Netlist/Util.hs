@@ -702,6 +702,7 @@ mkTopUnWrapper topEntity annM man dstId args = do
   instLabel <- extendIdentifier Basic topName' ("_" `append` fst dstId)
   let topCompDecl =
         InstDecl
+          (Just topName')
           topName'
           instLabel
           (map (\(p,i,t) -> (Identifier p Nothing,In, t,Identifier i Nothing)) (concat iports) ++

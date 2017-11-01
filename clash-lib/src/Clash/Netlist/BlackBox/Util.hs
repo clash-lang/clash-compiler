@@ -34,7 +34,7 @@ import           Text.PrettyPrint.Leijen.Text.Monadic (displayT, renderCompact,
                                                        vcat, (<$$>), nest)
 import qualified Text.PrettyPrint.Leijen.Text.Monadic as PP
 
-import           Clash.Backend                        (Backend (..))
+import           Clash.Backend                        (Backend (..), Usage (..))
 import           Clash.Driver.Types                   (ClashException (..))
 import           Clash.Netlist.BlackBox.Parser
 import           Clash.Netlist.BlackBox.Types
@@ -374,9 +374,9 @@ renderTag b (BV False es e) = do
   let ty = lineToType b [e]
   (displayT . renderOneLine) <$> fromBV ty e'
 
-renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType . snd $ bbResult b
+renderTag b (Typ Nothing)   = fmap (displayT . renderOneLine) . hdlType Internal . snd $ bbResult b
 renderTag b (Typ (Just n))  = let (_,ty,_) = bbInputs b !! n
-                              in  (displayT . renderOneLine) <$> hdlType ty
+                              in  (displayT . renderOneLine) <$> hdlType Internal ty
 renderTag b (TypM Nothing)  = fmap (displayT . renderOneLine) . hdlTypeMark . snd $ bbResult b
 renderTag b (TypM (Just n)) = let (_,ty,_) = bbInputs b !! n
                               in  (displayT . renderOneLine) <$> hdlTypeMark ty
@@ -393,7 +393,7 @@ renderTag b (Depth e)      = return . Text.pack . show . treeDepth $ lineToType 
     treeDepth (RTree n _) = n
     treeDepth _           = error $ $(curLoc) ++ "treeDepth of a non-tree type"
 renderTag b e@(TypElem _)   = let ty = lineToType b [e]
-                              in  (displayT . renderOneLine) <$> hdlType ty
+                              in  (displayT . renderOneLine) <$> hdlType Internal ty
 renderTag _ (Gen b)         = displayT . renderOneLine <$> genStmt b
 renderTag _ (GenSym [C t] _) = return t
 renderTag b (Vars n)        =
@@ -412,7 +412,7 @@ renderTag b (IndexType (L n)) =
   case bbInputs b !! n of
     (Literal _ (NumLit n'),_,_) ->
       let hty = Index (fromInteger n')
-      in  fmap (displayT . renderOneLine) (hdlType hty)
+      in  fmap (displayT . renderOneLine) (hdlType Internal hty)
     x -> error $ $(curLoc) ++ "Index type not given a literal: " ++ show x
 renderTag b (FilePath e)    = case e of
   L n -> do

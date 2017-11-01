@@ -82,7 +82,12 @@ instance Backend VHDLState where
 
   genHDL          = genVHDL
   mkTyPackage     = mkTyPackage_
-  hdlType         = vhdlType
+  hdlType Internal      ty = vhdlType ty
+  hdlType (External nm) ty = case ty of
+    Vector _ _  -> text nm <> dot <> vhdlType ty
+    RTree _ _   -> text nm <> dot <> vhdlType ty
+    Product _ _ -> text nm <> dot <> vhdlType ty
+    _           -> vhdlType ty
   hdlTypeErrValue = vhdlTypeErrValue
   hdlTypeMark     = vhdlTypeMark
   hdlSig t ty     = sigDecl (text t) ty
@@ -168,6 +173,8 @@ genVHDL nm sp c = do
     setSrcSpan sp
     v <- vhdl
     i <- use includes
+    libraries .= []
+    packages  .= []
     return ((unpack cName,v),i)
   where
     cName   = componentName c
@@ -726,9 +733,11 @@ inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
     conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
     conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
 
-inst_ (InstDecl nm lbl pms) = fmap Just $
-    nest 2 $ text lbl <+> colon <+> "entity"
-              <+> text nm <$$> pms' <> semi
+inst_ (InstDecl libM nm lbl pms) = do
+    maybe (return ()) (\lib -> libraries %= (lib:)) libM
+    fmap Just $
+      nest 2 $ text lbl <+> colon <+> "entity"
+                <+> maybe empty ((<> ".") . text) libM <> text nm <$$> pms' <> semi
   where
     pms' = do
       rec (p,ls) <- fmap unzip $ sequence [ (,formalLength i) A.<$> fill (maximum ls) (expr_ False i) <+> "=>" <+> expr_ False e | (i,_,_,e) <- pms]
@@ -996,11 +1005,11 @@ expr_ _ (ConvBV topM hwty True e) = do
   case topM of
     Nothing -> text (T.pack nm) <> "_types" <> dot <> "toSLV" <>
                parens (vhdlTypeMark hwty <> "'" <> parens (expr_ False e))
-    Just t  -> text t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
+    Just t  -> text t <> dot <> text t <> "_types" <> dot <> "toSLV" <> parens (expr_ False e)
 
 expr_ _ (ConvBV topM _ False e) = do
   nm <- use modNm
-  maybe (text (T.pack nm) <> "_types" ) ((<> "_types") . text) topM <> dot <>
+  maybe (text (T.pack nm) <> "_types" ) (\t -> text t <> dot <> text t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty

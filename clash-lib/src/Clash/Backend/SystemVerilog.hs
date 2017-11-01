@@ -83,7 +83,7 @@ instance Backend SystemVerilogState where
 
   genHDL          = genVerilog
   mkTyPackage     = mkTyPackage_
-  hdlType         = verilogType
+  hdlType _       = verilogType
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
   hdlSig t ty     = sigDecl (text t) ty
@@ -655,7 +655,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     conds i ((Nothing,e):_)   = ("default" <+> colon <+> text i <+> equals <+> expr_ False e) <:> return []
     conds i ((Just c ,e):es') = (exprLit (Just (scrutTy,conSize scrutTy)) c <+> colon <+> text i <+> equals <+> expr_ False e) <:> conds i es'
 
-inst_ (InstDecl nm lbl pms) = fmap Just $
+inst_ (InstDecl _ nm lbl pms) = fmap Just $
     text nm <+> text lbl <$$> pms' <> semi
   where
     pms' = tupled $ sequence [dot <> expr_ False i <+> parens (expr_ False e) | (i,_,_,e) <- pms]

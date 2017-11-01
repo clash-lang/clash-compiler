@@ -178,6 +178,28 @@ clashHDL t env extraArgs modName =
               False
               False
 
+ghdlLibrary
+  :: FilePath
+  -- ^ Working directory
+  -> String
+  -- ^ Module name
+  -> FilePath
+  -- ^ Directory with the VHDL files
+  -> TestTree
+ghdlLibrary env modName lib = withResource (return env) (const (return ()))
+    (\d -> testProgram "GHDL (library)" "ghdl"
+      ("-i":("--work="++workName):("--workdir="++workdir):"--std=93":vhdlFiles d lib') (Just env) False False)
+  where
+    lib' = map toLower lib
+    workName = case lib' of {[] -> map toLower modName ++ "_topentity"; k -> k}
+    workdir  = case lib' of {[] -> "."; k -> k}
+
+    vhdlFiles :: IO FilePath -> FilePath -> [FilePath]
+    vhdlFiles d subdir =  map (subdir </>)
+                       .  Unsafe.unsafePerformIO
+                       $  filter (List.isSuffixOf "vhdl")
+                      <$> (Directory.getDirectoryContents . (</> subdir) =<< d)
+
 ghdlImport
   :: FilePath
   -- ^ Working directory
@@ -199,12 +221,24 @@ ghdlMake
   -- ^ Working directory
   -> [FilePath]
   -- ^ Directories with the VHDL files
+  -> [FilePath]
+  -- ^ Library directories
   -> String
   -- ^ Name of the components we want to build
   -> TestTree
-ghdlMake env subdirs entName =
+ghdlMake env subdirs libs entName =
   testProgram "GHDL (make)" "ghdl"
-    ["-m","--workdir=work","-o",map toLower (noConflict entName subdirs),entName] (Just env) False False
+    (concat
+      [["-m"]
+      ,["--workdir=work"]
+      ,map (\l -> "-P" ++ emptyToDot (map toLower l)) libs
+      ,["-o",map toLower (noConflict entName subdirs)]
+      ,[entName]
+      ])
+    (Just env) False False
+  where
+    emptyToDot [] = "."
+    emptyToDot k  = k
 
 ghdlSim
   :: FilePath
@@ -295,10 +329,15 @@ runTest env VHDL extraArgs modName (subdirs,entName,doSim) = withResource aquire
     aquire    = Directory.createDirectoryIfMissing True workdir
     release _ = Directory.removeDirectoryRecursive vhdlDir
 
-    grp       = testGroup modName $
-                  [ clashHDL VHDL env extraArgs modName
-                  , ghdlImport modDir subdirs
-                  , ghdlMake modDir subdirs entName
+    libs
+      | length subdirs == 1 = []
+      | otherwise          = subdirs List.\\ [entName]
+
+    grp       = testGroup modName $ concat
+                  [ [clashHDL VHDL env extraArgs modName]
+                  , map (ghdlLibrary modDir modName) libs
+                  , [ghdlImport modDir (subdirs List.\\ libs)]
+                  , [ghdlMake modDir subdirs libs entName]
                   ] ++ if doSim then [ghdlSim modDir (noConflict entName subdirs)] else []
 
 runTest env Verilog extraArgs modName (subdirs,entName,doSim) =

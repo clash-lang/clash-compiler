@@ -356,7 +356,7 @@ mkFunApp dst fun args = do
                     let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                         outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
                     instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
-                    let instDecl      = InstDecl compName instLabel (outpAssign:inpAssigns)
+                    let instDecl      = InstDecl Nothing compName instLabel (outpAssign:inpAssigns)
                     return (argDecls ++ argDecls' ++ [instDecl])
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of

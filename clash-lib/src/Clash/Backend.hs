@@ -27,6 +27,13 @@ import Clash.Annotations.Primitive          (HDL)
 
 type ModName = String
 
+-- | Is a type used for internal or external use
+data Usage
+  = Internal
+  -- ^ Internal use
+  | External Text
+  -- ^ External use, field indicates the library name
+
 class Backend state where
   -- | Initial state for state monad
   initBackend :: Int -> HdlSyn -> state
@@ -52,7 +59,7 @@ class Backend state where
   -- | Generate a HDL package containing type definitions for the given HWTypes
   mkTyPackage      :: String -> [HWType] -> State state [(String, Doc)]
   -- | Convert a Netlist HWType to a target HDL type
-  hdlType          :: HWType       -> State state Doc
+  hdlType          :: Usage -> HWType -> State state Doc
   -- | Convert a Netlist HWType to an HDL error value for that type
   hdlTypeErrValue  :: HWType       -> State state Doc
   -- | Convert a Netlist HWType to the root of a target HDL type
