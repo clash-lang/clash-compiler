@@ -50,6 +50,7 @@ module Clash.Core.Type
   , reduceTypeFamily
   , undefinedTy
   , isIntegerTy
+  , normalizeType
   )
 where
 
@@ -70,6 +71,7 @@ import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           gacompare,gaeq,gfvAny,
                                                           runFreshM,unbind)
 import           Unbound.Generics.LocallyNameless.Extra  ()
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 -- Local imports
 import           Clash.Core.DataCon
@@ -513,3 +515,35 @@ isIntegerTy :: Type -> Bool
 isIntegerTy (ConstTy (TyCon (nm)))
   | "GHC.Integer.Type.Integer" `isPrefixOf` (name2String nm) = True
 isIntegerTy _ = False
+
+-- Normalize a type, looking through Signals and newtypes
+--
+-- For example: Vec (6-1) (Unsigned (3+1)) normalizes to Vec 5 (Unsigned 4)
+normalizeType :: HashMap TyConOccName TyCon -> Type -> Type
+normalizeType tcMap = go
+  where
+  go ty = case tyView ty of
+    TyConApp tcNm args
+      | name2String tcNm == "Clash.Signal.Internal.Signal"
+      , [_,elTy] <- args
+      -> go elTy
+      -- These Clash types are implemented with newtypes.
+      -- We need to keep these newtypes because they define the width of the numbers.
+      | name2String tcNm == "Clash.Sized.Internal.BitVector.BitVector" ||
+        name2String tcNm == "Clash.Sized.Internal.Index.Index"         ||
+        name2String tcNm == "Clash.Sized.Internal.Signed.Signed"       ||
+        name2String tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"
+      -> mkTyConApp tcNm (map go args)
+      | otherwise
+      -> case tcMap HashMap.! nameOcc tcNm of
+           AlgTyCon {algTcRhs = (NewTyCon _ nt)}
+             -> go (newTyConInstRhs nt args)
+           _ -> let args' = map go args
+                    ty' = mkTyConApp tcNm args'
+                in case reduceTypeFamily tcMap ty' of
+                  Just ty'' -> ty''
+                  Nothing  -> ty'
+    FunTy ty1 ty2 -> mkFunTy (go ty1) (go ty2)
+    (OtherType (ForAllTy (unsafeUnbind -> (tyvar,ty'))))
+      -> ForAllTy (bind tyvar (go ty'))
+    _ -> ty

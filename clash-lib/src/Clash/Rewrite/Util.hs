@@ -18,11 +18,12 @@ module Clash.Rewrite.Util where
 import           Control.DeepSeq
 import           Control.Exception           (throw)
 import           Control.Lens
-  (Lens', (%=), (+=), (^.), _2, _4, _5)
+  (Lens', (%=), (+=), (^.), _2, _4, _5, _Left)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Writer        as Writer
+import           Data.Bifunctor              (bimap)
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Lazy           as HML
 import qualified Data.HashMap.Strict         as HMS
@@ -53,6 +54,7 @@ import           Clash.Core.TyCon
   (TyCon, TyConOccName, tyConDataCons)
 import           Clash.Core.Type             (KindOrType, Type (..),
                                               TypeView (..), coreView,
+                                              normalizeType,
                                               typeKind, tyView)
 import           Clash.Core.Util
   (Delta, Gamma, collectArgs, isPolyFun, mkAbstraction, mkApps, mkId, mkLams,
@@ -583,7 +585,7 @@ specialise' :: Lens' extra (Map.Map (TmOccName, Int, Either Term Type) (TmName,T
             -> (Term, [Either Term Type]) -- ^ Function part of the term, split into root and applied arguments
             -> Either Term Type -- ^ Argument to specialize on
             -> RewriteMonad extra Term
-specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = do
+specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArgIn = do
   lvl <- Lens.view dbgLevel
 
   -- Don't specialise TopEntities
@@ -592,11 +594,18 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
   then traceIf (lvl >= DebugNone) ("Not specialising TopEntity: " ++ showDoc f) (return e)
   else do -- NondecreasingIndentation
 
+  tcm <- Lens.view tcCache
+
+  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
   -- Create binders and variable references for free variables in 'specArg'
-  (specBndrs,specVars) <- specArgBndrsAndVars ctx specArg
+  -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
+  (specBndrsIn,specVars) <- specArgBndrsAndVars ctx specArg
   let argLen  = length args
+      specBndrs :: [Either Id TyVar]
+      specBndrs = map (Lens.over _Left (normalizeId tcm)) specBndrsIn
+      specAbs :: Either Term Type
       specAbs = either (Left . (`mkAbstraction` specBndrs)) (Right . id) specArg
-  -- Determine if 'f' has already been specialized on 'specArg'
+  -- Determine if 'f' has already been specialized on (a type-normalized) 'specArg'
   specM <- Map.lookup (nameOcc f,argLen,specAbs) <$> Lens.use (extra.specMapLbl)
   case specM of
     -- Use previously specialized function
@@ -624,7 +633,6 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArg = 
                         Nothing)
             else do
               -- Make new binders for existing arguments
-              tcm                 <- Lens.view tcCache
               (boundArgs,argVars) <- fmap (unzip . map (either (Left *** Left) (Right *** Right))) $
                                      Monad.zipWithM
                                        (mkBinderFor tcm)
@@ -691,6 +699,18 @@ specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   changed newExpr
 
 specialise' _ _ _ _ e _ _ = return e
+
+normalizeTermTypes :: HashMap TyConOccName TyCon -> Term -> Term
+normalizeTermTypes tcm e = case e of
+  Cast e' ty1 ty2 -> Cast (normalizeTermTypes tcm e') (normalizeType tcm ty1) (normalizeType tcm ty2)
+  Var ty nm -> Var (normalizeType tcm ty) nm
+  -- TODO other terms?
+  _ -> e
+
+normalizeId :: HashMap TyConOccName TyCon -> Id -> Id
+normalizeId tcm (Id nm (Unbound.Embed ty)) = Id nm (Unbound.Embed $ normalizeType tcm ty)
+normalizeId _   tyvar = tyvar
+
 
 -- | Create binders and variable references for free variables in 'specArg'
 specArgBndrsAndVars :: [CoreContext]
