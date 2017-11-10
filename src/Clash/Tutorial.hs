@@ -72,6 +72,7 @@ where
 
 import Clash.Prelude
 import Clash.Explicit.Prelude (freqCalc)
+import Clash.Explicit.Testbench
 import Control.Monad.ST
 import Data.Array
 import Data.Char
@@ -125,9 +126,9 @@ topEntity = exposeClockReset mac
 let testBench :: Signal System Bool
     testBench = done
       where
-        testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
-        expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
-        done           = exposeClockReset (expectedOutput (topEntity clk rst testInput)) clk rst
+        testInput      = stimuliGenerator clk rst $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
+        expectedOutput = outputVerifier clk rst $(listToVecTH [0 :: Signed 9,1,5,14])
+        done           = expectedOutput (topEntity clk rst testInput)
         clk            = tbSystemClockGen (not <$> done)
         rst            = systemResetGen
 :}
@@ -560,6 +561,8 @@ order for the CλaSH compiler to do this you need to do one of the following:
 For example, you can test the earlier defined /topEntity/ by:
 
 @
+import Clash.Explicit.Testbench
+
 topEntity
   :: 'Clock' System 'Source'
   -> 'Reset' System 'Asynchronous'
@@ -571,9 +574,9 @@ topEntity = 'exposeClockReset' mac
 testBench :: 'Signal' System Bool
 testBench = done
   where
-    testInput    = 'stimuliGenerator' $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
-    expectOutput = 'outputVerifier' $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
-    done         = 'exposeClockReset' (expectOutput (topEntity clk rst testInput)) clk rst
+    testInput    = 'stimuliGenerator' clk rst $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
+    expectOutput = 'outputVerifier' clk rst $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
+    done         = expectOutput (topEntity clk rst testInput)
     clk          = 'tbSystemClockGen' (not '<$>' done)
     rst          = 'systemResetGen'
 @
