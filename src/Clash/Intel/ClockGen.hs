@@ -6,8 +6,9 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 PLL and other clock-related components for Intel (Altera) FPGAs
 -}
 
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE GADTs          #-}
 module Clash.Intel.ClockGen where
 
 import Clash.Promoted.Symbol
@@ -23,8 +24,18 @@ import Unsafe.Coerce
 -- * 1 output clock
 -- * a reset port
 -- * a locked port
+--
+-- You must use type applications to specify the output clock domain, e.g.:
+--
+-- @
+-- type Dom100MHz = Dom \"A\" 10000
+--
+-- -- outputs a clock running at 100 MHz
+-- altpll @@Dom100MHz (SSymbol @@"altpll50to100") clk50 rst
+-- @
 altpll
-  :: SSymbol name
+  :: forall pllOut pllIn name
+   . SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the QSys
   -- dialog.
   --
@@ -50,8 +61,18 @@ altpll _ clk (Async rst) = (unsafeCoerce (clockGate clk rst), unsafeCoerce rst)
 -- * 1 output clock
 -- * a reset port
 -- * a locked port
+--
+-- You must use type applications to specify the output clock domain, e.g.:
+--
+-- @
+-- type Dom100MHz = Dom \"A\" 10000
+--
+-- -- outputs a clock running at 100 MHz
+-- alteraPll @@Dom100MHz (SSymbol @@"alteraPll50to100") clk50 rst
+-- @
 alteraPll
-  :: SSymbol name
+  :: forall pllOut pllIn name
+   . SSymbol name
   -- ^ Name of the component, must correspond to the name entered in the QSys
   -- dialog.
   --

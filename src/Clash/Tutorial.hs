@@ -909,13 +909,12 @@ topEntity
   -> Reset Dom50 Asynchronous
   -> Signal Dom50 Bit
   -> Signal Dom50 (BitVector 8)
-topEntity clk rst key1 =
-    let  (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' (SSymbol @ "altpll50") clk rst
-         rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
-    in   'Clash.Signal.exposeClockReset' leds pllOut rstSync
+topEntity clk rst = 'Clash.Signal.exposeClockReset' (\\key1 ->
+    let key1R = 'Clash.Prelude.isRising' 1 key1
+    in  'Clash.Prelude.mealy' blinkerT (1,False,0) key1R) pllOut rstSync
   where
-    key1R  = 'Clash.Prelude.isRising' 1 key1
-    leds   = 'Clash.Prelude.mealy' blinkerT (1,False,0) key1R
+    (pllOut,pllStable) = 'Clash.Intel.ClockGen.altpll' @@Dom50 (SSymbol @@"altpll50") clk rst
+    rstSync            = 'Clash.Signal.resetSynchronizer' pllOut ('Clash.Signal.unsafeToAsyncReset' pllStable)
 
 blinkerT (leds,mode,cntr) key1R = ((leds',mode',cntr'),leds)
   where
