@@ -73,7 +73,7 @@ runNormalization
   -- ^ UniqueSupply
   -> BindingMap
   -- ^ Global Binders
-  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -> (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded Type -> HWType translator
   -> HashMap TyConOccName TyCon
   -- ^ TyCon cache
@@ -358,7 +358,7 @@ callTreeToList visited (CBranch (nm,bndr) used)
 -- * There are 2 or more reset arguments in scope that have the same reset
 --   domain annotation, and at least one of them is an asynchronous reset.
 clockResetErrors
-  :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  :: (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -> HashMap TyConOccName TyCon
   -> Type
   -> [String]

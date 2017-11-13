@@ -57,6 +57,9 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_errorInvalidCoercions :: Bool
                            }
 
+-- | Represents an exception in Clash, caused by an approximate line of code (@SrcSpan@). Clash will
+--   display the first string given to this constructor. The second argument can hold extra
+--   information the user can request by providing an extra flag, but which is not displayed by default.
 data ClashException = ClashException SrcSpan String (Maybe String)
 
 instance Show ClashException where

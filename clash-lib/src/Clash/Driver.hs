@@ -13,6 +13,7 @@
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE TupleSections            #-}
 
+
 module Clash.Driver where
 
 import qualified Control.Concurrent.Supply        as Supply
@@ -75,7 +76,7 @@ generateHDL
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -> (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)
@@ -363,7 +364,7 @@ normalizeEntity
   -- ^ TyCon cache
   -> IntMap TyConName
   -- ^ Tuple TyCon cache
-  -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+  -> (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> PrimEvaluator
   -- ^ Hardcoded evaluator (delta-reduction)

@@ -6,6 +6,7 @@
   Assortment of utility function used in the Clash library
 -}
 
+
 {-# LANGUAGE CPP                  #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE MagicHash            #-}

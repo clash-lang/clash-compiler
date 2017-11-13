@@ -26,20 +26,23 @@ import Clash.Core.TyCon                 (TyCon (..), TyConOccName, tyConDataCons
 import Clash.Core.Type
   (LitTy (..), Type (..), TypeView (..), coreView, tyView)
 import Clash.Core.Util                  (tyNatSize)
-import Clash.Netlist.Util               (coreTypeToHWType)
+import Clash.Netlist.Util               (coreTypeToHWType')
 import Clash.Netlist.Types              (HWType(..))
 import Clash.Signal.Internal            (ClockKind (..), ResetKind (..))
 import Clash.Util                       (curLoc)
 
 ghcTypeToHWType
-  :: Int
-  -> Bool
+  :: Int -- ^ word width (for example: 32 or 64 bits)
+  -> Bool -- ^ float support
+  -> Bool -- ^ indicating if this is a top level type. Used to err on constructs which are legal
+          --   as in a top level, but not as part of another construct. For example, InOut cannot
+          --   be used in a tuple.
   -> HashMap TyConOccName TyCon
   -> Type
   -> Maybe (Either String HWType)
 ghcTypeToHWType iw floatSupport = go
   where
-    go m ty@(tyView -> TyConApp tc args) = runExceptT $
+    go isTopLevel m ty@(tyView -> TyConApp tc args) = runExceptT $
       case name2String tc of
         "GHC.Int.Int8"                  -> return (Signed 8)
         "GHC.Int.Int16"                 -> return (Signed 16)
@@ -94,11 +97,12 @@ ghcTypeToHWType iw floatSupport = go
 
         "GHC.Prim.Any" -> return (BitVector 1)
 
-        "Clash.Signal.Internal.InOut" ->
-          ExceptT $ return $ coreTypeToHWType go m (args !! 1)
+        "Clash.Signal.Internal.InOut" -> if isTopLevel
+          then ExceptT $ return $ coreTypeToHWType' False go m (args !! 1)
+          else error "Cannot use InOut as a component of another type"
 
         "Clash.Signal.Internal.Signal" ->
-          ExceptT $ return $ coreTypeToHWType go m (args !! 1)
+          ExceptT $ return $ coreTypeToHWType' False go m (args !! 1)
 
         "Clash.Signal.Internal.Clock"
           | [dom,clkKind] <- args
@@ -127,13 +131,13 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
+          elHWTy <- ExceptT $ return $ coreTypeToHWType' False go m elTy
           return $ Vector (fromInteger sz) elHWTy
 
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ coreTypeToHWType go m elTy
+          elHWTy <- ExceptT $ return $ coreTypeToHWType' False go m elTy
           return $ RTree (fromInteger sz) elHWTy
 
         "String" -> return String
@@ -143,7 +147,7 @@ ghcTypeToHWType iw floatSupport = go
 
         _ -> ExceptT Nothing
 
-    go _ _ = Nothing
+    go _ _ _ = Nothing
 
 domain
   :: HashMap TyConOccName TyCon

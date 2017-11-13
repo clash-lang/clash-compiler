@@ -16,6 +16,7 @@
 module Clash.Netlist.Util where
 
 import           Control.Error           (hush)
+import           Control.Exception       (throw)
 import           Control.Lens            ((.=),(%=))
 import qualified Control.Lens            as Lens
 import           Control.Monad           (zipWithM)
@@ -24,7 +25,7 @@ import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
 import           Data.String             (IsString)
-import           Data.List               (intersperse, unzip4)
+import           Data.List               (intersperse, unzip4, intercalate)
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
@@ -33,7 +34,7 @@ import           Unbound.Generics.LocallyNameless
 import qualified Unbound.Generics.LocallyNameless as Unbound
 
 import           Clash.Annotations.TopEntity (PortName (..), TopEntity (..))
-import           Clash.Driver.Types      (Manifest (..))
+import           Clash.Driver.Types      (Manifest (..),SrcSpan,ClashException(..))
 import           Clash.Core.DataCon      (DataCon (..))
 import           Clash.Core.FreeVars     (termFreeIds, typeFreeVars)
 import           Clash.Core.Name         (Name (..), appendToName, name2String)
@@ -82,25 +83,37 @@ splitNormalized tcm expr = do
       ty <- termType tcm expr
       return $! Left ($(curLoc) ++ "Not in normal from: no Letrec:\n\n" ++ showDoc expr ++ "\n\nWhich has type:\n\n"  ++ showDoc ty)
 
+unsafeCoreTypeToHWType' :: Bool
+                        -> String
+                        -> (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+                        -> HashMap TyConOccName TyCon
+                        -> Type
+                        -> HWType
+unsafeCoreTypeToHWType' isTopLevel loc builtInTranslation m = either (error . (loc ++)) id . coreTypeToHWType' isTopLevel builtInTranslation m
+
 -- | Converts a Core type to a HWType given a function that translates certain
 -- builtin types. Errors if the Core type is not translatable.
 unsafeCoreTypeToHWType :: String
-                       -> (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+                       -> (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                        -> HashMap TyConOccName TyCon
                        -> Type
                        -> HWType
-unsafeCoreTypeToHWType loc builtInTranslation m = either (error . (loc ++)) id . coreTypeToHWType builtInTranslation m
+unsafeCoreTypeToHWType = unsafeCoreTypeToHWType' True
+
+
+unsafeCoreTypeToHWTypeM' :: Bool -> String -> Type -> NetlistMonad HWType
+unsafeCoreTypeToHWTypeM' isTopLevel loc ty = unsafeCoreTypeToHWType' isTopLevel loc <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty
 
 -- | Converts a Core type to a HWType within the NetlistMonad; errors on failure
-unsafeCoreTypeToHWTypeM :: String
-                        -> Type
-                        -> NetlistMonad HWType
-unsafeCoreTypeToHWTypeM loc ty = unsafeCoreTypeToHWType loc <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty
+unsafeCoreTypeToHWTypeM :: String -> Type -> NetlistMonad HWType
+unsafeCoreTypeToHWTypeM = unsafeCoreTypeToHWTypeM' True
+
+coreTypeToHWTypeM' :: Bool -> Type -> NetlistMonad (Maybe HWType)
+coreTypeToHWTypeM' isTopLevel ty = hush <$> (coreTypeToHWType' isTopLevel <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
 
 -- | Converts a Core type to a HWType within the NetlistMonad; 'Nothing' on failure
-coreTypeToHWTypeM :: Type
-                  -> NetlistMonad (Maybe HWType)
-coreTypeToHWTypeM ty = hush <$> (coreTypeToHWType <$> Lens.use typeTranslator <*> Lens.use tcCache <*> pure ty)
+coreTypeToHWTypeM :: Type -> NetlistMonad (Maybe HWType)
+coreTypeToHWTypeM = coreTypeToHWTypeM' True
 
 -- | Returns the name and period of the clock corresponding to a type
 synchronizedClk :: HashMap TyConOccName TyCon -- ^ TyCon cache
@@ -131,20 +144,28 @@ synchronizedClk tcm ty
   | otherwise
   = Nothing
 
--- | Converts a Core type to a HWType given a function that translates certain
--- builtin types. Returns a string containing the error message when the Core
--- type is not translatable.
-coreTypeToHWType :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+coreTypeToHWType' :: Bool
+                 -> (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                  -> HashMap TyConOccName TyCon
                  -> Type
                  -> Either String HWType
-coreTypeToHWType builtInTranslation m (builtInTranslation m -> Just hty) = hty
-coreTypeToHWType builtInTranslation m (coreView m -> Just ty) = coreTypeToHWType builtInTranslation m ty
-coreTypeToHWType builtInTranslation m ty@(tyView -> TyConApp tc args) = mkADT builtInTranslation m (showDoc ty) tc args
-coreTypeToHWType _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
+coreTypeToHWType' isTopLevel builtInTranslation m (builtInTranslation isTopLevel m -> Just hty) = hty
+coreTypeToHWType' isTopLevel builtInTranslation m (coreView m -> Just ty) = coreTypeToHWType' isTopLevel builtInTranslation m ty
+coreTypeToHWType' isTopLevel builtInTranslation m ty@(tyView -> TyConApp tc args) = mkADT builtInTranslation m (showDoc ty) tc args
+coreTypeToHWType' _ _ _ ty = Left $ "Can't translate non-tycon type: " ++ showDoc ty
+
+-- | Converts a Core type to a HWType given a function that translates certain
+-- builtin types. Returns a string containing the error message when the Core
+-- type is not translatable.
+coreTypeToHWType :: (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+                 -> HashMap TyConOccName TyCon
+                 -> Type
+                 -> Either String HWType
+coreTypeToHWType = coreTypeToHWType' True
+
 
 -- | Converts an algebraic Core type (split into a TyCon and its argument) to a HWType.
-mkADT :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
+mkADT :: (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType)) -- ^ Hardcoded Type -> HWType translator
       -> HashMap TyConOccName TyCon -- ^ TyCon cache
       -> String -- ^ String representation of the Core type for error messages
       -> TyConName -- ^ The TyCon
@@ -162,7 +183,7 @@ mkADT builtInTranslation m tyString tc args = case tyConDataCons (m HashMap.! na
         argTVss      = map dcUnivTyVars dcs
         argSubts     = map ((`zip` args) . map nameOcc) argTVss
         substArgTyss = zipWith (\s tys -> map (substTys s) tys) argSubts argTyss
-    argHTyss         <- mapM (mapM (coreTypeToHWType builtInTranslation m)) substArgTyss
+    argHTyss         <- mapM (mapM (coreTypeToHWType' False builtInTranslation m)) substArgTyss
     case (dcs,argHTyss) of
       (_:[],[[elemTy]])      -> return elemTy
       (_:[],[elemTys@(_:_)]) -> return $ Product tcName elemTys
@@ -184,7 +205,7 @@ isRecursiveTy m tc = case tyConDataCons (m HashMap.! nameOcc tc) of
 
 -- | Determines if a Core type is translatable to a HWType given a function that
 -- translates certain builtin types.
-representableType :: (HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
+representableType :: (Bool -> HashMap TyConOccName TyCon -> Type -> Maybe (Either String HWType))
                   -> Bool -- ^ Allow zero-bit things
                   -> HashMap TyConOccName TyCon
                   -> Type
@@ -331,8 +352,7 @@ mkUniqueArguments (Just teM) args = do
       let i        = varName var
           i'       = pack (name2String i)
           ty       = unembed (varType var)
-          portType | isInOutType ty = Bidirectional
-                   | otherwise      = Unidirectional
+          portType = toPortType ty
           hwty = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
       (ports,decls,_,pN) <- mkInput pM (portType,i',hwty)
       return (ports,decls,(nameOcc i, Var ty (repName (unpack pN) i)))
@@ -349,12 +369,13 @@ mkUniqueResult Nothing res = do
 mkUniqueResult (Just teM) res = do
   tcm       <- Lens.use tcCache
   typeTrans <- Lens.use typeTranslator
+  curComp   <- Lens.use curCompNm
   let o        = varName res
       o'       = pack (name2String o)
       ty       = unembed (varType res)
       hwty     = unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
       oPortSupply = fmap t_output teM
-  (ports,decls,pN) <- mkOutput oPortSupply (toPortType ty,o',hwty)
+  (ports,decls,pN) <- mkOutput oPortSupply (errOnInOut curComp (toPortType ty), o', hwty)
   let pO = repName (unpack pN) o
   return (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
 
@@ -369,6 +390,16 @@ idToPort var = do
         , pack $ name2String i
         , unsafeCoreTypeToHWType $(curLoc) typeTrans tcm ty
         )
+
+errOnInOut :: (Identifier, SrcSpan) -> PortType -> PortType
+errOnInOut (xname, srcspan) Bidirectional = throw (ClashException srcspan err Nothing)
+  where
+    err = intercalate "" [ "Function outputs cannot be of type InOut a. Reformulate your function "
+                         , show xname
+                         , " in such a way that the inout port is an argument."
+                         ]
+
+errOnInOut _ p = p
 
 toPortType :: Type -> PortType
 toPortType t | isInOutType t = Bidirectional

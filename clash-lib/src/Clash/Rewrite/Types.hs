@@ -81,7 +81,7 @@ data RewriteEnv
   = RewriteEnv
   { _dbgLevel       :: DebugLevel
   -- ^ Lvl at which we print debugging messages
-  , _typeTranslator :: HashMap TyConOccName TyCon -> Type
+  , _typeTranslator :: Bool -> HashMap TyConOccName TyCon -> Type
                     -> Maybe (Either String HWType)
   -- ^ Hardcode Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon
