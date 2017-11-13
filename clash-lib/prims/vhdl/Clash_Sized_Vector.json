@@ -1,7 +1,7 @@
 [ { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.head"
     , "type"      : "head :: Vec (n + 1) a -> a"
-    , "templateE" : "~IF ~VIVADO ~THEN fromSLV(~VAR[vec][0](0)) ~ELSE ~VAR[vec][0](0) ~FI"
+    , "templateE" : "~IF ~VIVADO ~THEN ~TYPMO'(fromSLV(~VAR[vec][0](0))) ~ELSE ~VAR[vec][0](0) ~FI"
     }
   }
 , { "BlackBox" :
@@ -13,7 +13,7 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Vector.last"
     , "type"      : "Vec (n + 1) a -> a"
-    , "templateE" : "~IF ~VIVADO ~THEN fromSLV(~VAR[vec][0](~VAR[vec][0]'high)) ~ELSE ~VAR[vec][0](~VAR[vec][0]'high) ~FI"
+    , "templateE" : "~IF ~VIVADO ~THEN ~TYPMO'(fromSLV(~VAR[vec][0](~VAR[vec][0]'high))) ~ELSE ~VAR[vec][0](~VAR[vec][0]'high) ~FI"
     }
   }
 , { "BlackBox" :
