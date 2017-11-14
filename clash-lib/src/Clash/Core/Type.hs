@@ -49,6 +49,7 @@ module Clash.Core.Type
   , findFunSubst
   , reduceTypeFamily
   , undefinedTy
+  , isIntegerTy
   )
 where
 
@@ -57,7 +58,7 @@ import           Control.DeepSeq                         as DS
 import           Data.Hashable                           (Hashable)
 import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
-import           Data.List                               (foldl')
+import           Data.List                               (foldl',isPrefixOf)
 import           Data.Maybe                              (isJust, mapMaybe)
 import           GHC.Base                                (isTrue#,(==#))
 import           GHC.Generics                            (Generic(..))
@@ -507,3 +508,8 @@ undefinedTy :: Type
 undefinedTy =
   let aNm = string2SystemName "a"
   in  ForAllTy (bind (TyVar aNm (embed liftedTypeKind)) (VarTy liftedTypeKind aNm))
+
+isIntegerTy :: Type -> Bool
+isIntegerTy (ConstTy (TyCon (nm)))
+  | "GHC.Integer.Type.Integer" `isPrefixOf` (name2String nm) = True
+isIntegerTy _ = False

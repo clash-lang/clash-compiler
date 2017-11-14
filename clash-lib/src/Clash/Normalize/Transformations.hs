@@ -46,6 +46,7 @@ module Clash.Normalize.Transformations
   , caseCast
   , letCast
   , eliminateCastCast
+  , argCastSpec
   )
 where
 
@@ -65,6 +66,7 @@ import qualified Data.Monoid                 as Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Set.Lens               as Lens
 import           Data.Text                   (Text, unpack)
+import           Debug.Trace                 (trace)
 import           Unbound.Generics.LocallyNameless
   (Bind, Embed (..), bind, embed, rec, unbind, unembed, unrebind, unrec)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -545,7 +547,7 @@ bindConstantVar = inlineBinders test
         _ -> return False
     -- test _ _ = return False
 
--- | Push a cast over a case into it's alternatives
+-- | Push a cast over a case into it's alternatives.
 caseCast :: NormRewrite
 caseCast _ (Cast (Case subj ty alts) ty1 ty2) = do
   alts' <- mapM castAlt alts
@@ -562,6 +564,36 @@ letCast _ (Cast (Letrec b) ty1 ty2) = do
   let (binds,body) = unsafeUnbind b
   changed $ Letrec $ bind binds (Cast body ty1 ty2)
 letCast _ e = return e
+
+
+-- | Push cast over an argument to a funtion into that function
+--
+-- This is done by specializing on the casted argument.
+-- Example:
+-- @
+--   y = f (cast a)
+--     where f x = g x
+-- @
+-- transforms to:
+-- @
+--   y = f' a
+--     where f' x' = (\x -> g x) (cast x')
+-- @
+argCastSpec :: NormRewrite
+argCastSpec ctx e@(App _ (Cast e' _ _)) = case e' of
+  Var _ _ -> go
+  Cast (Var _ _) _ _ -> go
+  _ -> warn go
+  where
+    go = specializeNorm ctx e
+    warn = trace (unlines ["WARNING: " ++ $(curLoc) ++ "specializing a function on a possibly non work-free cast."
+                          ,"Generated HDL implementation might contain duplicate work."
+                          ,"Please report this as a bug."
+                          ,""
+                          ,"Expression where this occurs:"
+                          ,showDoc e
+                          ])
+argCastSpec _ e = return e
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
 -- These are the result of the 'splitCastWork' transformation.
