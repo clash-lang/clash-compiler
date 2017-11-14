@@ -86,6 +86,7 @@ import           Clash.Core.Subst
 import           Clash.Core.Term             (LetBinding, Pat (..), Term (..), TmOccName)
 import           Clash.Core.Type             (TypeView (..), applyFunTy,
                                               applyTy, isPolyFunCoreTy,
+                                              normalizeType,
                                               splitFunTy, typeKind,
                                               tyView, undefinedTy)
 import           Clash.Core.TyCon            (tyConDataCons)
@@ -609,9 +610,14 @@ inlineCast = inlineBinders test
 --   (cast :: b -> a) $ (cast :: a -> b) x   ==> x
 -- @
 eliminateCastCast :: NormRewrite
-eliminateCastCast _ c@(Cast (Cast e tyA tyB) tyB' tyC)
-  | tyB == tyB' && tyA == tyC = changed e
-  | otherwise = throwError
+eliminateCastCast _ c@(Cast (Cast e tyA tyB) tyB' tyC) = do
+  tcm <- Lens.view tcCache
+  let ntyA  = normalizeType tcm tyA
+      ntyB  = normalizeType tcm tyB
+      ntyB' = normalizeType tcm tyB'
+      ntyC  = normalizeType tcm tyC
+  if ntyB == ntyB' && ntyA == ntyC then changed e
+                                   else throwError
   where throwError = do
           (nm,sp) <- Lens.use curFun
           throw (ClashException sp ($(curLoc) ++ showDoc nm
