@@ -11,6 +11,7 @@
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ViewPatterns      #-}
 
 module Clash.Core.Evaluator where
@@ -24,6 +25,7 @@ import           Data.List
 import           Data.Map
   (Map,delete,fromList,insert,lookup,union)
 import           Data.Text                               (Text)
+import           Debug.Trace                             (trace)
 import           Clash.Core.DataCon
 import           Clash.Core.Literal
 import           Clash.Core.Name
@@ -36,6 +38,7 @@ import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Driver.Types                      (BindingMap)
 import           Prelude                                 hiding (lookup)
+import           Clash.Util                              (curLoc)
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe
 
@@ -232,6 +235,8 @@ step eval gbl tcm (h, k, e) = case e of
   (TyApp e1 ty) -> Just (h,Instantiate ty:k,e1)
   (Case scrut ty alts) -> Just (h,Scrutinise ty alts:k,scrut)
   (Letrec bs)   -> Just (allocate h k bs)
+  Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
+                                    ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
 
 newLetBinding
   :: TyConMap

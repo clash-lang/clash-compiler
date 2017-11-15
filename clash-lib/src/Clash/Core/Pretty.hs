@@ -114,6 +114,7 @@ instance Pretty Term where
     TyApp e' ty  -> pprPrecTyApp prec e' ty
     Letrec b     -> lunbind b $ \(xes,e') -> pprPrecLetrec prec (unrec xes) e'
     Case e' _ alts -> pprPrecCase prec e' =<< mapM (`lunbind` return) alts
+    Cast e' ty1 ty2-> pprPrecCast prec e' ty1 ty2
 
 data BindingSite
   = LambdaBind
@@ -183,21 +184,31 @@ pprPrecTyApp :: LFresh m => Rational -> Term -> Type -> m Doc
 pprPrecTyApp prec e ty = do
   e' <- pprPrec opPrec e
   ty' <- pprParendType ty
-  return $ prettyParen (prec >= appPrec) $ e' $$ (char '@' <> ty')
+  return $ prettyParen (prec >= appPrec) $ e' $$ nest 2 (char '@' <> ty')
 
-pprPrecLetrec :: LFresh m => Rational -> [(Id, Embed Term)] -> Term
-  -> m Doc
-pprPrecLetrec prec xes body
-  | [] <- xes = pprPrec prec body
-  | otherwise = do
-    body' <- pprPrec noPrec body
-    xes'  <- mapM (\(x,e) -> do
-                    x' <- pprBndr LetBind x
-                    e' <- pprPrec noPrec (unembed e)
-                    return $ x' $$ equals <+> e'
-                  ) xes
-    return $ prettyParen (prec > noPrec) $
-      hang (text "letrec") 2 (vcat xes') $$ text "in" <+> body'
+-- TODO use more conventional cast operator (|> or ▷) ?
+pprPrecCast :: LFresh m => Rational -> Term -> Type -> Type -> m Doc
+pprPrecCast prec e ty1 ty2 = do
+  e' <- pprPrec appPrec e
+  ty1' <- pprType ty1
+  ty2' <- pprType ty2
+  return $ prettyParen (prec >= appPrec) $
+    parens (text "cast" $$ nest 5 (vcat [text "::" <+> ty1', text "->" <+> ty2']))
+      $$ nest 2 e'
+
+pprPrecLetrec :: LFresh m => Rational -> [(Id, Embed Term)] -> Term -> m Doc
+pprPrecLetrec prec xes body = do
+  body' <- pprPrec noPrec body
+  xes'  <- mapM (\(x,e) -> do
+                  x' <- pprBndr LetBind x
+                  e' <- pprPrec noPrec (unembed e)
+                  return $ x' $$ equals <+> e'
+                ) xes
+  let xes'' = case xes' of
+                [] -> [text "EmptyLetrec"]
+                _  -> xes'
+  return $ prettyParen (prec > noPrec) $
+    hang (text "letrec") 2 (vcat xes'') $$ text "in" <+> body'
 
 pprPrecCase :: LFresh m => Rational -> Term -> [(Pat,Term)] -> m Doc
 pprPrecCase prec e alts = do

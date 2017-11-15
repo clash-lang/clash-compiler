@@ -1905,7 +1905,7 @@ makeHDL backend optsRef srcs = do
               primDir <- Clash.Backend.primDir backend'
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEntities,primMap) <-
-                  generateBindings (opt_errorInvalidCoercions opts') primDir idirs (Clash.Backend.hdlKind backend') src (Just dflags)
+                  generateBindings primDir idirs (Clash.Backend.hdlKind backend') src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff

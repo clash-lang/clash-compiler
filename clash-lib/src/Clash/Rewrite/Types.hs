@@ -53,6 +53,7 @@ data CoreContext
   | CaseAlt    [Id]  -- ^ RHS of a case-alternative with the variables bound by
                      -- the pattern on the LHS
   | CaseScrut        -- ^ Subject of a case-decomposition
+  | CastBody         -- ^ Body of a Cast
   deriving (Eq,Show)
 
 -- | State of a rewriting session

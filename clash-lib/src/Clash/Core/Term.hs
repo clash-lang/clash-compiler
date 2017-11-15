@@ -51,6 +51,7 @@ data Term
   | Letrec  !(Bind (Rec [LetBinding]) Term) -- ^ Recursive let-binding
   | Case    !Term !Type [Alt]               -- ^ Case-expression: subject, type of
                                             -- alternatives, list of alternatives
+  | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   deriving (Show,Generic,NFData,Hashable)
 
 -- | Term reference
