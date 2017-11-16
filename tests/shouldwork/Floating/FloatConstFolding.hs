@@ -1,6 +1,7 @@
 module FloatConstFolding where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 topEntity :: Signal System (Float,Double,Signed 8,Signed 9)
 topEntity = pure ( resFloat
@@ -69,8 +70,9 @@ f = e + pi_noinline
 expectedOutput = (unpack 0x3F45628A, unpack 0x3FED4161686C9EEE, 1, 1) :> Nil
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    expectOutput = outputVerifier expectedOutput
+    expectOutput = outputVerifier clk rst expectedOutput
     done         = expectOutput topEntity
-    done'        = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk          = tbSystemClockGen (not <$> done)
+    rst          = systemResetGen

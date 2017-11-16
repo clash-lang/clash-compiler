@@ -2,6 +2,7 @@
 module DTFold where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 #if MIN_VERSION_singletons(2,4,0)
 import Data.Singletons.Prelude hiding (type (+))
 #else
@@ -24,9 +25,10 @@ topEntity = populationCount
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator $(listToVecTH ([0..20]::[BitVector 16]))
-    expectedOutput = outputVerifier   $(listToVecTH ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))
+    testInput      = stimuliGenerator clk rst $(listToVecTH ([0..20]::[BitVector 16]))
+    expectedOutput = outputVerifier   clk rst $(listToVecTH ([0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2]::[Index 17]))
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

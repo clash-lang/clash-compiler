@@ -1,6 +1,7 @@
 module LotOfStates where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 data States = S_0
             | S_1
@@ -32,16 +33,21 @@ fsm s i
   | s == S_10 && i == 11 = (S_0,  11)
   | otherwise            = (s,     0)
 
-topEntity :: SystemClockReset => Signal System (Unsigned 8) -> Signal System (Unsigned 8)
-topEntity = mealy fsm S_0
+topEntity
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System (Unsigned 8)
+  -> Signal System (Unsigned 8)
+topEntity = exposeClockReset (mealy fsm S_0)
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput = stimuliGenerator $(listToVecTH
+    testInput = stimuliGenerator clk rst $(listToVecTH
         [0 :: (Unsigned 8), 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 1, 1])
-    expectedOutput = outputVerifier $(listToVecTH
+    expectedOutput = outputVerifier clk rst $(listToVecTH
         [0 :: (Unsigned 8), 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 6, 0, 0, 7, 0, 0, 8, 0, 9, 0, 10,  0, 11,  0, 1, 0])
-    done  = expectedOutput (topEntity testInput)
-    done' = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

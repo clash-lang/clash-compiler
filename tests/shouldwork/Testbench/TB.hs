@@ -1,12 +1,16 @@
 module TB where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 type Inp   = (Signed 4,Outp)
 type Outp  = (Maybe (Signed 8,Bool),Bit)
 
-topEntity :: SystemClockReset => Signal System Inp -> Signal System Outp
-topEntity = transfer `mealy` initS
+topEntity
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> Signal System Inp -> Signal System Outp
+topEntity = exposeClockReset (transfer `mealy` initS)
 {-# NOINLINE topEntity #-}
 
 transfer s i = (i,o)
@@ -16,15 +20,16 @@ transfer s i = (i,o)
 initS = (0,(Nothing,0))
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator
+    testInput      = stimuliGenerator clk rst
                       $(listToVecTH ([ (1,(Just (4,True), 0))
                                      , (3,(Nothing, 1))
                                      ]::[(Signed 4,(Maybe (Signed 8,Bool),Bit))]))
-    expectedOutput = outputVerifier
+    expectedOutput = outputVerifier clk rst
                       $(listToVecTH ([(Nothing,0)
                                      ,(Just (4,True), 0)
                                      ]::[(Maybe (Signed 8,Bool),Bit)]))
-    done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen
