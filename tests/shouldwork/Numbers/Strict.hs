@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module Strict where
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 {-
 Test the strict evaluation of Unsigned values
@@ -37,10 +38,11 @@ g x !y = x `seq` x + y :> Nil
 
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput    = stimuliGenerator ((big1,big2) :> Nil)
+    testInput    = stimuliGenerator clk rst ((big1,big2) :> Nil)
     testEntity   = fmap $ map (`shiftR` 64) . uncurry topEntity
-    expectOutput = outputVerifier (repeat 0xc :> Nil)
+    expectOutput = outputVerifier clk rst (repeat 0xc :> Nil)
     done         = expectOutput (testEntity testInput)
-    done'        = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk          = tbSystemClockGen (not <$> done)
+    rst          = systemResetGen

@@ -1,6 +1,7 @@
 module Calculator where
 
 import Clash.Prelude hiding (Word)
+import Clash.Explicit.Testbench
 import CalculatorTypes
 
 (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
@@ -33,20 +34,22 @@ datamem mem (addr,Nothing)  = (mem                 ,mem !! addr)
 datamem mem (addr,Just val) = (replace addr val mem,mem !! addr)
 
 topEntity
-  :: SystemClockReset
-  => Signal System (OPC Word)
+  :: Clock  System Source
+  -> Reset  System Asynchronous
+  -> Signal System (OPC Word)
   -> Signal System (Maybe Word)
-topEntity i = val
-  where
+topEntity = exposeClockReset go where
+  go i = val where
     (addr,val) = (pu alu <^> (0,0,0 :: Unsigned 3)) (mem,i)
     mem        = (datamem <^> initMem) (addr,val)
     initMem    = replicate (SNat :: SNat 8) 0
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
-    testInput      = stimuliGenerator $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
-    expectedOutput = outputVerifier   $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
-    done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    testInput      = stimuliGenerator clk rst $(listToVecTH [Imm 1::OPC Word,Push,Imm 2,Push,Pop,Pop,Pop,ADD])
+    expectedOutput = outputVerifier clk rst $(listToVecTH [Just 1 :: Maybe Word,Nothing,Just 2,Nothing,Nothing,Nothing,Nothing,Just 3])
+    done           = expectedOutput (topEntity clk rst testInput)
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

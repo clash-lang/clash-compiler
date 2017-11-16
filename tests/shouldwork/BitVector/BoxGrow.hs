@@ -1,6 +1,7 @@
 module BoxGrow where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 ys >:> xss = zipWith (:>) ys xss
 xss <:< ys = zipWith (:<) xss ys
@@ -15,10 +16,10 @@ topEntity = box0
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
     testInput      = pure (repeat (repeat 1))
-    expectedOutput = outputVerifier ( ((0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :>
+    expectedOutput = outputVerifier clk rst ( ((0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :>
                                       (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
                                       (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
                                       (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
@@ -26,4 +27,5 @@ testBench = done'
                                       (0 :> 1 :> 1 :> 1 :> 1 :> 1 :> 1 :> 0 :> Nil) :>
                                       (0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> 0 :> Nil) :> Nil) :> Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

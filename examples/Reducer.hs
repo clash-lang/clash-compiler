@@ -165,7 +165,12 @@ reducer (dataIn,index) = redOut
     (fromResMem,redOut)        = mealyB resBuffer     initResState (newDiscr,newDiscrVal,index,pipe,toResMem)
     (arg1,arg2,shift,toResMem) = fmapB controller (inp1, inp2, pipe, fromResMem)
 
-topEntity = reducer
+topEntity
+  :: Clock System Source
+  -> Reset System Asynchronous
+  -> (Signal System DataInt, Signal System ArrayIndex)
+  -> Signal System OutputSignal
+topEntity = exposeClockReset reducer
 
 fmapB f = unbundle . fmap f . bundle
 

@@ -1,6 +1,7 @@
 module VFold where
 
 import Clash.Prelude
+import Clash.Explicit.Testbench
 
 csSort = vfold (const csRow)
   where
@@ -12,9 +13,10 @@ topEntity = csSort
 {-# NOINLINE topEntity #-}
 
 testBench :: Signal System Bool
-testBench = done'
+testBench = done
   where
     testInput      = pure (7 :> 3 :> 9 :> 1 :> Nil)
-    expectedOutput = outputVerifier ((1:>3:>7:>9:>Nil):>Nil)
+    expectedOutput = outputVerifier clk rst ((1:>3:>7:>9:>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
+    clk            = tbSystemClockGen (not <$> done)
+    rst            = systemResetGen

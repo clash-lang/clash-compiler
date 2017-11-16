@@ -30,8 +30,8 @@ import I2C.Types
                      , PortField "" [PortName "i2cO_clk"]
                      ]
     }) #-}
-i2c rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
+i2c clk arst rst ena clkCnt start stop read write ackIn din i2cI = (dout,hostAck,busy,al,ackOut,i2cO)
   where
-    (hostAck,ackOut,dout,bitCtrl) = byteMaster (rst,start,stop,read,write,ackIn,din,bitResp)
-    (bitResp,busy,i2cO)           = bitMaster  (rst,ena,clkCnt,bitCtrl,i2cI)
+    (hostAck,ackOut,dout,bitCtrl) = byteMaster clk arst (rst,start,stop,read,write,ackIn,din,bitResp)
+    (bitResp,busy,i2cO)           = bitMaster  clk arst (rst,ena,clkCnt,bitCtrl,i2cI)
     (cmdAck,al,dbout)             = unbundle bitResp
