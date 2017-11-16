@@ -687,11 +687,18 @@ specialise' specMapLbl specHistLbl specLimitLbl ctx e (Var _ f, args) specArgIn 
         Nothing -> return e
   where
     unsafeCollectBndrs :: Term -> [Name a]
-    unsafeCollectBndrs = map (either (coerceName . varName) (coerceName . varName)) . go []
+    unsafeCollectBndrs =
+        map (either (coerceName . varName) (coerceName . varName)) . reverse . go []
       where
-        go bs (Lam b)   = let (v,e')  = unsafeUnbind b in go (Left v:bs)   e'
-        go bs (TyLam b) = let (tv,e') = unsafeUnbind b in go (Right tv:bs) e'
-        go bs _         = reverse bs
+        go bs (Lam b)    = let (v,e')  = unsafeUnbind b in go (Left v:bs)   e'
+        go bs (TyLam b)  = let (tv,e') = unsafeUnbind b in go (Right tv:bs) e'
+        go bs (App e' _) = case go [] e' of
+          []  -> bs
+          bs' -> init bs' ++ bs
+        go bs (TyApp e' _) = case go [] e' of
+          []  -> bs
+          bs' -> init bs' ++ bs
+        go bs _ = bs
 
 specialise' _ _ _ ctx _ (appE,args) (Left specArg) = do
   -- Create binders and variable references for free variables in 'specArg'
