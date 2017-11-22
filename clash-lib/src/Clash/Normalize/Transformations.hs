@@ -55,7 +55,8 @@ import           Control.Concurrent.Supply   (splitSupply)
 import           Control.Exception           (throw)
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
-import           Control.Monad.Writer        (WriterT (..), lift, listen, tell)
+import           Control.Monad.Writer
+  (WriterT (..), censor, lift, listen, tell)
 import           Control.Monad.Trans.Except  (runExcept)
 import           Data.Bits                   ((.&.), complement)
 import qualified Data.Either                 as Either
@@ -194,8 +195,33 @@ nonRepSpec ctx e@(App e1 e2)
                                               <*> Lens.view tcCache
                                               <*> pure e2Ty)
        if nonRepE2 && not localVar
-         then specializeNorm ctx e
+         then do
+           e2' <- inlineInternalSpecialisationArgument e2
+           specializeNorm ctx (App e1 e2')
          else return e
+  where
+    -- | If the argument on which we're specialising ia an internal function,
+    -- one created by the compiler, then inline that function before we
+    -- specialise.
+    --
+    -- We need to do this because otherwise the specialisation history won't
+    -- recognize the new specialisation argument as something the function has
+    -- already been specialised on
+    inlineInternalSpecialisationArgument
+      :: Term
+      -> NormalizeSession Term
+    inlineInternalSpecialisationArgument app
+      | (Var _ f,fArgs) <- collectArgs app
+      = do
+        fTmM <- fmap (HashMap.lookup (nameOcc f)) $ Lens.use bindings
+        case fTmM of
+          Just (fNm,_,_,_,tm)
+            | nameSort fNm == Internal
+            -> do
+              tm' <- censor (const mempty) (bottomupR appProp ctx (mkApps tm fArgs))
+              return tm'
+          _ -> return app
+      | otherwise = return app
 
 nonRepSpec _ e = return e
 
