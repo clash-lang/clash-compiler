@@ -151,7 +151,13 @@ domain m (tyView -> TyConApp tcNm [LitTy (SymTy nm),rateTy])
   | name2String tcNm == "Clash.Signal.Internal.Dom"
   = do rate <- mapExceptT (Just . coerce) (tyNatSize m rateTy)
        return (nm,rate)
-domain _ ty = fail $ "Can't translate domain: " ++ showDoc ty
+
+-- Polymorphic clocks are clocks which domains are left polymorphic. This usually
+-- is a result of 'ignoring' a number of PLL outputs. Ideally, we would like to
+-- display an error whenever a program *uses* an polymorphic clock, but Clash has
+-- to deeply evaluate the result we will yield in this function, thus always
+-- triggering an error even for valid use cases.
+domain _ _ = return ("__polymorphic clock / undefined domain__", -1)
 
 clockKind
   :: HashMap TyConOccName TyCon
