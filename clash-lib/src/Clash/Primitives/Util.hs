@@ -9,7 +9,8 @@
 
 module Clash.Primitives.Util where
 
-import           Data.Aeson.Extra       (decodeAndReport)
+import           Data.Aeson             (FromJSON)
+import           Data.Aeson.Extra       (decodeOrErr)
 import qualified Data.ByteString.Lazy   as LZ
 import qualified Data.HashMap.Lazy      as HashMap
 import           Data.List              (isSuffixOf)
@@ -20,6 +21,15 @@ import qualified System.FilePath        as FilePath
 
 import           Clash.Primitives.Types
 import           Clash.Util
+
+parsePrimitive :: (FromJSON a)
+               => FilePath
+               -> IO [a]
+parsePrimitive filename = ( return
+                          . fromMaybe []
+                          . decodeOrErr filename
+                        <=< LZ.readFile
+                          ) filename
 
 -- | Generate a set of primitives that are found in the primitive definition
 -- files in the given directories.
@@ -38,12 +48,7 @@ generatePrimMap filePaths = do
              return []
      ) filePaths
 
-  primitives <- fmap concat $ mapM
-                  ( return
-                  . fromMaybe []
-                  . decodeAndReport
-                  <=< LZ.readFile
-                  ) primitiveFiles
+  primitives <- fmap concat $ mapM parsePrimitive primitiveFiles
 
   let primMap = HashMap.fromList $ zip (map name primitives) primitives
 
