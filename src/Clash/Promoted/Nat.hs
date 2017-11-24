@@ -28,7 +28,6 @@ module Clash.Promoted.Nat
     -- ** Construction
   , snatProxy
   , withSNat
-  , snat
     -- ** Conversion
   , snatToInteger, snatToNum
     -- ** Arithmetic
@@ -95,11 +94,6 @@ data SNat (n :: Nat) where
 instance Lift (SNat n) where
   lift s = sigE [| SNat |]
                 (appT (conT ''SNat) (litT $ numTyLit (snatToInteger s)))
-
--- | Create a singleton literal for a type-level natural number
-snat :: KnownNat n => SNat n
-snat = SNat
-{-# DEPRECATED snat "Use 'SNat' instead of 'snat'" #-}
 
 -- | Create an @`SNat` n@ from a proxy for /n/
 snatProxy :: KnownNat n => proxy n -> SNat n

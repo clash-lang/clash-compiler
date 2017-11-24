@@ -33,7 +33,7 @@ module Clash.Sized.Vector
     Vec(Nil,(:>),(:<))
     -- * Accessors
     -- ** Length information
-  , length, maxIndex, lengthS
+  , length, lengthS
     -- ** Indexing
   , (!!), head, last, at
   , indices, indicesI
@@ -48,10 +48,10 @@ module Clash.Sized.Vector
     -- * Construction
     -- ** Initialisation
   , singleton
-  , replicate, replicateI, repeat
+  , replicate, repeat
   , iterate, iterateI, generate, generateI
     -- *** Initialisation from a list
-  , listToVecTH, v
+  , listToVecTH
     -- ** Concatenation
   , (++), (+>>), (<<+), concat
   , shiftInAt0, shiftInAtN , shiftOutFrom0, shiftOutFromN
@@ -1046,13 +1046,6 @@ index_int xs i@(I# n0)
 xs !! i = index_int xs (fromEnum i)
 {-# INLINE (!!) #-}
 
--- | The index (subscript) of the last element in a 'Vec'tor as an 'Int'
--- value.
-maxIndex :: KnownNat n => Vec n a -> Int
-maxIndex = subtract 1 . length
-{-# NOINLINE maxIndex #-}
-{-# DEPRECATED maxIndex "'maxIndex' will be removed in clash-prelude-1.0, use 'length xs - 1' instead." #-}
-
 -- | The length of a 'Vec'tor as an 'Int' value.
 --
 -- >>> length (6 :> 7 :> 8 :> Nil)
@@ -1211,21 +1204,6 @@ replicate n a = replicateU (toUNat n) a
 replicateU :: UNat n -> a -> Vec n a
 replicateU UZero     _ = Nil
 replicateU (USucc s) x = x `Cons` replicateU s x
-
--- | \"'replicateI' @a@\" creates a vector with as many copies of /a/ as
--- demanded by the context.
---
--- >>> replicateI 6 :: Vec 5 Int
--- <BLANKLINE>
--- <interactive>:...
---     In the use of ‘replicateI’
---     (imported from Clash.Prelude, but defined in Clash.Sized.Vector):
---     Deprecated: "Use 'repeat' instead of 'replicateI'"
--- <6,6,6,6,6>
-replicateI :: KnownNat n => a -> Vec n a
-replicateI = withSNat replicate
-{-# INLINE replicateI #-}
-{-# DEPRECATED replicateI "Use 'repeat' instead of 'replicateI'" #-}
 
 -- | \"'repeat' @a@\" creates a vector with as many copies of /a/ as demanded
 -- by the context.
@@ -1589,10 +1567,6 @@ toList = foldr (:) []
 listToVecTH :: Lift a => [a] -> ExpQ
 listToVecTH []     = [| Nil |]
 listToVecTH (x:xs) = [| x :> $(listToVecTH xs) |]
-
-v :: Lift a => [a] -> ExpQ
-v = listToVecTH
-{-# DEPRECATED v "'v' will be removed in clash-prelude-1.0, use 'listToVecTH'" #-}
 
 -- | 'Vec'tor as a 'Proxy' for 'Nat'
 asNatProxy :: Vec n a -> Proxy n
