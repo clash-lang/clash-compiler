@@ -163,9 +163,9 @@ module Clash.Explicit.Signal
   , tbClockGen
   , asyncResetGen
   , syncResetGen
-  , systemClock
-  , tbSystemClock
-  , systemReset
+  , systemClockGen
+  , tbSystemClockGen
+  , systemResetGen
     -- * Boolean connectives
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
@@ -236,10 +236,10 @@ type System = 'Dom "system" 10000
 -- | Clock generator for the 'System' clock domain.
 --
 -- __NB__: should only be used for simulation, and __not__ for the /testBench/
--- function. For the /testBench/ function, used 'tbSystemClock'
-systemClock
+-- function. For the /testBench/ function, used 'tbSystemClockGen'
+systemClockGen
   :: Clock System 'Source
-systemClock = clockGen
+systemClockGen = clockGen
 
 -- | Clock generator for the 'System' clock domain.
 --
@@ -257,12 +257,12 @@ systemClock = clockGen
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = expectedOutput (topEntity <$> testInput)
---     done'          = withClockReset ('tbSystemClock' (not <\$\> done')) systemReset done
+--     done'          = withClockReset ('tbSystemClockGen' (not <\$\> done')) systemResetGen done
 -- @
-tbSystemClock
+tbSystemClockGen
   :: Signal System Bool
   -> Clock System 'Source
-tbSystemClock = tbClockGen
+tbSystemClockGen = tbClockGen
 
 -- | Reset generator for the 'System' clock domain.
 --
@@ -280,10 +280,10 @@ tbSystemClock = tbClockGen
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = expectedOutput (topEntity <$> testInput)
---     done'          = withClockReset (tbSystemClock (not <\$\> done')) 'systemReset' done
+--     done'          = withClockReset (tbSystemClockGen (not <\$\> done')) 'systemResetGen' done
 -- @
-systemReset :: Reset System 'Asynchronous
-systemReset = asyncResetGen
+systemResetGen :: Reset System 'Asynchronous
+systemResetGen = asyncResetGen
 
 -- | Normally, asynchronous resets can be both asynchronously asserted and
 -- de-asserted. Asynchronous de-assertion can induce meta-stability in the
@@ -452,7 +452,7 @@ repSchedule high low = take low $ repSchedule' low high 1
 -- | \"@'delay' clk s@\" delays the values in 'Signal' /s/ for once cycle, the
 -- value at time 0 is /undefined/.
 --
--- >>> printX (sampleN 3 (delay systemClock (fromList [1,2,3,4])))
+-- >>> printX (sampleN 3 (delay systemClockGen (fromList [1,2,3,4])))
 -- [X,1,2]
 delay
   :: HasCallStack
@@ -466,7 +466,7 @@ delay = \clk i -> withFrozenCallStack (delay# clk i)
 -- | \"@'register' clk rst i s@\" delays the values in 'Signal' /s/ for one
 -- cycle, and sets the value to @i@ the moment the reset becomes 'False'.
 --
--- >>> sampleN 3 (register systemClock systemReset 8 (fromList [1,2,3,4]))
+-- >>> sampleN 3 (register systemClockGen systemResetGen 8 (fromList [1,2,3,4]))
 -- [8,1,2]
 register
   :: HasCallStack
@@ -500,9 +500,9 @@ register = \clk rst initial i -> withFrozenCallStack
 --
 -- We get:
 --
--- >>> sampleN 8 (sometimes1 systemClock systemReset)
+-- >>> sampleN 8 (sometimes1 systemClockGen systemResetGen)
 -- [Nothing,Just 1,Nothing,Just 1,Nothing,Just 1,Nothing,Just 1]
--- >>> sampleN 8 (count systemClock systemReset)
+-- >>> sampleN 8 (count systemClockGen systemResetGen)
 -- [0,0,1,1,2,2,3,3]
 regMaybe
   :: HasCallStack
@@ -529,9 +529,9 @@ regMaybe = \clk rst initial iM -> withFrozenCallStack
 --
 -- We get:
 --
--- >>> sampleN 8 (oscillate systemClock systemReset)
+-- >>> sampleN 8 (oscillate systemClockGen systemResetGen)
 -- [False,True,False,True,False,True,False,True]
--- >>> sampleN 8 (count systemClock systemReset)
+-- >>> sampleN 8 (count systemClockGen systemResetGen)
 -- [0,0,1,1,2,2,3,3]
 regEn
   :: Clock domain clk
@@ -554,7 +554,7 @@ regEn = \clk rst initial en i -> withFrozenCallStack
 -- | Simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a list of
 -- samples of type /a/
 --
--- >>> simulateB (unbundle . register systemClock systemReset (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- >>> simulateB (unbundle . register systemClockGen systemResetGen (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --
@@ -571,7 +571,7 @@ simulateB f = simulate (bundle . f . unbundle)
 -- | /Lazily/ simulate a (@'Unbundled' a -> 'Unbundled' b@) function given a
 -- list of samples of type /a/
 --
--- >>> simulateB (unbundle . register systemClock systemReset (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
+-- >>> simulateB (unbundle . register systemClockGen systemResetGen (8,8) . bundle) [(1,1), (2,2), (3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 --

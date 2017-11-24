@@ -112,8 +112,8 @@ import Clash.XException           (XException, errorX, seqX)
 >>> import Clash.Promoted.Symbol
 >>> import Clash.XException
 >>> type System = Dom "System" 10000
->>> let systemClock = clockGen @System
->>> let systemReset = asyncResetGen @System
+>>> let systemClockGen = clockGen @System
+>>> let systemResetGen = asyncResetGen @System
 >>> let register = register#
 >>> let registerS = register#
 >>> let registerA = register#
@@ -775,7 +775,7 @@ fromList = Prelude.foldr headStrictSignal (errorX "finite list")
 -- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register systemClock systemReset 8) [1, 2, 3]
+-- >>> simulate (register systemClockGen systemResetGen 8) [1, 2, 3]
 -- [8,1,2,3...
 -- ...
 --
@@ -834,7 +834,7 @@ fromList_lazy = Prelude.foldr (:-) (error "finite list")
 -- | Simulate a (@'Clash.Signal.Signal' a -> 'Clash.Signal.Signal' b@) function
 -- given a list of samples of type @a@
 --
--- >>> simulate (register systemClock systemReset 8) [1, 2, 3]
+-- >>> simulate (register systemClockGen systemResetGen 8) [1, 2, 3]
 -- [8,1,2,3...
 -- ...
 --

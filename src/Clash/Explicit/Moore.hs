@@ -48,7 +48,7 @@ import Clash.Explicit.Signal (Bundle (..), Clock, Reset, Signal, register)
 -- topEntity clk rst = 'moore' clk rst mac id 0
 -- @
 --
--- >>> simulate (topEntity systemClock systemReset) [(1,1),(2,2),(3,3),(4,4)]
+-- >>> simulate (topEntity systemClockGen systemResetGen) [(1,1),(2,2),(3,3),(4,4)]
 -- [0,1,5,14...
 -- ...
 --

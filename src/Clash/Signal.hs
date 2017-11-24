@@ -88,9 +88,9 @@ module Clash.Signal
   , tbClockGen
   , asyncResetGen
   , syncResetGen
-  , systemClock
-  , tbSystemClock
-  , systemReset
+  , systemClockGen
+  , tbSystemClockGen
+  , systemResetGen
     -- * Boolean connectives
   , (.&&.), (.||.)
     -- * Product/Signal isomorphism
@@ -128,7 +128,7 @@ import           Test.QuickCheck       (Property, property)
 import           Unsafe.Coerce         (unsafeCoerce)
 
 import           Clash.Explicit.Signal
-  (System, resetSynchronizer, systemClock, systemReset, tbSystemClock)
+  (System, resetSynchronizer, systemClockGen, systemResetGen, tbSystemClockGen)
 import qualified Clash.Explicit.Signal as S
 import           Clash.Promoted.Nat    (SNat (..))
 import           Clash.Promoted.Symbol (SSymbol (..))
@@ -412,7 +412,7 @@ withReset rst r
 --     testInput      = pure ((1 :> 2 :> 3 :> Nil) :> (4 :> 5 :> 6 :> Nil) :> Nil)
 --     expectedOutput = outputVerifier ((1:>2:>3:>4:>5:>6:>Nil):>Nil)
 --     done           = expectedOutput (topEntity <$> testInput)
---     done'          = 'withClockReset' (tbSystemClock (not <\$\> done')) systemReset done
+--     done'          = 'withClockReset' (tbSystemClockGen (not <\$\> done')) systemResetGen done
 -- @
 withClockReset
   :: Clock domain gated

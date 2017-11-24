@@ -156,7 +156,7 @@ import Clash.XException
 -- rP clk rst = 'registerB' clk rst (8,8)
 -- @
 --
--- >>> simulateB (rP systemClock systemReset) [(1,1),(2,2),(3,3)] :: [(Int,Int)]
+-- >>> simulateB (rP systemClockGen systemResetGen) [(1,1),(2,2),(3,3)] :: [(Int,Int)]
 -- [(8,8),(1,1),(2,2),(3,3)...
 -- ...
 registerB

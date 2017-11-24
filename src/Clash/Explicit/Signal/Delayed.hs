@@ -120,7 +120,7 @@ dfromList_lazy = coerce . fromList_lazy
 -- delay3 clk rst = 'delayed' clk rst (0 ':>' 0 ':>' 0 ':>' 'Nil')
 -- @
 --
--- >>> sampleN 6 (delay3 systemClock systemReset (dfromList [1..]))
+-- >>> sampleN 6 (delay3 systemClockGen systemResetGen (dfromList [1..]))
 -- [0,0,0,1,2,3]
 delayed
   :: forall domain gated synchronous a n d
@@ -148,7 +148,7 @@ delayed clk rst m ds = coerce (delaySignal (coerce ds))
 -- delay2 = 'delayI'
 -- @
 --
--- >>> sampleN 6 (delay2 systemClock systemReset (dfromList [1..]))
+-- >>> sampleN 6 (delay2 systemClockGen systemResetGen (dfromList [1..]))
 -- [0,0,1,2,3,4]
 delayedI
   :: (Default a, KnownNat d)
@@ -171,7 +171,7 @@ delayedI clk rst = delayed clk rst (repeat def)
 --                    in  (acc, 'delay' clk rst ('singleton' 0) acc')
 -- @
 --
--- >>> sampleN 6 (mac systemClock systemReset (dfromList [1..]) (dfromList [1..]))
+-- >>> sampleN 6 (mac systemClockGen systemResetGen (dfromList [1..]) (dfromList [1..]))
 -- [0,1,5,14,30,55]
 feedback
   :: (DSignal domain n a -> (DSignal domain n a,DSignal domain (n + m + 1) a))

@@ -124,7 +124,7 @@ let testBench :: Signal System Bool
         testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
         expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
         done           = expectedOutput (topEntity testInput)
-        done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+        done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
 :}
 
 >>> :{
@@ -565,7 +565,7 @@ testBench = done'
     testInput    = 'stimuliGenerator' $('listToVecTH' [(1,1) :: ('Signed' 9,'Signed' 9),(2,2),(3,3),(4,4)])
     expectOutput = 'outputVerifier' $('listToVecTH' [0 :: 'Signed' 9,1,5,14])
     done         = expectOutput (topEntity testInput)
-    done'        = 'withClockReset' ('tbSystemClock' (not '<$>' done')) 'systemReset' done
+    done'        = 'withClockReset' ('tbSystemClockGen' (not '<$>' done')) 'systemResetGen' done
 @
 
 This will create a stimulus generator that creates the same inputs as we used

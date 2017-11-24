@@ -45,7 +45,7 @@ We can see that it works as expected:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity systemClock (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity systemClockGen (fromList [3..5])__
 [10,11,12]
 @
 
@@ -64,7 +64,7 @@ And then we would see:
 
 @
 __>>> import qualified Data.List as L__
-__>>> L.tail $ sampleN 4 $ topEntity2 systemClock (fromList [3..5])__
+__>>> L.tail $ sampleN 4 $ topEntity2 systemClockGen (fromList [3..5])__
 [(1,2),(1,3)(1,-4)]
 @
 

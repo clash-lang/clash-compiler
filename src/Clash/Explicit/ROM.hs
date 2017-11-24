@@ -30,7 +30,7 @@ import GHC.TypeLits           (KnownNat, type (^))
 import Prelude hiding         (length)
 
 -- import Clash.Signal           (Signal)
--- import Clash.Signal.Explicit  (Signal', SClock, systemClock)
+-- import Clash.Signal.Explicit  (Signal', SClock, systemClockGen)
 import Clash.Explicit.Signal  (Clock, Signal, delay)
 
 import Clash.Sized.Unsigned   (Unsigned)
