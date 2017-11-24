@@ -67,13 +67,12 @@ where
 import Control.DeepSeq            (NFData (..))
 import Data.Data                  (Data)
 import Data.Default               (Default (..))
-import Data.Function              (on)
 import Data.Proxy                 (Proxy (..))
 import Text.Read                  (Read (..), ReadPrec)
 import Language.Haskell.TH        (TypeQ, appT, conT, litT, numTyLit, sigE)
 import Language.Haskell.TH.Syntax (Lift(..))
 import GHC.TypeLits               (CmpNat, KnownNat, Nat, type (+), type (-),
-                                   type (*), type (<=), type (^), natVal)
+                                   type (*), type (<=), natVal)
 import GHC.TypeLits.Extra         (CLog)
 import Test.QuickCheck.Arbitrary  (Arbitrary (..), CoArbitrary (..),
                                    arbitraryBoundedIntegral,
