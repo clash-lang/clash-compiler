@@ -23,4 +23,4 @@ testBench = done'
     testInput      = stimuliGenerator ((2 :> 3 :> 4 :> Nil) :> Nil)
     expectedOutput = outputVerifier   ((20 :> 47 :> 74 :> Nil) :> Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

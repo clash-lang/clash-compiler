@@ -12,4 +12,4 @@ testBench = done'
     testInput      = pure (iterateI (+1) 1,iterateI (+1) 3)
     expectedOutput = outputVerifier ((1:>3:>2:>4:>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

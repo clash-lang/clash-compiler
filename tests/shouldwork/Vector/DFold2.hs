@@ -17,4 +17,4 @@ testBench = done'
                                       (2:>3:>0:>1:>Nil):>
                                       (1:>2:>3:>0:>Nil):>Nil):>Nil)
     done           = expectedOutput (topEntity <$> testInput)
-    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

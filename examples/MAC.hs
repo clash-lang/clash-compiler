@@ -24,4 +24,4 @@ testBench = done'
     testInput      = stimuliGenerator $(listToVecTH [(1,1) :: (Signed 9,Signed 9),(2,2),(3,3),(4,4)])
     expectedOutput = outputVerifier $(listToVecTH [0 :: Signed 9,1,5,14])
     done           = expectedOutput (topEntity testInput)
-    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

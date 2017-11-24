@@ -43,4 +43,4 @@ testBench = done'
     testEntity   = fmap $ map (`shiftR` 64) . uncurry topEntity
     expectOutput = outputVerifier (repeat 0xc :> Nil)
     done         = expectOutput (testEntity testInput)
-    done'        = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'        = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

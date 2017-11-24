@@ -44,4 +44,4 @@ testBench = done'
     expectedOutput = outputVerifier $(listToVecTH
         [0 :: (Unsigned 8), 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 0, 6, 0, 0, 7, 0, 0, 8, 0, 9, 0, 10,  0, 11,  0, 1, 0])
     done  = expectedOutput (topEntity testInput)
-    done' = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done' = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

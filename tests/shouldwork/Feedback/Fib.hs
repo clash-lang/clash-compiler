@@ -16,4 +16,4 @@ testBench = done'
   where
     expectedOutput = outputVerifier $(listToVecTH [1 :: Unsigned 64,1,2,3,5])
     done           = expectedOutput topEntity
-    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

@@ -68,4 +68,4 @@ testBench = done'
                                                 ,$(listToVecTH [Nothing :: Maybe (Signed 5),Nothing,Nothing,Just (-1)])
                                                 ])
     done           = expectedOutput (topEntity (unbundle testInput))
-    done'          = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done

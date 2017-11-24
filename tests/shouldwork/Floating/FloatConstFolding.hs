@@ -73,4 +73,4 @@ testBench = done'
   where
     expectOutput = outputVerifier expectedOutput
     done         = expectOutput topEntity
-    done'        = withClockReset (tbSystemClock (not <$> done')) systemReset done
+    done'        = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
