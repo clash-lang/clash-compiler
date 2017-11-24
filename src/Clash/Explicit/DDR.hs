@@ -73,37 +73,34 @@ ddrIn#
   -> a
   -> Signal fast a
   -> Signal slow (a,a)
-ddrIn# (Clock {}) (Sync rst) i0 i1 i2 xs =
+ddrIn# (Clock {}) (Sync rst) i0 i1 i2 =
   go ((errorX "ddrIn: initial value 0 undefined")
      ,(errorX "ddrIn: initial value 1 undefined")
      ,(errorX "ddrIn: initial value 2 undefined"))
      rst
-     xs
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
     go (o0,o1,o2) rt@(~(r :- rs)) as@(~(x0 :- x1 :- xs)) =
       let (o0',o1',o2') = if r then (i0,i1,i2) else (o2,x0,x1)
       in o0 `seqX` o1 `seqX` (o0,o1) :- (rt `seq` as `seq` go (o0',o1',o2') rs xs)
 
-ddrIn# (Clock {}) (Async rst) i0 i1 i2 xs =
+ddrIn# (Clock {}) (Async rst) i0 i1 i2 =
   go ((errorX "ddrIn: initial value 0 undefined")
      ,(errorX "ddrIn: initial value 1 undefined")
      ,(errorX "ddrIn: initial value 2 undefined"))
      rst
-     xs
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
     go (o0,o1,o2) ~(r :- rs) as@(~(x0 :- x1 :- xs)) =
       let (o0',o1',o2') = if r then (i0,i1,i2) else (o0,o1,o2)
       in o0' `seqX` o1' `seqX`(o0',o1') :- (as `seq` go (o2',x0,x1) rs xs)
 
-ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 xs =
+ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 =
   go ((errorX "ddrIn: initial value 0 undefined")
      ,(errorX "ddrIn: initial value 1 undefined")
      ,(errorX "ddrIn: initial value 2 undefined"))
      rst
      ena
-     xs
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
     go (o0,o1,o2) rt@(~(r :- rs)) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
@@ -112,13 +109,12 @@ ddrIn# (GatedClock _ _ ena) (Sync rst) i0 i1 i2 xs =
            :- (rt `seq` as `seq` if e then go (o0',o1',o2') rs es xs
                                       else go (o0 ,o1 ,o2)    rs es xs)
 
-ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 xs =
+ddrIn# (GatedClock _ _ ena) (Async rst) i0 i1 i2 =
   go ((errorX "ddrIn: initial value 0 undefined")
      ,(errorX "ddrIn: initial value 1 undefined")
      ,(errorX "ddrIn: initial value 2 undefined"))
      rst
      ena
-     xs
   where
     go :: (a,a,a) -> Signal slow Bool -> Signal slow Bool -> Signal fast a -> Signal slow (a,a)
     go (o0,o1,o2) ~(r :- rs) ~(e :- es) as@(~(x0 :- x1 :- xs)) =
@@ -161,5 +157,5 @@ ddrOut# clk rst i0 xs ys =
   where
     xs' = register clk rst i0 xs
     ys' = register clk rst i0 ys
-    zipSig (x :- xs) (y :- ys) = x :- y :- zipSig xs ys
+    zipSig (a :- as) (b :- bs) = a :- b :- zipSig as bs
 {-# NOINLINE ddrOut# #-}
