@@ -30,6 +30,8 @@ module Clash.Signal.Internal
   ( -- * Datatypes
     Domain (..)
   , Signal (..)
+  , head#
+  , tail#
     -- * Clocks
   , Clock (..)
   , ClockKind (..)
@@ -156,6 +158,12 @@ never create a clock that goes any faster!
 data Signal (domain :: Domain) a
   -- | The constructor, @(':-')@, is __not__ synthesisable.
   = a :- Signal domain a
+
+head# :: Signal dom a -> a
+head# (x' :- _ )  = x'
+
+tail# :: Signal dom a -> Signal dom a
+tail# (_  :- xs') = xs'
 
 instance Show a => Show (Signal domain a) where
   show (x :- xs) = show x ++ " " ++ show xs
