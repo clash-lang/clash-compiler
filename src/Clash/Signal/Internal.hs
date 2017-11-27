@@ -88,6 +88,7 @@ module Clash.Signal.Internal
   )
 where
 
+import Type.Reflection            (Typeable)
 import Control.Applicative        (liftA2, liftA3)
 import Control.DeepSeq            (NFData, force)
 import Control.Exception          (catch, evaluate, throw)
@@ -122,6 +123,7 @@ import Clash.XException           (Undefined (..), XException, errorX, seqX)
 
 -- | A domain with a name (@Symbol@) and a clock period (@Nat@) in /ps/
 data Domain = Dom { domainName :: Symbol, clkPeriod :: Nat }
+  deriving (Typeable)
 
 infixr 5 :-
 {- | CλaSH has synchronous 'Signal's in the form of:
