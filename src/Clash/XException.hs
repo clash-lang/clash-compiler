@@ -29,7 +29,7 @@ CallStack (from HasCallStack):
 
 module Clash.XException
   ( -- * 'X': An exception for uninitialized values
-    XException, errorX
+    XException, errorX, isX, maybeX
     -- * Printing 'X' exceptions as \"X\"
   , ShowX (..), showsX, printX, showsPrecXWith
     -- * Strict evaluation
@@ -38,6 +38,7 @@ module Clash.XException
 where
 
 import Control.Exception (Exception, catch, evaluate, throw)
+import Control.DeepSeq   (NFData, rnf)
 import Data.Complex      (Complex)
 import Data.Int          (Int8,Int16,Int32,Int64)
 import Data.Ratio        (Ratio)
@@ -76,6 +77,24 @@ seqX a b = unsafeDupablePerformIO
   (catch (evaluate a >> return b) (\(XException _) -> return b))
 {-# NOINLINE seqX #-}
 infixr 0 `seqX`
+
+-- | Fully evaluate a value, returning 'Nothing' if is throws 'XException'.
+--
+-- > maybeX 42               = Just 42
+-- > maybeX (XException msg) = Nothing
+-- > maybeX _|_              = _|_
+maybeX :: NFData a => a -> Maybe a
+maybeX = either (const Nothing) Just . isX
+
+-- | Fully evaluate a value, returning @'Left' msg@ if is throws 'XException'.
+--
+-- > isX 42               = Right 42
+-- > isX (XException msg) = Left msg
+-- > isX _|_              = _|_
+isX :: NFData a => a -> Either String a
+isX a = unsafeDupablePerformIO
+  (catch (evaluate (rnf a) >> return (Right a)) (\(XException msg) -> return (Left msg)))
+{-# NOINLINE isX #-}
 
 showXWith :: (a -> ShowS) -> a -> ShowS
 showXWith f x =
