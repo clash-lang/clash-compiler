@@ -151,9 +151,21 @@ whnf eval gbl tcm isSubj (h,k,e) =
         | Just e' <- unwindStack s
         -> e'
         | otherwise
-        -> error $ unlines [ "Compile-time evaluation failure:"
-                           , "Expression under evaluation: " ++ showDoc e
-                           ]
+        -> error $ unlines $ [ "Compile-time evaluation failure:"
+                             , "Expression under evaluation: " ++ showDoc e
+                             , "Stack:"
+                             ] ++
+                             [ "  "++showDoc frame | frame <- k] ++
+                             [ ""
+                             , "Heap:"
+                             , showHeap h
+                             ]
+
+showHeap :: Heap -> String
+showHeap (Heap h _) =
+    unlines [ "  "++show name ++ "  ===  " ++ showDoc value
+            | (name,value) <- M.toList h
+            ]
 
 -- | Are we in a context where special primitives must be forced.
 --
@@ -166,7 +178,7 @@ isScrut _ = False
 -- | Completely unwind the stack to get back the complete term
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
-unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
+unwindStack (h,(kf:k'),e) = case kf of
   PrimApply nm ty tys vs tms ->
     unwindStack
       (h,k'
@@ -176,19 +188,8 @@ unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
   Apply id_ ->
-    case lookup (nameOcc (varName id_)) h' of
-      Just e' -> unwindStack (h,k',App e e')
-      Nothing -> error $ unlines
-                       $ [ "Clash.Core.Evaluator.unwindStack: Failed heap lookup"
-                         , "Stack:"
-                         ] ++
-                         [ "  "++showDoc frame | frame <- kf:k'] ++
-                         [ ""
-                         , "Heap:"
-                         ] ++
-                         [ "  "++show name ++ "  ===  " ++ showDoc value
-                         | (name,value) <- M.toList h'
-                         ]
+    let e' = lookupLetBinding h (varName id_)
+    in unwindStack (h,k',App e e')
   Scrutinise _ [] ->
     unwindStack (h,k',e)
   Scrutinise ty alts ->
@@ -280,12 +281,29 @@ step eval gbl tcm (h, k, e) = case e of
   Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
                                     ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
 
+lookupLetBinding :: Heap -> TmName -> Term
+lookupLetBinding h nm =
+    case lookupLetBinding' h nm of
+      Just e  -> e
+      Nothing -> error $ unlines
+                       $ [ "Clash.Core.Evaluator.unwindStack: Failed heap lookup"
+                         , "Name: " ++ showDoc nm
+                         , "Heap:"
+                         , showHeap h
+                         ]
+
+lookupLetBinding' :: Heap -> TmName -> Maybe Term
+lookupLetBinding' (Heap h _) nm = lookup (nameOcc nm) h
+
 newLetBinding
   :: TyConMap
   -> Heap
   -> Term
   -> (Heap,Id)
-newLetBinding _   h            (Var ty nm) = (h,Id nm (embed ty))
+-- Short out trivial bindings. e.g. if we are inserting (v1 = v2) into the heap [v2 = v3],
+-- the resulting heap is [v2 = v3, v1 = v3].
+newLetBinding tcm h (Var ty nm)
+  | Just (Var _ty nm') <- lookupLetBinding' h nm = newLetBinding tcm h (Var ty nm')
 newLetBinding tcm (Heap h ids) e           =
     (Heap (insert (nameOcc nm) e h) ids',Id nm (embed ty))
   where
