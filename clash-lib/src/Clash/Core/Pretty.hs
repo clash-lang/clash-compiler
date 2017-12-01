@@ -18,7 +18,7 @@ module Clash.Core.Pretty
 where
 
 import Data.Char                        (isSymbol, isUpper, ord)
-import Data.Text                        (unpack)
+import Data.Text                        (Text, unpack)
 import GHC.Show                         (showMultiLineString)
 import Numeric                          (fromRat)
 import Text.PrettyPrint                 (Doc, char, comma, empty, equals, hang,
@@ -88,6 +88,9 @@ period = char '.'
 
 rarrow :: Doc
 rarrow = text "->"
+
+instance Pretty Text where
+  pprPrec _ = pure . text . unpack
 
 instance Pretty Type where
   pprPrec _ = pprType

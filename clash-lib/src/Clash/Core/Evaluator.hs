@@ -24,8 +24,10 @@ import           Data.List
   (foldl',mapAccumL,uncons)
 import           Data.Map
   (Map,delete,fromList,insert,lookup,union)
+import qualified Data.Map                                as M
 import           Data.Text                               (Text)
 import           Debug.Trace                             (trace)
+import           Text.PrettyPrint                        (hsep, text)
 import           Clash.Core.DataCon
 import           Clash.Core.Literal
 import           Clash.Core.Name
@@ -58,6 +60,31 @@ data StackFrame
   | PrimApply  Text Type [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   deriving Show
+
+instance Pretty StackFrame where
+    pprPrec _ (Update i) = do
+        i' <- ppr i
+        pure $ hsep ["Update", i']
+    pprPrec _ (Apply i) = do
+        i' <- ppr i
+        pure $ hsep ["Apply", i']
+    pprPrec _ (Instantiate t) = do
+        t' <- ppr t
+        pure $ hsep ["Instantiate", t']
+    pprPrec _ (PrimApply a b c d e) = do
+        a' <- ppr a
+        b' <- ppr b
+        c' <- ppr c
+        d' <- pure $ text $ show d
+        e' <- ppr e
+        pure $ hsep ["PrimApply", a', "::", b',
+                     "; type args=", c',
+                     "; val args=", d',
+                     "term args=", e']
+    pprPrec _ (Scrutinise a b) = do
+        a' <- ppr a
+        b' <- pure $ text $ show b
+        pure $ hsep ["Scrutinise ", a', b']
 
 -- Values
 data Value
@@ -113,16 +140,20 @@ whnf
   -> State
 whnf eval gbl tcm isSubj (h,k,e) =
     if isSubj
-       then go (h,Scrutinise undefined []:k,e) -- See [Note: empty case expressions]
+       then go (h,Scrutinise ty []:k,e) -- See [Note: empty case expressions]
        else go (h,k,e)
   where
+    ty = runFreshM $ termType tcm e
+
     go s = case step eval gbl tcm s of
       Just s' -> go s'
       Nothing
         | Just e' <- unwindStack s
         -> e'
         | otherwise
-        -> error $ showDoc e
+        -> error $ unlines [ "Compile-time evaluation failure:"
+                           , "Expression under evaluation: " ++ showDoc e
+                           ]
 
 -- | Are we in a context where special primitives must be forced.
 --
@@ -144,9 +175,20 @@ unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
               (e:tms))
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
-  Apply id_ -> do
-    e' <- lookup (nameOcc (varName id_)) h'
-    unwindStack (h,k',App e e')
+  Apply id_ ->
+    case lookup (nameOcc (varName id_)) h' of
+      Just e' -> unwindStack (h,k',App e e')
+      Nothing -> error $ unlines
+                       $ [ "Clash.Core.Evaluator.unwindStack: Failed heap lookup"
+                         , "Stack:"
+                         ] ++
+                         [ "  "++showDoc frame | frame <- kf:k'] ++
+                         [ ""
+                         , "Heap:"
+                         ] ++
+                         [ "  "++show name ++ "  ===  " ++ showDoc value
+                         | (name,value) <- M.toList h'
+                         ]
   Scrutinise _ [] ->
     unwindStack (h,k',e)
   Scrutinise ty alts ->
