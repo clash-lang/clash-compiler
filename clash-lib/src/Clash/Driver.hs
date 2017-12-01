@@ -213,7 +213,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Testbench netlist generation took " ++ show normNetDiff
 
       -- 3. Write HDL
-      let (hdlDocs,_) = createHDL hdlState2 modName' netlist undefined
+      let (hdlDocs,_) = createHDL hdlState2 modName' netlist
+                           (error "Driver: dummy top component")
                            (Text.unpack topNm, Left manifest')
           dir = hdlDir </> maybe "" t_name annM </> modName'
       prepareDir (opt_cleanhdl opts) (extension hdlState2) dir

@@ -377,7 +377,8 @@ inlineOrLiftBinders condition inlineOrLift ctx expr@(Letrec b) = do
       -- that we intend to lift, the other binders, and the body
       let (others',res')     = substituteBinders doInline (doLift ++ others) res
           (doLift',others'') = splitAt (length doLift) others'
-      (gamma,delta) <- mkEnv (LetBinding undefined (map fst xes) : ctx)
+      (gamma,delta) <- mkEnv (LetBinding (error "inlineOrLiftBinders: dummy binder")
+                                         (map fst xes) : ctx)
       doLift'' <- mapM (liftBinding gamma delta) doLift'
       -- We then substitute the lifted binders in the other binders and the body
       let (others3,res'') = substituteBinders doLift'' others'' res'
