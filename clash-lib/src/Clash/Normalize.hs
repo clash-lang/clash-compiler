@@ -27,7 +27,9 @@ import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
 import qualified Data.Set                         as Set
 import qualified Data.Set.Lens                    as Lens
-import           Unbound.Generics.LocallyNameless (unembed)
+import           Data.Semigroup                   ((<>))
+import           Unbound.Generics.LocallyNameless (unembed, runLFreshM)
+import           Text.PrettyPrint                 (vcat)
 
 import           BasicTypes                       (InlineSpec (..))
 import           SrcLoc                           (SrcSpan,noSrcSpan)
@@ -35,7 +37,7 @@ import           SrcLoc                           (SrcSpan,noSrcSpan)
 import           Clash.Core.Evaluator             (PrimEvaluator)
 import           Clash.Core.FreeVars              (termFreeIds)
 import           Clash.Core.Name                  (Name (..), NameSort (..))
-import           Clash.Core.Pretty                (showDoc)
+import           Clash.Core.Pretty                (showDoc, ppr)
 import           Clash.Core.Subst                 (substTms)
 import           Clash.Core.Term                  (Term (..), TmName, TmOccName)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
@@ -208,7 +210,12 @@ checkNonRecursive
   -> BindingMap
 checkNonRecursive norm = case Maybe.mapMaybe go (HashMap.toList norm) of
     []  -> norm
-    rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive components: " ++ show rcs
+    rcs -> error $ $(curLoc) ++ "Callgraph after normalisation contains following recursive components: "
+                   ++ show (vcat $ runLFreshM $ sequence [ do a' <- ppr a
+                                                              b' <- ppr b
+                                                              return $ a' <> b'
+                                                         | (a,b ) <- rcs
+                                                         ])
   where
     go (nm,(_,_,_,_,tm)) =
       let used = Lens.toListOf termFreeIds tm
