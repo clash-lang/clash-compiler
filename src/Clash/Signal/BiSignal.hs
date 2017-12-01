@@ -235,6 +235,7 @@ writeToBiSignal input writes =
     (fmap pack <$> writes)
     (isJust <$> writes)
     (pack . fromJust <$> writes)
+{-# INLINE writeToBiSignal #-}
 
 -- | Converts the 'out' part of a BiSignal to an 'in' part. In simulation it
 -- checks whether multiple components are writing and will error accordingly.
