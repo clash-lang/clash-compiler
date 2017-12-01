@@ -290,7 +290,7 @@
 * New features:
   * Inlining limit is configurable, run with `-clash-inline-limit=N` to set the inlining limit to `N`
   * Specialisation limit is configurable, run with `clash-spec-limit=N` to set the inline limit to `N`
-  * Debug level is configurable, run with `-clash-debug <LEVEL>` where `<LEVEL>` can be: `DebugNone, DebugFinal, DebugName, DebugApplied, DebugAll`. Be default, `clash` runs with `DebugNone`.
+  * Debug level is configurable, run with `-fclash-debug <LEVEL>` where `<LEVEL>` can be: `DebugNone, DebugFinal, DebugName, DebugApplied, DebugAll`. Be default, `clash` runs with `DebugNone`.
 
 * Fixes bugs:
   * Extend evaluator for `GHC.Integer.Type.minusInteger` and `CLaSH.Promoted.Nat.SNat`.
