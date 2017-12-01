@@ -50,6 +50,7 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "ClassOps"            (["","ClassOps_testBench"],"ClassOps_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "CountTrailingZeros"  (["","CountTrailingZeros_testBench"],"CountTrailingZeros_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "DivMod"              ([""],"DivMod_topEntity",False)
+            , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "FromJust"            ([""],"FromJust_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "IrrefError"          ([""],"IrrefError_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LambdaDrop"          ([""],"LambdaDrop_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "LotOfStates"         (["","LotOfStates_testBench"],"LotOfStates_testBench",True) -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
