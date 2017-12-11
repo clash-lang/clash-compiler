@@ -29,10 +29,9 @@ install:
   $HOME/.stack-work-cache/installplan.txt; fi;
 script:
 - if [ "$PEDANTIC" = "YES" ]; then export STACKOPTS=--pedantic; fi
-- stack --no-terminal --skip-ghc-check build $STACKOPTS
+- stack --no-terminal --skip-ghc-check build --haddock --no-haddock-deps $STACKOPTS
 # - stack --no-terminal --skip-ghc-check sdist
 - stack exec clash-testsuite
-- stack haddock
 matrix:
   fast_finish: true
   include:
