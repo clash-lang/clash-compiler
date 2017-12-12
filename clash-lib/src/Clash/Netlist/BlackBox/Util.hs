@@ -258,6 +258,8 @@ renderElem b (IF c t f) = do
               _ -> error $ $(curLoc) ++ "IF: LIT must be a numeric lit"
           | DataCon (Signed _) _ [Literal _ (NumLit i)] <- l
             -> fromInteger i
+          | DataCon (Unsigned _) _ [Literal _ (NumLit i)] <- l
+            -> fromInteger i
         k -> error $ $(curLoc) ++ ("IF: LIT must be a numeric lit:" ++ show k)
       (Depth e)  -> case lineToType b [e] of
                       (RTree n _) -> n
