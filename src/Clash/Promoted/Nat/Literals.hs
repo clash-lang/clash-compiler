@@ -23,7 +23,7 @@ You can generate more 'SNat' literals using 'decLiteralsD' from "Clash.Promoted.
 
 {-# LANGUAGE Trustworthy #-}
 
-{-# OPTIONS_HADDOCK show-extensions #-}
+{-# OPTIONS_HADDOCK show-extensions, prune #-}
 
 module Clash.Promoted.Nat.Literals where
 
