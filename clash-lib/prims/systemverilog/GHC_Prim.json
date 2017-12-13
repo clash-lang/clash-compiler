@@ -255,7 +255,7 @@ assign ~RESULT = {~SYM[0],~SYM[1]};
     }
   }
 , { "BlackBox" :
-    { "name"      : "GHC.Prim.uncheckedIShiftL#"
+    { "name"      : "GHC.Prim.uncheckedShiftRL#"
     , "type"      : "uncheckedShiftRL# :: Word# -> Int# -> Word#"
     , "templateE" : "~ARG[0] >> ~ARG[1]"
     }
