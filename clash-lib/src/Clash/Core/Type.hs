@@ -174,14 +174,20 @@ coreView tcMap ty = case tyView ty of
     | otherwise
     -> case tcMap HashMap.! nameOcc tcNm of
          AlgTyCon {algTcRhs = (NewTyCon _ nt)}
-           -> Just (newTyConInstRhs nt args)
+           -> newTyConInstRhs nt args
          _ -> reduceTypeFamily tcMap ty
   _ -> Nothing
 
 -- | Instantiate and Apply the RHS/Original of a NewType with the given
 -- list of argument types
-newTyConInstRhs :: ([TyName],Type) -> [Type] -> Type
-newTyConInstRhs (tvs,ty) tys = foldl AppTy (substTys (zip tvs' tys1) ty) tys2
+--
+-- Returns /Nothing/ when under-applied
+newTyConInstRhs :: ([TyName],Type) -> [Type] -> Maybe Type
+newTyConInstRhs (tvs,ty) tys
+    | length tvs <= length tys
+    = Just (foldl AppTy (substTys (zip tvs' tys1) ty) tys2)
+    | otherwise
+    = Nothing
   where
     (tys1, tys2) = splitAtList tvs tys
     tvs'         = map nameOcc tvs
@@ -537,7 +543,9 @@ normalizeType tcMap = go
       | otherwise
       -> case tcMap HashMap.! nameOcc tcNm of
            AlgTyCon {algTcRhs = (NewTyCon _ nt)}
-             -> go (newTyConInstRhs nt args)
+             -> case newTyConInstRhs nt args of
+                  Just ty' -> go ty'
+                  Nothing  -> ty
            _ -> let args' = map go args
                     ty' = mkTyConApp tcNm args'
                 in case reduceTypeFamily tcMap ty' of
