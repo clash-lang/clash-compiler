@@ -24,8 +24,10 @@ import           Data.List
   (foldl',mapAccumL,uncons)
 import           Data.Map
   (Map,delete,fromList,insert,lookup,union)
+import qualified Data.Map                                as M
 import           Data.Text                               (Text)
 import           Debug.Trace                             (trace)
+import           Text.PrettyPrint                        (hsep, text)
 import           Clash.Core.DataCon
 import           Clash.Core.Literal
 import           Clash.Core.Name
@@ -58,6 +60,31 @@ data StackFrame
   | PrimApply  Text Type [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   deriving Show
+
+instance Pretty StackFrame where
+    pprPrec _ (Update i) = do
+        i' <- ppr i
+        pure $ hsep ["Update", i']
+    pprPrec _ (Apply i) = do
+        i' <- ppr i
+        pure $ hsep ["Apply", i']
+    pprPrec _ (Instantiate t) = do
+        t' <- ppr t
+        pure $ hsep ["Instantiate", t']
+    pprPrec _ (PrimApply a b c d e) = do
+        a' <- ppr a
+        b' <- ppr b
+        c' <- ppr c
+        d' <- pure $ text $ show d
+        e' <- ppr e
+        pure $ hsep ["PrimApply", a', "::", b',
+                     "; type args=", c',
+                     "; val args=", d',
+                     "term args=", e']
+    pprPrec _ (Scrutinise a b) = do
+        a' <- ppr a
+        b' <- pure $ text $ show b
+        pure $ hsep ["Scrutinise ", a', b']
 
 -- Values
 data Value
@@ -113,16 +140,32 @@ whnf
   -> State
 whnf eval gbl tcm isSubj (h,k,e) =
     if isSubj
-       then go (h,Scrutinise undefined []:k,e) -- See [Note: empty case expressions]
+       then go (h,Scrutinise ty []:k,e) -- See [Note: empty case expressions]
        else go (h,k,e)
   where
+    ty = runFreshM $ termType tcm e
+
     go s = case step eval gbl tcm s of
       Just s' -> go s'
       Nothing
         | Just e' <- unwindStack s
         -> e'
         | otherwise
-        -> error $ showDoc e
+        -> error $ unlines $ [ "Compile-time evaluation failure:"
+                             , "Expression under evaluation: " ++ showDoc e
+                             , "Stack:"
+                             ] ++
+                             [ "  "++showDoc frame | frame <- k] ++
+                             [ ""
+                             , "Heap:"
+                             , showHeap h
+                             ]
+
+showHeap :: Heap -> String
+showHeap (Heap h _) =
+    unlines [ "  "++show name ++ "  ===  " ++ showDoc value
+            | (name,value) <- M.toList h
+            ]
 
 -- | Are we in a context where special primitives must be forced.
 --
@@ -135,7 +178,7 @@ isScrut _ = False
 -- | Completely unwind the stack to get back the complete term
 unwindStack :: State -> Maybe State
 unwindStack s@(_,[],_) = Just s
-unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
+unwindStack (h,(kf:k'),e) = case kf of
   PrimApply nm ty tys vs tms ->
     unwindStack
       (h,k'
@@ -144,9 +187,9 @@ unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
               (e:tms))
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
-  Apply id_ -> do
-    e' <- lookup (nameOcc (varName id_)) h'
-    unwindStack (h,k',App e e')
+  Apply id_ ->
+    let e' = lookupLetBinding h (varName id_)
+    in unwindStack (h,k',App e e')
   Scrutinise _ [] ->
     unwindStack (h,k',e)
   Scrutinise ty alts ->
@@ -238,12 +281,29 @@ step eval gbl tcm (h, k, e) = case e of
   Cast _ _ _ -> trace (unlines ["WARNING: " ++ $(curLoc) ++ "Clash currently can't symbolically evaluate casts"
                                     ,"If you have testcase that produces this message, please open an issue about it."]) Nothing
 
+lookupLetBinding :: Heap -> TmName -> Term
+lookupLetBinding h nm =
+    case lookupLetBinding' h nm of
+      Just e  -> e
+      Nothing -> error $ unlines
+                       $ [ "Clash.Core.Evaluator.unwindStack: Failed heap lookup"
+                         , "Name: " ++ showDoc nm
+                         , "Heap:"
+                         , showHeap h
+                         ]
+
+lookupLetBinding' :: Heap -> TmName -> Maybe Term
+lookupLetBinding' (Heap h _) nm = lookup (nameOcc nm) h
+
 newLetBinding
   :: TyConMap
   -> Heap
   -> Term
   -> (Heap,Id)
-newLetBinding _   h            (Var ty nm) = (h,Id nm (embed ty))
+-- Short out trivial bindings. e.g. if we are inserting (v1 = v2) into the heap [v2 = v3],
+-- the resulting heap is [v2 = v3, v1 = v3].
+newLetBinding tcm h (Var ty nm)
+  | Just (Var _ty nm') <- lookupLetBinding' h nm = newLetBinding tcm h (Var ty nm')
 newLetBinding tcm (Heap h ids) e           =
     (Heap (insert (nameOcc nm) e h) ids',Id nm (embed ty))
   where
