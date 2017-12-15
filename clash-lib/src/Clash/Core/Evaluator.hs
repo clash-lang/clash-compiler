@@ -24,8 +24,10 @@ import           Data.List
   (foldl',mapAccumL,uncons)
 import           Data.Map
   (Map,delete,fromList,insert,lookup,union)
+import qualified Data.Map                                as M
 import           Data.Text                               (Text)
 import           Debug.Trace                             (trace)
+import           Text.PrettyPrint                        (hsep)
 import           Clash.Core.DataCon
 import           Clash.Core.Literal
 import           Clash.Core.Name
@@ -58,6 +60,31 @@ data StackFrame
   | PrimApply  Text Type [Type] [Value] [Term]
   | Scrutinise Type [Alt]
   deriving Show
+
+instance Pretty StackFrame where
+  pprPrec _ (Update i) = do
+    i' <- ppr i
+    pure (hsep ["Update", i'])
+  pprPrec _ (Apply i) = do
+    i' <- ppr i
+    pure (hsep ["Apply", i'])
+  pprPrec _ (Instantiate t) = do
+    t' <- ppr t
+    pure (hsep ["Instantiate", t'])
+  pprPrec _ (PrimApply a b c d e) = do
+      a' <- ppr a
+      b' <- ppr b
+      c' <- ppr c
+      d' <- ppr (map valToTerm d)
+      e' <- ppr e
+      pure $ hsep ["PrimApply", a', "::", b',
+                   "; type args=", c',
+                   "; val args=", d',
+                   "term args=", e']
+  pprPrec _ (Scrutinise a b) = do
+      a' <- ppr a
+      b' <- ppr (Case (Literal (CharLiteral '_')) a b)
+      pure $ hsep ["Scrutinise ", a', b']
 
 -- Values
 data Value
@@ -113,9 +140,11 @@ whnf
   -> State
 whnf eval gbl tcm isSubj (h,k,e) =
     if isSubj
-       then go (h,Scrutinise undefined []:k,e) -- See [Note: empty case expressions]
+       then go (h,Scrutinise ty []:k,e) -- See [Note: empty case expressions]
        else go (h,k,e)
   where
+    ty = runFreshM $ termType tcm e
+
     go s = case step eval gbl tcm s of
       Just s' -> go s'
       Nothing
@@ -145,13 +174,28 @@ unwindStack (h@(Heap h' _),(kf:k'),e) = case kf of
   Instantiate ty ->
     unwindStack (h,k',TyApp e ty)
   Apply id_ -> do
-    e' <- lookup (nameOcc (varName id_)) h'
-    unwindStack (h,k',App e e')
+    case lookup (nameOcc (varName id_)) h' of
+      Just e' -> unwindStack (h,k',App e e')
+      Nothing -> error $ unlines
+                       $ [ "Clash.Core.Evaluator.unwindStack:"
+                         , "Stack:"
+                         ] ++
+                         [ "  "++showDoc frame | frame <- kf:k'] ++
+                         [ ""
+                         , "Expression:"
+                         , showDoc e
+                         , ""
+                         , "Heap:"
+                         ] ++
+                         [ "  "++show name ++ "  ===  " ++ showDoc value
+                         | (name,value) <- M.toList h'
+                         ]
   Scrutinise _ [] ->
     unwindStack (h,k',e)
   Scrutinise ty alts ->
     unwindStack (h,k',Case e ty alts)
-  _ -> error (show kf)
+  Update _ ->
+    unwindStack (h,k',e)
 
 {- [Note: forcing special primitives]
 Clash uses the `whnf` function in two places (for now):
@@ -282,7 +326,7 @@ force gbl (Heap h ids) k x' = case lookup nm h of
     Nothing -> case HM.lookup nm gbl of
       Nothing          -> Nothing
       Just (_,_,_,_,e) -> Just (Heap h ids,k,e)
-    Just e -> Just (Heap (delete nm h) ids,k,e)
+    Just e -> Just (Heap (delete nm h) ids,Update x':k,e)
     -- Removing the heap-bound value on a force ensures we do not get stuck on
     -- expressions such as: "let x = x in x"
   where
