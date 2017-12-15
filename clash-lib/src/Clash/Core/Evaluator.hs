@@ -287,9 +287,12 @@ newLetBinding
   -> Heap
   -> Term
   -> (Heap,Id)
-newLetBinding _   h            (Var ty nm) = (h,Id nm (embed ty))
-newLetBinding tcm (Heap h ids) e           =
-    (Heap (insert (nameOcc nm) e h) ids',Id nm (embed ty))
+newLetBinding tcm h@(Heap h' ids) e
+  | Var ty' nm' <- e
+  , Just _ <- lookup (nameOcc nm') h'
+  = (h, Id nm' (embed ty'))
+  | otherwise
+  = (Heap (insert (nameOcc nm) e h') ids',Id nm (embed ty))
   where
     (i,ids') = freshId ids
     nm       = makeSystemName "x" (toInteger i)
