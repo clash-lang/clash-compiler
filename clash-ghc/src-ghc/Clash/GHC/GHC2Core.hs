@@ -355,6 +355,8 @@ coreToTerm primMap unlocs srcsp coreExpr = Reader.runReaderT (term coreExpr) src
               | f == pack "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
               | f == pack "GHC.Base.$"                       -> return (dollarTerm xType)
               | f == pack "GHC.Stack.withFrozenCallStack"    -> return (withFrozenCallStackTerm xType)
+              | f == pack "GHC.Magic.lazy"                   -> return (idTerm xType)
+              | f == pack "GHC.Magic.runRW#"                 -> return (runRWTerm xType)
               | otherwise                                    -> return (C.Prim xNameS xType)
             Just (BlackBox {}) ->
               return (C.Prim xNameS xType)
@@ -804,6 +806,57 @@ withFrozenCallStackTerm (C.ForAllTy tvATy) =
     fId           = C.Id fName (embed fTy)
 
 withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given the type:
+--
+-- @forall a. a -> a@
+--
+-- Generate the term
+--
+-- @/\(a:*).\(x:a).x@
+idTerm
+  :: C.Type
+  -> C.Term
+idTerm (C.ForAllTy tvATy) =
+  C.TyLam (bind aTV (
+  C.Lam   (bind xId (
+  C.Var xTy xName))))
+  where
+    (aTV,funTy)     = runFreshM (unbind tvATy)
+    (C.FunTy xTy _) = C.tyView funTy
+    xName           = C.string2SystemName "x"
+    xId             = C.Id xName (embed xTy)
+
+idTerm ty = error $ $(curLoc) ++ show ty
+
+-- | Given type type:
+--
+-- @forall (r :: RuntimeRep) (o :: TYPE r).(State# RealWorld -> o) -> o@
+--
+-- Genereate the term:
+--
+-- @/\(r:RuntimeRep)./\(o:TYPE r).\(f:State# RealWord -> o) -> f realWorld#@
+runRWTerm
+  :: C.Type
+  -> C.Term
+runRWTerm (C.ForAllTy tvRTy) =
+  C.TyLam (bind rTV (
+  C.TyLam (bind oTV (
+  C.Lam   (bind fId (
+  (C.App (C.Var fTy fName) (C.Prim rwNm rwTy))))))))
+  where
+    (rTV,oTV,funTy) = runFreshM $ do
+      { (rTV',C.ForAllTy tvOTy) <- unbind tvRTy
+      ; (oTV',funTy')           <- unbind tvOTy
+      ; return (rTV',oTV',funTy')
+      }
+    (C.FunTy fTy _)  = C.tyView funTy
+    (C.FunTy rwTy _) = C.tyView fTy
+    fName            = C.string2SystemName "f"
+    fId              = C.Id fName (embed fTy)
+    rwNm             = pack "Clash.GHC.GHC2Core.realWorld#"
+
+runRWTerm ty = error $ $(curLoc) ++ show ty
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of
