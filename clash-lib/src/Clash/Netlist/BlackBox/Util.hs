@@ -284,6 +284,13 @@ renderElem b (IF c t f) = do
                     in case ty of
                        Reset _ _ Synchronous -> 1
                        _ -> 0
+      (StrCmp [C t1] n) ->
+        let (e,_,_) = bbInputs b !! n
+        in  case exprToText e of
+              Just t2
+                | t1 == t2  -> 1
+                | otherwise -> 0
+              Nothing -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
       (And es)   -> if all (==1) (map (check iw syn) es)
                        then 1
                        else 0
@@ -344,16 +351,9 @@ renderTag b (I esc n)       = do
   escape <- if esc then unextend else pure id
   (escape . displayT . renderOneLine) <$> expr False e
 renderTag b (N n)           = let (e,_,_) = bbInputs b !! n
-                              in  toName e
-  where
-    toName (Literal _ (StringLit l)) = return (Text.pack l)
-    toName (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
-      let (e',_,_) = head (bbInputs ctx)
-      in  toName e'
-    toName (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
-      let (e',_,_) = head (bbInputs ctx)
-      in  toName e'
-    toName e' = error $ $(curLoc) ++ "Expected a string literal: " ++ show e'
+                              in  case exprToText e of
+                                     Just t -> return t
+                                     _ -> error $ $(curLoc) ++ "Expected a string literal: " ++ show e
 
 renderTag b (L n)           = let (e,_,_) = bbInputs b !! n
                               in  (displayT . renderOneLine) <$> expr False (mkLit e)
@@ -436,6 +436,18 @@ renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
 renderTag _ e = do e' <- prettyElem e
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
+exprToText
+  :: Expr
+  -> Maybe Text
+exprToText (Literal _ (StringLit l)) = Just (Text.pack l)
+exprToText (BlackBoxE "Clash.Promoted.Symbol.SSymbol" _ _ _ _ ctx _) =
+  let (e',_,_) = head (bbInputs ctx)
+  in  exprToText e'
+exprToText (BlackBoxE "GHC.CString.unpackCString#" _ _ _ _ ctx _) =
+  let (e',_,_) = head (bbInputs ctx)
+  in  exprToText e'
+exprToText _ = Nothing
+
 prettyBlackBox :: Monad m
                => BlackBoxTemplate
                -> m Text
@@ -515,6 +527,9 @@ prettyElem (IsLit i) = (displayT . renderOneLine) <$> (text "~ISLIT" <> brackets
 prettyElem (IsVar i) = (displayT . renderOneLine) <$> (text "~ISVAR" <> brackets (int i))
 prettyElem (IsGated i) = (displayT . renderOneLine) <$> (text "~ISGATED" <> brackets (int i))
 prettyElem (IsSync i) = (displayT . renderOneLine) <$> (text "~ISSYNC" <> brackets (int i))
+prettyElem (StrCmp es i) = do
+  es' <- prettyBlackBox es
+  (displayT . renderOneLine) <$> (text "~STRCMP" <> brackets (text es') <> brackets (int i))
 prettyElem (GenSym es i) = do
   es' <- prettyBlackBox es
   (displayT . renderOneLine) <$> (text "~GENSYM" <> brackets (text es') <> brackets (int i))
@@ -542,4 +557,5 @@ usedArguments = nub . concatMap go
       IF b esT esF -> go b ++ usedArguments esT ++ usedArguments esF
       SigD es _ -> usedArguments es
       BV _ es _ -> usedArguments es
+      StrCmp _ i -> [i]
       _ -> []
