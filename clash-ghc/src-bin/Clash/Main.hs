@@ -180,6 +180,7 @@ defaultMain = flip withArgs $ do
                                     [ LangExt.TemplateHaskell
                                     , LangExt.TemplateHaskellQuotes
                                     , LangExt.DataKinds
+                                    , LangExt.MonoLocalBinds
                                     , LangExt.TypeOperators
                                     , LangExt.FlexibleContexts
                                     , LangExt.ConstraintKinds
