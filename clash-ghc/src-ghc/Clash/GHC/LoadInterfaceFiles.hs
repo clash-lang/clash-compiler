@@ -226,7 +226,7 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
         -> Left (bndr, MkCore.mkRuntimeErrorApp MkCore.aBSENT_ERROR_ID
                                                 (Var.varType _id)
-                                                "no_unfolding"
+                                                ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
                 )
       _ -> Right bndr
   _ -> Right bndr
