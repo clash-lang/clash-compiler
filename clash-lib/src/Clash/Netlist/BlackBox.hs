@@ -20,6 +20,7 @@ module Clash.Netlist.BlackBox where
 import           Control.Exception             (throw)
 import           Control.Lens                  ((<<%=))
 import qualified Control.Lens                  as Lens
+import           Control.Monad.IO.Class        (liftIO)
 import           Data.Char                     (ord)
 import           Data.Either                   (lefts)
 import qualified Data.HashMap.Lazy             as HashMap
@@ -183,7 +184,10 @@ mkPrimitive bbEParen bbEasD dst nm args ty = do
   where
     go =
       \case
-        Just p@(P.BlackBox {outputReg = wr}) -> do
+        Just p@(P.BlackBox {outputReg = wr, warning = wn}) -> do
+          -- Print blackbox warning
+          maybe (pure ()) (liftIO . putStrLn . ("Warning: " ++) . unpack) wn
+
           case kind p of
             TDecl -> do
               let tempD = template p

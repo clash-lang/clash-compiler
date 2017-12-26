@@ -8,10 +8,12 @@
   Module that connects all the parts of the Clash compiler library
 -}
 
+{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE TupleSections            #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 module Clash.Driver where
 
@@ -23,6 +25,7 @@ import           Control.Monad                    (guard, when, unless, join, fo
 import           Control.Monad.State              (evalState, get)
 import           Data.Hashable                    (hash)
 import qualified Data.HashSet                     as HashSet
+import qualified Data.HashMap.Strict              as HashMap
 import           Data.IntMap                      (IntMap)
 import           Data.List                        (intercalate)
 import           Data.Maybe                       (fromMaybe)
@@ -86,6 +89,18 @@ import           Clash.Util                       (first)
 getClashModificationDate :: IO Clock.UTCTime
 getClashModificationDate = Directory.getModificationTime =<< getExecutablePath
 
+-- Suppress primitive warnings when they are disabled
+handlePrimWarnings
+  :: ClashOpts
+  -> Primitive a b c
+  -> Primitive a b c
+handlePrimWarnings opts = \case
+  blackbox@(BlackBox {})
+    | not (opt_primWarn opts) -> blackbox { warning = Nothing }
+  prim -> prim
+
+  -- No more TopEntities to process
+
 -- | Create a set of target HDL files for a set of functions
 generateHDL
   :: forall backend . Backend backend
@@ -114,10 +129,11 @@ generateHDL
   -- ^ Debug information level for the normalization process
   -> (Clock.UTCTime,Clock.UTCTime)
   -> IO ()
-generateHDL reprs bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
-  opts (startTime,prepTime) = go prepTime [] topEntities where
+generateHDL reprs bindingsMap hdlState primMap' tcm tupTcm typeTrans eval
+  topEntities opts (startTime,prepTime) = go prepTime [] topEntities where
 
-  -- No more TopEntities to process
+  primMap = HashMap.map (handlePrimWarnings opts) primMap'
+
   go prevTime _ [] = putStrLn $ "Total compilation took " ++
                               show (Clock.diffUTCTime prevTime startTime)
 
@@ -344,12 +360,12 @@ compilePrimitive pkgDbs topDir (BlackBoxHaskell bbName bbGenName source) = do
       Hint.setImports [ "Clash.Netlist.BlackBox.Types",  qualMod]
       Hint.unsafeInterpret funcName "BlackBoxFunction"
 
-compilePrimitive pkgDbs topDir (BlackBox pNm tkind oReg libM imps incs templ) = do
+compilePrimitive pkgDbs topDir (BlackBox pNm tkind warnings oReg libM imps incs templ) = do
   libM'  <- mapM parseTempl libM
   imps'  <- mapM parseTempl imps
   incs'  <- mapM (traverse parseBB) incs
   templ' <- parseBB templ
-  return (BlackBox pNm tkind oReg libM' imps' incs' templ')
+  return (BlackBox pNm tkind warnings oReg libM' imps' incs' templ')
  where
   interpreterArgs = concatMap (("-package-db":) . (:[])) pkgDbs
 

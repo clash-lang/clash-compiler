@@ -635,7 +635,7 @@ removeUnusedExpr :: NormRewrite
 removeUnusedExpr _ e@(collectArgs -> (p@(Prim nm _),args)) = do
   bbM <- HashMap.lookup nm <$> Lens.use (extra.primitives)
   case bbM of
-    Just (BlackBox pNm _ _ _ _ inc templ) -> do
+    Just (BlackBox pNm _ _ _ _ _ inc templ) -> do
       let usedArgs = if isFromInt pNm
                         then [0,1,2]
                         else usedArguments templ ++

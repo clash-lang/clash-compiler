@@ -135,6 +135,10 @@ data Primitive a b c
     -- ^ Name of the primitive
   , kind      :: TemplateKind
     -- ^ Whether this results in an expression or a declaration
+  , warning  :: Maybe S.Text
+    -- ^ A warning to be outputted when the primitive is instantiated.
+    -- This is intended to be used as a warning for primitives that are not
+    -- synthesizable, but may also be used for other purposes.
   , outputReg :: Bool
     -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
     -- (@False@); when not specified in the /.json/ file, the value will default
@@ -186,6 +190,7 @@ instance FromJSON UnresolvedPrimitive where
           "BlackBox"  ->
             BlackBox <$> conVal .: "name"
                      <*> (conVal .: "kind" >>= parseTemplateKind)
+                     <*> conVal .:? "warning"
                      <*> conVal .:? "outputReg" .!= False
                      <*> conVal .:? "libraries" .!= []
                      <*> conVal .:? "imports" .!= []

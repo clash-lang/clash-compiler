@@ -47,6 +47,7 @@ data ClashOpts = ClashOpts { opt_inlineLimit :: Int
                            , opt_dbgLevel    :: DebugLevel
                            , opt_cachehdl    :: Bool
                            , opt_cleanhdl    :: Bool
+                           , opt_primWarn    :: Bool
                            , opt_intWidth    :: Int
                            , opt_hdlDir      :: Maybe String
                            , opt_hdlSyn      :: HdlSyn
@@ -68,6 +69,7 @@ defClashOpts
   , opt_inlineConstantLimit = 0
   , opt_cachehdl            = True
   , opt_cleanhdl            = True
+  , opt_primWarn            = True
   , opt_intWidth            = WORD_SIZE_IN_BITS
   , opt_hdlDir              = Nothing
   , opt_hdlSyn              = Other
