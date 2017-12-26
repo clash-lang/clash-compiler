@@ -60,7 +60,7 @@ doHDL b src = do
   putStrLn $ "Parsing primitives took " ++ show prepStartDiff'
 
   generateHDL (buildCustomReprs reprs) bindingsMap (Just b) primMap2 tcm tupTcm (ghcTypeToHWType WORD_SIZE_IN_BITS True) reduceConstant topEntities
-    (ClashOpts 20 20 15 0 DebugNone False True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing) (startTime,prepTime)
+    (ClashOpts 20 20 15 0 DebugNone False True True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing) (startTime,prepTime)
 
 main :: IO ()
 main = genVHDL "./examples/FIR.hs"

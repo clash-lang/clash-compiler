@@ -35,7 +35,7 @@ typeTrans :: (CustomReprs -> TyConMap -> Bool -> Type -> Maybe (Either String HW
 typeTrans = ghcTypeToHWType WORD_SIZE_IN_BITS True
 
 opts :: ClashOpts
-opts = ClashOpts 20 20 15 0 DebugNone False True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing
+opts = ClashOpts 20 20 15 0 DebugNone False True True WORD_SIZE_IN_BITS Nothing HDLSYN True True ["."] Nothing
 
 backend :: VHDLState
 backend = initBackend WORD_SIZE_IN_BITS HDLSYN

@@ -55,6 +55,7 @@ end~FI
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.clockGen"
     , "kind" : "Declaration"
+    , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
 "clockGen
   :: (domain ~ Dom nm period -- ARG[0]
@@ -82,6 +83,7 @@ assign ~RESULT = ~SYM[0];
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.tbClockGen"
     , "kind" : "Declaration"
+    , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
     , "type" :
 "tbClockGen
   :: (domain ~ Dom nm period -- ARG[0]
