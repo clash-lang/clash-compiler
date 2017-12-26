@@ -142,6 +142,7 @@ end process;~FI~FI
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.clockGen"
+    , "warning" : "Clash.Signal.Internal.clockGen is not synthesizable!"
     , "type" :
 "clockGen
   :: (domain ~ Dom nm period -- ARG[0]
@@ -168,6 +169,7 @@ end process;
   }
 , { "BlackBox" :
     { "name"      : "Clash.Signal.Internal.tbClockGen"
+    , "warning" : "Clash.Signal.Internal.tbClockGen is not synthesizable!"
     , "type" :
 "tbClockGen
   :: (domain ~ Dom nm period -- ARG[0]

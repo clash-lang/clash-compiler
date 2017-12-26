@@ -8,6 +8,7 @@
   Module that connects all the parts of the Clash compiler library
 -}
 
+{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TemplateHaskell          #-}
@@ -94,7 +95,13 @@ generateHDL
 generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   opts (startTime,prepTime) = go prepTime [] topEntities where
 
-  primMap' = HM.map parsePrimitive primMap
+  -- Suppress primitive warnings when they are disabled
+  handlePrimWarnings = \case
+    blackbox@(BlackBox {})
+      | not (opt_primWarn opts) -> blackbox { warning = Nothing }
+    prim -> prim
+
+  primMap' = HM.map (parsePrimitive . handlePrimWarnings) primMap
 
   -- No more TopEntities to process
   go prevTime _ [] = putStrLn $ "Total compilation took " ++
@@ -234,13 +241,13 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
   go benchTime seen' topEntities'
 
 parsePrimitive :: Primitive Text -> Primitive BlackBoxTemplate
-parsePrimitive (BlackBox pNm oReg libM imps inc templT) =
+parsePrimitive (BlackBox pNm warnM oReg libM imps inc templT) =
   let (templ,err) = either (first Left . runParse) (first Right . runParse) templT
       inc'        = case fmap (second runParse) inc of
                       Just (x,(t,[])) -> Just (x,t)
                       _ -> Nothing
   in  case err of
-        [] -> BlackBox pNm oReg libM imps inc' templ
+        [] -> BlackBox pNm warnM oReg libM imps inc' templ
         _  -> error $ "Errors in template for: " ++ show pNm ++ ":\n" ++ show err
 parsePrimitive (Primitive pNm typ) = Primitive pNm typ
 

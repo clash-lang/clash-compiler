@@ -29,6 +29,10 @@ data Primitive a
   = BlackBox
   { name     :: !S.Text
     -- ^ Name of the primitive
+  , warning  :: Maybe S.Text
+    -- ^ A warning to be outputted when the primitive is instantiated.
+    -- This is intended to be used as a warning for primitives that are not
+    -- synthesizable, but may also be used for other purposes.
   , outputReg :: Bool
     -- ^ Verilog only: whether the result should be a /reg/(@True@) or /wire/
     -- (@False@); when not specified in the /.json/ file, the value will default
@@ -53,6 +57,7 @@ instance FromJSON (Primitive Text) where
   parseJSON (Object v) = case H.toList v of
     [(conKey,Object conVal)] -> case conKey of
       "BlackBox"  -> BlackBox <$> conVal .: "name"
+                              <*> conVal .:? "warning"
                               <*> conVal .:? "outputReg" .!= False
                               <*> conVal .:? "libraries" .!= []
                               <*> conVal .:? "imports" .!= []
