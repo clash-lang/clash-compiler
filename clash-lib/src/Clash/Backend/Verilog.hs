@@ -67,9 +67,9 @@ instance Backend VerilogState where
   initBackend     = VerilogState 0 [] noSrcSpan []
   hdlKind         = const Verilog
 #ifdef CABAL
-  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "verilog"))
+  primDirs        = const $ fmap (:[]) $ Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "verilog")
 #else
-  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "verilog")
+  primDirs _      = return ["clash-lib" System.FilePath.</> "prims" System.FilePath.</> "verilog"]
 #endif
   extractTypes    = const HashSet.empty
   name            = const "verilog"

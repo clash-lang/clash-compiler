@@ -73,9 +73,9 @@ instance Backend SystemVerilogState where
   initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan []
   hdlKind         = const SystemVerilog
 #ifdef CABAL
-  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "systemverilog"))
+  primDirs        = const $ fmap (:[]) $ Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "systemverilog")
 #else
-  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "systemverilog")
+  primDirs _      = return ["clash-lib" System.FilePath.</> "prims" System.FilePath.</> "systemverilog"]
 #endif
   extractTypes    = _tyCache
   name            = const "systemverilog"

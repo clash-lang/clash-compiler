@@ -42,7 +42,7 @@ class Backend state where
   hdlKind :: state -> HDL
 
   -- | Location for the primitive definitions
-  primDir :: state -> IO FilePath
+  primDirs :: state -> IO [FilePath]
 
   -- | Name of backend, used for directory to put output files in. Should be
   -- | constant function / ignore argument.

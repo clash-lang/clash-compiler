@@ -72,9 +72,9 @@ instance Backend VHDLState where
   initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] []
   hdlKind         = const VHDL
 #ifdef CABAL
-  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "vhdl"))
+  primDirs        = const $ fmap (:[]) $ Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "vhdl")
 #else
-  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "vhdl")
+  primDirs _      = return ["clash-lib" System.FilePath.</> "prims" System.FilePath.</> "vhdl"]
 #endif
   extractTypes    = _tyCache
   name            = const "vhdl"

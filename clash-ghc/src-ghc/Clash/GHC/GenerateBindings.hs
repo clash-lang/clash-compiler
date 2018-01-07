@@ -57,7 +57,7 @@ import           Clash.Rewrite.Util      (mkInternalVar, mkSelectorCase)
 import           Clash.Util              ((***),first)
 
 generateBindings ::
-     FilePath
+     [FilePath]  -- ^ primitives (blackbox) directory
   -> [FilePath]
   -> HDL
   -> String
@@ -68,9 +68,9 @@ generateBindings ::
           , Maybe TopEntity -- (maybe) TopEntity annotation
           , Maybe TmName)]  -- (maybe) associated testbench
         ,PrimMap Text)      -- The primitives found in '.' and 'primDir'
-generateBindings primDir importDirs hdl modName dflagsM = do
+generateBindings primDirs importDirs hdl modName dflagsM = do
   (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP) <- loadModules hdl modName dflagsM
-  primMap <- generatePrimMap (pFP ++ (primDir:importDirs))
+  primMap <- generatePrimMap $ concat [pFP, primDirs, importDirs]
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
       tcCache                       = makeAllTyCons tcMap' fiEnvs
