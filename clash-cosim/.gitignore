@@ -39,3 +39,7 @@
 
 # Apple
 *.DS_Store
+
+# IntelliJ IDE
+.idea/
+*.iml
