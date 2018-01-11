@@ -366,6 +366,15 @@ modifier offset (Indexed (ty@(Product _ argTys),_,fI)) = Just (start+offset,end+
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
+modifier offset (Indexed (ty@(Clock nm rt Gated),_,fI)) = Just (start+offset,end+offset)
+  where
+    argTys  = [Clock nm rt Source, Bool]
+    argTy   = argTys !! fI
+    argSize = typeSize argTy
+    otherSz = otherSize argTys (fI - 1)
+    start   = typeSize ty - 1 - otherSz
+    end     = start - argSize + 1
+
 modifier offset (Indexed (ty@(Vector _ argTy),1,1)) = Just (start+offset,end+offset)
   where
     argSize = typeSize argTy
@@ -466,6 +475,8 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 
 expr_ _ (DataCon (Product _ _) _ es) = listBraces (mapM (expr_ False) es)
+
+expr_ _ (DataCon (Clock _ _ Gated) _ es) = listBraces (mapM (expr_ False) es)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"

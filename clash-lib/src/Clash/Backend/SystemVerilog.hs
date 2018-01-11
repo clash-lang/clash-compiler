@@ -697,6 +697,12 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ tys),_,fI)))) = do
   id'<- fmap (displayT . renderOneLine) (text id_ <> dot <> tyName ty <> "_sel" <> int fI)
   simpleFromSLV (tys !! fI) id'
 
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock nm rt Gated),_,fI)))) = do
+  let tys = [Clock nm rt Source, Bool]
+      ty' = gatedClockType ty
+  id'<- fmap (displayT . renderOneLine) (text id_ <> dot <> tyName ty' <> "_sel" <> int fI)
+  simpleFromSLV (tys !! fI) id'
+
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
   id' <- fmap (displayT . renderOneLine) (text id_ <> brackets (int 0))
   simpleFromSLV elTy id'
@@ -778,6 +784,8 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
 expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
+expr_ _ (DataCon (Clock nm rt Gated) _ es) =
+  listBraces (zipWithM toSLV [Clock nm rt Source,Bool] es)
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"

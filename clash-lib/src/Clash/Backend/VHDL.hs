@@ -786,6 +786,10 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argT
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) =
   text id_ <> dot <> tyName ty <> "_sel" <> int fI
 
+expr_ _ (Identifier id_ (Just (Indexed (ty@(Clock _ _ Gated),_,fI)))) = do
+  ty' <- normaliseType ty
+  text id_ <> dot <> tyName ty' <> "_sel" <> int fI
+
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,1)))) = do
   syn <- hdlSyn
   case syn of
@@ -901,6 +905,10 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = "to_unsigned" <> tupled (sequence [int i,int (typeSize ty)])
 expr_ _ (DataCon ty@(Product _ _) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
+
+expr_ _ (DataCon ty@(Clock _ _ Gated) _ es) = do
+    ty' <- normaliseType ty
+    tupled $ zipWithM (\i e' -> tyName ty' <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"

@@ -47,6 +47,7 @@ import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
 import           Clash.Core.Var          (Id, Var (..), modifyVarName)
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
+import           Clash.Signal.Internal   (ClockKind (..))
 import           Clash.Util
 
 mkIdentifier :: IdType -> Identifier -> NetlistMonad Identifier
@@ -506,6 +507,15 @@ mkInput pM = case pM of
               netassgn = Assignment i' dcExpr
           return (concat ports,[netdecl,netassgn],dcExpr,i')
 
+        Clock nm rt Gated -> do
+          let hwtys = [Clock nm rt Source,Bool]
+          arguments <- zipWithM appendIdentifier (map (i',) hwtys) [0..]
+          (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
+          let netdecl  = NetDecl Nothing i' hwty
+              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
+              netassgn = Assignment i' dcExpr
+          return (concat ports,[netdecl,netassgn],dcExpr,i')
+
         _ -> return ([(i',hwty)],[],Identifier i' Nothing,i')
 
 
@@ -533,6 +543,15 @@ mkInput pM = case pM of
           return (concat ports,[netdecl,netassgn],trExpr,pN)
 
         Product _ hwtys -> do
+          arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
+          (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
+          let netdecl  = NetDecl Nothing pN hwty
+              dcExpr   = DataCon hwty (DC (hwty,0)) exprs
+              netassgn = Assignment pN dcExpr
+          return (concat ports,[netdecl,netassgn],dcExpr,pN)
+
+        Clock nm rt Gated -> do
+          let hwtys = [Clock nm rt Source, Bool]
           arguments <- zipWithM appendIdentifier (map (pN,) hwtys) [0..]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
           let netdecl  = NetDecl Nothing pN hwty
@@ -766,6 +785,7 @@ doConv hwty (Just topM) b e = case hwty of
   Vector  {} -> ConvBV topM hwty b e
   RTree   {} -> ConvBV topM hwty b e
   Product {} -> ConvBV topM hwty b e
+  Clock _ _ Gated -> ConvBV topM hwty b e
   _          -> e
 
 -- | Generate input port mappings for the TopEntity
@@ -817,6 +837,16 @@ mkTopInput topM inps pM = case pM of
                           | n <- [0..]]
           return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
 
+        Clock nm rt Gated -> do
+          let hwtys = [Clock nm rt Source,Bool]
+          arguments <- zipWithM appendIdentifier (map (i,) hwtys) [0..]
+          (inps'',arguments1) <- mapAccumLM go inps' arguments
+          let (ports,decls,ids) = unzip3 arguments1
+              assigns = zipWith (argBV topM) ids
+                          [ Identifier i' (Just (Indexed (hwty,0,n)))
+                          | n <- [0..]]
+          return (inps'',(concat ports,iDecl:assigns++concat decls,Left i'))
+
         _ -> return (rest,([(iN,i',hwty)],[iDecl],Left i'))
 
     go [] _ = error "This shouldn't happen"
@@ -858,6 +888,18 @@ mkTopInput topM inps pM = case pM of
           return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
 
         Product _ hwtys -> do
+          arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
+          (inps'',arguments1) <-
+            mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
+                       (zip (extendPorts ps) arguments)
+          let (ports,decls,ids) = unzip3 arguments1
+              assigns = zipWith (argBV topM) ids
+                          [ Identifier pN' (Just (Indexed (hwty,0,n)))
+                          | n <- [0..]]
+          return (inps'',(concat ports,pDecl:assigns ++ concat decls,Left pN'))
+
+        Clock nm rt Gated -> do
+          let hwtys = [Clock nm rt Source,Bool]
           arguments <- zipWithM appendIdentifier (map (pN',) hwtys) [0..]
           (inps'',arguments1) <-
             mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
