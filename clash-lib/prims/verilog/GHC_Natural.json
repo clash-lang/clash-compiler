@@ -1,6 +1,0 @@
-[ { "Primitive" :
-    { "name"      : "GHC.Natural.NatS#"
-    , "primType"  : "Constructor"
-    }
-  }
-]
