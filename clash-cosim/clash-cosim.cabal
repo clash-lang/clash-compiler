@@ -1,0 +1,41 @@
+Name:		    clash-cosim
+Version:	    0.1
+Cabal-Version:  >= 2.0
+License:	    BSD2
+License-File:	LICENSE
+Author:		    John Verheij
+Homepage:	    https://github.com/jgjverheij/clash-cosim/
+Category:       Hardware
+Synopsis:	    Co-simulation in Clash, see: https://essay.utwente.nl/70777/
+Build-Type:     Custom
+Data-Files:     src/cbits/cosim_vpi.vpi
+                src/cbits/cosim_vpi.sl
+
+custom-setup
+  setup-depends: base,
+                 process,
+                 Cabal
+
+source-repository head
+  type: git
+  location: https://github.com/jgjverheij/clash-cosim/
+
+Library
+  default-language: Haskell2010
+  C-sources:        src/cbits/cosim_clash.c
+  CC-Options:       -fPIC -Wall -Werror -O2
+  HS-Source-Dirs:   src
+  Build-Depends:	base,
+                    clash-prelude             >= 0.99,
+                    deepseq                   >= 1.4.0,
+                    ghc-typelits-extra        >= 0.2.1   && < 0.3,
+                    ghc-typelits-knownnat     >= 0.2.2   && < 0.4,
+                    ghc-typelits-natnormalise >= 0.4.2   && < 0.6,
+                    parsec                    >= 3.0.0,
+                    random                    >= 1.0.0,
+                    template-haskell          >= 2.0.0,
+                    text
+
+  Exposed-modules:  Clash.CoSim,
+                    Clash.CoSim.DSL
+                    Paths_clash_cosim

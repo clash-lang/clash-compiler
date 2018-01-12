@@ -38,6 +38,6 @@ char* hdlExtension(int hdl);
 int commandCompile(int simulator, char *fileName, char *topEntity, struct coSimFiles *files, int noFiles, char ****commands);
 
 /* Define the command to execute a specific simulator */
-char** commandExecute(int simulator,  char* fileName, char* topEntity);
+char** commandExecute(int simulator, char* moduleDirectory, char* fileName, char* topEntity);
 
 #endif 

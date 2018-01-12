@@ -34,8 +34,14 @@
 #define LEN     6
 
 
-struct coSimState *disposeSettings(int **settings, char **topEntity, char ***sourcePaths, struct coSimState **state, struct coSimFiles **files)
+struct coSimState *disposeSettings(int **settings, char **moduleDirectory, char **topEntity, char ***sourcePaths, struct coSimState **state, struct coSimFiles **files)
 {
+    if (*moduleDirectory != NULL)
+    {
+        free(*moduleDirectory);
+        *moduleDirectory = NULL;
+    }
+
     if (*topEntity != NULL)
     {   
         free(*topEntity);
@@ -54,7 +60,7 @@ struct coSimState *disposeSettings(int **settings, char **topEntity, char ***sou
 }
 
 /* function to start co-simulation */
-struct coSimState *simStart(int *settings, char *topEntity, char **sourcePaths)
+struct coSimState *simStart(int *settings, char *moduleDirectory, char *topEntity, char **sourcePaths)
 {
     // variables
     char*** commandC = NULL;        // command for compiling
@@ -67,26 +73,28 @@ struct coSimState *simStart(int *settings, char *topEntity, char **sourcePaths)
     // create new state
     retVal = createCoSimState();
     if (retVal == NULL)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
     retVal->reset = settings[RST];
     
     // check if source files exist
     if(sourcePaths == NULL || settings[NOFILES] <= 0) 
     {
         printf("No source or file given\n");
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
     }
     if(topEntity == NULL)
     {
         printf("No top-entity given\n");
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
     }
     
     // get all the files
     ext = hdlExtension(settings[HDL]);
     numberOfFiles = getAllFiles(&files, settings[NOFILES], sourcePaths, ext);
     if (ext != NULL) free(ext);
-    if (numberOfFiles <= 0) return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+    if (numberOfFiles <= 0) return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
     
     // set created files in struct, they will be deleted afterwards
     retVal->noFiles = 2;
@@ -96,76 +104,102 @@ struct coSimState *simStart(int *settings, char *topEntity, char **sourcePaths)
     strcpy(retVal->fileNames[1], sourcePaths[0]);
     
     // create tempory name 
-    if(tempName(&(retVal->fileNames[0])) < 0) return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+    if(tempName(&(retVal->fileNames[0])) < 0){
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
     
     // build command for compiling
     noCommands = commandCompile(settings[SIM], retVal->fileNames[0], topEntity, files, numberOfFiles, &commandC);
-    if (noCommands < 0 || commandC == NULL) return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+    if (noCommands < 0 || commandC == NULL){
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
     
     // execute commands
     for (i = 0; i<noCommands; i++)
     {   
-        if (startProcess(commandC[i], NULL, settings[STDOUT], 1) < 0)
-            return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+        if (startProcess(commandC[i], NULL, settings[STDOUT], 1) < 0){
+            return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+        }
     }
-    
+
     // build command for execution
-    commandE = commandExecute(settings[SIM], retVal->fileNames[0], topEntity);
-    if (commandE == NULL) return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+    commandE = commandExecute(settings[SIM], moduleDirectory, retVal->fileNames[0], topEntity);
+    if (commandE == NULL)
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
         
     // start simulator    
     if (startProcess(commandE, &(retVal->comm), settings[STDOUT], 0) < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
-    
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
+
     // send period
     sprintf(retVal->strR, "%d", settings[PERIOD]);
     if (writeMessage(retVal->strR,retVal->comm, 1) < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
     
     // send reset
     sprintf(retVal->strR, "%d", settings[RST]);
     if (writeMessage(retVal->strR,retVal->comm, 1) < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
-        
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
+
     // exchange input port-names
     retVal->noInput = exchangePortNames(retVal);
     if (retVal->noInput < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
-        
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
+
     if (retVal->noInput != settings[LEN])
     {
         printf("Simulator expects %d input ports, but %d given\n", retVal->noInput, settings[LEN]);
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
     }
 
     // exchange port-bits
     retVal->inputSizes = (int *) malloc(retVal->noInput * sizeof(int));
     if (exchangePortSizes(retVal, 1) < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
-            
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
+
     // malloc inputs
     retVal->input = malloc (retVal->noInput * sizeof (int*));
     for(i = 0; i<retVal->noInput; i++)
+    {
         retVal->input[i] = (int *) malloc(retVal->inputSizes[i] * sizeof(int));
+    }
         
     // exchange output port-names
     retVal->noOutput = exchangePortNames(retVal);
     if (retVal->noOutput < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
-        
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
+
     // exchange port-bits
     retVal->outputSizes = (int *) malloc(retVal->noOutput * sizeof(int));
     if (exchangePortSizes(retVal, 0) < 0)
-        return disposeSettings(&settings, &topEntity, &sourcePaths, &retVal, &files);
-        
+    {
+        return disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &retVal, &files);
+    }
+
     // malloc output
     retVal->output = malloc (retVal->noInput * sizeof (int*));
     for(i = 0; i<retVal->noOutput; i++)
+    {
         retVal->output[i] = (int *) malloc(retVal->outputSizes[i] * sizeof(int));
-    
+    }
+
     // dispose
-    disposeSettings(&settings, &topEntity, &sourcePaths, &nullState, &files);
-    
+    disposeSettings(&settings, &moduleDirectory, &topEntity, &sourcePaths, &nullState, &files);
+
     // return struct
     return retVal;
 }

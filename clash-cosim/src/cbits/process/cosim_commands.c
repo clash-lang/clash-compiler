@@ -176,7 +176,7 @@ int commandCompile(int simulator, char *fileName, char *topEntity, struct coSimF
 }
 
 /* Define the command to execute a specific simulator */
-char** commandExecute(int simulator,  char* fileName, char* topEntity)
+char** commandExecute(int simulator, char* moduleDirectory, char* fileName, char* topEntity)
 {
     // variables
     char **command;
@@ -191,7 +191,7 @@ char** commandExecute(int simulator,  char* fileName, char* topEntity)
             
             if (fileName == NULL)
             {
-                printf ("File-Name is needed for defining command.\n");
+                printf ("Filename is needed for defining command.\n");
             }
             else
             {
@@ -206,15 +206,16 @@ char** commandExecute(int simulator,  char* fileName, char* topEntity)
                 command[1] = (char*) malloc((strlen("-N")+1) * sizeof(char));
                 strcpy(command[1], "-N");
             
-                // current dir interface
-                command[2] = (char*) malloc((strlen("-M.")+1) * sizeof(char));
-                strcpy(command[2], "-M.");
-            
+                // Tell vpp where it can find cosim_vpi
+                command[2] = (char*) malloc((strlen("-M") + strlen(moduleDirectory) + 1) * sizeof(char));
+                strcpy(command[2], "-M");
+                strcpy(command[2]+strlen("-M"), moduleDirectory);
+
                 // name vpi interface
                 command[3] = (char*) malloc((strlen("-mcosim_vpi")+1) * sizeof(char));
                 strcpy(command[3], "-mcosim_vpi");
             
-                // file-name
+                // filename
                 command[4] = (char*) malloc((strlen(fileName)+1) * sizeof(char));
                 strcpy(command[4], fileName);
             
@@ -271,9 +272,11 @@ char** commandExecute(int simulator,  char* fileName, char* topEntity)
                 strcpy(command[6], "-pli");
             
                 // name vpi interface
-                command[7] = (char*) malloc((strlen("cosim_vpi.sl")+1) * sizeof(char));
-                strcpy(command[7], "cosim_vpi.sl");
-            
+                command[7] = (char*) malloc((strlen(moduleDirectory)+strlen("/")+strlen("cosim_vpi.sl")+1) * sizeof(char));
+                strcpy(command[7], moduleDirectory);
+                strcpy(command[7]+strlen(moduleDirectory), "/");
+                strcpy(command[7]+strlen(moduleDirectory)+strlen("/"), "cosim_vpi.sl");
+
                 // NULL
                 command[8] = NULL;
             }

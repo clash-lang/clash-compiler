@@ -43,3 +43,4 @@
 # IntelliJ IDE
 .idea/
 *.iml
+dist/

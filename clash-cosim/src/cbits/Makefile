@@ -1,9 +1,8 @@
 # Rules
-all:: clash
+all:: cosim_vpi.vpi libcosim_clash.so cosim_vpi.sl
 
 CC = gcc
 VPI = iverilog-vpi
-CLASH = clash --interactive
 CFLAGS = -Wall -O2
 
 cosim_vpi.sl: cosim_vpi.c
@@ -16,9 +15,6 @@ cosim_vpi.vpi: cosim_vpi.c
 libcosim_clash.so: cosim_clash.c 
 	$(CC) $(CFLAGS) -fPIC -o cosim_clash.o -c cosim_clash.c 
 	$(CC) $(CFLAGS) -shared -o libcosim_clash.so cosim_clash.o
-
-clash: cosim_vpi.vpi libcosim_clash.so CoSimCLaSH.hs CoSimTest.hs
-	$(CLASH) CoSimTest.hs CoSimCLaSH.hs -lcosim_clash -L.
 
 # remove created files
 clean:
