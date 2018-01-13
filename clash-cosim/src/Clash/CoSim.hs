@@ -31,8 +31,6 @@ module Clash.CoSim
 ---------------------------
 ---- IMPORTS --------------
 ---------------------------
-import Debug.Trace
-
 import Paths_clash_cosim
 
 -- Haskell
@@ -65,6 +63,7 @@ import System.Random (randomRs, newStdGen)
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax
+import NeatInterpolation
 
 -- Cosim
 import qualified Clash.CoSim.DSL as DSL
@@ -366,7 +365,32 @@ coSimStep state xs = do
 
         -- perform simulation step
         rv <- withForeignPtr state c_simStep
-        when (rv /= 0) $ error "Error in co-simulation step"
+
+        -- HACK: Fetch Ubuntu 18.04 version of iverilog in case of error. Although
+        -- this is not guaranteed to install the latest patched version, it is a
+        -- pretty safe bet as this package has been stable for almost two years
+        -- now. We use a Danish mirror (one.com) as the *.archive.ubuntu.com do
+        -- not support HTTPS (this is usually no problem due to APT handling auth
+        -- logic).
+        when (rv /= 0) $ error $ T.unpack [text|
+            Error in co-simulation step. This can be caused by a bug in iverilog,
+            which occurs in some builds. Use the latest version from the website,
+            or on Ubuntu <= 16.04 systems, run:
+
+                cd /tmp
+                wget -q https://mirror.one.com/ubuntu/pool/main/r/readline/libreadline7_7.0-0ubuntu2_amd64.deb
+                wget -q https://mirror.one.com/ubuntu/pool/universe/i/iverilog/iverilog_10.1-0.1build1_amd64.deb
+                sha256sum libreadline7_7.0-0ubuntu2_amd64.deb iverilog_10.1-0.1build1_amd64.deb
+                sudo dpkg -i libreadline7_7.0-0ubuntu2_amd64.deb iverilog_10.1-0.1build1_amd64.deb
+                rm libreadline7_7.0-0ubuntu2_amd64.deb iverilog_10.1-0.1build1_amd64.deb
+                cd -
+
+            Make sure the checksums correspond with:
+
+                647f958429e17496bc96f188befd8229d30b2c1719255a5e8d15b5cd7be8593b  libreadline7_7.0-0ubuntu2_amd64.deb
+                5aab60f8f7cbae29205c47684c5fce41a60e6d8e1b8fea31013747407e95bf0b  iverilog_10.1-0.1build1_amd64.deb
+
+            |]
 
         -- read output
         ys <- coSimOutput state

@@ -3,17 +3,23 @@ Version:	    0.1
 Cabal-Version:  >= 2.0
 License:	    BSD2
 License-File:	LICENSE
-Author:		    John Verheij
+Author:		    John Verheij <https://github.com/jgjverheij>
+Maintainer:     Martijn Bastiaan <martijn@qbaylogic.com>
 Homepage:	    https://github.com/jgjverheij/clash-cosim/
 Category:       Hardware
 Synopsis:	    Co-simulation in Clash, see: https://essay.utwente.nl/70777/
+Description:    clash-cosim implements Verilog cosimulation in Haskell and
+                integrates with Clash natively. Cosimulation allows a user to
+                write inline Verilog code and still produce an executable.
 Build-Type:     Custom
 Data-Files:     src/cbits/cosim_vpi.vpi
                 src/cbits/cosim_vpi.sl
 
 custom-setup
-  setup-depends: base,
+  setup-depends: base >= 4.9.0 && < 4.11,
                  process,
+                 text,
+                 neat-interpolation >= 0.3.0,
                  Cabal
 
 source-repository head
@@ -23,19 +29,23 @@ source-repository head
 Library
   default-language: Haskell2010
   C-sources:        src/cbits/cosim_clash.c
-  CC-Options:       -fPIC -Wall -Werror -O2
+  LD-Options:       --fatal-warnings
+  CC-Options:       -fPIC -Wall -Werror -Wl,--fatal-warnings
   HS-Source-Dirs:   src
-  Build-Depends:	base,
+  Build-Depends:	base                      >= 4.9.0   && < 4.11,
                     clash-prelude             >= 0.99,
                     deepseq                   >= 1.4.0,
                     ghc-typelits-extra        >= 0.2.1   && < 0.3,
                     ghc-typelits-knownnat     >= 0.2.2   && < 0.4,
                     ghc-typelits-natnormalise >= 0.4.2   && < 0.6,
+                    neat-interpolation        >= 0.3.0,
                     parsec                    >= 3.0.0,
                     random                    >= 1.0.0,
                     template-haskell          >= 2.0.0,
                     text
 
-  Exposed-modules:  Clash.CoSim,
+  Exposed-Modules:  Clash.CoSim,
                     Clash.CoSim.DSL
                     Paths_clash_cosim
+
+  Autogen-Modules:  Paths_clash_cosim
