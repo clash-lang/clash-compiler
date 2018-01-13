@@ -14,6 +14,19 @@
 /* Include */
 #include "cosim_process.h"
 
+/* Get temporary directory based on environment variables. Default to /tmp */
+const char *getTmpDir (void)
+{
+    char *tmpdir;
+
+    if ((tmpdir = getenv ("TEMP")) != NULL)   return tmpdir;
+    if ((tmpdir = getenv ("TMP")) != NULL)    return tmpdir;
+    if ((tmpdir = getenv ("TMPDIR")) != NULL) return tmpdir;
+
+    return "/tmp";
+}
+
+/* Generate temporary file. Store name in **name. */
 int tempName(char **name)
 {
     if (*name != NULL)
@@ -21,18 +34,32 @@ int tempName(char **name)
         printf("Nullpointer must be given to 'tempName'\n");
         return -1;
     }
-    
-    // #pragma clang diagnostic push
-    // #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    *name = tempnam(".","clash");
-    // #pragma clang diagnostic pop
-    
+
+    const char *tmpdir = getTmpDir();
+
+    *name = malloc((strlen(tmpdir)
+                  + strlen("/")
+                  + strlen("clash_cosim_XXXXXX")
+                  + 1) * sizeof(char));
+
     if (*name == NULL)
     {
-        printf("Unable to create tempory file-name\n");
+        printf("Could not allocate memory for *name.");
         return -1;
     }
-    
+
+    strcpy(*name, tmpdir);
+    strcpy((*name)+strlen(tmpdir), "/");
+    strcpy((*name)+strlen(tmpdir)+strlen("/"), "clash_cosim_XXXXXX");
+
+    int fd = mkstemp(*name);
+
+    if (fd == -1)
+    {
+        printf("Unable to create temporary file-name\n");
+        return -1;
+    }
+
     return 0;
 }
 
