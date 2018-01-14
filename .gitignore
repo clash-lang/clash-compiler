@@ -48,3 +48,6 @@ cabal.config
 
 # Nix output
 result*
+
+# Sphinx output
+_build/

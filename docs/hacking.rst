@@ -146,6 +146,19 @@ Convenient hacking tips
 The following are some convenient tips for when you're hacking on the compiler
 and library source code for Clash.
 
+Debugging the compiler
+~~~~~~~~~~~~~~~~~~~~~~
+
+The `clash` and `clashi` executables provide a `-fclash-debug=<level>` flag which allows dumping of the various intermediate representations used by the compiler. This can be used in conjunction with GHC's usual `-ddump-simpl` flag to see how the compiler is transforming your program. 
+
+`-fclash-debug` accepts several debug levels:
+
+ * `DebugNone` disables debug output
+ * `DebugFinal` shows the final, completely normalized expression
+ * `DebugName` shows the names of transformations as they are performed
+ * `DebugApplied` shows the result of each sub-expression rewrite
+ * `DebugAll` enables all of the above.
+
 Quick one-shot iteration
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
