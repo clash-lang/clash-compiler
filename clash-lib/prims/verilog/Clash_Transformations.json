@@ -1,7 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "Clash.Transformations.removedArg"
-    , "type"      : "removedArg :: a"
-    , "templateE" : "~ERRORO"
-    }
-  }
-]

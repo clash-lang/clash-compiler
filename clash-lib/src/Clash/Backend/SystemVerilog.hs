@@ -69,14 +69,20 @@ data SystemVerilogState =
 
 makeLenses ''SystemVerilogState
 
+primsRoot :: IO FilePath
+#ifdef CABAL
+primsRoot = Paths_clash_lib.getDataFileName "prims"
+#else
+primsRoot = return ("clash-lib" System.FilePath.</> "prims")
+#endif
+
 instance Backend SystemVerilogState where
   initBackend     = SystemVerilogState HashSet.empty [] HashMap.empty 0 "" [] [] noSrcSpan []
   hdlKind         = const SystemVerilog
-#ifdef CABAL
-  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "systemverilog"))
-#else
-  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "systemverilog")
-#endif
+  primDirs        = do root <- primsRoot
+                       return [ root System.FilePath.</> "common"
+                              , root System.FilePath.</> "systemverilog"
+                              ]
   extractTypes    = _tyCache
   name            = const "systemverilog"
   extension       = const ".sv"
