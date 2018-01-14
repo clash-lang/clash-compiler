@@ -59,6 +59,7 @@ Extra-source-files:
   CHANGELOG.md
 
 Data-files:
+  prims/common/*.json,
   prims/verilog/*.json,
   prims/systemverilog/*.json,
   prims/vhdl/*.json

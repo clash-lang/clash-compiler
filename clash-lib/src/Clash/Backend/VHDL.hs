@@ -68,14 +68,20 @@ data VHDLState =
 
 makeLenses ''VHDLState
 
+primsRoot :: IO FilePath
+#ifdef CABAL
+primsRoot = Paths_clash_lib.getDataFileName "prims"
+#else
+primsRoot = return ("clash-lib" System.FilePath.</> "prims")
+#endif
+
 instance Backend VHDLState where
   initBackend     = VHDLState HashSet.empty [] HashMap.empty "" noSrcSpan [] [] []
   hdlKind         = const VHDL
-#ifdef CABAL
-  primDir         = const (Paths_clash_lib.getDataFileName ("prims" System.FilePath.</> "vhdl"))
-#else
-  primDir _       = return ("clash-lib" System.FilePath.</> "prims" System.FilePath.</> "vhdl")
-#endif
+  primDirs        = const $ do root <- primsRoot
+                               return [ root System.FilePath.</> "common"
+                                      , root System.FilePath.</> "vhdl"
+                                      ]
   extractTypes    = _tyCache
   name            = const "vhdl"
   extension       = const ".vhdl"

@@ -1902,10 +1902,10 @@ makeHDL backend optsRef srcs = do
                   opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)
                                ,opt_importPaths = idirs}
                   backend' = backend iw syn
-              primDir <- Clash.Backend.primDir backend'
+              primDirs <- Clash.Backend.primDirs backend'
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEntities,primMap) <-
-                  generateBindings primDir idirs (Clash.Backend.hdlKind backend') src (Just dflags)
+                  generateBindings primDirs idirs (Clash.Backend.hdlKind backend') src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff

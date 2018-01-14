@@ -1,7 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "Debug.Trace.trace"
-    , "type"      : "trace :: String -> a -> a"
-    , "templateE" : "~ARG[1]"
-    }
-  }
-]

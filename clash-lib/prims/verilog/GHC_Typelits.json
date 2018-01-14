@@ -1,7 +1,0 @@
-[ { "BlackBox" :
-    { "name"      : "GHC.TypeLits.natVal"
-    , "type"      : "natVal :: forall n proxy. KnownNat n => proxy n -> Integer"
-    , "templateE" : "~ARG[0]"
-    }
-  }
-]
