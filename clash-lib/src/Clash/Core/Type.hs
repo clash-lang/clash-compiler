@@ -227,7 +227,7 @@ typeKind m (tyView -> FunTy _arg res)
   | otherwise       = liftedTypeKind
   where k = typeKind m res
 
-typeKind m (tyView -> TyConApp tc args) = foldl kindFunResult (tyConKind (m HashMap.! nameOcc tc)) args
+typeKind m (tyView -> TyConApp tc args) = foldl' kindFunResult (tyConKind (m HashMap.! nameOcc tc)) args
 
 typeKind m (AppTy fun arg)      = kindFunResult (typeKind m fun) arg
 typeKind _ (ConstTy ct)         = error $ $(curLoc) ++ "typeKind: naked ConstTy: " ++ show ct
@@ -357,7 +357,7 @@ findFunSubst tcm (tcSubst:rest) args = case funSubsts tcm tcSubst args of
 -- a substituted RHS
 funSubsts :: HashMap TyConOccName TyCon -> ([Type],Type) -> [Type] -> Maybe Type
 funSubsts tcm (tcSubstLhs,tcSubstRhs) args = do
-  tySubts <- foldl (funSubst tcm) (Just []) (zip tcSubstLhs args)
+  tySubts <- foldl' (funSubst tcm) (Just []) (zip tcSubstLhs args)
   let tyRhs = substTys tySubts tcSubstRhs
   -- Type functions can return higher-kinded types
   case drop (length tcSubstLhs) args of
@@ -400,7 +400,7 @@ funSubst tcm (Just s) = uncurry go
     go ty1@(LitTy _) ty2 = if ty1 == ty2 then Just s else Nothing
     go (tyView -> TyConApp tc argTys) (tyView -> TyConApp tc' argTys')
       | tc == tc'
-      = foldl (funSubst tcm) (Just s) (zip argTys argTys')
+      = foldl' (funSubst tcm) (Just s) (zip argTys argTys')
     go _ _ = Nothing
 
 {- [Note: lazy type families]
