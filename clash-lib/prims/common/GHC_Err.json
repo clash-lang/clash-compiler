@@ -5,6 +5,12 @@
     }
   }
 , { "BlackBox" :
+    { "name"      : "GHC.Err.errorWithoutStackTrace"
+    , "type"      : "errorWithoutStackTrace :: [Char] -> a"
+    , "templateE" : "~ERRORO"
+    }
+  }
+, { "BlackBox" :
     { "name"      : "GHC.Err.undefined"
     , "type"      : "undefined :: a"
     , "templateE" : "~ERRORO"
