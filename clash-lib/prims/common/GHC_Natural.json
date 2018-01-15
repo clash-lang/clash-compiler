@@ -3,4 +3,10 @@
     , "primType"  : "Constructor"
     }
   }
+, { "BlackBox" :
+    { "name"      : "GHC.Natural.underflowError"
+    , "type"      : "underflowError :: a"
+    , "templateE" : "~ERRORO"
+    }
+  }
 ]
