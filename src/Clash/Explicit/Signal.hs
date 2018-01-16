@@ -108,7 +108,7 @@ meta-stability:
     *   /Clock situations 1, 2, and 3/:
 
         @
-        k :: Clock domain Source -> Clock domain source -> ..
+        k :: Clock domain Source -> Clock domain Source -> ..
         k x y = ..
 
         l :: Clock domain Source -> Clock domain Gated -> ..

@@ -1393,7 +1393,7 @@ repeat = withSNat replicate
 -- >>> iterate d4 (+1) 1
 -- <1,2,3,4>
 --
--- \"'interate' @n f z@\" corresponds to the following circuit layout:
+-- \"'iterate' @n f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/iterate.svg>>
 iterate :: SNat n -> (a -> a) -> a -> Vec n a
@@ -1408,7 +1408,7 @@ iterate SNat = iterateI
 -- >>> iterateI (+1) 1 :: Vec 3 Int
 -- <1,2,3>
 --
--- \"'interateI' @f z@\" corresponds to the following circuit layout:
+-- \"'iterateI' @f z@\" corresponds to the following circuit layout:
 --
 -- <<doc/iterate.svg>>
 iterateI :: KnownNat n => (a -> a) -> a -> Vec n a

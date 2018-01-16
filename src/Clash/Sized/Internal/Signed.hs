@@ -31,10 +31,10 @@ module Clash.Sized.Internal.Signed
     -- ** Length information
   , size#
     -- * Type classes
-    -- ** BitConvert
+    -- ** BitPack
   , pack#
   , unpack#
-    -- Eq
+    -- ** Eq
   , eq#
   , neq#
     -- ** Ord

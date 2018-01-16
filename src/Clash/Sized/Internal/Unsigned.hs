@@ -29,7 +29,7 @@ module Clash.Sized.Internal.Unsigned
     -- ** Length information
   , size#
     -- * Type classes
-    -- ** BitConvert
+    -- ** BitPack
   , pack#
   , unpack#
     -- ** Eq

@@ -36,7 +36,7 @@ module Clash.Sized.Internal.Index
     -- * Construction
   , fromSNat
     -- * Type classes
-    -- ** BitConvert
+    -- ** BitPack
   , pack#
   , unpack#
     -- ** Eq
