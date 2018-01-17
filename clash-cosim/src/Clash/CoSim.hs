@@ -21,9 +21,8 @@ module Clash.CoSim
     , customVerilog
     , defaultSettings
     , mapAccumLM
-    , raw
     , verilog
-    , verilogS
+    , verilogWithSettings
     , wordPack
     , wordUnpack
     ) where
@@ -138,28 +137,51 @@ data HDL = Verilog
 notHandled ts = error (ts ++ " are not handled by the verilog quasiquoter.")
 
 verilog :: QuasiQuoter
-verilog = customVerilog defaultSettings
+verilog = customVerilog False
 
-verilogS = customVerilog
+verilogWithSettings :: QuasiQuoter
+verilogWithSettings = customVerilog True
 
-customVerilog :: CoSimSettings -> QuasiQuoter
-customVerilog settings = QuasiQuoter { quoteExp  = compileVerilog settings
-                                     , quotePat  = notHandled "patterns"
-                                     , quoteType = notHandled "types"
-                                     , quoteDec  = notHandled "declarations"
-                                     }
+customVerilog :: Bool -> QuasiQuoter
+customVerilog explicitSettings =
+    QuasiQuoter { quoteExp  = compileVerilog explicitSettings
+                , quotePat  = notHandled "patterns"
+                , quoteType = notHandled "types"
+                , quoteDec  = notHandled "declarations"
+                }
+
+compileVerilog :: Bool -> String -> Q Exp
+compileVerilog explicitSettings source = do
+  -- coSimWrapper: we generate a function with $(length userArgs) arguments
+  -- which passes those arguments to coSim. The function adheres to the
+  -- following type signature:
+  --
+  --   coSimWrapper :: a1 -> a2 -> .. -> CoSimSettings -> aa1 -> aa2 -> r
+  --
+  -- where a1, a2, .. are explicitely named arguments and aa1, aa2, .. are
+  -- anonymous arugments (thus allowing dot-free notation).
+  settingsArg   <- newName "settings"
+  namedArgs     <- sequence $ map newName varNames
+  anonymousArgs <- sequence $ map newName anonymousNames
+
+  let wrapperArgs = concat [ map varP namedArgs
+                           , [varP settingsArg]
+                           , map varP anonymousArgs ]
+
+  let runTuple       = [| (verilogModule, modName', $(varE settingsArg)) |]
+  let coSimCall      = apply [| coSim $(runTuple) |] (namedArgs ++ anonymousArgs)
+  let coSimWrapper   = lamE wrapperArgs coSimCall
+  let appliedWrapper = apply coSimWrapper (map mkName varNames)
+
+  -- Add default settings to wrapper call if user does not supply their
+  -- own settings record
+  if explicitSettings
+      then
+          appliedWrapper
+      else
+          [| $appliedWrapper $(liftData defaultSettings) |]
 
 
-raw :: QuasiQuoter
-raw = QuasiQuoter { quoteExp  = \s -> [| s |]
-                  , quotePat  = notHandled "patterns"
-                  , quoteType = notHandled "types"
-                  , quoteDec  = notHandled "declarations"
-                  }
-
-
-compileVerilog :: CoSimSettings -> String -> Q Exp
-compileVerilog settings source = apply [| coSim $(run) |] args
     where
         -- HACK: Generate random name for module. We should replace this with
         -- some intelligent procedure taking into account the context in which
@@ -175,8 +197,7 @@ compileVerilog settings source = apply [| coSim $(run) |] args
                           Right d  -> d
 
         -- Get variables from DSL, create names we can use in quasiquoters
-        varNames = DSL.vars dsl
-        args     = (map mkName varNames)
+        (varNames, anonymousNames) = DSL.vars dsl
 
         -- Convenience function to apply a list of arguments to a function
         apply = foldl (\f x -> [| $f $(varE x) |])
@@ -184,7 +205,6 @@ compileVerilog settings source = apply [| coSim $(run) |] args
         -- Create CoSimRun by recompiling to verilog source
         modName' = fromMaybe randName name
         verilogModule = DSL.toVerilog dsl modName'
-        run           = [| (verilogModule, modName', $(liftData settings)) |]
 
 
 --------------------------------------
@@ -529,25 +549,14 @@ instance {-# OVERLAPPING #-} (CoSimType t1, CoSimType r) => CoSim (t1 -> r) wher
     coSim' s streams a1 = coSimBB1 (source s) (modname s) a1 $ (coSim' s . parseInput streams) a1
     {-# INLINE coSim' #-}
 
-instance {-# OVERLAPPING #-} (CoSimType t1, CoSimType r) => CoSim (t1 -> CoSimSettings -> r) where
-    coSim' (source, name, _) streams a1 settings = coSim' (source, name, settings) streams a1
-    {-# INLINE coSim' #-}
-
 instance {-# OVERLAPPING #-} (CoSimType t1, CoSimType t2, CoSimType r) => CoSim (t1 -> t2 -> r) where
     coSim' s streams a1 a2 = coSimBB2 (source s) (modname s) a1 a2 $ (coSim' s . parseInput streams) a1 a2
-    {-# INLINE coSim' #-}
-
-instance {-# OVERLAPPING #-} (CoSimType t1, CoSimType t2, CoSimType r) => CoSim (t1 -> t2 -> CoSimSettings -> r) where
-    coSim' (source, name, _) streams a1 a2 settings = coSim' (source, name, settings) streams a1 a2
     {-# INLINE coSim' #-}
 
 instance {-# OVERLAPPING #-} (CoSimType t1, CoSimType t2, CoSimType t3, CoSimType r) => CoSim (t1 -> t2 -> t3 -> r) where
     coSim' s streams a1 a2 a3 = coSimBB3 (source s) (modname s) a1 a2 a3 $ (coSim' s . parseInput streams) a1 a2 a3
     {-# INLINE coSim' #-}
 
-instance {-# OVERLAPPING #-} (CoSimType t1, CoSimType t2, CoSimType t3, CoSimType r) => CoSim (t1 -> t2 -> t3 -> CoSimSettings -> r) where
-    coSim' (source, name, _) streams a1 a2 a3 settings = coSim' (source, name, settings) streams a1 a2 a3
-    {-# INLINE coSim' #-}
 
 -- Cosim functions with an associated blackbox
 coSimBB0 :: (CoSimType r) => String -> String -> r -> r

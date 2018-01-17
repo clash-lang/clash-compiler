@@ -9,6 +9,7 @@ import Text.Printf (printf)
 import Text.Parsec ( (<|>)
                    , alphaNum
                    , char
+                   , digit
                    , lower
                    , many
                    , many1
@@ -22,7 +23,8 @@ import Text.Parsec ( (<|>)
                    )
 
 data CoSimDSLToken = HDL String
-                   | Var String
+                   | VarName String
+                   | VarNum Int
                       deriving (Show)
 
 
@@ -38,30 +40,37 @@ hdlParser :: Parsec String st String
 hdlParser = many1 (noneOf "$")
 
 -- | Parse Haskell id: [_a-z][A-Za-z0-9_]*
-idParser :: Parsec String st String
-idParser = (:) <$> (lower <|> char '_') <*> many (alphaNum <|> char '_')
+varNameParser :: Parsec String st String
+varNameParser = (:) <$> (lower <|> char '_') <*> many (alphaNum <|> char '_')
 
--- | Parse construction "${<id>}", where <id> is parsed by idParser
-varParser :: Parsec String st String
-varParser = try (string "${") *> idParser <*  (string "}")
+-- | Parse anonymous argument id: [0-9]+
+varNumParser :: Parsec String st Int
+varNumParser = read <$> many1 digit
+
+-- | Parse construction "${<id>}" or "${<num>}"
+varParser :: Parsec String st CoSimDSLToken
+varParser = try (string "${") *> numOrName <*  (string "}")
+    where
+        numOrName = (VarName <$> varNameParser)
+                <|> (VarNum <$> varNumParser)
 
 -- | Parse a sequence of CoSimDSL tokens
 sourceParser :: Parsec String st [CoSimDSLToken]
 sourceParser = many (
-        Var <$> varParser
+        varParser
     <|> try (HDL <$> string "$")
     <|> HDL <$> hdlParser
     )
 
-withHeaderParser :: Parsec String st [CoSimDSLToken]
-withHeaderParser = (:) <$> (Var <$> header) <*> sourceParser
+withHeaderParser :: Parsec String st (String, [CoSimDSLToken])
+withHeaderParser = (,) <$> header <*> sourceParser
     where
         header = spaces
               *> string "MODULE:"
               *> spaces
               *>
 
-              idParser
+              varNameParser
 
               <* spaces
               <* string "---"
@@ -72,7 +81,7 @@ withHeaderParser = (:) <$> (Var <$> header) <*> sourceParser
 -- can't be found, just parse CoSimDSL tokens.
 dslParser :: Parsec String st CoSimDSL
 dslParser =
-  let toCoSimDSL tokens = (Just $ tokenToString $ head tokens, tail tokens) in
+  let toCoSimDSL (name, tokens) = (Just $ name, tokens) in
   try (toCoSimDSL <$> withHeaderParser) <|> ((,) Nothing) <$> sourceParser
 
 
@@ -85,16 +94,56 @@ parseDSL = parse dslParser ""
 --------------------------------------
 ---- Parse result manipulation -------
 --------------------------------------
-isVar :: CoSimDSLToken -> Bool
-isVar (Var _) = True
-isVar _       = False
+varNames :: [CoSimDSLToken] -> [String]
+varNames []                   = []
+varNames (VarName s : tokens) = nub $ s : varNames tokens
+varNames (_ : tokens)         = nub $ varNames tokens
 
-vars :: [CoSimDSLToken] -> [String]
-vars = nub . (map tokenToString) . (filter isVar)
+-- | Number of anonymous arguments used in this DSL. It will pick out the highest
+-- arugment number, even if not all arguments are used. For example, if ${0} and
+-- ${5} had been specified but not all number in between, this function would
+-- return 5+1=6 anonymous arguments.
+nVarNums :: [CoSimDSLToken] -> Int
+nVarNums []                  = 0
+nVarNums (VarNum n : tokens) = max (succ n) (nVarNums tokens)
+nVarNums (_ : tokens)        = nVarNums tokens
 
-tokenToString :: CoSimDSLToken -> String
-tokenToString (HDL x) = x
-tokenToString (Var x) = x
+vars
+    :: [CoSimDSLToken]
+    -> ( [String]
+       -- ^ Named arguments
+       , [String]
+       -- ^ Anonymous arguments
+       )
+vars tokens =
+    let varNames' = varNames tokens in
+    (varNames', anonymousNames (nVarNums tokens) varNames')
+
+-- Generate a unique name for each anonymous argument. Names will be
+-- generated according to this scheme: aa0, aa1, ... In case of conflicts
+-- with non-anonymous variable names underscores will be added in this
+-- manner: aa0, _aa0, __aa0, ..
+anonymousNames
+    :: Int
+    -- ^ Number of anonymous argument names to generate
+    -> [String]
+    -- ^ Existing argument names
+    -> [String]
+    -- ^ Unique anonymous argument names
+anonymousNames nVarNums' varNames' =
+  let aaName n m = (replicate m '_') ++ "aa" ++ show n in
+  map (head . dropWhile (`elem` varNames')) $
+  [[aaName n m | m <- [0..]] | n <- [0..nVarNums'-1]]
+
+tokensToString :: [CoSimDSLToken] -> String
+tokensToString tokens = concatMap tokenToString tokens
+    where
+        (varNames', anonymousNames') = vars tokens
+
+        tokenToString :: CoSimDSLToken -> String
+        tokenToString (HDL s)     = s
+        tokenToString (VarName s) = s
+        tokenToString (VarNum n)  = anonymousNames' !! n
 
 toVerilog
     :: [CoSimDSLToken]
@@ -104,9 +153,11 @@ toVerilog
     -> String
     -- ^ Verilog module
 toVerilog dsl mod =
-    concat [ printf "module %s (%sresult);" mod (concatMap (++", ") (vars dsl))
+    concat [ printf
+                 "module %s (%sresult);"
+                 mod (concatMap (++", ") $ uncurry (++) (vars dsl))
            , "\n"
-           , concat $ map tokenToString dsl
+           , tokensToString dsl
            , "\n"
            , "endmodule"
            , "\n"

@@ -35,18 +35,6 @@ genInstance n = do
   putStrLn line3
   putStrLn ""
 
-  -- Instance *with* CoSimSettings argument
-  let line1 = "instance {-# OVERLAPPING #-} (%sCoSimType r) => CoSim (%sCoSimSettings -> r) where"
-      line2 = "coSim' (source, name, _) streams %s settings = coSim' (source, name, settings) streams %s"
-      line3 = "    {-# INLINE coSim' #-}"
-
-  printf line1 constraints funcArgs
-  putStrLn ""
-  putStr "    "
-  printf line2 args args
-  putStrLn ""
-  putStrLn line3
-  putStrLn ""
 
 genBBFunc n = do
   let aVars       = map (('a':) . show) [1..n]
