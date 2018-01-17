@@ -286,10 +286,8 @@ coSim settings = coSim' settings []
 coSimMarshall
     :: CoSimRun
     -- ^ Simulation settings
-    -> [(Int, SignalStream)]
-    -- ^ SignalStreams and their sizes
-    -> Int
-    -- ^ Size of output stream
+    -> [SignalStream]
+    -- ^ SignalStreams
     -> IO ( Bool
           -- ^ ResetFase
           , Ptr CInt
@@ -301,9 +299,7 @@ coSimMarshall
           , Ptr CString
           -- ^ Files
           )
-coSimMarshall (source, name, CoSimSettings{..}) streams oSize = do
-        let (iSizes, _iStreams) = unzip streams
-
+coSimMarshall (source, name, CoSimSettings{..}) streams = do
         -- files
         c_f         <- (newCString source) >>= c_writeToFile
         c_fs        <- mapM newCString files
@@ -335,19 +331,17 @@ coSimMarshall (source, name, CoSimSettings{..}) streams oSize = do
 
 coSimStart
   :: CoSimRun
-  -> [(Int {- Bitsize of input stream -}, SignalStream {- Input stream -})]
+  -> [SignalStream]
   -- ^ Input streams
-  -> Int
-  -- ^ Bitsize of output stream
   -> SignalStream
   -- ^ Output stream
-coSimStart settings streams oSize  = unsafePerformIO $ do
+coSimStart settings streams = unsafePerformIO $ do
         -- clean up
         coSimCleanUp
 
         -- marshall c-types
         (resetFase, c_settingsPtr, c_moduleDir, c_topEntity, c_filePtrs) <-
-            coSimMarshall settings streams oSize
+            coSimMarshall settings streams
 
         -- start simulation
         c_coSimState' <- c_simStart c_settingsPtr c_moduleDir c_topEntity c_filePtrs
@@ -358,7 +352,7 @@ coSimStart settings streams oSize  = unsafePerformIO $ do
 
         -- perform simulation steps
         c_oLength <- withForeignPtr c_coSimState c_outputLength
-        (_, ys)   <- mapAccumLM coSimStep c_coSimState $ f resetFase (map snd streams)
+        (_, ys)   <- mapAccumLM coSimStep c_coSimState $ f resetFase streams
 
         return $ case transposeList c_oLength ys of
                      []  -> error "Simulator expects no output ports"
@@ -469,10 +463,6 @@ coSimOutput state = do
 ---- CONVERSION ----------------------
 --------------------------------------
 
-lazyBitSize :: forall a .  (BitPack a, KnownNat (BitSize a)) => a -> Int
-lazyBitSize x = succ $ fromIntegral $ (maxBound :: Index (BitSize a))
-
-
 -- | Return the number of bits in the type of the argument. The actual value of
 -- the argument is ignored. Errors for types that do not have a fixed bitsize,
 -- like Integer.
@@ -501,19 +491,19 @@ wordUnpack' x y = (shiftL x 32) .|. (4294967295 .&. (fromIntegral y))
 
 parseInput
     :: CoSimType t
-    => [(Int, SignalStream)]
+    => [SignalStream]
     -> t
-    -> [(Int, SignalStream)]
-parseInput streams x = (signalBitSize x, toSignalStream x) : streams
+    -> [SignalStream]
+parseInput streams x = toSignalStream x : streams
 
 parseOutput
     :: CoSimType t
-    => ([(Int, SignalStream)] -> Int -> SignalStream)
-    -> [(Int, SignalStream)]
+    => ([SignalStream] -> SignalStream)
+    -> [SignalStream]
     -> t
 parseOutput f streams = res
         where
-            qs  = f (reverse streams) (signalBitSize res)
+            qs  = f (reverse streams)
             res = fromSignalStream $ qs
 
 --------------------------------------
@@ -523,7 +513,7 @@ parseOutput f streams = res
 class CoSim r where
     coSim'
       :: CoSimRun
-      -> [(Int, SignalStream)]
+      -> [SignalStream]
       -> r
 
 --------------------------------------
@@ -589,8 +579,6 @@ class CoSimType t where
     -- | Return the number of bits in the type of the argument. The actual value of
     -- the argument is ignored. Errors for types that do not have a fixed bitsize,
     -- like Integer. This function will not evaluate its argument.
-    signalBitSize    :: t -> Int
-
     toSignalStream   :: t -> SignalStream
     fromSignalStream :: SignalStream -> t
 
@@ -599,6 +587,5 @@ class CoSimType t where
 --------------------------------------
 
 instance {-# OVERLAPPING #-} (ClashType a, NFData a) => CoSimType (Signal clk a) where
-    signalBitSize    = lazyBitSize . head . CP.sample
     toSignalStream   = map (wordPack . CP.pack) . CP.sample
     fromSignalStream = CP.fromList . map (CP.unpack . wordUnpack)
