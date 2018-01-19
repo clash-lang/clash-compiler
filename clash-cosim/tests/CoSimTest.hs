@@ -21,7 +21,7 @@ import qualified Data.List as L
 import Data.Int
 
 -- CoSim
-import Clash.Simulator
+import Clash.CoSim
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote

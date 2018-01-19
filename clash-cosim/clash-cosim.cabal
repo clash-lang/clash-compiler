@@ -14,12 +14,18 @@ Description:    clash-cosim implements Verilog cosimulation in Haskell and
 Build-Type:     Custom
 Data-Files:     src/cbits/cosim_vpi.vpi
                 src/cbits/cosim_vpi.sl
+                src/prims/verilog/Clash_CoSim_CoSimInstances.json
 
 custom-setup
-  setup-depends: base >= 4.9.0 && < 4.11,
+--  ghc-options:   -Wall -Werror
+  setup-depends: aeson,
+                 aeson-pretty,
+                 base >= 4.9.0 && < 4.11,
+                 directory,
                  process,
                  text,
                  neat-interpolation >= 0.3.0,
+                 template-haskell >= 2.0.0,
                  Cabal
 
 source-repository head
@@ -34,9 +40,7 @@ Library
   ghc-options:      -Wall -Werror
   CC-Options:       -fPIC -Wall -Werror -Wl,--fatal-warnings
   HS-Source-Dirs:   src
-  Build-Depends:	aeson,
-                    aeson-pretty,
-                    base                      >= 4.9.0   && < 4.11,
+  Build-Depends:    base                      >= 4.9.0   && < 4.11,
                     clash-prelude             >= 0.99,
                     deepseq                   >= 1.4.0,
                     ghc-typelits-extra        >= 0.2.1   && < 0.3,
@@ -57,6 +61,7 @@ Library
                     Paths_clash_cosim
 
   Autogen-Modules:  Paths_clash_cosim
+  cpp-options:      -DCABAL
 
 test-suite test
   default-language:

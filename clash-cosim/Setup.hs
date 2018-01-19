@@ -1,15 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
-import Control.Exception (IOException, SomeException, try)
+import Control.Exception (IOException, SomeException, try, throwIO, catch)
 import Control.Monad     (unless)
 import Data.Char         (isSpace)
 import Data.List         (isPrefixOf, isInfixOf, dropWhileEnd, intercalate)
 import Data.Maybe        (fromJust)
 import NeatInterpolation (text)
 import System.IO         (stderr, hPutStrLn)
+import System.Directory  (removeFile)
 import System.Process    (callProcess, readProcessWithExitCode)
+import System.Environment (setEnv)
 import Text.Printf       (printf)
+
+
 
 import qualified Data.Text    as Text
 import qualified Data.Text.IO as Text
@@ -30,11 +36,24 @@ import Distribution.Simple.LocalBuildInfo (LocalBuildInfo, configFlags)
 import Distribution.Simple.LocalBuildInfo
 import Distribution.PackageDescription
 
+-- Blackbox generation
+import GHC.Exts (fromList)
+import Language.Haskell.TH
+import Data.Aeson (Value (Array, String, Object))
+import Data.Aeson.Encode.Pretty (encodePretty)
+import Text.Printf (printf)
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TL
 
-main = defaultMainWithHooks
-          simpleUserHooks { postBuild = cosimBuild
-                          , postClean = cosimClean
-                          }
+
+__COSIM_MAX_NUMBER_OF_ARGUMENTS__ = 16
+__COSIM_PRIMITIVE_PATH__ = "src/prims/verilog/Clash_CoSim_CoSimInstances.json"
+
+main = do
+    setEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS" $ show __COSIM_MAX_NUMBER_OF_ARGUMENTS__
+    defaultMainWithHooks simpleUserHooks { postBuild = cosimBuild
+                                         , postClean = cosimClean
+                                         }
 
 
 supportsMinusN :: String -> Bool
@@ -134,6 +153,10 @@ cosimBuild args flags pkgDescription localBuildInfo = do
         Right _ ->
             return ()
 
+    writeFile
+        __COSIM_PRIMITIVE_PATH__
+        (blackboxJsonString __COSIM_MAX_NUMBER_OF_ARGUMENTS__)
+
 -- | Cleans binaries made by cosimPostBuild
 cosimClean
     :: Args
@@ -143,4 +166,76 @@ cosimClean
     -> IO ()
 cosimClean args flags pkgDescription stub = do
     postClean simpleUserHooks args flags pkgDescription stub
+    tryIO $ removeFile __COSIM_PRIMITIVE_PATH__
     callProcess "make" ["-C", "src/cbits", "clean", "-s"]
+
+--------------------------------------
+---- BLACKBOX GENERATION -------------
+--------------------------------------
+-- | Create a blackbox object of the following structure:
+--
+--        { 'name': name,
+--          'type': type_,
+--          'templateD': templateD }
+--
+-- TODO: preferably, this function should be in Clash.CoSim.CodeGeneration. But
+-- I can't figure out how to run a function in that module from here, so this
+-- will have to do. Alternatively, Clash could support blackbox annotation which
+-- contain json contents instead of directory names.
+blackboxObject
+    :: String
+    -- ^ name
+    -> String
+    -- ^ type
+    -> String
+    -- ^ templateD
+    -> Value
+blackboxObject bbname type_ templateD =
+  Object (fromList [("BlackBox", Object (fromList [
+      ("name", String $ Text.pack bbname)
+    , ("type", String $ Text.pack type_)
+    , ("templateD", String $ Text.pack templateD)
+    ]))])
+
+-- | Create blackbox for a given number of arguments
+blackboxJson'
+    :: Int
+    -- ^ Number of arguments of coSimN
+    -> Value
+    -- ^ Blackbox object
+blackboxJson' n = blackboxObject bbname "" templateD
+    where
+      -- Offset where 'real' arguments start, instead of constraints
+      argsOffset = 1 -- result constraint
+                 + n -- argument constraints
+
+      -- Offset where signal arguments start
+      signalOffset = argsOffset -- constraints
+                   + 3          -- source, module name, simulation settings
+
+      sourceOffset = argsOffset
+      moduleOffset = argsOffset + 1
+
+      bbname    = "Clash.CoSim.CoSimInstances.coSim" ++ show n
+      args      = concat [printf "~ARG[%d], " i | i <- [signalOffset..signalOffset+n-1]] :: String
+      template  = printf "~TEMPLATE[~LIT[%d].v][~LIT[%d]]" moduleOffset sourceOffset
+      compname  = printf "~STRLIT[%d]" moduleOffset
+      instanc_  = printf "~GENSYM[~STRLIT[%d]_inst][0] (%s~RESULT)" moduleOffset args
+      templateD = unwords [template, compname, instanc_, ";"]
+
+-- | Create blackbox for all coSim functions up to n
+blackboxJson
+    :: Int
+    -- ^ Number of blackboxes to generate
+    -> Value
+    -- ^ Array of blackbox objects
+blackboxJson n = Array $ fromList $ map blackboxJson' [1..n]
+
+-- | Create blackbox for all coSim functions up to n. This function will encode
+-- the json structure as a string, using a pretty printer.
+blackboxJsonString
+    :: Int
+    -- ^ Number of blackboxes to generate
+    -> String
+    -- ^ Encoded json file
+blackboxJsonString = TL.unpack . TL.decodeUtf8 . encodePretty . blackboxJson

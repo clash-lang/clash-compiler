@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
 module Clash.CoSim.CodeGeneration
     ( arrow
@@ -10,28 +11,16 @@ module Clash.CoSim.CodeGeneration
     , applyE
     , applyT
     , coSimGen
-    , blackboxJson
-    , blackboxJsonString
     ) where
 
+import Paths_clash_cosim
 
+import Clash.Annotations.Primitive (Primitive(..), HDL(..))
 import Clash.CoSim.Types
 import Clash.Prelude (Signal)
-import System.Environment (lookupEnv)
-
-import qualified Data.Text as Text
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
-
-
-import Control.Monad (replicateM)
-
--- Blackbox generation
-import GHC.Exts (fromList)
+import System.Environment (getEnv)
 import Language.Haskell.TH
-import Data.Aeson (Value (Array, String, Object))
-import Data.Aeson.Encode.Pretty (encodePretty)
-import Text.Printf (printf)
+import Control.Monad (replicateM)
 
 --------------------------------------
 ---- TEMPLATE HASKELL TOOLS ----------
@@ -64,8 +53,17 @@ applyT = foldl (\t x -> AppT t (VarT x))
 ---- CODE GENERATION -----------------
 --------------------------------------
 coSimGen :: Q [Dec]
+
 coSimGen = do
-    n <- (maybe 8 read) <$> runIO (lookupEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS")
+#ifdef CABAL
+    -- We're running in a CABAL environment, so we know this environment
+    -- variable is set:
+    n <- read <$> runIO (getEnv "COSIM_MAX_NUMBER_OF_ARGUMENTS")
+#else
+    let n = 16
+#endif
+
+
     concat <$> (sequence $ map coSimGen' [1..n])
 
 coSimGen' :: Int -> Q [Dec]
@@ -81,7 +79,12 @@ coSimGen' n = do
     -- NOINLINE pragma
     let inline = PragmaD $ InlineP coSimName NoInline FunLike AllPhases
 
-    return [coSimType, coSim, inline]
+    -- Clash blackbox pragma
+    primDir        <- runIO $ getDataFileName "src/prims/verilog"
+    primitiveAnn   <- [| Primitive Verilog primDir |]
+    let blackboxAnn = PragmaD $ AnnP (ValueAnnotation coSimName) primitiveAnn
+
+    return [coSimType, coSim, inline, blackboxAnn]
 
 
 -- | Generate type signature of coSim function
@@ -116,69 +119,4 @@ coSimTypeGen n = do
     return $ ForallT (map PlainTV varNames) constraints ctx
 
 
---------------------------------------
----- BLACKBOX GENERATION -------------
---------------------------------------
--- | Create a blackbox object of the following structure:
---
---        { 'name': name,
---          'type': type_,
---          'templateD': templateD }
---
-bbObject
-    :: String
-    -- ^ name
-    -> String
-    -- ^ type
-    -> String
-    -- ^ templateD
-    -> Value
-bbObject bbname type_ templateD =
-  Object (fromList [("BlackBox", Object (fromList [
-      ("name", String $ Text.pack bbname)
-    , ("type", String $ Text.pack type_)
-    , ("templateD", String $ Text.pack templateD)
-    ]))])
 
--- | Create blackbox for a given number of arguments
-blackboxJson'
-    :: Int
-    -- ^ Number of arguments of coSimN
-    -> Value
-    -- ^ Blackbox object
-blackboxJson' n = bbObject bbname "" templateD
-    where
-      -- Offset where 'real' arguments start, instead of constraints
-      argsOffset = 1 -- result constraint
-                 + n -- argument constraints
-
-      -- Offset where signal arguments start
-      signalOffset = argsOffset -- constraints
-                   + 3          -- source, module name, simulation settings
-
-      sourceOffset = argsOffset
-      moduleOffset = argsOffset + 1
-
-      bbname    = "Clash.CoSim.CoSimInstances.coSim" ++ show n
-      args      = concat [printf "~ARG[%d], " i | i <- [signalOffset..signalOffset+n-1]] :: String
-      template  = printf "~TEMPLATE[~LIT[%d].v][~LIT[%d]]" moduleOffset sourceOffset
-      compname  = printf "~STRLIT[%d]" moduleOffset
-      instanc_  = printf "~GENSYM[~STRLIT[%d]_inst][0] (%s~RESULT)" moduleOffset args
-      templateD = unwords [template, compname, instanc_, ";"]
-
--- | Create blackbox for all coSim functions up to n
-blackboxJson
-    :: Int
-    -- ^ Number of blackboxes to generate
-    -> Value
-    -- ^ Array of blackbox objects
-blackboxJson n = Array $ fromList $ map blackboxJson' [1..n]
-
--- | Create blackbox for all coSim functions up to n. This function will encode
--- the json structure as a string, using a pretty printer.
-blackboxJsonString
-    :: Int
-    -- ^ Number of blackboxes to generate
-    -> String
-    -- ^ Encoded json file
-blackboxJsonString = T.unpack . T.decodeUtf8 . encodePretty . blackboxJson
