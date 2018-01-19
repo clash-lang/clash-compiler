@@ -1,9 +1,8 @@
-module Clash.CoSim.DSL where
+module Clash.CoSim.DSLParser where
 
 import Prelude
 
-import Data.Either
-import Data.List (nub, sort, intercalate)
+import Data.List (nub)
 import Text.Printf (printf)
 
 import Text.Parsec ( (<|>)
@@ -138,7 +137,7 @@ anonymousNames nVarNums' varNames' =
 tokensToString :: [CoSimDSLToken] -> String
 tokensToString tokens = concatMap tokenToString tokens
     where
-        (varNames', anonymousNames') = vars tokens
+        (_varNames', anonymousNames') = vars tokens
 
         tokenToString :: CoSimDSLToken -> String
         tokenToString (HDL s)     = s
@@ -152,10 +151,10 @@ toVerilog
     -- ^ Module name
     -> String
     -- ^ Verilog module
-toVerilog dsl mod =
+toVerilog dsl moduleName =
     concat [ printf
                  "module %s (%sresult);"
-                 mod (concatMap (++", ") $ uncurry (++) (vars dsl))
+                 moduleName (concatMap (++", ") $ uncurry (++) (vars dsl))
            , "\n"
            , tokensToString dsl
            , "\n"

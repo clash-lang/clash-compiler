@@ -31,9 +31,12 @@ Library
   C-sources:        src/cbits/cosim_clash.c
 -- TODO: Reintroduce this option, without breaking tests:
 --  LD-Options:       --fatal-warnings
+  ghc-options:      -Wall -Werror
   CC-Options:       -fPIC -Wall -Werror -Wl,--fatal-warnings
   HS-Source-Dirs:   src
-  Build-Depends:	base                      >= 4.9.0   && < 4.11,
+  Build-Depends:	aeson,
+                    aeson-pretty,
+                    base                      >= 4.9.0   && < 4.11,
                     clash-prelude             >= 0.99,
                     deepseq                   >= 1.4.0,
                     ghc-typelits-extra        >= 0.2.1   && < 0.3,
@@ -45,8 +48,12 @@ Library
                     template-haskell          >= 2.0.0,
                     text
 
-  Exposed-Modules:  Clash.CoSim,
-                    Clash.CoSim.DSL
+  Exposed-Modules:  Clash.CoSim.CodeGeneration,
+                    Clash.CoSim.CoSimInstances,
+                    Clash.CoSim.DSLParser,
+                    Clash.CoSim.Simulator,
+                    Clash.CoSim.Types,
+                    Clash.CoSim,
                     Paths_clash_cosim
 
   Autogen-Modules:  Paths_clash_cosim

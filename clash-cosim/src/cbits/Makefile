@@ -4,7 +4,7 @@ all:: cosim_vpi.vpi libcosim_clash.so cosim_vpi.sl
 CC = gcc
 VPI = iverilog-vpi
 LFLAGS =
-CFLAGS = -Wall -O2 -Wl,$(LFLAGS)
+CFLAGS = -Wall -O2 
 
 cosim_vpi.sl: cosim_vpi.c
 	$(CC) $(CFLAGS) -o cosim_vpi.o -c -m32 -fPIC -fno-stack-protector -g cosim_vpi.c

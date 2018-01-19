@@ -21,7 +21,7 @@ import qualified Data.List as L
 import Data.Int
 
 -- CoSim
-import Clash.CoSim
+import Clash.Simulator
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote
@@ -80,6 +80,7 @@ expectedOutput =
 ------------------------------------------------------
 ------- CO-SIMUlATION --------------------------------
 ------------------------------------------------------
+{-
 
 verilog_fir
   :: t ~ Signed 64
@@ -102,6 +103,7 @@ verilog_fir x = [verilog|
     |] defaultSettings { period = 1000
                        , files = ["./verilog/coSimTest"]
                        }
+-}
 
 verilog_mult
   :: t ~ Signed 64
@@ -117,9 +119,9 @@ verilog_mult x y = [verilog|
 
   assign result = ${x} * ${y};
 
-  |] defaultSettings
+  |] --defaultSettings
 
-
+{-
 verilog_reg
   :: t ~ Signed 64
   => Signal d t
@@ -153,7 +155,7 @@ verilog_reg x = s
 
           |] defaultSettings { period = 10
                              , resetFase = True
-                             }
+                             }-}
 
 main =
     putStrLn $ show
