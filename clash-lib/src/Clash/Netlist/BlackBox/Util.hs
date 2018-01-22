@@ -39,6 +39,7 @@ import           System.FilePath                 (replaceBaseName, takeBaseName,
                                                   takeFileName, (<.>))
 import qualified Text.PrettyPrint.ANSI.Leijen    as ANSI
 import           Text.Printf
+import           Text.Read                       (readEither)
 import           Text.Trifecta.Result            hiding (Err)
 
 import           Clash.Backend                   (Backend (..), Usage (..))
@@ -108,7 +109,7 @@ setSym bbCtx l = do
               nm' <- lift (mkUniqueIdentifier Extended (concatT (C "#":nm)))
               let decls = case typeSize hwTy of
                     0 -> []
-                    _ -> [N.NetDecl Nothing nm' hwTy
+                    _ -> [N.NetDecl Nothing False nm' hwTy
                          ,N.Assignment nm' e'
                          ]
               _2 %= (IntMap.insert i (nm',decls))
@@ -502,6 +503,18 @@ renderTag b (IncludeName n) = case indexMaybe (bbQsysIncName b) n of
 renderTag b (OutputWireReg n) = case IntMap.lookup n (bbFunctions b) of
   Just (_,rw,_,_,_,_) -> case rw of {N.Wire -> return "wire"; N.Reg -> return "reg"}
   _ -> error $ $(curLoc) ++ "~OUTPUTWIREREG[" ++ show n ++ "] used where argument " ++ show n ++ " is not a function"
+renderTag b (Repeat [es] [i]) = do
+  i'  <- Text.unpack <$> renderTag b i
+  es' <- renderTag b es
+  let i'' = case (readEither i' :: Either String Int) of
+              Left msg -> error $ $(curLoc) ++ "Could not parse " ++ show i' ++ ". read reported: " ++ msg ++ "."
+              Right n  -> n
+  return $ Text.concat $ take i'' $ repeat es'
+
+renderTag b (DevNull es) = do
+  _ <- mapM (renderElem b) es
+  return $ Text.empty
+
 renderTag _ e = do e' <- getMon (prettyElem e)
                    error $ $(curLoc) ++ "Unable to evaluate: " ++ show e'
 
@@ -605,6 +618,23 @@ prettyElem (StrCmp es i) = do
 prettyElem (GenSym es i) = do
   es' <- prettyBlackBox es
   renderOneLine <$> (string "~GENSYM" <> brackets (string es') <> brackets (int i))
+prettyElem (Repeat [es] [i]) = do
+  es' <- prettyElem es
+  i'  <- prettyElem i
+  renderOneLine
+    <$> string "~REPEAT"
+    <>  brackets (string es')
+    <>  brackets (string i')
+prettyElem (Repeat es i) = error $ $(curLoc)
+                                ++ "Unexpected number of arguments in either "
+                                ++ show es
+                                ++ " or "
+                                ++ show i
+                                ++ ". Both lists are expected to have a single element."
+prettyElem (DevNull es) = do
+  es' <- mapM prettyElem es
+  renderOneLine <$> (string "~DEVNULL" <> brackets (string $ Text.concat es'))
+
 prettyElem (SigD es mI) = do
   es' <- prettyBlackBox es
   renderOneLine <$>
@@ -633,4 +663,5 @@ usedArguments = nub . concatMap go
       BV _ es _ -> usedArguments es
       StrCmp _ i -> [i]
       GenSym es _ -> usedArguments es
+      DevNull es -> usedArguments es
       _ -> []

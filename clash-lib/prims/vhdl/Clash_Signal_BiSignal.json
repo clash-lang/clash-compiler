@@ -1,0 +1,35 @@
+[ {
+    "BlackBox":{
+      "name":"Clash.Signal.BiSignal.writeToBiSignal#",
+      "type":"
+                writeToBiSignal# :: HasCallStack         -- ARG[0]
+                                 => BiSignalIn ds d a    -- ARG[1]
+                                 -> Signal (Maybe a)     -- ARG[2]
+                                 -> Signal d Bool        -- ARG[3]
+                                 -> Signal d a           -- ARG[4]
+                                 -> BiSingalOut ds d a   -- RESULT
+      ",
+      "templateD":
+"-- writeToBiSignal#
+with (~ARG[3]) select
+  ~ARG[1] <= ~ARG[4] when true,
+  \"~REPEAT[Z][~SIZE[~TYP[1]]]\" when others;
+"
+    }
+  },
+  {
+    "BlackBox":{
+      "name":"Clash.Signal.BiSignal.readFromBiSignal",
+      "type":"
+                readFromBiSignal :: HasCallStack      -- ARG[0]
+                                 => BiSignalIn ds d a -- ARG[1]
+                                 -> Signal d a        -- RESULT
+             ",
+      "templateD":
+"
+-- readFromBiSignal
+~RESULT <= ~ARG[1];
+"
+    }
+  }
+]

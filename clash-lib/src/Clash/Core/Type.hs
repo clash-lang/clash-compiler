@@ -168,6 +168,12 @@ tyView t = OtherType t
 coreView :: HashMap TyConOccName TyCon -> Type -> Maybe Type
 coreView tcMap ty = case tyView ty of
   TyConApp tcNm args
+    | name2String tcNm == "Clash.Signal.BiSignal.BiSignalIn"
+    , [_,_,_,elTy] <- args
+    -> Just elTy
+    | name2String tcNm == "Clash.Signal.BiSignal.BiSignalOut"
+    , [_,_,_,elTy] <- args
+    -> Just elTy
     | name2String tcNm == "Clash.Signal.Internal.Signal"
     , [_,elTy] <- args
     -> Just elTy

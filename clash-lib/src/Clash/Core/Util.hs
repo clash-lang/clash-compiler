@@ -423,12 +423,20 @@ mkRTree lrCon brCon resTy = go
 --   * Vec n (Signal' clk a)
 --   * data Wrap = W (Signal clk' Int)
 --   * etc.
+--
+-- This also include BiSignals, i.e.:
+--
+--   * BiSignalIn High System Int
+--   * etc.
+--
 isSignalType :: HashMap TyConOccName TyCon -> Type -> Bool
 isSignalType tcm ty = go HashSet.empty ty
   where
     go tcSeen (tyView -> TyConApp tcNm args) = case name2String tcNm of
-      "Clash.Signal.Internal.Signal"  -> True
-      _ | tcNm `HashSet.member` tcSeen -> False -- Do not follow rec types
+      "Clash.Signal.Internal.Signal"      -> True
+      "Clash.Signal.BiSignal.BiSignalIn"  -> True
+      "Clash.Signal.Internal.BiSignalOut" -> True
+      _ | tcNm `HashSet.member` tcSeen    -> False -- Do not follow rec types
         | otherwise -> case HashMap.lookup (nameOcc tcNm) tcm of
             Just tc -> let dcs         = tyConDataCons tc
                            dcInsArgTys = concat

@@ -96,11 +96,11 @@ instance Backend SystemVerilogState where
 
   genHDL          = genVerilog
   mkTyPackage     = mkTyPackage_
-  hdlType _       = verilogType
+  hdlType _       = verilogType False
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
   hdlRecSel       = verilogRecSel
-  hdlSig t ty     = sigDecl (string t) ty
+  hdlSig t ty     = sigDecl False (string t) ty
   genStmt True    = do cnt <- use genDepth
                        genDepth += 1
                        if cnt > 0
@@ -346,9 +346,9 @@ splitVecTy :: HWType -> Maybe ([Either Int Int],SystemVerilogM Doc)
 splitVecTy = fmap splitElemTy . go
   where
     splitElemTy (ns,t) = case t of
-      Product _ _ -> (ns, verilogType t)
+      Product _ _ -> (ns, verilogType False t)
       Vector _ _  -> error $ $(curLoc) ++ "impossible"
-      Clock {}    -> (ns, verilogType t)
+      Clock {}    -> (ns, verilogType False t)
       Reset {}    -> (ns, "logic")
       Bool        -> (ns, "logic")
       Bit         -> (ns, "logic")
@@ -381,12 +381,12 @@ lvType ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$> do
     _ -> case splitVecTy ty of
       Just (ns,elTy') -> elTy' <> hcat (mapM range ns)
       _ -> error $ $(curLoc) ++ "impossible"
-lvType ty | typeSize ty > 0 = Just A.<$> verilogType ty
+lvType ty | typeSize ty > 0 = Just A.<$> verilogType False ty
 lvType _ = pure Nothing
 
 funDec :: HWType -> SystemVerilogM (Maybe Doc)
 funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
-  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <> line <>
+  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl False "i" ty) <> semi <> line <>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int n <> semi <+> "n=n+1") <> line <>
       indent 2 (tName <> "_to_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
@@ -397,13 +397,13 @@ funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
       indent 2 (tName <> "_from_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
   "endfunction" <> line <>
   if n > 1 then
-    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy <> comma <> vecSigDecl "xs") <> semi <> line <>
+    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl False "x" elTy <> comma <> vecSigDecl "xs") <> semi <> line <>
     indent 2
       (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi <> line <>
        tName <> "_cons" <> brackets (int 1 <> colon <> int (n-1)) <+> "=" <+> "xs" <> semi) <> line <>
     "endfunction"
   else
-    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl "x" elTy) <> semi <> line <>
+    "function" <+> tName <+> tName <> "_cons" <> parens (sigDecl False "x" elTy) <> semi <> line <>
     indent 2
       (tName <> "_cons" <> brackets (int 0) <+> "=" <+> (toSLV elTy (Identifier "x" Nothing)) <> semi) <> line <>
     "endfunction"
@@ -431,7 +431,7 @@ funDec ty@(Vector n elTy) | typeSize ty > 0 = Just A.<$>
 
 
 funDec ty@(RTree n elTy) | typeSize elTy > 0 = Just A.<$>
-  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl "i" ty) <> semi <> line <>
+  "function" <+> "logic" <+> ranges <+> tName <> "_to_lv" <> parens (sigDecl False "i" ty) <> semi <> line <>
   indent 2
     ("for" <+> parens ("int n = 0" <> semi <+> "n <" <+> int (2^n) <> semi <+> "n=n+1") <> line <>
       indent 2 (tName <> "_to_lv" <> brackets "n" <+> "=" <+> "i[n]" <> semi)) <> line <>
@@ -488,16 +488,20 @@ module_ c =
   modBody    = indent 2 (decls (declarations c)) <> line <> line <> insts (declarations c)
   modEnding  = "endmodule"
 
-  inPorts  = sequence [ sigPort Nothing   p | p       <- inputs c  ]
-  outPorts = sequence [ sigPort (Just wr) p | (wr, p) <- outputs c ]
+  inPorts  = sequence [ sigPort (Nothing,isB)   (i,ty) | (isB,i,ty) <- inputs c  ]
+  outPorts = sequence [ sigPort (Just wr,False) p      | (wr, p)    <- outputs c ]
 
-  wr2ty Nothing     = "input"
-  wr2ty (Just Wire) = "output"
-  wr2ty (Just Reg)  = "output"
+  wr2ty (Nothing,isBidirectional)
+    | isBidirectional
+    = ("inout",isBidirectional)
+    | otherwise
+    = ("input",False)
+  wr2ty (Just _,_)
+    = ("output",False)
 
   -- map a port to its verilog type, port name, and any encoding notes
-  sigPort (wr2ty -> portTy) (nm, hwTy)
-    = portTy <+> sigDecl (string nm) hwTy <+> encodingNote hwTy
+  sigPort (wr2ty -> (portTy,isBidirectional)) (nm, hwTy)
+    = portTy <+> sigDecl isBidirectional (string nm) hwTy <+> encodingNote hwTy
   -- slightly more readable than 'tupled', makes the output Haskell-y-er
   commafy v = (comma <> space) <> pure v
 
@@ -519,9 +523,9 @@ module_ c =
 
 addSeen :: Component -> SystemVerilogM ()
 addSeen c = do
-  let iport = map fst $ inputs c
+  let iport = map (\(_,a,_) -> a) $ inputs c
       oport = map (fst.snd) $ outputs c
-      nets  = mapMaybe (\case {NetDecl' _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
+      nets  = mapMaybe (\case {NetDecl' _ _ _ i _ -> Just i; _ -> Nothing}) $ declarations c
   Mon (idSeen .= concat [iport,oport,nets])
   Mon (oports .= oport)
 
@@ -544,9 +548,11 @@ mkUniqueId i = do
         False -> do Mon (idSeen %= (i'':))
                     return i''
 
-verilogType :: HWType -> SystemVerilogM Doc
-verilogType t = do
+verilogType :: IsBidirectional -> HWType -> SystemVerilogM Doc
+verilogType isBidirectional t = do
   Mon (tyCache %= HashSet.insert t)
+  let logicOrWire | isBidirectional = "wire"
+                  | otherwise       = "logic"
   case t of
     Product _ _   -> do
       nm <- Mon $ use modNm
@@ -557,17 +563,17 @@ verilogType t = do
     RTree _ _ -> do
       nm <- Mon $ use modNm
       string (pack nm) <> "_types::" <> tyName t
-    Signed n      -> "logic signed" <+> brackets (int (n-1) <> colon <> int 0)
-    Clock _ _ Gated -> verilogType (gatedClockType t)
+    Signed n      -> logicOrWire <+> "signed" <+> brackets (int (n-1) <> colon <> int 0)
+    Clock _ _ Gated -> verilogType isBidirectional (gatedClockType t)
     Clock {}      -> "logic"
     Reset {}      -> "logic"
     Bit           -> "logic"
     Bool          -> "logic"
     String        -> "string"
-    _ -> "logic" <+> brackets (int (typeSize t -1) <> colon <> int 0)
+    _ -> logicOrWire <+> brackets (int (typeSize t -1) <> colon <> int 0)
 
-sigDecl :: SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
-sigDecl d t = verilogType t <+> d
+sigDecl :: IsBidirectional -> SystemVerilogM Doc -> HWType -> SystemVerilogM Doc
+sigDecl isBidirectional d t = verilogType isBidirectional t <+> d
 
 -- | Convert a Netlist HWType to the root of a Verilog type
 verilogTypeMark :: HWType -> SystemVerilogM Doc
@@ -647,11 +653,11 @@ decls ds = do
       _  -> punctuate' semi (A.pure dsDoc)
 
 decl :: Declaration -> SystemVerilogM (Maybe Doc)
-decl (NetDecl' noteM _ id_ tyE) =
+decl (NetDecl' noteM isBidirectional _ id_ tyE) =
   Just A.<$> maybe id addNote noteM (typ tyE)
   where
     typ (Left  ty) = string ty <+> string id_
-    typ (Right ty) = sigDecl (string id_) ty
+    typ (Right ty) = sigDecl isBidirectional (string id_) ty
     addNote n = mappend ("//" <+> string n <> line)
 
 decl _ = return Nothing
@@ -671,7 +677,7 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
     ; if syn == Vivado && id_ `elem` p
          then do
               { regId <- mkUniqueId =<< Mon (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
-              ; verilogType ty <+> string regId <> semi <> line <>
+              ; verilogType False ty <+> string regId <> semi <> line <>
                 "always_comb begin" <> line <>
                 indent 2 ("if" <> parens (expr_ True scrut) <> line <>
                             (indent 2 $ string regId <+> equals <+> expr_ False t <> semi) <> line <>
@@ -696,7 +702,7 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     ; if syn == Vivado && id_ `elem` p
          then do
            { regId <- mkUniqueId =<< Mon (extendIdentifier <*> pure Extended <*> pure id_ <*> pure "_reg")
-           ; verilogType ty <+> string regId <> semi <> line <>
+           ; verilogType False ty <+> string regId <> semi <> line <>
              "always_comb begin" <> line <>
              indent 2 ("case" <> parens (expr_ True scrut) <> line <>
                          (indent 2 $ vcat $ punctuate semi (conds regId es)) <> semi <> line <>
@@ -725,7 +731,7 @@ inst_ (InstDecl _ nm lbl pms) = fmap Just $
 inst_ (BlackBoxD _ libs imps inc bs bbCtx) =
   fmap Just (Mon (column (renderBlackBox libs imps inc bs bbCtx)))
 
-inst_ (NetDecl' _ _ _ _) = return Nothing
+inst_ (NetDecl' _ _ _ _ _) = return Nothing
 
 -- | Turn a Netlist expression into a SystemVerilog expression
 expr_ :: Bool -- ^ Enclose in parenthesis?

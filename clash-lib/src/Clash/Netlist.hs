@@ -200,13 +200,13 @@ genComponentT compName componentExpr = do
       netDecls <- fmap catMaybes . mapM mkNetDecl $ filter ((/= result) . varName . fst) binders
       decls    <- concat <$> mapM (uncurry mkDeclarations . second unembed) binders
 
-      Just (NetDecl' _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
+      Just (NetDecl' _ _ rw _ _) <- mkNetDecl . head $ filter ((==result) . varName . fst) binders
 
       let (compOutps',resUnwrappers') = case compOutps of
             [oport] -> ([(rw,oport)],resUnwrappers)
-            _       -> let NetDecl n res resTy = head resUnwrappers
+            _       -> let NetDecl n isBidir res resTy = head resUnwrappers
                        in  (map (Wire,) compOutps
-                           ,NetDecl' n rw res (Right resTy):tail resUnwrappers
+                           ,NetDecl' n isBidir rw res (Right resTy):tail resUnwrappers
                            )
           component      = Component componentName2 compInps compOutps'
                              (netDecls ++ argWrappers ++ decls ++ resUnwrappers')
@@ -220,13 +220,16 @@ genComponentT compName componentExpr = do
 
 mkNetDecl :: (Id, Embed Term) -> NetlistMonad (Maybe Declaration)
 mkNetDecl (id_,tm) = do
-  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) (unembed (varType id_))
+  let typ             = unembed (varType id_)
+      isBidirectional = containsBiSignalIn typ
+  hwTy <- unsafeCoreTypeToHWTypeM $(curLoc) typ
   wr   <- wireOrReg (unembed tm)
   if isVoid hwTy
      then return Nothing
      else return . Just $ NetDecl' (addSrcNote (nameLoc nm))
+             isBidirectional
              wr
-             (Text.pack (name2String nm))
+             (id2identifier id_)
              (Right hwTy)
 
   where
@@ -285,7 +288,7 @@ mkDeclarations' bndr app =
         throw (ClashException sp ($(curLoc) ++ "Not in normal form: Var-application with Type arguments:\n\n" ++ showDoc app) Nothing)
     _ -> do
       (exprApp,declsApp) <- mkExpr False (Right bndr) (unembed $ varType bndr) app
-      let dstId = Text.pack . name2String $ varName bndr
+      let dstId = id2identifier bndr
           assn  = case exprApp of
                     Identifier _ Nothing -> []
                     _ -> [Assignment dstId exprApp]
@@ -306,19 +309,19 @@ mkSelection bndr scrut altTy alts = do
   scrutHTy               <- unsafeCoreTypeToHWTypeM $(curLoc) scrutTy
   altHTy                 <- unsafeCoreTypeToHWTypeM $(curLoc) altTy
   scrutId <- extendIdentifier Extended
-               (Text.pack (name2String (varName bndr)))
+               (id2identifier bndr)
                (Text.pack "_selection")
   (_,sp) <- Lens.use curCompNm
   (scrutExpr,scrutDecls) <- first (mkScrutExpr sp scrutHTy (fst (head alts'))) <$> mkExpr True (Left scrutId) scrutTy scrut
   (exprs,altsDecls)      <- (second concat . unzip) <$> mapM (mkCondExpr scrutHTy) alts'
 
-  let dstId = Text.pack . name2String $ varName bndr
+  let dstId = id2identifier bndr
   return $! scrutDecls ++ altsDecls ++ [CondAssignment dstId altHTy scrutExpr scrutHTy exprs]
   where
     mkCondExpr :: HWType -> (Pat,Term) -> NetlistMonad ((Maybe HW.Literal,Expr),[Declaration])
     mkCondExpr scrutHTy (pat,alt) = do
       altId <- extendIdentifier Extended
-                 (Text.pack (name2String (varName bndr)))
+                 (id2identifier bndr)
                  (Text.pack "_sel_alt")
       (altExpr,altDecls) <- mkExpr False (Left altId) altTy alt
       (,altDecls) <$> case pat of
@@ -363,7 +366,7 @@ mkFunApp dst fun args = do
       | let (fArgTys,fResTy) = splitFunTys tcm ty
       , length fArgTys == length args
       -> do
-        let dstId = Text.pack . name2String $ varName dst
+        let dstId = id2identifier dst
         argHWTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc)) fArgTys
         -- Filter out the arguments of hwtype `Void` and only translate them
         -- to the intermediate HDL afterwards
@@ -406,7 +409,7 @@ mkFunApp dst fun args = do
               let dstId = Text.pack . name2String $ varName dst
               (argExprs,argDecls)   <- fmap (second concat . unzip) $! mapM (\(e,t) -> mkExpr False (Left dstId) t e) argsFiltered'
               (argExprs',argDecls') <- (second concat . unzip) <$> mapM (toSimpleVar dst) (zip argExprs tysFiltered)
-              let inpAssigns    = zipWith (\(i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
+              let inpAssigns    = zipWith (\(_,i,t) e -> (Identifier i Nothing,In,t,e)) compInps argExprs'
                   outpAssign    = (Identifier (fst compOutp) Nothing,Out,snd compOutp,Identifier dstId Nothing)
               instLabel <- extendIdentifier Basic compName (Text.pack "_" `Text.append` dstId)
               let instDecl      = InstDecl Nothing compName instLabel (outpAssign:inpAssigns)
@@ -414,7 +417,7 @@ mkFunApp dst fun args = do
             else error $ $(curLoc) ++ "under-applied normalized function"
         Nothing -> case args of
           [] -> do
-            let dstId = Text.pack . name2String $ varName dst
+            let dstId = id2identifier dst
             return [Assignment dstId (Identifier (Text.pack $ name2String fun) Nothing)]
           _ -> error $ $(curLoc) ++ "Unknown function: " ++ showDoc fun
 
@@ -424,12 +427,13 @@ toSimpleVar :: Id
 toSimpleVar _ (e@(Identifier _ _),_) = return (e,[])
 toSimpleVar dst (e,ty) = do
   argNm <- extendIdentifier Extended
-             (Text.pack (name2String (varName dst)))
+             (id2identifier dst)
              (Text.pack "_fun_arg")
   argNm' <- mkUniqueIdentifier Extended argNm
   hTy <- unsafeCoreTypeToHWTypeM $(curLoc) ty
-  let argDecl = NetDecl Nothing argNm' hTy
-      argAssn = Assignment argNm' e
+  let isBidirectional = containsBiSignalIn ty
+      argDecl         = NetDecl Nothing isBidirectional argNm' hTy
+      argAssn         = Assignment argNm' e
   return (Identifier argNm' Nothing,[argDecl,argAssn])
 
 -- | Generate an expression for a term occurring on the RHS of a let-binder
@@ -503,7 +507,7 @@ mkProjection mkDec bndr scrut altTy alt = do
   (selId,modM,decls) <- do
     scrutNm <- either return
                  (\b -> extendIdentifier Extended
-                          (Text.pack (name2String (varName b)))
+                          (id2identifier b)
                           (Text.pack ("_projection")))
                  bndr
     (scrutExpr,newDecls) <- mkExpr False (Left scrutNm) scrutTy scrut
@@ -511,7 +515,7 @@ mkProjection mkDec bndr scrut altTy alt = do
       Identifier newId modM -> return (newId,modM,newDecls)
       _ -> do
         scrutNm' <- mkUniqueIdentifier Extended scrutNm
-        let scrutDecl = NetDecl Nothing scrutNm' sHwTy
+        let scrutDecl = NetDecl Nothing False scrutNm' sHwTy
             scrutAssn = Assignment scrutNm' scrutExpr
         return (scrutNm',Nothing,newDecls ++ [scrutDecl,scrutAssn])
 
@@ -541,7 +545,7 @@ mkProjection mkDec bndr scrut altTy alt = do
   case bndr of
     Left scrutNm | mkDec -> do
       scrutNm' <- mkUniqueIdentifier Extended scrutNm
-      let scrutDecl = NetDecl Nothing scrutNm' vHwTy
+      let scrutDecl = NetDecl Nothing False scrutNm' vHwTy
           scrutAssn = Assignment scrutNm' extractExpr
       return (Identifier scrutNm' Nothing,scrutDecl:scrutAssn:decls)
     _ -> return (extractExpr,decls)

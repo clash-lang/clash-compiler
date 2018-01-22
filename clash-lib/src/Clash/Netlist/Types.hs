@@ -76,11 +76,14 @@ data NetlistState
 -- | Signal reference
 type Identifier = Text
 
+-- | Whether this port is an inout port
+type IsBidirectional = Bool
+
 -- | Component: base unit of a Netlist
 data Component
   = Component
   { componentName :: !Identifier -- ^ Name of the component
-  , inputs        :: [(Identifier,HWType)] -- ^ Input ports
+  , inputs        :: [(IsBidirectional,Identifier,HWType)] -- ^ Input ports
   , outputs       :: [(WireOrReg,(Identifier,HWType))] -- ^ Output ports
   , declarations  :: [Declaration] -- ^ Internal declarations
   }
@@ -144,7 +147,7 @@ data Declaration
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
   | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
   | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl' (Maybe Identifier) WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
+  | NetDecl' (Maybe Identifier) IsBidirectional WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
   deriving Show
 
 data WireOrReg = Wire | Reg
@@ -152,10 +155,10 @@ data WireOrReg = Wire | Reg
 
 instance NFData WireOrReg
 
-pattern NetDecl :: Maybe Identifier -> Identifier -> HWType -> Declaration
-pattern NetDecl note d ty <- NetDecl' note Wire d (Right ty)
+pattern NetDecl :: Maybe Identifier -> IsBidirectional -> Identifier -> HWType -> Declaration
+pattern NetDecl note isBidirectional d ty <- NetDecl' note isBidirectional Wire d (Right ty)
   where
-    NetDecl note d ty = NetDecl' note Wire d (Right ty)
+    NetDecl note isBidirectional d ty = NetDecl' note isBidirectional Wire d (Right ty)
 
 data PortDirection = In | Out
   deriving Show

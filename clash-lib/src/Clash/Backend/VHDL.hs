@@ -553,6 +553,21 @@ tyImports nm = do
      ] ++ (map (("library" <+>) . pretty) (nub libs))
        ++ (map (("use" <+>) . pretty) (nub packs)))
 
+
+-- TODO: Way too much happening on a single line
+port :: Num t
+     => Bool
+     -> T.Text
+     -> HWType
+     -> VHDLM Doc
+     -> Int
+     -> VHDLM (Doc, t)
+port isBidirectional elName hwType portDirection fillToN =
+  (,fromIntegral $ T.length elName) <$> (encodingNote hwType <> fill fillToN (pretty elName) <+> colon <+> direction <+> vhdlType hwType)
+ where
+  direction | isBidirectional = "inout"
+            | otherwise       = portDirection
+
 entity :: Component -> VHDLM Doc
 entity c = do
     rec (p,ls) <- fmap unzip (ports (maximum ls))
@@ -565,11 +580,8 @@ entity c = do
       ) <> line <>
       "end" <> semi
   where
-    ports l = sequence
-            $ [ (,fromIntegral $ T.length i) <$> (encodingNote ty <> fill l (pretty i) <+> colon <+> "in" <+> vhdlType ty)
-              | (i,ty) <- inputs c ] ++
-              [ (,fromIntegral $ T.length i) <$> (encodingNote ty <> fill l (pretty i) <+> colon <+> "out" <+> vhdlType ty)
-              | (_,(i,ty)) <- outputs c ]
+    ports l = sequence $ [port isBidirectional iName hwType "in" l | (isBidirectional, iName, hwType) <- inputs c]
+                      ++ [port False oName hwType "out" l | (_, (oName, hwType)) <- outputs c]
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -722,7 +734,7 @@ decls ds = do
       _  -> punctuate' semi (pure dsDoc)
 
 decl :: Int ->  Declaration -> VHDLM (Maybe (Doc,Int))
-decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
+decl l (NetDecl' noteM _ _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
   maybe id addNote noteM ("signal" <+> fill l (pretty id_) <+> colon <+> either pretty vhdlType ty)
   where
     addNote n = mappend ("--" <+> pretty n <> line)
