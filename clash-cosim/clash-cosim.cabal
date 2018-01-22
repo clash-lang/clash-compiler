@@ -13,9 +13,29 @@ Description:    clash-cosim implements Verilog cosimulation in Haskell and
                 write inline Verilog code and still produce an executable. For
                 user documentation, see: <https://github.com/QBayLogic/clash-cosim-qbl>.
 Build-Type:     Custom
+
+--
 Data-Files:     src/cbits/cosim_vpi.vpi
                 src/cbits/cosim_vpi.sl
                 src/prims/verilog/Clash_CoSim_CoSimInstances.json
+
+extra-tmp-files: src/prims/verilog/Clash_CoSim_CoSimInstances.json
+
+Extra-Source-Files: src/cbits/comm/*.c
+                    src/cbits/comm/*.h
+                    src/cbits/control/*.c
+                    src/cbits/control/*.h
+                    src/cbits/include/*.h
+                    src/cbits/process/*.c
+                    src/cbits/process/*.h
+                    src/cbits/traversing/*.c
+                    src/cbits/traversing/*.h
+                    src/cbits/types/*.c
+                    src/cbits/types/*.h
+                    src/cbits/*.c
+                    src/cbits/Makefile
+                    src/prims/README.md
+                    tests/*.hs
 
 custom-setup
 --  ghc-options:   -Wall -Werror

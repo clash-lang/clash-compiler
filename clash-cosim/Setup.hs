@@ -166,7 +166,6 @@ cosimClean
     -> IO ()
 cosimClean args flags pkgDescription stub = do
     postClean simpleUserHooks args flags pkgDescription stub
-    tryIO $ removeFile __COSIM_PRIMITIVE_PATH__
     callProcess "make" ["-C", "src/cbits", "clean", "-s"]
 
 --------------------------------------
