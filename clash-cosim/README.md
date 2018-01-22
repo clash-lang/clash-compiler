@@ -190,3 +190,6 @@ We solve (2), (3) and (5) by defining a quasiquoter parsing `${..}` constructs i
 * Allow Clash blackbox notation to be used (?).
 
 * Implement VHDL cosimulation
+
+* Implement zero-argument functions ("generators")
+
