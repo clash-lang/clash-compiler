@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
 {-|
 Module      : Clash.CoSim.Simulator
@@ -20,7 +21,11 @@ module Clash.CoSim.Simulator
 ---------------------------
 ---- IMPORTS --------------
 ---------------------------
+#ifdef CABAL
 import Paths_clash_cosim
+#else
+import Clash.CoSim.Paths_clash_cosim
+#endif
 
 -- Haskell
 import Data.List
