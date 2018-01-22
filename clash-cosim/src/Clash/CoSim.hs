@@ -2,6 +2,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE QuasiQuotes #-}
 
+{-|
+Module      : Clash.CoSim.CoSim
+Description : Example usage: <https://github.com/QBayLogic/clash-cosim-qbl>.
+-}
 module Clash.CoSim
     ( CoSimulator(..)
     , CoSimSettings(..)
@@ -16,6 +20,7 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Quote
 import Language.Haskell.TH.Syntax
 
+import Clash.CoSim.Types
 import Clash.CoSim.Simulator
 import Clash.CoSim.CodeGeneration
 import Clash.CoSim.CoSimInstances
@@ -91,7 +96,7 @@ compileVerilog explicitSettings source = do
         randName = "cosim_" ++ (take 10 $ randomRs ('a','z') $ unsafePerformIO newStdGen)
 
         -- Parse DSL, throw runtime error if invalid
-        (name, dsl) = case DSL.parseDSL source of
+        (name, dsl) = case DSL.parse source of
                           Left err -> error $ show err
                           Right d  -> d
 

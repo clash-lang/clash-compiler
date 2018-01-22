@@ -1,10 +1,15 @@
-module Clash.CoSim.DSLParser where
+module Clash.CoSim.DSLParser
+  ( toVerilog
+  , vars
+  , parse
+  ) where
 
 import Prelude
 
 import Data.List (nub)
 import Text.Printf (printf)
 
+import qualified Text.Parsec
 import Text.Parsec ( (<|>)
                    , alphaNum
                    , char
@@ -13,7 +18,6 @@ import Text.Parsec ( (<|>)
                    , many
                    , many1
                    , noneOf
-                   , parse
                    , Parsec
                    , ParseError
                    , spaces
@@ -21,15 +25,17 @@ import Text.Parsec ( (<|>)
                    , try
                    )
 
+
 data CoSimDSLToken = HDL String
+                   -- ^ String representing 'dumb' HDL code
                    | VarName String
+                   -- ^ Named argument
                    | VarNum Int
+                   -- ^ Anonymous argument
                       deriving (Show)
 
 
-type CoSimDSL = (Maybe String, [CoSimDSLToken])
-
-type NamelessModule = (String, String)
+type CoSimDSL = [CoSimDSLToken]
 
 --------------------------------------
 ---- Parse functions -----------------
@@ -54,14 +60,14 @@ varParser = try (string "${") *> numOrName <*  (string "}")
                 <|> (VarNum <$> varNumParser)
 
 -- | Parse a sequence of CoSimDSL tokens
-sourceParser :: Parsec String st [CoSimDSLToken]
+sourceParser :: Parsec String st CoSimDSL
 sourceParser = many (
         varParser
     <|> try (HDL <$> string "$")
     <|> HDL <$> hdlParser
     )
 
-withHeaderParser :: Parsec String st (String, [CoSimDSLToken])
+withHeaderParser :: Parsec String st (String, CoSimDSL)
 withHeaderParser = (,) <$> header <*> sourceParser
     where
         header = spaces
@@ -78,22 +84,48 @@ withHeaderParser = (,) <$> header <*> sourceParser
 
 -- | Try to parse header with module name and then CoSimDSL tokens. When header
 -- can't be found, just parse CoSimDSL tokens.
-dslParser :: Parsec String st CoSimDSL
+dslParser :: Parsec String st (Maybe String, CoSimDSL)
 dslParser =
   let toCoSimDSL (name, tokens) = (Just $ name, tokens) in
   try (toCoSimDSL <$> withHeaderParser) <|> ((,) Nothing) <$> sourceParser
 
-
-parseDSL
+-- | Parse a HDL template. Will return a ParseError on a fail, or a tuple of the
+-- detected module name and a CoSimDSL token. Parsing will detect variable names
+-- according to:
+--
+--     * ${[_a-z][A-Za-z0-9_]*} or ${[0-9]+}
+--
+-- That is, the following are valid constructs:
+--
+--     * ${0}
+--     * ${20}
+--     * ${_abc}
+--     * ${vaR}
+--     * ${test0}
+--
+-- But the following are not:
+--
+--     * ${prime'}
+--     * ${Uppercase}
+--
+-- The parser will detect a module name if it is mentioned as the first thing
+-- followed by at least three dashes on the following line. For example:
+--
+-- @
+-- MODULE: my_module_name
+-- ----------
+-- <!-- HDL code starts here -->
+-- @
+parse
     :: String
-    -> Either ParseError CoSimDSL
-parseDSL = parse dslParser ""
+    -> Either ParseError (Maybe String, CoSimDSL)
+parse = Text.Parsec.parse dslParser ""
 
 
 --------------------------------------
 ---- Parse result manipulation -------
 --------------------------------------
-varNames :: [CoSimDSLToken] -> [String]
+varNames :: CoSimDSL -> [String]
 varNames []                   = []
 varNames (VarName s : tokens) = nub $ s : varNames tokens
 varNames (_ : tokens)         = nub $ varNames tokens
@@ -102,17 +134,19 @@ varNames (_ : tokens)         = nub $ varNames tokens
 -- arugment number, even if not all arguments are used. For example, if ${0} and
 -- ${5} had been specified but not all number in between, this function would
 -- return 5+1=6 anonymous arguments.
-nVarNums :: [CoSimDSLToken] -> Int
+nVarNums :: CoSimDSL -> Int
 nVarNums []                  = 0
 nVarNums (VarNum n : tokens) = max (succ n) (nVarNums tokens)
 nVarNums (_ : tokens)        = nVarNums tokens
 
+-- | Generate a list of named arguments and anonymous arguments mentioned in a
+-- parsed HDL template.
 vars
-    :: [CoSimDSLToken]
+    :: CoSimDSL
     -> ( [String]
-       -- ^ Named arguments
+       -- Named arguments
        , [String]
-       -- ^ Anonymous arguments
+       -- Anonymous arguments
        )
 vars tokens =
     let varNames' = varNames tokens in
@@ -134,7 +168,7 @@ anonymousNames nVarNums' varNames' =
   map (head . dropWhile (`elem` varNames')) $
   [[aaName n m | m <- [0..]] | n <- [0..nVarNums'-1]]
 
-tokensToString :: [CoSimDSLToken] -> String
+tokensToString :: CoSimDSL -> String
 tokensToString tokens = concatMap tokenToString tokens
     where
         (_varNames', anonymousNames') = vars tokens
@@ -144,8 +178,11 @@ tokensToString tokens = concatMap tokenToString tokens
         tokenToString (VarName s) = s
         tokenToString (VarNum n)  = anonymousNames' !! n
 
+-- | Reassemble parsed HDL template into HDL module. Add a header including
+-- the detected variables in the HDL template. The module header will always
+-- mention the result port name last.
 toVerilog
-    :: [CoSimDSLToken]
+    :: CoSimDSL
     -- ^ DSL to convert to verilog module
     -> String
     -- ^ Module name

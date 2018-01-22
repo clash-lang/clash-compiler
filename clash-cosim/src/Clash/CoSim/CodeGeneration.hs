@@ -4,13 +4,16 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE CPP #-}
 
+{-|
+Module      : Clash.CoSim.CodeGeneration
+Description : Template Haskell utilities
+
+This module contains the logic for generating coSim/N/ functions and their
+declarations. It also houses general template haskell functions used elsewhere.
+-}
 module Clash.CoSim.CodeGeneration
-    ( arrow
-    , arrowsR
-    , arrowsL
+    ( coSimGen
     , applyE
-    , applyT
-    , coSimGen
     ) where
 
 import Paths_clash_cosim
@@ -36,24 +39,18 @@ arrowsR :: [Type] -> Type -> Type
 arrowsR [] t = t
 arrowsR ts t = arrow (head ts) (arrowsR (tail ts) t)
 
--- | Apply arrows repeatedly from left to [right]. That is, conceptually,
--- evaluating `arrowsR a [b, c]` ~ `a -> (b -> c)`.
-arrowsL :: Type -> [Type] -> Type
-arrowsL t [] = t
-arrowsL t ts = arrow t (arrowsL (head ts) (tail ts))
-
 -- | Convenience function to apply a list of arguments to a function
 applyE :: Foldable t => ExpQ -> t Name -> ExpQ
 applyE = foldl (\f x -> [| $f $(varE x) |])
 
-applyT :: Foldable t => Type -> t (Name) -> Type
-applyT = foldl (\t x -> AppT t (VarT x))
-
 --------------------------------------
 ---- CODE GENERATION -----------------
 --------------------------------------
+-- | Generate coSim/N/ functions and their annotations. Inspect the result of this
+-- function by passing @-ddump-splices@ to ghc. The number of instances generated
+-- is dependent on the environment variable COSIM_MAX_NUMBER_OF_ARGUMENTS (defaults
+-- to 16.)
 coSimGen :: Q [Dec]
-
 coSimGen = do
 #ifdef CABAL
     -- We're running in a CABAL environment, so we know this environment

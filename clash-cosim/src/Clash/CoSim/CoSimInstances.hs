@@ -3,6 +3,12 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-|
+Module      : Clash.CoSim.CoSimInstances
+Description : Monovariadic instances of coSimN
+
+Automatically generated monovariadic versions of coSimN.
+-}
 module Clash.CoSim.CoSimInstances where
 
 import NeatInterpolation

@@ -5,11 +5,15 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-|
+Module      : Clash.CoSim.Simulator
+Description : Simulator communication logic
+
+This module has been developed as a part of John Verheij's MSc project. Please
+see: <https://essay.utwente.nl/70777/>.
+-}
 module Clash.CoSim.Simulator
-    ( CoSimulator(..)
-    , CoSimSettings(..)
-    , ClashType
-    , coSimN
+    ( coSimN
     , defaultSettings
     ) where
 
@@ -65,9 +69,9 @@ foreign import ccall "writeToFile"      c_writeToFile   :: CString -> IO CString
 ---- Types ---------------------------
 --------------------------------------
 type CoSimRun = ( String
-                -- ^ Source code
+                -- Source code
                 , String
-                -- ^ Module name
+                -- Module name
                 , CoSimSettings
                 )
 
@@ -137,15 +141,15 @@ coSimMarshall
     -> [SignalStream]
     -- ^ SignalStreams
     -> IO ( Bool
-          -- ^ ResetFase
+          -- ResetFase
           , Ptr CInt
-          -- ^ Settings
+          -- Settings
           , CString
-          -- ^ Module directory
+          -- Module directory
           , CString
-          -- ^ Top entity name
+          -- Top entity name
           , Ptr CString
-          -- ^ Files
+          -- Files
           )
 coSimMarshall (source, name, CoSimSettings{..}) streams = do
         -- files
@@ -358,11 +362,15 @@ parseOutput f streams = res
 --------------------------------------
 ---- POLYVARIDIC ---------------------
 --------------------------------------
+-- | Polyvariadic simulation function.
 coSimN
     :: CoSim r
     => String
+    -- ^ HDL source
     -> String
+    -- ^ Module name to simulate
     -> CoSimSettings
+    -- ^ Simulation settings
     -> r
 coSimN source' modName' settings =
     coSim (source', modName', settings) []
