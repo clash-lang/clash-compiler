@@ -141,10 +141,14 @@ setSym bbCtx l = do
     concatT :: [Element] -> Text
     concatT = Text.concat
             . map (\case { C t -> t
+                         ; N i -> case elementToText bbCtx (N i) of
+                                         Right t ->
+                                             t
+                                         Left msg ->
+                                             error $ $(curLoc) ++  "Could not convert "
+                                                               ++ "~NAME[" ++ show i ++ "]"
+                                                               ++ " to string:" ++ msg
                          ; O _ | Identifier t _ <- fst (bbResult bbCtx)
-                               -> t
-                         ; N n | let (e,_,_) = bbInputs bbCtx !! n
-                               , Just t <- exprToText e
                                -> t
                          ; _   -> error "unexpected element in GENSYM"})
 
