@@ -186,8 +186,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,seen') <- genNetlist transformedBindings topEntities primMap'
-                                tcm typeTrans [] iw mkId extId seen
+      (netlist,dfiles,mfiles,seen') <- genNetlist transformedBindings topEntities primMap'
+                                tcm typeTrans [] [] iw mkId extId seen
                                 hdlDir prefixM (nameOcc topEntity)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -202,6 +202,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       prepareDir (opt_cleanhdl opts) (extension hdlState') dir
       mapM_ (writeHDL dir) hdlDocs
       copyDataFiles (opt_importPaths opts) dir dfiles
+      writeMemoryDataFiles dir mfiles
 
       topTime <- hdlDocs `seq` Clock.getCurrentTime
       return (topTime,manifest',seen')
@@ -221,8 +222,8 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       putStrLn $ "Testbench normalisation took " ++ show prepNormDiff
 
       -- 2. Generate netlist for topEntity
-      (netlist,dfiles,_) <- genNetlist transformedBindings topEntities primMap'
-                              tcm typeTrans [] iw mkId extId seen'
+      (netlist,dfiles,mfiles,_) <- genNetlist transformedBindings topEntities primMap'
+                              tcm typeTrans [] [] iw mkId extId seen'
                               hdlDir prefixM (nameOcc tb)
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
@@ -237,6 +238,7 @@ generateHDL bindingsMap hdlState primMap tcm tupTcm typeTrans eval topEntities
       writeHDL (hdlDir </> maybe "" t_name annM) (head hdlDocs)
       mapM_ (writeHDL dir) (tail hdlDocs)
       copyDataFiles (opt_importPaths opts) dir dfiles
+      writeMemoryDataFiles dir mfiles
 
       hdlDocs `seq` Clock.getCurrentTime
 
@@ -343,7 +345,23 @@ writeHDL dir (cname, hdl) = do
     Text.hPutStr h (clean rendered)
     Text.hPutStr h (Text.pack "\n")
 
-copyDataFiles :: [FilePath] -> FilePath -> [(String,FilePath)] -> IO ()
+-- | Copy given files
+writeMemoryDataFiles
+    :: FilePath
+    -- ^ Directory to copy  files to
+    -> [(String, String)]
+    -- ^ (filename, content)
+    -> IO ()
+writeMemoryDataFiles dir files =
+    mapM_
+      (uncurry writeFile)
+      [(dir </> fname, content) | (fname, content) <- files]
+
+copyDataFiles
+    :: [FilePath]
+    -> FilePath
+    -> [(String,FilePath)]
+    -> IO ()
 copyDataFiles idirs dir = mapM_ (copyFile' idirs)
   where
     copyFile' dirs (nm,old) = do
