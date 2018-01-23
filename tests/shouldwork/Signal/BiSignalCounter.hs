@@ -28,15 +28,15 @@ counter (write, prevread) i = ((write', prevread'), output)
 -- | Write on odd cyles
 f :: Clock System Source
   -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System Int
-  -> BiSignalOut Undefined System Int
+  -> BiSignalIn  Undefined System (BitSize Int)
+  -> BiSignalOut Undefined System (BitSize Int)
 f clk rst s = writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s))
 
 -- | Write on even cyles
 g :: Clock System Source
   -> Reset System Asynchronous
-  -> BiSignalIn  Undefined System Int
-  -> BiSignalOut Undefined System Int
+  -> BiSignalIn  Undefined System (BitSize Int)
+  -> BiSignalOut Undefined System (BitSize Int)
 g clk rst s = writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s))
 
 
@@ -60,6 +60,6 @@ main = do
 testBench :: Signal System Bool
 testBench = done
   where
-    clock          = tbSystemClock (not <$> done)
-    done           = expectedOutput (topEntity clock systemReset)
-    expectedOutput = outputVerifier clock systemReset (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)
+    clock          = tbSystemClockGen (not <$> done)
+    done           = expectedOutput (topEntity clock systemResetGen)
+    expectedOutput = outputVerifier clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)

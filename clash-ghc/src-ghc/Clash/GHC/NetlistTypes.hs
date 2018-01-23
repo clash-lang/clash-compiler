@@ -99,11 +99,13 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Signal.Internal.Signal" ->
           ExceptT $ return $ coreTypeToHWType go m keepVoid (args !! 1)
 
-        "Clash.Signal.BiSignal.BiSignalIn" ->
-          let [_, _, typ] = args in ExceptT $ return $ coreTypeToHWType go m keepVoid typ
+        "Clash.Signal.BiSignal.BiSignalIn" -> do
+          let [_, _, szTy] = args
+          (BitVector . fromInteger) <$> mapExceptT (Just .coerce) (tyNatSize m szTy)
 
-        "Clash.Signal.BiSignal.BiSignalOut" ->
-          let [_, _, typ] = args in ExceptT $ return $ coreTypeToHWType go m keepVoid typ
+        "Clash.Signal.BiSignal.BiSignalOut" -> do
+          let [_, _, szTy] = args
+          (BitVector . fromInteger) <$> mapExceptT (Just .coerce) (tyNatSize m szTy)
 
         "Clash.Signal.Internal.Clock"
           | [dom,clkKind] <- args
