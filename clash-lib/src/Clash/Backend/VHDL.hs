@@ -281,6 +281,7 @@ normaliseType (Clock _ _ Gated) =
   return (Product "GatedClock" [Bit,Bool])
 normaliseType (Clock {}) = return Bit
 normaliseType (Reset {}) = return Bit
+normaliseType (BiDirectional ty) = normaliseType ty
 normaliseType ty = return ty
 
 mkVecZ :: HWType -> HWType
@@ -1028,6 +1029,13 @@ expr_ _ (ConvBV topM _ False e) = do
   nm <- Mon $ use modNm
   maybe (pretty (T.pack nm) <> "_types" ) (\t -> pretty t <> dot <> pretty t <> "_types") topM <> dot <>
     "fromSLV" <> parens (expr_ False e)
+
+expr_ _ (DataCon (Vector _ (BiDirectional _)) (DC (Void Nothing,-1)) []) =
+    string $ T.pack $ unwords [ "This is a hack to support bidirectional signals."
+                            , "If you ever read this message in a target HDL,"
+                            , "please submit a bug report along with the code"
+                            , "causing this defect."
+                            ]
 
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 

@@ -105,7 +105,8 @@ ghcTypeToHWType iw floatSupport = go
 
         "Clash.Signal.BiSignal.BiSignalOut" -> do
           let [_, _, szTy] = args
-          (BitVector . fromInteger) <$> mapExceptT (Just .coerce) (tyNatSize m szTy)
+          (BiDirectional . BitVector . fromInteger) <$>
+            mapExceptT (Just .coerce) (tyNatSize m szTy)
 
         "Clash.Signal.Internal.Clock"
           | [dom,clkKind] <- args

@@ -931,6 +931,13 @@ expr_ b (ConvBV topM t False e) = do
         tyName t <> "_from_lv" <> parens (expr_ False e)
     _ -> expr b e
 
+expr_ _ (DataCon (Vector _ (BiDirectional _)) (DC (Void Nothing,-1)) []) =
+    string $ pack $ unwords [ "This is a hack to support bidirectional signals."
+                          , "If you ever read this message in a target HDL,"
+                          , "please submit a bug report along with the code"
+                          , "causing this defect."
+                          ]
+
 expr_ _ e = error $ $(curLoc) ++ (show e) -- empty
 
 otherSize :: [HWType] -> Int -> Int

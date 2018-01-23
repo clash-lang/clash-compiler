@@ -103,20 +103,36 @@ data HWType
   -- ^ Empty type. @Just Size@ for "empty" Vectors so we can still have
   -- primitives that can traverse e.g. Vectors of unit and know the lenght of
   -- that vector.
-  | String -- ^ String type
-  | Bool -- ^ Boolean type
-  | Bit -- ^ Bit type
-  | BitVector !Size -- ^ BitVector of a specified size
-  | Index    !Integer -- ^ Unsigned integer with specified (exclusive) upper bounder
-  | Signed   !Size -- ^ Signed integer of a specified size
-  | Unsigned !Size -- ^ Unsigned integer of a specified size
-  | Vector   !Size       !HWType -- ^ Vector type
-  | RTree    !Size       !HWType -- ^ RTree type
-  | Sum      !Identifier [Identifier] -- ^ Sum type: Name and Constructor names
-  | Product  !Identifier [HWType] -- ^ Product type: Name and field types
-  | SP       !Identifier [(Identifier,[HWType])] -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock    !Identifier !Integer !ClockKind -- ^ Clock type with specified name and period
-  | Reset    !Identifier !Integer !ResetKind -- ^ Reset type corresponding to clock with a specified name and period
+  | String
+  -- ^ String type
+  | Bool
+  -- ^ Boolean type
+  | Bit
+  -- ^ Bit type
+  | BitVector     !Size
+  -- ^ BitVector of a specified size
+  | Index         !Integer
+  -- ^ Unsigned integer with specified (exclusive) upper bounder
+  | Signed        !Size
+  -- ^ Signed integer of a specified size
+  | Unsigned      !Size
+  -- ^ Unsigned integer of a specified size
+  | Vector        !Size       !HWType
+  -- ^ Vector type
+  | RTree         !Size       !HWType
+  -- ^ RTree type
+  | Sum           !Identifier [Identifier]
+  -- ^ Sum type: Name and Constructor names
+  | Product       !Identifier [HWType]
+  -- ^ Product type: Name and field types
+  | SP            !Identifier [(Identifier,[HWType])]
+  -- ^ Sum-of-Product type: Name and Constructor names + field types
+  | Clock         !Identifier !Integer !ClockKind
+  -- ^ Clock type with specified name and period
+  | Reset         !Identifier !Integer !ResetKind
+  -- ^ Reset type corresponding to clock with a specified name and period
+  | BiDirectional !HWType
+  -- ^ Tagging type indicating a bidirectional (inout) port
   deriving (Eq,Ord,Show,Generic)
 
 instance Hashable ClockKind
@@ -145,9 +161,12 @@ data Declaration
   -- * Type of the scrutinee
   --
   -- * List of: (Maybe expression scrutinized expression is compared with,RHS of alternative)
-  | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)] -- ^ Instantiation of another component
-  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext -- ^ Instantiation of blackbox declaration
-  | NetDecl' (Maybe Identifier) IsBidirectional WireOrReg !Identifier (Either Identifier HWType) -- ^ Signal declaration
+  | InstDecl (Maybe Identifier) !Identifier !Identifier [(Expr,PortDirection,HWType,Expr)]
+  -- ^ Instantiation of another component
+  | BlackBoxD !S.Text [BlackBoxTemplate] [BlackBoxTemplate] [((S.Text,S.Text),BlackBoxTemplate)] !BlackBoxTemplate BlackBoxContext
+  -- ^ Instantiation of blackbox declaration
+  | NetDecl' (Maybe Identifier) IsBidirectional WireOrReg !Identifier (Either Identifier HWType)
+  -- ^ Signal declaration
   deriving Show
 
 data WireOrReg = Wire | Reg
