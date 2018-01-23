@@ -24,7 +24,7 @@ import           Control.Monad.Trans.Except (runExcept)
 import           Data.Either             (partitionEithers)
 import           Data.HashMap.Strict     (HashMap)
 import qualified Data.HashMap.Strict     as HashMap
-import           Data.List               (intersperse, unzip4)
+import           Data.List               (intersperse, unzip4,isPrefixOf)
 import           Data.Maybe              (catMaybes,fromMaybe)
 import           Data.Text.Lazy          (append,pack,unpack)
 import qualified Data.Text.Lazy          as Text
@@ -307,21 +307,62 @@ termHWTypeM e = do
   ty <- termType m e
   coreTypeToHWTypeM ty
 
+-- | Is this type a Clash.Signal.BiSignal.BiSignalIn?
 isBiSignalIn :: Type -> Bool
-isBiSignalIn (tyView -> TyConApp tc _) = name2String tc == "Clash.Signal.BiSignal.BiSignalIn"
-isBiSignalIn _                         = False
+isBiSignalIn (tyView -> TyConApp tc _)
+  = name2String tc == "Clash.Signal.BiSignal.BiSignalIn"
+isBiSignalIn _ = False
 
+-- | Is this type a Clash.Signal.BiSignal.BiSignalIn? Alternatively, is any
+-- of its subtypes?
 containsBiSignalIn :: Type -> Bool
-containsBiSignalIn typ@(tyView -> TyConApp _constr subTypes) = isBiSignalIn typ || any containsBiSignalIn subTypes
-containsBiSignalIn _                                         = False
+containsBiSignalIn typ@(tyView -> TyConApp _constr subTypes)
+  = isBiSignalIn typ || any containsBiSignalIn subTypes
+containsBiSignalIn _ = False
 
+-- | Check if a type is a GHC tuple
+isTuple :: Type -> Bool
+isTuple (tyView -> TyConApp constr _subTypes) =
+  "GHC.Tuple" `isPrefixOf` name2String constr
+isTuple _type = False
+
+-- | Check if a type is either a BiSignalOut or a tuple having one or more
+-- BiSignalOut members. This function will return 'True' if any of these
+-- assumptions is violated. We use this check to prevent user from using
+-- BiSignalOut is such a way that it is very difficult to eliminate them
+-- from the final HDL design.
+isIllegalRes :: Type -> Bool
+isIllegalRes typ@(tyView -> TyConApp _constr subTypes) =
+  if isTuple typ
+    then
+      any (\e -> not (isBiSignalOut e) && containsBiSignalOut e) subTypes
+    else
+      not (isBiSignalOut typ) && any containsBiSignalOut subTypes
+isIllegalRes _ = False
+
+-- | A type is considered 'empty' if it is a BiSignalOut, or a tuple
+-- of solely BiSignalOuts.
+isEmptyType :: Type -> Bool
+isEmptyType typ@(tyView -> TyConApp _constr subTypes) =
+  if isTuple typ
+    then
+      all isBiSignalOut subTypes
+    else
+      isBiSignalOut typ
+isEmptyType _ = False
+
+-- | Is this type a Clash.Signal.BiSignal.BiSignalOut?
 isBiSignalOut :: Type -> Bool
-isBiSignalOut (tyView -> TyConApp tc _) = name2String tc == "Clash.Signal.BiSignal.BiSignalOut"
-isBiSignalOut _                         = False
+isBiSignalOut (tyView -> TyConApp constr _args)
+  = name2String constr == "Clash.Signal.BiSignal.BiSignalOut"
+isBiSignalOut _ = False
 
+-- | Is this type a Clash.Signal.BiSignal.BiSignalOut? Alternatively, is any
+-- of its subtypes?
 containsBiSignalOut :: Type -> Bool
-containsBiSignalOut typ@(tyView -> TyConApp _constr subTypes) = isBiSignalOut typ || any containsBiSignalOut subTypes
-containsBiSignalOut _                                         = False
+containsBiSignalOut typ@(tyView -> TyConApp _constr args)
+  = isBiSignalOut typ || any containsBiSignalOut args
+containsBiSignalOut _ = False
 
 containsBiSignal :: Type -> Bool
 containsBiSignal typ = containsBiSignalIn typ || containsBiSignalOut typ
@@ -427,11 +468,24 @@ mkUniqueResult
   -> Id
   -> NetlistMonad (Maybe ([(Identifier,HWType)],[Declaration],Id,(TmOccName,Term)))
 mkUniqueResult Nothing res = do
-  ([res'],[subst]) <- mkUnique [] [res]
-  portM <- idToOutPort res'
-  case portM of
-    Just port -> return (Just ([port],[],res',subst))
-    _         -> return Nothing
+  (_, srcspan) <- Lens.use curCompNm
+
+  let ty   = id2type res
+  let err  = "BiSignalIn cannot be a function's result. Use 'readFromBiSignal'."
+  let err2 = "BiSignalOut cannot be part of a composite type other than tuple."
+
+  if containsBiSignalIn ty
+    then throw (ClashException srcspan ($(curLoc) ++ err) Nothing)
+    else if isIllegalRes ty
+      then throw (ClashException srcspan ($(curLoc) ++ err2) Nothing)
+      else if isEmptyType (id2type res)
+        then return Nothing
+        else do
+            ([res'],[subst]) <- mkUnique [] [res]
+            portM <- idToOutPort res'
+            case portM of
+              Just port -> return (Just ([port],[],res',subst))
+              _         -> return Nothing
 
 mkUniqueResult (Just teM) res = do
   tcm       <- Lens.use tcCache
@@ -442,17 +496,23 @@ mkUniqueResult (Just teM) res = do
       ty   = unembed (varType res)
       hwty = unsafeCoreTypeToHWType sp $(curLoc) typeTrans tcm True ty
       oPortSupply = fmap t_output teM
-  if not (isVoid hwty || isBiSignalOut ty)
-     then do
-        outputM <- mkOutput oPortSupply (o',hwty)
-        case outputM of
-          Just (ports,decls,pN) -> do
-            let pO = repName (unpack pN) o
-            return $ if containsBiSignalIn ty
-                        then throw (ClashException sp ($(curLoc) ++ "BiSignalIn cannot be a function's result. Use 'readFromBiSignal'.") Nothing)
-                        else Just (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
-          Nothing -> return Nothing
-     else return Nothing
+
+  let err  = "BiSignalIn cannot be a function's result. Use 'readFromBiSignal'."
+  let err2 = "BiSignalOut cannot be part of a composite type other than tuple."
+
+  if containsBiSignalIn ty
+    then throw (ClashException sp ($(curLoc) ++ err) Nothing)
+    else if isIllegalRes ty
+      then throw (ClashException sp ($(curLoc) ++ err2) Nothing)
+      else if isEmptyType ty || isVoid hwty
+        then return Nothing
+        else do
+          output <- mkOutput oPortSupply (o', hwty)
+          return $ case output of
+            Nothing -> Nothing
+            Just (ports, decls, pN) ->
+              let pO = repName (unpack pN) o in
+              Just (ports,decls,Id pO (embed ty),(nameOcc o,Var ty pO))
 
 -- | Same as idToPort, but:
 --    * Additionally indicates if the port is bidirectional
@@ -462,9 +522,11 @@ idToInPort var = do
   let ty = unembed (varType var)
   (_, srcspan) <- Lens.use curCompNm
   portM <- idToPort var
-  return $ if containsBiSignalOut ty
-              then throw (ClashException srcspan ($(curLoc) ++ "You cannot use BiSignalOut in function arguments.") Nothing)
-              else fmap (\(a,b) -> (containsBiSignalIn ty,a,b)) portM
+  return $ if not $ containsBiSignalOut ty
+              then fmap (\(a,b) -> (containsBiSignalIn ty,a,b)) portM
+              else
+                let err = "You cannot use BiSignalOut in function arguments." in
+                throw (ClashException srcspan ($(curLoc) ++ err) Nothing)
 
 -- | Same as idToPort, but:
 --    * Throws an error if port is of type BiSignalIn

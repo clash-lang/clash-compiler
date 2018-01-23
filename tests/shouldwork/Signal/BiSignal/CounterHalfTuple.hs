@@ -5,7 +5,7 @@
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.Normalise #-}
 {-# OPTIONS_GHC -fplugin=GHC.TypeLits.KnownNat.Solver #-}
 
-module BiSignalCounter where
+module CounterHalfTuple where
 
 import Data.Int
 import Debug.Trace
@@ -24,30 +24,46 @@ counter (write, prevread) i = ((write', prevread'), output)
     output    = if write then Just (succ prevread) else Nothing
     prevread' = if write then prevread else i
     write' = not write
+{-# NOINLINE counter #-}
 
 -- | Write on odd cyles
 f :: Clock System Source
   -> Reset System Asynchronous
   -> BiSignalIn  Undefined System (BitSize Int)
-  -> BiSignalOut Undefined System (BitSize Int)
-f clk rst s = writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s))
+  -> ( Signal System Int
+     , BiSignalOut Undefined System (BitSize Int)
+     )
+f clk rst s = (6, writeToBiSignal s (mealy clk rst counter (False, 0) (readFromBiSignal s)))
+{-# NOINLINE f #-}
 
 -- | Write on even cyles
 g :: Clock System Source
   -> Reset System Asynchronous
   -> BiSignalIn  Undefined System (BitSize Int)
-  -> BiSignalOut Undefined System (BitSize Int)
-g clk rst s = writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s))
+  -> ( Signal System Int
+     , BiSignalOut Undefined System (BitSize Int)
+     )
+g clk rst s = (7, writeToBiSignal s (mealy clk rst counter (True, 0) (readFromBiSignal s)))
+{-# NOINLINE g #-}
 
 
-{-# NOINLINE topEntity #-}
 topEntity :: Clock System Source
           -> Reset System Asynchronous
-          -> Signal System Int
-topEntity clk rst = readFromBiSignal bus'
+          -> ( Signal System Int
+             , Signal System Int
+             , Signal System Int
+             )
+topEntity clk rst = ( readFromBiSignal bus'
+                    , fInt
+                    , gInt
+                    )
   where
-    bus  = mergeBiSignalOuts $ f clk rst bus' :> g clk rst bus' :> Nil
+    (fInt, fBus) = f clk rst bus'
+    (gInt, gBus) = g clk rst bus'
+
+    bus  = mergeBiSignalOuts (fBus :> gBus :> Nil)
     bus' = veryUnsafeToBiSignalIn bus
+{-# NOINLINE topEntity #-}
 
 
 main :: IO()
@@ -61,5 +77,6 @@ testBench :: Signal System Bool
 testBench = done
   where
     clock          = tbSystemClockGen (not <$> done)
-    done           = expectedOutput (topEntity clock systemResetGen)
+    (a, _b, _c)    = topEntity clock systemResetGen
+    done           = expectedOutput a
     expectedOutput = outputVerifier clock systemResetGen (1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil)

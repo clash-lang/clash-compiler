@@ -594,7 +594,6 @@ mkDcApplication
     -> NetlistMonad (Expr,[Declaration])
     -- ^ Returned expression and a list of generate BlackBox declarations
 mkDcApplication dstHType bndr dc args = do
--- <<<<<<< HEAD
   let dcNm = name2String (dcName dc)
   (_, sp)             <- Lens.use curCompNm
   tcm                 <- Lens.use tcCache
