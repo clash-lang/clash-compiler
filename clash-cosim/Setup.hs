@@ -218,8 +218,8 @@ blackboxJson' n = blackboxObject bbname "" templateD
       bbname    = "Clash.CoSim.CoSimInstances.coSim" ++ show n
       args      = concat [printf "~ARG[%d], " i | i <- [signalOffset..signalOffset+n-1]] :: String
       template  = printf "~TEMPLATE[~LIT[%d].v][~LIT[%d]]" moduleOffset sourceOffset
-      compname  = printf "~STRLIT[%d]" moduleOffset
-      instanc_  = printf "~GENSYM[~STRLIT[%d]_inst][0] (%s~RESULT)" moduleOffset args
+      compname  = printf "~NAME[%d]" moduleOffset
+      instanc_  = printf "~GENSYM[~NAME[%d]_inst][0] (%s~RESULT)" moduleOffset args
       templateD = unwords [template, compname, instanc_, ";"]
 
 -- | Create blackbox for all coSim functions up to n
