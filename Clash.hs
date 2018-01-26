@@ -35,7 +35,7 @@ doHDL :: Backend s
        -> IO ()
 doHDL b src = do
   startTime <- Clock.getCurrentTime
-  pd      <- primDir b
+  pd      <- primDirs b
   (bindingsMap,tcm,tupTcm,topEntities,primMap) <- generateBindings pd ["."] (hdlKind b) src Nothing
   prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
   let prepStartDiff = Clock.diffUTCTime prepTime startTime
