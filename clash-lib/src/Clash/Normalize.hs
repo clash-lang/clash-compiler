@@ -144,7 +144,7 @@ normalize' nm = do
     Just (nm',ty,sp,inl,tm) -> do
       tcm <- Lens.view tcCache
       let (_,resTy) = splitCoreFunForallTy tcm ty
-      resTyRep <- not <$> isUntranslatableType resTy
+      resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
             tmNorm <- makeCached nm (extra.normalized) $ do

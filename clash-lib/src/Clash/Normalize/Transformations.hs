@@ -116,6 +116,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     nonRepTest ((Id _ tyE), _)
       = not <$> (representableType <$> Lens.view typeTranslator
                                    <*> Lens.view allowZero
+                                   <*> pure False
                                    <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
     nonRepTest _ = return False
@@ -185,7 +186,11 @@ nonRepSpec ctx e@(App e1 e2)
   = do tcm <- Lens.view tcCache
        e2Ty <- termType tcm e2
        localVar <- isLocalVar e2
-       nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure e2Ty)
+       nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
+                                              <*> Lens.view allowZero
+                                              <*> pure False
+                                              <*> Lens.view tcCache
+                                              <*> pure e2Ty)
        if nonRepE2 && not localVar
          then specializeNorm ctx e
          else return e
@@ -204,7 +209,11 @@ caseLet _ e = return e
 caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
-    ty1Rep  <- representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure alts1Ty
+    ty1Rep <- representableType <$> Lens.view typeTranslator
+                                <*> Lens.view allowZero
+                                <*> pure False
+                                <*> Lens.view tcCache
+                                <*> pure alts1Ty
     if not ty1Rep
       then do newAlts <- mapM ( return
                                   . uncurry bind
@@ -244,7 +253,11 @@ inlineNonRep _ e@(Case scrut altsTy alts)
                      (return e)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
-        nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator <*> Lens.view allowZero <*> Lens.view tcCache <*> pure scrutTy)
+        nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
+                                                  <*> Lens.view allowZero
+                                                  <*> pure False
+                                                  <*> Lens.view tcCache
+                                                  <*> pure scrutTy)
         case (nonRepScrut, bodyMaybe) of
           (True,Just (_,_,_,_,scrutBody)) -> do
             Monad.when noException (zoomExtra (addNewInline f cf))
@@ -399,7 +412,7 @@ nonRepANF ctx e@(App appConPrim arg)
   | (conPrim, _) <- collectArgs e
   , isCon conPrim || isPrim conPrim
   = do
-    untranslatable <- isUntranslatable arg
+    untranslatable <- isUntranslatable False arg
     case (untranslatable,arg) of
       (True,Letrec b) -> do (binds,body) <- unbind b
                             changed (Letrec (bind binds (App appConPrim body)))
@@ -416,7 +429,7 @@ topLet :: NormRewrite
 topLet ctx e
   | all isLambdaBodyCtx ctx && not (isLet e)
   = do
-  untranslatable <- isUntranslatable e
+  untranslatable <- isUntranslatable False e
   if untranslatable
     then return e
     else do tcm <- Lens.view tcCache
@@ -428,7 +441,7 @@ topLet ctx e@(Letrec b)
   = do
     (binds,body)   <- unbind b
     localVar       <- isLocalVar body
-    untranslatable <- isUntranslatable body
+    untranslatable <- isUntranslatable False body
     if localVar || untranslatable
       then return e
       else do tcm <- Lens.view tcCache
@@ -669,7 +682,7 @@ inlineWorkFree _ e@(collectArgs -> (Var _ (nameOcc -> f),args))
     argsHaveWork <- or <$> mapM (either expressionHasWork
                                         (const (pure False)))
                                 args
-    untranslatable <- isUntranslatableType eTy
+    untranslatable <- isUntranslatableType True eTy
     let isSignal = isSignalType tcm eTy
     if untranslatable || isSignal || argsHaveWork
       then return e
@@ -698,7 +711,7 @@ inlineWorkFree _ e@(Var fTy (nameOcc -> f)) = do
   tcm <- Lens.view tcCache
   let closed   = not (isPolyFunCoreTy tcm fTy)
       isSignal = isSignalType tcm fTy
-  untranslatable <- isUntranslatableType fTy
+  untranslatable <- isUntranslatableType True fTy
   if closed && not untranslatable && not isSignal
     then do
       bndrs <- Lens.use bindings
@@ -717,7 +730,7 @@ inlineWorkFree _ e = return e
 -- | Inline small functions
 inlineSmall :: NormRewrite
 inlineSmall _ e@(collectArgs -> (Var _ (nameOcc -> f),args)) = do
-  untranslatable <- isUntranslatable e
+  untranslatable <- isUntranslatable True e
   topEnts <- Lens.view topEntities
   if untranslatable || f `HashSet.member` topEnts
     then return e
@@ -937,7 +950,7 @@ collectANF ctx e@(App appf arg)
   | (conVarPrim, _) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
-    untranslatable <- lift (isUntranslatable arg)
+    untranslatable <- lift (isUntranslatable False arg)
     localVar       <- lift (isLocalVar arg)
     constantNoCR   <- lift (isConstantNotClockReset arg)
     case (untranslatable,localVar || constantNoCR,arg) of
@@ -954,7 +967,7 @@ collectANF _ (Letrec b) = do
   -- See NOTE [unsafeUnbind]
   let (binds,body) = unsafeUnbind b
   tell (unrec binds)
-  untranslatable <- lift (isUntranslatable body)
+  untranslatable <- lift (isUntranslatable False body)
   localVar       <- lift (isLocalVar body)
   if localVar || untranslatable
     then return body
@@ -1379,7 +1392,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
         let ([_sArg,vArg],[nTy,aTy]) = Either.partitionEithers args
         case runExcept (tyNatSize tcm nTy) of
           Right n -> do
-            untranslatableTy <- isUntranslatableType aTy
+            untranslatableTy <- isUntranslatableType False aTy
             if untranslatableTy
                then reduceReplicate n aTy eTy vArg
                else return e
@@ -1423,7 +1436,7 @@ reduceNonRepPrim _ e@(App _ _) | (Prim f _, args) <- collectArgs e = do
       _ -> return e
   where
     isUntranslatableType_not_poly t = do
-      u <- isUntranslatableType t
+      u <- isUntranslatableType False t
       if u
          then return (null $ Lens.toListOf typeFreeVars t)
          else return False

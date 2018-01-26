@@ -501,22 +501,30 @@ isLocalVar _ = return False
 
 {-# INLINE isUntranslatable #-}
 -- | Determine if a term cannot be represented in hardware
-isUntranslatable :: Term
-                 -> RewriteMonad extra Bool
-isUntranslatable tm = do
+isUntranslatable
+  :: Bool
+  -- ^ String representable
+  -> Term
+  -> RewriteMonad extra Bool
+isUntranslatable stringRepresentable tm = do
   tcm <- Lens.view tcCache
   not <$> (representableType <$> Lens.view typeTranslator
                              <*> Lens.view allowZero
+                             <*> pure stringRepresentable
                              <*> pure tcm
                              <*> termType tcm tm)
 
 {-# INLINE isUntranslatableType #-}
 -- | Determine if a type cannot be represented in hardware
-isUntranslatableType :: Type
-                     -> RewriteMonad extra Bool
-isUntranslatableType ty =
+isUntranslatableType
+  :: Bool
+  -- ^ String representable
+  -> Type
+  -> RewriteMonad extra Bool
+isUntranslatableType stringRepresentable ty =
   not <$> (representableType <$> Lens.view typeTranslator
                              <*> Lens.view allowZero
+                             <*> pure stringRepresentable
                              <*> Lens.view tcCache
                              <*> pure ty)
 

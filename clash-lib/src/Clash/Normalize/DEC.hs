@@ -143,7 +143,7 @@ collectGlobals inScope substitution seen e@(collectArgs -> (fun, args@(_:_)))
     uniqSupply Lens..= ids2
     let eval = whnf' primEval bndrs tcm ids1 False
     eTy <- termType tcm e
-    untran <- isUntranslatableType eTy
+    untran <- isUntranslatableType False eTy
     case untran of
       -- Don't lift out non-representable values, because they cannot be let-bound
       -- in our desired normal form.
@@ -306,7 +306,7 @@ disJointSelProj _ (Leaf []) = return (Nothing,[])
 disJointSelProj argTys cs = do
     let maxIndex = length argTys - 1
         css = map (\i -> fmap ((:[]) . (!!i)) cs) [0..maxIndex]
-    (untran,tran) <- partitionM (isUntranslatableType . snd) (zip [0..] argTys)
+    (untran,tran) <- partitionM (isUntranslatableType False . snd) (zip [0..] argTys)
     let untranCs   = map (css!!) (map fst untran)
         untranSels = zipWith (\(_,ty) cs' -> genCase ty Nothing []  cs')
                              untran untranCs
