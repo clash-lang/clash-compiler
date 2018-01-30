@@ -1,18 +1,19 @@
-Name:		    clash-cosim
-Version:	    0.1
+Name:           clash-cosim
+Version:        0.1
 Cabal-Version:  >= 2.0
-License:	    BSD2
-License-File:	LICENSE
-Author:		    John Verheij <https://github.com/jgjverheij>
+License:        BSD2
+License-File:   LICENSE
+Author:         John Verheij <https://github.com/jgjverheij>
 Maintainer:     Martijn Bastiaan <martijn@qbaylogic.com>
-Homepage:	    https://github.com/jgjverheij/clash-cosim/
+Homepage:       https://github.com/jgjverheij/clash-cosim/
 Category:       Hardware
-Synopsis:	    Co-simulation in Clash
+Synopsis:       Co-simulation in Clash
 Description:    clash-cosim implements Verilog cosimulation in Haskell and
                 integrates with Clash natively. Cosimulation allows a user to
                 write inline Verilog code and still produce an executable. For
                 user documentation, see: <https://github.com/QBayLogic/clash-cosim-qbl>.
 Build-Type:     Custom
+tested-with:    GHC == 8.2.2, GHC == 8.4.1
 
 --
 Data-Files:     src/cbits/cosim_vpi.vpi
