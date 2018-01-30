@@ -34,7 +34,7 @@ Extra-Source-Files: src/cbits/comm/*.c
                     src/cbits/types/*.h
                     src/cbits/*.c
                     src/cbits/Makefile
-                    src/prims/README.md
+                    src/prims/verilog/README.md
                     tests/*.hs
 
 custom-setup
