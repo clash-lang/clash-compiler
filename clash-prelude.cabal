@@ -59,7 +59,7 @@ Extra-source-files:   README.md
 
 extra-doc-files:      doc/*.svg
 
-Cabal-version:        >=1.10
+Cabal-version:        >=1.18
 
 source-repository head
   type: git
