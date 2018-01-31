@@ -8,6 +8,7 @@
   Transformations of the Normalization process
 -}
 
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
@@ -319,9 +320,18 @@ caseCon ctx e@(Case subj ty alts)
       Literal l -> caseCon ctx (Case (Literal l) ty alts)
       subj' -> case collectArgs subj' of
         (Data _,_) -> caseCon ctx (Case subj' ty alts)
+#if MIN_VERSION_ghc(8,2,2)
+        (Prim nm ty',_:msgOrCallStack:_)
+          | nm == "Control.Exception.Base.absentError" ->
+            let e' = mkApps (Prim nm ty') [Right ty,msgOrCallStack]
+            in  changed e'
+#endif
+
         (Prim nm ty',repTy:_:msgOrCallStack:_)
           | nm `elem` ["Control.Exception.Base.patError"
+#if !MIN_VERSION_ghc(8,2,2)
                       ,"Control.Exception.Base.absentError"
+#endif
                       ,"GHC.Err.undefined"] ->
             let e' = mkApps (Prim nm ty') [repTy,Right ty,msgOrCallStack]
             in  changed e'
