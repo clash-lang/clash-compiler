@@ -165,8 +165,8 @@ main =
 clashHDL :: BuildTarget -> FilePath -> [String] -> String -> TestTree
 clashHDL t env extraArgs modName =
   testProgram ("Clash(" ++ show t ++ ")")
-              "stack"
-              (concat [["exec","clash","--"
+              "cabal"
+              (concat [["new-run","clash","--"
                        ,case t of { VHDL -> "--vhdl"
                                   ; Verilog -> "--verilog"
                                   ; SystemVerilog -> "--systemverilog"
