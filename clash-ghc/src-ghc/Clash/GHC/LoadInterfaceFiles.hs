@@ -224,7 +224,11 @@ loadExprFromTyThing bndr tyThing = case tyThing of
         in Left (bndr,dfExpr)
       CoreSyn.NoUnfolding
         | Demand.isBottomingSig $ IdInfo.strictnessInfo _idInfo
+#if MIN_VERSION_ghc(8,2,2)
+        -> Left (bndr, MkCore.mkAbsentErrorApp
+#else
         -> Left (bndr, MkCore.mkRuntimeErrorApp MkCore.aBSENT_ERROR_ID
+#endif
                                                 (Var.varType _id)
                                                 ("no_unfolding " ++ showPpr unsafeGlobalDynFlags bndr)
                 )
