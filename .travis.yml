@@ -110,7 +110,7 @@ script:
   - (cd "./clash-ghc" && cabal sdist && cd "..")
   - mv "."/clash-ghc/dist/clash-ghc-*.tar.gz ${DISTDIR}/
   - find ${DISTDIR} -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' -C ${DISTDIR} \;
-  - "printf 'packages: %b/clash-lib-*/*.cabal %b/clash-ghc-*/*.cabal clash-prelude/*.cabal testsuite/*.cabal\\n' ${DISTDIR} ${DISTDIR} > cabal.project"
+  - "printf 'packages: %b/clash-lib-*/*.cabal %b/clash-ghc-*/*.cabal clash-prelude/*.cabal testsuite/*.cabal\\npackage clash-testsuite\\n  flags: travisci\\n' ${DISTDIR} ${DISTDIR} > cabal.project"
   - cat cabal.project
   # this builds all libraries and executables (without tests/benchmarks)
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
