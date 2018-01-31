@@ -59,7 +59,6 @@ Library
   C-sources:        src/cbits/cosim_clash.c
 -- TODO: Reintroduce this option, without breaking tests:
 --  LD-Options:       --fatal-warnings
-  ghc-options:      -Wall -Werror
   CC-Options:       -fPIC -Wall -Werror -Wl,--fatal-warnings
   HS-Source-Dirs:   src
   Build-Depends:    base                      >= 4.9.0   && < 4.11,
