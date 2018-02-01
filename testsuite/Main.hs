@@ -99,6 +99,11 @@ main = do
             [ runTest ("tests" </> "shouldwork" </> "CSignal") defBuild [] "CBlockRamTest" ([""],"CBlockRamTest_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "CSignal") defBuild [] "MAC"           ([""],"MAC_topEntity",False)
             ]
+#ifdef COSIM
+        , testGroup "CoSim"
+            [runTest ("tests" </> "shouldwork" </> "CoSim") Verilog ["-i../../../clash-cosim/src/prims/verilog"] "Multiply" (["","Multiply_testBench"],"Multiply_testBench",True)
+            ]
+#endif
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)
             ]

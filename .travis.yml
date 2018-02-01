@@ -39,12 +39,12 @@ matrix:
   include:
     - compiler: "ghc-8.2.2"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.2.2,ghdl,gperf], sources: [hvr-ghc,pgavin-ghdl]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.2.2,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
     - compiler: "ghc-8.4.1"
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.1,ghdl,gperf], sources: [hvr-ghc,pgavin-ghdl]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.1,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
     - compiler: "ghc-head"
       env: GHCHEAD=true
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head,ghdl,gperf], sources: [hvr-ghc,pgavin-ghdl]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head,ghdl,gperf,g++-multilib], sources: [hvr-ghc,pgavin-ghdl]}}
 
   allow_failures:
     - compiler: "ghc-head"
@@ -65,6 +65,7 @@ before_install:
   - vvp -V
 
 install:
+  - git clone https://github.com/clash-lang/clash-cosim.git
   - cabal --version
   - echo "$(${HC} --version) [$(${HC} --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - BENCH=${BENCH---enable-benchmarks}
@@ -112,7 +113,7 @@ script:
   - (cd "./clash-ghc" && cabal sdist && cd "..")
   - mv "."/clash-ghc/dist/clash-ghc-*.tar.gz ${DISTDIR}/
   - find ${DISTDIR} -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' -C ${DISTDIR} \;
-  - "printf 'packages: %b/clash-lib-*/*.cabal %b/clash-ghc-*/*.cabal clash-prelude/*.cabal testsuite/*.cabal\\npackage clash-testsuite\\n  flags: travisci\\n\\npackage clash-ghc\\n  executable-dynamic: True\\n' ${DISTDIR} ${DISTDIR} > cabal.project"
+  - "printf 'packages: %b/clash-lib-*/*.cabal %b/clash-ghc-*/*.cabal clash-prelude/*.cabal clash-cosim/*.cabal testsuite/*.cabal\\npackage clash-testsuite\\n  flags: travisci cosim\\n\\npackage clash-ghc\\n  executable-dynamic: True\\n' ${DISTDIR} ${DISTDIR} > cabal.project"
   - cat cabal.project
   # this builds all libraries and executables (without tests/benchmarks)
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
