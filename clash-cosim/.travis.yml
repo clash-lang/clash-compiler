@@ -100,6 +100,7 @@ script:
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
   - (cd "." && ./dist-newstyle/build/x86_64-linux/${HC}/clash-cosim-*/setup/setup sdist)
   - mv "."/dist/clash-cosim-*.tar.gz ${DISTDIR}/
+  - find ${DISTDIR} -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' -C ${DISTDIR} \;
   - "printf 'packages: %b/clash-cosim-*/*.cabal \\noptional-packages: ./clash-prelude/clash-prelude.cabal\\n' ${DISTDIR} > cabal.project"
   - rm -rf ./dist-newstyle
   - cat cabal.project
