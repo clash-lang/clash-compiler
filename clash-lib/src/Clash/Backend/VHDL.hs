@@ -615,12 +615,27 @@ entity c = do
          [] -> emptyDoc
          _  -> indent 2 ("port" <>
                          parens (align $ vcat $ punctuate semi (pure p)) <>
-                         semi)
+                         semi <> line <> line <> attrs)
       ) <> line <>
       "end" <> semi
   where
     ports l = sequence $ [port iName hwType "in" l | (iName, hwType) <- inputs c]
                       ++ [port oName hwType "out" l | (_, (oName, hwType)) <- outputs c]
+
+    -- TODO / HACK: We print attributes inside the entity block. This conforms
+    -- to the VHDL standard (IEEE Std 1076-1993, 5.1 Attribute specification,
+    -- paragraph 9), and is subsequently implemented in this way by open-source
+    -- simulators such as GHDL. Intel and Xilinx use their own annotation schemes
+    -- unfortunately.
+    --
+    -- References:
+    --  * https://www.mail-archive.com/ghdl-discuss@gna.org/msg03175.html
+    --  * https://forums.xilinx.com/t5/Simulation-and-Verification/wrong-attribute-decorations-of-port-signals-generated-by-write/m-p/704905#M16265
+    --  * http://quartushelp.altera.com/15.0/mergedProjects/hdl/vhdl/vhdl_file_dir_chip.htm
+    attrs       = renderAttrs $ inputAttrs ++ outputAttrs
+    inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
+    outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
+
 
 architecture :: Component -> VHDLM Doc
 architecture c =
@@ -628,17 +643,14 @@ architecture c =
     (("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
      decls (declarations c)) <> line <>
      line <>
-     renderAttrs attrs) <> line <>
+     renderAttrs declAttrs) <> line <>
   nest 2
     ("begin" <> line <>
      insts (declarations c)) <> line <>
     "end" <> semi
  where
-   attrs       = inputAttrs ++ outputAttrs ++ declAttrs
    netdecls    = filter isNetDecl (declarations c)
    declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) <- netdecls, attr <- hwTypeAttrs hwtype]
-   inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
-   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
    isNetDecl (NetDecl' _ _ _ (Right _)) = True
