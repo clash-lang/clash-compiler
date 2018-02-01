@@ -170,7 +170,8 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTupleRev" (["","CounterHalfTupleRev_testBench"],"CounterHalfTupleRev_testBench",True)
             ]
         , testGroup "SynthesisAttributes"
-            [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"              ([""],"Simple_topEntity",False) "main"
+            [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"  ([""],"Simple_topEntity",False) "main"
+            , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" ([""],"Product_topEntity",False) "main"
             ]
         , testGroup "Testbench" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/1152
             [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-fclash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench",True)
