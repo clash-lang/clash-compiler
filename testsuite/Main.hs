@@ -169,6 +169,9 @@ main = do
             , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTuple" (["","CounterHalfTuple_testBench"],"CounterHalfTuple_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Signal" </> "BiSignal") defBuild [] "CounterHalfTupleRev" (["","CounterHalfTupleRev_testBench"],"CounterHalfTupleRev_testBench",True)
             ]
+        , testGroup "SynthesisAttributes"
+            [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"              ([""],"Simple_topEntity",False) "main"
+            ]
         , testGroup "Testbench" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/1152
             [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-fclash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench",True)
             , runTest ("tests" </> "shouldwork" </> "Testbench") defBuild [] "SyncTB"                    (["","SyncTB_testBench"],"SyncTB_testBench",True)
@@ -416,16 +419,24 @@ createTestTrees modName tests tmpDirAndLocks =
       nexts     = ((++ [Nothing]) <$>) locks
       prevNexts = zip <$> prevs <*> nexts
 
+type ExtraTestFunc
+  = FilePath -- Env dir
+ -> BuildTarget
+ -> FilePath -- HDL dir
+ -> FilePath -- Mod dir
+ -> String   -- Mod name
+ -> String   -- (Haskell) ent name
+ -> SeqTestTree
+
 runTest'
   :: FilePath
   -> BuildTarget
   -> [String]
   -> String
   -> ([String],String,Bool)
+  -> [ExtraTestFunc]
   -> TestTree
-runTest' _ All  _ _ _ = error "Unexpected target in runTest': All"
-runTest' _ Both _ _ _ = error "Unexpected target in runTest': Both"
-runTest' env VHDL extraArgs modName (subdirs, entName, doSim) =
+runTest' env VHDL extraArgs modName (subdirs, entName, doSim) extraTests =
   withResource acquire tastyRelease (createTestTrees "VHDL" seqTests)
     where
       cwDir   = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
@@ -444,8 +455,9 @@ runTest' env VHDL extraArgs modName (subdirs, entName, doSim) =
           , [ghdlImport modDir (subdirs List.\\ libs)]
           , [ghdlMake modDir subdirs libs entName]
         ] ++ [if doSim then [ghdlSim modDir (noConflict entName subdirs)] else []]
+          ++ [map (\f -> f (cwDir </> env) VHDL vhdlDir modDir modName entName) extraTests]
 
-runTest' env Verilog extraArgs modName (subdirs, entName, doSim) =
+runTest' env Verilog extraArgs modName (subdirs, entName, doSim) extraTests =
   withResource acquire tastyRelease (createTestTrees "Verilog" seqTests)
     where
       cwDir      = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
@@ -457,8 +469,9 @@ runTest' env Verilog extraArgs modName (subdirs, entName, doSim) =
         [ clashHDL Verilog (cwDir </> env) extraArgs modName
         , iverilog modDir subdirs entName
         ] ++ if doSim then [vvp modDir (noConflict entName subdirs)] else []
+          ++ map (\f -> f (cwDir </> env) Verilog verilogDir modDir modName entName) extraTests
 
-runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) =
+runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) extraTests =
   withResource acquire tastyRelease (createTestTrees "SystemVerilog" seqTests)
     where
       cwDir   = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
@@ -471,6 +484,18 @@ runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) =
           [ [ clashHDL SystemVerilog (cwDir </> env) extraArgs modName ]
           , vlog modDir subdirs
           ] ++ [if doSim then [vsim modDir entName] else []]
+            ++ [map (\f -> f (cwDir </> env) SystemVerilog svDir modDir modName entName) extraTests]
+
+runTest' env Both extraArgs modName entNameM extraTests = testGroup modName
+  [ runTest' env VHDL extraArgs modName entNameM extraTests
+  , runTest' env Verilog extraArgs modName entNameM extraTests
+  ]
+
+runTest' env All extraArgs modName entNameM extraTests = testGroup modName
+  [ runTest' env VHDL extraArgs modName entNameM extraTests
+  , runTest' env Verilog extraArgs modName entNameM extraTests
+  , runTest' env SystemVerilog extraArgs modName entNameM extraTests
+  ]
 
 runTest
   :: FilePath
@@ -479,19 +504,8 @@ runTest
   -> String
   -> ([String],String,Bool)
   -> TestTree
-runTest env Both extraArgs modName entNameM = testGroup modName
-  [ runTest' env VHDL extraArgs modName entNameM
-  , runTest' env Verilog extraArgs modName entNameM
-  ]
-
-runTest env All extraArgs modName entNameM = testGroup modName
-  [ runTest' env VHDL extraArgs modName entNameM
-  , runTest' env Verilog extraArgs modName entNameM
-  , runTest' env SystemVerilog extraArgs modName entNameM
-  ]
-
-runTest env target extraArgs modName entNameM =
-  testGroup modName [runTest' env target extraArgs modName entNameM]
+runTest env target extraArgs modName (subdirs,entName,doSim) =
+  runTest' env target extraArgs modName (subdirs,entName,doSim) []
 
 runFailingTest'
   :: FilePath
@@ -547,3 +561,40 @@ runFailingTest env All extraArgs modName expectedStderr =
     ]
 runFailingTest env target extraArgs modName expectedStderr =
   testGroup modName [ runFailingTest' env target extraArgs modName expectedStderr ]
+
+outputTest'
+  :: String
+  -> ExtraTestFunc
+outputTest' funcName env target _hdlDir modDir modName entityName =
+  testProgram "Output file test" "cabal" args PrintStdErr False
+    where
+      -- TODO: Clean up flags
+      args = [ "new-exec"
+             , "--"
+             , "runghc"
+             , "-XDataKinds"
+             , "-XTypeOperators"
+             , "-XNoImplicitPrelude"
+             , "-main-is"
+             , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
+             , env </> modName <.> "hs"
+             , modDir
+             , filename
+             ]
+      filename =
+        case target of
+          VHDL          -> map toLower $ entityName ++ ".vhdl"
+          Verilog       -> entityName ++ ".v"
+          SystemVerilog -> entityName ++ ".sv"
+          _             -> error $ "Unexpected target: " ++ show target
+
+outputTest
+  :: FilePath
+  -> BuildTarget
+  -> [String]
+  -> String
+  -> ([String],String,Bool)
+  -> String
+  -> TestTree
+outputTest env target extraArgs modName entNameM funcName =
+  runTest' env target extraArgs modName entNameM [outputTest' funcName]
