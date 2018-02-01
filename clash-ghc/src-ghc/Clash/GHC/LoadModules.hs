@@ -152,6 +152,7 @@ loadModules hdl modName dflagsM = do
                                 , LangExt.ScopedTypeVariables
                                 , LangExt.MagicHash
                                 , LangExt.ExplicitForAll
+                                , LangExt.QuasiQuotes
                                 ]
                   let dfDis = foldl DynFlags.xopt_unset dfEn
                                 [ LangExt.ImplicitPrelude
