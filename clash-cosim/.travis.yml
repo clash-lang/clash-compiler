@@ -14,6 +14,7 @@ cache:
   directories:
     - $HOME/.cabal/packages
     - $HOME/.cabal/store
+    - $HOME/iverilog
 
 before_cache:
   - rm -fv $HOME/.cabal/packages/hackage.haskell.org/build-reports.log
@@ -30,10 +31,10 @@ matrix:
   include:
     - compiler: "ghc-8.2.2"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.2.2,iverilog], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.2.2,gperf], sources: [hvr-ghc]}}
     - compiler: "ghc-8.4.1"
       env: GHCHEAD=true
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.1,iverilog], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.4.1,gperf], sources: [hvr-ghc]}}
 
   allow_failures:
     - compiler: "ghc-8.4.1"
@@ -47,6 +48,10 @@ before_install:
   - "PATH=/opt/ghc/bin:/opt/ghc-ppa-tools/bin:$HOME/local/bin:$PATH"
   - HCNUMVER=$(( $(${HC} --numeric-version|sed -E 's/([0-9]+)\.([0-9]+)\.([0-9]+).*/\1 * 10000 + \2 * 100 + \3/') ))
   - echo $HCNUMVER
+  - chmod +x ./.travis/install_iverilog.sh
+  - ./.travis/install_iverilog.sh
+  - export PATH=$PATH:$HOME/iverilog/bin
+  - vvp -V
 
 install:
   - cabal --version
