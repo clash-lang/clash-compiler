@@ -101,7 +101,8 @@ main = do
             ]
 #ifdef COSIM
         , testGroup "CoSim"
-            [runTest ("tests" </> "shouldwork" </> "CoSim") Verilog ["-i../../../clash-cosim/src/prims/verilog"] "Multiply" (["","Multiply_testBench"],"Multiply_testBench",True)
+            [ runTest ("tests" </> "shouldwork" </> "CoSim") Verilog ["-i../../../clash-cosim/src/prims/verilog"] "Multiply" (["","Multiply_testBench"],"Multiply_testBench",True)
+            , runTest ("tests" </> "shouldwork" </> "CoSim") Verilog ["-i../../../clash-cosim/src/prims/verilog"] "Register" (["","Register_testBench"],"Register_testBench",True)
             ]
 #endif
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
