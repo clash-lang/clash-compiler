@@ -27,6 +27,9 @@ index-state: 2018-07-03T07:02:43Z
 package clash-ghc
   executable-dynamic: True
 
+package clash-testsuite
+  flags: cosim
+
 optional-packages: ghc-typelits-extra/ghc-typelits-extra.cabal
                    ghc-typelits-knownnat/ghc-typelits-knownnat.cabal
                    ghc-typelits-natnormalise/ghc-typelits-natnormalise.cabal
