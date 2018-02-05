@@ -26,13 +26,19 @@ executable clash-testsuite
   main-is:             Main.hs
   ghc-options:         -Wall
   other-modules:       Test.Tasty.Program
-  other-extensions:    DeriveDataTypeable
-  build-depends:       base          >=4.8      && <5,
-                       deepseq       >=1.4      && <1.5,
-                       directory     >=1.2      && <1.4,
-                       filepath      >=1.4      && <1.5,
-                       process       >=1.2      && <1.7,
-                       tasty         >=0.10.1.2 && <0.12
+  default-extensions:  DeriveDataTypeable
+                       OverloadedStrings
+                       ViewPatterns
+  build-depends:       base               >=4.8      && <5,
+                       deepseq            >=1.4      && <1.5,
+                       directory          >=1.2      && <1.4,
+                       filepath           >=1.4      && <1.5,
+                       process            >=1.2      && <1.7,
+                       tasty              >=0.10.1.2 && <0.12,
+                       neat-interpolation >=0.3      && <0.4,
+                       regex-pcre-builtin >=0.9      && <1,
+                       regex-pcre-text    >=0.9      && <1,
+                       text
 
   -- hs-source-dirs:
   default-language:    Haskell2010

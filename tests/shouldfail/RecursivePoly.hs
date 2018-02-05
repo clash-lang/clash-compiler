@@ -1,6 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module RecursivePoly where
 
+import Clash.Prelude
+
 topEntity :: Integer
 topEntity = f 0
 

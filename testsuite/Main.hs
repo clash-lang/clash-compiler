@@ -2,7 +2,11 @@
 module Main (main) where
 
 import Test.Tasty
-import Test.Tasty.Program
+import Test.Tasty.Program ( testProgram
+                          , testFailingProgram
+                          , PrintOutput ( PrintStdErr
+                                        , PrintNeither )
+                          )
 
 import           Data.Char        (toLower)
 import qualified Data.List        as List
@@ -64,6 +68,14 @@ main =
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TagToEnum"           ([""],"TagToEnum_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TestIndex"           ([""],"TestIndex_topEntity",False)
             , runTest ("tests" </> "shouldwork" </> "Basic") defBuild [] "TwoFunctions"        ([""],"TwoFunctions_topEntity",False)
+
+            -- Fails:
+            , testGroup "Failing" [
+                runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursiveBoxed" (Just "Callgraph after normalisation contains following recursive components")
+               , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursiveDatatype" (Just "Not in normal form: no Letrec")
+--                  Disabled, due to it eating gigabytes of memory:
+--                , runFailingTest ("tests" </> "shouldfail") defBuild [] "RecursivePoly" (Just "??")
+              ]
             ]
         , testGroup "BitVector"
             [ runTest ("tests" </> "shouldwork" </> "BitVector") defBuild [] "Box"     (["","Box_testBench"],"Box_testBench",True)
@@ -162,22 +174,42 @@ main =
         ]
     ]
 
-clashHDL :: BuildTarget -> FilePath -> [String] -> String -> TestTree
+clashCmd
+  :: BuildTarget
+  -- ^ Build target
+  -> [String]
+  -- ^ Extra arguments
+  -> String
+  -- ^ Module name
+  -> (String, [String])
+clashCmd target extraArgs modName = ("cabal", ["new-run", "clash", "--"] ++ args)
+  where
+    args = concat [
+        [target']
+      , extraArgs
+      , [modName <.> "hs"]
+      ]
+
+    target' = case target of
+      VHDL -> "--vhdl"
+      Verilog -> "--verilog"
+      SystemVerilog -> "--systemverilog"
+      _ -> error $ "Unexpected target in clashCmd: " ++ show target
+
+clashHDL
+  :: BuildTarget
+  -- ^ Build target
+  -> FilePath
+  -- ^ Working directory
+  -> [String]
+  -- ^ Extra arguments
+  -> String
+  -- ^ Module name
+  -> TestTree
 clashHDL t env extraArgs modName =
-  testProgram ("Clash(" ++ show t ++ ")")
-              "cabal"
-              (concat [["new-run","clash","--"
-                       ,case t of { VHDL -> "--vhdl"
-                                  ; Verilog -> "--verilog"
-                                  ; SystemVerilog -> "--systemverilog"
-                                  }
-                       ]
-                      ,extraArgs
-                      ,[modName <.> "hs"]
-                      ])
-              (Just env)
-              False
-              False
+  let (cmd, args) = clashCmd t extraArgs modName in
+  let testName = "Clash(" ++ show t ++ ")" in
+  testProgram testName cmd args (Just env) PrintStdErr False
 
 ghdlLibrary
   :: FilePath
@@ -189,7 +221,7 @@ ghdlLibrary
   -> TestTree
 ghdlLibrary env modName lib = withResource (return env) (const (return ()))
     (\d -> testProgram "GHDL (library)" "ghdl"
-      ("-i":("--work="++workName):("--workdir="++workdir):"--std=93":vhdlFiles d lib') (Just env) False False)
+      ("-i":("--work="++workName):("--workdir="++workdir):"--std=93":vhdlFiles d lib') (Just env) PrintStdErr False)
   where
     lib' = map toLower lib
     workName = case lib' of {[] -> map toLower modName ++ "_topentity"; k -> k}
@@ -209,7 +241,7 @@ ghdlImport
   -> TestTree
 ghdlImport env subdirs = withResource (return env) (const (return ()))
     (\d -> testProgram "GHDL (import)" "ghdl"
-      ("-i":"--workdir=work":"--std=93":concatMap (vhdlFiles d) ((map.map) toLower subdirs)) (Just env) False False)
+      ("-i":"--workdir=work":"--std=93":concatMap (vhdlFiles d) ((map.map) toLower subdirs)) (Just env) PrintStdErr False)
   where
     vhdlFiles :: IO FilePath -> FilePath -> [FilePath]
     vhdlFiles d subdir =  map (subdir </>)
@@ -236,7 +268,7 @@ ghdlMake env subdirs libs entName =
       ,["-o",map toLower (noConflict entName subdirs)]
       ,[entName]
       ])
-    (Just env) False False
+    (Just env) PrintStdErr False
   where
     emptyToDot [] = "."
     emptyToDot k  = k
@@ -248,7 +280,7 @@ ghdlSim
   -- ^ Name of the testbench executable
   -> TestTree
 ghdlSim env tbName = testProgram "GHDL (sim)" "ghdl"
-  ["-r","--workdir=work",tbName,"--assert-level=error"] (Just env) False False
+  ["-r","--workdir=work",tbName,"--assert-level=error"] (Just env) PrintStdErr False
 
 iverilog
   :: FilePath
@@ -261,7 +293,7 @@ iverilog
 iverilog env subdirs entName = withResource (return env) (const (return ()))
     (\d -> testProgram "iverilog" "iverilog"
               ("-g2":"-s":entName:"-o":noConflict entName subdirs:
-               concatMap (verilogFiles d) subdirs) (Just env) False False)
+               concatMap (verilogFiles d) subdirs) (Just env) PrintStdErr False)
   where
     verilogFiles :: IO FilePath -> FilePath -> [FilePath]
     verilogFiles d subdir =  map (subdir </>)
@@ -285,7 +317,7 @@ vvp
   -> String
   -- ^ Name of the testbench object
   -> TestTree
-vvp env entName = testProgram "vvp" "vvp" [entName] (Just env) False True
+vvp env entName = testProgram "vvp" "vvp" [entName] (Just env) PrintStdErr True
 
 vlog
   :: FilePath
@@ -294,8 +326,8 @@ vlog
   -- ^ Directory with the SystemVerilog files
   -> TestTree
 vlog env subdirs = testGroup "vlog"
-  [ testProgram "vlib" "vlib" ["work"] (Just env) False False
-  , testProgram "vlog" "vlog" ("-sv":"-work":"work":typFiles ++ allFiles) (Just env) False False
+  [ testProgram "vlib" "vlib" ["work"] (Just env) PrintStdErr False
+  , testProgram "vlog" "vlog" ("-sv":"-work":"work":typFiles ++ allFiles) (Just env) PrintStdErr False
   ]
   where
     typFiles = map (\d -> d </> "*_types.sv") subdirs
@@ -304,7 +336,7 @@ vlog env subdirs = testGroup "vlog"
 vsim :: FilePath -> String -> TestTree
 vsim env entName =
   testProgram "vsim" "vsim"
-    ["-batch","-do",doScript,entName] (Just env) False False
+    ["-batch","-do",doScript,entName] (Just env) PrintStdErr False
   where
     doScript = List.intercalate ";"
       [ "run -all"
@@ -375,3 +407,31 @@ runTest env All extraArgs modName entNameM = testGroup "VHDL & Verilog & SystemV
   , runTest env Verilog extraArgs modName entNameM
   , runTest env SystemVerilog extraArgs modName entNameM
   ]
+
+runFailingTest
+  :: FilePath
+  -- ^ Working directory
+  -> BuildTarget
+  -- ^ Build target
+  -> [String]
+  -- ^ Extra arguments
+  -> String
+  -- ^ Module name
+  -> Maybe String
+  -- ^ Expected stderr (regular expression)
+  -> TestTree
+runFailingTest env Both extraArgs modName expectedStderr =
+  testGroup "VHDL & Verilog"
+    [ runFailingTest env VHDL extraArgs modName expectedStderr
+    , runFailingTest env Verilog extraArgs modName expectedStderr
+    ]
+runFailingTest env All extraArgs modName expectedStderr =
+  testGroup "VHDL & Verilog & SystemVerilog"
+    [ runFailingTest env VHDL extraArgs modName expectedStderr
+    , runFailingTest env Verilog extraArgs modName expectedStderr
+    , runFailingTest env SystemVerilog extraArgs modName expectedStderr
+    ]
+runFailingTest env target extraArgs modName expectedStderr =
+  let (cmd, args) = clashCmd target extraArgs modName in
+  let testName = "Clash(" ++ show target ++ ")" in
+  testFailingProgram testName cmd args (Just env) PrintNeither False Nothing expectedStderr
