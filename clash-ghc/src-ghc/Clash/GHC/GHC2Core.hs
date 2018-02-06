@@ -564,47 +564,54 @@ coreToAttr t =
                   , showPpr unsafeGlobalDynFlags t ]
 
 coreToAttrs'
-  :: [Type]
-  -> State GHC2CoreState [C.Attr']
-coreToAttrs' [annotationType, _star, _realType, attributes] =
-  case annotationType of
-    TyConApp ty [TyConApp ty' _args'] -> do
-      name'  <- typeConstructorToString ty
-      name'' <- typeConstructorToString ty'
+    :: [Type]
+    -> State GHC2CoreState [C.Attr']
+coreToAttrs' [annotationType, _star, realType, attributes] = allAttrs
+ where
+  allAttrs = (++) <$> attrs <*> subAttrs
 
-      let result | name' == "GHC.Types.[]" && name'' == _ATTR_NAME =
+  subAttrs =
+    coreToAttrs realType
+
+  attrs =
+    case annotationType of
+      TyConApp ty [TyConApp ty' _args'] -> do
+        name'  <- typeConstructorToString ty
+        name'' <- typeConstructorToString ty'
+
+        let result | name' == "GHC.Types.[]" && name'' == _ATTR_NAME =
                       -- List of attributes
                       sequence $ map coreToAttr (listTypeToListOfTypes attributes)
-                 | name' == "GHC.Types.[]" =
+                   | name' == "GHC.Types.[]" =
                       -- List, but uknown types
                       error $ $(curLoc) ++ unwords [ "Annotate expects an"
                                                    , "Attr or a list of"
                                                    , "Attr's, but got a list"
                                                    , "of:", name'']
-                 | otherwise =
-                      -- Some unknown nested type
+                   | otherwise =
+                        -- Some unknown nested type
                       error $ $(curLoc) ++ unwords [ "Annotate expects an"
                                                    , "Attr or a list of"
                                                    , "Attr's, but got:"
                                                    , name' ]
 
-      result
+        result
 
-    TyConApp ty _args -> do
-      name' <- typeConstructorToString ty
-      if name' == _ATTR_NAME
-        then
-          -- Single annotation
-          sequence [coreToAttr attributes]
-        else do
-          -- Annotation to something we don't recognize (not a list,
-          -- nor an Attr)
-          tystr <- typeConstructorToString ty
-          error $ unwords [ "Annotate expects an Attr or a list of"
-                          , "Attr's, but got:", tystr ]
-    _ ->
-      error $ $(curLoc) ++ unwords [ "Expected TyConApp, not:"
-                                   , showPpr unsafeGlobalDynFlags annotationType]
+      TyConApp ty _args -> do
+        name' <- typeConstructorToString ty
+        if name' == _ATTR_NAME
+          then
+            -- Single annotation
+            sequence [coreToAttr attributes]
+          else do
+            -- Annotation to something we don't recognize (not a list,
+            -- nor an Attr)
+            tystr <- typeConstructorToString ty
+            error $ unwords [ "Annotate expects an Attr or a list of Attr's,"
+                            , "but got:", tystr ]
+      _ ->
+        error $ $(curLoc) ++ unwords [ "Expected TyConApp, not:"
+                                     , showPpr unsafeGlobalDynFlags annotationType]
 
 coreToAttrs' illegal =
   error $ "Expected list with four items (as Annotate has four arguments), but got: "
@@ -647,7 +654,7 @@ coreToType ty = ty'' >>= annotateType ty
   where
     ty'' =
       case coreView ty of
-        Just ty' -> coreToType' ty'
+        Just ty' -> coreToType ty'
         Nothing  -> coreToType' ty
 
 coreToType'
