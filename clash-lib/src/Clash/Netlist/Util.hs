@@ -53,7 +53,7 @@ import           Clash.Core.TyCon
 import           Clash.Core.Type         (Type (..), TypeView (..), LitTy (..),
                                           coreView, splitTyConAppM, tyView)
 import           Clash.Core.Util         (collectBndrs, termType, tyNatSize)
-import           Clash.Core.Var          (Id, Var (..),modifyVarName)
+import           Clash.Core.Var          (Id, Var (..),modifyVarName,Attr')
 import           Clash.Netlist.Id        (IdType (..), stripDollarPrefixes)
 import           Clash.Netlist.Types     as HW
 import           Clash.Signal.Internal   (ClockKind (..))
@@ -712,12 +712,12 @@ mkInput pM = case pM of
   where
     go (i,hwty) = do
       i' <- mkUniqueIdentifier Extended i
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
-          arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
+          arguments <- mapM (appendIdentifier (i',hwty'')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let hwty2    = filterVoid hwty'
+          let hwty2    = filterVoid hwty''
               netdecl  = NetDecl Nothing i' (Vector sz hwty2)
               vecExpr  = mkVectorChain sz hwty2 exprs
               netassgn = Assignment i' vecExpr
@@ -726,10 +726,10 @@ mkInput pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Vector"
 
-        RTree d hwty' -> do
-          arguments <- mapM (appendIdentifier (i',hwty')) [0..2^d-1]
+        RTree d hwty'' -> do
+          arguments <- mapM (appendIdentifier (i',hwty'')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) arguments
-          let hwty2    = filterVoid hwty'
+          let hwty2    = filterVoid hwty''
               netdecl  = NetDecl Nothing i' (RTree d hwty2)
               trExpr   = mkRTreeChain d hwty2 exprs
               netassgn = Assignment i' trExpr
@@ -746,15 +746,15 @@ mkInput pM = case pM of
           (ports,_,exprs,_) <- unzip4 <$> mapM (mkInput Nothing) argumentsFiltered'
           case exprs of
             [expr] ->
-              let hwty'    = filterVoid hwty
-                  netdecl  = NetDecl Nothing i' hwty'
+              let hwty''   = filterVoid hwty
+                  netdecl  = NetDecl Nothing i' hwty''
                   dcExpr   = expr
                   netassgn = Assignment i' expr
               in  return (concat ports,[netdecl,netassgn],dcExpr,i')
             _ ->
-              let hwty'    = filterVoid hwty
-                  netdecl  = NetDecl Nothing i' hwty'
-                  dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
+              let hwty''   = filterVoid hwty
+                  netdecl  = NetDecl Nothing i' hwty''
+                  dcExpr   = DataCon hwty'' (DC (hwty'',0)) exprs
                   netassgn = Assignment i' dcExpr
               in  if null attrs then
                     return (concat ports,[netdecl,netassgn],dcExpr,i')
@@ -779,12 +779,12 @@ mkInput pM = case pM of
 
     go' (PortProduct p ps) (i,hwty) = do
       pN <- uniquePortName p i
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
-          arguments <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
+          arguments <- mapM (appendIdentifier (pN,hwty'')) [0..sz-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
-          let hwty2    = filterVoid hwty'
+          let hwty2    = filterVoid hwty''
               netdecl  = NetDecl Nothing pN (Vector sz hwty2)
               vecExpr  = mkVectorChain sz hwty2 exprs
               netassgn = Assignment pN vecExpr
@@ -793,10 +793,10 @@ mkInput pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Vector"
 
-        RTree d hwty' -> do
-          arguments <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
+        RTree d hwty'' -> do
+          arguments <- mapM (appendIdentifier (pN,hwty'')) [0..2^d-1]
           (ports,_,exprs,_) <- unzip4 <$> zipWithM mkInput (extendPorts ps) arguments
-          let hwty2    = filterVoid hwty'
+          let hwty2    = filterVoid hwty''
               netdecl  = NetDecl Nothing pN (RTree d hwty2)
               trExpr   = mkRTreeChain d hwty2 exprs
               netassgn = Assignment pN trExpr
@@ -813,14 +813,14 @@ mkInput pM = case pM of
           (ports,_,exprs,_) <- unzip4 <$> uncurry (zipWithM mkInput) argumentsFiltered'
           case exprs of
             [expr] ->
-                 let hwty'    = filterVoid hwty
-                     netdecl  = NetDecl Nothing pN hwty'
+                 let hwty''   = filterVoid hwty'
+                     netdecl  = NetDecl Nothing pN hwty''
                      dcExpr   = expr
                      netassgn = Assignment pN expr
                  in  return (concat ports,[netdecl,netassgn],dcExpr,pN)
-            _ -> let hwty'    = filterVoid hwty
-                     netdecl  = NetDecl Nothing pN hwty'
-                     dcExpr   = DataCon hwty' (DC (hwty',0)) exprs
+            _ -> let hwty''   = filterVoid hwty'
+                     netdecl  = NetDecl Nothing pN hwty''
+                     dcExpr   = DataCon hwty'' (DC (hwty'',0)) exprs
                      netassgn = Assignment pN dcExpr
                  in  if null attrs then
                        return (concat ports,[netdecl,netassgn],dcExpr,pN)
@@ -912,8 +912,20 @@ genTopComponentName _mkId prefixM (Just ann) _nm =
 genTopComponentName mkId prefixM Nothing nm =
   genComponentName [] mkId prefixM nm
 
--- | Generate output port mappings. Will yield Nothing if the only output is
--- Void.
+
+-- | Strips one or more layers of attributes from a HWType; stops at first
+-- non-Annotated. Accumilates all attributes of nested annotations.
+stripAttributes
+  :: HWType
+  -> ([Attr'], HWType)
+-- Recursively strip type, accumulate attrs:
+stripAttributes (Annotated attrs typ) =
+  let (attrs', typ') = stripAttributes typ
+  in (attrs ++ attrs', typ')
+-- Not an annotated type, so just return it:
+stripAttributes typ = ([], typ)
+
+-- | Generate output port mappings
 mkOutput
   :: Maybe PortName
   -> (Identifier,HWType)
@@ -922,6 +934,8 @@ mkOutput _pM (_o, (BiDirectional Out _)) = return Nothing
 mkOutput _pM (_o, (Void _))  = return Nothing
 mkOutput pM  (o,  hwty)      = Just <$> mkOutput' pM (o, hwty)
 
+-- | Generate output port mappings. Will yield Nothing if the only output is
+-- Void.
 mkOutput'
   :: Maybe PortName
   -> (Identifier,HWType)
@@ -932,24 +946,24 @@ mkOutput' pM = case pM of
   where
     go (o,hwty) = do
       o' <- mkUniqueIdentifier Extended o
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
           unless (null attrs)
             (throwAnnotatedSplitError $(curLoc) "Vector")
-          results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
+          results <- mapM (appendIdentifier (o',hwty'')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
-          let hwty2   = Vector sz (filterVoid hwty')
+          let hwty2   = Vector sz (filterVoid hwty'')
               netdecl = NetDecl Nothing o' hwty2
               assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
 
-        RTree d hwty' -> do
+        RTree d hwty'' -> do
           unless (null attrs)
             (throwAnnotatedSplitError $(curLoc) "RTree")
-          results <- mapM (appendIdentifier (o',hwty')) [0..2^d-1]
+          results <- mapM (appendIdentifier (o',hwty'')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) results
-          let hwty2   = RTree d (filterVoid hwty')
+          let hwty2   = RTree d (filterVoid hwty'')
               netdecl = NetDecl Nothing o' hwty2
               assigns = zipWith (assignId o' hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,o')
@@ -962,14 +976,14 @@ mkOutput' pM = case pM of
           (ports,decls,ids) <- unzip3 <$> mapM (mkOutput' Nothing) resultsFiltered'
           case ids of
             [i] ->
-              let hwty'   = filterVoid hwty
-                  netdecl = NetDecl Nothing o' hwty'
+              let hwty''  = filterVoid hwty
+                  netdecl = NetDecl Nothing o' hwty''
                   assign  = Assignment i (Identifier o' Nothing)
               in  return (concat ports,netdecl:assign:concat decls,o')
             _   ->
-              let hwty'   = filterVoid hwty
-                  netdecl = NetDecl Nothing o' hwty'
-                  assigns = zipWith (assignId o' hwty' 0) ids [0..]
+              let hwty''  = filterVoid hwty
+                  netdecl = NetDecl Nothing o' hwty''
+                  assigns = zipWith (assignId o' hwty'' 0) ids [0..]
               in  if null attrs then
                      return (concat ports,netdecl:assigns ++ concat decls,o')
                   else
@@ -983,24 +997,24 @@ mkOutput' pM = case pM of
 
     go' (PortProduct p ps) (o,hwty) = do
       pN <- uniquePortName p o
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
           unless (null attrs)
             (throwAnnotatedSplitError $(curLoc) "Vector")
-          results <- mapM (appendIdentifier (pN,hwty')) [0..sz-1]
+          results <- mapM (appendIdentifier (pN,hwty'')) [0..sz-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts ps) results
-          let hwty2   = Vector sz (filterVoid hwty')
+          let hwty2   = Vector sz (filterVoid hwty'')
               netdecl = NetDecl Nothing pN hwty2
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
 
-        RTree d hwty' -> do
+        RTree d hwty'' -> do
           unless (null attrs)
             (throwAnnotatedSplitError $(curLoc) "RTree")
-          results <- mapM (appendIdentifier (pN,hwty')) [0..2^d-1]
+          results <- mapM (appendIdentifier (pN,hwty'')) [0..2^d-1]
           (ports,decls,ids) <- unzip3 <$> zipWithM mkOutput' (extendPorts ps) results
-          let hwty2   = RTree d (filterVoid hwty')
+          let hwty2   = RTree d (filterVoid hwty'')
               netdecl = NetDecl Nothing pN hwty2
               assigns = zipWith (assignId pN hwty2 10) ids [0..]
           return (concat ports,netdecl:assigns ++ concat decls,pN)
@@ -1012,12 +1026,12 @@ mkOutput' pM = case pM of
               resultsFiltered' = unzip (map snd resultsFiltered)
           (ports,decls,ids) <- unzip3 <$> uncurry (zipWithM mkOutput') resultsFiltered'
           case ids of
-            [i] -> let hwty'   = filterVoid hwty
-                       netdecl = NetDecl Nothing pN hwty'
+            [i] -> let hwty''  = filterVoid hwty'
+                       netdecl = NetDecl Nothing pN hwty''
                        assign  = Assignment i (Identifier pN Nothing)
                    in  return (concat ports,netdecl:assign:concat decls,pN)
-            _   -> let hwty'   = filterVoid hwty
-                       netdecl = NetDecl Nothing pN hwty'
+            _   -> let hwty''  = filterVoid hwty'
+                       netdecl = NetDecl Nothing pN hwty''
                        assigns = zipWith (assignId pN hwty' 0) ids [0..]
                    in  if null attrs then
                          return (concat ports,netdecl:assigns ++ concat decls,pN)
@@ -1190,10 +1204,10 @@ mkTopInput topM inps pM = case pM of
     go inps'@((iN,_):rest) (i,hwty) = do
       i' <- mkUniqueIdentifier Basic i
       let iDecl = NetDecl Nothing i' hwty
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
-          arguments <- mapM (appendIdentifier (i',hwty')) [0..sz-1]
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
+          arguments <- mapM (appendIdentifier (i',hwty'')) [0..sz-1]
           (inps'',arguments1) <- mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
@@ -1204,8 +1218,8 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Vector"
 
-        RTree d hwty' -> do
-          arguments <- mapM (appendIdentifier (i',hwty')) [0..2^d-1]
+        RTree d hwty'' -> do
+          arguments <- mapM (appendIdentifier (i',hwty'')) [0..2^d-1]
           (inps'',arguments1) <- mapAccumLM go inps' arguments
           let (ports,decls,ids) = unzip3 arguments1
               assigns = zipWith (argBV topM) ids
@@ -1255,10 +1269,10 @@ mkTopInput topM inps pM = case pM of
       let pN = portName p i
       pN' <- mkUniqueIdentifier Extended pN
       let pDecl = NetDecl Nothing pN' hwty
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
-          arguments <- mapM (appendIdentifier (pN',hwty')) [0..sz-1]
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
+          arguments <- mapM (appendIdentifier (pN',hwty'')) [0..sz-1]
           (inps'',arguments1) <-
             mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
@@ -1271,8 +1285,8 @@ mkTopInput topM inps pM = case pM of
           else
             throwAnnotatedSplitError $(curLoc) "Vector"
 
-        RTree d hwty' -> do
-          arguments <- mapM (appendIdentifier (pN',hwty')) [0..2^d-1]
+        RTree d hwty'' -> do
+          arguments <- mapM (appendIdentifier (pN',hwty'')) [0..2^d-1]
           (inps'',arguments1) <-
             mapAccumLM (\acc (p',o') -> mkTopInput topM acc p' o') inps'
                        (zip (extendPorts ps) arguments)
@@ -1382,25 +1396,25 @@ mkTopOutput' topM outps pM = case pM of
     go outps'@((oN,_):rest) (o,hwty) = do
       o' <- mkUniqueIdentifier Extended o
       let oDecl = NetDecl Nothing o' hwty
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
-          results <- mapM (appendIdentifier (o',hwty')) [0..sz-1]
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
+          results <- mapM (appendIdentifier (o',hwty'')) [0..sz-1]
           (outps'',results1) <- mapAccumLM go outps' results
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
-              netassgn = Assignment o' (mkVectorChain sz hwty' ids')
+              netassgn = Assignment o' (mkVectorChain sz hwty'' ids')
           if null attrs then
             return (outps'',(concat ports,oDecl:netassgn:concat decls,Left o'))
           else
             throwAnnotatedSplitError $(curLoc) "Vector"
 
-        RTree d hwty' -> do
-          results <- mapM (appendIdentifier (o',hwty')) [0..2^d-1]
+        RTree d hwty'' -> do
+          results <- mapM (appendIdentifier (o',hwty'')) [0..2^d-1]
           (outps'',results1) <- mapAccumLM go outps' results
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
-              netassgn = Assignment o' (mkRTreeChain d hwty' ids')
+              netassgn = Assignment o' (mkRTreeChain d hwty'' ids')
           if null attrs then
             return (outps'',(concat ports,oDecl:netassgn:concat decls,Left o'))
           else
@@ -1434,29 +1448,29 @@ mkTopOutput' topM outps pM = case pM of
       let pN = portName p o
       pN' <- mkUniqueIdentifier Extended pN
       let pDecl = NetDecl Nothing pN' hwty
-      let attrs = hwTypeAttrs hwty
-      case hwty of
-        Vector sz hwty' -> do
-          results <- mapM (appendIdentifier (pN',hwty')) [0..sz-1]
+      let (attrs, hwty') = stripAttributes hwty
+      case hwty' of
+        Vector sz hwty'' -> do
+          results <- mapM (appendIdentifier (pN',hwty'')) [0..sz-1]
           (outps'',results1) <-
             mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
                        (zip (extendPorts ps) results)
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
-              netassgn = Assignment pN' (mkVectorChain sz hwty' ids')
+              netassgn = Assignment pN' (mkVectorChain sz hwty'' ids')
           if null attrs then
             return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
           else
             throwAnnotatedSplitError $(curLoc) "Vector"
 
-        RTree d hwty' -> do
-          results <- mapM (appendIdentifier (pN',hwty')) [0..2^d-1]
+        RTree d hwty'' -> do
+          results <- mapM (appendIdentifier (pN',hwty'')) [0..2^d-1]
           (outps'',results1) <-
             mapAccumLM (\acc (p',o') -> mkTopOutput' topM acc p' o') outps'
                        (zip (extendPorts ps) results)
           let (ports,decls,ids) = unzip3 results1
               ids' = map (resBV topM) ids
-              netassgn = Assignment pN' (mkRTreeChain d hwty' ids')
+              netassgn = Assignment pN' (mkRTreeChain d hwty'' ids')
           if null attrs then
             return (outps'',(concat ports,pDecl:netassgn:concat decls,Left pN'))
           else

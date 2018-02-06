@@ -172,6 +172,10 @@ main = do
         , testGroup "SynthesisAttributes"
             [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"  ([""],"Simple_topEntity",False) "main"
             , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" ([""],"Product_topEntity",False) "main"
+            , testGroup "Failing" [
+                runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInArgs" (Just "Attempted to split Product into a number of HDL ports.")
+              , runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInResult" (Just "Attempted to split Product into a number of HDL ports.")
+              ]
             ]
         , testGroup "Testbench" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/1152
             [ runTest ("tests" </> "shouldwork" </> "Testbench") defBuild ["-fclash-inline-limit=0"] "TB" (["","TB_testBench"],"TB_testBench",True)
@@ -524,7 +528,7 @@ runFailingTest' _ All  _ _ _ = error "Unexpected test target: All"
 runFailingTest' _ Both _ _ _ = error "Unexpected test target: Both"
 runFailingTest' env target extraArgs modName expectedStderr =
   let cwDir       = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory in
-  let (cmd, args) = clashCmd target (cwDir </> env) extraArgs modName in
+  let (cmd, args) = clashCmd target (cwDir </> env) ("-fclash-nocache" : extraArgs) modName in
   let testName    = "clash (" ++ show target ++ ")" in
   testFailingProgram
     testName
