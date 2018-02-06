@@ -172,8 +172,9 @@ main = do
         , testGroup "SynthesisAttributes"
             [ outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Simple"  ([""],"Simple_topEntity",False) "main"
             , outputTest ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" ([""],"Product_topEntity",False) "main"
+            , runTest    ("tests" </> "shouldwork" </> "SynthesisAttributes") defBuild [] "Product" (["", "Product_testBench"],"Product_testBench",True)
             , testGroup "Failing" [
-                runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInArgs" (Just "Attempted to split Product into a number of HDL ports.")
+                runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInArgs"   (Just "Attempted to split Product into a number of HDL ports.")
               , runFailingTest ("tests" </> "shouldfail" </> "SynthesisAttributes") defBuild [] "ProductInResult" (Just "Attempted to split Product into a number of HDL ports.")
               ]
             ]
@@ -577,9 +578,26 @@ outputTest' funcName env target _hdlDir modDir modName entityName =
       args = [ "new-exec"
              , "--"
              , "runghc"
+             , "-XBinaryLiterals"
+             , "-XConstraintKinds"
              , "-XDataKinds"
+             , "-XDeriveLift"
+             , "-XExplicitForAll"
+             , "-XExplicitNamespaces"
+             , "-XFlexibleContexts"
+             , "-XKindSignatures"
+             , "-XMagicHash"
+             , "-XMonoLocalBinds"
+             , "-XScopedTypeVariables"
+             , "-XTemplateHaskell"
+             , "-XTemplateHaskellQuotes"
+             ,  "-XTypeApplications"
+             , "-XTypeFamilies"
              , "-XTypeOperators"
              , "-XNoImplicitPrelude"
+             , "-XNoMonomorphismRestriction"
+             , "-XNoStrict"
+             , "-XNoStrictData"
              , "-main-is"
              , "--ghc-arg=" ++ modName ++ "." ++ funcName ++ show target
              , env </> modName <.> "hs"

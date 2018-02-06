@@ -16,6 +16,10 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
 --------------- Logic -------------------
+mac
+  :: SystemClockReset
+  => Signal System (Signed 9, Signed 9)
+  -> Signal System (Signed 9)
 mac xy = mealy macT 0 xy
   where
     macT acc (x,y) = (acc',o)
@@ -25,13 +29,16 @@ mac xy = mealy macT 0 xy
 
 topEntity
   :: SystemClockReset
-  => Signal System (Signed 9) `Annotate` 'StringAttr "top" "input1"
-  -> Signal System (Signed 9) `Annotate` 'StringAttr "top" "input2"
+  => Signal System ( Signed 9 `Annotate` 'StringAttr "top" "input1"
+                   , Signed 9 `Annotate` 'StringAttr "top" "input2"
+                   )
   -> Signal System ( Signed 9 `Annotate` 'StringAttr "top" "output1"
-                   , Signed 9 `Annotate` 'StringAttr "top" "output2" )
-topEntity x y = bundle (s, s)
+                   , Signed 9 `Annotate` 'StringAttr "top" "output2"
+                   )
+topEntity xy = bundle (s, s)
   where
-    s = mac $ bundle (x, y)
+    s = mac xy
+{-# NOINLINE topEntity #-}
 
 
 --------------- Actual tests for generated HDL -------------------
@@ -66,3 +73,22 @@ mainVerilog = do
 
 -- Verilog and SystemVerilog should share annotation syntax
 mainSystemVerilog = mainVerilog
+
+-- Simulation tests
+testBench :: Signal System Bool
+testBench = done'
+  where
+    testInput      = stimuliGenerator $(listToVecTH [ (1, 1) :: (Signed 9, Signed 9)
+                                                    , (2, 2)
+                                                    , (3, 3)
+                                                    , (4, 4)
+                                                    ])
+
+    expectedOutput = outputVerifier $(listToVecTH [ (0, 0) :: (Signed 9, Signed 9)
+                                                  , (1, 1)
+                                                  , (5, 5)
+                                                  , (14, 14)
+                                                  ])
+
+    done           = expectedOutput (topEntity testInput)
+    done'          = withClockReset (tbSystemClockGen (not <$> done')) systemResetGen done
