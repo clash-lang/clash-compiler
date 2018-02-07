@@ -208,8 +208,7 @@ clashHDL
   -> TestTree
 clashHDL t env extraArgs modName =
   let (cmd, args) = clashCmd t extraArgs modName in
-  let testName = "Clash(" ++ show t ++ ")" in
-  testProgram testName cmd args (Just env) PrintStdErr False
+  testProgram "clash" cmd args (Just env) PrintStdErr False
 
 ghdlLibrary
   :: FilePath
@@ -348,13 +347,16 @@ vsim env entName =
       , "quit -code 2 -f"
       ]
 
-runTest :: FilePath
-        -> BuildTarget
-        -> [String]
-        -> String
-        -> ([String],String,Bool)
-        -> TestTree
-runTest env VHDL extraArgs modName (subdirs,entName,doSim) = withResource aquire release (const grp)
+runTest'
+  :: FilePath
+  -> BuildTarget
+  -> [String]
+  -> String
+  -> ([String],String,Bool)
+  -> TestTree
+runTest' _ All  _ _ _ = error "Unexpected target: All"
+runTest' _ Both _ _ _ = error "Unexpected target: Both"
+runTest' env VHDL extraArgs modName (subdirs,entName,doSim) = withResource aquire release (const grp)
   where
     vhdlDir   = env </> "vhdl"
     modDir    = vhdlDir </> modName
@@ -366,47 +368,76 @@ runTest env VHDL extraArgs modName (subdirs,entName,doSim) = withResource aquire
       | length subdirs == 1 = []
       | otherwise          = subdirs List.\\ [entName]
 
-    grp       = testGroup modName $ concat
+    grp       = testGroup "VHDL" $ concat
                   [ [clashHDL VHDL env extraArgs modName]
                   , map (ghdlLibrary modDir modName) libs
                   , [ghdlImport modDir (subdirs List.\\ libs)]
                   , [ghdlMake modDir subdirs libs entName]
                   ] ++ if doSim then [ghdlSim modDir (noConflict entName subdirs)] else []
 
-runTest env Verilog extraArgs modName (subdirs,entName,doSim) =
+runTest' env Verilog extraArgs modName (subdirs,entName,doSim) =
     withResource (return ()) release (const grp)
   where
     verilogDir = env </> "verilog"
     modDir     = verilogDir </> modName
     release _  = Directory.removeDirectoryRecursive verilogDir
 
-    grp        = testGroup modName $
+    grp        = testGroup "Verilog" $
                    [ clashHDL Verilog env extraArgs modName
                    , iverilog modDir subdirs entName
                    ] ++ if doSim then [vvp modDir (noConflict entName subdirs)] else []
 
-runTest env SystemVerilog extraArgs modName (subdirs,entName,doSim) =
+runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) =
     withResource (return ()) release (const grp)
   where
     svDir     = env </> "systemverilog"
     modDir    = svDir </> modName
     release _ = Directory.removeDirectoryRecursive svDir
 
-    grp       = testGroup modName $
+    grp       = testGroup "SystemVerilog" $
                   [ clashHDL SystemVerilog env extraArgs modName
                   , vlog modDir subdirs
                   ] ++ if doSim then [vsim modDir entName] else []
 
-runTest env Both extraArgs modName entNameM = testGroup "VHDL & Verilog"
-  [ runTest env VHDL extraArgs modName entNameM
-  , runTest env Verilog extraArgs modName entNameM
+runTest
+  :: FilePath
+  -> BuildTarget
+  -> [String]
+  -> String
+  -> ([String],String,Bool)
+  -> TestTree
+runTest env Both extraArgs modName entNameM = testGroup modName
+  [ runTest' env VHDL extraArgs modName entNameM
+  , runTest' env Verilog extraArgs modName entNameM
   ]
 
-runTest env All extraArgs modName entNameM = testGroup "VHDL & Verilog & SystemVerilog"
-  [ runTest env VHDL extraArgs modName entNameM
-  , runTest env Verilog extraArgs modName entNameM
-  , runTest env SystemVerilog extraArgs modName entNameM
+runTest env All extraArgs modName entNameM = testGroup modName
+  [ runTest' env VHDL extraArgs modName entNameM
+  , runTest' env Verilog extraArgs modName entNameM
+  , runTest' env SystemVerilog extraArgs modName entNameM
   ]
+
+runTest env target extraArgs modName entNameM =
+  testGroup modName [runTest' env target extraArgs modName entNameM]
+
+runFailingTest'
+  :: FilePath
+  -- ^ Working directory
+  -> BuildTarget
+  -- ^ Build target
+  -> [String]
+  -- ^ Extra arguments
+  -> String
+  -- ^ Module name
+  -> Maybe String
+  -- ^ Expected stderr (regular expression)
+  -> TestTree
+runFailingTest' _ All  _ _ _ = error "Unexpected test target: All"
+runFailingTest' _ Both _ _ _ = error "Unexpected test target: Both"
+runFailingTest' env target extraArgs modName expectedStderr =
+  let (cmd, args) = clashCmd target extraArgs modName in
+  let testName = "clash (" ++ show target ++ ")" in
+  testFailingProgram testName cmd args (Just env) PrintNeither False Nothing expectedStderr
 
 runFailingTest
   :: FilePath
@@ -421,17 +452,15 @@ runFailingTest
   -- ^ Expected stderr (regular expression)
   -> TestTree
 runFailingTest env Both extraArgs modName expectedStderr =
-  testGroup "VHDL & Verilog"
-    [ runFailingTest env VHDL extraArgs modName expectedStderr
-    , runFailingTest env Verilog extraArgs modName expectedStderr
+  testGroup modName
+    [ runFailingTest' env VHDL extraArgs modName expectedStderr
+    , runFailingTest' env Verilog extraArgs modName expectedStderr
     ]
 runFailingTest env All extraArgs modName expectedStderr =
-  testGroup "VHDL & Verilog & SystemVerilog"
-    [ runFailingTest env VHDL extraArgs modName expectedStderr
-    , runFailingTest env Verilog extraArgs modName expectedStderr
-    , runFailingTest env SystemVerilog extraArgs modName expectedStderr
+  testGroup modName
+    [ runFailingTest' env VHDL extraArgs modName expectedStderr
+    , runFailingTest' env Verilog extraArgs modName expectedStderr
+    , runFailingTest' env SystemVerilog extraArgs modName expectedStderr
     ]
 runFailingTest env target extraArgs modName expectedStderr =
-  let (cmd, args) = clashCmd target extraArgs modName in
-  let testName = "Clash(" ++ show target ++ ")" in
-  testFailingProgram testName cmd args (Just env) PrintNeither False Nothing expectedStderr
+  testGroup modName [ runFailingTest' env target extraArgs modName expectedStderr ]
