@@ -902,7 +902,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     argTys     = snd $ args !! i
     dcSize     = conSize ty + sum (map typeSize argTys)
     dcExpr     = expr_ False (dcToExpr ty i)
-    argExprs   = zipWith toSLV argTys es
+    argExprs   = map parens (zipWith toSLV argTys es)
     extraArg   = case typeSize ty - dcSize of
                    0 -> []
                    n -> [bits (replicate n U)]
