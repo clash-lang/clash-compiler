@@ -1,6 +1,8 @@
 {-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
 module RecursiveBoxed where
 
+import Clash.Prelude
+
 data B a = B a
 
 topEntity :: B (Int -> Int)
