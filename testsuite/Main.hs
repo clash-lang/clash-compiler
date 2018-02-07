@@ -5,18 +5,23 @@ import Test.Tasty
 import Test.Tasty.Program ( testProgram
                           , testFailingProgram
                           , PrintOutput ( PrintStdErr
-                                        , PrintNeither )
+                                        , PrintNeither
+                                        , PrintStdOut )
                           )
 
 import           Data.Char        (toLower)
 import qualified Data.List        as List
 import qualified System.Directory as Directory
+import           System.Process   (callProcess)
 import           System.FilePath  ((</>),(<.>))
 import qualified System.IO.Unsafe as Unsafe
+import           System.IO.Temp   (createTempDirectory)
+import Control.Concurrent.Lock    ( Lock, newAcquired )
 
 data BuildTarget
   = VHDL | Verilog | SystemVerilog | Both | All
   deriving Show
+
 
 defBuild :: BuildTarget
 #ifdef TRAVISBUILD
@@ -25,8 +30,13 @@ defBuild = Both
 defBuild = All
 #endif
 
+temporaryDirectory :: String
+temporaryDirectory = ".clash-test-tmp"
+
 main :: IO ()
-main =
+main = do
+  callProcess "cabal" ["new-build", "all"]
+
   defaultMain $ testGroup "tests"
     [ testGroup "examples"
       [runTest "examples"             defBuild [] "ALU"          ([""],"ALU_topEntity",False)
@@ -174,20 +184,53 @@ main =
         ]
     ]
 
+type SeqTestTree = IO FilePath -> IO (Maybe Lock, Maybe Lock) -> TestTree
+
+
+hdlFiles :: String -> IO FilePath -> FilePath -> FilePath -> [FilePath]
+hdlFiles ext cwd env subdir = Unsafe.unsafePerformIO $ do
+  vhdlDir  <- (</> env </> subdir) <$> cwd
+  allFiles <- Directory.getDirectoryContents vhdlDir
+  return $ (subdir </>) <$> filter (List.isSuffixOf ext) allFiles
+
+tastyAcquire
+  :: [t]
+  -> [FilePath]
+  -> IO (FilePath, [Maybe Lock])
+tastyAcquire seqTests dirs = do
+  tests <- newLocks seqTests
+  Directory.createDirectoryIfMissing True temporaryDirectory
+  tmpDir <- createTempDirectory temporaryDirectory "clash-test-"
+  _ <- mapM (Directory.createDirectoryIfMissing True) $ map (tmpDir </>) dirs
+  return (tmpDir, tests)
+
+tastyRelease
+  :: (FilePath, b)
+  -> IO ()
+tastyRelease (tmpDir, _) = Directory.removeDirectoryRecursive tmpDir
+
+newLocks
+  :: [t]
+  -> IO [Maybe Lock]
+newLocks tests = sequence [Just <$> newAcquired | _ <- tests]
+
 clashCmd
   :: BuildTarget
   -- ^ Build target
+  -> FilePath
+  -- ^ Work directory
   -> [String]
   -- ^ Extra arguments
   -> String
   -- ^ Module name
   -> (String, [String])
-clashCmd target extraArgs modName = ("cabal", ["new-run", "clash", "--"] ++ args)
+clashCmd target sourceDir extraArgs modName = ("cabal", ["new-run", "clash", "--"] ++ args)
   where
     args = concat [
         [target']
       , extraArgs
-      , [modName <.> "hs"]
+      , [sourceDir </> modName <.> "hs"]
+      , ["-i" ++ sourceDir]
       ]
 
     target' = case target of
@@ -200,65 +243,55 @@ clashHDL
   :: BuildTarget
   -- ^ Build target
   -> FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> [String]
   -- ^ Extra arguments
   -> String
   -- ^ Module name
-  -> TestTree
-clashHDL t env extraArgs modName =
-  let (cmd, args) = clashCmd t extraArgs modName in
-  testProgram "clash" cmd args (Just env) PrintStdErr False
+  -> SeqTestTree
+clashHDL t sourceDir extraArgs modName =
+  let (cmd, args) = clashCmd t sourceDir extraArgs modName in
+  testProgram "clash" cmd args PrintStdErr False
 
 ghdlLibrary
   :: FilePath
-  -- ^ Working directory
+  -- ^ Directory with modules in it, relative to temporary directory
   -> String
   -- ^ Module name
   -> FilePath
   -- ^ Directory with the VHDL files
-  -> TestTree
-ghdlLibrary env modName lib = withResource (return env) (const (return ()))
-    (\d -> testProgram "GHDL (library)" "ghdl"
-      ("-i":("--work="++workName):("--workdir="++workdir):"--std=93":vhdlFiles d lib') (Just env) PrintStdErr False)
-  where
-    lib' = map toLower lib
-    workName = case lib' of {[] -> map toLower modName ++ "_topentity"; k -> k}
-    workdir  = case lib' of {[] -> "."; k -> k}
+  -> SeqTestTree
+ghdlLibrary env modName lib cwd =
+  testProgram "GHDL (library)" "ghdl" args PrintStdErr False $ (</> env) <$> cwd
+      where
+        args = ("-i":("--work="++workName):("--workdir="++workdir):"--std=93":hdlFiles "vhdl" cwd env lib')
 
-    vhdlFiles :: IO FilePath -> FilePath -> [FilePath]
-    vhdlFiles d subdir =  map (subdir </>)
-                       .  Unsafe.unsafePerformIO
-                       $  filter (List.isSuffixOf "vhdl")
-                      <$> (Directory.getDirectoryContents . (</> subdir) =<< d)
+        lib' = map toLower lib
+        workName = case lib' of {[] -> map toLower modName ++ "_topentity"; k -> k}
+        workdir  = case lib' of {[] -> "."; k -> k}
 
 ghdlImport
   :: FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> [FilePath]
   -- ^ Directories with the VHDL files
-  -> TestTree
-ghdlImport env subdirs = withResource (return env) (const (return ()))
-    (\d -> testProgram "GHDL (import)" "ghdl"
-      ("-i":"--workdir=work":"--std=93":concatMap (vhdlFiles d) ((map.map) toLower subdirs)) (Just env) PrintStdErr False)
-  where
-    vhdlFiles :: IO FilePath -> FilePath -> [FilePath]
-    vhdlFiles d subdir =  map (subdir </>)
-                       .  Unsafe.unsafePerformIO
-                       $  filter (List.isSuffixOf "vhdl")
-                      <$> (Directory.getDirectoryContents . (</> subdir) =<< d)
+  -> SeqTestTree
+ghdlImport env subdirs cwd =
+  testProgram "GHDL (import)" "ghdl" args PrintStdErr False $ (</> env) <$> cwd
+    where
+      args = "-i":"--workdir=work":"--std=93":concatMap (hdlFiles "vhdl" cwd env) ((map.map) toLower subdirs)
 
 ghdlMake
   :: FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> [FilePath]
   -- ^ Directories with the VHDL files
   -> [FilePath]
   -- ^ Library directories
   -> String
   -- ^ Name of the components we want to build
-  -> TestTree
-ghdlMake env subdirs libs entName =
+  -> SeqTestTree
+ghdlMake env subdirs libs entName cwd =
   testProgram "GHDL (make)" "ghdl"
     (concat
       [["-m"]
@@ -267,7 +300,7 @@ ghdlMake env subdirs libs entName =
       ,["-o",map toLower (noConflict entName subdirs)]
       ,[entName]
       ])
-    (Just env) PrintStdErr False
+    PrintStdErr False $ (</> env) <$> cwd
   where
     emptyToDot [] = "."
     emptyToDot k  = k
@@ -277,28 +310,23 @@ ghdlSim
   -- ^ Directory with the compiled simulation
   -> String
   -- ^ Name of the testbench executable
-  -> TestTree
-ghdlSim env tbName = testProgram "GHDL (sim)" "ghdl"
-  ["-r","--workdir=work",tbName,"--assert-level=error"] (Just env) PrintStdErr False
+  -> SeqTestTree
+ghdlSim env tbName cwd =
+ let args = ["-r","--workdir=work",tbName,"--assert-level=error"] in
+ testProgram "GHDL (sim)" "ghdl" args PrintStdErr False $ (</> env) <$> cwd
 
 iverilog
   :: FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> [FilePath]
   -- ^ Directories with the Verilog files
   -> String
   -- ^ Name of the component we want to build
-  -> TestTree
-iverilog env subdirs entName = withResource (return env) (const (return ()))
-    (\d -> testProgram "iverilog" "iverilog"
-              ("-g2":"-s":entName:"-o":noConflict entName subdirs:
-               concatMap (verilogFiles d) subdirs) (Just env) PrintStdErr False)
-  where
-    verilogFiles :: IO FilePath -> FilePath -> [FilePath]
-    verilogFiles d subdir =  map (subdir </>)
-                          .  Unsafe.unsafePerformIO
-                          $  filter (List.isSuffixOf "v")
-                         <$> (Directory.getDirectoryContents . (</> subdir) =<< d)
+  -> SeqTestTree
+iverilog env subdirs entName cwd =
+  testProgram "iverilog" "iverilog" args PrintStdErr False $ (</> env) <$> cwd
+    where
+      args = ("-g2":"-s":entName:"-o":noConflict entName subdirs:concatMap (hdlFiles "v" cwd env) subdirs)
 
 noConflict :: String -> [String] -> String
 noConflict nm seen
@@ -309,34 +337,35 @@ noConflict nm seen
       | (nm ++ show n) `elem` seen = go (n+1)
       | otherwise                  = (nm ++ show n)
 
-
 vvp
   :: FilePath
   -- ^ Directory with the compiled simulation
   -> String
   -- ^ Name of the testbench object
-  -> TestTree
-vvp env entName = testProgram "vvp" "vvp" [entName] (Just env) PrintStdErr True
+  -> SeqTestTree
+vvp env entName cwd =
+  testProgram "vvp" "vvp" [entName] PrintStdOut True $ (</> env) <$> cwd
 
 vlog
   :: FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> [FilePath]
   -- ^ Directory with the SystemVerilog files
-  -> TestTree
-vlog env subdirs = testGroup "vlog"
-  [ testProgram "vlib" "vlib" ["work"] (Just env) PrintStdErr False
-  , testProgram "vlog" "vlog" ("-sv":"-work":"work":typFiles ++ allFiles) (Just env) PrintStdErr False
+  -> [SeqTestTree]
+vlog env subdirs =
+  [ \cwd -> testProgram "vlib" "vlib" ["work"] PrintStdErr False $ (</> env) <$> cwd
+  , \cwd -> testProgram "vlog" "vlog" ("-sv":"-work":"work":typFiles ++ allFiles) PrintStdErr False $ (</> env) <$> cwd
   ]
   where
     typFiles = map (\d -> d </> "*_types.sv") subdirs
     allFiles = map (\d -> d </> "*.sv") subdirs
 
-vsim :: FilePath -> String -> TestTree
-vsim env entName =
-  testProgram "vsim" "vsim"
-    ["-batch","-do",doScript,entName] (Just env) PrintStdErr False
+vsim :: FilePath -> String -> SeqTestTree
+vsim env entName cwd =
+  testProgram "vsim" "vsim" args PrintStdErr False $ (</> env) <$> cwd
   where
+    args = ["-batch", "-do", doScript, entName]
+
     doScript = List.intercalate ";"
       [ "run -all"
       , unwords
@@ -347,6 +376,20 @@ vsim env entName =
       , "quit -code 2 -f"
       ]
 
+createTestTrees
+  :: TestName
+  -> [SeqTestTree]
+  -> IO (FilePath, [Maybe Lock])
+  -> TestTree
+createTestTrees modName tests tmpDirAndLocks =
+  testGroup modName $ [t tmpDir ((!!i) <$> prevNexts) | (i, t) <- zip [0..] tests]
+    where
+      tmpDir    = fst <$> tmpDirAndLocks
+      locks     = snd <$> tmpDirAndLocks
+      prevs     = (([Nothing] ++) <$>) locks
+      nexts     = ((++ [Nothing]) <$>) locks
+      prevNexts = zip <$> prevs <*> nexts
+
 runTest'
   :: FilePath
   -> BuildTarget
@@ -354,50 +397,54 @@ runTest'
   -> String
   -> ([String],String,Bool)
   -> TestTree
-runTest' _ All  _ _ _ = error "Unexpected target: All"
-runTest' _ Both _ _ _ = error "Unexpected target: Both"
-runTest' env VHDL extraArgs modName (subdirs,entName,doSim) = withResource aquire release (const grp)
-  where
-    vhdlDir   = env </> "vhdl"
-    modDir    = vhdlDir </> modName
-    workdir   = modDir </> "work"
-    aquire    = Directory.createDirectoryIfMissing True workdir
-    release _ = Directory.removeDirectoryRecursive vhdlDir
+runTest' _ All  _ _ _ = error "Unexpected target in runTest': All"
+runTest' _ Both _ _ _ = error "Unexpected target in runTest': Both"
+runTest' env VHDL extraArgs modName (subdirs, entName, doSim) =
+  withResource acquire tastyRelease (createTestTrees "VHDL" seqTests)
+    where
+      cwDir   = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
+      vhdlDir = "vhdl"
+      modDir  = vhdlDir </> modName
+      workDir = modDir </> "work"
+      acquire = tastyAcquire seqTests [vhdlDir, modDir, workDir]
 
-    libs
-      | length subdirs == 1 = []
-      | otherwise          = subdirs List.\\ [entName]
+      libs
+        | length subdirs == 1 = []
+        | otherwise          = subdirs List.\\ [entName]
 
-    grp       = testGroup "VHDL" $ concat
-                  [ [clashHDL VHDL env extraArgs modName]
-                  , map (ghdlLibrary modDir modName) libs
-                  , [ghdlImport modDir (subdirs List.\\ libs)]
-                  , [ghdlMake modDir subdirs libs entName]
-                  ] ++ if doSim then [ghdlSim modDir (noConflict entName subdirs)] else []
+      seqTests = concat $ [
+           [clashHDL VHDL (cwDir </> env) extraArgs modName]
+          , map (ghdlLibrary modDir modName) libs
+          , [ghdlImport modDir (subdirs List.\\ libs)]
+          , [ghdlMake modDir subdirs libs entName]
+        ] ++ [if doSim then [ghdlSim modDir (noConflict entName subdirs)] else []]
 
-runTest' env Verilog extraArgs modName (subdirs,entName,doSim) =
-    withResource (return ()) release (const grp)
-  where
-    verilogDir = env </> "verilog"
-    modDir     = verilogDir </> modName
-    release _  = Directory.removeDirectoryRecursive verilogDir
+runTest' env Verilog extraArgs modName (subdirs, entName, doSim) =
+  withResource acquire tastyRelease (createTestTrees "Verilog" seqTests)
+    where
+      cwDir      = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
+      verilogDir = "verilog"
+      modDir     = verilogDir </> modName
+      acquire    = tastyAcquire seqTests [verilogDir, modDir]
 
-    grp        = testGroup "Verilog" $
-                   [ clashHDL Verilog env extraArgs modName
-                   , iverilog modDir subdirs entName
-                   ] ++ if doSim then [vvp modDir (noConflict entName subdirs)] else []
+      seqTests =
+        [ clashHDL Verilog (cwDir </> env) extraArgs modName
+        , iverilog modDir subdirs entName
+        ] ++ if doSim then [vvp modDir (noConflict entName subdirs)] else []
 
 runTest' env SystemVerilog extraArgs modName (subdirs,entName,doSim) =
-    withResource (return ()) release (const grp)
-  where
-    svDir     = env </> "systemverilog"
-    modDir    = svDir </> modName
-    release _ = Directory.removeDirectoryRecursive svDir
+  withResource acquire tastyRelease (createTestTrees "SystemVerilog" seqTests)
+    where
+      cwDir   = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory
+      svDir   = "systemverilog"
+      modDir  = svDir </> modName
+      acquire = tastyAcquire seqTests [svDir, modDir]
 
-    grp       = testGroup "SystemVerilog" $
-                  [ clashHDL SystemVerilog env extraArgs modName
-                  , vlog modDir subdirs
-                  ] ++ if doSim then [vsim modDir entName] else []
+      seqTests =
+        concat $
+          [ [ clashHDL SystemVerilog (cwDir </> env) extraArgs modName ]
+          , vlog modDir subdirs
+          ] ++ [if doSim then [vsim modDir entName] else []]
 
 runTest
   :: FilePath
@@ -422,7 +469,7 @@ runTest env target extraArgs modName entNameM =
 
 runFailingTest'
   :: FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> BuildTarget
   -- ^ Build target
   -> [String]
@@ -435,13 +482,23 @@ runFailingTest'
 runFailingTest' _ All  _ _ _ = error "Unexpected test target: All"
 runFailingTest' _ Both _ _ _ = error "Unexpected test target: Both"
 runFailingTest' env target extraArgs modName expectedStderr =
-  let (cmd, args) = clashCmd target extraArgs modName in
-  let testName = "clash (" ++ show target ++ ")" in
-  testFailingProgram testName cmd args (Just env) PrintNeither False Nothing expectedStderr
+  let cwDir       = Unsafe.unsafePerformIO $ Directory.getCurrentDirectory in
+  let (cmd, args) = clashCmd target (cwDir </> env) extraArgs modName in
+  let testName    = "clash (" ++ show target ++ ")" in
+  testFailingProgram
+    testName
+    cmd
+    args
+    PrintNeither
+    False
+    Nothing
+    expectedStderr
+    (Directory.getCurrentDirectory)
+    (return (Nothing, Nothing))
 
 runFailingTest
   :: FilePath
-  -- ^ Working directory
+  -- ^ Work directory
   -> BuildTarget
   -- ^ Build target
   -> [String]
