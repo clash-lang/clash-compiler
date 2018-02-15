@@ -86,6 +86,7 @@ Library
 
   Exposed-modules:    Clash.Annotations.TopEntity
                       Clash.Annotations.Primitive
+                      Clash.Annotations.BitRepresentation
 
                       Clash.Class.BitPack
                       Clash.Class.Num
