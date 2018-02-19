@@ -40,6 +40,8 @@ import Clash.Driver.Types        (BindingMap, DebugLevel)
 import Clash.Netlist.Types       (HWType)
 import Clash.Util
 
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+
 -- | Context in which a term appears
 data CoreContext
   = AppFun           -- ^ Function position of an application
@@ -85,7 +87,10 @@ data RewriteEnv
   = RewriteEnv
   { _dbgLevel       :: DebugLevel
   -- ^ Lvl at which we print debugging messages
-  , _typeTranslator :: HashMap TyConOccName TyCon -> Bool -> Type
+  , _typeTranslator :: CustomReprs
+                    -> HashMap TyConOccName TyCon
+                    -> Bool
+                    -> Type
                     -> Maybe (Either String HWType)
   -- ^ Hardcode Type -> HWType translator
   , _tcCache        :: HashMap TyConOccName TyCon
@@ -96,6 +101,7 @@ data RewriteEnv
   -- ^ Hardcoded evaluator (delta-reduction)}
   , _topEntities    :: HashSet TmOccName
   -- ^ Functions that are considered TopEntities
+  , _customReprs    :: CustomReprs
   }
 
 makeLenses ''RewriteEnv

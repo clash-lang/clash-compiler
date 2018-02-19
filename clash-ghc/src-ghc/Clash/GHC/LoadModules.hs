@@ -110,6 +110,9 @@ loadModules
   :: HDL
   -> String
   -> Maybe (DynFlags.DynFlags)
+  -> Bool
+  -- ^ Ignore topentities. If True, the topentity list returned by
+  -- this function will always be empty.
   -> IO ( [CoreSyn.CoreBind]                     -- Binders
         , [(CoreSyn.CoreBndr,Int)]               -- Class operations
         , [CoreSyn.CoreBndr]                     -- Unlocatable Expressions
@@ -119,7 +122,7 @@ loadModules
            , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
         , [FilePath]
         )
-loadModules hdl modName dflagsM = do
+loadModules hdl modName dflagsM ignoreTopEntities = do
   libDir <- MonadUtils.liftIO ghcLibDir
 
   GHC.runGhc (Just libDir) $ do
@@ -280,17 +283,31 @@ loadModules hdl modName dflagsM = do
         benches     = filter ((== "testBench") . varNameString) rootIds
         mergeBench (x,y) = (x,y,lookup x benchAnn)
         allSyn'     = map mergeBench allSyn
-    topEntities' <- case topEntities of
-      [] -> case topSyn of
-        [] -> Panic.pgmError $ "No 'topEntity', nor function with a 'Synthesize' annotation found in root module: " ++
-                                (Outputable.showSDocUnsafe (ppr rootModule))
-        _ -> return allSyn'
-      [x] -> case lookup x topSyn of
-        Nothing -> case lookup x benchAnn of
-          Nothing -> return ((x,Nothing,listToMaybe benches):allSyn')
-          Just y  -> return ((x,Nothing,Just y):allSyn')
-        Just _  -> return allSyn'
-      _ -> Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
+
+    --
+    topEntities' <-
+      if ignoreTopEntities
+        then
+          return []
+        else
+          case (topEntities, topSyn) of
+            ([], []) ->
+              Panic.pgmError $ unwords [ "No 'topEntity', nor function with a"
+                                       , "'Synthesize' annotation found in root"
+                                       , "module:"
+                                       , (Outputable.showSDocUnsafe (ppr rootModule)) ]
+            ([], _) ->
+              return allSyn'
+            ([x], _) ->
+              case lookup x topSyn of
+                Nothing ->
+                  case lookup x benchAnn of
+                    Nothing -> return ((x,Nothing,listToMaybe benches):allSyn')
+                    Just y  -> return ((x,Nothing,Just y):allSyn')
+                Just _ ->
+                  return allSyn'
+            (_, _) ->
+              Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
     return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub $ pFP ++ pFP')
 

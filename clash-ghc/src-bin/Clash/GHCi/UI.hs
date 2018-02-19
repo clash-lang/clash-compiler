@@ -147,6 +147,8 @@ import           Clash.Util (clashLibVersion)
 import qualified Data.Time.Clock as Clock
 import qualified Paths_clash_ghc
 
+import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
+
 -----------------------------------------------------------------------------
 
 data GhciSettings = GhciSettings {
@@ -1887,9 +1889,10 @@ makeHDL backend optsRef srcs = do
   dflags <- GHC.getSessionDynFlags
   liftIO $ do startTime <- Clock.getCurrentTime
               opts  <- readIORef optsRef
-              let iw = opt_intWidth opts
-                  fp = opt_floatSupport opts
+              let iw  = opt_intWidth opts
+                  fp  = opt_floatSupport opts
                   syn = opt_hdlSyn opts
+                  hdl = Clash.Backend.hdlKind backend'
                   -- determine whether `-outputdir` was used
                   outputDir = do odir <- objectDir dflags
                                  hidir <- hiDir dflags
@@ -1902,15 +1905,32 @@ makeHDL backend optsRef srcs = do
                   opts' = opts {opt_hdlDir = maybe outputDir Just (opt_hdlDir opts)
                                ,opt_importPaths = idirs}
                   backend' = backend iw syn
+
               primDirs <- Clash.Backend.primDirs backend'
+
+              -- Check for custom representation options
+              let parseReprs = customRepresentations idirs hdl (Just dflags)
+              reprs <- buildCustomReprs <$> (concat <$> (sequence $ map parseReprs (opt_customReprs opts)))
+
               forM_ srcs $ \src -> do
                 (bindingsMap,tcm,tupTcm,topEntities,primMap) <-
-                  generateBindings primDirs idirs (Clash.Backend.hdlKind backend') src (Just dflags)
+                  generateBindings primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
-                Clash.Driver.generateHDL bindingsMap (Just backend') primMap tcm
-                  tupTcm (ghcTypeToHWType iw fp) reduceConstant topEntities opts' (startTime,prepTime)
+
+                Clash.Driver.generateHDL
+                  reprs
+                  bindingsMap
+                  (Just backend')
+                  primMap
+                  tcm
+                  tupTcm
+                  (ghcTypeToHWType iw fp)
+                  reduceConstant
+                  topEntities
+                  opts'
+                  (startTime,prepTime)
 
 makeVHDL :: IORef ClashOpts -> [FilePath] -> InputT GHCi ()
 makeVHDL = makeHDL' (Clash.Backend.initBackend :: Int -> HdlSyn -> VHDLState)

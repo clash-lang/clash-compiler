@@ -17,6 +17,7 @@ import CmdLineParser
 import Panic
 import SrcLoc
 
+import Data.List (nub)
 import Data.IORef
 import Control.Monad
 import Clash.Driver.Types
@@ -69,6 +70,7 @@ flagsClash r = [
   , defFlag "fclash-float-support"           $ NoArg (liftEwM (setFloatSupport r))
   , defFlag "fclash-allow-zero-width"        $ NoArg (setAllowZeroWidth r)
   , defFlag "fclash-component-prefix"        $ SepArg (liftEwM . setComponentPrefix r)
+  , defFlag "fclash-custom-reprs"            $ SepArg (setCustomReprFile r)
   ]
 
 setInlineLimit :: IORef ClashOpts
@@ -113,6 +115,15 @@ setIntWidth r n =
   if n == 32 || n == 64
      then liftEwM $ modifyIORef r (\c -> c {opt_intWidth = n})
      else addWarn (show n ++ " is an invalid Int/Word/Integer bit-width. Allowed widths: 32, 64.")
+
+setCustomReprFile
+  :: IORef ClashOpts
+  -> String
+  -> EwM IO ()
+setCustomReprFile r s = liftEwM $ modifyIORef r modify
+  where
+    modify c = c {opt_customReprs = nub $ s : opt_customReprs c}
+
 
 setHdlDir :: IORef ClashOpts
           -> String

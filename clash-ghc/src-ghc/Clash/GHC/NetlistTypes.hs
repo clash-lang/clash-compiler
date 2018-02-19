@@ -32,16 +32,19 @@ import Clash.Netlist.Types              (HWType(..), PortDirection (..))
 import Clash.Signal.Internal            (ClockKind (..), ResetKind (..))
 import Clash.Util                       (curLoc)
 
+import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
+
 ghcTypeToHWType
   :: Int
   -> Bool
+  -> CustomReprs
   -> HashMap TyConOccName TyCon
   -> Bool
   -> Type
   -> Maybe (Either String HWType)
 ghcTypeToHWType iw floatSupport = go
   where
-    go m keepVoid ty@(tyView -> TyConApp tc args) = runExceptT $
+    go reprs m keepVoid ty@(tyView -> TyConApp tc args) = runExceptT $
       case name2String tc of
         "GHC.Int.Int8"                  -> return (Signed 8)
         "GHC.Int.Int16"                 -> return (Signed 16)
@@ -97,7 +100,7 @@ ghcTypeToHWType iw floatSupport = go
         "GHC.Prim.Any" -> return (Void Nothing)
 
         "Clash.Signal.Internal.Signal" ->
-          ExceptT $ return $ coreTypeToHWType go m keepVoid (args !! 1)
+          ExceptT $ return $ coreTypeToHWType go reprs m keepVoid (args !! 1)
 
         "Clash.Signal.BiSignal.BiSignalIn" -> do
           let [_, _, szTy] = args
@@ -149,7 +152,7 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.Vector.Vec" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ coreTypeToHWType go m keepVoid elTy
+          elHWTy <- ExceptT $ return $ coreTypeToHWType go reprs m keepVoid elTy
           case elHWTy of
             Void {}     -> return (Void (Just (Vector (fromInteger sz) elHWTy)))
             _ | sz == 0 -> return (Void (Just (Vector (fromInteger sz) elHWTy)))
@@ -158,7 +161,7 @@ ghcTypeToHWType iw floatSupport = go
         "Clash.Sized.RTree.RTree" -> do
           let [szTy,elTy] = args
           sz     <- mapExceptT (Just . coerce) (tyNatSize m szTy)
-          elHWTy <- ExceptT $ return $ coreTypeToHWType go m keepVoid elTy
+          elHWTy <- ExceptT $ return $ coreTypeToHWType go reprs m keepVoid elTy
           case elHWTy of
             Void {} -> return (Void (Just (RTree (fromInteger sz) elHWTy)))
             _       -> return $ RTree (fromInteger sz) elHWTy
@@ -170,7 +173,7 @@ ghcTypeToHWType iw floatSupport = go
 
         _ -> ExceptT Nothing
 
-    go _ _ _ = Nothing
+    go _ _ _ _ = Nothing
 
 domain
   :: HashMap TyConOccName TyCon

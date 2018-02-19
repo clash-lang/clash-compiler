@@ -1322,7 +1322,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Right n <- runExcept (tyNatSize tcm nTy)
     , [i,j] <- bitVectorLiterals' args
     -> let val = BitVector.unsafeToInteger
-               $ BitVector.setSlice# (BV i) (unsafeSNat m) (unsafeSNat n) (BV j)
+               $ BitVector.setSlice# (BV 0 i) (unsafeSNat m) (unsafeSNat n) (BV 0 j)
            resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo val)
   "Clash.Sized.Internal.BitVector.slice#"
@@ -1332,7 +1332,7 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
     , Right n <- runExcept (tyNatSize tcm nTy)
     , [i] <- bitVectorLiterals' args
     -> let val = BitVector.unsafeToInteger
-               $ BitVector.slice# (BV i) (unsafeSNat m) (unsafeSNat n)
+               $ BitVector.slice# (BV 0 i) (unsafeSNat m) (unsafeSNat n)
            resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo val)
   "Clash.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)

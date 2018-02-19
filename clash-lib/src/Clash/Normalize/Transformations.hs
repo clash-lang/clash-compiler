@@ -123,6 +123,7 @@ inlineOrLiftNonRep = inlineOrLiftBinders nonRepTest inlineTest
     nonRepTest :: (Var Term, Embed Term) -> RewriteMonad extra Bool
     nonRepTest ((Id _ tyE), _)
       = not <$> (representableType <$> Lens.view typeTranslator
+                                   <*> Lens.view customReprs
                                    <*> pure False
                                    <*> Lens.view tcCache
                                    <*> pure (unembed tyE))
@@ -194,6 +195,7 @@ nonRepSpec ctx e@(App e1 e2)
        e2Ty <- termType tcm e2
        localVar <- isLocalVar e2
        nonRepE2 <- not <$> (representableType <$> Lens.view typeTranslator
+                                              <*> Lens.view customReprs
                                               <*> pure False
                                               <*> Lens.view tcCache
                                               <*> pure e2Ty)
@@ -241,6 +243,7 @@ caseCase :: NormRewrite
 caseCase _ e@(Case (Case scrut alts1Ty alts1) alts2Ty alts2)
   = do
     ty1Rep <- representableType <$> Lens.view typeTranslator
+                                <*> Lens.view customReprs
                                 <*> pure False
                                 <*> Lens.view tcCache
                                 <*> pure alts1Ty
@@ -284,6 +287,7 @@ inlineNonRep _ e@(Case scrut altsTy alts)
       else do
         bodyMaybe   <- fmap (HashMap.lookup f) $ Lens.use bindings
         nonRepScrut <- not <$> (representableType <$> Lens.view typeTranslator
+                                                  <*> Lens.view customReprs
                                                   <*> pure False
                                                   <*> Lens.view tcCache
                                                   <*> pure scrutTy)
@@ -337,6 +341,7 @@ caseCon _ c@(Case (Literal l) _ alts) = do
 
 caseCon ctx e@(Case subj ty alts)
   | (Prim _ _,_) <- collectArgs subj = do
+    reprs <- Lens.view customReprs
     tcm <- Lens.view tcCache
     bndrs <- Lens.use bindings
     primEval <- Lens.view evaluator
@@ -375,7 +380,7 @@ caseCon ctx e@(Case subj ty alts)
           _ -> do
             subjTy <- termType tcm subj
             tran   <- Lens.view typeTranslator
-            case coreTypeToHWType tran tcm False subjTy of
+            case coreTypeToHWType tran reprs tcm False subjTy of
               Right (Void (Just hty))
                 | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
                 -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)
@@ -384,10 +389,11 @@ caseCon ctx e@(Case subj ty alts)
                      (caseOneAlt e)
 
 caseCon ctx e@(Case subj ty alts) = do
+  reprs <- Lens.view customReprs
   tcm <- Lens.view tcCache
   subjTy <- termType tcm subj
   tran <- Lens.view typeTranslator
-  case coreTypeToHWType tran tcm False subjTy of
+  case coreTypeToHWType tran reprs tcm False subjTy of
     Right (Void (Just hty))
       | hty `elem` [BitVector 0, Unsigned 0, Signed 0, Index 1]
       -> caseCon ctx (Case (Literal (IntegerLiteral 0)) ty alts)

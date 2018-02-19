@@ -13,6 +13,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE MultiWayIf        #-}
 
 module Clash.Backend.VHDL (VHDLState) where
 
@@ -34,6 +35,7 @@ import           Data.Semigroup.Monad.Extra
 import           Data.Text.Lazy                       (unpack)
 import qualified Data.Text.Lazy                       as T
 import           Data.Text.Prettyprint.Doc.Extra
+import           GHC.Stack                            (HasCallStack)
 import qualified System.FilePath
 import           Text.Printf
 
@@ -47,6 +49,12 @@ import           Clash.Netlist.Types                  hiding (_intWidth, intWidt
 import           Clash.Netlist.Util                   hiding (mkIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
 import           Clash.Util                           (clogBase, curLoc, first, makeCached, on, (<:>))
+
+import           Clash.Annotations.BitRepresentation.Internal
+  (ConstrRepr'(..))
+import           Clash.Annotations.BitRepresentation.Util
+  (BitOrigin(Lit, Field), bitOrigins, bitRanges)
+
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -275,8 +283,12 @@ normaliseType (Product nm tys) = Product nm <$> (mapM normaliseType tys)
 normaliseType ty@(SP _ elTys)      = do
   Mon $ mapM_ ((tyCache %=) . HashSet.insert) (concatMap snd elTys)
   return (BitVector (typeSize ty))
+normaliseType (CustomSP _ size elTys) = do
+  Mon $ mapM_ ((tyCache %=) . HashSet.insert) [ty | (_, _, subTys) <- elTys, ty <- subTys]
+  return (BitVector size)
 normaliseType ty@(Index _)     = return (Unsigned (typeSize ty))
 normaliseType ty@(Sum _ _)     = return (BitVector (typeSize ty))
+normaliseType ty@(CustomSum _ _ _) = return (BitVector (typeSize ty))
 normaliseType (Clock _ _ Gated) =
   return (Product "GatedClock" [Bit,Bool])
 normaliseType (Clock {}) = return Bit
@@ -691,7 +703,7 @@ tyName t@(Product nm _)  = do
              then go mkId s (i+1) n
              else n'
 tyName t@(SP _ _)        = "std_logic_vector_" <> int (typeSize t)
-tyName _ = emptyDoc
+tyName e = error $ $(curLoc) ++ show e
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 vhdlTypeErrValue :: HWType -> VHDLM Doc
@@ -741,9 +753,57 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
 
 decl _ _ = return Nothing
 
+patLitCustom' :: Integral a => VHDLM Doc -> Int -> a -> a -> VHDLM Doc
+patLitCustom' var size mask value =
+  if isUseLessMask mask then
+    -- A mask of all ones will result in the same value when AND-ed with another
+    -- value. We therefore leave out the mask completely.
+    var <+> "=" <+> (bits' value)
+  else
+    -- Select 'right' bits by AND-ing with mask and comparing it with the value
+    parens (var <+> "and" <+> (bits' mask)) <+> "=" <+> (bits' value)
+
+    where
+      bits'         = bits . (toBits size)
+      isUseLessMask = (all (== H)) . (toBits size)
+
+patLitCustom :: VHDLM Doc -> HWType -> Literal -> VHDLM Doc
+patLitCustom var (CustomSum _name size reprs) (NumLit (fromIntegral -> i)) =
+  patLitCustom' var size mask value
+    where
+      ((ConstrRepr' _name _n mask value _anns), _id) = reprs !! i
+
+patLitCustom var (CustomSP _name size reprs) (NumLit (fromIntegral -> i)) =
+  patLitCustom' var size mask value
+    where
+      ((ConstrRepr' _name _n mask value _anns), _id, _tys) = reprs !! i
+
+patLitCustom _ x y = error $ $(curLoc) ++ unwords
+  [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
+  , "not", show x, "and", show y]
+
 insts :: [Declaration] -> VHDLM Doc
 insts [] = emptyDoc
 insts is = vcat . punctuate line . fmap catMaybes $ mapM inst_ is
+
+-- | Helper function for inst_, handling CustomSP and CustomSum
+inst_' :: T.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> VHDLM (Maybe Doc)
+inst_' id_ scrut scrutTy es = fmap Just $
+  (pretty id_ <+> larrow <+> align (vcat (conds esNub) <> semi))
+    where
+      esMod = map (first (fmap (patMod scrutTy))) es
+      esNub = nubBy ((==) `on` fst) esMod
+      var   = expr_ True scrut
+
+      conds :: [(Maybe Literal,Expr)] -> VHDLM [Doc]
+      conds []                = return []
+      conds [(_,e)]           = expr_ False e <:> return []
+      conds ((Nothing,e):_)   = expr_ False e <:> return []
+      conds ((Just c ,e):es') = expr_ False e <+> "when"
+                                              <+> patLitCustom var scrutTy c
+                                              <+> "else"
+                                              <:> conds es'
+
 
 -- | Turn a Netlist Declaration to a VHDL concurrent block
 inst_ :: Declaration -> VHDLM (Maybe Doc)
@@ -759,7 +819,13 @@ inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   where
     (t,f) = if b then (l,r) else (r,l)
 
-inst_ (CondAssignment id_ _ scrut scrutTy es) = fmap Just $
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <> line <>
       indent 2 (pretty id_ <+> larrow <+> align (vcat (punctuate comma (conds esNub)) <> semi))
   where
@@ -793,16 +859,28 @@ inst_ _ = return Nothing
 expr_ :: Bool -- ^ Enclose in parenthesis?
      -> Expr -- ^ Expr to convert
      -> VHDLM Doc
-expr_ _ (Literal sizeM lit)                           = exprLit sizeM lit
-expr_ _ (Identifier id_ Nothing)                      = pretty id_
-expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy id_ start end
-  where
-    argTys   = snd $ args !! dcI
-    argTy    = argTys !! fI
-    argSize  = typeSize argTy
-    other    = otherSize argTys (fI-1)
-    start    = typeSize ty - 1 - conSize ty - other
-    end      = start - argSize + 1
+expr_ _ (Literal sizeM lit) = exprLit sizeM lit
+expr_ _ (Identifier id_ Nothing) = pretty id_
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
+  hcat $ punctuate " & " $ sequence ranges
+    where
+      (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
+
+      ranges =
+        map range $ bitRanges (anns !! fI)
+
+      range (start, end) =
+        pretty id_ <> parens (int start <+> "downto" <+> int end)
+
+expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
+  fromSLV argTy id_ start end
+    where
+      argTys   = snd $ args !! dcI
+      argTy    = argTys !! fI
+      argSize  = typeSize argTy
+      other    = otherSize argTys (fI-1)
+      start    = typeSize ty - 1 - conSize ty - other
+      end      = start - argSize + 1
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _),_,fI)))) =
   pretty id_ <> dot <> tyName ty <> "_sel" <> int fI
@@ -923,7 +1001,53 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
                    n -> [bits (replicate n U)]
     assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
-expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = expr_ False (dcToExpr ty i)
+expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) =
+  expr_ False (dcToExpr ty i)
+expr_ _ (DataCon ty@(CustomSum _ _ tys) (DC (_,i)) []) =
+  let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
+  "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
+expr_ _ (DataCon (CustomSP _ size args) (DC (_,i)) es) =
+  hcat $ punctuate " & " $ mapM range origins
+    where
+      (cRepr, _, argTys) = args !! i
+
+      -- Build bit representations for all constructor arguments
+      argExprs = zipWith toSLV argTys es :: [VHDLM Doc]
+
+      -- Spread bits of constructor arguments using masks
+      origins = bitOrigins size cRepr :: [BitOrigin]
+
+      range
+        :: BitOrigin
+        -> VHDLM Doc
+      range (Lit ns) =
+        dquotes $ hcat $ mapM bit_char ns
+      range (Field n start end) =
+        -- We want to select the bits starting from 'start' downto and including
+        -- 'end'. We cannot use "(start downto end)" in VHDL, as the preceeding
+        -- expression might be anything. This notation only works on identifiers
+        -- unfortunately.
+        let fsize = start - end + 1 in
+        let expr' = argExprs !! n in
+
+        -- HACK: While expr' is a std_logic_vector (see call `toSLV`), it cannot
+        -- be cast to unsigned in case of literals. This is fixed by explicitly
+        -- casting it to std_logic_vector.
+        let unsigned = "unsigned" <> parens ("std_logic_vector'" <> parens expr') in
+
+        if | fsize == size ->
+               -- If sizes are equal, rotating / resizing amounts to doing nothing
+               expr'
+           | end == 0 ->
+               -- Rotating is not necessary if relevant bits are already at the end
+               let resized = "resize" <> parens (unsigned <> comma <> int fsize) in
+               "std_logic_vector" <> parens resized
+           | otherwise ->
+               -- Select bits 'start' downto and including 'end'
+               let rotated  = unsigned <+> "ror" <+> int end in
+               let resized = "resize" <> parens (rotated <> comma <> int fsize) in
+               "std_logic_vector" <> parens resized
+
 expr_ _ (DataCon ty@(Product _ _) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> "_sel" <> int i <+> rarrow <+> expr_ False e') [0..] es
 
@@ -1131,6 +1255,10 @@ toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Sum _ _)    e = expr_ False e
+toSLV (CustomSum _ size reprs) (DataCon _ (DC (_,i)) _) =
+  let (ConstrRepr' _ _ _ value _) = fst $ reprs !! i in
+  let unsigned = "to_unsigned" <> parens (int (fromIntegral value) <> comma <> int size) in
+  "std_logic_vector" <> parens unsigned
 toSLV t@(Product _ tys) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     encloseSep lparen rparen " & " (zipWithM toSLV tys selIds')
@@ -1143,7 +1271,8 @@ toSLV (Product _ tys) (DataCon _ _ es) = do
 toSLV (Product _ _) e = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
-toSLV (SP _ _) e = expr_ False e
+toSLV (SP _ _) e       = expr_ False e
+toSLV (CustomSP _ _ _) e = expr_ False e
 toSLV (Vector n elTy) (Identifier id_ Nothing) = do
     selIds' <- sequence selIds
     syn <- Mon hdlSyn
@@ -1158,9 +1287,9 @@ toSLV (Vector n elTy) (DataCon _ _ es) = parens $ vcat $ punctuate " & " (zipWit
 toSLV (Vector _ _) e = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.toSLV" <> parens (expr_ False e)
-toSLV hty      e = error $ $(curLoc) ++  "toSLV: ty:" ++ show hty ++ "\n expr: " ++ show e
+toSLV hty e = error $ $(curLoc) ++  "toSLV:\n\nType: " ++ show hty ++ "\n\nExpression: " ++ show e
 
-fromSLV :: HWType -> Identifier -> Int -> Int -> VHDLM Doc
+fromSLV :: HasCallStack => HWType -> Identifier -> Int -> Int -> VHDLM Doc
 fromSLV Bool              id_ start _   = do
   nm <- Mon $ use modNm
   pretty (T.toLower $ T.pack nm) <> "_types.fromSLV" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int start))
@@ -1170,6 +1299,7 @@ fromSLV (Index _)         id_ start end = "unsigned" <> parens (pretty id_ <> pa
 fromSLV (Signed _)        id_ start end = "signed" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Unsigned _)      id_ start end = "unsigned" <> parens (pretty id_ <> parens (int start <+> "downto" <+> int end))
 fromSLV (Sum _ _)         id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
+fromSLV (CustomSum _ _ _) id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV t@(Product _ tys) id_ start _ = do
     tupled $ zipWithM (\s e -> s <+> rarrow <+> e) selNames args
   where
@@ -1180,6 +1310,7 @@ fromSLV t@(Product _ tys) id_ start _ = do
     ends       = map (+1) (tail starts)
     args       = zipWith3 (`fromSLV` id_) tys starts ends
 
+fromSLV (CustomSP _ _ _)  id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (SP _ _)          id_ start end = pretty id_ <> parens (int start <+> "downto" <+> int end)
 fromSLV (Vector n elTy)   id_ start _   =
     if n > 1 then tupled args
