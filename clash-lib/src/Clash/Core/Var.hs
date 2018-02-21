@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                          2017, Google Inc.
+                     2017-2018, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -12,22 +12,45 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Core.Var
-  ( Var (..)
+  ( Attr' (..)
+  , Var (..)
   , Id
   , TyVar
   , modifyVarName
+  , attrName
   )
 where
+
 
 import Control.DeepSeq                  (NFData (..))
 import Data.Hashable                    (Hashable)
 import Data.Typeable                    (Typeable)
 import GHC.Generics                     (Generic)
 import Unbound.Generics.LocallyNameless (Alpha,Embed,Subst(..))
-
 import Clash.Core.Name                  (Name)
 import {-# SOURCE #-} Clash.Core.Term   (Term)
 import {-# SOURCE #-} Clash.Core.Type   (Kind, Type)
+
+
+-- | Interal version of Clash.Annotation.SynthesisAttributes.Attr.
+--
+-- Needed because Clash.Annotation.SynthesisAttributes.Attr uses the Symbol
+-- kind for names, which do not have a term-level representation
+data Attr'
+  = BoolAttr' String Bool
+  | IntegerAttr' String Integer
+  | StringAttr' String String
+  | Attr' String
+  deriving (Eq, Show, NFData, Generic, Hashable, Typeable, Alpha, Ord)
+
+instance Subst Type Attr'
+instance Subst Term Attr'
+
+attrName :: Attr' -> String
+attrName (BoolAttr' n _)    = n
+attrName (IntegerAttr' n _) = n
+attrName (StringAttr' n _)  = n
+attrName (Attr' n)          = n
 
 -- | Variables in CoreHW
 data Var a

@@ -51,6 +51,9 @@ module Clash.Core.Type
   , undefinedTy
   , isIntegerTy
   , normalizeType
+  , varAttrs
+  , getFunResult
+  , typeAttrs
   )
 where
 
@@ -61,7 +64,7 @@ import           Data.HashMap.Strict                     (HashMap)
 import qualified Data.HashMap.Strict                     as HashMap
 import           Data.List                               (foldl',isPrefixOf)
 import           Data.Maybe                              (isJust, mapMaybe)
-import           GHC.Base                                (isTrue#,(==#))
+import           GHC.Base                                (isTrue#,(==#),(<|>))
 import           GHC.Generics                            (Generic(..))
 import           GHC.Integer                             (smallInteger)
 import           GHC.Integer.Logarithms                  (integerLogBase#)
@@ -69,7 +72,7 @@ import           Unbound.Generics.LocallyNameless        (Alpha(..),Bind,Fresh,
                                                           Subst(..),SubstName(..),
                                                           acompare,aeq,bind,embed,
                                                           gacompare,gaeq,gfvAny,
-                                                          runFreshM,unbind)
+                                                          runFreshM,unbind,unembed)
 import           Unbound.Generics.LocallyNameless.Extra  ()
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -83,6 +86,16 @@ import           Clash.Core.TysPrim
 import           Clash.Core.Var
 import           Clash.Util
 
+varAttrs :: Var a -> [Attr']
+varAttrs t@(TyVar _ _) =
+  error $ $(curLoc) ++ "Unexpected argument: " ++ show t
+
+varAttrs (Id _ ty) =
+  case unembed ty of
+    AnnType attrs _typ -> attrs
+    _                  -> []
+
+
 -- | Types in CoreHW: function and polymorphic types
 data Type
   = VarTy    !Kind !TyName      -- ^ Type variable
@@ -90,6 +103,7 @@ data Type
   | ForAllTy !(Bind TyVar Type) -- ^ Polymorphic Type
   | AppTy    !Type !Type        -- ^ Type Application
   | LitTy    !LitTy             -- ^ Type literal
+  | AnnType  [Attr'] !Type      -- ^ Annotated type, see Clash.Annotations.SynthesisAttributes
   deriving (Show,Generic,NFData,Hashable)
 
 -- | An easier view on types
@@ -228,6 +242,7 @@ typeKind m (ForAllTy b)         = let (_,ty) = runFreshM $ unbind b
                                   in typeKind m ty
 typeKind _ (LitTy (NumTy _))    = typeNatKind
 typeKind _ (LitTy (SymTy _))    = typeSymbolKind
+typeKind m (AnnType _ann typ)   = typeKind m typ
 typeKind m (tyView -> FunTy _arg res)
   | isSuperKind m k = k
   | otherwise       = liftedTypeKind
@@ -309,6 +324,27 @@ isPolyFunCoreTy _ ty = case tyView ty of
   FunTy _ _ -> True
   OtherType (ForAllTy _) -> True
   _ -> False
+
+-- | Extract rightmost type of types concatenated using an arrow (i.e., the
+-- result of a function). Fails (returns Nothing) if this is not a function
+-- type.
+getFunResult
+  :: Type
+  -> Maybe Type
+getFunResult typ =
+  case tyView typ of
+    FunTy _arg result ->
+      getFunResult result <|> Just result
+    _ ->
+      Nothing
+
+-- | Extract attributes from type. Will return an empty list if this is an
+-- AnnType with an empty list AND if this is not an AnnType at all.
+typeAttrs
+  :: Type
+  -> [Attr']
+typeAttrs (AnnType attrs _typ) = attrs
+typeAttrs _                    = []
 
 -- | Is a type a function type?
 isFunTy :: HashMap TyConOccName TyCon

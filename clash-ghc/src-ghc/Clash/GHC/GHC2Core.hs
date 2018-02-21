@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
-                     2017     , Google Inc.
+                     2017-2818, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -76,7 +76,7 @@ import OccName    (occNameString)
 import Outputable (showPpr)
 import Pair       (Pair (..))
 import SrcLoc     (isGoodSrcSpan)
-import TyCon      (AlgTyConRhs (..), TyCon,
+import TyCon      (AlgTyConRhs (..), TyCon, tyConName,
                    algTyConRhs, isAlgTyCon, isFamilyTyCon,
                    isFunTyCon, isNewTyCon,
                    isPrimTyCon, isTupleTyCon,
@@ -499,12 +499,160 @@ coreToDataCon dc = do
              , C.dcExtTyVars  = eTvs
              }
 
-coreToType :: Type
-           -> State GHC2CoreState C.Type
-coreToType ty = coreToType' $ fromMaybe ty (coreView ty)
+typeConstructorToString
+  :: TyCon
+  -> State GHC2CoreState String
+typeConstructorToString constructor =
+    C.name2String <$> coreToName tyConName tyConUnique qualfiedNameString constructor
 
-coreToType' :: Type
-            -> State GHC2CoreState C.Type
+_ATTR_NAME :: String
+_ATTR_NAME = "Clash.Annotations.SynthesisAttributes.Attr"
+
+-- | Flatten a list type structure to a list of types.
+listTypeToListOfTypes :: Type -> [Type]
+listTypeToListOfTypes (TyConApp _ [_, a, as]) = a : listTypeToListOfTypes as
+listTypeToListOfTypes _                       = []
+
+-- | Try to determine boolean value by looking at constructor name of type.
+boolTypeToBool :: Type -> State GHC2CoreState Bool
+boolTypeToBool (TyConApp constructor _args) = do
+  constructorName <- typeConstructorToString constructor
+  return $ case constructorName of
+    "GHC.Types.True"  -> True
+    "GHC.Types.False" -> False
+    _ -> error $ "Expected boolean constructor, got:" ++ constructorName
+boolTypeToBool s =
+  error $ unwords [ "Could not unpack given type to bool:"
+                  , showPpr unsafeGlobalDynFlags s ]
+
+-- | Returns string of (LitTy (StrTyLit s)) construction.
+tyLitToString :: Type -> String
+tyLitToString (LitTy (StrTyLit s)) = unpackFS s
+tyLitToString s = error $ unwords [ "Could not unpack given type to string:"
+                                  , showPpr unsafeGlobalDynFlags s ]
+
+-- | Returns integer of (LitTy (NumTyLit n)) construction.
+tyLitToInteger :: Type -> Integer
+tyLitToInteger (LitTy (NumTyLit n)) = n
+tyLitToInteger s = error $ unwords [ "Could not unpack given type to integer:"
+                                   , showPpr unsafeGlobalDynFlags s ]
+
+-- | Try to interpret a Type as an Attr
+coreToAttr
+  :: Type
+  -> State GHC2CoreState C.Attr'
+coreToAttr (TyConApp ty args) = do
+  let key   = args !! 0
+  let value = args !! 1
+  name' <- typeConstructorToString ty
+  case name' of
+    "Clash.Annotations.SynthesisAttributes.StringAttr" ->
+        return $ C.StringAttr' (tyLitToString key) (tyLitToString value)
+    "Clash.Annotations.SynthesisAttributes.IntegerAttr" ->
+        return $ C.IntegerAttr' (tyLitToString key) (tyLitToInteger value)
+    "Clash.Annotations.SynthesisAttributes.BoolAttr" -> do
+        bool <- boolTypeToBool value
+        return $ C.BoolAttr' (tyLitToString key) bool
+    "Clash.Annotations.SynthesisAttributes.Attr" ->
+        return $ C.Attr' (tyLitToString key)
+    _ ->
+        error $ unwords [ "Expected StringAttr, IntegerAttr, BoolAttr or Attr"
+                        , "constructor, got:" ++ name' ]
+
+coreToAttr t =
+  error $ unwords [ "Expected type constructor (TyConApp), but got:"
+                  , showPpr unsafeGlobalDynFlags t ]
+
+coreToAttrs'
+  :: [Type]
+  -> State GHC2CoreState [C.Attr']
+coreToAttrs' [annotationType, _star, _realType, attributes] =
+  case annotationType of
+    TyConApp ty [TyConApp ty' _args'] -> do
+      name'  <- typeConstructorToString ty
+      name'' <- typeConstructorToString ty'
+
+      let result | name' == "GHC.Types.[]" && name'' == _ATTR_NAME =
+                      -- List of attributes
+                      sequence $ map coreToAttr (listTypeToListOfTypes attributes)
+                 | name' == "GHC.Types.[]" =
+                      -- List, but uknown types
+                      error $ $(curLoc) ++ unwords [ "Annotate expects an"
+                                                   , "Attr or a list of"
+                                                   , "Attr's, but got a list"
+                                                   , "of:", name'']
+                 | otherwise =
+                      -- Some unknown nested type
+                      error $ $(curLoc) ++ unwords [ "Annotate expects an"
+                                                   , "Attr or a list of"
+                                                   , "Attr's, but got:"
+                                                   , name' ]
+
+      result
+
+    TyConApp ty _args -> do
+      name' <- typeConstructorToString ty
+      if name' == _ATTR_NAME
+        then
+          -- Single annotation
+          sequence [coreToAttr attributes]
+        else do
+          -- Annotation to something we don't recognize (not a list,
+          -- nor an Attr)
+          tystr <- typeConstructorToString ty
+          error $ unwords [ "Annotate expects an Attr or a list of"
+                          , "Attr's, but got:", tystr ]
+    _ ->
+      error $ $(curLoc) ++ unwords [ "Expected TyConApp, not:"
+                                   , showPpr unsafeGlobalDynFlags annotationType]
+
+coreToAttrs' illegal =
+  error $ "Expected list with four items (as Annotate has four arguments), but got: "
+      ++ show (map (showPpr unsafeGlobalDynFlags) illegal)
+
+-- | If this type has an annotate type synonym, return list of attributes.
+coreToAttrs
+  :: Type
+  -> State GHC2CoreState [C.Attr']
+coreToAttrs (TyConApp tycon kindsOrTypes) = do
+  name' <- typeConstructorToString tycon
+
+  if name' == "Clash.Annotations.SynthesisAttributes.Annotate"
+    then
+      coreToAttrs' kindsOrTypes
+    else
+      return []
+
+coreToAttrs _ =
+    return []
+
+-- | Wrap given type in annotation if is annotated using the contructs
+-- defined in Clash.Annotations.SynthesisAttributes.
+annotateType
+  :: Type
+  -> C.Type
+  -> State GHC2CoreState C.Type
+annotateType ty cty = do
+  attrs <- coreToAttrs ty
+  case attrs of
+    [] -> return cty
+    _  -> return $ C.AnnType attrs cty
+
+-- | Converts GHC Type to a Clash Type. Strips newtypes and signals, with the
+-- exception of newtypes used as annotations (see: SynthesisAttributes).
+coreToType
+  :: Type
+  -> State GHC2CoreState C.Type
+coreToType ty = ty'' >>= annotateType ty
+  where
+    ty'' =
+      case coreView ty of
+        Just ty' -> coreToType' ty'
+        Nothing  -> coreToType' ty
+
+coreToType'
+  :: Type
+  -> State GHC2CoreState C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToType (varType tv) <*> (coreToVar tv)
 coreToType' (TyConApp tc args)
   | isFunTyCon tc = foldl C.AppTy (C.ConstTy C.Arrow) <$> mapM coreToType args

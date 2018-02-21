@@ -1,19 +1,21 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                          2017, Google Inc.
+                     2017-2018, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
   Generate VHDL for assorted Netlist datatypes
 -}
 
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE MultiWayIf        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecursiveDo       #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecursiveDo         #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Clash.Backend.VHDL (VHDLState) where
 
@@ -23,11 +25,12 @@ import           Control.Monad                        (forM,join,liftM,zipWithM)
 import           Control.Monad.State                  (State)
 import           Data.Bits                            (testBit, Bits)
 import           Data.Graph.Inductive                 (Gr, mkGraph, topsort')
+import           Data.Hashable                        (Hashable)
 import           Data.HashMap.Lazy                    (HashMap)
 import qualified Data.HashMap.Lazy                    as HashMap
 import           Data.HashSet                         (HashSet)
 import qualified Data.HashSet                         as HashSet
-import           Data.List                            (mapAccumL,nub,nubBy)
+import           Data.List                            (mapAccumL,nub,nubBy,intersperse)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 #if !MIN_VERSION_base(4,11,0)
 import           Data.Monoid                          hiding (Sum, Product)
@@ -48,6 +51,7 @@ import           Clash.Annotations.BitRepresentation.ClashLib
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges)
 import           Clash.Backend
+import           Clash.Core.Var                       (Attr'(..),attrName)
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
@@ -299,6 +303,7 @@ topSortHWTys hwtys = sorted
     edge _                 = []
 
 normaliseType :: HWType -> VHDLM HWType
+normaliseType (Annotated _ ty) = normaliseType ty
 normaliseType (Vector n ty)    = Vector n <$> (normaliseType ty)
 normaliseType (RTree d ty)     = RTree d <$> (normaliseType ty)
 normaliseType (Product nm tys) = Product nm <$> (mapM normaliseType tys)
@@ -620,12 +625,118 @@ entity c = do
 architecture :: Component -> VHDLM Doc
 architecture c =
   nest 2
-    ("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
+    (("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
      decls (declarations c)) <> line <>
+     line <>
+     renderAttrs attrs) <> line <>
   nest 2
     ("begin" <> line <>
      insts (declarations c)) <> line <>
     "end" <> semi
+ where
+   attrs       = inputAttrs ++ outputAttrs ++ declAttrs
+   netdecls    = filter isNetDecl (declarations c)
+   declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) <- netdecls, attr <- hwTypeAttrs hwtype]
+   inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
+   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
+
+   isNetDecl :: Declaration -> Bool
+   isNetDecl (NetDecl' _ _ _ (Right _)) = True
+   isNetDecl _                          = False
+
+
+attrType
+  :: t ~ HashMap T.Text T.Text
+  => t
+  -> Attr'
+  -> t
+attrType types attr =
+  case HashMap.lookup name' types of
+    Nothing    -> HashMap.insert name' type' types
+    Just type'' | type'' == type' -> types
+                | otherwise -> error $
+                      $(curLoc) ++ unwords [ T.unpack name', "already assigned"
+                                           , T.unpack type'', "while we tried to"
+                                           , "add", T.unpack type' ]
+ where
+  name' = T.pack $ attrName attr
+  type' = T.pack $ case attr of
+            BoolAttr' _ _    -> "boolean"
+            IntegerAttr' _ _ -> "integer"
+            StringAttr' _ _  -> "string"
+            Attr' _          -> "bool"
+
+-- | Create 'attrname -> type' mapping for given attributes. Will err if multiple
+-- types are assigned to the same name.
+attrTypes :: [Attr'] -> HashMap T.Text T.Text
+attrTypes = foldl attrType HashMap.empty
+
+-- | Create a 'attrname -> (type, [(signalname, value)]). Will err if multiple
+-- types are assigned to the same name.
+attrMap
+  :: forall t
+   . t ~ HashMap T.Text (T.Text, [(T.Text, T.Text)])
+  => [(T.Text, Attr')]
+  -> t
+attrMap attrs = foldl go empty' attrs
+ where
+  empty' = HashMap.fromList
+           [(k, (types HashMap.! k, [])) | k <- HashMap.keys types]
+  types = attrTypes (map snd attrs)
+
+  go :: t -> (T.Text, Attr') -> t
+  go map' attr = HashMap.adjust
+                   (go' attr)
+                   (T.pack $ attrName $ snd attr)
+                   map'
+
+  go'
+    :: (T.Text, Attr')
+    -> (T.Text, [(T.Text, T.Text)])
+    -> (T.Text, [(T.Text, T.Text)])
+  go' (signalName, attr) (typ, elems) =
+    (typ, (signalName, renderAttr attr) : elems)
+
+renderAttrs
+  :: [(T.Text, Attr')]
+  -> VHDLM Doc
+renderAttrs (attrMap -> attrs) =
+  vcat $ sequence $ intersperse " " $ map renderAttrGroup (assocs attrs)
+ where
+  renderAttrGroup
+    :: (T.Text, (T.Text, [(T.Text, T.Text)]))
+    -> VHDLM Doc
+  renderAttrGroup (attrname, (typ, elems)) =
+    ("attribute" <+> string attrname <+> colon <+> string typ <> semi)
+    <> line <>
+    (hcat $ sequence $ map (renderAttrDecl attrname) elems)
+
+  renderAttrDecl
+    :: T.Text
+    -> (T.Text, T.Text)
+    -> VHDLM Doc
+  renderAttrDecl attrname (signalName, value) = "attribute"
+                                             <+> string attrname
+                                             <+> "of"
+                                             <+> string signalName
+                                             <+> colon
+                                             <+> "signal is"
+                                             <+> string value
+                                             <+> semi
+
+-- | Return all key/value pairs in the map in arbitrary key order.
+assocs :: Eq a => Hashable a => HashMap a b -> [(a,b)]
+assocs m = zip keys (map (m HashMap.!) keys)
+ where
+  keys = (HashMap.keys m)
+
+-- | Convert single attribute to VHDL syntax
+renderAttr :: Attr' -> T.Text
+renderAttr (StringAttr'  _key value) = T.pack $ show value
+renderAttr (IntegerAttr' _key value) = T.pack $ show value
+renderAttr (BoolAttr'    _key True ) = T.pack $ "true"
+renderAttr (BoolAttr'    _key False) = T.pack $ "false"
+renderAttr (Attr'        _key      ) = T.pack $ "true"
 
 -- | Convert a Netlist HWType to a VHDL type
 vhdlType :: HWType -> VHDLM Doc

@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
-                          2017, Google Inc.
+                     2017-2018, Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -38,7 +38,7 @@ import           Data.List                            (nub, nubBy)
 import           Data.Monoid                          hiding (Product, Sum)
 #endif
 import           Data.Semigroup.Monad
-import           Data.Text.Lazy                       (pack, unpack)
+import           Data.Text.Lazy                       (pack, unpack, intercalate)
 import qualified Data.Text.Lazy                       as Text
 import           Data.Text.Prettyprint.Doc.Extra
 #ifdef CABAL
@@ -54,6 +54,7 @@ import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr'(..))
 import           Clash.Annotations.BitRepresentation.Util
   (BitOrigin(Lit, Field), bitOrigins, bitRanges, isContinuousMask)
+import           Clash.Core.Var                       (Attr'(..))
 import           Clash.Backend
 import           Clash.Driver.Types                   (SrcSpan, noSrcSpan)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
@@ -233,7 +234,9 @@ sigPort :: Maybe WireOrReg
         -> Text.Text
         -> HWType
         -> VerilogM Doc
-sigPort wor pName hwType = portType <+> verilogType' True hwType <+> string pName <+> encodingNote hwType
+sigPort wor pName hwType =
+    addAttrs (hwTypeAttrs hwType)
+      (portType <+> verilogType' True hwType <+> string pName <+> encodingNote hwType)
   where
     portType = case wor of
                  Nothing   -> if isBiSignalIn hwType then "inout" else "input"
@@ -355,13 +358,33 @@ decls ds = do
       [] -> emptyDoc
       _  -> punctuate' semi (A.pure dsDoc)
 
+-- | Add attribute notation to given declaration
+addAttrs
+  :: [Attr']
+  -> VerilogM Doc
+  -> VerilogM Doc
+addAttrs []     t = t
+addAttrs attrs' t =
+  "(*" <+> attrs'' <+> "*)" <+> t
+ where
+  attrs'' = string $ intercalate ", " (map renderAttr attrs')
+
+-- | Convert single attribute to verilog syntax
+renderAttr :: Attr' -> Text.Text
+renderAttr (StringAttr'  key value) = pack $ concat [key, " = ", show value]
+renderAttr (IntegerAttr' key value) = pack $ concat [key, " = ", show value]
+renderAttr (BoolAttr'    key True ) = pack $ concat [key, " = ", "1"]
+renderAttr (BoolAttr'    key False) = pack $ concat [key, " = ", "0"]
+renderAttr (Attr'        key      ) = pack $ key
+
 decl :: Declaration -> VerilogM (Maybe Doc)
 decl (NetDecl' noteM wr id_ tyE) =
-  Just A.<$> maybe id addNote noteM (wireOrRegDoc wr <+> tyDec tyE)
+  Just A.<$> maybe id addNote noteM (addAttrs attrs (wireOrRegDoc wr <+> tyDec tyE))
   where
     tyDec (Left  ty) = string ty <+> string id_
     tyDec (Right ty) = sigDecl (string id_) ty
     addNote n = mappend ("//" <+> string n <> line)
+    attrs = fromMaybe [] (hwTypeAttrs A.<$> either (const Nothing) Just tyE)
 
 decl _ = return Nothing
 
