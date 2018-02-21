@@ -607,55 +607,70 @@ port elName hwType portDirection fillToN =
   direction | isBiSignalIn hwType = "inout"
             | otherwise           = portDirection
 
+
+-- [Note] Hack entity attributes in architecture
+--
+-- By default we print attributes inside the entity block. This conforms
+-- to the VHDL standard (IEEE Std 1076-1993, 5.1 Attribute specification,
+-- paragraph 9), and is subsequently implemented in this way by open-source
+-- simulators such as GHDL.
+---
+-- Intel and Xilinx use their own annotation schemes unfortunately, which
+-- require attributes in the architecture.
+--
+-- References:
+--  * https://www.mail-archive.com/ghdl-discuss@gna.org/msg03175.html
+--  * https://forums.xilinx.com/t5/Simulation-and-Verification/wrong-attribute-decorations-of-port-signals-generated-by-write/m-p/704905#M16265
+--  * http://quartushelp.altera.com/15.0/mergedProjects/hdl/vhdl/vhdl_file_dir_chip.htm
+
 entity :: Component -> VHDLM Doc
 entity c = do
+    syn <- Mon hdlSyn
     rec (p,ls) <- fmap unzip (ports (maximum ls))
     "entity" <+> pretty (componentName c) <+> "is" <> line <>
       (case p of
          [] -> emptyDoc
-         _  -> indent 2 ("port" <>
-                         parens (align $ vcat $ punctuate semi (pure p)) <>
-                         semi <> line <> line <> attrs)
-      ) <> line <>
-      "end" <> semi
+         _  -> case syn of
+          -- See: [Note] Hack entity attributes in architecture
+          Other -> indent 2 (rports p <> line <> line <> attrs) <> line <> "end" <> semi
+          _     -> indent 2 (rports p) <> "end" <> semi
+      )
   where
     ports l = sequence $ [port iName hwType "in" l | (iName, hwType) <- inputs c]
                       ++ [port oName hwType "out" l | (_, (oName, hwType)) <- outputs c]
 
-    -- TODO / HACK: We print attributes inside the entity block. This conforms
-    -- to the VHDL standard (IEEE Std 1076-1993, 5.1 Attribute specification,
-    -- paragraph 9), and is subsequently implemented in this way by open-source
-    -- simulators such as GHDL. Intel and Xilinx use their own annotation schemes
-    -- unfortunately.
-    --
-    -- References:
-    --  * https://www.mail-archive.com/ghdl-discuss@gna.org/msg03175.html
-    --  * https://forums.xilinx.com/t5/Simulation-and-Verification/wrong-attribute-decorations-of-port-signals-generated-by-write/m-p/704905#M16265
-    --  * http://quartushelp.altera.com/15.0/mergedProjects/hdl/vhdl/vhdl_file_dir_chip.htm
+    rports p = "port" <> (parens (align (vcat (punctuate semi (pure p))))) <> semi
+
     attrs       = renderAttrs $ inputAttrs ++ outputAttrs
     inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
     outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
 
 
 architecture :: Component -> VHDLM Doc
-architecture c =
-  nest 2
-    (("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
-     decls (declarations c)) <> line <>
-     line <>
-     renderAttrs declAttrs) <> line <>
-  nest 2
-    ("begin" <> line <>
-     insts (declarations c)) <> line <>
-    "end" <> semi
+architecture c = do {
+  ; syn <- Mon hdlSyn
+  ; let attrs = case syn of
+                  -- See: [Note] Hack entity attributes in architecture
+                  Other -> declAttrs
+                  _     -> inputAttrs ++ outputAttrs ++ declAttrs
+  ; nest 2
+      (("architecture structural of" <+> pretty (componentName c) <+> "is" <> line <>
+       decls (declarations c)) <> line <>
+       if null attrs then emptyDoc else line <> line <> renderAttrs attrs) <> line <>
+    nest 2
+      ("begin" <> line <>
+       insts (declarations c)) <> line <>
+      "end" <> semi
+  }
  where
    netdecls    = filter isNetDecl (declarations c)
    declAttrs   = [(id_, attr) | NetDecl' _ _ id_ (Right hwtype) <- netdecls, attr <- hwTypeAttrs hwtype]
+   inputAttrs  = [(id_, attr) | (id_, hwtype) <- inputs c, attr <- hwTypeAttrs hwtype]
+   outputAttrs = [(id_, attr) | (_wireOrReg, (id_, hwtype)) <- outputs c, attr <- hwTypeAttrs hwtype]
 
    isNetDecl :: Declaration -> Bool
    isNetDecl (NetDecl' _ _ _ (Right _)) = True
    isNetDecl _                          = False
-
 
 attrType
   :: t ~ HashMap T.Text T.Text

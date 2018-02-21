@@ -124,9 +124,12 @@ setHdlSyn :: IORef ClashOpts
           -> EwM IO ()
 setHdlSyn r s = case readMaybe s of
   Just hdlSyn -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = hdlSyn})
-  Nothing     -> if s == "Xilinx"
-                    then liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
-                    else addWarn (s ++ " is an unknown hdl synthesis tool")
+  Nothing -> case s of
+    "Xilinx"  -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
+    "ISE"     -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Vivado})
+    "Altera"  -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Quartus})
+    "Intel"   -> liftEwM $ modifyIORef r (\c -> c {opt_hdlSyn = Quartus})
+    _         -> addWarn (s ++ " is an unknown hdl synthesis tool")
 
 setErrorExtra :: IORef ClashOpts -> IO ()
 setErrorExtra r = modifyIORef r (\c -> c {opt_errorExtra = True})
