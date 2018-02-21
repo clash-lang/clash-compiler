@@ -30,6 +30,7 @@ import           Control.Arrow                   (second)
 #if MIN_VERSION_ghc(8,6,0)
 import           Control.Exception               (throwIO)
 #endif
+import           Control.Monad.IO.Class          (liftIO)
 import           Data.Generics.Uniplate.DataOnly (transform)
 import           Data.List                       (foldl', lookup, nub)
 import           Data.Maybe                      (catMaybes, fromMaybe,
@@ -63,6 +64,7 @@ import qualified TidyPgm
 import qualified Unique
 #if MIN_VERSION_ghc(8,2,0)
 import qualified UniqDFM
+import qualified UniqFM
 #else
 import qualified UniqFM
 #endif
@@ -77,9 +79,12 @@ import qualified UniqSet
 import qualified Var
 
 -- Internal Modules
-import           Clash.GHC.GHC2Core              (modNameM)
+import           Clash.Annotations.BitRepresentation          (DataReprAnn)
+import           Clash.Annotations.BitRepresentation.Internal (DataRepr')
+import           Clash.GHC.GHC2Core                           (modNameM)
 import           Clash.GHC.LoadInterfaceFiles
-import           Clash.Util                      (curLoc)
+import           Clash.GHC.LoadInterfaceFiles                 (loadExternalExprs, toDataRepr')
+import           Clash.Util                                   (curLoc)
 
 ghcLibDir :: IO FilePath
 ghcLibDir = do
@@ -121,6 +126,7 @@ loadModules
            , Maybe TopEntity                     -- (maybe) TopEntity annotation
            , Maybe CoreSyn.CoreBndr)]            -- (maybe) testBench bndr
         , [FilePath]
+        , [DataRepr']
         )
 loadModules hdl modName dflagsM ignoreTopEntities = do
   libDir <- MonadUtils.liftIO ghcLibDir
@@ -250,7 +256,7 @@ loadModules hdl modName dflagsM ignoreTopEntities = do
         modFamInstEnvs'          = foldr UniqFM.plusUFM UniqFM.emptyUFM modFamInstEnvs
 #endif
 
-    (externalBndrs,clsOps,unlocatable,pFP) <-
+    (externalBndrs,clsOps,unlocatable,pFP,reprs) <-
       loadExternalExprs hdl (UniqSet.mkUniqSet binderIds) bindersC
 
     -- Find local primitive annotations
@@ -278,6 +284,7 @@ loadModules hdl modName dflagsM ignoreTopEntities = do
     allSyn   <- findSynthesizeAnnotations binderIds
     benchAnn <- findTestBenchAnnotations binderIds
     topSyn   <- findSynthesizeAnnotations rootIds
+    reprs'   <- findCustomReprAnnotations
     let varNameString = OccName.occNameString . Name.nameOccName . Var.varName
         topEntities = filter ((== "topEntity") . varNameString) rootIds
         benches     = filter ((== "testBench") . varNameString) rootIds
@@ -309,7 +316,7 @@ loadModules hdl modName dflagsM ignoreTopEntities = do
             (_, _) ->
               Panic.pgmError $ $(curLoc) ++ "Multiple 'topEntities' found."
 
-    return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub $ pFP ++ pFP')
+    return (bindersC ++ makeRecursiveGroups externalBndrs,clsOps,unlocatable,(fst famInstEnvs,modFamInstEnvs'),topEntities',nub $ pFP ++ pFP',reprs++reprs')
 
 -- | Given a set of bindings, make explicit non-recursive bindings and
 -- recursive binding groups.
@@ -349,6 +356,19 @@ makeRecursiveGroups
     makeBind (Digraph.AcyclicSCC (b,e)) = CoreSyn.NonRec b e
     makeBind (Digraph.CyclicSCC bs)     = CoreSyn.Rec bs
 
+findCustomReprAnnotations
+  :: GHC.GhcMonad m
+  => m [DataRepr']
+findCustomReprAnnotations = do
+  hsc_env <- GHC.getSession
+  ann_env <- liftIO $ HscTypes.prepareAnnotations hsc_env Nothing
+
+  let deserializer = Serialized.deserializeWithData :: ([Word8] -> DataReprAnn)
+  let deserialized = Annotations.deserializeAnns deserializer ann_env
+  let reprs        = concat $ UniqFM.nonDetEltsUFM deserialized
+
+  return $ map toDataRepr' reprs
+
 findSynthesizeAnnotations
   :: GHC.GhcMonad m
   => [CoreSyn.CoreBndr]
@@ -363,7 +383,7 @@ findSynthesizeAnnotations bndrs = do
       anns'    = map (filter isSyn) anns
       annBndrs = filter (not . null . snd) (zip bndrs anns')
   case filter ((> 1) . length . snd) annBndrs of
-    [] -> return (map (second listToMaybe) annBndrs)
+    [] -> return $ map (second listToMaybe) annBndrs
     as -> Panic.pgmError $
             "The following functions have multiple 'Synthesize' annotations: " ++
             Outputable.showSDocUnsafe (ppr (map fst as))

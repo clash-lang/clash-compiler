@@ -111,7 +111,7 @@ deref bindings (Var _type name)  =
 deref _bindings t = t
 
 parseTHName :: Term -> Text.Text
-parseTHName (App (App _ name) (App _ module_)) =
+parseTHName (App (App _ name) (App _ mod_)) =
   Text.pack $ (parseStringLit module_) ++ "." ++ (parseStringLit name)
 parseTHName th = error $ $(curLoc) ++ "Expected THName, but got: " ++ show th
 
@@ -142,18 +142,18 @@ parseConstrRepr src n (App (App (App (App _constr thname) mask) value) fieldmask
     (map parseWordLit $ parseList fieldmasks)
 parseConstrRepr _src _n cr = error $ $(curLoc) ++ "Expected ConstrRepr, but got: " ++ show cr
 
-stripDataRepr :: TypeName -> TypeName
-stripDataRepr (TypeName _dataRepr [tn]) = tn
+stripDataRepr :: TypeName' -> TypeName'
+stripDataRepr (TypeName' _dataRepr [tn]) = tn
 stripDataRepr e = error $ "Unexpected type: " ++ show e
 
-coreToTypeName' :: Type -> TypeName
-coreToTypeName' typ =
-  case coreToTypeName typ of
+coreToTypeName'' :: Type -> TypeName'
+coreToTypeName'' typ =
+  case coreToTypeName' typ of
     Right typ' ->
       typ'
     Left err ->
       error $ concat [ $(curLoc), "Could not translate type: ", show typ, "."
-                     , "\n\n", "coreToTypeName reported: ", err, "." ]
+                     , "\n\n", "coreToTypeName' reported: ", err, "." ]
 
 parseDataRepr
   :: BindingMap
@@ -165,7 +165,7 @@ parseDataRepr bindings (_name, typ, srcspan, _, (deref bindings -> reprsTerm)) =
     (App (App _constr size) reprs) ->
       let reprs' = [parseConstrRepr srcspan i r | (i, r) <- zip [0..] (parseList reprs)] in
       let size'  = parseWordLit size in
-      let typ'   = stripDataRepr $ coreToTypeName' typ in
+      let typ'   = stripDataRepr $ coreToTypeName'' typ in
       deepseq (reprs', size', typ') (DataRepr' typ' size' reprs')
     _ ->
       error $ $(curLoc) ++ "Expected DataRepr, but got: " ++ show reprsTerm
@@ -182,7 +182,7 @@ customRepresentations
   -> IO [DataRepr']
 customRepresentations _importDirs hdl dflagsM modName = do
   -- Load module with custom representations in it, and convert to Clash types
-  (bindings, clsOps, unlocatable, _, _, _) <- loadModules hdl modName dflagsM True
+  (bindings, clsOps, unlocatable, _, _, _, _) <- loadModules hdl modName dflagsM True
   let mkBindings' = mkBindings HashMap.empty bindings clsOps unlocatable
   let ((bindingsMap, _), _) = State.runState mkBindings' emptyGHC2CoreState
 
@@ -204,14 +204,19 @@ generateBindings
   -- ^ HDL target
   -> String
   -> Maybe  (GHC.DynFlags)
-  -> IO (BindingMap,HashMap TyConOccName TyCon,IntMap TyConName
-        ,[( TmName          -- topEntity bndr
-          , Type            -- type of the topEntity bndr
-          , Maybe TopEntity -- (maybe) TopEntity annotation
-          , Maybe TmName)]  -- (maybe) associated testbench
-        ,PrimMap Text.Text) -- The primitives found in '.' and 'primDir'
+  -> IO ( BindingMap
+        , HashMap TyConOccName TyCon
+        , IntMap TyConName
+        , [( TmName          -- topEntity bndr
+           , Type            -- type of the topEntity bndr
+           , Maybe TopEntity -- (maybe) TopEntity annotation
+           , Maybe TmName    -- (maybe) associated testbench
+           )]
+        , PrimMap Text.Text  -- The primitives found in '.' and 'primDir'
+        , [DataRepr']
+        )
 generateBindings primDirs importDirs hdl modName dflagsM = do
-  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP) <- loadModules hdl modName dflagsM False
+  (bindings,clsOps,unlocatable,fiEnvs,topEntities,pFP,reprs) <- loadModules hdl modName dflagsM False
   primMap <- generatePrimMap $ concat [pFP, primDirs, importDirs]
   let ((bindingsMap,clsVMap),tcMap) = State.runState (mkBindings primMap bindings clsOps unlocatable) emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons tcMap
@@ -230,7 +235,7 @@ generateBindings primDirs importDirs hdl modName dflagsM = do
                                               Nothing       -> error "This shouldn't happen"
                                           ) topEntities'
 
-  return (retypedBindings,allTcCache,tupTcCache,topEntities'',primMap)
+  return (retypedBindings,allTcCache,tupTcCache,topEntities'',primMap,reprs)
 
 retypeBindings
   :: HashMap TyConOccName TyCon

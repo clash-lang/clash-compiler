@@ -14,12 +14,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 module Clash.Annotations.BitRepresentation.Internal
   ( DataRepr'(..)
   , ConstrRepr'(..)
-  , TypeName(..)
+  , TypeName'(..)
   , CustomReprs
   , getDataRepr
   , getConstrRepr
   , buildCustomReprs
-  , coreToTypeName
+  , coreToTypeName'
   ) where
 
 import qualified Data.Map       as Map
@@ -42,11 +42,11 @@ type Size'    = Word
 
 type FieldAnn' = BitMask'
 
-type CustomReprs = ( Map.Map TypeName DataRepr'
+type CustomReprs = ( Map.Map TypeName' DataRepr'
                    , Map.Map Text.Text ConstrRepr'
                    )
 
-getDataRepr :: TypeName -> CustomReprs -> Maybe DataRepr'
+getDataRepr :: TypeName' -> CustomReprs -> Maybe DataRepr'
 getDataRepr name (reprs, _) = Map.lookup name reprs
 
 getConstrRepr :: Text.Text -> CustomReprs -> Maybe ConstrRepr'
@@ -60,44 +60,44 @@ buildCustomRepr d@(DataRepr' name _size constrReprs) (dMap, cMap) =
 buildCustomReprs :: [DataRepr'] -> CustomReprs
 buildCustomReprs = foldr buildCustomRepr (Map.empty, Map.empty)
 
-coreToTypeName :: Type -> Either String TypeName
-coreToTypeName (AppTy t1 t2) = do
-  (TypeName name names) <- coreToTypeName t1
-  t2typeName            <- coreToTypeName t2
-  return $ TypeName name (names ++ [t2typeName])
-coreToTypeName (ConstTy (TyCon name)) =
-  return $ TypeName (Text.pack $ name2String name) []
-coreToTypeName e =
+coreToTypeName' :: Type -> Either String TypeName'
+coreToTypeName' (AppTy t1 t2) = do
+  (TypeName' name names) <- coreToTypeName' t1
+  t2typeName            <- coreToTypeName' t2
+  return $ TypeName' name (names ++ [t2typeName])
+coreToTypeName' (ConstTy (TyCon name)) =
+  return $ TypeName' (Text.pack $ name2String name) []
+coreToTypeName' e =
   Left $ $(curLoc) ++ "Unexpected type: " ++ show e
 
 -- |
-data TypeName =
-  TypeName Text.Text [TypeName]
+data TypeName' =
+  TypeName' Text.Text [TypeName']
     deriving (Generic, NFData, Eq, Typeable, Hashable, Ord)
 
-showTypeName
+showTypeName'
   :: Bool
   -- ^ Wrap in parentheses?
-  -> TypeName
-  -- ^ TypeName to pretty print
+  -> TypeName'
+  -- ^ TypeName' to pretty print
   -> Text.Text
 -- Terminal: ignore request for parentheses
-showTypeName _ (TypeName name []) =
+showTypeName' _ (TypeName' name []) =
   name
 -- Wrap in parentheses, and move on:
-showTypeName True typeName =
-  Text.concat ["(", showTypeName False typeName, ")"]
+showTypeName' True typeName =
+  Text.concat ["(", showTypeName' False typeName, ")"]
 -- Separate names by spaces:
-showTypeName False (TypeName name names) =
-  Text.intercalate " " $ name : map (showTypeName True) names
+showTypeName' False (TypeName' name names) =
+  Text.intercalate " " $ name : map (showTypeName' True) names
 
-instance Show TypeName where
-  show tn = concat [ "TypeName<", Text.unpack $ showTypeName False tn, ">" ]
+instance Show TypeName' where
+  show tn = concat [ "TypeName'<", Text.unpack $ showTypeName' False tn, ">" ]
 
 -- |
 data DataRepr' =
   DataRepr'
-    TypeName
+    TypeName'
     -- ^ Qualified name of type (recursive)
     Size'
     -- ^ Size of data type

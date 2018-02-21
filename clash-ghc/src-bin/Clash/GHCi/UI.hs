@@ -1910,17 +1910,17 @@ makeHDL backend optsRef srcs = do
 
               -- Check for custom representation options
               let parseReprs = customRepresentations idirs hdl (Just dflags)
-              reprs <- buildCustomReprs <$> (concat <$> (sequence $ map parseReprs (opt_customReprs opts)))
+              reprsFromFile <- concat <$> (mapM parseReprs (opt_customReprs opts))
 
               forM_ srcs $ \src -> do
-                (bindingsMap,tcm,tupTcm,topEntities,primMap) <-
+                (bindingsMap,tcm,tupTcm,topEntities,primMap,reprsFromAnns) <-
                   generateBindings primDirs idirs hdl src (Just dflags)
                 prepTime <- startTime `deepseq` bindingsMap `deepseq` tcm `deepseq` Clock.getCurrentTime
                 let prepStartDiff = Clock.diffUTCTime prepTime startTime
                 putStrLn $ "Loading dependencies took " ++ show prepStartDiff
 
                 Clash.Driver.generateHDL
-                  reprs
+                  (buildCustomReprs $ reprsFromFile ++ reprsFromAnns)
                   bindingsMap
                   (Just backend')
                   primMap

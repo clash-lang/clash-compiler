@@ -14,6 +14,7 @@
 module Clash.GHC.LoadInterfaceFiles
   ( loadExternalExprs
   , primitiveFilePath
+  , toDataRepr'
   )
 where
 
@@ -23,14 +24,18 @@ import           Data.Char                   (toLower)
 import           Data.Either                 (partitionEithers)
 import           Data.List                   (elemIndex, foldl', partition)
 import           Data.Maybe                  (fromMaybe, isJust, isNothing,
-                                              mapMaybe)
+                                              mapMaybe, catMaybes)
 import           Data.Word                   (Word8)
+import qualified Data.Text.Lazy              as Text
+import           Language.Haskell.TH.Syntax  (OccName(..), Name(..),
+                                              NameFlavour(..), ModName(..))
 import           System.Directory            (createDirectoryIfMissing)
 import           System.FilePath.Posix       ((<.>), (</>))
 
-import           Clash.Annotations.Primitive
+
 
 -- GHC API
+import           Annotations (Annotation(..), getAnnTargetName_maybe)
 import qualified Annotations
 import qualified BasicTypes
 import qualified Class
@@ -63,7 +68,10 @@ import qualified VarSet
 #endif
 
 -- Internal Modules
-import           Clash.Util                  (curLoc, traceIf, (***))
+import           Clash.Annotations.Primitive
+import           Clash.Annotations.BitRepresentation
+import           Clash.Annotations.BitRepresentation.Internal
+import           Clash.Util                                   (curLoc, traceIf)
 
 runIfl :: GHC.GhcMonad m => GHC.Module -> TcRnTypes.IfL a -> m a
 runIfl modName action = do
@@ -109,26 +117,27 @@ loadExternalExprs ::
        , [(CoreSyn.CoreBndr,Int)]              -- Class Ops
        , [CoreSyn.CoreBndr]                    -- Unlocatable
        , [FilePath]
+       , [DataRepr']
        )
-loadExternalExprs hdl = go [] [] [] []
+loadExternalExprs hdl = go [] [] [] [] []
   where
-    go locatedExprs clsOps unlocated pFP _ [] =
-      return (locatedExprs,clsOps,unlocated,pFP)
+    go locatedExprs clsOps unlocated pFP reprs _ [] =
+      return (locatedExprs,clsOps,unlocated,pFP,reprs)
 
-    go locatedExprs clsOps unlocated pFP visited (CoreSyn.NonRec _ e:bs) = do
-      (locatedExprs',clsOps',unlocated',pFP',visited') <-
-        go' locatedExprs clsOps unlocated pFP visited [e]
-      go locatedExprs' clsOps' unlocated' pFP' visited' bs
+    go locatedExprs clsOps unlocated pFP reprs visited (CoreSyn.NonRec _ e:bs) = do
+      (locatedExprs',clsOps',unlocated',pFP',reprs',visited') <-
+        go' locatedExprs clsOps unlocated pFP reprs visited [e]
+      go locatedExprs' clsOps' unlocated' pFP' reprs' visited' bs
 
-    go locatedExprs clsOps unlocated pFP visited (CoreSyn.Rec bs:bs') = do
-      (locatedExprs',clsOps',unlocated',pFP',visited') <-
-        go' locatedExprs clsOps unlocated pFP visited (map snd bs)
-      go locatedExprs' clsOps' unlocated' pFP' visited' bs'
+    go locatedExprs clsOps unlocated pFP reprs visited (CoreSyn.Rec bs:bs') = do
+      (locatedExprs',clsOps',unlocated',pFP',reprs',visited') <-
+        go' locatedExprs clsOps unlocated pFP reprs visited (map snd bs)
+      go locatedExprs' clsOps' unlocated' pFP' reprs' visited' bs'
 
-    go' locatedExprs clsOps unlocated pFP visited [] =
-      return (locatedExprs,clsOps,unlocated,pFP,visited)
+    go' locatedExprs clsOps unlocated pFP reprs visited [] =
+      return (locatedExprs,clsOps,unlocated,pFP,reprs,visited)
 
-    go' locatedExprs clsOps unlocated pFP visited (e:es) = do
+    go' locatedExprs clsOps unlocated pFP reprs visited (e:es) = do
       let fvs = CoreFVs.exprSomeFreeVarsList
                   (\v -> Var.isId v &&
                          isNothing (Id.isDataConId_maybe v) &&
@@ -145,8 +154,8 @@ loadExternalExprs hdl = go [] [] [] []
                           (elemIndex v clsIds)
             ) clsOps'
 
-      ((locatedExprs',unlocated'),pFP') <-
-         ((partitionEithers *** concat) . unzip) <$> mapM (loadExprFromIface hdl) fvs'
+      (locatedAndUnlocated, pFP', reprs') <- unzip3 <$> mapM (loadExprFromIface hdl) fvs'
+      let (locatedExprs', unlocated') = partitionEithers locatedAndUnlocated
 
       let visited' = foldl' UniqSet.addListToUniqSet visited
                        [ map fst locatedExprs'
@@ -157,7 +166,8 @@ loadExternalExprs hdl = go [] [] [] []
       go' (locatedExprs'++locatedExprs)
           (clsOps''++clsOps)
           (unlocated'++unlocated)
-          (pFP'++pFP)
+          (concat pFP'++pFP)
+          (concat reprs'++reprs)
           visited'
           (es ++ map snd locatedExprs')
 
@@ -166,9 +176,10 @@ loadExprFromIface ::
   => HDL
   -> CoreSyn.CoreBndr
   -> m (Either
-          (CoreSyn.CoreBndr,CoreSyn.CoreExpr)
-          CoreSyn.CoreBndr
+          (CoreSyn.CoreBndr,CoreSyn.CoreExpr) -- Located
+          CoreSyn.CoreBndr                    -- Unlocated
        ,[FilePath]
+       ,[DataRepr']
        )
 loadExprFromIface hdl bndr = do
   dflags <- GHC.getSessionDynFlags
@@ -180,7 +191,7 @@ loadExprFromIface hdl bndr = do
     Just nameMod -> runIfl nameMod $ do
       ifaceM <- loadIface nameMod
       case ifaceM of
-        Nothing    -> return (Right bndr,[])
+        Nothing    -> return (Right bndr,[],[])
         Just iface -> do
           let decls = map snd (GHC.mi_decls iface)
           let nameFun = GHC.getOccName $ Var.varName bndr
@@ -190,13 +201,60 @@ loadExprFromIface hdl bndr = do
           let declM = filter ((== nameFun) . IfaceSyn.ifName) decls
 #endif
           anns <- TcIface.tcIfaceAnnotations (GHC.mi_anns iface)
-          primFPs <- loadPrimitiveAnnotations hdl outDir anns
+          primFPs   <- loadPrimitiveAnnotations hdl outDir anns
+          let reprs  = loadCustomReprAnnotations anns
           case declM of
             [namedDecl] -> do
               tyThing <- loadDecl namedDecl
-              return (loadExprFromTyThing bndr tyThing,primFPs)
-            _ -> return (Right bndr,primFPs)
-    Nothing -> return (Right bndr,[])
+              return (loadExprFromTyThing bndr tyThing,primFPs,reprs)
+            _ -> return (Right bndr,primFPs,reprs)
+    Nothing -> return (Right bndr,[],[])
+
+toDataRepr' :: DataReprAnn -> DataRepr'
+toDataRepr' (DataReprAnn typ size constrs) =
+  DataRepr' (toTypeName' typ) size (zipWith toConstrRepr' [0..] constrs)
+    where
+      toConstrRepr' :: Int -> ConstrRepr -> ConstrRepr'
+      toConstrRepr' n (ConstrRepr name mask value fieldanns) =
+        ConstrRepr' (thToText name) n (fromIntegral mask) value (map fromIntegral fieldanns)
+
+      thToText :: Name -> Text.Text
+      thToText (Name (OccName name') (NameG _namespace _pkgName (ModName modName))) =
+        Text.pack $ modName ++ "." ++ name'
+      thToText name' = error $ $(curLoc) ++ "Unexpected pattern: " ++ show name'
+
+      toTypeName' :: TypeName -> TypeName'
+      toTypeName' (TT name')      = TypeName' (thToText name') []
+      toTypeName' (TN name' subs) = TypeName' (thToText name') (map toTypeName' subs)
+
+loadCustomReprAnnotations
+  :: [Annotations.Annotation]
+  -> [DataRepr']
+loadCustomReprAnnotations anns =
+--  traceShow (length anns) $
+  catMaybes $ map go $ catMaybes $ zipWith filterNameless anns reprs
+    where
+        env         = Annotations.mkAnnEnv anns
+        deserialize = Serialized.deserializeWithData :: [Word8] -> DataReprAnn
+        reprs       = UniqFM.eltsUFM (Annotations.deserializeAnns deserialize env)
+
+        filterNameless
+          :: Annotation
+          -> [DataReprAnn]
+          -> Maybe (Name.Name, [DataReprAnn])
+        filterNameless (Annotation ann_target _) reprs' =
+          (,reprs') <$> getAnnTargetName_maybe ann_target
+
+        go
+          :: (Name.Name, [DataReprAnn])
+          -> Maybe DataRepr'
+        go (_name, [])      = Nothing
+        go (_name,  [repr]) = Just $ toDataRepr' repr
+        go (name, reprs')   =
+          error $ $(curLoc) ++ "Multiple DataReprAnn annotations for same type: \n\n"
+                            ++ (Outputable.showPpr DynFlags.unsafeGlobalDynFlags name)
+                            ++ "\n\nReprs:\n\n"
+                            ++ show reprs'
 
 loadPrimitiveAnnotations ::
   MonadIO m
