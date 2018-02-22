@@ -2,6 +2,7 @@
 module Clash.Annotations.BitRepresentation.Util
   ( bitOrigins
   , bitRanges
+  , isContinuousMask
   , BitOrigin(..)
   ) where
 
@@ -93,3 +94,12 @@ bitRanges word = reverse $ map swap ranges
     groups' = filter (head . snd) groups
     groups  = snd $ mapAccumL offsets 0 (group bits)
     bits    = map (testBit word) [0..finiteBitSize word - 1]
+
+isContinuousMask :: Word -> Bool
+isContinuousMask word =
+  -- Use case expression so we avoid calculating all groups
+  case bitRanges word of
+    -- At least two groups:
+    (_:_:_) -> False
+    -- Zero or one group:
+    _       -> True

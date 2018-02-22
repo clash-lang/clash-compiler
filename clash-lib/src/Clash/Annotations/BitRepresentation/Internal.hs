@@ -15,6 +15,7 @@ module Clash.Annotations.BitRepresentation.Internal
   ( DataRepr'(..)
   , ConstrRepr'(..)
   , TypeName'(..)
+  , BitMask'
   , CustomReprs
   , getDataRepr
   , getConstrRepr
