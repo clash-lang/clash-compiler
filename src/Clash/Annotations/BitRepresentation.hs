@@ -25,9 +25,9 @@ import qualified Language.Haskell.TH.Syntax as TH
 import Data.Data (Data)
 import Data.Typeable (Typeable)
 
-type BitMask  = Word
-type Value    = Word
-type Size     = Word
+type BitMask  = Integer
+type Value    = Integer
+type Size     = Integer
 
 type FieldAnn = BitMask
 
@@ -99,5 +99,3 @@ data ConstrRepr =
     [FieldAnn]
     -- ^ Masks for fields. Indicates where fields are stored.
       deriving (Show, Data, Typeable)
-
-
