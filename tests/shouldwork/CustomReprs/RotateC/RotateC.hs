@@ -12,12 +12,12 @@ data Color
   = Red
   | Green
   | Blue
-    deriving (Eq, Show{-, Generic, ShowX-})
+    deriving (Eq, Show, Generic, ShowX)
 
 data MaybeColor
   = NothingC
   | JustC Color
-    deriving (Eq, Show{-, Generic, ShowX-})
+    deriving (Eq, Show, Generic, ShowX)
 
 -- Test functions:
 rotateColor
@@ -29,18 +29,11 @@ rotateColor c =
     Green -> Blue
     Blue  -> Red
 
-colorToInt
-  :: Color
-  -> Int
-colorToInt Red   = 33
-colorToInt Green = 34
-colorToInt Blue  = 35
-
 topEntity
   :: SystemClockReset
   => Signal System MaybeColor
-  -> Signal System Int
-topEntity = fmap (colorToInt . f)
+  -> Signal System Color
+topEntity = fmap f
   where
     f cM =
       case cM of
@@ -58,10 +51,10 @@ testBench = done'
                                :> (JustC Blue)
                                :> Nil
 
-    expectedOutput = outputVerifier $ 33 -- Red
-                                   :> 34 -- Green
-                                   :> 35 -- Blue
-                                   :> 33 -- Red
+    expectedOutput = outputVerifier $ Red
+                                   :> Green
+                                   :> Blue
+                                   :> Red
                                    :> Nil
 
     done  = expectedOutput (topEntity testInput)

@@ -3,6 +3,7 @@ module Rotate where
 
 import Clash.Annotations.BitRepresentation
 import Clash.Prelude
+import GHC.Generics
 import Data.Maybe
 
 -- Test data structures:
@@ -10,7 +11,7 @@ data Color
   = Red
   | Green
   | Blue
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, ShowX)
 
 {-# ANN module (DataReprAnn
                   (TT ''Color)
@@ -59,18 +60,11 @@ rotateColor c =
     Green -> Blue
     Blue  -> Red
 
-colorToInt
-  :: Color
-  -> Int
-colorToInt Red   = 33
-colorToInt Green = 34
-colorToInt Blue  = 35
-
 topEntity
   :: SystemClockReset
   => Signal System (Maybe Color)
-  -> Signal System Int
-topEntity = fmap (colorToInt . f)
+  -> Signal System Color
+topEntity = fmap f
   where
     f cM =
       case cM of
@@ -88,10 +82,10 @@ testBench = done'
                                :> (Just Blue)
                                :> Nil
 
-    expectedOutput = outputVerifier $ 33 -- Red
-                                   :> 34 -- Green
-                                   :> 35 -- Blue
-                                   :> 33 -- Red
+    expectedOutput = outputVerifier $ Red
+                                   :> Green
+                                   :> Blue
+                                   :> Red
                                    :> Nil
 
     done  = expectedOutput (topEntity testInput)
