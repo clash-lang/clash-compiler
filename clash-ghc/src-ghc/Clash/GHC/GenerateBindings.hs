@@ -47,7 +47,7 @@ import           Clash.Core.Name         (Name (..), string2SystemName, name2Str
 import           Clash.Core.Term         (Term (..), TmName, TmOccName)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.TyCon        (TyCon, TyConName, TyConOccName)
-import           Clash.Core.Literal      (Literal(WordLiteral, StringLiteral))
+import           Clash.Core.Literal      (Literal(IntegerLiteral, StringLiteral))
 import           Clash.Core.TysPrim      (tysPrimMap)
 import           Clash.Core.Subst        (substTms)
 import           Clash.Core.Util         (mkLams, mkTyLams, termType)
@@ -119,9 +119,9 @@ parseStringLit :: Term -> String
 parseStringLit (App _ (Literal (StringLiteral s))) = s
 parseStringLit sl = error $ $(curLoc) ++ "Expected stringlit, but got: " ++ show sl
 
-parseWordLit :: Term -> Word
-parseWordLit (App _ (Literal (WordLiteral n))) = fromIntegral n
-parseWordLit wl = error $ $(curLoc) ++ "Expected wordlit, but got: " ++ show wl
+parseIntegerLit :: Term -> Integer
+parseIntegerLit (Literal (IntegerLiteral n)) = n
+parseIntegerLit wl = error $ $(curLoc) ++ "Expected integerlit, but got: " ++ show wl
 
 parseList :: Term -> [Term]
 parseList (App (App _type headTerm) tailTerm) = headTerm : parseList tailTerm
@@ -137,9 +137,9 @@ parseConstrRepr src n (App (App (App (App _constr thname) mask) value) fieldmask
   ConstrRepr'
     (parseTHName thname)
     n
-    (parseWordLit mask)
-    (parseWordLit value)
-    (map parseWordLit $ parseList fieldmasks)
+    (parseIntegerLit mask)
+    (parseIntegerLit value)
+    (map parseIntegerLit $ parseList fieldmasks)
 parseConstrRepr _src _n cr = error $ $(curLoc) ++ "Expected ConstrRepr, but got: " ++ show cr
 
 stripDataRepr :: TypeName' -> TypeName'
@@ -164,7 +164,7 @@ parseDataRepr bindings (_name, typ, srcspan, _, (deref bindings -> reprsTerm)) =
   case reprsTerm of
     (App (App _constr size) reprs) ->
       let reprs' = [parseConstrRepr srcspan i r | (i, r) <- zip [0..] (parseList reprs)] in
-      let size'  = parseWordLit size in
+      let size'  = parseIntegerLit size in
       let typ'   = stripDataRepr $ coreToTypeName'' typ in
       deepseq (reprs', size', typ') (DataRepr' typ' size' reprs')
     _ ->

@@ -37,9 +37,9 @@ import Clash.Core.Type (Type (..), ConstTy (TyCon))
 
 import Prelude
 
-type BitMask' = Word
-type Value'   = Word
-type Size'    = Word
+type BitMask' = Integer
+type Value'   = Integer
+type Size'    = Integer
 
 type FieldAnn' = BitMask'
 
@@ -120,5 +120,3 @@ data ConstrRepr' =
     [FieldAnn']
     --
       deriving (Show, Generic, NFData, Eq, Typeable, Ord, Hashable)
-
-
