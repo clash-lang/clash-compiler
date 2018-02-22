@@ -753,7 +753,13 @@ decl l (NetDecl' noteM _ id_ ty) = Just <$> (,fromIntegral (T.length id_)) <$>
 
 decl _ _ = return Nothing
 
-patLitCustom' :: Integral a => VHDLM Doc -> Int -> a -> a -> VHDLM Doc
+patLitCustom'
+  :: Integral a
+  => VHDLM Doc
+  -> Int
+  -> a
+  -> a
+  -> VHDLM Doc
 patLitCustom' var size mask value =
   if isUseLessMask mask then
     -- A mask of all ones will result in the same value when AND-ed with another
@@ -767,7 +773,11 @@ patLitCustom' var size mask value =
       bits'         = bits . (toBits size)
       isUseLessMask = (all (== H)) . (toBits size)
 
-patLitCustom :: VHDLM Doc -> HWType -> Literal -> VHDLM Doc
+patLitCustom
+  :: VHDLM Doc
+  -> HWType
+  -> Literal
+  -> VHDLM Doc
 patLitCustom var (CustomSum _name size reprs) (NumLit (fromIntegral -> i)) =
   patLitCustom' var size mask value
     where
@@ -1044,7 +1054,7 @@ expr_ _ (DataCon (CustomSP _ size args) (DC (_,i)) es) =
                "std_logic_vector" <> parens resized
            | otherwise ->
                -- Select bits 'start' downto and including 'end'
-               let rotated  = unsigned <+> "ror" <+> int end in
+               let rotated  = unsigned <+> "srl" <+> int end in
                let resized = "resize" <> parens (rotated <> comma <> int fsize) in
                "std_logic_vector" <> parens resized
 
