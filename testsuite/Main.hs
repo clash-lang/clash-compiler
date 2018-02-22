@@ -106,22 +106,22 @@ main = do
             ]
 #endif
         , let env = ("tests" </> "shouldwork" </> "CustomReprs") in testGroup "CustomReprs"
-            [ runTest (env </> "Annotated") VHDL [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
-            , runTest (env </> "RotateC") VHDL [] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprCompact.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprCompactScrambled.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprWide.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprStrangeMasks.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprLastBitConstructor.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            [ runTest (env </> "Annotated") SystemVerilog [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog [] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprCompact.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprCompactScrambled.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprWide.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprStrangeMasks.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "ReprLastBitConstructor.hs"] "RotateC" (["", "RotateC_testBench"],"RotateC_testBench",True)
 
-            , runTest (env </> "RotateC") VHDL [] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",True)
-            , runTest (env </> "RotateC") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "RotateCScrambledRepr.hs"] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",False)
+            , runTest (env </> "RotateC") SystemVerilog [] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",True)
+            , runTest (env </> "RotateC") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateC" </> "RotateCScrambledRepr.hs"] "RotateCScrambled" (["", "RotateCScrambled_testBench"],"RotateCScrambled_testBench",False)
 
-            , runTest (env </> "RotateCNested") VHDL [] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
-            , runTest (env </> "RotateCNested") VHDL ["-fclash-custom-reprs", "../.." </> env </> "RotateCNested" </> "ReprCompact.hs"] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
+            , runTest (env </> "RotateCNested") SystemVerilog [] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
+            , runTest (env </> "RotateCNested") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "RotateCNested" </> "ReprCompact.hs"] "RotateCNested" (["", "RotateCNested_testBench"],"RotateCNested_testBench",True)
 
-            , runTest (env </> "Rotate") VHDL [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
-            , runTest (env </> "Rotate") VHDL ["-fclash-custom-reprs", "../.." </> env </> "Rotate" </> "ReprCompact.hs"] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
+            , runTest (env </> "Rotate") SystemVerilog [] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
+            , runTest (env </> "Rotate") SystemVerilog ["-fclash-custom-reprs", "../.." </> env </> "Rotate" </> "ReprCompact.hs"] "Rotate" (["", "Rotate_testBench"],"Rotate_testBench",True)
             ]
         , testGroup "Feedback" -- Broken on GHC 8.0 due to: https://ghc.haskell.org/trac/ghc/ticket/11525
             [ runTest ("tests" </> "shouldwork" </> "Feedback") defBuild [] "Fib" (["","Fib_testBench"],"Fib_testBench",True)

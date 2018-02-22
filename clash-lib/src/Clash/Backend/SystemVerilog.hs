@@ -14,6 +14,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE MultiWayIf        #-}
 
 module Clash.Backend.SystemVerilog (SystemVerilogState) where
 
@@ -50,7 +51,13 @@ import           Clash.Netlist.Id                     (IdType (..), mkBasicId')
 import           Clash.Netlist.Types                  hiding (_intWidth, intWidth)
 import           Clash.Netlist.Util                   hiding (mkIdentifier, extendIdentifier)
 import           Clash.Signal.Internal                (ClockKind (..))
-import           Clash.Util                           (curLoc, makeCached, (<:>))
+import           Clash.Util                           (curLoc, makeCached, (<:>), first, on)
+
+import Clash.Annotations.BitRepresentation.Internal   ( ConstrRepr'(..))
+import Clash.Annotations.BitRepresentation.Util       ( BitOrigin(Lit, Field)
+                                                      , bitOrigins
+                                                      , bitRanges
+                                                      )
 
 #ifdef CABAL
 import qualified Paths_clash_lib
@@ -74,6 +81,9 @@ data SystemVerilogState =
     }
 
 makeLenses ''SystemVerilogState
+
+squote :: Mon (State SystemVerilogState) Doc
+squote = string "'"
 
 primsRoot :: IO FilePath
 #ifdef CABAL
@@ -588,16 +598,18 @@ verilogTypeMark t = do
     _ -> emptyDoc
 
 tyName :: HWType -> SystemVerilogM Doc
-tyName Bool              = "logic"
-tyName Bit               = "logic"
-tyName (Vector n elTy)   = "array_of_" <> int n <> "_" <> tyName elTy
-tyName (RTree n elTy)    = "tree_of_" <> int n <> "_" <> tyName elTy
-tyName (BitVector n)     = "logic_vector_" <> int n
-tyName t@(Index _)       = "logic_vector_" <> int (typeSize t)
-tyName (Signed n)        = "signed_" <> int n
-tyName (Unsigned n)      = "logic_vector_" <> int n
-tyName t@(Sum _ _)       = "logic_vector_" <> int (typeSize t)
-tyName t@(Product nm _)  = Mon (makeCached t nameCache prodName)
+tyName Bool                = "logic"
+tyName Bit                 = "logic"
+tyName (Vector n elTy)     = "array_of_" <> int n <> "_" <> tyName elTy
+tyName (RTree n elTy)      = "tree_of_" <> int n <> "_" <> tyName elTy
+tyName (BitVector n)       = "logic_vector_" <> int n
+tyName t@(Index _)         = "logic_vector_" <> int (typeSize t)
+tyName (Signed n)          = "signed_" <> int n
+tyName (Unsigned n)        = "logic_vector_" <> int n
+tyName t@(Sum _ _)         = "logic_vector_" <> int (typeSize t)
+tyName t@(CustomSum _ _ _) = "logic_vector_" <> int (typeSize t)
+tyName t@(CustomSP _ _ _)  = "logic_vector_" <> int (typeSize t)
+tyName t@(Product nm _)    = Mon (makeCached t nameCache prodName)
   where
     prodName = do
       seen <- use tySeen
@@ -666,6 +678,71 @@ insts :: [Declaration] -> SystemVerilogM Doc
 insts [] = emptyDoc
 insts is = indent 2 . vcat . punctuate line . fmap catMaybes $ mapM inst_ is
 
+patLitCustom'
+  :: Integral a
+  => SystemVerilogM Doc
+  -> Int
+  -> a
+  -> a
+  -> SystemVerilogM Doc
+patLitCustom' var size mask value =
+  if isUseLessMask mask then
+    -- A mask of all ones will result in the same value when AND-ed with another
+    -- value. We therefore leave out the mask completely.
+    var <+> "==" <+> (bits' value)
+  else
+    -- Select 'right' bits by AND-ing with mask and comparing it with the value
+    parens (var <+> "&" <+> bits' mask) <+> "==" <+> bits' value
+
+    where
+      bits' value'  = int size <> squote <> "sb" <> bits (toBits size value')
+      isUseLessMask = (all (== H)) . (toBits size)
+
+patLitCustom
+  :: SystemVerilogM Doc
+  -> HWType
+  -> Literal
+  -> SystemVerilogM Doc
+patLitCustom var (CustomSum _name size reprs) (NumLit (fromIntegral -> i)) =
+  patLitCustom' var size mask value
+    where
+      ((ConstrRepr' _name _n mask value _anns), _id) = reprs !! i
+
+patLitCustom var (CustomSP _name size reprs) (NumLit (fromIntegral -> i)) =
+  patLitCustom' var size mask value
+    where
+      ((ConstrRepr' _name _n mask value _anns), _id, _tys) = reprs !! i
+
+patLitCustom _ x y = error $ $(curLoc) ++ unwords
+  [ "You can only pass CustomSP / CustomSum and a NumLit to this function,"
+  , "not", show x, "and", show y]
+
+patMod :: HWType -> Literal -> Literal
+patMod hwTy (NumLit i) = NumLit (i `mod` (2 ^ typeSize hwTy))
+patMod _ l = l
+
+-- | Helper function for inst_, handling CustomSP and CustomSum
+inst_' :: Text.Text -> Expr -> HWType -> [(Maybe Literal, Expr)] -> SystemVerilogM (Maybe Doc)
+inst_' id_ scrut scrutTy es = fmap Just $
+  "always_comb begin" <> line <> indent 2 assignment <> line <> "end"
+    where
+      assignment = string id_ <+> equals <+> align (conds esNub) <> semi
+
+      esMod = map (first (fmap (patMod scrutTy))) es
+      esNub = nubBy ((==) `on` fst) esMod
+      var   = expr_ True scrut
+
+      conds :: [(Maybe Literal,Expr)] -> SystemVerilogM Doc
+      conds []                = error $ $(curLoc) ++ "Empty list of conditions invalid."
+      conds [(_,e)]           = expr_ False e
+      conds ((Nothing,e):_)   = expr_ False e
+      conds ((Just c ,e):es') =
+        parens $ parens predicate <+> "?" <+> parens expr' <+> ":" <> line <> others
+          where
+            predicate = patLitCustom var scrutTy c
+            expr'     = expr_ False e
+            others    = conds es'
+
 -- | Turn a Netlist Declaration to a SystemVerilog concurrent block
 inst_ :: Declaration -> SystemVerilogM (Maybe Doc)
 inst_ (Assignment id_ e) = fmap Just $
@@ -695,6 +772,12 @@ inst_ (CondAssignment id_ ty scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just 
     }
   where
     (t,f) = if b then (l,r) else (r,l)
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSP _ _ _) es) =
+  inst_' id_ scrut scrutTy es
+
+inst_ (CondAssignment id_ _ scrut scrutTy@(CustomSum _ _ _) es) =
+  inst_' id_ scrut scrutTy es
 
 inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
     { syn <- Mon hdlSyn
@@ -739,6 +822,17 @@ expr_ :: Bool -- ^ Enclose in parenthesis?
       -> SystemVerilogM Doc
 expr_ _ (Literal sizeM lit)                           = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing)                      = string id_
+expr_ _ (Identifier id_ (Just (Indexed (CustomSP _id _size args,dcI,fI)))) =
+  braces $ hcat $ punctuate ", " $ sequence ranges
+    where
+      -- TODO: what if subconstructutor is bigger? We would need to add zeroes.
+      (ConstrRepr' _name _n _mask _value anns, _, _argTys) = args !! dcI
+
+      ranges =
+        map range' $ bitRanges (anns !! fI)
+
+      range' (start, end) =
+        string id_ <> brackets (int start <> ":" <> int end)
 expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) = fromSLV argTy id_ start end
   where
     argTys   = snd $ args !! dcI
@@ -838,6 +932,43 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
     assignExpr = braces (hcat $ punctuate comma $ sequence (dcExpr:argExprs ++ extraArg))
 
 expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = int (typeSize ty) <> "'d" <> int i
+expr_ _ (DataCon ty@(CustomSum _ _ tys) (DC (_,i)) []) =
+  let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
+  int (typeSize ty) <> squote <> "sd" <> int (fromIntegral value)
+expr_ _ (DataCon (CustomSP _ size args) (DC (_,i)) es) =
+  braces $ hcat $ punctuate ", " $ mapM range' origins
+    where
+      (cRepr, _, argTys) = args !! i
+
+      -- Build bit representations for all constructor arguments
+      argExprs = zipWith toSLV argTys es :: [SystemVerilogM Doc]
+
+      -- Spread bits of constructor arguments using masks
+      origins = bitOrigins size cRepr :: [BitOrigin]
+
+      range'
+        :: BitOrigin
+        -> SystemVerilogM Doc
+      range' (Lit ns) =
+        int (length ns) <> squote <> "sb" <> hcat (mapM bit_char ns)
+      range' (Field n start end) =
+        -- We want to select the bits starting from 'start' downto and including
+        -- 'end'. We cannot use "(start downto end)" in VHDL, as the preceeding
+        -- expression might be anything. This notation only works on identifiers
+        -- unfortunately.
+        let fsize = start - end + 1 in
+        let expr' = argExprs !! n in
+
+        if | fsize == size ->
+               -- If sizes are equal, rotating / resizing amounts to doing nothing
+               expr'
+           | end == 0 ->
+               -- Rotating is not necessary if relevant bits are already at the end
+               int fsize <> squote <> parens expr'
+           | otherwise ->
+               -- Select bits 'start' downto and including 'end'
+               let rotated  = parens expr' <+> ">>" <+> int end in
+               int fsize <> squote <> parens rotated
 expr_ _ (DataCon (Product _ tys) _ es) = listBraces (zipWithM toSLV tys es)
 expr_ _ (DataCon (Clock nm rt Gated) _ es) =
   listBraces (zipWithM toSLV [Clock nm rt Source,Bool] es)
