@@ -260,12 +260,14 @@ mkTyPackage_ modName hwtys =
       | otherwise                        = ty1 == ty2
 
     isUnsigned :: HWType -> Bool
-    isUnsigned (Unsigned _)  = True
-    isUnsigned (BitVector _) = True
-    isUnsigned (Index _)     = True
-    isUnsigned (Sum _ _)     = True
-    isUnsigned (SP _ _)      = True
-    isUnsigned _             = False
+    isUnsigned (Unsigned _)      = True
+    isUnsigned (BitVector _)     = True
+    isUnsigned (Index _)         = True
+    isUnsigned (Sum _ _)         = True
+    isUnsigned (CustomSum _ _ _) = True
+    isUnsigned (SP _ _)          = True
+    isUnsigned (CustomSP _ _ _)  = True
+    isUnsigned _                 = False
 
 mkUsedTys :: HWType
         -> [HWType]
