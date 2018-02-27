@@ -11,7 +11,6 @@ data types.
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Annotations.BitRepresentation
@@ -21,7 +20,6 @@ module Clash.Annotations.BitRepresentation
  , TypeName(..)
  ) where
 
-import Language.Haskell.TH.Instances ()           -- instance Lift TH.Name
 import qualified Language.Haskell.TH.Syntax as TH
 
 import Data.Data (Data)
@@ -37,7 +35,7 @@ data TypeName = TN TH.Name [TypeName]
               -- ^ Type name with a number of types as arguments
               | TT TH.Name
               -- ^ Type name terminal; equivalent to TN with an empty list
-                 deriving (Show, Data, Typeable, TH.Lift)
+                 deriving (Show, Data, Typeable)
 
 -- | Type annotation for inline annotations. Example usage:
 --
