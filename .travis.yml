@@ -120,7 +120,7 @@ script:
 
   # build & run tests, build benchmarks
   - cabal new-build -w ${HC} ${TEST} ${BENCH} all
-  - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -w ${HC} clash-testsuite -j16; fi
+  - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-run -w ${HC} -- clash-testsuite -j16; fi
 
   # cabal check
   - (cd ${DISTDIR}/clash-lib-* && cabal check)
