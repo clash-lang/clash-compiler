@@ -199,6 +199,7 @@ representableType builtInTranslation allowZero stringRepresentable m =
     isRepresentable hty = case hty of
       String          -> stringRepresentable
       Bool            -> True
+      Bit             -> True
       BitVector n     -> (n > 0) || allowZero
       Index n         -> (n > 0) || allowZero
       Signed n        -> (n > 0) || allowZero
@@ -219,6 +220,7 @@ typeSize :: HWType
 typeSize Void = 0
 typeSize String = 1
 typeSize Bool = 1
+typeSize Bit = 1
 typeSize (Clock {}) = 1
 typeSize (Reset {}) = 1
 typeSize (BitVector i) = i

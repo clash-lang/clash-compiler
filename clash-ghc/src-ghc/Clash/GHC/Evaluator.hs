@@ -1065,24 +1065,26 @@ reduceConstant isSubj gbl tcm h k nm ty tys args = case nm of
                $ BitVector.slice# (BV i) (unsafeSNat m) (unsafeSNat n)
            resTyInfo = extractTySizeInfo tcm ty tys
        in  reduce (mkBitVectorLit' resTyInfo val)
-  "Clash.Sized.Internal.BitVector.split#" -- :: forall n m. KnownNat n => BitVector (m + n) -> (BitVector m, BitVector n)
-    | nTy : mTy : _ <- tys
-    , Right n <-  runExcept (tyNatSize tcm nTy)
-    , Right m <-  runExcept (tyNatSize tcm mTy)
-    , [i] <- bitVectorLiterals' args
-    -> let ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
-           (_,tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty'
-           (Just tupTc) = HashMap.lookup (nameOcc tupTcNm) tcm
-           [tupDc] = tyConDataCons tupTc
-           bvTy : _ = tyArgs
-           valM = i `shiftR` fromInteger n
-           valN = i .&. mask
-           mask = bit (fromInteger n) - 1
-    in reduce $
-       mkApps (Data tupDc) (map Right tyArgs ++
-                [ Left (mkBitVectorLit bvTy mTy m valM)
-                , Left (mkBitVectorLit bvTy nTy n valN)])
-
+  "Clash.Sized.Internal.BitVector.splitL#"
+  -- :: forall n m. KnownNat n => BitVector (m + n) -> BitVector m
+   | nTy : mTy : _ <- tys
+   , Right n <-  runExcept (tyNatSize tcm nTy)
+   , Right m <-  runExcept (tyNatSize tcm mTy)
+   , [i] <- bitVectorLiterals' args
+   -> let ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
+          (_,bvTy) = splitFunForallTy ty'
+          valM = i `shiftR` fromInteger n
+      in reduce (mkBitVectorLit bvTy mTy m valM)
+  "Clash.Sized.Internal.BitVector.splitR#"
+  -- :: forall n m. KnownNat n => BitVector (m + n) -> BitVector n
+   | nTy : _ : _ <- tys
+   , Right n <-  runExcept (tyNatSize tcm nTy)
+   , [i] <- bitVectorLiterals' args
+   -> let ty' = List.foldl' ((runFreshM .) . applyTy tcm) ty tys
+          (_,bvTy) = splitFunForallTy ty'
+          valN = i .&. mask
+          mask = bit (fromInteger n) - 1
+      in reduce (mkBitVectorLit bvTy nTy n valN)
   "Clash.Sized.Internal.BitVector.msb#" -- :: forall n. KnownNat n => BitVector n -> Bit
     | [i] <- bitVectorLiterals' args
     , Just (_, kn) <- extractKnownNat tcm tys

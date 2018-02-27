@@ -101,6 +101,8 @@ pTagE =  O True            <$  pToken "~ERESULT"
      <|> IsVar             <$> (pToken "~ISVAR" *> pBrackets pNatural)
      <|> IsGated           <$> (pToken "~ISGATED" *> pBrackets pNatural)
      <|> IsSync            <$> (pToken "~ISSYNC" *> pBrackets pNatural)
+     <|> IsBit Nothing     <$  (pToken "~ISBITO")
+     <|> (IsBit . Just)    <$> (pToken "~ISBIT" *> pBrackets pNatural)
      <|> StrCmp            <$> (pToken "~STRCMP" *> pBrackets pSigD) <*> pBrackets pNatural
      <|> OutputWireReg     <$> (pToken "~OUTPUTWIREREG" *> pBrackets pNatural)
      <|> GenSym            <$> (pToken "~GENSYM" *> pBrackets pSigD) <*> pBrackets pNatural

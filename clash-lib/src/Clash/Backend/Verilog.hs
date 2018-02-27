@@ -249,17 +249,18 @@ verilogType' isDecl t =
       getVerilogTy _          = (empty,    typeSize t)
 
   in case t of
-       -- special case: clocks and resets
+       -- special case: Bit, clocks and resets
        Clock _ _ Gated -> verilogType' isDecl (gatedClockType t)
        Clock {} -> empty
        Reset {} -> empty
+       Bit      -> empty
 
        -- otherwise, print the type and prefix
        ty | (prefix, sz) <- getVerilogTy ty
          -> prefix <+> renderVerilogTySize (sz-1)
 
 gatedClockType :: HWType -> HWType
-gatedClockType (Clock nm rt Gated) = Product "GatedClock" [Clock nm rt Source,Bool]
+gatedClockType (Clock _ _ Gated) = Product "GatedClock" [Bit,Bool]
 gatedClockType ty = ty
 {-# INLINE gatedClockType #-}
 
@@ -372,9 +373,9 @@ modifier offset (Indexed (ty@(Product _ argTys),_,fI)) = Just (start+offset,end+
     start   = typeSize ty - 1 - otherSz
     end     = start - argSize + 1
 
-modifier offset (Indexed (ty@(Clock nm rt Gated),_,fI)) = Just (start+offset,end+offset)
+modifier offset (Indexed (ty@(Clock _ _ Gated),_,fI)) = Just (start+offset,end+offset)
   where
-    argTys  = [Clock nm rt Source, Bool]
+    argTys  = [Bit, Bool]
     argTy   = argTys !! fI
     argSize = typeSize argTy
     otherSz = otherSize argTys (fI - 1)

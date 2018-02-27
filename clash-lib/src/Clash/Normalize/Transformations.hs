@@ -1186,7 +1186,7 @@ reduceBinders processed body ((id_,expr):binders) = case List.find ((== expr) . 
     Nothing -> reduceBinders ((id_,expr):processed) body binders
 
 reduceConst :: NormRewrite
-reduceConst _ e@(App _ _)
+reduceConst _ e
   | isConstant e
   , (conPrim, _) <- collectArgs e
   , isPrim conPrim
