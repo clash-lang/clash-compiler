@@ -7,13 +7,13 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.pack#"
     , "type"      : "pack# :: Unsigned n -> BitVector n"
-    , "templateE" : "std_logic_vector(~ARG[0])"
+    , "templateE" : "~IF~ISBITO~THEN~VAR[u][0](0)~ELSEstd_logic_vector(~ARG[0])~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.Unsigned.unpack#"
     , "type"      : "unpack# :: BitVector n -> Unsigned n"
-    , "templateE" : "unsigned(~ARG[0])"
+    , "templateE" : "~IF~ISBIT[0]~THENunsigned'(0 => ~ARG[0])~ELSEunsigned(~ARG[0])~FI"
     }
   }
 , { "BlackBox" :

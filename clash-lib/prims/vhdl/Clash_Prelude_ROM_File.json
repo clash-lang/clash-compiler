@@ -31,8 +31,9 @@ begin
                 mod ~LIT[1]
   -- pragma translate_on
                 ;
-
-  ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
+  ~IF~ISBITO~THEN
+  ~RESULT <= to_stdulogic(~SYM[2](~SYM[3])(0));~ELSE
+  ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));~FI
 end block;
 -- asyncRomFile end"
     }

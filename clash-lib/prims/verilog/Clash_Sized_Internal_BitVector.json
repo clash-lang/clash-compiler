@@ -31,19 +31,19 @@
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceAnd#"
     , "type"      : "reduceAnd# :: KnownNat n => BitVector n -> BitVector 1"
-    , "templateE" : "& (~ARG[1])"
+    , "templateE" : "~IF~ISBIT[1]~THEN~ARG[1]~ELSE& (~ARG[1])~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceOr#"
     , "type"      : "reduceOr# :: BitVector n -> BitVector 1"
-    , "templateE" : "| (~ARG[0])"
+    , "templateE" : "~IF~ISBIT[0]~THEN~ARG[0]~ELSE| (~ARG[0])~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.reduceXor#"
     , "type"      : "reduceXor# :: BitVector n -> BitVector 1"
-    , "templateE" : "^ (~ARG[0])"
+    , "templateE" : "~IF~ISBIT[0]~THEN~ARG[0]~ELSE^ (~ARG[0])~FI"
     }
   }
 , { "BlackBox" :
@@ -53,7 +53,7 @@
         => BitVector n -- ARG[1]
         -> Int         -- ARG[2]
         -> Bit"
-    , "templateE" : "~VAR[bv][1][~ARG[2]]"
+    , "templateE" : "~IF~ISBIT[1]~THEN~ARG[1]~ELSE~VAR[bv][1][~ARG[2]]~FI"
     }
   }
 , { "BlackBox" :
@@ -67,9 +67,10 @@
     , "outputReg" : true
     , "templateD" :
 "// replaceBit start
-always @(*) begin
+always @(*) begin~IF~ISBIT[1]~THEN
+  ~RESULT = ~VAR[din][3]~ELSE
   ~RESULT = ~ARG[1];
-  ~RESULT[~ARG[2]] = ~VAR[din][3];
+  ~RESULT[~ARG[2]] = ~VAR[din][3]~FI;
 end
 // replaceBit end"
     }
@@ -85,9 +86,10 @@ end
     , "outputReg" : true
     , "templateD" :
 "// setSlice begin
-always @(*) begin
+always @(*) begin~IF~ISBIT[0]~THEN
+  ~RESULT = ~VAR[din][3]~ELSE
   ~RESULT = ~ARG[0];
-  ~RESULT[~LIT[1] : ~LIT[2]] = ~VAR[din][3];
+  ~RESULT[~LIT[1] : ~LIT[2]] = ~VAR[din][3];~FI
 end
 // setSlice end"
     }
@@ -99,16 +101,25 @@ end
         -> SNat m                -- ARG[1]
         -> SNat n                -- ARG[2]
         -> BitVector (m + 1 - n)"
-    , "templateE" : "~VAR[bv][0][~LIT[1] : ~LIT[2]]"
+    , "templateE" : "~IF~ISBIT[0]~THEN~ARG[0]~ELSE~IF~ISBITO~THEN~VAR[bv][0][~LIT[1]~ELSE~VAR[bv][0][~LIT[1] : ~LIT[2]]~FI~FI"
     }
   }
 , { "BlackBox" :
-    { "name" : "Clash.Sized.Internal.BitVector.split#"
+    { "name" : "Clash.Sized.Internal.BitVector.splitL#"
     , "type" :
-"split# :: KnownNat n        -- ARG[0]
-        => BitVector (m + n) -- ARG[1]
-        -> (BitVector m, BitVector n)"
-    , "templateE" : "~ARG[1]"
+"splitL# :: KnownNat n        -- ARG[0]
+         => BitVector (m + n) -- ARG[1]
+         -> BitVector m"
+    , "templateE" : "~IF~ISBIT[1]~THEN~ARG[1]~ELSE~IF~ISBITO~THEN~VAR[bv][1][LIT[0]]~ELSE~VAR[bv][1][(~SIZE[~TYP[1]]-1) : ~LIT[0]]~FI~FI"
+    }
+  }
+, { "BlackBox" :
+    { "name" : "Clash.Sized.Internal.BitVector.splitR#"
+    , "type" :
+"splitR# :: KnownNat n        -- ARG[0]
+         => BitVector (m + n) -- ARG[1]
+         -> BitVector n"
+    , "templateE" : "~IF~ISBIT[1]~THEN~ARG[1]~ELSE~IF~ISBITO~THEN~VAR[bv][1][0]~ELSE~VAR[bv][1][(~LIT[0]-1) : 0]~FI~FI"
     }
   }
 , { "BlackBox" :
@@ -173,7 +184,7 @@ end
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.maxBound#"
     , "type"      : "maxBound# :: KnownNat n => BitVector n"
-    , "templateE" : "{~LIT[0] {1'b1}}"
+    , "templateE" : "~IF~ISBITO~THEN1'b1~ELSE{~LIT[0] {1'b1}}~FI"
     }
   }
 , { "BlackBox" :
@@ -203,7 +214,7 @@ end
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.fromInteger#"
     , "type"      : "fromInteger# :: KnownNat n => Integer -> BitVector n"
-    , "templateE" : "$unsigned(~ARG[1][(~LIT[0]-1):0])"
+    , "templateE" : "~IF~ISBITO~THEN~VAR[bv][1][0]~ELSE$unsigned(~VAR[bv][1][(~LIT[0]-1):0])~FI"
     }
   }
 , { "BlackBox" :
@@ -269,23 +280,24 @@ end
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.shiftL#"
     , "type"      : "shiftL# :: KnownNat n => BitVector n -> Int -> BitVector n"
-    , "templateE" : "~ARG[1] << ~ARG[2]"
+    , "templateE" : "~IF~ISBITO~THEN~ARG[1]~ELSE~ARG[1] << ~ARG[2]~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.shiftR#"
     , "type"      : "shiftR# :: KnownNat n => BitVector n -> Int -> BitVector n"
-    , "templateE" : "~ARG[1] >> ~ARG[2]"
+    , "templateE" : "~IF~ISBITO~THEN~ARG[1]~ELSE~ARG[1] >> ~ARG[2]~FI"
     }
   }
 , { "BlackBox" :
     { "name"      : "Clash.Sized.Internal.BitVector.rotateL#"
     , "type"      : "rotateL# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
-"// rotateL begin
+"// rotateL begin~IF~ISBITO~THEN
+assign ~RESULT = ~ARG[1];~ELSE
 wire [2*~LIT[0]-1:0] ~SYM[0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} << ~ARG[2];
-assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
+assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];~FI
 // rotateL end"
     }
   }
@@ -293,10 +305,11 @@ assign ~RESULT = ~SYM[0][2*~LIT[0]-1 : ~LIT[0]];
     { "name"      : "Clash.Sized.Internal.BitVector.rotateR#"
     , "type"      : "rotateR# :: KnownNat n => BitVector n -> Int -> BitVector n"
     , "templateD" :
-"// rotateR begin
+"// rotateR begin~IF~ISBITO~THEN
+assign ~RESULT = ~ARG[1];~ELSE
 wire [2*~LIT[0]-1:0] ~GENSYM[bv][0];
 assign ~SYM[0] = {~ARG[1],~ARG[1]} >> ~ARG[2];
-assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];
+assign ~RESULT = ~SYM[0][~LIT[0]-1 : 0];~FI
 // rotateR end"
     }
   }

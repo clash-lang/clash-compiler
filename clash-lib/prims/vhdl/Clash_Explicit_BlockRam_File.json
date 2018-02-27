@@ -51,10 +51,12 @@ begin
   begin
     if rising_edge(~SYM[7]) then
       if ~SYM[8] then
-        if ~ARG[6] then
-          ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
-        end if;
-        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+        if ~ARG[6] then~IF~ISBITO~THEN
+          ~SYM[2](~SYM[5]) <= to_bitvector(0 => ~ARG[8]);~ELSE
+          ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);~FI
+        end if;~IF~ISBITO~THEN
+        ~RESULT <= to_stdulogic(~SYM[2](~SYM[4])(0))~ELSE
+        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))~FI
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -65,10 +67,12 @@ begin
   ~SYM[9] : process(~ARG[2])
   begin
     if rising_edge(~ARG[2]) then
-      if ~ARG[6] then
-        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
-      end if;
-      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+      if ~ARG[6] then~IF~ISBITO~THEN
+        ~SYM[2](~SYM[5]) <= to_bitvector(0 => ~ARG[8]);~ELSE
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);~FI
+      end if;~IF~ISBITO~THEN
+      ~RESULT <= to_stdulogic(~SYM[2](~SYM[4])(0))~ELSE
+      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))~FI
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on
@@ -79,11 +83,13 @@ begin
   ~SYM[9] : process(~SYM[7])
   begin
     if rising_edge(~SYM[7]) then
-      if ~ARG[6] and ~SYM[8] then
-        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
+      if ~ARG[6] and ~SYM[8] then~IF~ISBITO~THEN
+        ~SYM[2](~SYM[5]) <= to_bitvector(0 => ~ARG[8]);~ELSE
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);~FI
       end if;
-      if ~SYM[8] then
-        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+      if ~SYM[8] then~IF~ISBITO~THEN
+        ~RESULT <= to_stdulogic(~SYM[2](~SYM[4]))~ELSE
+        ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))~FI
         -- pragma translate_off
         after 1 ps
         -- pragma translate_on
@@ -94,10 +100,12 @@ begin
   ~SYM[9] : process(~ARG[2])
   begin
     if rising_edge(~ARG[2]) then
-      if ~ARG[6] then
-        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);
-      end if;
-      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))
+      if ~ARG[6] then~IF~ISBITO~THEN
+        ~SYM[2](~SYM[5]) <= to_bitvector(0 => ~ARG[8]);~ELSE
+        ~SYM[2](~SYM[5]) <= to_bitvector(~ARG[8]);~FI
+      end if;~IF~ISBITO~THEN
+      ~RESULT <= to_stdulogic(~SYM[2](~SYM[4])(0))~ELSE
+      ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[4]))~FI
       -- pragma translate_off
       after 1 ps
       -- pragma translate_on

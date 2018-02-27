@@ -110,7 +110,7 @@ mkArgument bndr e = do
     ty    <- termType tcm e
     iw    <- Lens.use intWidth
     hwTyM <- N.termHWTypeM e
-    let eTyMsg = "(" ++ showDoc e ++ " :: " ++ showDoc ty ++ ")"
+    let eTyMsg = "(" ++ showDoc e ++ " :: " ++ show ty ++ ")"
     ((e',t,l),d) <- case hwTyM of
       Nothing   ->
         return ((Identifier (error ($(curLoc) ++ "Forced to evaluate untranslatable type: " ++ eTyMsg)) Nothing
