@@ -98,6 +98,7 @@ pTagE =  O True            <$  string "~ERESULT"
      <|> (HdlSyn Other)    <$  string "~OTHERSYN"
      <|> (BV True)         <$> (string "~TOBV" *> brackets' pSigD) <*> brackets' pTagE
      <|> (BV False)        <$> (string "~FROMBV" *> brackets' pSigD) <*> brackets' pTagE
+     <|> Sel               <$> (string "~SEL" *> brackets' pTagE) <*> brackets' natural'
      <|> IsLit             <$> (string "~ISLIT" *> brackets' natural')
      <|> IsVar             <$> (string "~ISVAR" *> brackets' natural')
      <|> IsGated           <$> (string "~ISGATED" *> brackets' natural')

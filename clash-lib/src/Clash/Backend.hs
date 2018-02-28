@@ -65,6 +65,8 @@ class Backend state where
   hdlTypeErrValue  :: HWType       -> Mon (State state) Doc
   -- | Convert a Netlist HWType to the root of a target HDL type
   hdlTypeMark      :: HWType       -> Mon (State state) Doc
+  -- | Create a record selector
+  hdlRecSel        :: HWType -> Int -> Mon (State state) Doc
   -- | Create a signal declaration from an identifier (Text) and Netlist HWType
   hdlSig           :: Text -> HWType -> Mon (State state) Doc
   -- | Create a generative block statement marker

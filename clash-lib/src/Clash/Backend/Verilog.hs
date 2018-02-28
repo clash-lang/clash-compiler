@@ -90,6 +90,7 @@ instance Backend VerilogState where
   hdlType _       = verilogType
   hdlTypeErrValue = verilogTypeErrValue
   hdlTypeMark     = verilogTypeMark
+  hdlRecSel       = verilogRecSel
   hdlSig t ty     = sigDecl (string t) ty
   genStmt True    = do cnt <- use genDepth
                        genDepth += 1
@@ -295,6 +296,14 @@ verilogTypeMark = const emptyDoc
 -- | Convert a Netlist HWType to an error VHDL value for that type
 verilogTypeErrValue :: HWType -> VerilogM Doc
 verilogTypeErrValue ty = braces (int (typeSize ty) <+> braces "1'bx")
+
+verilogRecSel
+  :: HWType
+  -> Int
+  -> VerilogM Doc
+verilogRecSel ty i = case modifier 0 (Indexed (ty,0,i)) of
+  Just (start,end) -> brackets (int start <> colon <> int end)
+  _ -> error "Can't make a record selector"
 
 decls :: [Declaration] -> VerilogM Doc
 decls [] = emptyDoc
