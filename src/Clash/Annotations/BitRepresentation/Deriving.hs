@@ -79,8 +79,6 @@ encodingOneHot
 encodingOneHot qty
   = do ty <- qty
        let tyNm = getTyNm ty
-           tyNm' = buildTypeName ty
-
        (TyConI tyCon) <- reify tyNm
        let
            constructors = getCons tyCon
@@ -96,7 +94,7 @@ encodingOneHot qty
            reps :: [Q Exp]
            reps = zipWith f [0..] constructors
 
-       [| DataReprAnn tyNm' width $(listE reps) |]
+       [| DataReprAnn ty width $(listE reps) |]
 
 -- hack that adds BitPack instance (without functional pack/unpack, just BitSize)
 encodingOneHot'
@@ -105,8 +103,6 @@ encodingOneHot'
 encodingOneHot' qty = do
   ty <- qty
   let tyNm = getTyNm ty
-      tyNm' = buildTypeName ty
-
   (TyConI tyCon) <- reify tyNm
   let
       cs = getCons tyCon
@@ -121,7 +117,7 @@ encodingOneHot' qty = do
 
       reps :: [Q Exp]
       reps = zipWith f [0..] cs
-      body = [| DataReprAnn tyNm' width $(listE reps) |]
+      body = [| DataReprAnn ty width $(listE reps) |]
 
       extra = instanceD (return []) [t| BitPack $(qty) |] [declSize,declPack,declUnpack]
       declPack = funD 'pack [clause [] (normalB $ varE 'undefined) []] -- TODO pack implementation
@@ -139,8 +135,6 @@ encodingNormal
 encodingNormal qty = do
   ty <- qty
   let tyNm = getTyNm ty
-      tyNm' = buildTypeName ty
-
   (TyConI tyCon) <- reify tyNm
   let
     cs = getCons tyCon
@@ -183,7 +177,7 @@ encodingNormal qty = do
     reps :: [Q Exp]
     reps = zipWith3 f [0..] cs allWidths'''
 
-  [| DataReprAnn tyNm' $(width) $(listE reps) |]
+  [| DataReprAnn ty $(width) $(listE reps) |]
 
 -- | Construct field bitmasks for normal encoding
 fieldAnnsNormal :: Integer -> Integer -> [Integer] -> [Integer]
@@ -197,8 +191,6 @@ encodingWide :: Q Type -> Q Exp
 encodingWide qty = do
   ty <- qty
   let tyNm = getTyNm ty
-      tyNm' = buildTypeName ty
-
   (TyConI tyCon) <- reify tyNm
   let
     cs = getCons tyCon
@@ -231,7 +223,7 @@ encodingWide qty = do
     body  = [|
       \consMaskE fieldBitsE fieldMaskssE ->
         let reps = consRepsWide consMaskE fieldBitsE [0..] conNms fieldMaskssE in
-        DataReprAnn tyNm' $width reps
+        DataReprAnn ty $width reps
       |]
 
   appsE [body, consMask, fieldBits, fieldMaskss]
@@ -310,18 +302,12 @@ fieldTypes con = case con of
   InfixC (_,ty1) _nm (_,ty2) -> [ty1,ty2]
   _ -> error $ {-$(curLoc) ++-} "No support for constructors like: " ++ show con
 
-buildTypeName :: Type -> TypeName
-buildTypeName ty = case collectArgs ty of
-  Just (nm,[])   -> TT nm
-  Just (nm,args) -> TN nm (map buildTypeName args)
-  _      -> error $ {-$(curLoc) ++-} "Can't build BitRepresentation.TypeName for type: " ++ show ty
+collectTyArgs :: Type -> Maybe (Name,[Type])
+collectTyArgs = go []
   where
-    collectArgs :: Type -> Maybe (Name,[Type])
-    collectArgs = go []
-      where
-        go args (AppT ty1 ty2) = go (ty2:args) ty1
-        go args (ConT nm) = Just (nm,args)
-        go _    _         = Nothing
+    go args (AppT ty1 ty2) = go (ty2:args) ty1
+    go args (ConT nm) = Just (nm,args)
+    go _    _         = Nothing
 
 conName :: Con -> Name
 conName c = case c of
@@ -349,6 +335,3 @@ integerLog2Ceil :: Integer -> Integer
 integerLog2Ceil n =
   let nlog2 = fromIntegral $ I# (integerLog2# n) in
   if n > 2^nlog2 then nlog2 + 1 else nlog2
-
-
-

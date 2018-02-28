@@ -20,9 +20,10 @@ module Clash.Annotations.BitRepresentation
  ( DataRepr(..)
  , DataReprAnn(..)
  , ConstrRepr(..)
- , TypeName(..)
+ , reprType
  ) where
 
+import qualified Language.Haskell.TH.Lib as TH
 import qualified Language.Haskell.TH.Syntax as TH
 
 import Data.Data (Data)
@@ -34,18 +35,16 @@ type Size     = Integer
 
 type FieldAnn = BitMask
 
-data TypeName = TN TH.Name [TypeName]
-              -- ^ Type name with a number of types as arguments
-              | TT TH.Name
-              -- ^ Type name terminal; equivalent to TN with an empty list
-                 deriving (Show, Data, Typeable)
+reprType :: TH.TypeQ -> TH.ExpQ
+reprType qty = qty >>= TH.lift
 
-deriving instance TH.Lift TypeName
+deriving instance TH.Lift TH.Type
 
--- instances we need to derive Lift TypeName
 -- NOTE: Don't import these from Language.Haskell.TH.Instances
 --       Doing so will also import `instance Lift Exp`
 --       And that changes certain TH mistakes from compile to run time errors.
+deriving instance TH.Lift TH.TyVarBndr
+deriving instance TH.Lift TH.TyLit
 deriving instance TH.Lift TH.Name
 deriving instance TH.Lift TH.OccName
 deriving instance TH.Lift TH.NameFlavour
@@ -53,25 +52,26 @@ deriving instance TH.Lift TH.ModName
 deriving instance TH.Lift TH.NameSpace
 deriving instance TH.Lift TH.PkgName
 
+
 -- | Type annotation for inline annotations. Example usage:
 --
 -- @
 -- data Color = R | G | B
--- {-# ANN module (DataReprAnn (TT ''Color) 2 [...]) #-}
+-- {-# ANN module (DataReprAnn $(typeOf [t|Color|]) 2 [...]) #-}
 -- @
 --
--- To annotate composed types, use TN. For example, if we want to annotate
+-- Or if we want to annotate
 -- `Maybe Color`:
 --
 -- @
 -- {-# ANN module ( DataReprAnn
---                    (TN ''Maybe [TT ''Color])
+--                    $(typeOf [t|Maybe Color|])
 --                    2
 --                    [...] ) #-}
 -- @
 data DataReprAnn =
   DataReprAnn
-    TypeName
+    TH.Type
     -- ^ Type this annotation is for
     Size
     -- ^ Size of type
